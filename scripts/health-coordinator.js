@@ -62,8 +62,59 @@ const EVICT_AFTER_STOPPED_MS = 5 * 60 * 1000;
 // Test-only injection hook (RESEARCH §10, used by injection.test.sh).
 // When set, the named check throws on next tick. Coordinator surfaces 'unknown',
 // never 'healthy' (SPEC R6). Comma-separated list of check names.
+//
+// LEGACY: process.env.HEALTH_COORDINATOR_INJECT_THROW set via launchctl setenv.
+// Phase 33-12 empirically falsified launchd's plist-vs-domain env precedence —
+// `launchctl setenv` does NOT override plist-declared empty defaults on macOS
+// Sequoia (Darwin 25.4.0). See 33-12-SUMMARY for the 3 independent reproductions.
+// The env-var path is kept for backward compat / dev-time use, but production
+// AC#13 testing now goes through POST /test/inject (loopback-gated).
 const INJECT_THROW = (process.env.HEALTH_COORDINATOR_INJECT_THROW || '')
   .split(',').map(s => s.trim()).filter(Boolean);
+
+// Phase 33-15: in-memory injection flags for AC#13 (replaces 33-12's plist
+// propagation approach which was falsified empirically — see 33-12-SUMMARY).
+// POST /test/inject sets these; POST /test/reset clears them. Loopback only.
+// Keys are check kinds: 'db_health' | 'docker_health' | 'container' (alias for
+// docker_health) | 'lsl' | 'services' | 'tick' | `services.${name}`.
+// Values are modes: 'throw' (raise) | 'fail' (return degraded result).
+const injectionFlags = new Map();
+
+/**
+ * Unified injection-flag lookup. Honors BOTH the in-memory flag map (set by
+ * POST /test/inject — preferred AC#13 path) AND the legacy env var (kept for
+ * backward compat / dev-time use). Either path triggers the injection.
+ *
+ * Returns the mode ('throw' | 'fail') if active for the kind, otherwise null.
+ *
+ * Kind aliases:
+ *   - 'container' → 'docker_health' (SPEC R7 names .container.healthcheck;
+ *     the existing INJECT_THROW kind is docker_health). A POST /test/inject
+ *     with kind='container' lights up the docker_health check site as well.
+ *
+ * @param {string} kind - Check kind to query.
+ * @returns {string|null} Mode if active, else null.
+ */
+function shouldInject(kind) {
+  // In-memory flag wins (newer + per-process; no env propagation issues).
+  const memMode = injectionFlags.get(kind);
+  if (memMode) return memMode;
+  // 'container' ↔ 'docker_health' alias: if either is set in memory, the
+  // docker_health check site fires (and vice versa for callers querying
+  // 'container' directly — though no production caller does this today).
+  if (kind === 'docker_health' && injectionFlags.has('container')) {
+    return injectionFlags.get('container');
+  }
+  if (kind === 'container' && injectionFlags.has('docker_health')) {
+    return injectionFlags.get('docker_health');
+  }
+  // Legacy env-var path: comma-separated list of kinds, mode is always 'throw'.
+  if (INJECT_THROW.includes(kind)) return 'throw';
+  // Honor the alias for the env-var path too.
+  if (kind === 'docker_health' && INJECT_THROW.includes('container')) return 'throw';
+  if (kind === 'container' && INJECT_THROW.includes('docker_health')) return 'throw';
+  return null;
+}
 
 // Ensure .logs/ exists (matches obs-api pattern).
 try { fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true }); } catch { /* race-safe */ }
@@ -174,8 +225,12 @@ psm.initialize().then(() => { psmReady = true; }).catch(err => {
  * @returns {{ healthcheck: string, last_probe_end: string | null }}
  */
 function pollDockerHealth() {
-  if (INJECT_THROW.includes('docker_health')) {
-    throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=docker_health)');
+  const mode = shouldInject('docker_health');
+  if (mode === 'throw') {
+    throw new Error('forced (shouldInject docker_health=throw)');
+  }
+  if (mode === 'fail') {
+    return { healthcheck: 'unknown', last_probe_end: null };
   }
   try {
     const result = spawnSync('docker',
@@ -335,10 +390,20 @@ async function runAllChecks() {
 
   // ----- LSL staleness + project rollup (signals were ingested between ticks) -----
   try {
-    if (INJECT_THROW.includes('lsl')) {
-      throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=lsl)');
+    const lslMode = shouldInject('lsl');
+    if (lslMode === 'throw') {
+      throw new Error('forced (shouldInject lsl=throw)');
     }
-    refreshLslStaleness();
+    if (lslMode === 'fail') {
+      // Mark every project rollup as 'unknown' (SPEC R6) and skip refresh.
+      const rollup = {};
+      for (const e of Object.values(currentState.lsl)) {
+        rollup[e.projectName || 'unknown'] = 'unknown';
+      }
+      currentState.lsl_by_project = rollup;
+    } else {
+      refreshLslStaleness();
+    }
   } catch (err) {
     log(`lsl refresh threw: ${err.message}`, 'ERROR');
     // Mark every project rollup as 'unknown' on failure (SPEC R6).
@@ -352,21 +417,28 @@ async function runAllChecks() {
 
   // ----- Service liveness via PSM (host services only — D-08 drops container supervisorctl) -----
   try {
-    if (INJECT_THROW.includes('services')) {
-      throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=services)');
+    const svcMode = shouldInject('services');
+    if (svcMode === 'throw') {
+      throw new Error('forced (shouldInject services=throw)');
     }
-    if (psmReady && typeof psm.getRegisteredServices === 'function') {
-      const registered = psm.getRegisteredServices() || [];
-      currentState.services = registered.map(svc => ({
-        name: svc.name,
-        pid: svc.pid || null,
-        status: svc.pid && psm.isProcessAlive(svc.pid) ? 'running' : 'stopped',
-        last_seen: Date.now()
-      }));
+    if (svcMode === 'fail') {
+      currentState.services = (currentState.services || []).map(s => ({ ...s, status: 'unknown' }));
+      // Skip the PSM populate path — leave services 'unknown' (SPEC R6).
+      // Fall through to the rule iteration below; per-rule entries still get added.
+    } else {
+      if (psmReady && typeof psm.getRegisteredServices === 'function') {
+        const registered = psm.getRegisteredServices() || [];
+        currentState.services = registered.map(svc => ({
+          name: svc.name,
+          pid: svc.pid || null,
+          status: svc.pid && psm.isProcessAlive(svc.pid) ? 'running' : 'stopped',
+          last_seen: Date.now()
+        }));
+      }
+      // If PSM has no getRegisteredServices method, currentState.services is left
+      // for signal-driven population (POST /signals service_status) and the rule
+      // iteration below ensures each enabled rule gets at least an 'unknown' slot.
     }
-    // If PSM has no getRegisteredServices method, currentState.services is left
-    // for signal-driven population (POST /signals service_status) and the rule
-    // iteration below ensures each enabled rule gets at least an 'unknown' slot.
   } catch (err) {
     log(`services check threw: ${err.message}`, 'ERROR');
     // Mark every service as 'unknown' (SPEC R6 — never 'healthy' on exception)
@@ -375,10 +447,13 @@ async function runAllChecks() {
 
   // ----- Database health via PSM (LevelDB lock detection + Phase A whitelist) -----
   try {
-    if (INJECT_THROW.includes('db_health')) {
-      throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=db_health)');
+    const dbMode = shouldInject('db_health');
+    if (dbMode === 'throw') {
+      throw new Error('forced (shouldInject db_health=throw)');
     }
-    if (psmReady && typeof psm.checkDatabaseHealth === 'function') {
+    if (dbMode === 'fail') {
+      currentState.databases = { status: 'unknown' };
+    } else if (psmReady && typeof psm.checkDatabaseHealth === 'function') {
       const dbStatus = await psm.checkDatabaseHealth();
       // PSM returns { levelDB: { available, locked, lockedBy }, qdrant: { available } }
       // Aggregate to a single status: healthy iff levelDB available + not locked + qdrant available.
@@ -447,8 +522,26 @@ async function runAllChecks() {
     serviceRulePromises.push((async () => {
       let result;
       try {
-        if (INJECT_THROW.includes(`services.${name}`)) {
-          throw new Error(`forced (services.${name})`);
+        const perSvcMode = shouldInject(`services.${name}`);
+        if (perSvcMode === 'throw') {
+          throw new Error(`forced (shouldInject services.${name}=throw)`);
+        }
+        if (perSvcMode === 'fail') {
+          // Surface 'unknown' for this rule and skip the probe (SPEC R6).
+          result = { status: 'unknown', latency_ms: null, error: 'injected fail' };
+          // Fall through to the result-recording block below.
+          const idx = currentState.services.findIndex(s => s.name === name);
+          const prevLastSeen = idx >= 0 ? currentState.services[idx].last_seen : null;
+          const entry = {
+            name,
+            status: result.status,
+            last_seen: prevLastSeen,
+            latency_ms: result.latency_ms,
+            probe_error: result.error
+          };
+          if (idx < 0) currentState.services.push(entry);
+          else currentState.services[idx] = entry;
+          return;
         }
         if (rule.check_type === 'http_health' && rule.endpoint) {
           result = await probeHttpHealth(rule.endpoint, rule.timeout_ms || 3000);
@@ -546,9 +639,12 @@ async function runAllChecks() {
  */
 async function tick() {
   try {
-    if (INJECT_THROW.includes('tick')) {
-      throw new Error('forced (HEALTH_COORDINATOR_INJECT_THROW=tick)');
+    const tickMode = shouldInject('tick');
+    if (tickMode === 'throw') {
+      throw new Error('forced (shouldInject tick=throw)');
     }
+    // tick=fail is treated identically to throw at the tick boundary — outer
+    // guard logs and currentState slices stay at their last 'unknown' values.
     await runAllChecks();
   } catch (err) {
     // Outer guard: should not be reached because runAllChecks isolates per-check
@@ -616,6 +712,62 @@ app.post('/health/refresh', async (_req, res) => {
     // SPEC R6: surface failure, never mask as healthy.
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// =====================================================================
+// Phase 33-15: Test injection endpoints (loopback-gated, AC#13)
+// =====================================================================
+// Replaces 33-12's plist-propagation approach (empirically falsified — see
+// 33-12-SUMMARY). Sets in-memory injection flags consulted by shouldInject().
+// Loopback gate: 127.0.0.1, ::1, ::ffff:127.0.0.1 only — Docker containers
+// reaching via host.docker.internal are NOT loopback and get 403.
+
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const VALID_INJECT_KINDS = new Set(['db_health', 'container', 'docker_health']);
+const VALID_INJECT_MODES = new Set(['throw', 'fail']);
+
+/**
+ * Returns the active injection flags as an array of { kind, mode } objects.
+ */
+function listActiveInjections() {
+  return [...injectionFlags.entries()].map(([k, m]) => ({ kind: k, mode: m }));
+}
+
+// POST /test/inject — sets an in-memory injection flag (AC#13).
+//   body: { kind, mode } | { reset: true }
+//   200: { ok: true, active: [{kind, mode}, ...] }
+//   400: invalid kind/mode
+//   403: non-loopback caller
+app.post('/test/inject', (req, res) => {
+  const ip = req.socket.remoteAddress;
+  if (!LOOPBACK_IPS.has(ip)) {
+    return res.status(403).json({ error: 'loopback only', remote: ip });
+  }
+  const body = req.body || {};
+  if (body.reset === true) {
+    injectionFlags.clear();
+    return res.json({ ok: true, active: [] });
+  }
+  const { kind, mode } = body;
+  if (!VALID_INJECT_KINDS.has(kind) || !VALID_INJECT_MODES.has(mode)) {
+    return res.status(400).json({
+      error: 'invalid kind or mode',
+      valid_kinds: [...VALID_INJECT_KINDS],
+      valid_modes: [...VALID_INJECT_MODES]
+    });
+  }
+  injectionFlags.set(kind, mode);
+  return res.json({ ok: true, active: listActiveInjections() });
+});
+
+// POST /test/reset — convenience alias for { reset: true } (loopback-gated).
+app.post('/test/reset', (req, res) => {
+  const ip = req.socket.remoteAddress;
+  if (!LOOPBACK_IPS.has(ip)) {
+    return res.status(403).json({ error: 'loopback only', remote: ip });
+  }
+  injectionFlags.clear();
+  return res.json({ ok: true, active: [] });
 });
 
 // RESEARCH §3: bind 0.0.0.0 (not 127.0.0.1) so Linux Docker containers reaching
