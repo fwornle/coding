@@ -171,7 +171,7 @@ psm.initialize().then(() => { psmReady = true; }).catch(err => {
  * Equivalent shell command:
  *   docker inspect coding-services --format '{{.State.Health.Status}}'
  *
- * @returns {{ status: string, last_probe_end: string | null }}
+ * @returns {{ healthcheck: string, last_probe_end: string | null }}
  */
 function pollDockerHealth() {
   if (INJECT_THROW.includes('docker_health')) {
@@ -184,13 +184,13 @@ function pollDockerHealth() {
     );
     if (result.status !== 0) {
       // Docker daemon down or container not found / no healthcheck declared
-      return { status: 'unknown', last_probe_end: null };
+      return { healthcheck: 'unknown', last_probe_end: null };
     }
-    const status = (result.stdout || '').trim() || 'none';
-    return { status, last_probe_end: new Date().toISOString() };
+    const healthcheck = (result.stdout || '').trim() || 'none';
+    return { healthcheck, last_probe_end: new Date().toISOString() };
   } catch (err) {
     log(`docker inspect failed: ${err.message}`, 'ERROR');
-    return { status: 'unknown', last_probe_end: null };
+    return { healthcheck: 'unknown', last_probe_end: null };
   }
 }
 
