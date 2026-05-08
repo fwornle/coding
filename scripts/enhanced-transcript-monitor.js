@@ -4366,6 +4366,10 @@ ORDER BY m.time_created ASC;`;
       // Phase 33 D-09: POST lsl_heartbeat signal to coordinator (replaces
       // the legacy file write). session_id comes from CLAUDE_SESSION_ID ||
       // SESSION_ID env vars set by bin/coding via launch-agent-common.sh.
+      // tmux_pane is captured from TMUX_PANE inherited from the spawning
+      // shell so the statusline can find THIS pane's heartbeat even when
+      // CLAUDE_SESSION_ID leaks across panes (env inheritance from a common
+      // parent shell makes session-id-only matching unreliable).
       await this._postSignal({
         kind: 'lsl_heartbeat',
         session_id: this.sessionId,
@@ -4375,6 +4379,7 @@ ORDER BY m.time_created ASC;`;
           projectPath: this.config.projectPath,
           transcriptPath: this.transcriptPath,
           exchangeCount: this.exchangeCount,
+          tmux_pane: process.env.TMUX_PANE || null,
           ...healthData
         },
         ts: Date.now()

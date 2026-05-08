@@ -291,6 +291,7 @@ function ingestSignal(signal) {
         projectPath,
         projectName,
         transcriptPath: signal.payload?.transcriptPath,
+        tmuxPane: signal.payload?.tmux_pane || null,
         agent: signal.payload?.agent,
         source: signal.source
       };

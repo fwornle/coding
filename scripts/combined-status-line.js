@@ -240,29 +240,29 @@ class CombinedStatusLine {
    * Get trajectory state from live-state.json
    */
   /**
-   * Build the LSL badge string for the tmux statusline.
+   * Check LSL transcript monitor health for the CURRENT pane.
    *
-   * Returns project rollup with labels (`C` for coding, `RA` for
-   * rapid-automations, etc.) plus a per-pane marker if THIS pane's
-   * (session_id, project) compound key is missing from the coordinator —
-   * keeping both the "which projects are alive" answer the user wants
-   * and the D-11 "which pane is sick" signal.
+   * Per-pane semantics (D-11, plan 33-13). Status reflects THIS session's
+   * lsl heartbeat, not a project rollup. With two tmux panes for the same
+   * project, a dead pane shows red while a live pane shows green.
    *
-   * Examples:
-   *   all healthy:                `[LSL: C·RA·DT]`
-   *   one project degraded:       `[LSL: C·RA 🔴DT]`
-   *   this pane untracked:        `[LSL: C·RA·DT ⚠️this]`
-   *   coordinator unreachable:    `[LSL?]`
+   * Lookup precedence in coordinator state:
+   *   1. tmuxPane match — unique per pane, robust against CLAUDE_SESSION_ID
+   *      env-leak from a parent shell
+   *   2. (session_id, project) compound key — fallback for non-tmux shells
+   *      where TMUX_PANE is unset
    *
-   * Returns `{ text, color }` where color is one of 'green' | 'yellow' | 'red'.
-   * Returns `null` when nothing should be shown (rare — only on full-healthy
-   * AND coordinator unreachable race).
+   * Returns 'healthy', 'stale', or 'down'. Compact tmux badge: shown only
+   * when degraded ([LSL🔴] or [LSL⚠️]); hidden when healthy. The per-project
+   * label rendering and active-pane underline are produced separately by
+   * the project-status segment, so this badge is intentionally minimal.
    */
-  getLSLBadge() {
+  getLSLHealthStatus() {
     const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
     const sid = process.env.CLAUDE_SESSION_ID || process.env.SESSION_ID;
     const cwd = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
     const myProject = path.basename(cwd);
+    const myTmuxPane = process.env.TMUX_PANE || null;
     let state;
     try {
       const out = execSync(
@@ -271,51 +271,22 @@ class CombinedStatusLine {
       );
       state = JSON.parse(out);
     } catch {
-      return { text: '[LSL?]', color: 'red' };
+      return 'down';
     }
-
-    const rollup = state.lsl_by_project || {};
-    const entries = Object.entries(rollup);
-    if (entries.length === 0) return { text: '[LSL🔴]', color: 'red' };
-
-    const label = (name) => {
-      const parts = String(name).split(/[^a-zA-Z]|(?=[A-Z])/).filter(Boolean);
-      const initials = parts.map(p => p[0].toUpperCase()).join('');
-      return (initials || String(name).slice(0, 2)).slice(0, 3);
-    };
-
-    const healthyLabels = [];
-    const sickEntries = [];
-    for (const [project, status] of entries) {
-      if (status === 'healthy') healthyLabels.push(label(project));
-      else sickEntries.push({ project, status });
+    let entry = null;
+    if (myTmuxPane && myProject) {
+      entry = Object.values(state.lsl || {}).find(e =>
+        e && e.tmuxPane === myTmuxPane && e.projectName === myProject
+      );
     }
-
-    // Per-pane check: is THIS (sid, project) combination tracked?
-    let paneSick = false;
-    if (sid && myProject) {
-      const key = `${sid}:${myProject}`;
-      const entry = state.lsl?.[key];
-      if (!entry || entry.status === 'stopped') paneSick = true;
-      else {
-        const ageMs = Date.now() - (entry.lastBeat || 0);
-        if (ageMs > 120_000) paneSick = true;
-      }
+    if (!entry && sid && myProject) {
+      entry = state.lsl?.[`${sid}:${myProject}`];
     }
-
-    let text = '[LSL: ' + healthyLabels.join('·');
-    let color = 'green';
-    if (sickEntries.length > 0) {
-      if (healthyLabels.length > 0) text += ' ';
-      text += sickEntries.map(s => `🔴${label(s.project)}`).join(' ');
-      color = 'red';
-    }
-    if (paneSick) {
-      text += ' ⚠️this';
-      if (color === 'green') color = 'yellow';
-    }
-    text += ']';
-    return { text, color };
+    if (!entry) return 'down';
+    if (entry.status === 'stopped') return 'down';
+    const ageMs = Date.now() - (entry.lastBeat || 0);
+    if (ageMs > 120_000) return 'stale';
+    return 'healthy';
   }
 
   getTrajectoryState() {
@@ -657,191 +628,74 @@ class CombinedStatusLine {
 
   async getGlobalHealthStatus() {
     try {
-      // Read health status from the statusline health monitor
-      const healthStatusFile = join(rootDir, '.logs', 'statusline-health-status.txt');
-      
-      if (!existsSync(healthStatusFile)) {
-        return { 
-          status: 'initializing',
-          gcm: { icon: '🟡', status: 'initializing' },
+      // Phase 33: source of truth for sessions/GCM is the coordinator
+      // (`http://localhost:3034/health/state`), replacing the legacy
+      // `.logs/statusline-health-status.txt` written by a host daemon that
+      // no longer exists. Output shape is preserved unchanged so the
+      // downstream Sessions Display rendering (per-project labels with
+      // active-pane underline) works as before.
+      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+      let state;
+      try {
+        const out = execSync(
+          `curl -fs --max-time 2 "${url}/health/state"`,
+          { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
+        );
+        state = JSON.parse(out);
+      } catch {
+        return {
+          status: 'error',
+          gcm: { icon: '❌', status: 'error' },
           sessions: {},
-          guards: { icon: '🟡', status: 'initializing' }
+          guards: { icon: '❌', status: 'error' }
         };
       }
-      
-      // Read the latest health status
-      const healthStatus = readFileSync(healthStatusFile, 'utf8').trim();
-      
-      // Parse the health status format: [GCM:✅] [Sessions: coding:🟢] [Guards:✅]
-      const gcmMatch = healthStatus.match(/\[GCM:([^\]]+)\]/);
-      const sessionsMatch = healthStatus.match(/\[Sessions:\s*([^\]]+)\]/);
-      const guardsMatch = healthStatus.match(/\[Guards:([^\]]+)\]/);
-      
+
       const result = {
         status: 'operational',
-        rawStatus: healthStatus,
         gcm: { icon: '✅', status: 'healthy' },
         sessions: {},
         guards: { icon: '✅', status: 'healthy' }
       };
-      
-      // Parse GCM status
-      if (gcmMatch) {
-        result.gcm.icon = gcmMatch[1];
-        result.gcm.status = gcmMatch[1] === '✅' ? 'healthy' : 
-                           gcmMatch[1] === '🟡' ? 'warning' : 'unhealthy';
-      }
-      
-      // Parse sessions status - format: "project:icon" or "project:icon(reason)"
-      if (sessionsMatch) {
-        const sessionsStr = sessionsMatch[1].trim();
-        // CRITICAL: Properly handle reasons with spaces like "(no tr)" by parsing character-by-character
-        // tracking parenthesis depth
-        const sessionPairs = [];
-        let current = '';
-        let inParens = false;
 
-        for (let i = 0; i < sessionsStr.length; i++) {
-          const char = sessionsStr[i];
-          if (char === '(') {
-            inParens = true;
-            current += char;
-          } else if (char === ')') {
-            inParens = false;
-            current += char;
-          } else if (char === ' ' && !inParens) {
-            if (current) sessionPairs.push(current);
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        if (current) sessionPairs.push(current);
-
-        for (const pair of sessionPairs) {
-          // Split on : to get project and icon+reason
-          const colonIndex = pair.indexOf(':');
-          if (colonIndex === -1) continue;
-
-          const projectName = pair.substring(0, colonIndex);
-          const iconPart = pair.substring(colonIndex + 1);
-          if (!projectName || !iconPart) continue;
-
-          // Extract icon and optional reason - look for pattern like "icon(reason)"
-          const reasonMatch = iconPart.match(/\(([^)]+)\)/);
-          const icon = reasonMatch ? iconPart.substring(0, iconPart.indexOf('(')) : iconPart;
-          const reason = reasonMatch ? reasonMatch[1] : undefined;
-
-          result.sessions[projectName] = {
-            icon: icon,
-            reason: reason,
-            status: icon === '🟢' ? 'healthy' :
-                   icon === '🟡' ? 'warning' : 'unhealthy'
-          };
-        }
-      }
-      
-      // Parse guards status
-      if (guardsMatch) {
-        result.guards.icon = guardsMatch[1];
-        result.guards.status = guardsMatch[1] === '✅' ? 'healthy' : 
-                              guardsMatch[1] === '🟡' ? 'warning' : 'unhealthy';
-      }
-      
-      // Check if health file is recent (within 60 seconds)
-      // The daemon writes every ~15s but health checks can take longer during probes
-      const stats = fs.statSync(healthStatusFile);
-      const age = Date.now() - stats.mtime.getTime();
-
-      if (age > 60000) {
-        result.status = 'stale';
-        result.gcm.status = 'stale';
-
-        // AUTO-CORRECTION: When status file is stale, validate sessions against
-        // actual running processes to prevent showing phantom/crashed sessions
-        const runningMonitors = this.getRunningTranscriptMonitorsSync();
-
-        if (runningMonitors.size > 0) {
-          // Build dynamic reverse mapping: abbreviation → project name
-          // This handles ALL projects, not just hardcoded ones
-          const abbrevToProject = new Map();
-          for (const projectName of runningMonitors) {
-            const abbrev = this.getProjectAbbreviation(projectName);
-            abbrevToProject.set(abbrev, projectName);
-          }
-
-          // Filter sessions to only include those with running monitors
-          const validatedSessions = {};
-          for (const [abbrev, sessionData] of Object.entries(result.sessions)) {
-            const projectName = abbrevToProject.get(abbrev) || this.getProjectNameFromAbbrev(abbrev);
-            if (runningMonitors.has(projectName) || runningMonitors.has(abbrev)) {
-              validatedSessions[abbrev] = sessionData;
-            }
-          }
-          result.sessions = validatedSessions;
-
-          if (process.env.DEBUG_STATUS) {
-            console.error(`DEBUG: Stale file auto-correction: filtered sessions to ${Object.keys(validatedSessions).join(', ')} based on running monitors: ${[...runningMonitors].join(', ')}`);
-          }
-        } else {
-          // No running monitors — but sessions may still be valid if agent processes
-          // (claude, copilot, opencode, mastra) are running. Trust the status file data when
-          // it was recently written by the daemon, just slightly outside the freshness window.
-          // Only clear if file is VERY stale (> 5 minutes = daemon is truly dead)
-          if (age > 300000) {
-            result.sessions = {};
-            if (process.env.DEBUG_STATUS) {
-              console.error('DEBUG: Stale file auto-correction: cleared all sessions (file >5min old, daemon likely dead)');
-            }
-          }
-          // Otherwise keep sessions from daemon's last write — it validates them already
-        }
+      // Map coordinator's lsl_by_project rollup → sessions map keyed by
+      // full project name. Status icons preserve the original 3-state
+      // convention: 🟢 healthy, 🟡 degraded/warning, 🔴 stopped/unhealthy.
+      const rollup = state.lsl_by_project || {};
+      for (const [projectName, status] of Object.entries(rollup)) {
+        const icon = status === 'healthy' ? '🟢'
+                   : status === 'degraded' || status === 'stale' || status === 'warning' ? '🟡'
+                   : '🔴';
+        result.sessions[projectName] = {
+          icon,
+          status: icon === '🟢' ? 'healthy' : icon === '🟡' ? 'warning' : 'unhealthy'
+        };
       }
 
-      // CRITICAL: Check for stale trajectory data in CURRENT project only
-      // GCM status should only reflect issues in the project where it's displayed
-      // Skip trajectory check when no transcript monitors are running — trajectory
-      // is maintained by the monitor, so a stale trajectory without a monitor is expected
+      // Trajectory check: only for the CURRENT project. Trajectory file is
+      // maintained by ETM; a stale file with no running monitor is expected.
       let currentProjectTrajectoryIssue = null;
-
-      // Determine current project from environment or working directory
       const currentProjectPath = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
       const currentProjectName = currentProjectPath.split('/').pop();
-
-      // Only check trajectory if a transcript monitor is running for this project
       const trajRunningMonitors = this.getRunningTranscriptMonitorsSync();
       const hasMonitorForCurrentProject = trajRunningMonitors.has(currentProjectName);
 
       if (hasMonitorForCurrentProject) {
-        // Check trajectory for current project only
         const currentTrajectoryPath = join(currentProjectPath, '.specstory', 'trajectory', 'live-state.json');
         if (existsSync(currentTrajectoryPath)) {
           const trajStats = fs.statSync(currentTrajectoryPath);
           const trajAge = Date.now() - trajStats.mtime.getTime();
-          const oneHour = 60 * 60 * 1000;
-
-          if (trajAge > oneHour) {
-            currentProjectTrajectoryIssue = `stale tr`;
-          }
+          if (trajAge > 60 * 60 * 1000) currentProjectTrajectoryIssue = 'stale tr';
         } else {
-          // Monitor running but no trajectory file
-          const currentSession = result.sessions[currentProjectName] || result.sessions['coding'] || result.sessions['C'];
-          if (currentSession && currentSession.status === 'healthy') {
-            currentProjectTrajectoryIssue = 'no tr';
-          }
+          const currentSession = result.sessions[currentProjectName];
+          if (currentSession && currentSession.status === 'healthy') currentProjectTrajectoryIssue = 'no tr';
         }
       }
-
-      // If trajectory issue detected in CURRENT project, downgrade GCM status
       if (currentProjectTrajectoryIssue) {
         result.gcm.status = 'warning';
         result.gcm.icon = '🟡';
         result.gcm.reason = currentProjectTrajectoryIssue;
-
-        // If status is still 'operational', downgrade to 'degraded'
-        if (result.status === 'operational') {
-          result.status = 'degraded';
-        }
+        if (result.status === 'operational') result.status = 'degraded';
       }
 
       return result;
@@ -1638,14 +1492,16 @@ class CombinedStatusLine {
       }
     }
 
-    // LSL (Live Session Logging) badge — project rollup with per-pane marker.
-    // Always rendered (compact when all healthy) so the user can see at a
-    // glance which projects are tracked and whether THIS pane is heart­beating.
-    const lslBadge = this.getLSLBadge();
-    if (lslBadge) {
-      parts.push(lslBadge.text);
-      if (lslBadge.color === 'red') overallColor = 'red';
-      else if (lslBadge.color === 'yellow' && overallColor === 'green') overallColor = 'yellow';
+    // LSL (Live Session Logging) — compact per-pane health badge.
+    // Hidden when healthy to keep the line tight; the per-project labels
+    // (rendered above as Sessions Display) already show per-project status.
+    const lslStatus = this.getLSLHealthStatus();
+    if (lslStatus === 'down') {
+      parts.push('[LSL🔴]');
+      overallColor = 'red';
+    } else if (lslStatus === 'stale') {
+      parts.push('[LSL⚠️]');
+      if (overallColor === 'green') overallColor = 'yellow';
     }
 
     // Constraint Monitor Status with TRJ label (trajectory)
