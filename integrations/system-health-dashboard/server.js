@@ -461,6 +461,11 @@ class SystemHealthAPIServer {
             }
 
             // Services
+            // Coordinator's own violationCount (shown in dashboard badge) treats both
+            // hard failures AND unknown services as violations. Match that here so the
+            // Active Violations table agrees with the badge — otherwise users see
+            // "2 violations" but the table shows only 1 row, leaving them confused
+            // about which services the badge is counting.
             if (state && Array.isArray(state.services)) {
                 for (const svc of state.services) {
                     if (!svc || !svc.name) continue;
@@ -470,6 +475,8 @@ class SystemHealthAPIServer {
                     checks.push({ check: svc.name, name: `service.${svc.name}`, category: 'services', status: ui, raw_status: raw, last_seen: svc.last_seen, timestamp: ts, message: `${svc.name} ${raw}` });
                     if (isHardFailure(raw)) {
                         violations.push({ check: svc.name, kind: `service.${svc.name}`, severity: 'high', detail: raw, message: `${svc.name} ${raw}`, timestamp: ts });
+                    } else if (raw === 'unknown') {
+                        violations.push({ check: svc.name, kind: `service.${svc.name}`, severity: 'warning', detail: 'unknown', message: `${svc.name} has not reported (no probe data yet)`, timestamp: ts });
                     }
                 }
             }
