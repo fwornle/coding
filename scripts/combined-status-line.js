@@ -17,92 +17,38 @@ import { UKBProcessManager } from './ukb-process-manager.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = process.env.CODING_REPO || join(__dirname, '..');
 
-// Visual width measurement for tmux's status-right truncation.
+// Right-pad the status line so tmux always renders a stable trailing edge.
 //
-// tmux trims/truncates by *terminal cell* count, not character count. Mixed
-// width strings (ASCII 1-cell + emoji 2-cell + ZWJ sequences as 2-cell graphemes
-// + tmux #[...] format escapes as 0-cell) drift between renders, leaving the
-// trailing edge unaligned (e.g. "12:411" — a leftover digit from a previous,
-// wider render). Pad the produced string to a fixed cell width so every
-// render fills the same number of columns and tmux can never re-truncate
-// to a different position.
-const STATUS_LINE_TARGET_CELLS = 199; // status-right-length=200 in .tmux.conf, leave 1 cell of slack
-function _isWideCodepoint(cp) {
-  // East Asian Wide / Fullwidth + emoji-like ranges per UAX#11 + UTS#51.
-  return (
-    (cp >= 0x1100 && cp <= 0x115F) ||
-    (cp >= 0x231A && cp <= 0x231B) ||
-    (cp === 0x2329 || cp === 0x232A) ||
-    (cp >= 0x23E9 && cp <= 0x23EC) ||
-    (cp === 0x23F0 || cp === 0x23F3) ||
-    (cp >= 0x25FD && cp <= 0x25FE) ||
-    (cp >= 0x2614 && cp <= 0x2615) ||
-    (cp >= 0x2648 && cp <= 0x2653) ||
-    (cp === 0x267F) || (cp === 0x2693) ||
-    (cp === 0x26A1) || (cp >= 0x26AA && cp <= 0x26AB) ||
-    (cp >= 0x26BD && cp <= 0x26BE) ||
-    (cp >= 0x26C4 && cp <= 0x26C5) ||
-    (cp === 0x26CE) || (cp === 0x26D4) ||
-    (cp === 0x26EA) || (cp >= 0x26F2 && cp <= 0x26F3) ||
-    (cp === 0x26F5) || (cp === 0x26FA) || (cp === 0x26FD) ||
-    (cp === 0x2705) || (cp >= 0x270A && cp <= 0x270B) ||
-    (cp === 0x2728) || (cp === 0x274C) || (cp === 0x274E) ||
-    (cp >= 0x2753 && cp <= 0x2755) || (cp === 0x2757) ||
-    (cp >= 0x2795 && cp <= 0x2797) || (cp === 0x27B0) || (cp === 0x27BF) ||
-    (cp >= 0x2B1B && cp <= 0x2B1C) || (cp === 0x2B50) || (cp === 0x2B55) ||
-    (cp >= 0x2E80 && cp <= 0x303E) ||
-    (cp >= 0x3041 && cp <= 0x33FF) ||
-    (cp >= 0x3400 && cp <= 0x4DBF) ||
-    (cp >= 0x4E00 && cp <= 0x9FFF) ||
-    (cp >= 0xA000 && cp <= 0xA4CF) ||
-    (cp >= 0xAC00 && cp <= 0xD7A3) ||
-    (cp >= 0xF900 && cp <= 0xFAFF) ||
-    (cp >= 0xFE30 && cp <= 0xFE4F) ||
-    (cp >= 0xFF00 && cp <= 0xFF60) ||
-    (cp >= 0xFFE0 && cp <= 0xFFE6) ||
-    (cp >= 0x1F1E6 && cp <= 0x1F1FF) ||
-    (cp >= 0x1F300 && cp <= 0x1F64F) ||
-    (cp >= 0x1F680 && cp <= 0x1F6FF) ||
-    (cp >= 0x1F700 && cp <= 0x1F77F) ||
-    (cp >= 0x1F780 && cp <= 0x1F7FF) ||
-    (cp >= 0x1F800 && cp <= 0x1F8FF) ||
-    (cp >= 0x1F900 && cp <= 0x1F9FF) ||
-    (cp >= 0x1FA00 && cp <= 0x1FAFF) ||
-    (cp >= 0x20000 && cp <= 0x2FFFD) ||
-    (cp >= 0x30000 && cp <= 0x3FFFD)
-  );
-}
-function _graphemeWidth(g) {
-  if (!g) return 0;
-  const cp = g.codePointAt(0);
-  if (cp < 0x20 || cp === 0x7F) return 0;
-  // VS-16 (U+FE0F) inside the cluster forces emoji presentation → 2 cells.
-  if (g.includes('️')) return 2;
-  // VS-15 (U+FE0E) forces text presentation → 1 cell.
-  if (g.includes('︎')) return 1;
-  if (cp < 0x7F) return 1;
-  return _isWideCodepoint(cp) ? 2 : 1;
-}
-const _segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
-  ? new Intl.Segmenter('en', { granularity: 'grapheme' })
-  : null;
-function visualCellWidth(str) {
-  if (!str) return 0;
-  // Strip tmux format escapes (#[...]) — these are markup, zero visual width.
+// tmux truncates status-right to status-right-length cells (=200). When the
+// new render's cell count is less than the previous render's, the rightmost
+// (delta) cells aren't overwritten and the previous render's trailing chars
+// remain visible (e.g. "12:411", "12:5096" — leftover digits from earlier,
+// wider renders).
+//
+// Trying to pad to exactly 200 cells using our own width function requires
+// matching tmux's u8_width table EXACTLY. tmux follows UAX#11 strictly, so
+// Symbols-block codepoints with VS-16 (⚠️ ⚙️ ⏰ — U+26xx + U+FE0F) are 1
+// cell in tmux even though terminals render them as 2. The previous attempt
+// to hit a fixed cell count using width prediction undershot tmux by 1 cell
+// per such emoji, leaving 2-3 cells of residue when the joined content
+// happened to contain two such emojis.
+//
+// Skip cell prediction entirely. Pad with a count that is guaranteed to be
+// ≥ status-right-length in tmux's view regardless of how it interprets
+// emoji width. The lower bound is "1 cell per codepoint": every non-control
+// codepoint is at minimum 1 cell, so N codepoints → ≥N cells in tmux. With
+// target=220 codepoints, the line is always ≥220 cells in tmux → tmux
+// truncates to exactly 200, fully overwriting any prior-render residue.
+//
+// Use codepoint count via [...s] (not s.length, which counts UTF-16 code
+// units and would let an all-emoji input reach the target with only ~half
+// the codepoints, defeating the lower bound).
+const STATUS_LINE_TARGET_CODEPOINTS = 220;
+function padStatusLine(str) {
+  // Strip tmux #[...] format escapes — they're markup, not visible chars.
   const stripped = String(str).replace(/#\[[^\]]*\]/g, '');
-  let width = 0;
-  if (_segmenter) {
-    for (const { segment } of _segmenter.segment(stripped)) {
-      width += _graphemeWidth(segment);
-    }
-  } else {
-    for (const ch of stripped) width += _graphemeWidth(ch);
-  }
-  return width;
-}
-function padToVisualWidth(str, targetCells) {
-  const current = visualCellWidth(str);
-  const pad = Math.max(0, targetCells - current);
+  const codepoints = [...stripped].length;
+  const pad = Math.max(0, STATUS_LINE_TARGET_CODEPOINTS - codepoints);
   return str + ' '.repeat(pad);
 }
 
@@ -1734,17 +1680,10 @@ class CombinedStatusLine {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     parts.push(timeStr);
 
-    // Pad to a fixed visual cell count. Plain ' '.repeat(N) — no matter how
-    // large — does not solve the residual-char problem because tmux truncates
-    // by *cell* count and the truncation point depends on the actual cells
-    // before the trailing spaces. Compute the real cell width with grapheme
-    // clustering + UAX#11 wide-char detection (treating ZWJ sequences and
-    // VS-16 emoji presentation as 2 cells, tmux #[...] markup as 0 cells)
-    // and pad to STATUS_LINE_TARGET_CELLS. Every render now occupies exactly
-    // the same number of terminal columns, so tmux's cell-counter sees a
-    // stable line and the right edge never drifts left between renders.
+    // Pad past tmux's truncation point so the previous render's trailing
+    // chars are always overwritten. See padStatusLine() at top of file.
     const joined = parts.join(' ');
-    const statusText = padToVisualWidth(joined, STATUS_LINE_TARGET_CELLS);
+    const statusText = padStatusLine(joined);
 
     // Since Claude Code doesn't support tooltips/clicks natively,
     // we'll provide the text and have users run ./bin/status for details
