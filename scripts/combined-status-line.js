@@ -740,17 +740,57 @@ class CombinedStatusLine {
       };
 
       // Map coordinator's lsl_by_project rollup → sessions map keyed by
-      // full project name. Status icons preserve the original 3-state
-      // convention: 🟢 healthy, 🟡 degraded/warning, 🔴 stopped/unhealthy.
+      // full project name. For healthy ETMs, surface the graduated session
+      // lifecycle icons (🟢🌲🫒🪨⚫💤) by stat-ing each entry's transcript
+      // file and bucketing the age. The Phase 33 coordinator only exposes
+      // a 3-state rollup (healthy/degraded/stopped); the per-project
+      // user-activity age (the signal cooling-down depends on) is computed
+      // here client-side from `lsl[*].transcriptPath` mtime.
+      //
+      // Lifecycle thresholds match docs/health-system/status-line.md:
+      //   <5m  🟢  Active
+      //   <15m 🌲  Cooling
+      //   <1h  🫒  Fading
+      //   <6h  🪨  Dormant
+      //   <24h ⚫  Inactive
+      //   ≥24h 💤  Sleeping
+      // Non-healthy statuses bypass the lifecycle and surface as 🟡 / 🔴.
       const rollup = state.lsl_by_project || {};
+      const lslEntries = Object.values(state.lsl || {});
+      const transcriptAgeMs = (projectName) => {
+        const entry = lslEntries.find(e => e?.projectName === projectName && e?.transcriptPath);
+        if (!entry?.transcriptPath) return null;
+        try {
+          return Date.now() - fs.statSync(entry.transcriptPath).mtimeMs;
+        } catch {
+          return null;
+        }
+      };
+      const ageToActivityIcon = (ageMs) => {
+        if (ageMs === null || ageMs < 5 * 60_000) return '🟢';
+        if (ageMs < 15 * 60_000) return '🌲';
+        if (ageMs < 60 * 60_000) return '🫒';
+        if (ageMs < 6 * 60 * 60_000) return '🪨';
+        if (ageMs < 24 * 60 * 60_000) return '⚫';
+        return '💤';
+      };
       for (const [projectName, status] of Object.entries(rollup)) {
-        const icon = status === 'healthy' ? '🟢'
-                   : status === 'degraded' || status === 'stale' || status === 'warning' ? '🟡'
-                   : '🔴';
-        result.sessions[projectName] = {
-          icon,
-          status: icon === '🟢' ? 'healthy' : icon === '🟡' ? 'warning' : 'unhealthy'
-        };
+        let icon;
+        let activityAgeMs = null;
+        if (status === 'healthy') {
+          activityAgeMs = transcriptAgeMs(projectName);
+          icon = ageToActivityIcon(activityAgeMs);
+        } else if (status === 'degraded' || status === 'stale' || status === 'warning') {
+          icon = '🟡';
+        } else {
+          icon = '🔴';
+        }
+        // All graduated activity icons (🟢🌲🫒🪨⚫💤) reflect a healthy ETM
+        // with varying user-activity age. Only 🟡 / 🔴 are unhealthy.
+        const sessionStatus = icon === '🟡' ? 'warning'
+                            : icon === '🔴' ? 'unhealthy'
+                            : 'healthy';
+        result.sessions[projectName] = { icon, status: sessionStatus, activityAgeMs };
       }
 
       // Trajectory check: only for the CURRENT project. Trajectory file is
