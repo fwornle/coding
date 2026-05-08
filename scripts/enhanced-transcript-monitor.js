@@ -17,6 +17,23 @@ const __dirname = dirname(__filename);
 const codingRoot = join(__dirname, '..');
 config({ path: join(codingRoot, '.env') });
 
+// ETM runs on the host, but the `claude-mcp` launcher exports
+// CODING_TOOLS_PATH=/coding (the in-container bind-mount path) for tools that
+// run inside docker. ETM inheriting that env then tries to mkdir('/coding/.health')
+// and read '/coding/.specstory/config/redaction-patterns.json' on the host —
+// neither exists, every poll fails, the pipeline stalls silently. Resolve a
+// host-safe coding path for ETM's own filesystem ops, keeping the env var as
+// a last-resort fallback for legitimately host-side overrides (like a
+// CODING_REPO pointing at a different checkout).
+function resolveHostCodingPath() {
+  const fromEnv = process.env.CODING_REPO || process.env.CODING_TOOLS_PATH;
+  if (fromEnv && (fromEnv.startsWith('/Users/') || fromEnv.startsWith('/home/'))) {
+    return fromEnv;
+  }
+  return codingRoot;
+}
+const HOST_CODING_PATH = resolveHostCodingPath();
+
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -71,14 +88,15 @@ let redactor = null;
 // Initialize redactor with configuration
 async function initializeRedactor() {
   if (!redactor) {
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
-    redactor = new ConfigurableRedactor({
-      configPath: path.join(codingPath, '.specstory', 'config', 'redaction-patterns.json'),
+    const candidate = new ConfigurableRedactor({
+      configPath: path.join(HOST_CODING_PATH, '.specstory', 'config', 'redaction-patterns.json'),
       debug: false
     });
-    
-    // CRITICAL: Actually initialize the redactor - no fallbacks allowed
-    await redactor.initialize();
+    // Initialize BEFORE assigning the singleton — otherwise a thrown init()
+    // leaves a half-baked instance behind and every subsequent redact() call
+    // throws "not initialized", silently stalling the whole pipeline.
+    await candidate.initialize();
+    redactor = candidate;
   }
   return redactor;
 }
@@ -262,10 +280,9 @@ class EnhancedTranscriptMonitor {
    * Get state file path for persisting lastProcessedUuid
    */
   getStateFilePath() {
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
     const projectName = path.basename(this.config.projectPath);
     const stateFileName = `${projectName}-transcript-monitor-state.json`;
-    return path.join(codingPath, '.health', stateFileName);
+    return path.join(HOST_CODING_PATH, '.health', stateFileName);
   }
 
   /**

@@ -242,25 +242,22 @@ class CombinedStatusLine {
   /**
    * Check LSL transcript monitor health for the CURRENT pane.
    *
-   * Per-pane semantics (D-11, plan 33-13). Status reflects THIS session's
-   * lsl heartbeat, not a project rollup. With two tmux panes for the same
-   * project, a dead pane shows red while a live pane shows green.
-   *
    * Lookup precedence in coordinator state:
-   *   1. tmuxPane match — unique per pane, robust against CLAUDE_SESSION_ID
-   *      env-leak from a parent shell
-   *   2. (session_id, project) compound key — fallback for non-tmux shells
-   *      where TMUX_PANE is unset
-   *
-   * Returns 'healthy', 'stale', or 'down'. Compact tmux badge: shown only
-   * when degraded ([LSL🔴] or [LSL⚠️]); hidden when healthy. The per-project
-   * label rendering and active-pane underline are produced separately by
-   * the project-status segment, so this badge is intentionally minimal.
+   *   1. (tmuxPane, project) — strongest, per-pane.
+   *   2. (session_id, project) — when ETM and statusline share CLAUDE_SESSION_ID.
+   *   3. (project) — any heartbeat for this project. Required because the
+   *      ETM is a project-level singleton: when launched by a parent shell
+   *      it tags heartbeats with its own session id (e.g. etm-PID-TS) and
+   *      its own TMUX_PANE (or null), neither of which match a pane that
+   *      attached later. Without this fallback the badge spuriously goes
+   *      red even when the project is being monitored healthily.
    */
   getLSLHealthStatus() {
     const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
     const sid = process.env.CLAUDE_SESSION_ID || process.env.SESSION_ID;
-    const cwd = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
+    const cwd = process.env.TRANSCRIPT_SOURCE_PROJECT
+      || process.env.TMUX_PANE_PATH
+      || process.cwd();
     const myProject = path.basename(cwd);
     const myTmuxPane = process.env.TMUX_PANE || null;
     let state;
@@ -273,20 +270,42 @@ class CombinedStatusLine {
     } catch {
       return 'down';
     }
-    let entry = null;
+    const evaluate = (entry) => {
+      if (!entry) return null;
+      if (entry.status === 'stopped') return 'down';
+      // ETM emits status='degraded' when isSuspiciousActivity fires
+      // (0 exchanges processed in >30 min uptime). The process is alive but
+      // the pipeline is stalled — no LSL files, no observations. Surface
+      // that as 'stale' so the badge actually warns instead of pretending
+      // green just because the heartbeat is fresh.
+      if (entry.status === 'degraded') return 'stale';
+      const ageMs = Date.now() - (entry.lastBeat || 0);
+      if (ageMs > 120_000) return 'stale';
+      return 'healthy';
+    };
+    // Strongest signal: an entry pinned to THIS pane. If found, trust it
+    // exclusively — pane-level distinctions matter (e.g. a dead pane
+    // shouldn't go green just because a sibling pane is alive).
     if (myTmuxPane && myProject) {
-      entry = Object.values(state.lsl || {}).find(e =>
-        e && e.tmuxPane === myTmuxPane && e.projectName === myProject
+      const e = Object.values(state.lsl || {}).find(x =>
+        x && x.tmuxPane === myTmuxPane && x.projectName === myProject
       );
+      if (e) return evaluate(e);
     }
-    if (!entry && sid && myProject) {
-      entry = state.lsl?.[`${sid}:${myProject}`];
+    // Otherwise aggregate across all entries for this project. A stopped
+    // ghost (e.g. an old ETM that the coordinator marked stopped after >15s
+    // silence) shouldn't drag the badge red when a fresh ETM is heartbeating
+    // for the same project. Take the best verdict.
+    if (myProject) {
+      const verdicts = Object.values(state.lsl || {})
+        .filter(x => x && x.projectName === myProject)
+        .map(evaluate)
+        .filter(Boolean);
+      if (verdicts.includes('healthy')) return 'healthy';
+      if (verdicts.includes('stale')) return 'stale';
+      if (verdicts.length > 0) return 'down';
     }
-    if (!entry) return 'down';
-    if (entry.status === 'stopped') return 'down';
-    const ageMs = Date.now() - (entry.lastBeat || 0);
-    if (ageMs > 120_000) return 'stale';
-    return 'healthy';
+    return 'down';
   }
 
   getTrajectoryState() {
