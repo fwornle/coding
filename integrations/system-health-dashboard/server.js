@@ -14,6 +14,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import { spawn, execSync } from 'child_process';
+import net from 'net';
 import { parse as parseYaml } from 'yaml';
 import { runIfMain } from '../../lib/utils/esm-cli.js';
 import { createRequire } from 'node:module';
@@ -2975,15 +2976,23 @@ class SystemHealthAPIServer {
             const metadataFile = join(cgrDir, 'shared-data', 'cache-metadata.json');
             const lastIndexedFile = join(codingRoot, '.data', 'cgr-last-indexed');
 
-            // Check Memgraph availability via bolt port
-            let memgraphRunning = false;
-            try {
-                const { execSync: execSyncLocal } = require('child_process');
-                execSyncLocal('nc -z localhost 7687', { timeout: 2000, stdio: 'ignore' });
-                memgraphRunning = true;
-            } catch {
-                // Memgraph not reachable
-            }
+            // Check Memgraph availability via bolt port. Probe `memgraph:7687`
+            // (docker-compose service hostname — dashboard backend runs in the
+            // same compose network) and fall back to localhost. `nc` is not
+            // installed in the container, so use Node's net module directly.
+            const probeTcp = (host, port, timeoutMs = 1500) => new Promise((resolve) => {
+                const sock = new net.Socket();
+                let done = false;
+                const finish = (ok) => { if (done) return; done = true; try { sock.destroy(); } catch {} resolve(ok); };
+                sock.setTimeout(timeoutMs);
+                sock.once('connect', () => finish(true));
+                sock.once('error', () => finish(false));
+                sock.once('timeout', () => finish(false));
+                try { sock.connect(port, host); } catch { finish(false); }
+            });
+            let memgraphRunning = await probeTcp('memgraph', 7687);
+            if (!memgraphRunning) memgraphRunning = await probeTcp('localhost', 7687);
+            if (!memgraphRunning) memgraphRunning = await probeTcp('host.docker.internal', 7687);
 
             if (!memgraphRunning) {
                 return res.json({
