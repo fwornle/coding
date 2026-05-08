@@ -1,5 +1,7 @@
 # Enhanced Health Monitoring System
 
+> **Phase 33 architecture (current).** The 6-layer multi-supervisor design described below is the historical model and most of its components have been retired. The current architecture replaces the layered supervisors with a single **health coordinator at `:3034`** running inside the `coding-services` container. See [`docs-content/architecture/health-monitoring.md`](../../docs-content/architecture/health-monitoring.md) for the post-Phase-33 model. Components that remain active: `EnhancedTranscriptMonitor` (now POSTs `lsl_heartbeat` signals to the coordinator), `health-verifier.js verify` (one-shot CLI). Components retired: `HealthVerifier` daemon mode, `StatusLineHealthMonitor`, `GlobalProcessSupervisor`, `GlobalLSLCoordinator`, `SystemMonitorWatchdog`, `MonitoringVerifier`, `LiveLoggingCoordinator`, `ProcessStateManager`. On-disk artifacts retired: `.health/verification-status.json`, `.logs/statusline-health-status.txt`, `.lsl/global-registry.json`, `.live-process-registry.json`. Supervisord blocks retired: `[program:health-verifier]`, `[program:browser-access]`.
+
 ## Overview
 
 The Enhanced Health Monitoring System provides comprehensive health tracking and status reporting across all Claude Code sessions. This system includes individual session monitoring, smart abbreviation generation, auto-recovery mechanisms, and multi-project coordination through a 6-layer protection architecture with 9 core classes.
@@ -10,7 +12,7 @@ The Enhanced Health Monitoring System provides comprehensive health tracking and
 
 ### 6-Layer Protection Architecture
 
-![Enhanced Health Monitoring Overview](../images/enhanced-health-monitoring-overview.png)
+![Enhanced Health Monitoring Overview](../images/health-monitoring-overview.png)
 
 The system implements a robust 6-layer monitoring protection with 9 core classes:
 

@@ -4,23 +4,26 @@ Comprehensive health tracking and status reporting across all Claude Code sessio
 
 ![System Health Dashboard](../images/health-monitor.png)
 
-## 6-Layer Protection Architecture
+!!! info "Phase 33 architecture (current)"
+    The architecture below describes the historical 6-layer multi-supervisor design. Phase 33 (plan 33-04) consolidated the layered system into a single **health coordinator at :3034** that owns the live state, with reporters (ETM, `health-verifier verify` CLI) writing signals and consumers (statusline, dashboard, prompt hook) reading state. See [Health Monitoring](../architecture/health-monitoring.md) for the current model. The retired daemons (`HealthVerifier` daemon mode, `StatusLineHealthMonitor`, `GlobalProcessSupervisor`, `GlobalLSLCoordinator`) and their on-disk artifacts (`.health/verification-status.json`, `.logs/statusline-health-status.txt`, `.lsl/global-registry.json`) are no longer in use.
+
+## 6-Layer Protection Architecture (historical)
 
 ![4-Layer Monitoring Architecture](../images/4-layer-monitoring-architecture.png)
 
-The system implements a robust 6-layer monitoring protection with 9 core classes:
+The system formerly implemented a 6-layer monitoring protection with 9 core classes:
 
-| Layer | Class | Purpose |
-|-------|-------|---------|
-| **Layer 0** | SystemMonitorWatchdog | Ultimate failsafe - runs via cron/launchd, ensures GSC always runs |
-| **Layer 1** | GlobalServiceCoordinator | Self-healing daemon managing all critical services |
-| **Layer 1** | GlobalLSLCoordinator | Multi-project transcript monitoring manager |
-| **Layer 2** | MonitoringVerifier | Pre-session verification (exit 0=OK, 1=FAIL, 2=WARN) |
-| **Layer 3** | HealthVerifier | Core verification engine with auto-healing |
-| **Layer 4** | StatusLineHealthMonitor | Health aggregation for Claude Code status bar |
-| **Layer 5** | EnhancedTranscriptMonitor | Real-time per-project transcript monitoring |
-| **Layer 5** | LiveLoggingCoordinator | Logging orchestration with multi-user support |
-| **Core** | ProcessStateManager | Unified registry with atomic file locking (used by all) |
+| Layer | Class | Purpose | Status |
+|-------|-------|---------|--------|
+| **Layer 0** | SystemMonitorWatchdog | Ultimate failsafe - runs via cron/launchd, ensures GSC always runs | retired |
+| **Layer 1** | GlobalServiceCoordinator | Self-healing daemon managing all critical services | retired (supervisord owns lifecycle) |
+| **Layer 1** | GlobalLSLCoordinator | Multi-project transcript monitoring manager | retired (launcher spawns ETMs directly) |
+| **Layer 2** | MonitoringVerifier | Pre-session verification (exit 0=OK, 1=FAIL, 2=WARN) | retired |
+| **Layer 3** | HealthVerifier | Core verification engine with auto-healing | reduced to one-shot CLI (`verify` / `status` / `report`) |
+| **Layer 4** | StatusLineHealthMonitor | Health aggregation for Claude Code status bar | retired (statusline reads coordinator directly) |
+| **Layer 5** | EnhancedTranscriptMonitor | Real-time per-project transcript monitoring | active (POSTs `lsl_heartbeat` to coordinator) |
+| **Layer 5** | LiveLoggingCoordinator | Logging orchestration with multi-user support | retired |
+| **Core** | ProcessStateManager | Unified registry with atomic file locking | retired |
 
 ![Health System Classes](../images/health-system-classes.png)
 
@@ -72,24 +75,23 @@ The system implements a robust 6-layer monitoring protection with 9 core classes
 - Exit codes: 0=OK, 1=Critical failure (MUST NOT START), 2=Warning
 - Validates: watchdog, coordinator, project registration, service health
 
-### Layer 3: HealthVerifier
+### Layer 3: HealthVerifier (now reporter-mode CLI)
 
 **Location:** `scripts/health-verifier.js`
 
-- Core verification engine with 15-second periodic checks
-- Checks databases (LevelDB, Qdrant, SQLite, Memgraph, CGR Cache), services, processes
-- Generates health scores (0-100) per service
-- Triggers auto-healing via HealthRemediationActions
-- Daemon robustness: Heartbeat mechanism, error handlers, and external watchdog
+Reduced to a one-shot reporter in plan 33-04. The `start` (daemon) subcommand was removed; the `[program:health-verifier]` supervisord block was retired in commit `58e968e45`. Surviving subcommands:
 
-### Layer 4: StatusLineHealthMonitor
+| Command | Effect |
+|---------|--------|
+| `verify` | Run database/service/process/file checks, POST a `verify_run` signal to the coordinator, exit 0/1 |
+| `status` | GET coordinator `/health/state`, print compact summary |
+| `report` | GET coordinator `/health/state`, print verbose (or `--json`) |
 
-**Location:** `scripts/statusline-health-monitor.js`
+Auto-healing was removed; remediation is operator-driven post-Phase-33. The coordinator owns periodic probing of services and databases.
 
-- Health aggregation for Claude Code status bar
-- 15-second update interval with auto-healing
-- Only shows sessions with running transcript monitors
-- Outputs to: `.logs/statusline-health-status.txt`
+### Layer 4: StatusLineHealthMonitor (retired)
+
+**Replaced by** on-demand rendering in `scripts/combined-status-line.js`. The statusline pulls coordinator `/health/state` per render and synthesizes the verifier-shape fields the badge logic needs. The legacy `.logs/statusline-health-status.txt` file is no longer written or read.
 
 ### Layer 5: EnhancedTranscriptMonitor
 

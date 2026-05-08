@@ -1,0 +1,47 @@
+@startuml health-coordinator-architecture
+!include _standard-style.puml
+
+title Health Monitoring Architecture (Phase 33)
+
+top to bottom direction
+
+package "Reporters (write signals)" {
+  rectangle "ETM (per project)\nenhanced-transcript-monitor.js" as ETM <<core>>
+  rectangle "Health verifier CLI\nhealth-verifier.js verify" as VERIFIER <<cli>>
+}
+
+package "Coordinator (single SoT)" {
+  rectangle "Health coordinator\nhealth-coordinator.js" as COORD <<core>>
+  database "/health/state\n(in-memory)" as STATE <<storage>>
+  COORD -[#888]- STATE
+}
+
+package "Consumers (read state)" {
+  rectangle "combined-status-line.js\n(tmux status-right)" as STATUSLINE <<util>>
+  rectangle "system-health-dashboard\n:3032 / :3033" as DASHBOARD <<api>>
+  rectangle "health-prompt-hook.js" as HOOK <<util>>
+}
+
+ETM -[#green,dashed]-> COORD : POST /signals\nlsl_heartbeat\n(every ~2s)
+VERIFIER -[#green,dashed]-> COORD : POST /signals\nverify_run\n(one-shot)
+
+STATUSLINE -[#orange]-> COORD : GET /health/state\n(per render)
+DASHBOARD  -[#orange]-> COORD : GET /health/state\n(card refresh)
+HOOK       -[#orange]-> COORD : GET /health/state\n(per prompt)
+
+note right of COORD
+  Marks LSL entries stopped
+  after >15s without a fresh
+  heartbeat. Probes services
+  (dashboard, vkb, semantic-
+  analysis SSE, llm_cli_proxy)
+  directly.
+end note
+
+note bottom of STATUSLINE
+  Stats lsl[*].transcriptPath
+  for activity age, then maps
+  to graduated cooling icons.
+end note
+
+@enduml

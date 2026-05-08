@@ -1,319 +1,243 @@
 # Health Monitoring
 
-Multi-layer supervision architecture for system reliability with multi-agent support and spawn storm prevention.
+Coordinator-centric health architecture (Phase 33). One process — the **health coordinator at :3034** — owns the live health state. Reporters POST signals, consumers (statusline, dashboard, prompt hooks) GET state. There is no longer a host-side `health-verifier` daemon, no `.health/verification-status.json` file, and no `.logs/statusline-health-status.txt` rollup.
 
-![Health System Architecture](../images/enhanced-health-monitoring-overview.png)
+![Health Coordinator Architecture](../images/health-coordinator-architecture.png)
 
-## Architecture Overview
+## Roles
 
-The health monitoring system uses a **multi-layer resilience architecture** with spawn storm prevention to ensure services stay running, with automatic recovery at each level.
+| Role | Process | Where it runs | Lifecycle |
+|------|---------|---------------|-----------|
+| Coordinator | `health-coordinator.js` | inside `coding-services` container, port 3034 (host-mapped) | supervisord-managed; `coding-services` healthcheck flips on failure |
+| ETM | `enhanced-transcript-monitor.js` | host (one per project) | spawned by `claude-mcp` launcher / `agent-common-setup.sh` |
+| Statusline producer | `combined-status-line.js` | host (per render) | tmux re-invokes via wrapper every 5 s |
+| Statusline cache reader | `combined-status-line-wrapper.js` | host (per render) | same |
+| Health verifier | `health-verifier.js` | host (CLI, one-shot) | invoked manually or from a scheduler — no daemon |
+| Dashboard | `system-health-dashboard/server.js` | inside container, ports 3032/3033 | supervisord-managed |
 
-| Layer | Component | Trigger | What It Supervises | Spawn Guards |
-|-------|-----------|---------|-------------------|--------------|
-| Cache | StatusLineFastPath | Every 5s (tmux) | N/A (read-only) | N/A |
-| 1 | CombinedStatusLine | Cache miss | GPS, SHM (fallback only) | GPS heartbeat gate |
-| 2 | GlobalProcessSupervisor | 30s loop | HealthVerifier, SHM, TranscriptMonitors | OS dup check, re-registration, GLC deference |
-| 2 | GlobalLSLCoordinator | 30s loop | TranscriptMonitors (primary) | Per-session, launched by coding |
-| 2 | GlobalServiceCoordinator | 15s loop | Constraint services (api, dashboard) | OS dup check, orphan kill, 2m cooldown, 6/hr limit |
-| 3 | HealthVerifier | 60s loop | Databases, Services, Processes | N/A |
-| Hook | HealthPromptHook | Every prompt | LSL (safety net) | 1/min lockfile rate limit |
+## Coordinator: source of truth
 
-**Key Guarantee**: If any service dies, it will be restarted within:
+**Endpoint:** `GET http://localhost:3034/health/state`
 
-- 30 seconds (by GlobalLSLCoordinator if session active, or GlobalProcessSupervisor)
-- Or the next cache miss (by CombinedStatusLine as fallback supervisor, only if GPS is also dead)
-- Or the next user prompt (by HealthPromptHook if GPS restart budget exhausted)
+```jsonc
+{
+  "container": { "healthcheck": "healthy", "last_probe_end": "..." },
+  "services": [
+    { "name": "enhanced_transcript_monitor", "status": "running", "derived_from": "lsl_heartbeats" },
+    { "name": "dashboard_server", "status": "running", "latency_ms": 1 }
+  ],
+  "lsl": {
+    "etm-87152-1778236220322:coding": {
+      "status": "running",
+      "lastBeat": 1778237165511,
+      "sessionId": "etm-87152-1778236220322",
+      "projectName": "coding",
+      "transcriptPath": "/Users/.../coding/9e40cccd-....jsonl",
+      "tmuxPane": null,
+      "source": "enhanced-transcript-monitor"
+    }
+  },
+  "lsl_by_project": { "coding": "healthy", "rapid-automations": "healthy" },
+  "processes": [],
+  "databases": { "status": "healthy", "levelDB": {}, "qdrant": {} },
+  "files": [],
+  "generated_at": "..."
+}
+```
 
-### Supervisor Priority
+**SoT promises:**
 
-Transcript monitors are managed by a priority-ordered chain of supervisors:
+- One writer (`health-coordinator.js`); no other process writes to `/health/state`.
+- LSL entries are marked `status=stopped` automatically after **>15 s** without a fresh `lsl_heartbeat` from their reporter.
+- ETM service status is **derived** from `lsl_heartbeats` — there is no `service_status` signal kind for ETM. Other services are probed directly by the coordinator.
+- `generated_at` is updated on every state refresh; consumers use it for staleness detection (`>180 s` is a `[🏥⏰]` stale badge).
 
-| Priority | Supervisor | When Active |
-|----------|-----------|-------------|
-| 1 (Primary) | GlobalLSLCoordinator | Session active (launched by `coding`) |
-| 2 (Fallback) | GlobalProcessSupervisor | No coordinator running |
-| 3 (Safety net) | HealthPromptHook | GPS exhausted + LSL down |
+## Reporters
 
-GPS checks for the coordinator daemon via `pgrep` before restarting. This prevents the dual-supervisor race condition where both spawn monitors simultaneously, causing the second to exit with "another instance already running".
+### ETM (per project)
 
-![Dual Supervisor Resolution](../images/dual-supervisor-resolution.png)
+`scripts/enhanced-transcript-monitor.js` — one per project, host-side. Heartbeats every poll cycle (~2 s):
 
-## Cache Layer: Fast-Path
+```jsonc
+POST /signals
+{
+  "kind": "lsl_heartbeat",
+  "session_id": "<from CLAUDE_SESSION_ID env>",
+  "source": "enhanced-transcript-monitor",
+  "status": "running" | "degraded",
+  "payload": {
+    "projectPath": "...",
+    "transcriptPath": "...",
+    "exchangeCount": 42,
+    "tmux_pane": "<TMUX_PANE or null>"
+  },
+  "ts": 1778237165511
+}
+```
 
-**Component**: `scripts/status-line-fast.cjs`
+`status: 'degraded'` is set when `isSuspiciousActivity` fires (0 exchanges processed in >30 min uptime — pipeline alive but stalled). Statusline maps this to `🟡` (`[LSL⚠️]`).
 
-**Function**: Ultra-fast CJS cache reader (~60ms) — invoked by tmux `status-right` every 5 seconds
+The ETM also writes per-project LSL files to `.specstory/history/YYYY/MM/YYYY-MM-DD_HHMM-HHMM_<hash>.md` and posts observation summaries to the proxy.
 
-- CommonJS module (no ESM overhead) — eliminates 2-18s ESM module resolution under system load
-- Reads pre-rendered status from `.logs/combined-status-line-cache.txt`
-- If cache <60s old: serves immediately
-- If cache >20s old: triggers background refresh via `combined-status-line.js` (detached, non-blocking)
-- Falls back to synchronous full CSL only if cache missing or >60s stale
+**Host path resolution:** ETM uses a `resolveHostCodingPath()` helper at script init that prefers `/Users/`-style values from `CODING_REPO` / `CODING_TOOLS_PATH` and falls back to `__dirname/..`. This avoids the `claude-mcp` launcher's `CODING_TOOLS_PATH=/coding` (in-container path) leaking into the host-side ETM and breaking redactor config / `.health` mkdir.
 
-## Layer 1: Display + Fallback Supervisor
+### Health verifier (one-shot CLI)
 
-**Component**: `scripts/combined-status-line.js`
+`scripts/health-verifier.js` is **reporter-mode only** since plan 33-04. Subcommands:
 
-**Function**: Full status display + fallback supervisor (GPS heartbeat-gated)
+| Command | Effect |
+|---------|--------|
+| `verify` | Run database/service/process/file checks; POST a `verify_run` signal to the coordinator; exit 0/1 |
+| `status` | GET `/health/state` from coordinator; print compact summary |
+| `report` | GET `/health/state` from coordinator; print verbose (or `--json`) |
 
-- Renders full status bar with all segments (health, quota, sessions, compliance, knowledge, LSL)
-- Writes pre-rendered output to `.logs/combined-status-line-cache.txt`
-- **GPS heartbeat gate**: ensure* supervision functions only run when GPS heartbeat is stale (>60s)
-- When GPS is running (normal): display-only, no process spawning
-- When GPS is dead: fallback supervisor for GPS, SHM, and transcript monitors
-- 2-minute active session gating (only spawns monitors for actively-written transcripts)
-- Respects intentional stop markers (prevents restart loops)
+The `start` daemon subcommand was removed when the coordinator took over lifecycle. The supervisord `[program:health-verifier]` block was likewise retired (the program ran `health-verifier.js start` which now exits with "Unknown command: start"; it was kept with `autostart=false` as a transitional shim until commit `58e968e45` removed it entirely).
 
-## Layer 2: Active Supervision
+## Consumers
 
-### GlobalProcessSupervisor
+### Statusline (`combined-status-line.js`)
 
-**Component**: `scripts/global-process-supervisor.js`
+- Pulls `/health/state` once per render.
+- Maps `lsl_by_project[*]` rollup → 3-state (healthy/degraded/stopped).
+- For each `healthy` project, stats the corresponding `lsl[*].transcriptPath` mtime to compute user-activity age and bucket into the lifecycle (🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤).
+- Synthesizes "verifier-shape" fields for the `[🏥...]` badge from coordinator services + databases + container healthcheck — no `.health/verification-status.json` read.
 
-**Function**: Continuous supervision of all services with OS-level fallback
+### Dashboard (`integrations/system-health-dashboard`)
 
-- 30-second supervision loop with dynamic project discovery
-- Discovers projects from: PSM registry, health files, Claude transcript directories
-- **OS-level fallback**: When PSM says "not registered", checks OS process table via `findRunningProcessesByScript()` — re-registers alive services instead of blind respawn
-- **Defers to GlobalLSLCoordinator**: Before restarting a transcript monitor, checks for an active coordinator daemon via `pgrep`. If the coordinator is managing monitors, GPS skips the restart to prevent dual-supervisor conflicts
-- Health file staleness threshold: **120 seconds** (2× write interval, prevents false-positive "dead" detection at boundary)
-- 5-minute cooldown per service prevents restart storms
-- Max 10 restarts per hour per service (safety limit)
-- Respects intentional stop markers
-- Auto-restarts on own code change via AutoRestartWatcher
-- Heartbeat file: `.health/supervisor-heartbeat.json`
+- Backend (`server.js`) at port 3033 reads coordinator state and exposes per-card APIs.
+- Frontend at port 3032 polls the API.
+- Supervisord process panel reads supervisorctl directly inside the container (the coordinator does not surface raw supervisord state).
+- The `cgr_cache` tile reads `.cgr/cache-metadata.json` via Node fs (no `jq` dependency) and computes commits-behind via `git rev-list`.
 
-### GlobalLSLCoordinator
+### Health prompt hook (`scripts/health-prompt-hook.js`)
 
-**Component**: `scripts/global-lsl-coordinator.js`
+- Runs on every prompt submit.
+- Reads `/health/state` and surfaces a one-line health summary to the prompt.
+- Trusts the coordinator's `overallStatus` — does not re-classify based on accepted/non-critical violations.
 
-**Function**: Per-session transcript monitor management (primary supervisor for monitors)
+## Session activity lifecycle
 
-- Started by `launch-claude.sh` when a coding session begins
-- 30-second health check loop per registered project
-- **Primary supervisor** for transcript monitors — GPS defers when coordinator is active
-- Registers monitors with PSM, cleans up dead processes
-- Can run in `ensure` mode (one-shot) or `monitor` mode (daemon)
+The graduated cooling icons in the statusline come from per-project transcript mtime, not heartbeat freshness:
 
-### GlobalServiceCoordinator
+| Icon | Status | Time since last activity |
+|------|--------|--------------------------|
+| 🟢 | Active | < 5 min |
+| 🌲 | Cooling | 5 – 15 min |
+| 🫒 | Fading | 15 min – 1 h |
+| 🪨 | Dormant | 1 – 6 h |
+| ⚫ | Inactive | 6 – 24 h |
+| 💤 | Sleeping | ≥ 24 h |
 
-**Component**: `scripts/global-service-coordinator.js`
+The thresholds match `docs/health-system/status-line.md`. The user-activity age is computed client-side by stat-ing `lsl[*].transcriptPath`, since the coordinator's 3-state `lsl_by_project` rollup is binary-ish (healthy/degraded/stopped) and doesn't surface mtime.
 
-**Function**: Manages constraint services (api-service port 3031, dashboard-service port 3030). These services are managed by supervisord inside the `coding-services` container.
+## Bind-mount staleness supervision
 
-- 15-second health check loop with port-based liveness checks
-- **OS-level duplicate check** via `findRunningProcessesByScript()` before every spawn
-- **Orphan kill**: Kills spawned process if post-spawn health check fails (prevents accumulation)
-- **Cooldown**: 2-minute per-service cooldown between restart attempts
-- **Rate limiting**: Max 6 restarts per service per hour
-
-## Layer 3: Verification & Auto-Healing
-
-**Component**: `scripts/health-verifier.js`
-
-**Function**: Periodic health verification with auto-healing
-
-- 60-second periodic checks
-- Dynamic discovery of ALL projects
-- Checks databases (LevelDB, Qdrant, SQLite, Memgraph), services, processes
-- Generates health scores (0-100) per service
-- Triggers auto-healing via HealthRemediationActions
-
-### host.docker.internal endpoint rewriting
-
-`checkHTTPHealth` rewrites `host.docker.internal:*` URLs to `localhost:*` when the verifier is running on the host (no `/.dockerenv`). The same rule config is shared by the in-container verifier — which keeps `host.docker.internal` since it actually works there — and the host-side daemon, which would otherwise mark services like the LLM CLI proxy unavailable purely because `host.docker.internal` doesn't resolve outside Docker.
-
-### Bind-mount staleness supervision
-
-macOS Docker Desktop occasionally caches single-file bind-mounts at mount time and stops reflecting later host edits — the symptom is that the container sees a truncated/older copy of the file while the host has the current content, silently breaking YAML/JSON loaders inside the container.
+macOS Docker Desktop occasionally caches single-file bind-mounts at mount time and stops reflecting later host edits — the symptom is that the container sees a truncated/older copy while the host has the current content, silently breaking YAML/JSON loaders inside the container.
 
 The verifier compares host `stat` vs `docker exec stat` for each bind-mounted file in `coding-services`:
 
 | Watched file | Why |
 |--------------|-----|
 | `.constraint-monitor.yaml` | Constraint config — drift breaks the dashboard |
-| `.global-lsl-registry.json` | LSL coordinator status — drift hides projects |
 | `integrations/system-health-dashboard/server.js` | Dashboard code — drift causes startup failures |
 | `scripts/consolidate-observations.js` | Consolidator CLI — drift desyncs heartbeat schema |
 
-When sizes diverge, the verifier raises a `bind_mount_freshness` violation and the `refresh_bind_mounts` remediation runs `docker-compose up -d --force-recreate coding-services` (with the standard per-action cooldown to avoid restart loops; refuses to run from inside the container).
+When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Remediation is operator-driven (`docker-compose up -d --force-recreate coding-services`); no auto-heal is wired in post-Phase-33.
 
-![Bind-mount staleness detection and auto-healing](../images/bind-mount-staleness-detection.png)
+![Bind-mount staleness detection](../images/bind-mount-staleness-detection.png)
 
-## Status Aggregation
+## Health dashboard
 
-**Component**: `scripts/statusline-health-monitor.js`
+**Frontend:** `http://localhost:3032`
+**API:** `http://localhost:3033`
 
-**Function**: Aggregates health from all layers for display
+### Cards
 
-- 15-second update interval with auto-healing
-- Multi-agent detection: Claude, Copilot, OpenCode (via process scanning)
-- Agent age cap: running agent's display age capped at monitor uptime
-- **Not-found transcript guard**: agents without Claude-compatible transcripts (e.g., OpenCode) correctly show as ⚫ inactive instead of falsely 🟢 active
-- Sessions only removed when agent process exits, never hidden
-- Outputs to: `.logs/statusline-health-status.txt`
+| Card | Source |
+|------|--------|
+| Databases (LevelDB / Qdrant / CGR Cache) | coordinator `databases` + dashboard `cgr_cache` synthesis |
+| Services (VKB / Constraint Monitor / Dashboard / Semantic Analysis SSE) | coordinator `services` |
+| Processes (Process Registry / Stale PIDs) | coordinator `processes` |
+| UKB Workflows (status / capacity / history) | semantic-analysis SSE server (:3848) |
+| Service Detail (Port Liveness / Supervisord Processes) | dashboard server probes ports + queries supervisorctl |
 
-### Multi-Agent Detection
+### Key API endpoints
 
-The health monitor detects all coding agent types by scanning process tables:
+| Endpoint | Description |
+|----------|-------------|
+| `/api/health` | Dashboard's own self-healthcheck (not the coordinator rollup) |
+| `/api/cgr/freshness` | CGR cache freshness; probes Memgraph reachability |
+| `/api/health-verifier/status` | Pass-through to coordinator `/health/state` |
+| `/api/health-verifier/report` | Same, verbose |
+| `/api/ukb/*` | UKB workflow control + history |
 
-| Agent | Binary | Detection |
-|-------|--------|-----------|
-| Claude | `claude` | `ps -eo pid,comm` exact match |
-| Copilot | `copilot` | Path-ending match `/copilot$` |
-| OpenCode | `opencode` | Path-ending match `/opencode$` |
+## Retired components (do not write/read)
 
-Agent project association is resolved via `lsof -p <PID> | grep cwd` → extracts project name from `/Agentic/<project>` path.
-
-### Session Lifecycle
-
-Sessions use a graduated cooling scheme based on idle time:
-
-```
-🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → 💤 Sleeping
-   <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
-```
-
-- **Agent running**: Age capped at monitor uptime (fresh sessions start green, cool naturally)
-- **No agent**: Removed from display (session closed)
-- **Never hidden**: All states are visible, including 💤 sleeping
-
-## Per-Project Monitoring
-
-**Component**: `scripts/enhanced-transcript-monitor.js`
-
-**Function**: Real-time transcript monitoring per project
-
-- 2-second check interval for prompt detection
-- Writes health files to centralized `.health/` directory
-- Generates LSL files in `.specstory/history/`
-- **Periodic flush**: Writes accumulated exchanges every 5 minutes during long agent runs (prevents multi-hour buffering)
-- **Idle timeout with tmux guard**: After 30 minutes of no transcript activity, checks for active tmux session via pane cwd. If session exists, stays alive instead of exiting (prevents wasting GPS restart budget overnight)
-- Auto-restarts on code change via AutoRestartWatcher
-- Marks project as intentionally stopped on graceful shutdown
-
-## Auto-Restart on Code Change
-
-**Component**: `scripts/auto-restart-watcher.js`
-
-**Function**: Watches script files on disk for changes
-
-- Uses `fs.watchFile` with 5-second poll interval
-- 2-second debounce for rapid saves
-- Triggers graceful exit on change — supervision restarts with new code
-- Used by: GlobalProcessSupervisor, StatusLineHealthMonitor, EnhancedTranscriptMonitor
-
-## Health Dashboard
-
-**URL**: `http://localhost:3032`
-
-**Features**:
-
-- Real-time service status (3-card system: Databases, Services, Processes)
-- UKB Workflow Monitor with visual workflow graph
-- Service restart controls
-- Auto-healing history
-
-### API Endpoints (Port 3033)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Overall system health |
-| `/api/services` | GET | Individual service status |
-| `/api/metrics` | GET | Health metrics history |
-| `/api/alerts` | GET | Recent alerts |
-
-## Health Files
-
-| File | Purpose |
-|------|---------|
-| `.health/verification-status.json` | HealthVerifier output |
-| `.health/supervisor-heartbeat.json` | GlobalProcessSupervisor heartbeat |
-| `.health/*-transcript-monitor-health.json` | Per-project health files (centralized) |
-| `.logs/statusline-health-status.txt` | StatusLineHealthMonitor rendered output |
-| `.logs/combined-status-line-cache.txt` | Pre-rendered status cache (served by fast-path) |
-| `.live-process-registry.json` | ProcessStateManager registry |
+| Component | Removed in | Replacement |
+|-----------|-----------|-------------|
+| Host-side `health-verifier` daemon (`start` subcommand) | Plan 33-04 | Coordinator `:3034` |
+| `[program:health-verifier]` supervisord block | Commit `58e968e45` | n/a |
+| `[program:browser-access]` supervisord block | Commit `1cd72cd2b` | `/gsd-browser` (Playwright via CLI) |
+| `.health/verification-status.json` | Plan 33-04 | Coordinator `/health/state` |
+| `.logs/statusline-health-status.txt` | Plan 33-04 | Coordinator `lsl_by_project` |
+| `.lsl/global-registry.json` | Plan 33-04 | Coordinator `lsl` map |
+| `GlobalProcessSupervisor` daemon | Plan 33-04 | Coordinator + supervisord |
+| `GlobalLSLCoordinator` daemon | Plan 33-04 | Coordinator + per-launcher ETM spawn |
+| `StatusLineHealthMonitor` daemon | Plan 33-04 | On-demand render in `combined-status-line.js` |
 
 ## Troubleshooting
 
-### Status bar blank
+### Coordinator unreachable / `[🏥💤]`
 
 ```bash
-# Check cache file freshness
-ls -la .logs/combined-status-line-cache.txt
+# Is the container up?
+docker ps --format '{{.Names}} {{.Status}}' | grep coding-services
 
-# Test fast-path directly (should complete in <100ms)
-time node scripts/status-line-fast.cjs
+# Is the coordinator port mapped?
+lsof -nP -iTCP:3034 -sTCP:LISTEN
 
-# Force full refresh
+# Direct probe
+curl -fs http://localhost:3034/health/state | jq '.generated_at'
+```
+
+### LSL pipeline stalled (no new files / no observations)
+
+The most common cause is the ETM hitting an init error after which a half-baked redactor singleton blocks all subsequent transcript processing. Symptoms: ETMs are alive and heartbeating (`status=running`) but `exchangeCount=0` for hours and no LSL files / observations appear.
+
+```bash
+# ETM log for redactor / ENOENT errors
+tail -100 transcript-monitor.log | grep -iE 'not initialized|enoent.*\.health|enoent.*\.specstory.*config'
+
+# If the env has CODING_TOOLS_PATH=/coding (the in-container path), the host-side
+# resolver in enhanced-transcript-monitor.js should reject it and fall back to
+# __dirname/.. — verify the fix is in place:
+grep -n 'resolveHostCodingPath' scripts/enhanced-transcript-monitor.js
+
+# Restart with a clean env:
+pkill -f 'enhanced-transcript-monitor.js.*coding'
+nohup env -i HOME=$HOME PATH=$PATH \
+  CODING_REPO=/Users/Q284340/Agentic/coding \
+  node scripts/enhanced-transcript-monitor.js /Users/Q284340/Agentic/coding \
+  >> .logs/etm-coding.log 2>&1 &
+```
+
+### Status line shows residual chars (`12:411`, `13:0656`)
+
+See [Status Line / Right-edge stability](../guides/status-line.md#right-edge-stability-nbsp-terminator--codepoint-padding) — verify the wrapper preserves trailing whitespace and the producer pads to ≥220 codepoints + NBSP terminator.
+
+### Project shows 🟢 despite hours idle
+
+The cooling lifecycle depends on `transcriptPath` mtime. If the project shows 🟢 but should be ⚫, either the transcript path is wrong or the file isn't being read:
+
+```bash
+# Coordinator's transcriptPath for the project
+curl -fs http://localhost:3034/health/state \
+  | jq '.lsl | to_entries[] | select(.value.projectName=="rapid-automations")'
+
+# Is that file actually on disk and being updated?
+stat /Users/.../target.jsonl
+
+# Force a fresh statusline render
+rm -f .logs/combined-status-line-cache-*.txt
 node scripts/combined-status-line.js
-
-# Check for process spawn storm (should be <80 Node processes)
-ps aux | grep node | wc -l
-```
-
-## Troubleshooting
-
-### LSL shows red / monitor crash-loop
-
-```bash
-# Check GPS restart history (look for "exceeded hourly restart limit")
-grep "coding" .logs/global-process-supervisor.log | tail -20
-
-# Check if dual supervisors are competing
-pgrep -f "global-lsl-coordinator.js monitor"  # Should be 0 or 1
-pgrep -f "global-process-supervisor"            # Should be exactly 1
-
-# Check if monitor exits due to "another instance already running"
-# Start a test monitor with visible output:
-node scripts/enhanced-transcript-monitor.js /path/to/project 2>&1 | head -20
-
-# Force clean restart
-node scripts/global-lsl-coordinator.js ensure /path/to/project
-```
-
-### Monitor not updating
-
-```bash
-# Check if process is running
-ps aux | grep enhanced-transcript-monitor
-
-# Check health file timestamp
-ls -la .health/coding-transcript-monitor-health.json
-
-# Force restart (supervisor will restart automatically)
-kill $(pgrep -f "enhanced-transcript-monitor.*coding")
-```
-
-### Session not showing
-
-```bash
-# Check if agent process is detected
-ps -eo pid,comm | awk '/claude$|copilot$|opencode$/ {print}'
-
-# Check agent's working directory
-lsof -p <PID> 2>/dev/null | grep cwd
-
-# Check health monitor status
-cat .logs/statusline-health-status.txt
-```
-
-### Health dashboard not loading
-
-```bash
-# Check if server is running
-lsof -i :3032
-
-# Check health API
-curl http://localhost:3033/api/health
-```
-
-### Services stuck unhealthy
-
-```bash
-# Manual health check with auto-heal
-node scripts/health-verifier.js --auto-heal
-
-# View health status
-cat .health/verification-status.json | jq '.'
 ```

@@ -2,6 +2,8 @@
 
 Automatic system health monitoring and self-healing that ensures a stable development environment.
 
+> **Phase 33 architecture (current).** The 6-layer multi-supervisor design described below is the historical model. Phase 33 (plan 33-04) consolidated lifecycle ownership into a single **health coordinator at `:3034`** running inside the `coding-services` container; reporters (ETM, `health-verifier verify` CLI) POST signals and consumers (statusline, dashboard, prompt hook) read state. The retired daemons (`HealthVerifier` daemon mode, `StatusLineHealthMonitor`, `GlobalProcessSupervisor`, `GlobalLSLCoordinator`, `SystemMonitorWatchdog`) and on-disk artifacts (`.health/verification-status.json`, `.logs/statusline-health-status.txt`, `.lsl/global-registry.json`) are no longer in use. See [`docs-content/architecture/health-monitoring.md`](../../docs-content/architecture/health-monitoring.md) and [`docs-content/guides/status-line.md`](../../docs-content/guides/status-line.md) for the current model.
+
 ![System Health Dashboard](../images/health-monitor.png)
 
 ## What It Provides
@@ -16,7 +18,7 @@ The Health System provides **failsafe monitoring** with automatic verification a
 
 ## Architecture
 
-![Health System Architecture](../images/enhanced-health-monitoring-overview.png)
+![Health System Architecture](../images/health-monitoring-overview.png)
 
 ### Core Components
 
@@ -39,7 +41,7 @@ The health system is built on interconnected components with active supervision:
 
 ### Supervision Architecture
 
-![Health Monitoring Architecture](../images/enhanced-health-monitoring-overview.png)
+![Health Monitoring Architecture](../images/health-monitoring-overview.png)
 
 **Cache Layer** - `status-line-fast.cjs` serves pre-rendered cache in ~60ms (CJS, no ESM overhead)
 **Display + Fallback Layer** - CombinedStatusLine renders full status, writes cache; ensure* functions gated by GPS heartbeat

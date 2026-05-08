@@ -1,5 +1,14 @@
 # Status Line System
 
+> **Phase 33 architecture (current).** This document describes the historical multi-layer rendering pipeline. The current model is documented in [`docs-content/guides/status-line.md`](../../docs-content/guides/status-line.md). Key changes since this doc was last fully reviewed:
+>
+> - The `[🐳MCP:...]` Docker MCP block has been removed from the rendered output.
+> - The `[🏥...]` health badge reads live from the coordinator at `:3034/health/state`; the `.health/verification-status.json` file is no longer written.
+> - Per-pane LSL status comes from the coordinator's `lsl_by_project` rollup + `lsl[*].transcriptPath` mtime; the `.logs/statusline-health-status.txt` file is no longer written.
+> - The right edge is anchored with codepoint-floor padding (≥220 codepoints, after stripping zero-width tmux markup) plus a non-breaking-space terminator (U+00A0) to survive tmux's `#(shell-cmd)` trailing-whitespace strip.
+> - The graduated cooling lifecycle (🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤) is preserved and is now driven by `lsl[*].transcriptPath` mtime instead of in-memory monitor state.
+> - `[program:health-verifier]` and `[program:browser-access]` supervisord blocks are gone.
+
 Real-time visual indicators of system health and development activity, rendered in the **tmux status bar** for all coding agents (Claude Code, CoPilot, and future agents).
 
 ## Tmux-Based Rendering

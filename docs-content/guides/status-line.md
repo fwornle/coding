@@ -1,6 +1,6 @@
 # Status Line Complete Guide
 
-Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions by `tmux-session-wrapper.sh`, which configures `status-right` to invoke `status-line-fast.cjs` — an ultra-fast CJS cache reader (~60ms) that serves pre-rendered status from a file-based cache, eliminating the 2-18s ESM module loading penalty under system load.
+Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions; `status-right` invokes `combined-status-line-wrapper.js`, which reads a per-project pre-rendered cache (~60ms warm-path) and falls back to `combined-status-line.js` for full re-renders. The renderer pulls live state from the **health coordinator at :3034** (Phase 33 single source of truth, replacing the retired host-side `health-verifier` daemon and `.health/verification-status.json` file).
 
 ![Status Line Display](../images/status-line-display.png)
 
@@ -9,20 +9,21 @@ Real-time visual indicators of system health and development activity rendered v
 ### Example Display
 
 ```
-[🐳MCP:SA✅CM✅CGR✅] [🏥✅] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [RA⚫C🟢] [🔒 77% ⚙️IMP] [📚❌] [📋18-19] 18:34
 ```
+
+The current pane's project is rendered with an underline (`#[underscore]…#[nounderscore]`) so each parallel tmux window highlights its own project.
 
 ### Component Breakdown
 
 | Component | Example | Description |
 |-----------|---------|-------------|
-| Docker MCP Health | `[🐳MCP:SA✅CM✅CGR✅]` | Health of containerized MCP SSE servers |
-| System Health | `[🏥✅]` | Unified health (infrastructure + services) |
-| Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons |
-| Constraint Compliance | `🔒 67%` | Code quality compliance percentage |
-| Trajectory State | `🔍 EX` | Current development activity |
+| System Health | `[🏥✅]` | Coordinator-derived health rollup (services + databases + container) |
+| Active Sessions | `[RA⚫C🟢]` | Per-project abbreviations with graduated activity icons |
+| Constraint + Trajectory | `[🔒 77% ⚙️IMP]` | Code quality % and current trajectory state |
 | Knowledge System | `[📚✅]` | Knowledge extraction status |
-| LSL Time Window | `📋17-18` | Session time range (HHMM-HHMM) |
+| LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
+| Time | `18:34` | Local HH:MM, anchored to the right edge |
 
 ---
 
@@ -30,13 +31,15 @@ Real-time visual indicators of system health and development activity rendered v
 
 ### System Health Indicators
 
+The badge is derived live from the coordinator at `:3034/health/state`. There is no longer a host-side `health-verifier` daemon; the badge reflects the coordinator's rollup of probed services, database checks, and container healthcheck.
+
 | Display | Meaning | Action |
 |---------|---------|--------|
 | `[🏥✅]` | All systems healthy | None needed |
-| `[🏥⚠️]` | Issues detected | Check dashboard for details |
-| `[🏥⏰]` | **Stale** - verification data >2 minutes old | Health verifier may have crashed |
-| `[🏥❌]` | Critical issues or error | Immediate attention required |
-| `[🏥💤]` | Health verifier offline | Start health verifier |
+| `[🏥⚠️]` | Non-critical issue (e.g. degraded service or GCM warning) | Check dashboard for details |
+| `[🏥⏰]` | **Stale** — coordinator's `generated_at` >3 minutes old | Coordinator may be down; check container |
+| `[🏥❌]` | Critical issue (downed service, unhealthy DB, container probe fail) | Immediate attention required |
+| `[🏥💤]` | Coordinator unreachable | Verify dashboard service is running |
 
 ### Session Activity Indicators
 
@@ -86,60 +89,35 @@ Sessions use a **graduated color scheme** based on time since last activity. **A
 | Paused/Disabled | `[📚🔇 ]` | Knowledge extraction disabled in config |
 | Offline | `[📚❌]` | System offline or initialization failed |
 
-### Internal Health Components
+### Coordinator Health Endpoint
 
-The statusline-health-monitor writes detailed health to `.logs/statusline-health-status.txt`:
+The statusline pulls all health-related signals live from the coordinator. Inspect raw state with:
 
+```bash
+curl -fs http://localhost:3034/health/state | jq .
 ```
-[GCM:✅] [Sessions: C:🟢] [Guards:✅] [DB:✅] [VKB:✅] [Browser:✅] [Dash:✅]
-```
 
-| Label | Ports | Service | Description |
-|-------|-------|---------|-------------|
-| `GCM` | - | Global Process Supervisor | Session coordinator and auto-restart |
-| `Sessions` | - | Transcript Monitors | Per-project Claude session health |
-| `Guards` | 3030/3031 | Constraint Monitor | Dashboard and API for code quality |
-| `DB` | - | Databases | LevelDB, SQLite, Qdrant, Memgraph |
-| `VKB` | 8080 | Knowledge Visualization | Graph visualization server |
-| `Browser` | 3847 | Browser Automation | SSE server for parallel sessions |
-| `Dash` | 3032/3033 | System Health Dashboard | UI and API for health monitoring |
+| Top-level key | Meaning |
+|--------------|---------|
+| `container.healthcheck` | Docker `coding-services` container probe result |
+| `services` | List of probed services with `status`, `last_seen`, `latency_ms`, `probe_error` |
+| `databases` | LevelDB / Qdrant / Memgraph availability + lock state |
+| `lsl` | Per-session ETM heartbeats (sessionId, projectName, transcriptPath, lastBeat) |
+| `lsl_by_project` | 3-state rollup per project: `healthy` / `degraded` / `stopped` |
+| `processes` | Stale-PID / uptime / CPU / memory / zombie checks |
+| `files` | Disk space, log file size, services-running file freshness |
+| `generated_at` | Coordinator's last refresh — drives the `[🏥⏰]` staleness check |
+
+Phase 33 retired the `.logs/statusline-health-status.txt` rollup and the `.health/verification-status.json` file; do not write or read those paths in new code.
 
 ### Transcript Discovery Auto-Heal
 
-The statusline-health-monitor detects **broken transcript monitors** — monitors running but unable to find their project's Claude JSONL transcript (e.g., path encoding mismatch).
+The ETM (`enhanced-transcript-monitor.js`) detects **broken transcript discovery** — monitor running but unable to locate its project's transcript JSONL.
 
-- **Detection**: Monitor running >2 min with `transcriptPath: null`
-- **Remediation**: Kills broken monitor; GPS auto-restarts it
-- **Display**: Session shows `🟡` warning instead of silently disappearing
-- **Path encoding**: Claude Code replaces both `/` and `_` with `-` (e.g., `/_work/` → `--work-`)
-
----
-
----
-
-## Containerized MCP Indicators
-
-### Docker MCP Health Display
-
-| Abbreviation | Service | Port | Health Check |
-|--------------|---------|------|--------------|
-| `SA` | Semantic Analysis | 3848 | `http://localhost:3848/health` |
-| `CM` | Constraint Monitor | 3849 | `http://localhost:3849/health` |
-| `CGR` | Code Graph RAG | 3850 | `http://localhost:3850/health` |
-
-### Status Icons
-
-- `✅` - Service healthy and responding
-- `❌` - Service down or not responding
-- `⚠️` - Service responding but with issues
-
-### Examples
-
-| Display | Meaning |
-|---------|---------|
-| `[🐳MCP:SA✅CM✅CGR✅]` | All Docker MCP services healthy |
-| `[🐳MCP:SA✅CM❌CGR✅]` | Constraint Monitor is down |
-| `[🐳MCP:SA⚠️CM✅CGR✅]` | Semantic Analysis has issues |
+- **Detection**: ETM heartbeat reports `transcriptPath: null` while uptime exceeds the discovery grace period
+- **Remediation**: ETM exits with non-zero status; the launcher / supervisor restarts it
+- **Display**: Project rolls up as `degraded`, surfaces as `🟡` in the sessions block
+- **Path encoding**: Claude Code replaces both `/` and `_` with `-` (e.g. `/_work/` → `--work-`)
 
 ---
 
@@ -167,37 +145,42 @@ This replaces the previous approach of using agent-specific status bar APIs (e.g
 
 ### Cache Fast-Path
 
-The `status-line-fast.cjs` is a CommonJS module that eliminates ESM module loading overhead:
+`combined-status-line-wrapper.js` reads a per-project pre-rendered cache to avoid the ~2-18s ESM module load on cold-start:
 
-- Reads pre-rendered status from `.logs/combined-status-line-cache.txt`
-- If cache <60s old → **serves immediately** (~60ms)
-- If cache >20s old → triggers **background refresh** via `combined-status-line.js` (detached)
-- If cache missing/stale → synchronous fallback to full CSL
+- Cache file: `.logs/combined-status-line-cache-<project>.txt` (one per tmux pane, keyed by `TMUX_PANE_PATH` basename)
+- Cache TTL: 30 s — fresh reads serve in <100 ms
+- Cold or stale: spawns the full `combined-status-line.js` (inherits stdio so its output streams to tmux)
+- The wrapper preserves trailing whitespace and the NBSP terminator on cached output (see "Right-edge stability" below)
 
-This ensures the status bar **never goes blank** under system load (ESM imports took 2-18s under high process count).
+### Right-edge stability (NBSP terminator + codepoint padding)
+
+The status-right truncation pipeline in tmux interacts with emoji widths in a way that can leave residual chars at the right edge ("12:411", "13:0656" — leftover digits from a previous, wider render). Two stacked tactics anchor the right edge:
+
+1. **Codepoint-floor padding**: pad the rendered string to ≥ 220 codepoints (after stripping zero-width tmux `#[…]` markup). Counted via `[...s].length` (codepoints), not `s.length` (UTF-16 units). Every codepoint is at minimum 1 cell in tmux's measurement, so 220 codepoints ≥ 200 cells — comfortably above `status-right-length=200`. Tmux always truncates to exactly 200 cells, fully overwriting prior-render residue.
+
+2. **Anti-strip terminator**: end the line with one **non-breaking space** (U+00A0). tmux's `#(shell-cmd)` substitution strips trailing ASCII whitespace before plugging into the format; without a non-ASCII-whitespace terminator the trailing-space pad would be dropped. NBSP is 1 cell, visually identical to space, but is not ASCII whitespace — the strip stops on it and the pad survives.
+
+The combination is robust across tmux versions despite UAX#11 / VS-16 disagreements on emoji width (tmux counts ⚠️ ⚙️ as 1 cell while terminals render them as 2; predicting tmux's count exactly would mirror its internal table per version).
 
 ### Status Line Update Flow
 
 ![Status Line Hook Timing](../images/status-line-hook-timing.png)
 
-**Cache Fast-Path (normal operation):**
+**Cache fast-path (normal operation):**
 
-1. **Tmux Timer**: `status-right` fires every 5 seconds → `status-line-fast.cjs`
-2. **Cache Check**: Read `.logs/combined-status-line-cache.txt`
-3. If cache fresh → serve immediately (~60ms), done
-4. If cache >20s → trigger background refresh (detached `combined-status-line.js`)
+1. **tmux status-interval**: `status-right` fires every 5 s → `combined-status-line-wrapper.js`
+2. **Cache check**: read `.logs/combined-status-line-cache-<project>.txt`
+3. Fresh (<30 s): pass through to tmux (preserving trailing NBSP terminator), done
+4. Stale or missing: spawn `combined-status-line.js` inline
 
-**Full Refresh (background or fallback):**
+**Full refresh:**
 
-1. **Status Collection**:
-   - Read health verification status
-   - Query constraint monitor API
-   - Read trajectory state file
-   - Scan LSL registry
-2. **Status Aggregation**: Combine all indicators
-3. **Display**: Render to tmux status bar (supports tmux formatting codes: `#[underscore]`, `#[bold]`, colors)
-4. **Cache Write**: Save to `.logs/combined-status-line-cache.txt`
-5. **GPS Check**: If GPS heartbeat >60s stale, run ensure* functions as fallback supervisor
+1. **State pull**: single `GET http://localhost:3034/health/state` from the coordinator (with curl fallback if the coordinator is unreachable)
+2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🌲 / 🫒 / 🪨 / ⚫ / 💤)
+3. **Constraint compliance**: cached call to constraint-monitor API (port 3031)
+4. **Trajectory state**: read `.specstory/trajectory/live-state.json` for the current pane's project
+5. **Render**: assemble parts, pad to ≥ 220 codepoints + NBSP terminator
+6. **Cache write**: save to `.logs/combined-status-line-cache-<project>.txt`
 
 ### Caching
 
@@ -231,13 +214,15 @@ The supervision architecture includes guards to prevent runaway process spawning
 ### State Transitions
 
 **Health States** (for `[🏥...]` indicator):
-- Health check success → Healthy (✅)
-- GCM or Health Verifier issues → Warning (⚠️)
-- Critical failures → Critical (❌)
+- Coordinator reachable + 0 critical issues → Healthy (✅)
+- Coordinator reachable + ≥1 service `degraded` / GCM warning → Warning (⚠️)
+- Coordinator reachable + critical failure (downed service, unhealthy DB, container probe fail) → Critical (❌)
+- Coordinator `generated_at` >3 min old → Stale (⏰)
+- Coordinator unreachable → Offline (💤)
 
 **Session States** (graduated cooling scheme):
-- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤
-- Sessions only removed when agent exits, never hidden while running
+- Driven by `transcriptPath` mtime in coordinator state, bucketed: 🟢 (<5 m) → 🌲 (<15 m) → 🫒 (<1 h) → 🪨 (<6 h) → ⚫ (<24 h) → 💤 (≥24 h)
+- Sessions only removed when the project's ETM stops heartbeating, never hidden while alive
 
 ---
 
@@ -291,33 +276,22 @@ Project names are automatically abbreviated:
 
 ### Status Line Configuration
 
-**File**: `config/status-line-config.json`
+The renderer reads a small set of environment variables and the coordinator endpoint; legacy `config/status-line-config.json` `health_source` / `lsl_registry` keys are no longer consulted.
 
-```json
-{
-  "enabled": true,
-  "update_interval_ms": 5000,
-  "cache_duration_ms": 300000,
-  "health_source": ".health/verification-status.json",
-  "trajectory_source": ".specstory/trajectory/live-state.json",
-  "lsl_registry": ".lsl/global-registry.json",
-  "constraint_api": "http://localhost:3031/api/compliance/{project}",
-  "abbreviation_style": "smart",
-  "multi_session_display": true,
-  "max_sessions_displayed": 5
-}
-```
+| Env var | Purpose | Default |
+|---------|---------|---------|
+| `HEALTH_COORDINATOR_URL` | Coordinator base URL | `http://localhost:3034` |
+| `TMUX_PANE_PATH` | Per-pane current path (set by tmux) | — |
+| `TRANSCRIPT_SOURCE_PROJECT` | Override project path resolution | — |
+| `CODING_REPO` | Repo root for cache file location | script's `__dirname/..` |
+| `CLAUDE_SESSION_ID` / `SESSION_ID` | Session identifier for per-pane lookups | — |
 
-### Configuration Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `enabled` | Toggle status line on/off | `true` |
-| `update_interval_ms` | How often to check for updates | 5000ms |
-| `cache_duration_ms` | How long to cache health status | 5 minutes |
-| `abbreviation_style` | `smart` \| `first-letter` \| `full-name` | `smart` |
-| `multi_session_display` | Show multiple sessions or just active one | `true` |
-| `max_sessions_displayed` | Maximum sessions to show | 5 |
+| Tunable | Where | Default |
+|---------|-------|---------|
+| `STATUS_LINE_TARGET_CODEPOINTS` | top of `combined-status-line.js` | 220 |
+| Cache TTL | wrapper script | 30 s |
+| Tmux refresh interval | `~/.tmux.conf` `status-interval` | 5 s |
+| `status-right-length` | `~/.tmux.conf` | 200 |
 
 ---
 
@@ -369,16 +343,21 @@ ps aux | grep global-service-coordinator | grep -v grep
 ### Status line not updating?
 
 ```bash
-# Check if health verifier is running
-ps aux | grep health-verifier
+# Check the coordinator (Phase 33 SoT)
+curl -fs http://localhost:3034/health/state | jq '.generated_at, .lsl_by_project'
 
-# Manually trigger health check
-node scripts/health-verifier.js
+# Trigger an explicit one-shot verifier run (writes a verify_run signal to coordinator)
+node scripts/health-verifier.js verify
 
-# Check status files exist
-ls -la .health/verification-status.json
+# Trajectory state exists?
 ls -la .specstory/trajectory/live-state.json
+
+# Force a fresh render (clears the per-project cache)
+rm -f .logs/combined-status-line-cache-*.txt
+node scripts/combined-status-line.js
 ```
+
+Note: there is no longer a host-side `health-verifier` daemon. `verify`, `status`, and `report` are the only supported subcommands; `start` was removed in plan 33-04 when the coordinator at :3034 took over lifecycle. If you still see a `monitoring:health-verifier STOPPED` line on the dashboard, your supervisord config is pre-Phase-33 — the program block was retired alongside `browser-access`.
 
 ### Wrong project showing as active?
 
@@ -405,19 +384,20 @@ ps aux | grep enhanced-transcript-monitor | grep PROJECT_NAME
 # Sessions show if: agent process running OR transcript monitor running
 ```
 
-### Docker MCP services showing unhealthy?
+### Right edge shows residual chars (e.g. `12:411`, `13:0656`)?
+
+This was the symptom of two stacked bugs that have been fixed; if you still see it, your installed code is pre-Phase-33 or pre-`914c69423`. Verify:
 
 ```bash
-# Check if Docker containers are running
-docker compose -f docker/docker-compose.yml ps
+# Wrapper preserves trailing whitespace (must NOT do .trim())
+grep -n 'rstrip\|trim()' scripts/combined-status-line-wrapper.js
 
-# Test individual health endpoints
-curl http://localhost:3848/health  # Semantic Analysis
-curl http://localhost:3849/health  # Constraint Monitor
-curl http://localhost:3850/health  # Code Graph RAG
+# Producer pads to 220 codepoints + NBSP terminator
+grep -n 'STATUS_LINE_TARGET_CODEPOINTS\|ANTI_STRIP_TERMINATOR' scripts/combined-status-line.js
 
-# Check container logs for errors
-docker compose -f docker/docker-compose.yml logs coding-services
+# Cache file ends with NBSP (UTF-8 c2 a0)
+xxd .logs/combined-status-line-cache-coding.txt | tail -1
+# Expect the last 2 non-newline bytes to be: c2 a0
 ```
 
 ---
@@ -428,22 +408,28 @@ docker compose -f docker/docker-compose.yml logs coding-services
 
 | File | Purpose |
 |------|---------|
-| `scripts/tmux-session-wrapper.sh` | Tmux session wrapper — wraps all agents with unified status bar |
-| `scripts/status-line-fast.cjs` | Ultra-fast CJS cache reader (~60ms) — invoked by tmux `status-right` |
-| `scripts/combined-status-line.js` | Full status line renderer + fallback supervisor (writes cache) |
-| `scripts/combined-status-line-wrapper.js` | ESM wrapper (backup; primary is fast-path CJS) |
-| `scripts/statusline-health-monitor.js` | Session health monitor daemon (multi-agent detection) |
-| `scripts/global-service-coordinator.js` | Constraint service management with spawn guards |
-| `scripts/auto-restart-watcher.js` | File-change detection for daemon code reloading |
-| `scripts/health-verifier.js` | Health status provider |
-| `.lsl/global-registry.json` | LSL session registry |
-| `.health/verification-status.json` | Health status cache |
-| `.logs/statusline-health-status.txt` | Rendered status line output |
-| `.logs/combined-status-line-cache.txt` | Pre-rendered status cache (served by fast-path) |
+| `scripts/tmux-session-wrapper.sh` | Wraps all agents in a tmux session with unified status bar |
+| `scripts/combined-status-line-wrapper.js` | Cache fast-path reader invoked by tmux `status-right` |
+| `scripts/combined-status-line.js` | Full status line renderer; writes per-project cache |
+| `scripts/health-coordinator.js` | Phase 33 SoT — collects signals at :3034, exposes `/health/state` |
+| `scripts/health-verifier.js` | Reporter-mode CLI: `verify`, `status`, `report` (no daemon) |
+| `scripts/enhanced-transcript-monitor.js` | Per-project ETM; POSTs `lsl_heartbeat` signals to coordinator |
+| `.specstory/trajectory/live-state.json` | Current trajectory state for the pane's project |
+| `.logs/combined-status-line-cache-<project>.txt` | Per-pane pre-rendered status cache |
+
+**Retired (do not write/read):**
+
+| File | Replaced by |
+|------|-------------|
+| `.health/verification-status.json` | Coordinator `/health/state` |
+| `.logs/statusline-health-status.txt` | Coordinator `/health/state` (sessions block) |
+| `.lsl/global-registry.json` | Coordinator `lsl` map |
+| `[program:health-verifier]` supervisord block | Removed in 33-04 — `start` subcommand no longer exists |
+| `[program:browser-access]` supervisord block | Removed; replaced by Playwright-via-CLI (`/gsd-browser`) |
 
 **Configuration:**
 
 | File | Purpose |
 |------|---------|
-| `config/status-line-config.json` | Status line configuration |
+| `~/.tmux.conf` | `status-right-length`, `status-interval`, `status-right` invocation |
 | `config/live-logging-config.json` | Provider config |

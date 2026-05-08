@@ -1,0 +1,89 @@
+@startuml health-monitoring-overview
+!include _standard-style.puml
+
+title Health Monitoring System Architecture (Phase 33)
+
+top to bottom direction
+
+package "Reporters (host)" {
+  component "EnhancedTranscriptMonitor\n(per project)" as ETM <<core>>
+  component "health-verifier.js verify\n(one-shot CLI)" as VERIFIER <<cli>>
+  note bottom of ETM
+    **Per-project ETM**
+    - 2s check interval
+    - LSL file generation
+    - Trajectory analysis
+    - POSTs lsl_heartbeat
+      every poll cycle
+  end note
+  note bottom of VERIFIER
+    **Subcommands**
+    - verify (POST verify_run)
+    - status / report (GET state)
+    No daemon — `start` was
+    removed in plan 33-04.
+  end note
+}
+
+package "Coordinator (single SoT, in container)" {
+  component "health-coordinator.js\n:3034" as COORD <<core>>
+  database "/health/state\n(in-memory)" as STATE <<storage>>
+  COORD -[#888]- STATE
+  note right of COORD
+    **Owns lifecycle + state**
+    - Receives signals
+    - Probes services
+      directly
+    - Marks LSL stopped
+      after >15s silence
+    - Single writer of
+      /health/state
+  end note
+}
+
+package "Consumers" {
+  component "combined-status-line.js\n(tmux status-right)" as STATUSLINE <<util>>
+  component "system-health-dashboard\n:3032 / :3033" as DASHBOARD <<api>>
+  component "health-prompt-hook.js\n(per prompt)" as HOOK <<util>>
+}
+
+package "Probed services" {
+  component "VKB :8080" as VKB <<infra>>
+  component "Constraint Monitor\n:3030 / :3031" as CM <<infra>>
+  component "Semantic Analysis SSE\n:3848" as SA <<infra>>
+  component "LLM CLI Proxy\n:12435" as PROXY <<infra>>
+  component "Memgraph / LevelDB\nQdrant" as DBS <<storage>>
+  component "Container healthcheck" as CONTAINER <<infra>>
+}
+
+ETM -[#green,dashed]-> COORD : POST /signals\nlsl_heartbeat
+VERIFIER -[#green,dashed]-> COORD : POST /signals\nverify_run
+
+COORD -[#orange,dashed]-> VKB
+COORD -[#orange,dashed]-> CM
+COORD -[#orange,dashed]-> SA
+COORD -[#orange,dashed]-> PROXY
+COORD -[#orange,dashed]-> DBS
+COORD -[#orange,dashed]-> CONTAINER
+
+STATUSLINE -[#blue]-> COORD : GET /health/state\n(per render)
+DASHBOARD  -[#blue]-> COORD : GET /health/state\n(card refresh)
+HOOK       -[#blue]-> COORD : GET /health/state\n(per prompt)
+
+note right of STATUSLINE
+  Stats lsl[*].transcriptPath
+  for activity age and maps
+  to graduated cooling icons.
+end note
+
+legend right
+  |= Component |= Where it runs |= Cadence |
+  | EnhancedTranscriptMonitor | host (one per project) | every 2s heartbeat |
+  | health-verifier.js | host (CLI, one-shot) | manual / scheduled |
+  | health-coordinator.js | inside coding-services container | continuous |
+  | combined-status-line.js | host (per render) | every 5s via tmux |
+  | system-health-dashboard | inside container | continuous |
+  | health-prompt-hook.js | host (per prompt) | per Claude prompt |
+endlegend
+
+@enduml
