@@ -421,6 +421,17 @@ class SystemHealthAPIServer {
             const state = await upstream.json();
             const checks = [];
             const violations = [];
+            // SPEC R8 frontend-compat: violations-table.tsx & system-checks-table.tsx
+            // pass row.timestamp to `new Date(...)` unconditionally; missing/invalid
+            // values cause RangeError and crash the panel. Use coordinator's generated_at
+            // (or now) as a fallback per-row timestamp.
+            const stamp = state && state.generated_at ? state.generated_at : new Date().toISOString();
+            const tsForLastSeen = (ls) => {
+                if (!ls) return stamp;
+                if (typeof ls === 'string') return ls;
+                if (typeof ls === 'number') return new Date(ls).toISOString();
+                return stamp;
+            };
 
             // Container check
             // SPEC R8 frontend-compat: dist/ does:
@@ -431,17 +442,18 @@ class SystemHealthAPIServer {
             // Frontend dist/ stays gated per SPEC R8 — no rebuild.
             if (state && state.container) {
                 const c = state.container.healthcheck || 'unknown';
-                checks.push({ check: 'container', name: 'container', category: 'services', status: c, source: 'docker.healthcheck' });
-                if (c === 'unhealthy') violations.push({ kind: 'container', severity: 'critical', detail: c });
+                checks.push({ check: 'container', name: 'container', category: 'services', status: c, source: 'docker.healthcheck', timestamp: stamp, message: `docker healthcheck=${c}` });
+                if (c === 'unhealthy') violations.push({ check: 'container', kind: 'container', severity: 'critical', detail: c, message: `Container reports ${c}`, timestamp: stamp });
             }
 
             // Services
             if (state && Array.isArray(state.services)) {
                 for (const svc of state.services) {
                     if (!svc || !svc.name) continue;
-                    checks.push({ check: svc.name, name: `service.${svc.name}`, category: 'services', status: svc.status || 'unknown', last_seen: svc.last_seen });
+                    const ts = tsForLastSeen(svc.last_seen);
+                    checks.push({ check: svc.name, name: `service.${svc.name}`, category: 'services', status: svc.status || 'unknown', last_seen: svc.last_seen, timestamp: ts, message: `${svc.name} ${svc.status || 'unknown'}` });
                     if (svc.status && svc.status !== 'running') {
-                        violations.push({ kind: `service.${svc.name}`, severity: 'high', detail: svc.status });
+                        violations.push({ check: svc.name, kind: `service.${svc.name}`, severity: 'high', detail: svc.status, message: `${svc.name} ${svc.status}`, timestamp: ts });
                     }
                 }
             }
@@ -450,23 +462,23 @@ class SystemHealthAPIServer {
             if (state && Array.isArray(state.processes)) {
                 for (const p of state.processes) {
                     if (!p || !p.name) continue;
-                    checks.push({ check: p.name, name: `process.${p.name}`, category: 'processes', status: p.status || 'unknown' });
+                    checks.push({ check: p.name, name: `process.${p.name}`, category: 'processes', status: p.status || 'unknown', timestamp: stamp, message: `${p.name} ${p.status || 'unknown'}` });
                     if (p.status && p.status !== 'running' && p.status !== 'healthy') {
-                        violations.push({ kind: `process.${p.name}`, severity: 'medium', detail: p.status });
+                        violations.push({ check: p.name, kind: `process.${p.name}`, severity: 'medium', detail: p.status, message: `${p.name} ${p.status}`, timestamp: stamp });
                     }
                 }
             }
             // Synthetic stale_pids entry — coordinator doesn't track stale PIDs (legacy verifier did).
             // Emit a dummy 'healthy' so the Process panel renders 'Process Registry' / 'Stale PIDs'
             // rather than empty. Source labeled as synthetic for traceability.
-            checks.push({ check: 'stale_pids', name: 'process.stale_pids', category: 'processes', status: 'healthy', source: 'synthetic.coordinator-derived' });
+            checks.push({ check: 'stale_pids', name: 'process.stale_pids', category: 'processes', status: 'healthy', source: 'synthetic.coordinator-derived', timestamp: stamp, message: 'no stale pids tracked (synthetic)' });
 
             // LSL by project
             if (state && state.lsl_by_project && typeof state.lsl_by_project === 'object') {
                 for (const [project, status] of Object.entries(state.lsl_by_project)) {
-                    checks.push({ check: `lsl.${project}`, name: `lsl.${project}`, category: 'services', status });
+                    checks.push({ check: `lsl.${project}`, name: `lsl.${project}`, category: 'services', status, timestamp: stamp, message: `LSL ${project} ${status}` });
                     if (status !== 'healthy') {
-                        violations.push({ kind: `lsl.${project}`, severity: 'medium', detail: status });
+                        violations.push({ check: `lsl.${project}`, kind: `lsl.${project}`, severity: 'medium', detail: status, message: `LSL ${project} ${status}`, timestamp: stamp });
                     }
                 }
             }
@@ -474,15 +486,15 @@ class SystemHealthAPIServer {
             // Databases — flatten sub-checks the frontend expects (leveldb_lock_check,
             // qdrant_availability, etc.) AND emit the rollup as 'databases'.
             if (state && state.databases && state.databases.status) {
-                checks.push({ check: 'databases', name: 'databases', category: 'databases', status: state.databases.status });
+                checks.push({ check: 'databases', name: 'databases', category: 'databases', status: state.databases.status, timestamp: stamp, message: `databases ${state.databases.status}` });
                 if (state.databases.status !== 'healthy') {
-                    violations.push({ kind: 'databases', severity: 'high', detail: state.databases.status });
+                    violations.push({ check: 'databases', kind: 'databases', severity: 'high', detail: state.databases.status, message: `databases ${state.databases.status}`, timestamp: stamp });
                 }
                 // Sub-checks: coordinator emits these alongside .status
                 for (const subKey of ['leveldb_lock_check', 'leveldb_accessibility', 'qdrant_availability', 'graph_integrity']) {
                     const sub = state.databases[subKey];
                     if (sub != null && typeof sub === 'string') {
-                        checks.push({ check: subKey, name: `databases.${subKey}`, category: 'databases', status: sub });
+                        checks.push({ check: subKey, name: `databases.${subKey}`, category: 'databases', status: sub, timestamp: stamp, message: `${subKey} ${sub}` });
                     }
                 }
             }
