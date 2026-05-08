@@ -240,43 +240,82 @@ class CombinedStatusLine {
    * Get trajectory state from live-state.json
    */
   /**
-   * Check LSL transcript monitor health for the CURRENT pane (D-11 / G3 fix, plan 33-13).
+   * Build the LSL badge string for the tmux statusline.
    *
-   * Per-pane semantics: status reflects THIS session's lsl heartbeat, not the
-   * project rollup. With two tmux panes / same project, a dead pane shows red,
-   * a live pane shows green — making it visually obvious which session is sick.
+   * Returns project rollup with labels (`C` for coding, `RA` for
+   * rapid-automations, etc.) plus a per-pane marker if THIS pane's
+   * (session_id, project) compound key is missing from the coordinator —
+   * keeping both the "which projects are alive" answer the user wants
+   * and the D-11 "which pane is sick" signal.
    *
-   * Reads from coordinator's /health/state.lsl[<sid>] where <sid> matches
-   * `process.env.CLAUDE_SESSION_ID` (the canonical session-id form per D-09:
-   * `claude-<pid>-<ts>`, set by bin/coding/launch-agent-common.sh and emitted
-   * by ETM as the lsl_heartbeat signal's session_id).
+   * Examples:
+   *   all healthy:                `[LSL: C·RA·DT]`
+   *   one project degraded:       `[LSL: C·RA 🔴DT]`
+   *   this pane untracked:        `[LSL: C·RA·DT ⚠️this]`
+   *   coordinator unreachable:    `[LSL?]`
    *
-   * Synchronous because this is a tmux statusline tick (~1Hz). 2s timeout via
-   * AbortController; fail-closed to 'down' on coordinator unreachable, missing
-   * sid env var, or no entry — consistent with SPEC R6 (never silently 'healthy'
-   * on error).
-   *
-   * Returns 'healthy', 'stale', or 'down'.
+   * Returns `{ text, color }` where color is one of 'green' | 'yellow' | 'red'.
+   * Returns `null` when nothing should be shown (rare — only on full-healthy
+   * AND coordinator unreachable race).
    */
-  getLSLHealthStatus() {
-    const sid = process.env.CLAUDE_SESSION_ID || process.env.SESSION_ID;
-    if (!sid) return 'down';
+  getLSLBadge() {
     const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+    const sid = process.env.CLAUDE_SESSION_ID || process.env.SESSION_ID;
+    const cwd = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
+    const myProject = path.basename(cwd);
+    let state;
     try {
       const out = execSync(
         `curl -fs --max-time 2 "${url}/health/state"`,
         { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
       );
-      const state = JSON.parse(out);
-      const entry = state.lsl?.[sid];
-      if (!entry) return 'down';
-      if (entry.status === 'stopped') return 'down';
-      const ageMs = Date.now() - (entry.lastBeat || entry.last_seen || 0);
-      if (ageMs > 120_000) return 'stale';
-      return 'healthy';
+      state = JSON.parse(out);
     } catch {
-      return 'down';
+      return { text: '[LSL?]', color: 'red' };
     }
+
+    const rollup = state.lsl_by_project || {};
+    const entries = Object.entries(rollup);
+    if (entries.length === 0) return { text: '[LSL🔴]', color: 'red' };
+
+    const label = (name) => {
+      const parts = String(name).split(/[^a-zA-Z]|(?=[A-Z])/).filter(Boolean);
+      const initials = parts.map(p => p[0].toUpperCase()).join('');
+      return (initials || String(name).slice(0, 2)).slice(0, 3);
+    };
+
+    const healthyLabels = [];
+    const sickEntries = [];
+    for (const [project, status] of entries) {
+      if (status === 'healthy') healthyLabels.push(label(project));
+      else sickEntries.push({ project, status });
+    }
+
+    // Per-pane check: is THIS (sid, project) combination tracked?
+    let paneSick = false;
+    if (sid && myProject) {
+      const key = `${sid}:${myProject}`;
+      const entry = state.lsl?.[key];
+      if (!entry || entry.status === 'stopped') paneSick = true;
+      else {
+        const ageMs = Date.now() - (entry.lastBeat || 0);
+        if (ageMs > 120_000) paneSick = true;
+      }
+    }
+
+    let text = '[LSL: ' + healthyLabels.join('·');
+    let color = 'green';
+    if (sickEntries.length > 0) {
+      if (healthyLabels.length > 0) text += ' ';
+      text += sickEntries.map(s => `🔴${label(s.project)}`).join(' ');
+      color = 'red';
+    }
+    if (paneSick) {
+      text += ' ⚠️this';
+      if (color === 'green') color = 'yellow';
+    }
+    text += ']';
+    return { text, color };
   }
 
   getTrajectoryState() {
@@ -1599,16 +1638,15 @@ class CombinedStatusLine {
       }
     }
 
-    // LSL (Live Session Logging) Status - independent check for transcript monitor
-    const lslStatus = this.getLSLHealthStatus();
-    if (lslStatus === 'down') {
-      parts.push('[LSL🔴]');
-      overallColor = 'red';
-    } else if (lslStatus === 'stale') {
-      parts.push('[LSL⚠️]');
-      if (overallColor === 'green') overallColor = 'yellow';
+    // LSL (Live Session Logging) badge — project rollup with per-pane marker.
+    // Always rendered (compact when all healthy) so the user can see at a
+    // glance which projects are tracked and whether THIS pane is heart­beating.
+    const lslBadge = this.getLSLBadge();
+    if (lslBadge) {
+      parts.push(lslBadge.text);
+      if (lslBadge.color === 'red') overallColor = 'red';
+      else if (lslBadge.color === 'yellow' && overallColor === 'green') overallColor = 'yellow';
     }
-    // When healthy, don't show — keeps statusline compact
 
     // Constraint Monitor Status with TRJ label (trajectory)
     if (constraint.status === 'operational') {

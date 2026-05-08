@@ -277,10 +277,17 @@ function ingestSignal(signal) {
       const projectPath = signal.payload?.projectPath || 'unknown';
       const projectName = path.basename(projectPath);
       const status = signal.status === 'stopped' ? 'stopped' : 'running';
-      currentState.lsl[sid] = {
+      // Compound key: many ETMs can share a CLAUDE_SESSION_ID inherited from a
+      // parent shell while watching different projects. Keying by sid alone
+      // collapses them into one last-writer-wins entry; compound key gives
+      // each (session, project) pair its own slot so all projects surface in
+      // the rollup and the per-pane lookup can pick the right one.
+      const key = `${sid}:${projectName}`;
+      currentState.lsl[key] = {
         status,
         lastBeat: ts,
         ...(status === 'stopped' ? { stoppedAt: ts } : {}),
+        sessionId: sid,
         projectPath,
         projectName,
         transcriptPath: signal.payload?.transcriptPath,
