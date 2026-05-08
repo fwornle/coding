@@ -1747,10 +1747,18 @@ class CombinedStatusLine {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     parts.push(timeStr);
 
-    // Trailing pad: when the statusline shrinks between renders (e.g. variable-
-    // length segments come and go), some renderers leave residual chars from the
-    // previous longer render. The pad overwrites those columns with spaces.
-    const statusText = parts.join(' ') + '          ';
+    // Right-pad with enough spaces to overflow the configured
+    // status-right-length (200 in .tmux.conf). tmux measures string width using
+    // its own East-Asian Width table, which disagrees with the terminal for
+    // some emoji sequences (U+FE0F selectors, ZWJ joins, U+26xx symbols).
+    // When a previous render had more visible cells than the new one, fixed
+    // small pads (e.g. 10 spaces) can leave residual chars from the previous
+    // render. Padding to ≥ status-right-length ensures tmux's cell-counter
+    // never has to extend or truncate ambiguously: there are always more
+    // trailing spaces than the configured width, so the renderer overwrites
+    // any leftover columns with spaces regardless of cell-count drift.
+    const joined = parts.join(' ');
+    const statusText = joined + ' '.repeat(200);
 
     // Since Claude Code doesn't support tooltips/clicks natively,
     // we'll provide the text and have users run ./bin/status for details

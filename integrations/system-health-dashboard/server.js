@@ -494,6 +494,121 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // CGR Cache: bundled frontend's Databases panel adds a "CGR Cache" tile
+            // when it finds a check named `cgr_cache` with details {commits_behind,
+            // cached_commit, repo_name}. The original staleness script depends on
+            // `jq`, which isn't installed in this container; read cache-metadata.json
+            // with Node natively and compute commits_behind via git, both available.
+            try {
+                const metaFile = join(codingRoot, 'integrations', 'code-graph-rag', 'shared-data', 'cache-metadata.json');
+                if (existsSync(metaFile)) {
+                    const meta = JSON.parse(readFileSync(metaFile, 'utf-8'));
+                    const cachedCommit = meta.commit_hash || '';
+                    const cachedShort = meta.commit_short || (cachedCommit ? cachedCommit.slice(0, 7) : '');
+                    let currentCommit = '';
+                    let commitsBehind = null;
+                    let cgrRawStatus = 'unknown';
+                    try {
+                        currentCommit = execSync(`git -C "${codingRoot}" rev-parse HEAD`, { encoding: 'utf-8', timeout: 2000 }).trim();
+                        if (cachedCommit && currentCommit) {
+                            if (cachedCommit === currentCommit) {
+                                commitsBehind = 0;
+                                cgrRawStatus = 'fresh';
+                            } else {
+                                try {
+                                    const out = execSync(`git -C "${codingRoot}" rev-list --count "${cachedCommit}..${currentCommit}"`, { encoding: 'utf-8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+                                    commitsBehind = parseInt(out, 10) || 0;
+                                    cgrRawStatus = commitsBehind === 0 ? 'fresh' : commitsBehind < 50 ? 'fresh' : 'stale';
+                                } catch {
+                                    // Cached commit no longer reachable from HEAD (rebased/force-pushed
+                                    // or branch switch). Fall back to indexed_at age — treat anything
+                                    // older than 7 days as stale.
+                                    if (meta.indexed_at) {
+                                        const ageDays = (Date.now() - new Date(meta.indexed_at).getTime()) / 86_400_000;
+                                        cgrRawStatus = ageDays > 7 ? 'stale' : 'fresh';
+                                        commitsBehind = -1; // sentinel: unknown count, ref unreachable
+                                    } else {
+                                        cgrRawStatus = 'stale';
+                                    }
+                                }
+                            }
+                        }
+                    } catch {
+                        // git unavailable — keep unknown
+                    }
+                    const cgrStatus =
+                        cgrRawStatus === 'fresh' ? 'passed' :
+                        cgrRawStatus === 'stale' ? 'warning' :
+                        'unknown';
+                    checks.push({
+                        check: 'cgr_cache',
+                        name: 'databases.cgr_cache',
+                        category: 'databases',
+                        status: cgrStatus,
+                        raw_status: cgrRawStatus,
+                        timestamp: stamp,
+                        message: cgrRawStatus === 'fresh' && commitsBehind === 0 ? 'CGR cache up to date' :
+                                 cgrRawStatus === 'fresh' && commitsBehind > 0 ? `CGR cache ${commitsBehind} commits behind (within threshold)` :
+                                 cgrRawStatus === 'fresh' ? 'CGR cache fresh (commits-behind unavailable)' :
+                                 cgrRawStatus === 'stale' && commitsBehind === -1 ? 'CGR cache reference no longer in repo history — re-index recommended' :
+                                 cgrRawStatus === 'stale' ? `CGR cache ${commitsBehind} commits behind — consider re-index` :
+                                 'CGR cache status unknown (no git/cached commit)',
+                        details: {
+                            commits_behind: commitsBehind,
+                            cached_commit: cachedShort,
+                            current_commit: currentCommit ? currentCommit.slice(0, 7) : '',
+                            repo_name: meta.repo_name || 'coding',
+                            indexed_at: meta.indexed_at
+                        }
+                    });
+                }
+            } catch {
+                // Best-effort: skip CGR tile if probe fails
+            }
+
+            // Supervisord: bundled frontend renders a "Supervisord Processes" panel
+            // that looks up `processes.find(c => c.check === 'supervisord_status')`
+            // and reads `c.details.all_processes`. The rule was deleted in 33-06,
+            // so the card was rendering empty/red. Probe supervisorctl directly
+            // here (this server.js runs INSIDE the container alongside supervisord)
+            // and synthesize the check so the panel populates.
+            try {
+                // execSync is imported at top of file. supervisorctl returns non-zero
+                // if any service is not RUNNING — capture stderr and ignore the exit
+                // code so partial states still populate the panel.
+                let out;
+                try {
+                    out = execSync('supervisorctl status', { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'pipe'] });
+                } catch (e) {
+                    out = (e && e.stdout) ? e.stdout.toString() : '';
+                }
+                const all_processes = out.split('\n').filter(Boolean).map(line => {
+                    const m = line.match(/^(\S+)\s+(\S+)/);
+                    return m ? { name: m[1], status: m[2] } : null;
+                }).filter(Boolean);
+                const allRunning = all_processes.length > 0 && all_processes.every(p => p.status === 'RUNNING');
+                checks.push({
+                    check: 'supervisord_status',
+                    name: 'process.supervisord_status',
+                    category: 'processes',
+                    status: allRunning ? 'passed' : 'warning',
+                    raw_status: allRunning ? 'running' : 'partial',
+                    timestamp: stamp,
+                    message: allRunning ? `${all_processes.length} processes running` : 'one or more supervisord processes not RUNNING',
+                    details: { all_processes }
+                });
+            } catch {
+                checks.push({
+                    check: 'supervisord_status',
+                    name: 'process.supervisord_status',
+                    category: 'processes',
+                    status: 'unknown',
+                    timestamp: stamp,
+                    message: 'supervisorctl not reachable from dashboard backend',
+                    details: { all_processes: [] }
+                });
+            }
+
             // LSL by project
             if (state && state.lsl_by_project && typeof state.lsl_by_project === 'object') {
                 for (const [project, status] of Object.entries(state.lsl_by_project)) {

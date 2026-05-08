@@ -411,6 +411,25 @@ async function runAllChecks() {
     } else {
       refreshLslStaleness();
     }
+
+    // Derive enhanced_transcript_monitor service status from lsl entries.
+    // ETM only POSTs lsl_heartbeat signals (not service_status), so the rule
+    // entry stays 'unknown' forever otherwise. ETM is healthy iff at least one
+    // lsl entry is fresh (running). This is the cheapest way to surface
+    // "something is heart­beating" as the ETM service indicator without
+    // changing the ETM signal contract.
+    const etmIdx = currentState.services.findIndex(s => s.name === 'enhanced_transcript_monitor');
+    const anyRunning = Object.values(currentState.lsl).some(e => e.status === 'running');
+    const mostRecent = Object.values(currentState.lsl)
+      .reduce((m, e) => (e.lastBeat || 0) > (m || 0) ? e.lastBeat : m, 0);
+    const etmEntry = {
+      name: 'enhanced_transcript_monitor',
+      status: anyRunning ? 'running' : (mostRecent ? 'stopped' : 'unknown'),
+      last_seen: mostRecent || null,
+      derived_from: 'lsl_heartbeats'
+    };
+    if (etmIdx >= 0) currentState.services[etmIdx] = etmEntry;
+    else currentState.services.push(etmEntry);
   } catch (err) {
     log(`lsl refresh threw: ${err.message}`, 'ERROR');
     // Mark every project rollup as 'unknown' on failure (SPEC R6).
