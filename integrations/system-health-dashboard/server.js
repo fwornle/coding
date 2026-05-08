@@ -432,6 +432,19 @@ class SystemHealthAPIServer {
                 if (typeof ls === 'number') return new Date(ls).toISOString();
                 return stamp;
             };
+            // SPEC R8 frontend-compat: bundle's status mapper accepts only
+            //   passed | warning | failed | error
+            // and renders anything else as "offline" (Down/grey). Coordinator emits
+            // semantic statuses (running, healthy, stopped, unknown). Translate so
+            // healthy services render "operational", explicit failures render "error",
+            // and unknown stays neutral.
+            const toUiStatus = (raw) => {
+                if (raw === 'healthy' || raw === 'running' || raw === 'ok' || raw === 'present') return 'passed';
+                if (raw === 'stopped' || raw === 'unhealthy' || raw === 'failed' || raw === 'error') return 'failed';
+                if (raw === 'degraded' || raw === 'stale' || raw === 'warning') return 'warning';
+                return 'unknown';
+            };
+            const isHardFailure = (raw) => raw === 'stopped' || raw === 'unhealthy' || raw === 'failed' || raw === 'error';
 
             // Container check
             // SPEC R8 frontend-compat: dist/ does:
@@ -441,9 +454,10 @@ class SystemHealthAPIServer {
             // `category:` (panel-filter), AND `name:` (post-Phase-33 namespaced consumer).
             // Frontend dist/ stays gated per SPEC R8 — no rebuild.
             if (state && state.container) {
-                const c = state.container.healthcheck || 'unknown';
-                checks.push({ check: 'container', name: 'container', category: 'services', status: c, source: 'docker.healthcheck', timestamp: stamp, message: `docker healthcheck=${c}` });
-                if (c === 'unhealthy') violations.push({ check: 'container', kind: 'container', severity: 'critical', detail: c, message: `Container reports ${c}`, timestamp: stamp });
+                const raw = state.container.healthcheck || 'unknown';
+                const ui = toUiStatus(raw);
+                checks.push({ check: 'container', name: 'container', category: 'services', status: ui, raw_status: raw, source: 'docker.healthcheck', timestamp: stamp, message: `docker healthcheck=${raw}` });
+                if (isHardFailure(raw)) violations.push({ check: 'container', kind: 'container', severity: 'critical', detail: raw, message: `Container reports ${raw}`, timestamp: stamp });
             }
 
             // Services
@@ -451,9 +465,11 @@ class SystemHealthAPIServer {
                 for (const svc of state.services) {
                     if (!svc || !svc.name) continue;
                     const ts = tsForLastSeen(svc.last_seen);
-                    checks.push({ check: svc.name, name: `service.${svc.name}`, category: 'services', status: svc.status || 'unknown', last_seen: svc.last_seen, timestamp: ts, message: `${svc.name} ${svc.status || 'unknown'}` });
-                    if (svc.status && svc.status !== 'running') {
-                        violations.push({ check: svc.name, kind: `service.${svc.name}`, severity: 'high', detail: svc.status, message: `${svc.name} ${svc.status}`, timestamp: ts });
+                    const raw = svc.status || 'unknown';
+                    const ui = toUiStatus(raw);
+                    checks.push({ check: svc.name, name: `service.${svc.name}`, category: 'services', status: ui, raw_status: raw, last_seen: svc.last_seen, timestamp: ts, message: `${svc.name} ${raw}` });
+                    if (isHardFailure(raw)) {
+                        violations.push({ check: svc.name, kind: `service.${svc.name}`, severity: 'high', detail: raw, message: `${svc.name} ${raw}`, timestamp: ts });
                     }
                 }
             }
@@ -462,22 +478,21 @@ class SystemHealthAPIServer {
             if (state && Array.isArray(state.processes)) {
                 for (const p of state.processes) {
                     if (!p || !p.name) continue;
-                    checks.push({ check: p.name, name: `process.${p.name}`, category: 'processes', status: p.status || 'unknown', timestamp: stamp, message: `${p.name} ${p.status || 'unknown'}` });
-                    if (p.status && p.status !== 'running' && p.status !== 'healthy') {
-                        violations.push({ check: p.name, kind: `process.${p.name}`, severity: 'medium', detail: p.status, message: `${p.name} ${p.status}`, timestamp: stamp });
+                    const raw = p.status || 'unknown';
+                    const ui = toUiStatus(raw);
+                    checks.push({ check: p.name, name: `process.${p.name}`, category: 'processes', status: ui, raw_status: raw, timestamp: stamp, message: `${p.name} ${raw}` });
+                    if (isHardFailure(raw)) {
+                        violations.push({ check: p.name, kind: `process.${p.name}`, severity: 'medium', detail: raw, message: `${p.name} ${raw}`, timestamp: stamp });
                     }
                 }
             }
-            // Synthetic stale_pids entry — coordinator doesn't track stale PIDs (legacy verifier did).
-            // Emit a dummy 'healthy' so the Process panel renders 'Process Registry' / 'Stale PIDs'
-            // rather than empty. Source labeled as synthetic for traceability.
-            checks.push({ check: 'stale_pids', name: 'process.stale_pids', category: 'processes', status: 'healthy', source: 'synthetic.coordinator-derived', timestamp: stamp, message: 'no stale pids tracked (synthetic)' });
 
             // LSL by project
             if (state && state.lsl_by_project && typeof state.lsl_by_project === 'object') {
                 for (const [project, status] of Object.entries(state.lsl_by_project)) {
-                    checks.push({ check: `lsl.${project}`, name: `lsl.${project}`, category: 'services', status, timestamp: stamp, message: `LSL ${project} ${status}` });
-                    if (status !== 'healthy') {
+                    const ui = toUiStatus(status);
+                    checks.push({ check: `lsl.${project}`, name: `lsl.${project}`, category: 'services', status: ui, raw_status: status, timestamp: stamp, message: `LSL ${project} ${status}` });
+                    if (isHardFailure(status)) {
                         violations.push({ check: `lsl.${project}`, kind: `lsl.${project}`, severity: 'medium', detail: status, message: `LSL ${project} ${status}`, timestamp: stamp });
                     }
                 }
@@ -486,15 +501,17 @@ class SystemHealthAPIServer {
             // Databases — flatten sub-checks the frontend expects (leveldb_lock_check,
             // qdrant_availability, etc.) AND emit the rollup as 'databases'.
             if (state && state.databases && state.databases.status) {
-                checks.push({ check: 'databases', name: 'databases', category: 'databases', status: state.databases.status, timestamp: stamp, message: `databases ${state.databases.status}` });
-                if (state.databases.status !== 'healthy') {
-                    violations.push({ check: 'databases', kind: 'databases', severity: 'high', detail: state.databases.status, message: `databases ${state.databases.status}`, timestamp: stamp });
+                const raw = state.databases.status;
+                const ui = toUiStatus(raw);
+                checks.push({ check: 'databases', name: 'databases', category: 'databases', status: ui, raw_status: raw, timestamp: stamp, message: `databases ${raw}` });
+                if (isHardFailure(raw)) {
+                    violations.push({ check: 'databases', kind: 'databases', severity: 'high', detail: raw, message: `databases ${raw}`, timestamp: stamp });
                 }
                 // Sub-checks: coordinator emits these alongside .status
                 for (const subKey of ['leveldb_lock_check', 'leveldb_accessibility', 'qdrant_availability', 'graph_integrity']) {
                     const sub = state.databases[subKey];
                     if (sub != null && typeof sub === 'string') {
-                        checks.push({ check: subKey, name: `databases.${subKey}`, category: 'databases', status: sub, timestamp: stamp, message: `${subKey} ${sub}` });
+                        checks.push({ check: subKey, name: `databases.${subKey}`, category: 'databases', status: toUiStatus(sub), raw_status: sub, timestamp: stamp, message: `${subKey} ${sub}` });
                     }
                 }
             }
@@ -502,7 +519,7 @@ class SystemHealthAPIServer {
             // SPEC R8 frontend-compat: bundle gates dispatch on `n.data && n.data.summary`.
             // Without `summary`, the entire payload is silently dropped (UI shows "no check data yet").
             // Frontend reads `summary.passed` and `summary.total_checks`.
-            const passed = checks.filter(c => c.status === 'healthy' || c.status === 'running' || c.status === 'ok').length;
+            const passed = checks.filter(c => c.status === 'passed').length;
             const summary = { passed, total_checks: checks.length };
             res.json({
                 status: 'success',
@@ -536,11 +553,17 @@ class SystemHealthAPIServer {
         const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
         try {
             const upstream = await fetch(`${base}/health/refresh`, { method: 'POST' });
-            const body = await upstream.text();
-            res.status(upstream.status).type(upstream.headers.get('content-type') || 'application/json').send(body);
+            if (!upstream.ok) {
+                return res.status(502).json({ status: 'error', message: `coordinator returned HTTP ${upstream.status}` });
+            }
+            // SPEC R8 frontend-compat: bundle expects `{status: 'success'}` envelope.
+            // Coordinator returns raw state; wrap so the success branch fires.
+            let payload;
+            try { payload = await upstream.json(); } catch { payload = null; }
+            res.json({ status: 'success', data: payload || {} });
         } catch (err) {
             process.stderr.write(`[Dashboard] health-verifier/verify proxy failed: ${err.message}\n`);
-            res.status(503).json({ status: 'error', error: 'coordinator unreachable' });
+            res.status(503).json({ status: 'error', message: 'coordinator unreachable' });
         }
     }
 
