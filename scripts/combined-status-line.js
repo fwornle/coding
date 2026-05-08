@@ -22,34 +22,38 @@ const rootDir = process.env.CODING_REPO || join(__dirname, '..');
 // tmux truncates status-right to status-right-length cells (=200). When the
 // new render's cell count is less than the previous render's, the rightmost
 // (delta) cells aren't overwritten and the previous render's trailing chars
-// remain visible (e.g. "12:411", "12:5096" — leftover digits from earlier,
-// wider renders).
+// remain visible (e.g. "12:411", "12:5096", "13:0656" — leftover digits from
+// earlier, wider renders).
 //
-// Trying to pad to exactly 200 cells using our own width function requires
-// matching tmux's u8_width table EXACTLY. tmux follows UAX#11 strictly, so
-// Symbols-block codepoints with VS-16 (⚠️ ⚙️ ⏰ — U+26xx + U+FE0F) are 1
-// cell in tmux even though terminals render them as 2. The previous attempt
-// to hit a fixed cell count using width prediction undershot tmux by 1 cell
-// per such emoji, leaving 2-3 cells of residue when the joined content
-// happened to contain two such emojis.
+// Two cooperating tactics are required:
 //
-// Skip cell prediction entirely. Pad with a count that is guaranteed to be
-// ≥ status-right-length in tmux's view regardless of how it interprets
-// emoji width. The lower bound is "1 cell per codepoint": every non-control
-// codepoint is at minimum 1 cell, so N codepoints → ≥N cells in tmux. With
-// target=220 codepoints, the line is always ≥220 cells in tmux → tmux
-// truncates to exactly 200, fully overwriting any prior-render residue.
+// 1. Padding amount. Don't predict tmux's emoji-width table — it differs
+//    from terminal renderers (e.g. tmux counts ⚠️ ⚙️ as 1 cell while the
+//    terminal renders them as 2). Use the lower bound: a non-control
+//    codepoint is at minimum 1 cell, so N codepoints → ≥N cells in tmux,
+//    regardless of UAX#11 / VS-16 / ZWJ interpretation. Pad to ≥220
+//    codepoints (counted via [...s] — UTF-16 units would let an all-emoji
+//    input reach target with half the codepoints, breaking the bound).
 //
-// Use codepoint count via [...s] (not s.length, which counts UTF-16 code
-// units and would let an all-emoji input reach the target with only ~half
-// the codepoints, defeating the lower bound).
+// 2. Anti-strip terminator. tmux's `#(...)` shell-output substitution
+//    strips trailing ASCII whitespace before substituting into the
+//    status-right format. With trailing spaces gone, the truncation+align
+//    pipeline ends up rendering only the joined content's natural width;
+//    when content shrinks between renders, the prior render's trailing
+//    chars at positions >current-content-width remain on screen
+//    (the residue user sees as "13:0656"). End the padded string with
+//    one non-breaking space (U+00A0): 1 cell visually, indistinguishable
+//    from a space, but NOT ASCII whitespace — so tmux's strip leaves it
+//    intact, the trailing-space pad survives substitution, and the
+//    truncation pipeline always emits status-right-length cells.
 const STATUS_LINE_TARGET_CODEPOINTS = 220;
+const ANTI_STRIP_TERMINATOR = ' ';
 function padStatusLine(str) {
   // Strip tmux #[...] format escapes — they're markup, not visible chars.
   const stripped = String(str).replace(/#\[[^\]]*\]/g, '');
   const codepoints = [...stripped].length;
-  const pad = Math.max(0, STATUS_LINE_TARGET_CODEPOINTS - codepoints);
-  return str + ' '.repeat(pad);
+  const padCount = Math.max(0, STATUS_LINE_TARGET_CODEPOINTS - codepoints - 1);
+  return str + ' '.repeat(padCount) + ANTI_STRIP_TERMINATOR;
 }
 
 // Load configuration
