@@ -31,8 +31,13 @@ try {
     const stat = statSync(cacheFile);
     const ageMs = Date.now() - stat.mtimeMs;
     if (ageMs < 30000) {
-      const cached = readFileSync(cacheFile, 'utf8').trim();
-      if (cached) {
+      // CRITICAL: do NOT .trim() here — the producer pads to a fixed visual
+      // cell count so tmux always renders the same width. Trimming the
+      // trailing spaces re-introduces the cell-drift residue that motivated
+      // the padding in the first place ("12:411" leftover chars). Strip the
+      // line terminator only.
+      const cached = readFileSync(cacheFile, 'utf8').replace(/\r?\n$/, '');
+      if (cached.trimEnd()) {
         process.stdout.write(cached + '\n');
         process.exit(0);
       }

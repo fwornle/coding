@@ -17,6 +17,95 @@ import { UKBProcessManager } from './ukb-process-manager.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = process.env.CODING_REPO || join(__dirname, '..');
 
+// Visual width measurement for tmux's status-right truncation.
+//
+// tmux trims/truncates by *terminal cell* count, not character count. Mixed
+// width strings (ASCII 1-cell + emoji 2-cell + ZWJ sequences as 2-cell graphemes
+// + tmux #[...] format escapes as 0-cell) drift between renders, leaving the
+// trailing edge unaligned (e.g. "12:411" — a leftover digit from a previous,
+// wider render). Pad the produced string to a fixed cell width so every
+// render fills the same number of columns and tmux can never re-truncate
+// to a different position.
+const STATUS_LINE_TARGET_CELLS = 199; // status-right-length=200 in .tmux.conf, leave 1 cell of slack
+function _isWideCodepoint(cp) {
+  // East Asian Wide / Fullwidth + emoji-like ranges per UAX#11 + UTS#51.
+  return (
+    (cp >= 0x1100 && cp <= 0x115F) ||
+    (cp >= 0x231A && cp <= 0x231B) ||
+    (cp === 0x2329 || cp === 0x232A) ||
+    (cp >= 0x23E9 && cp <= 0x23EC) ||
+    (cp === 0x23F0 || cp === 0x23F3) ||
+    (cp >= 0x25FD && cp <= 0x25FE) ||
+    (cp >= 0x2614 && cp <= 0x2615) ||
+    (cp >= 0x2648 && cp <= 0x2653) ||
+    (cp === 0x267F) || (cp === 0x2693) ||
+    (cp === 0x26A1) || (cp >= 0x26AA && cp <= 0x26AB) ||
+    (cp >= 0x26BD && cp <= 0x26BE) ||
+    (cp >= 0x26C4 && cp <= 0x26C5) ||
+    (cp === 0x26CE) || (cp === 0x26D4) ||
+    (cp === 0x26EA) || (cp >= 0x26F2 && cp <= 0x26F3) ||
+    (cp === 0x26F5) || (cp === 0x26FA) || (cp === 0x26FD) ||
+    (cp === 0x2705) || (cp >= 0x270A && cp <= 0x270B) ||
+    (cp === 0x2728) || (cp === 0x274C) || (cp === 0x274E) ||
+    (cp >= 0x2753 && cp <= 0x2755) || (cp === 0x2757) ||
+    (cp >= 0x2795 && cp <= 0x2797) || (cp === 0x27B0) || (cp === 0x27BF) ||
+    (cp >= 0x2B1B && cp <= 0x2B1C) || (cp === 0x2B50) || (cp === 0x2B55) ||
+    (cp >= 0x2E80 && cp <= 0x303E) ||
+    (cp >= 0x3041 && cp <= 0x33FF) ||
+    (cp >= 0x3400 && cp <= 0x4DBF) ||
+    (cp >= 0x4E00 && cp <= 0x9FFF) ||
+    (cp >= 0xA000 && cp <= 0xA4CF) ||
+    (cp >= 0xAC00 && cp <= 0xD7A3) ||
+    (cp >= 0xF900 && cp <= 0xFAFF) ||
+    (cp >= 0xFE30 && cp <= 0xFE4F) ||
+    (cp >= 0xFF00 && cp <= 0xFF60) ||
+    (cp >= 0xFFE0 && cp <= 0xFFE6) ||
+    (cp >= 0x1F1E6 && cp <= 0x1F1FF) ||
+    (cp >= 0x1F300 && cp <= 0x1F64F) ||
+    (cp >= 0x1F680 && cp <= 0x1F6FF) ||
+    (cp >= 0x1F700 && cp <= 0x1F77F) ||
+    (cp >= 0x1F780 && cp <= 0x1F7FF) ||
+    (cp >= 0x1F800 && cp <= 0x1F8FF) ||
+    (cp >= 0x1F900 && cp <= 0x1F9FF) ||
+    (cp >= 0x1FA00 && cp <= 0x1FAFF) ||
+    (cp >= 0x20000 && cp <= 0x2FFFD) ||
+    (cp >= 0x30000 && cp <= 0x3FFFD)
+  );
+}
+function _graphemeWidth(g) {
+  if (!g) return 0;
+  const cp = g.codePointAt(0);
+  if (cp < 0x20 || cp === 0x7F) return 0;
+  // VS-16 (U+FE0F) inside the cluster forces emoji presentation → 2 cells.
+  if (g.includes('️')) return 2;
+  // VS-15 (U+FE0E) forces text presentation → 1 cell.
+  if (g.includes('︎')) return 1;
+  if (cp < 0x7F) return 1;
+  return _isWideCodepoint(cp) ? 2 : 1;
+}
+const _segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+  ? new Intl.Segmenter('en', { granularity: 'grapheme' })
+  : null;
+function visualCellWidth(str) {
+  if (!str) return 0;
+  // Strip tmux format escapes (#[...]) — these are markup, zero visual width.
+  const stripped = String(str).replace(/#\[[^\]]*\]/g, '');
+  let width = 0;
+  if (_segmenter) {
+    for (const { segment } of _segmenter.segment(stripped)) {
+      width += _graphemeWidth(segment);
+    }
+  } else {
+    for (const ch of stripped) width += _graphemeWidth(ch);
+  }
+  return width;
+}
+function padToVisualWidth(str, targetCells) {
+  const current = visualCellWidth(str);
+  const pad = Math.max(0, targetCells - current);
+  return str + ' '.repeat(pad);
+}
+
 // Load configuration
 let config = {};
 try {
@@ -601,21 +690,44 @@ class CombinedStatusLine {
   }
 
   async getHealthVerifierStatus() {
+    // Plan 33-04 retired host-side daemon writes to .health/verification-status.json;
+    // the coordinator at :3034 is now the SoT. Read from there and synthesize
+    // the verifier-shape fields the badge logic expects.
     try {
-      const statusPath = join(rootDir, '.health/verification-status.json');
-      if (!existsSync(statusPath)) {
-        return { status: 'offline' };
+      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+      const out = execSync(
+        `curl -fs --max-time 2 "${url}/health/state"`,
+        { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
+      );
+      const state = JSON.parse(out);
+
+      const generatedAt = state.generated_at ? new Date(state.generated_at).getTime() : 0;
+      const age = generatedAt ? (Date.now() - generatedAt) : Infinity;
+      if (age > 180_000) {
+        return { status: 'stale', lastUpdate: state.generated_at };
       }
 
-      const statusData = JSON.parse(readFileSync(statusPath, 'utf8'));
-      const age = Date.now() - new Date(statusData.lastUpdate).getTime();
+      const services = state.services || [];
+      const downServices = services.filter(s =>
+        s && s.status && s.status !== 'running' && s.status !== 'unknown'
+      );
+      const dbStatus = state.databases?.status;
+      const containerOk = !state.container?.healthcheck
+        || state.container.healthcheck === 'healthy';
 
-      // Stale if > 3 minutes old (verifier runs every 60s, allow for slow cycles)
-      if (age > 180000) {
-        return { status: 'stale', ...statusData };
-      }
+      const criticalCount = downServices.length
+        + (dbStatus && dbStatus !== 'healthy' && dbStatus !== 'unknown' ? 1 : 0)
+        + (containerOk ? 0 : 1);
+      const overallStatus = criticalCount === 0 ? 'healthy' : 'degraded';
 
-      return { status: 'operational', ...statusData };
+      return {
+        status: 'operational',
+        overallStatus,
+        criticalCount,
+        violationCount: 0,
+        autoHealingActive: false,
+        lastUpdate: state.generated_at
+      };
     } catch (error) {
       return { status: 'error', error: error.message };
     }
@@ -1622,18 +1734,17 @@ class CombinedStatusLine {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     parts.push(timeStr);
 
-    // Right-pad with enough spaces to overflow the configured
-    // status-right-length (200 in .tmux.conf). tmux measures string width using
-    // its own East-Asian Width table, which disagrees with the terminal for
-    // some emoji sequences (U+FE0F selectors, ZWJ joins, U+26xx symbols).
-    // When a previous render had more visible cells than the new one, fixed
-    // small pads (e.g. 10 spaces) can leave residual chars from the previous
-    // render. Padding to ≥ status-right-length ensures tmux's cell-counter
-    // never has to extend or truncate ambiguously: there are always more
-    // trailing spaces than the configured width, so the renderer overwrites
-    // any leftover columns with spaces regardless of cell-count drift.
+    // Pad to a fixed visual cell count. Plain ' '.repeat(N) — no matter how
+    // large — does not solve the residual-char problem because tmux truncates
+    // by *cell* count and the truncation point depends on the actual cells
+    // before the trailing spaces. Compute the real cell width with grapheme
+    // clustering + UAX#11 wide-char detection (treating ZWJ sequences and
+    // VS-16 emoji presentation as 2 cells, tmux #[...] markup as 0 cells)
+    // and pad to STATUS_LINE_TARGET_CELLS. Every render now occupies exactly
+    // the same number of terminal columns, so tmux's cell-counter sees a
+    // stable line and the right edge never drifts left between renders.
     const joined = parts.join(' ');
-    const statusText = joined + ' '.repeat(200);
+    const statusText = padToVisualWidth(joined, STATUS_LINE_TARGET_CELLS);
 
     // Since Claude Code doesn't support tooltips/clicks natively,
     // we'll provide the text and have users run ./bin/status for details
