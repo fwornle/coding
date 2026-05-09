@@ -2036,8 +2036,15 @@ async function main() {
         const stat = fs.statSync(cacheFile);
         const ageMs = Date.now() - stat.mtimeMs;
         if (ageMs < 30000) {
-          const cached = readFileSync(cacheFile, 'utf8').trim();
-          if (cached) {
+          // CRITICAL: do NOT .trim() — the producer pads to a fixed visual
+          // cell count and ends with a non-ASCII NBSP terminator (so tmux's
+          // `#(...)` substitution can't strip the trailing pad). Trimming
+          // here strips the NBSP and the padding, dropping the line below
+          // tmux's status-right-length and re-introducing the cell-drift
+          // residue (the "07:407" / "12:411" leftover-digit bug). Strip the
+          // line terminator only — same as combined-status-line-wrapper.js.
+          const cached = readFileSync(cacheFile, 'utf8').replace(/\r?\n$/, '');
+          if (cached.trimEnd()) {
             process.stdout.write(cached + '\n', () => process.exit(0));
             return;
           }
