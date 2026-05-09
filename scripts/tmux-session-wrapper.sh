@@ -30,9 +30,12 @@ tmux_session_wrapper() {
   local coding_repo="${CODING_REPO:?CODING_REPO must be set}"
   local agent="${CODING_AGENT:-agent}"
   local session_name="coding-${agent}-$$"
-  # Pass project identity into status command so each session underlines its OWN project
+  # Pass project identity into status command so each session underlines its OWN project.
+  # TMUX_PANE_WIDTH=#{pane_width} is expanded by tmux per pane on each substitution,
+  # letting status-line-fast.cjs / combined-status-line.js size the right-pad to fit
+  # the actual pane width (the prerequisite for residue-free trailing-edge filling).
   local transcript_project="${TRANSCRIPT_SOURCE_PROJECT:-${CODING_PROJECT_DIR:-$(pwd)}}"
-  local status_cmd="CODING_REPO=${coding_repo} TRANSCRIPT_SOURCE_PROJECT=${transcript_project} node ${coding_repo}/scripts/status-line-fast.cjs"
+  local status_cmd="CODING_REPO=${coding_repo} TRANSCRIPT_SOURCE_PROJECT=${transcript_project} TMUX_PANE_WIDTH=#{pane_width} node ${coding_repo}/scripts/status-line-fast.cjs"
 
   # Export so tmux environment inherits it (needed for the status-right #() command)
   export CODING_REPO

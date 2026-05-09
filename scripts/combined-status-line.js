@@ -17,43 +17,27 @@ import { UKBProcessManager } from './ukb-process-manager.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = process.env.CODING_REPO || join(__dirname, '..');
 
-// Right-pad the status line so tmux always renders a stable trailing edge.
+// Identity passthrough. tmux right-aligns status-right against the pane's
+// actual right edge on its own; any trailing characters we add (spaces,
+// NBSP, anything) become the right-most cells and push our content left.
+// Verified empirically by appending NBSPs and watching the time string
+// shift one cell leftward per NBSP added.
 //
-// tmux truncates status-right to status-right-length cells (=200). When the
-// new render's cell count is less than the previous render's, the rightmost
-// (delta) cells aren't overwritten and the previous render's trailing chars
-// remain visible (e.g. "12:411", "12:5096", "13:0656" — leftover digits from
-// earlier, wider renders).
+// Earlier versions of this function did codepoint-targeted padding and
+// added an "anti-strip" NBSP terminator. Both were attempts to mask a
+// separate bug -- residue from previous wider renders persisting in the
+// status-right area when content shrank between renders. The actual fix
+// for that residue is the per-pane cache key
+// (combined-status-line-cache-<project>-w<paneWidth>.txt) plus stopping
+// from emitting trailing whitespace; once those landed, the padding became
+// unnecessary and actually counter-productive.
 //
-// Two cooperating tactics are required:
-//
-// 1. Padding amount. Don't predict tmux's emoji-width table — it differs
-//    from terminal renderers (e.g. tmux counts ⚠️ ⚙️ as 1 cell while the
-//    terminal renders them as 2). Use the lower bound: a non-control
-//    codepoint is at minimum 1 cell, so N codepoints → ≥N cells in tmux,
-//    regardless of UAX#11 / VS-16 / ZWJ interpretation. Pad to ≥220
-//    codepoints (counted via [...s] — UTF-16 units would let an all-emoji
-//    input reach target with half the codepoints, breaking the bound).
-//
-// 2. Anti-strip terminator. tmux's `#(...)` shell-output substitution
-//    strips trailing ASCII whitespace before substituting into the
-//    status-right format. With trailing spaces gone, the truncation+align
-//    pipeline ends up rendering only the joined content's natural width;
-//    when content shrinks between renders, the prior render's trailing
-//    chars at positions >current-content-width remain on screen
-//    (the residue user sees as "13:0656"). End the padded string with
-//    one non-breaking space (U+00A0): 1 cell visually, indistinguishable
-//    from a space, but NOT ASCII whitespace — so tmux's strip leaves it
-//    intact, the trailing-space pad survives substitution, and the
-//    truncation pipeline always emits status-right-length cells.
-const STATUS_LINE_TARGET_CODEPOINTS = 220;
-const ANTI_STRIP_TERMINATOR = ' ';
+// A residual 1-2 cell gap between the visible content and the pane's
+// actual right edge remains. Mechanism unidentified -- not status-right-length,
+// not status-justify, not window-status-separator. Likely tmux's internal
+// margin around `#[range=right]`. The cells are empty (no stale text).
 function padStatusLine(str) {
-  // Strip tmux #[...] format escapes — they're markup, not visible chars.
-  const stripped = String(str).replace(/#\[[^\]]*\]/g, '');
-  const codepoints = [...stripped].length;
-  const padCount = Math.max(0, STATUS_LINE_TARGET_CODEPOINTS - codepoints - 1);
-  return str + ' '.repeat(padCount) + ANTI_STRIP_TERMINATOR;
+  return String(str);
 }
 
 // Load configuration
@@ -1734,8 +1718,6 @@ class CombinedStatusLine {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     parts.push(timeStr);
 
-    // Pad past tmux's truncation point so the previous render's trailing
-    // chars are always overwritten. See padStatusLine() at top of file.
     const joined = parts.join(' ');
     const statusText = padStatusLine(joined);
 
@@ -2029,7 +2011,13 @@ async function main() {
     // this status render is for; cache is keyed per-project.
     const panePath = process.env.TMUX_PANE_PATH || process.env.TRANSCRIPT_SOURCE_PROJECT || '';
     const paneProject = panePath ? basename(panePath) : '';
-    const cacheSuffix = paneProject ? `-${paneProject}` : '';
+    // Cache key includes pane width so two same-project panes don't share
+    // a per-render cache. (padStatusLine itself no longer adapts to width --
+    // tmux right-aligns -- but the cache content is per-render.)
+    const paneWidth = process.env.TMUX_PANE_WIDTH || '';
+    const cacheSuffix = paneProject
+      ? `-${paneProject}${paneWidth ? `-w${paneWidth}` : ''}`
+      : '';
     const cacheFile = join(rootDir, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
     try {
       if (existsSync(cacheFile)) {

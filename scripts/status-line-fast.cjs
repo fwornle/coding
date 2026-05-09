@@ -7,10 +7,18 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const codingRepo = process.env.CODING_REPO || path.join(__dirname, '..');
-// Per-project cache so each tmux session gets its own underline
+// Per-project + per-pane-width cache. Width suffix prevents an older wider-
+// pane render from leaking into a narrower pane's display when two same-
+// project panes coexist. The padStatusLine in combined-status-line.js no
+// longer pads (tmux right-aligns automatically) but per-pane caching is
+// still required: cache content is per-render, and two same-project panes
+// would otherwise see each other's stale cache.
 const projectPath = process.env.TRANSCRIPT_SOURCE_PROJECT || process.env.TMUX_PANE_PATH || '';
 const projectName = projectPath ? path.basename(projectPath) : '';
-const cacheSuffix = projectName ? `-${projectName}` : '';
+const paneWidth = process.env.TMUX_PANE_WIDTH || '';
+const cacheSuffix = projectName
+  ? `-${projectName}${paneWidth ? `-w${paneWidth}` : ''}`
+  : '';
 const cacheFile = path.join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 const cslScript = path.join(__dirname, 'combined-status-line.js');
 
@@ -56,17 +64,25 @@ function reunderline(text, targetAbbrev) {
   return s;
 }
 
-// Read project-specific cache
+// Read project-specific cache.
+// NEVER .trim() — combined-status-line.js right-pads the output to fit tmux's
+// status-right area exactly and ends with a non-ASCII NBSP terminator so
+// tmux's `#(...)` substitution can't strip the trailing pad. .trim() would
+// strip both, leaving the right side under-filled and surfacing previous
+// renders' content as ghost characters ("07:407", "08:14187"). Strip the
+// line terminator only. Same goes for the sibling-borrow + writeback path
+// below: writing trimmed content back to disk poisons the cache for the
+// next reader.
 let cachedContent = '';
 let cacheAgeMs = Infinity;
 try {
   const stat = fs.statSync(cacheFile);
   cacheAgeMs = Date.now() - stat.mtimeMs;
-  cachedContent = fs.readFileSync(cacheFile, 'utf8').trim();
+  cachedContent = fs.readFileSync(cacheFile, 'utf8').replace(/\r?\n$/, '');
 } catch { /* no cache */ }
 
 // If no project-specific cache, borrow from any sibling cache and re-apply underline
-if (!cachedContent && projectName) {
+if (!cachedContent.trimEnd() && projectName) {
   try {
     const logsDir = path.join(codingRepo, '.logs');
     const siblings = fs.readdirSync(logsDir)
@@ -76,8 +92,8 @@ if (!cachedContent && projectName) {
       const stat = fs.statSync(sibPath);
       const age = Date.now() - stat.mtimeMs;
       if (age < 60000) {
-        const content = fs.readFileSync(sibPath, 'utf8').trim();
-        if (content) {
+        const content = fs.readFileSync(sibPath, 'utf8').replace(/\r?\n$/, '');
+        if (content.trimEnd()) {
           cachedContent = reunderline(content, getAbbrev(projectName));
           cacheAgeMs = age;
           // Write the re-underlined cache so future reads are instant
@@ -90,7 +106,7 @@ if (!cachedContent && projectName) {
 }
 
 // Fresh cache (<60s): use it directly
-if (cacheAgeMs < 60000 && cachedContent) {
+if (cacheAgeMs < 60000 && cachedContent.trimEnd()) {
   process.stdout.write(cachedContent + '\n');
   // If cache is aging (>20s), trigger background refresh — but don't wait
   if (cacheAgeMs > 20000) {
@@ -117,13 +133,14 @@ const fallbackTimer = setTimeout(() => {
 
 child.on('exit', (code) => {
   clearTimeout(fallbackTimer);
-  const result = output.trim();
-  if (code === 0 && result) {
+  // Same NO-TRIM rule as the cache reads above. Strip line terminator only.
+  const result = output.replace(/\r?\n$/, '');
+  if (code === 0 && result.trimEnd()) {
     process.stdout.write(result + '\n');
     process.exit(0);
   }
   // CSL failed — use stale cache rather than showing "Status Offline"
-  if (cachedContent) {
+  if (cachedContent.trimEnd()) {
     process.stdout.write(cachedContent + '\n');
     // Trigger background refresh for next cycle
     const bg = spawn('node', [cslScript], {

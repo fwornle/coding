@@ -22,7 +22,16 @@ const codingRepo = process.env.CODING_REPO || join(__dirname, '..');
 // TMUX_PANE_PATH is expanded per-window by tmux before running this command.
 const panePath = process.env.TMUX_PANE_PATH || '';
 const paneProject = panePath ? basename(panePath) : '';
-const cacheSuffix = paneProject ? `-${paneProject}` : '';
+// Cache key includes pane_width because every-render content varies (LSL
+// counts, time, badge states), and we want each pane to read a freshly-
+// rendered cache that matches its own width even when two panes share the
+// same project. Without the width suffix, two same-project panes share a
+// cache and an older render from a wider pane can leak into a narrower
+// pane's display.
+const paneWidth = process.env.TMUX_PANE_WIDTH || '';
+const cacheSuffix = paneProject
+  ? `-${paneProject}${paneWidth ? `-w${paneWidth}` : ''}`
+  : '';
 const cacheFile = join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 
 // Fast path: serve from cache if fresh (<30s)
