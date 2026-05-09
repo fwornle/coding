@@ -1409,6 +1409,7 @@ OUTPUT FORMAT — respond with one or more insight blocks:
 
 <insight>
 <topic>Component or area name (e.g. "Dashboard Observations System", "Docker Build Pipeline")</topic>
+<scope>One concrete subsystem, tool, or workflow this insight is about. Must be narrow enough that someone reading it could point at one folder, one binary, or one external service. Examples: "scripts/combined-status-line.js (tmux statusline renderer)", "GSD planning framework (~/.claude/skills/gsd-*)", "Docker compose stack for coding-services", "ObservationConsolidator pipeline". NOT acceptable: "statusline and hooks", "various tools", "configuration".</scope>
 <confidence>0.0-1.0 — how well-established this knowledge is</confidence>
 <summary>
 What we know about this topic. Written as reference documentation someone could consult to understand the current state.
@@ -1417,9 +1418,10 @@ Use markdown formatting: bullet lists (- item) for enumerating components/issues
 </insight>
 
 RULES:
-- If an existing insight's topic matches new digest content, produce an UPDATED version (same topic name) with merged knowledge.
+- **One insight = one subsystem.** Each <insight> block must describe a single coherent component, tool, or workflow. If digests cover unrelated subsystems (e.g. GSD planning framework AND tmux statusline rendering, even when both happen to touch \`~/.claude/settings.json\`), emit SEPARATE insights — never merge them under a pan-topic title like "X and Y Integration".
+- **Shared vocabulary is not a merge signal.** Two digests both mentioning "statusline", "hook", or "settings.json" do NOT belong together unless they describe the same code path or feature. Verify by writing the <scope> first: if you cannot name one concrete subsystem in <scope>, split into multiple insights.
+- If an existing insight's topic matches new digest content, produce an UPDATED version (same topic name) with merged knowledge — but only when the new digest is actually about the same subsystem.
 - Don't create insights for one-off tasks that are fully complete and unlikely to recur.
-- Prefer fewer, richer insights over many thin ones.
 - Confidence reflects how many data points support the insight (0.5 = single digest, 0.9 = many corroborating digests).
 - Remove stale information from existing insights when digests show things have changed.
 - Topic names should be stable across updates (don't rename topics).`,
@@ -1432,7 +1434,7 @@ ${digestBlock}
 
 ${existingBlock}
 
-Produce updated/new insights.`,
+Produce updated/new insights. Each insight MUST include a <scope> block before <confidence>.`,
     };
   }
 
@@ -1491,18 +1493,60 @@ Produce updated/new insights.`,
 
   /**
    * Parse <insight> blocks from LLM response.
+   *
+   * Schema (current): <topic> <scope> <confidence> <summary>. The <scope> field is
+   * required by the prompt — it forces the LLM to name one concrete subsystem
+   * before writing the body, which prevents pan-topic fusions like the historical
+   * "GSD Statusline and Hook Integration" insight that conflated GSD planning
+   * tooling with the bin/coding tmux statusline.
+   *
+   * Backward-compat: also accepts the legacy <topic><confidence><summary> shape so
+   * an LLM that ignores the new instruction or a model running an older system
+   * prompt still produces parseable output (logged as a warning so we can spot
+   * regressions). Insights with a missing/empty/generic <scope> get scope = null
+   * and metadata.scope_warning, which downstream cluster-quality reporting can
+   * surface.
    */
   _parseInsights(response, digests) {
-    const insightPattern = /<insight>\s*<topic>(.*?)<\/topic>\s*<confidence>(.*?)<\/confidence>\s*<summary>([\s\S]*?)<\/summary>\s*<\/insight>/g;
+    const withScope = /<insight>\s*<topic>(.*?)<\/topic>\s*<scope>([\s\S]*?)<\/scope>\s*<confidence>(.*?)<\/confidence>\s*<summary>([\s\S]*?)<\/summary>\s*<\/insight>/g;
+    const legacy = /<insight>\s*<topic>(.*?)<\/topic>\s*<confidence>(.*?)<\/confidence>\s*<summary>([\s\S]*?)<\/summary>\s*<\/insight>/g;
+
+    // Generic scopes that are too vague to count as subsystem-narrow — these
+    // are exactly the failure mode we want to catch ("various", "tools",
+    // "system", etc.). When we see one, treat scope as missing.
+    const GENERIC_SCOPE = /^(various|tools?|system|configuration|setup|misc(ellaneous)?|general|n\/?a|none)$/i;
 
     const insights = [];
-    let match;
-    while ((match = insightPattern.exec(response)) !== null) {
-      const topic = match[1].trim();
-      const confidence = Math.min(1.0, Math.max(0.0, parseFloat(match[2].trim()) || 0.5));
-      const summary = match[3].trim();
+    const seenSpans = [];
 
-      insights.push({ topic, summary, confidence, metadata: {} });
+    let m;
+    while ((m = withScope.exec(response)) !== null) {
+      const topic = m[1].trim();
+      const scopeRaw = m[2].trim();
+      const confidence = Math.min(1.0, Math.max(0.0, parseFloat(m[3].trim()) || 0.5));
+      const summary = m[4].trim();
+      const scope = scopeRaw && !GENERIC_SCOPE.test(scopeRaw) ? scopeRaw : null;
+      const metadata = scope ? { scope } : { scope: null, scope_warning: 'missing_or_generic' };
+      insights.push({ topic, summary, confidence, metadata });
+      seenSpans.push([m.index, m.index + m[0].length]);
+    }
+
+    // Pick up legacy-shape blocks the new regex missed (LLM ignored the
+    // <scope> instruction entirely). Mark them so we can spot regressions.
+    while ((m = legacy.exec(response)) !== null) {
+      const start = m.index;
+      const end = start + m[0].length;
+      // Skip if this span was already consumed by the with-scope matcher.
+      if (seenSpans.some(([s, e]) => start >= s && end <= e)) continue;
+      const topic = m[1].trim();
+      const confidence = Math.min(1.0, Math.max(0.0, parseFloat(m[2].trim()) || 0.5));
+      const summary = m[3].trim();
+      insights.push({
+        topic,
+        summary,
+        confidence,
+        metadata: { scope: null, scope_warning: 'legacy_no_scope_field' },
+      });
     }
 
     return insights;
