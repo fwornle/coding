@@ -13987,5 +13987,103 @@
       "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/feedback_statusline_is_tmux.md",
       "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/feedback_claude_path_encoding.md"
     ]
+  },
+  {
+    "id": "366823de-0ecc-4244-ac92-95fc09003d3e",
+    "summary": "Intent: Save lessons learned from the current session into project memory files.\nApproach: Two specific learnings were worth persisting: the statusline terminology disambiguation and the lossy Claude path encoding issue; generic lessons were skipped as already documented elsewhere.\nArtifacts: edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/feedback_statusline_is_tmux.md, edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/feedback_claude_path_encoding.md, edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/MEMORY.md\nResult: Added two memory entries: (1) \"status line\" refers to the tmux statusline via `combined-status-line.js`, not Claude Code's harness; (2) Claude transcript directory naming collapses both `/` and `_` to `-`, making reverse-decoding impossible — always forward-encode, with pointers to `enhanced-transcript-monitor.js:1703` and `health-coordinator.js`.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-09T05:02:32.012Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/feedback_statusline_is_tmux.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/feedback_claude_path_encoding.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/MEMORY.md"
+    ]
+  },
+  {
+    "id": "19662881-ac61-495d-b3b1-064b62a11f7d",
+    "summary": "Intent: Commit the .data artifact files to the repository.\nApproach: Split commits by artifact type following project convention, separating knowledge-graph export from observation exports.\nArtifacts: edited .data/knowledge-export/coding.json, edited .data/observation-export/digests.json, edited .data/observation-export/insights.json, edited .data/observation-export/metadata.json\nResult: Two commits created: one for the knowledge-graph export refresh and one for the observation exports (digests, insights, observations, metadata); settings and heartbeat files left untouched.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-09T05:04:37.057Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ea272c36-2ef8-4138-be36-650310c23a75",
+    "summary": "Intent: [user shared an image, likely showing a UI or data issue related to insight consolidation]\nApproach: Developer investigated insight consolidation pipeline by searching codebase for related files.\nArtifacts: edited feedback_statusline_is_tmux.md, edited feedback_claude_path_encoding.md, edited MEMORY.md\nResult: Investigation was initiated but no concrete solution or outcome was reached in this exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-09T05:07:53.379Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic--work-rapid-automations/memory/feedback_statusline_is_tmux.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic--work-rapid-automations/memory/feedback_claude_path_encoding.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic--work-rapid-automations/memory/MEMORY.md"
+    ]
+  },
+  {
+    "id": "98909a0c-85cd-4e65-8184-cb5737424ca2",
+    "summary": "Intent: Investigate the broken \"online learning\" statusline indicator, determine if it's from an obsolete system, and propose whether to replace it with the observations-digest-insights system.\nApproach: Search the codebase to find what produces the broken indicator before proposing changes.\nArtifacts: edited ObservationConsolidator.js\nResult: Investigation was initiated but incomplete — the exchange ends mid-search with no findings or proposal yet produced.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-09T05:11:23.988Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "550f6e09-81ad-462a-b91e-f613894cdd14",
+    "summary": "Intent: Investigate the broken \"online learning\" status indicator in the status line, determine its origin, and assess whether it should be replaced with the observations-digest-insights system.\nApproach: Read the relevant scripts to trace where the online learning health status originates and whether the underlying system is still active or deprecated.\nArtifacts: edited ObservationConsolidator.js\nResult: Investigation is ongoing; no changes made yet. The developer suspects the old online learning system is defunct and wants to replace it with the observations-digest-insights system in the status line, removing all traces of the old system from code and docs.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-09T05:11:23.988Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "8093a10b-6f87-44bc-894a-4c1f7453198e",
+    "summary": "Intent: Confirm and execute a pending change, then remove a bad insight from the observation consolidator.\nApproach: Read the ObservationConsolidator.js file, investigated the SQLite database structure and existing insights, then applied the fix along with cleaning up the problematic insight entry.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: ObservationConsolidator.js was updated with the intended change and the bad insight was removed or corrected within the file.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-09T05:23:35.274Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
   }
 ]
