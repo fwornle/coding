@@ -142,7 +142,7 @@ The verifier compares host `stat` vs `docker exec stat` for each bind-mounted fi
 | `integrations/system-health-dashboard/server.js` | Dashboard code — drift causes startup failures |
 | `scripts/consolidate-observations.js` | Consolidator CLI — drift desyncs heartbeat schema |
 
-When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Remediation is operator-driven (`docker-compose up -d --force-recreate coding-services`); no auto-heal is wired in post-Phase-33.
+When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Remediation is operator-driven (`docker-compose restart coding-services` is enough to invalidate the FUSE cache; `--force-recreate` is needed only if the volume mapping itself changed). This particular check has no auto-heal hook because container recreation is too disruptive to dispatch automatically — see [Auto-healing](#auto-healing) below for the services that *do* self-heal.
 
 ![Bind-mount staleness detection](../images/bind-mount-staleness-detection.png)
 
@@ -170,6 +170,32 @@ When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Reme
 | `/api/health-verifier/status` | Pass-through to coordinator `/health/state` |
 | `/api/health-verifier/report` | Same, verbose |
 | `/api/ukb/*` | UKB workflow control + history |
+
+## Auto-healing
+
+Two complementary paths bring failed services back without operator action:
+
+### 1. Coordinator-driven safety net (proactive)
+
+`ensureEtmForActiveProjects()` runs on every coordinator tick. It walks the projects under `~/Agentic/`, checks each for an actively-written Claude transcript (`*.jsonl` mtime within the last 2 min), and spawns an `enhanced-transcript-monitor` for any project that is *active* but has no fresh heartbeat in the coordinator's `lsl` map. Rate-limited to one sweep per 30 s with a startup grace of ~20 s so existing ETMs (started before the coordinator) get a chance to register first. This closes the gap left when Phase 33 retired `GlobalLSLCoordinator` — sessions launched outside `bin/coding` (VS Code Claude extension, manual `node` invocations, agent worktrees) are now picked up automatically.
+
+### 2. Dashboard-driven restart click (reactive)
+
+The dashboard violations table renders an "Enabled" badge + Restart button on any row whose service has an entry in the dashboard's `AUTO_HEAL_MAP` (`integrations/system-health-dashboard/server.js`). Clicking the button POSTs to `coordinator :3034 /health/remediate { action, service }`. The coordinator lazy-imports `HealthRemediationActions` and dispatches via `executeAction(actionName, details)`, then triggers an immediate `forceTick()` so the next dashboard poll reflects the new state.
+
+The proxy hop is necessary because the dashboard runs *inside* the `coding-services` container, which cannot reach host-side processes (ETM, vkb, etc.) via `supervisorctl` — the coordinator runs natively and can.
+
+| Service | Action | Handler |
+|---------|--------|---------|
+| `enhanced_transcript_monitor` | `restart_transcript_monitor` | `restartTranscriptMonitor()` |
+| `vkb_server` | `restart_vkb_server` | `restartVkbServer()` |
+| `constraint_monitor` | `restart_constraint_monitor` | `restartConstraintMonitor()` |
+| `dashboard_server`, `health_dashboard_*` | `restart_dashboard_server` / `restart_health_*` | corresponding handlers |
+| `llm_cli_proxy` | `restart_llm_cli_proxy` | `restartLLMCLIProxy()` |
+
+If the coordinator proxy fails (network or coordinator down) the dashboard falls back to the legacy local `restartCommands` map (`supervisorctl` inside the container, `npm`/`bin` paths on host), so a coordinator outage does not strand the Restart button.
+
+`HealthRemediationActions` enforces a per-action 5-min cooldown on failure and a 10-attempt-per-hour ceiling, preventing spawn storms when an underlying issue keeps killing the restarted process.
 
 ## Retired components (do not write/read)
 

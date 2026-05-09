@@ -1,7 +1,7 @@
 @startuml health-coordinator-architecture
 !include _standard-style.puml
 
-title Health Monitoring Architecture (Phase 33)
+title Health Monitoring Architecture (Phase 33 + auto-heal wiring)
 
 top to bottom direction
 
@@ -13,13 +13,19 @@ package "Reporters (write signals)" {
 package "Coordinator (single SoT)" {
   rectangle "Health coordinator\nhealth-coordinator.js" as COORD <<core>>
   database "/health/state\n(in-memory)" as STATE <<storage>>
+  rectangle "HealthRemediationActions\n(host-side dispatcher)" as REMEDIATE <<core>>
   COORD -[#888]- STATE
+  COORD -[#888]- REMEDIATE
 }
 
 package "Consumers (read state)" {
   rectangle "combined-status-line.js\n(tmux status-right)" as STATUSLINE <<util>>
   rectangle "system-health-dashboard\n:3032 / :3033" as DASHBOARD <<api>>
   rectangle "health-prompt-hook.js" as HOOK <<util>>
+}
+
+package "Healable host services" {
+  rectangle "ETM, VKB,\nconstraint-monitor,\nllm_cli_proxy, ..." as TARGETS <<infra>>
 }
 
 ETM -[#green,dashed]-> COORD : POST /signals\nlsl_heartbeat\n(every ~2s)
@@ -29,6 +35,11 @@ STATUSLINE -[#orange]-> COORD : GET /health/state\n(per render)
 DASHBOARD  -[#orange]-> COORD : GET /health/state\n(card refresh)
 HOOK       -[#orange]-> COORD : GET /health/state\n(per prompt)
 
+DASHBOARD -[#red]-> COORD : POST /health/remediate\n{action, service}\n(Restart-button click)
+COORD -[#red]-> REMEDIATE : executeAction(...)
+REMEDIATE -[#red]-> TARGETS : spawn / supervisorctl restart\n(host-side)
+COORD -[#red,dashed]-> ETM : auto-spawn safety net\n(active transcript +\nno fresh heartbeat,\nrate-limited 30s)
+
 note right of COORD
   Marks LSL entries stopped
   after >15s without a fresh
@@ -36,6 +47,32 @@ note right of COORD
   (dashboard, vkb, semantic-
   analysis SSE, llm_cli_proxy)
   directly.
+
+  ETM safety net (every tick):
+  ensureEtmForActiveProjects()
+  spawns ETM for any project
+  with an active jsonl
+  transcript and no live
+  heartbeat — 30s rate-limit,
+  20s startup grace.
+end note
+
+note left of REMEDIATE
+  Lazy-imported on first
+  /health/remediate call.
+  Honors per-action cooldown
+  (5 min after failure) and
+  hourly rate limit (10/h).
+end note
+
+note bottom of DASHBOARD
+  AUTO_HEAL_MAP attaches
+  auto_heal=true and
+  auto_heal_action=<name>
+  to violation rows so the
+  frontend renders "Enabled"
+  and a working Restart
+  button.
 end note
 
 note bottom of STATUSLINE

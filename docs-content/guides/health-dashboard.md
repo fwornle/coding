@@ -87,7 +87,7 @@ Reduced to a one-shot reporter in plan 33-04. The `start` (daemon) subcommand wa
 | `status` | GET coordinator `/health/state`, print compact summary |
 | `report` | GET coordinator `/health/state`, print verbose (or `--json`) |
 
-Auto-healing was removed; remediation is operator-driven post-Phase-33. The coordinator owns periodic probing of services and databases.
+Auto-healing now flows through the coordinator (re-introduced after the initial Phase-33 cut): the dashboard's Restart-button click POSTs `coordinator :3034 /health/remediate { action, service }`, which dispatches via `HealthRemediationActions.executeAction()` on the host. The coordinator also runs an `ensureEtmForActiveProjects()` safety net every tick that auto-spawns ETM for any project with an active transcript and no fresh heartbeat. See [Auto-healing](../architecture/health-monitoring.md#auto-healing) for the full wiring.
 
 ### Layer 4: StatusLineHealthMonitor (retired)
 
