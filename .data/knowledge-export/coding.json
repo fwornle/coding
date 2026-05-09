@@ -12090,14 +12090,14 @@
     },
     {
       "name": "System Health Dashboard and Service Architecture",
-      "entityType": "Container",
+      "entityType": "Process",
       "observations": [
-        "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host only)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer\n- `localhost:3033` — health API / live-logging dashboard server\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n- `localhost:12436` — Observations API (health checks confirmed against this port)\n\n**Architectural rule:** Docker runs headless backend services/APIs; host runs tools requiring host networking or hot-reload dev UIs. All port values must come exclusively from `.env.ports` — no hardcoding.\n\n**Health verification and Docker stability:**\n- `health-verification-rules.json` (`/Users/.../Agentic/coding/config/`) must be kept in sync with bind-mount changes — stale `bind_mount_freshness.files` entries cause containers to force-recreate in a loop every ~5 minutes\n- Fixed May 5: removed stale reference to `scripts/consolidate-observations.js` from `bind_mount_freshness.files` after obs-api cutover removed that bind-mount\n- **False LSL DOWN alert pattern**: JSON parse errors in health hooks default to `DOWN` state — investigate parse errors before assuming service is down; LSL processes and port `12436` should be verified independently\n- Dashboard at port `3032` (not `3030`) is the observations viewer; conflicting health indicators across UI panels may reflect divergent health check sources\n\n**Idle CPU fixes (May 2):**\n- `server.js:1031` had a 100ms `setInterval` firing 10×/sec — rewritten with stat-gate on `mtimeMs+size`, adaptive intervals (100ms active / 1s idle); commit `e1f12d7ab`\n- `scripts/global-process-supervisor.js`: DEBUG file-write gate added\n- `healthRefreshMiddleware.ts`: adaptive polling with visibility gate\n\n**Other known issues and fixes:**\n- **Port 3030 conflict**: leftover Next.js dev server → fix: `free-coding-ports.sh`\n- Stale browser cache hides deployed fixes — hard refresh (`Cmd+Shift+R`) required\n- **Multi-phase Docker-mode refactor completed (May 1)**: all `isDockerMode` branches stripped from 8 scripts\n- `supervisord.conf` inherits proxy env vars; `NO_PROXY` covers internal services\n- **Removed integrations (May 2):** Serena, Stagehand/browser-access, shadcn MCP entries removed from `.claude/mcp.json` and related files"
+        "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host only)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server (`integrations/system-health-dashboard/static-server.js`)\n- `localhost:3033` — health API / live-logging dashboard server; `/api/observations` reverse-proxies to `localhost:12436`\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist loaded in production as of Phase 33 cutover)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n- `localhost:12435` — LLM CLI proxy (confirmed running on port 12435, PID 67019)\n- `localhost:12436` — Observations API (`obs_api`); not managed by launchctl — spawned by `start-services-robust.js`\n\n**Architectural rule:** Docker runs headless backend services/APIs; host runs tools requiring host networking or hot-reload dev UIs. All port values must come exclusively from `.env.ports` — no hardcoding.\n\n**Health monitoring architecture (Phase 33 — complete):**\n- HTTP POST signals to coordinator via `HEALTH_COORDINATOR_URL`; dashboard backend reverse-proxies `/api/*` to host coordinator\n- `integrations/system-health-dashboard/static-server.js`: `/api/*` reverse-proxy mounted **before** `express.static` and SPA catch-all\n- Consumer files migrated off direct `readFileSync(.health/*.json)` to `fetch(/health/state)` coordinator requests\n- **Stale daemon cleanup**: `global-lsl-coordinator.js` spawn calls removed from `scripts/agent-common-setup.sh`; zombie `nohup` processes must be manually killed\n- **plist env injection**: `EnvironmentVariables` plist declarations override `launchctl setenv` on macOS Darwin 25.4.0 — plan 33-15 adds `POST /test/inject` endpoint (guarded by `NODE_ENV=test`) as workaround\n- **Phase 33 status**: 11/14 plans complete; gaps G1, G2 closed; G7 (plist env) addressed via plan 33-15\n\n**`server.js` dashboard API fixes (cumulative):**\n- Port Liveness panel DOWN, \"No check data yet\" UI, frontend render crash, `RangeError: Invalid time value` — all previously fixed\n- **Status translation bug**: needed `\"passed\"`/`\"failed\"`/`\"warning\"` mapping — identified May 8, fix status unconfirmed\n- **False violation flagging** and **malformed verify endpoint response shape** — identified May 8\n- **`handleGetCGRFreshness`**: fixed by switching to Node's built-in `net` module for port 7687 connectivity checks\n- **`health-verifier` STOPPED**: removed from `supervisord.conf` to eliminate misleading dashboard state\n- **Auto-heal regression (fixed May 9)**: coordinator-proxy violation synthesis in `server.js` omitted `auto_heal` and `auto_heal_action` fields — a Phase 33 reader migration regression; without those fields, frontend fell back to \"Manual\" badge instead of invoking `restartTranscriptMonitor`; fixed and committed alongside `health-coordinator.js` and `CLAUDE.md`\n\n**ETM / coordinator state issues:**\n- ETM process was not running as of May 9 — restarted as parallel remediation step\n- ETM spawned without `TMUX_PANE` causes pane-match lookup to fail; project-level fallback added to `getLSLHealthStatus()` in `combined-status-line.js`\n- `enhanced-transcript-monitor.js` was inheriting `/coding` container path for `CODING_TOOLS_PATH` instead of host path — fixed\n\n**Health verification and Docker stability:**\n- **False LSL DOWN alert pattern**: JSON parse errors in health hooks default to `DOWN` — investigate parse errors before assuming service is down\n- Docker `unless-stopped` does NOT restart after Docker Desktop manual quit — enable \"Start Docker Desktop when you sign in\"\n- **`health-verification-rules.json`**: LLM CLI proxy false violation fixed by correcting hostname in probe config; must be kept in sync with bind-mount changes"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.849Z",
-        "last_updated": "2026-05-06T00:18:40.759Z"
+        "last_updated": "2026-05-09T05:04:31.838Z"
       },
       "id": "mc4flkg3oje83q"
     },
@@ -12142,27 +12142,27 @@
     },
     {
       "name": "Planning and Execution Workflow",
-      "entityType": "File",
+      "entityType": "Container",
       "observations": [
-        "The project uses a structured phase-based planning workflow tracked across several docs.\n\n- `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md` updated at start of each phase with phase entry and requirements IDs\n- Auto-generated `{phase}-CONTEXT.md` files capture key architectural decisions before execution\n- Plans stored under `.planning/phases/{phase-name}/` as numbered PLAN files (e.g. `32-01`, `32-02`)\n- Multi-wave or sequential plans used when intra-wave file conflicts exist on shared files (e.g. adapter files in phase 32)\n- `PROJECT.md` updated at completion of each phase\n- Milestone completion uses a `complete-milestone` workflow: pre-flight audit, plan summary verification, `STATE.md` update, git tag\n- Code-review workflow scoped to phase SUMMARY files; findings categorized as critical/warning/info"
+        "The project uses a structured phase-based planning workflow tracked across several docs.\n\n- `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md` updated at start/end of each phase; `PROJECT.md` updated at completion\n- Auto-generated `{phase}-CONTEXT.md`, `{phase}-DISCUSSION-LOG.md`, `{phase}-SPEC.md`, `{phase}-VALIDATION.md` capture decisions before execution\n- Plans stored under `.planning/phases/{phase-name}/` as numbered PLAN files (e.g. `33-01`, `33-02`)\n- **Multi-wave execution model**: Waves 0–1 = safe file creation; Waves 3+ = live daemon changes; wave dispatch uses `--wave N` flag on `gsd-execute-phase`\n- Parallel subagent dispatch is default; overridden to sequential when `depends_on` declarations exist or submodule path conflicts arise\n- Subagent writes to worktree branch (`worktree-agent-{hash}`), merged to main by orchestrator after all wave agents complete\n- **Gap closure mode**: `--gaps` flag on `gsd-plan-phase` skips research phase and loads `VERIFICATION.md`; `--gaps-only` on execute; produces additional numbered plans (e.g. 33-09 through 33-15 for phase 33)\n- **Human-verify checkpoints**: embedded in destructive plans (e.g. docker-compose rebuild, `git rm`, launchctl plist swap); require live diagnostics before approval — do not approve if zombie processes or cascading failures present\n- **Plan falsification pattern**: when a plan's core hypothesis is disproven empirically, close the plan as `falsified-by-discovery` and create a replacement plan to preserve audit trail (e.g. 33-12 → 33-15)\n- `{phase}-SUMMARY.md` materialization sometimes requires manual orchestrator write due to subagent Write-tool role restrictions\n- Milestone completion uses `complete-milestone` workflow: pre-flight audit, plan summary verification, `STATE.md` update, git tag\n- New phases must be registered in `ROADMAP.md` before spec work can proceed"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.898Z",
-        "last_updated": "2026-04-26T10:38:00.003Z"
+        "last_updated": "2026-05-07T13:01:51.707Z"
       },
       "id": "mc4flkg2vazpbn"
     },
     {
       "name": "GSD Statusline and Hook Integration",
-      "entityType": "File",
+      "entityType": "Process",
       "observations": [
-        "- **Current GSD version**: `1.40.0` (updated May 3 from 1.39.1); 65 skills installed; runtime restart required after install\n- **v1.40.0 changes**: 6 namespaced `<COMPANY_NAME_REDACTED>-skills` added, skill surface consolidated from 86→59 entries, new `gsd-edit-phase` and post-merge build gate\n- **v1.39.0 change**: consolidates 31 micro-skills into grouped parent commands with flags\n- Context window percentage display (`context_window.remaining_percentage`) disappeared — Claude Code stopped passing this field; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`\n- **Parallel session detection**: `getRunningAgentSessions`/`getProjectSessionsHealth` logic is intact (not broken by API-removal commit); single-entry-per-project behavior is pre-existing design, not a regression\n- **`health-prompt-hook.js`**: cwd-robust LSL check added May 2 to eliminate false alarms\n- **False warning fixes (May 1)**: `health-prompt-hook.js` and `combined-status-line.js` both fixed for misclassifying `overallStatus=healthy` with non-critical violations as warning\n- **API quota display removed (May 2)**: Groq, Anthropic, OpenAI, X/Grok provider display stripped from `combined-status-line.js`"
+        "- **Current GSD version**: `1.40.0` (updated May 3 from 1.39.1); 65 skills installed; runtime restart required after install\n- **v1.40.0 changes**: 6 namespaced skills added, skill surface consolidated from 86→59 entries, new `gsd-edit-phase` and post-merge build gate\n- Context window percentage display disappeared — Claude Code stopped passing this field; no fix available from project side\n- The `[LSL●]` health indicator in tmux is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy`\n\n**`combined-status-line.js` recent fixes (May 8):**\n- **Per-pane underlined project labels**: prior change over-reached by rewriting display logic; reverted per-pane underlined label rendering (`C`, `RA`, etc.) to original logic while retaining coordinator endpoint as health data source — `getGlobalHealthStatus()` now pulls from coordinator URL\n- **Graduated cooling-down icons restored**: Phase 33 migration had dropped the `healthy→cooling` graduated icon sequence; fixed by statting `transcriptPath` mtime via coordinator's exposed field, computing age client-side, mapping to lifecycle buckets: `🟢`/`🌲`/`🫒`/`🪨`/`⚫`/`💤`\n- **LSL fallback for missing `TMUX_PANE`**: project-level fallback added to `getLSLHealthStatus()` to handle ETM spawned without pane context\n- **NBSP fix**: confirmed working\n- **`health-verifier` block**: removed from `supervisord.conf` (was `autostart=false`, caused misleading STOPPED display)\n- **Five identified display issues** (clock alignment, supervisord/ETM service row, CGR pane, per-pane ETM display, docs) — investigation complete, fixes partially applied\n\n**Known open items:**\n- Health badge display behavior and layout/padding issues in `combined-status-line.js` — tasks created, no code changes yet\n- `status-line.md` documentation update — reconnaissance done, edits not yet applied\n- D-11 lock mechanism added; option (b) inline edit applied to worktree `agent-a5cbf87747b243eab`\n\n**`health-prompt-hook.js`**: cwd-robust LSL check added May 2; false warning fix for `overallStatus=healthy` with non-critical violations applied May 1"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.907Z",
-        "last_updated": "2026-05-03T08:33:40.439Z"
+        "last_updated": "2026-05-09T04:14:08.223Z"
       },
       "id": "mc4flkg1y4ci6q"
     },
@@ -12183,12 +12183,12 @@
       "name": "Diagrams and Documentation Conventions",
       "entityType": "File",
       "observations": [
-        "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, consistent component stereotypes, layout guidelines, and arrow macros\n- `lsl-repo-split.puml` updated May 3 to conform to style guide; PNG regenerated to `docs/images/lsl-repo-split.png`\n- `lsl-repo-split.png` referenced in all 8 private `*-history` repo READMEs on GHE (patched commit `bc8a559` for `rapid-automations-history`)\n- Other diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `observation-memory-hierarchy.puml`\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore` — should not be committed"
+        "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, consistent component stereotypes, layout guidelines, and arrow macros\n- `lsl-repo-split.puml` updated May 3 to conform to style guide; PNG regenerated to `docs/images/lsl-repo-split.png`\n- `lsl-repo-split.png` referenced in all 8 private `*-history` repo READMEs on GHE\n- Other diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `observation-memory-hierarchy.puml`\n- **`docs/puml/health-coordinator-architecture.puml`**: updated May 8 with standard style include, proper stereotypes, corrected layout; updated again May 9 to full style guide compliance (standard style include, stereotypes, arrow macros, correct layout direction); PNG regenerated to `docs/images/` (93 KB)\n- `docs-content/architecture/health-monitoring.md` rewritten to replace ASCII art with PNG reference\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore`\n- `status-line.md` documentation update targeted but not yet applied (reconnaissance only as of May 8)"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.956Z",
-        "last_updated": "2026-05-03T08:33:40.537Z"
+        "last_updated": "2026-05-09T05:04:31.847Z"
       },
       "id": "mc4flkg1c37dsd"
     },
@@ -12282,6 +12282,19 @@
         "last_updated": "2026-05-03T04:22:52.058Z"
       },
       "id": "mc4flkg2nj7k5v"
+    },
+    {
+      "name": "LLM Proxy and Network Detection",
+      "entityType": "Config",
+      "observations": [
+        "The LLM proxy bridges requests to different providers based on network context (VPN vs. corporate network vs. home).\n\n**Key files:**\n- `proxy-bridge/server.mjs` — main proxy bridge\n- `bin/start-llm-proxy.sh` — startup script\n- `network-detect.ts` / `dist/network-detect.js` — compiled network detection logic\n- `llm-providers.yaml` — provider routing config\n\n**Known issues and fixes:**\n- **macOS VPN false positive (fixed May 7)**: `proxy-bridge/server.mjs` was matching any `utun*` interface, triggering false VPN detection for iCloud Private Relay, iMessage, and FaceTime system tunnels — fixed by importing `dist/network-detect.js` instead of reimplementing interface detection\n- **Corporate network (CN) routing (fixed May 6)**: CN sessions now route through Copilot subscription (same as VPN), not a separate path — `llm-providers.yaml` and `network-detect.ts` updated\n- **Home DNS false positives**: Fritz!Box DNS may trigger false corporate network detection — more reliable signal sought but not yet implemented\n- **`backfill-raw-observations.mjs`**: updated to correct observation rows mislabeled due to bad network context detection"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-05-07T05:30:27.229Z",
+        "last_updated": "2026-05-07T05:30:27.229Z"
+      },
+      "id": "mc4flkg9ltxut"
     }
   ],
   "relations": [
@@ -19094,14 +19107,20 @@
       "to": "LSL Live Session Logging System",
       "relationType": "has_insight",
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "LLM Proxy and Network Detection",
+      "relationType": "has_insight",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-05-06T00:18:45.835Z",
-    "total_entities": 681,
-    "total_relations": 1135,
+    "exported_at": "2026-05-09T05:04:36.923Z",
+    "total_entities": 682,
+    "total_relations": 1136,
     "description": "Coding project infrastructure and patterns"
   }
 }
