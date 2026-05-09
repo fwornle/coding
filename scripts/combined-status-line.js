@@ -605,37 +605,38 @@ class CombinedStatusLine {
   }
 
   async getKnowledgeSystemStatus() {
+    // Phase A replacement (2026-05-09): the legacy
+    // .health/<project>-transcript-monitor-health.json file stopped being
+    // written at the Phase 33 cutover (the ETM POSTs heartbeats now), so
+    // the [📚] badge had been frozen at ❌ for months. New source of truth
+    // is the coordinator's `knowledge_pipeline` slice — observation /
+    // digest / insight freshness derived from the obs_api consolidation
+    // status endpoint. See health-coordinator.js:pollKnowledgePipeline.
     try {
-      // Read knowledge extraction status from transcript monitor health file
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-      const projectName = basename(process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd());
-      const healthFile = join(codingPath, '.health', `${projectName}-transcript-monitor-health.json`);
-
-      if (!existsSync(healthFile)) {
-        return {
-          status: 'offline',
-          extractionState: 'disabled',
-          budgetUsage: null,
-          cacheHitRate: null
-        };
+      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+      const out = execSync(
+        `curl -fs --max-time 2 "${url}/health/state"`,
+        { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
+      );
+      const state = JSON.parse(out);
+      const kp = state.knowledge_pipeline;
+      if (!kp || !kp.status) {
+        return { status: 'unreachable', reason: 'no knowledge_pipeline slice in /health/state' };
       }
-
-      const healthData = JSON.parse(readFileSync(healthFile, 'utf8'));
-      const knowledgeStatus = healthData.knowledgeExtraction || {};
-
       return {
-        status: knowledgeStatus.enabled ? 'operational' : 'disabled',
-        extractionState: knowledgeStatus.state || 'unknown',
-        lastExtraction: knowledgeStatus.lastExtraction || null,
-        errorCount: knowledgeStatus.errorCount || 0,
-        enabled: knowledgeStatus.enabled || false
+        status: kp.status,
+        lastObservationAt: kp.lastObservationAt,
+        lastDigestAt: kp.lastDigestAt,
+        lastInsightAt: kp.lastInsightAt,
+        obsAgeMs: kp.obsAgeMs,
+        digAgeMs: kp.digAgeMs,
+        insAgeMs: kp.insAgeMs,
+        totals: kp.totals,
+        inflight: kp.inflight,
+        reason: kp.reason
       };
     } catch (error) {
-      return {
-        status: 'offline',
-        extractionState: 'error',
-        error: error.message
-      };
+      return { status: 'unreachable', reason: error.message };
     }
   }
 
@@ -1654,23 +1655,32 @@ class CombinedStatusLine {
       overallColor = 'red';
     }
 
-    // Knowledge System Status - simplified (no counts)
-    if (knowledge.status === 'operational') {
-      const errorCount = knowledge.errorCount || 0;
-      if (errorCount > 0) {
-        parts.push('[📚⚠️]'); // Has errors - check dashboard
+    // Knowledge pipeline (observation/digest/insight freshness via coordinator).
+    // Replaces the legacy ETM-extraction signal that stopped flowing at the
+    // Phase 33 cutover. Source: state.knowledge_pipeline at /health/state.
+    switch (knowledge.status) {
+      case 'healthy':
+        parts.push('[📚✅]');
+        break;
+      case 'stale':
+        parts.push('[📚⚠️]');
         if (overallColor === 'green') overallColor = 'yellow';
-      } else {
-        const stateIcon = knowledge.extractionState === 'ready' ? '✅' :
-                          knowledge.extractionState === 'processing' ? '⏳' :
-                          knowledge.extractionState === 'idle' ? '💤' : '✅';
-        parts.push(`[📚${stateIcon}]`);
-      }
-    } else if (knowledge.status === 'disabled') {
-      parts.push('[📚🔇]'); // Disabled
-    } else {
-      parts.push('[📚❌]'); // Offline
-      if (overallColor === 'green') overallColor = 'yellow';
+        break;
+      case 'stalled':
+        parts.push('[📚🔴]');
+        if (overallColor === 'green') overallColor = 'yellow';
+        break;
+      case 'disabled':
+        parts.push('[📚🔇]');
+        break;
+      case 'unknown':
+        parts.push('[📚❓]');
+        break;
+      case 'unreachable':
+      default:
+        parts.push('[📚❌]');
+        if (overallColor === 'green') overallColor = 'yellow';
+        break;
     }
 
     // UKB (Update Knowledge Base) Process Status - shows 13-agent workflow activity
@@ -1941,24 +1951,47 @@ class CombinedStatusLine {
 
     lines.push('');
 
-    // Knowledge System Section
-    lines.push('📚 KNOWLEDGE SYSTEM');
-    if (knowledge.status === 'operational') {
-      lines.push(`   ✅ Status: Operational`);
-      lines.push(`   🔄 State: ${knowledge.extractionState || 'unknown'}`);
-      if (knowledge.lastExtraction) {
-        const lastTime = new Date(knowledge.lastExtraction).toLocaleTimeString();
-        lines.push(`   ⏱️  Last Extraction: ${lastTime}`);
+    // Knowledge Pipeline Section (observations / digests / insights)
+    lines.push('📚 KNOWLEDGE PIPELINE');
+    const fmtAge = (ms) => {
+      if (ms == null) return 'never';
+      const sec = Math.round(ms / 1000);
+      if (sec < 60) return `${sec}s ago`;
+      const min = Math.round(sec / 60);
+      if (min < 60) return `${min}m ago`;
+      const hr = Math.round(min / 60);
+      if (hr < 48) return `${hr}h ago`;
+      return `${Math.round(hr / 24)}d ago`;
+    };
+    const verdictIcon = ({
+      healthy: '✅',
+      stale: '⚠️',
+      stalled: '🔴',
+      unreachable: '❌',
+      disabled: '🔇',
+      unknown: '❓'
+    })[knowledge.status] || '❌';
+    lines.push(`   ${verdictIcon} Status: ${knowledge.status || 'unknown'}`);
+    if (knowledge.totals) {
+      lines.push(`   📦 Totals: obs=${knowledge.totals.observations} digests=${knowledge.totals.digests} insights=${knowledge.totals.insights}`);
+      if (knowledge.totals.undigested != null) {
+        lines.push(`   ⏸  Undigested: ${knowledge.totals.undigested} (past=${knowledge.totals.pendingPast}, today=${knowledge.totals.pendingToday})`);
       }
-      if (knowledge.errorCount > 0) {
-        lines.push(`   ⚠️  Errors: ${knowledge.errorCount}`);
-      }
-    } else if (knowledge.status === 'disabled') {
-      lines.push(`   🔇  Status: Disabled`);
-      lines.push(`   💡 Enable in config`);
-    } else {
-      lines.push(`   ❌ Status: Offline`);
-      lines.push(`   🔍 Extraction: Unavailable`);
+    }
+    if (knowledge.obsAgeMs != null) {
+      lines.push(`   📝 Last observation: ${fmtAge(knowledge.obsAgeMs)}`);
+    }
+    if (knowledge.digAgeMs != null) {
+      lines.push(`   🧮 Last digest: ${fmtAge(knowledge.digAgeMs)}`);
+    }
+    if (knowledge.insAgeMs != null) {
+      lines.push(`   💡 Last insight: ${fmtAge(knowledge.insAgeMs)}`);
+    }
+    if (knowledge.inflight) {
+      lines.push(`   🔄 In-flight consolidation: ${JSON.stringify(knowledge.inflight)}`);
+    }
+    if (knowledge.reason) {
+      lines.push(`   ℹ  ${knowledge.reason}`);
     }
 
     lines.push('');

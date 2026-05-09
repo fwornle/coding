@@ -9,7 +9,7 @@ Real-time visual indicators of system health and development activity rendered v
 ### Example Display
 
 ```
-[🏥✅] [RA⚫C🟢] [🔒 77% ⚙️IMP] [📚❌] [📋18-19] 18:34
+[🏥✅] [RA⚫C🟢] [🔒 77% ⚙️IMP] [📚✅] [📋18-19] 18:34
 ```
 
 The current pane's project is rendered with an underline (`#[underscore]…#[nounderscore]`) so each parallel tmux window highlights its own project.
@@ -21,7 +21,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | System Health | `[🏥✅]` | Coordinator-derived health rollup (services + databases + container) |
 | Active Sessions | `[RA⚫C🟢]` | Per-project abbreviations with graduated activity icons |
 | Constraint + Trajectory | `[🔒 77% ⚙️IMP]` | Code quality % and current trajectory state |
-| Knowledge System | `[📚✅]` | Knowledge extraction status |
+| Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
 
@@ -78,16 +78,20 @@ Sessions use a **graduated color scheme** based on time since last activity. **A
 | ✅ | VER (Verifying) | Testing and validation |
 | 🚫 | BLK (Blocked) | Intervention preventing action |
 
-### Knowledge System Indicators
+### Knowledge Pipeline Indicators
+
+The badge reflects the freshness of the **observation → digest → insight** pipeline (the `obs_api` service backed by `.observations/observations.db`). Verdict is driven by *observation* freshness only — digest and insight cadences are intentionally slower and don't gate the badge. Source: `state.knowledge_pipeline` at the coordinator's `/health/state` (populated by `pollKnowledgePipeline`, which calls `obs_api`'s `/api/consolidation/status`).
 
 | Status | Icon | Meaning |
 |--------|------|---------|
-| Ready | `[📚✅]` | Knowledge extraction ready and operational |
-| Processing | `[📚⏳]` | Actively extracting knowledge from session |
-| Idle | `[📚💤]` | Operational but waiting/sleeping |
-| Warning | `[📚⚠️ ⚠️N]` | Has N errors but still operational |
-| Paused/Disabled | `[📚🔇 ]` | Knowledge extraction disabled in config |
-| Offline | `[📚❌]` | System offline or initialization failed |
+| Healthy | `[📚✅]` | Last observation written within 15 minutes — pipeline is ingesting |
+| Stale | `[📚⚠️]` | Last observation 15 min – 6 h ago — likely just idle |
+| Stalled | `[📚🔴]` | Last observation > 6 h ago — pipeline appears dead |
+| Disabled | `[📚🔇]` | obs_api reachable but no rows in any pipeline table |
+| Unknown | `[📚❓]` | Coordinator just started, slice not yet populated |
+| Unreachable | `[📚❌]` | obs_api unreachable, returning non-OK, or returning unparseable JSON |
+
+Tooltip details (visible in the verbose status output) include observation/digest/insight ages, totals, and any in-flight consolidation.
 
 ### Coordinator Health Endpoint
 

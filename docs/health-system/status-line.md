@@ -51,7 +51,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
 - `🔒 67%` - **Constraint Compliance**: Code quality compliance percentage
 - `🔍 EX` - **Trajectory State**: Current development activity
-- `[📚✅]` - **Knowledge System**: Knowledge extraction status
+- `[📚✅]` - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
 ### Internal Health Status (Raw Output)

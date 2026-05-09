@@ -157,6 +157,19 @@ const currentState = {
   processes: [],
   databases: { status: 'unknown' },
   files: [],
+  // Observation/digest/insight pipeline freshness — drives the [📚] statusline
+  // badge. Replaces the legacy `knowledgeExtraction` field that was read from
+  // a per-project health file the ETM stopped writing at the Phase 33 cutover.
+  // Status: 'unknown' before first probe · 'healthy' / 'stale' / 'stalled' /
+  // 'unreachable' / 'disabled' after.
+  knowledge_pipeline: {
+    status: 'unknown',
+    lastObservationAt: null,
+    lastDigestAt: null,
+    lastInsightAt: null,
+    totals: null,
+    last_probe_end: null
+  },
   generated_at: new Date(STARTED_AT).toISOString(),
   coordinator_uptime_s: 0
 };
@@ -336,6 +349,98 @@ function ingestSignal(signal) {
       // Tolerant: accept unknown kinds in the skeleton stage; later plans tighten.
       log(`ingestSignal: unknown kind '${signal.kind}'`, 'WARN');
   }
+}
+
+// Knowledge pipeline freshness probe. Hits obs_api's
+// /api/consolidation/status to read the latest observation/digest/insight
+// timestamps + totals. Replaces the [📚] indicator's legacy data source
+// (per-project ETM health file that stopped being written at Phase 33).
+//
+// Health verdict (driven by observation freshness only — digests and insights
+// run on slower async cadences and would falsely downgrade the badge if they
+// gated it):
+//   'healthy'      — observation written within OBS_FRESH_MS
+//   'stale'        — last observation between OBS_FRESH_MS and OBS_STALL_MS
+//                    (likely just idle — no active Claude session right now)
+//   'stalled'      — last observation older than OBS_STALL_MS (pipeline dead)
+//   'unreachable'  — obs_api unreachable / non-OK / parse error
+//   'disabled'     — obs_api reachable but no rows in any table yet
+const OBS_API_URL = process.env.OBS_API_URL || 'http://localhost:12436';
+const OBS_FRESH_MS = 15 * 60 * 1000;     // 15 min — counts as fresh
+const OBS_STALL_MS = 6 * 60 * 60 * 1000; // 6 h — considered stalled
+
+async function pollKnowledgePipeline() {
+  const probeEndedAt = () => new Date().toISOString();
+  let body;
+  try {
+    const r = await fetch(`${OBS_API_URL}/api/consolidation/status`, {
+      signal: AbortSignal.timeout(2_000)
+    });
+    if (!r.ok) {
+      currentState.knowledge_pipeline = {
+        status: 'unreachable',
+        reason: `HTTP ${r.status}`,
+        lastObservationAt: null,
+        lastDigestAt: null,
+        lastInsightAt: null,
+        totals: null,
+        last_probe_end: probeEndedAt()
+      };
+      return;
+    }
+    body = await r.json();
+  } catch (err) {
+    currentState.knowledge_pipeline = {
+      status: 'unreachable',
+      reason: err.message,
+      lastObservationAt: null,
+      lastDigestAt: null,
+      lastInsightAt: null,
+      totals: null,
+      last_probe_end: probeEndedAt()
+    };
+    return;
+  }
+
+  const now = Date.now();
+  const ageMs = (iso) => (iso ? now - new Date(iso).getTime() : null);
+  const obsAge = ageMs(body.lastObservationAt);
+  const digAge = ageMs(body.lastDigestAt);
+  const insAge = ageMs(body.lastInsightAt);
+
+  let status;
+  if (body.totalObs === 0 && body.totalDigests === 0 && body.totalInsights === 0) {
+    status = 'disabled';
+  } else if (obsAge === null) {
+    // No observation rows yet — treat as stale, not stalled.
+    status = 'stale';
+  } else if (obsAge > OBS_STALL_MS) {
+    status = 'stalled';
+  } else if (obsAge > OBS_FRESH_MS) {
+    status = 'stale';
+  } else {
+    status = 'healthy';
+  }
+
+  currentState.knowledge_pipeline = {
+    status,
+    lastObservationAt: body.lastObservationAt,
+    lastDigestAt: body.lastDigestAt,
+    lastInsightAt: body.lastInsightAt,
+    obsAgeMs: obsAge,
+    digAgeMs: digAge,
+    insAgeMs: insAge,
+    totals: {
+      observations: body.totalObs,
+      digests: body.totalDigests,
+      insights: body.totalInsights,
+      undigested: body.undigested,
+      pendingPast: body.pendingPast,
+      pendingToday: body.pendingToday
+    },
+    inflight: body.inflight,
+    last_probe_end: probeEndedAt()
+  };
 }
 
 // ETM spawn safety net (Phase 33 fills the gap left by removing the legacy
@@ -573,6 +678,22 @@ async function runAllChecks() {
       rollup[name] = 'unknown';
     }
     currentState.lsl_by_project = rollup;
+  }
+
+  // ----- Knowledge pipeline freshness (drives [📚] statusline badge) -----
+  try {
+    await pollKnowledgePipeline();
+  } catch (err) {
+    log(`knowledge_pipeline probe threw: ${err.message}`, 'ERROR');
+    currentState.knowledge_pipeline = {
+      status: 'unreachable',
+      reason: err.message,
+      lastObservationAt: null,
+      lastDigestAt: null,
+      lastInsightAt: null,
+      totals: null,
+      last_probe_end: new Date().toISOString()
+    };
   }
 
   // ----- Service liveness via PSM (host services only — D-08 drops container supervisorctl) -----

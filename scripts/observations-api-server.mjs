@@ -670,12 +670,23 @@ app.get('/api/consolidation/status', (_req, res) => {
     let totalInsights = 0;
     try { totalInsights = db.prepare('SELECT COUNT(*) as cnt FROM insights').get().cnt; } catch { /* table may not exist */ }
 
+    // Latest write timestamps per table — consumed by health-coordinator's
+    // knowledge_pipeline slice to drive the [📚] statusline badge. ISO-8601
+    // strings (the column type), null when the table is empty or absent.
+    let lastObservationAt = null;
+    try { lastObservationAt = db.prepare('SELECT MAX(created_at) AS t FROM observations').get().t || null; } catch { /* */ }
+    let lastDigestAt = null;
+    try { lastDigestAt = db.prepare('SELECT MAX(created_at) AS t FROM digests').get().t || null; } catch { /* */ }
+    let lastInsightAt = null;
+    try { lastInsightAt = db.prepare('SELECT MAX(created_at) AS t FROM insights').get().t || null; } catch { /* */ }
+
     const inflight = readConsolidationHeartbeat();
 
     res.json({
       totalObs, undigested, lowQuality, pendingPast, pendingToday,
       digested: totalObs - undigested - lowQuality,
       totalDigests, totalInsights,
+      lastObservationAt, lastDigestAt, lastInsightAt,
       inflight,
     });
   } catch (err) {
