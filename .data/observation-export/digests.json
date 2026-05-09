@@ -9868,6 +9868,25 @@
     "project": "rapid-automations"
   },
   {
+    "id": "67fc0fc2-6aaf-4eb3-85a1-092832905ad4",
+    "date": "2026-05-04",
+    "theme": "Docker Container Downtime Root Cause Investigation",
+    "summary": "Investigated why the `coding-services` Docker container went down overnight and failed to auto-restart.\n\n- **Root cause:** Docker Desktop was manually quit, cleanly shutting down the VM and container (exit code 0); the `unless-stopped` restart policy only triggers on daemon restart, requiring Docker Desktop to be relaunched manually.\n- **Ruling out:** Mac reboot and container crash were both eliminated as causes via Docker logs, Mac uptime, and sleep/wake event analysis.\n- **Secondary issue found:** `health-verifier` inside the container is in an ongoing crash-respawn loop (unrelated to the downtime).\n- **Fix:** Enable \"Start Docker Desktop when you sign in\" in Docker Desktop settings to prevent recurrence.\n- No files were modified during this investigation.",
+    "observationIds": [
+      "60d64514-3e2a-4c06-92be-edc01b9f61d8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-07T05:28:44.332Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
     "id": "edbc168e-3c65-4ff1-a794-d62b08497e58",
     "date": "2026-05-05",
     "theme": "Docker Container Recreating in Loop: Bind Mount Fix",
@@ -9999,5 +10018,1151 @@
       "sourceCount": 1
     },
     "project": "coding"
+  },
+  {
+    "id": "af06c13e-cbb4-479c-b880-6e8ee71c2abd",
+    "date": "2026-05-06",
+    "theme": "Phase 33 Spec and Discuss Workflow Initialization",
+    "summary": "Goal was to register and fully spec out Phase 33 (health-monitoring-consolidation) as a strategic redesign under a new v7.0 milestone.\n\n- `ROADMAP.md` updated to add Phase 33 under v7.0\n- `33-CONTEXT.md` and `33-DISCUSSION-LOG.md` created and populated through the discuss-phase workflow\n- Four architectural areas were resolved through guided gray-area analysis:\n  - **Signal protocol**: HTTP POST to coordinator via `HEALTH_COORDINATOR_URL` env var\n  - **Compat proxy**: dashboard backend reverse-proxies `/api/health-verifier/*` to host coordinator\n  - **Rules engine**: coordinator reads rules JSON directly; `bind_mount_freshness` rule deleted; container-process supervision dropped in favor of Docker healthcheck\n  - **Session ID**: reuse existing `CLAUDE_SESSION_ID`/`SESSION_ID` with 5-minute grace period before eviction\n- All four areas locked and committed; phase ready to proceed to planning",
+    "observationIds": [
+      "36a05744-65bf-4741-8803-96c1687bfe45",
+      "f4deb5bd-145f-47fe-9a4f-ec0f2ff2bdf9",
+      "aa4cfb09-8064-4648-a42f-3e9cd2a8a5ac",
+      "11694206-010f-4601-8423-d30326fcb7f0",
+      "65b1b3dd-25b1-44a5-b721-f1dcc58e072f",
+      "4ddadde7-8e69-4832-bf67-ac1deb70b233"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/33-health-monitoring-consolidation/33-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/33-health-monitoring-consolidation/33-DISCUSSION-LOG.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3ec8a37d-27ff-4ca6-80dc-f1ad7cd88ada",
+    "date": "2026-05-06",
+    "theme": "Pre-Phase-33 Commit Cleanup and Session Continuity",
+    "summary": "Between discuss and plan phases, work focused on committing prior fixes and re-establishing session context.\n\n- `enhanced-transcript-monitor.js` edited and git staging initiated for health config fixes and `.data` JSON files (observation 7, cut off before completion)\n- Recent LSL session log files read to reconstruct continuity; cross-referenced with `git log` and `STATE.md`\n- `backfill-raw-observations.mjs` touched during context reconstruction\n- Summary confirmed: Phase A health monitoring fixes committed, Phase B (phase 33) has SPEC/CONTEXT/DISCUSSION-LOG committed and was ready for `/gsd-plan-phase 33`",
+    "observationIds": [
+      "9bc29d44-b69a-41c3-b545-ae06c25e66b3",
+      "7807e390-1e7d-4f8c-a678-29a47ad16ab4",
+      "753f179a-e00e-40d3-9b22-cfaddfadc5e3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/33-health-monitoring-consolidation/33-VALIDATION.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-raw-observations.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "cb5e984f-8da8-4727-b6b3-f9b5c59ecf75",
+    "date": "2026-05-06",
+    "theme": "Phase 33 Plan-Phase Workflow Execution",
+    "summary": "The plan-phase workflow was run for phase 33 to assess research needs and proceed to task planning.\n\n- Workflow read phase metadata, `SPEC.md`, and `CONTEXT.md`\n- Determined phase 33 has a fully locked SPEC and rich CONTEXT with low ambiguity, making research likely unnecessary\n- `33-VALIDATION.md` was created/updated as part of the workflow\n- Workflow paused at a user confirmation gate before proceeding to planner spawn",
+    "observationIds": [
+      "376523b4-c58d-4447-943a-3912f7356221",
+      "68587753-8818-4faf-9df7-95ef4c2fa009"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/33-health-monitoring-consolidation/33-VALIDATION.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8596658a-7268-449a-83e8-8736712049cb",
+    "date": "2026-05-06",
+    "theme": "Phase 33 Wave 0 and Wave 1 Subagent Execution",
+    "summary": "The execute-phase workflow was loaded and phase 33 plans were discovered, grouped into waves, and the first two waves executed via subagents.\n\n- 8 plans identified across multiple waves; Waves 1–2 flagged as safe (file creation), Waves 3–5 flagged as touching live daemons (`health-verifier`, `statusline-health-monitor`, `mcp-constraint-monitor`, launchd jobs)\n- **Plan 33-01 (Wave 0 scaffold)** completed with 4 commits:\n  - Extracted `createRotatingLogger` to `lib/utils/log-rotator.js`\n  - Added Phase 33 test harness scaffold with 8 intentionally-red acceptance test stubs for `health-coordinator`\n- **Plan 33-02 (Wave 1)** completed:\n  - `scripts/health-coordinator.js` created (322 lines, Express on port 3034)\n  - LaunchAgent plist created but not loaded in production\n  - Orchestrator noted `33-02-SUMMARY.md` required manual materialization due to agent Write-tool role restrictions, to prevent re-execution detection issues\n- Worktree branch `worktree-agent-a806784b07e5154d3` merged into main\n- `33-02-SUMMARY.md` updated across multiple orchestrator observations",
+    "observationIds": [
+      "d65d2579-3458-4c20-a5fb-9f4856fefd81",
+      "aeccd275-0b18-48ed-8ab6-9fc43b82d657",
+      "4a28c0e0-f3ff-45c2-9162-a513c5c8cb22",
+      "f6c5ee90-04a1-4a76-a629-ea6d2d18e22f",
+      "db176c12-18e3-4457-8429-9d1f7a0d71cf",
+      "8829e3ed-245b-4919-b986-1ef499a35cbe"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/33-health-monitoring-consolidation/33-02-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ab97bbcf-cd88-42f3-b71d-f67839ef1676",
+    "date": "2026-05-06",
+    "theme": "Phase 33 Wave 2 Execution Initiated",
+    "summary": "Wave 2 of phase 33 execution was initiated by the orchestrator in the afternoon session.\n\n- One plan identified for Wave 2: **33-03**, spawned as a subagent\n- Plan 33-03 covers rule registry integration, Docker healthcheck passthrough, and 4-category iteration in the coordinator\n- Coordinator remains unloaded in production during this wave\n- `backfill-raw-observations.mjs` touched as part of orchestrator context",
+    "observationIds": [
+      "429ddf16-e99d-499b-ba6c-81643aba445d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-raw-observations.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "19ce6857-ede7-4d49-9878-fd921fc59b3b",
+    "date": "2026-05-06",
+    "theme": "Diagnostic Investigation of Screenshot-Reported Issues",
+    "summary": "A user-shared screenshot triggered investigation into two concurrent system issues while the 33-03 executor was running in its worktree.\n\n- **Issue 1**: opencode LLM summaries returning \"LLM summary unavailable\" — identified as a distinct failure requiring separate attention\n- **Issue 2**: live recording / transcript monitoring status — investigated via running processes, recent history files, DB state, and API endpoint responses\n- `backfill-raw-observations.mjs` examined as part of the DB/observation data investigation\n- 33-03 executor confirmed running in its worktree without conflict with the diagnostic work",
+    "observationIds": [
+      "9bb2d6da-4dd1-41cb-b6b3-4ae7617e9124",
+      "fa333a0e-f7bb-40f1-b305-6e0949defebe"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-raw-observations.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "dc36d0c0-70c7-46cb-8b66-90e2bfbecb0e",
+    "date": "2026-05-06",
+    "theme": "Backfill Script Fix and Proxy Corporate Network Detection",
+    "summary": "Two related fixes were made to address mislabeled observations and incorrect network-context routing in the LLM proxy.\n\n- `backfill-raw-observations.mjs` updated to correct observation rows mislabeled due to bad network context detection\n- Investigated `network-detect.ts` and `llm-providers.yaml` in the proxy project to understand VPN vs. corporate network (CN) mode determination\n- Proxy updated so that CN (corporate network) sessions now also route through the Copilot subscription, not just VPN sessions\n- Home DNS (Fritz!Box) identified as a potential source of false positives for corporate network detection; a more reliable signal was sought",
+    "observationIds": [
+      "681e0f46-229b-4c81-951f-7880bdf6ea7a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-raw-observations.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ff3793a7-5bb2-4282-9aca-ad5284b357d5",
+    "date": "2026-05-06",
+    "theme": "AI Kraken SPA Scaffolding and Data Extraction",
+    "summary": "Initial setup work for an \"AI Kraken\" themed single-page application intended to serve as a searchable information hub.\n\n- Explored existing project structure to determine where to scaffold the SPA\n- Attempted to scrape a <COMPANY_NAME_REDACTED> skills marketplace page as a content source for the hub\n- Fell back to reading a cached HTML file from the tool output directory to extract marketplace/skill entry metadata (embedded JSON or structured HTML)\n- No files were created during this session; work stalled during the data ingestion/setup phase before any artifacts were produced",
+    "observationIds": [
+      "ebc30d50-8439-42ad-a145-f98eb8d6021c",
+      "1d6748d2-fc96-47b7-965f-6db5c5b17c10"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "ai-transformation-day-hackathon"
+  },
+  {
+    "id": "42f6a75b-9a61-4872-ba63-133060acce85",
+    "date": "2026-05-06",
+    "theme": "AI Kraken Browser Game Build and Iterative Enhancement",
+    "summary": "A full hackathon submission game was built and iteratively enhanced across a single session for `teams/daFrankTeam/`.\n\n- **Initial build**: Created a self-contained vanilla HTML/CSS/JS SPA in `teams/daFrankTeam/index.html` and `teams/daFrankTeam/team.json` — a ship vs. AI Kraken game with adaptive enemy behavior, 3 difficulty phases, torpedo mechanics, particle effects, and score tracking.\n- **Bug fix**: Resolved a runtime `bubbles is undefined` error by adding an `init()` call before the `loop()` start to ensure game state was properly initialized.\n- **Wave & power-up expansion**: Extended the game to 5 waves with increasing Kraken counts and a wave 5 boss; added 5 power-up types (Laser, Spread Shot, Homing Missiles, Freeze Ray, Shield) dropping from defeated enemies, plus visual indicators for active power-<COMPANY_NAME_REDACTED>.\n- **Final feature pass** (commit `020f519`): Added `Q`-key homing AOE torpedo, `E`-key 8-second autopilot mode (10s cooldown), and fully synthesized sound effects via the Web Audio API for shooting, explosions, power-<COMPANY_NAME_REDACTED>, damage, and wave transitions.",
+    "observationIds": [
+      "f651567e-e7ac-4862-beb2-e16eb440ae71",
+      "e6f6ee5e-6955-4e0f-9261-3ede93661d0b",
+      "21a5dbac-68d4-47b1-9bc1-812e679c55aa",
+      "dc676ec2-722e-4cba-8fb9-68392dec12bd"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "teams/daFrankTeam/index.html",
+      "teams/daFrankTeam/team.json",
+      "one game script file",
+      "game file (kraken game)",
+      "game file (committed as 020f519)"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T05:29:25.186Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "daFrankTeam"
+  },
+  {
+    "id": "cf87f5f0-a6c1-4cc7-8803-19d96ab42358",
+    "date": "2026-05-06",
+    "theme": "Phase 33 Wave 2 Orchestration and Subagent Spawning",
+    "summary": "The orchestrator launched wave 2 of phase 33 using the `gsd-execute-phase` skill workflow. A single plan (`33-03`) was identified and a subagent was spawned in worktree isolation to handle its execution. The plan covers:\n- Rule registry implementation\n- Docker healthcheck passthrough\n- 4-category iteration logic in the coordinator\n\nThe orchestrator maintained lean context while tracking checkpoint state. Overall progress stands at 2/8 plans completed, with the subagent awaiting completion at time of observation.",
+    "observationIds": [
+      "da0296f5-8266-4c9e-88b7-b4bb73da1589"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-07T13:00:01.650Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9945dfec-dde2-4163-b645-33b0fb229717",
+    "date": "2026-05-07",
+    "theme": "Fix macOS VPN false positive in proxy bridge",
+    "summary": "Both observations address the same fix: the VPN bridge in `proxy-bridge/server.mjs` was incorrectly matching any `utun*` network interface, causing false positives on macOS where iCloud Private Relay, iMessage, and FaceTime also create `utun*` tunnel interfaces.\n\n- Replaced the broad `utun*` regex/glob match with the smarter detection logic already available in `dist/network-detect.js` (compiled from `network-detect.ts`)\n- Files changed: `proxy-bridge/server.mjs`, `bin/start-llm-proxy.sh`\n- The fix avoids reimplementing logic by importing the existing `network-detect` module, which correctly distinguishes real VPN interfaces from macOS system tunnels\n- Observation 1 also references execution of phase 33 wave 3 as part of the same task",
+    "observationIds": [
+      "b235662d-296d-4657-be56-10b67f75ee2a",
+      "716cc6a8-7721-4db3-8b36-c9e9c0bfc195"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T05:29:31.536Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d3e62f4c-7742-46d4-b4f2-050daa2467a6",
+    "date": "2026-05-07",
+    "theme": "Phase 33 Wave 3-4 Health Monitoring Consolidation Execution",
+    "summary": "Session context was loaded from STATE.md and prior logs, then phase 33 waves 3 and 4 were executed under the GSD workflow.\n\n- Wave 3 plans executed via parallel subagent dispatch with `--wave 3` flag\n- Wave 4 ran sequentially (submodule path conflict) via a single subagent handling plan 33-05\n- Plan 33-05 migrated three consumer files off direct `readFileSync(.health/*.json)` calls to reverse-proxied `fetch(/health/state)` coordinator requests: `health-prompt-hook.js`, `system-health-dashboard/server.js`, `mcp-constraint-monitor/src/dashboard-server.js`\n- `agent-common-setup.sh` and submodule pointer updated; 5 of 8 phase plans complete after wave 4",
+    "observationIds": [
+      "34072618-b41b-4643-a537-c94930e3cbcc",
+      "5663c15f-790a-47f2-97fe-7ba031c5d514",
+      "5ae08898-880e-4e24-9431-e5ff55333bc4",
+      "34c1aca9-686b-466d-9ad7-4137f0ff281a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-aba45691a9825eb66/scripts/agent-common-setup.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e03f6632-3054-4b6c-9b9b-2b63f77686db",
+    "date": "2026-05-07",
+    "theme": "Phase 33 Wave 5 Rules Cleanup and Cutover Plans",
+    "summary": "Wave 5 of phase 33 was initiated with plans 33-06 (rules cleanup) and 33-07 (cutover/destructive operations).\n\n- Orchestrator analyzed `depends_on` declarations and overrode parallel default to dispatch sequentially\n- 33-06 dispatched first; 33-07 queued after with destructive tasks: docker-compose rebuild, `git rm` daemon scripts, launchctl plist swap\n- A human-verify checkpoint embedded in 33-07 Task 5 requires manual dashboard verification before completion\n- `agent-common-setup.sh` updated to reflect wave state",
+    "observationIds": [
+      "e1da9682-7f0b-41ae-8282-3fbd5d5b2775",
+      "39d5ca59-feb0-4ef4-9cb5-1a3bcdd259d1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-aba45691a9825eb66/scripts/agent-common-setup.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "376fcb7f-2fa8-4a52-9c5c-e95ec91d221f",
+    "date": "2026-05-07",
+    "theme": "Phase 33 Cutover Checkpoint Diagnosis and Zombie Process Cleanup",
+    "summary": "Developer shared screenshots of the 33-07 cutover checkpoint state; assistant ran live diagnostics before approving.\n\n- 4 issues identified: 3 zombie legacy daemon processes not killed by `launchctl bootout`, all services showing \"unknown\" status (pre-existing probe gap G1), tmux statusline red due to session-ID mismatch (G3), and dashboard verify button failing\n- Checkpoint not approved; recommendation was to kill zombie PIDs then proceed to 33-08\n- Zombie processes traced to detached `nohup` daemons parented to launchd (PID 1), spawned by stale calls in `scripts/agent-common-setup.sh` referencing `global-lsl-coordinator.js`\n- Source scripts confirmed deleted, so kills would be permanent; `agent-common-setup.sh` patched to remove stale spawn calls",
+    "observationIds": [
+      "2ee25a9a-1449-4a18-afb2-48a19371784e",
+      "b73f53c4-ba45-4952-9f7c-1be6a3055f6c",
+      "462a2f92-643c-4a61-b839-bbc0c3280d0e",
+      "3640d0d8-a894-4e5a-b5d3-583cebdb4deb",
+      "9b756cd9-bfb7-4bc7-94f3-751c359ffcf7",
+      "9384885e-0b43-4b86-9eca-083dc63cd355"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-aba45691a9825eb66/scripts/agent-common-setup.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9e0bdf95-082d-4bd2-a245-ae1b54d85ab7",
+    "date": "2026-05-07",
+    "theme": "Phase 33 Wave 6 Acceptance Suite Execution and Gap Discovery",
+    "summary": "Screenshots were reviewed correlating visual symptoms to pre-identified gaps (G1, G2, G3), then wave 6 was dispatched with plan 33-08 running the 13-criterion acceptance suite.\n\n- Dashboard services showing Down/unknown → G1; tmux statusline session-ID mismatch → G3; VOKB unresponsiveness deemed unrelated\n- 33-08 subagent ran acceptance scripts against live system on port 3034 with no source changes\n- Results: 7 PASS, 5 FAIL, 1 PASS-DEVIATION, plus 2 newly surfaced gaps beyond predictions\n- Phase 33 reached 8/8 plans complete but with open failures; follow-up gap planning triggered via `/gsd-plan-phase 33 --gaps`\n- `STATE.md` updated throughout",
+    "observationIds": [
+      "b3a2706d-ac50-4bb4-be60-ae8a8f7d97e8",
+      "66ff8a58-b7aa-4473-a57f-c82b6b4a5062",
+      "15c42115-8d7d-491d-adcd-de50c42a4430"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8b91e22e-2e42-42a0-a5dc-b7204b3b04c9",
+    "date": "2026-05-07",
+    "theme": "Phase 33 Gap Planning and Wave 1 Gap-Closure Execution",
+    "summary": "Gap closure mode was initiated for phase 33 using `--gaps` flag on the plan-phase workflow, then executed with `--gaps-only`.\n\n- Plan-phase workflow loaded VERIFICATION.md and skipped research phase in gap mode\n- Orchestrator discovered 14 total plans (8 already complete), grouped gap closure into waves\n- Wave 1 dispatched 4 plans in parallel: 33-09 (service probes G1), 33-10 (SPA route order G2), 33-12 (plist env fix G7), 33-14 (cleanup bundle)\n- `STATE.md` updated to track 8/14 plans complete entering wave 1",
+    "observationIds": [
+      "f27f2a53-5d14-4f9a-9620-4aa13ca1018d",
+      "884331e0-27dd-44fd-be50-e10a52136b85"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3f5a21a7-f64f-49b7-9a00-fde1138f5624",
+    "date": "2026-05-07",
+    "theme": "Plan 33-09 Service Probes G1 Gap Closure",
+    "summary": "Plan 33-09 completed, closing the G1 gap where all services reported \"unknown\" status due to missing active probing.\n\n- Implemented HTTP/TCP service-probe helpers and wired probe dispatch into `health-coordinator`\n- Registered `obs_api` rule\n- 5 commits on worktree branch; 9/9 unit tests passing\n- Smoke test confirmed 7/9 services probing correctly",
+    "observationIds": [
+      "33a52dbc-162d-40b9-a1bf-b47b0f4945a3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2b6929f3-1658-4555-91ea-d542d5be00b2",
+    "date": "2026-05-07",
+    "theme": "Plan 33-10 SPA Route Order and Dashboard Proxy Fix",
+    "summary": "Plan 33-10 completed, fixing the G2 SPA/API route ordering gap in the health dashboard.\n\n- Reverse-proxy for `/api/*` mounted before `express.static` and SPA catch-all in `integrations/system-health-dashboard/static-server.js`\n- Missing bind-mount added in `docker/docker-compose.yml`\n- `console.log` calls replaced to meet project constraints\n- New test script created: `scripts/__tests__/health-coordinator/dashboard-endpoints.test.sh`\n- AC#5 and AC#9 both pass with live verification on port 3032",
+    "observationIds": [
+      "12a48a3b-0ff6-4c69-92bf-c34b074a624c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "integrations/system-health-dashboard/static-server.js",
+      "docker/docker-compose.yml",
+      "scripts/__tests__/health-coordinator/dashboard-endpoints.test.sh",
+      ".planning/phases/33-health-monitoring-consolidation/33-10-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9a50a0d0-0e15-4d16-8d4d-e65254bcdb51",
+    "date": "2026-05-07",
+    "theme": "Plan 33-12 Plist Env Hypothesis Falsified; Plan 33-15 Created",
+    "summary": "Plan 33-12 (plist environment variable fix for AC#13/G7) was halted when its core hypothesis was empirically disproven.\n\n- `EnvironmentVariables` plist declarations override `launchctl setenv` on macOS Darwin 25.4.0, blocking AC#13\n- Three alternative injection vectors were surfaced; Option A (POST `/test/inject` guarded by `NODE_ENV=test`) recommended\n- Developer selected Option A; 33-12 closed as falsified-by-discovery to preserve audit trail\n- New plan 33-15 added as wave 4 implementing `POST /test/inject` in `scripts/health-coordinator.js`, sequenced after 33-09 and 33-11\n- `STATE.md` updated throughout",
+    "observationIds": [
+      "daec2d76-0d05-4864-b719-321553a9c305",
+      "5f373909-b677-41fb-b4af-b58779311390",
+      "7b3bd431-eebb-47c8-8178-a2b4c0f99a90"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6872476d-a4f7-4ecd-886e-919fe330fa6c",
+    "date": "2026-05-07",
+    "theme": "Plan 33-14 Cleanup Bundle Merged; Wave 1 Complete",
+    "summary": "Plan 33-14 gap-closure cleanup bundle completed and merged, bringing phase 33 to 11/14 plans complete.\n\n- Removed stale `global-service-coordinator` block from `scripts/free-coding-ports.sh` and `scripts/start-services-robust.js`\n- Dropped dead `--auto-heal` argument\n- Bumped eviction test sleep to 22s in `scripts/__tests__/health-coordinator/eviction.test.sh`\n- Removed `start_global_lsl_monitoring` stub from `scripts/agent-common-setup.sh`\n- Created `33-14-SUMMARY.md`; all lints passed\n- Orchestrator merged all 4 wave-1 worktrees sequentially after completion notifications from all agents",
+    "observationIds": [
+      "c17478b6-794b-4523-b84e-cbc3fe5d541c",
+      "c35844eb-61b5-44be-8bdc-a90d17be8507",
+      "04aa4f57-382b-425b-8864-ef29f8fd7709",
+      "c02118a6-cdbe-4cc2-8e78-428d9cbab656"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/free-coding-ports.sh",
+      "scripts/start-services-robust.js",
+      "scripts/__tests__/health-coordinator/eviction.test.sh",
+      "scripts/agent-common-setup.sh",
+      ".planning/phases/33-health-monitoring-consolidation/33-14-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1429bf06-9c47-43d6-9f27-6f5bade874fd",
+    "date": "2026-05-07",
+    "theme": "Combined Status Line Option B Inline Implementation",
+    "summary": "Developer selected option (b) from a prior menu, triggering a targeted inline edit to the combined status line script.\n\n- ~15 lines of changes plus a D-11 lock mechanism added to `scripts/combined-status-line.js` in worktree `agent-a5cbf87747b243eab`\n- Implemented as a small surgical change rather than spawning a continuation agent\n- Syntax check passed after edit",
+    "observationIds": [
+      "616adb26-7c2b-4acd-a42a-6c41d1c2ec06",
+      "57889651-183d-4ea6-8b0e-07e07ea63d22",
+      "6b3ae7e2-0d25-4b3f-8066-6ed3ba608a78"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-a5cbf87747b243eab/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "16cdec53-27e0-4227-873f-848d1f94a3d0",
+    "date": "2026-05-07",
+    "theme": "Observations API (obs_api) Down on Port 12436 Diagnosis",
+    "summary": "Developer shared dashboard screenshots showing `obs_api` down, triggering diagnosis and restart attempt.\n\n- `obs_api` on port 12436 confirmed not running, causing cascading 502 errors on `:3033/api/observations` (reverse proxy) and \"all down\" readings in the port-liveness dashboard panel\n- Service not managed by launchctl/supervisord — spawned by `start-services-robust.js`\n- Direct restart initiated via `node` command; no files were modified during this investigation",
+    "observationIds": [
+      "bd2b7a3b-2e81-42b4-9e98-45d6fe4949b1",
+      "a1c74c9e-45df-434b-862f-3599ac1520df",
+      "dfaf6881-9d86-4b46-9506-3a642a937560"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "591d6cd1-7189-4eb8-88fa-b1cf7eb96458",
+    "date": "2026-05-07",
+    "theme": "daFrankTeam README creation and repository push",
+    "summary": "The goal was to document the daFrankTeam hackathon project and push the changes to the remote repository.\n\n- Created `teams/daFrankTeam/README.md` summarizing the AI Kraken Browser Game build session, covering the initial build, bug fixes, wave/power-up expansion, and final features (homing torpedo, autopilot, Web Audio API sounds)\n- Resolved a merge conflict in `.gitignore` before successfully committing and pushing as commit `509f91f`",
+    "observationIds": [
+      "3e77190e-616b-49b0-8743-69b493fe5465",
+      "2ec9c8cb-0693-4e8c-bede-ad77c9e1d0ec"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "teams/daFrankTeam/README.md",
+      ".gitignore"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-07T13:00:55.926Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "daFrankTeam"
+  },
+  {
+    "id": "6312ba77-ee20-408d-8fa3-28d64a7307a3",
+    "date": "2026-05-07",
+    "theme": "Dashboard Empty Panels and Port Liveness Diagnosis",
+    "summary": "Multiple overlapping diagnostic sessions investigated why the system health dashboard showed empty panels and reported all ports DOWN despite other improvements (violations reduced from 8 to 2, LSL showing green).\n\n- Primary suspicion was a frontend/backend endpoint routing mismatch — the frontend reading from a different endpoint than what the backend routes served\n- Secondary investigation traced the Port Liveness panel's separate port→check mapping logic, distinct from the violations count\n- All sessions edited `server.js` but no fixes were applied during this diagnostic phase; investigation was ongoing at the close of this group",
+    "observationIds": [
+      "fc85dfde-a71d-4021-a3b3-3fe425a36229",
+      "1ed1ad5e-4049-49c0-ad7a-ee5453a4d2b8",
+      "c70669da-0793-41dd-8c8b-144c88768316",
+      "0282fb92-0016-4104-a735-fddb3ecf4994",
+      "ec3f6b2c-b9a7-407e-bb69-b4bab00c29d2",
+      "85331c04-35f0-4b15-b0fd-21cc3dda427d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-08T00:19:04.861Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7b73158c-d26f-41c3-8fc7-1992d4e2b283",
+    "date": "2026-05-07",
+    "theme": "Port Liveness Panel Fixed via Category Property",
+    "summary": "Root cause of the Port Liveness panel showing all ports as DOWN was identified and fixed.\n\n- The panel's data filtering logic required `check.category === 'services'`, but the `category` property was absent from the port check mapping\n- Fix applied in `server.js`: added the missing `category` field to the port check mapping so the panel correctly filters and displays port status",
+    "observationIds": [
+      "11f61c42-0b98-40ef-87a3-47a9d8120ad1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-08T00:19:04.861Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "41089c0f-034c-497f-9f5d-9aecd70b2cc4",
+    "date": "2026-05-07",
+    "theme": "API Schema Mismatch Causing \"No Check Data Yet\" UI",
+    "summary": "Investigated why the dashboard UI displayed \"no check data yet\" despite the API correctly returning 23 checks.\n\n- Port 3033 was returning 0 checks while port 3032 returned checks correctly; a JSON parsing issue around `data.checks` nesting added initial confusion\n- Root cause traced to a missing `summary` field in the `/report` API response wrapper — the frontend store silently discarded the entire payload when this field was absent\n- Fix targeted `server.js` to align the response schema with what the frontend parser expected",
+    "observationIds": [
+      "14cfe782-2ae0-43ca-8dcc-56f3133ed111",
+      "abbe448e-2f65-456c-9dcf-43d9772fc8c5",
+      "029c9b70-29f9-4f55-94e7-1c07054967c9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-08T00:19:04.861Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "47ce75b4-5b13-4fb8-90e2-3480bbd6b894",
+    "date": "2026-05-07",
+    "theme": "Frontend Render Crash on Undefined `.length` Access Fixed",
+    "summary": "A runtime render error crashed the dashboard frontend after data began flowing through the system.\n\n- Error was caused by the frontend accessing `.recommendations.length` on the API response object, which did not include that field\n- Traced through built frontend assets to confirm the undefined access site\n- Fix applied in `server.js`: added an empty `recommendations: []` array to the server response to satisfy the frontend's contract and prevent the crash",
+    "observationIds": [
+      "7e188662-bf53-4302-b84d-37a8bde89f32",
+      "94b35c80-488a-42d3-afc8-8a3eb01f6609",
+      "0fea6eba-96e7-4af0-a83e-f364b0d4dcca"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-08T00:19:04.861Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8c5ff1c8-90b4-4155-baac-407029e87b38",
+    "date": "2026-05-08",
+    "theme": "Fix Invalid Time Value Errors in Dashboard Tables",
+    "summary": "The agent addressed a `RangeError: Invalid time value` appearing in the system health dashboard, traced from a screenshot of the UI. The root cause was that `violations-table` and `system-checks-table` frontend components attempted to parse `.timestamp` fields on each row, but the server was not emitting those fields — resulting in undefined values being passed to date parsing logic with no null guards.\n\n- Fix applied to `server.js` in the `system-health-dashboard` integration\n- Added `.timestamp` fields to each violation and system-check row emitted by the server\n- Resolved the `RangeError` by ensuring the frontend receives valid timestamp values rather than `undefined`",
+    "observationIds": [
+      "4fbca1aa-ca4f-4a17-8fe1-7f935c24f1ad",
+      "9c7ee10d-948e-43d1-9cfc-b17153306d96",
+      "eaaf122c-013b-494e-b8fd-9032f875c7ab"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-08T04:29:35.002Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8752d977-f9a6-49be-af07-1eef7aa33352",
+    "date": "2026-05-08",
+    "theme": "Health Dashboard Initial Bug Identification",
+    "summary": "Investigated the system health dashboard UI based on shared screenshots, querying endpoints and reading source code to identify concrete bugs. Three bugs were found in `server.js`:\n- Incorrect status translation (needed `\"passed\"`/`\"failed\"`/`\"warning\"` mapping)\n- False violation flagging\n- Malformed verify endpoint response shape\n\nNo fixes were applied during this phase; investigation only.",
+    "observationIds": [
+      "1717b353-605b-4874-93af-baa9ce20ae5e",
+      "0e9304b4-8f86-49e5-89bb-bb7d29e89d44"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8b454fd1-7c29-490f-8ff3-de29220fd2e4",
+    "date": "2026-05-08",
+    "theme": "LLM CLI Proxy False Violation Due to Hostname Resolution",
+    "summary": "Investigated why the health dashboard showed a violation for the LLM CLI proxy despite the service running. <USER_ID_REDACTED> live health state and inspected `health-verification-rules.json` to diagnose the discrepancy between badge counts and active violations.\n\n- LLM CLI proxy confirmed running on port 12435 (PID 67019)\n- Coordinator probe returns `ENOTFOUND`, indicating the rule references an unresolvable hostname instead of `localhost`/`127.0.0.1`\n- Root cause isolated to `health-verification-rules.json`; fix was to correct the hostname in the probe configuration",
+    "observationIds": [
+      "d7317867-50c3-4fa9-b761-ccf1129e2b7d",
+      "2a571d58-62c3-4dc1-bcd8-5c930bd0ae17",
+      "c0ff3d35-a696-45cb-a9c1-d1f3e749e44c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/config/health-verification-rules.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7a544e19-c1be-4b55-a82d-ebf7e01697d5",
+    "date": "2026-05-08",
+    "theme": "ETM Processes Missing from Coordinator State",
+    "summary": "Investigated why 3 running ETM processes for the coding project were not surfacing in coordinator state. Ran process diagnostics and inspected heartbeat/session logic in the enhanced-transcript-monitor script, editing `health-coordinator.js`.\n\n- Confirmed 3 ETM processes active for the coding project\n- None appeared in coordinator state\n- Investigation narrowed to the heartbeat path as the likely cause of the disconnect; no fix applied yet",
+    "observationIds": [
+      "ab2d9b49-f6ec-43ef-84a6-99177cdc1e3b",
+      "a4569e6f-3d9c-4545-b923-65203641021e",
+      "7bd12f6e-9d38-47ab-82e2-64d660698f3d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7a362086-77e7-4cf7-8f9d-ad68ad489733",
+    "date": "2026-05-08",
+    "theme": "Combined Status Line Visual Bug Investigation",
+    "summary": "Reviewed `combined-status-line.js` source and git history based on shared screenshots showing display/alignment issues. Identified five issues in priority order:\n1. Clock alignment\n2. Supervisord/ETM service row\n3. CGR pane\n4. Per-pane ETM display\n5. Docs\n\nInvestigation only — no changes were made during this phase.",
+    "observationIds": [
+      "5439fb5f-00a3-41d6-b454-ee62b0ef6dda",
+      "54418169-bb46-4a73-b2a3-67929987560a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b0dad5f6-18a4-414d-975b-c6a60a0cd779",
+    "date": "2026-05-08",
+    "theme": "Restore Per-Pane Underlined Project Labels in Status Line",
+    "summary": "Fixed the tmux status line which was incorrectly showing the same generic project label across all parallel sessions instead of per-session underlined abbreviations (e.g., `C` underlined in coding, `RA` underlined in rapid-automation). The prior change had over-reached by rewriting display logic rather than only replacing the data source.\n\n- Reverted per-pane underlined label rendering to its original logic in `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js`\n- Retained the new central coordinator endpoint as the health data source, replacing stale distributed JSON file lookups\n- `getGlobalHealthStatus()` now pulls from coordinator URL; per-pane project abbreviation display behavior fully restored",
+    "observationIds": [
+      "10b30eb7-046a-4816-b48c-8926ef9fb2c7",
+      "9a3d05c8-dc84-45ef-b9dd-9c68a2957a93",
+      "da1330ec-fbfc-4825-8c07-49c5566e247f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "62f71131-b2b8-4c00-945f-4ac80ae25cdd",
+    "date": "2026-05-08",
+    "theme": "Rogue ETM Process Kill and Memgraph Freshness Fix",
+    "summary": "Investigated ETM process state and coordinator health based on a shared screenshot. Identified and addressed two bugs in `server.js`:\n\n- A rapid-automations ETM process was incorrectly killed; addressed to prevent recurrence\n- `handleGetCGRFreshness` was using `nc` (netcat) which is unavailable in the container environment, causing false-negative Memgraph freshness checks despite the container being healthy on port 7687\n- Fixed by switching to Node's built-in `net` module for port 7687 connectivity checks in `/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js`",
+    "observationIds": [
+      "6da8754e-a0b8-41ff-b619-016972919060",
+      "056c2e0e-408a-4f18-b9e7-bf479490b1f2",
+      "46b883d9-1f56-4fb4-9d85-02c42ebb80a5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "0b7a8ba0-8f90-41a9-a9e8-46e39cf2d65b",
+    "date": "2026-05-08",
+    "theme": "Multi-Session Continuity Review and Diagnosis",
+    "summary": "Loaded recent LSL files to re-establish context, then investigated screenshots showing red/error states across the dashboard. Diagnosed three issues spanning `combined-status-line.js`, `supervisord.conf`, and `enhanced-transcript-monitor.js`:\n\n- `health-verifier` STOPPED is by design (`autostart=false`) — not a real error\n- Rapid-automations ETM was not running, so no heartbeat was being produced for that project\n- LSL badge showing red because ETM was spawned without `TMUX_PANE`, causing pane-match lookup to fail and cwd-based fallback to also miss\n\nProposed fixes: respawn RA ETM, add sid-only fallback in `getLSLHealthStatus()`, fix health-verifier dashboard presentation.",
+    "observationIds": [
+      "936cd199-b412-4d62-a8c2-e26ffb25a085",
+      "c426dc75-9aee-4ab2-affe-e944ff471e58"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docker/supervisord.conf",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b36387e2-3335-431b-aa01-ca1836804992",
+    "date": "2026-05-08",
+    "theme": "LSL Fallback, Supervisord Cleanup, and ETM Path Fix",
+    "summary": "Resolved a chain of failures triggered by the \"ABC\" prompt. Three root causes were fixed across multiple files:\n\n- Added project-level fallback to `getLSLHealthStatus()` in `combined-status-line.js` to handle missing `TMUX_PANE`\n- Removed the defunct `health-verifier` block from `supervisord.conf` to eliminate misleading STOPPED state\n- Fixed `enhanced-transcript-monitor.js` to resolve `CODING_TOOLS_PATH` from the host path (was inheriting `/coding` container path), allowing the redactor to initialize correctly and LSL files to be produced again",
+    "observationIds": [
+      "8486713f-3dde-4e6d-922b-c51fb0aa27de"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docker/supervisord.conf",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9b065685-c284-4ec2-97d4-0ad78429a3c7",
+    "date": "2026-05-08",
+    "theme": "Health Badge Logic Investigation in Status Line",
+    "summary": "Investigated health badge display and `healthVerifier` object sourcing in `combined-status-line.js` based on shared screenshots. Examined badge logic, healthVerifier origin, and padding/justification logic, as well as a specific prior commit.\n\n- Two issues identified: health badge display behavior and layout/padding\n- Tasks created to track fixes; no code changes made during this phase",
+    "observationIds": [
+      "e66fd876-9c54-427a-b446-50ab1472d0f2",
+      "8fe68af9-59c7-4e56-a22f-e8f2ac2152bd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "286288e0-181d-4299-a786-ac95eca78963",
+    "date": "2026-05-08",
+    "theme": "Cooling-Down State Regression Diagnosis",
+    "summary": "Investigated loss of the graduated cooling-down icon sequence in the status line after the Phase 33 coordinator migration. Searched project docs and inspected `combined-status-line.js` session/globalHealth logic.\n\n- The Phase 33 migration preserved only a 3-state rollup and dropped the graduated cooling-down icon sequence (`healthy→cooling` states)\n- Transcript activity age was never plumbed through the coordinator's project state map\n- Fix requires statting `transcriptPath` per LSL entry client-side and mapping age to graduated icons when status is healthy\n- Also confirmed NBSP fix was working",
+    "observationIds": [
+      "a209555c-fc55-4331-b28b-88f4fd90fb54",
+      "eec2f4be-50ad-4084-be80-4bb5ae20c0df"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docker/supervisord.conf",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a9d2fcca-60b9-4d92-a864-76e8f32ea3fa",
+    "date": "2026-05-08",
+    "theme": "Restore Graduated Lifecycle Icons in Status Line",
+    "summary": "Resumed work from the cooling-down regression diagnosis and implemented the fix in `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js`.\n\n- Status line now stats transcript file mtime via the coordinator's exposed `transcriptPath`\n- Computes age client-side and maps to the correct lifecycle bucket: `🟢`/`🌲`/`🫒`/`🪨`/`⚫`/`💤`\n- Fully restores per-project idle-time icons that were lost during the Phase 33 coordinator migration\n- Syntax verified with a `node` check after edits",
+    "observationIds": [
+      "56ee5798-a804-44b5-9cf8-8db2a4e1a6ce",
+      "bd288a04-6fcd-45a7-a08d-6710264d151d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6697aa0b-7260-4e3e-8fb1-1d93a05c92ac",
+    "date": "2026-05-08",
+    "theme": "Documentation Update Reconnaissance for Status Line",
+    "summary": "Initiated a documentation update pass following recent status line changes. Inspected `mkdocs.yml`, the docs directory structure, and the existing `status-line.md` guide to understand scope before editing.\n\n- No documentation was updated; work remained in the reconnaissance phase\n- Targeted file: `status-line.md`",
+    "observationIds": [
+      "d61fa19b-e76d-4db4-a354-20bd2171dd23",
+      "5231494a-2686-49f2-afc7-f15b1e8d7063"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f7e1fe21-0b31-4b32-adfe-f819aef36b6e",
+    "date": "2026-05-08",
+    "theme": "Health Monitoring Docs Rewrite with PlantUML Diagram",
+    "summary": "Applied the project documentation style guide to the health monitoring architecture documentation:\n\n- Updated `/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-coordinator-architecture.puml` with standard style include, proper stereotypes, and corrected layout\n- Generated PNG from the updated PUML source\n- Rewrote `/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/health-monitoring.md` to remove ASCII art diagrams and replace them with a reference to the generated PNG",
+    "observationIds": [
+      "c476dace-d2ff-4764-a47e-bef4ac1c391a",
+      "c5560f3f-1511-465a-888f-d990a17e7057"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-coordinator-architecture.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/health-monitoring.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ef5790f8-eb83-4d2b-8d81-c2d0247d39cd",
+    "date": "2026-05-08",
+    "theme": "Backfill Missing Observation Summaries",
+    "summary": "Ran a backfill pass to populate missing LLM summaries for observations that had raw message data but no structured output. Used a dry-run first to identify candidates, then ran for real.\n\n- 2 observations successfully backfilled\n- 2 observations skipped due to empty or non-actionable exchange content\n- No source files were modified",
+    "observationIds": [
+      "2bb23372-d593-49ff-8a2c-fac68817fcd2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "98f3ecc8-9258-47af-a158-671c538df4b7",
+    "date": "2026-05-08",
+    "theme": "Session Context Load and Continuity Summary",
+    "summary": "Loaded recent session logs (LSL procedure) across two projects — **rapid-automations** and **coding** — to restore context continuity covering May 3–May 8.\n\nKey prior work surfaced:\n- `rapid-automations`: GHE push fix landed May 3\n- `coding`: Major statusline refactor on May 8 introducing per-pane project labels and health coordinator migration, touching `combined-status-line.js`, `health-coordinator.js`, `server.js`, and `enhanced-transcript-monitor.js`\n\nNo new code was written; output was a synthesized continuity summary to orient the current session.",
+    "observationIds": [
+      "252d4122-63ff-438c-910b-e35870edafca"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-09T04:13:02.045Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "e681763b-9178-44cd-93cf-a3213eb07b55",
+    "date": "2026-05-09",
+    "theme": "Context7 MCP Server False Failure Diagnosis",
+    "summary": "Investigated a reported failure of the Context7 MCP server. Running CLI diagnostic commands confirmed the server was actually connected and healthy. The apparent failure was attributed to either stale UI state or confusion caused by separate `<COMPANY_NAME_REDACTED>` servers displaying a \"Needs authentication\" status alongside it. No artifacts were modified.",
+    "observationIds": [
+      "f7e6578d-a409-453e-8a37-66978033ae31"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-09T04:13:05.377Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "07daf288-ab8a-404e-b634-567a1a9d769b",
+    "date": "2026-05-09",
+    "theme": "Context Continuity Load from Previous Sessions",
+    "summary": "Session opened by reading the two most recent LSL files to restore context from prior work (May 8–9, 2026).\n- Prior sessions covered statusline/Phase 33 coordinator fixes, a cooling-down icon investigation, and an abandoned context7 MCP triage.\n- Current state noted: dirty data exports in `.data/` and a degraded LSL rapid-automations health flag.\n- `server.js` was flagged as having pending edits.",
+    "observationIds": [
+      "81737234-d146-46b8-8015-50eaa2330d52"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-09T05:03:32.034Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8d2070ba-edf4-454c-891b-1d63270e69a2",
+    "date": "2026-05-09",
+    "theme": "Auto-Heal Badge Regression Fix in ETM Violations",
+    "summary": "Investigated why the health dashboard displayed a \"Manual\" badge on an Enhanced Transcript Monitor (ETM) violation instead of triggering auto-healing.\n\n- Root cause: the coordinator-proxy violation synthesis in `server.js` omitted `auto_heal` and `auto_heal_action` fields — a regression from the Phase 33 reader migration.\n- Without those fields, the frontend cannot invoke the existing `restartTranscriptMonitor` handler and falls back to \"Manual\".\n- ETM process was found not running; it was restarted in the background as a parallel remediation step.\n- `server.js` was read and assessed in observation 3 but no edits were committed at that stage — the fix was carried forward to the commit in observations 4/5.",
+    "observationIds": [
+      "f468681b-b289-4e38-8af1-2b148a1505af",
+      "0ae3653b-dc58-4f42-9101-adb219fceab4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-09T05:03:32.034Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "96f354b4-5eeb-4361-b053-b531ac5c693a",
+    "date": "2026-05-09",
+    "theme": "Selective Commit of Auto-Heal and ETM Safety-Net Fixes",
+    "summary": "Staged and committed the auto-heal wiring fix and ETM auto-spawn safety-net changes in a single focused commit.\n\n- Files committed: `server.js`, `health-coordinator.js`, `CLAUDE.md`.\n- `CLAUDE.md` note was tightened for clarity before inclusion.\n- Intentionally excluded from staging: `.data/` exports and `.claude/settings.local.json` (auto-generated / personal settings).\n- Commit message described auto-heal field wiring improvements and ETM safety-net auto-spawn behavior.",
+    "observationIds": [
+      "876da1e7-02ab-417d-a78c-7f1e62cf2375",
+      "5c7c5388-16d8-4f0e-91aa-f4c5fad94a75"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/CLAUDE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T05:03:32.034Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1ac386ad-15d3-4ccb-a700-e8ee845a1c30",
+    "date": "2026-05-09",
+    "theme": "PlantUML Diagram Style Compliance for Health Coordinator",
+    "summary": "Updated the health coordinator architecture diagram to comply with the project's PlantUML documentation style guide.\n\n- Edited `docs/puml/health-coordinator-architecture.puml` to use: standard style include, stereotypes, arrow macros, and correct layout direction.\n- Regenerated the PNG artifact to `docs/images/` (93 KB output).",
+    "observationIds": [
+      "b6577166-01ca-4cd9-86f8-067a6eadde74"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-coordinator-architecture.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T05:03:32.034Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "973db6ae-1419-4929-9c10-c629267edc64",
+    "date": "2026-05-09",
+    "theme": "Tmux Status Line ETM Discovery and Project Detection Fix",
+    "summary": "Investigation and fix of the tmux status line failing to show the `rapid-automations` (RA) project and incorrectly marking LSL as degraded.\n\n- Root cause traced: `ensureAllTranscriptMonitorsRunning()` used lossy reverse-decoding of Claude transcript-dir paths (where both `/` and `_` map to `-`), so `_work/rapid-automations` resolved to a nonexistent path, ETM was never spawned, and the coordinator had no heartbeat for RA\n- Fix applied: replaced reverse-decode logic with forward-encoding (enumerate disk paths first, encode forward), moved fix from dead code in `combined-status-line.js` to the health coordinator's tick loop where ETM spawning actually occurs\n- Modified files: `combined-status-line.js`, `health-coordinator.js`, `health-coordinator-architecture.puml`\n- Coordinator restarted via `launchctl`; a stale duplicate coordinator process (PID 9570, worktree instance) was identified and killed, leaving only the launchd-managed instance (PID 88770)",
+    "observationIds": [
+      "bedf5328-6893-4a4a-92c9-ce319a08f3f7",
+      "3a24b265-d7de-44b1-9c5b-0e862ba21205",
+      "3aea4f41-4b21-4aa6-8cbe-185ce9e37327",
+      "6a3ba69e-c29d-495c-80d0-bfd57b3df2e1",
+      "6549bba4-f338-4895-be6b-4ddd8789b3a0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-coordinator-architecture.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-09T05:03:32.034Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "eb7d21e9-36ab-44b6-a8cb-5c46d64cc74a",
+    "date": "2026-05-09",
+    "theme": "Rapid-Automations Orphaned Submodule Gitlink Removal",
+    "summary": "Debugged and fixed a git submodule fetch error blocking commits and pushes in the `rapid-automations` umbrella repo.\n\n- Root cause: a stale/orphaned `rapid-toolkit` gitlink existed at the repo root (without the `integrations/` prefix) after the toolkit was relocated to `integrations/rapid-toolkit`, causing fetch failures on push\n- Fix: removed the orphaned entry via `git rm --cached` and committed the fix in an isolated commit\n- Since `main` is branch-protected, changes were pushed to a new feature branch `fix/orphan-rapid-toolkit-gitlink`; branch is 3 commits behind main and requires a rebase before merging via PR",
+    "observationIds": [
+      "df58abaa-8d3c-4bf1-84aa-2208a9abb69a",
+      "504ccaec-532f-4d8f-9e52-bfdd94d4a430",
+      "d5f82d52-8fc3-4b3a-9400-d21c5049945d",
+      "64b9fbbb-15af-4253-acb6-1f3379c97cad",
+      "5302fb45-0cea-4f28-ae2c-e475fee7169d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-09T05:03:32.034Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
   }
 ]
