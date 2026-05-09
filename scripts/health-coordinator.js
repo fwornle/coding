@@ -32,7 +32,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
@@ -338,6 +338,126 @@ function ingestSignal(signal) {
   }
 }
 
+// ETM spawn safety net (Phase 33 fills the gap left by removing the legacy
+// per-project LSL coordinator). Discovers projects with an actively-written
+// Claude transcript and ensures an enhanced-transcript-monitor process is
+// running for each. Rate-limited to once per 30s to prevent spawn storms.
+const ETM_SPAWN_INTERVAL_MS = 30_000;
+const ETM_TRANSCRIPT_ACTIVE_MS = 120_000; // jsonl mtime within 2 min = active
+let _lastEtmSpawnCheck = 0;
+
+/**
+ * Forward-encode a project path to its Claude transcript dir name.
+ * Claude Code collapses both `/` and `_` to `-` (verified in
+ * enhanced-transcript-monitor.js:1703). The reverse direction is lossy
+ * (`Agentic/_work/foo` and `Agentic/-work-foo` encode identically), so
+ * any discovery code MUST run forward (path → encoded), not the reverse.
+ */
+function encodeClaudeProjectDir(projectPath) {
+  return projectPath.replace(/[\/_]/g, '-');
+}
+
+/**
+ * Walk Agentic dir up to depth 2 to enumerate real on-disk project paths.
+ * This covers both `Agentic/<name>` and `Agentic/_work/<name>` layouts.
+ */
+function discoverProjectCandidates(agenticDir) {
+  const out = [];
+  let entries;
+  try {
+    entries = fs.readdirSync(agenticDir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    const lvl1 = path.join(agenticDir, entry.name);
+    out.push(lvl1);
+    let subEntries;
+    try {
+      subEntries = fs.readdirSync(lvl1, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const sub of subEntries) {
+      if (!sub.isDirectory() || sub.name.startsWith('.')) continue;
+      out.push(path.join(lvl1, sub.name));
+    }
+  }
+  return out;
+}
+
+/**
+ * Ensure an enhanced-transcript-monitor is running for every project with an
+ * actively-written Claude transcript. Skips projects that already have a
+ * running heartbeat in currentState.lsl (set by ETM heartbeats; staleness
+ * pass at HEARTBEAT_STALENESS_MS = 15s). Rate-limited to once per 30s.
+ */
+function ensureEtmForActiveProjects() {
+  const now = Date.now();
+  // Startup grace: wait HEARTBEAT_STALENESS_MS + buffer before doing the first
+  // spawn check so existing ETMs (started before us) get a chance to heartbeat
+  // and populate currentState.lsl. Without this, a coordinator restart spawns
+  // a redundant ETM for every active project even when one is already running.
+  if (now - STARTED_AT < HEARTBEAT_STALENESS_MS + 5_000) return;
+  if (now - _lastEtmSpawnCheck < ETM_SPAWN_INTERVAL_MS) return;
+  _lastEtmSpawnCheck = now;
+
+  const homeDir = process.env.HOME;
+  if (!homeDir) return;
+  const agenticDir = path.dirname(REPO_ROOT);
+  const claudeProjectsDir = path.join(homeDir, '.claude', 'projects');
+  if (!fs.existsSync(claudeProjectsDir)) return;
+  const monitorScript = path.join(REPO_ROOT, 'scripts', 'enhanced-transcript-monitor.js');
+  if (!fs.existsSync(monitorScript)) return;
+
+  // Project names already covered by a fresh heartbeat — skip these.
+  const coveredProjects = new Set();
+  for (const entry of Object.values(currentState.lsl)) {
+    if (entry?.status === 'running' && entry?.projectName) {
+      coveredProjects.add(entry.projectName);
+    }
+  }
+
+  for (const projectPath of discoverProjectCandidates(agenticDir)) {
+    const projectName = path.basename(projectPath);
+    if (coveredProjects.has(projectName)) continue;
+
+    const transcriptDir = path.join(claudeProjectsDir, encodeClaudeProjectDir(projectPath));
+    if (!fs.existsSync(transcriptDir)) continue;
+
+    let latestMtime = 0;
+    try {
+      for (const f of fs.readdirSync(transcriptDir)) {
+        if (!f.endsWith('.jsonl')) continue;
+        const m = fs.statSync(path.join(transcriptDir, f)).mtime.getTime();
+        if (m > latestMtime) latestMtime = m;
+      }
+    } catch {
+      continue;
+    }
+    if (latestMtime === 0 || (now - latestMtime) > ETM_TRANSCRIPT_ACTIVE_MS) continue;
+
+    log(`spawning ETM for active project ${projectName} (${projectPath})`, 'INFO');
+    try {
+      const child = spawn('node', [monitorScript, projectPath], {
+        detached: true,
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          CODING_REPO: REPO_ROOT,
+          CODING_TOOLS_PATH: REPO_ROOT,
+          TRANSCRIPT_SOURCE_PROJECT: projectPath
+        },
+        cwd: REPO_ROOT
+      });
+      child.unref();
+    } catch (err) {
+      log(`failed to spawn ETM for ${projectName}: ${err.message}`, 'ERROR');
+    }
+  }
+}
+
 /**
  * Refresh per-session LSL state staleness / eviction (D-10).
  * Called at every tick:
@@ -431,6 +551,19 @@ async function runAllChecks() {
     };
     if (etmIdx >= 0) currentState.services[etmIdx] = etmEntry;
     else currentState.services.push(etmEntry);
+
+    // Safety net: ensure an ETM is running for every project with an
+    // actively-written Claude transcript. Phase 33 removed the legacy
+    // per-project LSL coordinator that used to spawn these; without this
+    // sweep, any session not launched via `bin/coding` (e.g. VS Code's
+    // Claude extension, or one whose ETM died) leaves no heartbeats in
+    // lsl_by_project and the statusline cannot render its label. Internally
+    // rate-limited to once per 30s; safe to call every tick.
+    try {
+      ensureEtmForActiveProjects();
+    } catch (err) {
+      log(`ETM safety-net spawn threw: ${err.message}`, 'ERROR');
+    }
   } catch (err) {
     log(`lsl refresh threw: ${err.message}`, 'ERROR');
     // Mark every project rollup as 'unknown' on failure (SPEC R6).
@@ -738,6 +871,38 @@ app.post('/health/refresh', async (_req, res) => {
   } catch (err) {
     // SPEC R6: surface failure, never mask as healthy.
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /health/remediate — dashboard proxies "Restart" button clicks here so
+// host-side processes (ETM, etc.) can be restarted from inside the Docker'd
+// dashboard. Lazy-imports HealthRemediationActions to avoid pulling in PSM at
+// coordinator startup.
+//   body: { action: '<remediation_action>', service?: '<svc_name>' }
+//   200: { ok: true, success, message, action, ... }
+//   400: missing/unknown action
+//   500: dispatcher error
+let remediationDispatcher = null;
+async function getRemediationDispatcher() {
+  if (remediationDispatcher) return remediationDispatcher;
+  const mod = await import('./health-remediation-actions.js');
+  remediationDispatcher = new mod.HealthRemediationActions({});
+  return remediationDispatcher;
+}
+app.post('/health/remediate', async (req, res) => {
+  const { action, service, details } = req.body || {};
+  if (!action || typeof action !== 'string') {
+    return res.status(400).json({ ok: false, error: 'action required' });
+  }
+  try {
+    const dispatcher = await getRemediationDispatcher();
+    const result = await dispatcher.executeAction(action, { service, ...(details || {}) });
+    // Trigger an immediate state refresh so the next dashboard poll reflects the change.
+    forceTick().catch(() => {});
+    return res.status(result.success ? 200 : 500).json({ ok: result.success, ...result });
+  } catch (err) {
+    log(`remediate ${action} threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 

@@ -29,6 +29,25 @@ const require_cjs = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_REPO || join(__dirname, '../..');
 
+// Service → remediation mapping. Keys MUST match the `name` field emitted by
+// the coordinator at /health/state; `action` MUST match a case handled in
+// scripts/health-remediation-actions.js executeAction(). Used by both the
+// violation builder (to stamp `auto_heal: true` + `auto_heal_action` so the
+// frontend renders "Enabled" + Restart button) and handleRestartService (to
+// route restart clicks through the coordinator's host-side dispatcher).
+const AUTO_HEAL_MAP = {
+    enhanced_transcript_monitor: {
+        action: 'restart_transcript_monitor',
+        recommendation: 'Restart the LSL transcript monitor (host process). Last heartbeat lapsed beyond stale threshold.'
+    },
+    vkb_server: { action: 'restart_vkb_server', recommendation: 'Restart VKB server.' },
+    constraint_monitor: { action: 'restart_constraint_monitor', recommendation: 'Restart constraint monitor.' },
+    dashboard_server: { action: 'restart_dashboard_server', recommendation: 'Restart dashboard frontend.' },
+    health_dashboard_api: { action: 'restart_health_api', recommendation: 'Restart health dashboard API.' },
+    health_dashboard_frontend: { action: 'restart_health_frontend', recommendation: 'Restart health dashboard frontend.' },
+    llm_cli_proxy: { action: 'restart_llm_cli_proxy', recommendation: 'Restart LLM CLI proxy.' }
+};
+
 /**
  * Load port configuration from centralized .env.ports file
  */
@@ -467,6 +486,14 @@ class SystemHealthAPIServer {
             // Active Violations table agrees with the badge — otherwise users see
             // "2 violations" but the table shows only 1 row, leaving them confused
             // about which services the badge is counting.
+            //
+            // Auto-heal metadata: violations-table.tsx renders the "Enabled" badge +
+            // a Restart button when the row carries `auto_heal: true`, `category:
+            // 'services'`, `status: 'error'`, and `auto_heal_action`. The 33-05
+            // reshape dropped these fields, so every coordinator-derived violation
+            // showed "Manual" with no restart path. Re-attach them via a static
+            // service→action map (must match handlers in
+            // scripts/health-remediation-actions.js).
             if (state && Array.isArray(state.services)) {
                 for (const svc of state.services) {
                     if (!svc || !svc.name) continue;
@@ -474,10 +501,31 @@ class SystemHealthAPIServer {
                     const raw = svc.status || 'unknown';
                     const ui = toUiStatus(raw);
                     checks.push({ check: svc.name, name: `service.${svc.name}`, category: 'services', status: ui, raw_status: raw, last_seen: svc.last_seen, timestamp: ts, message: `${svc.name} ${raw}` });
+                    const heal = AUTO_HEAL_MAP[svc.name];
                     if (isHardFailure(raw)) {
-                        violations.push({ check: svc.name, kind: `service.${svc.name}`, severity: 'high', detail: raw, message: `${svc.name} ${raw}`, timestamp: ts });
+                        violations.push({
+                            check: svc.name,
+                            kind: `service.${svc.name}`,
+                            category: 'services',
+                            status: 'error',
+                            severity: 'high',
+                            detail: raw,
+                            message: `${svc.name} ${raw}`,
+                            timestamp: ts,
+                            ...(heal ? { auto_heal: true, auto_heal_action: heal.action, recommendation: heal.recommendation } : {})
+                        });
                     } else if (raw === 'unknown') {
-                        violations.push({ check: svc.name, kind: `service.${svc.name}`, severity: 'warning', detail: 'unknown', message: `${svc.name} has not reported (no probe data yet)`, timestamp: ts });
+                        violations.push({
+                            check: svc.name,
+                            kind: `service.${svc.name}`,
+                            category: 'services',
+                            status: 'warning',
+                            severity: 'warning',
+                            detail: 'unknown',
+                            message: `${svc.name} has not reported (no probe data yet)`,
+                            timestamp: ts,
+                            ...(heal ? { auto_heal: true, auto_heal_action: heal.action, recommendation: heal.recommendation } : {})
+                        });
                     }
                 }
             }
@@ -704,10 +752,43 @@ class SystemHealthAPIServer {
                 });
             }
 
-            console.log(`🔄 Restart request received for service: ${serviceName}, action: ${action}`);
+            process.stderr.write(`[Dashboard] Restart request received for service: ${serviceName}, action: ${action}\n`);
 
-            // Map service check names to restart commands
-            // Docker mode uses supervisorctl; native mode uses npm/bin commands
+            // Prefer the coordinator's host-side remediation dispatcher when the
+            // service has a known auto-heal action. The coordinator runs natively
+            // on the host and can spawn host processes (ETM, etc.) that this
+            // container cannot reach via supervisorctl. If the proxy fails, fall
+            // through to the local supervisorctl/npm command map below.
+            const heal = AUTO_HEAL_MAP[serviceName];
+            const remediationAction = (action && action !== 'restart') ? action : heal?.action;
+            if (remediationAction) {
+                const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
+                try {
+                    const upstream = await fetch(`${base}/health/remediate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: remediationAction, service: serviceName })
+                    });
+                    if (upstream.ok) {
+                        const result = await upstream.json();
+                        setTimeout(() => {
+                            fetch(`${base}/health/refresh`, { method: 'POST' }).catch(() => {});
+                        }, 2000);
+                        return res.json({
+                            status: result.success ? 'success' : 'error',
+                            message: result.message || `Remediation ${remediationAction} dispatched`,
+                            data: { service: serviceName, action: remediationAction, result, triggered_at: new Date().toISOString() }
+                        });
+                    }
+                    process.stderr.write(`[Dashboard] coordinator remediate ${remediationAction} -> HTTP ${upstream.status}; falling back\n`);
+                } catch (err) {
+                    process.stderr.write(`[Dashboard] coordinator remediate proxy failed: ${err.message}; falling back\n`);
+                }
+            }
+
+            // Fallback: local restart commands (legacy path for services the
+            // coordinator can't reach, or when the coordinator is down).
+            // Docker mode uses supervisorctl; native mode uses npm/bin commands.
             const isDocker = existsSync('/.dockerenv');
             const restartCommands = isDocker ? {
                 vkb_server: 'supervisorctl restart web-services:vkb-server',
@@ -732,7 +813,7 @@ class SystemHealthAPIServer {
             }
 
             // Execute restart command in background (non-blocking)
-            console.log(`📝 Executing restart command: ${command}`);
+            process.stderr.write(`[Dashboard] Executing restart command: ${command}\n`);
             const restartProcess = spawn('/bin/bash', ['-c', command], {
                 cwd: codingRoot,
                 detached: true,
@@ -761,7 +842,7 @@ class SystemHealthAPIServer {
                 }
             });
         } catch (error) {
-            console.error('Failed to restart service:', error);
+            process.stderr.write(`[Dashboard] Failed to restart service: ${error.message}\n${error.stack}\n`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to restart service',
