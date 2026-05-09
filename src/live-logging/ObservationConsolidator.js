@@ -1189,10 +1189,21 @@ export class ObservationConsolidator {
           try { existingDigestIds = JSON.parse(existing.digest_ids || '[]'); } catch { /* ok */ }
           const mergedDigestIds = [...new Set([...existingDigestIds, ...entryDigestIds])];
 
+          // Use json_patch so the freshly-parsed scope/scope_warning are
+          // overlayed onto existing metadata without clobbering any unrelated
+          // fields a future caller might have added. RFC 7396 patches:
+          // {} = no-op; null values would delete keys, but we never emit nulls.
           this.db.prepare(`
-            UPDATE insights SET summary = ?, digest_ids = ?, last_updated = ?, confidence = ?
+            UPDATE insights
+            SET summary = ?, digest_ids = ?, last_updated = ?, confidence = ?,
+                metadata = json_patch(COALESCE(metadata, '{}'), ?)
             WHERE id = ?
-          `).run(this._redact(entry.summary), JSON.stringify(mergedDigestIds), now, entry.confidence, existing.id);
+          `).run(
+            this._redact(entry.summary), JSON.stringify(mergedDigestIds),
+            now, entry.confidence,
+            this._redactPaths(JSON.stringify(entry.metadata || {})),
+            existing.id
+          );
           embeddingQueue.push({ id: existing.id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
           updated++;
         } else {
