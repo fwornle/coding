@@ -143,11 +143,19 @@ Plans:
 
 **Goal:** Close real LLM proxy supervision gaps in the central health coordinator (semantic-work probe, central network-mode publishing, on-the-fly VPN/CN re-detection, auto-heal wiring) AND execute the deferred Option B from commit 0049fc179 — delete the dead `StreamingKnowledgeExtractor` / `RealTimeTrajectoryAnalyzer` / related modules that the ETM still runs (2 LLM calls per exchange + 1 per prompt set, output unread since the [📚] badge rewire) — so the coordinator becomes the honest single source of truth for proxy semantic-readiness AND the ETM hot path stops doing dead work.
 
-**Plans:** 0 plans (to be created by /gsd-plan-phase)
+**Plans:** 6 plans
 
 Plans:
-- [ ] TBD (run /gsd-spec-phase 34 → /gsd-discuss-phase 34 → /gsd-plan-phase 34)
 
+**Wave 1 (parallel — disjoint files)**
+- [ ] 34-01-PLAN.md — Update llm_cli_proxy rule in config/health-verification-rules.json: flip auto_heal=true + add cooldown 3/5min (D-06 + D-07 kill-switch via existing POST /health/refresh)
+- [ ] 34-02-PLAN.md — Add state.proxy slice + pollProxySemantic (60s, D-01 payload, D-02 four-mode classification) + pollProxyMode (every tick) to scripts/health-coordinator.js — observation only, no FSM
+- [ ] 34-04-PLAN.md — ETM strip (D-08 Plan A): delete ~80 LoC of dead online-learning paths from scripts/enhanced-transcript-monitor.js + checkpoint cross-project ETM smoke verify (D-09 + D-10)
+- [ ] 34-06-PLAN.md — Phase 33 leftover closure: AC #6 detection-latency P95 ≤ 10s + AC #11 destructive kill -9 respawn ≤ 30s + plist dead-key cleanup (D-15 + D-16 + D-17)
+
+**Wave 2** *(depends on Wave 1 — Plan 34-03 reads RULES from 34-01 + adds FSM on top of 34-02; Plan 34-05 deletes files orphaned by 34-04 + surfaces state.proxy from 34-02)*
+- [ ] 34-03-PLAN.md — Auto-heal FSM (D-06 cooldown) + VPN/CN flap kickstart (D-05) wired into pollProxySemantic + pollProxyMode; rewrite restartLLMCLIProxy() in scripts/health-remediation-actions.js to use launchctl kickstart -k (PATTERNS.md anomaly #3)
+- [ ] 34-05-PLAN.md — ETM Plan B + surface: delete 6 source files + clean dead readers in scripts/combined-status-line.js (corrected line list per PATTERNS.md anomaly #4) + add [🧠] proxy badge (collision-resolved with UKB indicator per anomaly #1) + add LLM Proxy Health card to system-health-dashboard (D-11 + FUSE caveat)
 </details>
 
 ---
