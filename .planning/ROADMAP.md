@@ -9,7 +9,7 @@
 - v4.0 -- Mastra Integration & LSL Observational Memory (Phases 20-23, shipped 2026-04-05)
 - v5.0 -- Service Reliability & Health System Overhaul (Phases 24-27, in progress)
 - v6.0 -- Knowledge Context Injection (Phases 28-32, shipped 2026-04-25) -> [archive](milestones/v6.0-ROADMAP.md)
-- v7.0 -- Health Monitoring Consolidation (Phase 33, in progress)
+- v7.0 -- Health Monitoring Consolidation (Phases 33-34, in progress)
 
 ---
 
@@ -138,6 +138,15 @@ Plans:
 - [x] 33-13-PLAN.md — G3 (MED): canonical session-id form for LSL keying — **starts with `checkpoint:decision`** (4 options: ETM normalizes / per-pane reads env / coordinator fuzzy / project-rollup canonical). Includes human-verify checkpoint for two-pane tmux scenario
 
 **Acceptance gate after gap-closure:** re-run `bash scripts/__tests__/health-coordinator/run-all.sh` + re-execute plan 33-08's acceptance suite. Phase 33 declared complete when SPEC AC pass count goes from 7 → 13 (or 13 with documented deviations for AC#2 LLM-CLI-proxy out-of-scope).
+
+### Phase 34: Proxy Supervision and ETM Legacy Cleanup
+
+**Goal:** Close real LLM proxy supervision gaps in the central health coordinator (semantic-work probe, central network-mode publishing, on-the-fly VPN/CN re-detection, auto-heal wiring) AND execute the deferred Option B from commit 0049fc179 — delete the dead `StreamingKnowledgeExtractor` / `RealTimeTrajectoryAnalyzer` / related modules that the ETM still runs (2 LLM calls per exchange + 1 per prompt set, output unread since the [📚] badge rewire) — so the coordinator becomes the honest single source of truth for proxy semantic-readiness AND the ETM hot path stops doing dead work.
+
+**Plans:** 0 plans (to be created by /gsd-plan-phase)
+
+Plans:
+- [ ] TBD (run /gsd-spec-phase 34 → /gsd-discuss-phase 34 → /gsd-plan-phase 34)
 
 </details>
 
