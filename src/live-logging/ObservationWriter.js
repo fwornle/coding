@@ -596,8 +596,21 @@ export class ObservationWriter {
 
   /**
    * Check if a semantically similar observation already exists for this agent.
-   * Uses stemmed keyword overlap with both Jaccard and containment measures
-   * against a 4-hour window of recent observations.
+   * Uses stemmed keyword overlap on both the combined Intent+Approach text
+   * (broad signal) and the Intent line alone (narrow signal). A 4-hour window
+   * of recent observations is searched.
+   *
+   * The Intent-only check exists because the combined check can be defeated
+   * by paraphrased Approach text. Concrete case (the bug this fixes): three
+   * observations written within the same second with byte-identical Intent
+   * lines but different LLM-paraphrased Approaches yielded combined Jaccard
+   * 0.29–0.37 — all below the 0.4 threshold — and slipped through, even
+   * though their Intent jaccard was 1.0.
+   *
+   * Intent-only dedup requires both Intents to carry >= 4 meaningful keywords
+   * to avoid false positives on terse Intents (e.g. "Restart the obs-api
+   * service via PSM" vs "Restart the llm-proxy service via PSM" — different
+   * services, similar wording).
    */
   _isSemanticallyDuplicate(agent, summary) {
     if (!this.db) return false;
@@ -616,6 +629,7 @@ export class ObservationWriter {
 
     const newKeywords = this._extractKeywords(newText);
     if (newKeywords.size < 3) return false;
+    const newIntentKw = newIntent ? this._extractKeywords(newIntent) : new Set();
 
     for (const row of recent) {
       const existingIntent = this._extractIntent(row.summary);
@@ -626,25 +640,37 @@ export class ObservationWriter {
       const existingKeywords = this._extractKeywords(existingText);
       if (existingKeywords.size < 3) continue;
 
-      // Count intersection
+      // Combined Intent+Approach signal — broad overlap.
       let intersection = 0;
       for (const w of newKeywords) {
         if (existingKeywords.has(w)) intersection++;
       }
-
-      // Two complementary measures:
-      // 1. Jaccard: shared / total unique keywords (catches equal-length overlap)
       const union = new Set([...newKeywords, ...existingKeywords]).size;
       const jaccard = intersection / union;
-
-      // 2. Containment: shared / min set size (catches subset relationships,
-      //    e.g. "fix observations frontend" is contained in "fix three issues
-      //    shadow folder observations frontend reclassify")
       const minSize = Math.min(newKeywords.size, existingKeywords.size);
       const containment = intersection / minSize;
 
-      // Duplicate if either: strong Jaccard OR high containment of the smaller set
+      // Duplicate if either: strong combined Jaccard OR high containment.
       if (jaccard > 0.4 || containment > 0.7) return true;
+
+      // Intent-only signal — narrow but high-confidence. Catches the case
+      // where Intent is near-identical but Approach paraphrasing dilutes the
+      // combined score. Both Intents must carry >= 4 meaningful keywords so
+      // terse near-matches like "Restart obs-api via PSM" vs "Restart
+      // llm-proxy via PSM" don't false-positive (those land at jaccard ≈ 0.5
+      // because the discriminating service names are short identifiers).
+      if (newIntentKw.size >= 4 && existingIntent) {
+        const existingIntentKw = this._extractKeywords(existingIntent);
+        if (existingIntentKw.size >= 4) {
+          let intentInter = 0;
+          for (const w of newIntentKw) {
+            if (existingIntentKw.has(w)) intentInter++;
+          }
+          const intentUnion = new Set([...newIntentKw, ...existingIntentKw]).size;
+          const intentJaccard = intentInter / intentUnion;
+          if (intentJaccard > 0.7) return true;
+        }
+      }
     }
     return false;
   }
