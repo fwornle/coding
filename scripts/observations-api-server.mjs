@@ -91,6 +91,14 @@ function isCorruptionError(err) {
   return msg.includes('malformed') || msg.includes('corrupt') || msg.includes('disk I/O');
 }
 
+// Reading the heartbeat doubles as crash-recovery: if the pid that wrote it
+// is dead, or the file is older than 15× the 2s heartbeat interval (so the
+// worker has clearly stopped bumping it), the heartbeat is stale and we
+// actively clean it up. Otherwise the dashboard would render a perpetual
+// "Consolidating..." after any obs-api crash or restart, blocking the user
+// from triggering a fresh run.
+const HEARTBEAT_STALE_MS = 30_000;
+
 function readConsolidationHeartbeat() {
   try {
     if (!fs.existsSync(HEARTBEAT_PATH)) return null;
@@ -102,6 +110,22 @@ function readConsolidationHeartbeat() {
     const stderrAgeMs = now - stderrAt;
     let alive = false;
     try { process.kill(data.pid, 0); alive = true; } catch { /* dead */ }
+
+    // Stale-heartbeat recovery. Two failure modes the live writer can leave
+    // behind: (1) the obs-api process that owned the run died (alive=false),
+    // (2) the in-process worker is still in this process but stopped bumping
+    // — usually because the consolidation thread is hung on a wedged LLM call
+    // or DB lock. Either way, the dashboard should NOT keep showing
+    // "Consolidating..." indefinitely. Clean up the file so a fresh run can
+    // be triggered, and report inflight=null upstream.
+    if (!alive || ageMs > HEARTBEAT_STALE_MS) {
+      try { fs.unlinkSync(HEARTBEAT_PATH); } catch { /* may already be gone */ }
+      process.stderr.write(
+        `[obs-api] cleared stale consolidation heartbeat (pid=${data.pid}, alive=${alive}, ageMs=${ageMs})\n`
+      );
+      return null;
+    }
+
     return {
       pid: data.pid,
       alive,
