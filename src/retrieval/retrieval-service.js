@@ -35,7 +35,13 @@ export class RetrievalService {
    * @param {function} [options.dbGetter] - Function returning a better-sqlite3 db instance
    */
   constructor(options = {}) {
-    this.scoreThreshold = options.scoreThreshold ?? 0.82;
+    // Default 0.70 (was 0.82). MiniLM-L6-v2 cosine similarities cluster
+    // 0.75-0.82 for same-project docs (see _applyTopicRelevance commentary),
+    // so a 0.82 floor filtered out almost every legitimate match in practice
+    // — Qdrant returned 0 insights for typical queries and the consumer fell
+    // back to a noisy keyword-only mix. Lowering the floor lets semantic
+    // results in; the topic-relevance pass does the actual ranking.
+    this.scoreThreshold = options.scoreThreshold ?? 0.70;
     this.defaultBudget = options.defaultBudget ?? 1000;
     this.embeddingService = null;
     this.qdrantClient = null;
@@ -301,15 +307,30 @@ export class RetrievalService {
   }
 
   /**
-   * Demote results whose topic/theme has no keyword overlap with the query.
+   * Boost or demote results based on query-keyword overlap with their topic
+   * and summary, plus an additional exact-token boost for "topic-name" matches.
    *
-   * Extracts significant words (3+ chars, lowercased) from the query, then
-   * checks each result's topic/theme/summary_preview for overlap. Results
-   * with zero overlap are demoted by 0.4x; partial overlap gets no change;
-   * strong overlap (3+ words) gets a 1.3x boost.
+   * MiniLM-L6-v2 cosine similarities cluster 0.75-0.82 for same-project docs,
+   * so vector similarity alone cannot reliably discriminate topics within the
+   * corpus. Two compensating signals are applied:
    *
-   * This compensates for MiniLM-L6-v2's inability to discriminate topics
-   * within a single-project corpus (cosine similarities cluster 0.75-0.82).
+   *   1. Substring overlap (broad signal): counts query words appearing as
+   *      substrings of the result's topic/theme/summary_preview. "status" in
+   *      "statusline" counts. Bands push boosts/demotes hard enough to cover
+   *      the typical 3× raw-RRF gap between a noisy top hit and the truly
+   *      relevant result.
+   *
+   *   2. Exact-token overlap (strong signal, NEW): counts query words that
+   *      appear AS WHOLE TOKENS in the topic field (split on non-alphanumerics).
+   *      A query like "drift on the statusline" matching the topic "Tmux
+   *      Statusline Renderer" exactly on "statusline" is a near-certain
+   *      relevance signal — far stronger than a substring hit.
+   *
+   * Compounding the two ensures that an item with strong substring overlap
+   * AND a topic-name token match (e.g. "Tmux Statusline Renderer" for a
+   * statusline question) reliably outscores items with high raw embedding
+   * similarity but no topical relevance (e.g. "Observations Pipeline" for the
+   * same query).
    *
    * @param {Array<object>} results - Fused results with rrfScore
    * @param {string} query - Original search query (may include [context: ...])
@@ -343,27 +364,57 @@ export class RetrievalService {
       if (!result.rrfScore) continue;
 
       const p = result.payload || {};
-      // Build text to match against: topic, theme, summary
+
+      // Substring-overlap target: topic + theme + summary_preview
       const topicText = [
         p.topic || '',
         p.theme || '',
         p.summary_preview || '',
       ].join(' ').toLowerCase();
 
-      // Count overlapping words
-      let overlap = 0;
+      // Exact-token target: ONLY topic/theme (the named field — title-like).
+      // Tokenize on non-alphanumerics so "Tmux Statusline Renderer" yields
+      // ['tmux','statusline','renderer'] — a query word "statusline" matches
+      // the whole token, not just any substring.
+      const topicTokens = new Set(
+        ((p.topic || '') + ' ' + (p.theme || ''))
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter(Boolean)
+      );
+
+      // Count overlaps in both modes
+      let substringOverlap = 0;
+      let exactTokenOverlap = 0;
       for (const word of queryWords) {
-        if (topicText.includes(word)) overlap++;
+        if (topicText.includes(word)) substringOverlap++;
+        if (topicTokens.has(word)) exactTokenOverlap++;
       }
 
-      if (overlap === 0) {
-        // No keyword overlap at all — strong demotion
-        result.rrfScore *= 0.4;
-      } else if (overlap >= 3) {
-        // Strong overlap — boost
-        result.rrfScore *= 1.3;
-      }
-      // 1-2 word overlap: neutral (no change)
+      // Substring band — broad signal, governs the base multiplier.
+      // 0   → 0.30× (hard demote, was 0.40×): an item with no topical overlap
+      //      at all is almost never what the user is asking about, even if
+      //      the embedding model thinks it's similar.
+      // 1   → 1.00× (neutral): one accidental substring hit is too weak.
+      // 2   → 1.50× (boost, was 1.00× neutral): two overlapping words is a
+      //      meaningful topical signal.
+      // 3+  → 1.90× (strong boost, was 1.30×): high topical overlap.
+      let multiplier = 1.0;
+      if (substringOverlap === 0) multiplier = 0.30;
+      else if (substringOverlap === 1) multiplier = 1.00;
+      else if (substringOverlap === 2) multiplier = 1.50;
+      else multiplier = 1.90;
+
+      // Exact-token band — narrow signal, compounds with substring band.
+      // Matching a whole token of the topic with a query word is the
+      // strongest topical signal we have without an LLM in the loop.
+      // 1   → ×1.6 compound (e.g. query "statusline drift" matches topic
+      //      "Tmux Statusline Renderer" on "statusline").
+      // 2+  → ×2.2 compound (query saturates the topic).
+      if (exactTokenOverlap === 1) multiplier *= 1.6;
+      else if (exactTokenOverlap >= 2) multiplier *= 2.2;
+
+      result.rrfScore *= multiplier;
     }
   }
 

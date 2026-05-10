@@ -155,11 +155,17 @@ async function main() {
     // 9. Truncate query for retrieval (server rejects > 500 chars)
     const query = enrichedQuery.slice(0, MAX_QUERY_CHARS);
 
-    // 10. Call retrieval service with context
+    // 10. Call retrieval service with context.
+    // threshold=0.70: MiniLM-L6-v2 same-project cosine similarities cluster
+    // at 0.75-0.82 (see retrieval-service.js _applyTopicRelevance), so a
+    // higher floor silently filtered out almost every legitimate insight or
+    // digest. The retrieval-service's topic-relevance pass (substring + exact-
+    // token overlap) does the actual ranking; the threshold's job is just to
+    // let the candidates in.
     const result = await callRetrieval({
       query,
       budget: 1000,
-      threshold: 0.82,
+      threshold: 0.70,
       context,
     });
     if (!result || !result.markdown || result.meta?.results_count === 0) return;
