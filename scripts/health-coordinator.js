@@ -821,6 +821,29 @@ async function runAllChecks() {
     };
   }
 
+  // ----- Proxy network mode (every tick — Plan 34-02 R2; Plan 34-03 adds flap kickstart) -----
+  try {
+    await pollProxyMode();
+  } catch (err) {
+    log(`proxy networkMode probe threw: ${err.message}`, 'ERROR');
+    currentState.proxy.networkMode = 'unknown';
+  }
+
+  // ----- Proxy semantic readiness (every 60s — Plan 34-02 R1; Plan 34-03 adds auto-heal FSM) -----
+  const _proxyProbeAge = currentState.proxy.last_probe_end
+    ? Date.now() - new Date(currentState.proxy.last_probe_end).getTime()
+    : Infinity;
+  if (_proxyProbeAge >= PROXY_PROBE_INTERVAL_MS) {
+    try {
+      await pollProxySemantic();
+    } catch (err) {
+      log(`proxy semantic probe threw: ${err.message}`, 'ERROR');
+      currentState.proxy.semantic_ok = false;
+      currentState.proxy.reason = err.message;
+      currentState.proxy.last_probe_end = new Date().toISOString();
+    }
+  }
+
   // ----- Service liveness via PSM (host services only — D-08 drops container supervisorctl) -----
   try {
     const svcMode = shouldInject('services');
