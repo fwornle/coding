@@ -129,6 +129,7 @@ class CombinedStatusLine {
       const constraintStatus = await this.getConstraintStatus();
       const semanticStatus = await this.getSemanticStatus();
       const knowledgeStatus = await this.getKnowledgeSystemStatus();
+      const proxyStatus = await this.getProxySystemStatus();
       const liveLogTarget = await this.getCurrentLiveLogTarget();
       const redirectStatus = await this.getRedirectStatus();
       const globalHealthStatus = await this.getGlobalHealthStatus();
@@ -141,7 +142,7 @@ class CombinedStatusLine {
       // legacy ensure*Running spawn paths and the GPS heartbeat probe were
       // removed along with the four legacy daemons.
 
-      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus, ukbStatus);
+      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, proxyStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus, ukbStatus);
 
       this.statusCache = status;
       this.lastUpdate = now;
@@ -668,6 +669,42 @@ class CombinedStatusLine {
         totals: kp.totals,
         inflight: kp.inflight,
         reason: kp.reason
+      };
+    } catch (error) {
+      return { status: 'unreachable', reason: error.message };
+    }
+  }
+
+  async getProxySystemStatus() {
+    // Phase 34 (D-12): the coordinator publishes proxy semantic-readiness +
+    // networkMode + auto_heal_status under state.proxy. This drives the
+    // [🧠] badge. See health-coordinator.js:pollProxySemantic +
+    // evaluateAutoHealFSM (Plan 34-02 + 34-03).
+    try {
+      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+      const out = execSync(
+        `curl -fs --max-time 2 "${url}/health/state"`,
+        { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
+      );
+      const state = JSON.parse(out);
+      const p = state.proxy;
+      if (!p) {
+        return { status: 'unreachable', reason: 'no proxy slice in /health/state' };
+      }
+      // Map (semantic_ok, auto_heal_status) → 6-state enum per D-12.
+      let status;
+      if (p.auto_heal_status === 'disabled') status = 'disabled';
+      else if (p.auto_heal_status === 'cooldown') status = 'cooling';
+      else if (p.semantic_ok === null) status = 'unknown';
+      else if (p.semantic_ok === true) status = 'healthy';
+      else status = 'degraded';
+      return {
+        status,
+        semantic_ok: p.semantic_ok,
+        networkMode: p.networkMode,
+        auto_heal_status: p.auto_heal_status,
+        kickstart_count: p.kickstart_count,
+        reason: p.reason,
       };
     } catch (error) {
       return { status: 'unreachable', reason: error.message };
@@ -1579,7 +1616,7 @@ class CombinedStatusLine {
   // `.health/supervisor-heartbeat.json` dependency. combined-status-line
   // is now display-only.
 
-  async buildCombinedStatus(constraint, semantic, knowledge, liveLogTarget, redirectStatus, globalHealth, healthVerifier, ukbStatus) {
+  async buildCombinedStatus(constraint, semantic, knowledge, proxy, liveLogTarget, redirectStatus, globalHealth, healthVerifier, ukbStatus) {
     const parts = [];
     let overallColor = 'green';
 
@@ -1729,6 +1766,40 @@ class CombinedStatusLine {
       case 'unreachable':
       default:
         parts.push('[📚❌]');
+        if (overallColor === 'green') overallColor = 'yellow';
+        break;
+    }
+
+    // Phase 34 (D-12): proxy semantic readiness drives [🧠] badge.
+    // Source: state.proxy at /health/state (set by pollProxySemantic +
+    // evaluateAutoHealFSM in health-coordinator.js).
+    //
+    // COLLISION NOTE (PATTERNS.md anomaly #1): the UKB workflow indicator
+    // below ALSO opens with `[🧠`. We coexist by suffix shape — proxy
+    // emits a single status emoji ([🧠✅] / [🧠⚠️] / [🧠🚫] / [🧠🔇] /
+    // [🧠❓] / [🧠❌]); UKB emits an N+icon counter form ([🧠1⏳2⚠️]).
+    // Visually distinguishable.
+    switch (proxy?.status) {
+      case 'healthy':
+        parts.push('[🧠✅]');
+        break;
+      case 'degraded':
+        parts.push('[🧠⚠️]');
+        if (overallColor === 'green') overallColor = 'yellow';
+        break;
+      case 'cooling':
+        parts.push('[🧠🚫]');
+        overallColor = 'red';
+        break;
+      case 'disabled':
+        parts.push('[🧠🔇]');
+        break;
+      case 'unknown':
+        parts.push('[🧠❓]');
+        break;
+      case 'unreachable':
+      default:
+        parts.push('[🧠❌]');
         if (overallColor === 'green') overallColor = 'yellow';
         break;
     }

@@ -11,7 +11,10 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { StreamingKnowledgeExtractor } from '../../src/knowledge-management/StreamingKnowledgeExtractor.js';
+// Phase 34 (D-08 Plan B): the streaming-extractor module was deleted
+// by Plan 34-05. The describe blocks below only exercise ontology
+// components and never instantiated that extractor, so the dangling
+// import line was the only thing to remove here.
 import { GraphDatabaseService } from '../../src/knowledge-management/GraphDatabaseService.js';
 import { KnowledgeRetriever } from '../../src/knowledge-management/KnowledgeRetriever.js';
 import { OntologyManager } from '../../src/ontology/OntologyManager.js';
@@ -75,7 +78,7 @@ describe('Ontology Integration Tests', () => {
 
   describe('Full Knowledge Extraction with Ontology', () => {
     test('should classify, validate, and store knowledge with ontology metadata', async () => {
-      // Test ontology components working together without full StreamingKnowledgeExtractor
+      // Test ontology components working together without the deleted streaming extractor
       const config = {
         upperOntologyPath: path.join(fixturesPath, 'test-upper.json'),
         lowerOntologyPath: path.join(fixturesPath, 'test-lower.json'),
