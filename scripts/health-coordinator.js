@@ -467,6 +467,107 @@ async function pollKnowledgePipeline() {
   };
 }
 
+/**
+ * Phase 34 R1 (D-01, D-02): tier-pinned semantic-work probe.
+ * POSTs a single-token-elicit prompt every 60s; classifies the response per D-02:
+ *   - HTTP 4xx/5xx                         -> reason='http_<code>',     semantic_ok=false
+ *   - Network timeout (>10s)               -> reason='timeout',         semantic_ok=false
+ *   - HTTP 200 missing/empty content       -> reason='empty_content',   semantic_ok=false
+ *   - HTTP 200 content lacks 'OK' substring -> reason='oksub_missing',  semantic_ok=false
+ *   - HTTP 200 + content contains 'OK'     -> reason=null,              semantic_ok=true
+ * NEVER silently 'healthy' on error (Pattern A); always sets last_probe_end.
+ */
+async function pollProxySemantic() {
+  const probeEndedAt = () => new Date().toISOString();
+  const start = Date.now();
+  const probeBody = {
+    messages: [{ role: 'user', content: 'reply with the single token: OK' }],
+    provider: 'copilot',
+    tier: 'haiku',
+    maxTokens: 5
+  };
+  const prevSemantic = currentState.proxy.semantic_ok;
+  let r;
+  try {
+    r = await fetch(`${PROXY_URL}/api/complete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(probeBody),
+      signal: AbortSignal.timeout(PROXY_PROBE_TIMEOUT_MS)
+    });
+  } catch (err) {
+    const elapsed = Date.now() - start;
+    const reason = (err && (err.name === 'TimeoutError' || /aborted|timeout/i.test(err.message)))
+      ? 'timeout' : `network_${err.message || 'error'}`;
+    currentState.proxy.semantic_ok = false;
+    currentState.proxy.last_round_trip_ms = elapsed;
+    currentState.proxy.reason = reason;
+    currentState.proxy.last_probe_end = probeEndedAt();
+    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (${reason})`, 'INFO');
+    return;
+  }
+  const elapsed = Date.now() - start;
+  currentState.proxy.last_round_trip_ms = elapsed;
+  currentState.proxy.last_probe_end = probeEndedAt();
+  if (!r.ok) {
+    currentState.proxy.semantic_ok = false;
+    currentState.proxy.reason = `http_${r.status}`;
+    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (http_${r.status})`, 'INFO');
+    return;
+  }
+  let body;
+  try { body = await r.json(); }
+  catch (err) {
+    currentState.proxy.semantic_ok = false;
+    currentState.proxy.reason = 'empty_content';
+    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (empty_content/json-parse: ${err.message})`, 'INFO');
+    return;
+  }
+  // D-02: extract content. Shape per copilot proxy: { choices: [ { message: { content: '...' } } ] } OR { content: '...' } OR { text: '...' }
+  const content = (body?.choices?.[0]?.message?.content)
+    ?? body?.content ?? body?.text ?? '';
+  if (!content || typeof content !== 'string') {
+    currentState.proxy.semantic_ok = false;
+    currentState.proxy.reason = 'empty_content';
+    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (empty_content)`, 'INFO');
+    return;
+  }
+  if (!content.includes('OK')) {
+    currentState.proxy.semantic_ok = false;
+    currentState.proxy.reason = 'oksub_missing';
+    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (oksub_missing — got: ${String(content).slice(0, 80)})`, 'INFO');
+    return;
+  }
+  // Success.
+  currentState.proxy.semantic_ok = true;
+  currentState.proxy.reason = null;
+  if (prevSemantic !== true) log(`proxy semantic_ok flip -> true (${elapsed}ms)`, 'INFO');
+  log(`proxy semantic probe ok (${elapsed}ms)`, 'DEBUG');
+}
+
+/**
+ * Phase 34 R2: poll the proxy's networkMode every tick (~5s) and surface as
+ * state.proxy.networkMode. Pattern A: any error -> 'unknown' (never silently
+ * a real value). Plan 34-03 will add VPN/CN flap kickstart on transition;
+ * THIS PLAN ONLY OBSERVES.
+ */
+async function pollProxyMode() {
+  try {
+    const r = await fetch(`${PROXY_URL}/health`, {
+      signal: AbortSignal.timeout(PROXY_MODE_POLL_TIMEOUT_MS)
+    });
+    if (!r.ok) {
+      currentState.proxy.networkMode = 'unknown';
+      return;
+    }
+    const body = await r.json();
+    const mode = body?.networkMode;
+    currentState.proxy.networkMode = (mode === 'vpn' || mode === 'public') ? mode : 'unknown';
+  } catch (err) {
+    currentState.proxy.networkMode = 'unknown';
+  }
+}
+
 // ETM spawn safety net (Phase 33 fills the gap left by removing the legacy
 // per-project LSL coordinator). Discovers projects with an actively-written
 // Claude transcript and ensures an enhanced-transcript-monitor process is
