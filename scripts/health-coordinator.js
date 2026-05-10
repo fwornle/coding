@@ -170,6 +170,22 @@ const currentState = {
     totals: null,
     last_probe_end: null
   },
+  // Proxy semantic-readiness — drives the [🧠] statusline badge (Plan 34-05)
+  // and the dashboard proxy-health card (Plan 34-05). semantic_ok=true only
+  // after a successful POST /api/complete round-trip with content containing
+  // "OK". networkMode mirrors the proxy's published value (vpn|public|unknown).
+  // auto_heal_status follows D-06 cooldown FSM (wired in Plan 34-03).
+  proxy: {
+    semantic_ok: null,                   // null until first probe; true|false after
+    last_round_trip_ms: null,            // int, last completion latency
+    networkMode: 'unknown',              // 'vpn' | 'public' | 'unknown'
+    auto_heal_status: 'healthy',         // 'healthy'|'kickstart_pending'|'cooldown'|'disabled' (Plan 34-03 transitions)
+    kickstart_count: 0,                  // running counter since coordinator boot (D-14 soak gate)
+    kickstart_timestamps: [],            // sliding window for D-06 cooldown FSM
+    consecutive_failures: 0,             // resets on success
+    last_probe_end: null,                // ISO timestamp of last semantic probe completion
+    reason: null                         // last failure classification: 'http_<code>'|'timeout'|'empty_content'|'oksub_missing'|null
+  },
   generated_at: new Date(STARTED_AT).toISOString(),
   coordinator_uptime_s: 0
 };
@@ -368,6 +384,14 @@ function ingestSignal(signal) {
 const OBS_API_URL = process.env.OBS_API_URL || 'http://localhost:12436';
 const OBS_FRESH_MS = 15 * 60 * 1000;     // 15 min — counts as fresh
 const OBS_STALL_MS = 6 * 60 * 60 * 1000; // 6 h — considered stalled
+
+// ----- Proxy supervision constants (Phase 34 D-01 / D-02 / D-06) -----
+const PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:12435';
+const PROXY_PROBE_INTERVAL_MS = 60_000;          // D-01: every 60s
+const PROXY_PROBE_TIMEOUT_MS = 10_000;            // D-02: 10s round-trip threshold
+const PROXY_MODE_POLL_TIMEOUT_MS = 2_000;         // GET /health is fast; 2s budget
+const PROXY_KICKSTART_WINDOW_MS = 5 * 60_000;     // D-06: 5 min sliding window
+const PROXY_KICKSTART_MAX = 3;                    // D-06: 3 kickstarts then cooldown
 
 async function pollKnowledgePipeline() {
   const probeEndedAt = () => new Date().toISOString();
