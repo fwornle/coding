@@ -37,6 +37,15 @@ claude-code-mcp-docker.json
 *.local
 .claude/settings.local.json
 
+# Claude Code Agent-tool isolation worktrees (transient — created per-agent,
+# deleted automatically when the agent makes no changes; only the path/branch
+# is reported on completion).
+.claude/worktrees/
+
+# Runtime heartbeat written by the consolidator while it's processing — pid +
+# timestamps + last error message. Refreshed every few seconds; not source.
+.observations/consolidation-heartbeat.json
+
 # Cache directories
 .cache/
 __pycache__/
