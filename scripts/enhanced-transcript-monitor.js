@@ -63,26 +63,6 @@ import { DatabaseManager } from '../src/databases/DatabaseManager.js';
 import { UnifiedInferenceEngine } from '../src/inference/UnifiedInferenceEngine.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
-// Trajectory analyzer integration (optional - requires @anthropic-ai/sdk)
-let RealTimeTrajectoryAnalyzer = null;
-try {
-  const module = await import('../src/live-logging/RealTimeTrajectoryAnalyzer.js');
-  RealTimeTrajectoryAnalyzer = module.default || module.RealTimeTrajectoryAnalyzer;
-} catch (err) {
-  // Trajectory analyzer not available (missing dependencies) - continue without it
-  console.log('Trajectory analyzer not available:', err.message);
-}
-
-// Knowledge extraction integration (optional)
-let StreamingKnowledgeExtractor = null;
-try {
-  const module = await import('../src/knowledge-management/StreamingKnowledgeExtractor.js');
-  StreamingKnowledgeExtractor = module.default;
-} catch (err) {
-  // Knowledge extraction not available - continue without it
-  console.log('Knowledge extraction not available:', err.message);
-}
-
 // ConfigurableRedactor instance for consistent redaction
 let redactor = null;
 
@@ -184,38 +164,9 @@ class EnhancedTranscriptMonitor {
       console.error('Reliable coding classifier initialization failed:', err.message);
     });
 
-    // Initialize knowledge extraction (optional, non-blocking)
-    this.knowledgeExtractor = null;
-    this.knowledgeExtractionEnabled = config.enableKnowledgeExtraction !== false && StreamingKnowledgeExtractor !== null;
-    this.knowledgeExtractionStatus = { state: 'idle', lastExtraction: null, errorCount: 0 };
-    if (this.knowledgeExtractionEnabled) {
-      this.initializeKnowledgeExtractor().catch(err => {
-        this.debug(`Knowledge extractor initialization failed (non-critical): ${err.message}`);
-        this.knowledgeExtractionStatus.state = 'disabled';
-      });
-    }
-    
     // Semantic analyzer removed — all LLM calls route through the LLM proxy (port 12435)
     // SemanticAnalyzer called APIs directly (no proxy support), hanging on VPN
     this.semanticAnalyzer = null;
-    
-    // Initialize real-time trajectory analyzer (if available)
-    this.trajectoryAnalyzer = null;
-    if (RealTimeTrajectoryAnalyzer) {
-      try {
-        this.trajectoryAnalyzer = new RealTimeTrajectoryAnalyzer({
-          projectPath: this.config.projectPath,
-          codingToolsPath: process.env.CODING_TOOLS_PATH || process.env.CODING_REPO,
-          debug: this.debug_enabled
-        });
-        this.debug('Real-time trajectory analyzer initialized');
-      } catch (error) {
-        console.error('Failed to initialize trajectory analyzer:', error.message);
-        this.trajectoryAnalyzer = null;
-      }
-    } else {
-      this.debug('Trajectory analyzer not available (missing dependencies)');
-    }
 
     // Observation tap - fire-and-forget per D-04 (Phase 23)
     this.observationWriter = null;
@@ -730,120 +681,6 @@ class EnhancedTranscriptMonitor {
     } catch (error) {
       return 3600000; // Default: 1 hour
     }
-  }
-
-  /**
-   * Initialize reliable coding classifier
-   */
-  /**
-   * Initialize knowledge extraction system (optional, non-blocking)
-   */
-  async initializeKnowledgeExtractor() {
-    if (!StreamingKnowledgeExtractor) {
-      this.debug('Knowledge extraction not available');
-      return;
-    }
-
-    try {
-      // Initialize database manager (without GraphDB to avoid lock conflicts with VKB)
-      const databaseManager = new DatabaseManager({
-        projectPath: this.config.projectPath,
-        debug: this.debug_enabled,
-        graphDb: { enabled: false }  // Disable GraphDB - VKB server owns the GraphDB lock
-      });
-      await databaseManager.initialize();
-
-      // NOTE: EmbeddingGenerator removed - embedding generation now handled by MCP semantic analysis
-      // Initialize embedding generator
-      // const embeddingGenerator = new EmbeddingGenerator({
-      //   projectPath: this.config.projectPath,
-      //   databaseManager: databaseManager,
-      //   debug: this.debug_enabled
-      // });
-
-      // Initialize inference engine — route all models through copilot on VPN
-      // Direct API providers (groq, openai, anthropic) hang on corporate VPN
-      const vpnSafeRouting = {
-        'trajectory-intent': 'copilot/claude-sonnet-4.6',
-        'trajectory-goal': 'copilot/claude-sonnet-4.6',
-        'knowledge-pattern': 'copilot/claude-sonnet-4.6',
-        'knowledge-concept': 'copilot/claude-sonnet-4.6',
-        'concept-abstraction': 'copilot/claude-sonnet-4.6',
-        'sensitive-analysis': 'copilot/claude-sonnet-4.6',
-        'default': 'copilot/claude-sonnet-4.6'
-      };
-      const inferenceEngine = new UnifiedInferenceEngine({
-        projectPath: this.config.projectPath,
-        modelRouting: vpnSafeRouting,
-        debug: this.debug_enabled
-      });
-
-      // Create knowledge extractor with all dependencies
-      this.knowledgeExtractor = new StreamingKnowledgeExtractor({
-        projectPath: this.config.projectPath,
-        databaseManager: databaseManager,
-        embeddingGenerator: null, // Embedding generation now handled by MCP semantic analysis
-        inferenceEngine: inferenceEngine,
-        trajectoryAnalyzer: this.trajectoryAnalyzer, // Pass existing trajectory analyzer if available
-        enableBudgetTracking: true,
-        enableSensitivityDetection: true,
-        debug: this.debug_enabled
-      });
-
-      await this.knowledgeExtractor.initialize();
-      this.knowledgeExtractionStatus.state = 'ready';
-      this.debug('✅ Knowledge extraction initialized');
-    } catch (error) {
-      this.debug(`❌ Failed to initialize knowledge extractor: ${error.message}`);
-      this.knowledgeExtractionStatus.state = 'error';
-      throw error;
-    }
-  }
-
-  /**
-   * Extract knowledge from exchanges asynchronously (non-blocking)
-   * This runs in the background and doesn't block LSL processing
-   */
-  async extractKnowledgeAsync(exchanges) {
-    if (!this.knowledgeExtractor || this.knowledgeExtractionStatus.state !== 'ready') {
-      return;
-    }
-
-    try {
-      this.knowledgeExtractionStatus.state = 'processing';
-      const startTime = Date.now();
-
-      // Convert exchanges to format expected by knowledge extractor
-      const transcript = exchanges.map(ex => ({
-        role: ex.isUserPrompt ? 'user' : 'assistant',
-        content: ex.isUserPrompt ? ex.userMessage : ex.assistantMessage,
-        timestamp: ex.timestamp
-      }));
-
-      // Extract knowledge (async, non-blocking)
-      const extractedKnowledge = await this.knowledgeExtractor.extractFromTranscript(transcript);
-
-      const duration = Date.now() - startTime;
-      this.knowledgeExtractionStatus.state = 'ready';
-      this.knowledgeExtractionStatus.lastExtraction = new Date().toISOString();
-
-      this.debug(`📚 Knowledge extracted: ${extractedKnowledge.length} items in ${duration}ms`);
-    } catch (error) {
-      this.knowledgeExtractionStatus.state = 'error';
-      throw error;
-    }
-  }
-
-  /**
-   * Get current knowledge extraction status (for status line)
-   */
-  getKnowledgeExtractionStatus() {
-    return {
-      enabled: this.knowledgeExtractionEnabled,
-      state: this.knowledgeExtractionStatus.state,
-      lastExtraction: this.knowledgeExtractionStatus.lastExtraction,
-      errorCount: this.knowledgeExtractionStatus.errorCount
-    };
   }
 
   /**
@@ -3831,26 +3668,6 @@ ORDER BY m.time_created ASC;`;
       const currentTranche = this.getCurrentTimetranche(exchange.timestamp); // Use exchange timestamp
       this.debug(`Tranche: ${currentTranche.timeString} for exchange at ${new Date(exchange.timestamp).toISOString()}`);
       
-      // Real-time trajectory analysis for each exchange
-      if (this.trajectoryAnalyzer) {
-        try {
-          const trajectoryAnalysis = await this.trajectoryAnalyzer.analyzeTrajectoryState(exchange);
-          
-          // Check if intervention is needed
-          if (this.trajectoryAnalyzer.shouldIntervene(trajectoryAnalysis)) {
-            const guidance = this.trajectoryAnalyzer.generateInterventionGuidance(trajectoryAnalysis, exchange);
-            this.debug(`🎯 Trajectory intervention: ${guidance.message}`);
-            
-            // Log intervention to health file for monitoring
-            this.logHealthError(`Trajectory intervention: ${guidance.message}`);
-          }
-          
-          this.debug(`📊 Trajectory state: ${trajectoryAnalysis.state} (confidence: ${trajectoryAnalysis.confidence})`);
-        } catch (error) {
-          this.debug(`Failed to analyze trajectory: ${error.message}`);
-        }
-      }
-
       // Observations now fire at prompt-set level in processUserPromptSetCompletion,
       // not per-exchange. This ensures the LLM sees ALL tool calls, edits, and outcomes
       // before generating the summary — not just the first exchange.
@@ -3956,14 +3773,6 @@ ORDER BY m.time_created ASC;`;
     // this.saveLastProcessedUuid();  // DISABLED
 
     console.log(`📊 EXCHANGE SUMMARY: ${userPromptCount} user prompts, ${nonUserPromptCount} non-user prompts (total: ${exchanges.length})`);
-
-    // Trigger knowledge extraction asynchronously (non-blocking)
-    if (this.knowledgeExtractionEnabled && this.knowledgeExtractor && exchanges.length > 0) {
-      this.extractKnowledgeAsync(exchanges).catch(err => {
-        this.debug(`Knowledge extraction failed (non-critical): ${err.message}`);
-        this.knowledgeExtractionStatus.errorCount++;
-      });
-    }
 
     // Time-based flush: if the prompt set has been accumulating for too long without
     // a user prompt (e.g., OpenCode stops persisting user messages after session grows),
@@ -4407,12 +4216,6 @@ ORDER BY m.time_created ASC;`;
       this.healthIntervalId = null;
     }
 
-    // Stop trajectory analyzer heartbeat
-    if (this.trajectoryAnalyzer) {
-      this.trajectoryAnalyzer.stopHeartbeat();
-      this.debug('🎯 Trajectory analyzer heartbeat stopped');
-    }
-
     // Shutdown file manager gracefully
     if (this.fileManager) {
       await this.fileManager.shutdown();
@@ -4522,9 +4325,7 @@ ORDER BY m.time_created ASC;`;
           suspicionReason: isSuspiciousActivity ? `No exchanges processed in ${uptimeHours.toFixed(1)} hours` : null
         },
         streamingActive: this.streamingReader !== null,
-        errors: this.healthErrors || [],
-        trajectory: this.trajectoryAnalyzer ? this.trajectoryAnalyzer.getCurrentTrajectoryState() : null,
-        knowledgeExtraction: this.getKnowledgeExtractionStatus()
+        errors: this.healthErrors || []
       };
 
       // Add warning if suspicious activity detected
