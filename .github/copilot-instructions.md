@@ -71,10 +71,19 @@ cd integrations/<submodule> && npm run build
 cd $CODING_REPO/docker && docker-compose build coding-services && docker-compose up -d coding-services
 ```
 
-**Dashboard UI** (`integrations/system-health-dashboard/`): Bind-mounted, no Docker rebuild needed:
+**Dashboard** (`integrations/system-health-dashboard/`): Bind-mounted into `coding-services` (`docker-compose.yml:96-102` covers `dist/`, `server.js`, `static-server.js`), so **no `docker-compose build` is needed** — but Docker Desktop's VirtioFS caches bind-mounted files and does NOT pick up host edits live. After editing, you MUST do one of:
+
 ```bash
+# Frontend (UI bundle) only — rebuild dist/, then restart the frontend service:
 cd $CODING_REPO/integrations/system-health-dashboard && npm run build
+docker exec coding-services supervisorctl restart web-services:health-dashboard-frontend
+
+# Backend (server.js / static-server.js) — restart the whole container to invalidate the FUSE cache;
+# `supervisorctl restart web-services:health-dashboard` alone re-reads the STALE cached file:
+cd $CODING_REPO/docker && docker-compose restart coding-services
 ```
+
+Symptom of the stale-cache bug: the dashboard backend exits with `SyntaxError: Invalid or unexpected token` mid-line, because Docker serves a truncated snapshot of the file. Verify with `docker exec coding-services wc -lc /coding/integrations/system-health-dashboard/server.js` vs the host — sizes must match.
 
 **Config files** (`integrations/mcp-server-semantic-analysis/config/`): Bind-mounted read-only, no rebuild needed.
 
