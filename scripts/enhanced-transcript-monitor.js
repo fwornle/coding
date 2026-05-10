@@ -3227,23 +3227,23 @@ ORDER BY m.time_created ASC;`;
       const dir = path.dirname(baseFile);
       if (!fs.existsSync(dir)) return;
 
-      const currentProjectName = path.basename(this.config.projectPath);
-      const resolvedTarget = path.resolve(targetProject);
-      const resolvedProject = path.resolve(this.config.projectPath);
-      const isRedirected = resolvedTarget !== resolvedProject;
-      const timestamp = tranche.originalTimestamp ||
-        new Date(`${tranche.date}T${tranche.timeString.split('-')[0].slice(0,2)}:${tranche.timeString.split('-')[0].slice(2)}:00.000Z`).getTime();
-
-      // Build candidate list: base file + part files 1..99
-      const candidates = [baseFile];
-      for (let n = 1; n <= 99; n++) {
-        const partFilename = generateLSLFilename(
-          timestamp, currentProjectName, targetProject,
-          isRedirected ? this.config.projectPath : targetProject,
-          { partNumber: n }
-        );
-        candidates.push(path.join(dir, partFilename));
+      // Tranche-agnostic search: ps_id is universally unique (millisecond
+      // timestamp). If a block with this ps_id exists in ANY file in the
+      // day's directory, it's a duplicate and must be removed regardless of
+      // which tranche the file represents. This handles the case where
+      // different flush paths derive different tranches for the same set
+      // (some use first-exchange tranche, others use last-exchange tranche).
+      const baseName = path.basename(baseFile);
+      const datePrefix = baseName.slice(0, 10); // "YYYY-MM-DD"
+      let dirEntries;
+      try {
+        dirEntries = fs.readdirSync(dir);
+      } catch {
+        return;
       }
+      const candidates = dirEntries
+        .filter(name => name.startsWith(datePrefix) && name.endsWith('.md'))
+        .map(name => path.join(dir, name));
 
       const anchor = `<a name="${promptSetId}"></a>`;
       const nextAnchorPattern = '<a name="ps_';
@@ -3251,11 +3251,14 @@ ORDER BY m.time_created ASC;`;
       for (const file of candidates) {
         if (!fs.existsSync(file)) continue;
         let content = fs.readFileSync(file, 'utf8');
+        // Quick existence check before doing any string manipulation
+        if (content.indexOf(anchor) < 0) continue;
+
         let totalRemoved = 0;
         let occurrences = 0;
 
-        // Loop in case the file has accumulated multiple duplicate blocks
-        // from a prior buggy run — strip them ALL on first encounter.
+        // Loop to remove ALL duplicates of this ps_id (defense against
+        // pre-existing duplicates left by an earlier buggy run).
         while (true) {
           const start = content.indexOf(anchor);
           if (start < 0) break;
