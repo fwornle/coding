@@ -3363,7 +3363,7 @@ ORDER BY m.time_created ASC;`;
     }
 
     let _release;
-    let sessionFile;
+    const writtenFiles = []; // basenames of all tranche files written, for stderr/git-track
     try {
       try {
         _release = await lockfile.lock(_lockTarget, {
@@ -3377,60 +3377,97 @@ ORDER BY m.time_created ASC;`;
         this.debug(`flush lock acquire failed (proceeding without lock): ${lockErr.message}`);
       }
 
-      await this._removeExistingPromptSetBlock(targetProject, tranche, promptSetId);
-
-      // Use split-aware file path: automatically creates numbered parts when files exceed max size
-      // (recompute AFTER the block removal so size-based part selection sees the corrected file)
-      sessionFile = this.getActiveSessionFilePath(targetProject, tranche);
-
-      // Create session file with the actual content (no empty files)
-      // Add prompt set anchor and header for classification log links
-      let sessionContent = '';
-
-      // Add prompt set anchor for linking from classification logs
-      sessionContent += `<a name="${promptSetId}"></a>\n`;
-      sessionContent += `## Prompt Set (${promptSetId})\n\n`;
-
-      // Calculate prompt set metadata
-      const firstExchange = meaningfulExchanges[0];
-      const lastExchange = meaningfulExchanges[meaningfulExchanges.length - 1];
-      const startTime = new Date(firstExchange.timestamp || Date.now());
-      const endTime = new Date(lastExchange.timestamp || Date.now());
-      const duration = endTime.getTime() - startTime.getTime();
-      const toolCallCount = meaningfulExchanges.reduce((sum, ex) => sum + (ex.toolCalls?.length || 0), 0);
-
-      sessionContent += `**Time:** ${startTime.toISOString()}\n`;
-      sessionContent += `**Duration:** ${duration}ms\n`;
-      sessionContent += `**Tool Calls:** ${toolCallCount}\n\n`;
-
-      // Add all exchanges in this prompt set
+      // PER-EXCHANGE TRANCHE ROUTING (2026-05-10)
+      // ----------------------------------------
+      // Group exchanges by their OWN timestamp's tranche, not the prompt set's
+      // first-exchange tranche. A long-running session that crosses 08:30 → 11:15
+      // will write 4 slices: into 08-09, 09-10, 10-11, 11-12 files — each carrying
+      // the same ps_id (so `grep -l ps_X *.md | xargs cat` reconstructs the full
+      // set). Time-based browsing ("what was I doing at 10:30?") works naturally
+      // without scanning unrelated tranche files.
+      //
+      // The helper (_removeExistingPromptSetBlock) already searches the day's whole
+      // directory for the ps_id anchor, so it cleans up stale slices in any tranche
+      // before this round writes fresh ones.
+      const exchangesByTranche = new Map();
       for (const exchange of meaningfulExchanges) {
-        sessionContent += await this.formatExchangeForLogging(exchange, targetProject !== this.config.projectPath);
+        const exTranche = this.getCurrentTimetranche(exchange.timestamp);
+        const key = `${exTranche.date}|${exTranche.timeString}`;
+        if (!exchangesByTranche.has(key)) {
+          exchangesByTranche.set(key, { tranche: exTranche, exchanges: [] });
+        }
+        exchangesByTranche.get(key).exchanges.push(exchange);
       }
 
-      sessionContent += `---\n\n`;
+      // Sort tranches chronologically (oldest first)
+      const sortedSlices = [...exchangesByTranche.values()].sort((a, b) => {
+        const ka = `${a.tranche.date}${a.tranche.timeString}`;
+        const kb = `${b.tranche.date}${b.tranche.timeString}`;
+        return ka.localeCompare(kb);
+      });
+      const totalSlices = sortedSlices.length;
+      const setStartTime = new Date(meaningfulExchanges[0].timestamp || Date.now());
+      const setEndTime = new Date(meaningfulExchanges[meaningfulExchanges.length - 1].timestamp || Date.now());
+      const setDuration = setEndTime.getTime() - setStartTime.getTime();
+      const setToolCallCount = meaningfulExchanges.reduce((sum, ex) => sum + (ex.toolCalls?.length || 0), 0);
 
-      if (!fs.existsSync(sessionFile)) {
-        // Create file with content immediately (may be a new split part)
-        await this.createSessionFileWithContent(targetProject, tranche, sessionContent, sessionFile);
-      } else {
-        // Check if file needs rotation before appending (legacy archive rotation at 40MB)
-        const rotationCheck = await this.fileManager.checkFileRotation(sessionFile);
+      // Phase 1: remove any existing ps_id blocks from the day (helper is day-wide)
+      await this._removeExistingPromptSetBlock(targetProject, tranche, promptSetId);
 
-        if (rotationCheck.needsRotation) {
-          this.debug(`File rotated: ${path.basename(sessionFile)} (${this.fileManager.formatBytes(rotationCheck.currentSize)})`);
+      // Phase 2: write one slice per tranche
+      for (let sliceIdx = 0; sliceIdx < totalSlices; sliceIdx++) {
+        const { tranche: sliceTranche, exchanges: sliceExchanges } = sortedSlices[sliceIdx];
+        const sessionFile = this.getActiveSessionFilePath(targetProject, sliceTranche);
 
-          // After rotation, create new session file with current content
-          await this.createSessionFileWithContent(targetProject, tranche, sessionContent);
+        // Build the slice block. Use the SAME ps_id anchor across slices so they're
+        // discoverable as parts of the same prompt set (grep -l).
+        let sessionContent = '';
+        sessionContent += `<a name="${promptSetId}"></a>\n`;
+        if (totalSlices > 1) {
+          sessionContent += `## Prompt Set (${promptSetId}) — slice ${sliceIdx + 1}/${totalSlices}\n\n`;
         } else {
-          // Append to existing file
-          try {
-            fs.appendFileSync(sessionFile, sessionContent);
-            this.debug(`📝 Appended ${meaningfulExchanges.length} exchanges to ${path.basename(sessionFile)}`);
-          } catch (error) {
-            this.logHealthError(`Failed to append to session file: ${error.message}`);
+          sessionContent += `## Prompt Set (${promptSetId})\n\n`;
+        }
+
+        const sliceFirst = sliceExchanges[0];
+        const sliceLast = sliceExchanges[sliceExchanges.length - 1];
+        const sliceStart = new Date(sliceFirst.timestamp || Date.now());
+        const sliceEnd = new Date(sliceLast.timestamp || Date.now());
+        const sliceDuration = sliceEnd.getTime() - sliceStart.getTime();
+        const sliceToolCalls = sliceExchanges.reduce((sum, ex) => sum + (ex.toolCalls?.length || 0), 0);
+
+        sessionContent += `**Time:** ${sliceStart.toISOString()}\n`;
+        sessionContent += `**Duration:** ${sliceDuration}ms\n`;
+        sessionContent += `**Tool Calls:** ${sliceToolCalls}\n`;
+        if (totalSlices > 1) {
+          sessionContent += `**Slice:** ${sliceIdx + 1}/${totalSlices} (window ${sliceTranche.timeString})\n`;
+          sessionContent += `**Set Total:** ${meaningfulExchanges.length} exchanges, ${setToolCallCount} tool calls, ${setDuration}ms over ${totalSlices} window(s) — find all slices via \`grep -l "${promptSetId}" *.md\`\n`;
+        }
+        sessionContent += '\n';
+
+        for (const exchange of sliceExchanges) {
+          sessionContent += await this.formatExchangeForLogging(exchange, targetProject !== this.config.projectPath);
+        }
+
+        sessionContent += `---\n\n`;
+
+        if (!fs.existsSync(sessionFile)) {
+          await this.createSessionFileWithContent(targetProject, sliceTranche, sessionContent, sessionFile);
+        } else {
+          const rotationCheck = await this.fileManager.checkFileRotation(sessionFile);
+          if (rotationCheck.needsRotation) {
+            this.debug(`File rotated: ${path.basename(sessionFile)} (${this.fileManager.formatBytes(rotationCheck.currentSize)})`);
+            await this.createSessionFileWithContent(targetProject, sliceTranche, sessionContent);
+          } else {
+            try {
+              fs.appendFileSync(sessionFile, sessionContent);
+              this.debug(`📝 Appended slice ${sliceIdx + 1}/${totalSlices} (${sliceExchanges.length} exch) to ${path.basename(sessionFile)}`);
+            } catch (error) {
+              this.logHealthError(`Failed to append to session file: ${error.message}`);
+            }
           }
         }
+        writtenFiles.push(sessionFile);
       }
     } finally {
       if (_release) {
@@ -3442,15 +3479,16 @@ ORDER BY m.time_created ASC;`;
     // DISABLED: This was causing constant timestamp-only updates with minimal value
     // await this.updateComprehensiveTrajectory(targetProject);
 
-    process.stderr.write(`[LSL] Completed user prompt set: ${meaningfulExchanges.length}/${completedSet.length} exchanges → ${path.basename(sessionFile)}\n`);
+    const writtenBasenames = writtenFiles.map(f => path.basename(f)).join(', ');
+    process.stderr.write(`[LSL] Completed user prompt set: ${meaningfulExchanges.length}/${completedSet.length} exchanges → ${writtenBasenames}\n`);
 
     // Git auto-track: stage LSL files in the project's own .specstory directory
     // Fire-and-forget: don't block the monitor on git operations
-    if (sessionFile.includes('.specstory/history/') || sessionFile.includes('.specstory/logs/')) {
-      const resolvedTarget = path.resolve(targetProject);
-      const resolvedProject = path.resolve(this.config.projectPath);
-      // Only git-add for the monitor's own project, not cross-project files
-      if (resolvedTarget === resolvedProject) {
+    const resolvedTarget = path.resolve(targetProject);
+    const resolvedProject = path.resolve(this.config.projectPath);
+    if (resolvedTarget === resolvedProject) {
+      for (const sessionFile of writtenFiles) {
+        if (!sessionFile.includes('.specstory/history/') && !sessionFile.includes('.specstory/logs/')) continue;
         try {
           const { exec } = await import('child_process');
           exec(`git add "${sessionFile}"`, { cwd: this.config.projectPath, timeout: 5000 }, (err) => {
