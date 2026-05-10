@@ -40,6 +40,56 @@ function padStatusLine(str) {
   return String(str);
 }
 
+// Rough visible-cell count for a status-line string. Treats tmux style markers
+// (#[fg=...] etc.) as zero-width and ignores zero-width combining characters.
+// Counts every other codepoint as exactly one cell — emoji are intentionally
+// undercounted (they render at 2 cells in most terminals). The undercount is
+// safe because the only consumer below uses this to LEFT-pad to a target cell
+// count; undercounting means we over-pad with leading spaces, and tmux
+// truncates anything past status-right-length from the left edge — so the
+// extra spaces simply get trimmed without affecting visible content.
+function visibleCellWidth(s) {
+  const stripped = String(s).replace(/#\[[^\]]*\]/g, '');
+  let width = 0;
+  for (const ch of stripped) {
+    const cp = ch.codePointAt(0);
+    if (cp == null) continue;
+    if (cp === 0xFE0F) continue;                          // emoji variation selector
+    if (cp >= 0x0300 && cp <= 0x036F) continue;           // combining diacriticals
+    if (cp >= 0x200B && cp <= 0x200D) continue;           // ZWSP / ZWNJ / ZWJ
+    width += 1;
+  }
+  return width;
+}
+
+// Left-pad a status-line payload with regular spaces so tmux always allocates
+// the same number of cells for status-right, regardless of payload length.
+//
+// Why this is needed: tmux does NOT auto-clear cells when status-right content
+// shrinks render-to-render. If a previous render filled N cells and the next
+// render fills N-K cells, the rightmost K cells of the previous render leak
+// through. This is the mechanism behind the "shifted left + leftover
+// characters" bug, observed acutely when a transient SYS:ERR / SYS:TIMEOUT
+// fallback (~10 cells) replaced the normal ~100-130 cell render. tmux's known
+// limitation, not a producer bug; the only way to suppress it without
+// patching tmux is to keep the producer's output cell-count constant.
+//
+// Padding is LEADING because trailing whitespace in tmux #(...) substitutions
+// is stripped (and any non-stripped trailing chars push our content one cell
+// leftward — see padStatusLine commentary above).
+//
+// Target cells: TMUX_PANE_WIDTH if available, else 200 (the
+// status-right-length cap configured by tmux-session-wrapper.sh:49). tmux
+// truncates content longer than status-right-length from the LEFT, so an
+// over-pad never eats into the visible right-anchored content.
+function leftPadToStableCellWidth(text, paneWidth) {
+  const target = parseInt(paneWidth, 10) || 200;
+  if (target <= 0) return text;
+  const cur = visibleCellWidth(text);
+  if (cur >= target) return text;
+  return ' '.repeat(target - cur) + text;
+}
+
 // Load configuration
 let config = {};
 try {
@@ -2044,7 +2094,9 @@ async function main() {
 
     const timeout = setTimeout(() => {
       console.error('⚠️ SYS:TIMEOUT - Status line generation took >8s');
-      process.stdout.write('⚠️ SYS:TIMEOUT\n', () => process.exit(1));
+      // Pad short marker output so it overwrites the previous render's cells.
+      const timeoutText = leftPadToStableCellWidth('⚠️ SYS:TIMEOUT', paneWidth);
+      process.stdout.write(timeoutText + '\n', () => process.exit(1));
     }, 8000);
 
     const statusLine = new CombinedStatusLine();
@@ -2052,20 +2104,30 @@ async function main() {
 
     clearTimeout(timeout);
 
+    // Pad to a stable cell count so tmux repaints the full status-right area
+    // every render — see leftPadToStableCellWidth() commentary at top of file.
+    // Caching the padded form means readers (status-line-fast.cjs,
+    // combined-status-line-wrapper.js) emit padded output too, with no
+    // re-padding logic required on their side.
+    const paddedText = leftPadToStableCellWidth(status.text, paneWidth);
+
     // Write cache for fast-path on subsequent invocations (keyed per-project)
-    try { writeFileSync(cacheFile, status.text, 'utf8'); } catch { /* best effort */ }
+    try { writeFileSync(cacheFile, paddedText, 'utf8'); } catch { /* best effort */ }
 
     // Claude Code status line expects plain text output
     // Rich features like tooltips may need different configuration
     // Use explicit stdout.write with callback to ensure complete flush before exit
-    process.stdout.write(status.text + '\n', () => {
+    process.stdout.write(paddedText + '\n', () => {
       process.exit(0);
     });
   } catch (error) {
     // CRITICAL: Log actual error to stderr so we can debug, not silent failure!
     console.error(`⚠️ FATAL ERROR in status line generation: ${error.message}`);
     console.error(error.stack);
-    process.stdout.write('⚠️ SYS:ERR\n', () => process.exit(1));
+    // Pad the catch-all marker for the same reason as the success path.
+    const errPaneWidth = process.env.TMUX_PANE_WIDTH || '';
+    const errText = leftPadToStableCellWidth('⚠️ SYS:ERR', errPaneWidth);
+    process.stdout.write(errText + '\n', () => process.exit(1));
   }
 }
 

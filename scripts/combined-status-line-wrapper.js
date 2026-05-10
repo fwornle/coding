@@ -40,11 +40,12 @@ try {
     const stat = statSync(cacheFile);
     const ageMs = Date.now() - stat.mtimeMs;
     if (ageMs < 30000) {
-      // CRITICAL: do NOT .trim() here — the producer pads to a fixed visual
-      // cell count so tmux always renders the same width. Trimming the
-      // trailing spaces re-introduces the cell-drift residue that motivated
-      // the padding in the first place ("12:411" leftover chars). Strip the
-      // line terminator only.
+      // CRITICAL: do NOT .trim() here — the producer LEFT-pads with spaces to
+      // a stable cell count so tmux repaints the full status-right area every
+      // render (tmux does not auto-clear cells when content shrinks). Trim
+      // would strip those leading spaces and re-introduce the residue bug
+      // (the "12:411" / "07:407" leftover-digit artifacts and the SYS:ERR-
+      // overlay residue). Strip the line terminator only.
       const cached = readFileSync(cacheFile, 'utf8').replace(/\r?\n$/, '');
       if (cached.trimEnd()) {
         process.stdout.write(cached + '\n');

@@ -65,14 +65,16 @@ function reunderline(text, targetAbbrev) {
 }
 
 // Read project-specific cache.
-// NEVER .trim() — combined-status-line.js right-pads the output to fit tmux's
-// status-right area exactly and ends with a non-ASCII NBSP terminator so
-// tmux's `#(...)` substitution can't strip the trailing pad. .trim() would
-// strip both, leaving the right side under-filled and surfacing previous
-// renders' content as ghost characters ("07:407", "08:14187"). Strip the
-// line terminator only. Same goes for the sibling-borrow + writeback path
-// below: writing trimmed content back to disk poisons the cache for the
-// next reader.
+// NEVER .trim() — combined-status-line.js LEFT-pads the output with spaces to
+// a stable cell count (see leftPadToStableCellWidth there). The leading spaces
+// force tmux to allocate the same status-right cell count on every render,
+// which is the only way to make tmux repaint cells when payload shrinks
+// (without those, a transient short payload like SYS:ERR leaves the previous
+// wider render's trailing cells visible). .trim() would strip those spaces and
+// reintroduce the residue ("07:407" leftover-digit artifacts, SYS:ERR overlay
+// bleed). Strip the line terminator only. Same goes for the sibling-borrow +
+// writeback path below: writing trimmed content back to disk poisons the
+// cache for the next reader.
 let cachedContent = '';
 let cacheAgeMs = Infinity;
 try {
