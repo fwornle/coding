@@ -1,10 +1,12 @@
 # Plan 34-05 SUMMARY — ETM Plan B + [🧠] proxy badge + dashboard surface
 
-**Status:** Tasks 1 + 2 (partial) complete and on main. Task 2(d) dead-reader
-cleanup, Task 3 (dashboard card), W-1 live tmux render, and browser-driven
-dashboard verification are deferred operator gates.
+**Status:** Tasks 1 + 2 (partial) + 3 complete and on main. Task 2(d)
+dead-reader cleanup and W-1 live tmux render remain deferred operator
+gates.
 
-**Commit:** `3351f6e89` — feat(34-05): delete 6 dead modules + add [🧠] proxy badge to statusline (Tasks 1+2 partial)
+**Commits:**
+- `3351f6e89` — feat(34-05): delete 6 dead modules + add [🧠] proxy badge to statusline (Tasks 1+2 partial)
+- `<this commit>` — feat(34-05): add LLM Proxy Health card to dashboard (Task 3)
 
 ## What landed
 
@@ -84,10 +86,60 @@ worktrees`. Verified end-to-end.
 | Offline render emits `[🧠✅]` after `[📚✅]` | PASS (verified: `… [📚✅] [🧠✅] [📋16-17] 16:20`) |
 | Unreachable-coordinator graceful exit | PASS (`HEALTH_COORDINATOR_URL=http://127.0.0.1:1` exits 0) |
 
+## Task 3 — LLM Proxy Health dashboard card (newly added)
+
+`integrations/system-health-dashboard/src/components/system-health-dashboard.tsx`:
+- New `getProxyHealthItems()` builder mirrors `getPortDetailItems`'s
+  pattern. Reads `(healthStatus as any)?.proxy` (pragmatic narrow);
+  returns 3 items — Semantic readiness (RTT in ms), Network mode
+  (vpn/public/unknown), Auto-heal (healthy/cooldown N/3-in-5m/disabled).
+  Falls back to a single "no data" offline item when `proxy` is null.
+- New `<HealthStatusCard title="LLM Proxy Health" icon={<Brain text-purple-500 />} items={getProxyHealthItems()} />`
+  card added as the 5th tile in the existing `lg:grid-cols-5` cluster
+  (after UKB Workflows). `Brain` icon was already imported from
+  `lucide-react`; the purple tint distinguishes it from UKB Workflows
+  which uses the default Brain colour.
+
+`integrations/system-health-dashboard/src/store/slices/healthStatusSlice.ts`:
+- Added `proxy: ProxyHealth | null` to `HealthStatusState`. Loose typing
+  on purpose — the slice's internal shape evolves with the coordinator's
+  pollProxySemantic / FSM and a strict dashboard-side type sync would
+  gate every coordinator schema tweak. Consumers narrow at usage site.
+- `fetchHealthStatusSuccess` now writes `state.proxy = action.payload.proxy ?? null`.
+  Replace, not merge — when coordinator marks the slice null (proxy
+  unreachable), the dashboard card sees null too rather than the last
+  successful read.
+
+`integrations/system-health-dashboard/server.js`:
+- `handleGetHealthStatus` (`/api/health-verifier/status` reverse-proxy
+  to coordinator) now passes `proxy: state.proxy ?? null` through into
+  the data envelope. Without this the coordinator's proxy slice would
+  never reach the dashboard's redux store, and the card would only ever
+  see the "no data" fallback.
+
+Build / restart:
+- `cd integrations/system-health-dashboard && npm run build` — OK,
+  `built in 5.48s`. Two pre-existing unrelated TS errors in
+  `node-details-sidebar.tsx` ignored (Vite emits dist anyway).
+- `docker-compose restart coding-services` — full container restart
+  required because `server.js` was edited (Docker Desktop's VirtioFS
+  caches bind-mounted files and `supervisorctl restart` alone re-reads
+  the STALE cached file per CLAUDE.md FUSE caveat). Live verified:
+  `/api/health-verifier/status` returns `proxy: { semantic_ok: true,
+  networkMode: "public", auto_heal_status: "healthy", … }`.
+
+Browser verification (via headless Playwright + screenshot):
+- `LLM Proxy Health` card renders as the 5th tile.
+- All 3 items visible: `Semantic readiness 817ms RTT (OK)` /
+  `Network mode public (OK)` / `Auto-heal healthy (OK)`.
+- No layout regression — Databases / Services / Processes / UKB
+  Workflows / LLM Proxy Health all aligned in the
+  `lg:grid-cols-5` row.
+
 ## Deferred — operator gate
 
-This plan is `autonomous: false` and three of its acceptance items
-need operator-side validation that this session can't credibly drive:
+This plan is `autonomous: false` and two of its acceptance items
+remain deferred for operator-side validation:
 
 ### 1. Task 2(d) — dead-reader cleanup in `combined-status-line.js`
 
@@ -113,20 +165,7 @@ Recommended follow-up: a small focused commit replacing each
 present at line 1099-1101 of combined-status-line.js). Test by hard-
 restarting both ETMs and watching `state.lsl[<sid>].lastBeat` advance.
 
-### 2. Task 3 — LLM Proxy Health dashboard card
-
-Touches `integrations/system-health-dashboard/src/components/system-health-dashboard.tsx`
-(add `getProxyHealthItems()` builder + `<HealthStatusCard title="LLM Proxy Health" …>`
-render), then:
-- `cd integrations/system-health-dashboard && npm run build`
-- `docker exec coding-services supervisorctl restart web-services:health-dashboard-frontend`
-- Browser visual verify at http://localhost:3032 via `/playwright-cli`
-
-All three operations involve disrupting the live dashboard mid-session;
-Task 3 is also `autonomous: false`. Deferring keeps the user's open
-dashboard tab undisturbed.
-
-### 3. W-1 live tmux render check
+### 2. W-1 live tmux render check
 
 `tmux capture-pane` can't see `status-right`'s `#(…)` substitution
 output — it's rendered by tmux itself, not by the shell inside the
@@ -141,7 +180,7 @@ right side of the bar, confirm the `[🧠]` token appears between
 where the badge should be (a known cell-width artifact), the regex
 that drives left-padding may need adjustment — file as a follow-up.
 
-### 4. R3 / R4 destructive tests for [🧠] state transitions
+### 3. R3 / R4 destructive tests for [🧠] state transitions
 
 The plan calls for exercising `auto_heal_status='cooldown'` to confirm
 the `[🧠🚫]` badge renders + forces overallColor red, and the dashboard
@@ -157,8 +196,9 @@ failure for 5+ min, cycle 3 kickstarts).
 | 34-02 | ✅ on main |
 | 34-03 | ✅ on main (R3/R4 destructive tests deferred) |
 | 34-04 | ✅ on main |
-| **34-05** | **🟡 partial** — Tasks 1 + 2 (badge) done; Task 2(d) dead-reader cleanup + Task 3 dashboard card deferred to operator |
+| **34-05** | **🟢 mostly done** — Tasks 1 + 2 (badge) + 3 (dashboard card) on main; only Task 2(d) dead-reader cleanup + W-1 live tmux render remain |
 | 34-06 | ⏸ paused at Task 1 gate |
 
-When Task 2(d) and Task 3 ship, this SUMMARY's "Status" line graduates to
-"Complete pending live operator validation".
+When Task 2(d) ships and W-1 + R3/R4 cooldown observable tests are
+operator-validated, this SUMMARY's "Status" line graduates to
+"Complete".

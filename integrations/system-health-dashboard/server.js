@@ -396,7 +396,12 @@ class SystemHealthAPIServer {
                     violationCount: violations.length,
                     criticalCount: violations.filter(v => v.severity === 'critical').length,
                     lastUpdate: state && state.generated_at ? state.generated_at : new Date().toISOString(),
-                    autoHealingActive: false  // D-08: narrow heals; not "actively healing"
+                    autoHealingActive: false,  // D-08: narrow heals; not "actively healing"
+                    // Phase 34 (D-11): pass through the coordinator's proxy
+                    // slice so the dashboard's LLM Proxy Health card has data
+                    // to render. Without this the card would only ever see
+                    // the "no data" fallback even when state.proxy is fresh.
+                    proxy: state && state.proxy ? state.proxy : null
                 }
             });
         } catch (err) {

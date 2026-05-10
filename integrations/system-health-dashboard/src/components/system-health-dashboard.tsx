@@ -347,6 +347,45 @@ export default function SystemHealthDashboard() {
     })
   }
 
+  // Phase 34 (D-11): build LLM Proxy Health card items from coordinator's
+  // state.proxy slice (added in Plan 34-02; auto_heal_status driven by the
+  // FSM in Plan 34-03). Reads (healthStatus as any).proxy because the
+  // healthStatus typing has not yet been extended for the new slice —
+  // pragmatic narrowing avoids a type-only follow-up gating this commit.
+  const getProxyHealthItems = () => {
+    const proxy = (healthStatus as any)?.proxy
+    if (!proxy) {
+      return [{ name: 'Proxy semantic', status: 'offline' as const, description: 'No data yet — coordinator unreachable or proxy slice missing' }]
+    }
+    const semanticStatus: 'operational' | 'warning' | 'error' | 'offline' =
+      proxy.semantic_ok === true ? 'operational' :
+      proxy.semantic_ok === false ? 'error' : 'offline'
+    const cooldownDescription = proxy.auto_heal_status === 'cooldown'
+      ? `cooldown — ${(proxy.kickstart_timestamps?.length ?? '?')}/3 kickstarts in last 5 min`
+      : (proxy.auto_heal_status ?? 'unknown')
+    const autoHealStatus: 'operational' | 'warning' | 'offline' =
+      proxy.auto_heal_status === 'cooldown' ? 'warning' :
+      proxy.auto_heal_status === 'disabled' ? 'offline' : 'operational'
+    return [
+      {
+        name: 'Semantic readiness',
+        status: semanticStatus,
+        description: proxy.last_round_trip_ms != null ? `${proxy.last_round_trip_ms}ms RTT` : 'no data',
+        tooltip: proxy.reason ?? 'OK'
+      },
+      {
+        name: 'Network mode',
+        status: (proxy.networkMode === 'unknown' ? 'warning' : 'operational') as 'warning' | 'operational',
+        description: proxy.networkMode ?? 'unknown'
+      },
+      {
+        name: 'Auto-heal',
+        status: autoHealStatus,
+        description: cooldownDescription
+      }
+    ]
+  }
+
   // Build supervisord process items
   const getSupervisordItems = () => {
     const checks = getChecksByCategory('processes')
@@ -505,6 +544,11 @@ export default function SystemHealthDashboard() {
           items={getUKBItems()}
           clickable={true}
           onClick={() => setUkbModalOpen(true)}
+        />
+        <HealthStatusCard
+          title="LLM Proxy Health"
+          icon={<Brain className="h-5 w-5 text-purple-500" />}
+          items={getProxyHealthItems()}
         />
       </div>
 
