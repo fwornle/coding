@@ -50,6 +50,7 @@ import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import LSLFileManager from '../src/live-logging/LSLFileManager.js';
 import ClassificationLogger from './classification-logger.js';
 import ProcessStateManager from './process-state-manager.js';
+import lockfile from 'proper-lockfile';
 import { enableAutoRestart } from './auto-restart-watcher.js';
 import { execSync as _execSync } from 'child_process';
 import { ObservationWriter } from '../src/live-logging/ObservationWriter.js';
@@ -3339,64 +3340,101 @@ ORDER BY m.time_created ASC;`;
       return false;
     }
 
-    // BUG FIX (2026-05-10): Idempotent prompt-set block. Before writing, remove any
-    // existing block with the same ps_id from ALL part files in this tranche. Without
-    // this, repeated flushes of the same in-progress prompt set (time-based, stale,
-    // long-running) appended duplicate blocks that exceeded the 200KB splitter threshold
-    // and created a runaway proliferation of part files (52+ parts in one tranche).
-    await this._removeExistingPromptSetBlock(targetProject, tranche, promptSetId);
-
-    // Use split-aware file path: automatically creates numbered parts when files exceed max size
-    // (recompute AFTER the block removal so size-based part selection sees the corrected file)
-    const sessionFile = this.getActiveSessionFilePath(targetProject, tranche);
-
-    // Create session file with the actual content (no empty files)
-    // Add prompt set anchor and header for classification log links
-    let sessionContent = '';
-
-    // Add prompt set anchor for linking from classification logs
-    sessionContent += `<a name="${promptSetId}"></a>\n`;
-    sessionContent += `## Prompt Set (${promptSetId})\n\n`;
-
-    // Calculate prompt set metadata
-    const firstExchange = meaningfulExchanges[0];
-    const lastExchange = meaningfulExchanges[meaningfulExchanges.length - 1];
-    const startTime = new Date(firstExchange.timestamp || Date.now());
-    const endTime = new Date(lastExchange.timestamp || Date.now());
-    const duration = endTime.getTime() - startTime.getTime();
-    const toolCallCount = meaningfulExchanges.reduce((sum, ex) => sum + (ex.toolCalls?.length || 0), 0);
-
-    sessionContent += `**Time:** ${startTime.toISOString()}\n`;
-    sessionContent += `**Duration:** ${duration}ms\n`;
-    sessionContent += `**Tool Calls:** ${toolCallCount}\n\n`;
-
-    // Add all exchanges in this prompt set
-    for (const exchange of meaningfulExchanges) {
-      sessionContent += await this.formatExchangeForLogging(exchange, targetProject !== this.config.projectPath);
+    // BUG FIX (2026-05-10): Idempotent prompt-set block + cross-process serialization.
+    //
+    // Phase 1 (in-process idempotency): before writing, remove any existing block with
+    // the same ps_id from ALL part files in the day. This handles repeated flushes of
+    // the same in-progress prompt set (time-based, stale, long-running) without
+    // appending duplicate blocks.
+    //
+    // Phase 2 (cross-process serialization): wrap the helper + write in a per-day file
+    // lock so multiple ETMs can never racing each other. The coordinator's
+    // ensureEtmForActiveProjects can spawn a duplicate ETM during the heartbeat
+    // warm-up grace; without this lock, both ETMs' read-modify-write cycles can
+    // interleave and produce duplicate blocks that the in-process helper alone can't
+    // prevent. Lock granularity is per-day-directory because the helper modifies
+    // multiple files in that directory.
+    const _baseFileForLock = this.getSessionFilePath(targetProject, tranche);
+    const _lockDir = path.dirname(_baseFileForLock);
+    try { fs.mkdirSync(_lockDir, { recursive: true }); } catch {}
+    const _lockTarget = path.join(_lockDir, '.flush.lock');
+    if (!fs.existsSync(_lockTarget)) {
+      try { fs.writeFileSync(_lockTarget, ''); } catch {}
     }
 
-    sessionContent += `---\n\n`;
-    
-    if (!fs.existsSync(sessionFile)) {
-      // Create file with content immediately (may be a new split part)
-      await this.createSessionFileWithContent(targetProject, tranche, sessionContent, sessionFile);
-    } else {
-      // Check if file needs rotation before appending (legacy archive rotation at 40MB)
-      const rotationCheck = await this.fileManager.checkFileRotation(sessionFile);
-      
-      if (rotationCheck.needsRotation) {
-        this.debug(`File rotated: ${path.basename(sessionFile)} (${this.fileManager.formatBytes(rotationCheck.currentSize)})`);
-        
-        // After rotation, create new session file with current content
-        await this.createSessionFileWithContent(targetProject, tranche, sessionContent);
+    let _release;
+    let sessionFile;
+    try {
+      try {
+        _release = await lockfile.lock(_lockTarget, {
+          stale: 10_000,
+          retries: { retries: 10, minTimeout: 50, maxTimeout: 500, factor: 1.5 }
+        });
+      } catch (lockErr) {
+        // If we cannot acquire the lock after retries, fall through and write anyway.
+        // The in-process helper still provides best-effort idempotency; the dedupe
+        // maintenance script (scripts/lsl-dedupe.mjs) handles any residual duplicates.
+        this.debug(`flush lock acquire failed (proceeding without lock): ${lockErr.message}`);
+      }
+
+      await this._removeExistingPromptSetBlock(targetProject, tranche, promptSetId);
+
+      // Use split-aware file path: automatically creates numbered parts when files exceed max size
+      // (recompute AFTER the block removal so size-based part selection sees the corrected file)
+      sessionFile = this.getActiveSessionFilePath(targetProject, tranche);
+
+      // Create session file with the actual content (no empty files)
+      // Add prompt set anchor and header for classification log links
+      let sessionContent = '';
+
+      // Add prompt set anchor for linking from classification logs
+      sessionContent += `<a name="${promptSetId}"></a>\n`;
+      sessionContent += `## Prompt Set (${promptSetId})\n\n`;
+
+      // Calculate prompt set metadata
+      const firstExchange = meaningfulExchanges[0];
+      const lastExchange = meaningfulExchanges[meaningfulExchanges.length - 1];
+      const startTime = new Date(firstExchange.timestamp || Date.now());
+      const endTime = new Date(lastExchange.timestamp || Date.now());
+      const duration = endTime.getTime() - startTime.getTime();
+      const toolCallCount = meaningfulExchanges.reduce((sum, ex) => sum + (ex.toolCalls?.length || 0), 0);
+
+      sessionContent += `**Time:** ${startTime.toISOString()}\n`;
+      sessionContent += `**Duration:** ${duration}ms\n`;
+      sessionContent += `**Tool Calls:** ${toolCallCount}\n\n`;
+
+      // Add all exchanges in this prompt set
+      for (const exchange of meaningfulExchanges) {
+        sessionContent += await this.formatExchangeForLogging(exchange, targetProject !== this.config.projectPath);
+      }
+
+      sessionContent += `---\n\n`;
+
+      if (!fs.existsSync(sessionFile)) {
+        // Create file with content immediately (may be a new split part)
+        await this.createSessionFileWithContent(targetProject, tranche, sessionContent, sessionFile);
       } else {
-        // Append to existing file
-        try {
-          fs.appendFileSync(sessionFile, sessionContent);
-          this.debug(`📝 Appended ${meaningfulExchanges.length} exchanges to ${path.basename(sessionFile)}`);
-        } catch (error) {
-          this.logHealthError(`Failed to append to session file: ${error.message}`);
+        // Check if file needs rotation before appending (legacy archive rotation at 40MB)
+        const rotationCheck = await this.fileManager.checkFileRotation(sessionFile);
+
+        if (rotationCheck.needsRotation) {
+          this.debug(`File rotated: ${path.basename(sessionFile)} (${this.fileManager.formatBytes(rotationCheck.currentSize)})`);
+
+          // After rotation, create new session file with current content
+          await this.createSessionFileWithContent(targetProject, tranche, sessionContent);
+        } else {
+          // Append to existing file
+          try {
+            fs.appendFileSync(sessionFile, sessionContent);
+            this.debug(`📝 Appended ${meaningfulExchanges.length} exchanges to ${path.basename(sessionFile)}`);
+          } catch (error) {
+            this.logHealthError(`Failed to append to session file: ${error.message}`);
+          }
         }
+      }
+    } finally {
+      if (_release) {
+        try { await _release(); } catch (e) { this.debug(`flush lock release failed: ${e.message}`); }
       }
     }
 
