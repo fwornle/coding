@@ -1281,6 +1281,27 @@ export class ObservationConsolidator {
     // Apply confidence decay to existing insights
     this._decayConfidence();
 
+    // Self-heal any source='online' entities in the KG that lack an
+    // incoming has_insight edge. Possible causes (all observed):
+    //   - Entity was created before the linking code shipped (relation
+    //     creation was added in 23282ee17a; pre-existing online entities
+    //     never got linked).
+    //   - The PUT-then-POST sequence in _pushInsightAsKgEntity raced or
+    //     the relation POST silently failed (network blip, anchor not
+    //     yet visible to a fresh server).
+    //   - A separate path (e.g. dedup-kg-entities.js) updated the entity
+    //     without re-running the relation creation step.
+    // Running the sweep here makes the link self-healing without
+    // requiring a manual maintenance script per incident.
+    try {
+      const relinked = await this._relinkOrphanOnlineInsights();
+      if (relinked > 0) {
+        process.stderr.write(`[Consolidator] Relinked ${relinked} orphan online insight(s)\n`);
+      }
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Orphan relink sweep failed: ${err.message}\n`);
+    }
+
     // Export all tiers to git-tracked JSON after consolidation
     if (this._exporter) {
       try { this._exporter.exportAll(); } catch (err) {
@@ -1289,6 +1310,64 @@ export class ObservationConsolidator {
     }
 
     return { ...digestResult, ...insightResult };
+  }
+
+  /**
+   * Find every source='online' entity in the KG that has no incoming
+   * has_insight edge, resolve its project anchor, and POST the missing
+   * relation. The relation API is idempotent so re-runs are safe.
+   *
+   * Returns the number of relations actually created.
+   */
+  async _relinkOrphanOnlineInsights() {
+    const vkbUrl = process.env.VKB_API_URL || 'http://localhost:8080';
+
+    // Fetch all online entities and all relations once. Per-team scoping
+    // happens inside the loop via each entity's own `team` field, so we
+    // don't have to enumerate teams upfront.
+    let entitiesRes, relsRes;
+    try {
+      [entitiesRes, relsRes] = await Promise.all([
+        fetch(`${vkbUrl}/api/entities?source=online&limit=10000`),
+        fetch(`${vkbUrl}/api/relations?limit=100000`),
+      ]);
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Relink: VKB unreachable (${err.message})\n`);
+      return 0;
+    }
+    if (!entitiesRes.ok || !relsRes.ok) return 0;
+    const { entities = [] } = await entitiesRes.json();
+    const { relations = [] } = await relsRes.json();
+
+    const linked = new Set();
+    for (const r of relations) {
+      if (r.relation_type === 'has_insight' && r.to_name) linked.add(r.to_name);
+    }
+
+    let created = 0;
+    for (const e of entities) {
+      if (e.source !== 'online') continue;            // System fall-throughs
+      if (linked.has(e.entity_name)) continue;        // already linked
+      const team = e.team;
+      if (!team) continue;
+      const projectName = await this._ensureProjectAnchor(vkbUrl, team);
+      if (!projectName) continue;
+      try {
+        const res = await fetch(`${vkbUrl}/api/relations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: projectName,
+            to: e.entity_name,
+            type: 'has_insight',
+            team,
+            confidence: 1.0,
+          }),
+        });
+        if (res.ok) created++;
+      } catch { /* swallow per-entity errors; sweep is best-effort */ }
+    }
+    return created;
   }
 
   /**

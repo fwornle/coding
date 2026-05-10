@@ -1108,8 +1108,27 @@ export class GraphDatabaseService extends EventEmitter {
       // be retrieved directly (e.g. by Working Memory assembly).
       if (isProject && !(types && types.length > 0 && types.includes('Project'))) return;
 
-      // Apply source filter to regular insight nodes
-      if (source && attributes.source !== source) return;
+      // Apply source filter to regular insight nodes.
+      //
+      // Two writer vocabularies coexist for "auto-learned" entities:
+      //   - 'auto'   — older path: KnowledgeExtractor.js
+      //   - 'online' — current paths: ObservationConsolidator,
+      //                KnowledgeExportService (online-pipeline insights)
+      //
+      // The public API is documented as 'manual' | 'auto' (per
+      // KnowledgeQueryService.queryEntities JSDoc), and the deployed VKB
+      // bundle still maps `dataSource='online'` → `?source=auto`. Without
+      // this normalization, a `source=auto` query rejects every entity
+      // produced by the online pipeline (which writes 'online'), so the
+      // VKB's Online filter renders only the always-visible System node.
+      // Treat 'auto' and 'online' as synonyms in either direction so a
+      // filter for one matches data tagged with the other.
+      if (source) {
+        const isAutoAlias = source === 'auto' || source === 'online';
+        const storedIsAutoAlias = attributes.source === 'auto' || attributes.source === 'online';
+        const matches = isAutoAlias ? storedIsAutoAlias : attributes.source === source;
+        if (!matches) return;
+      }
 
       if (types && types.length > 0 && !types.includes(entityType)) return;
       if (minConfidence > 0 && (attributes.confidence === undefined || attributes.confidence < minConfidence)) return;
