@@ -118,10 +118,14 @@
         "check_type": "http_health",
         "endpoint": "http://localhost:12435/health",
         "timeout_ms": 3000,
-        "description": "LLM CLI Proxy - runs on host as launchd-managed daemon (com.coding.llm-cli-proxy). Coordinator probes via localhost since it also runs on host. Required for observation summarization.",
-        "auto_heal": false,
+        "description": "LLM CLI Proxy - runs on host as launchd-managed daemon (com.coding.llm-cli-proxy). Coordinator probes /health every tick AND issues a tier-pinned semantic probe (POST /api/complete with provider:'copilot', tier:'haiku', single-token 'OK' prompt) every 60s. Required for observation summarization.",
+        "auto_heal": true,
         "auto_heal_action": "restart_llm_cli_proxy",
-        "auto_heal_note": "Proxy runs on host, not in supervisord. Auto-heal disabled \u2014 manual start: cd integrations/llm-cli-proxy && npm start",
+        "auto_heal_note": "Phase 34: coordinator dispatches restart on sustained semantic_ok=false (>=60s) via launchctl kickstart -k gui/$UID/com.coding.llm-cli-proxy. Cooldown 3/5min then alert-only. Kill-switch: set auto_heal=false here + POST http://localhost:3034/health/refresh.",
+        "cooldown": {
+          "max_kickstarts": 3,
+          "window_seconds": 300
+        },
         "expected_status": "required"
       },
       "obs_api": {
