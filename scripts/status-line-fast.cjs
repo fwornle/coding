@@ -81,12 +81,17 @@ try {
   cachedContent = fs.readFileSync(cacheFile, 'utf8').replace(/\r?\n$/, '');
 } catch { /* no cache */ }
 
-// If no project-specific cache, borrow from any sibling cache and re-apply underline
+// If no project-specific cache, borrow from any sibling cache and re-apply underline.
+// Width-filter the candidates: borrowing across pane widths poisons the new key with
+// content sized for a different pane, producing a "shifted left + leftover characters"
+// render until the next background refresh. The width suffix on the cache key only
+// works if the borrow path respects it.
 if (!cachedContent.trimEnd() && projectName) {
   try {
     const logsDir = path.join(codingRepo, '.logs');
+    const widthSuffix = paneWidth ? `-w${paneWidth}.txt` : '.txt';
     const siblings = fs.readdirSync(logsDir)
-      .filter(f => f.startsWith('combined-status-line-cache-') && f.endsWith('.txt'));
+      .filter(f => f.startsWith('combined-status-line-cache-') && f.endsWith(widthSuffix));
     for (const sib of siblings) {
       const sibPath = path.join(logsDir, sib);
       const stat = fs.statSync(sibPath);
@@ -126,10 +131,12 @@ let output = '';
 child.stdout.on('data', (d) => { output += d; });
 child.stderr.on('data', () => {}); // discard stderr
 
-// Safety timeout: if CSL hangs beyond 5s, fall back to stale cache
+// Safety timeout: if CSL truly hangs, kill it. Must exceed CSL's own 8s
+// internal timeout (combined-status-line.js emits "⚠️ SYS:TIMEOUT" at 8s);
+// otherwise we SIGKILL before CSL gets to produce that informative output.
 const fallbackTimer = setTimeout(() => {
   child.kill('SIGKILL');
-}, 5000);
+}, 10000);
 
 child.on('exit', (code) => {
   clearTimeout(fallbackTimer);
@@ -149,6 +156,14 @@ child.on('exit', (code) => {
     bg.unref();
     process.exit(0);
   }
-  // No cache at all — nothing to show
+  // Last resort: if CSL produced *any* output (even with non-zero exit, e.g.
+  // its own "⚠️ SYS:TIMEOUT" marker), surface it instead of letting the
+  // tmux wrapper fall back to "[Status Offline]". A diagnostic marker is
+  // strictly more useful than silence.
+  if (result.trimEnd()) {
+    process.stdout.write(result + '\n');
+    process.exit(0);
+  }
+  // No cache, no output — nothing to show
   process.exit(code || 1);
 });
