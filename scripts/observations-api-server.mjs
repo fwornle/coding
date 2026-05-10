@@ -709,7 +709,11 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 
 async function shutdown(signal) {
-  process.stderr.write(`[obs-api] ${signal} — shutting down\n`);
+  // Include ppid so the next investigator can identify the SIGTERM sender —
+  // this codebase has at least three places that can kill obs_api
+  // (process-state-manager, health-remediation-actions, ETM-driven cleanups)
+  // and the source of any given kill has historically been a guessing game.
+  process.stderr.write(`[obs-api] ${signal} — shutting down (pid=${process.pid}, ppid=${process.ppid})\n`);
   _shuttingDown = true;
   // Wait briefly for in-flight consolidation to drain. Bound the wait so a
   // wedged LLM call can't outlast the supervisor's SIGKILL grace.

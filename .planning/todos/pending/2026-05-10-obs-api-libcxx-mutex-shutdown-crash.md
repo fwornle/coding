@@ -92,8 +92,40 @@ verifiably idempotent.
 Until then, the SIGKILL fallback in `scripts/restart-obs-api.mjs` is the
 operating workaround. Document it there and here so it's not removed.
 
+## Related investigation lead — Qdrant client/server version drift
+
+obs-api startup logs every cycle:
+
+```
+Client version 1.15.1 is incompatible with server version 1.17.0. Major
+versions should match and minor version difference must not exceed 1.
+Set checkCompatibility=false to skip version check.
+```
+
+Functionally benign for normal request paths, but the suspect-2 hypothesis
+above (Rust / native threadpool teardown racing JS exit) gets stronger if
+the client and server are using mismatched ABI-relevant code paths. Worth
+testing whether bumping `@qdrant/js-client-rest` to match the running
+Qdrant server (1.17.x) eliminates the abort.
+
+How to test: pin the client, restart obs-api, send several SIGTERM cycles
+and check whether the libc++abi line still appears. If it does, the
+mismatch is unrelated and the suspect remains fastembed/onnxruntime.
+
 ## Priority
 
 **Low.** Functional impact is bounded (in-flight consolidation drain is
 the only meaningful loss; the LLM call is retryable on the next
 consolidation tick). Cleanup work, not a blocker.
+
+EADDRINUSE-on-respawn (the visible flap symptom in the status line) is
+addressed separately by the `waitForPortBindable` gate added to
+`scripts/start-services-robust.js` — the supervisor now refuses to spawn
+until the port is actually bindable, so the abort no longer wastes a
+maxRetries slot. The mutex crash itself remains, just no longer cascades
+into a visible service flap.
+
+The new `[obs-api] SIGTERM — shutting down (pid=…, ppid=…)` log line in
+`observations-api-server.mjs:712` will identify the SIGTERM sender on the
+next occurrence — was previously a guess between PSM, health-remediation,
+and ETM-driven cleanups.

@@ -21,6 +21,7 @@ import { spawn, exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import http from 'http';
+import net from 'net';
 import {
   startServiceWithRetry,
   createHttpHealthCheck,
@@ -156,6 +157,33 @@ async function killProcessOnPortAndWait(port, options = {}) {
   }
 
   console.log(`[Cleanup] Warning: Port ${port} still in use after ${maxWaitMs}ms timeout`);
+  return false;
+}
+
+/**
+ * Wait until we can actually bind a TCP port, or timeout. Distinct from
+ * isPortListening (which only detects HTTP listeners): when a previous
+ * process has just crashed mid-shutdown, the kernel may still hold the
+ * socket for a short window even though nothing is responding to HTTP
+ * probes. Spawning a fresh listener during that window dies immediately
+ * with EADDRINUSE — burning a maxRetries slot for nothing. Probing the
+ * port with a throwaway createServer().listen() catches that case
+ * cleanly without inferring kernel state from log lines.
+ */
+async function waitForPortBindable(port, options = {}) {
+  const { host = '0.0.0.0', maxWaitMs = 5000, pollIntervalMs = 250 } = options;
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    const ok = await new Promise((resolve) => {
+      const probe = net.createServer();
+      probe.unref();
+      probe.once('error', () => resolve(false));
+      probe.once('listening', () => probe.close(() => resolve(true)));
+      try { probe.listen(port, host); } catch { resolve(false); }
+    });
+    if (ok) return true;
+    await sleep(pollIntervalMs);
+  }
   return false;
 }
 
@@ -859,6 +887,19 @@ const SERVICE_CONFIGS = {
     startFn: async () => {
       if (await isPortListening(PORTS.OBSERVATIONS_API)) {
         return { pid: 'already-running', service: 'observations-api', skipRegistration: true };
+      }
+
+      // The previous obs_api may have just crashed (libc++abi during shutdown
+      // is a known native-binding tear-down failure mode in this codebase).
+      // The crash leaves the listening socket briefly in an unbindable state
+      // even though isPortListening already returns false. Without this wait
+      // the spawn below dies immediately with EADDRINUSE, burning one of the
+      // outer startServiceWithRetry slots for nothing.
+      const bindable = await waitForPortBindable(PORTS.OBSERVATIONS_API, { maxWaitMs: 5000 });
+      if (!bindable) {
+        throw new Error(
+          `Port ${PORTS.OBSERVATIONS_API} not bindable after 5s — likely a recently-crashed previous obs_api still holding the socket. Outer retry will run.`
+        );
       }
 
       const entry = path.join(CODING_DIR, 'scripts/observations-api-server.mjs');
