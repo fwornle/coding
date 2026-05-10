@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: -- Knowledge Context Injection
 status: executing
-stopped_at: Phase 34 wave 2 partial — 34-03 done, 34-04/05 blocked, 34-06 paused
-last_updated: "2026-05-10T14:15:00.000Z"
-last_activity: 2026-05-10 -- Phase 34: 34-03 landed (FSM + flap kickstart + restartLLMCLIProxy rewrite); 34-01 + 34-02 cherry-picked from worktree branches onto main
+stopped_at: Phase 34 — 34-04 cherry-picked, 34-05 unblocked, 34-06 paused
+last_updated: "2026-05-10T14:30:00.000Z"
+last_activity: 2026-05-10 -- Phase 34: 34-04 cherry-picked from worktree (auto-merge clean against this session's ETM lock + tranche routing); 34-05 now unblocked
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 21
-  completed_plans: 18
-  percent: 86
+  completed_plans: 19
+  percent: 90
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 34 (proxy-supervision-and-etm-cleanup) — EXECUTING
-Plan: 3 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ on main; 34-04 blocked (worktree conflict with this session's ETM edits); 34-05 blocked on 34-04; 34-06 paused at Task 1 gate (operator approval pending on plist cleanup approach)
+Plan: 4 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ on main; 34-05 unblocked (depends on 34-04 which is now landed); 34-06 paused at Task 1 gate (operator approval pending on plist cleanup approach)
 Status: Executing Phase 34
-Last activity: 2026-05-10 -- Phase 34: 34-03 landed (FSM + flap kickstart + restartLLMCLIProxy launchctl rewrite)
+Last activity: 2026-05-10 -- Phase 34: 34-04 cherry-picked clean (worktree auto-merged with this session's ETM edits)
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
