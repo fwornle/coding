@@ -198,28 +198,56 @@ ensure_private_history_repo() {
     return 0
   fi
 
-  # 4. Derive default remote URL from outer repo's remote, swapping in -history suffix
+  # 4. Derive default remote URL.
+  #
+  # Private LSL history must NEVER end up on a public host. The previous
+  # logic followed the outer repo's `origin` and naively appended
+  # `-history`, which produced two failure modes seen in practice:
+  #   - Outer repo on github.com (e.g. coding's public mirror) → default
+  #     would propose pushing private session logs to PUBLIC GitHub.
+  #   - Outer repo under a team namespace (e.g. rapid-automations under
+  #     adpnext-apps/) → default would propose pushing user-personal
+  #     session logs to a TEAM namespace.
+  #
+  # New precedence, highest to lowest:
+  #   (a) LSL_HISTORY_REMOTE_TEMPLATE — explicit user template, wins.
+  #   (b) bmw.ghe.com user from ~/.config/gh/hosts.yml — enterprise
+  #       default. Builds https://bmw.ghe.com/<user>/<project>-history.git
+  #       which is private-by-default and matches the actual storage
+  #       location used by `coding` and `rapid-automations` today.
+  #   (c) Outer-remote derivation (legacy) — only when the outer remote
+  #       is itself on bmw.ghe.com. Suppressed for any other host so we
+  #       never silently propose a non-enterprise default.
   local default_url=""
   local outer_remote
   outer_remote=$(git -C "$project_dir" config --get remote.origin.url 2>/dev/null || true)
   local project_name
   project_name=$(basename "$project_dir")
 
-  if [ -n "$outer_remote" ]; then
-    # Replace the trailing .git path component with <name>-history.git
-    # Handles git@host:owner/repo.git, https://host/owner/repo.git, etc.
+  # (b) Try bmw.ghe.com username from gh CLI auth config
+  local ghe_user=""
+  if [ -f "$HOME/.config/gh/hosts.yml" ]; then
+    ghe_user=$(sed -n '/^bmw\.ghe\.com:/,/^[a-zA-Z]/p' "$HOME/.config/gh/hosts.yml" 2>/dev/null \
+               | awk -F: '/^[[:space:]]+user:/ { gsub(/[[:space:]]/, "", $2); print $2; exit }')
+  fi
+  if [ -n "$ghe_user" ]; then
+    default_url="https://bmw.ghe.com/${ghe_user}/${project_name}-history.git"
+  elif [ -n "$outer_remote" ] && [[ "$outer_remote" == *bmw.ghe.com* ]]; then
+    # (c) Outer is bmw.ghe.com — derive from it, same -history suffix.
     local host_owner repo_basename
     if [[ "$outer_remote" =~ ^([^/]+/)([^/]+)\.git$ ]]; then
       host_owner="${BASH_REMATCH[1]}"
       repo_basename="${BASH_REMATCH[2]}"
       default_url="${host_owner}${repo_basename}-history.git"
     else
-      # Fallback: append -history before .git
       default_url="${outer_remote%.git}-history.git"
     fi
   fi
+  # Outer remotes on github.com / cc-github.bmwgroup.net etc. intentionally
+  # do not produce a default here — the prompt will show "(no default …)"
+  # and the user must type or skip, preventing accidental public push.
 
-  # Honor template override
+  # (a) Honor explicit template override (wins over auto-derivation)
   if [ -n "${LSL_HISTORY_REMOTE_TEMPLATE:-}" ]; then
     default_url="${LSL_HISTORY_REMOTE_TEMPLATE//\{project\}/$project_name}"
   fi
@@ -284,6 +312,27 @@ ensure_private_history_repo() {
     return 1
   fi
   log "✅ Initialized private history repo at $history_dir"
+
+  # 6a. Seed the nested repo's own .gitignore. The ETM uses
+  # `proper-lockfile` to serialize prompt-set flushes across multiple ETM
+  # processes; this produces two transient artefacts under
+  # .specstory/history/<YYYY>/<MM>/: the sentinel `.flush.lock` file and
+  # the `.flush.lock.lock/` directory used as the held lock. Both must be
+  # ignored in the history repo — otherwise every commit picks them up.
+  # Patterns mirror the existing coding-history repo's .gitignore.
+  local hist_gitignore="$history_dir/.gitignore"
+  if [ ! -f "$hist_gitignore" ]; then
+    cat > "$hist_gitignore" <<'EOF'
+# LSL flush-lock sentinel files (used by ETM proper-lockfile to serialize
+# concurrent writes across multiple ETM processes). One per day directory at
+# YYYY/MM/.flush.lock plus the runtime .flush.lock.lock directory created by
+# proper-lockfile during locked operations.
+**/.flush.lock
+**/.flush.lock.lock/
+.DS_Store
+EOF
+    log "✅ Seeded $history_dir/.gitignore (proper-lockfile artefacts + .DS_Store)"
+  fi
 
   # 7. Ensure outer .gitignore ignores .specstory/history/
   local outer_gitignore="$project_dir/.gitignore"
