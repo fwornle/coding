@@ -64,6 +64,64 @@ function reunderline(text, targetAbbrev) {
   return s;
 }
 
+// Lifecycle icons we may patch in place. Mirrors the bands in
+// combined-status-line.js:ageToActivityIcon. Health icons (🟡 / 🔴) are
+// excluded — those reflect ETM health, not idle age, and must come from
+// the full CSL.
+const LIFECYCLE_ICONS = ['🟢', '🌲', '🫒', '🪨', '⚫', '💤'];
+function ageToActivityIcon(ageMs) {
+  if (ageMs == null || ageMs < 5 * 60_000) return '🟢';
+  if (ageMs < 15 * 60_000) return '🌲';
+  if (ageMs < 60 * 60_000) return '🫒';
+  if (ageMs < 6 * 60 * 60_000) return '🪨';
+  if (ageMs < 24 * 60 * 60_000) return '⚫';
+  return '💤';
+}
+
+// Read the sidecar { projectName: transcriptPath } map written by the full
+// CSL. Returns {} if missing — patching becomes a no-op.
+function readProjectMapping() {
+  try {
+    const file = path.join(codingRepo, '.logs', 'combined-status-line-projects.json');
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch { return {}; }
+}
+
+// Patch each project's lifecycle icon in `text` based on its current
+// transcript mtime. Only replaces lifecycle glyphs — leaves 🟡 / 🔴
+// alone so health-degraded sessions keep their warning icon. Returns
+// { text, anyTranscriptNewerThanCache } so the caller can decide
+// whether to also force a background refresh.
+function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
+  const lifecycleAlt = LIFECYCLE_ICONS.join('|');
+  let out = text;
+  let anyNewer = false;
+
+  // Process longest abbreviations first so the regex for "C" doesn't
+  // accidentally match inside "CA<icon>". (It can't with the (?![A-Z])
+  // guard below, but length-sort is the cheap belt-and-braces.)
+  const entries = Object.entries(mapping || {})
+    .map(([name, p]) => [name, p, getAbbrev(name)])
+    .sort((a, b) => b[2].length - a[2].length);
+
+  for (const [, transcriptPath, abbrev] of entries) {
+    let mt;
+    try { mt = fs.statSync(transcriptPath).mtimeMs; } catch { continue; }
+    if (mt > cacheMtimeMs) anyNewer = true;
+    const newIcon = ageToActivityIcon(Date.now() - mt);
+    // Match: <ABBREV>(?![A-Z]) optionally followed by a #[nounderscore]
+    // closing tag (when the abbrev is the underlined "current project"),
+    // immediately followed by exactly one lifecycle icon. The (?![A-Z])
+    // guard prevents abbrev "C" from matching the "C" in "CA🟢".
+    const re = new RegExp(
+      `(${abbrev}(?![A-Z])(?:#\\[nounderscore\\])?)(?:${lifecycleAlt})`,
+      'gu'
+    );
+    out = out.replace(re, `$1${newIcon}`);
+  }
+  return { text: out, anyNewer };
+}
+
 // Read project-specific cache.
 // NEVER .trim() — combined-status-line.js LEFT-pads the output with spaces to
 // a stable cell count (see leftPadToStableCellWidth there). The leading spaces
@@ -77,8 +135,10 @@ function reunderline(text, targetAbbrev) {
 // cache for the next reader.
 let cachedContent = '';
 let cacheAgeMs = Infinity;
+let cacheMtimeMs = 0;
 try {
   const stat = fs.statSync(cacheFile);
+  cacheMtimeMs = stat.mtimeMs;
   cacheAgeMs = Date.now() - stat.mtimeMs;
   cachedContent = fs.readFileSync(cacheFile, 'utf8').replace(/\r?\n$/, '');
 } catch { /* no cache */ }
@@ -103,6 +163,7 @@ if (!cachedContent.trimEnd() && projectName) {
         if (content.trimEnd()) {
           cachedContent = reunderline(content, getAbbrev(projectName));
           cacheAgeMs = age;
+          cacheMtimeMs = stat.mtimeMs;
           // Write the re-underlined cache so future reads are instant
           try { fs.writeFileSync(cacheFile, cachedContent, 'utf8'); } catch {}
           break;
@@ -112,11 +173,24 @@ if (!cachedContent.trimEnd() && projectName) {
   } catch { /* best effort */ }
 }
 
-// Fresh cache (<60s): use it directly
+// Fresh cache (<60s): use it directly, but first patch the per-project
+// lifecycle icons against current transcript mtimes. Without this, the
+// icon stays at whatever value was rendered at cache-write time and only
+// updates on the next CSL refresh — which adds tens of seconds of
+// "I just typed something but my session still shows ⚫" lag.
 if (cacheAgeMs < 60000 && cachedContent.trimEnd()) {
-  process.stdout.write(cachedContent + '\n');
-  // If cache is aging (>20s), trigger background refresh — but don't wait
-  if (cacheAgeMs > 20000) {
+  const mapping = readProjectMapping();
+  const { text: patched, anyNewer } = patchLifecycleIcons(
+    cachedContent, mapping, cacheMtimeMs
+  );
+  process.stdout.write(patched + '\n');
+  // Trigger background refresh when:
+  //   - cache is aging (>20s old), OR
+  //   - any tracked transcript is newer than the cache (user activity
+  //     happened after the last full render). The activity-newer trigger
+  //     is what gets the non-lifecycle parts of the line (UKB, knowledge
+  //     pipeline, etc.) caught up promptly after a long idle stretch.
+  if (cacheAgeMs > 20000 || anyNewer) {
     const bg = spawn('node', [cslScript], {
       env, stdio: 'ignore', detached: true
     });
@@ -150,7 +224,12 @@ child.on('exit', (code) => {
   }
   // CSL failed — use stale cache rather than showing "Status Offline"
   if (cachedContent.trimEnd()) {
-    process.stdout.write(cachedContent + '\n');
+    // Patch lifecycle icons against current transcript mtimes so the
+    // fallback render still reflects up-to-the-second activity, not the
+    // icon frozen in the stale cache.
+    const mapping = readProjectMapping();
+    const { text: patched } = patchLifecycleIcons(cachedContent, mapping, cacheMtimeMs);
+    process.stdout.write(patched + '\n');
     // Trigger background refresh for next cycle
     const bg = spawn('node', [cslScript], {
       env, stdio: 'ignore', detached: true

@@ -828,6 +828,22 @@ class CombinedStatusLine {
         result.sessions[projectName] = { icon, status: sessionStatus, activityAgeMs };
       }
 
+      // Sidecar: { projectName: transcriptPath } so status-line-fast.cjs can
+      // patch lifecycle icons inline using fresh transcript mtimes — without
+      // having to wait for the next async CSL refresh. This is what makes the
+      // lifecycle icons snap on the very next tmux tick after user activity,
+      // instead of lagging up to ~30s for the cache regen cycle to run.
+      try {
+        const projectsFile = join(rootDir, '.logs', 'combined-status-line-projects.json');
+        const mapping = {};
+        for (const entry of lslEntries) {
+          if (entry?.projectName && entry?.transcriptPath) {
+            mapping[entry.projectName] = entry.transcriptPath;
+          }
+        }
+        writeFileSync(projectsFile, JSON.stringify(mapping), 'utf8');
+      } catch { /* best effort */ }
+
       // Trajectory check: only for the CURRENT project. Trajectory file is
       // maintained by ETM; a stale file with no running monitor is expected.
       let currentProjectTrajectoryIssue = null;
