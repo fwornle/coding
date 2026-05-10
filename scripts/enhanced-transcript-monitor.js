@@ -3211,6 +3211,73 @@ ORDER BY m.time_created ASC;`;
    * @param {string} promptSetId - Optional prompt set ID for anchors (generated if not provided)
    * @returns {boolean} true if set was written, false if held back due to incomplete exchanges
    */
+  /**
+   * Remove any existing prompt-set block with the matching anchor from ALL part files
+   * in the same tranche. Makes processUserPromptSetCompletion idempotent: re-flushing
+   * the same prompt set replaces its block in place instead of appending a duplicate.
+   *
+   * Bug fix (2026-05-10): Without this, time-based / stale / long-running flushes that
+   * fire repeatedly on the SAME prompt set (same first-exchange timestamp → same ps_id)
+   * produced 12+ duplicate blocks in the same file, exceeding the 200KB splitter
+   * threshold and creating a runaway part-file proliferation (52+ parts in one tranche).
+   */
+  async _removeExistingPromptSetBlock(targetProject, tranche, promptSetId) {
+    try {
+      const baseFile = this.getSessionFilePath(targetProject, tranche);
+      const dir = path.dirname(baseFile);
+      if (!fs.existsSync(dir)) return;
+
+      const currentProjectName = path.basename(this.config.projectPath);
+      const resolvedTarget = path.resolve(targetProject);
+      const resolvedProject = path.resolve(this.config.projectPath);
+      const isRedirected = resolvedTarget !== resolvedProject;
+      const timestamp = tranche.originalTimestamp ||
+        new Date(`${tranche.date}T${tranche.timeString.split('-')[0].slice(0,2)}:${tranche.timeString.split('-')[0].slice(2)}:00.000Z`).getTime();
+
+      // Build candidate list: base file + part files 1..99
+      const candidates = [baseFile];
+      for (let n = 1; n <= 99; n++) {
+        const partFilename = generateLSLFilename(
+          timestamp, currentProjectName, targetProject,
+          isRedirected ? this.config.projectPath : targetProject,
+          { partNumber: n }
+        );
+        candidates.push(path.join(dir, partFilename));
+      }
+
+      const anchor = `<a name="${promptSetId}"></a>`;
+      const nextAnchorPattern = '<a name="ps_';
+
+      for (const file of candidates) {
+        if (!fs.existsSync(file)) continue;
+        let content = fs.readFileSync(file, 'utf8');
+        let totalRemoved = 0;
+        let occurrences = 0;
+
+        // Loop in case the file has accumulated multiple duplicate blocks
+        // from a prior buggy run — strip them ALL on first encounter.
+        while (true) {
+          const start = content.indexOf(anchor);
+          if (start < 0) break;
+          // Block ends at next prompt-set anchor (any ps_id) or EOF
+          const after = start + anchor.length;
+          const nextStart = content.indexOf(nextAnchorPattern, after);
+          const blockEnd = nextStart >= 0 ? nextStart : content.length;
+          totalRemoved += (blockEnd - start);
+          occurrences++;
+          content = content.slice(0, start) + content.slice(blockEnd);
+        }
+
+        if (occurrences > 0) {
+          fs.writeFileSync(file, content);
+          this.debug(`🗑️ Removed ${occurrences} existing block(s) for ${promptSetId} from ${path.basename(file)} (${totalRemoved} bytes)`);
+        }
+      }
+    } catch (error) {
+      this.debug(`_removeExistingPromptSetBlock error (non-fatal): ${error.message}`);
+    }
+  }
+
   async processUserPromptSetCompletion(completedSet, targetProject, tranche, promptSetId = null) {
     if (completedSet.length === 0) return false;
 
@@ -3269,7 +3336,15 @@ ORDER BY m.time_created ASC;`;
       return false;
     }
 
+    // BUG FIX (2026-05-10): Idempotent prompt-set block. Before writing, remove any
+    // existing block with the same ps_id from ALL part files in this tranche. Without
+    // this, repeated flushes of the same in-progress prompt set (time-based, stale,
+    // long-running) appended duplicate blocks that exceeded the 200KB splitter threshold
+    // and created a runaway proliferation of part files (52+ parts in one tranche).
+    await this._removeExistingPromptSetBlock(targetProject, tranche, promptSetId);
+
     // Use split-aware file path: automatically creates numbered parts when files exceed max size
+    // (recompute AFTER the block removal so size-based part selection sees the corrected file)
     const sessionFile = this.getActiveSessionFilePath(targetProject, tranche);
 
     // Create session file with the actual content (no empty files)

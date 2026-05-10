@@ -144,8 +144,9 @@
         "dynamic_discovery": true,
         "project_path": "/Users/q284340/Agentic/coding",
         "description": "Live Session Logging (LSL) transcript monitor - CRITICAL for session history",
-        "auto_heal": true,
+        "auto_heal": false,
         "auto_heal_action": "restart_transcript_monitor",
+        "auto_heal_note": "TEMPORARILY DISABLED 2026-05-10 — runaway tranche-rotation bug causing duplicate part files (see investigation in Phase 34 session). Re-enable AFTER root-cause fix.",
         "expected_status": "critical"
       }
     },
