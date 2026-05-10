@@ -478,71 +478,148 @@ async function pollKnowledgePipeline() {
  * NEVER silently 'healthy' on error (Pattern A); always sets last_probe_end.
  */
 async function pollProxySemantic() {
-  const probeEndedAt = () => new Date().toISOString();
-  const start = Date.now();
-  const probeBody = {
-    messages: [{ role: 'user', content: 'reply with the single token: OK' }],
-    provider: 'copilot',
-    tier: 'haiku',
-    maxTokens: 5
-  };
-  const prevSemantic = currentState.proxy.semantic_ok;
-  let r;
   try {
-    r = await fetch(`${PROXY_URL}/api/complete`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(probeBody),
-      signal: AbortSignal.timeout(PROXY_PROBE_TIMEOUT_MS)
-    });
-  } catch (err) {
+    const probeEndedAt = () => new Date().toISOString();
+    const start = Date.now();
+    const probeBody = {
+      messages: [{ role: 'user', content: 'reply with the single token: OK' }],
+      provider: 'copilot',
+      tier: 'haiku',
+      maxTokens: 5
+    };
+    const prevSemantic = currentState.proxy.semantic_ok;
+    let r;
+    try {
+      r = await fetch(`${PROXY_URL}/api/complete`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(probeBody),
+        signal: AbortSignal.timeout(PROXY_PROBE_TIMEOUT_MS)
+      });
+    } catch (err) {
+      const elapsed = Date.now() - start;
+      const reason = (err && (err.name === 'TimeoutError' || /aborted|timeout/i.test(err.message)))
+        ? 'timeout' : `network_${err.message || 'error'}`;
+      currentState.proxy.semantic_ok = false;
+      currentState.proxy.last_round_trip_ms = elapsed;
+      currentState.proxy.reason = reason;
+      currentState.proxy.last_probe_end = probeEndedAt();
+      if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (${reason})`, 'INFO');
+      return;
+    }
     const elapsed = Date.now() - start;
-    const reason = (err && (err.name === 'TimeoutError' || /aborted|timeout/i.test(err.message)))
-      ? 'timeout' : `network_${err.message || 'error'}`;
-    currentState.proxy.semantic_ok = false;
     currentState.proxy.last_round_trip_ms = elapsed;
-    currentState.proxy.reason = reason;
     currentState.proxy.last_probe_end = probeEndedAt();
-    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (${reason})`, 'INFO');
+    if (!r.ok) {
+      currentState.proxy.semantic_ok = false;
+      currentState.proxy.reason = `http_${r.status}`;
+      if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (http_${r.status})`, 'INFO');
+      return;
+    }
+    let body;
+    try { body = await r.json(); }
+    catch (err) {
+      currentState.proxy.semantic_ok = false;
+      currentState.proxy.reason = 'empty_content';
+      if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (empty_content/json-parse: ${err.message})`, 'INFO');
+      return;
+    }
+    // D-02: extract content. Shape per copilot proxy: { choices: [ { message: { content: '...' } } ] } OR { content: '...' } OR { text: '...' }
+    const content = (body?.choices?.[0]?.message?.content)
+      ?? body?.content ?? body?.text ?? '';
+    if (!content || typeof content !== 'string') {
+      currentState.proxy.semantic_ok = false;
+      currentState.proxy.reason = 'empty_content';
+      if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (empty_content)`, 'INFO');
+      return;
+    }
+    if (!content.includes('OK')) {
+      currentState.proxy.semantic_ok = false;
+      currentState.proxy.reason = 'oksub_missing';
+      if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (oksub_missing — got: ${String(content).slice(0, 80)})`, 'INFO');
+      return;
+    }
+    // Success.
+    currentState.proxy.semantic_ok = true;
+    currentState.proxy.reason = null;
+    if (prevSemantic !== true) log(`proxy semantic_ok flip -> true (${elapsed}ms)`, 'INFO');
+    log(`proxy semantic probe ok (${elapsed}ms)`, 'DEBUG');
+  } finally {
+    // Phase 34 D-06: every probe outcome flows through the FSM exactly once.
+    // Wrapping in try/finally guarantees this for all return paths AND any
+    // unexpected throw — semantic_ok is updated upstream of the FSM, so the
+    // FSM always sees the latest decision.
+    evaluateAutoHealFSM();
+  }
+}
+
+/**
+ * Phase 34 D-06: auto-heal cooldown finite state machine.
+ * States: 'healthy' | 'kickstart_pending' | 'cooldown' | 'disabled'.
+ * Transitions:
+ *   - rule.auto_heal !== true               -> 'disabled' (kill-switch via D-07)
+ *   - probe success                          -> 'healthy', reset consecutive_failures
+ *   - kickstart_timestamps.length >= 3 in 5 min -> 'cooldown' (suppress kickstart, log WARN)
+ *   - sustained failure >= 60s + within window -> dispatch restart_llm_cli_proxy via /health/remediate
+ * Called at the END of pollProxySemantic (success AND failure paths).
+ */
+function evaluateAutoHealFSM() {
+  // D-07 kill-switch: rule.auto_heal=false short-circuits all of this.
+  const rule = RULES?.rules?.services?.llm_cli_proxy;
+  if (!rule || rule.auto_heal !== true) {
+    if (currentState.proxy.auto_heal_status !== 'disabled') {
+      log(`proxy auto_heal disabled by config rule (auto_heal=${rule?.auto_heal})`, 'INFO');
+    }
+    currentState.proxy.auto_heal_status = 'disabled';
     return;
   }
-  const elapsed = Date.now() - start;
-  currentState.proxy.last_round_trip_ms = elapsed;
-  currentState.proxy.last_probe_end = probeEndedAt();
-  if (!r.ok) {
-    currentState.proxy.semantic_ok = false;
-    currentState.proxy.reason = `http_${r.status}`;
-    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (http_${r.status})`, 'INFO');
+
+  // Reset on probe success.
+  if (currentState.proxy.semantic_ok === true) {
+    if (currentState.proxy.consecutive_failures > 0 || currentState.proxy.auto_heal_status !== 'healthy') {
+      log(`proxy auto_heal -> healthy (recovered after ${currentState.proxy.consecutive_failures} consecutive failures)`, 'INFO');
+    }
+    currentState.proxy.consecutive_failures = 0;
+    currentState.proxy.auto_heal_status = 'healthy';
     return;
   }
-  let body;
-  try { body = await r.json(); }
-  catch (err) {
-    currentState.proxy.semantic_ok = false;
-    currentState.proxy.reason = 'empty_content';
-    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (empty_content/json-parse: ${err.message})`, 'INFO');
+
+  // Failure path. Slide the kickstart window first.
+  const now = Date.now();
+  currentState.proxy.kickstart_timestamps = currentState.proxy.kickstart_timestamps
+    .filter(ts => (now - ts) < PROXY_KICKSTART_WINDOW_MS);
+
+  // Already at the cap? Stay in cooldown until the window slides clear AND a probe succeeds.
+  if (currentState.proxy.kickstart_timestamps.length >= PROXY_KICKSTART_MAX) {
+    if (currentState.proxy.auto_heal_status !== 'cooldown') {
+      log(`proxy auto-heal cooldown engaged — ${currentState.proxy.kickstart_timestamps.length} kickstarts in last ${PROXY_KICKSTART_WINDOW_MS/1000}s`, 'WARN');
+    } else {
+      log(`proxy still in cooldown — kickstarts in window: ${currentState.proxy.kickstart_timestamps.length}`, 'WARN');
+    }
+    currentState.proxy.auto_heal_status = 'cooldown';
     return;
   }
-  // D-02: extract content. Shape per copilot proxy: { choices: [ { message: { content: '...' } } ] } OR { content: '...' } OR { text: '...' }
-  const content = (body?.choices?.[0]?.message?.content)
-    ?? body?.content ?? body?.text ?? '';
-  if (!content || typeof content !== 'string') {
-    currentState.proxy.semantic_ok = false;
-    currentState.proxy.reason = 'empty_content';
-    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (empty_content)`, 'INFO');
+
+  // Increment consecutive_failures EARLY so the dispatch gate sees the right count.
+  currentState.proxy.consecutive_failures += 1;
+
+  // Sustained-failure gate per Requirement 4: only kickstart after >=60s of failures.
+  // Probe interval is PROXY_PROBE_INTERVAL_MS (60s); 1 failed probe = ~60s sustained.
+  // Use ceil to allow first kickstart after the second consecutive failure (covers edge cases at boot).
+  const sustainedSeconds = currentState.proxy.consecutive_failures * (PROXY_PROBE_INTERVAL_MS / 1000);
+  if (sustainedSeconds < 60) {
+    currentState.proxy.auto_heal_status = 'kickstart_pending';
     return;
   }
-  if (!content.includes('OK')) {
-    currentState.proxy.semantic_ok = false;
-    currentState.proxy.reason = 'oksub_missing';
-    if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (oksub_missing — got: ${String(content).slice(0, 80)})`, 'INFO');
-    return;
-  }
-  // Success.
-  currentState.proxy.semantic_ok = true;
-  currentState.proxy.reason = null;
-  if (prevSemantic !== true) log(`proxy semantic_ok flip -> true (${elapsed}ms)`, 'INFO');
-  log(`proxy semantic probe ok (${elapsed}ms)`, 'DEBUG');
+
+  // Fire kickstart through the dispatcher (Pattern E — same code path as dashboard Restart button).
+  currentState.proxy.kickstart_timestamps.push(now);
+  currentState.proxy.kickstart_count += 1;
+  currentState.proxy.auto_heal_status = 'kickstart_pending';
+  log(`proxy auto-heal: dispatching restart_llm_cli_proxy (consecutive_failures=${currentState.proxy.consecutive_failures}, kickstart_count=${currentState.proxy.kickstart_count})`, 'INFO');
+  getRemediationDispatcher()
+    .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'semantic_ok=false sustained' }))
+    .catch(err => log(`proxy auto-heal kickstart failed: ${err.message}`, 'ERROR'));
 }
 
 /**
@@ -553,6 +630,7 @@ async function pollProxySemantic() {
  */
 async function pollProxyMode() {
   try {
+    const prevMode = currentState.proxy.networkMode;
     const r = await fetch(`${PROXY_URL}/health`, {
       signal: AbortSignal.timeout(PROXY_MODE_POLL_TIMEOUT_MS)
     });
@@ -563,6 +641,25 @@ async function pollProxyMode() {
     const body = await r.json();
     const mode = body?.networkMode;
     currentState.proxy.networkMode = (mode === 'vpn' || mode === 'public') ? mode : 'unknown';
+
+    // Phase 34 R3 / D-05: VPN/CN flap re-detection.
+    // Trigger kickstart ONLY on real-value <-> real-value transitions
+    // (vpn -> public OR public -> vpn). Transitions involving 'unknown'
+    // are coordinator-side noise (proxy startup, transient errors) and
+    // are NOT actionable. Flap kickstart does NOT push to
+    // kickstart_timestamps — flap is a USER ACTION (network changed),
+    // not a proxy-failure response, so cooldown does not gate it.
+    const realModes = new Set(['vpn', 'public']);
+    if (
+      realModes.has(prevMode) &&
+      realModes.has(currentState.proxy.networkMode) &&
+      prevMode !== currentState.proxy.networkMode
+    ) {
+      log(`proxy networkMode flip ${prevMode} -> ${currentState.proxy.networkMode}, dispatching restart_llm_cli_proxy`, 'INFO');
+      getRemediationDispatcher()
+        .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'networkMode-flip' }))
+        .catch(err => log(`networkMode-flip kickstart failed: ${err.message}`, 'ERROR'));
+    }
   } catch (err) {
     currentState.proxy.networkMode = 'unknown';
   }
@@ -1135,6 +1232,14 @@ app.post('/health/refresh', async (_req, res) => {
   try {
     const reloaded = loadRules();
     if (reloaded) RULES = reloaded;
+    // Phase 34 D-07: re-evaluate the auto-heal FSM immediately so the
+    // kill-switch toggle (rule.auto_heal flip) is visible on /health/state
+    // within one tick. Without this the FSM would only re-read the rule on
+    // the next 60s pollProxySemantic cycle, missing the spec's 5s budget.
+    // Safe to call here: the FSM's failure path only increments
+    // consecutive_failures when semantic_ok stayed false, and that flag is
+    // unaffected by /health/refresh.
+    evaluateAutoHealFSM();
     await forceTick();
     res.json(currentState);
   } catch (err) {
