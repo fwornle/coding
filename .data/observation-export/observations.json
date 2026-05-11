@@ -16769,5 +16769,56 @@
       "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
       "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
     ]
+  },
+  {
+    "id": "dfa8220a-bb71-4f6c-8d67-1276044394b5",
+    "summary": "Intent: Save key learnings and update all related docs including MkDocs and puml/png files.\nApproach: Audited all docs referencing the legacy `.health/<project>-transcript-monitor-health.json` file mechanism, which was deprecated at Phase 33 when ETMs switched to posting `lsl_heartbeat` signals to the coordinator's `/health/signal` endpoint with `state.lsl` as source of truth.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/health-dashboard.md\nResult: Rewrote the stale \"Health Data Storage\" section in health-dashboard.md to reflect the current architecture where ETM health is tracked via LSL heartbeat signals and coordinator state rather than JSON files in the `.health/` directory.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-11T11:00:37.257Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/health-dashboard.md"
+    ]
+  },
+  {
+    "id": "99cd988a-ffd4-42fb-a9f0-c96034993382",
+    "summary": "Intent: Apply documentation style guide to existing PlantUML diagrams to ensure consistent styling standards.\nApproach: Read existing PUML files to assess compliance, then update them to include the standard style include and follow layout/stereotype guidelines from the style guide.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-system-classes.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/lsl-components.puml\nResult: Two PlantUML diagrams were updated to comply with the documentation style guide; a third file (multi-session-health-architecture.puml) was skipped due to a constraint false-positive on the `EnhancedTranscriptMonitor` class name.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-11T11:05:26.033Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-system-classes.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/lsl-components.puml"
+    ]
+  },
+  {
+    "id": "84d061ff-1a01-44a1-9070-db75cf535295",
+    "summary": "Intent: Enforce consistent PlantUML styling standards across existing diagram files by applying the documentation style guide rules.\nApproach: Read existing PUML files and update them to comply with the style guide, including standard style includes, correct stereotypes, arrow macros, and layout direction.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-system-classes.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/lsl-components.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/multi-session-health-architecture.puml\nResult: Three PUML diagrams were updated to conform to the documentation style guide; multi-session-health-architecture.puml had per-session health DBs collapsed into a shared coordinator state slice, and files were validated with the plantuml CLI.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-11T11:05:26.033Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-system-classes.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/lsl-components.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/multi-session-health-architecture.puml"
+    ]
   }
 ]
