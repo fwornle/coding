@@ -773,17 +773,59 @@ class CombinedStatusLine {
       // Non-healthy statuses bypass the lifecycle and surface as 🟡 / 🔴.
       const rollup = state.lsl_by_project || {};
       const lslEntries = Object.values(state.lsl || {});
+      const agenticDir = dirname(process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir);
+      const claudeProjectsDir = process.env.HOME ? join(process.env.HOME, '.claude', 'projects') : null;
       const transcriptAgeMs = (projectName) => {
+        // Preferred: state.lsl carries an explicit transcriptPath that the
+        // ETM heartbeats. Stat it and return the age.
         const entry = lslEntries.find(e => e?.projectName === projectName && e?.transcriptPath);
-        if (!entry?.transcriptPath) return null;
-        try {
-          return Date.now() - fs.statSync(entry.transcriptPath).mtimeMs;
-        } catch {
-          return null;
+        if (entry?.transcriptPath) {
+          try {
+            return Date.now() - fs.statSync(entry.transcriptPath).mtimeMs;
+          } catch { /* fall through to dir-scan fallback */ }
         }
+        // Fallback: scan the project's Claude transcript dir directly.
+        // Some ETMs heartbeat without a transcriptPath (e.g. before any
+        // session activity has been observed in this ETM's lifetime, or
+        // when the ETM was just spawned by health-coordinator's tmux
+        // discovery for an idle session). Without this fallback the age
+        // is null and ageToActivityIcon below would return 🟢 — making
+        // a 19h-idle session render as Active, which is the opposite of
+        // what the lifecycle bands are supposed to convey.
+        //
+        // Path encoding: forward-encode (`/` and `_` → `-`), mirroring
+        // health-coordinator.js's encodeClaudeProjectDir (the reverse
+        // direction is lossy — see feedback_claude_path_encoding.md).
+        if (!claudeProjectsDir || !agenticDir) return null;
+        // Try both layouts: Agentic/<name> and Agentic/_work/<name>.
+        const candidates = [
+          join(agenticDir, projectName),
+          join(agenticDir, '_work', projectName),
+        ];
+        for (const projectPath of candidates) {
+          const encoded = projectPath.replace(/[\/_]/g, '-');
+          const dir = join(claudeProjectsDir, encoded);
+          if (!existsSync(dir)) continue;
+          try {
+            const jsonls = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+            if (jsonls.length === 0) continue;
+            let latest = 0;
+            for (const f of jsonls) {
+              const m = fs.statSync(join(dir, f)).mtimeMs;
+              if (m > latest) latest = m;
+            }
+            if (latest > 0) return Date.now() - latest;
+          } catch { /* try next candidate */ }
+        }
+        return null;
       };
       const ageToActivityIcon = (ageMs) => {
-        if (ageMs === null || ageMs < 5 * 60_000) return '🟢';
+        // null age (no transcript anywhere on disk) is genuinely unknown.
+        // Treat it as Inactive ⚫ rather than Active 🟢 — better to
+        // under-promise activity than to over-promise it, and the user
+        // can tell at a glance that this session has no observable signal.
+        if (ageMs === null) return '⚫';
+        if (ageMs < 5 * 60_000) return '🟢';
         if (ageMs < 15 * 60_000) return '🌲';
         if (ageMs < 60 * 60_000) return '🫒';
         if (ageMs < 6 * 60 * 60_000) return '🪨';
@@ -814,12 +856,52 @@ class CombinedStatusLine {
       // having to wait for the next async CSL refresh. This is what makes the
       // lifecycle icons snap on the very next tmux tick after user activity,
       // instead of lagging up to ~30s for the cache regen cycle to run.
+      //
+      // For projects whose coordinator entry lacks a transcriptPath
+      // (e.g. an ETM spawned for an idle tmux session that hasn't sent
+      // a prompt in this ETM's lifetime), fall back to scanning the
+      // project's Claude transcript dir directly and recording the
+      // freshest .jsonl. Without this, idle-but-tracked projects fall
+      // out of the fast-path patch set and their icon freezes at
+      // whatever the cache says.
       try {
         const projectsFile = join(rootDir, '.logs', 'combined-status-line-projects.json');
         const mapping = {};
+        const seen = new Set();
         for (const entry of lslEntries) {
           if (entry?.projectName && entry?.transcriptPath) {
             mapping[entry.projectName] = entry.transcriptPath;
+            seen.add(entry.projectName);
+          }
+        }
+        // Fallback: for projects in rollup but with no transcriptPath,
+        // look up via the same forward-encoded dir scan as transcriptAgeMs.
+        for (const projectName of Object.keys(rollup)) {
+          if (seen.has(projectName)) continue;
+          if (!claudeProjectsDir || !agenticDir) continue;
+          const candidates = [
+            join(agenticDir, projectName),
+            join(agenticDir, '_work', projectName),
+          ];
+          for (const projectPath of candidates) {
+            const encoded = projectPath.replace(/[\/_]/g, '-');
+            const dir = join(claudeProjectsDir, encoded);
+            if (!existsSync(dir)) continue;
+            try {
+              const jsonls = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+              if (jsonls.length === 0) continue;
+              let latestPath = null;
+              let latestMtime = 0;
+              for (const f of jsonls) {
+                const p = join(dir, f);
+                const m = fs.statSync(p).mtimeMs;
+                if (m > latestMtime) { latestMtime = m; latestPath = p; }
+              }
+              if (latestPath) {
+                mapping[projectName] = latestPath;
+                break;
+              }
+            } catch { /* try next candidate */ }
           }
         }
         writeFileSync(projectsFile, JSON.stringify(mapping), 'utf8');

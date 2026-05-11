@@ -70,7 +70,11 @@ function reunderline(text, targetAbbrev) {
 // the full CSL.
 const LIFECYCLE_ICONS = ['🟢', '🌲', '🫒', '🪨', '⚫', '💤'];
 function ageToActivityIcon(ageMs) {
-  if (ageMs == null || ageMs < 5 * 60_000) return '🟢';
+  // null age (no transcript anywhere) renders as Inactive ⚫, NOT Active 🟢.
+  // Same reasoning as combined-status-line.js: under-promise activity rather
+  // than mis-claim a stale session is Active.
+  if (ageMs == null) return '⚫';
+  if (ageMs < 5 * 60_000) return '🟢';
   if (ageMs < 15 * 60_000) return '🌲';
   if (ageMs < 60 * 60_000) return '🫒';
   if (ageMs < 6 * 60 * 60_000) return '🪨';
