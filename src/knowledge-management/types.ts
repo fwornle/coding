@@ -202,7 +202,7 @@ export interface KnowledgeSession {
   /** Project path */
   projectPath: string;
 
-  /** Session intent (from trajectory analysis) */
+  /** Session intent */
   intent?: string;
 
   /** Session start time */

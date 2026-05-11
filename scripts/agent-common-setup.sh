@@ -124,14 +124,13 @@ ensure_coding_runtime_ignored() {
     ".logs/"
     "logs/"
     "*.log"
-    ".specstory/trajectory/live-state.json"
     ".specstory/validation-report.json"
     ".specstory/change-log.json"
   )
 
   local added=false
   for entry in "${entries[@]}"; do
-    # Use -xF for exact whole-line matching (prevents ".specstory/trajectory/..." matching ".specstory/")
+    # Use -xF for exact whole-line matching to avoid substring false positives.
     if ! grep -qxF -- "$entry" "$gitignore_file" 2>/dev/null; then
       if [ "$added" = false ]; then
         echo "" >> "$gitignore_file"

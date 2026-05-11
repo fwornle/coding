@@ -60,14 +60,12 @@ export class EntityPatternAnalyzer {
         patterns: [
           /LSL(Session|Monitor|Classifier)/i,
           /Constraint(Rule|Monitor|Hook)/i,
-          /Trajectory(State|Generator)/i,
           /MCP(Agent|Service|Tool)/i,
           /Knowledge(Entity|Retriever|Extractor)/i,
         ],
         entityClassMap: {
           LSL: 'LSLSession',
           Constraint: 'ConstraintRule',
-          Trajectory: 'TrajectoryState',
           MCP: 'MCPAgent',
           Knowledge: 'KnowledgeEntity',
         },
@@ -297,7 +295,6 @@ export class EntityPatternAnalyzer {
       Coding: {
         LSL: 'LSLSession',
         Constraint: 'ConstraintRule',
-        Trajectory: 'TrajectoryState',
         Knowledge: 'KnowledgeEntity',
         MCP: 'MCPAgent',
       },

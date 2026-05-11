@@ -210,7 +210,7 @@ Format as: INSIGHT: [your observation] | CATEGORY: [info|success|warning|error]`
 Determine if this conversation is primarily about CODING INFRASTRUCTURE or NOT.
 
 **STRONG CODING_INFRASTRUCTURE indicators (high confidence):**
-- LSL systems, live session logging, transcript monitoring, trajectory generation
+- LSL systems, live session logging, transcript monitoring
 - Batch mode, foreign mode, from-nano-degree files, redirected files
 - Enhanced-transcript-monitor, generate-lsl scripts, session logs
 - MCP servers, semantic analysis tools, reliable coding classifier
@@ -291,8 +291,8 @@ Format: CLASSIFICATION: [CODING_INFRASTRUCTURE|NOT_CODING_INFRASTRUCTURE] | CONF
     // Strong coding infrastructure indicators
     const codingKeywords = [
       'enhanced-transcript-monitor', 'transcript-monitor', 'lsl system', 'live session logging',
-      'lsl', 'trajectory file', 'statusline', 'trajectory', 'semantic analysis', 'coding tools', 
-      'generate-proper-lsl', 'redaction', 'tool development', 
+      'lsl', 'statusline', 'semantic analysis', 'coding tools',
+      'generate-proper-lsl', 'redaction', 'tool development',
       'ci/cd', 'repository management', 'mcp__semantic_analysis',
       'mcp__semantic-analysis', 'mcp integration', 'semantic analyzer'
     ];

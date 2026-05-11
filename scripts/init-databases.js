@@ -107,7 +107,6 @@ async function initializeDatabases() {
       log('\n📦 Qdrant Collections:', 'cyan');
       log('  • knowledge_patterns (1536-dim) - High-quality OpenAI embeddings');
       log('  • knowledge_patterns_small (384-dim) - Fast local embeddings');
-      log('  • trajectory_analysis (384-dim) - Coding trajectory patterns');
       log('  • session_memory (384-dim) - Session-level knowledge');
     }
 

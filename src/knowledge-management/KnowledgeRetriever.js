@@ -2,11 +2,11 @@
  * KnowledgeRetriever
  *
  * Context-aware knowledge retrieval system using semantic search and ranking.
- * Retrieves relevant knowledge based on current trajectory, intent, and context.
+ * Retrieves relevant knowledge based on current intent and context.
  *
  * Key Features:
  * - Semantic search using dual-vector embeddings (384-dim fast, 1536-dim accurate)
- * - Context-aware ranking (considers trajectory state, intent, recency, relevance)
+ * - Context-aware ranking (considers intent, recency, relevance)
  * - Multi-source retrieval (knowledge patterns, code snippets, solutions)
  * - Freshness-based filtering (prioritize recent knowledge, filter stale)
  * - Knowledge fusion (combine and deduplicate results from multiple sources)
@@ -31,7 +31,6 @@
  * // Retrieve knowledge for current context
  * const results = await retriever.retrieve(query, {
  *   intent: 'debugging',
- *   trajectoryState: 'debugging',
  *   limit: 5
  * });
  *
@@ -144,7 +143,6 @@ export class KnowledgeRetriever extends EventEmitter {
     try {
       const {
         intent = null,
-        trajectoryState = null,
         projectPath = null,
         limit = this.defaultLimit,
         vectorSize = 'auto', // 'auto', 384, or 1536
@@ -187,7 +185,6 @@ export class KnowledgeRetriever extends EventEmitter {
       const rankedResults = await this.rankResults(rawResults, {
         query,
         intent,
-        trajectoryState,
         projectPath,
         includeStale
       });

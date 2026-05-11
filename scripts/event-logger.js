@@ -113,22 +113,6 @@ class EventLogger {
     });
   }
 
-  trajectoryGenerated(projectPath, lslCount, analysisType) {
-    this.info('TRAJECTORY', 'Project trajectory generated', {
-      project_path: projectPath,
-      lsl_count: lslCount,
-      analysis_type: analysisType
-    });
-  }
-
-  trajectoryFailed(projectPath, error) {
-    this.error('TRAJECTORY', 'Trajectory generation failed', {
-      project_path: projectPath,
-      error_message: error.message,
-      error_stack: error.stack
-    });
-  }
-
   statusLineUpdate(statusText, compliance, apiUsage) {
     this.debug('STATUS_LINE', 'Status updated', {
       status_text: statusText,

@@ -48,19 +48,6 @@ export const codingHeuristics: TeamHeuristics = {
       ],
     },
     {
-      entityClass: 'TrajectoryState',
-      description: 'Trajectory generation state',
-      patterns: [
-        {
-          keywords: ['trajectory', 'state', 'conversation', 'context', 'history'],
-          requiredKeywords: ['trajectory'],
-          baseConfidence: 0.75,
-          keywordBoost: 0.05,
-          maxConfidence: 0.9,
-        },
-      ],
-    },
-    {
       entityClass: 'MCPAgent',
       description: 'Model Context Protocol agent/server implementation',
       patterns: [

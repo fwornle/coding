@@ -1,7 +1,7 @@
 /**
  * UnifiedInferenceEngine
  *
- * Centralized LLM inference engine shared by all components (trajectory, knowledge extraction, etc.)
+ * Centralized LLM inference engine shared by all components (knowledge extraction, etc.)
  * Now delegates all provider management to LLMService from @rapid/llm-proxy.
  *
  * Key Features (preserved):
@@ -48,8 +48,6 @@ export class UnifiedInferenceEngine extends EventEmitter {
 
     // Model routing: maps operation types to provider/model specs
     this.modelRouting = config.modelRouting || {
-      'trajectory-intent': 'groq/llama-3.3-70b-versatile',
-      'trajectory-goal': 'groq/llama-3.3-70b-versatile',
       'knowledge-pattern': 'groq/llama-3.3-70b-versatile',
       'knowledge-concept': 'anthropic/claude-haiku-4-5',
       'concept-abstraction': 'anthropic/claude-haiku-4-5',

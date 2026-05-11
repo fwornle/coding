@@ -14,13 +14,12 @@
  * - Connection pooling and health monitoring
  *
  * Database Responsibilities:
- * 1. Qdrant: Vector embeddings for knowledge patterns, trajectory analysis, semantic search
+ * 1. Qdrant: Vector embeddings for knowledge patterns and semantic search
  * 2. SQLite: Budget tracking, session metrics, analytics, pattern analysis
  *
  * Collections in Qdrant:
  * - knowledge_patterns (1536-dim): OpenAI text-embedding-3-small embeddings
  * - knowledge_patterns_small (384-dim): sentence-transformers/all-MiniLM-L6-v2 embeddings
- * - trajectory_analysis (384-dim): Coding trajectory patterns
  * - session_memory (384-dim): Session-level knowledge
  *
  * Tables in SQLite:
@@ -52,7 +51,6 @@ export class DatabaseManager extends EventEmitter {
       collections: config.qdrant?.collections || {
         knowledge_patterns: { vectorSize: 1536, distance: 'Cosine' },
         knowledge_patterns_small: { vectorSize: 384, distance: 'Cosine' },
-        trajectory_analysis: { vectorSize: 384, distance: 'Cosine' },
         session_memory: { vectorSize: 384, distance: 'Cosine' }
       }
     };
