@@ -16603,6 +16603,23 @@
     ]
   },
   {
+    "id": "8eadbca8-f95e-4dce-b432-342d172dd22a",
+    "summary": "Intent: Resume cleanup by dropping only trajectory-related edges from the knowledge base.\nApproach: Targeted deletion of trajectory-only edges while preserving child entities, using the VKB delete API surface identified from api-routes.js.\nArtifacts: edited ROADMAP.md, edited STATE.md\nResult: Identified the delete API routes and confirmed 3 trajectory entities with 62 edges to remove; child entities remain untouched.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-11T10:33:34.677Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/Q284340/Agentic/coding/.planning/STATE.md"
+    ]
+  },
+  {
     "id": "b6d4c629-2e8b-46b8-9a4f-ba40c0f55d05",
     "summary": "Intent: Save key learnings from the current work session to memory.\nApproach: Updated existing memory file for statusline-in-tmux feedback rather than creating new files, consolidating learnings in place.\nArtifacts: edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_test_statusline_in_tmux.md\nResult: Key learnings saved to the statusline-tmux memory file, including new tactical detail, worktree verification feedback, and Phase 34 close gates.",
     "agent": "claude",
@@ -16633,6 +16650,74 @@
     "modifiedFiles": [
       "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_test_statusline_in_tmux.md",
       "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_worktree_verification.md"
+    ]
+  },
+  {
+    "id": "dd30d1a0-1121-4822-98ce-7f200773de70",
+    "summary": "Intent: [commit and push current changes in the coding project]\nApproach: Checked git state of memory directory and coding repo, determined memory dir is not a git repo, focused on coding repo's `.data/` exports.\nArtifacts: edited ROADMAP.md, edited STATE.md\nResult: Exchange was incomplete — the assistant began the commit process but the response was cut off before completion; no confirmed commit or push occurred.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-11T10:42:19.937Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/Q284340/Agentic/coding/.planning/STATE.md"
+    ]
+  },
+  {
+    "id": "95998da0-f735-47ee-ac92-f9bbbdd907fa",
+    "summary": "Intent: Load recent session logs to establish context continuity from previous work sessions.\nApproach: Read the most recent LSL file from the coding project's specstory history directory to summarize prior session activity.\nArtifacts: edited enhanced-transcript-monitor.js\nResult: Session summary produced covering Phase 34 completion (proxy-supervision-and-etm-cleanup), all 6 plans on main, 4 operator-gated items remaining, and suggested next steps around destructive tests and a 24h soak gate.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-11T10:47:01.826Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js"
+    ]
+  },
+  {
+    "id": "46ab2a0a-bdf6-4905-9ec0-7b968bac5689",
+    "summary": "Intent: Proceed with suggested next steps in the current planning phase.\nApproach: Assistant performed read-only checks first (soak gate snapshot, git status, summary review) before any destructive operations, deferring R3/R4 proxy outage tests for explicit approval.\nArtifacts: edited enhanced-transcript-monitor.js, edited server.js\nResult: Assistant reviewed the 34-05 summary and gathered system state; no changes were made, and destructive tests were explicitly deferred pending further approval.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-11T10:48:14.126Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/server.js"
+    ]
+  },
+  {
+    "id": "b2b7f332-151e-4161-ab24-95118d36804b",
+    "summary": "Intent: Proceed with the suggested next steps (D-14 soak gate check and 34-05 dead-reader cleanup scoping).\nApproach: Assistant checked D-14 soak gate status (not actionable due to insufficient uptime) and scoped the 34-05 dead-reader cleanup by reading relevant planning and script files before touching any code.\nArtifacts: edited enhanced-transcript-monitor.js, edited server.js, edited dashboard-server.js\nResult: D-14 soak gate is not yet actionable (0.25h uptime vs 24h threshold). Dead-reader cleanup scope was reviewed but no code changes were made.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-11T10:48:14.126Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/server.js",
+      "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/dashboard-server.js"
     ]
   }
 ]
