@@ -2,7 +2,7 @@
 
 /**
  * Enhanced Claude Code Transcript Monitor
- * Supports multiple parallel sessions with prompt-triggered trajectory updates
+ * Supports multiple parallel sessions with prompt-triggered exchange updates
  */
 
 // Load environment variables from coding/.env
@@ -2832,47 +2832,6 @@ ORDER BY m.time_created ASC;`;
   }
 
   /**
-   * Update comprehensive trajectory file
-   */
-  async updateComprehensiveTrajectory(targetProject) {
-    try {
-      const { spawn } = await import('child_process');
-      
-      // Use the CODING_TOOLS_PATH environment variable set by bin/coding
-      const codingToolsPath = process.env.CODING_TOOLS_PATH;
-      if (!codingToolsPath) {
-        throw new Error('CODING_TOOLS_PATH environment variable not set. Run from coding/bin/coding');
-      }
-      
-      const updateScript = path.join(codingToolsPath, 'scripts', 'repository-trajectory-generator.js');
-      
-      const child = spawn('node', [updateScript], {
-        cwd: targetProject,
-        stdio: 'pipe',
-        env: { ...process.env, TRANSCRIPT_SOURCE_PROJECT: targetProject }
-      });
-      
-      child.stdout.on('data', (data) => {
-        this.debug(`Trajectory: ${data.toString().trim()}`);
-      });
-      
-      child.stderr.on('data', (data) => {
-        this.debug(`Trajectory Error: ${data.toString().trim()}`);
-      });
-      
-      child.on('close', (code) => {
-        if (code === 0) {
-          this.debug(`✅ Updated comprehensive trajectory for ${path.basename(targetProject)}`);
-        } else {
-          this.debug(`⚠️ Trajectory update failed with code ${code}`);
-        }
-      });
-    } catch (error) {
-      this.debug(`Error updating comprehensive trajectory: ${error.message}`);
-    }
-  }
-
-  /**
    * Check if new session boundary crossed
    */
   isNewSessionBoundary(currentTranche, lastTranche) {
@@ -3311,10 +3270,6 @@ ORDER BY m.time_created ASC;`;
         try { await _release(); } catch (e) { this.debug(`flush lock release failed: ${e.message}`); }
       }
     }
-
-    // Update comprehensive trajectory instead of individual trajectory files
-    // DISABLED: This was causing constant timestamp-only updates with minimal value
-    // await this.updateComprehensiveTrajectory(targetProject);
 
     const writtenBasenames = writtenFiles.map(f => path.basename(f)).join(', ');
     process.stderr.write(`[LSL] Completed user prompt set: ${meaningfulExchanges.length}/${completedSet.length} exchanges → ${writtenBasenames}\n`);
