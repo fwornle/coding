@@ -40,14 +40,17 @@ function padStatusLine(str) {
   return String(str);
 }
 
-// Rough visible-cell count for a status-line string. Treats tmux style markers
-// (#[fg=...] etc.) as zero-width and ignores zero-width combining characters.
-// Counts every other codepoint as exactly one cell — emoji are intentionally
-// undercounted (they render at 2 cells in most terminals). The undercount is
-// safe because the only consumer below uses this to LEFT-pad to a target cell
-// count; undercounting means we over-pad with leading spaces, and tmux
-// truncates anything past status-right-length from the left edge — so the
-// extra spaces simply get trimmed without affecting visible content.
+// Visible-cell count for a status-line string. Treats tmux style markers
+// (#[fg=...] etc.) as zero-width, drops zero-width combining characters,
+// and — critically — counts emoji at TWO cells, matching what tmux and
+// macOS/iTerm terminals actually render.
+//
+// Previous version counted every codepoint as 1 cell, which under-counted
+// emoji width by a factor of two. With ~6 emojis in the status line that
+// adds up to a ~6-12 cell deficit: the padder thinks the content is short
+// and adds fewer leading spaces than needed, so the rendered line is wider
+// than the pane and content gets pushed away from the right edge. Phase
+// 34-05's [🧠] badge pushed this past the visible-drift threshold.
 function visibleCellWidth(s) {
   const stripped = String(s).replace(/#\[[^\]]*\]/g, '');
   let width = 0;
@@ -57,7 +60,18 @@ function visibleCellWidth(s) {
     if (cp === 0xFE0F) continue;                          // emoji variation selector
     if (cp >= 0x0300 && cp <= 0x036F) continue;           // combining diacriticals
     if (cp >= 0x200B && cp <= 0x200D) continue;           // ZWSP / ZWNJ / ZWJ
-    width += 1;
+    // Emoji ranges that render as 2 cells in modern terminals. Sourced
+    // from the East Asian Width "Wide" table plus common pictographic
+    // blocks. Not exhaustive — this is "correct enough" coverage for
+    // every emoji that appears in the status-line payload today:
+    //   🏥 🧠 ✅ 📚 🟢 🌲 🫒 🪨 ⚫ 💤 🟡 🔴 🚫 🔍 🔒 ⚠ 📋 ❌ 🩺 ⏰
+    const isWide =
+      (cp >= 0x1F300 && cp <= 0x1FAFF) ||   // misc pictographs, emoticons, symbols & pictographs ext-A
+      (cp >= 0x2600  && cp <= 0x27BF)  ||   // misc symbols + dingbats (✅⚠⚫)
+      (cp >= 0x2300  && cp <= 0x23FF)  ||   // misc technical (⏰)
+      (cp >= 0x1F000 && cp <= 0x1F2FF) ||   // mahjong/domino/playing-card + enclosed alphanum
+      (cp >= 0x1F680 && cp <= 0x1F6FF);     // transport & map symbols
+    width += isWide ? 2 : 1;
   }
   return width;
 }

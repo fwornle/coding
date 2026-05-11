@@ -674,6 +674,37 @@ const ETM_TRANSCRIPT_ACTIVE_MS = 120_000; // jsonl mtime within 2 min = active
 let _lastEtmSpawnCheck = 0;
 
 /**
+ * List project paths that currently have an open tmux session.
+ *
+ * The 2-minute jsonl-mtime gate above (ETM_TRANSCRIPT_ACTIVE_MS) defines
+ * "active" as "user typed in the last 2 minutes". That's too aggressive
+ * for the user-facing meaning of active: a Claude session can sit idle
+ * for hours and the user still expects it to appear in the statusline.
+ * tmux's view of "what windows are open" is the truest signal, so we
+ * union it with the mtime-based discovery — any project with a live
+ * tmux session bypasses the 2-min gate.
+ */
+function tmuxOpenProjectPaths(agenticDir) {
+  try {
+    const out = spawnSync('tmux', ['list-sessions', '-F', '#{session_path}'], {
+      encoding: 'utf8',
+      timeout: 1500,
+    });
+    if (out.status !== 0 || !out.stdout) return new Set();
+    const paths = new Set();
+    for (const line of out.stdout.split('\n')) {
+      const p = line.trim();
+      if (!p) continue;
+      if (!p.startsWith(agenticDir + '/')) continue;
+      if (fs.existsSync(p)) paths.add(p);
+    }
+    return paths;
+  } catch {
+    return new Set();
+  }
+}
+
+/**
  * Forward-encode a project path to its Claude transcript dir name.
  * Claude Code collapses both `/` and `_` to `-` (verified in
  * enhanced-transcript-monitor.js:1703). The reverse direction is lossy
@@ -746,6 +777,12 @@ function ensureEtmForActiveProjects() {
     }
   }
 
+  // Projects with a live tmux session bypass the 2-min mtime gate below.
+  // Without this, idle-but-open sessions (e.g. sketcher with last prompt
+  // 4 hours ago) silently drop out of the statusline because no ETM ever
+  // gets spawned for them.
+  const tmuxOpen = tmuxOpenProjectPaths(agenticDir);
+
   for (const projectPath of discoverProjectCandidates(agenticDir)) {
     const projectName = path.basename(projectPath);
     if (coveredProjects.has(projectName)) continue;
@@ -763,7 +800,13 @@ function ensureEtmForActiveProjects() {
     } catch {
       continue;
     }
-    if (latestMtime === 0 || (now - latestMtime) > ETM_TRANSCRIPT_ACTIVE_MS) continue;
+    // Gate: transcript fresh OR an open tmux session is rooted at this
+    // project (which means the user has a Claude window open right now,
+    // even if no prompt has been sent recently).
+    const transcriptFresh = latestMtime > 0 && (now - latestMtime) <= ETM_TRANSCRIPT_ACTIVE_MS;
+    const tmuxAlive = tmuxOpen.has(projectPath);
+    if (!transcriptFresh && !tmuxAlive) continue;
+    if (latestMtime === 0) continue; // need at least one transcript file to read
 
     log(`spawning ETM for active project ${projectName} (${projectPath})`, 'INFO');
     try {
