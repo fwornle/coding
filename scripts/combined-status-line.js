@@ -1161,82 +1161,46 @@ class CombinedStatusLine {
 
   async ensureTranscriptMonitorRunning() {
     try {
-      // CRITICAL FIX: Check PSM FIRST to prevent duplicate spawns
       const projectPath = process.env.TRANSCRIPT_SOURCE_PROJECT;
       if (!projectPath) {
-        return; // Can't check without project path
-      }
-
-      // Check if monitor is already registered in PSM
-      try {
-        const ProcessStateManager = (await import('./process-state-manager.js')).default;
-        const psm = new ProcessStateManager();
-        await psm.initialize();
-
-        // Check if project was intentionally stopped (prevents restart loops)
-        try {
-          if (await psm.isProjectStopped(projectPath)) {
-            if (process.env.DEBUG_STATUS) {
-              console.error('DEBUG: Project intentionally stopped, not restarting monitor');
-            }
-            return;
-          }
-        } catch {
-          // Fail-open: if check fails, continue with normal flow
-        }
-
-        const existingMonitor = await psm.getService('enhanced-transcript-monitor', 'per-project', { projectPath });
-
-        if (existingMonitor) {
-          // Check if registered PID is still alive
-          try {
-            process.kill(existingMonitor.pid, 0); // Test if process exists
-            if (process.env.DEBUG_STATUS) {
-              console.error('DEBUG: Transcript monitor already running (PID:', existingMonitor.pid, ')');
-            }
-            return; // Monitor is running, don't spawn another
-          } catch (err) {
-            // PID is dead, unregister it
-            if (process.env.DEBUG_STATUS) {
-              console.error('DEBUG: Registered monitor PID', existingMonitor.pid, 'is dead, cleaning up...');
-            }
-            await psm.unregisterService('enhanced-transcript-monitor', 'per-project', { projectPath });
-          }
-        }
-      } catch (psmError) {
-        if (process.env.DEBUG_STATUS) {
-          console.error('DEBUG: PSM check failed:', psmError.message);
-        }
-        // Fall through to health file check
-      }
-
-      // Check if integrated transcript monitor is running by looking for CENTRALIZED health file
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-      // CRITICAL FIX: Use centralized health file location (same as getCentralizedHealthFile in enhanced-transcript-monitor.js)
-      const projectName = basename(projectPath);
-      const healthFile = join(codingPath, '.health', `${projectName}-transcript-monitor-health.json`);
-
-      if (!existsSync(healthFile)) {
-        // Monitor not running, start it in background
-        if (process.env.DEBUG_STATUS) {
-          console.error('DEBUG: Transcript monitor not detected, starting...');
-        }
-        await this.startTranscriptMonitor();
         return;
       }
 
-      // Check if health file is recent (within last 10 seconds)
-      const stats = fs.statSync(healthFile);
-      const now = Date.now();
-      const age = now - stats.mtime.getTime();
+      const ProcessStateManager = (await import('./process-state-manager.js')).default;
+      const psm = new ProcessStateManager();
+      await psm.initialize();
 
-      if (age > 10000) {
-        // Health file is stale, restart monitor
-        if (process.env.DEBUG_STATUS) {
-          console.error('DEBUG: Transcript monitor health stale, restarting...');
+      try {
+        if (await psm.isProjectStopped(projectPath)) {
+          if (process.env.DEBUG_STATUS) {
+            console.error('DEBUG: Project intentionally stopped, not restarting monitor');
+          }
+          return;
         }
-        await this.startTranscriptMonitor();
+      } catch {
+        // Fail-open: if isProjectStopped check fails, continue.
       }
+
+      const existingMonitor = await psm.getService('enhanced-transcript-monitor', 'per-project', { projectPath });
+
+      if (existingMonitor && psm.isProcessAlive(existingMonitor.pid)) {
+        if (process.env.DEBUG_STATUS) {
+          console.error('DEBUG: Transcript monitor already running (PID:', existingMonitor.pid, ')');
+        }
+        return;
+      }
+
+      if (existingMonitor) {
+        if (process.env.DEBUG_STATUS) {
+          console.error('DEBUG: Registered monitor PID', existingMonitor.pid, 'is dead, cleaning up...');
+        }
+        await psm.unregisterService('enhanced-transcript-monitor', 'per-project', { projectPath });
+      }
+
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Transcript monitor not running, starting...');
+      }
+      await this.startTranscriptMonitor();
     } catch (error) {
       if (process.env.DEBUG_STATUS) {
         console.error('DEBUG: Error checking transcript monitor:', error.message);
@@ -1424,35 +1388,17 @@ class CombinedStatusLine {
         }
 
         const projectName = basename(projectPath);
-        const healthFile = join(codingPath, '.health', `${projectName}-transcript-monitor-health.json`);
 
         let needsRestart = false;
         let reason = '';
 
-        if (!existsSync(healthFile)) {
+        const existingMonitor = await psm.getService('enhanced-transcript-monitor', 'per-project', { projectPath });
+        if (!existingMonitor) {
           needsRestart = true;
-          reason = 'no health file';
-        } else {
-          const stats = fs.statSync(healthFile);
-          const age = Date.now() - stats.mtime.getTime();
-
-          if (age > 60000) {
-            needsRestart = true;
-            reason = `stale health file (${Math.round(age / 1000)}s)`;
-          } else {
-            // Check if PID is alive
-            try {
-              const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
-              const pid = healthData.metrics?.processId;
-              if (pid && !psm.isProcessAlive(pid)) {
-                needsRestart = true;
-                reason = `PID ${pid} is dead`;
-              }
-            } catch {
-              needsRestart = true;
-              reason = 'invalid health file';
-            }
-          }
+          reason = 'no PSM entry';
+        } else if (!psm.isProcessAlive(existingMonitor.pid)) {
+          needsRestart = true;
+          reason = `PID ${existingMonitor.pid} is dead`;
         }
 
         if (needsRestart) {

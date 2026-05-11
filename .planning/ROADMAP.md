@@ -155,7 +155,7 @@ Plans:
 
 **Wave 2** *(depends on Wave 1 — Plan 34-03 reads RULES from 34-01 + adds FSM on top of 34-02; Plan 34-05 deletes files orphaned by 34-04 + surfaces state.proxy from 34-02)*
 - [x] 34-03-PLAN.md — Auto-heal FSM (D-06 cooldown) + VPN/CN flap kickstart (D-05) wired into pollProxySemantic + pollProxyMode; rewrite restartLLMCLIProxy() in scripts/health-remediation-actions.js to use launchctl kickstart -k (PATTERNS.md anomaly #3) — Task 1 PID-change + D-07 kill-switch verified live; R3/R4 destructive tests deferred per SUMMARY operator runbook
-- [ ] 34-05-PLAN.md — ETM Plan B + surface: delete 6 source files + clean dead readers in scripts/combined-status-line.js (corrected line list per PATTERNS.md anomaly #4) + add [🧠] proxy badge (collision-resolved with UKB indicator per anomaly #1) + add LLM Proxy Health card to system-health-dashboard (D-11 + FUSE caveat)
+- [x] 34-05-PLAN.md — ETM Plan B + surface: delete 6 source files + clean dead readers in scripts/combined-status-line.js (Task 2(d) closed 2026-05-11 — methods 1+2 refactored to PSM-only; method 3 sync-constraint deferred; net -54 LoC) + add [🧠] proxy badge (collision-resolved with UKB indicator per anomaly #1) + add LLM Proxy Health card to system-health-dashboard (D-11 + FUSE caveat); W-1 live tmux render operator-verified 2026-05-11
 </details>
 
 ---

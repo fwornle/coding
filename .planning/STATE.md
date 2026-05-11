@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 34 (proxy-supervision-and-etm-cleanup) — FUNCTIONALLY COMPLETE
-Plan: 6 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ 34-05 🟢 (Tasks 1+2(badge)+3 on main; 2(d) dead-reader cleanup + W-1 live tmux render deferred to operator) 34-06 ✅ on main. D-14 24h soak gate (state.proxy.kickstart_count == 0 after 24h continuous operation) is PENDING by design — runs after phase merge.
-Status: Executing Phase 34 — ready to close pending the 24h soak window
-Last activity: 2026-05-11 -- Phase 34: 34-06 closed (plist bootout/bootstrap re-applied; AC #6 PASS; AC #11 PASS 1s respawn)
+Plan: 6 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ 34-05 ✅ (Task 2(d) dead-reader cleanup closed 2026-05-11 — methods 1+2 PSM-only; method 3 sync-constraint deferred; W-1 live tmux render operator-verified) 34-06 ✅ on main. D-14 24h soak gate (state.proxy.kickstart_count == 0 after 24h continuous operation) is PENDING by design — runs after phase merge. R3/R4 destructive cooldown tests for 34-03 + 34-05's `[🧠🚫]` badge transitions still gated on operator destructive-window.
+Status: Executing Phase 34 — ready to close pending the 24h soak window + R3/R4 destructive window
+Last activity: 2026-05-11 -- Phase 34: 34-05 Task 2(d) dead-reader cleanup closed (PSM-only refactor, -54 LoC net, end-to-end verified)
 
 Progress: [██████████] 100%
 

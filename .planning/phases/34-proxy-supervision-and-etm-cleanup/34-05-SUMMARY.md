@@ -1,8 +1,10 @@
 # Plan 34-05 SUMMARY — ETM Plan B + [🧠] proxy badge + dashboard surface
 
-**Status:** Tasks 1 + 2 (partial) + 3 complete and on main. Task 2(d)
-dead-reader cleanup and W-1 live tmux render remain deferred operator
-gates.
+**Status:** Tasks 1 + 2 (full) + 3 complete and on main. Task 2(d)
+dead-reader cleanup done for the two async methods (1 + 2); method 3
+(`getRunningTranscriptMonitorsSync`) intentionally retains its
+`.health/*.json` fallback because the method is synchronous and PSM
+init is async. W-1 live tmux render verified by operator on 2026-05-11.
 
 **Commits:**
 - `3351f6e89` — feat(34-05): delete 6 dead modules + add [🧠] proxy badge to statusline (Tasks 1+2 partial)
@@ -136,57 +138,80 @@ Browser verification (via headless Playwright + screenshot):
   Workflows / LLM Proxy Health all aligned in the
   `lg:grid-cols-5` row.
 
-## Deferred — operator gate
+## Task 2(d) — dead-reader cleanup (completed 2026-05-11)
 
-This plan is `autonomous: false` and two of its acceptance items
-remain deferred for operator-side validation:
+Refactor commit: `<this commit>` — drops 54 net LoC from
+`combined-status-line.js`. Two of three legacy `.health/<project>-transcript-monitor-health.json`
+reader sites removed:
 
-### 1. Task 2(d) — dead-reader cleanup in `combined-status-line.js`
+### `ensureTranscriptMonitorRunning()` (async, ~80 → ~50 LoC)
 
-The plan calls for cleaning ~100 LoC of `.health/<project>-transcript-monitor-health.json`
-reads inside the legacy `ensureTranscriptMonitorRunning`,
-`ensureTranscriptMonitorsRunning`, and `getRunningTranscriptMonitorsSync`
-methods. Current state: those methods are still wired into the spawn
-path and read from the dead `.health` directory. SPEC AC #8's primary
-grep target (the deleted-module names) is already clean without this
-cleanup.
+Old contract: PSM check primary; if PSM threw OR PSM returned no live
+monitor, fall through to `existsSync(healthFile)` + 10s freshness
+window. The fallback was redundant in the "no live monitor" case
+(PSM already gave a definitive answer) and unsafe in the "PSM threw"
+case (the .health file could be stale from a dead monitor whose
+unregister had been written before crash).
 
-Why deferred:
-- The methods are still call-graph-live (not isolated dead code), so
-  removing the `.health` reads requires careful PSM-only-fallback
-  rewiring.
-- Plan acceptance's wording ("decreases significantly", line 593 leave-
-  alone) signals the task is loose-spec; high regression risk against
-  legacy spawn machinery without a clearer rewrite contract.
-- Not blocking SPEC AC #8 grep clean.
+New contract:
+- PSM is the sole source of truth.
+- `getService` → if non-null `existingMonitor` AND `isProcessAlive(pid)` → no-op.
+- If `existingMonitor` non-null but PID dead → `unregisterService` then
+  `startTranscriptMonitor()`.
+- If PSM init throws → outer try/catch logs and returns. No spawn (the
+  next status-line tick retries).
 
-Recommended follow-up: a small focused commit replacing each
-`existsSync(healthFile)` branch with `psm.isProcessAlive(...)` (already
-present at line 1099-1101 of combined-status-line.js). Test by hard-
-restarting both ETMs and watching `state.lsl[<sid>].lastBeat` advance.
+### `ensureTranscriptMonitorsRunning()` (async, per-project loop)
 
-### 2. W-1 live tmux render check
+Old contract: per project, `existsSync(healthFile)` + 60s freshness
+window + `psm.isProcessAlive(healthData.metrics.processId)`. The
+healthFile-parse-then-pid-check pulled the same PID that PSM already
+had registered — pure indirection.
 
-`tmux capture-pane` can't see `status-right`'s `#(…)` substitution
-output — it's rendered by tmux itself, not by the shell inside the
-pane. Offline render is verifiably correct (`[🧠✅]` in the right
-position), but ground truth is the actual tmux pane render in an
-attached session per project memory `feedback_test_statusline_in_tmux.md`.
+New contract:
+- `existingMonitor = await psm.getService('enhanced-transcript-monitor', 'per-project', { projectPath })`
+- If `!existingMonitor` → `needsRestart=true, reason='no PSM entry'`
+- Else if `!psm.isProcessAlive(existingMonitor.pid)` → `needsRestart=true, reason='PID … is dead'`
+- The existing spawn block at lines 1404-1442 is unchanged; it already
+  did `unregisterService` before respawning.
 
-Operator runbook: open a fresh tmux pane in the coding project (which
-already wires `status-line-fast.cjs` into `status-right`), look at the
-right side of the bar, confirm the `[🧠]` token appears between
-`[📚]` and the timer/lifecycle clusters. If a colour cell appears
-where the badge should be (a known cell-width artifact), the regex
-that drives left-padding may need adjustment — file as a follow-up.
+### `getRunningTranscriptMonitorsSync()` (sync) — deliberately retained
 
-### 3. R3 / R4 destructive tests for [🧠] state transitions
+This method is synchronous (it's invoked from sync render paths) and
+PSM initialization is async. The pgrep-then-`.health/*.json`-fallback
+shape stays. PSM substitution would require either:
+- Restructuring the call site to async (out of scope here), or
+- Preloading PSM cache at module load and reading it synchronously
+  (couples render path to PSM cold-start cost).
 
-The plan calls for exercising `auto_heal_status='cooldown'` to confirm
-the `[🧠🚫]` badge renders + forces overallColor red, and the dashboard
-card surfaces "cooldown — N/3 kickstarts in last 5 min". These need
-the same destructive setup deferred from Plan 34-03 (force OAuth
-failure for 5+ min, cycle 3 kickstarts).
+Documented as intentional in the code path; not a regression vs the
+SPEC AC #8 grep (which only targets the deleted-module symbol names,
+not the .health-file reads).
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `node --check scripts/combined-status-line.js` | PASS |
+| Phase 33 `quick.sh` regression suite | PASS (2/2) |
+| Destructive end-to-end test: `kill -TERM 82996` (sketcher ETM) → status-line tick → PSM detects dead PID → spawns PID 7398 → coordinator state shows fresh `lastBeat_age_s=2.0` | PASS |
+| Offline render: all 6 badges present, `[🧠]` between `[📚]` and `[📋]` | PASS |
+| W-1 live tmux render (operator-confirmed 2026-05-11) | PASS |
+
+### Diff stats
+
+```
+scripts/combined-status-line.js | 110 ++++++++++------------------------------
+1 file changed, 28 insertions(+), 82 deletions(-)
+```
+
+## Deferred — R3 / R4 destructive tests for [🧠] state transitions
+
+The plan also calls for exercising `auto_heal_status='cooldown'` to
+confirm the `[🧠🚫]` badge renders + forces overallColor red, and the
+dashboard card surfaces "cooldown — N/3 kickstarts in last 5 min".
+These need the same destructive setup deferred from Plan 34-03 (force
+OAuth failure for 5+ min, cycle 3 kickstarts) and are tracked there.
 
 ## Phase 34 progress after this commit
 
@@ -196,9 +221,9 @@ failure for 5+ min, cycle 3 kickstarts).
 | 34-02 | ✅ on main |
 | 34-03 | ✅ on main (R3/R4 destructive tests deferred) |
 | 34-04 | ✅ on main |
-| **34-05** | **🟢 mostly done** — Tasks 1 + 2 (badge) + 3 (dashboard card) on main; only Task 2(d) dead-reader cleanup + W-1 live tmux render remain |
-| 34-06 | ⏸ paused at Task 1 gate |
+| **34-05** | **✅ done** — Tasks 1 + 2 (full, incl. 2(d) dead-reader cleanup) + 3 on main; W-1 live tmux render operator-verified 2026-05-11 |
+| 34-06 | ✅ on main |
 
-When Task 2(d) ships and W-1 + R3/R4 cooldown observable tests are
-operator-validated, this SUMMARY's "Status" line graduates to
-"Complete".
+R3/R4 destructive cooldown tests for the `[🧠🚫]` badge are the only
+acceptance items left — they share the destructive-window gate with
+Plan 34-03 and will fire in the same operator session.
