@@ -6,9 +6,8 @@
  * 2. Knowledge extraction from conversations
  * 3. Concept abstraction and storage
  * 4. Knowledge retrieval and search
- * 5. Trajectory tracking with intent classification
- * 6. Budget tracking and enforcement
- * 7. Cross-session knowledge sharing
+ * 5. Budget tracking and enforcement
+ * 6. Cross-session knowledge sharing
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -22,7 +21,6 @@ class MockKnowledgeLearningSystem {
     this.projectPath = options.projectPath;
     this.sessions = [];
     this.knowledgeBase = [];
-    this.trajectory = [];
     this.budget = {
       limit: options.budgetLimit || 8.33,
       used: 0,
@@ -37,12 +35,7 @@ class MockKnowledgeLearningSystem {
       id: `session_${Date.now()}`,
       startTime: Date.now(),
       metadata,
-      exchanges: [],
-      trajectory: {
-        intent: 'exploring',
-        state: 'active',
-        goal: null
-      }
+      exchanges: []
     };
 
     this.sessions.push(this.currentSession);
@@ -62,9 +55,6 @@ class MockKnowledgeLearningSystem {
     };
 
     this.currentSession.exchanges.push(exchange);
-
-    // Update trajectory
-    await this.updateTrajectory(exchange);
 
     // Extract knowledge in real-time
     await this.extractKnowledge(exchange);
@@ -289,100 +279,7 @@ class MockKnowledgeLearningSystem {
     return items.slice(0, options.limit || 10);
   }
 
-  // FR-5: Trajectory tracking with intent classification
-  async updateTrajectory(exchange) {
-    const intent = this.classifyIntent(exchange);
-    const state = this.determineState(exchange);
-
-    const trajectoryPoint = {
-      timestamp: Date.now(),
-      intent,
-      state,
-      exchange: exchange.id,
-      sessionId: this.currentSession.id
-    };
-
-    this.trajectory.push(trajectoryPoint);
-    this.currentSession.trajectory = {
-      intent,
-      state,
-      goal: this.inferGoal(intent)
-    };
-
-    return trajectoryPoint;
-  }
-
-  classifyIntent(exchange) {
-    const userLower = exchange.user.toLowerCase();
-
-    if (userLower.includes('implement') || userLower.includes('create')) {
-      return 'feature-dev';
-    }
-    if (userLower.includes('fix') || userLower.includes('error')) {
-      return 'debugging';
-    }
-    if (userLower.includes('test')) {
-      return 'testing';
-    }
-    if (userLower.includes('refactor')) {
-      return 'refactoring';
-    }
-    if (userLower.includes('understand') || userLower.includes('explain')) {
-      return 'learning';
-    }
-
-    return 'exploring';
-  }
-
-  determineState(exchange) {
-    if (exchange.assistant.includes('error') || exchange.assistant.includes('issue')) {
-      return 'blocked';
-    }
-    if (exchange.assistant.includes('complete') || exchange.assistant.includes('done')) {
-      return 'complete';
-    }
-
-    return 'implementing';
-  }
-
-  inferGoal(intent) {
-    const goals = {
-      'feature-dev': 'Build new feature',
-      'debugging': 'Fix bug',
-      'testing': 'Add test coverage',
-      'refactoring': 'Improve code quality',
-      'learning': 'Understand codebase',
-      'exploring': 'Explore options'
-    };
-
-    return goals[intent] || 'General development';
-  }
-
-  getTrajectoryAnalytics() {
-    const intentCounts = {};
-    const stateCounts = {};
-    let totalTime = 0;
-
-    for (let i = 0; i < this.trajectory.length; i++) {
-      const point = this.trajectory[i];
-
-      intentCounts[point.intent] = (intentCounts[point.intent] || 0) + 1;
-      stateCounts[point.state] = (stateCounts[point.state] || 0) + 1;
-
-      if (i > 0) {
-        totalTime += point.timestamp - this.trajectory[i - 1].timestamp;
-      }
-    }
-
-    return {
-      intentDistribution: intentCounts,
-      stateDistribution: stateCounts,
-      totalPoints: this.trajectory.length,
-      averageTimePerPoint: this.trajectory.length > 1 ? totalTime / (this.trajectory.length - 1) : 0
-    };
-  }
-
-  // FR-6: Budget tracking and enforcement
+  // FR-5: Budget tracking and enforcement
   canAffordCost(estimatedCost) {
     return (this.budget.used + estimatedCost) <= this.budget.limit;
   }
@@ -412,12 +309,11 @@ class MockKnowledgeLearningSystem {
     };
   }
 
-  // FR-7: Cross-session knowledge sharing
+  // FR-6: Cross-session knowledge sharing
   async exportKnowledge() {
     return {
       sessions: this.sessions,
       knowledge: this.knowledgeBase,
-      trajectory: this.trajectory,
       budget: this.budget
     };
   }
@@ -478,7 +374,6 @@ class MockKnowledgeLearningSystem {
       sessions: this.sessions.length,
       totalExchanges: this.sessions.reduce((sum, s) => sum + s.exchanges.length, 0),
       knowledgeItems: this.knowledgeBase.length,
-      trajectoryPoints: this.trajectory.length,
       budgetUsed: this.budget.used,
       budgetPercentage: (this.budget.used / this.budget.limit) * 100
     };
@@ -546,28 +441,6 @@ describe('Knowledge Learning Workflow E2E Tests', () => {
       const results = await system.searchKnowledge('caching');
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].relevance).toBeGreaterThan(0.5);
-    });
-
-    it('should track trajectory throughout session', async () => {
-      await system.startSession({ project: 'test' });
-
-      await system.processExchange(
-        'I want to implement a new feature',
-        'Let me help you design that feature'
-      );
-
-      await system.processExchange(
-        'How do I fix this bug?',
-        'Here is the solution to fix the bug'
-      );
-
-      await system.endSession();
-
-      const analytics = system.getTrajectoryAnalytics();
-
-      expect(analytics.intentDistribution['feature-dev']).toBeDefined();
-      expect(analytics.intentDistribution['debugging']).toBeDefined();
-      expect(analytics.totalPoints).toBe(2);
     });
 
     it('should enforce budget limits during session', async () => {

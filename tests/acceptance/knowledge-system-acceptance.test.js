@@ -3,8 +3,8 @@
  *
  * Phase 34 (D-08 Plan B) — gutted to a stub. The original suite exercised
  * src/knowledge-management/ modules that Plan 34-05 deleted (the streaming
- * extractor, decay tracker, concept abstraction agent, real-time
- * trajectory analyzer, et al.). The dynamic imports were already broken
+ * extractor, decay tracker, concept abstraction agent, et al.). The
+ * dynamic imports were already broken
  * before deletion — they referenced an `src/knowledge/` path that never
  * existed in this codebase shape — so the suite never ran in CI either.
  *

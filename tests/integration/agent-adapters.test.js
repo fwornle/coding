@@ -8,7 +8,6 @@
  * Key Areas:
  * - AgentAgnosticCache with file/HTTP/MCP backends
  * - Knowledge extraction from different transcript formats
- * - Trajectory tracking across agents
  * - Budget tracking universality
  * - Graceful degradation when agent features unavailable
  */
@@ -254,47 +253,6 @@ AI: Answer`;
 
       expect(result.extracted).toBe(0);
       expect(result.errors.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Trajectory Tracking - Agent Agnostic', () => {
-
-    it('should track trajectory regardless of agent type', async () => {
-      // Mock trajectory analyzer
-      const mockAnalyzer = {
-        analyzeTrajectoryState: vi.fn().mockResolvedValue({
-          state: 'implementing',
-          intent: 'feature-dev',
-          confidence: 0.85
-        })
-      };
-
-      const exchange = { user: 'Add feature X', assistant: 'Implementing feature X' };
-      const result = await mockAnalyzer.analyzeTrajectoryState(exchange);
-
-      expect(result.state).toBe('implementing');
-      expect(result.intent).toBe('feature-dev');
-      expect(result.confidence).toBeGreaterThan(0.8);
-    });
-
-    it('should persist trajectory history to database for all agents', async () => {
-      // Mock trajectory history service
-      const mockHistory = {
-        persistStateChange: vi.fn().mockResolvedValue({
-          buffered: true,
-          bufferSize: 1
-        })
-      };
-
-      const stateChange = {
-        state: 'implementing',
-        intent: 'feature-dev',
-        timestamp: Date.now()
-      };
-
-      const result = await mockHistory.persistStateChange(stateChange);
-      expect(mockHistory.persistStateChange).toHaveBeenCalled();
-      expect(result.buffered).toBe(true);
     });
   });
 
