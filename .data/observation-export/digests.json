@@ -11595,5 +11595,569 @@
       "sourceCount": 3
     },
     "project": "coding"
+  },
+  {
+    "id": "95b1dfd3-49dc-43cf-9cfa-a996f4868a0f",
+    "date": "2026-05-10",
+    "theme": "Phase 34 Proxy Supervision and ETM Dead-Code Cleanup",
+    "summary": "Completed plan 34-02 and 34-04 of phase 34, covering proxy semantic-readiness probes and ETM dead-code strip.\n\n- `health-coordinator.js`: added 6 `PROXY_*` constants, a `state.proxy` slice (9 fields), `pollProxySemantic` (D-01 payload + D-02 four-mode classification), and `pollProxyMode` probes wired into `tick()` with fail-open pattern\n- `health-verification-rules.json`: updated to capture checkpoint gate state\n- A D-10 cross-project safety gate required operator approval before killing and restarting the rapid-automations ETM (PID 54103)\n- After approval, rapid-automations ETM restarted (54103 → 48315); both ETMs verified heartbeating healthy\n- Dead-code strip removed 7 blocks / ~200 LoC from the coding ETM; commits `7a4066eb4` (strip) and `1cbaabde4` (SUMMARY) landed on the worktree branch; plan 34-06 queued",
+    "observationIds": [
+      "3a3daf91-dc0b-4b12-9306-6c09f8b02f9a",
+      "54ca269c-8cb3-498e-9e23-3569dc5d0b19",
+      "a4f039b1-78f7-4b65-a7c5-61fdcaf0b25f",
+      "acb8d4e4-0aaa-4eed-9828-4e1949280c58",
+      "3e4d8a32-928c-4b4f-889c-47f4466d3ba9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "health-coordinator.js",
+      "34-02-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/config/health-verification-rules.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8c96a815-e430-4c4c-b3ee-ff1e4a4d83a9",
+    "date": "2026-05-10",
+    "theme": "ETM Duplicate Block Fixes and Per-Exchange Tranche Routing",
+    "summary": "Addressed two related LSL/ETM correctness problems in `enhanced-transcript-monitor.js`: duplicate prompt-set blocks accumulating in output files, and all prompt-set writes being anchored to the first exchange's time window.\n\n- **Idempotency fix (obs 6):** Made `processUserPromptSetCompletion` idempotent by stripping prior `ps_${promptSetId}` blocks from all tranche part-files before appending the updated block, preventing files from growing past 200 KB and spawning unintended part files\n- **File-lock fix (obs 9, 10):** Wrapped the remove-existing-block + append logic with `proper-lockfile` (already a PSM dependency) to prevent race conditions when multiple ETM instances run concurrently during the heartbeat warm-up period; stress-tested with 3 concurrent ETMs for 90+ seconds with no new duplicates\n- **Per-exchange tranche routing (obs 7, 11, 14):** Redesigned so each exchange lands in the hourly file matching its own timestamp rather than the prompt set's start time, with `ps_id` as the linking key; long-running prompt sets now distribute across multiple hourly files, recoverable via grep\n- `combined-status-line.js` read repeatedly for context/diagnosis during this session\n- Two commits finalized: `865665502` (status-line width/cache/timer fixes in `scripts/status-line-fast.cjs`) and `22d456b0d` (per-exchange tranche routing in `scripts/enhanced-transcript-monitor.js`)",
+    "observationIds": [
+      "996d2c98-4d74-4e0c-84ef-08e648f44d5c",
+      "f6dd6d56-1d25-410c-ac8f-6102385a70d5",
+      "579fbb06-b7aa-4b11-92f7-6fbe4e98b4b6",
+      "7d15f0e4-4259-4715-993d-5032ea0ddd40",
+      "b6a94137-46cd-4b99-afe6-78603d2f4aa9",
+      "a39d57c2-0fe2-4c69-ac16-7dd344169ae3",
+      "84afec93-c032-455f-a7a7-46a3c3c8865e",
+      "b44df267-d439-4cb6-bf93-834e2106ca5d",
+      "ad1fb26a-ef3c-4f0a-8ecd-6a3b6a93024f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js.disabled",
+      "/tmp/test-lsl-idempotent-fix.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "scripts/status-line-fast.cjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 9
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f8ad4507-43b7-4f71-afbf-ffd6ee16abfa",
+    "date": "2026-05-10",
+    "theme": "Status Line Rendering Artifacts and Knowledge Injection Investigation",
+    "summary": "Investigated two separate display/diagnostic concerns, both triggered by shared screenshots and both ending without committed code changes.\n\n- **Tmux shrinking-cells artifact (obs 15):** Identified that `SYS:ERR` text leaks from previous renders because trailing spaces are stripped by tmux; fix requires leading-pad on every status emit in both the success-cache and error paths of `combined-status-line.js` — analysis complete, no code written yet\n- **Knowledge injection <USER_ID_REDACTED> (obs 16, 17, 18):** Traced the retrieval pipeline from hook → client → API server → retrieval service; confirmed the system uses keyword/recency-based matching rather than semantic/embedding search, identified as the root cause of poor retrieval relevance; no code changes made",
+    "observationIds": [
+      "6b6f7269-0190-4920-86f5-d8133841b33a",
+      "f31d7ad1-982e-4b75-a12c-84d130c82a88",
+      "6050b331-db12-4c0c-908d-5d5e288de095",
+      "11049054-5468-4a71-a62f-b403c7e78c19"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4f7df273-35d6-4e59-9fd5-a6d37d06baed",
+    "date": "2026-05-10",
+    "theme": "Observations API Restart Script and Service Hardening",
+    "summary": "Stabilized the `obs-api` service and addressed several reliability gaps identified through crash investigation.\n\n- `restart-obs-api.mjs` written as a proper `.mjs` module, committed to `scripts/`, and verified end-to-end: PSM registered the new process (PID 55923), retrieve latency confirmed at 73 ms\n- Bug report filed at `2026-05-10-obs-api-libcxx-mutex-shutdown-crash.md` for the `libc++abi` shutdown mutex crash; Qdrant client version pin deferred to this todo\n- From a parallel session's four proposed fixes, two were approved for `start-services-robust.js`: EADDRINUSE retry logic and adding `parentPid` to SIGTERM logging; shutdown reorder was rejected as flawed\n- `.gitignore` reviewed for repository hygiene around observation/knowledge export directories",
+    "observationIds": [
+      "4784748f-16c1-40ab-bbc3-b5e87defaae2",
+      "07c7ac7c-7b79-4124-936f-93a5554fa1e4",
+      "eea49cde-4c8a-4f9e-9323-276bff646d8e",
+      "21d2a397-1186-4f8a-be6a-fa3bf681d09b",
+      "4eb6cabb-bcf8-4f32-aaa7-705c3e4d3fb4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/restart-obs-api.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/2026-05-10-obs-api-libcxx-mutex-shutdown-crash.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/start-services-robust.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "355f97ef-e3fa-46bf-961f-ab749cf20101",
+    "date": "2026-05-10",
+    "theme": "Qdrant and SQLite Deduplication, Sync, and Stale Heartbeat Fix",
+    "summary": "Cleaned up drift between the SQLite observations store and Qdrant vector collections, then fixed a stale heartbeat bug in the API server.\n\n- **Deduplication (obs 24):** `dedupe-observations.mjs` created to collapse duplicate SQLite rows using a 4-hour window matching the live writer's behavior; dry run found 164 duplicates\n- **Orphan vector pruning (obs 25, 26):** `prune-orphan-vectors.mjs` created and run; 189 orphan vectors removed across `observations`, `digests`, and `insights` Qdrant collections; reverse drift (SQLite records missing embeddings) left out of scope\n- **Qdrant backfill (obs 27):** All three collections synced with SQLite; 1-point residuals in observations and digests due to content-hash collisions, noted as functionally harmless\n- **Stale heartbeat fix (obs 28, 29, 30):** Old `obs-api` instance (PID 46983) left a heartbeat file that caused the replacement server to report consolidation as perpetually in-progress; fixed in `observations-api-server.mjs` by adding a staleness check — treats heartbeats as stale if age > 30 s (15× the 2 s write interval) or if the recorded PID is no longer alive, then deletes the file and returns `null`",
+    "observationIds": [
+      "7496356b-35da-4b19-8a58-9114a3e2c866",
+      "e23f27d4-2d7b-4745-961e-53782fa6b735",
+      "b9fa5c28-2166-487c-8b0c-c105977ead52",
+      "cf31130c-1f93-49b6-ae51-1487d26262f4",
+      "c5e3427a-0ce1-4ca4-8502-61c1494bf1b7",
+      "36e9086a-f06b-4648-ad0b-7900e8f8b6a4",
+      "6a168c16-0cee-424f-8712-9533a08c8855"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/dedupe-observations.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/prune-orphan-vectors.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 7
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8cf541ad-ddcc-4fd4-a25a-5de712adef5f",
+    "date": "2026-05-10",
+    "theme": "Tmux Status Bar Ghost Character Residue Diagnosis",
+    "summary": "Investigated persistent ghost/residual character artifacts in the tmux status bar across multiple diagnostic rounds.\n\n- Initial hypothesis: varying render widths cause leftover characters when shorter content overwrites longer content\n- `bg=green` hypothesis was tested and falsified — residual digits persisted regardless of background color\n- Suspicion shifted to xterm.js cell-clearing quirks in VS Code's integrated terminal; next step was to test in Terminal.app or iTerm2\n- The 30-second self-correction timing was identified as a clue pointing toward a cache TTL or periodic refresh interval in `status-line-fast.cjs`\n- Files touched during investigation: `test-helper-against-real-file.mjs`, `enhanced-transcript-monitor.js`, `dedupe-lsl.mjs`\n- No fixes applied during this phase; investigation led into the cache contamination fix (obs 6–7)",
+    "observationIds": [
+      "f130c5df-5d8d-4e2c-ba97-632fe2edfb2f",
+      "01b89eb5-ff54-44c5-a09f-0445375269b9",
+      "f1ac0063-f126-4c65-b689-6df13587cfb9",
+      "9bec74d8-543c-451b-8516-3346ad52e033"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/tmp/test-helper-against-real-file.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/tmp/dedupe-lsl.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "5430d827-ad6b-47c3-b49b-09b8335ff8c0",
+    "date": "2026-05-10",
+    "theme": "Session Continuity Summary Across Projects",
+    "summary": "Read LSL files from both `rapid-automations` and `coding` projects to re-establish context continuity spanning 2026-05-09 to 2026-05-10. Key open items surfaced included: submodule diff on current branch, online-learning indicator Phase A replacement, LSL backfill verification, and the tmux statusline root-cause investigation.",
+    "observationIds": [
+      "c853a035-3b05-43b2-bb47-0a6d59b45c29"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/tmp/test-helper-against-real-file.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/tmp/dedupe-lsl.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "dc79434b-d59e-4dbe-9399-00afd275d399",
+    "date": "2026-05-10",
+    "theme": "Fix Cross-Width Cache Contamination in Status Line",
+    "summary": "Applied a targeted patch to `status-line-fast.cjs` to fix sibling-borrow logic that was causing cross-width cache contamination.\n\n- Sibling cache borrowing now filters by `-w${paneWidth}.txt` filename suffix, preventing incorrectly-sized cached content from being used in new panes\n- Cross-project priming is preserved; only cross-width borrowing is blocked\n- Orphaned pre-migration cache file `combined-status-line-cache-coding.txt` (without width suffix) was deleted from `.logs/`, leaving only width-suffixed caches",
+    "observationIds": [
+      "f3857533-9e48-4ea6-868b-6cf40c63b5d5",
+      "c6b58a47-40c0-4709-82f2-5f80b8d2e9a9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "c3ee9572-9859-4fda-8fae-5cabee2c6e69",
+    "date": "2026-05-10",
+    "theme": "Diagnose and Fix \"Status Offline\" Fallback in Status Bar",
+    "summary": "Investigated and resolved the `[Status Offline]` fallback appearing in the tmux status bar.\n\n- Root cause: stale combined-status-line cache (20+ minutes old, past the 60s freshness threshold) caused the fast-path borrow to be skipped, falling through to a synchronous CSL run that was also failing\n- `status-line-fast.cjs` safety timer extended from 5s to 10s (exceeding CSL's internal 8s timeout) so CSL can emit its own `⚠️ SYS:TIMEOUT` warning rather than being silently killed\n- Non-zero exit handling updated to emit any captured partial/error output instead of the generic `[Status Offline]` string\n- Fix confirmed via screenshot: status bar right-aligned with no leftover artifacts and active \"SK\" project underlined\n- A secondary `LSL sketcher degraded` issue was noted as unrelated to the statusline fix\n- Primary artifact modified: `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs`",
+    "observationIds": [
+      "06e412d1-36bd-4930-a212-a21a42f5b458",
+      "7b69a1f2-06b9-43ec-b19f-bb736bc3f035",
+      "b9e21b52-8a35-483c-8cf8-8899ad9ec040",
+      "5a00dd10-8c3d-4149-8e6e-2c77cc8f783b",
+      "6b9e08e9-2360-4af9-b929-e84b3eea00fc",
+      "ad1f7233-6646-4be0-927d-e1e8097cd8a3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/tmp/test-helper-against-real-file.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/tmp/dedupe-lsl.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/config/health-verification-rules.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/lsl-dedupe.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "f924158a-4b8d-4dbb-88f8-d13505e9e7f4",
+    "date": "2026-05-10",
+    "theme": "Investigate SK Project Yellow Indicator in Status Line",
+    "summary": "Investigated why the \"SK\" (sketcher) project indicator appears yellow in the combined status line.\n\n- \"SK\" is the abbreviation for the `sketcher` project; yellow color maps to the 🪨 (rock/stale) icon state in `combined-status-line.js`\n- Yellow is triggered by health/degraded status logic in the statusline script\n- A corrupted `SYS:ERR` cache was identified as compounding display issues\n- No fixes were applied; investigation was diagnostic only\n- Primary file inspected: `combined-status-line.js`",
+    "observationIds": [
+      "89a3ac7a-0f5f-48c9-8873-33747edcd386",
+      "0a3fe51d-a464-4f9b-8147-5e4214a4c51d",
+      "f1f444cf-1561-4781-8953-c51dda484787"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "f1467a45-8222-4b39-8c2a-5da4ca1f8c60",
+    "date": "2026-05-10",
+    "theme": "Combined Status Line Lifecycle Issues and obs_api Crash Investigation",
+    "summary": "Continued investigation into combined status line behavior and a separate `obs_api` service crash.\n\n- Read `combined-status-line.js`, `combined-status-line-wrapper.js`, and `status-line-fast.cjs` to identify two real lifecycle issues; no changes made pending further analysis\n- Live verification confirmed the 5-minute Active band works correctly across all three sessions/panes\n- `obs_api` was found recovered (PID 48173, ~1min uptime, 1ms latency) after an apparent stoppage; root cause pointed toward SIGTERM events in the observations-api log but was not fully confirmed\n- Health badge issues noted as unrelated to Active band configuration",
+    "observationIds": [
+      "1db3db6a-1b56-493c-bddc-2a0ad6e8c784",
+      "18d2e4a1-4adf-4b43-9367-c314ba4e1137",
+      "f670831e-d76d-4f45-a17a-b1b740e8562f",
+      "921b7179-eb1a-46cc-a54e-510acbd60ae9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line-wrapper.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/retrieval/retrieval-service.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/hooks/knowledge-injection-hook.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "6fba8b50-0be4-49d0-baa1-e49586765d88",
+    "date": "2026-05-10",
+    "theme": "Add EADDRINUSE Retry Logic to Service Orchestrator",
+    "summary": "Enhanced `start-services-robust.js` with two improvements for service reliability:\n\n- Added a `waitForPortBindable` helper function implementing EADDRINUSE retry logic for cases not covered by the existing restart helper\n- Added `process.ppid` to the SIGTERM log line to provide cheap but useful diagnostic data for tracing unexpected termination signals\n- File modified: `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/start-services-robust.js`",
+    "observationIds": [
+      "d948e97c-961f-4211-950d-a199a282baff"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/start-services-robust.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "89112345-c5b4-4c26-966f-e84e820f345f",
+    "date": "2026-05-10",
+    "theme": "Fix .flush.lock Appearing in History Repo Changesets",
+    "summary": "Resolved `.flush.lock` (created by `proper-lockfile`) appearing in git changesets for the specstory history repos.\n\n- `.gitignore` created/updated in `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.specstory/history/` to exclude `.flush.lock` and `.flush.lock.lock/`\n- `coding-history` `.gitignore` was confirmed to already contain the correct patterns (`.flush.lock` and `.flush.lock.lock/`), so no changes were needed there\n- `agent-common-setup.sh` updated to replicate the proven lockfile ignore patterns from `coding-history` so future history repo initializations include them automatically\n- Investigation also read `init-history.sh` and `coding` scripts to locate where default repo URL and gitignore are configured, but no URL changes were made",
+    "observationIds": [
+      "f94559f2-fbf8-4998-96c3-6e486ea84b83",
+      "cdca52ab-643f-4333-810c-3482c728ae3d",
+      "d37854e6-add8-42b6-bf85-4321f9dd30ec",
+      "c0dbbe01-0b5e-4a91-bea6-25718630bd0b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.specstory/history/.gitignore",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/dedupe-observations.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/agent-common-setup.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "5ac48fcb-1477-44c4-bebe-e509b2f9b6a5",
+    "date": "2026-05-10",
+    "theme": "Session Continuity Load Reveals Unresolved Pipeline Issues",
+    "summary": "Agent loaded recent session logs (LSL files) across the sketcher and coding projects to re-establish continuity context for the day.\n\n- **Coding project**: Prior session (09:00–11:47 CEST) left an unresolved suspected syntax error in `enhanced-transcript-monitor.js` within an active LSL pipeline\n- **Sketcher project**: No real activity, but uncommitted scaffolding files remain in the working tree\n- `combined-status-line.js` was edited as part of the session log review process\n- Key outstanding risk: the syntax error in `enhanced-transcript-monitor.js` was not resolved before the previous session ended and requires follow-up",
+    "observationIds": [
+      "084f704c-4b57-44fe-b53f-b4104c6a0a91"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-10T13:45:36.912Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "b2aa736b-c3d4-4c45-994c-76bb559cf722",
+    "date": "2026-05-10",
+    "theme": "Memory Visualizer Bundle Rebuild and Server Restart",
+    "summary": "Rebuilt the `memory-visualizer` bundle via npm and restarted `vkb-server` to apply changes. Verified correctness by confirming both source filters return 25 entities in the UI as expected. Minor edits made to `integration.test.js` as part of the process.",
+    "observationIds": [
+      "6a8d6630-f23d-4eb7-94ea-45f2ea5ab350"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/unit/ontology/integration.test.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-11T03:33:53.515Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "983fbae8-885f-4ec4-80fb-3e75a902acf0",
+    "date": "2026-05-10",
+    "theme": "Entity Relation Repair and Self-Healing Logic Development",
+    "summary": "Resumed interrupted work on orphaned entity relation repair and self-healing sweep logic. Key steps and outcomes:\n- Inspected API routes and ran `curl` commands to manually relink an orphaned entity via a POST to the relations API\n- Planned a self-healing sweep mechanism to prevent future orphaning across various failure paths\n- Committed changes across multiple repos, split into two logical commits covering:\n  - `integration.test.js`\n  - `knowledge-system-acceptance.test.js`\n  - `combined-status-line.js`\n  - `34-05-SUMMARY.md`",
+    "observationIds": [
+      "8244d778-584a-4e20-b47b-ca4fc2c1c9b4",
+      "489c1f6e-002f-49c0-bf34-a3ad066baac7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/unit/ontology/integration.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/acceptance/knowledge-system-acceptance.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-05-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-11T03:33:53.515Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "c55fb6f8-a20d-486b-9946-a4ebe2a7f046",
+    "date": "2026-05-10",
+    "theme": "Blue Color Coding Clarified as Rapid-Automations Project",
+    "summary": "Two sequential clarifications established that the blue color in the combined status line display corresponds to the `rapid-automations` (coding) project. The assistant investigated coordinator state, running monitors, and the `combined-status-line.js` script to confirm the color-to-project mapping, enabling correct interpretation of the monitoring UI going forward. No artifacts were modified.",
+    "observationIds": [
+      "465272ee-855b-4dbb-9520-90e8f8a25531",
+      "b8c8c0f1-a799-4ec2-a3f6-7baeed65d28f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-11T03:33:53.515Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "89bbefe9-848d-4f11-9632-b95b8e3dee87",
+    "date": "2026-05-10",
+    "theme": "Phase 34 Open Work Investigation and Cherry-Pick Integration",
+    "summary": "Session began with investigating open items from phase 34, then pivoted to integrating work via cherry-pick rather than merge.\n\n- Searched planning docs, phase files, roadmap, and git log to identify incomplete phase 34 items\n- Cherry-picked 6 specific commits in order onto the current branch\n- Verified syntax of `health-coordinator.js` post-cherry-pick\n- All 6 cherry-picks landed cleanly with no conflicts; hook points for 34-03 integration confirmed present in `health-coordinator.js`\n- `GraphDatabaseService.js` was modified across these operations",
+    "observationIds": [
+      "eca4615c-0f1d-4010-a6d1-577c4e14b815",
+      "9ae95b65-79d7-4bff-8ee1-f781e457fc71",
+      "7a2bc1da-50ad-4367-8f0d-fc3e84f269eb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/GraphDatabaseService.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-11T05:04:14.337Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "512fce17-5d69-4f70-ab14-3e509cb35e48",
+    "date": "2026-05-10",
+    "theme": "Roadmap and State Tracking Updated for Tasks 34-01 to 34-03",
+    "summary": "After completing integration work, planning documents were updated to reflect finished tasks.\n\n- Marked tasks 34-01 through 34-03 complete in `ROADMAP.md`\n- Updated `STATE.md` with `last_updated`, `last_activity`, `completed_plans` count, and current position\n- Files: `.planning/ROADMAP.md`, `.planning/STATE.md`",
+    "observationIds": [
+      "955375ec-0635-4fba-ac86-f20fe83829cb",
+      "648e7695-6c9c-4ad0-99af-32c7dbc0df2c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-11T05:04:14.337Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "259286c4-5311-45db-803a-9f03297ab68b",
+    "date": "2026-05-10",
+    "theme": "Cherry-Picking Task 34-04 Commits onto Main Branch",
+    "summary": "Resolved the 34-04 merge conflict by cherry-picking its commits cleanly onto main.\n\n- Applied two 34-04 commits (covering lock and per-exchange routing) via cherry-pick\n- Both landed without conflicts; prior session work preserved intact\n- Syntax check on the affected script passed\n- `GraphDatabaseService.js` modified",
+    "observationIds": [
+      "c748b44a-22f4-47b1-a97e-7d75c5a57a44",
+      "50b03a53-8b07-4917-a7a2-4b1dce6c4182"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/GraphDatabaseService.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-11T05:04:14.337Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "62d59b53-1b2a-4623-97bd-098128d31a53",
+    "date": "2026-05-10",
+    "theme": "Phase 34-05 Dead File Cleanup and ETM Housekeeping",
+    "summary": "Executed phase 34-05, focused on removing dead ETM source files and cleaning up orphaned references.\n\n- Read plan 34-05 (3 tasks: file deletions, statusline badge, dashboard card)\n- Deleted 6 dead source files: `RealTimeTrajectoryAnalyzer`, `StreamingKnowledgeExtractor`, `KnowledgeDecayTracker`, and related modules\n- Removed orphaned import from `tests/unit/ontology/integration.test.js`\n- Acceptance test cleanup was still in progress at observation time",
+    "observationIds": [
+      "502bb235-d0df-46d0-a341-3ac9343cc185",
+      "05a01a7e-397a-4250-8aeb-94220434be78"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/unit/ontology/integration.test.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-11T05:04:14.337Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7aef885b-b81b-4758-a778-d02d5dd18327",
+    "date": "2026-05-10",
+    "theme": "Proxy Health Card Added to System Health Dashboard",
+    "summary": "Implemented task 3 of phase 34-05 by adding a fifth health status card to the system health dashboard.\n\n- Located existing `<COMPANY_NAME_REDACTED>:grid-cols-5` grid layout and pre-imported `Brain` icon in `system-health-dashboard.tsx`\n- Added new proxy health `HealthStatusCard` using the existing card pattern and `healthStatus.proxy` data slice\n- Card renders successfully but displays **\"No data yet\"** fallback — `healthStatus.proxy` is `null` because the `state.proxy` slice from the coordinator is being dropped somewhere in the reducer/fetch path\n- Needs further investigation into the reducer or fetch pipeline to surface proxy data correctly\n- File: `integrations/system-health-dashboard/src/components/system-health-dashboard.tsx`",
+    "observationIds": [
+      "69f1bb1b-3838-4ce7-9881-0b4f5bfa69ed",
+      "e5af87e1-ef11-4355-a87f-9d7f53d9baf4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-11T05:04:14.337Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "811e44a1-bd63-48ec-9634-7e1cd5bbe557",
+    "date": "2026-05-11",
+    "theme": "Bug Fixes for Status Line and Health Coordinator Scripts",
+    "summary": "Two bug fixes were applied to the agentic scripting infrastructure. Initial work targeted `combined-status-line.js` alone, but deeper investigation revealed the relevant logic (transcript monitor spawning) actually resided in `health-coordinator.js`.\n\n- **Tmux session discovery bypass**: Fix correctly placed in `health-coordinator.js` after the true execution path was identified.\n- **`*-state.json` file pattern recognition**: Applied to `combined-status-line.js`.\n- Dead-code additions to `combined-status-line.js` (Source 4) from the first pass were reverted in favor of fixes in the correct location.\n\nFinal edited files:\n- `scripts/combined-status-line.js`\n- `scripts/health-coordinator.js`",
+    "observationIds": [
+      "65e7d3da-e9cc-4d68-9929-e11737bf821b",
+      "6b9b67cd-d44f-4c21-a5df-3beadcc10ba7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-11T05:04:20.071Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
   }
 ]
