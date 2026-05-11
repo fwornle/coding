@@ -114,8 +114,10 @@ curl -s http://localhost:3032/health | jq .
 ### 5. Verify LSL Monitor
 
 ```bash
-# Check monitor health file
-cat .health/coding-transcript-monitor-health.json | jq '{status, activity, lastCheck}'
+# Check ETM heartbeats via the coordinator (Phase 33+: .health/*.json files
+# stopped being written; coordinator's lsl slice is now the source of truth)
+curl -fs http://localhost:3034/health/state \
+  | jq '.lsl | to_entries | map(select(.key | endswith(":coding"))) | .[0].value | {status, lastBeat, projectName}'
 
 # Check if monitor process is running
 ps aux | grep -v grep | grep "enhanced-transcript-monitor"
@@ -185,8 +187,9 @@ cat ~/.claude/settings.json | jq '.mcpServers'
 
 **Fix**:
 ```bash
-# Check monitor status
-cat .health/coding-transcript-monitor-health.json
+# Check ETM heartbeat via coordinator (Phase 33+)
+curl -fs http://localhost:3034/health/state \
+  | jq '.lsl | to_entries | map(select(.key | endswith(":coding")))'
 
 # Restart monitor
 coding --restart-monitor

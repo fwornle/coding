@@ -309,8 +309,10 @@ node scripts/initialize-knowledge-system.js
 ### Verification
 
 ```bash
-# Check health status
-cat .health/coding-transcript-monitor-health.json | jq '.knowledgeExtraction'
+# Check knowledge-pipeline freshness via the coordinator (Phase 33+:
+# .health/*-transcript-monitor-health.json is no longer written; the
+# health-coordinator's knowledge_pipeline slice is the source of truth)
+curl -fs http://localhost:3034/health/state | jq '.knowledge_pipeline'
 
 # Check status line
 CODING_REPO=/path/to/coding node scripts/combined-status-line.js
@@ -403,5 +405,5 @@ const system = new KnowledgeLearningSystem({
 | `.data/knowledge-export/coding.json` | Git-tracked knowledge export |
 | `.data/ukb-last-run.json` | Incremental processing checkpoint |
 | `.cache/knowledge.db` | SQLite analytics database |
-| `.health/coding-transcript-monitor-health.json` | Knowledge extraction health |
+| Coordinator `state.knowledge_pipeline` slice (`http://localhost:3034/health/state`) | Knowledge extraction health (Phase 33+; supersedes the retired `.health/*-transcript-monitor-health.json`) |
 | `.specstory/config/knowledge-system.json` | Knowledge system configuration |

@@ -22,27 +22,25 @@ package "Global Monitoring Layer" {
   component [Combined Status Line\n(Watchdog)] as CSL <<infra>>
   component [Global Service Registry] as GSR <<storage>>
   component [Global LSL Registry] as GLR <<storage>>
+  component "Health Coordinator\nstate.lsl[sid:project]" as HC <<api>>
 }
 
 package "Session-Specific Monitoring" {
   package "Coding Session" {
     component [Claude (Coding)] as ClaudeC <<agent>>
     component [Enhanced Transcript Monitor] as ETM_C <<core>>
-    database [.transcript-monitor-health] as Health_C <<storage>>
     database [.claude/settings.local.json] as Settings_C <<storage>>
   }
-  
+
   package "Curriculum-Alignment Session" {
     component [Claude (CA)] as ClaudeCA <<agent>>
     component [Enhanced Transcript Monitor] as ETM_CA <<core>>
-    database [.transcript-monitor-health] as Health_CA <<storage>>
     database [.claude/settings.local.json] as Settings_CA <<storage>>
   }
-  
+
   package "Nano-Degree Session" {
     component [Claude (ND)] as ClaudeND <<agent>>
     component [Enhanced Transcript Monitor] as ETM_ND <<core>>
-    database [.transcript-monitor-health] as Health_ND <<storage>>
     database [.claude/settings.local.json] as Settings_ND <<storage>>
   }
 }
@@ -65,15 +63,15 @@ GLC CONTROL_LINE ETM_C : ensures/recovers
 GLC CONTROL_LINE ETM_CA : ensures/recovers
 GLC CONTROL_LINE ETM_ND : ensures/recovers
 
-' Health file generation
-ETM_C DATA_LINE Health_C : writes
-ETM_CA DATA_LINE Health_CA : writes
-ETM_ND DATA_LINE Health_ND : writes
+' Heartbeat signals (Phase 33+: ETMs POST to coordinator; legacy
+' .health/<project>-transcript-monitor-health.json files are retired)
+ETM_C DATA_LINE HC : POST lsl_heartbeat
+ETM_CA DATA_LINE HC : POST lsl_heartbeat
+ETM_ND DATA_LINE HC : POST lsl_heartbeat
 
-' StatusLine monitoring
-SHM SYNC_LINE Health_C : reads
-SHM SYNC_LINE Health_CA : reads
-SHM SYNC_LINE Health_ND : reads
+' StatusLine monitoring reads coordinator state.lsl slice (one HTTP call,
+' all sessions visible)
+SHM SYNC_LINE HC : reads state.lsl
 SHM ASYNC_LINE CTF : discovers sessions
 
 ' Claude sessions
@@ -124,9 +122,14 @@ note right of CSL
   Auto-restarts missing daemon
 end note
 
-note bottom of Health_C
-  Project-specific health files
-  enable individual monitoring
+note bottom of HC
+  Phase 33+ source of truth.
+  state.lsl[<sid>:<project>] keyed
+  by compound (sid, project) so
+  multiple sessions per project
+  don't collide.
+  HEARTBEAT_STALENESS_MS = 15_000
+  EVICT_AFTER_STOPPED_MS = 5 * 60 * 1000
 end note
 
 @enduml

@@ -62,8 +62,10 @@ ls ~/.claude/logs/mcp*.log
 # Check if monitor is running
 ps aux | grep enhanced-transcript-monitor
 
-# Check health file
-cat .health/coding-transcript-monitor-health.json
+# Check ETM heartbeat via coordinator (Phase 33+: .health/*.json files are
+# no longer written; coordinator's lsl slice is the source of truth)
+curl -fs http://localhost:3034/health/state \
+  | jq '.lsl | to_entries | map(select(.key | endswith(":coding")))'
 
 # Restart monitor
 coding --restart-monitor

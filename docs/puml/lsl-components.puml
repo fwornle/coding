@@ -46,19 +46,19 @@ package "Data Sources" {
 package "Output Files" {
   database "Local Project\n.specstory/history/" as localfiles <<storage>>
   database "Coding Infrastructure\ncoding/.specstory/history/" as codingfiles <<storage>>
-  file "Health Monitoring\n.transcript-monitor-health" as healthfiles <<storage>>
+  component "Health Coordinator\nstate.lsl[sid:project]" as healthcoord <<api>>
 }
 
 ' Enhanced Transcript Monitor relationships
 tpr SYNC_LINE transcripts : monitors
 extract SYNC_LINE transcripts : reads
-health SYNC_LINE healthfiles : writes
+health SYNC_LINE healthcoord : POST lsl_heartbeat
 session SYNC_LINE sessionfile : manages
 
 ' Global Coordinator relationships
 registry SYNC_LINE projregistry : manages
 lifecycle CONTROL_LINE tpr : spawns/controls
-healthmon DATA_LINE healthfiles : monitors
+healthmon DATA_LINE healthcoord : reads state.lsl
 recovery CONTROL_LINE lifecycle : triggers restart
 
 ' Classification System relationships

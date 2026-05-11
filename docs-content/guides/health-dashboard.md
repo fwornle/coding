@@ -438,56 +438,59 @@ This is likely the VKB server. To fix:
 
 ## Health Data Storage
 
-### Centralized Health Files
+### Coordinator-Centric Architecture (Phase 33+)
 
-All health files are centralized in the coding project's `.health/` directory:
+ETM health is no longer kept in per-project `.health/*.json` files. The
+`enhanced-transcript-monitor` POSTs `lsl_heartbeat` signals to the
+health-coordinator's `/health/signal` endpoint on every poll cycle,
+and the coordinator's in-memory `state.lsl` slice is the sole source
+of truth.
 
-- **Location**: `/Users/q284340/Agentic/coding/.health/`
-- **Pattern**: `{projectName}-transcript-monitor-health.json`
-- **Git Management**: Excluded via coding's `.gitignore`
+- **Endpoint**: `http://localhost:3034/health/state`
+- **Slice**: `state.lsl[<sid>:<projectName>]`
+- **Schema**: `{ status: 'running'|'stopped', lastBeat: <ms-epoch>, projectName, ... }`
+- **Process registry**: `ProcessStateManager` (`scripts/process-state-manager.js`) tracks ETM PIDs at `'enhanced-transcript-monitor' / 'per-project' / { projectPath }`.
 
-### File Structure
+### Inspecting Live ETM Health
 
-The `.health/` directory contains:
+```bash
+# All ETMs across all projects
+curl -fs http://localhost:3034/health/state | jq '.lsl'
 
-- `coding-transcript-monitor-health.json`
-- `curriculum-alignment-transcript-monitor-health.json`
-- `nano-degree-transcript-monitor-health.json`
-- `verifier-heartbeat.json`
+# Just one project (e.g. coding)
+curl -fs http://localhost:3034/health/state \
+  | jq '.lsl | to_entries | map(select(.key | endswith(":coding")))'
 
-### Health File Format
+# Process registry view (PIDs)
+node -e 'const PSM=require("./scripts/process-state-manager.js").default;(async()=>{const p=new PSM();await p.initialize();console.log(await p.getService("enhanced-transcript-monitor","per-project",{projectPath:process.cwd()}));})()'
+```
+
+### Coordinator State Shape
 
 ```json
 {
-  "timestamp": 1759046473900,
-  "projectPath": "/Users/q284340/Agentic/coding",
-  "transcriptPath": "/Users/.../coding/ff78b04f-7bf1-47f3-8bd5-95fad54132bf.jsonl",
-  "status": "running",
-  "userHash": "g9b30a",
-  "metrics": {
-    "memoryMB": 14,
-    "memoryTotalMB": 27,
-    "cpuUser": 6114958,
-    "cpuSystem": 1783796,
-    "uptimeSeconds": 6812,
-    "processId": 78580
-  },
-  "transcriptInfo": {
-    "status": "active",
-    "sizeBytes": 2453561,
-    "ageMs": 1417,
-    "lastFileSize": 2453561
-  },
-  "activity": {
-    "lastExchange": "b23853b3-26e9-42b2-ac52-a50817818382",
-    "exchangeCount": 20,
-    "isSuspicious": false,
-    "suspicionReason": null
-  },
-  "streamingActive": true,
-  "errors": []
+  "etm-82997-1778496466077:coding": {
+    "status": "running",
+    "lastBeat": 1778497234567,
+    "projectName": "coding",
+    "transcriptPath": "/Users/.../coding/<session-id>.jsonl"
+  }
 }
 ```
+
+Heartbeat staleness threshold is `HEARTBEAT_STALENESS_MS = 15_000`
+(coordinator marks `status='stopped'` after 15s without a beat); stopped
+entries are evicted after `EVICT_AFTER_STOPPED_MS = 5 * 60 * 1000`.
+
+### Legacy `.health/` Directory
+
+The `.health/` directory still exists but only holds the slimmer
+`*-transcript-monitor-state.json` files (per-ETM crash-recovery state),
+NOT the `*-transcript-monitor-health.json` files documented in earlier
+versions. The old health-JSON shape was retired at the Phase 33
+cutover (commit `8f304038e` and the coordinator-signal migration that
+followed). Plan 34-05 Task 2(d) removed the last reader sites in
+`scripts/combined-status-line.js` on 2026-05-11.
 
 ---
 

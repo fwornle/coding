@@ -154,8 +154,9 @@ for port in 3848 3849 3850; do
   echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status')"
 done
 
-# LSL monitor health
-cat .health/coding-transcript-monitor-health.json | jq '{status, activity}'
+# LSL monitor health (Phase 33+: read from coordinator, not .health/*.json)
+curl -fs http://localhost:3034/health/state \
+  | jq '.lsl | to_entries | map(select(.key | endswith(":coding"))) | .[0].value | {status, lastBeat}'
 
 # Container status
 docker compose -f docker/docker-compose.yml ps
