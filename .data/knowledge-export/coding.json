@@ -158,23 +158,6 @@
       "id": "mc4flkg22cvl1q"
     },
     {
-      "name": "Trajectory",
-      "entityType": "Component",
-      "observations": [
-        "[LLM] The Trajectory component utilizes the SpecstoryAdapter class, defined in lib/integrations/specstory-adapter.js, for logging conversations and events via Specstory. This class follows a specific pattern of constructor() + initialize() + logConversation() for its initialization and logging functionality. The logConversation() method employs a work-stealing concurrency pattern via a shared atomic index counter, allowing for efficient and concurrent logging of conversations and events.",
-        "[LLM] The Trajectory component leverages environment variables, such as BROWSER_ACCESS_PORT and CODE_GRAPH_RAG_SSE_PORT, for configuration and connectivity. These environment variables are used to establish connections to external services, such as the Browser Access MCP Server and the Code Graph RAG system. The integrations/browser-access/README.md and integrations/code-graph-rag/README.md files provide more information on the configuration and usage of these environment variables.",
-        "[LLM] The Trajectory component implements lazy loading for extension API initialization in its connectViaHTTP(), connectViaIPC(), and connectViaFileWatch() methods. This lazy loading approach allows the component to delay the initialization of the extension API until it is actually needed, reducing unnecessary overhead and improving performance. The specific implementation of lazy loading can be found in the lib/integrations/extension-api.js file.",
-        "[LLM] The Trajectory component utilizes Graphology and LevelDB for data storage and management. Although the specific implementation is not visible in the provided code snippet, the integrations/code-graph-rag/docs/claude-code-setup.md file provides information on setting up the Graph-Code MCP Server, which uses Graphology and LevelDB for data storage. The lib/integrations/graphology.js and lib/integrations/leveldb.js files likely contain the implementation details of the Graphology and LevelDB integration.",
-        "[LLM] The Trajectory component applies automatic JSON export sync for data persistence. This functionality ensures that the component's data is regularly exported to a JSON file, providing a backup of the data and allowing for easy recovery in case of a failure. The specific implementation of the automatic JSON export sync is not visible in the provided code snippet, but it is likely implemented in a separate module, such as lib/integrations/export.js, and configured using environment variables or a configuration file."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-07T12:38:08.302Z",
-        "last_updated": "2026-03-21T06:34:00.853Z"
-      },
-      "id": "mc4flkga1xqjr"
-    },
-    {
       "name": "LoggingModule",
       "entityType": "SubComponent",
       "observations": [
@@ -5417,25 +5400,6 @@
       "id": "mc4flkg2jo2pb9"
     },
     {
-      "name": "TrajectoryInitializer",
-      "entityType": "SubComponent",
-      "observations": [
-        "TrajectoryInitializer uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to initialize the Trajectory component",
-        "The TrajectoryInitializer initializes the Trajectory component, providing a centralized mechanism for initialization",
-        "The TrajectoryInitializer utilizes asynchronous programming to initialize the component without blocking other tasks",
-        "The TrajectoryInitializer enables encapsulation and reuse of code through the use of classes and objects",
-        "The TrajectoryInitializer allows for efficient and concurrent execution of tasks through the use of promises",
-        "The TrajectoryInitializer handles errors and exceptions through the ErrorManager sub-component",
-        "The TrajectoryInitializer utilizes the ConnectionManager sub-component to oversee the connection methods used to establish a connection to the Specstory extension"
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-08T16:12:23.887Z",
-        "last_updated": "2026-03-08T16:13:43.097Z"
-      },
-      "id": "mc4flkg49ul7wl"
-    },
-    {
       "name": "OntologyManager",
       "entityType": "SubComponent",
       "observations": [
@@ -6871,25 +6835,6 @@
         "last_updated": "2026-03-18T17:38:09.394Z"
       },
       "id": "mc4flkg1pgquog"
-    },
-    {
-      "name": "TrajectoryPlanning",
-      "entityType": "SubComponent",
-      "observations": [
-        "The SpecstoryAdapter class (lib/integrations/specstory-adapter.js) handles the connection and logging of conversation entries via the Specstory extension, which is used in TrajectoryPlanning.",
-        "The constructor of the SpecstoryAdapter class initializes the extensionId, extensionApi, sessionId, and initialized properties, demonstrating a clear and structured approach to object creation in TrajectoryPlanning.",
-        "The use of the Specstory extension in TrajectoryPlanning allows for easy modification and extension of the class, making it adaptable to different project requirements.",
-        "The lib/integrations/specstory-adapter.js file provides a clear example of how TrajectoryPlanning integrates with external extensions.",
-        "The initialization of properties in the SpecstoryAdapter class shows a focus on adaptability and fault tolerance in TrajectoryPlanning.",
-        "The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is a key component of TrajectoryPlanning, managing conversation entries and logging.",
-        "The extensionId property in the SpecstoryAdapter class is used to identify the Specstory extension in TrajectoryPlanning."
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-17T06:43:06.025Z",
-        "last_updated": "2026-03-17T06:44:22.519Z"
-      },
-      "id": "mc4flkg3k4ox7o"
     },
     {
       "name": "OntologyMetadataManagement",
@@ -12077,14 +12022,14 @@
     },
     {
       "name": "Observations Pipeline: Recording, Storage, and Viewer",
-      "entityType": "Process",
+      "entityType": "Container",
       "observations": [
-        "Observations written by `src/live-logging/ObservationWriter.js` to `~/Agentic/coding/.observations/observations.db`, displayed at `localhost:3032`. Full pipeline: `transcript-monitor.sh` → `enhanced-transcript-monitor.js` → `ObservationWriter.js` → HTTP POST to `localhost:12435/api/complete` → SQLite.\n\n**Known issues and fixes:**\n- **Dedup hash collision, stale file handle, semantic dedup suppression, artifacts field omission, `[Raw]` fallback, Docker stale connections**: all previously fixed\n- **DB corruption (permanent fix)**: `SafeDatabase.js` enforces WAL mode, `busy_timeout`, integrity checks, and SHM recovery\n- **DB corruption recovery (April 25)**: `restore-observations-from-export.js` reimports JSON exports; 670 observations, 312 digests, 19 insights restored\n- **SafeDatabase schema restoration bug**: corruption recovery auto-restores schema without the `project` column — causes digests page to show count but empty list body; fix pending in `SafeDatabase.js`\n- **False-positive redaction corruption**: `[a-zA-Z0-8+/]{40}` AWS secret pattern too broad — fix pending; 41 rows repaired April 26 via `repair-redaction-corruption.js`\n- **FTS5 index desync**: never populated by `ObservationWriter.js`; manually rebuilt April 25; `ObservationWriter.init()` needs FTS sync logic\n- **Stuck raw observations (April 29–30)**: 21 raw observations skipped by consolidator due to `<USER_ID_REDACTED>=low` filter; `backfill-raw-observations.js` recovered 15/21; 6 failed permanently due to DB corruption\n\n**ObservationConsolidator bug (fixed May 9):**\n- A bug in the consolidation pipeline's prompt path was identified and fixed; a bad insight entry was removed/corrected\n- Fix verified by triggering consolidation via HTTP POST to observations API against 8 pending observations — no orphaned digests found post-fix\n\n**Two-tier aggregation:**\n- **Digests** — daily thematic consolidation; **Insights** — weekly persistent knowledge synthesis\n- Consolidation daemon emits periodic heartbeats; dashboard reads heartbeats to distinguish active vs. orphaned processes\n- **Stuck consolidation button bug (fixed April 27)**: frontend heartbeat polling and per-stage progress event emission added\n- **Progress bar frozen at Stage 2 (April 29)**: `\"Insights updated: N\"` messages matched no regex in live-logging progress parser — fix proposed but unconfirmed\n- **Progress bar premature 100% bug**: `consolidation-progress.tsx` marks 100% at start of chunk rather than end — not yet fixed\n- **ObservationConsolidator process hang (April 29, fixed)**: unclosed Redis/DB connection in `consolidator.close()` prevented exit\n- **Observation replace strategy**: re-synthesize rather than append when new digests arrive — implementation pending\n- **Phase B** (planned): rewrite `consolidateDay()` to group by `(date, project)` instead of date alone\n- Qdrant backfill must be re-run after April 25 DB fixes"
+        "Observations written by `src/live-logging/ObservationWriter.js` to `~/Agentic/coding/.observations/observations.db`, displayed at `localhost:3032`. Full pipeline: `transcript-monitor.sh` → `enhanced-transcript-monitor.js` → `ObservationWriter.js` → HTTP POST to `localhost:12435/api/complete` → SQLite.\n\n**Known issues and fixes:**\n- **Dedup hash collision, stale file handle, semantic dedup suppression, artifacts field omission, `[Raw]` fallback, Docker stale connections**: all previously fixed\n- **DB corruption (permanent fix)**: `SafeDatabase.js` enforces WAL mode, `busy_timeout`, integrity checks, and SHM recovery\n- **SafeDatabase schema restoration bug**: corruption recovery auto-restores schema without the `project` column — causes digests page to show count but empty list body; fix pending\n- **False-positive redaction corruption**: `[a-zA-Z0-8+/]{40}` AWS secret pattern too broad — fix pending\n- **FTS5 index desync**: never populated by `ObservationWriter.js`; manually rebuilt April 25; sync logic still needed\n- **ObservationConsolidator bug (fixed May 9)**: bad prompt path in consolidation pipeline fixed; 8 pending observations processed cleanly\n\n**Deduplication and sync (May 10):**\n- `dedupe-observations.mjs`: collapses duplicate SQLite rows using a 4-hour window; dry run found 164 duplicates\n- `prune-orphan-vectors.mjs`: removed 189 orphan vectors across `observations`, `digests`, and `insights` Qdrant collections\n- All three Qdrant collections synced with SQLite; 1-point residuals due to content-hash collisions — functionally harmless\n- Reverse drift (SQLite records missing embeddings) left out of scope\n\n**Knowledge injection retrieval (obs 16–18):**\n- Retrieval pipeline: hook → client → API server → retrieval service\n- Uses keyword/recency-based matching, **not** semantic/embedding search — identified as root cause of poor retrieval relevance; no fix implemented yet\n\n**Two-tier aggregation:**\n- **Digests** — daily thematic consolidation; **Insights** — weekly persistent knowledge synthesis\n- Consolidation daemon emits periodic heartbeats; stale heartbeat now detected via 30 s age or dead PID check (see Observations API insight)\n- **Observation replace strategy**: re-synthesize rather than append when new digests arrive — implementation pending\n- **Phase B** (planned): rewrite `consolidateDay()` to group by `(date, project)` instead of date alone"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.842Z",
-        "last_updated": "2026-05-09T05:35:55.543Z"
+        "last_updated": "2026-05-10T13:47:31.779Z"
       },
       "id": "mc4flkg36enliy"
     },
@@ -12092,12 +12037,12 @@
       "name": "System Health Dashboard and Service Architecture",
       "entityType": "Container",
       "observations": [
-        "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host only)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server\n- `localhost:3033` — health API / live-logging dashboard server; `/api/observations` reverse-proxies to `localhost:12436`\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist loaded in production as of Phase 33)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n- `localhost:12435` — LLM CLI proxy\n- `localhost:12436` — Observations API (`obs_api`); spawned by `start-services-robust.js`\n\n**Architectural rule:** Docker runs headless backend services; host runs tools requiring host networking or hot-reload dev UIs. All port values from `.env.ports` — no hardcoding.\n\n**Health monitoring (Phase 33 — complete):**\n- HTTP POST signals to coordinator via `HEALTH_COORDINATOR_URL`\n- `integrations/system-health-dashboard/static-server.js`: `/api/*` reverse-proxy mounted before `express.static`\n- **plist env injection**: `EnvironmentVariables` plist declarations override `launchctl setenv` on macOS Darwin 25.4.0\n- **Auto-heal regression (fixed May 9)**: `server.js` coordinator-proxy violation synthesis omitted `auto_heal` and `auto_heal_action` fields — frontend fell back to \"Manual\" badge; fixed and committed\n\n**Phase 34 scope (LLM proxy supervision + ETM cleanup):**\n- Phase 34 investigates whether LLM proxy is supervised by health system (VPN/network-mode detection, semantic capability testing)\n- ETM legacy code (Option B removal) also in scope\n- Plan `34-06`: plist cleanup — removing `INJECT_THROW`, `TICK_MS`, and `HEALTH_COORDINATOR_URL` keys; retaining `PATH` and `HEALTH_COORDINATOR_PORT`; re-spawned after `34-02` and `34-04` complete to avoid serialization conflicts\n\n**`server.js` dashboard API fixes (cumulative):**\n- Port Liveness panel DOWN, \"No check data yet\", frontend render crash, `RangeError: Invalid time value` — all fixed\n- **`health-verifier` STOPPED**: removed from `supervisord.conf`\n- **`handleGetCGRFreshness`**: uses Node's built-in `net` module for port 7687 checks\n- ETM process was not running as of May 9 — restarted; inheriting wrong `CODING_TOOLS_PATH` (container vs. host) — fixed"
+        "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host only)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server\n- `localhost:3033` — health API / live-logging dashboard server; `/api/observations` reverse-proxies to `localhost:12436`\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist loaded in production as of Phase 33)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n- `localhost:12435` — LLM CLI proxy\n- `localhost:12436` — Observations API (`obs_api`); spawned by `start-services-robust.js`\n\n**Architectural rule:** Docker runs headless backend services; host runs tools requiring host networking or hot-reload dev UIs. All port values from `.env.ports` — no hardcoding.\n\n**Health monitoring (Phase 33 — complete):**\n- HTTP POST signals to coordinator via `HEALTH_COORDINATOR_URL`\n- `integrations/system-health-dashboard/static-server.js`: `/api/*` reverse-proxy mounted before `express.static`\n- **plist env injection**: `EnvironmentVariables` plist declarations override `launchctl setenv` on macOS Darwin 25.4.0\n- **Auto-heal regression (fixed May 9)**: `server.js` coordinator-proxy violation synthesis omitted `auto_heal` and `auto_heal_action` fields — fixed\n\n**Phase 34 — LLM proxy supervision (plans 34-01 through 34-04 complete):**\n- `health-coordinator.js`: added 6 `PROXY_*` constants, a `state.proxy` slice (9 fields), `pollProxySemantic` (D-01 payload + D-02 four-mode classification), and `pollProxyMode` probes wired into `tick()` with fail-open pattern\n- `health-verification-rules.json`: updated to capture checkpoint gate state\n- `GraphDatabaseService.js` modified across cherry-pick integration operations\n- rapid-automations ETM restarted (PID 54103 → 48315) after D-10 cross-project safety gate approval; both ETMs verified heartbeating healthy\n- Dead-code strip (~200 LoC, 7 blocks) removed from coding ETM; commits `7a4066eb4` (strip) and `1cbaabde4` (SUMMARY) landed\n\n**Proxy health card (Phase 34-05, task 3):**\n- Fifth `HealthStatusCard` added to `integrations/system-health-dashboard/src/components/system-health-dashboard.tsx`\n- Uses `<COMPANY_NAME_REDACTED>:grid-cols-5` grid layout with pre-imported `Brain` icon\n- **Known bug**: card displays \"No data yet\" — `healthStatus.proxy` is `null` because `state.proxy` slice from the coordinator is being dropped somewhere in the reducer/fetch path; needs investigation"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.849Z",
-        "last_updated": "2026-05-10T04:56:57.089Z"
+        "last_updated": "2026-05-11T05:05:28.081Z"
       },
       "id": "mc4flkg3oje83q"
     },
@@ -12142,14 +12087,14 @@
     },
     {
       "name": "Planning and Execution Workflow",
-      "entityType": "Container",
+      "entityType": "File",
       "observations": [
-        "The project uses a structured phase-based planning workflow tracked across several docs.\n\n- `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md` updated at start/end of each phase; `PROJECT.md` updated at completion\n- Auto-generated `{phase}-CONTEXT.md`, `{phase}-DISCUSSION-LOG.md`, `{phase}-SPEC.md`, `{phase}-VALIDATION.md` capture decisions before execution\n- Plans stored under `.planning/phases/{phase-name}/` as numbered PLAN files (e.g. `33-01`, `33-02`)\n- **Multi-wave execution model**: Waves 0–1 = safe file creation; Waves 3+ = live daemon changes; wave dispatch uses `--wave N` flag on `gsd-execute-phase`\n- Parallel subagent dispatch is default; overridden to sequential when `depends_on` declarations exist or submodule path conflicts arise\n- Subagent writes to worktree branch (`worktree-agent-{hash}`), merged to main by orchestrator after all wave agents complete\n- **Gap closure mode**: `--gaps` flag on `gsd-plan-phase` skips research phase and loads `VERIFICATION.md`; `--gaps-only` on execute; produces additional numbered plans (e.g. 33-09 through 33-15 for phase 33)\n- **Human-verify checkpoints**: embedded in destructive plans (e.g. docker-compose rebuild, `git rm`, launchctl plist swap); require live diagnostics before approval — do not approve if zombie processes or cascading failures present\n- **Plan falsification pattern**: when a plan's core hypothesis is disproven empirically, close the plan as `falsified-by-discovery` and create a replacement plan to preserve audit trail (e.g. 33-12 → 33-15)\n- `{phase}-SUMMARY.md` materialization sometimes requires manual orchestrator write due to subagent Write-tool role restrictions\n- Milestone completion uses `complete-milestone` workflow: pre-flight audit, plan summary verification, `STATE.md` update, git tag\n- New phases must be registered in `ROADMAP.md` before spec work can proceed"
+        "The project uses a structured GSD (Get Stuff Done) phase-based planning workflow.\n\n**Version and update:**\n- Current version: **v1.41.1** (updated May 9 from v1.41.0)\n- v1.41.1 fix: `buildStateFrontmatter` nested plan file counting\n- **Regression in v1.41.1**: `~/.claude/sdk/shared/model-catalog.json` missing, blocking `init phase-op` and preventing `spec-phase` workflow from completing — workaround is to fall back to `discuss-phase` workflow\n\n**Phase lifecycle artifacts:**\n- `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md` updated at start/end of each phase; `PROJECT.md` at completion\n- Auto-generated `{phase}-CONTEXT.md`, `{phase}-DISCUSSION-LOG.md`, `{phase}-SPEC.md`, `{phase}-VALIDATION.md`\n- Plans stored under `.planning/phases/{phase-name}/` as numbered PLAN files\n\n**Execution model:**\n- Multi-wave: Waves 0–1 = safe file creation; Waves 3+ = live daemon changes; `--wave N` flag on `gsd-execute-phase`\n- Parallel subagent dispatch default; sequential when `depends_on` or path conflicts\n- Subagent writes to `worktree-agent-{hash}` branch, merged by orchestrator after wave completes\n- `--gaps` / `--gaps-only` flags for gap closure mode\n- **Plan falsification pattern**: close as `falsified-by-discovery`, create replacement plan (e.g. 33-12 → 33-15)\n- Milestone completion uses `complete-milestone` workflow; new phases must be registered in `ROADMAP.md` first\n- **Cherry-pick integration pattern**: when merge conflicts arise, cherry-pick specific commits in order onto target branch rather than merging\n\n**Phase 33/34 status:**\n- Phase 33: fully complete (15/15 plans merged); milestone `v7.0` not formally closed (2 ACs deferred)\n- Phase 34: scoped around LLM proxy health supervision and ETM legacy cleanup\n  - Plans 34-01 through 34-05 complete; `ROADMAP.md` and `STATE.md` updated accordingly\n  - 34-04 (lock and per-exchange routing) landed via cherry-pick with no conflicts\n  - 34-05: deleted 6 dead ETM source files (`RealTimeTrajectoryAnalyzer`, `StreamingKnowledgeExtractor`, `KnowledgeDecayTracker`, and related modules); removed orphaned import from `tests/unit/ontology/integration.test.js`\n  - Plan `34-06` queued: plist cleanup — removing `INJECT_THROW`, `TICK_MS`, and `HEALTH_COORDINATOR_URL` keys; retaining `PATH` and `HEALTH_COORDINATOR_PORT`"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.898Z",
-        "last_updated": "2026-05-07T13:01:51.707Z"
+        "last_updated": "2026-05-11T05:05:28.000Z"
       },
       "id": "mc4flkg2vazpbn"
     },
@@ -12300,12 +12245,12 @@
       "name": "Tmux Statusline Renderer",
       "entityType": "Process",
       "observations": [
-        "The tmux right-side status bar is rendered by `scripts/combined-status-line.js`, wrapped by `combined-status-line-wrapper.js`, with fast-path caching in `status-line-fast.cjs`.\n\n**Bugs identified and fixed:**\n- **Cache poisoning**: `status-line-fast.cjs` was calling `.trim()` before writing back to the shared cache file — fixed\n- **Trailing NBSP misuse**: NBSP terminators pushed the right edge left — removed entirely\n- **Cell-vs-codepoint width mismatch**: emoji rendering as 1 or 2 terminal columns caused ghost characters\n- **tmux truncation behavior**: `status-right` truncated at `min(status-right-length, pane_width - status_left)`; trailing ASCII spaces stripped — padding moved to beginning of string\n- **Structural gap**: ~1-2 cell trailing gap is unavoidable; accepted as final resolution; bare content rendering adopted\n- **Dead code removed (May 9)**: ~4140 bytes removed — `cellWidth` table, `visibleCellCount`, `statusRightTargetCells`, `ANTI_STRIP_TERMINATOR`, `STATUS_LEFT_RESERVED_CELLS`, and related comments; `tmp/csl_cleanup.py` also cleaned up\n\n**Key architectural state:**\n- `TMUX_PANE_WIDTH=#{pane_width}` passed via `.tmux.conf` for cell-aware padding\n- Cache key in `combined-status-line-wrapper.js` includes pane width suffix (`-wNNN`)\n- ETM `getLSLHealthStatus()` has project-level fallback for when `TMUX_PANE` is missing\n- Updated to GSD v1.41.1 (May 9); update also touched `.tmux.conf`, `patch_csl_v2.py`, `csl_pad_rewrite.py`, `combined-status-line-wrapper.js`, `tmux-session-wrapper.sh`, `status-line-fast.cjs`"
+        "The tmux right-side status bar is rendered by `scripts/combined-status-line.js`, wrapped by `combined-status-line-wrapper.js`, with fast-path caching in `status-line-fast.cjs`.\n\n**Bugs identified and fixed:**\n- **Cache poisoning**: `status-line-fast.cjs` was calling `.trim()` before writing back to the shared cache file — fixed\n- **Trailing NBSP misuse**: NBSP terminators pushed the right edge left — removed entirely\n- **Cell-vs-codepoint width mismatch**: emoji rendering as 1 or 2 terminal columns caused ghost characters\n- **tmux truncation behavior**: `status-right` truncated at `min(status-right-length, pane_width - status_left)`; trailing ASCII spaces stripped — padding moved to beginning of string\n- **Dead code removed (May 9)**: ~4140 bytes removed — `cellWidth` table, `visibleCellCount`, `statusRightTargetCells`, `ANTI_STRIP_TERMINATOR`, `STATUS_LEFT_RESERVED_CELLS`\n- **Width/cache/timer fixes (May 10, commit `865665502`)**: additional fixes to `status-line-fast.cjs`\n\n**Open issue:**\n- **Shrinking-cells artifact (obs 15)**: `SYS:ERR` text leaks from previous renders because trailing spaces are stripped by tmux; fix requires leading-pad on every status emit in both the success-cache and error paths of `combined-status-line.js` — analysis complete, **no code written yet**\n\n**Key architectural state:**\n- `TMUX_PANE_WIDTH=#{pane_width}` passed via `.tmux.conf` for cell-aware padding\n- Cache key in `combined-status-line-wrapper.js` includes pane width suffix (`-wNNN`)\n- ETM `getLSLHealthStatus()` has project-level fallback for when `TMUX_PANE` is missing\n- Structural ~1-2 cell trailing gap accepted as unavoidable; bare content rendering adopted"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-05-09T10:49:05.549Z",
-        "last_updated": "2026-05-10T04:56:56.992Z"
+        "last_updated": "2026-05-10T13:47:31.646Z"
       },
       "id": "mc4flkg3go2dt3"
     },
@@ -12321,6 +12266,32 @@
         "last_updated": "2026-05-10T04:56:57.070Z"
       },
       "id": "mc4flkg2qlcqbn"
+    },
+    {
+      "name": "Enhanced Transcript Monitor (ETM) and LSL Tranche Routing",
+      "entityType": "Process",
+      "observations": [
+        "`scripts/enhanced-transcript-monitor.js` handles prompt-set completion events and writes to hourly tranche part-files.\n\n**Idempotency fix (obs 6, commit `22d456b0d`):**\n- `processUserPromptSetCompletion` is now idempotent: strips prior `ps_${promptSetId}` blocks from all tranche part-files before appending the updated block\n- Prevents files from growing past 200 KB and spawning unintended part files\n\n**File-lock fix (obs 9, 10):**\n- Remove-existing-block + append logic wrapped with `proper-lockfile` (already a PSM dependency)\n- Prevents race conditions when multiple ETM instances run concurrently during heartbeat warm-up\n- Stress-tested with 3 concurrent ETMs for 90+ seconds with no new duplicates\n\n**Per-exchange tranche routing (obs 7, 11, 14):**\n- Each exchange now lands in the hourly file matching its **own timestamp** (not the prompt set's start time)\n- `ps_id` is the linking key across multiple hourly files\n- Long-running prompt sets distribute across multiple hourly files; recoverable via grep on `ps_id`\n\n**Known architectural note:**\n- ETM dead-code strip (Phase 34, plan 34-04) removed ~200 LoC / 7 blocks from the coding ETM (commits `7a4066eb4`, `1cbaabde4`)\n- rapid-automations ETM was restarted (PID 54103 → 48315) as part of Phase 34 cleanup"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-05-10T13:47:31.376Z",
+        "last_updated": "2026-05-10T13:47:31.376Z"
+      },
+      "id": "mc4flkg3jlujzw"
+    },
+    {
+      "name": "Observations API Service Hardening",
+      "entityType": "Process",
+      "observations": [
+        "The observations API (`obs_api`) runs at `localhost:12436`, spawned by `start-services-robust.js`.\n\n**Restart script:**\n- `scripts/restart-obs-api.mjs` written as proper `.mjs` module, committed, and verified end-to-end\n- PSM registers new process (e.g. PID 55923); retrieve latency confirmed at 73 ms\n\n**Stale heartbeat fix (obs 28–30):**\n- Old `obs-api` instance (PID 46983) left a heartbeat file causing replacement server to report consolidation as perpetually in-progress\n- Fixed in `observations-api-server.mjs`: treats heartbeats as stale if age > 30 s (15× the 2 s write interval) **or** if the recorded PID is no longer alive — deletes file and returns `null`\n\n**EADDRINUSE and SIGTERM fixes (approved from parallel session):**\n- `start-services-robust.js`: added EADDRINUSE retry logic and `parentPid` to SIGTERM logging\n- Shutdown reorder proposal was rejected as flawed\n\n**Known open issue:**\n- `libc++abi` shutdown mutex crash filed at `2026-05-10-obs-api-libcxx-mutex-shutdown-crash.md`\n- Qdrant client version pin deferred as a TODO item"
+      ],
+      "source": "online",
+      "metadata": {
+        "created_at": "2026-05-10T13:47:31.749Z",
+        "last_updated": "2026-05-10T13:47:31.749Z"
+      },
+      "id": "mc4flkg1ybjyx0"
     }
   ],
   "relations": [
@@ -12345,12 +12316,6 @@
     {
       "from": "Coding",
       "to": "DockerizedServices",
-      "relationType": "parent-child",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "Trajectory",
       "relationType": "parent-child",
       "metadata": {}
     },
@@ -12477,36 +12442,6 @@
     {
       "from": "DockerizedServices",
       "to": "MonitoringService",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConnectionManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "DataFormatter",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "FallbackHandler",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "HttpRequestHelper",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "SpecstoryAdapter",
       "relationType": "contains",
       "metadata": {}
     },
@@ -12799,24 +12734,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "LoggerManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "SpecstoryApiClient",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConversationParser",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "EntityClassificationService",
       "relationType": "contains",
@@ -12975,30 +12892,6 @@
     {
       "from": "DockerizedServices",
       "to": "ProcessManagementService",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "SpecstoryIntegration",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConnectionHandler",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ProtocolManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "EnvironmentManager",
       "relationType": "contains",
       "metadata": {}
     },
@@ -13219,18 +13112,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "Logger",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "RetryMechanism",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "OntologyClassificationModule",
       "relationType": "contains",
@@ -13405,36 +13286,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "SpecstoryConnector",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "RetryPolicyManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConversationFormatter",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConnectionMonitor",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "LoggingGateway",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "EntityManagement",
       "relationType": "contains",
@@ -13605,18 +13456,6 @@
     {
       "from": "DockerizedServices",
       "to": "DockerContainerizer",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "LoggerModule",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "PersistenceModule",
       "relationType": "contains",
       "metadata": {}
     },
@@ -13845,18 +13684,6 @@
     {
       "from": "DockerizedServices",
       "to": "LLMService",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "DynamicImporter",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConversationLogger",
       "relationType": "contains",
       "metadata": {}
     },
@@ -14107,18 +13934,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "LogManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "IntegrationController",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "CodingPatterns",
       "to": "OntologyIntegration",
       "relationType": "contains",
@@ -14293,42 +14108,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "GraphDatabaseManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "LLMInitializer",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConcurrencyController",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "PipelineCoordinator",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ServiceStarter",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "SpecstoryAdapterFactory",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "NaturalLanguageProcessingModule",
       "relationType": "contains",
@@ -14475,24 +14254,6 @@
     {
       "from": "DockerizedServices",
       "to": "DockerComposeManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConnectionRetryManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "FileWatchManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "IPCManager",
       "relationType": "contains",
       "metadata": {}
     },
@@ -14647,12 +14408,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "SpecstoryAdapterInitializer",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "EntityPersistenceManager",
       "relationType": "contains",
@@ -14757,12 +14512,6 @@
     {
       "from": "DockerizedServices",
       "to": "LLMServiceProvider",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "Configurator",
       "relationType": "contains",
       "metadata": {}
     },
@@ -14893,18 +14642,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "ErrorManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "TrajectoryInitializer",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "OntologyManager",
       "relationType": "contains",
@@ -15015,12 +14752,6 @@
     {
       "from": "DockerizedServices",
       "to": "CodeGraphService",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "LoggingMechanism",
       "relationType": "contains",
       "metadata": {}
     },
@@ -15164,12 +14895,6 @@
     },
     {
       "from": "DockerizedServices",
-      "to": "CodingPatterns",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
       "to": "CodingPatterns",
       "relationType": "related_to",
       "metadata": {}
@@ -15379,18 +15104,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "LoggingManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "MetadataProcessor",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "KnowledgeGraphConstructionModule",
       "relationType": "contains",
@@ -15529,20 +15242,8 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "LoggingModule",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "DockerizedServices",
       "to": "CodeGraphAnalyzer",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "SpecstoryAdapterModule",
       "relationType": "contains",
       "metadata": {}
     },
@@ -15555,12 +15256,6 @@
     {
       "from": "CodeGraphAnalyzer",
       "to": "GraphAnalyzer",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ErrorHandlingModule",
       "relationType": "contains",
       "metadata": {}
     },
@@ -15650,12 +15345,6 @@
     },
     {
       "from": "LiveLoggingSystem",
-      "to": "Trajectory",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "LiveLoggingSystem",
       "to": "KnowledgeManagement",
       "relationType": "related_to",
       "metadata": {}
@@ -15663,12 +15352,6 @@
     {
       "from": "LiveLoggingSystem",
       "to": "ConstraintSystem",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "LLMAbstraction",
-      "to": "Trajectory",
       "relationType": "related_to",
       "metadata": {}
     },
@@ -15686,24 +15369,6 @@
     },
     {
       "from": "DockerizedServices",
-      "to": "Trajectory",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "DockerizedServices",
-      "to": "ConstraintSystem",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "KnowledgeManagement",
-      "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
       "to": "ConstraintSystem",
       "relationType": "related_to",
       "metadata": {}
@@ -15778,12 +15443,6 @@
       "from": "LoggingManager",
       "to": "LoggingManager",
       "relationType": "related_to",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "WorkflowManager",
-      "relationType": "contains",
       "metadata": {}
     },
     {
@@ -16045,12 +15704,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "TrajectoryPlanning",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "OntologyClassification",
       "to": "OntologyMetadataManagement",
       "relationType": "contains",
@@ -16059,12 +15712,6 @@
     {
       "from": "DockerizedServices",
       "to": "GraphDatabaseAdapter",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "LLMService",
       "relationType": "contains",
       "metadata": {}
     },
@@ -16549,24 +16196,6 @@
       "metadata": {}
     },
     {
-      "from": "Trajectory",
-      "to": "AdapterPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "ConcurrencyManager",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "SpecstoryLogger",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgeManagement",
       "to": "BrowserAccess",
       "relationType": "contains",
@@ -16683,12 +16312,6 @@
     {
       "from": "DockerizedServices",
       "to": "BrowserAccessComponent",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "DataAdapter",
       "relationType": "contains",
       "metadata": {}
     },
@@ -16827,12 +16450,6 @@
     {
       "from": "LLMAbstraction",
       "to": "DMRProviderAdapter",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "BrowserAccessIntegration",
       "relationType": "contains",
       "metadata": {}
     },
@@ -17007,18 +16624,6 @@
     {
       "from": "DockerizedServices",
       "to": "LLMController",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "BrowserAccess",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "CodeGraphRAG",
       "relationType": "contains",
       "metadata": {}
     },
@@ -17235,12 +16840,6 @@
     {
       "from": "LLMAbstraction",
       "to": "LLMOperations",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Trajectory",
-      "to": "IntegrationAdapter",
       "relationType": "contains",
       "metadata": {}
     },
@@ -19151,14 +18750,32 @@
       "to": "GSD Planning Framework",
       "relationType": "has_insight",
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Enhanced Transcript Monitor (ETM) and LSL Tranche Routing",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Observations API Service Hardening",
+      "relationType": "has_insight",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "LSL Tmux Health Indicator",
+      "relationType": "has_insight",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-05-10T04:57:02.133Z",
-    "total_entities": 684,
-    "total_relations": 1138,
+    "exported_at": "2026-05-11T10:42:42.432Z",
+    "total_entities": 683,
+    "total_relations": 1079,
     "description": "Coding project infrastructure and patterns"
   }
 }
