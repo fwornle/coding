@@ -325,9 +325,6 @@ class CombinedStatusLine {
   }
 
   /**
-   * Get trajectory state from live-state.json
-   */
-  /**
    * Check LSL transcript monitor health for the CURRENT pane.
    *
    * Lookup precedence in coordinator state:
@@ -394,73 +391,6 @@ class CombinedStatusLine {
       if (verdicts.length > 0) return 'down';
     }
     return 'down';
-  }
-
-  getTrajectoryState() {
-    // Map states to icons (from config/live-logging-config.json) - SINGLE SOURCE OF TRUTH
-    // NOTE: Leading space is intentional for proper spacing when appended
-    const stateIconMap = {
-      'exploring': ' 🔍EX',
-      'on_track': ' 📈ON',
-      'off_track': ' 📉OFF',
-      'implementing': ' ⚙️IMP',
-      'verifying': ' ✅VER',
-      'blocked': ' 🚫BLK'
-    };
-
-    // Determine which project we're currently working in
-    const targetProject = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-
-    // Try to read from current project first (if not coding)
-    let trajectoryPath;
-    if (targetProject && !targetProject.includes(codingPath)) {
-      trajectoryPath = join(targetProject, '.specstory', 'trajectory', 'live-state.json');
-    } else {
-      trajectoryPath = join(rootDir, '.specstory', 'trajectory', 'live-state.json');
-    }
-
-    // Auto-create trajectory file with defaults if missing (for new repositories)
-    if (!existsSync(trajectoryPath)) {
-      const trajectoryDir = dirname(trajectoryPath);
-      if (!existsSync(trajectoryDir)) {
-        const fs = require('fs');
-        fs.mkdirSync(trajectoryDir, { recursive: true });
-      }
-
-      const defaultState = {
-        currentState: 'exploring',
-        lastUpdated: new Date().toISOString(),
-        confidence: 0.8
-      };
-
-      writeFileSync(trajectoryPath, JSON.stringify(defaultState, null, 2));
-      console.error(`ℹ️ Auto-created trajectory state file: ${trajectoryPath}`);
-
-      return stateIconMap['exploring'];
-    }
-
-    try {
-      const trajectoryData = JSON.parse(readFileSync(trajectoryPath, 'utf8'));
-      const currentState = trajectoryData.currentState;
-
-      if (!currentState) {
-        // Auto-repair: add missing currentState field
-        trajectoryData.currentState = 'exploring';
-        trajectoryData.lastUpdated = new Date().toISOString();
-        writeFileSync(trajectoryPath, JSON.stringify(trajectoryData, null, 2));
-        console.error(`⚠️ Auto-repaired trajectory file (added missing currentState): ${trajectoryPath}`);
-      }
-
-      const icon = stateIconMap[currentState];
-      if (!icon) {
-        throw new Error(`Unknown trajectory state "${currentState}" in ${trajectoryPath}`);
-      }
-
-      return icon;
-    } catch (error) {
-      throw new Error(`Failed to read trajectory state from ${trajectoryPath}: ${error.message}`);
-    }
   }
 
   async getConstraintStatus() {
@@ -894,32 +824,6 @@ class CombinedStatusLine {
         }
         writeFileSync(projectsFile, JSON.stringify(mapping), 'utf8');
       } catch { /* best effort */ }
-
-      // Trajectory check: only for the CURRENT project. Trajectory file is
-      // maintained by ETM; a stale file with no running monitor is expected.
-      let currentProjectTrajectoryIssue = null;
-      const currentProjectPath = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
-      const currentProjectName = currentProjectPath.split('/').pop();
-      const trajRunningMonitors = this.getRunningTranscriptMonitorsSync();
-      const hasMonitorForCurrentProject = trajRunningMonitors.has(currentProjectName);
-
-      if (hasMonitorForCurrentProject) {
-        const currentTrajectoryPath = join(currentProjectPath, '.specstory', 'trajectory', 'live-state.json');
-        if (existsSync(currentTrajectoryPath)) {
-          const trajStats = fs.statSync(currentTrajectoryPath);
-          const trajAge = Date.now() - trajStats.mtime.getTime();
-          if (trajAge > 60 * 60 * 1000) currentProjectTrajectoryIssue = 'stale tr';
-        } else {
-          const currentSession = result.sessions[currentProjectName];
-          if (currentSession && currentSession.status === 'healthy') currentProjectTrajectoryIssue = 'no tr';
-        }
-      }
-      if (currentProjectTrajectoryIssue) {
-        result.gcm.status = 'warning';
-        result.gcm.icon = '🟡';
-        result.gcm.reason = currentProjectTrajectoryIssue;
-        if (result.status === 'operational') result.status = 'degraded';
-      }
 
       return result;
     } catch (error) {
@@ -1727,7 +1631,7 @@ class CombinedStatusLine {
       if (overallColor === 'green') overallColor = 'yellow';
     }
 
-    // Constraint Monitor Status with TRJ label (trajectory)
+    // Constraint Monitor Status
     if (constraint.status === 'operational') {
       // Convert compliance to percentage (0-10 scale to 0-100%)
       const compliancePercent = constraint.compliance <= 10 ?
@@ -1735,18 +1639,14 @@ class CombinedStatusLine {
         Math.round(constraint.compliance);
       const score = `${compliancePercent}%`;
       const violationsCount = constraint.violations || 0;
-      
-      // Get real-time trajectory state from live-state.json
-      const trajectoryIcon = this.getTrajectoryState();
 
-      // Build constraint section: shield + score + optional violations + trajectory
-      // These are independent concepts that should BOTH be visible
+      // Build constraint section: shield + score + optional violations
       let constraintPart = `[🔒 ${score}`;
       if (violationsCount > 0) {
         constraintPart += ` ⚠️ ${violationsCount}`;
         overallColor = 'yellow';
       }
-      constraintPart += `${trajectoryIcon}]`;
+      constraintPart += `]`;
       parts.push(constraintPart);
     } else if (constraint.status === 'degraded') {
       parts.push('[🔒 ⚠️]');
