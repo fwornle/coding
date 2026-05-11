@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: -- Knowledge Context Injection
 status: executing
-stopped_at: Phase 34 — 34-04 cherry-picked, 34-05 unblocked, 34-06 paused
-last_updated: "2026-05-10T14:30:00.000Z"
-last_activity: 2026-05-10 -- Phase 34: 34-04 cherry-picked from worktree (auto-merge clean against this session's ETM lock + tranche routing); 34-05 now unblocked
+stopped_at: Phase 34 — all 6 plans on main; D-14 24h soak gate pending post-merge
+last_updated: "2026-05-11T10:35:00.000Z"
+last_activity: 2026-05-11 -- Phase 34: 34-06 closed (plist bootout/bootstrap re-applied; AC #6 PASS; AC #11 PASS 1s respawn; 34-VERIFICATION.md written)
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 21
-  completed_plans: 19
-  percent: 90
+  completed_plans: 21
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 34 (proxy-supervision-and-etm-cleanup) — EXECUTING
-Plan: 4 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ on main; 34-05 unblocked (depends on 34-04 which is now landed); 34-06 paused at Task 1 gate (operator approval pending on plist cleanup approach)
-Status: Executing Phase 34
-Last activity: 2026-05-10 -- Phase 34: 34-04 cherry-picked clean (worktree auto-merged with this session's ETM edits)
+Phase: 34 (proxy-supervision-and-etm-cleanup) — FUNCTIONALLY COMPLETE
+Plan: 6 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ 34-05 🟢 (Tasks 1+2(badge)+3 on main; 2(d) dead-reader cleanup + W-1 live tmux render deferred to operator) 34-06 ✅ on main. D-14 24h soak gate (state.proxy.kickstart_count == 0 after 24h continuous operation) is PENDING by design — runs after phase merge.
+Status: Executing Phase 34 — ready to close pending the 24h soak window
+Last activity: 2026-05-11 -- Phase 34: 34-06 closed (plist bootout/bootstrap re-applied; AC #6 PASS; AC #11 PASS 1s respawn)
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
