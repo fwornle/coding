@@ -207,48 +207,96 @@ if (cacheAgeMs < 60000 && cachedContent.trimEnd()) {
 // but use stale cache as fallback if CSL fails or times out
 const child = spawn('node', [cslScript], { env, stdio: 'pipe' });
 
+// CRITICAL: close child's stdin immediately. CSL.readStdinInput() does
+// `for await (const chunk of process.stdin)` which hangs until EOF.
+// Without this end() call, CSL hangs the full 8s on every spawn for
+// any pane whose TRANSCRIPT_SOURCE_PROJECT is outside the coding repo
+// (triggering the redirect-status code path that reads stdin), then
+// emits "⚠️ SYS:TIMEOUT" instead of a real statusline.
+try { child.stdin.end(); } catch { /* already closed */ }
+
 let output = '';
+let stderrBuf = '';
 child.stdout.on('data', (d) => { output += d; });
-child.stderr.on('data', () => {}); // discard stderr
+child.stderr.on('data', (d) => { stderrBuf += d; });
 
 // Safety timeout: if CSL truly hangs, kill it. Must exceed CSL's own 8s
 // internal timeout (combined-status-line.js emits "⚠️ SYS:TIMEOUT" at 8s);
 // otherwise we SIGKILL before CSL gets to produce that informative output.
+const spawnStart = Date.now();
 const fallbackTimer = setTimeout(() => {
   child.kill('SIGKILL');
 }, 10000);
 
-child.on('exit', (code) => {
+function logFailure(reason, code, signal) {
+  // Foolproof debug: append every CSL failure/timeout to a log so the user
+  // (and future Claude sessions) can see WHY SYS:TIMEOUT/SYS:ERR fired.
+  try {
+    const entry = {
+      ts: new Date().toISOString(),
+      reason,
+      elapsedMs: Date.now() - spawnStart,
+      exitCode: code,
+      signal,
+      projectName,
+      paneWidth,
+      transcriptSourceProject: process.env.TRANSCRIPT_SOURCE_PROJECT || null,
+      hadStaleCache: !!cachedContent.trimEnd(),
+      cacheAgeMs: cacheAgeMs === Infinity ? null : Math.round(cacheAgeMs),
+      stderrTail: stderrBuf.replace(/\r?\n$/, '').split('\n').slice(-6).join('\n'),
+      stdoutTail: output.replace(/\r?\n$/, '').split('\n').slice(-2).join('\n'),
+    };
+    fs.appendFileSync(
+      path.join(codingRepo, '.logs', 'csl-failures.jsonl'),
+      JSON.stringify(entry) + '\n'
+    );
+  } catch { /* logging must never throw */ }
+}
+
+child.on('exit', (code, signal) => {
   clearTimeout(fallbackTimer);
   // Same NO-TRIM rule as the cache reads above. Strip line terminator only.
   const result = output.replace(/\r?\n$/, '');
-  if (code === 0 && result.trimEnd()) {
+
+  // Detect CSL-internal timeout/error markers so we can prefer cache over
+  // surfacing them to the user. The user explicitly does not want to see
+  // "SYS:TIMEOUT" / "SYS:ERR" in the statusline — those are diagnostic
+  // markers, not user-facing content.
+  const isMarkerOnly = /^\s*⚠️?\s*SYS:(TIMEOUT|ERR)\b/.test(result.trimStart());
+
+  if (code === 0 && result.trimEnd() && !isMarkerOnly) {
     process.stdout.write(result + '\n');
     process.exit(0);
   }
-  // CSL failed — use stale cache rather than showing "Status Offline"
+
+  // CSL failed OR produced only a diagnostic marker — log it.
+  logFailure(
+    code === 0 ? 'marker-only' : (signal === 'SIGKILL' ? 'sigkill' : 'nonzero-exit'),
+    code,
+    signal
+  );
+
+  // Foolproof fallback: ANY cached content beats showing a diagnostic
+  // marker to the user. We accept staleness up to whatever the disk has;
+  // the in-pane render will refresh on the next tmux tick once CSL recovers.
   if (cachedContent.trimEnd()) {
-    // Patch lifecycle icons against current transcript mtimes so the
-    // fallback render still reflects up-to-the-second activity, not the
-    // icon frozen in the stale cache.
     const mapping = readProjectMapping();
     const { text: patched } = patchLifecycleIcons(cachedContent, mapping, cacheMtimeMs);
     process.stdout.write(patched + '\n');
-    // Trigger background refresh for next cycle
+    // Trigger background refresh for next cycle (also feeds stdin EOF immediately)
     const bg = spawn('node', [cslScript], {
-      env, stdio: 'ignore', detached: true
+      env, stdio: ['ignore', 'ignore', 'ignore'], detached: true
     });
     bg.unref();
     process.exit(0);
   }
-  // Last resort: if CSL produced *any* output (even with non-zero exit, e.g.
-  // its own "⚠️ SYS:TIMEOUT" marker), surface it instead of letting the
-  // tmux wrapper fall back to "[Status Offline]". A diagnostic marker is
-  // strictly more useful than silence.
+
+  // No cache available — last resort, surface the marker (or whatever
+  // partial result CSL emitted) so the pane isn't blank.
   if (result.trimEnd()) {
     process.stdout.write(result + '\n');
     process.exit(0);
   }
-  // No cache, no output — nothing to show
+  // Truly nothing to show
   process.exit(code || 1);
 });

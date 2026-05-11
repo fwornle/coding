@@ -60,15 +60,33 @@ function visibleCellWidth(s) {
     if (cp === 0xFE0F) continue;                          // emoji variation selector
     if (cp >= 0x0300 && cp <= 0x036F) continue;           // combining diacriticals
     if (cp >= 0x200B && cp <= 0x200D) continue;           // ZWSP / ZWNJ / ZWJ
-    // Emoji ranges that render as 2 cells in modern terminals. Sourced
-    // from the East Asian Width "Wide" table plus common pictographic
-    // blocks. Not exhaustive — this is "correct enough" coverage for
-    // every emoji that appears in the status-line payload today:
-    //   🏥 🧠 ✅ 📚 🟢 🌲 🫒 🪨 ⚫ 💤 🟡 🔴 🚫 🔍 🔒 ⚠ 📋 ❌ 🩺 ⏰
+
+    // East Asian Width "Ambiguous" codepoints: tmux + xterm in a non-East-
+    // Asian locale count these as 1 cell (NOT 2) despite their wide
+    // visual rendering. Hand-picked from this script's emoji repertoire.
+    // The original Wide-range catch-all below treated them as 2 cells,
+    // which over-counted by 1 cell per occurrence and produced the
+    // recurring trailing-residue artifact ("13:32865", "14:2625"):
+    // tmux's cell-clear math used its own (smaller) wcwidth so cells the
+    // script thought it was covering were left exposed from the
+    // previous render. Peeling Ambiguous off Wide brings the two counts
+    // back into agreement. To add new codepoints here, verify their EAW
+    // class via https://www.unicode.org/Public/UCD/latest/ucd/EastAsianWidth.txt
+    // AND confirm tmux's actual rendering in this user's terminal.
+    const isAmbiguousNarrow =
+      cp === 0x26A0 ||                                    // ⚠ warning sign
+      cp === 0x2699 ||                                    // ⚙ gear
+      cp === 0x23F8 ||                                    // ⏸ pause
+      cp === 0x2501;                                      // ━ heavy horizontal
+    if (isAmbiguousNarrow) { width += 1; continue; }
+
+    // Confirmed EAW=Wide ranges. The 0x2600-0x27BF block contains both
+    // Wide (✅⚫❌❗❓🚫) and Ambiguous (⚠⚙) codepoints — the explicit
+    // Ambiguous list above peels off the latter before this catch-all.
     const isWide =
       (cp >= 0x1F300 && cp <= 0x1FAFF) ||   // misc pictographs, emoticons, symbols & pictographs ext-A
-      (cp >= 0x2600  && cp <= 0x27BF)  ||   // misc symbols + dingbats (✅⚠⚫)
-      (cp >= 0x2300  && cp <= 0x23FF)  ||   // misc technical (⏰)
+      (cp >= 0x2600  && cp <= 0x27BF)  ||   // misc symbols + dingbats (✅⚫❌)
+      (cp >= 0x2300  && cp <= 0x23FF)  ||   // misc technical (⏰⏳)
       (cp >= 0x1F000 && cp <= 0x1F2FF) ||   // mahjong/domino/playing-card + enclosed alphanum
       (cp >= 0x1F680 && cp <= 0x1F6FF);     // transport & map symbols
     width += isWide ? 2 : 1;
@@ -140,15 +158,32 @@ class CombinedStatusLine {
         return this.statusCache;
       }
 
-      const constraintStatus = await this.getConstraintStatus();
-      const semanticStatus = await this.getSemanticStatus();
-      const knowledgeStatus = await this.getKnowledgeSystemStatus();
-      const proxyStatus = await this.getProxySystemStatus();
-      const liveLogTarget = await this.getCurrentLiveLogTarget();
-      const redirectStatus = await this.getRedirectStatus();
-      const globalHealthStatus = await this.getGlobalHealthStatus();
-      const healthVerifierStatus = await this.getHealthVerifierStatus();
-      const ukbStatus = this.getUKBStatus();
+      // Per-step timing — stamped on `this` so the SYS:TIMEOUT handler can
+      // dump it to .logs/csl-failures.jsonl. Without this, every timeout
+      // was a black box ("why did it fire? no record anywhere").
+      this._stepTimings = [];
+      const timeStep = async (name, fn) => {
+        const t0 = Date.now();
+        this._lastStartedStep = name;
+        try {
+          const v = await fn();
+          this._stepTimings.push({ name, ms: Date.now() - t0, ok: true });
+          return v;
+        } catch (e) {
+          this._stepTimings.push({ name, ms: Date.now() - t0, ok: false, err: e.message });
+          throw e;
+        }
+      };
+
+      const constraintStatus      = await timeStep('constraint',      () => this.getConstraintStatus());
+      const semanticStatus        = await timeStep('semantic',        () => this.getSemanticStatus());
+      const knowledgeStatus       = await timeStep('knowledge',       () => this.getKnowledgeSystemStatus());
+      const proxyStatus           = await timeStep('proxy',           () => this.getProxySystemStatus());
+      const liveLogTarget         = await timeStep('liveLogTarget',   () => this.getCurrentLiveLogTarget());
+      const redirectStatus        = await timeStep('redirect',        () => this.getRedirectStatus());
+      const globalHealthStatus    = await timeStep('globalHealth',    () => this.getGlobalHealthStatus());
+      const healthVerifierStatus  = await timeStep('healthVerifier',  () => this.getHealthVerifierStatus());
+      const ukbStatus             = this.getUKBStatus();
 
       // Phase 33 plan 07: launchd's com.coding.health-coordinator KeepAlive
       // is the authoritative supervisor for the host-side health stack;
@@ -954,16 +989,28 @@ class CombinedStatusLine {
 
   async readStdinInput() {
     try {
-      // Read JSON input from stdin if available
-      if (process.stdin.isTTY) {
-        return null; // No stdin input when run directly
-      }
-      
-      let data = '';
-      for await (const chunk of process.stdin) {
-        data += chunk;
-      }
-      
+      // Read JSON input from stdin if available.
+      // TTY: no stdin payload expected when invoked directly by a human.
+      if (process.stdin.isTTY) return null;
+
+      // Piped stdin without an explicit EOF (e.g. fast.cjs forgetting to
+      // close the pipe) used to hang here for the full 8s SYS:TIMEOUT
+      // window. Guard with a short race so this code path can NEVER be
+      // the reason the statusline times out — at worst we miss a single
+      // stdin payload and getRedirectStatus returns { active: false }.
+      const STDIN_DEADLINE_MS = 200;
+      const readPromise = (async () => {
+        let data = '';
+        for await (const chunk of process.stdin) {
+          data += chunk;
+        }
+        return data;
+      })();
+      const timeoutPromise = new Promise(resolve =>
+        setTimeout(() => resolve(null), STDIN_DEADLINE_MS)
+      );
+      const data = await Promise.race([readPromise, timeoutPromise]);
+      if (data == null) return null; // deadline hit — no stdin payload
       return data.trim() ? JSON.parse(data) : null;
     } catch (error) {
       return null;
@@ -2121,14 +2168,35 @@ async function main() {
       // Cache read failed — fall through to full generation
     }
 
+    const statusLine = new CombinedStatusLine();
+
     const timeout = setTimeout(() => {
+      // Foolproof debug: append a JSON record of WHY the timeout fired so
+      // we can see which sub-step blocked. Without this, the user sees
+      // "SYS:TIMEOUT" and has no log to trace the root cause from.
+      try {
+        const entry = {
+          ts: new Date().toISOString(),
+          kind: 'csl-timeout',
+          elapsedMs: 8000,
+          lastStartedStep: statusLine._lastStartedStep || null,
+          steps: statusLine._stepTimings || [],
+          paneWidth,
+          transcriptSourceProject: process.env.TRANSCRIPT_SOURCE_PROJECT || null,
+          codingRepo: process.env.CODING_REPO || rootDir,
+        };
+        const logPath = join(rootDir, '.logs', 'csl-failures.jsonl');
+        // Use appendFileSync to ensure the record lands even if the
+        // process is about to exit(1). `fs` is the ESM default-import
+        // namespace at the top of this file.
+        fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
+      } catch { /* logging must never throw */ }
       console.error('⚠️ SYS:TIMEOUT - Status line generation took >8s');
       // Pad short marker output so it overwrites the previous render's cells.
       const timeoutText = leftPadToStableCellWidth('⚠️ SYS:TIMEOUT', paneWidth);
       process.stdout.write(timeoutText + '\n', () => process.exit(1));
     }, 8000);
 
-    const statusLine = new CombinedStatusLine();
     const status = await statusLine.generateStatus();
 
     clearTimeout(timeout);
