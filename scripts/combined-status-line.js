@@ -53,13 +53,26 @@ function padStatusLine(str) {
 // 34-05's [🧠] badge pushed this past the visible-drift threshold.
 function visibleCellWidth(s) {
   const stripped = String(s).replace(/#\[[^\]]*\]/g, '');
+  // Codepoint-by-codepoint iteration with VS16 lookahead — needed because
+  // U+FE0F (emoji variation selector) following an Ambiguous-Width base
+  // codepoint promotes it to 2-cell emoji presentation in xterm.js / tmux,
+  // even though the base codepoint alone would render as 1 cell. Without
+  // the lookahead, "⚠" was counted at 1 cell while terminals actually
+  // rendered "⚠️" (with VS16) at 2 cells — a 1-cell drift per occurrence
+  // and the direct cause of the "07:538" / "07:054" trailing-digit residue.
+  const chars = [...stripped];
   let width = 0;
-  for (const ch of stripped) {
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
     const cp = ch.codePointAt(0);
     if (cp == null) continue;
-    if (cp === 0xFE0F) continue;                          // emoji variation selector
+    if (cp === 0xFE0F) continue;                          // emoji variation selector (consumed below via lookahead)
     if (cp >= 0x0300 && cp <= 0x036F) continue;           // combining diacriticals
     if (cp >= 0x200B && cp <= 0x200D) continue;           // ZWSP / ZWNJ / ZWJ
+
+    // Lookahead for VS16 (U+FE0F): forces emoji presentation = 2 cells.
+    const nextCp = i + 1 < chars.length ? chars[i + 1].codePointAt(0) : null;
+    const hasVS16 = nextCp === 0xFE0F;
 
     // East Asian Width "Ambiguous" codepoints: tmux + xterm in a non-East-
     // Asian locale count these as 1 cell (NOT 2) despite their wide
@@ -70,15 +83,21 @@ function visibleCellWidth(s) {
     // tmux's cell-clear math used its own (smaller) wcwidth so cells the
     // script thought it was covering were left exposed from the
     // previous render. Peeling Ambiguous off Wide brings the two counts
-    // back into agreement. To add new codepoints here, verify their EAW
-    // class via https://www.unicode.org/Public/UCD/latest/ucd/EastAsianWidth.txt
+    // back into agreement.
+    //
+    // Exception: if VS16 follows, emoji-presentation is forced — count 2.
+    // To add new codepoints here, verify their EAW class via
+    // https://www.unicode.org/Public/UCD/latest/ucd/EastAsianWidth.txt
     // AND confirm tmux's actual rendering in this user's terminal.
     const isAmbiguousNarrow =
       cp === 0x26A0 ||                                    // ⚠ warning sign
       cp === 0x2699 ||                                    // ⚙ gear
       cp === 0x23F8 ||                                    // ⏸ pause
       cp === 0x2501;                                      // ━ heavy horizontal
-    if (isAmbiguousNarrow) { width += 1; continue; }
+    if (isAmbiguousNarrow) {
+      width += hasVS16 ? 2 : 1;
+      continue;
+    }
 
     // Confirmed EAW=Wide ranges. The 0x2600-0x27BF block contains both
     // Wide (✅⚫❌❗❓🚫) and Ambiguous (⚠⚙) codepoints — the explicit
@@ -114,18 +133,8 @@ function visibleCellWidth(s) {
 // status-right-length cap configured by tmux-session-wrapper.sh:49). tmux
 // truncates content longer than status-right-length from the LEFT, so an
 // over-pad never eats into the visible right-anchored content.
-//
-// CELL_DRIFT_BUFFER: pad 2 cells beyond pane width to absorb residual
-// cell-count drift between our visibleCellWidth prediction and what
-// xterm.js / iTerm2 actually render. Without this buffer, a one-cell
-// mismatch (e.g. a badge state change ✅↔⚠️ when the terminal's wcwidth
-// disagrees with ours on a single ambiguous codepoint) leaves the rightmost
-// cell of the previous render visible — the recurring "07:538"
-// trailing-digit residue. The extra 2 cells are leading spaces; tmux's
-// left-truncation absorbs them without affecting the visible right edge.
-const CELL_DRIFT_BUFFER = 2;
 function leftPadToStableCellWidth(text, paneWidth) {
-  const target = (parseInt(paneWidth, 10) || 200) + CELL_DRIFT_BUFFER;
+  const target = parseInt(paneWidth, 10) || 200;
   if (target <= 0) return text;
   const cur = visibleCellWidth(text);
   if (cur >= target) return text;
