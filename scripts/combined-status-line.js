@@ -421,6 +421,29 @@ class CombinedStatusLine {
   }
 
   /**
+   * Whether ANY tracked Claude session has a fresh LSL heartbeat (<5 min).
+   * Used to discriminate "actually broken" from "user just walked away" so
+   * coordinator-derived badges can show idle (⚫) instead of warning (⚠️/🔴)
+   * when no observation activity is expected.
+   */
+  async isUserActive() {
+    if (this._userActivePromise) return this._userActivePromise;
+    this._userActivePromise = (async () => {
+      const result = await this.getCoordinatorState();
+      if (!result.ok) return false;
+      const lsl = result.state.lsl || {};
+      const FRESH_MS = 5 * 60 * 1000;
+      const now = Date.now();
+      return Object.values(lsl).some(entry => {
+        if (!entry || entry.status === 'stopped') return false;
+        const lastBeat = entry.lastBeat || 0;
+        return lastBeat > 0 && (now - lastBeat) < FRESH_MS;
+      });
+    })();
+    return this._userActivePromise;
+  }
+
+  /**
    * Check LSL transcript monitor health for the CURRENT pane.
    *
    * Lookup precedence in coordinator state:
@@ -1637,6 +1660,12 @@ class CombinedStatusLine {
     const parts = [];
     let overallColor = 'green';
 
+    // Whether ANY Claude session has a fresh heartbeat. When the user is idle,
+    // we suppress the "warning" verdict on coordinator-derived badges and show
+    // ⚫ idle instead — "no recent activity" is expected during idle and
+    // shouldn't paint the line yellow/red.
+    const userActive = await this.isUserActive();
+
     // Store GCM status for health indicator (calculated first since health is first in display)
     const gcmIcon = globalHealth?.gcm?.icon || '🟡';
     const gcmHealthy = gcmIcon === '✅';
@@ -1763,12 +1792,24 @@ class CombinedStatusLine {
         parts.push('[📚✅]');
         break;
       case 'stale':
-        parts.push('[📚⚠️]');
-        if (overallColor === 'green') overallColor = 'yellow';
+        // Idle suppression: if no Claude session is active, "stale obs" just
+        // means the user walked away — show ⚫ (idle), not ⚠️ (warning).
+        if (!userActive) {
+          parts.push('[📚⚫]');
+        } else {
+          parts.push('[📚⚠️]');
+          if (overallColor === 'green') overallColor = 'yellow';
+        }
         break;
       case 'stalled':
-        parts.push('[📚🔴]');
-        if (overallColor === 'green') overallColor = 'yellow';
+        // Same idle suppression for the >6h band — only a true alarm if the
+        // user is actively working and the pipeline isn't ingesting.
+        if (!userActive) {
+          parts.push('[📚⚫]');
+        } else {
+          parts.push('[📚🔴]');
+          if (overallColor === 'green') overallColor = 'yellow';
+        }
         break;
       case 'disabled':
         parts.push('[📚🔇]');
@@ -1797,12 +1838,24 @@ class CombinedStatusLine {
         parts.push('[🧠✅]');
         break;
       case 'degraded':
-        parts.push('[🧠⚠️]');
-        if (overallColor === 'green') overallColor = 'yellow';
+        // Idle suppression: a degraded proxy semantic-probe during idle is
+        // typically the probe-window missing rather than a real outage.
+        if (!userActive) {
+          parts.push('[🧠⚫]');
+        } else {
+          parts.push('[🧠⚠️]');
+          if (overallColor === 'green') overallColor = 'yellow';
+        }
         break;
       case 'cooling':
-        parts.push('[🧠🚫]');
-        overallColor = 'red';
+        // The auto-heal cooldown state is transient; during idle it's not
+        // a user-actionable problem — show idle instead of red.
+        if (!userActive) {
+          parts.push('[🧠⚫]');
+        } else {
+          parts.push('[🧠🚫]');
+          overallColor = 'red';
+        }
         break;
       case 'disabled':
         parts.push('[🧠🔇]');

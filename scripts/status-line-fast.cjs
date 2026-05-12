@@ -152,6 +152,14 @@ try {
 // content sized for a different pane, producing a "shifted left + leftover characters"
 // render until the next background refresh. The width suffix on the cache key only
 // works if the borrow path respects it.
+// Cache TTL constants. Dropped from 60s to 30s so idle-state transitions
+// (📚⚠️ ↔ 📚⚫ when a Claude session resumes) recover within ~30s instead
+// of up to a full minute. The 10s background-refresh threshold is half the
+// TTL so we serve fresh content most of the time without spawning every
+// status-interval tick.
+const CACHE_TTL_MS = 30000;
+const BG_REFRESH_THRESHOLD_MS = 10000;
+
 if (!cachedContent.trimEnd() && projectName) {
   try {
     const logsDir = path.join(codingRepo, '.logs');
@@ -162,7 +170,7 @@ if (!cachedContent.trimEnd() && projectName) {
       const sibPath = path.join(logsDir, sib);
       const stat = fs.statSync(sibPath);
       const age = Date.now() - stat.mtimeMs;
-      if (age < 60000) {
+      if (age < CACHE_TTL_MS) {
         const content = fs.readFileSync(sibPath, 'utf8').replace(/\r?\n$/, '');
         if (content.trimEnd()) {
           cachedContent = reunderline(content, getAbbrev(projectName));
@@ -177,24 +185,24 @@ if (!cachedContent.trimEnd() && projectName) {
   } catch { /* best effort */ }
 }
 
-// Fresh cache (<60s): use it directly, but first patch the per-project
-// lifecycle icons against current transcript mtimes. Without this, the
-// icon stays at whatever value was rendered at cache-write time and only
-// updates on the next CSL refresh — which adds tens of seconds of
-// "I just typed something but my session still shows ⚫" lag.
-if (cacheAgeMs < 60000 && cachedContent.trimEnd()) {
+// Fresh cache: use it directly, but first patch the per-project lifecycle
+// icons against current transcript mtimes. Without this, the icon stays at
+// whatever value was rendered at cache-write time and only updates on the
+// next CSL refresh — which adds tens of seconds of "I just typed something
+// but my session still shows ⚫" lag.
+if (cacheAgeMs < CACHE_TTL_MS && cachedContent.trimEnd()) {
   const mapping = readProjectMapping();
   const { text: patched, anyNewer } = patchLifecycleIcons(
     cachedContent, mapping, cacheMtimeMs
   );
   process.stdout.write(patched + '\n');
   // Trigger background refresh when:
-  //   - cache is aging (>20s old), OR
+  //   - cache has aged past the background-refresh threshold, OR
   //   - any tracked transcript is newer than the cache (user activity
   //     happened after the last full render). The activity-newer trigger
   //     is what gets the non-lifecycle parts of the line (UKB, knowledge
   //     pipeline, etc.) caught up promptly after a long idle stretch.
-  if (cacheAgeMs > 20000 || anyNewer) {
+  if (cacheAgeMs > BG_REFRESH_THRESHOLD_MS || anyNewer) {
     const bg = spawn('node', [cslScript], {
       env, stdio: 'ignore', detached: true
     });
