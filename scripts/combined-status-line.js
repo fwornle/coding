@@ -367,20 +367,36 @@ class CombinedStatusLine {
    * Memoizing on the instance collapses 5 probes into 1 per render.
    * (A fresh CombinedStatusLine is constructed per CSL run, so the
    * memo never lives longer than one render.)
+   *
+   * Uses node's fetch (not execSync curl) to skip the subprocess-spawn
+   * cost. One retry on failure (~200ms delay) so a single transient
+   * slow response doesn't cascade every coordinator-derived badge to
+   * its "unreachable" state — that cascade produced jarring visual
+   * oscillations (🏥⚠️ LSL🔴 📚❌ 🧠❌ flipping back to all-green
+   * between renders).
    */
   async getCoordinatorState() {
     if (this._coordStatePromise) return this._coordStatePromise;
     this._coordStatePromise = (async () => {
       const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
-      try {
-        const out = execSync(
-          `curl -fs --max-time 2 "${url}/health/state"`,
-          { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
-        );
-        return { ok: true, state: JSON.parse(out) };
-      } catch (error) {
-        return { ok: false, error: error.message };
+      const PER_ATTEMPT_MS = 1500;
+      const RETRY_DELAY_MS = 150;
+      let lastErr;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const r = await fetch(`${url}/health/state`, {
+            signal: AbortSignal.timeout(PER_ATTEMPT_MS)
+          });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return { ok: true, state: await r.json() };
+        } catch (error) {
+          lastErr = error;
+          if (attempt < 2) {
+            await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+          }
+        }
       }
+      return { ok: false, error: lastErr?.message || 'unknown' };
     })();
     return this._coordStatePromise;
   }
