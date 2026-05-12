@@ -80,7 +80,6 @@ nav:
     - Knowledge Management: core-systems/ukb-vkb.md
     - Ontology: core-systems/ontology.md
     - Constraints: core-systems/constraints.md
-    - Trajectories: core-systems/trajectories.md
     - Observational Memory: core-systems/observational-memory.md
   - Architecture:
     - Overview: architecture/index.md
