@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v6.0
-milestone_name: -- Knowledge Context Injection
+milestone: v7.0
+milestone_name: Health Monitoring Consolidation
 status: executing
-stopped_at: Phase 34 — all 6 plans on main; D-14 24h soak gate pending post-merge
-last_updated: "2026-05-11T10:35:00.000Z"
-last_activity: 2026-05-11 -- Phase 34: 34-06 closed (plist bootout/bootstrap re-applied; AC #6 PASS; AC #11 PASS 1s respawn; 34-VERIFICATION.md written)
+stopped_at: Phase 34 — all 6 plans on main; 3 operator gates remain (R3 networkMode flap, R4 cooldown, D-14 24h soak)
+last_updated: "2026-05-12T14:55:00.000Z"
+last_activity: 2026-05-12 -- tmux statusline residue fix in ~/.tmux.conf (codepoint-widths U+26A0=2); milestone tag corrected v6.0 → v7.0
 progress:
-  total_phases: 3
-  completed_phases: 1
+  total_phases: 2
+  completed_phases: 2
   total_plans: 21
   completed_plans: 21
   percent: 100
