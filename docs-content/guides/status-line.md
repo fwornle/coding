@@ -1,6 +1,6 @@
 # Status Line Complete Guide
 
-Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions; `status-right` invokes `combined-status-line-wrapper.js`, which reads a per-project pre-rendered cache (~60ms warm-path) and falls back to `combined-status-line.js` for full re-renders. The renderer pulls live state from the **health coordinator at :3034** (Phase 33 single source of truth, replacing the retired host-side `health-verifier` daemon and `.health/verification-status.json` file).
+Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions; `status-right` invokes `status-line-fast.cjs`, a CommonJS fast-path reader that serves a per-pane pre-rendered cache (~60 ms) and spawns the full `combined-status-line.js` (CSL) renderer only when the cache is stale. The renderer pulls live state from the **health coordinator at :3034** (Phase 33 single source of truth, replacing the retired host-side `health-verifier` daemon and `.health/verification-status.json` file). All five coordinator-derived badges share a single memoized probe per render — see [Architecture → Shared coordinator probe](#shared-coordinator-probe).
 
 ![Status Line Display](../images/status-line-display.png)
 
@@ -20,7 +20,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 |-----------|---------|-------------|
 | System Health | `[🏥✅]` | Coordinator-derived health rollup (services + databases + container) |
 | Active Sessions | `[RA⚫C🟢]` | Per-project abbreviations with graduated activity icons |
-| Constraint + Trajectory | `[🔒 77% ⚙️IMP]` | Code quality % and current trajectory state |
+| Constraint | `[🔒 77%]` | Code quality % (with optional `⚠️ N` violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
@@ -66,17 +66,6 @@ Sessions use a **graduated color scheme** based on time since last activity. **A
 
 !!! warning "Not-Found Transcript Guard"
     Agents that don't produce Claude-compatible transcripts (e.g., OpenCode) have `transcriptInfo.status: 'not_found'`. The age cap logic skips these sessions — they correctly display as ⚫ inactive instead of falsely showing as 🟢 active.
-
-### Trajectory States
-
-| Icon | State | Description |
-|------|-------|-------------|
-| 🔍 | EX (Exploring) | Information gathering and analysis |
-| 📈 | ON (On Track) | Productive progression |
-| 📉 | OFF (Off Track) | Deviating from optimal path |
-| ⚙️ | IMP (Implementing) | Active code modification |
-| ✅ | VER (Verifying) | Testing and validation |
-| 🚫 | BLK (Blocked) | Intervention preventing action |
 
 ### Knowledge Pipeline Indicators
 
@@ -149,22 +138,33 @@ This replaces the previous approach of using agent-specific status bar APIs (e.g
 
 ### Cache Fast-Path
 
-`combined-status-line-wrapper.js` reads a per-project pre-rendered cache to avoid the ~2-18s ESM module load on cold-start:
+`status-line-fast.cjs` is the primary entry point invoked by tmux `status-right`. It's a CommonJS reader (no ESM module-load penalty under load) that serves the per-pane pre-rendered cache in ~60 ms:
 
-- Cache file: `.logs/combined-status-line-cache-<project>.txt` (one per tmux pane, keyed by `TMUX_PANE_PATH` basename)
-- Cache TTL: 30 s — fresh reads serve in <100 ms
-- Cold or stale: spawns the full `combined-status-line.js` (inherits stdio so its output streams to tmux)
-- The wrapper preserves trailing whitespace and the NBSP terminator on cached output (see "Right-edge stability" below)
+- Cache file: `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt` (one per (project, pane-width) tuple — width key prevents cross-pane contamination)
+- Cache TTL: 60 s in fast.cjs (a separate 30 s TTL inside CSL itself when CSL re-enters via its own cache check)
+- Fresh (<60 s): serves immediately, optionally patches lifecycle icons against current transcript mtimes, triggers background refresh if cache >20 s old or transcript activity is newer than cache
+- Stale or missing: spawns the full `combined-status-line.js` synchronously
+- **Critical detail**: fast.cjs calls `child.stdin.end()` immediately after spawning CSL. CSL's `readStdinInput()` (used by `getRedirectStatus()`) iterates over `process.stdin` and would otherwise hang the full 8 s SYS:TIMEOUT window waiting for EOF on any pane whose `TRANSCRIPT_SOURCE_PROJECT` falls outside the coding repo.
+- `combined-status-line-wrapper.js` is retained as a backup but is no longer the primary path.
 
-### Right-edge stability (NBSP terminator + codepoint padding)
+### Shared coordinator probe
 
-The status-right truncation pipeline in tmux interacts with emoji widths in a way that can leave residual chars at the right edge ("12:411", "13:0656" — leftover digits from a previous, wider render). Two stacked tactics anchor the right edge:
+Every render needs five different slices of `state` from the health coordinator (`knowledge_pipeline`, `proxy`, `services` rollup, `lsl_by_project`, generated_at staleness). Each was previously a separate synchronous probe via `execSync('curl …')`; five identical localhost HTTP calls per render added up to ~3 s under load and tripped the 8 s SYS:TIMEOUT during tmux refresh bursts.
 
-1. **Codepoint-floor padding**: pad the rendered string to ≥ 220 codepoints (after stripping zero-width tmux `#[…]` markup). Counted via `[...s].length` (codepoints), not `s.length` (UTF-16 units). Every codepoint is at minimum 1 cell in tmux's measurement, so 220 codepoints ≥ 200 cells — comfortably above `status-right-length=200`. Tmux always truncates to exactly 200 cells, fully overwriting prior-render residue.
+The renderer now exposes a single `getCoordinatorState()` method memoized on the `CombinedStatusLine` instance (one instance per render):
 
-2. **Anti-strip terminator**: end the line with one **non-breaking space** (U+00A0). tmux's `#(shell-cmd)` substitution strips trailing ASCII whitespace before plugging into the format; without a non-ASCII-whitespace terminator the trailing-space pad would be dropped. NBSP is 1 cell, visually identical to space, but is not ASCII whitespace — the strip stops on it and the pad survives.
+- Uses native `fetch` instead of `execSync(curl)` to skip subprocess-spawn overhead
+- 1.5 s per-attempt budget with one retry (150 ms gap)
+- All five `getXxxStatus()` methods await the shared result; one HTTP call serves the whole render
+- A single transient slow response no longer cascades every coordinator-derived badge (`🏥` `LSL` `📚` `🧠`) to its unreachable state simultaneously
 
-The combination is robust across tmux versions despite UAX#11 / VS-16 disagreements on emoji width (tmux counts ⚠️ ⚙️ as 1 cell while terminals render them as 2; predicting tmux's count exactly would mirror its internal table per version).
+### Right-edge stability (VS16-aware cell counting)
+
+The recurring trailing-digit residue at the right edge (`07:538`, `12:411`) traced to cell-width prediction. The fix is in `visibleCellWidth()` and pads correctly via `leftPadToStableCellWidth()`:
+
+- The cell-count function iterates over codepoints with a **VS16 lookahead**: when an East-Asian-Width-Ambiguous codepoint (e.g. `U+26A0 ⚠`) is followed by `U+FE0F` (variation-selector-16), it's promoted to 2 cells, matching how xterm.js and tmux render forced-emoji-presentation. Without the lookahead, `⚠` counted as 1 cell while terminals rendered `⚠️` at 2 — a 1-cell drift per occurrence that left the rightmost cell of the previous render exposed on badge transitions like `[📚✅] ↔ [📚⚠️]`.
+- Padding is **leading-spaces only** to TMUX_PANE_WIDTH (or 200 if unset). Trailing characters get stripped by tmux's `#(shell-cmd)` substitution, so any trailing terminator (NBSP, space, etc.) doesn't survive the round-trip.
+- Comparison: the earlier NBSP-terminator + 220-codepoint approach has been retired in favour of correct per-codepoint cell counting.
 
 ### Status Line Update Flow
 
@@ -182,9 +182,8 @@ The combination is robust across tmux versions despite UAX#11 / VS-16 disagreeme
 1. **State pull**: single `GET http://localhost:3034/health/state` from the coordinator (with curl fallback if the coordinator is unreachable)
 2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🌲 / 🫒 / 🪨 / ⚫ / 💤)
 3. **Constraint compliance**: cached call to constraint-monitor API (port 3031)
-4. **Trajectory state**: read `.specstory/trajectory/live-state.json` for the current pane's project
-5. **Render**: assemble parts, pad to ≥ 220 codepoints + NBSP terminator
-6. **Cache write**: save to `.logs/combined-status-line-cache-<project>.txt`
+4. **Render**: assemble parts, pad to paneWidth cells (see `leftPadToStableCellWidth()` for the cell-width-stability mechanism)
+5. **Cache write**: save to `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt`
 
 ### Caching
 
@@ -193,7 +192,6 @@ The combination is robust across tmux versions despite UAX#11 / VS-16 disagreeme
 | Pre-rendered status (fast-path) | 60s TTL, 20s background refresh |
 | Health status | 5 minutes |
 | Constraint compliance | 1 minute |
-| Trajectory state | Read on every update |
 | LSL status | Read on every update |
 
 ### Spawn Storm Prevention
@@ -353,9 +351,6 @@ curl -fs http://localhost:3034/health/state | jq '.generated_at, .lsl_by_project
 # Trigger an explicit one-shot verifier run (writes a verify_run signal to coordinator)
 node scripts/health-verifier.js verify
 
-# Trajectory state exists?
-ls -la .specstory/trajectory/live-state.json
-
 # Force a fresh render (clears the per-project cache)
 rm -f .logs/combined-status-line-cache-*.txt
 node scripts/combined-status-line.js
@@ -418,8 +413,7 @@ xxd .logs/combined-status-line-cache-coding.txt | tail -1
 | `scripts/health-coordinator.js` | Phase 33 SoT — collects signals at :3034, exposes `/health/state` |
 | `scripts/health-verifier.js` | Reporter-mode CLI: `verify`, `status`, `report` (no daemon) |
 | `scripts/enhanced-transcript-monitor.js` | Per-project ETM; POSTs `lsl_heartbeat` signals to coordinator |
-| `.specstory/trajectory/live-state.json` | Current trajectory state for the pane's project |
-| `.logs/combined-status-line-cache-<project>.txt` | Per-pane pre-rendered status cache |
+| `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt` | Per-(pane, width) pre-rendered status cache |
 
 **Retired (do not write/read):**
 

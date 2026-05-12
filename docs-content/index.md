@@ -15,7 +15,6 @@ Coding is an infrastructure layer that enhances AI coding assistants by:
 - **Capturing everything** - Automatic session logging of all prompts, tool calls, and responses
 - **Learning from experience** - Build a knowledge base from your coding history and conversations
 - **Preventing mistakes** - Constraint system stops errors before they happen
-- **Tracking progress** - Real-time trajectory detection and status feedback
 
 ![System Architecture](images/coding-system-architecture.png)
 
@@ -100,7 +99,6 @@ Real-time feedback via the unified tmux status bar showing system health, costs,
 |-----------|---------|
 | Health icons | Service status (green/red) |
 | Cost display | API usage tracking |
-| Trajectory | Current development phase |
 | LSL status | Logging window and routing |
 
 [Learn more about Status Line](guides/status-line.md){ .md-button }
@@ -177,7 +175,6 @@ vkb
 | Health Monitoring | :material-check-circle:{ .green } Production | 3-layer supervision architecture |
 | Status Line | :material-check-circle:{ .green } Production | Real-time terminal feedback |
 | Online Learning | :material-progress-clock:{ .yellow } Beta | Continuous learning without manual UKB |
-| Trajectory Detection | :material-progress-clock:{ .yellow } Beta | Real-time goal and deviation tracking |
 
 ---
 
@@ -209,7 +206,7 @@ Coding provides several MCP (Model Context Protocol) servers:
 
     ---
 
-    LSL, UKB/VKB, Constraints, Trajectories
+    LSL, UKB/VKB, Constraints, Observational Memory
 
     [:octicons-arrow-right-24: Explore](core-systems/index.md)
 

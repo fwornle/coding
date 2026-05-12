@@ -178,7 +178,7 @@ The storage flows through three layers:
 ![Knowledge Extraction Sequence](../images/continuous-learning-sequence-extraction.png)
 
 1. **Exchange Processing**: Developer interacts with coding agent
-2. **Intent Classification**: Trajectory analyzer classifies developer intent
+2. **Intent Classification**: Classifier categorizes developer intent
 3. **Budget Check**: Budget tracker verifies cost allowance
 4. **Sensitivity Detection**: Classifier routes sensitive data to local models
 5. **Knowledge Extraction**: Buffered exchanges are processed and stored
@@ -215,7 +215,6 @@ The storage flows through three layers:
 |------------|------------|---------|
 | `knowledge_patterns` | 1536-dim | High-quality long-term storage |
 | `knowledge_patterns_small` | 384-dim | Fast local embeddings |
-| `trajectory_analysis` | 384-dim | Development trajectory tracking |
 | `session_memory` | 384-dim | Session-specific memory |
 
 ### SQLite Tables

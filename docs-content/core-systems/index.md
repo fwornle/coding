@@ -52,20 +52,6 @@ The coding infrastructure consists of six interconnected systems that work toget
 
     [:octicons-arrow-right-24: Learn more](constraints.md)
 
--   :material-compass:{ .lg .middle } **Trajectory Detection**
-
-    ---
-
-    Tracks development progress and detects when you're deviating from your goals.
-
-    ![Trajectory Analysis](../images/real-time-trajectory-analysis-flow.png)
-
-    - Real-time state tracking
-    - Goal deviation alerts
-    - Status line integration
-
-    [:octicons-arrow-right-24: Learn more](trajectories.md)
-
 -   :material-heart-pulse:{ .lg .middle } **Health Monitoring**
 
     ---
@@ -90,7 +76,7 @@ The coding infrastructure consists of six interconnected systems that work toget
 
     - Service health indicators
     - Cost tracking display
-    - Trajectory and LSL status
+    - LSL status
 
     [:octicons-arrow-right-24: Learn more](../guides/status-line.md)
 
@@ -133,7 +119,6 @@ flowchart TB
     subgraph Feedback["Feedback Systems"]
         T[Status Line]
         U[Health Monitor]
-        V[Trajectory Analyzer]
     end
 
     A --> D
@@ -141,7 +126,6 @@ flowchart TB
     H --> J
     I --> J
     U --> T
-    V --> T
 ```
 
 ---

@@ -356,7 +356,6 @@ Let me be honest about where things stand:
 
 **Working but needs refinement:**  
 - Continuous learning (automatic knowledge extraction)  
-- Trajectory detection (recognizing exploring vs. implementing vs. debugging)  
 - Some edge cases in the multi-agent workflow, which has grown from a much simpler set-up to what might have become a slightly too complicated configuration  
 
 **The code itself reflects its vibe-coded origins.** There are inconsistencies. Some abstractions could be cleaner. But it works, and more importantly, the patterns are sound.

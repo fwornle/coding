@@ -117,18 +117,9 @@ The host-side Claude CLI talks to lightweight stdio proxies, which forward to th
 | Knowledge (UKB) | `.data/knowledge-graph/` | LevelDB |
 | Knowledge Export | `.data/knowledge-export/` | JSON |
 | Continuous Learning | Qdrant + `.cache/knowledge.db` | Vectors + SQLite |
-| Trajectories | `.specstory/trajectory/` | JSON |
 | Health | `.health/` | JSON |
 
 ## Cross-System Integration
-
-### LSL + Trajectories
-
-LSL exchanges feed real-time trajectory analysis:
-
-```
-LSL Exchange --> Significance Check --> Trajectory Analyzer --> State Update --> Status Line
-```
 
 ### LSL + Knowledge
 

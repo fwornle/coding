@@ -62,7 +62,7 @@ Progressive escalation for reliability:
 | Layer | Component | Function |
 |-------|-----------|----------|
 | 4 | Service Health | UKB, VKB, Semantic Analysis |
-| 3 | System Verifier | LSL, Constraints, Trajectory |
+| 3 | System Verifier | LSL, Constraints |
 | 2 | System Coordinator | Overall health, metrics |
 | 1 | System Watchdog | Critical failures, alerts |
 

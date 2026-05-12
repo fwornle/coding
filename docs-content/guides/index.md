@@ -16,7 +16,7 @@ Comprehensive reference guides with detailed explanations, complete configuratio
   <img src="../images/status-line-display.png" alt="Status Line">
   <div class="card-content">
     <h3>Status Line Guide</h3>
-    <p>Complete emoji reference, trajectory states, and configuration</p>
+    <p>Complete emoji reference and configuration</p>
   </div>
 </a>
 

@@ -105,7 +105,6 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 - **📋 Live Session Logging** - Real-time conversation classification and routing
 - **🔒 Constraint Monitoring** - PreToolUse hook enforcement for code quality
 - **🧠 Knowledge Management** - Capture, visualize, and share development insights
-- **📈 Trajectory Generation** - Automated project analysis and documentation
 - **👁️ Observational Memory** - Per-exchange LLM observations from live sessions, browsable dashboard
 - **🤖 Multi-Agent Analysis** - 11 specialized AI agents for comprehensive code analysis
 
