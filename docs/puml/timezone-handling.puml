@@ -27,7 +27,6 @@ rectangle "Time Processing" {
 
 rectangle "Output Generation" {
   file "LSL Session Files" as LSLFiles
-  file "Trajectory Files" as TrajFiles
   component "Status Line Display" as StatusDisplay
 }
 
@@ -42,7 +41,6 @@ Calculator --> LSLFiles : Filename: 1230-1330-session.md
 Calculator --> StatusDisplay : Display: 📋1230-1330-session
 
 Utils --> LSLFiles : Format: "12:33 CEST (10:33:13 UTC)"
-Utils --> TrajFiles : Timezone-aware timestamps
 
 ' Functions: parseTimestamp(utc) to local, formatTimestamp() to display, getTimeWindow() to tranche, getTimezone() from .env
 

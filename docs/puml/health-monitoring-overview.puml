@@ -12,7 +12,6 @@ package "Reporters (host)" {
     **Per-project ETM**
     - 2s check interval
     - LSL file generation
-    - Trajectory analysis
     - POSTs lsl_heartbeat
       every poll cycle
   end note

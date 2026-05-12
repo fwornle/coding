@@ -57,11 +57,11 @@ SemanticSvc --> SemanticAPI : checks AI services
 ' Output generation
 GCM --> GCM_Out : operational/warning/failed
 CoreSvc --> Core_Out : healthy/degraded/failed
-ConstraintSvc --> Constraint_Out : compliance % + trajectory
+ConstraintSvc --> Constraint_Out : compliance %
 SemanticSvc --> Semantic_Out : API status
 
 ' Final aggregation
-MainScript --> TmuxStatus : [GCM✅] [C🟢] [🛡️ 85% 🔍EX] [🧠API✅]
+MainScript --> TmuxStatus : [GCM✅] [C🟢] [🛡️ 85%] [🧠API✅]
 
 note top of CC
   **Rendering: tmux status-right**
@@ -78,7 +78,6 @@ note right of ConstraintAPI
   • API: http://localhost:3031/api/violations
   • Data: Recent violations, compliance score
   • Calculation: 100% - penalties for violations
-  • Trajectory: Activity pattern detection
   • Timeout: 2 seconds with graceful fallback
 end note
 

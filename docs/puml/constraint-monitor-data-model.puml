@@ -46,7 +46,6 @@ package "DuckDB (Analytics)" as duckdb_pkg {
     event_type : STRING  
     constraint_id : STRING
     violation_severity : INT
-    trajectory_score : INT
     timestamp : TIMESTAMP
     content : TEXT
     processed : BOOLEAN
@@ -85,7 +84,6 @@ package "DuckDB (Analytics)" as duckdb_pkg {
     total_events : INT
     violation_count : INT
     compliance_percentage : FLOAT
-    avg_trajectory_score : FLOAT
     intervention_count : INT
   }
 }

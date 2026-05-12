@@ -16,9 +16,6 @@ rectangle "Coding Project" as Coding {
   folder ".specstory/history" as CodingFiles {
     file "1530-1630_from-<project>.md" as CodingLSL
   }
-  folder ".specstory/trajectory" as TrajectoryFiles {
-    file "1530-1630_coding-trajectory.md" as Trajectory
-  }
 }
 
 component "Enhanced\nTranscript Monitor" as Monitor
@@ -32,8 +29,6 @@ Monitor -> Classifier : Analyze content type
 Classifier -> NanoFiles : <project> content
 Classifier -> CodingFiles : coding content
 Classifier -> RedirectStatus : Update routing status
-
-Monitor -> TrajectoryFiles : Generate trajectories\n(semantic analysis)
 
 ' Classification logic: File paths with /coding/, Tool operations on coding files, Git operations, Development workflows
 

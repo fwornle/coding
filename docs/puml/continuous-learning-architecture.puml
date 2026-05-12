@@ -47,24 +47,6 @@ package "Knowledge Management" <<core>> {
   [TemporalDecayTracker] <<util>>
 }
 
-package "Trajectory Tracking" <<core>> {
-  [RealTimeTrajectoryAnalyzer] <<core>>
-
-  note right of RealTimeTrajectoryAnalyzer
-    **Intent Classification**
-    • learning
-    • debugging
-    • feature-development
-    • refactoring
-
-    **Trajectory States**
-    • exploring
-    • implementing
-    • verifying
-    • blocked
-  end note
-}
-
 package "Caching Layer" <<storage>> {
   [AgentAgnosticCache] <<storage>>
   [FileBackend] <<storage>>
@@ -76,7 +58,6 @@ package "Database Layer" <<storage>> {
   database "Qdrant\n(Docker Vector Search)" as Qdrant {
     [knowledge_patterns\n1536-dim]
     [knowledge_patterns_small\n384-dim]
-    [trajectory_analysis\n384-dim]
     [session_memory\n384-dim]
   }
 
@@ -135,7 +116,6 @@ AdapterAPI SYNC_LINE [GenericAdapter]
 [StreamingKnowledgeExtractor] SYNC_LINE [UnifiedInferenceEngine]
 [KnowledgeRetriever] SYNC_LINE [UnifiedInferenceEngine]
 [ConceptAbstractionAgent] SYNC_LINE [UnifiedInferenceEngine]
-[RealTimeTrajectoryAnalyzer] SYNC_LINE [UnifiedInferenceEngine]
 
 [UnifiedInferenceEngine] CONTROL_LINE [BudgetTracker]
 [UnifiedInferenceEngine] CONTROL_LINE [SensitivityClassifier]
@@ -158,8 +138,6 @@ AdapterAPI SYNC_LINE [GenericAdapter]
 [AgentAgnosticCache] OPTIONAL_LINE [MCPBackend]
 
 [BudgetTracker] DATA_LINE SQLite
-[RealTimeTrajectoryAnalyzer] DATA_LINE Qdrant
-[RealTimeTrajectoryAnalyzer] DATA_LINE SQLite
 
 ' Optional manual export to Graph DB
 [ConceptAbstractionAgent] OPTIONAL_LINE GraphDB : Manual export\nvia UKB

@@ -109,33 +109,6 @@ package "Knowledge Management" <<core>> {
   }
 }
 
-package "Trajectory" <<core>> {
-  class RealTimeTrajectoryAnalyzer {
-    - inferenceEngine: UnifiedInferenceEngine
-    - historyService: HistoryService
-    - dbManager: DatabaseManager
-    --
-    + analyzeState(exchange): Promise<TrajectoryState>
-    + detectIntentTransition(current, previous): boolean
-    + getAnalytics(sessionId): Promise<Analytics>
-    - classifyIntent(exchange): Promise<Intent>
-    - extractGoal(exchange): Promise<string>
-    - extractConcepts(exchange): Promise<string[]>
-  }
-
-  class TrajectoryState {
-    + currentState: string
-    + intent: string
-    + goal: string
-    + concepts: string[]
-    + patterns_applied: string[]
-    + learning_points: string[]
-    + context_chain: IntentTransition[]
-    + timestamp: Date
-    + confidence: number
-  }
-}
-
 package "Database" <<storage>> {
   class DatabaseManager {
     - qdrantClient: QdrantClient
@@ -217,10 +190,6 @@ KnowledgeRetriever --> TemporalDecayTracker : applies decay
 ConceptAbstractionAgent --> UnifiedInferenceEngine : uses
 ConceptAbstractionAgent --> EmbeddingGenerator : uses
 ConceptAbstractionAgent --> DatabaseManager : queries
-
-RealTimeTrajectoryAnalyzer --> UnifiedInferenceEngine : uses
-RealTimeTrajectoryAnalyzer --> DatabaseManager : stores
-RealTimeTrajectoryAnalyzer --> TrajectoryState : produces
 
 DatabaseManager --> EmbeddingGenerator : uses
 TemporalDecayTracker --> DatabaseManager : uses

@@ -7,7 +7,6 @@ top to bottom direction
 
 package "Coding Core System" as core #E8F5E8 {
   [LSL\nSystem] as lsl <<core>>
-  [Trajectory\nGeneration] as trajectory <<core>>
   [Constraint\nMonitoring] as constraints <<core>>
 }
 
@@ -29,8 +28,8 @@ lsl -down-> groq : Layer 4 Classification\n(fast semantic)
 lsl -down-> gemini : Fallback 1
 lsl -down-> anthropic : Fallback 2
 lsl -down-> openai : Fallback 3
-trajectory -down-> semantic : MCP Protocol\n(deep analysis)
 constraints -down-> monitor : PreToolUse Hook
+constraints -down-> semantic : MCP Protocol\n(deep analysis)
 
 note bottom of mcp
   **MCP Servers** provide:
@@ -47,11 +46,12 @@ note right of lsl
   (NOT the 14-agent MCP server)
 end note
 
-note right of trajectory
-  **Trajectory Analysis**
-  Uses MCP Semantic Analysis
-  for deep repository insights
-  and architectural patterns
+note right of constraints
+  **Deep Semantic Analysis**
+  Constraint Monitoring delegates
+  to MCP Semantic Analysis for
+  cross-file architectural pattern
+  detection beyond per-event rules.
 end note
 
 @enduml

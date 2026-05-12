@@ -55,7 +55,7 @@ activate processor
 group Semantic Analysis
   processor -> groq : analyze interaction
   activate groq
-  groq -> groq : trajectory thinking
+  groq -> groq : chain-of-thought reasoning
   groq -> processor : semantic insights
   deactivate groq
 end

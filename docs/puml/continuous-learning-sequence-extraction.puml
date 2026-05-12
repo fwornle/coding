@@ -6,7 +6,7 @@ title Continuous Learning - Real-Time Knowledge Extraction Sequence
 actor "Developer" as Dev
 participant "Coding Agent\n(Claude/Copilot)" as Agent
 participant "StreamingKnowledge\nExtractor" as Extractor
-participant "RealTimeTrajectory\nAnalyzer" as Trajectory
+participant "Intent\nClassifier" as Classifier
 participant "UnifiedInference\nEngine" as Engine
 participant "BudgetTracker" as Budget
 participant "Sensitivity\nClassifier" as Sensitivity
@@ -20,10 +20,10 @@ activate Agent
 Agent -> Extractor: processExchange(exchange)
 activate Extractor
 
-Extractor -> Trajectory: analyzeState(exchange)
-activate Trajectory
+Extractor -> Classifier: classifyIntent(exchange)
+activate Classifier
 
-Trajectory -> Engine: infer(prompt, {task: 'intent-classification'})
+Classifier -> Engine: infer(prompt, {task: 'intent-classification'})
 activate Engine
 
 Engine -> Budget: canAfford('groq', estimatedTokens)
@@ -62,16 +62,11 @@ activate Cache
 Cache --> Engine: cached
 deactivate Cache
 
-Engine --> Trajectory: {intent: 'learning', confidence: 0.92}
+Engine --> Classifier: {intent: 'learning', confidence: 0.92}
 deactivate Engine
 
-Trajectory -> DB: storeTrajectoryState(state)
-activate DB
-DB --> Trajectory: stored
-deactivate DB
-
-Trajectory --> Extractor: {intent: 'learning', state: 'exploring'}
-deactivate Trajectory
+Classifier --> Extractor: {intent: 'learning'}
+deactivate Classifier
 
 == Knowledge Extraction ==
 Extractor -> Extractor: buffer.push(exchange)

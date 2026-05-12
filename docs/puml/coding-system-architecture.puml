@@ -13,7 +13,6 @@ actor "AI Assistant\n(Claude/Copilot/etc)" as ai
 package "Core Systems" as core #E8F5E8 {
   [Live Session Logging\n(LSL)] as lsl <<core>>
   [Constraint Monitoring] as constraints <<core>>
-  [Trajectory Generation] as trajectory <<core>>
   [Status Line System] as status <<core>>
 }
 
@@ -52,7 +51,6 @@ ai -down-> ukb : manual insights
 lsl -down-> extractor : classified content
 lsl -right-> lsl_logs : session logs
 constraints -down-> mcp_constraints : violations
-trajectory -down-> semantic : deep analysis
 
 ' Knowledge flows
 extractor -down-> graphdb : entities/relations
@@ -72,7 +70,6 @@ extractor -down-> sqlite : budget tracking
 ' Status monitoring
 status -up-> lsl : monitors
 status -up-> constraints : monitors
-status -up-> trajectory : monitors
 
 ' Optional export
 graphdb -right-> json : manual export\n(ukb export)
