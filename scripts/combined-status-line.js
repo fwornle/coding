@@ -360,6 +360,32 @@ class CombinedStatusLine {
   }
 
   /**
+   * Shared coordinator state probe. Five badge checks all need
+   * GET /health/state — without memoization they each fire their own
+   * synchronous curl, which under load (or during a tmux probe storm)
+   * each hits the 2s --max-time ceiling and adds up to a SYS:TIMEOUT.
+   * Memoizing on the instance collapses 5 probes into 1 per render.
+   * (A fresh CombinedStatusLine is constructed per CSL run, so the
+   * memo never lives longer than one render.)
+   */
+  async getCoordinatorState() {
+    if (this._coordStatePromise) return this._coordStatePromise;
+    this._coordStatePromise = (async () => {
+      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+      try {
+        const out = execSync(
+          `curl -fs --max-time 2 "${url}/health/state"`,
+          { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
+        );
+        return { ok: true, state: JSON.parse(out) };
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
+    })();
+    return this._coordStatePromise;
+  }
+
+  /**
    * Check LSL transcript monitor health for the CURRENT pane.
    *
    * Lookup precedence in coordinator state:
@@ -372,24 +398,16 @@ class CombinedStatusLine {
    *      attached later. Without this fallback the badge spuriously goes
    *      red even when the project is being monitored healthily.
    */
-  getLSLHealthStatus() {
-    const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+  async getLSLHealthStatus() {
     const sid = process.env.CLAUDE_SESSION_ID || process.env.SESSION_ID;
     const cwd = process.env.TRANSCRIPT_SOURCE_PROJECT
       || process.env.TMUX_PANE_PATH
       || process.cwd();
     const myProject = path.basename(cwd);
     const myTmuxPane = process.env.TMUX_PANE || null;
-    let state;
-    try {
-      const out = execSync(
-        `curl -fs --max-time 2 "${url}/health/state"`,
-        { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
-      );
-      state = JSON.parse(out);
-    } catch {
-      return 'down';
-    }
+    const result = await this.getCoordinatorState();
+    if (!result.ok) return 'down';
+    const state = result.state;
     const evaluate = (entry) => {
       if (!entry) return null;
       if (entry.status === 'stopped') return 'down';
@@ -626,32 +644,24 @@ class CombinedStatusLine {
     // is the coordinator's `knowledge_pipeline` slice — observation /
     // digest / insight freshness derived from the obs_api consolidation
     // status endpoint. See health-coordinator.js:pollKnowledgePipeline.
-    try {
-      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
-      const out = execSync(
-        `curl -fs --max-time 2 "${url}/health/state"`,
-        { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
-      );
-      const state = JSON.parse(out);
-      const kp = state.knowledge_pipeline;
-      if (!kp || !kp.status) {
-        return { status: 'unreachable', reason: 'no knowledge_pipeline slice in /health/state' };
-      }
-      return {
-        status: kp.status,
-        lastObservationAt: kp.lastObservationAt,
-        lastDigestAt: kp.lastDigestAt,
-        lastInsightAt: kp.lastInsightAt,
-        obsAgeMs: kp.obsAgeMs,
-        digAgeMs: kp.digAgeMs,
-        insAgeMs: kp.insAgeMs,
-        totals: kp.totals,
-        inflight: kp.inflight,
-        reason: kp.reason
-      };
-    } catch (error) {
-      return { status: 'unreachable', reason: error.message };
+    const result = await this.getCoordinatorState();
+    if (!result.ok) return { status: 'unreachable', reason: result.error };
+    const kp = result.state.knowledge_pipeline;
+    if (!kp || !kp.status) {
+      return { status: 'unreachable', reason: 'no knowledge_pipeline slice in /health/state' };
     }
+    return {
+      status: kp.status,
+      lastObservationAt: kp.lastObservationAt,
+      lastDigestAt: kp.lastDigestAt,
+      lastInsightAt: kp.lastInsightAt,
+      obsAgeMs: kp.obsAgeMs,
+      digAgeMs: kp.digAgeMs,
+      insAgeMs: kp.insAgeMs,
+      totals: kp.totals,
+      inflight: kp.inflight,
+      reason: kp.reason
+    };
   }
 
   async getProxySystemStatus() {
@@ -659,79 +669,64 @@ class CombinedStatusLine {
     // networkMode + auto_heal_status under state.proxy. This drives the
     // [🧠] badge. See health-coordinator.js:pollProxySemantic +
     // evaluateAutoHealFSM (Plan 34-02 + 34-03).
-    try {
-      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
-      const out = execSync(
-        `curl -fs --max-time 2 "${url}/health/state"`,
-        { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
-      );
-      const state = JSON.parse(out);
-      const p = state.proxy;
-      if (!p) {
-        return { status: 'unreachable', reason: 'no proxy slice in /health/state' };
-      }
-      // Map (semantic_ok, auto_heal_status) → 6-state enum per D-12.
-      let status;
-      if (p.auto_heal_status === 'disabled') status = 'disabled';
-      else if (p.auto_heal_status === 'cooldown') status = 'cooling';
-      else if (p.semantic_ok === null) status = 'unknown';
-      else if (p.semantic_ok === true) status = 'healthy';
-      else status = 'degraded';
-      return {
-        status,
-        semantic_ok: p.semantic_ok,
-        networkMode: p.networkMode,
-        auto_heal_status: p.auto_heal_status,
-        kickstart_count: p.kickstart_count,
-        reason: p.reason,
-      };
-    } catch (error) {
-      return { status: 'unreachable', reason: error.message };
+    const result = await this.getCoordinatorState();
+    if (!result.ok) return { status: 'unreachable', reason: result.error };
+    const p = result.state.proxy;
+    if (!p) {
+      return { status: 'unreachable', reason: 'no proxy slice in /health/state' };
     }
+    // Map (semantic_ok, auto_heal_status) → 6-state enum per D-12.
+    let status;
+    if (p.auto_heal_status === 'disabled') status = 'disabled';
+    else if (p.auto_heal_status === 'cooldown') status = 'cooling';
+    else if (p.semantic_ok === null) status = 'unknown';
+    else if (p.semantic_ok === true) status = 'healthy';
+    else status = 'degraded';
+    return {
+      status,
+      semantic_ok: p.semantic_ok,
+      networkMode: p.networkMode,
+      auto_heal_status: p.auto_heal_status,
+      kickstart_count: p.kickstart_count,
+      reason: p.reason,
+    };
   }
 
   async getHealthVerifierStatus() {
     // Plan 33-04 retired host-side daemon writes to .health/verification-status.json;
     // the coordinator at :3034 is now the SoT. Read from there and synthesize
     // the verifier-shape fields the badge logic expects.
-    try {
-      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
-      const out = execSync(
-        `curl -fs --max-time 2 "${url}/health/state"`,
-        { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
-      );
-      const state = JSON.parse(out);
+    const result = await this.getCoordinatorState();
+    if (!result.ok) return { status: 'error', error: result.error };
+    const state = result.state;
 
-      const generatedAt = state.generated_at ? new Date(state.generated_at).getTime() : 0;
-      const age = generatedAt ? (Date.now() - generatedAt) : Infinity;
-      if (age > 180_000) {
-        return { status: 'stale', lastUpdate: state.generated_at };
-      }
-
-      const services = state.services || [];
-      const downServices = services.filter(s =>
-        s && s.status && s.status !== 'running' && s.status !== 'unknown'
-      );
-      const dbStatus = state.databases?.status;
-      const containerOk = !state.container?.healthcheck
-        || state.container.healthcheck === 'healthy';
-
-      const criticalCount = downServices.length
-        + (dbStatus && dbStatus !== 'healthy' && dbStatus !== 'unknown' ? 1 : 0)
-        + (containerOk ? 0 : 1);
-      const overallStatus = criticalCount === 0 ? 'healthy' : 'degraded';
-
-      return {
-        status: 'operational',
-        overallStatus,
-        criticalCount,
-        violationCount: 0,
-        autoHealingActive: false,
-        lastUpdate: state.generated_at
-      };
-    } catch (error) {
-      return { status: 'error', error: error.message };
+    const generatedAt = state.generated_at ? new Date(state.generated_at).getTime() : 0;
+    const age = generatedAt ? (Date.now() - generatedAt) : Infinity;
+    if (age > 180_000) {
+      return { status: 'stale', lastUpdate: state.generated_at };
     }
+
+    const services = state.services || [];
+    const downServices = services.filter(s =>
+      s && s.status && s.status !== 'running' && s.status !== 'unknown'
+    );
+    const dbStatus = state.databases?.status;
+    const containerOk = !state.container?.healthcheck
+      || state.container.healthcheck === 'healthy';
+
+    const criticalCount = downServices.length
+      + (dbStatus && dbStatus !== 'healthy' && dbStatus !== 'unknown' ? 1 : 0)
+      + (containerOk ? 0 : 1);
+    const overallStatus = criticalCount === 0 ? 'healthy' : 'degraded';
+
+    return {
+      status: 'operational',
+      overallStatus,
+      criticalCount,
+      violationCount: 0,
+      autoHealingActive: false,
+      lastUpdate: state.generated_at
+    };
   }
 
   /**
@@ -766,15 +761,8 @@ class CombinedStatusLine {
       // no longer exists. Output shape is preserved unchanged so the
       // downstream Sessions Display rendering (per-project labels with
       // active-pane underline) works as before.
-      const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
-      let state;
-      try {
-        const out = execSync(
-          `curl -fs --max-time 2 "${url}/health/state"`,
-          { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
-        );
-        state = JSON.parse(out);
-      } catch {
+      const coord = await this.getCoordinatorState();
+      if (!coord.ok) {
         return {
           status: 'error',
           gcm: { icon: '❌', status: 'error' },
@@ -782,6 +770,7 @@ class CombinedStatusLine {
           guards: { icon: '❌', status: 'error' }
         };
       }
+      const state = coord.state;
 
       const result = {
         status: 'operational',
@@ -1697,7 +1686,7 @@ class CombinedStatusLine {
     // LSL (Live Session Logging) — compact per-pane health badge.
     // Hidden when healthy to keep the line tight; the per-project labels
     // (rendered above as Sessions Display) already show per-project status.
-    const lslStatus = this.getLSLHealthStatus();
+    const lslStatus = await this.getLSLHealthStatus();
     if (lslStatus === 'down') {
       parts.push('[LSL🔴]');
       overallColor = 'red';
