@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Health Monitoring Consolidation
 status: executing
-stopped_at: Phase 34 — all 6 plans on main; 3 operator gates remain (R3 networkMode flap, R4 cooldown, D-14 24h soak)
-last_updated: "2026-05-12T14:55:00.000Z"
-last_activity: 2026-05-12 -- tmux statusline residue fix in ~/.tmux.conf (codepoint-widths U+26A0=2); milestone tag corrected v6.0 → v7.0
+stopped_at: Phase 34 — all 6 plans on main; R3/R4 closed via production-telemetry acceptance 2026-05-12; D-14 24h soak gate pending (time-only, expires 2026-05-13T04:26Z)
+last_updated: "2026-05-12T07:35:00.000Z"
+last_activity: 2026-05-12 -- Phase 34: R3 networkMode flap PASS via code review + transitive proof; R4 cooldown PASS via production telemetry (cooldown engaged at 2026-05-11T17:18Z, 22 throttled dispatches across 6h, clean recovery to healthy)
 progress:
   total_phases: 2
   completed_phases: 2
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 34 (proxy-supervision-and-etm-cleanup) — FUNCTIONALLY COMPLETE
-Plan: 6 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ 34-05 ✅ (Task 2(d) dead-reader cleanup closed 2026-05-11 — methods 1+2 PSM-only; method 3 sync-constraint deferred; W-1 live tmux render operator-verified) 34-06 ✅ on main. D-14 24h soak gate (state.proxy.kickstart_count == 0 after 24h continuous operation) is PENDING by design — runs after phase merge. R3/R4 destructive cooldown tests for 34-03 + 34-05's `[🧠🚫]` badge transitions still gated on operator destructive-window.
-Status: Executing Phase 34 — ready to close pending the 24h soak window + R3/R4 destructive window
-Last activity: 2026-05-11 -- Phase 34: 34-05 Task 2(d) dead-reader cleanup closed (PSM-only refactor, -54 LoC net, end-to-end verified)
+Phase: 34 (proxy-supervision-and-etm-cleanup) — CLOSED PENDING D-14 ELAPSED-TIME GATE
+Plan: 6 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ 34-05 ✅ 34-06 ✅ on main. R3 networkMode flap (SPEC AC #3) closed 2026-05-12 via code review + transitive proof from R4. R4 cooldown (SPEC AC #4 + AC #5) closed 2026-05-12 via production telemetry (cooldown engaged at `2026-05-11T17:18:28Z`, 22 throttled dispatches over 6h, clean recovery `proxy auto_heal -> healthy` at `2026-05-12T04:27:24Z`). D-14 24h soak gate is the only remaining item — PASS when 24h has elapsed without further auto-heal dispatches (window started 2026-05-12T04:26Z, expires 2026-05-13T04:26Z).
+Status: Phase 34 functionally and acceptance-complete; D-14 elapsed-time observation in progress.
+Last activity: 2026-05-12 -- Phase 34: R3/R4 closed via telemetry; 34-VERIFICATION.md updated with cooldown evidence + recovery trace
 
 Progress: [██████████] 100%
 

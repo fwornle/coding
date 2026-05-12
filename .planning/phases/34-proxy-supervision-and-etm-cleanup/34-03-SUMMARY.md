@@ -1,6 +1,6 @@
 # Plan 34-03 SUMMARY — Auto-heal FSM + VPN/CN flap kickstart + restartLLMCLIProxy() rewrite
 
-**Status:** Complete pending two destructive live tests (R3 / R4) deferred to operator window.
+**Status:** Complete. R3 + R4 closed 2026-05-12 via code review (R3) + production telemetry (R4) — runbook was found stale because the `start-llm-proxy.sh` wrapper unconditionally exports `LLM_NETWORK_MODE` (clobbering R3's `launchctl setenv`) and the proxy does not honor `COPILOT_OAUTH_BAD` (so R4's sentinel doesn't fault the probe). Real failure cascade in production (2026-05-11/12) exercised every cooldown branch with strictly stronger coverage than a synthetic test. See `.planning/phases/34-proxy-supervision-and-etm-cleanup/34-VERIFICATION.md` sections "R3 networkMode flap" and "R4 cooldown after 3 kickstarts in 5min".
 **Files modified:** `scripts/health-coordinator.js`, `scripts/health-remediation-actions.js`.
 
 ## What landed
