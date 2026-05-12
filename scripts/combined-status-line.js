@@ -114,8 +114,18 @@ function visibleCellWidth(s) {
 // status-right-length cap configured by tmux-session-wrapper.sh:49). tmux
 // truncates content longer than status-right-length from the LEFT, so an
 // over-pad never eats into the visible right-anchored content.
+//
+// CELL_DRIFT_BUFFER: pad 2 cells beyond pane width to absorb residual
+// cell-count drift between our visibleCellWidth prediction and what
+// xterm.js / iTerm2 actually render. Without this buffer, a one-cell
+// mismatch (e.g. a badge state change ✅↔⚠️ when the terminal's wcwidth
+// disagrees with ours on a single ambiguous codepoint) leaves the rightmost
+// cell of the previous render visible — the recurring "07:538"
+// trailing-digit residue. The extra 2 cells are leading spaces; tmux's
+// left-truncation absorbs them without affecting the visible right edge.
+const CELL_DRIFT_BUFFER = 2;
 function leftPadToStableCellWidth(text, paneWidth) {
-  const target = parseInt(paneWidth, 10) || 200;
+  const target = (parseInt(paneWidth, 10) || 200) + CELL_DRIFT_BUFFER;
   if (target <= 0) return text;
   const cur = visibleCellWidth(text);
   if (cur >= target) return text;
