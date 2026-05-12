@@ -12159,5 +12159,392 @@
       "sourceCount": 2
     },
     "project": "rapid-automations"
+  },
+  {
+    "id": "5a44d917-4c6f-4faf-b685-c5ce07429591",
+    "date": "2026-05-11",
+    "theme": "Tmux Status Bar Initial Diagnosis (Inconclusive)",
+    "summary": "User shared screenshots of a tmux status bar display issue for review. The assistant attempted to diagnose the problem by inspecting actual tmux session state, timezone utilities, and status bar rendering via bash commands rather than relying on theoretical cell-width calculations.\n\n- Artifacts touched: `system-health-dashboard.tsx`, `server.js`, `healthStatusSlice.ts`, `34-05-SUMMARY.md`\n- Investigation was inconclusive; prior analysis was acknowledged as incorrect\n- Assistant committed to verifying against actual tmux output in future steps rather than manual padding math",
+    "observationIds": [
+      "5a03cae4-1b81-4f7f-a59b-2bd7299b5ac6",
+      "ed6df8d8-7aaa-42be-93fa-424798bcbf47"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/store/slices/healthStatusSlice.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-05-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "5cd5b39d-13a5-4177-a4ae-9f372f20da5a",
+    "date": "2026-05-11",
+    "theme": "Trajectory Node Removal from Status Line and VKB",
+    "summary": "Goal was to remove trajectory-related nodes and edges from both the tmux status line display and the VKB (knowledge base), and to split prior changes into individual commits.\n\n- Read and analyzed `combined-status-line.js` to locate three trajectory-related code sections: `getTrajectoryState`, trajectory staleness checks, and trajectory icons — no edits made yet\n- Investigated the VKB server's delete API surface via `api-routes.js` to plan safe removal of trajectory entities and their edges\n- Confirmed deletion plan: 3 trajectory entities + 62 edges to be removed while preserving 55 child entities untouched\n- Updated `34-VERIFICATION.md`, `34-06-SUMMARY.md`, `ROADMAP.md`, and `STATE.md` to reflect plan\n- Actual deletions and `combined-status-line.js` edits were still pending at the end of these observations",
+    "observationIds": [
+      "41d0a190-1275-40dc-b348-9757ef91a221",
+      "60489a05-b4f4-4895-9a2c-cf2b7471c69c",
+      "5a6ea731-8914-4cb3-8dc5-9efce0fbd41d",
+      "8eadbca8-f95e-4dce-b432-342d172dd22a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/system-health-dashboard.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/store/slices/healthStatusSlice.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-05-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-VERIFICATION.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-06-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "d6be22d7-5718-465f-9e25-86c2b22fa41c",
+    "date": "2026-05-11",
+    "theme": "GSD Tool Version Check and Update Prompt",
+    "summary": "Executed the GSD update skill to check for available updates and display the changelog. The workflow read version detection scripts and fetched the remote changelog.\n\n- Detected GSD `1.41.1` installed globally, with `1.41.2` available\n- Changelog showed two bug fixes: phase naming consistency and nested plan file counting\n- A large set of project files were listed as artifacts (e.g., `server.js`, `dashboard-server.js`, `sse-server.js`, `UnifiedInferenceEngine.js`, `observation-generation-agent.ts`, and many others), likely reflecting ambient workspace state rather than direct edits\n- User was prompted to confirm proceeding with the clean install update",
+    "observationIds": [
+      "257371a6-5d38-435b-8a9a-861aab0aec92"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/dashboard-server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/sse-server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/engines/constraint-detector.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/databases/qdrant-client.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/engines/groq-engine.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/databases/duckdb-client.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/status/status-generator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/status/constraint-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/config/live-logging-config.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/databases/DatabaseManager.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/inference/UnifiedInferenceEngine.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/KnowledgeRetriever.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/types.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/SemanticAnalyzer.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/ontology/heuristics/EntityPatternAnalyzer.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/ontology/heuristics/coding-heuristics.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/agent-common-setup.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/event-logger.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/init-databases.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/src/agents/observation-generation-agent.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/config/component-manifest.yaml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/acceptance/knowledge-system-acceptance.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/e2e/knowledge-learning-workflow.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/integration/agent-adapters.test.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "74b12f3a-b898-4cda-b682-7d19e973e49f",
+    "date": "2026-05-11",
+    "theme": "Session Continuity Load for Rapid-Automations Project",
+    "summary": "Followed the `/sl` (session load) command protocol to re-establish continuity context from prior work sessions. Located and read the three most recent LSL files, checking sizes and cross-referencing with the coding project for overlapping sessions. Loaded LSL files spanning **2026-05-10 to 2026-05-11** to produce a session continuity summary for the `rapid-automations` project. `combined-status-line.js` was noted as an artifact.",
+    "observationIds": [
+      "e9ed7b07-1e75-452a-ba8f-166a059c40a1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "f6316d54-ba38-4505-8f0f-4f0a9b8ae48b",
+    "date": "2026-05-11",
+    "theme": "Tmux SYS:TIMEOUT and Emoji Degradation Fix",
+    "summary": "User shared screenshots showing `! SYS:TIMEOUT` in the tmux status line instead of the expected emoji-rendered status. Investigation and resolution spanned several steps:\n\n- Identified that `combined-status-line.js` was hitting a timeout fallback, causing the `SYS:TIMEOUT` string to display\n- Direct script execution timed at **0.18s** (well under the 8s timeout), indicating the timeout only fires in specific pane execution contexts\n- Also identified emoji degrading to ASCII fallback as a secondary issue\n- Root cause was isolated and a fix was applied to `combined-status-line.js` and `status-line-fast.cjs`\n- Verified fix by refreshing all tmux clients and inspecting cache files and failure logs: all three sessions (`rapid-automations`, `coding`, `sketcher`) rendered full emoji statuslines with no `SYS:TIMEOUT` errors; failure log was absent\n- Changes committed: staged only `scripts/combined-status-line.js` and `scripts/status-line-fast.cjs` to avoid including unrelated modifications",
+    "observationIds": [
+      "f76f7df9-feac-470e-af9e-6a3a57c1fcb0",
+      "d04c99fa-419e-4591-980e-e9243d9c9c69",
+      "19f29930-8d16-46d4-a479-48c617d820d7",
+      "47430133-5d5c-45c2-93b9-53c829d05f7f",
+      "4015b8d9-f796-495e-980c-2da9c8ca12cb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "64519e6e-2b80-421c-961e-d0fcdfb25b43",
+    "date": "2026-05-11",
+    "theme": "Plan 34-06 Execution: Plist Cleanup and Coordinator Restart",
+    "summary": "Multiple session starts drove execution of plan 34-06 (proxy supervision and ETM cleanup phase).\n\n- Verified live LaunchAgent plist state: already cleaned of three empty-default `EnvironmentVariables` keys (Option B cleanup confirmed)\n- Running coordinator still carried stale env vars, so a `bootout`/`bootstrap` cycle was performed\n- Health coordinator restarted successfully: PID 29014 → 85074, uptime reset to 3s\n- Task 3a detection-latency acceptance tests were initiated after the restart\n- Primary artifact touched: `combined-status-line.js` (appears incidental to session tracking)",
+    "observationIds": [
+      "180c3f7b-76c9-49e6-88e9-2663f058a975",
+      "f7b0e1fd-2f37-47dd-8548-0ee6584b341f",
+      "308bb374-a3f2-4253-83e6-31a13031bdb4",
+      "92cbe4dd-f3d3-4751-a406-c544a6f04810"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6b2ffa34-2aec-4844-9454-70932e25dc68",
+    "date": "2026-05-11",
+    "theme": "Phase 33 Resume: Two-Session-Agreement Test Failure Investigation",
+    "summary": "Resumed an interrupted Phase 33 health monitoring consolidation session.\n\n- `obs-api` service was restarted to restore the environment\n- `run-all.sh` exited 1; `two-session-agreement.test.sh` identified as the failing test\n- Investigation began to determine whether the failure was a pre-existing flake or a regression\n- Artifacts touched: `combined-status-line.js`, `status-line-fast.cjs`",
+    "observationIds": [
+      "c0e22e82-8fa4-4c4c-aa25-8ac62e339307",
+      "b890df1d-8abb-4ef3-aaae-4e7f33e071bd",
+      "6aa0b828-8373-4f40-8f83-f1b8ea91e45d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fe7ae3d0-c21a-49d3-9a8b-d235cbe63e95",
+    "date": "2026-05-11",
+    "theme": "Session Learnings Saved to Memory Files",
+    "summary": "Key tactical learnings from the day's sessions were persisted to project memory files.\n\n- Updated `feedback_test_statusline_in_tmux.md` with new tactical detail, worktree verification feedback, and Phase 34 close gates\n- Created new `feedback_worktree_verification.md` to capture worktree verification patterns\n- Both files live under `/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/`",
+    "observationIds": [
+      "b6d4c629-2e8b-46b8-9a4f-ba40c0f55d05",
+      "cae0e16c-a4ce-407d-8f55-cf55f405bef0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_test_statusline_in_tmux.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_worktree_verification.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fa9922eb-ae1d-484d-8301-4bab5f7ccfcb",
+    "date": "2026-05-11",
+    "theme": "Git Commit and Push Attempt (Incomplete)",
+    "summary": "An attempt was made to commit and push current changes in the coding project.\n\n- Checked git state of both the memory directory (confirmed not a git repo) and the coding repo's `.data/` exports\n- `ROADMAP.md` and `STATE.md` were touched\n- Exchange was cut off before any confirmed commit or push completed",
+    "observationIds": [
+      "dd30d1a0-1121-4822-98ce-7f200773de70"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ed339e5b-afc8-4366-9f4a-cbc4676792e0",
+    "date": "2026-05-11",
+    "theme": "Phase 34-05 Context Review and Finalization",
+    "summary": "Session context was restored from LSL history, then Phase 34-05 dead-reader cleanup was scoped and finalized after developer approval.\n\n- Read most recent LSL file to summarize prior activity: Phase 34 complete, all 6 plans on main, 4 operator-gated items remaining\n- D-14 soak gate checked and found not actionable (0.25h uptime vs 24h threshold); destructive R3/R4 proxy outage tests deferred pending explicit approval\n- Scoped 34-05 dead-reader cleanup by reading planning and script files — no code changes made during scoping\n- Following developer approval: `34-05-SUMMARY.md` finalized, `ROADMAP.md` updated to reflect task completion, `STATE.md` updated to close Task 2(d)\n- Artifacts: `.planning/phases/34-proxy-supervision-and-etm-cleanup/34-05-SUMMARY.md`, `.planning/ROADMAP.md`, `.planning/STATE.md`, `enhanced-transcript-monitor.js`, `server.js`, `dashboard-server.js`",
+    "observationIds": [
+      "95998da0-f735-47ee-ac92-f9bbbdd907fa",
+      "46ab2a0a-bdf6-4905-9ec0-7b968bac5689",
+      "b2b7f332-151e-4161-ab24-95118d36804b",
+      "a3e99340-608d-4461-b8e6-8cc721a5ecac",
+      "3598ff43-73a3-4b92-b32a-c0bc095c0ffd",
+      "f9663159-2355-4b49-8bc3-c97b64e78593"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/dashboard-server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-05-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c4131218-850c-42d8-8d3a-44cd37e90949",
+    "date": "2026-05-11",
+    "theme": "Documentation Update: Health Architecture and PlantUML Diagrams",
+    "summary": "Audited and updated documentation to reflect the current post-Phase-33 health architecture where ETMs post `lsl_heartbeat` signals rather than writing `.health/` JSON files.\n\n- Rewrote the \"Health Data Storage\" section in `docs-content/guides/health-dashboard.md` to reflect coordinator state / LSL heartbeat signal model\n- Updated `health-system-classes.puml` and `lsl-components.puml` to comply with documentation style guide (standard style includes, correct stereotypes, arrow macros, layout direction)\n- Updated `multi-session-health-architecture.puml`: collapsed per-session health DBs into a shared coordinator state slice; validated all three files with the `plantuml` CLI",
+    "observationIds": [
+      "dfa8220a-bb71-4f6c-8d67-1276044394b5",
+      "99cd988a-ffd4-42fb-a9f0-c96034993382",
+      "84d061ff-1a01-44a1-9070-db75cf535295"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/health-dashboard.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-system-classes.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/lsl-components.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/multi-session-health-architecture.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a12621a9-120a-414a-b9fa-a69a23091a2e",
+    "date": "2026-05-11",
+    "theme": "Status Line Emoji/Unicode Width Rendering Bug Investigation and Fix",
+    "summary": "Extended investigation into a tmux status line rendering bug showing residue characters (e.g., `⚠️SYS:TIMEOUT6`, trailing `25` after timestamp) and misaligned cell widths.\n\n- Initial diagnosis identified two issues: variable-width `⚠️` emoji causing trailing residue in the `[🔒 75%⚠️11]` fragment, and `combined-status-line.js` timing out 6+ consecutive times triggering emergency fallback display\n- Developer selected option 2: strip emojis to single ASCII chars before cell-width counting in `leftPadToStableCellWidth`\n- Implementation in `combined-status-line.js` proceeded but was partially reverted after developer objected to emojis being stripped from output (misinterpretation of the requirement)\n- Root cause refined empirically: \"Ambiguous\" East Asian Width codepoints (`⚠`, `⚙`, `⏸`, `━`) were being counted as 2 cells by the script but tmux's `wcwidth` treats them as 1, causing a 1-cell miscalculation; `visibleCellWidth()` was corrected accordingly\n- After further screenshots, a second layer was identified: tmux/xterm.js wcwidth mismatch where tmux counts emoji as 1 cell but VS Code's xterm.js renders them as 2 cells (tmux issues #836, #647) — diagnosed as a tmux config directive fix, not a script fix\n- Primary artifact: `combined-status-line.js`; secondary: `status-line-fast.cjs`, `feedback_statusline_no_emoji_strip.md`, `MEMORY.md`",
+    "observationIds": [
+      "4d68bece-d397-4d6b-a57e-5d1896292810",
+      "05be4eb2-1dd5-4ed9-b71e-708cd5f160bf",
+      "0211c92f-8ea3-483e-8313-7af544d01890",
+      "7c4acd57-31c6-4980-9ad1-5efd779b0be7",
+      "db29ec13-1659-4529-9bae-dae900ed8c66",
+      "35eae3c2-7cde-428f-97f0-b6ad2dd73c74",
+      "56743c00-ebcf-43ef-b690-45ae20d831a0",
+      "59ea7cc2-5b5f-4173-8856-2b978efabf81",
+      "0b9ba73d-f4e4-4381-8482-f5d7825c714e",
+      "5ff12013-b5f5-4ea1-9b6c-004265c56c4b",
+      "df8b3930-1607-4e11-8117-f556ab944e47",
+      "19f3ea4b-ff3f-44be-b80f-9c22e838c2ba",
+      "14fe1c8a-e51a-45a3-8c1e-131e6237cef9",
+      "01717382-3d6a-4692-bcfb-ba27209dc8dd",
+      "54d9b421-8e0b-45b8-9c41-b813cbb85e0d",
+      "c736f05d-999c-4684-a258-40ebdf87b1ce"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/enhanced-transcript-monitor.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/dashboard-server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/sse-server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/engines/constraint-detector.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/databases/qdrant-client.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/engines/groq-engine.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/databases/duckdb-client.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/status/status-generator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/status/constraint-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/config/live-logging-config.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/databases/DatabaseManager.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/inference/UnifiedInferenceEngine.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/KnowledgeRetriever.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/types.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/SemanticAnalyzer.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/ontology/heuristics/EntityPatternAnalyzer.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/ontology/heuristics/coding-heuristics.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/agent-common-setup.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/event-logger.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/init-databases.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/src/agents/observation-generation-agent.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/config/component-manifest.yaml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/acceptance/knowledge-system-acceptance.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/e2e/knowledge-learning-workflow.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/integration/agent-adapters.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/feedback_statusline_no_emoji_strip.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-automations/memory/MEMORY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 16
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4acad711-160e-4c0c-a874-4a2dd7dc9375",
+    "date": "2026-05-11",
+    "theme": "Fixing Emoji Width Misalignment in tmux Terminal",
+    "summary": "Investigated persistent character residue accumulating in the terminal, but only within VS Code. Root cause identified as a wcwidth mismatch between tmux and xterm.js:\n- tmux counts emoji as 1 cell wide by default\n- xterm.js (used by VS Code) renders them as 2 cells wide\n- This causes cursor drift and residue buildup over time\n\nModified `combined-status-line.js` and `status-line-fast.cjs` during investigation. Fix is to enable `variation-selector-always-wide` in tmux config (available since tmux 3.6), which aligns tmux's emoji width accounting with xterm.js rendering.",
+    "observationIds": [
+      "8be99336-a825-4166-8f8c-8618864fdb92"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T04:32:56.141Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
   }
 ]

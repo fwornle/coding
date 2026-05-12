@@ -144,7 +144,7 @@
   {
     "id": "0b32d35e-b593-410e-9c11-7cde3a3dcf07",
     "topic": "System Health Dashboard and Service Architecture",
-    "summary": "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host only)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server\n- `localhost:3033` — health API / live-logging dashboard server; `/api/observations` reverse-proxies to `localhost:12436`\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist loaded in production as of Phase 33)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n- `localhost:12435` — LLM CLI proxy\n- `localhost:12436` — Observations API (`obs_api`); spawned by `start-services-robust.js`\n\n**Architectural rule:** Docker runs headless backend services; host runs tools requiring host networking or hot-reload dev UIs. All port values from `.env.ports` — no hardcoding.\n\n**Health monitoring (Phase 33 — complete):**\n- HTTP POST signals to coordinator via `HEALTH_COORDINATOR_URL`\n- `integrations/system-health-dashboard/static-server.js`: `/api/*` reverse-proxy mounted before `express.static`\n- **plist env injection**: `EnvironmentVariables` plist declarations override `launchctl setenv` on macOS Darwin 25.4.0\n- **Auto-heal regression (fixed May 9)**: `server.js` coordinator-proxy violation synthesis omitted `auto_heal` and `auto_heal_action` fields — fixed\n\n**Phase 34 — LLM proxy supervision (plans 34-01 through 34-04 complete):**\n- `health-coordinator.js`: added 6 `PROXY_*` constants, a `state.proxy` slice (9 fields), `pollProxySemantic` (D-01 payload + D-02 four-mode classification), and `pollProxyMode` probes wired into `tick()` with fail-open pattern\n- `health-verification-rules.json`: updated to capture checkpoint gate state\n- `GraphDatabaseService.js` modified across cherry-pick integration operations\n- rapid-automations ETM restarted (PID 54103 → 48315) after D-10 cross-project safety gate approval; both ETMs verified heartbeating healthy\n- Dead-code strip (~200 LoC, 7 blocks) removed from coding ETM; commits `7a4066eb4` (strip) and `1cbaabde4` (SUMMARY) landed\n\n**Proxy health card (Phase 34-05, task 3):**\n- Fifth `HealthStatusCard` added to `integrations/system-health-dashboard/src/components/system-health-dashboard.tsx`\n- Uses `<COMPANY_NAME_REDACTED>:grid-cols-5` grid layout with pre-imported `Brain` icon\n- **Known bug**: card displays \"No data yet\" — `healthStatus.proxy` is `null` because `state.proxy` slice from the coordinator is being dropped somewhere in the reducer/fetch path; needs investigation",
+    "summary": "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host only)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server\n- `localhost:3033` — health API / live-logging dashboard server; `/api/observations` reverse-proxies to `localhost:12436`\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist loaded in production as of Phase 33)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n- `localhost:12435` — LLM CLI proxy\n- `localhost:12436` — Observations API (`obs_api`); spawned by `start-services-robust.js`\n\n**Architectural rule:** Docker runs headless backend services; host runs tools requiring host networking or hot-reload dev UIs. All port values from `.env.ports` — no hardcoding.\n\n**Health monitoring (Phase 33 — complete):**\n- HTTP POST signals to coordinator via `HEALTH_COORDINATOR_URL`\n- ETMs now post `lsl_heartbeat` signals rather than writing `.health/` JSON files\n- `integrations/system-health-dashboard/static-server.js`: `/api/*` reverse-proxy mounted before `express.static`\n- **plist env injection**: `EnvironmentVariables` plist declarations override `launchctl setenv` on macOS Darwin 25.4.0\n- **Auto-heal regression (fixed May 9)**: `server.js` coordinator-proxy violation synthesis omitted `auto_heal` and `auto_heal_action` fields — fixed\n\n**Phase 34 — LLM proxy supervision:**\n- Plans 34-01 through 34-05 complete; plan 34-06 queued\n- `health-coordinator.js`: added 6 `PROXY_*` constants, a `state.proxy` slice (9 fields), `pollProxySemantic` (D-01 payload + D-02 four-mode classification), and `pollProxyMode` probes wired into `tick()` with fail-open pattern\n- Dead-code strip (~200 LoC, 7 blocks) removed from coding ETM; commits `7a4066eb4` (strip) and `1cbaabde4` (SUMMARY) landed\n- 34-05: deleted 6 dead ETM source files (`RealTimeTrajectoryAnalyzer`, `StreamingKnowledgeExtractor`, `KnowledgeDecayTracker`, and related modules)\n- **Plan 34-06**: plist cleanup — removing `INJECT_THROW`, `TICK_MS`, and `HEALTH_COORDINATOR_URL` keys; retaining `PATH` and `HEALTH_COORDINATOR_PORT`; plist already cleaned, coordinator restarted (PID → 85074)\n\n**Proxy health card (Phase 34-05, task 3):**\n- Fifth `HealthStatusCard` added to `integrations/system-health-dashboard/src/components/system-health-dashboard.tsx`\n- Uses `<COMPANY_NAME_REDACTED>:grid-cols-5` grid layout with pre-imported `Brain` icon\n- **Known bug**: card displays \"No data yet\" — `healthStatus.proxy` is `null` because `state.proxy` slice from the coordinator is being dropped somewhere in the reducer/fetch path; needs investigation\n\n**Documentation:**\n- `docs-content/guides/health-dashboard.md` rewritten to reflect coordinator state / LSL heartbeat signal model\n- `health-system-classes.puml`, `lsl-components.puml`, `multi-session-health-architecture.puml` updated to style guide compliance and validated with `plantuml` CLI",
     "confidence": 0.9,
     "digestIds": [
       "7b369845-c5ed-4eed-b57e-1389ab99df9c",
@@ -431,14 +431,89 @@
       "512fce17-5d69-4f70-ab14-3e509cb35e48",
       "259286c4-5311-45db-803a-9f03297ab68b",
       "62d59b53-1b2a-4623-97bd-098128d31a53",
-      "7aef885b-b81b-4758-a778-d02d5dd18327"
+      "7aef885b-b81b-4758-a778-d02d5dd18327",
+      "64519e6e-2b80-421c-961e-d0fcdfb25b43",
+      "6b2ffa34-2aec-4844-9454-70932e25dc68",
+      "fe7ae3d0-c21a-49d3-9a8b-d235cbe63e95",
+      "fa9922eb-ae1d-484d-8301-4bab5f7ccfcb",
+      "ed339e5b-afc8-4366-9f4a-cbc4676792e0",
+      "c4131218-850c-42d8-8d3a-44cd37e90949",
+      "a12621a9-120a-414a-b9fa-a69a23091a2e",
+      "4acad711-160e-4c0c-a874-4a2dd7dc9375"
     ],
-    "lastUpdated": "2026-05-11T05:05:27.568Z",
+    "lastUpdated": "2026-05-12T04:34:53.974Z",
     "createdAt": "2026-04-24T11:33:34.817Z",
     "metadata": {
-      "scope": "integrations/system-health-dashboard/ and health-coordinator.js service mesh"
+      "scope": "Health coordinator, LaunchAgent plists, and dashboard service stack (ports 3030–3034)"
     },
     "project": "coding"
+  },
+  {
+    "id": "61c99e9c-c5a7-4f08-ae9c-a768f8b56037",
+    "topic": "Tmux Statusline Renderer",
+    "summary": "The tmux right-side status bar is rendered by `scripts/combined-status-line.js`, wrapped by `combined-status-line-wrapper.js`, with fast-path caching in `status-line-fast.cjs`.\n\n**Bugs identified and fixed:**\n- **Cache poisoning**: `status-line-fast.cjs` was calling `.trim()` before writing back to the shared cache file — fixed\n- **Trailing NBSP misuse**: NBSP terminators pushed the right edge left — removed entirely\n- **tmux truncation behavior**: `status-right` truncated at `min(status-right-length, pane_width - status_left)`; trailing ASCII spaces stripped — padding moved to beginning of string\n- **Dead code removed (May 9)**: ~4140 bytes removed — `cellWidth` table, `visibleCellCount`, `statusRightTargetCells`, `ANTI_STRIP_TERMINATOR`, `STATUS_LEFT_RESERVED_CELLS`\n- **Width/cache/timer fixes (May 10, commit `865665502`)**: additional fixes to `status-line-fast.cjs`\n- **Ambiguous East Asian Width fix**: `⚠`, `⚙`, `⏸`, `━` counted as 2 cells by script but tmux `wcwidth` treats them as 1 — `visibleCellWidth()` corrected accordingly\n\n**Rendering environment mismatch (tmux vs VS Code xterm.js):**\n- tmux counts emoji as 1 cell wide by default; xterm.js (VS Code) renders them as 2 cells wide\n- This causes cursor drift and residue buildup visible only inside VS Code terminal\n- Fix: enable `variation-selector-always-wide` in tmux config (available since tmux 3.6) — aligns tmux emoji accounting with xterm.js rendering; this is a tmux config fix, not a script fix\n\n**Open issue:**\n- **Shrinking-cells artifact**: `SYS:ERR` text leaks from previous renders because trailing spaces are stripped by tmux; fix requires leading-pad on every status emit — analysis complete, no code written yet\n\n**Key architectural state:**\n- `TMUX_PANE_WIDTH=#{pane_width}` passed via `.tmux.conf` for cell-aware padding\n- Cache key in `combined-status-line-wrapper.js` includes pane width suffix (`-wNNN`)\n- ETM `getLSLHealthStatus()` has project-level fallback for when `TMUX_PANE` is missing\n- Structural ~1-2 cell trailing gap accepted as unavoidable; bare content rendering adopted",
+    "confidence": 0.9,
+    "digestIds": [
+      "67d710a1-a508-4007-9db0-9fd1f2764cfd",
+      "8cae9ceb-ec9d-4a38-b117-a345b7aafd64",
+      "b97084a9-3b76-4771-b888-cf595c4bb7c1",
+      "f5d53227-792a-412c-9457-99761b9ac92d",
+      "37cfdea2-198e-455a-a601-f8589fb7ee00",
+      "e412e2b0-37f8-4c68-aca1-a7f0998dc25f",
+      "304a4c37-8947-4964-8710-77887ee27b0d",
+      "8054e181-e7b6-4751-90db-7da68092ef4f",
+      "1443b189-2800-4e06-b77d-5b64f4772176",
+      "95b1dfd3-49dc-43cf-9cfa-a996f4868a0f",
+      "8c96a815-e430-4c4c-b3ee-ff1e4a4d83a9",
+      "f8ad4507-43b7-4f71-afbf-ffd6ee16abfa",
+      "4f7df273-35d6-4e59-9fd5-a6d37d06baed",
+      "355f97ef-e3fa-46bf-961f-ab749cf20101",
+      "64519e6e-2b80-421c-961e-d0fcdfb25b43",
+      "6b2ffa34-2aec-4844-9454-70932e25dc68",
+      "fe7ae3d0-c21a-49d3-9a8b-d235cbe63e95",
+      "fa9922eb-ae1d-484d-8301-4bab5f7ccfcb",
+      "ed339e5b-afc8-4366-9f4a-cbc4676792e0",
+      "c4131218-850c-42d8-8d3a-44cd37e90949",
+      "a12621a9-120a-414a-b9fa-a69a23091a2e",
+      "4acad711-160e-4c0c-a874-4a2dd7dc9375"
+    ],
+    "lastUpdated": "2026-05-12T04:34:53.974Z",
+    "createdAt": "2026-05-09T10:49:05.020Z",
+    "metadata": {
+      "scope": "scripts/combined-status-line.js (tmux statusline renderer) and status-line-fast.cjs (fast-path cache)"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a460ac38-fda2-4d68-be67-a7f9df62c736",
+    "topic": "Tmux Status Bar and Status Line Fast Path",
+    "summary": "`status-line-fast.cjs` is the fast-path renderer for the tmux status bar; `combined-status-line.js` (CSL) is the full renderer. Both files are the canonical targets for statusline bug fixes.\n\n**Cache borrowing fix (2026-05-10):**\n- Sibling cache borrowing filters by `-w${paneWidth}.txt` suffix to prevent cross-width cache contamination\n- Orphaned pre-migration cache file `combined-status-line-cache-coding.txt` deleted from `.logs/`\n\n**`[Status Offline]` fallback fix (2026-05-10):**\n- Safety timer extended from 5s → 10s; non-zero exit emits captured partial/error output instead of generic `[Status Offline]`\n\n**Bug fixes (2026-05-11):**\n- `*-state.json` file pattern recognition fixed in `combined-status-line.js`\n- `SYS:TIMEOUT` display issue: script runs in 0.18s but timeout fired in specific pane execution contexts — fixed in both `combined-status-line.js` and `status-line-fast.cjs`\n- Emoji degrading to ASCII fallback also fixed in the same commit\n- Fix verified: all three sessions (`rapid-automations`, `coding`, `sketcher`) render full emoji statuslines with no `SYS:TIMEOUT`; failure log absent\n- Dead-code additions from initial misdiagnosis were reverted; trajectory-related nodes (`getTrajectoryState`, staleness checks, trajectory icons) slated for removal but edits still pending as of 2026-05-11\n\n**Color/icon mapping:**\n- Blue → `rapid-automations` (coding) project\n- Yellow → 🪨 (stale) state in `combined-status-line.js`\n\n**Ghost/residual character artifacts:** Not fully resolved; recommend testing in Terminal.app or iTerm2 to isolate xterm.js as cause.",
+    "confidence": 0.9,
+    "digestIds": [
+      "8cf541ad-ddcc-4fd4-a25a-5de712adef5f",
+      "5430d827-ad6b-47c3-b49b-09b8335ff8c0",
+      "dc79434b-d59e-4dbe-9399-00afd275d399",
+      "c3ee9572-9859-4fda-8fae-5cabee2c6e69",
+      "f924158a-4b8d-4dbb-88f8-d13505e9e7f4",
+      "f1467a45-8222-4b39-8c2a-5da4ca1f8c60",
+      "6fba8b50-0be4-49d0-baa1-e49586765d88",
+      "89112345-c5b4-4c26-966f-e84e820f345f",
+      "b2aa736b-c3d4-4c45-994c-76bb559cf722",
+      "983fbae8-885f-4ec4-80fb-3e75a902acf0",
+      "c55fb6f8-a20d-486b-9946-a4ebe2a7f046",
+      "811e44a1-bd63-48ec-9634-7e1cd5bbe557",
+      "5a44d917-4c6f-4faf-b685-c5ce07429591",
+      "5cd5b39d-13a5-4177-a4ae-9f372f20da5a",
+      "d6be22d7-5718-465f-9e25-86c2b22fa41c",
+      "74b12f3a-b898-4cda-b682-7d19e973e49f",
+      "f6316d54-ba38-4505-8f0f-4f0a9b8ae48b"
+    ],
+    "lastUpdated": "2026-05-12T04:34:53.974Z",
+    "createdAt": "2026-05-10T13:47:30.879Z",
+    "metadata": {
+      "scope": "scripts/combined-status-line.js and scripts/status-line-fast.cjs (tmux statusline renderers)"
+    },
+    "project": "rapid-automations"
   },
   {
     "id": "fc34cb6a-be67-4e3f-b44c-bb3c3594e829",
@@ -495,32 +570,6 @@
       "scope": "GSD planning framework (~/.claude/skills/gsd-* and .planning/ artifacts)"
     },
     "project": "coding"
-  },
-  {
-    "id": "a460ac38-fda2-4d68-be67-a7f9df62c736",
-    "topic": "Tmux Status Bar and Status Line Fast Path",
-    "summary": "`status-line-fast.cjs` is the fast-path renderer for the tmux status bar, borrowing cached output from sibling panes/projects to avoid synchronous CSL runs.\n\n**Cache borrowing fix (2026-05-10):**\n- Sibling cache borrowing now filters by `-w${paneWidth}.txt` filename suffix — prevents cross-width cache contamination\n- Orphaned pre-migration cache file `combined-status-line-cache-coding.txt` deleted from `.logs/`\n\n**`[Status Offline]` fallback fix (2026-05-10):**\n- Safety timer extended from 5s → 10s; non-zero exit now emits captured partial/error output instead of generic `[Status Offline]`\n\n**Bug fixes (2026-05-11):**\n- Tmux session discovery bypass: fix placed in `health-coordinator.js` (transcript monitor spawning lives there, not in CSL)\n- `*-state.json` file pattern recognition: fixed in `combined-status-line.js`\n- Dead-code additions to CSL from an initial misdiagnosis were reverted\n\n**Color-to-project mapping:** Blue in the combined status line corresponds to the `rapid-automations` (coding) project.\n\n**SK/sketcher yellow indicator:** Yellow maps to 🪨 (stale) state in `combined-status-line.js`; corrupted `SYS:ERR` cache compounds display issues.\n\n**Ghost/residual character artifacts:** Not fully resolved; recommend testing in Terminal.app or iTerm2 to isolate xterm.js as cause.",
-    "confidence": 0.9,
-    "digestIds": [
-      "8cf541ad-ddcc-4fd4-a25a-5de712adef5f",
-      "5430d827-ad6b-47c3-b49b-09b8335ff8c0",
-      "dc79434b-d59e-4dbe-9399-00afd275d399",
-      "c3ee9572-9859-4fda-8fae-5cabee2c6e69",
-      "f924158a-4b8d-4dbb-88f8-d13505e9e7f4",
-      "f1467a45-8222-4b39-8c2a-5da4ca1f8c60",
-      "6fba8b50-0be4-49d0-baa1-e49586765d88",
-      "89112345-c5b4-4c26-966f-e84e820f345f",
-      "b2aa736b-c3d4-4c45-994c-76bb559cf722",
-      "983fbae8-885f-4ec4-80fb-3e75a902acf0",
-      "c55fb6f8-a20d-486b-9946-a4ebe2a7f046",
-      "811e44a1-bd63-48ec-9634-7e1cd5bbe557"
-    ],
-    "lastUpdated": "2026-05-11T05:05:27.568Z",
-    "createdAt": "2026-05-10T13:47:30.879Z",
-    "metadata": {
-      "scope": "scripts/combined-status-line.js and scripts/health-coordinator.js (tmux status line rendering and coordinator)"
-    },
-    "project": "rapid-automations"
   },
   {
     "id": "3a5f4e2b-a7a3-4601-aa09-70352c032f86",
@@ -1272,10 +1321,24 @@
     "project": "coding"
   },
   {
+    "id": "765f9ace-857d-407e-bd0c-544722c18490",
+    "topic": "AI Kraken Browser Game (daFrankTeam)",
+    "summary": "A self-contained vanilla HTML/CSS/JS browser game built as a hackathon submission in `teams/daFrankTeam/`.\n\n- **Files**: `teams/daFrankTeam/index.html` (main SPA), `teams/daFrankTeam/team.json`, `teams/daFrankTeam/README.md`\n- **Core gameplay**: Ship vs. AI Kraken with adaptive enemy behavior, torpedo mechanics, particle effects, and score tracking\n- **Progression**: 5 waves with increasing Kraken counts; wave 5 includes a boss enemy\n- **Power-<COMPANY_NAME_REDACTED>**: 5 types (Laser, Spread Shot, Homing Missiles, Freeze Ray, Shield) dropped by defeated enemies, with active visual indicators\n- **Special abilities**: `Q` key — homing AOE torpedo; `E` key — 8-second autopilot mode (10s cooldown)\n- **Audio**: Fully synthesized sound effects via Web Audio API (shooting, explosions, power-<COMPANY_NAME_REDACTED>, damage, wave transitions); no external assets required\n- **Known bug fixed**: `bubbles is undefined` runtime error resolved by adding `init()` call before the `loop()` start to ensure game state initialization\n- **Last notable commits**: `020f519` (final feature pass), `509f91f` (README + resolved `.gitignore` merge conflict)",
+    "confidence": 0.9,
+    "digestIds": [
+      "42f6a75b-9a61-4872-ba63-133060acce85",
+      "591d6cd1-7189-4eb8-88fa-b1cf7eb96458"
+    ],
+    "lastUpdated": "2026-05-07T13:01:51.335Z",
+    "createdAt": "2026-05-07T05:30:26.730Z",
+    "metadata": {},
+    "project": "daFrankTeam"
+  },
+  {
     "id": "b49b8904-56e1-4c08-9122-df7b3ed48b58",
     "topic": "Diagrams and Documentation Conventions",
-    "summary": "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, consistent component stereotypes, layout guidelines, and arrow macros\n- `lsl-repo-split.puml` updated May 3 to conform to style guide; PNG regenerated to `docs/images/lsl-repo-split.png`\n- `lsl-repo-split.png` referenced in all 8 private `*-history` repo READMEs on GHE\n- Other diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `observation-memory-hierarchy.puml`\n- **`docs/puml/health-coordinator-architecture.puml`**: updated May 8 with standard style include, proper stereotypes, corrected layout; updated again May 9 to full style guide compliance (standard style include, stereotypes, arrow macros, correct layout direction); PNG regenerated to `docs/images/` (93 KB)\n- `docs-content/architecture/health-monitoring.md` rewritten to replace ASCII art with PNG reference\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore`\n- `status-line.md` documentation update targeted but not yet applied (reconnaissance only as of May 8)",
-    "confidence": 0.9,
+    "summary": "- PlantUML diagrams follow a project style guide: kebab-case filenames, standard style file includes, consistent component stereotypes, layout guidelines, and arrow macros; validated with `plantuml` CLI\n- `lsl-repo-split.puml` updated May 3 to conform to style guide; PNG regenerated to `docs/images/lsl-repo-split.png`\n- `lsl-repo-split.png` referenced in all 8 private `*-history` repo READMEs on GHE\n- Other diagrams created: `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `observation-memory-hierarchy.puml`\n- **`docs/puml/health-coordinator-architecture.puml`**: updated May 8 and May 9 to full style guide compliance; PNG regenerated to `docs/images/` (93 KB)\n- **Health architecture diagrams (May 11)**: `health-system-classes.puml`, `lsl-components.puml`, and `multi-session-health-architecture.puml` updated — collapsed per-session health DBs into shared coordinator state slice; all validated with `plantuml` CLI\n- `docs-content/guides/health-dashboard.md` rewritten May 11 to reflect LSL heartbeat signal model (replaces `.health/` JSON file model)\n- `docs-content/architecture/health-monitoring.md` rewritten to replace ASCII art with PNG reference\n- `local_cache/` (fastembed ONNX model cache) added to `.gitignore`\n- `status-line.md` documentation update targeted but not yet applied (reconnaissance only as of May 8)",
+    "confidence": 0.85,
     "digestIds": [
       "c724a186-dffb-4c8e-a44f-0bdfd221a206",
       "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
@@ -1309,52 +1372,20 @@
       "07daf288-ab8a-404e-b634-567a1a9d769b",
       "8d2070ba-edf4-454c-891b-1d63270e69a2",
       "96f354b4-5eeb-4361-b053-b531ac5c693a",
-      "1ac386ad-15d3-4ccb-a700-e8ee845a1c30"
+      "1ac386ad-15d3-4ccb-a700-e8ee845a1c30",
+      "64519e6e-2b80-421c-961e-d0fcdfb25b43",
+      "6b2ffa34-2aec-4844-9454-70932e25dc68",
+      "fe7ae3d0-c21a-49d3-9a8b-d235cbe63e95",
+      "fa9922eb-ae1d-484d-8301-4bab5f7ccfcb",
+      "ed339e5b-afc8-4366-9f4a-cbc4676792e0",
+      "c4131218-850c-42d8-8d3a-44cd37e90949",
+      "a12621a9-120a-414a-b9fa-a69a23091a2e",
+      "4acad711-160e-4c0c-a874-4a2dd7dc9375"
     ],
-    "lastUpdated": "2026-05-09T05:04:31.543Z",
+    "lastUpdated": "2026-05-12T04:34:53.974Z",
     "createdAt": "2026-04-25T15:07:41.719Z",
-    "metadata": {},
-    "project": "coding"
-  },
-  {
-    "id": "765f9ace-857d-407e-bd0c-544722c18490",
-    "topic": "AI Kraken Browser Game (daFrankTeam)",
-    "summary": "A self-contained vanilla HTML/CSS/JS browser game built as a hackathon submission in `teams/daFrankTeam/`.\n\n- **Files**: `teams/daFrankTeam/index.html` (main SPA), `teams/daFrankTeam/team.json`, `teams/daFrankTeam/README.md`\n- **Core gameplay**: Ship vs. AI Kraken with adaptive enemy behavior, torpedo mechanics, particle effects, and score tracking\n- **Progression**: 5 waves with increasing Kraken counts; wave 5 includes a boss enemy\n- **Power-<COMPANY_NAME_REDACTED>**: 5 types (Laser, Spread Shot, Homing Missiles, Freeze Ray, Shield) dropped by defeated enemies, with active visual indicators\n- **Special abilities**: `Q` key — homing AOE torpedo; `E` key — 8-second autopilot mode (10s cooldown)\n- **Audio**: Fully synthesized sound effects via Web Audio API (shooting, explosions, power-<COMPANY_NAME_REDACTED>, damage, wave transitions); no external assets required\n- **Known bug fixed**: `bubbles is undefined` runtime error resolved by adding `init()` call before the `loop()` start to ensure game state initialization\n- **Last notable commits**: `020f519` (final feature pass), `509f91f` (README + resolved `.gitignore` merge conflict)",
-    "confidence": 0.9,
-    "digestIds": [
-      "42f6a75b-9a61-4872-ba63-133060acce85",
-      "591d6cd1-7189-4eb8-88fa-b1cf7eb96458"
-    ],
-    "lastUpdated": "2026-05-07T13:01:51.335Z",
-    "createdAt": "2026-05-07T05:30:26.730Z",
-    "metadata": {},
-    "project": "daFrankTeam"
-  },
-  {
-    "id": "61c99e9c-c5a7-4f08-ae9c-a768f8b56037",
-    "topic": "Tmux Statusline Renderer",
-    "summary": "The tmux right-side status bar is rendered by `scripts/combined-status-line.js`, wrapped by `combined-status-line-wrapper.js`, with fast-path caching in `status-line-fast.cjs`.\n\n**Bugs identified and fixed:**\n- **Cache poisoning**: `status-line-fast.cjs` was calling `.trim()` before writing back to the shared cache file — fixed\n- **Trailing NBSP misuse**: NBSP terminators pushed the right edge left — removed entirely\n- **Cell-vs-codepoint width mismatch**: emoji rendering as 1 or 2 terminal columns caused ghost characters\n- **tmux truncation behavior**: `status-right` truncated at `min(status-right-length, pane_width - status_left)`; trailing ASCII spaces stripped — padding moved to beginning of string\n- **Dead code removed (May 9)**: ~4140 bytes removed — `cellWidth` table, `visibleCellCount`, `statusRightTargetCells`, `ANTI_STRIP_TERMINATOR`, `STATUS_LEFT_RESERVED_CELLS`\n- **Width/cache/timer fixes (May 10, commit `865665502`)**: additional fixes to `status-line-fast.cjs`\n\n**Open issue:**\n- **Shrinking-cells artifact (obs 15)**: `SYS:ERR` text leaks from previous renders because trailing spaces are stripped by tmux; fix requires leading-pad on every status emit in both the success-cache and error paths of `combined-status-line.js` — analysis complete, **no code written yet**\n\n**Key architectural state:**\n- `TMUX_PANE_WIDTH=#{pane_width}` passed via `.tmux.conf` for cell-aware padding\n- Cache key in `combined-status-line-wrapper.js` includes pane width suffix (`-wNNN`)\n- ETM `getLSLHealthStatus()` has project-level fallback for when `TMUX_PANE` is missing\n- Structural ~1-2 cell trailing gap accepted as unavoidable; bare content rendering adopted",
-    "confidence": 0.85,
-    "digestIds": [
-      "67d710a1-a508-4007-9db0-9fd1f2764cfd",
-      "8cae9ceb-ec9d-4a38-b117-a345b7aafd64",
-      "b97084a9-3b76-4771-b888-cf595c4bb7c1",
-      "f5d53227-792a-412c-9457-99761b9ac92d",
-      "37cfdea2-198e-455a-a601-f8589fb7ee00",
-      "e412e2b0-37f8-4c68-aca1-a7f0998dc25f",
-      "304a4c37-8947-4964-8710-77887ee27b0d",
-      "8054e181-e7b6-4751-90db-7da68092ef4f",
-      "1443b189-2800-4e06-b77d-5b64f4772176",
-      "95b1dfd3-49dc-43cf-9cfa-a996f4868a0f",
-      "8c96a815-e430-4c4c-b3ee-ff1e4a4d83a9",
-      "f8ad4507-43b7-4f71-afbf-ffd6ee16abfa",
-      "4f7df273-35d6-4e59-9fd5-a6d37d06baed",
-      "355f97ef-e3fa-46bf-961f-ab749cf20101"
-    ],
-    "lastUpdated": "2026-05-10T13:47:30.879Z",
-    "createdAt": "2026-05-09T10:49:05.020Z",
     "metadata": {
-      "scope": "scripts/combined-status-line.js and scripts/status-line-fast.cjs (rendering artifacts and shrinking-cells bug)"
+      "scope": "PlantUML diagram files under docs/puml/ and docs-content/ documentation"
     },
     "project": "coding"
   },
@@ -1627,7 +1658,7 @@
     "id": "02f1858d-b58d-442b-9c9f-c0daff6b746b",
     "topic": "LSL Live Session Logging System",
     "summary": "- **Log path standard**: all LSL writers output to `.specstory/history/logs/` (migration completed May 1)\n  - `classification-logger.js`, `live-logging-coordinator.js`, `OperationalLogger.js` all updated\n  - Old `.specstory/logs/` paths are obsolete; 828 legacy classification files pending deletion\n- **`lsl-paths.js`** updated to align with new path conventions\n- **Private history repo per project**: `ensure_private_history_repo` in `scripts/agent-common-setup.sh` sets up a `<project>-history` GHE repo for every managed project (see Git Repository Hygiene insight for details)\n- **Coordinator management**: global LSL coordinator must be explicitly killed and restarted after path changes\n- Post-restart pattern: 9 transcript monitors respawn; supervisor race condition may create ~8 duplicates; clean state = 1 supervisor + 1 monitor per project\n- **`live-logging-coordinator.js`** kept (not retired) due to active references in `start-services.sh`, `stop-services.sh`, config files, and test files\n- **Planned**: LSL files reorganized into `YYYY/MM/*` subdirectory hierarchy — scoped but not yet implemented",
-    "confidence": 0.6999999999999998,
+    "confidence": 0.6499999999999998,
     "digestIds": [
       "a2ce5159-8561-4c6a-a191-3c894ac3fef9",
       "0589da2c-8232-49c8-95a5-67d0463978dd",
@@ -1683,6 +1714,25 @@
     "createdAt": "2026-05-10T13:47:30.879Z",
     "metadata": {
       "scope": "`scripts/start-services-robust.js` (service startup orchestrator with EADDRINUSE retry)"
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "9f1b880b-4d8a-44ea-b024-97a6fab0fb45",
+    "topic": "GSD Tool Version Management",
+    "summary": "- GSD is installed globally; version checked via the `gsd-update` skill (reads local version detection scripts + fetches remote changelog)\n- As of 2026-05-11: `1.41.1` installed, `1.41.2` available\n- `1.41.2` changelog: phase naming consistency fix + nested plan file counting fix\n- Update flow: skill detects version delta, displays changelog, then prompts user to confirm clean install — user confirmation required before proceeding",
+    "confidence": 0.5,
+    "digestIds": [
+      "5a44d917-4c6f-4faf-b685-c5ce07429591",
+      "5cd5b39d-13a5-4177-a4ae-9f372f20da5a",
+      "d6be22d7-5718-465f-9e25-86c2b22fa41c",
+      "74b12f3a-b898-4cda-b682-7d19e973e49f",
+      "f6316d54-ba38-4505-8f0f-4f0a9b8ae48b"
+    ],
+    "lastUpdated": "2026-05-12T04:34:53.974Z",
+    "createdAt": "2026-05-12T04:34:53.974Z",
+    "metadata": {
+      "scope": "GSD CLI global install and `gsd-update` skill workflow"
     },
     "project": "rapid-automations"
   },
