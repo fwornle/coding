@@ -74,11 +74,14 @@ The badge reflects the freshness of the **observation → digest → insight** p
 | Status | Icon | Meaning |
 |--------|------|---------|
 | Healthy | `[📚✅]` | Last observation written within 15 minutes — pipeline is ingesting |
-| Stale | `[📚⚠️]` | Last observation 15 min – 6 h ago — likely just idle |
-| Stalled | `[📚🔴]` | Last observation > 6 h ago — pipeline appears dead |
+| Stale | `[📚⚠️]` | Last observation 15 min – 6 h ago AND a Claude session is actively heartbeating — anomalous |
+| Stalled | `[📚🔴]` | Last observation > 6 h ago AND a Claude session is actively heartbeating — pipeline appears dead |
+| **Idle** | **`[📚⚫]`** | **No Claude session heartbeating in the last 5 min — "no recent observations" is expected, not anomalous** |
 | Disabled | `[📚🔇]` | obs_api reachable but no rows in any pipeline table |
 | Unknown | `[📚❓]` | Coordinator just started, slice not yet populated |
 | Unreachable | `[📚❌]` | obs_api unreachable, returning non-OK, or returning unparseable JSON |
+
+**Idle suppression** is applied via `CombinedStatusLine.isUserActive()`, which checks `state.lsl` for any session whose `lastBeat` is within 5 min. When no session is heartbeating, the freshness-derived warnings (`stale`, `stalled`) collapse to a single `⚫` (idle) — the same rule applies to the proxy badge (`degraded`, `cooling` → `[🧠⚫]`). True error states (`disabled`, `unknown`, `unreachable`) are NOT suppressed.
 
 Tooltip details (visible in the verbose status output) include observation/digest/insight ages, totals, and any in-flight consolidation.
 
@@ -172,18 +175,19 @@ The recurring trailing-digit residue at the right edge (`07:538`, `12:411`) trac
 
 **Cache fast-path (normal operation):**
 
-1. **tmux status-interval**: `status-right` fires every 5 s → `combined-status-line-wrapper.js`
-2. **Cache check**: read `.logs/combined-status-line-cache-<project>.txt`
-3. Fresh (<30 s): pass through to tmux (preserving trailing NBSP terminator), done
-4. Stale or missing: spawn `combined-status-line.js` inline
+1. **tmux status-interval**: `status-right` fires every 5 s → `status-line-fast.cjs`
+2. **Cache check**: read `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt`
+3. Fresh (<30 s): pass through to tmux (with lifecycle-icon patching against current transcript mtimes), trigger background refresh if cache age >10 s or any tracked transcript is newer than cache
+4. Stale or missing: spawn `combined-status-line.js` synchronously and `child.stdin.end()` immediately so CSL's `readStdinInput()` doesn't hang waiting for EOF
 
 **Full refresh:**
 
-1. **State pull**: single `GET http://localhost:3034/health/state` from the coordinator (with curl fallback if the coordinator is unreachable)
+1. **Shared coordinator probe**: a single memoized `fetch(:3034/health/state)` per render (with one retry @ 1.5 s) feeds five `getXxxStatus()` methods — replaces the previous pattern of 5 independent `execSync(curl)` calls per render
 2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🌲 / 🫒 / 🪨 / ⚫ / 💤)
-3. **Constraint compliance**: cached call to constraint-monitor API (port 3031)
-4. **Render**: assemble parts, pad to paneWidth cells (see `leftPadToStableCellWidth()` for the cell-width-stability mechanism)
+3. **Constraint compliance**: separate call to constraint-monitor API (port 3031)
+4. **Render**: assemble parts, pad to paneWidth cells via `leftPadToStableCellWidth()` using VS16-aware `visibleCellWidth()` — see [Right-edge stability](#right-edge-stability-vs16-aware-cell-counting) above
 5. **Cache write**: save to `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt`
+6. **Failure logging**: any 8 s SYS:TIMEOUT or fast.cjs spawn failure appends a JSON record to `.logs/csl-failures.jsonl` with per-step timings so future Claude sessions can see which sub-step blocked
 
 ### Caching
 
@@ -290,10 +294,13 @@ The renderer reads a small set of environment variables and the coordinator endp
 
 | Tunable | Where | Default |
 |---------|-------|---------|
-| `STATUS_LINE_TARGET_CODEPOINTS` | top of `combined-status-line.js` | 220 |
-| Cache TTL | wrapper script | 30 s |
+| Cache TTL (fast-path) | `status-line-fast.cjs` `CACHE_TTL_MS` | 30 s |
+| Background refresh threshold | `status-line-fast.cjs` `BG_REFRESH_THRESHOLD_MS` | 10 s |
 | Tmux refresh interval | `~/.tmux.conf` `status-interval` | 5 s |
 | `status-right-length` | `~/.tmux.conf` | 200 |
+| `codepoint-widths` | `~/.tmux.conf` | `U+26A0=2,U+FE0F=0` |
+
+**`codepoint-widths` is required** for residue-free rendering: tmux's default wcwidth disagrees with xterm.js on `⚠` (U+26A0) and `U+FE0F` (VS16). The override anchors tmux's count to what xterm.js renders. If you see trailing-digit residue after badge transitions, this is the first thing to check.
 
 ---
 
