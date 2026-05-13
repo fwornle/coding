@@ -300,7 +300,7 @@ The status line appears automatically in Claude Code:
 - `[🐳]` - Docker mode indicator (only shown when running in Docker mode)
 - `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, CGR=Code Graph RAG
 - `[C🟢 UT🫒]` - Active sessions with activity icons (all sessions shown, 💤 for sleeping)
-- `[🔒 67% 🔍EX]` - Constraint compliance percentage + trajectory state
+- `[🔒 67%]` - Constraint compliance percentage (with optional `⚠️ N` violations sub-segment when non-zero)
 - `[📚✅]` - Knowledge system status (icons only, no counts)
 - `[🏥✅]` - Unified health (GCM + Health Verifier + Enforcement)
 - `📋17-18` - LSL time window (HHMM-HHMM)
@@ -324,7 +324,6 @@ See [Status Line System](./status-line.md) for complete documentation.
 - **[LSL](../lsl/)** - Health events logged in session logs
 - **[Constraints](../constraints/)** - Constraint monitor is a monitored service
 - **[Knowledge Management](../knowledge-management/)** - Monitors VKB, LevelDB, Qdrant
-- **[Trajectories](../trajectories/)** - Trajectory state shown in status line
 
 ## Key Files
 

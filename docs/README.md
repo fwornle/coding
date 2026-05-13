@@ -12,7 +12,6 @@ Central documentation for the unified semantic analysis & knowledge management s
 - **[Live Session Logging (LSL)](lsl/README.md)** - Real-time conversation classification and routing
 - **[Observational Memory](observations/README.md)** - Per-exchange LLM observations with browsable dashboard
 - **[Constraint Monitoring](constraints/README.md)** - Real-time code quality enforcement
-- **[Trajectory Generation](trajectories/README.md)** - Automated project analysis and documentation
 - **[Status Line System](health-system/README.md)** - Visual system status and activity indicators
 
 ### Integrations
@@ -82,7 +81,6 @@ Detailed standalone documentation for specific systems:
 ### Core System Details
 - **[Multi-Collection Classification](multi-collection-classification.md)** - 4-collection semantic classification with 768-dim embeddings (nomic-embed-text-v1)
 - **[Constraint Monitoring System](constraint-monitoring-system.md)** - Detailed constraint enforcement documentation
-- **[Trajectory Generation System](trajectory-generation-system.md)** - Repository analysis and trajectory reporting
 - **[Adaptive Transcript Format Detection](adaptive-transcript-format-detection.md)** - LSL format detection and adaptation
 
 ### Configuration & Setup

@@ -191,7 +191,7 @@ The monitoring system is built on 9 interconnected classes across 6 architectura
 | Type | Scope | Lifecycle | Examples |
 |------|-------|-----------|----------|
 | `global` | System-wide singleton | Managed by coordinator/watchdog | `vkb-server`, `constraint-dashboard`, `global-service-coordinator` |
-| `per-project` | One instance per project | Managed by coordinator | `transcript-monitor`, `trajectory-generator` |
+| `per-project` | One instance per project | Managed by coordinator | `enhanced-transcript-monitor` |
 | `per-session` | Tied to Claude session | Auto-cleanup on session end | Custom session services |
 
 ## Health Check Flow

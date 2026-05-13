@@ -261,10 +261,6 @@ cat .env
 npm install groq-sdk  # Or whichever provider you chose
 ```
 
-### Trajectory analyzer not available
-
-**This is normal** if no provider SDKs are installed yet. The monitor still works for basic logging. To enable trajectory analysis, install at least one provider SDK.
-
 ## Sensitive Data Routing
 
 For sensitive data, the system automatically routes to local models:

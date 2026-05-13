@@ -152,7 +152,6 @@ The `/lg` command provides instant access to:
 
 - **Compliance scoring** (0-10 scale)
 - **Violation tracking** (real-time)
-- **Trajectory indicators** (development patterns)
 - **Risk assessment** (Low/Medium/High)
 
 ### Status Display
@@ -198,11 +197,6 @@ Opens web interface at `http://localhost:3001/dashboard` showing:
 | Icon | Meaning |
 |------|---------|
 | 🔒 | Constraint Monitor active |
-| 🔍 EX | Exploring (gathering information) |
-| 📈 ON | On Track (productive trajectory) |
-| ⚙️ IMP | Implementing (active code changes) |
-| ✅ VER | Verifying (testing/validation) |
-| 🚫 BLK | Blocked (constraint intervention) |
 | 🧠 | Semantic Analysis active |
 | ✅ | No violations detected |
 | ⚠️ | Active violations present |
@@ -239,14 +233,13 @@ The Live Guardrails system monitors for:
 
 The `/lg` command complements the status line display:
 
-**Status Line**: `🔒 8.5 🔍EX 🧠 ✅`
+**Status Line**: `🔒 8.5 🧠 ✅`
 - Quick visual indicator in every message
 - Compact format
 
 **`/lg` Command**: Detailed breakdown
 - Full compliance metrics
 - Violation history
-- Trajectory analysis
 - Risk assessment
 
 ### When to Use `/lg`
@@ -254,7 +247,6 @@ The `/lg` command complements the status line display:
 - **Before committing code** - Check compliance score
 - **After constraint violations** - See detailed feedback
 - **Periodic health checks** - Monitor code quality trends
-- **Understanding trajectory** - See if you're on track
 - **Reviewing violations** - Examine recent issues and fixes
 
 ---

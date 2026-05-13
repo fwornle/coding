@@ -15,7 +15,7 @@ Coding is an intelligent development infrastructure that:
 
 ![Complete System Overview](../images/complete-system-overview.png)
 
-*The complete coding system showing all capabilities: real-time monitoring (LSL, Constraints, Trajectory, Status Line), knowledge management (Continuous Learning, UKB/VKB), MCP integrations, LLM providers, and storage architecture.*
+*The complete coding system showing all capabilities: real-time monitoring (LSL, Constraints, Status Line), knowledge management (Continuous Learning, UKB/VKB), MCP integrations, LLM providers, and storage architecture.*
 
 ---
 
@@ -45,24 +45,12 @@ Coding is an intelligent development infrastructure that:
 
 **Learn more:** [Constraint Monitoring Documentation](constraints/README.md)
 
-### 3. Trajectory Generation
-
-**Automated project analysis and living documentation**
-
-- **Repository Scanning**: Multi-layered code analysis
-- **MCP-Powered Analysis**: Deep semantic understanding using 14 agents
-- **Two-Tier System**: Light (quick insights) and Deep (comprehensive reports)
-- **Real-Time Updates**: Integrates with LSL for continuous trajectory updates
-- **Capability Focus**: Documents what the project does vs. historical activities
-
-**Learn more:** [Trajectory Generation Documentation](trajectories/README.md)
-
-### 4. Status Line System
+### 3. Status Line System
 
 **Visual system health and activity indicators via unified tmux status bar**
 
 - **Tmux-Based Rendering**: All agents (Claude, CoPilot) wrapped in tmux via shared `tmux-session-wrapper.sh`
-- **Real-Time Status**: Shows LSL activity, constraint compliance, trajectory state
+- **Real-Time Status**: Shows LSL activity and constraint compliance
 - **Health Monitoring**: 4-layer monitoring with automatic recovery
 - **Session Windows**: Time-based session boundaries with activity indicators
 - **Activity Detection**: Distinguishes coding infrastructure vs. project work
@@ -230,7 +218,6 @@ coding --project ~/Agentic/my-project
 # Work on code...
 # LSL automatically captures and classifies conversations
 # Constraint monitor blocks quality violations
-# Trajectory system tracks project evolution
 
 # At end of day, capture key insights
 ukb  # Auto-analyzes git commits since last run

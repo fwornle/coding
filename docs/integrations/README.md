@@ -88,10 +88,6 @@ The core systems communicate with integrations through different protocols:
 - Does NOT use the 14-agent MCP Semantic Analysis server (that's for deep analysis)
 - Classification happens in milliseconds with budget-conscious models
 
-**Trajectory Generation**:
-- Uses MCP Semantic Analysis (14 agents, 11 use LLM) for deep repository insights
-- Comprehensive architectural pattern extraction
-
 **Constraint Monitoring**:
 - Uses PreToolUse hooks to intercept tool calls before execution
 - MCP Constraint Monitor provides dashboard and API (ports 3030/3031)

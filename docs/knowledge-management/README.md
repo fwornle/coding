@@ -199,7 +199,6 @@ Available for Semantic Search
 Collections:
   knowledge_patterns (1536-dim)       # High-quality embeddings
   knowledge_patterns_small (384-dim)  # Fast local embeddings
-  trajectory_analysis (384-dim)       # Session trajectory data
   session_memory (384-dim)            # Short-term session context
 ```
 
@@ -369,7 +368,6 @@ vkb
 - [LSL](../lsl/) - Provides real-time data for Continuous Learning
 - [Health System](../health-system/) - Monitors knowledge system health
 - [Ontology](./ontology.md) - 4-layer classification system documentation
-- [Trajectories](../trajectories/) - Uses knowledge for trajectory analysis
 
 **Related Tools**:
 - [MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md) - Deep code analysis (separate from knowledge management)

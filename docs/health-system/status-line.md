@@ -42,15 +42,14 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 ### Reading the Status Line
 
-**Format**: `[🐳] [🐳MCP:health] [🏥 health] [sessions] [🔒 compliance trajectory] [📚 knowledge] 📋time`
+**Format**: `[🐳] [🐳MCP:health] [🏥 health] [sessions] [🔒 compliance] [📚 knowledge] 📋time`
 
 **Components**:
 - `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
 - `[🐳MCP:SA✅CM✅CGR✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
 - `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
-- `🔒 67%` - **Constraint Compliance**: Code quality compliance percentage
-- `🔍 EX` - **Trajectory State**: Current development activity
+- `🔒 67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `⚠️ N` violations sub-segment when non-zero)
 - `[📚✅]` - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
@@ -150,15 +149,6 @@ The statusline-health-monitor detects **broken transcript monitors** — monitor
 
 **Path Encoding**: Claude Code encodes project paths by replacing both `/` and `_` with `-`. For example, `/Users/foo/Agentic/_work/my-project` becomes `-Users-foo-Agentic--work-my-project`. The transcript monitor's `getProjectDirName()` must match this encoding exactly.
 
-### Trajectory States
-
-- `🔍 EX` (Exploring) - Information gathering and analysis
-- `📈 ON` (On Track) - Productive progression
-- `📉 OFF` (Off Track) - Deviating from optimal path
-- `⚙️ IMP` (Implementing) - Active code modification
-- `✅ VER` (Verifying) - Testing and validation
-- `🚫 BLK` (Blocked) - Intervention preventing action
-
 ### LSL Status Indicators
 
 **Color Coding**:
@@ -193,7 +183,7 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 
 **Sessions are only removed** when the agent process has exited (session closed). A session with a running agent always shows as 🟢 Active, regardless of transcript age.
 
-**No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings like missing trajectory files or stale health data. Normal session inactivity is shown through the graduated cooling sequence.
+**No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings (e.g. stale health data). Normal session inactivity is shown through the graduated cooling sequence.
 
 **Agent Age Cap**: When an agent process (claude, copilot, opencode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant. The session starts as 🟢 and naturally progresses through the cooling scheme based on how long the current session has been idle.
 
@@ -237,12 +227,9 @@ The StatusLineHealthMonitor (Layer 4) aggregates health from all other layers an
 
 **3. Status Line Integration**
 
-![Status Line Integration](../images/status-line-trajectory-integration.png)
-
 **Data Sources**:
 - **Health System**: Provides system health scores from `.health/verification-status.json`
 - **Constraint Monitor**: Provides compliance percentage from constraint API
-- **Trajectory Analyzer**: Provides current development state from `.specstory/trajectory/live-state.json`
 - **LSL System**: Provides logging status from Global LSL Registry
 
 ### Session Discovery
@@ -338,7 +325,6 @@ Where:
 1. **Status Collection**:
    - Read health verification status
    - Query constraint monitor API
-   - Read trajectory state file
    - Scan LSL registry
 2. **Status Aggregation**: Combine all indicators
 3. **Display**: Output full status bar
@@ -356,14 +342,12 @@ Where:
 - Pre-rendered status cache (fast-path): 60s TTL, 20s background refresh trigger
 - Health status cached for 5 minutes
 - Constraint compliance cached for 1 minute
-- Trajectory state read on every update
 - LSL status read on every update
 
 ### Integration Points
 
 **File Locations**:
 - Health: `.health/verification-status.json`
-- Trajectory: `.specstory/trajectory/live-state.json`
 - LSL Registry: `.lsl/global-registry.json`
 - Constraint API: `http://localhost:3031/api/compliance/:project`
 
@@ -414,7 +398,6 @@ Where:
   "update_interval_ms": 5000,
   "cache_duration_ms": 300000,
   "health_source": ".health/verification-status.json",
-  "trajectory_source": ".specstory/trajectory/live-state.json",
   "lsl_registry": ".lsl/global-registry.json",
   "constraint_api": "http://localhost:3031/api/compliance/{project}",
   "abbreviation_style": "smart",
@@ -493,7 +476,6 @@ node scripts/health-verifier.js
 
 # Check status files exist
 ls -la .health/verification-status.json
-ls -la .specstory/trajectory/live-state.json
 ```
 
 **Wrong project showing as active?**
@@ -640,13 +622,11 @@ ps -eo pid,tty,comm | grep claude
 - `scripts/combined-status-line-wrapper.js` - ESM wrapper (backup; primary is fast-path CJS)
 - `scripts/statusline-health-monitor.js` - Session health monitor daemon (detects running monitors, writes status)
 - `scripts/health-verifier.js` - Health status provider
-- `src/live-logging/RealTimeTrajectoryAnalyzer.js` - Trajectory state provider
 - `.lsl/global-registry.json` - LSL session registry
 - `.health/verification-status.json` - Health status cache
 - `.health/*-transcript-monitor-health.json` - Per-project health files (centralized in coding project)
 - `.logs/statusline-health-status.txt` - Rendered status line output
 - `.logs/combined-status-line-cache.txt` - Pre-rendered status cache (served by fast-path)
-- `.specstory/trajectory/live-state.json` - Trajectory state
 
 **Configuration**:
 
@@ -661,6 +641,5 @@ ps -eo pid,tty,comm | grep claude
 
 - [Health System Overview](./README.md) - Main health system documentation
 - [Enhanced Health Monitoring](./enhanced-health-monitoring.md) - Comprehensive health monitoring details
-- [Trajectory System](../trajectories/README.md) - Trajectory analysis documentation
 - [LSL System](../lsl/README.md) - Live session logging documentation
 - [Constraint Monitoring](../constraints/README.md) - Code quality enforcement

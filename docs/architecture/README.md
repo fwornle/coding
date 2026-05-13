@@ -24,7 +24,6 @@ Already documented in other sections:
 - **[4-Layer Monitoring](../health-system/README.md#architecture)** - System health monitoring architecture
 - **[LSL Classification](../lsl/README.md#architecture)** - Conversation classification and routing
 - **[Constraint Monitoring](../constraints/README.md#architecture)** - Real-time constraint enforcement
-- **[Trajectory Generation](../trajectories/README.md#architecture)** - Project analysis system
 
 ### Legacy Architecture Docs
 
@@ -97,7 +96,7 @@ Claude attempts tool → PreToolUse Hook → Constraint Monitor
 
 ```
 Layer 4: Service-Level Health (ukb, vkb, semantic-analysis)
-Layer 3: System Verifier (LSL, constraints, trajectory)
+Layer 3: System Verifier (LSL, constraints)
 Layer 2: System Coordinator (overall health, metrics)
 Layer 1: System Watchdog (critical failures, alerts)
 ```

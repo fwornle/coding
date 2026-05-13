@@ -352,7 +352,6 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 |-----------|------|-------------|---------|
 | Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons | C=coding (active), UT=ui-template (fading) |
 | Constraint Compliance | `🔒 67%` | Code quality compliance | 67% compliance |
-| Trajectory State | `🔍EX` | Development activity | EX=exploring, IMP=implementing |
 | Knowledge System | `[📚✅]` | Knowledge extraction status | ✅=healthy, ⚠️=issues |
 | Unified Health | `[🏥✅]` | GCM + Health Verifier + Enforcement | ✅=all healthy |
 | LSL Time Window | `📋17-18` | Session time range | 17:00-18:00 |

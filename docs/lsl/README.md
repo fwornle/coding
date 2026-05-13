@@ -384,7 +384,6 @@ Each pattern includes:
 - [Health System](../health-system/) - Monitors LSL service health
 - [Constraints](../constraints/) - Code quality enforcement
 - [Knowledge Management](../knowledge-management/) - Online knowledge extraction from LSLs
-- [Trajectories](../trajectories/) - Real-time trajectory analysis from LSL data
 
 ## Troubleshooting
 

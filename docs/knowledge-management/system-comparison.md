@@ -104,7 +104,6 @@ Provides **real-time knowledge extraction** from live coding sessions with budge
 
 - **StreamingKnowledgeExtractor** - Buffers and extracts knowledge in real-time
 - **KnowledgeRetriever** - Semantic search with temporal decay
-- **RealTimeTrajectoryAnalyzer** - Intent classification and trajectory tracking
 - **UnifiedInferenceEngine** - Multi-provider LLM routing with circuit breaker (delegates to `@rapid/llm-proxy`)
 - **BudgetTracker** - Cost tracking and $8.33/month enforcement
 - **SensitivityClassifier** - 5-layer privacy detection
