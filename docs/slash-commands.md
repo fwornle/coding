@@ -150,7 +150,7 @@ curriculum-alignment (2 sessions):
 
 The `/lg` command provides instant access to:
 
-- **Compliance scoring** (0-10 scale)
+- **Compliance scoring** (0-100% scale)
 - **Violation tracking** (real-time)
 - **Risk assessment** (Low/Medium/High)
 
@@ -164,12 +164,11 @@ Output:
 ```
 🔒 Live Guardrails - System Status
 ═══════════════════════════════════════════════
-📊 Current Status: 🔒 8.5 🔍EX 🧠 ✅
+📊 Current Status: [🔒85%] [🧠✅]
 
 🎯 Detailed Metrics:
-📊 Compliance: 8.5/10.0
+📊 Compliance: 85%
 ✅ Status: No active violations
-🔍 Activity: Exploring
 🟢 Risk Level: Low
 
 📈 Recent Activity:
@@ -199,15 +198,15 @@ Opens web interface at `http://localhost:3001/dashboard` showing:
 | 🔒 | Constraint Monitor active |
 | 🧠 | Semantic Analysis active |
 | ✅ | No violations detected |
-| ⚠️ | Active violations present |
+| 🟡 | Active violations present |
 
 ### Risk Levels
 
 | Level | Icon | Score Range | Meaning |
 |-------|------|-------------|---------|
-| Low | 🟢 | 8.0 - 10.0 | Excellent compliance |
-| Medium | 🟡 | 5.0 - 7.9 | Some violations |
-| High | 🔴 | 0.0 - 4.9 | Critical issues |
+| Low | 🟢 | 80% - 100% | Excellent compliance |
+| Medium | 🟡 | 50% - 79% | Some violations |
+| High | 🔴 | 0% - 49% | Critical issues |
 
 ### Violation Types
 
@@ -233,9 +232,9 @@ The Live Guardrails system monitors for:
 
 The `/lg` command complements the status line display:
 
-**Status Line**: `🔒 8.5 🧠 ✅`
+**Status Line**: `[🔒85%] [🧠✅]`
 - Quick visual indicator in every message
-- Compact format
+- Compact format (drops to `[🔒75%🟡4]` when active violations are present)
 
 **`/lg` Command**: Detailed breakdown
 - Full compliance metrics
@@ -267,7 +266,7 @@ The `/lg` command complements the status line display:
 
 ### During Development
 
-- **Status line** provides continuous monitoring: `🔒 8.5 🔍EX`
+- **Status line** provides continuous monitoring: `[🔒85%]`
 - **`/lg`** for detailed checks when needed
 - **Constraint violations** block critical issues automatically
 
