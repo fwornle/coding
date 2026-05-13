@@ -15,7 +15,7 @@ package "1. CONTINUOUS LEARNING\n(Automatic Real-Time)" as learning #E8F5E8 {
 
   note right of learning
     **Automatic during sessions**
-    • Budget: $8.33/month
+    • Budget: configurable monthly cap
     • Real-time extraction
     • Privacy-first
     • Writes to Graph DB + Qdrant

@@ -68,7 +68,7 @@ Team-specific lower ontologies extend these with project-specific types (e.g., `
 - Real-time extraction from LSL exchanges
 - Embedding generation (384-dim or 1536-dim)
 - Semantic search across sessions
-- Budget-aware LLM usage ($8.33/month limit)
+- Budget-aware LLM usage (configurable monthly limit)
 
 ### Storage
 

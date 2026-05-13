@@ -35,7 +35,7 @@ package "Core Inference Engine" <<core>> {
     • 5 failures → 1 min timeout
 
     **Budget Enforcement**
-    • $8.33/month limit
+    • Configurable monthly cap
     • Auto-fallback to local
   end note
 }

@@ -149,7 +149,7 @@ The storage flows through three layers:
 - **Agent-Agnostic Design**: Currently optimized for Claude Code; designed to support other AI assistants in future
 - **Real-Time Extraction**: Learns as you code, not after the fact
 - **Semantic Search**: Find relevant knowledge using vector similarity
-- **Budget-Aware**: Tracks LLM costs and enforces monthly limits ($8.33/month)
+- **Budget-Aware**: Tracks LLM costs and enforces a configurable monthly limit
 - **Privacy-First**: Automatically routes sensitive data to local models
 - **Cross-Session Learning**: Share knowledge across different coding sessions
 
@@ -160,7 +160,7 @@ The storage flows through three layers:
 **Inference Layer:**
 
 - `UnifiedInferenceEngine` - Central LLM inference with multi-provider support
-- `BudgetTracker` - Cost tracking and $8.33/month enforcement
+- `BudgetTracker` - Cost tracking with configurable monthly limit enforcement
 - `SensitivityClassifier` - 5-layer privacy detection
 - `CircuitBreaker` - Failure detection and provider failover
 
@@ -230,11 +230,12 @@ The storage flows through three layers:
 
 ### Monthly Limit
 
-Default: $8.33/month
+Configure a monthly USD cap that suits your usage; alerts fire at the
+configured threshold percentages.
 
 ```javascript
 const system = new KnowledgeLearningSystem({
-  budgetLimit: 8.33,
+  budgetLimit: 10,  // monthly USD cap (configurable)
   budgetAlerts: [
     { threshold: 50, action: 'log' },
     { threshold: 80, action: 'warn' },

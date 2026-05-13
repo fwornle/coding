@@ -277,7 +277,7 @@ All LLM requests route through the [`@rapid/llm-proxy`](https://bmw.ghe.com/adpn
 - **LRU cache**: Deduplicates requests (1000 entries, 1-hour TTL)
 - **Metrics tracking**: Cost, performance, and usage stats per provider
 
-**Cost Savings**: ~$50-100/month for active development (all UKB/LSL analysis routes through subscriptions first)
+**Cost Savings**: Subscription-first routing pushes most UKB/LSL analysis through Copilot/Claude max subscriptions before any paid API call, eliminating the per-token spend on those flows entirely.
 
 See [`@rapid/llm-proxy` Architecture](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy/tree/main/docs/architecture.md) and [LLM Architecture](../architecture/llm-architecture.md) for complete details.
 
@@ -503,9 +503,7 @@ Response:
 | GitHub Models | Free (rate limited) | Free (rate limited) | API access |
 | Local (DMR) | $0 | $0 | Final fallback |
 
-**Cost Savings Example**:
-- Before: 170 requests/day × $0.01 avg = **$51/month**
-- After: 170 requests/day × $0 (subscriptions) = **$0/month** ✅
+**Cost Savings**: When subscription quota is available, those requests cost **$0** per token instead of the per-token rates above — the per-call savings compound across the day-to-day volume of UKB/LSL analysis.
 
 ### Budget Alerts
 

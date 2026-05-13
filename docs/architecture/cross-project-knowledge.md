@@ -45,7 +45,7 @@ Assistant: [provides solution]
 **Benefits**:
 - ✅ Zero effort - happens automatically
 - ✅ Captures in-the-moment context
-- ✅ Budget-aware ($8.33/month limit)
+- ✅ Budget-aware (configurable monthly cap)
 - ✅ Privacy-first (sensitive data → local models)
 
 **See**: [Continuous Learning System Documentation](../knowledge-management/continuous-learning-system.md)

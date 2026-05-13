@@ -10,7 +10,7 @@ package "AUTOMATIC: Continuous Learning (Real-Time)" as automatic {
   rectangle "StreamingKnowledge\nExtractor" as extractor
   note right of extractor
     - Auto-classifies exchanges
-    - Budget-aware ($8.33/month)
+    - Budget-aware (configurable monthly cap)
     - Privacy-first (local models)
     - Zero user effort
   end note

@@ -78,7 +78,7 @@ The system is built around several key components:
 
 **Inference Layer** (delegates to `@rapid/llm-proxy`):
 - `UnifiedInferenceEngine` - Central LLM inference with multi-provider support
-- `BudgetTracker` - Cost tracking and $8.33/month enforcement
+- `BudgetTracker` - Cost tracking with configurable monthly limit enforcement
 - `SensitivityClassifier` - 5-layer privacy detection
 - `CircuitBreaker` - Failure detection and provider failover
 
@@ -133,7 +133,7 @@ const accurateEmbedding = await embeddingGen.generate(text, { model: '1536-dim' 
 **Rationale**:
 - Cost savings: Local models are free
 - Privacy: Sensitive data never leaves the machine
-- Budget enforcement: Hard $8.33/month limit prevents overspending
+- Budget enforcement: Configurable monthly cap prevents overspending
 
 **Fallback Chain**:
 ```
@@ -254,7 +254,7 @@ import { KnowledgeLearningSystem } from './src/KnowledgeLearningSystem.js';
 // Initialize system
 const system = new KnowledgeLearningSystem({
   projectPath: '/path/to/your/project',
-  budgetLimit: 8.33,  // $8.33/month
+  budgetLimit: 10,  // monthly USD cap (configurable)
   qdrantUrl: 'http://localhost:6333'
 });
 
@@ -290,7 +290,7 @@ Control LLM costs with budget limits:
 
 ```javascript
 const system = new KnowledgeLearningSystem({
-  budgetLimit: 8.33,  // Monthly limit in USD
+  budgetLimit: 10,  // monthly USD cap (configurable)
   budgetAlerts: [
     { threshold: 50, action: 'log' },
     { threshold: 80, action: 'warn' },
@@ -304,9 +304,9 @@ const system = new KnowledgeLearningSystem({
 ```javascript
 const budget = await system.getBudgetStatus();
 console.log({
-  used: budget.used,           // $1.23
-  remaining: budget.remaining, // $7.10
-  percentage: budget.percentage // 14.8%
+  used: budget.used,           // accumulated USD this period
+  remaining: budget.remaining, // USD remaining until cap
+  percentage: budget.percentage // percent of monthly cap consumed
 });
 ```
 

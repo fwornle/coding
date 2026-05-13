@@ -216,7 +216,7 @@ Collections:
 
 **UnifiedInferenceEngine**:
 - Multi-provider LLM routing (Groq → OpenRouter → Local)
-- Budget tracking ($8.33/month enforcement)
+- Budget tracking with configurable monthly cap enforcement
 - Circuit breaker for provider failover
 - Privacy-aware routing (sensitive data to local models)
 
@@ -247,10 +247,10 @@ Collections:
 ### Budget Management
 
 **Cost Tracking**:
-- Hard limit: $8.33/month
+- Configurable monthly USD cap
 - Per-request cost calculation
-- Budget alerts at 80% threshold
-- Automatic fallback to local models when limit reached
+- Budget alerts at threshold percentages (configurable)
+- Automatic fallback to local models when cap reached
 
 ### Privacy-First Architecture
 

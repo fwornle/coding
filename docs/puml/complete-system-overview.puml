@@ -22,7 +22,7 @@ ai -down-> realtime : all interactions
 
 ' Knowledge Management (side by side, compact)
 package "Knowledge Management" as km #FFF9E6 {
-  component "Continuous Learning\n(Automatic, $8.33/mo)" as learning <<core>>
+  component "Continuous Learning\n(Automatic)" as learning <<core>>
   component "UKB/VKB\n(Manual Capture)" as ukb <<cli>>
 }
 

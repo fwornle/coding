@@ -26,7 +26,7 @@ The coding project contains **TWO COMPLEMENTARY knowledge management systems** t
 | **Integration** | MCP Protocol (Claude Code) | Agent-agnostic (Claude, Copilot, Cursor, etc.) |
 | **Storage** | UKB (shared-memory.json + Graph DB) | Qdrant (vectors) + SQLite (analytics) |
 | **LLM Usage** | Ad-hoc analysis tasks | Continuous with budget tracking |
-| **Budget Control** | No built-in budget tracking | Strict $8.33/month limit enforced |
+| **Budget Control** | No built-in budget tracking | Configurable monthly budget cap |
 | **Privacy** | Standard semantic analysis privacy | 5-layer sensitivity detection, local fallback |
 | **Caching** | Agent-agnostic graph database | Agent-agnostic cache (file/HTTP/MCP) |
 | **Analysis Speed** | 1-5 minutes (full repository) | Real-time (<2s for intent classification) |
@@ -105,7 +105,7 @@ Provides **real-time knowledge extraction** from live coding sessions with budge
 - **StreamingKnowledgeExtractor** - Buffers and extracts knowledge in real-time
 - **KnowledgeRetriever** - Semantic search with temporal decay
 - **UnifiedInferenceEngine** - Multi-provider LLM routing with circuit breaker (delegates to `@rapid/llm-proxy`)
-- **BudgetTracker** - Cost tracking and $8.33/month enforcement
+- **BudgetTracker** - Cost tracking with configurable monthly limit enforcement
 - **SensitivityClassifier** - 5-layer privacy detection
 - **TemporalDecayTracker** - Knowledge aging and freshness management
 - **AgentAgnosticCache** - Universal caching (file/HTTP/MCP backends)
@@ -171,7 +171,7 @@ The three systems work together in a complementary pipeline:
 
    → Continuous Learning extracts this pattern
    → Stores in Qdrant with intent: 'learning'
-   → Budget tracker logs cost ($0.002)
+   → Budget tracker logs per-call cost
    → Sensitivity detector marks as 'CONFIDENTIAL'
    ```
 
@@ -235,7 +235,7 @@ The three systems work together in a complementary pipeline:
 - **Provider-agnostic** (uses Anthropic Claude primarily)
 
 **Continuous Learning**:
-- **Strict budget limits** ($8.33/month, alerts at 80%)
+- **Configurable budget limits** (monthly cap, threshold-based alerts)
 - **5-layer privacy detection** (path/keyword/pattern/hash/LLM)
 - **Fail-safe routing** (sensitive data → local models only)
 - **Multi-provider** (Groq/Anthropic/OpenAI/Local with failover)
@@ -256,7 +256,7 @@ The three systems work together in a complementary pipeline:
 ### Use Continuous Learning When:
 
 ✅ You want **real-time learning** during coding sessions
-✅ You need **budget-conscious operations** ($8.33/month limit)
+✅ You need **budget-conscious operations** with a configurable monthly cap
 ✅ You're working with **sensitive code** (local-first privacy)
 ✅ You want **agent-agnostic** compatibility (Claude/Copilot/Cursor)
 ✅ You need **fast semantic search** (<500ms)

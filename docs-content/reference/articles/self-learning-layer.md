@@ -215,7 +215,7 @@ Similarly, it's not locked to any LLM provider. The system supports 10 providers
 
 **Content sensitivity routing**: Discussing API architecture? Send it to the cloud for fast, accurate analysis. Processing something with potential credentials? Route it locally - the data never leaves your machine.
 
-**Cost savings**: ~$50-100/month for active development by routing through subscriptions first. Budget tracking is built in with configurable limits and automatic fallback to local models when thresholds are reached.
+**Cost savings**: Subscription-first routing eliminates per-token spend whenever Copilot or Claude max quota covers the request. Budget tracking is built in with configurable limits and automatic fallback to local models when thresholds are reached.
 
 ### Unified LLM Layer Architecture
 

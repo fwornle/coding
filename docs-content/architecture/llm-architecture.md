@@ -500,7 +500,7 @@ export SEMANTIC_ANALYSIS_MODE=local
 - **Total: $0.00 per run** ✅
 - **Bonus: ~3x faster** via parallelized copilot calls
 
-**Estimated savings**: ~$50-100/month for active development
+**Savings**: When the subscription quota covers the request, the per-token cost is $0 — material per-call savings vs. the paid-API fallback path.
 
 ---
 
