@@ -40,10 +40,6 @@ package "Core Inference Engine" <<core>> {
   component "Sensitivity\nClassifier" as SENS <<util>>
 }
 
-package "Trajectory Tracking" <<core>> {
-  component "Trajectory\nAnalyzer" as TRAJ <<core>>
-}
-
 package "Caching Layer" <<storage>> {
   component "Agent\nCache" as CACHE <<storage>>
   component "File\nBackend" as FBACK <<storage>>
@@ -95,7 +91,6 @@ LOCALLLM -[hidden]right-> VLLM
 COPILOT -[hidden]down-> ADAPTER_API
 CPA -[hidden]down-> CA
 RETRIEVER -[hidden]down-> EXTRACTOR
-TRAJ -[hidden]down-> ENGINE
 SENS -[hidden]down-> BUDGET
 
 ' Session → Adapters
@@ -118,7 +113,6 @@ GA --> EXTRACTOR
 EXTRACTOR --> ENGINE
 RETRIEVER --> ENGINE
 CONCEPT --> ENGINE
-TRAJ --> ENGINE
 
 ' Inference → Utils & Providers
 ENGINE --> BUDGET
@@ -139,8 +133,6 @@ CONCEPT ..> GRAPH
 DECAY ..> QDRANT
 DECAY ..> SQLITE
 BUDGET ..> SQLITE
-TRAJ ..> QDRANT
-TRAJ ..> SQLITE
 
 ' Cache connections
 ENGINE ..> CACHE

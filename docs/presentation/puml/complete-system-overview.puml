@@ -18,7 +18,6 @@ actor "AI Assistant\n(Claude/Copilot)" as ai #FFE6E6
 package "Core Real-Time Systems" as realtime #E8F5E8 {
   component "Live Session Logging\n(5-Layer Classification)" as lsl <<core>>
   component "Constraint Monitoring\n(18 Constraints)" as constraints <<core>>
-  component "Trajectory Generation\n(Light & Deep)" as trajectory <<core>>
   component "Status Line System\n(4-Layer Health)" as status <<core>>
 }
 
@@ -50,7 +49,6 @@ package "MCP Integration Servers" as mcp #E0E7FF {
   [Code Graph RAG] as code_graph <<mcp>>
 }
 
-trajectory -down-> mcp : deep analysis
 constraints -down-> mcp_constraint : violations
 
 ' Storage Layer
