@@ -148,6 +148,6 @@ A separate `SemanticValidator` previously called an LLM (anthropic/claude-haiku,
 
 ## Status Line Integration
 
-Format: `[🔒 {compliance}%]` — with an optional ` ⚠️ {N}` sub-segment when violations are non-zero.
+Format: `[🔒 {compliance}%]` — with an optional ` 🟡 {N}` sub-segment when violations are non-zero.
 
-Example: `[🔒 94%]` shows 94% compliance; `[🔒 75% ⚠️ 4]` shows 75% with 4 active violations.
+Example: `[🔒 94%]` shows 94% compliance; `[🔒 75% 🟡 4]` shows 75% with 4 active violations.

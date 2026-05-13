@@ -110,14 +110,14 @@ The `[🏥...]` section shows **unified system health** combining:
 | Display | Meaning | Action |
 |---------|---------|--------|
 | `[🏥✅]` | All systems healthy | None needed |
-| `[🏥⚠️]` | Issues detected | Check dashboard for details |
+| `[🏥🟡]` | Issues detected | Check dashboard for details |
 | `[🏥⏰]` | **Stale** - verification data >2 minutes old | Health verifier may have crashed |
 | `[🏥❌]` | Critical issues or error | Immediate attention required |
 | `[🏥💤]` | Health verifier offline | Start health verifier |
 
 **Note**: Violation counts are no longer shown in the status line. Details are available on the health dashboard at http://localhost:3033.
 
-**Common Causes of `[🏥⚠️]` (Issues)**:
+**Common Causes of `[🏥🟡]` (Issues)**:
 - Constraint enforcement disabled
 - Service health check failures
 - Database connectivity issues
@@ -292,7 +292,7 @@ The status line displays information for **multiple active coding agent sessions
 
 **Multiple Active Sessions**:
 ```
-[🏥⚠️] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒 CA🌲] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒 CA🌲] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 Where:
@@ -443,7 +443,7 @@ node scripts/status-line-fast.cjs
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥⚠️] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
+# [🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Troubleshooting

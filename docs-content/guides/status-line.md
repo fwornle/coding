@@ -20,7 +20,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 |-----------|---------|-------------|
 | System Health | `[🏥✅]` | Coordinator-derived health rollup (services + databases + container) |
 | Active Sessions | `[RA⚫C🟢]` | Per-project abbreviations with graduated activity icons |
-| Constraint | `[🔒 77%]` | Code quality % (with optional `⚠️ N` violations sub-segment when non-zero) |
+| Constraint | `[🔒 77%]` | Code quality % (with optional `🟡 N` violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
@@ -36,7 +36,7 @@ The badge is derived live from the coordinator at `:3034/health/state`. There is
 | Display | Meaning | Action |
 |---------|---------|--------|
 | `[🏥✅]` | All systems healthy | None needed |
-| `[🏥⚠️]` | Non-critical issue (e.g. degraded service or GCM warning) | Check dashboard for details |
+| `[🏥🟡]` | Non-critical issue (e.g. degraded service or GCM warning) | Check dashboard for details |
 | `[🏥⏰]` | **Stale** — coordinator's `generated_at` >3 minutes old | Coordinator may be down; check container |
 | `[🏥❌]` | Critical issue (downed service, unhealthy DB, container probe fail) | Immediate attention required |
 | `[🏥💤]` | Coordinator unreachable | Verify dashboard service is running |
@@ -74,7 +74,7 @@ The badge reflects the freshness of the **observation → digest → insight** p
 | Status | Icon | Meaning |
 |--------|------|---------|
 | Healthy | `[📚✅]` | Last observation written within 15 minutes — pipeline is ingesting |
-| Stale | `[📚⚠️]` | Last observation 15 min – 6 h ago AND a Claude session is actively heartbeating — anomalous |
+| Stale | `[📚🟡]` | Last observation 15 min – 6 h ago AND a Claude session is actively heartbeating — anomalous |
 | Stalled | `[📚🔴]` | Last observation > 6 h ago AND a Claude session is actively heartbeating — pipeline appears dead |
 | **Idle** | **`[📚⚫]`** | **No Claude session heartbeating in the last 5 min — "no recent observations" is expected, not anomalous** |
 | Disabled | `[📚🔇]` | obs_api reachable but no rows in any pipeline table |
@@ -161,13 +161,13 @@ The renderer now exposes a single `getCoordinatorState()` method memoized on the
 - All five `getXxxStatus()` methods await the shared result; one HTTP call serves the whole render
 - A single transient slow response no longer cascades every coordinator-derived badge (`🏥` `LSL` `📚` `🧠`) to its unreachable state simultaneously
 
-### Right-edge stability (VS16-aware cell counting)
+### Right-edge stability (cell-width consistency)
 
-The recurring trailing-digit residue at the right edge (`07:538`, `12:411`) traced to cell-width prediction. The fix is in `visibleCellWidth()` and pads correctly via `leftPadToStableCellWidth()`:
+The recurring trailing-digit residue at the right edge (`07:538`, `12:411`, `07:158`) traces to disagreement between the script's `visibleCellWidth()`, tmux's wcwidth, and the rendered font glyph. The fix is to only emit codepoints where all three measurements agree:
 
-- The cell-count function iterates over codepoints with a **VS16 lookahead**: when an East-Asian-Width-Ambiguous codepoint (e.g. `U+26A0 ⚠`) is followed by `U+FE0F` (variation-selector-16), it's promoted to 2 cells, matching how xterm.js and tmux render forced-emoji-presentation. Without the lookahead, `⚠` counted as 1 cell while terminals rendered `⚠️` at 2 — a 1-cell drift per occurrence that left the rightmost cell of the previous render exposed on badge transitions like `[📚✅] ↔ [📚⚠️]`.
+- **Warning states use `🟡` (U+1F7E1, EAW=Wide), not `⚠️` (U+26A0 + U+FE0F, EAW=Ambiguous).** Earlier attempts to "promote" `⚠️` to 2 cells via a VS16 lookahead in `visibleCellWidth()` matched the font glyph width but disagreed with tmux's wcwidth (which doesn't honor VS16 for Ambiguous codepoints in non-CJK locales). The disagreement left 1 cell of the previous render exposed on every transition that involved `⚠️`, and the font glyph visibly overlapped the closing `]`. The VS16 lookahead logic is retained for the `⚠️ SYS:TIMEOUT` / `SYS:ERR` fallback markers — error visibility there outweighs cell-perfect padding.
 - Padding is **leading-spaces only** to TMUX_PANE_WIDTH (or 200 if unset). Trailing characters get stripped by tmux's `#(shell-cmd)` substitution, so any trailing terminator (NBSP, space, etc.) doesn't survive the round-trip.
-- Comparison: the earlier NBSP-terminator + 220-codepoint approach has been retired in favour of correct per-codepoint cell counting.
+- The earlier NBSP-terminator + 220-codepoint approach has been retired in favour of correct per-codepoint cell counting.
 
 ### Status Line Update Flow
 
@@ -221,7 +221,7 @@ The supervision architecture includes guards to prevent runaway process spawning
 
 **Health States** (for `[🏥...]` indicator):
 - Coordinator reachable + 0 critical issues → Healthy (✅)
-- Coordinator reachable + ≥1 service `degraded` / GCM warning → Warning (⚠️)
+- Coordinator reachable + ≥1 service `degraded` / GCM warning → Warning (🟡)
 - Coordinator reachable + critical failure (downed service, unhealthy DB, container probe fail) → Critical (❌)
 - Coordinator `generated_at` >3 min old → Stale (⏰)
 - Coordinator unreachable → Offline (💤)

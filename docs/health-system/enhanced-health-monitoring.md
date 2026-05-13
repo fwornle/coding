@@ -379,7 +379,7 @@ The `[🏥...]` indicator combines:
 | Display | Meaning |
 |---------|---------|
 | `[🏥✅]` | All systems healthy |
-| `[🏥⚠️]` | Issues detected - check dashboard |
+| `[🏥🟡]` | Issues detected - check dashboard |
 | `[🏥⏰]` | Health data stale (>2 min old) |
 | `[🏥❌]` | Critical issues |
 | `[🏥💤]` | Health verifier offline |
