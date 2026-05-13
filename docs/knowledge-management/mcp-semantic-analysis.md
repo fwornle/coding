@@ -456,5 +456,3 @@ The semantic-analysis server supports custom workflow definitions. See `integrat
 - Enable Claude to make intelligent decisions about analysis scope
 - Integrate seamlessly with Claude Code workflow
 - Eliminate manual command-line operations
-
-**Archived Documentation**: See `docs/archive/historical/` for documentation of the previous CLI-based system.

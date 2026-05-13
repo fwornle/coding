@@ -226,10 +226,6 @@ If you were using the old UKB CLI system:
 - [Cross-Project Knowledge System](../architecture/cross-project-knowledge.md) - Architecture overview
 - [Continuous Learning System](./continuous-learning-system.md) - Automatic knowledge capture
 
-**Historical Documentation (Archived)**:
-- [UKB Lock-Free Architecture](../archive/historical/ukb-lock-free-architecture.md) - v2.0 architecture (deprecated)
-- [UKB Issues Analysis](../archive/historical/ukb-issues-analysis.md) - Historical analysis
-
 ---
 
 ## Why the Change?
