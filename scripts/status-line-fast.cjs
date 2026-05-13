@@ -82,13 +82,23 @@ function ageToActivityIcon(ageMs) {
   return '💤';
 }
 
-// Read the sidecar { projectName: transcriptPath } map written by the full
-// CSL. Returns {} if missing — patching becomes a no-op.
+// Read the sidecar { projectName: {tp, hbTs} } map written by the full
+// CSL. Returns {} if missing — patching becomes a no-op. Tolerates the
+// legacy string shape ({ projectName: transcriptPath }) in case a stale
+// pre-fix sidecar is still on disk during the first post-fix tick.
 function readProjectMapping() {
   try {
     const file = path.join(codingRepo, '.logs', 'combined-status-line-projects.json');
     return JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch { return {}; }
+}
+
+// Normalize either shape to {tp, hbTs}. Legacy string entry has no
+// heartbeat data — hbTs=0 disables the promotion path, falling back to
+// pure transcript-mtime behaviour for that tick.
+function normalizeMappingEntry(v) {
+  if (typeof v === 'string') return { tp: v, hbTs: 0 };
+  return { tp: v?.tp, hbTs: v?.hbTs || 0 };
 }
 
 // Patch each project's lifecycle icon in `text` based on its current
@@ -105,14 +115,23 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
   // accidentally match inside "CA<icon>". (It can't with the (?![A-Z])
   // guard below, but length-sort is the cheap belt-and-braces.)
   const entries = Object.entries(mapping || {})
-    .map(([name, p]) => [name, p, getAbbrev(name)])
+    .map(([name, v]) => [name, normalizeMappingEntry(v), getAbbrev(name)])
     .sort((a, b) => b[2].length - a[2].length);
 
-  for (const [, transcriptPath, abbrev] of entries) {
+  const now = Date.now();
+  for (const [, { tp, hbTs }, abbrev] of entries) {
     let mt;
-    try { mt = fs.statSync(transcriptPath).mtimeMs; } catch { continue; }
+    try { mt = fs.statSync(tp).mtimeMs; } catch { continue; }
     if (mt > cacheMtimeMs) anyNewer = true;
-    const newIcon = ageToActivityIcon(Date.now() - mt);
+    let newIcon = ageToActivityIcon(now - mt);
+    // Mirror combined-status-line.js's heartbeat promotion: a fresh ETM
+    // heartbeat (<5min) overrides a non-Active transcript-derived icon.
+    // Without this, the fast-path would actively undo the CSL's
+    // promoted icon on every tmux tick — flipping 🟢 back to 🌲/🫒
+    // until the next 30s cache regen.
+    if (newIcon !== '🟢' && hbTs > 0 && (now - hbTs) < 5 * 60_000) {
+      newIcon = '🟢';
+    }
     // Match: <ABBREV>(?![A-Z]) optionally followed by a #[nounderscore]
     // closing tag (when the abbrev is the underlined "current project"),
     // immediately followed by exactly one lifecycle icon. The (?![A-Z])

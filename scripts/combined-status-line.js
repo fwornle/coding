@@ -914,12 +914,40 @@ class CombinedStatusLine {
         if (ageMs < 24 * 60 * 60_000) return '⚫';
         return '💤';
       };
+      // Freshest ETM heartbeat age for a project. Used to promote the
+      // transcript-derived icon to 🟢 when the ETM is actively observing
+      // activity that doesn't manifest as new .jsonl writes — e.g. a
+      // long-running agent turn (one prompt that takes 25 min to complete)
+      // or a non-Claude session (OpenCode/Copilot) whose transcript path
+      // isn't a real file. Returns null if no running heartbeat is present.
+      const heartbeatAgeMs = (projectName) => {
+        let latestBeat = 0;
+        for (const e of lslEntries) {
+          if (e?.projectName !== projectName) continue;
+          if (e.status === 'stopped') continue;
+          if (e.lastBeat && e.lastBeat > latestBeat) latestBeat = e.lastBeat;
+        }
+        return latestBeat > 0 ? Date.now() - latestBeat : null;
+      };
       for (const [projectName, status] of Object.entries(rollup)) {
         let icon;
         let activityAgeMs = null;
         if (status === 'healthy') {
           activityAgeMs = transcriptAgeMs(projectName);
           icon = ageToActivityIcon(activityAgeMs);
+          // Heartbeat promotion: if the transcript-derived icon is not
+          // already Active but the ETM is heartbeating fresh (<5min),
+          // override to 🟢. The transcript is updated only at prompt
+          // boundaries, so a session in the middle of a long agent turn
+          // looks idle by mtime but is actually in full swing. The
+          // heartbeat is the canonical "user/agent is here right now"
+          // signal — when it's fresh, that overrides the cooling band.
+          if (icon !== '🟢') {
+            const hbAge = heartbeatAgeMs(projectName);
+            if (hbAge !== null && hbAge < 5 * 60_000) {
+              icon = '🟢';
+            }
+          }
         } else if (status === 'degraded' || status === 'stale' || status === 'warning') {
           icon = '🟡';
         } else {
@@ -950,9 +978,22 @@ class CombinedStatusLine {
         const projectsFile = join(rootDir, '.logs', 'combined-status-line-projects.json');
         const mapping = {};
         const seen = new Set();
+        // Freshest lastBeat per project, used by the fast-path patcher to
+        // mirror the heartbeat-promotion logic without having to re-poll
+        // the coordinator on every tmux tick.
+        const freshestBeat = new Map();
+        for (const e of lslEntries) {
+          if (!e?.projectName) continue;
+          if (e.lastBeat && e.lastBeat > (freshestBeat.get(e.projectName) || 0)) {
+            freshestBeat.set(e.projectName, e.lastBeat);
+          }
+        }
         for (const entry of lslEntries) {
           if (entry?.projectName && entry?.transcriptPath) {
-            mapping[entry.projectName] = entry.transcriptPath;
+            mapping[entry.projectName] = {
+              tp: entry.transcriptPath,
+              hbTs: freshestBeat.get(entry.projectName) || 0,
+            };
             seen.add(entry.projectName);
           }
         }
@@ -980,7 +1021,10 @@ class CombinedStatusLine {
                 if (m > latestMtime) { latestMtime = m; latestPath = p; }
               }
               if (latestPath) {
-                mapping[projectName] = latestPath;
+                mapping[projectName] = {
+                  tp: latestPath,
+                  hbTs: freshestBeat.get(projectName) || 0,
+                };
                 break;
               }
             } catch { /* try next candidate */ }
