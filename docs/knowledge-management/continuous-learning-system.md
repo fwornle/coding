@@ -514,7 +514,7 @@ concepts.forEach(concept => {
 import { BudgetTracker } from './src/inference/BudgetTracker.js';
 
 const budget = new BudgetTracker({
-  monthlyLimit: 8.33,
+  monthlyLimit: 10,  // monthly USD cap (configurable)
   costPerProvider: {
     'groq': { input: 0.0004, output: 0.0006 },      // Per 1K tokens
     'openrouter': { input: 0.001, output: 0.001 },

@@ -124,7 +124,7 @@ Provides **real-time knowledge extraction** from live coding sessions with budge
 // Automatic during session
 const system = new KnowledgeLearningSystem({
   projectPath: '/path/to/project',
-  budgetLimit: 8.33
+  budgetLimit: 10  // monthly USD cap (configurable)
 });
 
 await system.initialize();

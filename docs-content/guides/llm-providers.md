@@ -413,7 +413,7 @@ UKB_FALLBACK_PROVIDER=local
 ```env
 # .env
 LEARNING_LLM_PROVIDER=groq
-LEARNING_BUDGET_LIMIT=8.33  # Monthly limit in USD
+LEARNING_BUDGET_LIMIT=10  # Monthly USD cap (configurable)
 LEARNING_FALLBACK_TO_LOCAL=true
 ```
 
@@ -477,14 +477,14 @@ Response:
 
 ```json
 {
-  "monthlyLimit": 8.33,
-  "used": 2.45,
-  "remaining": 5.88,
-  "percentage": 29.4,
+  "monthlyLimit": 10,
+  "used": 2.50,
+  "remaining": 7.50,
+  "percentage": 25.0,
   "providers": {
     "groq": 1.20,
     "anthropic": 0.85,
-    "openai": 0.40
+    "openai": 0.45
   }
 }
 ```
