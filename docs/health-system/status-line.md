@@ -49,7 +49,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `[🐳MCP:SA✅CM✅CGR✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
 - `[C🟢 UT🟤]` - **Active Sessions**: Project abbreviations with activity icons
-- `🔒 67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `⚠️ N` violations sub-segment when non-zero)
+- `🔒 67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `🟡N` violations sub-segment when non-zero)
 - `[📚✅]` - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 

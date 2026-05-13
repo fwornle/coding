@@ -1820,10 +1820,17 @@ class CombinedStatusLine {
       const score = `${compliancePercent}%`;
       const violationsCount = constraint.violations || 0;
 
-      // Build constraint section: shield + score + optional violations
+      // Build constraint section: shield + score + optional violations.
+      // The pre/post 🟡 spaces were anti-overlap workarounds back when
+      // ⚠️ (U+26A0) had a cell-width mismatch between tmux's wcwidth and
+      // xterm.js's rendered glyph — a 1-cell drift visually clobbered
+      // adjacent characters. After moving warning indicators to 🟡
+      // (U+1F7E1, EAW=Wide) AND adding the explicit codepoint-widths
+      // override in ~/.tmux.conf, the cell count agrees across script,
+      // tmux, and renderer — the spaces are no longer needed.
       let constraintPart = `[🔒 ${score}`;
       if (violationsCount > 0) {
-        constraintPart += ` 🟡 ${violationsCount}`;
+        constraintPart += `🟡${violationsCount}`;
         overallColor = 'yellow';
       }
       constraintPart += `]`;

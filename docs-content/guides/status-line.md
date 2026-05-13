@@ -20,7 +20,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 |-----------|---------|-------------|
 | System Health | `[🏥✅]` | Coordinator-derived health rollup (services + databases + container) |
 | Active Sessions | `[RA⚫C🟢]` | Per-project abbreviations with graduated activity icons |
-| Constraint | `[🔒 77%]` | Code quality % (with optional `🟡 N` violations sub-segment when non-zero) |
+| Constraint | `[🔒 77%]` | Code quality % (with optional `🟡N` violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
