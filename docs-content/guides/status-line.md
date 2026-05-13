@@ -45,6 +45,8 @@ The badge is derived live from the coordinator at `:3034/health/state`. There is
 
 Sessions use a **graduated color scheme** based on time since last activity. **All sessions are always displayed** — sleeping sessions show as 💤, never hidden. Sessions are only removed when the agent process exits.
 
+The "time since last activity" signal is the project's Claude `.jsonl` transcript mtime — i.e., the time of the last *prompt boundary*. A long-running agent turn (one prompt that takes 25 minutes) writes nothing to the transcript while it's in flight, so a project actively being worked on by an agent looks idle by mtime alone. To capture that, a **heartbeat promotion** rule overrides the transcript-derived band: if the project's ETM heartbeat (`state.lsl[*].lastBeat`) is fresh (< 5 min) and the transcript-derived icon would be anything other than 🟢, the icon is promoted to 🟢. The heartbeat is the canonical "agent/user is here right now" signal. The promotion also handles non-Claude sessions (OpenCode / Copilot) whose `transcriptPath` is not a real file — pure transcript-mtime logic would mis-bucket them.
+
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
 | 🟢 | Active | < 5 minutes | Active session with recent activity |
@@ -183,7 +185,7 @@ The recurring trailing-digit residue at the right edge (`07:538`, `12:411`, `07:
 **Full refresh:**
 
 1. **Shared coordinator probe**: a single memoized `fetch(:3034/health/state)` per render (with one retry @ 1.5 s) feeds five `getXxxStatus()` methods — replaces the previous pattern of 5 independent `execSync(curl)` calls per render
-2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🌲 / 🫒 / 🪨 / ⚫ / 💤)
+2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🌲 / 🫒 / 🪨 / ⚫ / 💤). A fresh ETM heartbeat (< 5 min) promotes a non-Active band to 🟢 (captures long-running agent turns and non-Claude sessions).
 3. **Constraint compliance**: separate call to constraint-monitor API (port 3031)
 4. **Render**: assemble parts, pad to paneWidth cells via `leftPadToStableCellWidth()` using VS16-aware `visibleCellWidth()` — see [Right-edge stability](#right-edge-stability-vs16-aware-cell-counting) above
 5. **Cache write**: save to `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt`
@@ -228,6 +230,7 @@ The supervision architecture includes guards to prevent runaway process spawning
 
 **Session States** (graduated cooling scheme):
 - Driven by `transcriptPath` mtime in coordinator state, bucketed: 🟢 (<5 m) → 🌲 (<15 m) → 🫒 (<1 h) → 🪨 (<6 h) → ⚫ (<24 h) → 💤 (≥24 h)
+- **Heartbeat-promotion override:** if `lsl[*].lastBeat` is < 5 min, any non-🟢 band is overridden to 🟢. Captures long-running agent turns (one prompt that takes >5 min) and non-Claude sessions whose `transcriptPath` is not a real file
 - Sessions only removed when the project's ETM stops heartbeating, never hidden while alive
 
 ---

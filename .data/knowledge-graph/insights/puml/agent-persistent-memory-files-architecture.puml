@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Agent Memory Layer" {
+  component "Persistent Memory Files" as pmf <<storage>>
+  component "MEMORY.md Index" as memidx <<core>>
+  component "Topic Memory Files" as topics <<storage>>
+}
+
+package "Semantic Analysis Infrastructure" {
+  component "MCP Semantic Analysis Server" as mcp <<api>>
+  component "Knowledge Management Agent" as kma <<agent>>
+  component "UKB Workflow Engine" as ukb <<core>>
+}
+
+package "Knowledge Storage" {
+  database "Knowledge Graph\n(Graphology + LevelDB)" as kg <<storage>>
+  database "Observation Store\n(SQLite)" as obs <<storage>>
+}
+
+package "Claude Agent Runtime" {
+  component "Claude Code Session" as claude <<external>>
+  component "Context Injector\n(system-reminder)" as ctx <<core>>
+}
+
+claude --> ctx : loads
+ctx --> memidx : reads on startup
+memidx --> topics : indexes
+pmf --> memidx : registered in
+pmf --> topics : contains
+
+kma --> kg : persists entities
+ukb --> kma : orchestrates
+mcp --> ukb : triggers
+claude --> mcp : calls tools
+
+obs --> kma : feeds observations
+kg ..> pmf : informs memory writes
+
+@enduml

@@ -1,0 +1,84 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Planning and Execution Workflow — Sequence
+
+actor "User / Agent" as User
+participant "MCP Tool\n(execute_workflow)" as MCP
+participant "SSE Server\n:3848" as SSE
+participant "WorkflowRunner" as Runner
+participant "Coordinator" as Coord
+participant "LLM Provider" as LLM
+participant "PersistenceAgent" as Persist
+database "LevelDB\nKnowledge Graph" as KG
+participant "ProgressTracker\n(workflow-progress.json)" as Progress
+
+== Trigger ==
+
+User -> MCP : execute_workflow(wave-analysis,\nteam: coding, async_mode: true)
+MCP -> SSE : POST /workflow/start
+SSE -> Progress : reset / initialize progress
+SSE -> Runner : spawn workflow process
+Runner --> SSE : workflow_id
+
+SSE --> MCP : { workflow_id, status: "running" }
+MCP --> User : workflow started
+
+== Wave Initialization ==
+
+Runner -> Coord : loadTeamConfig(coding)
+Coord -> KG : read existing entities & relations
+KG --> Coord : entity graph snapshot
+Coord -> Progress : update(step: "initialize", status: running)
+
+== Analysis Wave ==
+
+group loop [for each observation batch]
+  Coord -> LLM : analyzeObservations(batch)
+  LLM --> Coord : raw patterns + insights
+  Coord -> Coord : classifyEntities(ontology)
+  Coord -> Progress : update(step: "analyze", substep: batchN)
+end
+
+== Classification ==
+
+Coord -> LLM : classifyWithOntology(entities)
+LLM --> Coord : typed entities (Detail / Component / ...)
+Coord -> Coord : validateClassification()
+Coord -> Progress : update(step: "classify", status: done)
+
+== KG Operations ==
+
+group KG-Ops [dedup → predict → merge]
+  Coord -> Coord : deduplicateEntities()
+  Coord -> Coord : predictRelations()
+  Coord -> Coord : mergeGraph()
+  Coord -> Progress : update(step: "kg-ops", substeps: 3/3)
+end
+
+== Persistence ==
+
+Coord -> Persist : persistEntities(entities, relations)
+Persist -> KG : upsert nodes + edges
+KG --> Persist : confirmed write count
+Persist -> Progress : update(step: "persist", entities: N)
+
+== Insight Generation ==
+
+Coord -> LLM : generateInsights(finalGraph)
+LLM --> Coord : insight documents
+Coord -> KG : storeInsights()
+Coord -> Progress : update(step: "insights", status: done)
+
+== Completion ==
+
+Runner -> Progress : update(status: "completed", totalEntities: N)
+Runner --> SSE : workflow finished
+
+SSE -> User : SSE event: workflow_complete
+User -> MCP : get_workflow_status(workflow_id)
+MCP -> Progress : read final state
+Progress --> MCP : { status, entities, relations, orphans }
+MCP --> User : summary report
+
+@enduml

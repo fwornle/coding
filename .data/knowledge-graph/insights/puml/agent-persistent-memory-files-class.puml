@@ -1,0 +1,114 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Memory Index" {
+  class MemoryIndex <<file>> {
+    +filename: String = "MEMORY.md"
+    +maxLines: Integer = 200
+    +entries: List<IndexEntry>
+    --
+    +addEntry(title: String, path: String, hook: String): void
+    +removeEntry(path: String): void
+    +listEntries(): List<IndexEntry>
+  }
+
+  class IndexEntry {
+    +title: String
+    +filePath: String
+    +oneLiner: String
+  }
+}
+
+package "Memory Types" {
+  abstract class MemoryFile <<file>> {
+    +name: String
+    +description: String
+    +type: MemoryType
+    +content: String
+    --
+    +read(): String
+    +write(content: String): void
+    +update(content: String): void
+    +delete(): void
+  }
+
+  enum MemoryType {
+    USER
+    FEEDBACK
+    PROJECT
+    REFERENCE
+  }
+
+  class UserMemory <<file>> {
+    +role: String
+    +goals: String
+    +preferences: String
+    +knowledge: String
+    --
+    +tailorResponseTo(): UserProfile
+  }
+
+  class FeedbackMemory <<file>> {
+    +rule: String
+    +why: String
+    +howToApply: String
+    --
+    +isApplicable(context: String): Boolean
+    +getGuidance(): String
+  }
+
+  class ProjectMemory <<file>> {
+    +factOrDecision: String
+    +why: String
+    +howToApply: String
+    +absoluteDate: String
+    --
+    +isStale(now: Date): Boolean
+    +getContext(): String
+  }
+
+  class ReferenceMemory <<file>> {
+    +systemName: String
+    +resourceUrl: String
+    +purpose: String
+    --
+    +resolve(): ExternalResource
+  }
+}
+
+package "Memory Manager" {
+  class MemoryManager <<service>> {
+    -memoryRoot: String
+    -index: MemoryIndex
+    --
+    +save(type: MemoryType, name: String, content: String): MemoryFile
+    +recall(query: String): List<MemoryFile>
+    +forget(name: String): void
+    +verify(file: MemoryFile): Boolean
+    +checkForDuplicates(name: String): MemoryFile
+  }
+
+  class MemoryVerifier <<service>> {
+    --
+    +fileExists(path: String): Boolean
+    +functionExists(name: String): Boolean
+    +isStale(file: MemoryFile): Boolean
+    +reconcileWithDisk(file: MemoryFile): MemoryFile
+  }
+}
+
+' Inheritance
+UserMemory --|> MemoryFile
+FeedbackMemory --|> MemoryFile
+ProjectMemory --|> MemoryFile
+ReferenceMemory --|> MemoryFile
+
+' Composition / Association
+MemoryFile --> MemoryType : typed by
+MemoryIndex "1" --* "many" IndexEntry : indexes
+MemoryManager "1" --o "1" MemoryIndex : maintains
+MemoryManager "1" --* "many" MemoryFile : manages
+MemoryManager ..> MemoryVerifier : uses
+MemoryVerifier ..> MemoryFile : validates
+
+@enduml

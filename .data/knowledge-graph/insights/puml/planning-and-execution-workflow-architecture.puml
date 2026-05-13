@@ -1,0 +1,41 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Trigger Layer" {
+  component "MCP Client" as mcp_client <<external>>
+  component "Scheduler" as scheduler <<core>>
+}
+
+package "Execution Layer" {
+  component "execute_workflow\nMCP Tool" as exec_tool <<api>>
+  component "Incremental Analysis\nTrigger" as incr_trigger <<core>>
+  component "Wave Analysis\nWorkflow" as wave_workflow <<core>>
+}
+
+package "Processing Layer" {
+  component "Coordinator Agent" as coordinator <<agent>>
+  component "Persistence Agent" as persistence <<agent>>
+  component "Insight Generation\nAgent" as insight_agent <<agent>>
+}
+
+package "Storage Layer" {
+  database "Knowledge Graph\n(LevelDB + Graphology)" as kg <<storage>>
+  database "Workflow Progress\n(.data/workflow-progress.json)" as progress_store <<storage>>
+}
+
+mcp_client --> exec_tool : invokes
+scheduler --> incr_trigger : triggers
+
+exec_tool --> wave_workflow : starts
+incr_trigger --> wave_workflow : starts
+
+wave_workflow --> coordinator : orchestrates
+wave_workflow --> progress_store : writes status
+
+coordinator --> insight_agent : delegates
+coordinator --> persistence : delegates
+
+insight_agent --> kg : stores insights
+persistence --> kg : persists entities
+
+@enduml

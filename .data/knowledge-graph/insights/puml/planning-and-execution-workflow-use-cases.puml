@@ -1,0 +1,85 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Developer" as dev
+actor "MCP Client" as mcp
+actor "Scheduler" as sched <<system>>
+actor "LLM Provider" as llm <<system>>
+actor "Knowledge Graph" as kg <<system>>
+
+rectangle "Planning and Execution Workflow" {
+
+  rectangle "Workflow Triggering" {
+    usecase "Invoke execute_workflow\n(MCP Tool)" as UC_INVOKE
+    usecase "Trigger Incremental\nAnalysis" as UC_INCR
+    usecase "Run Wave Analysis" as UC_WAVE
+    usecase "Run Batch Analysis" as UC_BATCH
+  }
+
+  rectangle "Analysis Pipeline" {
+    usecase "Index Codebase\n(code-graph-rag)" as UC_INDEX
+    usecase "Observe Session\nActivity" as UC_OBS
+    usecase "Classify Entities\n(Ontology)" as UC_CLASSIFY
+    usecase "Generate Insights" as UC_INSIGHT
+    usecase "Detect Patterns" as UC_PATTERN
+  }
+
+  rectangle "Knowledge Persistence" {
+    usecase "Persist Entities\nto Graph DB" as UC_PERSIST
+    usecase "Deduplicate\nEntities" as UC_DEDUP
+    usecase "Merge & Predict\nRelationships" as UC_MERGE
+    usecase "Generate Embeddings" as UC_EMBED
+  }
+
+  rectangle "Workflow Control" {
+    usecase "Monitor Progress\n(SSE Stream)" as UC_MONITOR
+    usecase "Step Through\nDebug Mode" as UC_DEBUG
+    usecase "Reset Checkpoint" as UC_RESET
+    usecase "Refresh Stale\nEntities" as UC_REFRESH
+  }
+
+}
+
+dev --> UC_INVOKE
+dev --> UC_DEBUG
+dev --> UC_RESET
+dev --> UC_REFRESH
+dev --> UC_MONITOR
+
+mcp --> UC_INVOKE
+mcp --> UC_INCR
+
+sched --> UC_INCR
+
+UC_INVOKE ..> UC_WAVE : <<include>>
+UC_INVOKE ..> UC_BATCH : <<include>>
+
+UC_WAVE ..> UC_INDEX : <<include>>
+UC_WAVE ..> UC_OBS : <<include>>
+UC_WAVE ..> UC_CLASSIFY : <<include>>
+UC_WAVE ..> UC_INSIGHT : <<include>>
+UC_WAVE ..> UC_PATTERN : <<include>>
+UC_WAVE ..> UC_PERSIST : <<include>>
+
+UC_INCR ..> UC_WAVE : <<extend>>
+
+UC_PERSIST ..> UC_DEDUP : <<include>>
+UC_PERSIST ..> UC_MERGE : <<include>>
+UC_PERSIST ..> UC_EMBED : <<include>>
+
+UC_DEBUG ..> UC_WAVE : <<extend>>
+
+UC_CLASSIFY --> llm
+UC_INSIGHT --> llm
+UC_PATTERN --> llm
+
+UC_PERSIST --> kg
+UC_DEDUP --> kg
+UC_MERGE --> kg
+UC_EMBED --> kg
+
+UC_MONITOR --> sched : notifies
+
+@enduml
