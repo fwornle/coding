@@ -51,7 +51,6 @@ The architecture consists of several layers:
 - **Coding Session Layer**: Agent-agnostic interface (Claude Code, Copilot, Cursor, etc.)
 - **Unified Inference Engine**: Multi-provider LLM routing with circuit breaker and budget enforcement
 - **Knowledge Management**: Real-time extraction, retrieval, concept abstraction, temporal decay
-- **Trajectory Tracking**: Intent classification and trajectory state analysis
 - **Caching Layer**: Agent-agnostic cache with file/HTTP/MCP backends
 - **Database Layer**: Dual-database (Qdrant for vectors, SQLite for analytics)
 
@@ -89,8 +88,7 @@ The system is built around several key components:
 - `ConceptAbstractionAgent` - Pattern generalization (3+ instances)
 - `TemporalDecayTracker` - Knowledge aging and freshness management
 
-**Trajectory & Caching**:
-- `RealTimeTrajectoryAnalyzer` - Intent classification and trajectory tracking
+**Caching & Storage**:
 - `AgentAgnosticCache` - Universal caching (file/HTTP/MCP backends)
 - `DatabaseManager` - Dual-database coordination (Qdrant + SQLite)
 - `EmbeddingGenerator` - Vector embedding generation (384-dim/1536-dim)
@@ -241,7 +239,7 @@ The system operates with:
 
 **Qdrant (Optional)**:
 - Host: localhost:6333
-- Collections: `knowledge_patterns` (1536-dim), `knowledge_patterns_small` (384-dim), `trajectory_analysis` (384-dim), `session_memory` (384-dim)
+- Collections: `knowledge_patterns` (1536-dim), `knowledge_patterns_small` (384-dim), `session_memory` (384-dim)
 - Without Qdrant: System works but no semantic search
 
 **SQLite (Required)**:
@@ -417,11 +415,10 @@ const system = new KnowledgeLearningSystem({
 
 The diagram above shows the complete flow of real-time knowledge extraction, including:
 1. **Exchange Processing**: Developer interacts with coding agent
-2. **Intent Classification**: Trajectory analyzer classifies developer intent
-3. **Budget Check**: Budget tracker verifies cost allowance
-4. **Sensitivity Detection**: Classifier routes sensitive data to local models
-5. **Knowledge Extraction**: Buffered exchanges are processed and stored
-6. **Budget Fallback**: Automatic fallback to local models when budget exceeded
+2. **Budget Check**: Budget tracker verifies cost allowance
+3. **Sensitivity Detection**: Classifier routes sensitive data to local models
+4. **Knowledge Extraction**: Buffered exchanges are processed and stored
+5. **Budget Fallback**: Automatic fallback to local models when budget exceeded
 
 ```javascript
 import { StreamingKnowledgeExtractor } from './src/knowledge-management/StreamingKnowledgeExtractor.js';
@@ -486,43 +483,7 @@ results.forEach(result => {
 });
 ```
 
-### Example 3: Trajectory Tracking
-
-```javascript
-import { RealTimeTrajectoryAnalyzer } from './src/trajectory/RealTimeTrajectoryAnalyzer.js';
-
-const analyzer = new RealTimeTrajectoryAnalyzer({
-  inferenceEngine,
-  historyService
-});
-
-// Analyze coding trajectory
-const state = await analyzer.analyzeState({
-  user: 'I need to fix this authentication bug',
-  assistant: 'Let me help you debug the auth flow'
-});
-
-console.log({
-  intent: state.intent,     // 'debugging'
-  state: state.state,       // 'implementing'
-  goal: state.goal,         // 'Fix authentication bug'
-  confidence: state.confidence
-});
-
-// Get trajectory analytics
-const analytics = await analyzer.getAnalytics({
-  sessionId: 'session-123',
-  timeRange: { start: Date.now() - 86400000, end: Date.now() }
-});
-
-console.log({
-  intentDistribution: analytics.intentCounts,
-  averageTimeInState: analytics.averageTimePerState,
-  mostCommonIntent: analytics.dominantIntent
-});
-```
-
-### Example 4: Concept Abstraction
+### Example 3: Concept Abstraction
 
 ```javascript
 import { ConceptAbstractionAgent } from './src/knowledge-management/ConceptAbstractionAgent.js';
@@ -547,7 +508,7 @@ concepts.forEach(concept => {
 });
 ```
 
-### Example 5: Budget-Aware Operations
+### Example 4: Budget-Aware Operations
 
 ```javascript
 import { BudgetTracker } from './src/inference/BudgetTracker.js';
