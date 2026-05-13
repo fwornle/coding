@@ -1687,19 +1687,19 @@ class CombinedStatusLine {
         parts.push('[🏥❌]'); // Critical - check dashboard
         overallColor = 'red';
       } else if (!gcmHealthy) {
-        parts.push('[🏥⚠️]'); // GCM unhealthy (independent of verifier)
+        parts.push('[🏥🟡]'); // GCM unhealthy (independent of verifier)
         if (overallColor === 'green') overallColor = 'yellow';
       } else if (verifierHealthy || violationCount === 0) {
         parts.push('[🏥✅]'); // All healthy (GCM + services)
       } else {
-        parts.push('[🏥⚠️]'); // Non-accepted violations
+        parts.push('[🏥🟡]'); // Non-accepted violations
         if (overallColor === 'green') overallColor = 'yellow';
       }
     } else if (healthVerifier && healthVerifier.status === 'stale') {
       parts.push('[🏥⏰]'); // Stale
       if (overallColor === 'green') overallColor = 'yellow';
     } else if (!gcmHealthy) {
-      parts.push('[🏥⚠️]'); // GCM unhealthy
+      parts.push('[🏥🟡]'); // GCM unhealthy
       if (overallColor === 'green') overallColor = 'yellow';
     } else if (healthVerifier && healthVerifier.status === 'error') {
       parts.push('[🏥❌]'); // Error
@@ -1755,7 +1755,7 @@ class CombinedStatusLine {
       parts.push('[LSL🔴]');
       overallColor = 'red';
     } else if (lslStatus === 'stale') {
-      parts.push('[LSL⚠️]');
+      parts.push('[LSL🟡]');
       if (overallColor === 'green') overallColor = 'yellow';
     }
 
@@ -1771,13 +1771,13 @@ class CombinedStatusLine {
       // Build constraint section: shield + score + optional violations
       let constraintPart = `[🔒 ${score}`;
       if (violationsCount > 0) {
-        constraintPart += ` ⚠️ ${violationsCount}`;
+        constraintPart += ` 🟡 ${violationsCount}`;
         overallColor = 'yellow';
       }
       constraintPart += `]`;
       parts.push(constraintPart);
     } else if (constraint.status === 'degraded') {
-      parts.push('[🔒 ⚠️]');
+      parts.push('[🔒 🟡]');
       overallColor = 'yellow';
     } else {
       parts.push('[🔒 ❌]');
@@ -1797,7 +1797,7 @@ class CombinedStatusLine {
         if (!userActive) {
           parts.push('[📚⚫]');
         } else {
-          parts.push('[📚⚠️]');
+          parts.push('[📚🟡]');
           if (overallColor === 'green') overallColor = 'yellow';
         }
         break;
@@ -1830,8 +1830,8 @@ class CombinedStatusLine {
     //
     // COLLISION NOTE (PATTERNS.md anomaly #1): the UKB workflow indicator
     // below ALSO opens with `[🧠`. We coexist by suffix shape — proxy
-    // emits a single status emoji ([🧠✅] / [🧠⚠️] / [🧠🚫] / [🧠🔇] /
-    // [🧠❓] / [🧠❌]); UKB emits an N+icon counter form ([🧠1⏳2⚠️]).
+    // emits a single status emoji ([🧠✅] / [🧠🟡] / [🧠🚫] / [🧠🔇] /
+    // [🧠❓] / [🧠❌]); UKB emits an N+icon counter form ([🧠1⏳2🟡]).
     // Visually distinguishable.
     switch (proxy?.status) {
       case 'healthy':
@@ -1843,7 +1843,7 @@ class CombinedStatusLine {
         if (!userActive) {
           parts.push('[🧠⚫]');
         } else {
-          parts.push('[🧠⚠️]');
+          parts.push('[🧠🟡]');
           if (overallColor === 'green') overallColor = 'yellow';
         }
         break;
@@ -1878,7 +1878,7 @@ class CombinedStatusLine {
         ukbPart += `${ukbStatus.running}⏳`;
       }
       if (ukbStatus.stale > 0) {
-        ukbPart += `${ukbStatus.stale}⚠️`;
+        ukbPart += `${ukbStatus.stale}🟡`;
         if (overallColor === 'green') overallColor = 'yellow';
       }
       if (ukbStatus.frozen > 0) {

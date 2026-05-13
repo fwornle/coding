@@ -153,7 +153,7 @@ try {
 // render until the next background refresh. The width suffix on the cache key only
 // works if the borrow path respects it.
 // Cache TTL constants. Dropped from 60s to 30s so idle-state transitions
-// (📚⚠️ ↔ 📚⚫ when a Claude session resumes) recover within ~30s instead
+// (📚🟡 ↔ 📚⚫ when a Claude session resumes) recover within ~30s instead
 // of up to a full minute. The 10s background-refresh threshold is half the
 // TTL so we serve fresh content most of the time without spawning every
 // status-interval tick.
