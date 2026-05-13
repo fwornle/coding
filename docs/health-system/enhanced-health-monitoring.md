@@ -343,14 +343,14 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 
 ### Current Display
 ```
-[C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] [🏥✅] 📋17-18
+[C🟢 UT🟤] [🔒 67% 🔍EX] [📚✅] [🏥✅] 📋17-18
 ```
 
 ### Component Breakdown
 
 | Component | Icon | Description | Example |
 |-----------|------|-------------|---------|
-| Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons | C=coding (active), UT=ui-template (fading) |
+| Active Sessions | `[C🟢 UT🟤]` | Project abbreviations with activity icons | C=coding (active), UT=ui-template (fading) |
 | Constraint Compliance | `🔒 67%` | Code quality compliance | 67% compliance |
 | Knowledge System | `[📚✅]` | Knowledge extraction status | ✅=healthy, ⚠️=issues |
 | Unified Health | `[🏥✅]` | GCM + Health Verifier + Enforcement | ✅=all healthy |
@@ -363,9 +363,8 @@ Sessions use a graduated color scheme based on time since last activity:
 | Icon | Status | Time Since Activity | Display |
 |------|--------|---------------------|---------|
 | 🟢 | Active | < 5 minutes | Shown |
-| 🌲 | Cooling | 5 - 15 minutes | Shown |
-| 🫒 | Fading | 15 min - 1 hour | Shown |
-| 🪨 | Dormant | 1 - 6 hours | Shown |
+| 🟠 | Cooling | 5 - 30 minutes | Shown |
+| 🟤 | Fading | 30 min - 6 hours | Shown |
 | ⚫ | Inactive | 6 - 24 hours | Shown |
 | 💤 | Sleeping | > 24 hours | **Hidden** |
 

@@ -288,18 +288,18 @@ The status line appears automatically in Claude Code:
 
 **Native Mode:**
 ```
-[C🟢 UT🫒] [🔒 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
+[C🟢 UT🟤] [🔒 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:✅] [C🟢 UT🫒] [🔒 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
+[🐳] [🐳MCP:✅] [C🟢 UT🟤] [🔒 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
 **Components:**
 - `[🐳]` - Docker mode indicator (only shown when running in Docker mode)
 - `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, CGR=Code Graph RAG
-- `[C🟢 UT🫒]` - Active sessions with activity icons (all sessions shown, 💤 for sleeping)
+- `[C🟢 UT🟤]` - Active sessions with activity icons (all sessions shown, 💤 for sleeping)
 - `[🔒 67%]` - Constraint compliance percentage (with optional `⚠️ N` violations sub-segment when non-zero)
 - `[📚✅]` - Knowledge system status (icons only, no counts)
 - `[🏥✅]` - Unified health (GCM + Health Verifier + Enforcement)

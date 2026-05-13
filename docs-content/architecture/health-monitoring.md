@@ -99,7 +99,7 @@ The `start` daemon subcommand was removed when the coordinator took over lifecyc
 
 - Pulls `/health/state` once per render.
 - Maps `lsl_by_project[*]` rollup → 3-state (healthy/degraded/stopped).
-- For each `healthy` project, stats the corresponding `lsl[*].transcriptPath` mtime to compute user-activity age and bucket into the lifecycle (🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤).
+- For each `healthy` project, stats the corresponding `lsl[*].transcriptPath` mtime to compute user-activity age and bucket into the lifecycle (🟢 → 🟠 → 🟤 → ⚫ → 💤).
 - Synthesizes "verifier-shape" fields for the `[🏥...]` badge from coordinator services + databases + container healthcheck — no `.health/verification-status.json` read.
 
 ### Dashboard (`integrations/system-health-dashboard`)
@@ -122,9 +122,8 @@ The graduated cooling icons in the statusline come from per-project transcript m
 | Icon | Status | Time since last activity |
 |------|--------|--------------------------|
 | 🟢 | Active | < 5 min |
-| 🌲 | Cooling | 5 – 15 min |
-| 🫒 | Fading | 15 min – 1 h |
-| 🪨 | Dormant | 1 – 6 h |
+| 🟠 | Cooling | 5 – 30 min |
+| 🟤 | Fading | 30 min – 6 h |
 | ⚫ | Inactive | 6 – 24 h |
 | 💤 | Sleeping | ≥ 24 h |
 

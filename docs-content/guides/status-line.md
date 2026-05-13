@@ -50,18 +50,20 @@ The "time since last activity" signal is the project's Claude `.jsonl` transcrip
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
 | 🟢 | Active | < 5 minutes | Active session with recent activity |
-| 🌲 | Cooling | 5 - 15 minutes | Session cooling down |
-| 🫒 | Fading | 15 min - 1 hour | Session fading, still tracked |
-| 🪨 | Dormant | 1 - 6 hours | Session dormant but alive |
+| 🟠 | Cooling | 5 - 30 minutes | Session cooling down |
+| 🟤 | Fading | 30 min - 6 hours | Session fading, still tracked |
 | ⚫ | Inactive | 6 - 24 hours | Session inactive but tracked |
 | 💤 | Sleeping | > 24 hours | Long-term dormant session |
 | ❌ | Error | Any | Health check failed or service crash |
 
-**Visual progression:**
+**Visual progression:** circles fade green → orange → brown → black, then 💤 once the session has been idle over a day.
 ```
-🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → 💤 Sleeping
-   <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
+🟢 Active → 🟠 Cooling → 🟤 Fading → ⚫ Inactive → 💤 Sleeping
+   <5min      5-30min     30m-6hr     6-24hr       >24hr
 ```
+
+!!! note "Color choice rationale"
+    🟡 (yellow) and 🔴 (red) are intentionally omitted from the lifecycle — they are reserved as health-state indicators (warning / critical) in the `[🏥]`, `[LSL]`, `[📚]` and `[🧠]` badges. Lifecycle icons must be distinguishable from health icons at a glance, so the lifecycle uses green → orange → brown → black exclusively.
 
 !!! info "Agent Age Cap"
     When an agent process (Claude, Copilot, OpenCode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant — the session starts green and naturally progresses through the cooling scheme based on how long the current session has been idle.
@@ -185,7 +187,7 @@ The recurring trailing-digit residue at the right edge (`07:538`, `12:411`, `07:
 **Full refresh:**
 
 1. **Shared coordinator probe**: a single memoized `fetch(:3034/health/state)` per render (with one retry @ 1.5 s) feeds five `getXxxStatus()` methods — replaces the previous pattern of 5 independent `execSync(curl)` calls per render
-2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🌲 / 🫒 / 🪨 / ⚫ / 💤). A fresh ETM heartbeat (< 5 min) promotes a non-Active band to 🟢 (captures long-running agent turns and non-Claude sessions).
+2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🟠 / 🟤 / ⚫ / 💤). A fresh ETM heartbeat (< 5 min) promotes a non-Active band to 🟢 (captures long-running agent turns and non-Claude sessions).
 3. **Constraint compliance**: separate call to constraint-monitor API (port 3031)
 4. **Render**: assemble parts, pad to paneWidth cells via `leftPadToStableCellWidth()` using VS16-aware `visibleCellWidth()` — see [Right-edge stability](#right-edge-stability-vs16-aware-cell-counting) above
 5. **Cache write**: save to `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt`
@@ -229,7 +231,7 @@ The supervision architecture includes guards to prevent runaway process spawning
 - Coordinator unreachable → Offline (💤)
 
 **Session States** (graduated cooling scheme):
-- Driven by `transcriptPath` mtime in coordinator state, bucketed: 🟢 (<5 m) → 🌲 (<15 m) → 🫒 (<1 h) → 🪨 (<6 h) → ⚫ (<24 h) → 💤 (≥24 h)
+- Driven by `transcriptPath` mtime in coordinator state, bucketed: 🟢 (<5 m) → 🟠 (<30 m) → 🟤 (<6 h) → ⚫ (<24 h) → 💤 (≥24 h)
 - **Heartbeat-promotion override:** if `lsl[*].lastBeat` is < 5 min, any non-🟢 band is overridden to 🟢. Captures long-running agent turns (one prompt that takes >5 min) and non-Claude sessions whose `transcriptPath` is not a real file
 - Sessions only removed when the project's ETM stops heartbeating, never hidden while alive
 
@@ -314,7 +316,7 @@ The renderer reads a small set of environment variables and the coordinator endp
 Every 15 seconds, the statusline-health-monitor broadcasts status to all Claude session terminals via ANSI escape codes:
 
 ```
-Terminal Tab: "C🟢 | UT🫒 CA🌲"
+Terminal Tab: "C🟢 | UT🟤 CA🟠"
               ↑          ↑
         Current     Other active sessions
         project     (all sessions shown)

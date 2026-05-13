@@ -6,7 +6,7 @@
 > - The `[🏥...]` health badge reads live from the coordinator at `:3034/health/state`; the `.health/verification-status.json` file is no longer written.
 > - Per-pane LSL status comes from the coordinator's `lsl_by_project` rollup + `lsl[*].transcriptPath` mtime; the `.logs/statusline-health-status.txt` file is no longer written.
 > - The right edge is anchored with codepoint-floor padding (≥220 codepoints, after stripping zero-width tmux markup) plus a non-breaking-space terminator (U+00A0) to survive tmux's `#(shell-cmd)` trailing-whitespace strip.
-> - The graduated cooling lifecycle (🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤) is preserved and is now driven by `lsl[*].transcriptPath` mtime instead of in-memory monitor state.
+> - The graduated cooling lifecycle (🟢 → 🟠 → 🟤 → ⚫ → 💤) is preserved and is now driven by `lsl[*].transcriptPath` mtime instead of in-memory monitor state.
 > - `[program:health-verifier]` and `[program:browser-access]` supervisord blocks are gone.
 
 Real-time visual indicators of system health and development activity, rendered in the **tmux status bar** for all coding agents (Claude Code, CoPilot, and future agents).
@@ -32,12 +32,12 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Native Mode:**
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [C🟢 UT🟤] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Reading the Status Line
@@ -48,7 +48,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
 - `[🐳MCP:SA✅CM✅CGR✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
-- `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
+- `[C🟢 UT🟤]` - **Active Sessions**: Project abbreviations with activity icons
 - `🔒 67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `⚠️ N` violations sub-segment when non-zero)
 - `[📚✅]` - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
@@ -168,16 +168,15 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
 | 🟢 | Active | < 5 minutes | Active session with recent activity |
-| 🌲 | Cooling | 5 - 15 minutes | Session cooling down |
-| 🫒 | Fading | 15 min - 1 hour | Session fading, still tracked |
-| 🪨 | Dormant | 1 - 6 hours | Session dormant but alive |
+| 🟠 | Cooling | 5 - 30 minutes | Session cooling down |
+| 🟤 | Fading | 30 min - 6 hours | Session fading, still tracked |
 | ⚫ | Inactive | 6 - 24 hours | Session inactive but tracked |
 | 💤 | Sleeping | > 24 hours | Long-term dormant session |
 | ❌ | Error | Any | Health check failed or service crash |
 
 **Session Lifecycle**:
 ```
-🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → 💤 Sleeping
+🟢 Active → 🟠 Cooling → 🟤 Fading → ⚫ Inactive → 💤 Sleeping
    <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
 ```
 
@@ -258,8 +257,8 @@ The system uses multiple discovery methods to find all active sessions:
 
 **Example**:
 - `[C🟢 UT🟢]` - coding and ui-template both active
-- `[C🟢 CA🌲]` - coding active, curriculum-alignment cooling
-- `[C🟢 UT🫒 CA🪨]` - coding active, ui-template fading, curriculum-alignment dormant
+- `[C🟢 CA🟠]` - coding active, curriculum-alignment cooling
+- `[C🟢 UT🟤 CA🟤]` - coding active, ui-template fading, curriculum-alignment dormant
 - Sessions only removed when agent process exits (never hidden while running)
 
 ### Smart Abbreviation Engine
@@ -292,7 +291,7 @@ The status line displays information for **multiple active coding agent sessions
 
 **Multiple Active Sessions**:
 ```
-[🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒 CA🌲] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤 CA🟠] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 Where:
@@ -366,9 +365,9 @@ Where:
 
 **Session Activity States** (for project sessions - graduated cooling scheme):
 - **Active** (🟢) - Currently active (< 5 min)
-- **Cooling** (🌲) - Recently active (5-15 min)
-- **Fading** (🫒) - Activity fading (15 min - 1 hr)
-- **Dormant** (🪨) - Dormant but trackable (1-6 hr)
+- **Cooling** (🟠) - Recently active (5-30 min)
+- **Fading** (🟤) - Activity fading (30 min - 6 hr)
+
 - **Inactive** (⚫) - Session idle (6-24 hr) - last visible state
 - **Sleeping** (💤) - Long-term dormant (> 24 hr) - still shown
 
@@ -376,7 +375,7 @@ Where:
 - Health check success → Healthy (✅)
 - GCM or Health Verifier issues → Warning (⚠️)
 - Critical failures → Critical (❌)
-- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤
+- Time passage → 🟢 → 🟠 → 🟤 → ⚫ → 💤
 - Sessions only removed when agent exits, never hidden while running
 
 ### Status Display States
@@ -443,7 +442,7 @@ node scripts/status-line-fast.cjs
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🔒 67% 🔍EX] [📚✅] 📋17-18
+# [🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤] [🔒 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Troubleshooting
@@ -571,7 +570,7 @@ The status line system now includes **automatic terminal title updates** that wo
 Every 15 seconds, the statusline-health-monitor broadcasts status to all Claude session terminals via ANSI escape codes:
 
 ```
-Terminal Tab: "C🟢 | UT🫒 CA🌲"
+Terminal Tab: "C🟢 | UT🟤 CA🟠"
               ↑          ↑
         Current     Other active sessions
         project     (sleeping sessions hidden)

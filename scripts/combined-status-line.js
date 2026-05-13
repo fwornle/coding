@@ -839,20 +839,29 @@ class CombinedStatusLine {
 
       // Map coordinator's lsl_by_project rollup → sessions map keyed by
       // full project name. For healthy ETMs, surface the graduated session
-      // lifecycle icons (🟢🌲🫒🪨⚫💤) by stat-ing each entry's transcript
+      // lifecycle icons (🟢🟠🟤⚫💤) by stat-ing each entry's transcript
       // file and bucketing the age. The Phase 33 coordinator only exposes
       // a 3-state rollup (healthy/degraded/stopped); the per-project
       // user-activity age (the signal cooling-down depends on) is computed
       // here client-side from `lsl[*].transcriptPath` mtime.
       //
-      // Lifecycle thresholds match docs/health-system/status-line.md:
-      //   <5m  🟢  Active
-      //   <15m 🌲  Cooling
-      //   <1h  🫒  Fading
-      //   <6h  🪨  Dormant
-      //   <24h ⚫  Inactive
-      //   ≥24h 💤  Sleeping
-      // Non-healthy statuses bypass the lifecycle and surface as 🟡 / 🔴.
+      // Lifecycle thresholds (5 bands; match docs/health-system/status-line.md):
+      //   <5m   🟢  Active   (bright green)
+      //   <30m  🟠  Cooling  (orange)
+      //   <6h   🟤  Fading   (brown)
+      //   <24h  ⚫  Inactive (black)
+      //   ≥24h  💤  Sleeping
+      // Earlier 🌲/🫒/🪨 icons were retired: 🫒 (U+1FAD2) and 🪨 (U+1FAA8)
+      // are Unicode 13.0 (2020) — too new for most tmux wcwidth tables, so
+      // tmux counted them as 1 cell while VS Code's xterm.js / iTerm2
+      // rendered them as 2 cells, leaving recurring trailing residue at
+      // the right edge of status-right. The replacement set sticks to
+      // colored circles (U+1F7E0-U+1F7E4, Unicode 12.0) paired with
+      // explicit codepoint-widths overrides in ~/.tmux.conf so tmux and
+      // the terminal renderer agree on 2 cells per icon. 🟡 and 🔴 are
+      // intentionally OMITTED from this lifecycle ladder — they are
+      // reserved for unhealthy ETM states (warning / critical) which
+      // bypass the lifecycle path entirely.
       const rollup = state.lsl_by_project || {};
       const lslEntries = Object.values(state.lsl || {});
       const agenticDir = dirname(process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir);
@@ -908,9 +917,8 @@ class CombinedStatusLine {
         // can tell at a glance that this session has no observable signal.
         if (ageMs === null) return '⚫';
         if (ageMs < 5 * 60_000) return '🟢';
-        if (ageMs < 15 * 60_000) return '🌲';
-        if (ageMs < 60 * 60_000) return '🫒';
-        if (ageMs < 6 * 60 * 60_000) return '🪨';
+        if (ageMs < 30 * 60_000) return '🟠';
+        if (ageMs < 6 * 60 * 60_000) return '🟤';
         if (ageMs < 24 * 60 * 60_000) return '⚫';
         return '💤';
       };
@@ -953,7 +961,7 @@ class CombinedStatusLine {
         } else {
           icon = '🔴';
         }
-        // All graduated activity icons (🟢🌲🫒🪨⚫💤) reflect a healthy ETM
+        // All graduated activity icons (🟢🟠🟤⚫💤) reflect a healthy ETM
         // with varying user-activity age. Only 🟡 / 🔴 are unhealthy.
         const sessionStatus = icon === '🟡' ? 'warning'
                             : icon === '🔴' ? 'unhealthy'

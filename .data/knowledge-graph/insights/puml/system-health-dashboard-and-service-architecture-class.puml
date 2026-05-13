@@ -1,0 +1,146 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Frontend Layer" {
+  class HealthDashboard <<service>> {
+    -port: 3032
+    -host: localhost
+    +renderServiceStatus(): void
+    +renderWorkflowProgress(): void
+    +renderConstraintViolations(): void
+  }
+
+  class ConstraintDashboard <<service>> {
+    -port: 3030
+    -host: localhost
+    +renderViolations(): void
+    +renderComplianceMetrics(): void
+  }
+
+  class VKBViewer <<service>> {
+    -port: 8080
+    -host: localhost
+    +renderKnowledgeGraph(): void
+    +displayEntities(): void
+    +displayRelations(): void
+  }
+}
+
+package "Backend API Layer" {
+  class HealthAPI <<service>> {
+    -port: 3033
+    -host: localhost
+    +getServiceHealth(): HealthStatus
+    +getWorkflowStatus(): WorkflowStatus
+    +getLLMMode(): string
+    +postMockLLM(enabled: boolean): void
+    +postSingleStepMode(enabled: boolean): void
+  }
+
+  class ConstraintDashboardAPI <<service>> {
+    -port: 3031
+    -host: localhost
+    -entrypoint: dashboard-server.js
+    +getViolations(): Violation[]
+    +getConstraintStatus(): ConstraintStatus
+  }
+
+  class SemanticAnalysisSSE <<service>> {
+    -port: 3848
+    -host: localhost
+    +executeWorkflow(name: string): WorkflowId
+    +streamProgress(): SSEStream
+    +getHealth(): HealthStatus
+  }
+}
+
+package "Core Services" {
+  class SemanticAnalysisMCP <<service>> {
+    -containerName: coding-services
+    +analyzeCode(path: string): AnalysisResult
+    +executeWorkflow(params: WorkflowParams): void
+    +queryCodeGraph(query: string): GraphResult
+    +generateDocumentation(): Documentation
+  }
+
+  class ConstraintMonitorMCP <<service>> {
+    -containerName: coding-services
+    +checkConstraints(content: string): Violation[]
+    +getConstraintStatus(): ConstraintStatus
+    +updateConstraints(rules: Rule[]): void
+  }
+
+  class CodeGraphRAG <<service>> {
+    -containerName: coding-services
+    +indexRepository(): void
+    +queryGraph(query: string): QueryResult
+    +getCodeSnippet(name: string): Snippet
+    +comprehensiveAnalysis(name: string): Analysis
+  }
+}
+
+package "Data Layer" {
+  class KnowledgeGraph <<file>> {
+    -storagePath: .data/knowledge-graph/
+    -engine: Graphology+LevelDB
+    +getEntities(): KGEntity[]
+    +getRelations(): KGRelation[]
+    +mergeNodeAttributes(): void
+  }
+
+  class WorkflowProgress <<file>> {
+    -filePath: .data/workflow-progress.json
+    -status: string
+    -currentStep: string
+    -mockLLM: boolean
+    -singleStepMode: boolean
+    +read(): ProgressState
+    +write(state: ProgressState): void
+  }
+
+  class ObservationExport <<file>> {
+    -basePath: .data/observation-export/
+    +readDigests(): Digest[]
+    +readInsights(): Insight[]
+    +readObservations(): Observation[]
+    +readMetadata(): Metadata
+  }
+}
+
+package "Infrastructure" {
+  class DockerCompose <<service>> {
+    -composeFile: docker/docker-compose.yml
+    -primaryService: coding-services
+    +build(service: string): void
+    +up(service: string): void
+    +restart(service: string): void
+  }
+
+  class Supervisor <<service>> {
+    -group: web-services
+    +restart(process: string): void
+    +status(): ProcessStatus[]
+  }
+}
+
+' Relationships
+HealthDashboard ..> HealthAPI : queries :3033
+ConstraintDashboard ..> ConstraintDashboardAPI : queries :3031
+VKBViewer ..> KnowledgeGraph : reads
+
+HealthAPI --o SemanticAnalysisMCP : monitors
+HealthAPI --o ConstraintMonitorMCP : monitors
+HealthAPI --o CodeGraphRAG : monitors
+
+SemanticAnalysisSSE --|> HealthAPI : extends
+SemanticAnalysisMCP ..> SemanticAnalysisSSE : drives workflows
+SemanticAnalysisMCP ..> KnowledgeGraph : persists
+SemanticAnalysisMCP ..> WorkflowProgress : tracks
+SemanticAnalysisMCP ..> ObservationExport : reads
+
+ConstraintMonitorMCP ..> ConstraintDashboardAPI : feeds
+
+DockerCompose --* coding-services : manages
+Supervisor ..> DockerCompose : restarts via
+
+@enduml

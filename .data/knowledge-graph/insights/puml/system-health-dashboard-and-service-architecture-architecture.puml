@@ -1,0 +1,39 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "User Interfaces" {
+  component "System Health Dashboard" as dashboard <<core>>
+  component "VKB Graph Viewer" as vkb <<core>>
+  component "Constraint Dashboard" as constraintUI <<core>>
+}
+
+package "Backend Services" {
+  component "Health API" as healthApi <<api>>
+  component "Dashboard Server" as dashServer <<api>>
+  component "Constraint API" as constraintApi <<api>>
+  component "Semantic Analysis SSE" as sseSrv <<core>>
+}
+
+package "Knowledge & Analysis" {
+  component "Semantic Analysis MCP" as semMcp <<agent>>
+  component "Constraint Monitor MCP" as conMcp <<agent>>
+  database "Knowledge Graph\n(Graphology + LevelDB)" as kg <<storage>>
+}
+
+cloud "Claude / LLM" as llm <<external>>
+
+dashboard --> healthApi : "port 3033"
+dashboard --> dashServer : "port 3032"
+constraintUI --> constraintApi : "port 3031"
+vkb --> kg : "port 8080"
+
+sseSrv --> semMcp : triggers workflow
+healthApi --> sseSrv : "port 3848"
+
+semMcp --> kg : reads / writes
+conMcp --> kg : reads violations
+
+semMcp --> llm : LLM calls
+dashboard ..> sseSrv : "SSE workflow status"
+
+@enduml

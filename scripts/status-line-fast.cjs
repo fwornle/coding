@@ -68,16 +68,23 @@ function reunderline(text, targetAbbrev) {
 // combined-status-line.js:ageToActivityIcon. Health icons (🟡 / 🔴) are
 // excluded — those reflect ETM health, not idle age, and must come from
 // the full CSL.
-const LIFECYCLE_ICONS = ['🟢', '🌲', '🫒', '🪨', '⚫', '💤'];
+//
+// The icons fade green → orange → brown → black → 💤. 🟡 and 🔴 are
+// intentionally omitted: 🟡 is the warning indicator and 🔴 is the
+// critical indicator. Retired icons 🌲/🫒/🪨 had wcwidth mismatches
+// in tmux (🫒 U+1FAD2 and 🪨 U+1FAA8 are Unicode 13.0 — too new for
+// most tmux wcwidth tables; tmux counted them as 1 cell while VS
+// Code / iTerm rendered as 2, producing recurring right-edge
+// residue).
+const LIFECYCLE_ICONS = ['🟢', '🟠', '🟤', '⚫', '💤'];
 function ageToActivityIcon(ageMs) {
   // null age (no transcript anywhere) renders as Inactive ⚫, NOT Active 🟢.
   // Same reasoning as combined-status-line.js: under-promise activity rather
   // than mis-claim a stale session is Active.
   if (ageMs == null) return '⚫';
   if (ageMs < 5 * 60_000) return '🟢';
-  if (ageMs < 15 * 60_000) return '🌲';
-  if (ageMs < 60 * 60_000) return '🫒';
-  if (ageMs < 6 * 60 * 60_000) return '🪨';
+  if (ageMs < 30 * 60_000) return '🟠';
+  if (ageMs < 6 * 60 * 60_000) return '🟤';
   if (ageMs < 24 * 60 * 60_000) return '⚫';
   return '💤';
 }
@@ -127,7 +134,7 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     // Mirror combined-status-line.js's heartbeat promotion: a fresh ETM
     // heartbeat (<5min) overrides a non-Active transcript-derived icon.
     // Without this, the fast-path would actively undo the CSL's
-    // promoted icon on every tmux tick — flipping 🟢 back to 🌲/🫒
+    // promoted icon on every tmux tick — flipping 🟢 back to 🟠/🟤
     // until the next 30s cache regen.
     if (newIcon !== '🟢' && hbTs > 0 && (now - hbTs) < 5 * 60_000) {
       newIcon = '🟢';
