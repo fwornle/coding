@@ -1828,7 +1828,7 @@ class CombinedStatusLine {
       // (U+1F7E1, EAW=Wide) AND adding the explicit codepoint-widths
       // override in ~/.tmux.conf, the cell count agrees across script,
       // tmux, and renderer — the spaces are no longer needed.
-      let constraintPart = `[🔒 ${score}`;
+      let constraintPart = `[🔒${score}`;
       if (violationsCount > 0) {
         constraintPart += `🟡${violationsCount}`;
         overallColor = 'yellow';

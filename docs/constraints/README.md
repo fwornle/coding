@@ -359,9 +359,9 @@ Edit `constraints.yaml` and set `enabled: false` for any constraint:
 - [LSL](../lsl/) - PostToolUse hooks log all constraint interactions
 - [Health System](../health-system/) - Monitors constraint monitor service health
 
-**Status Line Display**: `[🔒 {compliance}%]` — with an optional `🟡{N}` sub-segment when violations are non-zero.
+**Status Line Display**: `[🔒{compliance}%]` — with an optional `🟡{N}` sub-segment when violations are non-zero.
 
-Example: `[🔒 94%]` shows 94% constraint compliance; `[🔒 75%🟡4]` shows 75% with 4 active violations.
+Example: `[🔒94%]` shows 94% constraint compliance; `[🔒75%🟡4]` shows 75% with 4 active violations.
 
 ## See Also
 

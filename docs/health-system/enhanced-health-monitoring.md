@@ -343,7 +343,7 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 
 ### Current Display
 ```
-[C🟢 UT🟤] [🔒 67% 🔍EX] [📚✅] [🏥✅] 📋17-18
+[C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] [🏥✅] 📋17-18
 ```
 
 ### Component Breakdown
@@ -351,7 +351,7 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 | Component | Icon | Description | Example |
 |-----------|------|-------------|---------|
 | Active Sessions | `[C🟢 UT🟤]` | Project abbreviations with activity icons | C=coding (active), UT=ui-template (fading) |
-| Constraint Compliance | `🔒 67%` | Code quality compliance | 67% compliance |
+| Constraint Compliance | `🔒67%` | Code quality compliance | 67% compliance |
 | Knowledge System | `[📚✅]` | Knowledge extraction status | ✅=healthy, ⚠️=issues |
 | Unified Health | `[🏥✅]` | GCM + Health Verifier + Enforcement | ✅=all healthy |
 | LSL Time Window | `📋17-18` | Session time range | 17:00-18:00 |

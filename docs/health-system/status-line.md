@@ -32,24 +32,24 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Native Mode:**
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [C🟢 UT🟤] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Reading the Status Line
 
-**Format**: `[🐳] [🐳MCP:health] [🏥 health] [sessions] [🔒 compliance] [📚 knowledge] 📋time`
+**Format**: `[🐳] [🐳MCP:health] [🏥 health] [sessions] [🔒compliance] [📚 knowledge] 📋time`
 
 **Components**:
 - `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
 - `[🐳MCP:SA✅CM✅CGR✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
 - `[C🟢 UT🟤]` - **Active Sessions**: Project abbreviations with activity icons
-- `🔒 67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `🟡N` violations sub-segment when non-zero)
+- `🔒67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `🟡N` violations sub-segment when non-zero)
 - `[📚✅]` - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
@@ -286,12 +286,12 @@ The status line displays information for **multiple active coding agent sessions
 
 **Single Active Session**:
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢] [🔒67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Multiple Active Sessions**:
 ```
-[🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤 CA🟠] [🔒 67% 🔍EX] [📚✅] 📋17-18
+[🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤 CA🟠] [🔒67% 🔍EX] [📚✅] 📋17-18
 ```
 
 Where:
@@ -442,7 +442,7 @@ node scripts/status-line-fast.cjs
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤] [🔒 67% 🔍EX] [📚✅] 📋17-18
+# [🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Troubleshooting
