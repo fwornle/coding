@@ -135,8 +135,9 @@
         "endpoint": "http://localhost:12436/health",
         "timeout_ms": 3000,
         "description": "Observations API server (obs-api) - REST + SSE for live observation feed",
-        "auto_heal": false,
-        "auto_heal_note": "No host-side supervisor for obs-api in this environment; restart manually: nohup node scripts/observations-api-server.mjs &",
+        "auto_heal": true,
+        "auto_heal_action": "restart_obs_api",
+        "auto_heal_note": "Coordinator auto-restarts after 2+ consecutive unreachable probes (max 3 restarts, 10 min cooldown)",
         "expected_status": "required"
       },
       "enhanced_transcript_monitor": {

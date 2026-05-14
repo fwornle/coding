@@ -400,6 +400,15 @@ const OBS_API_URL = process.env.OBS_API_URL || 'http://localhost:12436';
 const OBS_FRESH_MS = 15 * 60 * 1000;     // 15 min — counts as fresh
 const OBS_STALL_MS = 6 * 60 * 60 * 1000; // 6 h — considered stalled
 
+// obs_api auto-heal — restart when unreachable for 2+ consecutive probes (~10s).
+// Simpler than the proxy FSM: no sliding window, just a consecutive-failure gate
+// with a max-restart cap to avoid infinite restart loops.
+const OBS_API_MAX_RESTARTS = 3;           // max restarts before cooldown
+const OBS_API_COOLDOWN_MS = 10 * 60_000;  // 10 min cooldown after max restarts
+let obsApiConsecutiveFailures = 0;
+let obsApiRestartCount = 0;
+let obsApiLastRestartAt = 0;
+
 // ----- Proxy supervision constants (Phase 34 D-01 / D-02 / D-06) -----
 const PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:12435';
 const PROXY_PROBE_INTERVAL_MS = 60_000;          // D-01: every 60s
@@ -480,6 +489,48 @@ async function pollKnowledgePipeline() {
     inflight: body.inflight,
     last_probe_end: probeEndedAt()
   };
+  evaluateObsApiAutoHeal();
+}
+
+/**
+ * obs_api auto-heal FSM — restart obs_api when unreachable.
+ * Called at the end of pollKnowledgePipeline.
+ */
+function evaluateObsApiAutoHeal() {
+  const rule = RULES?.rules?.services?.obs_api;
+  if (!rule || rule.auto_heal !== true) return;
+
+  const status = currentState.knowledge_pipeline?.status;
+  if (status !== 'unreachable') {
+    if (obsApiConsecutiveFailures > 0) {
+      log(`obs_api auto-heal -> healthy (recovered after ${obsApiConsecutiveFailures} failures, ${obsApiRestartCount} restarts)`, 'INFO');
+    }
+    obsApiConsecutiveFailures = 0;
+    return;
+  }
+
+  obsApiConsecutiveFailures++;
+
+  // Cooldown: too many restarts recently
+  const now = Date.now();
+  if (obsApiRestartCount >= OBS_API_MAX_RESTARTS && (now - obsApiLastRestartAt) < OBS_API_COOLDOWN_MS) {
+    log(`obs_api auto-heal cooldown — ${obsApiRestartCount} restarts, waiting ${Math.round((OBS_API_COOLDOWN_MS - (now - obsApiLastRestartAt)) / 1000)}s`, 'WARN');
+    return;
+  }
+  // Reset counter after cooldown window
+  if (obsApiRestartCount >= OBS_API_MAX_RESTARTS && (now - obsApiLastRestartAt) >= OBS_API_COOLDOWN_MS) {
+    obsApiRestartCount = 0;
+  }
+
+  // Gate: require 2+ consecutive failures (~10s) before restarting
+  if (obsApiConsecutiveFailures < 2) return;
+
+  obsApiRestartCount++;
+  obsApiLastRestartAt = now;
+  log(`obs_api auto-heal: dispatching restart_obs_api (consecutive_failures=${obsApiConsecutiveFailures}, restart_count=${obsApiRestartCount})`, 'INFO');
+  getRemediationDispatcher()
+    .then(d => d.executeAction('restart_obs_api', { reason: 'unreachable sustained' }))
+    .catch(err => log(`obs_api auto-heal failed: ${err.message}`, 'ERROR'));
 }
 
 /**

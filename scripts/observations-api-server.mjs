@@ -753,10 +753,14 @@ async function shutdown(signal) {
     if (_writer) {
       try { await _writer.close?.(); } catch { /* best effort */ }
     }
-    process.exit(0);
+    // SIGKILL ourselves to skip Node's native destructor teardown.
+    // process.exit(0) triggers the fastembed C++ cleanup path which hits a
+    // libc++ mutex bug ("mutex lock failed: Invalid argument") and crashes
+    // with a non-zero exit code.  SIGKILL bypasses all destructors cleanly.
+    process.kill(process.pid, 'SIGKILL');
   });
   // Hard exit if graceful shutdown stalls
-  setTimeout(() => process.exit(1), 25_000).unref();
+  setTimeout(() => process.kill(process.pid, 'SIGKILL'), 25_000).unref();
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
