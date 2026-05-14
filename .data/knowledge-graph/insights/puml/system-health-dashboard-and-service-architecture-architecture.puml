@@ -1,39 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "User Interfaces" {
-  component "System Health Dashboard" as dashboard <<core>>
-  component "VKB Graph Viewer" as vkb <<core>>
-  component "Constraint Dashboard" as constraintUI <<core>>
+top to bottom direction
+
+package "System Health Dashboard" {
+    component "Health Dashboard UI" as dashboardUI <<core>>
+    component "Metrics Collector" as metricsCollector <<core>>
+    component "Alert Manager" as alertManager <<core>>
 }
 
-package "Backend Services" {
-  component "Health API" as healthApi <<api>>
-  component "Dashboard Server" as dashServer <<api>>
-  component "Constraint API" as constraintApi <<api>>
-  component "Semantic Analysis SSE" as sseSrv <<core>>
+package "Semantic Analysis Infrastructure" {
+    component "Semantic Analyzer" as semanticAnalyzer <<core>>
+    component "Knowledge Manager" as knowledgeManager <<core>>
+    component "MCP Tools" as mcpTools <<api>>
 }
 
-package "Knowledge & Analysis" {
-  component "Semantic Analysis MCP" as semMcp <<agent>>
-  component "Constraint Monitor MCP" as conMcp <<agent>>
-  database "Knowledge Graph\n(Graphology + LevelDB)" as kg <<storage>>
+package "Storage Layer" {
+    database "Knowledge Graph" as knowledgeGraph <<storage>>
+    database "Metrics Store" as metricsStore <<storage>>
 }
 
-cloud "Claude / LLM" as llm <<external>>
+package "External Integrations" {
+    cloud "External Services" as externalServices <<external>>
+    component "Agent Orchestrator" as agentOrchestrator <<agent>>
+}
 
-dashboard --> healthApi : "port 3033"
-dashboard --> dashServer : "port 3032"
-constraintUI --> constraintApi : "port 3031"
-vkb --> kg : "port 8080"
-
-sseSrv --> semMcp : triggers workflow
-healthApi --> sseSrv : "port 3848"
-
-semMcp --> kg : reads / writes
-conMcp --> kg : reads violations
-
-semMcp --> llm : LLM calls
-dashboard ..> sseSrv : "SSE workflow status"
+dashboardUI --> metricsCollector : "collects"
+dashboardUI --> alertManager : "triggers"
+metricsCollector --> metricsStore : "persists"
+semanticAnalyzer --> knowledgeManager : "updates"
+knowledgeManager --> knowledgeGraph : "stores"
+mcpTools --> semanticAnalyzer : "feeds"
+agentOrchestrator --> mcpTools : "invokes"
+agentOrchestrator --> externalServices : "integrates"
+metricsCollector --> semanticAnalyzer : "monitors"
+alertManager --> agentOrchestrator : "notifies"
 
 @enduml

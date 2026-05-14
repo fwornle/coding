@@ -5,81 +5,64 @@ left to right direction
 
 actor "Developer" as dev
 actor "MCP Client" as mcp
-actor "Scheduler" as sched <<system>>
-actor "LLM Provider" as llm <<system>>
-actor "Knowledge Graph" as kg <<system>>
+actor "Scheduler" as scheduler
 
 rectangle "Planning and Execution Workflow" {
 
   rectangle "Workflow Triggering" {
-    usecase "Invoke execute_workflow\n(MCP Tool)" as UC_INVOKE
-    usecase "Trigger Incremental\nAnalysis" as UC_INCR
-    usecase "Run Wave Analysis" as UC_WAVE
-    usecase "Run Batch Analysis" as UC_BATCH
+    usecase "Execute Workflow\nvia MCP Tool" as UC1
+    usecase "Trigger Incremental\nAnalysis" as UC2
+    usecase "Invoke execute_workflow\nTool" as UC3
   }
 
-  rectangle "Analysis Pipeline" {
-    usecase "Index Codebase\n(code-graph-rag)" as UC_INDEX
-    usecase "Observe Session\nActivity" as UC_OBS
-    usecase "Classify Entities\n(Ontology)" as UC_CLASSIFY
-    usecase "Generate Insights" as UC_INSIGHT
-    usecase "Detect Patterns" as UC_PATTERN
+  rectangle "Planning Phase" {
+    usecase "Analyze Codebase\nStructure" as UC4
+    usecase "Generate Execution\nPlan" as UC5
+    usecase "Identify Semantic\nDependencies" as UC6
+    usecase "Prioritize Analysis\nTargets" as UC7
   }
 
-  rectangle "Knowledge Persistence" {
-    usecase "Persist Entities\nto Graph DB" as UC_PERSIST
-    usecase "Deduplicate\nEntities" as UC_DEDUP
-    usecase "Merge & Predict\nRelationships" as UC_MERGE
-    usecase "Generate Embeddings" as UC_EMBED
+  rectangle "Execution Phase" {
+    usecase "Run Semantic\nAnalysis" as UC8
+    usecase "Update Knowledge\nGraph" as UC9
+    usecase "Persist Analysis\nResults" as UC10
+    usecase "Manage Knowledge\nBase" as UC11
   }
 
-  rectangle "Workflow Control" {
-    usecase "Monitor Progress\n(SSE Stream)" as UC_MONITOR
-    usecase "Step Through\nDebug Mode" as UC_DEBUG
-    usecase "Reset Checkpoint" as UC_RESET
-    usecase "Refresh Stale\nEntities" as UC_REFRESH
+  rectangle "Monitoring & Reporting" {
+    usecase "Track Workflow\nProgress" as UC12
+    usecase "Report Execution\nStatus" as UC13
+    usecase "Handle Errors &\nRetries" as UC14
   }
-
 }
 
-dev --> UC_INVOKE
-dev --> UC_DEBUG
-dev --> UC_RESET
-dev --> UC_REFRESH
-dev --> UC_MONITOR
+' Actor relationships
+dev --> UC1
+dev --> UC12
+mcp --> UC3
+scheduler --> UC2
 
-mcp --> UC_INVOKE
-mcp --> UC_INCR
+' Include relationships
+UC1 ..> UC3 : <<include>>
+UC2 ..> UC4 : <<include>>
+UC3 ..> UC5 : <<include>>
 
-sched --> UC_INCR
+UC5 ..> UC6 : <<include>>
+UC5 ..> UC7 : <<include>>
 
-UC_INVOKE ..> UC_WAVE : <<include>>
-UC_INVOKE ..> UC_BATCH : <<include>>
+UC8 ..> UC9 : <<include>>
+UC8 ..> UC10 : <<include>>
+UC9 ..> UC11 : <<include>>
 
-UC_WAVE ..> UC_INDEX : <<include>>
-UC_WAVE ..> UC_OBS : <<include>>
-UC_WAVE ..> UC_CLASSIFY : <<include>>
-UC_WAVE ..> UC_INSIGHT : <<include>>
-UC_WAVE ..> UC_PATTERN : <<include>>
-UC_WAVE ..> UC_PERSIST : <<include>>
+UC12 ..> UC13 : <<include>>
 
-UC_INCR ..> UC_WAVE : <<extend>>
+' Extend relationships
+UC14 ..> UC8 : <<extend>>
+UC14 ..> UC5 : <<extend>>
 
-UC_PERSIST ..> UC_DEDUP : <<include>>
-UC_PERSIST ..> UC_MERGE : <<include>>
-UC_PERSIST ..> UC_EMBED : <<include>>
-
-UC_DEBUG ..> UC_WAVE : <<extend>>
-
-UC_CLASSIFY --> llm
-UC_INSIGHT --> llm
-UC_PATTERN --> llm
-
-UC_PERSIST --> kg
-UC_DEDUP --> kg
-UC_MERGE --> kg
-UC_EMBED --> kg
-
-UC_MONITOR --> sched : notifies
+' Flow connections
+UC4 --> UC5
+UC5 --> UC8
+UC8 --> UC12
 
 @enduml

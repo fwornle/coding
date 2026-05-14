@@ -1,0 +1,86 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title System Health Dashboard and Service Architecture\nUse Case Diagram
+
+' Actors
+actor "System Administrator" as admin
+actor "Developer" as dev
+actor "Monitoring Service" as monitor <<system>>
+actor "Knowledge Management\nInfrastructure" as kmi <<system>>
+actor "Semantic Analysis\nEngine" as sae <<system>>
+
+' Use Case Groups
+rectangle "System Health Dashboard" {
+    usecase "View System Health\nOverview" as UC1
+    usecase "Monitor Service\nStatus" as UC2
+    usecase "View Performance\nMetrics" as UC3
+    usecase "Configure Alert\nThresholds" as UC4
+    usecase "Generate Health\nReports" as UC5
+    usecase "View Dependency\nMap" as UC6
+}
+
+rectangle "Service Architecture Management" {
+    usecase "Register Service\nEndpoint" as UC7
+    usecase "Manage Service\nLifecycle" as UC8
+    usecase "Analyze Service\nDependencies" as UC9
+    usecase "Perform Semantic\nAnalysis" as UC10
+    usecase "Manage Knowledge\nGraph" as UC11
+    usecase "Index Service\nMetadata" as UC12
+}
+
+rectangle "Infrastructure Operations" {
+    usecase "Collect Health\nMetrics" as UC13
+    usecase "Detect Service\nAnomalies" as UC14
+    usecase "Trigger Automated\nRecovery" as UC15
+    usecase "Sync Knowledge\nBase" as UC16
+}
+
+' Admin relationships
+admin --> UC1
+admin --> UC3
+admin --> UC4
+admin --> UC5
+admin --> UC6
+admin --> UC7
+admin --> UC8
+
+' Developer relationships
+dev --> UC1
+dev --> UC2
+dev --> UC3
+dev --> UC6
+dev --> UC9
+dev --> UC10
+
+' Monitoring Service relationships
+monitor --> UC13
+monitor --> UC14
+monitor --> UC15
+monitor --> UC2
+
+' Knowledge Management relationships
+kmi --> UC11
+kmi --> UC12
+kmi --> UC16
+
+' Semantic Analysis Engine relationships
+sae --> UC10
+sae --> UC9
+sae --> UC11
+
+' Include relationships
+UC1 ..> UC2 : <<include>>
+UC1 ..> UC3 : <<include>>
+UC5 ..> UC3 : <<include>>
+UC9 ..> UC10 : <<include>>
+UC11 ..> UC12 : <<include>>
+UC14 ..> UC13 : <<include>>
+
+' Extend relationships
+UC15 ..> UC14 : <<extend>>
+UC6 ..> UC9 : <<extend>>
+UC16 ..> UC11 : <<extend>>
+
+' Notes
+@enduml

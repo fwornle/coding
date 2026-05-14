@@ -12546,5 +12546,1084 @@
       "sourceCount": 1
     },
     "project": "coding"
+  },
+  {
+    "id": "05dd0c11-c54b-4cea-8987-ef167e4a3d3e",
+    "date": "2026-05-11",
+    "theme": "Diagnosing Tmux Emoji Width Mismatch in VS Code Terminal",
+    "summary": "All three observations represent the same claude agent investigation into visual rendering artifacts (residue/drift) in the tmux status line when running inside VS Code's xterm.js terminal renderer.\n\n- **Root cause**: cell-width disagreement between tmux's internal Unicode width tables and xterm.js for certain emoji characters\n- Initial hypothesis pointed to `variation-selector-always-wide` being OFF by default, causing 1-cell drift for emoji+VS16 sequences\n- Further investigation revealed the option was already enabled, shifting suspicion to **Unicode 13.0+ emoji** (e.g. 🪨 `U+1FAA8`) whose width tmux undercounts relative to xterm.js\n- A prior scripted workaround was **reverted** after it introduced a new rendering disagreement\n- No artifacts were modified; investigation was purely diagnostic and remains **ongoing**",
+    "observationIds": [
+      "7628cdd6-3ccf-4279-9b99-ceecda2b0d54",
+      "ccda98b3-f0de-4e6f-88c7-b461ce94ec27",
+      "3e9d0967-de4d-4514-a16d-16af4c27de99"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-12T12:00:53.857Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "bf3738b1-06e5-46e0-bf0c-903f85cb1753",
+    "date": "2026-05-12",
+    "theme": "Combined Status Line Badge Failures Diagnosed and Fixed",
+    "summary": "A series of investigations into `combined-status-line.js` traced two separate issues visible in screenshots: a red `[📚🔴]` knowledge-pipeline badge driven by a `stalled` coordinator state, and cascading badge failures caused by a single consolidated coordinator probe failing and degrading all derived badges simultaneously.\n\n- Root cause of cascade: after probe consolidation, a single transient `curl` failure to `:3034/health/state` simultaneously degraded all coordinator-derived badges\n- Also identified: duplicate `obs_api` processes on ports 3034/12436 causing health-check discrepancies\n- Fix applied: hardened `getCoordinatorState` in `combined-status-line.js` against transient failures to prevent cascade degradation\n- 5 commits pushed to `origin/main` (including statusline fixes and trajectory refactoring)\n- Post-push verification confirmed all three tmux sessions showed healthy statuslines\n- A dynamic monitoring loop was armed on `csl-failures.jsonl` with a ~25-minute heartbeat fallback to watch for recurrence over ~60 minutes",
+    "observationIds": [
+      "5aae9103-9d27-4598-9db5-f082e3b64362",
+      "6a3fb8f0-af71-4da6-b39e-8ba7c732138e",
+      "dd736735-4131-45d8-b8a0-3e064b497ad3",
+      "a5cb6dad-fada-4edf-83a1-5557bb2f89d2",
+      "df8fff50-232a-497c-aee4-90cc7ed6dc65",
+      "cb610c87-d3aa-45e7-8eea-5a02dcdeb25c",
+      "5a6d6115-10ab-4f49-9ef8-52809dee74a3",
+      "80d835fa-b68a-4963-8025-a8278782f2af",
+      "3a633d7e-e7da-4ae7-b0ee-391776c2fadb",
+      "9de04f66-e79d-4988-a731-b5f1de62e044"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/.tmux.conf",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_tmux_emoji_width_fix.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/MEMORY.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_test_statusline_in_tmux.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 10
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "39bb95b0-cf35-464a-9f5f-037cd223a61d",
+    "date": "2026-05-12",
+    "theme": "Merged Branch Cleanup and Submodule URL Fixes",
+    "summary": "Post-merge cleanup for branch `fix/orphan-rapid-toolkit-gitlink` (squash-merged to `origin/main` via PR #12) uncovered a deeper submodule misconfiguration in the `rapid-automations` project.\n\n- Cleanup steps (local only, steps 1–5) were partially blocked by SSH authentication failures against `<COMPANY_NAME_REDACTED>.ghe.com`\n- Root cause of SSH failures: `.gitmodules` contained malformed `<COMPANY_NAME_REDACTED>@<host>` URLs instead of the correct `git@<host>` pattern, overriding the SSH config's `User git` directive\n- Further investigation revealed all three submodules (`rapid-toolkit`, `rapid-agentic-sandbox`, `operational-knowledge-management`) shared the same broken SSH URL pattern\n- Network topology clarified: `<COMPANY_NAME_REDACTED>.ghe.com` SSH is firewalled outside VPN, but HTTPS (port 443) is publicly accessible — explaining why `rapid-automations-history` pushes worked outside VPN\n- Fix applied: updated `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.gitmodules` to use HTTPS URLs for all three submodules, matching the already-working OKM pattern\n- Submodule pointer for `rapid-toolkit` remained at intermediate commit `d133df6` pending successful fetch after URL fix",
+    "observationIds": [
+      "33b6ac12-2073-4638-a1d1-b216fa5a58d1",
+      "a9efa502-aa13-46c9-9978-dd994a83f697",
+      "b05c904f-632f-4191-8da8-6ffde935ac32",
+      "d066c507-3da1-482f-ac5a-c236505d0e6b",
+      "04e391f5-7694-4eb2-8c5c-4a9998cfcdaf",
+      "3322d3d5-ea0c-458d-a9ad-acda3cb36d68",
+      "81e8da4d-2448-40f5-af2f-9dc2286bfc0d",
+      "1d76f459-dd2d-4824-ae53-d56ad469e400",
+      "b53748ee-38f3-485e-ad25-03c447f24534",
+      "28e08531-f08d-4365-9e9c-8376e989efdb",
+      "50fd72a9-8afb-41b3-a2ba-e6c5e0f76053",
+      "4e22e0ca-e0a4-499c-b232-bb260139a923",
+      "53d6b24e-5ca5-4ea6-baef-69b74308806a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.gitmodules"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 13
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "d340b3ed-7b0b-42ae-a787-6e7ce5ef4312",
+    "date": "2026-05-12",
+    "theme": "Status Line Rendering Residue Bug Investigated and Fixed",
+    "summary": "A screenshot showing a ghost/residue character leaking through the combined status line prompted investigation into cell-width counting discrepancies.\n\n- Identified a 1-cell mismatch between how `visibleCellWidth` counts the ⚠️ emoji versus how VS Code's xterm.js renders it\n- The `leftPadToStableCellWidth` function was over-predicting available space, causing prior render content to bleed through during stable operation\n- Fix applied to `combined-status-line.js`: added a residue buffer to the left-padding/cell-width calculation logic to absorb the drift\n- Observation 27 followed up by verifying a `+2` `CELL_DRIFT_BUFFER` (or equivalent offset) was present in the rendering code; results updated in `STATE.md`, `MEMORY.md`, and phase-34 summary documents",
+    "observationIds": [
+      "8356e04a-b828-4c96-a9f0-94bd5f52cc92",
+      "7ac173df-7ad1-490a-ae52-77dccc730791",
+      "723cc66e-bb4a-4975-867b-758ee92f4236",
+      "a1a8f1b1-46e1-45cb-98ab-f96ef7d52215"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-VERIFICATION.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-03-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/project_phase34_close_gates.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/MEMORY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "5c355cd3-689e-49e0-be60-79f42315f7d8",
+    "date": "2026-05-12",
+    "theme": "Persisting tmux emoji width fix to config",
+    "summary": "Multiple overlapping claude sessions converged on the same goal: making the tmux emoji/codepoint-widths fix permanent after confirming it resolved display residue.\n\n- Added `set -g codepoint-widths \"U+26A0=2\"` to `~/.tmux.conf` so the fix survives restarts\n- Reloaded the running tmux server config\n- Documented the root cause (tmux wcwidth table disagreement, not a script bug) in `reference_tmux_emoji_width_fix.md`\n- Updated `MEMORY.md` and `feedback_test_statusline_in_tmux.md` with cross-references to prevent future script-side fix attempts",
+    "observationIds": [
+      "8a55cdde-d9c4-417f-ad72-b2397c252449",
+      "d03af9d8-c525-412b-88ad-d6855104d8d8",
+      "a2ba7527-2914-4773-bc98-7f43f71ebbe8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.tmux.conf",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_tmux_emoji_width_fix.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/MEMORY.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_test_statusline_in_tmux.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ac836989-1409-457e-b6ea-1b7257b77b49",
+    "date": "2026-05-12",
+    "theme": "GSD roadmap review and STATE.md milestone correction",
+    "summary": "Session reviewed the open GSD roadmap and corrected a stale milestone tag in `STATE.md`.\n\n- Summarized open work: Phase 34 (v7.0) functionally complete with 3 operator-gated items; v3.0 Phase 19.1 at 2/4; v4.0 Phase 20 at 1/2; v5.0 not started; Phase 999.1 backlog pending\n- Identified that `STATE.md` frontmatter incorrectly referenced v6.0 instead of v7.0 (Health Monitoring Consolidation)\n- Corrected the milestone tag to `v7.0 — Health Monitoring Consolidation` and pushed as commit `f4d6beec1`",
+    "observationIds": [
+      "e8a177ac-10f3-4e57-b809-df38ece0602b",
+      "be433157-ca2a-49db-83f7-6feeccac3e52",
+      "da297d46-a122-41ce-8017-825169cb9443"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "09971393-fad5-4a1a-bac0-fe87a44a82ac",
+    "date": "2026-05-12",
+    "theme": "Committing accumulated repo drift and settings changes",
+    "summary": "Housekeeping commit pass to clear accumulated drift from the coding project repository.\n\n- Grouped into three semantically distinct commits: Bash allowlist additions, knowledge-export refresh, and observation-export refresh (+1438 lines)\n- Updated `.gitmodules` as part of the push\n- Working tree left clean after all three commits",
+    "observationIds": [
+      "25be8a03-7644-4d3d-87ef-db4623af3f01"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.gitmodules"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a50ffaf5-5584-436e-9c9f-24928ba00be5",
+    "date": "2026-05-12",
+    "theme": "Phase 34 R3/R4 runbook execution attempts",
+    "summary": "Two overlapping sessions attempted to execute the final R3 and R4 operator-gated steps to close out Phase 34.\n\n- R3 (networkMode flap test, ~30s) was fired but results were ambiguous: `LLM_NETWORK_MODE` env var did not affect `state.proxy.networkMode` as expected, and the expected log path was missing\n- R4 (~7 min outage + ~5 min cooldown) was held pending investigation of the R3 anomaly\n- Both sessions read the phase 34 summary runbook before attempting execution",
+    "observationIds": [
+      "4b2d536d-a3c6-45f2-93e2-e9a961609ad1",
+      "efefbad7-638c-4eec-8793-59d11448ccc2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.gitmodules"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "339c71b6-1ea6-4f20-82b4-cfa21b9d1344",
+    "date": "2026-05-12",
+    "theme": "Proxy health endpoint check and jq typo fix",
+    "summary": "Investigated a curl against the local proxy health endpoint, uncovering a jq field typo.\n\n- Fixed typo `kickstart_coun` → `kickstart_count` in jq query that was producing null results\n- Confirmed proxy health state: `kickstart_count=99`, `auto_heal_status=\"healthy\"`, `consecutive_failures=0`, `semantic_ok=true`\n- D-14 soak window approximately 1.6h elapsed of 24h at time of check",
+    "observationIds": [
+      "4a7fad80-4fb0-423a-97b9-3d6876b78a32",
+      "68856211-7a4b-4003-8a41-94d4cd8a9ba8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b9484c44-9fef-4736-a6ec-f28b2498aeae",
+    "date": "2026-05-12",
+    "theme": "Saving session learnings to persistent modular memory",
+    "summary": "Captured key session learnings as discrete memory files rather than a single monolithic entry.\n\n- Created `feedback_stale_runbooks_telemetry.md` covering stale runbook/telemetry findings\n- Created `feedback_gsd_state_milestone_drift.md` covering GSD state and milestone drift patterns\n- `MEMORY.md` index update was queued but not confirmed complete\n- Attempted git commit of memory directory was abandoned after discovering it is not under version control; files persist via Claude's memory system only",
+    "observationIds": [
+      "a0022938-b1c2-443e-96f9-b9700980a85c",
+      "91813864-337f-4354-a924-61dca5c5b480"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5c5c2501-ef4c-4a6c-97ad-b48dc3d9b1a0",
+    "date": "2026-05-12",
+    "theme": "Trajectory documentation removal and mkdocs restructuring",
+    "summary": "Investigation and execution of trajectory system documentation cleanup across multiple overlapping sessions.\n\n- Initial search confirmed trajectory references remained in docs but no conclusion was reached in observation 14\n- User selected **option 1** (dedicated pages) combined with **option 3** (phasing strategy) for the restructuring approach\n- Updated `mkdocs.yml` navigation to implement the selection: Phase A targets dedicated trajectory artifact pages for removal/restructuring; Phase B queued for broader doc reference cleanup\n- `combined-status-line.js` appeared as a side artifact during investigation but was not the primary target",
+    "observationIds": [
+      "f04ea020-804f-4c20-b2ea-9ad216939f46",
+      "1e316ffc-c71c-45ce-8079-a6ec41312a24",
+      "cc474c22-f154-4424-9eda-4480bf1804cf",
+      "6afe62b5-7080-438e-9cbf-9fce48dab307"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/mkdocs.yml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-12T12:01:49.471Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f0e51170-3fc5-4a96-a64c-068485fb4c88",
+    "date": "2026-05-12",
+    "theme": "Persist Session Learnings to Agent Memory Files",
+    "summary": "Saved two feedback memories to persistent storage to capture key learnings from the session:\n- `feedback_stale_runbooks_telemetry.md`: stale acceptance runbooks decay as code evolves; verify test infra before reading telemetry.\n- `feedback_gsd_state_milestone_drift.md`: `STATE.md` milestone frontmatter must stay in sync with `ROADMAP.md` to avoid wrong milestone tags in working memory.\n- `MEMORY.md` index was updated to reference both new entries.",
+    "observationIds": [
+      "72d25c33-706a-4572-b984-8e188673efb6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/MEMORY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-13T04:45:59.612Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1b89b51e-aa63-4a8f-b812-f1262898fdfd",
+    "date": "2026-05-12",
+    "theme": "Audit and Remove Stale Trajectory References from Docs",
+    "summary": "Goal was to clean up all remaining references to the removed trajectory system across documentation, after confirming source code was already clean.\n\n- **Audit (obs 2):** Scoped the problem — 10+ `docs-content` files, 17+ legacy `docs/` files, root `README`, and ~20 PUML diagrams still referenced trajectories. Three cleanup strategies were proposed.\n- **PUML cleanup (obs 3):** All 11 affected architecture diagrams updated to remove trajectory references: `timezone-handling.puml`, `health-monitoring-overview.puml`, `cross-project-learning.puml`, `constraint-monitor-dataflow.puml`, `project-routing.puml`, `statusline-architecture.puml`, `constraint-monitor-data-model.puml`, `coding-system-architecture.puml`, `complete-system-overview.puml`, `cross-project-data-flow.puml`, `integration-architecture.puml`.\n- **Legacy docs cleanup (obs 4 & 5):** Began batch pass through the 16-file `docs/` tree; `docs/README.md` and `docs/system-overview.md` were updated. The remaining ~14 files were identified but not yet modified.",
+    "observationIds": [
+      "91158336-8f8f-4365-87c5-19b3777bfd12",
+      "dd0d8adc-2fbb-420a-8029-518f345a4adc",
+      "4438ac12-874c-411b-b819-4f96c3122ee8",
+      "1c94ab2c-06ef-454a-a5bf-3ad9e9e1006a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/timezone-handling.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-monitoring-overview.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/cross-project-learning.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/constraint-monitor-dataflow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/project-routing.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/statusline-architecture.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/constraint-monitor-data-model.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/coding-system-architecture.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/complete-system-overview.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/cross-project-data-flow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/integration-architecture.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/system-overview.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-13T04:45:59.612Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "36f37299-2812-465c-b21b-51b5f9524729",
+    "date": "2026-05-12",
+    "theme": "Status-line guide documentation updates and additions",
+    "summary": "Resumed a previously in-progress documentation update task targeting `docs-content/guides/status-line.md`. The session applied multiple queued edits across the guide:\n\n- Added residue troubleshooting content\n- Clarified fast-path naming\n- Added a `codepoint-widths` entry to the configuration table\n- Added a new failure-logging section\n\nObservation 2 represents a mid-session interruption of the same work captured in observation 1.",
+    "observationIds": [
+      "83fd8c76-3e92-4454-9399-50145701957f",
+      "046da9de-b662-4a0f-9396-5859877c6683"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-13T04:45:59.612Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "3ade564f-c5ad-4edd-9410-41dbeabd0b78",
+    "date": "2026-05-12",
+    "theme": "Idle-state badges and reduced cache TTL implementation",
+    "summary": "Implemented idle-state rendering for both `📚` and `🧠` status badges in the combined status line scripts, and reduced cache TTL for fresher updates. Key changes:\n\n- Added `isUserActive()` helper to detect idle sessions in `combined-status-line.js`\n- Used helper inside `buildCombinedStatus()` to render `⚫` (idle) instead of `⚠️`/degraded states when user is inactive\n- Reduced cache TTL from 60s to 30s in `status-line-fast.cjs`\n- Syntax checks and runtime tests confirmed correct behavior",
+    "observationIds": [
+      "57f57bde-d54c-42f8-b2f9-fe748dd36010",
+      "a9c8a06d-a1c9-4f2a-95c7-e079bbfe6c30"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-13T04:45:59.612Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "bbb130f7-8bea-41e4-8e46-cc02cdca2335",
+    "date": "2026-05-12",
+    "theme": "Coding Statusline Health Monitoring Session",
+    "summary": "Ran a ~60-minute dynamic monitoring loop to watch for recurrence of `SYS:TIMEOUT` and coordinator-cascade failures in the coding statusline pipeline.\n- Checked `csl-failures.jsonl`, combined-status-line-cache files, and live tmux renders each iteration\n- Used `ScheduleWakeup` for self-pacing throughout the window\n- Concluded with a clean bill of health: no new failures, all cache files healthy, tmux render confirmed stable; monitoring was stopped with no further wakeups scheduled.",
+    "observationIds": [
+      "73688c97-ed32-4417-a32e-d806077a4987"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:09:42.310Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "aab7964b-780a-4657-b87f-bd2fa59de43c",
+    "date": "2026-05-12",
+    "theme": "Status-Line Docs Update and Push to Remote",
+    "summary": "Resumed and completed an in-progress documentation update for the status-line guide, then pushed changes to remote.\n- Edited `/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md`\n- Added documentation on badge degradation behavior during idle sessions\n- Documented the 3-stage latency chain (~90s worst-case end-to-end)\n- Clarified the semantic distinction between idle and broken pipeline states\n- Changes successfully pushed to `origin/main`; branches are now in sync.",
+    "observationIds": [
+      "db4309c1-7a7a-4b24-b482-750f58bdd572",
+      "b1650c90-dbcf-4a39-9c33-e13b5b897fe3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:09:42.310Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "685de6cf-74fa-48de-84cc-5f12b1b625d3",
+    "date": "2026-05-13",
+    "theme": "Trajectory Cleanup Phase D: Commit Clean Files",
+    "summary": "Finalized and committed the Phase D trajectory cleanup batch of 14 legacy `docs/` files confirmed free of trajectory references.\n\n- Reverted partial edit to `continuous-learning-system.md` to HEAD to keep the working tree clean before committing\n- Committed `24d6db15e` with 14 files cleaned (–72/+12 lines)\n- Two files deferred: `continuous-learning-system.md` (needs surgical edits) and `ukb-issues-analysis.md` (intentionally preserved as archive)\n- Tracking state updated across `34-VERIFICATION.md`, `STATE.md`, `34-03-SUMMARY.md`, `project_phase34_close_gates.md`, and `MEMORY.md`",
+    "observationIds": [
+      "89671d6f-f23d-4c1c-b914-2f974d2aab52",
+      "7b992e6e-08e9-4931-bc28-1eb25e116a10"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-VERIFICATION.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-03-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/project_phase34_close_gates.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/MEMORY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-13T04:46:13.610Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1a7fbfae-b568-4e62-a21f-922fa031d31e",
+    "date": "2026-05-13",
+    "theme": "Context Continuity Load from Prior Session Logs",
+    "summary": "Established session continuity by reading recent `.specstory/history/` logs covering 2026-05-12 to 2026-05-13.\n\n- Confirmed prior sessions executed trajectory subsystem decommissioning across Phases A–D\n- Identified the single remaining deferred file: `docs/knowledge-management/continuous-learning-system.md` with ~10 references requiring surgical edits\n- Set clear next-step target before proceeding with remaining cleanup work",
+    "observationIds": [
+      "3dc185c0-467b-4e46-a14e-b2ebc91f91c1",
+      "fc3e584f-fe61-4e90-b17d-5edb6b924a8c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-13T04:46:13.610Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "871b140d-130b-4e05-9463-88c9dfe9828b",
+    "date": "2026-05-13",
+    "theme": "Complete and Commit continuous-learning-system.md Cleanup",
+    "summary": "Completed the final deferred file from the trajectory cleanup arc and pushed the closing commit.\n\n- Read `docs/knowledge-management/continuous-learning-system.md` to locate incomplete sections and residual trajectory references\n- Made targeted surgical edits to finish incomplete content throughout the document\n- Staged and pushed as commit `9aa64b529`, formally closing the full trajectory cleanup arc (Phases A → D-final)",
+    "observationIds": [
+      "9c7aa450-e513-417a-8db0-31abdea76cd6",
+      "c466bd49-5a7b-42ba-ab15-a15b94735988"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-13T04:46:13.610Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fa6c9e21-a694-485f-a599-abdca4232867",
+    "date": "2026-05-13",
+    "theme": "Post-Cleanup Verification and Stale Reference Audit",
+    "summary": "Ran a post-commit verification pass across `docs/` and `docs-content/` to confirm no regressions after the trajectory cleanup arc.\n\n- Used `grep` searches to surface stale references and orphaned files\n- Found two potential issues: problematic presentation PUMLs and stray references in `status-line.md`\n- Both items flagged for further review; no immediate fixes applied",
+    "observationIds": [
+      "5d9df825-cced-4e80-8402-fc78132a15f2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-13T04:46:13.610Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5f96fa88-90f6-4af4-a16e-0f914eb03866",
+    "date": "2026-05-13",
+    "theme": "Assessing and Resolving status-line.md Edit Overlap",
+    "summary": "Claude investigated potential conflicts between trajectory-scrub branch commits and local unstaged edits to `docs-content/guides/status-line.md`. Initial assessment flagged a direct overlap — trajectory-scrub Phase B had already deleted 58 lines from the file, with local edits sitting on top. Deeper diff analysis revealed the overlap was complementary rather than conflicting:\n- Phase B handled trajectory content removal\n- Local edits addressed technical accuracy: fast-path script name updates, coordinator probe docs, VS16 fix, failure log corrections, TTL values corrected to `30s`/`10s`, and new idle-suppression `⚫` state documentation\nChanges were ultimately committed without conflict resolution issues.",
+    "observationIds": [
+      "576c907a-3b8e-467c-810a-974a7b31c00d",
+      "948bb282-114d-4d29-93aa-e7d72abb3e64"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-13T04:46:13.610Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "f8d19e27-f39b-4db3-869d-45cab64510c8",
+    "date": "2026-05-13",
+    "theme": "PlantUML Diagram Phase E Trajectory Cleanup",
+    "summary": "Executed \"phase E\" cleanup of PlantUML architecture diagrams by removing trajectory-related components.\n- Removed trajectory component and its associated edge from `complete-system-overview.puml`\n- Identified additional deletions needed: `trajectory-system-architecture.puml` and edits to `continuous-learning-architecture.puml`\n- Full execution of all planned deletions was not confirmed per ground truth.",
+    "observationIds": [
+      "a492e00a-6327-4f67-8972-54ee531ef8ff"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/presentation/puml/complete-system-overview.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "39839446-2bd9-458e-b88b-1306594b3ad8",
+    "date": "2026-05-13",
+    "theme": "Docs Cleanup: Hallucinated Cost Values and Archive Removal",
+    "summary": "Multi-step documentation cleanup effort by claude covering hallucinated budget figures, stale archive content, and build verification.\n\n- Investigated `$8.33/month` cost figures in docs; confirmed no `BudgetTracker` class backs them; scrubbed bare `8.33` and `$8.33` literals from `system-comparison.md`, `continuous-learning-system.md`, `llm-providers.md`, and `knowledge-workflows.md`\n- Removed stale `docs/archive/` directory after scrubbing inbound references from `mcp-semantic-analysis.md`\n- Ran `mkdocs --strict` build repeatedly to catch regressions; final build passed with exit 0\n- Committed changes in two commits: `1b7d3398b` (23 files, note: heredoc escaping artifact in message body) and `c3bf15df0` (9 files, emoji substitutions `⚠️→🟡` and rewritten \"Right-edge stability\" section in `enhanced-health-monitoring.md`)\n- Also verified no reintroduction of scrubbed terms (`trajectory`, `$X/month`) across modified files including `release-notes.md`, `health-monitoring.md`, `constraints.md`, `README.md`, `status-line.md`",
+    "observationIds": [
+      "015be4fb-7cc0-4d2e-b40a-4f3fa3c37534",
+      "0e6a4b13-5f98-4460-9aa9-8b398399bbc2",
+      "8d75a35c-ff81-44f3-b9cb-6fd0cfe4bda3",
+      "dd287adb-3763-4478-bb01-129b163e2703",
+      "9aa7c188-3881-47a4-83f5-0a9f11aac7ee",
+      "0112722c-3b17-401c-bc25-8dbcad0dc602",
+      "328f46e0-d32c-4e96-b6a7-40fd4fd0399c",
+      "1093cff4-fc36-4137-beea-3918d045cb68"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/knowledge-workflows.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/llm-providers.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/mcp-semantic-analysis.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/release-notes.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/health-monitoring.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/core-systems/constraints.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/constraints/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/health-system/enhanced-health-monitoring.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 8
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f862bc31-1514-4056-a3a8-71a6f520d07b",
+    "date": "2026-05-13",
+    "theme": "Insights System Refactor: Knowledge Docs Instead of Activity Logs",
+    "summary": "Large collaborative effort by opencode agents to diagnose and fix the insight generation pipeline, which was producing chronological activity logs rather than synthesized domain knowledge documents.\n\n**Root causes identified:**\n- ~587 entities hitting a fallback template path (LLM synthesis failing) that dumped raw bullet-point observations\n- Bad entity names like `BugFixPattern`, `SemanticAnalysisWorkflowIssue` generated before naming guards existed\n- No explicit anti-log instruction in LLM synthesis prompts\n\n**Fixes applied** (primarily in `src/observation-generation-agent.ts`, `server/src/intelligence/knowledge-synthesis.ts`, and `src/insight-generator.ts`):\n- Added `isProcessActivityName` filter to reject process/activity entity names at creation time\n- Added negative naming examples to entity generation prompts\n- Enhanced insight generation prompt to explicitly produce reference-style knowledge documents, not chronological logs\n- Changed fallback template path to return `null` instead of writing low-<USER_ID_REDACTED> bullet-list files\n\n**Build/deploy** (obs 21–28): Iteratively fixed TypeScript type errors introduced by the null-return changes — updated `generateInsightContent`, `generateInsightDocument`, and `generateTechnicalDocumentation` return types to `string | null` / `InsightDocument | null`, handled null at all call sites, corrected log level `\"warn\"` → `\"warning\"`. Build succeeded and service deployed healthy via Docker.\n\nExisting bad-named entities still require a purge-and-batch-refresh to fully clean up the insights dashboard.",
+    "observationIds": [
+      "574c7e9d-dd56-4562-907b-45a4151c3a74",
+      "ab153d9d-9b4a-422d-a9b7-45772bfde434",
+      "2ed61f76-2c7b-490b-90c9-3bf189998c28",
+      "b4b434f2-61ed-4fa4-a9e8-7653def28e30",
+      "d06cb628-57f0-40f4-93a9-ac3c6c734ae3",
+      "5a5e002b-ee0d-4180-a38a-2eeffa206f30",
+      "f4ed0076-5ca2-4149-a09e-056de0f01c7e",
+      "60f2790c-ae5b-4177-a186-8ae17ed401de",
+      "ec5f111a-b8ac-41d9-a4dc-c293230a0d20",
+      "e3972c57-d9a1-4c01-bbbd-74981f5e4d11",
+      "eb37d7aa-93b0-4bc1-a4a7-bee33f44a186",
+      "a7897957-e2af-46a2-be45-bbb82af1d4b4",
+      "12f17041-8b8d-4600-9dd0-69226ba32d40",
+      "50237dda-2fcc-4105-9f5e-12737d635f80",
+      "583495e5-5dc8-447f-8348-299aa779a99c",
+      "96a830e4-a51f-4ced-97b3-311d54d7ef09",
+      "ce7fe18a-9366-4fd1-ba39-f5c034d0bc61",
+      "57ab8766-a703-4c1c-9293-0bd8f55b06d2",
+      "4883dc5d-acd0-43af-8b5c-9c640d1ba70e"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "integrations/mcp-server-semantic-analysis/observation-generation-agent.ts",
+      "observation-generation-agent.ts (added isProcessActivityName filter",
+      "server/src/intelligence/knowledge-synthesis.ts",
+      "services/intelligence/insight-generator or similar insight generation file (fallback template logic and null return)",
+      "entity documentation generation caller to handle null return",
+      "integrations/mcp-server-semantic-analysis/insight-generation-agent.ts",
+      "multiple files in the coding project (specific paths not provided in exchange)",
+      "(multiple files with type fixes for InsightDocument return types",
+      "multiple source files in the coding project (InsightDocument-related service file)",
+      "multiple files in the coding project (insight generation service files)",
+      "src/insight-generator.ts (multiple locations for return type fixes"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 19
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+    "date": "2026-05-13",
+    "theme": "Tmux Status Line Emoji Rendering and Formatting Fixes",
+    "summary": "Series of fixes to `combined-status-line.js` addressing emoji rendering width issues and compliance segment formatting in the tmux status line.\n\n- Diagnosed that Unicode 13+ emojis (`🫒`, `🪨`) cause cell-width mismatches in tmux's wcwidth tables\n- Replaced the project-status emoji ladder in `combined-status-line.js` with widely-supported emojis: `🟢→🟡→🟠→🟤→⚫→💤`\n- Fixed compliance/violations segment formatting around the `🔒` emoji\n- Removed trailing space after `🔒` so the segment now renders as `[🔒61%🟡95]` without extra whitespace\n- Also updated `status-line-fast.cjs` and `status-line.md` during investigation",
+    "observationIds": [
+      "c30223dc-7cdb-49a9-a2cd-6a6871e12cc8",
+      "75c3725c-cfd7-48f8-a224-df2e14c5b4ce",
+      "30cd7882-3c51-4390-b7c6-714f1db3a693",
+      "bbcf85fb-c6b3-4caf-a619-88f22d2bff79",
+      "7fbd20db-7607-4235-8561-56b1f10f13f7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+    "date": "2026-05-13",
+    "theme": "Workflow Architecture Clarification via MCP Server",
+    "summary": "Brief informational exchange about the semantic analysis MCP server's role in the workflow system.\n\n- Retrieved current workflow status via the `semantic-analysis` MCP tool\n- Clarified that the `wave-analysis` workflow lives inside `integrations/mcp-server-semantic-analysis` and runs as a long-lived async process within its Docker container; `execute_workflow` and `get_workflow_status` are the only API surface since no CLI equivalent exists\n- No code changes made",
+    "observationIds": [
+      "219f7d0f-d39d-4902-bf10-6c20e5563e99",
+      "31671973-6786-423a-a281-ec59945d1453"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1b095664-feaf-4be0-be51-428f1b32cda8",
+    "date": "2026-05-13",
+    "theme": "Stuck Workflow Diagnosis and Fresh Execution Attempt",
+    "summary": "Investigated why a newly triggered workflow failed to advance. Container logs and progress files revealed the container had gone idle ~16 minutes prior, the previous workflow had already completed, and the new workflow never started — likely due to overlap detection or a silent rejection. A fresh execution was attempted to recover.",
+    "observationIds": [
+      "1aa50149-fb2c-48af-8313-63178f17c994"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+    "date": "2026-05-13",
+    "theme": "Slash-Commands Documentation Cleanup and Verification",
+    "summary": "Applied sequential edits to `slash-commands.md` to remove or correct stale formatting references identified in a prior review pass. A final `grep` sweep confirmed no remaining issues in the file.",
+    "observationIds": [
+      "41829e22-62c4-47c6-9950-31d78fe9a9d5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "slash-commands.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+    "date": "2026-05-13",
+    "theme": "System Health Dashboard Failures: Container Rebuild and obs_api Crash",
+    "summary": "Investigated a system health dashboard showing multiple service failures. Three root causes were identified and addressed:\n- `browser-access` and `health-verifier` failures: stale `coding-services` container image not reflecting `supervisord.conf` changes — fixed by rebuilding the container.\n- `obs_api` not running after reboot: port 12436 not listening; restart via `coding --claude` required.\n- `obs_api` crash root cause: a `better-sqlite3` mutex exception triggered by SIGTERM during a power outage (not a runtime bug).\n\nThe Docker rebuild was initiated and monitored across multiple steps; the new container was confirmed clean with `mcp-servers:browser-access` and `monitoring:health-verifier` program blocks removed. A non-fatal Qdrant client/server version mismatch (1.15.1 vs 1.17.0) was also noted. Files edited: `combined-status-line.js`, `status-line-fast.cjs`, `status-line.md`.",
+    "observationIds": [
+      "49d1b4cb-3884-4a40-b1c8-47890cb37f39",
+      "7eeb769d-3431-4135-a3e9-4caddf2e5294",
+      "7d3de2f5-eaff-4bc5-856f-0931390fcdeb",
+      "25593e86-1c66-46e0-b173-d333e460d9a0",
+      "783322f4-167d-42f7-981d-e580fa61d4e6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+    "date": "2026-05-13",
+    "theme": "Rapid-LLM-Proxy Corporate Network Detection and Mode Labeling Fixes",
+    "summary": "A multi-step effort to correctly detect and label the corporate network in the rapid-llm-proxy and downstream health/display components:\n\n- **Root cause (obs 43):** Corporate detection only checked RFC1918 ranges, missing the internal `160.50.x.x` range, causing the proxy to run in \"public\" mode.\n- **Labeling fix (obs 45–50):** Renamed the conflated `'vpn'` NetworkMode to `'corporate'` throughout the codebase; updated type definitions, IP detection logic (`isPrivateIP` → `isCorporateIP`), and all comparison references across `src/types.ts`, `src/network-detect.ts`, `src/provider-registry.ts`, `proxy-bridge/server.mjs`, and `bin/start-llm-proxy.sh`. Backward-compatible checks accepting both `'vpn'` and `'corporate'` were added. A pre-existing TypeScript error in `provider-registry.ts`'s `initialize()` signature was also fixed.\n- **Cascade fix (obs 51–55):** After renaming, `health-coordinator.js` and the system health dashboard only recognized `'vpn'`/`'public'`, causing `'corporate'` to fall through to `'unknown'`, triggering dashboard warnings and a broken LLM proxy status display. Added `'corporate'` to all valid-mode checks in `health-coordinator.js` and `system-health-dashboard`/`combined-status-line.js`.\n- **Outcome:** Network mode now correctly reports `\"corporate\"` with `semantic_ok: true`; statusline and dashboard display healthy status on the corporate network.",
+    "observationIds": [
+      "971093dc-2444-4568-9c6b-e4c03509499e",
+      "00a43769-692b-4770-b7f2-5db011652d0d",
+      "ab273dcf-5fb0-4a72-b11d-21bdc55a2537",
+      "cb165fbf-f509-4ad1-8ca5-8f0db7941547",
+      "fbfcb4c0-46f5-457f-b67e-e08a7d0afc44",
+      "41693448-647e-4078-af8b-bcd4e048b547",
+      "a88561bf-5bf6-48ed-b052-d54d22d9ff52",
+      "d3e20485-753f-49b5-9f64-6e547f0f98c2",
+      "c6942937-ce58-4534-aed5-59563d5708d1",
+      "30555874-8848-456e-a95a-5a8675523376",
+      "00835ffc-0d1a-4d0f-9797-e6fda50d356a",
+      "76ac6e21-701e-4225-a84f-780b00bbdcd6",
+      "868fb9fe-043a-4739-af44-e082c7e74cfe"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "the coding startup/proxy script to add <COMPANY_NAME_REDACTED>'s `160.50.x.x` range to the corporate network detection regex",
+      "network detection source files",
+      "proxy-bridge/server.mjs",
+      "startup script",
+      "network-detect module",
+      "rapid-llm-proxy/src/network-detect.ts",
+      "rapid-llm-proxy/src/types.ts",
+      "src/provider-registry.ts",
+      "rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "scripts/health-coordinator.js",
+      "dashboard file (network mode rendering)",
+      "combined-status-line (file)",
+      "system-health-dashboard"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 13
+    },
+    "project": "coding"
+  },
+  {
+    "id": "cfea460c-24d4-4919-a557-df8dea362e85",
+    "date": "2026-05-13",
+    "theme": "Legacy Docs Trajectory Reference Audit and Cleanup",
+    "summary": "Audited the `docs/` tree for remaining trajectory-related references. Only one file was found, located in `docs/archive/historical/` as a historical snapshot — determined to be left unmodified to preserve the historical record. Updated `status-line.md` to reflect the audit outcome.",
+    "observationIds": [
+      "3f92ed35-8554-4c42-85a2-3bcefc8dad2d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "fd0457bc-0237-470b-840c-2aff28491016",
+    "date": "2026-05-13",
+    "theme": "Session Log Context Loading for Rapid-Automations Project",
+    "summary": "Followed the `/sl` command protocol to load recent session logs (2026-05-11 through 2026-05-13) and establish continuity from prior work sessions in the rapid-automations project. Multiple documentation and architecture files were updated as part of this context restoration, including:\n- `knowledge-workflows.md`, `ukb-vkb.md`, `continuous-learning-system.md`, `system-comparison.md`\n- `README.md`, `cross-project-knowledge.md`\n- `complete-system-overview.puml`, `continuous-learning-architecture.puml`",
+    "observationIds": [
+      "44a4439c-cba5-4ad4-b2e2-e9f33d904159"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/knowledge-workflows.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/core-systems/ukb-vkb.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/architecture/cross-project-knowledge.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/complete-system-overview.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/continuous-learning-architecture.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "e6c7b9d4-0fb3-4999-b678-e7ad879cc7c2",
+    "date": "2026-05-13",
+    "theme": "Status Line Emoji Width Bug Diagnosis and Fix",
+    "summary": "A screenshot revealed a visual rendering bug in the combined status line where a trailing digit appeared when the books/OKB segment displayed ⚠️ instead of ✅. Investigation identified the root cause as a cell-width miscalculation of the ⚠️ emoji (with VS16 variation selector) in `combined-status-line.js`, causing clock text to bleed past the segment boundary.\n\n- Fix applied by switching ⚠️ to 🟡 across all affected locations\n- **Doc files** (9 files including `knowledge-workflows.md`, `ukb-vkb.md`, `llm-providers.md`, etc.) updated in one commit\n- **Code files** `combined-status-line.js` and `status-line-fast.cjs` updated in a second commit\n- Both commits pushed to `origin/main` (range `c3bf15df0..5c5f5d8e4`)",
+    "observationIds": [
+      "af3952c3-f9f9-4da3-b3e8-d343224c7a5a",
+      "dfb7c45b-213a-4573-a4b6-1010656cdb38",
+      "b55d1080-8dca-4570-bd28-a0292ab0f4f2",
+      "e32aaa80-8cae-42a2-aa0a-8f72f5b797d1",
+      "e051421b-19ef-4038-87eb-90b5a4797383"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/knowledge-workflows.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/core-systems/ukb-vkb.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/architecture/cross-project-knowledge.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/presentation/puml/complete-system-overview.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/continuous-learning-architecture.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/three-systems-integration.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/cross-project-knowledge-flow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/llm-providers.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/llm-architecture.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/reference/articles/self-learning-layer.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "78e46067-2fbd-48c6-a93e-a7b103cc7d8e",
+    "date": "2026-05-13",
+    "theme": "Post-Fix Status Line Rendering Investigation and Heartbeat Logic",
+    "summary": "After the emoji fix was pushed, further screenshots revealed additional rendering issues in the combined status line. Investigation examined live output, emoji codepoint handling, tmux `codepoint-widths` configuration, and heartbeat/age logic.\n\n- Diagnosis implicated tmux configuration as a contributing factor alongside residual width issues\n- Heartbeat fix designed and applied: any project reporting a `'healthy'` lifecycle rollup state is now always displayed with a 🟢 icon, overriding stale transcript-derived icon logic\n- Primary artifact modified: `combined-status-line.js`",
+    "observationIds": [
+      "f149287e-c420-4469-9a4b-a19199d1fdd3",
+      "d70ca213-ffb1-4481-b16f-da4f1ec871dc",
+      "175dd8b6-861d-41ad-875d-ff1a2b4dfd21",
+      "117116d2-b30a-4461-92e4-c5ffe7c499ca",
+      "ba50f5ce-1db9-4f09-b365-0bd86d2e5f4d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "8e8e2a95-a06b-430d-a82b-b77e09d74254",
+    "date": "2026-05-13",
+    "theme": "Git Sync and Submodule Rebase Conflict Resolution",
+    "summary": "Aligned the local rapid-automations repo with `origin/main` after local commits had diverged. A rebase conflict arose on the `integrations/rapid-toolkit` submodule pointer.\n\n- Initial `git checkout --ours` silently failed; resolved by directly updating the index entry to origin's newer commit hash (`e0365c0`)\n- Amended the rebased commit to correctly reflect the submodule state and clarify the commit message as a URL fix only\n- Files touched during sync: `combined-status-line.js`, `status-line-fast.cjs`, `.tmux.conf`, `status-line.md`, `health-monitoring.md`, `release-notes.md`",
+    "observationIds": [
+      "fd6f230f-0bde-4277-9dc0-0224f4ececc1",
+      "e0f82a6a-bcd9-4ca3-a331-ce1a22e455de",
+      "4b0bed88-46ca-4f2a-97ad-cc1edb689886"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/<USER_ID_REDACTED>/.tmux.conf",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/health-monitoring.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/release-notes.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "a1080ab0-83cf-448b-bb46-d9e3d09833ab",
+    "date": "2026-05-13",
+    "theme": "GSD Version Check and Session Context Initialization",
+    "summary": "Two housekeeping/setup operations were performed at session start by the `claude` agent:\n\n- **GSD update check**: Followed `update.md` workflow to compare local vs. npm registry versions; confirmed GSD is already at the latest version (`1.41.2` globally installed), no update needed. Touched `mcp-semantic-analysis.md` and `ukb-update.md`.\n- **Session log loading**: Executed `/sl` command to read recent LSL files from both the sketcher and coding projects (May 10–13, 2026) via `slash-commands.md`, aiming to restore continuity context for the sketcher project. No actionable continuity content was surfaced from the exchange.\n\nBoth operations were preparatory and resulted in no substantive code changes.",
+    "observationIds": [
+      "4cee17f1-f79f-465f-ab62-2fcfddab26f9",
+      "d770ea3b-fe55-47fd-af3e-b3530f984cf6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/mcp-semantic-analysis.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/ukb-update.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/slash-commands.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:10:56.334Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "e9ede659-6858-49f6-afd7-b948872301cb",
+    "date": "2026-05-14",
+    "theme": "LLM CLI Proxy Network Detection Fix",
+    "summary": "Root cause identified: the launchd-managed `com.coding.llm-cli-proxy` agent always detected \"public\" network because DNS couldn't resolve the corporate PAC host from the home router context.\n\n- Fix proposed and implemented: detect corporate network by checking if `px` is running on `127.0.0.1:3128` instead of relying on DNS resolution\n- `start-llm-proxy.sh` edited to add localhost:3128 px-process check as fallback corporate network detection\n- Requirements captured for three network states (home-no-VPN, home+VPN, office/CN) requiring different `HTTPS_PROXY` configurations\n- `server.mjs` updated so LLM proxy's `detectNetworkMode()` <USER_ID_REDACTED> the health coordinator for network state first, falling back to local autonomous detection if unavailable",
+    "observationIds": [
+      "d9e6fa7c-4c43-494a-a642-1121313dae60",
+      "77d32b96-7f09-4dc2-b7c8-589ecdec49a1",
+      "ae1e1b88-645b-48e8-9361-97f499e7c5b5",
+      "81f8705b-3132-467b-b880-cc1b9e8688b2"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "start-llm-proxy.sh",
+      "server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:11:21.529Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+    "date": "2026-05-14",
+    "theme": "Centralizing Network/Proxy Detection in Health Coordinator",
+    "summary": "Refactored network/proxy detection into the health coordinator as a centralized polled service, exposing state via `/health/state` so all consumers (statusline, dashboard) share a single source of truth instead of detecting independently. Text-only badges (`[N:HOME]`/`[N:CN]`, `[P:ON]`/`[P:OFF]`) were chosen to avoid emoji-width rendering bugs.\n\n- Health coordinator updated to poll `location`, `proxy_running`, `proxy_functional`, `internet_reachable` on a 30s interval\n- `buildCombinedStatus` in the statusline builder updated to render network/proxy badges\n- Health monitoring dashboard updated to read from coordinator's network state\n- Fixed a runtime crash: CommonJS `require()` calls inside an ESM module were replaced with proper ESM imports (`require('net')`, `require('http')`, etc.)\n- Resolved variable collision where the Node.js `net` module conflicted with the local network state object — state references renamed to `netState` throughout lines 934–988\n- Debugging revealed the coordinator inherits stale `HTTPS_PROXY` env vars causing probe failures when `px` restarts; PSM respawn cycle was used to apply fixes",
+    "observationIds": [
+      "2997fcde-d1f6-468c-a900-64731190f0f4",
+      "1bb88463-ed5b-4a78-88c5-e6acc0840520",
+      "28e7de16-34d1-46cb-b47f-af608209761e",
+      "7d7fceec-b6dd-4967-a07e-dedfd90148b9"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "health coordinator service",
+      "statusline builder",
+      "health monitoring dashboard",
+      "coordinator source file to replace `require()` calls with ESM imports",
+      "health coordinator file (multiple ESM import fixes and `net.` → `netState.` variable rename corrections)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:11:21.529Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "66d1d358-8d26-4682-ae2e-00d77034eda7",
+    "date": "2026-05-14",
+    "theme": "Health Dashboard Offline Display Bug and Docker Startup",
+    "summary": "Health monitoring dashboard was not loading due to Docker daemon not running. Once addressed, the dashboard showed LevelDB, Qdrant, Stale PIDs, local proxy, internet, and `obs_api` as offline/erroring.\n\n- Docker daemon was not running; options were to start Docker Desktop or run the dashboard standalone with Node.js\n- `obs_api` was genuinely stopped and was restarted manually\n- LevelDB, Qdrant, and Stale PIDs showing \"Offline\" were false negatives: the frontend `mapCheckStatus` function mapped `'unknown'` sub-check status to `'offline'` instead of a neutral \"Unknown\" state\n- Frontend health status component (`mapCheckStatus` function and badge renderer) fixed to treat `'unknown'` as \"Unknown\" rather than \"Offline\", correcting false offline reports",
+    "observationIds": [
+      "f489e640-5e36-4f2e-bf22-afd99f88ac2e",
+      "1c592c55-3521-4af6-8132-ff1bb22a5b5a",
+      "1badbc7b-887c-4de8-872e-f4fef604e51d",
+      "7ab36452-43cb-4606-bc88-3b03365a9bd8",
+      "8c35183d-3ccb-4849-aeb0-33e293d81407"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "frontend health status component (mapCheckStatus function and badge renderer)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:11:21.529Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "57c5da22-7946-4b4d-8737-f019173b589a",
+    "date": "2026-05-14",
+    "theme": "Health Dashboard Network Status Bug and obs_api Auto-Heal Gaps",
+    "summary": "Investigated three bugs: false \"Internet Unreachable\"/\"Local proxy Offline\" on the dashboard, `obs_api` not being auto-restarted when it stopped, and the root cause of `obs_api` stopping.\n\n- **Network status bug**: `handleGetHealthStatus` in `server.js` passed `proxy` data to the frontend but never passed the `network` object, so `healthStatus.network` was always `undefined`; additionally, the running Docker Node process was serving a stale version of `server.js` without the fix — restarting the container resolved it\n- **obs_api auto-heal**: `obs_api` was missing from `AUTO_HEAL_MAP` and had no remediation action in `health-remediation-actions.js` — both were added; separately identified that the `auto_heal` flag only enables a manual \"Restart\" button in the UI, not an automatic restart loop (only the LLM proxy has an FSM-based auto-heal in the coordinator)\n- **obs_api crash cause**: stopped due to a Qdrant client/server version mismatch and a SIGTERM from an orphaned parent process, followed by a native fastembed crash during cleanup\n- Files edited: `server.js`, `health-remediation-actions.js`",
+    "observationIds": [
+      "979864cd-670c-493d-81da-97d30a116012",
+      "15313aaa-2fa0-48aa-b442-162acc3abd0c",
+      "549fc8e9-b822-4777-9fde-115e33316575",
+      "13aa0b84-cf19-4fe2-8633-77dc2a758376",
+      "173bc03a-0f07-4616-a2b3-deb81ac4e3ec",
+      "ed527d12-82a8-4077-aba7-0a32b1455824",
+      "c1c45fe9-0af2-4647-99d1-cc934996237c"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "server.js",
+      "health-remediation-actions.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:11:21.529Z",
+    "metadata": {
+      "sourceCount": 7
+    },
+    "project": "coding"
   }
 ]

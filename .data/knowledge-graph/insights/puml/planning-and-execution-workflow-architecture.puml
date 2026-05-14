@@ -1,41 +1,28 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+top to bottom direction
+
 package "Trigger Layer" {
-  component "MCP Client" as mcp_client <<external>>
-  component "Scheduler" as scheduler <<core>>
+  component "MCP Tools" as mcp <<api>>
+  component "execute_workflow" as exec_tool <<cli>>
+  component "Incremental Analysis" as incremental <<core>>
 }
 
-package "Execution Layer" {
-  component "execute_workflow\nMCP Tool" as exec_tool <<api>>
-  component "Incremental Analysis\nTrigger" as incr_trigger <<core>>
-  component "Wave Analysis\nWorkflow" as wave_workflow <<core>>
+package "Workflow Core" {
+  component "Planning and Execution Workflow" as workflow <<core>>
 }
 
-package "Processing Layer" {
-  component "Coordinator Agent" as coordinator <<agent>>
-  component "Persistence Agent" as persistence <<agent>>
-  component "Insight Generation\nAgent" as insight_agent <<agent>>
+package "Semantic Infrastructure" {
+  component "Semantic Analysis Engine" as semantic <<core>>
+  component "Knowledge Management" as knowledge <<storage>>
 }
 
-package "Storage Layer" {
-  database "Knowledge Graph\n(LevelDB + Graphology)" as kg <<storage>>
-  database "Workflow Progress\n(.data/workflow-progress.json)" as progress_store <<storage>>
-}
-
-mcp_client --> exec_tool : invokes
-scheduler --> incr_trigger : triggers
-
-exec_tool --> wave_workflow : starts
-incr_trigger --> wave_workflow : starts
-
-wave_workflow --> coordinator : orchestrates
-wave_workflow --> progress_store : writes status
-
-coordinator --> insight_agent : delegates
-coordinator --> persistence : delegates
-
-insight_agent --> kg : stores insights
-persistence --> kg : persists entities
+mcp --> exec_tool : "exposes"
+exec_tool --> workflow : "triggers"
+incremental --> workflow : "auto-triggers"
+workflow --> semantic : "drives"
+semantic --> knowledge : "updates"
+workflow --> knowledge : "reads/writes"
 
 @enduml

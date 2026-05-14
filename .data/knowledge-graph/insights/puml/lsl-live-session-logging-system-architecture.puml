@@ -1,0 +1,20 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "LSL Live Session Logging System" {
+    component "LSL Config" as lslConfig <<core>>
+}
+
+package "integrations/system-health-dashboard" {
+    component "System Health Dashboard" as healthDashboard <<api>>
+    component "Session Logger" as sessionLogger <<core>>
+    component "Live Session Monitor" as liveMonitor <<core>>
+}
+
+lslConfig --> sessionLogger : "configures"
+sessionLogger --> liveMonitor : "feeds"
+liveMonitor --> healthDashboard : "reports to"
+
+@enduml

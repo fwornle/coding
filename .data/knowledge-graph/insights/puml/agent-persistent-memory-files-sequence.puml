@@ -1,59 +1,58 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title Agent Persistent Memory Files — Read/Write Lifecycle
+title Agent Persistent Memory Files - Interaction Sequence
 
-participant "Claude Agent" as Agent
-participant "MEMORY.md\n(Index)" as Index
-participant "memory/*.md\n(Topic Files)" as TopicFiles
-participant "Auto-Memory\nSystem" as AutoMem
-participant "Conversation\nContext" as Context
+participant "Agent" as Agent
+participant "Memory Manager" as MemMgr
+participant "Persistent Memory Files" as PMF
+participant "Semantic Analyzer" as SemAnalyzer
+participant "Knowledge Store" as KnowledgeStore
 
-== Session Start: Memory Load ==
+== Initialization ==
+Agent -> MemMgr : initialize()
+MemMgr -> PMF : loadMemoryFiles()
+PMF --> MemMgr : memoryFilesLoaded
+MemMgr --> Agent : ready
 
-Agent -> Index : read MEMORY.md (index)
-Index --> Agent : list of topic file pointers
-Agent -> TopicFiles : read relevant topic files
-TopicFiles --> Agent : user prefs, feedback, project state
-Agent -> Context : inject memory into working context
+== Knowledge Retrieval ==
+Agent -> MemMgr : retrieveContext(query)
+MemMgr -> PMF : readMemoryFile(contextKey)
+PMF --> MemMgr : rawMemoryData
+MemMgr -> SemAnalyzer : analyzeSemantics(rawMemoryData)
+SemAnalyzer --> MemMgr : enrichedContext
+MemMgr --> Agent : contextResponse
 
-== During Session: Knowledge Acquisition ==
+== Knowledge Persistence ==
+Agent -> MemMgr : persistKnowledge(data)
+MemMgr -> SemAnalyzer : extractSemanticEntities(data)
+SemAnalyzer --> MemMgr : semanticEntities
+MemMgr -> KnowledgeStore : storeEntities(semanticEntities)
+KnowledgeStore --> MemMgr : stored
+MemMgr -> PMF : writeMemoryFile(data)
+PMF --> MemMgr : written
+MemMgr --> Agent : persistenceConfirmed
 
-Agent -> Agent : detect new user preference\nor feedback signal
-Agent -> AutoMem : classify memory type\n(user / feedback / project / reference)
-
-alt New memory
-    AutoMem -> TopicFiles : write <topic>.md\nwith frontmatter + body
-    AutoMem -> Index : append one-line pointer to MEMORY.md
-else Update existing
-    AutoMem -> TopicFiles : surgical replace in existing file
-    note right : keep Why: and How to apply: lines\nup to date
+== Memory Update Cycle ==
+loop Periodic Sync
+    MemMgr -> PMF : syncMemoryFiles()
+    PMF -> KnowledgeStore : reconcileKnowledge()
+    KnowledgeStore --> PMF : reconciled
+    PMF --> MemMgr : syncComplete
 end
 
-== Recall: Stale Memory Check ==
-
-Agent -> TopicFiles : read memory referencing\na file path or function name
-TopicFiles --> Agent : stored claim (may be stale)
-Agent -> Agent : verify claim against current\ncodebase state
-
-alt Still valid
-    Agent -> Context : apply memory as context
-else Stale / contradicted
-    Agent -> TopicFiles : update or remove stale entry
-    Agent -> Index : update pointer if filename changed
-    Agent -> Context : apply observed current state
+== Error Handling ==
+alt Memory File Not Found
+    Agent -> MemMgr : retrieveContext(unknownKey)
+    MemMgr -> PMF : readMemoryFile(unknownKey)
+    PMF --> MemMgr : fileNotFound
+    MemMgr -> PMF : createMemoryFile(unknownKey)
+    PMF --> MemMgr : fileCreated
+    MemMgr --> Agent : emptyContext
+else Semantic Analysis Failure
+    MemMgr -> SemAnalyzer : analyzeSemantics(data)
+    SemAnalyzer --> MemMgr : analysisError
+    MemMgr --> Agent : fallbackRawData
 end
-
-== Fault: MEMORY.md Overflow ==
-
-AutoMem -> Index : attempt append
-Index --> AutoMem : WARNING — line count > 200\n(truncation risk)
-AutoMem -> Index : trim verbose entries\nshorten to ≤150 chars/line
-AutoMem -> TopicFiles : move detail into topic file\n(not the index)
-
-== Session End ==
-
-Agent -> Context : discard ephemeral task state
-note over TopicFiles : persisted memories survive\ninto future conversations
 
 @enduml

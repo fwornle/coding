@@ -1,5 +1,49 @@
 [
   {
+    "id": "a460ac38-fda2-4d68-be67-a7f9df62c736",
+    "topic": "Tmux Status Bar and Status Line Fast Path",
+    "summary": "`status-line-fast.cjs` is the fast-path renderer for the tmux status bar; `combined-status-line.js` (CSL) is the full renderer. Both files are the canonical targets for statusline bug fixes.\n\n**Cache borrowing fix (2026-05-10):**\n- Sibling cache borrowing filters by `-w${paneWidth}.txt` suffix to prevent cross-width cache contamination\n- Orphaned pre-migration cache file `combined-status-line-cache-coding.txt` deleted from `.logs/`\n\n**`[Status Offline]` fallback fix (2026-05-10):**\n- Safety timer extended from 5s → 10s; non-zero exit emits captured partial/error output instead of generic `[Status Offline]`\n\n**Bug fixes (2026-05-11):**\n- `*-state.json` file pattern recognition fixed\n- `SYS:TIMEOUT` display issue fixed in both files\n- Emoji degrading to ASCII fallback also fixed in the same commit\n- Dead-code trajectory-related nodes (`getTrajectoryState`, staleness checks, trajectory icons) removed (confirmed clean per 2026-05-13 audit — only historical snapshot remains in `docs/archive/historical/`)\n\n**Coordinator cascade fix (2026-05-12):**\n- `getCoordinatorState` hardened against transient `curl` failures to `:3034/health/state` to prevent cascade degradation of all coordinator-derived badges\n- Duplicate `obs_api` processes on ports 3034/12436 identified as causing health-check discrepancies\n\n**Ghost/residual character fix (2026-05-12):**\n- 1-cell mismatch between `visibleCellWidth` counting of ⚠️ emoji vs. VS Code xterm.js rendering caused prior render content to bleed through\n- `leftPadToStableCellWidth` over-predicted available space; fix adds `+2` `CELL_DRIFT_BUFFER` to absorb drift\n\n**Emoji width bug fix (2026-05-13):**\n- ⚠️ with VS16 variation selector causes cell-width miscalculation in tmux, making clock text bleed past segment boundary\n- Fixed by replacing ⚠️ with 🟡 in all affected locations in both `combined-status-line.js` and `status-line-fast.cjs`\n- 9 doc files also updated in the same batch (commits `c3bf15df0..5c5f5d8e4`)\n\n**Heartbeat/lifecycle icon fix (2026-05-13):**\n- Post-emoji-fix screenshots revealed further rendering issues; tmux `codepoint-widths` config implicated as contributing factor\n- Heartbeat logic updated: any project reporting a `'healthy'` lifecycle rollup state always renders 🟢, overriding stale transcript-derived icon logic\n\n**Idle-state badges (2026-05-12):**\n- `isUserActive()` helper added to `combined-status-line.js` to detect idle sessions\n- `buildCombinedStatus()` renders `⚫` (idle) instead of ⚠️/degraded states when user is inactive, suppressing false degradation signals\n- Cache TTL reduced from 60s → 30s in `status-line-fast.cjs` for fresher updates\n\n**Documentation (`docs-content/guides/status-line.md`):**\n- Updated (2026-05-12–13) with: residue troubleshooting, fast-path script name corrections, coordinator probe docs, VS16 fix notes, failure log section, TTL values corrected to `30s`/`10s`, `⚫` idle-suppression state documentation, badge degradation during idle sessions, 3-stage latency chain (~90s worst-case end-to-end), semantic distinction between idle and broken pipeline states, and trajectory-reference audit outcome\n- All changes pushed to `origin/main`\n\n**Color/icon mapping:**\n- Blue → `rapid-automations` (coding) project\n- Yellow/🟡 → stale state (replaces ⚠️)",
+    "confidence": 0.95,
+    "digestIds": [
+      "8cf541ad-ddcc-4fd4-a25a-5de712adef5f",
+      "5430d827-ad6b-47c3-b49b-09b8335ff8c0",
+      "dc79434b-d59e-4dbe-9399-00afd275d399",
+      "c3ee9572-9859-4fda-8fae-5cabee2c6e69",
+      "f924158a-4b8d-4dbb-88f8-d13505e9e7f4",
+      "f1467a45-8222-4b39-8c2a-5da4ca1f8c60",
+      "6fba8b50-0be4-49d0-baa1-e49586765d88",
+      "89112345-c5b4-4c26-966f-e84e820f345f",
+      "b2aa736b-c3d4-4c45-994c-76bb559cf722",
+      "983fbae8-885f-4ec4-80fb-3e75a902acf0",
+      "c55fb6f8-a20d-486b-9946-a4ebe2a7f046",
+      "811e44a1-bd63-48ec-9634-7e1cd5bbe557",
+      "5a44d917-4c6f-4faf-b685-c5ce07429591",
+      "5cd5b39d-13a5-4177-a4ae-9f372f20da5a",
+      "d6be22d7-5718-465f-9e25-86c2b22fa41c",
+      "74b12f3a-b898-4cda-b682-7d19e973e49f",
+      "f6316d54-ba38-4505-8f0f-4f0a9b8ae48b",
+      "bf3738b1-06e5-46e0-bf0c-903f85cb1753",
+      "39bb95b0-cf35-464a-9f5f-037cd223a61d",
+      "d340b3ed-7b0b-42ae-a787-6e7ce5ef4312",
+      "36f37299-2812-465c-b21b-51b5f9524729",
+      "3ade564f-c5ad-4edd-9410-41dbeabd0b78",
+      "5f96fa88-90f6-4af4-a16e-0f914eb03866",
+      "bbb130f7-8bea-41e4-8e46-cc02cdca2335",
+      "aab7964b-780a-4657-b87f-bd2fa59de43c",
+      "cfea460c-24d4-4919-a557-df8dea362e85",
+      "fd0457bc-0237-470b-840c-2aff28491016",
+      "e6c7b9d4-0fb3-4999-b678-e7ad879cc7c2",
+      "78e46067-2fbd-48c6-a93e-a7b103cc7d8e",
+      "8e8e2a95-a06b-430d-a82b-b77e09d74254"
+    ],
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-10T13:47:30.879Z",
+    "metadata": {
+      "scope": "scripts/combined-status-line.js and status-line-fast.cjs (tmux statusline renderers)"
+    },
+    "project": "rapid-automations"
+  },
+  {
     "id": "8e029912-b5f0-487a-af6f-b5f1d31d5c84",
     "topic": "Enhanced Transcript Monitor (ETM) Architecture and Known Failure Modes",
     "summary": "The ETM lives at `enhanced-transcript-monitor.js` and monitors OpenCode SQLite/Claude JSONL transcript sources, extracting exchanges and firing observations at the return-to-user-prompt boundary. The startup chain is: `bin/coding` → `agent-common-setup.sh` → `global-lsl-coordinator` → detached spawn with PSM registration.\n\n**Known failure modes and fixes applied:**\n- `better-sqlite3` ESM load failure → fallback to sqlite3 CLI; 2GB OpenCode DB causes idle-timeout death spirals\n- Coordinator killing ETM during 71-second OpenCode session transitions\n- `lastProcessedUuid` pointing mid-exchange causing content-free continuations\n- 26+ duplicate monitor processes from over-eager coordinator restarts\n- `ENOBUFS` pipe buffer overflow from ~27MB sqlite3 subprocess output\n- Auto-restart file watcher detecting changes to the ETM script itself, triggering \"Idle timeout exit\" log regardless of true cause (misleading signal)\n- `isAssistantComplete` checked globally latest message rather than message relative to buffered prompt set, stalling flush deferral\n- Four `else` branches (~lines 1253, 1269, 1297, 3668) cleared `currentUserPromptSet` without calling `_firePromptSetObservation`, silently discarding observations — all four patched\n- `rapid-automations` ETM launched as detached daemon with stdout/stderr → `/dev/null`, making logs invisible (unlike `onboarding-repro` which logs to `transcript-monitor.log`)\n- ETM health file `status: \"missing\"` with `sizeBytes: 0` indicates session ID mismatch between state file and health file — ETM has lost track of current session\n- **Project path decoding bug (fixed 2026-05-09):** `ensureAllTranscriptMonitorsRunning()` in `health-coordinator.js` used lossy reverse-decoding of Claude transcript-dir paths (both `/` and `_` map to `-`), so `_work/rapid-automations` resolved to a nonexistent path, ETM was never spawned for RA, and the coordinator had no heartbeat for it — fixed by enumerating disk paths first and encoding forward instead of reverse-decoding\n- Stale duplicate coordinator processes (e.g., worktree instances) can accumulate alongside the launchd-managed instance; identify and kill by PID\n\n**Classification pipeline:**\n- `determineTargetProject` in `'all'` mode never returns null; LSL-vs-observation-only flush decision is around lines 570–577\n- `coding-keywords.json` drives keyword routing; minimum_score raised to 4 with −5 penalty exclusions and majority-vote logic to prevent false positives\n- `SpecstoryBatchConverter` class handles specstory classification and observation recording\n\n**Active DB location:** `~/Agentic/coding/.observations/observations.db` (360KB+ with active WAL); project-local DBs (e.g., `onboarding-repro`) stay at 0 bytes due to foreign-mode early-return guards.",
@@ -144,7 +188,7 @@
   {
     "id": "0b32d35e-b593-410e-9c11-7cde3a3dcf07",
     "topic": "System Health Dashboard and Service Architecture",
-    "summary": "Services and ports in the coding project ecosystem:\n- `localhost:3030` — constraint-dashboard Next.js frontend (host only)\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server\n- `localhost:3033` — health API / live-logging dashboard server; `/api/observations` reverse-proxies to `localhost:12436`\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist loaded in production as of Phase 33)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker); `localhost:3002` — OKB host alias; **never use 3022**\n- `localhost:12435` — LLM CLI proxy\n- `localhost:12436` — Observations API (`obs_api`); spawned by `start-services-robust.js`\n\n**Architectural rule:** Docker runs headless backend services; host runs tools requiring host networking or hot-reload dev UIs. All port values from `.env.ports` — no hardcoding.\n\n**Health monitoring (Phase 33 — complete):**\n- HTTP POST signals to coordinator via `HEALTH_COORDINATOR_URL`\n- ETMs now post `lsl_heartbeat` signals rather than writing `.health/` JSON files\n- `integrations/system-health-dashboard/static-server.js`: `/api/*` reverse-proxy mounted before `express.static`\n- **plist env injection**: `EnvironmentVariables` plist declarations override `launchctl setenv` on macOS Darwin 25.4.0\n- **Auto-heal regression (fixed May 9)**: `server.js` coordinator-proxy violation synthesis omitted `auto_heal` and `auto_heal_action` fields — fixed\n\n**Phase 34 — LLM proxy supervision:**\n- Plans 34-01 through 34-05 complete; plan 34-06 queued\n- `health-coordinator.js`: added 6 `PROXY_*` constants, a `state.proxy` slice (9 fields), `pollProxySemantic` (D-01 payload + D-02 four-mode classification), and `pollProxyMode` probes wired into `tick()` with fail-open pattern\n- Dead-code strip (~200 LoC, 7 blocks) removed from coding ETM; commits `7a4066eb4` (strip) and `1cbaabde4` (SUMMARY) landed\n- 34-05: deleted 6 dead ETM source files (`RealTimeTrajectoryAnalyzer`, `StreamingKnowledgeExtractor`, `KnowledgeDecayTracker`, and related modules)\n- **Plan 34-06**: plist cleanup — removing `INJECT_THROW`, `TICK_MS`, and `HEALTH_COORDINATOR_URL` keys; retaining `PATH` and `HEALTH_COORDINATOR_PORT`; plist already cleaned, coordinator restarted (PID → 85074)\n\n**Proxy health card (Phase 34-05, task 3):**\n- Fifth `HealthStatusCard` added to `integrations/system-health-dashboard/src/components/system-health-dashboard.tsx`\n- Uses `<COMPANY_NAME_REDACTED>:grid-cols-5` grid layout with pre-imported `Brain` icon\n- **Known bug**: card displays \"No data yet\" — `healthStatus.proxy` is `null` because `state.proxy` slice from the coordinator is being dropped somewhere in the reducer/fetch path; needs investigation\n\n**Documentation:**\n- `docs-content/guides/health-dashboard.md` rewritten to reflect coordinator state / LSL heartbeat signal model\n- `health-system-classes.puml`, `lsl-components.puml`, `multi-session-health-architecture.puml` updated to style guide compliance and validated with `plantuml` CLI",
+    "summary": "**Services and ports:**\n- `localhost:3030` — constraint-dashboard Next.js frontend\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server\n- `localhost:3033` — health API / live-logging dashboard server\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker)\n- `localhost:12435` — LLM CLI proxy\n- `localhost:12436` — Observations API (`obs_api`)\n\n**Architectural rule:** All port values from `.env.ports` — no hardcoding. Docker runs headless backend services; host runs tools requiring host networking or hot-reload dev UIs.\n\n**Phase 34 — LLM proxy supervision (current state):**\n- Plans 34-01 through 34-05 complete; plan 34-06 queued (plist cleanup: remove `INJECT_THROW`, `TICK_MS`, `HEALTH_COORDINATOR_URL`; retain `PATH`, `HEALTH_COORDINATOR_PORT`)\n- Proxy health card added as fifth `HealthStatusCard`; **known bug**: displays \"No data yet\" — `healthStatus.proxy` is `null` due to `state.proxy` slice being dropped in reducer/fetch path\n- **R3/R4 operator-gated steps**: R3 (networkMode flap test) ambiguous — `LLM_NETWORK_MODE` env var did not affect `state.proxy.networkMode`; R4 held\n\n**Infrastructure issues fixed (May 13–14):**\n- `browser-access` and `health-verifier` failures: stale `coding-services` container image — fixed by rebuild\n- `obs_api` crash: `better-sqlite3` mutex exception from SIGTERM during power outage (not a runtime bug)\n- Qdrant client/server version mismatch (1.15.1 vs 1.17.0) — noted, not yet fixed\n- Frontend `mapCheckStatus` function mapped `'unknown'` sub-check status to `'offline'` instead of neutral \"Unknown\" — fixed\n- `obs_api` missing from `AUTO_HEAL_MAP` and `health-remediation-actions.js` — both added; note `auto_heal` flag only enables manual UI button, not an automatic restart loop\n\n**obs_api auto-restart note:** Only the LLM proxy has FSM-based auto-heal in the coordinator; `obs_api` requires manual restart via `coding --claude`",
     "confidence": 0.9,
     "digestIds": [
       "7b369845-c5ed-4eed-b57e-1389ab99df9c",
@@ -439,19 +483,114 @@
       "ed339e5b-afc8-4366-9f4a-cbc4676792e0",
       "c4131218-850c-42d8-8d3a-44cd37e90949",
       "a12621a9-120a-414a-b9fa-a69a23091a2e",
-      "4acad711-160e-4c0c-a874-4a2dd7dc9375"
+      "4acad711-160e-4c0c-a874-4a2dd7dc9375",
+      "05dd0c11-c54b-4cea-8987-ef167e4a3d3e",
+      "5c355cd3-689e-49e0-be60-79f42315f7d8",
+      "ac836989-1409-457e-b6ea-1b7257b77b49",
+      "09971393-fad5-4a1a-bac0-fe87a44a82ac",
+      "a50ffaf5-5584-436e-9c9f-24928ba00be5",
+      "339c71b6-1ea6-4f20-82b4-cfa21b9d1344",
+      "b9484c44-9fef-4736-a6ec-f28b2498aeae",
+      "5c5c2501-ef4c-4a6c-97ad-b48dc3d9b1a0",
+      "f8d19e27-f39b-4db3-869d-45cab64510c8",
+      "39839446-2bd9-458e-b88b-1306594b3ad8",
+      "f862bc31-1514-4056-a3a8-71a6f520d07b",
+      "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+      "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+      "1b095664-feaf-4be0-be51-428f1b32cda8",
+      "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+      "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+      "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+      "e9ede659-6858-49f6-afd7-b948872301cb",
+      "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+      "66d1d358-8d26-4682-ae2e-00d77034eda7",
+      "57c5da22-7946-4b4d-8737-f019173b589a"
     ],
-    "lastUpdated": "2026-05-12T04:34:53.974Z",
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
     "createdAt": "2026-04-24T11:33:34.817Z",
     "metadata": {
-      "scope": "Health coordinator, LaunchAgent plists, and dashboard service stack (ports 3030–3034)"
+      "scope": "`integrations/system-health-dashboard/` — health dashboard frontend, static server, and coordinator service"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b07b7c15-9835-42c8-80ed-cbfd394c7c8e",
+    "topic": "OKM Submodule and Multi-Repo Sync Workflow",
+    "summary": "The `operational-knowledge-management` repo is a git submodule within `rapid-automations`. JSON export files live under `.data/exports` inside the submodule.\n\n**Current remote state:**\n- `rapid-automations` and OKM submodule sync via HTTPS to `origin/main`\n- All three submodules (`rapid-toolkit`, `rapid-agentic-sandbox`, `operational-knowledge-management`) updated to HTTPS URLs in `.gitmodules` (previously had malformed `<USER>@<host>` URLs instead of `git@<host>`)\n- Network topology: `<COMPANY>.ghe.com` SSH is firewalled outside VPN; HTTPS (port 443) is publicly accessible — HTTPS URLs work outside VPN\n\n**Known pitfalls:**\n- `url.<base>.insteadOf` rewrite rules in `~/.gitconfig` can silently re-route fetches through SSH even after updating remote URLs — must check/remove conflicting rewrite rules when switching transports\n- Malformed SSH URLs with explicit `<USER>@<host>` override the SSH config's `User git` directive, breaking key selection\n- Submodule commit + parent bump must both complete; partial mid-exchange commits leave the parent pointing to an uncommitted submodule state\n- **Orphaned gitlinks:** After relocating `rapid-toolkit` from repo root to `integrations/rapid-toolkit`, a stale gitlink at the root persisted and blocked pushes — fix via `git rm --cached <path>` and a dedicated commit\n- **Branch protection + PR flow:** Since `main` is branch-protected, fixes must go through a feature branch + PR; use `fix/<description>` naming; rebase required if branch is behind main before merge\n- **Rebase conflict on submodule pointer:** `git checkout --ours` silently fails for submodule pointer conflicts during rebase; fix by directly updating the index entry to the desired commit hash (e.g. `git update-index --cacheinfo 160000,<hash>,<path>`) then amending the rebased commit\n- Submodule pointer for `rapid-toolkit` resolved to `e0365c0` after the 2026-05-13 sync",
+    "confidence": 0.9,
+    "digestIds": [
+      "f219b47f-ab72-4355-a497-be0849262e9c",
+      "4c816774-8cfa-4291-b114-c50e40eef026",
+      "061f214f-340d-4e89-ba70-104b9b7fd9f6",
+      "4c2602d8-d69c-4b5b-9d1a-771af650e28a",
+      "0d6a6742-ca79-468f-87ad-c0110ccd6838",
+      "973db6ae-1419-4929-9c10-c629267edc64",
+      "eb7d21e9-36ab-44b6-a8cb-5c46d64cc74a",
+      "58c5a825-9b67-480e-b4d1-d0a068dbcd88",
+      "ad858341-2d53-4c19-83f9-d16c10c70248",
+      "3eed42ca-10d5-4b67-a600-87d7302615c7",
+      "bf3738b1-06e5-46e0-bf0c-903f85cb1753",
+      "39bb95b0-cf35-464a-9f5f-037cd223a61d",
+      "d340b3ed-7b0b-42ae-a787-6e7ce5ef4312",
+      "bbb130f7-8bea-41e4-8e46-cc02cdca2335",
+      "aab7964b-780a-4657-b87f-bd2fa59de43c",
+      "cfea460c-24d4-4919-a557-df8dea362e85",
+      "fd0457bc-0237-470b-840c-2aff28491016",
+      "e6c7b9d4-0fb3-4999-b678-e7ad879cc7c2",
+      "78e46067-2fbd-48c6-a93e-a7b103cc7d8e",
+      "8e8e2a95-a06b-430d-a82b-b77e09d74254"
+    ],
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-06T00:18:40.321Z",
+    "metadata": {
+      "scope": "git submodule management for rapid-automations (rapid-toolkit, rapid-agentic-sandbox, operational-knowledge-management)"
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "abd2b128-cf49-409a-8b29-79421e5f8be8",
+    "topic": "LLM Proxy and Network Detection",
+    "summary": "**Key files:**\n- `proxy-bridge/server.mjs` — main proxy bridge\n- `bin/start-llm-proxy.sh` — startup script with network detection\n- `src/network-detect.ts` / `dist/network-detect.js` — compiled network detection\n- `src/types.ts`, `src/provider-registry.ts` — type definitions and routing config\n- `llm-providers.yaml` — provider routing config\n\n**Fixes applied:**\n- **macOS VPN false positive (May 7)**: `server.mjs` matched any `utun*` interface, triggering false VPN for iCloud/iMessage tunnels — fixed by importing `dist/network-detect.js`\n- **Corporate network detection (May 13)**: `isPrivateIP` only checked RFC1918 ranges, missing `160.50.x.x` — extended to `isCorporateIP` covering internal ranges\n- **`'vpn'` → `'corporate'` rename (May 13)**: `NetworkMode` type renamed throughout `src/types.ts`, `src/network-detect.ts`, `src/provider-registry.ts`, `proxy-bridge/server.mjs`, `bin/start-llm-proxy.sh`; backward-compatible checks accept both `'vpn'` and `'corporate'`\n- **Cascade fix**: `health-coordinator.js` and system health dashboard updated to recognize `'corporate'` as a valid mode alongside `'vpn'`/`'public'`\n- **launchd DNS fix (May 14)**: `com.coding.llm-cli-proxy` agent always detected \"public\" because DNS couldn't resolve corporate PAC host; fix: detect corporate network by checking if `px` is running on `127.0.0.1:3128` instead of DNS resolution\n- **`server.mjs` coordination (May 14)**: `detectNetworkMode()` now <USER_ID_REDACTED> health coordinator for network state first, falling back to local detection if unavailable\n\n**Current state:** Network mode correctly reports `\"corporate\"` with `semantic_ok: true` on corporate network; `start-llm-proxy.sh` uses `px` process check as fallback",
+    "confidence": 0.9,
+    "digestIds": [
+      "67fc0fc2-6aaf-4eb3-85a1-092832905ad4",
+      "bd67823d-3431-496e-9875-e8c488219572",
+      "4e8a1d20-7c63-406d-9e72-1174c351886d",
+      "eac26ceb-ac9d-4bac-8636-fbc019615e7b",
+      "28ee9bc0-ead5-4083-b7ae-d9b3d50be022",
+      "af06c13e-cbb4-479c-b880-6e8ee71c2abd",
+      "3ec8a37d-27ff-4ca6-80dc-f1ad7cd88ada",
+      "cb5e984f-8da8-4727-b6b3-f9b5c59ecf75",
+      "8596658a-7268-449a-83e8-8736712049cb",
+      "ab97bbcf-cd88-42f3-b71d-f67839ef1676",
+      "19ce6857-ede7-4d49-9878-fd921fc59b3b",
+      "dc36d0c0-70c7-46cb-8b66-90e2bfbecb0e",
+      "9945dfec-dde2-4163-b645-33b0fb229717",
+      "f8d19e27-f39b-4db3-869d-45cab64510c8",
+      "39839446-2bd9-458e-b88b-1306594b3ad8",
+      "f862bc31-1514-4056-a3a8-71a6f520d07b",
+      "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+      "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+      "1b095664-feaf-4be0-be51-428f1b32cda8",
+      "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+      "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+      "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+      "e9ede659-6858-49f6-afd7-b948872301cb",
+      "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+      "66d1d358-8d26-4682-ae2e-00d77034eda7",
+      "57c5da22-7946-4b4d-8737-f019173b589a"
+    ],
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-07T05:30:26.730Z",
+    "metadata": {
+      "scope": "`proxy-bridge/server.mjs`, `bin/start-llm-proxy.sh`, `src/network-detect.ts` — LLM proxy network mode detection and routing"
     },
     "project": "coding"
   },
   {
     "id": "61c99e9c-c5a7-4f08-ae9c-a768f8b56037",
     "topic": "Tmux Statusline Renderer",
-    "summary": "The tmux right-side status bar is rendered by `scripts/combined-status-line.js`, wrapped by `combined-status-line-wrapper.js`, with fast-path caching in `status-line-fast.cjs`.\n\n**Bugs identified and fixed:**\n- **Cache poisoning**: `status-line-fast.cjs` was calling `.trim()` before writing back to the shared cache file — fixed\n- **Trailing NBSP misuse**: NBSP terminators pushed the right edge left — removed entirely\n- **tmux truncation behavior**: `status-right` truncated at `min(status-right-length, pane_width - status_left)`; trailing ASCII spaces stripped — padding moved to beginning of string\n- **Dead code removed (May 9)**: ~4140 bytes removed — `cellWidth` table, `visibleCellCount`, `statusRightTargetCells`, `ANTI_STRIP_TERMINATOR`, `STATUS_LEFT_RESERVED_CELLS`\n- **Width/cache/timer fixes (May 10, commit `865665502`)**: additional fixes to `status-line-fast.cjs`\n- **Ambiguous East Asian Width fix**: `⚠`, `⚙`, `⏸`, `━` counted as 2 cells by script but tmux `wcwidth` treats them as 1 — `visibleCellWidth()` corrected accordingly\n\n**Rendering environment mismatch (tmux vs VS Code xterm.js):**\n- tmux counts emoji as 1 cell wide by default; xterm.js (VS Code) renders them as 2 cells wide\n- This causes cursor drift and residue buildup visible only inside VS Code terminal\n- Fix: enable `variation-selector-always-wide` in tmux config (available since tmux 3.6) — aligns tmux emoji accounting with xterm.js rendering; this is a tmux config fix, not a script fix\n\n**Open issue:**\n- **Shrinking-cells artifact**: `SYS:ERR` text leaks from previous renders because trailing spaces are stripped by tmux; fix requires leading-pad on every status emit — analysis complete, no code written yet\n\n**Key architectural state:**\n- `TMUX_PANE_WIDTH=#{pane_width}` passed via `.tmux.conf` for cell-aware padding\n- Cache key in `combined-status-line-wrapper.js` includes pane width suffix (`-wNNN`)\n- ETM `getLSLHealthStatus()` has project-level fallback for when `TMUX_PANE` is missing\n- Structural ~1-2 cell trailing gap accepted as unavoidable; bare content rendering adopted",
+    "summary": "The tmux right-side status bar is rendered by `scripts/combined-status-line.js`, wrapped by `combined-status-line-wrapper.js`, with fast-path caching in `status-line-fast.cjs`.\n\n**Bugs identified and fixed:**\n- **Cache poisoning**: `status-line-fast.cjs` was calling `.trim()` before writing back to cache — fixed\n- **Trailing NBSP misuse**: NBSP terminators pushed right edge left — removed entirely\n- **tmux truncation**: `status-right` truncated at `min(status-right-length, pane_width - status_left)`; padding moved to beginning\n- **Dead code removed (May 9)**: ~4140 bytes removed — `cellWidth` table, `visibleCellCount`, `statusRightTargetCells`, `ANTI_STRIP_TERMINATOR`, `STATUS_LEFT_RESERVED_CELLS`\n- **Ambiguous East Asian Width fix**: `⚠`, `⚙`, `⏸`, `━` corrected in `visibleCellWidth()`\n- **Unicode 13+ emoji replacement (May 13)**: `🫒`, `🪨` replaced with widely-supported emojis `🟢→🟡→🟠→🟤→⚫→💤` to avoid wcwidth mismatches\n- **Compliance segment formatting (May 13)**: trailing space after `🔒` removed; now renders as `[🔒61%🟡95]`\n- **Network/proxy badges added**: text-only `[N:HOME]`/`[N:CN]`, `[P:ON]`/`[P:OFF]` badges from health coordinator state; chosen to avoid emoji-width rendering bugs\n\n**Rendering environment mismatch (resolved):**\n- Root cause: tmux Unicode width tables undercount certain Unicode 13.0+ emoji relative to xterm.js\n- Fix: `set -g codepoint-widths \"U+26A0=2\"` in `~/.tmux.conf` — documented in `reference_tmux_emoji_width_fix.md`\n\n**Open issue:**\n- **Shrinking-cells artifact**: `SYS:ERR` text leaks from previous renders; fix requires leading-pad on every emit — analysis complete, no code written\n\n**Key architectural state:**\n- `TMUX_PANE_WIDTH=#{pane_width}` passed via `.tmux.conf`\n- Cache key includes pane width suffix (`-wNNN`)",
     "confidence": 0.9,
     "digestIds": [
       "67d710a1-a508-4007-9db0-9fd1f2764cfd",
@@ -475,50 +614,40 @@
       "ed339e5b-afc8-4366-9f4a-cbc4676792e0",
       "c4131218-850c-42d8-8d3a-44cd37e90949",
       "a12621a9-120a-414a-b9fa-a69a23091a2e",
-      "4acad711-160e-4c0c-a874-4a2dd7dc9375"
+      "4acad711-160e-4c0c-a874-4a2dd7dc9375",
+      "05dd0c11-c54b-4cea-8987-ef167e4a3d3e",
+      "5c355cd3-689e-49e0-be60-79f42315f7d8",
+      "ac836989-1409-457e-b6ea-1b7257b77b49",
+      "09971393-fad5-4a1a-bac0-fe87a44a82ac",
+      "a50ffaf5-5584-436e-9c9f-24928ba00be5",
+      "339c71b6-1ea6-4f20-82b4-cfa21b9d1344",
+      "b9484c44-9fef-4736-a6ec-f28b2498aeae",
+      "5c5c2501-ef4c-4a6c-97ad-b48dc3d9b1a0",
+      "f8d19e27-f39b-4db3-869d-45cab64510c8",
+      "39839446-2bd9-458e-b88b-1306594b3ad8",
+      "f862bc31-1514-4056-a3a8-71a6f520d07b",
+      "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+      "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+      "1b095664-feaf-4be0-be51-428f1b32cda8",
+      "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+      "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+      "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+      "e9ede659-6858-49f6-afd7-b948872301cb",
+      "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+      "66d1d358-8d26-4682-ae2e-00d77034eda7",
+      "57c5da22-7946-4b4d-8737-f019173b589a"
     ],
-    "lastUpdated": "2026-05-12T04:34:53.974Z",
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
     "createdAt": "2026-05-09T10:49:05.020Z",
     "metadata": {
-      "scope": "scripts/combined-status-line.js (tmux statusline renderer) and status-line-fast.cjs (fast-path cache)"
+      "scope": "`scripts/combined-status-line.js` (tmux statusline renderer) and `status-line-fast.cjs` (fast-path cache)"
     },
     "project": "coding"
   },
   {
-    "id": "a460ac38-fda2-4d68-be67-a7f9df62c736",
-    "topic": "Tmux Status Bar and Status Line Fast Path",
-    "summary": "`status-line-fast.cjs` is the fast-path renderer for the tmux status bar; `combined-status-line.js` (CSL) is the full renderer. Both files are the canonical targets for statusline bug fixes.\n\n**Cache borrowing fix (2026-05-10):**\n- Sibling cache borrowing filters by `-w${paneWidth}.txt` suffix to prevent cross-width cache contamination\n- Orphaned pre-migration cache file `combined-status-line-cache-coding.txt` deleted from `.logs/`\n\n**`[Status Offline]` fallback fix (2026-05-10):**\n- Safety timer extended from 5s → 10s; non-zero exit emits captured partial/error output instead of generic `[Status Offline]`\n\n**Bug fixes (2026-05-11):**\n- `*-state.json` file pattern recognition fixed in `combined-status-line.js`\n- `SYS:TIMEOUT` display issue: script runs in 0.18s but timeout fired in specific pane execution contexts — fixed in both `combined-status-line.js` and `status-line-fast.cjs`\n- Emoji degrading to ASCII fallback also fixed in the same commit\n- Fix verified: all three sessions (`rapid-automations`, `coding`, `sketcher`) render full emoji statuslines with no `SYS:TIMEOUT`; failure log absent\n- Dead-code additions from initial misdiagnosis were reverted; trajectory-related nodes (`getTrajectoryState`, staleness checks, trajectory icons) slated for removal but edits still pending as of 2026-05-11\n\n**Color/icon mapping:**\n- Blue → `rapid-automations` (coding) project\n- Yellow → 🪨 (stale) state in `combined-status-line.js`\n\n**Ghost/residual character artifacts:** Not fully resolved; recommend testing in Terminal.app or iTerm2 to isolate xterm.js as cause.",
-    "confidence": 0.9,
-    "digestIds": [
-      "8cf541ad-ddcc-4fd4-a25a-5de712adef5f",
-      "5430d827-ad6b-47c3-b49b-09b8335ff8c0",
-      "dc79434b-d59e-4dbe-9399-00afd275d399",
-      "c3ee9572-9859-4fda-8fae-5cabee2c6e69",
-      "f924158a-4b8d-4dbb-88f8-d13505e9e7f4",
-      "f1467a45-8222-4b39-8c2a-5da4ca1f8c60",
-      "6fba8b50-0be4-49d0-baa1-e49586765d88",
-      "89112345-c5b4-4c26-966f-e84e820f345f",
-      "b2aa736b-c3d4-4c45-994c-76bb559cf722",
-      "983fbae8-885f-4ec4-80fb-3e75a902acf0",
-      "c55fb6f8-a20d-486b-9946-a4ebe2a7f046",
-      "811e44a1-bd63-48ec-9634-7e1cd5bbe557",
-      "5a44d917-4c6f-4faf-b685-c5ce07429591",
-      "5cd5b39d-13a5-4177-a4ae-9f372f20da5a",
-      "d6be22d7-5718-465f-9e25-86c2b22fa41c",
-      "74b12f3a-b898-4cda-b682-7d19e973e49f",
-      "f6316d54-ba38-4505-8f0f-4f0a9b8ae48b"
-    ],
-    "lastUpdated": "2026-05-12T04:34:53.974Z",
-    "createdAt": "2026-05-10T13:47:30.879Z",
-    "metadata": {
-      "scope": "scripts/combined-status-line.js and scripts/status-line-fast.cjs (tmux statusline renderers)"
-    },
-    "project": "rapid-automations"
-  },
-  {
     "id": "fc34cb6a-be67-4e3f-b44c-bb3c3594e829",
     "topic": "Planning and Execution Workflow",
-    "summary": "The project uses a structured GSD (Get Stuff Done) phase-based planning workflow.\n\n**Version and update:**\n- Current version: **v1.41.1** (updated May 9 from v1.41.0)\n- v1.41.1 fix: `buildStateFrontmatter` nested plan file counting\n- **Regression in v1.41.1**: `~/.claude/sdk/shared/model-catalog.json` missing, blocking `init phase-op` and preventing `spec-phase` workflow from completing — workaround is to fall back to `discuss-phase` workflow\n\n**Phase lifecycle artifacts:**\n- `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md` updated at start/end of each phase; `PROJECT.md` at completion\n- Auto-generated `{phase}-CONTEXT.md`, `{phase}-DISCUSSION-LOG.md`, `{phase}-SPEC.md`, `{phase}-VALIDATION.md`\n- Plans stored under `.planning/phases/{phase-name}/` as numbered PLAN files\n\n**Execution model:**\n- Multi-wave: Waves 0–1 = safe file creation; Waves 3+ = live daemon changes; `--wave N` flag on `gsd-execute-phase`\n- Parallel subagent dispatch default; sequential when `depends_on` or path conflicts\n- Subagent writes to `worktree-agent-{hash}` branch, merged by orchestrator after wave completes\n- `--gaps` / `--gaps-only` flags for gap closure mode\n- **Plan falsification pattern**: close as `falsified-by-discovery`, create replacement plan (e.g. 33-12 → 33-15)\n- Milestone completion uses `complete-milestone` workflow; new phases must be registered in `ROADMAP.md` first\n- **Cherry-pick integration pattern**: when merge conflicts arise, cherry-pick specific commits in order onto target branch rather than merging\n\n**Phase 33/34 status:**\n- Phase 33: fully complete (15/15 plans merged); milestone `v7.0` not formally closed (2 ACs deferred)\n- Phase 34: scoped around LLM proxy health supervision and ETM legacy cleanup\n  - Plans 34-01 through 34-05 complete; `ROADMAP.md` and `STATE.md` updated accordingly\n  - 34-04 (lock and per-exchange routing) landed via cherry-pick with no conflicts\n  - 34-05: deleted 6 dead ETM source files (`RealTimeTrajectoryAnalyzer`, `StreamingKnowledgeExtractor`, `KnowledgeDecayTracker`, and related modules); removed orphaned import from `tests/unit/ontology/integration.test.js`\n  - Plan `34-06` queued: plist cleanup — removing `INJECT_THROW`, `TICK_MS`, and `HEALTH_COORDINATOR_URL` keys; retaining `PATH` and `HEALTH_COORDINATOR_PORT`",
+    "summary": "The project uses a structured GSD (Get Stuff Done) phase-based planning workflow.\n\n**Version and update:**\n- Current version: **v1.41.1** (updated May 9 from v1.41.0)\n- v1.41.1 fix: `buildStateFrontmatter` nested plan file counting\n- **Regression in v1.41.1**: `~/.claude/sdk/shared/model-catalog.json` missing, blocking `init phase-op` and preventing `spec-phase` workflow from completing — workaround is to fall back to `discuss-phase` workflow\n\n**Phase lifecycle artifacts:**\n- `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md` updated at start/end of each phase; `PROJECT.md` at completion\n- Auto-generated `{phase}-CONTEXT.md`, `{phase}-DISCUSSION-LOG.md`, `{phase}-SPEC.md`, `{phase}-VALIDATION.md`\n- Plans stored under `.planning/phases/{phase-name}/` as numbered PLAN files\n- **Known drift pattern**: `STATE.md` frontmatter milestone tag can become stale (e.g. referenced v6.0 instead of v7.0); check and correct at phase boundaries — corrected to `v7.0 — Health Monitoring Consolidation` in commit `f4d6beec1`\n- **Feedback memory captured**: `feedback_gsd_state_milestone_drift.md` added to agent memory — `STATE.md` milestone frontmatter must stay in sync with `ROADMAP.md` to avoid wrong milestone tags in working memory\n\n**Execution model:**\n- Multi-wave: Waves 0–1 = safe file creation; Waves 3+ = live daemon changes; `--wave N` flag on `gsd-execute-phase`\n- Parallel subagent dispatch default; sequential when `depends_on` or path conflicts\n- Subagent writes to `worktree-agent-{hash}` branch, merged by orchestrator after wave completes\n- `--gaps` / `--gaps-only` flags for gap closure mode\n- **Plan falsification pattern**: close as `falsified-by-discovery`, create replacement plan (e.g. 33-12 → 33-15)\n- Milestone completion uses `complete-milestone` workflow; new phases must be registered in `ROADMAP.md` first\n- **Cherry-pick integration pattern**: when merge conflicts arise, cherry-pick specific commits in order onto target branch rather than merging\n\n**Phase 33/34 status:**\n- Phase 33: fully complete (15/15 plans merged); milestone `v7.0` not formally closed (2 ACs deferred)\n- Phase 34: scoped around LLM proxy health supervision and ETM legacy cleanup\n  - Plans 34-01 through 34-05 complete; `ROADMAP.md` and `STATE.md` updated accordingly\n  - 34-04 (lock and per-exchange routing) landed via cherry-pick with no conflicts\n  - 34-05: deleted 6 dead ETM source files; removed orphaned import from `tests/unit/ontology/integration.test.js`\n  - Plan `34-06` queued: plist cleanup — removing `INJECT_THROW`, `TICK_MS`, and `HEALTH_COORDINATOR_URL` keys; retaining `PATH` and `HEALTH_COORDINATOR_PORT`\n  - **R3/R4 operator-gated steps**: R3 (networkMode flap test) attempted but results ambiguous — `LLM_NETWORK_MODE` env var did not affect `state.proxy.networkMode` as expected; R4 held pending R3 investigation\n\n**Open roadmap:** v3.0 Phase 19.1 at 2/4; v4.0 Phase 20 at 1/2; v5.0 not started; Phase 999.1 backlog pending",
     "confidence": 0.9,
     "digestIds": [
       "c724a186-dffb-4c8e-a44f-0bdfd221a206",
@@ -562,12 +691,26 @@
       "512fce17-5d69-4f70-ab14-3e509cb35e48",
       "259286c4-5311-45db-803a-9f03297ab68b",
       "62d59b53-1b2a-4623-97bd-098128d31a53",
-      "7aef885b-b81b-4758-a778-d02d5dd18327"
+      "7aef885b-b81b-4758-a778-d02d5dd18327",
+      "05dd0c11-c54b-4cea-8987-ef167e4a3d3e",
+      "5c355cd3-689e-49e0-be60-79f42315f7d8",
+      "ac836989-1409-457e-b6ea-1b7257b77b49",
+      "09971393-fad5-4a1a-bac0-fe87a44a82ac",
+      "a50ffaf5-5584-436e-9c9f-24928ba00be5",
+      "339c71b6-1ea6-4f20-82b4-cfa21b9d1344",
+      "b9484c44-9fef-4736-a6ec-f28b2498aeae",
+      "5c5c2501-ef4c-4a6c-97ad-b48dc3d9b1a0",
+      "f0e51170-3fc5-4a96-a64c-068485fb4c88",
+      "1b89b51e-aa63-4a8f-b812-f1262898fdfd",
+      "685de6cf-74fa-48de-84cc-5f12b1b625d3",
+      "1a7fbfae-b568-4e62-a21f-922fa031d31e",
+      "871b140d-130b-4e05-9463-88c9dfe9828b",
+      "fa6c9e21-a694-485f-a599-abdca4232867"
     ],
-    "lastUpdated": "2026-05-11T05:05:27.568Z",
+    "lastUpdated": "2026-05-13T04:47:21.943Z",
     "createdAt": "2026-04-25T15:07:41.719Z",
     "metadata": {
-      "scope": "GSD planning framework (~/.claude/skills/gsd-* and .planning/ artifacts)"
+      "scope": "GSD planning framework (~/.claude/skills/gsd-* and STATE.md/ROADMAP.md lifecycle)"
     },
     "project": "coding"
   },
@@ -1390,25 +1533,6 @@
     "project": "coding"
   },
   {
-    "id": "4ec5dec9-93d1-4c03-b38a-1ddf4a96fca8",
-    "topic": "Observations API Service Hardening",
-    "summary": "The observations API (`obs_api`) runs at `localhost:12436`, spawned by `start-services-robust.js`.\n\n**Restart script:**\n- `scripts/restart-obs-api.mjs` written as proper `.mjs` module, committed, and verified end-to-end\n- PSM registers new process (e.g. PID 55923); retrieve latency confirmed at 73 ms\n\n**Stale heartbeat fix (obs 28–30):**\n- Old `obs-api` instance (PID 46983) left a heartbeat file causing replacement server to report consolidation as perpetually in-progress\n- Fixed in `observations-api-server.mjs`: treats heartbeats as stale if age > 30 s (15× the 2 s write interval) **or** if the recorded PID is no longer alive — deletes file and returns `null`\n\n**EADDRINUSE and SIGTERM fixes (approved from parallel session):**\n- `start-services-robust.js`: added EADDRINUSE retry logic and `parentPid` to SIGTERM logging\n- Shutdown reorder proposal was rejected as flawed\n\n**Known open issue:**\n- `libc++abi` shutdown mutex crash filed at `2026-05-10-obs-api-libcxx-mutex-shutdown-crash.md`\n- Qdrant client version pin deferred as a TODO item",
-    "confidence": 0.85,
-    "digestIds": [
-      "95b1dfd3-49dc-43cf-9cfa-a996f4868a0f",
-      "8c96a815-e430-4c4c-b3ee-ff1e4a4d83a9",
-      "f8ad4507-43b7-4f71-afbf-ffd6ee16abfa",
-      "4f7df273-35d6-4e59-9fd5-a6d37d06baed",
-      "355f97ef-e3fa-46bf-961f-ab749cf20101"
-    ],
-    "lastUpdated": "2026-05-10T13:47:30.879Z",
-    "createdAt": "2026-05-10T13:47:30.879Z",
-    "metadata": {
-      "scope": "scripts/observations-api-server.mjs and scripts/start-services-robust.js (crash recovery, stale heartbeat, restart script)"
-    },
-    "project": "coding"
-  },
-  {
     "id": "d9a3dae6-22fc-4d6e-bfaa-2e1d644ce280",
     "topic": "Live Session Logging (LSL) System and Session Continuity",
     "summary": "LSL session logs are stored in `.specstory/history/` as markdown files following the naming convention `{date}_{time-window}[-part]_{hash}.md`, with files from the rapid-automations project ending in `*_from-rapid-automation`. Files exceeding 200KB are auto-split at \"## Prompt Set\" boundaries; `.specstory/archive/` is gitignored.\n\nThe `/sl` skill command (LSL procedure) loads recent session logs to establish context continuity — used regularly at session start to surface prior work across projects.\n\n**Recurring session-start pattern:**\n- Multiple LSL files may need to be checked due to short/sparse content in recent files\n- Most recent file may contain only the `/sl` echo with no substantive entries, yielding only partial context restoration\n- Files touched incidentally during context loading (e.g. `combined-status-line-wrapper.js`, `status-line-fast.cjs`) should not be treated as intentionally modified\n- Scanning a time window (e.g. 0600–1300) is the standard approach when session boundary is uncertain\n\n**Health indicator:**\n- The `[LSL●]` tmux health indicator is driven by `combined-status-line-wrapper.js` → `getLSLHealthStatus()` → `health-prompt-hook.js`; red state triggers when `violationCount > 0` OR `!gcmHealthy` in `/tmp/.../global-status.json`\n- Health degradation traced to: expired OAuth tokens, observation violations (all entries tagged `[Raw]`), and stale ETM registry paths\n\n**ETM routing:**\n- The ETM's keyword-based project routing (`coding-keywords.json`) had a false-positive bug fixed by raising `minimum_score` to 4, adding −5 penalty exclusion patterns, and majority-vote logic in `determineTargetProject()`",
@@ -1529,28 +1653,104 @@
     "project": "rapid-automations"
   },
   {
-    "id": "b07b7c15-9835-42c8-80ed-cbfd394c7c8e",
-    "topic": "OKM Submodule and Multi-Repo Sync Workflow",
-    "summary": "The `operational-knowledge-management` repo is a git submodule within `rapid-automations`. JSON export files live under `.data/exports` inside the submodule.\n\n**Current remote state:**\n- `rapid-automations` and OKM submodule sync via HTTPS to `origin/main`\n- `rapid-agentic-sandbox`, `rapid-toolkit`, and `rapidscribe-meeting` submodules retain SSH origins\n- Remote URLs updated via `git remote set-url` to replace SSH with HTTPS\n\n**Known pitfalls:**\n- `url.<base>.insteadOf` rewrite rules in `~/.gitconfig` can silently re-route fetches through SSH even after updating remote URLs — must check/remove conflicting rewrite rules when switching transports\n- Submodule commit + parent bump must both complete; partial mid-exchange commits leave the parent pointing to an uncommitted submodule state\n- 5 unpushed commits accumulated before sync — regular push cadence recommended\n- **Orphaned gitlinks:** After relocating `rapid-toolkit` from repo root to `integrations/rapid-toolkit`, a stale gitlink at the root persisted and blocked pushes — fix via `git rm --cached <path>` and a dedicated commit\n- **Branch protection + PR flow:** Since `main` is branch-protected, fixes must go through a feature branch + PR; use `fix/<description>` naming (e.g. `fix/orphan-rapid-toolkit-gitlink`); rebase required if branch is behind main before merge\n- Modified doc files (`feedback_statusline_is_tmux.md`, `feedback_claude_path_encoding.md`, `MEMORY.md`) are bundled into fix branches when ready",
-    "confidence": 0.85,
+    "id": "4ec5dec9-93d1-4c03-b38a-1ddf4a96fca8",
+    "topic": "Observations API Service Hardening",
+    "summary": "The observations API (`obs_api`) runs at `localhost:12436`, spawned by `start-services-robust.js`.\n\n**Restart script:** `scripts/restart-obs-api.mjs` written as proper `.mjs` module; PSM registers new process; retrieve latency ~73 ms.\n\n**Stale heartbeat fix:** Treats heartbeats as stale if age > 30s **or** if recorded PID is no longer alive — deletes file and returns `null`.\n\n**EADDRINUSE and SIGTERM fixes:** `start-services-robust.js` has EADDRINUSE retry logic and `parentPid` in SIGTERM logging.\n\n**Crash causes identified:**\n- `better-sqlite3` mutex exception triggered by SIGTERM during power outage (not a runtime bug)\n- Qdrant client/server version mismatch (1.15.1 vs 1.17.0) causes crashes\n- SIGTERM from orphaned parent process followed by native fastembed crash during cleanup\n\n**Auto-heal gap:** `obs_api` was missing from `AUTO_HEAL_MAP` and `health-remediation-actions.js` — both added May 14; however auto-heal only enables a manual UI \"Restart\" button, not an automatic loop.\n\n**Known open issues:**\n- `libc++abi` shutdown mutex crash documented at `2026-05-10-obs-api-libcxx-mutex-shutdown-crash.md`\n- Qdrant client version pin deferred as TODO",
+    "confidence": 0.8,
     "digestIds": [
-      "f219b47f-ab72-4355-a497-be0849262e9c",
-      "4c816774-8cfa-4291-b114-c50e40eef026",
-      "061f214f-340d-4e89-ba70-104b9b7fd9f6",
-      "4c2602d8-d69c-4b5b-9d1a-771af650e28a",
-      "0d6a6742-ca79-468f-87ad-c0110ccd6838",
-      "973db6ae-1419-4929-9c10-c629267edc64",
-      "eb7d21e9-36ab-44b6-a8cb-5c46d64cc74a",
-      "58c5a825-9b67-480e-b4d1-d0a068dbcd88",
-      "ad858341-2d53-4c19-83f9-d16c10c70248",
-      "3eed42ca-10d5-4b67-a600-87d7302615c7"
+      "95b1dfd3-49dc-43cf-9cfa-a996f4868a0f",
+      "8c96a815-e430-4c4c-b3ee-ff1e4a4d83a9",
+      "f8ad4507-43b7-4f71-afbf-ffd6ee16abfa",
+      "4f7df273-35d6-4e59-9fd5-a6d37d06baed",
+      "355f97ef-e3fa-46bf-961f-ab749cf20101",
+      "f8d19e27-f39b-4db3-869d-45cab64510c8",
+      "39839446-2bd9-458e-b88b-1306594b3ad8",
+      "f862bc31-1514-4056-a3a8-71a6f520d07b",
+      "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+      "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+      "1b095664-feaf-4be0-be51-428f1b32cda8",
+      "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+      "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+      "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+      "e9ede659-6858-49f6-afd7-b948872301cb",
+      "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+      "66d1d358-8d26-4682-ae2e-00d77034eda7",
+      "57c5da22-7946-4b4d-8737-f019173b589a"
     ],
-    "lastUpdated": "2026-05-09T10:49:05.020Z",
-    "createdAt": "2026-05-06T00:18:40.321Z",
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-10T13:47:30.879Z",
     "metadata": {
-      "scope": "Git submodule management and branch protection workflow for `rapid-automations` and its submodules"
+      "scope": "`observations-api-server.mjs` and `scripts/restart-obs-api.mjs` — obs_api at localhost:12436"
     },
-    "project": "rapid-automations"
+    "project": "coding"
+  },
+  {
+    "id": "7b933b8a-ef25-414b-9a3e-dcbc5f309d94",
+    "topic": "Trajectory Documentation Cleanup",
+    "summary": "Full trajectory cleanup arc (Phases A–D) is complete as of commit `9aa64b529`. Phase E was partially executed on May 13.\n\n**Completed (Phases A–D):**\n- All 11 affected PlantUML diagrams updated; 14 additional `docs/` files committed in Phase D batch (commit `24d6db15e`)\n- `docs/knowledge-management/continuous-learning-system.md` — final deferred file committed as `9aa64b529`\n- `grep` verification pass run across `docs/` and `docs-content/` after final commit\n\n**Phase E (May 13, partial):**\n- Removed trajectory component and its associated edge from `complete-system-overview.puml`\n- Additional deletions identified but unconfirmed: `trajectory-system-architecture.puml` deletion and edits to `continuous-learning-architecture.puml`\n\n**Intentionally preserved:**\n- `docs/knowledge-management/ukb-issues-analysis.md` — kept as archive, trajectory references intentionally retained\n\n**Post-cleanup state:**\n- Two flagged items remain: problematic presentation PUMLs and stray references in `status-line.md`\n- Source code was already clean before this arc began; only documentation required cleanup",
+    "confidence": 0.8,
+    "digestIds": [
+      "05dd0c11-c54b-4cea-8987-ef167e4a3d3e",
+      "5c355cd3-689e-49e0-be60-79f42315f7d8",
+      "ac836989-1409-457e-b6ea-1b7257b77b49",
+      "09971393-fad5-4a1a-bac0-fe87a44a82ac",
+      "a50ffaf5-5584-436e-9c9f-24928ba00be5",
+      "339c71b6-1ea6-4f20-82b4-cfa21b9d1344",
+      "b9484c44-9fef-4736-a6ec-f28b2498aeae",
+      "5c5c2501-ef4c-4a6c-97ad-b48dc3d9b1a0",
+      "f0e51170-3fc5-4a96-a64c-068485fb4c88",
+      "1b89b51e-aa63-4a8f-b812-f1262898fdfd",
+      "685de6cf-74fa-48de-84cc-5f12b1b625d3",
+      "1a7fbfae-b568-4e62-a21f-922fa031d31e",
+      "871b140d-130b-4e05-9463-88c9dfe9828b",
+      "fa6c9e21-a694-485f-a599-abdca4232867",
+      "f8d19e27-f39b-4db3-869d-45cab64510c8",
+      "39839446-2bd9-458e-b88b-1306594b3ad8",
+      "f862bc31-1514-4056-a3a8-71a6f520d07b",
+      "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+      "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+      "1b095664-feaf-4be0-be51-428f1b32cda8",
+      "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+      "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+      "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+      "e9ede659-6858-49f6-afd7-b948872301cb",
+      "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+      "66d1d358-8d26-4682-ae2e-00d77034eda7",
+      "57c5da22-7946-4b4d-8737-f019173b589a"
+    ],
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-12T12:03:44.473Z",
+    "metadata": {
+      "scope": "PlantUML architecture diagrams and docs/ markdown files — trajectory component removal arc"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "42080d93-3982-4016-99d7-6ed071441b75",
+    "topic": "Health Coordinator: Network/Proxy Detection Centralization",
+    "summary": "**Architecture (May 14):** Network/proxy detection refactored into health coordinator as a centralized polled service; all consumers read from `/health/state` instead of detecting independently.\n\n**Polled fields (30s interval):** `location`, `proxy_running`, `proxy_functional`, `internet_reachable`\n\n**Bugs fixed during implementation:**\n- CommonJS `require()` calls inside an ESM module replaced with proper ESM imports (`require('net')`, `require('http')`, etc.)\n- Variable collision: Node.js `net` module conflicted with local network state object — state references renamed to `netState` throughout lines 934–988\n- Coordinator inherits stale `HTTPS_PROXY` env vars causing probe failures when `px` restarts; PSM respawn cycle required to apply fixes\n- `handleGetHealthStatus` in `server.js` was passing `proxy` data to frontend but never passing the `network` object — `healthStatus.network` was always `undefined`; fixed and container restarted\n\n**Text badge design:** `[N:HOME]`/`[N:CN]`, `[P:ON]`/`[P:OFF]` in statusline — text-only to avoid emoji-width rendering bugs",
+    "confidence": 0.8,
+    "digestIds": [
+      "f8d19e27-f39b-4db3-869d-45cab64510c8",
+      "39839446-2bd9-458e-b88b-1306594b3ad8",
+      "f862bc31-1514-4056-a3a8-71a6f520d07b",
+      "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+      "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+      "1b095664-feaf-4be0-be51-428f1b32cda8",
+      "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+      "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+      "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+      "e9ede659-6858-49f6-afd7-b948872301cb",
+      "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+      "66d1d358-8d26-4682-ae2e-00d77034eda7",
+      "57c5da22-7946-4b4d-8737-f019173b589a"
+    ],
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-14T11:13:45.983Z",
+    "metadata": {
+      "scope": "`integrations/system-health-dashboard/health-coordinator.js` — centralized network and proxy state polling"
+    },
+    "project": "coding"
   },
   {
     "id": "211bc87b-c4db-4ca6-b231-9f4ec44e4558",
@@ -1613,86 +1813,93 @@
     "project": "rapid-automations"
   },
   {
-    "id": "abd2b128-cf49-409a-8b29-79421e5f8be8",
-    "topic": "LLM Proxy and Network Detection",
-    "summary": "The LLM proxy bridges requests to different providers based on network context (VPN vs. corporate network vs. home).\n\n**Key files:**\n- `proxy-bridge/server.mjs` — main proxy bridge\n- `bin/start-llm-proxy.sh` — startup script\n- `network-detect.ts` / `dist/network-detect.js` — compiled network detection logic\n- `llm-providers.yaml` — provider routing config\n\n**Known issues and fixes:**\n- **macOS VPN false positive (fixed May 7)**: `proxy-bridge/server.mjs` was matching any `utun*` interface, triggering false VPN detection for iCloud Private Relay, iMessage, and FaceTime system tunnels — fixed by importing `dist/network-detect.js` instead of reimplementing interface detection\n- **Corporate network (CN) routing (fixed May 6)**: CN sessions now route through Copilot subscription (same as VPN), not a separate path — `llm-providers.yaml` and `network-detect.ts` updated\n- **Home DNS false positives**: Fritz!Box DNS may trigger false corporate network detection — more reliable signal sought but not yet implemented\n- **`backfill-raw-observations.mjs`**: updated to correct observation rows mislabeled due to bad network context detection",
+    "id": "25707d49-229c-4df8-b837-ef29181a93f8",
+    "topic": "Docs Build and Content Hygiene",
+    "summary": "- `mkdocs --strict` is the standard verification step after documentation changes; exit 0 = clean build\n- **Hallucinated cost values scrub (May 13)**: `$8.33/month` figures had no backing `BudgetTracker` class — removed from `system-comparison.md`, `continuous-learning-system.md`, `llm-providers.md`, `knowledge-workflows.md`\n- **Archive removal (May 13)**: `docs/archive/` directory deleted after scrubbing inbound references from `mcp-semantic-analysis.md`\n- Committed in two passes: `1b7d3398b` (23 files) and `c3bf15df0` (9 files); latter included emoji substitutions `⚠️→🟡` and rewrote \"Right-edge stability\" section in `enhanced-health-monitoring.md`\n- Terms to watch for reintroduction: `trajectory`, `$X/month`, bare `8.33` cost literals\n- `status-line.md` documentation update still pending (identified but not applied)",
     "confidence": 0.7,
     "digestIds": [
-      "67fc0fc2-6aaf-4eb3-85a1-092832905ad4",
-      "bd67823d-3431-496e-9875-e8c488219572",
-      "4e8a1d20-7c63-406d-9e72-1174c351886d",
-      "eac26ceb-ac9d-4bac-8636-fbc019615e7b",
-      "28ee9bc0-ead5-4083-b7ae-d9b3d50be022",
-      "af06c13e-cbb4-479c-b880-6e8ee71c2abd",
-      "3ec8a37d-27ff-4ca6-80dc-f1ad7cd88ada",
-      "cb5e984f-8da8-4727-b6b3-f9b5c59ecf75",
-      "8596658a-7268-449a-83e8-8736712049cb",
-      "ab97bbcf-cd88-42f3-b71d-f67839ef1676",
-      "19ce6857-ede7-4d49-9878-fd921fc59b3b",
-      "dc36d0c0-70c7-46cb-8b66-90e2bfbecb0e",
-      "9945dfec-dde2-4163-b645-33b0fb229717"
+      "f8d19e27-f39b-4db3-869d-45cab64510c8",
+      "39839446-2bd9-458e-b88b-1306594b3ad8",
+      "f862bc31-1514-4056-a3a8-71a6f520d07b",
+      "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+      "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+      "1b095664-feaf-4be0-be51-428f1b32cda8",
+      "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+      "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+      "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+      "e9ede659-6858-49f6-afd7-b948872301cb",
+      "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+      "66d1d358-8d26-4682-ae2e-00d77034eda7",
+      "57c5da22-7946-4b4d-8737-f019173b589a"
     ],
-    "lastUpdated": "2026-05-07T05:30:26.730Z",
-    "createdAt": "2026-05-07T05:30:26.730Z",
-    "metadata": {},
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-14T11:13:45.983Z",
+    "metadata": {
+      "scope": "MkDocs documentation build (`mkdocs --strict`) and docs/ markdown content correctness"
+    },
     "project": "coding"
   },
   {
-    "id": "468c50ba-7f9a-4e8e-9fd7-0eb30eee02cf",
-    "topic": "VS Code Workspace and GHE SSH Authentication",
-    "summary": "The `rapid-automations` VS Code workspace is configured at `rapid-automations.code-workspace` and explicitly declares all 6 repository folders with `git.autoRepositoryDetection: false`.\n\n**Known issues:**\n- Repositories missing from SCM panel: caused by VS Code's Repositories view being disabled — not a git/auth problem\n- A window reload is required after workspace config changes to take effect\n- GHE SSH auth failure (`publickey permission denied`) has two causes:\n  1. Remote URLs with an explicit email username override the `User git` SSH config directive, breaking key selection\n  2. The work SSH key needs to be re-registered under GHE Settings → Keys — both personal and work keys were rejected by `<COMPANY_NAME_REDACTED>.ghe.com`\n\n**Workaround in use:** Switch remote URLs from SSH to HTTPS via `git remote set-url`; watch for `url.<base>.insteadOf` rewrite rules in git config that may silently re-route fetches back through SSH despite the URL change.",
+    "id": "9f87c486-a45b-4302-9ebe-f83a7a23a4c8",
+    "topic": "Insights System Refactor: Knowledge Docs Instead of Activity Logs",
+    "summary": "**Root causes of activity-log output (identified May 13):**\n- ~587 entities hit a fallback template path when LLM synthesis failed, producing raw bullet-point observation dumps\n- Bad entity names like `BugFixPattern`, `SemanticAnalysisWorkflowIssue` generated before naming guards existed\n- No explicit anti-log instruction in LLM synthesis prompts\n\n**Fixes applied:**\n- `isProcessActivityName` filter added to reject process/activity entity names at creation time\n- Negative naming examples added to entity generation prompts\n- Insight generation prompt explicitly instructs reference-style knowledge docs, not chronological logs\n- Fallback template path returns `null` instead of writing low-<USER_ID_REDACTED> bullet-list files\n- Return types updated throughout: `generateInsightContent`, `generateInsightDocument`, `generateTechnicalDocumentation` now return `string | null` / `InsightDocument | null`; all call sites handle null; log level `\"warn\"` → `\"warning\"` corrected\n- Build succeeded and service deployed healthy via Docker\n\n**Known remaining issue:**\n- Existing bad-named entities require a purge-and-batch-refresh to fully clean up the insights dashboard",
     "confidence": 0.7,
     "digestIds": [
-      "f219b47f-ab72-4355-a497-be0849262e9c",
-      "4c816774-8cfa-4291-b114-c50e40eef026",
-      "061f214f-340d-4e89-ba70-104b9b7fd9f6",
-      "4c2602d8-d69c-4b5b-9d1a-771af650e28a",
-      "0d6a6742-ca79-468f-87ad-c0110ccd6838"
+      "f8d19e27-f39b-4db3-869d-45cab64510c8",
+      "39839446-2bd9-458e-b88b-1306594b3ad8",
+      "f862bc31-1514-4056-a3a8-71a6f520d07b",
+      "4be74783-d1a3-43ad-9763-d6a84ee623b8",
+      "942d564d-4cca-41c2-ab3e-fad4b64067d6",
+      "1b095664-feaf-4be0-be51-428f1b32cda8",
+      "8669a61b-b259-4cc0-96dd-0ca4511b6d80",
+      "9e32f64e-42a0-4b1a-b8bc-909846eff740",
+      "fa3f6864-2e94-4a98-9f4e-9cfe67dca454",
+      "e9ede659-6858-49f6-afd7-b948872301cb",
+      "5ae9820b-3dca-4f3d-8317-a13aebd7a063",
+      "66d1d358-8d26-4682-ae2e-00d77034eda7",
+      "57c5da22-7946-4b4d-8737-f019173b589a"
     ],
-    "lastUpdated": "2026-05-06T00:18:40.321Z",
-    "createdAt": "2026-05-06T00:18:40.321Z",
-    "metadata": {},
-    "project": "rapid-automations"
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-14T11:13:45.983Z",
+    "metadata": {
+      "scope": "`src/insight-generator.ts`, `server/src/intelligence/knowledge-synthesis.ts`, `src/observation-generation-agent.ts` — insight document generation pipeline"
+    },
+    "project": "coding"
   },
   {
-    "id": "02f1858d-b58d-442b-9c9f-c0daff6b746b",
-    "topic": "LSL Live Session Logging System",
-    "summary": "- **Log path standard**: all LSL writers output to `.specstory/history/logs/` (migration completed May 1)\n  - `classification-logger.js`, `live-logging-coordinator.js`, `OperationalLogger.js` all updated\n  - Old `.specstory/logs/` paths are obsolete; 828 legacy classification files pending deletion\n- **`lsl-paths.js`** updated to align with new path conventions\n- **Private history repo per project**: `ensure_private_history_repo` in `scripts/agent-common-setup.sh` sets up a `<project>-history` GHE repo for every managed project (see Git Repository Hygiene insight for details)\n- **Coordinator management**: global LSL coordinator must be explicitly killed and restarted after path changes\n- Post-restart pattern: 9 transcript monitors respawn; supervisor race condition may create ~8 duplicates; clean state = 1 supervisor + 1 monitor per project\n- **`live-logging-coordinator.js`** kept (not retired) due to active references in `start-services.sh`, `stop-services.sh`, config files, and test files\n- **Planned**: LSL files reorganized into `YYYY/MM/*` subdirectory hierarchy — scoped but not yet implemented",
-    "confidence": 0.6499999999999998,
+    "id": "c0f9b92d-a026-4f80-bc5f-780e095f8327",
+    "topic": "Enhanced Transcript Monitor Pipeline",
+    "summary": "- Unresolved suspected syntax error in `enhanced-transcript-monitor.js` was left unresolved at end of session 2026-05-10\n- The file is part of an active LSL pipeline in the coding project\n- This error requires follow-up before the pipeline can be considered stable\n- Known risk: session ended without confirming whether the syntax error was real or resolved\n- As of 2026-05-13 session-start context load, no actionable update on this issue was surfaced",
+    "confidence": 0.6,
     "digestIds": [
-      "a2ce5159-8561-4c6a-a191-3c894ac3fef9",
-      "0589da2c-8232-49c8-95a5-67d0463978dd",
-      "2c2861b9-4122-4c98-bc7a-804c9fa6f016",
-      "582500f3-43f0-4f2d-b2d0-0944459ff21a",
-      "f8e809c2-1b16-4940-9676-d08a288e8e06",
-      "fed84267-52e6-499f-971a-c665b7bfb290",
-      "eeb76f5c-e9e9-4656-9084-670adb40e460",
-      "d8f1bd7e-97c3-4a00-af01-0f1d6e269a29",
-      "7286f89a-cf29-43cd-892a-1a864113d41c",
-      "896887cb-ba97-4251-9d02-06e6d460f50e",
-      "9da5ade1-cb39-474b-ac82-ec611f4a5933",
-      "4834a372-efdd-4614-b232-ee16d22c1399",
-      "57c75995-3803-4e85-9ce0-2e7ee4595032",
-      "a97072cd-108f-4af5-9fd5-90494be45710",
-      "5d2961ad-ab4c-47d2-8a4f-36cfd051fabf",
-      "583b0194-0fc3-440f-b495-96d753851822",
-      "7303c6d8-335a-41a6-9cf2-da201eab2b92",
-      "d182720e-c19f-4e65-8883-29b0bcff96b4",
-      "80feab7d-8f73-4548-bc10-b1d16cf31703",
-      "d9bda45b-b40f-44b7-a350-840df2970c4b",
-      "eb6ed09a-230e-4a4b-9566-c26ef88f4b1a",
-      "82339b7a-9d5a-431d-a7e6-da0c6881cb1f",
-      "1d01fef4-0df4-42ce-a2cf-bb29151766b9",
-      "04d1980c-bb3e-435a-8ad1-f8af1263f446",
-      "15896d9c-c343-4702-85b7-e6a2a0c68b0b",
-      "2b464294-772d-4908-805c-181f6e265a0a",
-      "adb19409-c689-4579-9877-d34049df450b",
-      "7387be12-11fd-429c-91f6-0cd9e596f169",
-      "3f416836-b5b7-4688-a295-fa40c76ea47d"
+      "5ac48fcb-1477-44c4-bebe-e509b2f9b6a5",
+      "a1080ab0-83cf-448b-bb46-d9e3d09833ab"
     ],
-    "lastUpdated": "2026-05-03T04:22:51.080Z",
-    "createdAt": "2026-05-02T09:57:31.330Z",
-    "metadata": {},
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-10T13:47:30.879Z",
+    "metadata": {
+      "scope": "`enhanced-transcript-monitor.js` in the coding project LSL pipeline"
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "1ac3a526-bf82-473b-87cf-e0936f0cc294",
+    "topic": "Agent Persistent Memory Files",
+    "summary": "The project maintains a persistent agent memory store — individual `feedback_*.md` and `reference_*.md` files indexed by `MEMORY.md`.\n\n**Known entries added:**\n- `feedback_stale_runbooks_telemetry.md` — stale acceptance runbooks decay as code evolves; always verify test infrastructure before reading telemetry results\n- `feedback_gsd_state_milestone_drift.md` — `STATE.md` milestone frontmatter must stay in sync with `ROADMAP.md`; mismatches cause incorrect milestone tags to appear in working memory at phase boundaries\n- `reference_tmux_emoji_width_fix.md` — documents the tmux `codepoint-widths` config fix for Unicode width rendering disagreement with xterm.js (added earlier)\n\n**Conventions:**\n- `MEMORY.md` index is updated whenever new feedback files are added\n- Files follow `feedback_<slug>.md` or `reference_<slug>.md` naming\n- Session continuity can be re-established by reading `.specstory/history/` logs when `MEMORY.md` context is lost",
+    "confidence": 0.6,
+    "digestIds": [
+      "f0e51170-3fc5-4a96-a64c-068485fb4c88",
+      "1b89b51e-aa63-4a8f-b812-f1262898fdfd",
+      "685de6cf-74fa-48de-84cc-5f12b1b625d3",
+      "1a7fbfae-b568-4e62-a21f-922fa031d31e",
+      "871b140d-130b-4e05-9463-88c9dfe9828b",
+      "fa6c9e21-a694-485f-a599-abdca4232867"
+    ],
+    "lastUpdated": "2026-05-13T04:47:21.943Z",
+    "createdAt": "2026-05-13T04:47:21.943Z",
+    "metadata": {
+      "scope": "`MEMORY.md` index and `feedback_*.md` files in the agent's persistent memory store"
+    },
     "project": "coding"
   },
   {
@@ -1716,6 +1923,54 @@
       "scope": "`scripts/start-services-robust.js` (service startup orchestrator with EADDRINUSE retry)"
     },
     "project": "rapid-automations"
+  },
+  {
+    "id": "468c50ba-7f9a-4e8e-9fd7-0eb30eee02cf",
+    "topic": "VS Code Workspace and GHE SSH Authentication",
+    "summary": "The `rapid-automations` VS Code workspace is configured at `rapid-automations.code-workspace` and explicitly declares all 6 repository folders with `git.autoRepositoryDetection: false`.\n\n**Known issues:**\n- Repositories missing from SCM panel: caused by VS Code's Repositories view being disabled — not a git/auth problem\n- A window reload is required after workspace config changes to take effect\n- GHE SSH auth failure (`publickey permission denied`) has two causes:\n  1. Remote URLs with an explicit email username override the `User git` SSH config directive, breaking key selection\n  2. The work SSH key needs to be re-registered under GHE Settings → Keys — both personal and work keys were rejected by `<COMPANY_NAME_REDACTED>.ghe.com`\n\n**Workaround in use:** Switch remote URLs from SSH to HTTPS via `git remote set-url`; watch for `url.<base>.insteadOf` rewrite rules in git config that may silently re-route fetches back through SSH despite the URL change.",
+    "confidence": 0.5999999999999999,
+    "digestIds": [
+      "f219b47f-ab72-4355-a497-be0849262e9c",
+      "4c816774-8cfa-4291-b114-c50e40eef026",
+      "061f214f-340d-4e89-ba70-104b9b7fd9f6",
+      "4c2602d8-d69c-4b5b-9d1a-771af650e28a",
+      "0d6a6742-ca79-468f-87ad-c0110ccd6838"
+    ],
+    "lastUpdated": "2026-05-06T00:18:40.321Z",
+    "createdAt": "2026-05-06T00:18:40.321Z",
+    "metadata": {},
+    "project": "rapid-automations"
+  },
+  {
+    "id": "f628015e-ac1b-4a29-ad2d-c2a392ce7b69",
+    "topic": "Sketcher Project Working Tree",
+    "summary": "- Uncommitted scaffolding files remain in the sketcher project's working tree as of 2026-05-10\n- No real feature activity has occurred in the sketcher project recently\n- A 2026-05-13 session attempted to restore continuity context via `/sl` but surfaced no actionable content\n- These files should be reviewed: either committed, stashed, or cleaned up to avoid confusion in future sessions",
+    "confidence": 0.5,
+    "digestIds": [
+      "5ac48fcb-1477-44c4-bebe-e509b2f9b6a5",
+      "a1080ab0-83cf-448b-bb46-d9e3d09833ab"
+    ],
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-10T13:47:30.879Z",
+    "metadata": {
+      "scope": "Uncommitted scaffolding files in the sketcher project working tree"
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "86747c68-faf3-4315-b8bf-e7410f11eafc",
+    "topic": "GSD Version Check Workflow",
+    "summary": "- Session-start ritual: compare local vs. npm registry version using `update.md` workflow\n- As of 2026-05-13, GSD is at latest version `1.41.2` globally installed\n- No code changes result when already up to date",
+    "confidence": 0.5,
+    "digestIds": [
+      "a1080ab0-83cf-448b-bb46-d9e3d09833ab"
+    ],
+    "lastUpdated": "2026-05-14T11:13:45.983Z",
+    "createdAt": "2026-05-14T11:13:45.983Z",
+    "metadata": {
+      "scope": "GSD update check procedure described in `update.md`"
+    },
+    "project": "sketcher"
   },
   {
     "id": "9f1b880b-4d8a-44ea-b024-97a6fab0fb45",
@@ -1755,40 +2010,51 @@
     "project": "rapid-automations"
   },
   {
-    "id": "c0f9b92d-a026-4f80-bc5f-780e095f8327",
-    "topic": "Enhanced Transcript Monitor Pipeline",
-    "summary": "- Unresolved suspected syntax error in `enhanced-transcript-monitor.js` was left unresolved at end of a prior session (09:00–11:47 CEST, 2026-05-10)\n- The file is part of an active LSL pipeline in the coding project\n- This error requires follow-up before the pipeline can be considered stable\n- Known risk: session ended without confirming whether the syntax error was real or resolved",
-    "confidence": 0.5,
+    "id": "02f1858d-b58d-442b-9c9f-c0daff6b746b",
+    "topic": "LSL Live Session Logging System",
+    "summary": "- **Log path standard**: all LSL writers output to `.specstory/history/logs/` (migration completed May 1)\n  - `classification-logger.js`, `live-logging-coordinator.js`, `OperationalLogger.js` all updated\n  - Old `.specstory/logs/` paths are obsolete; 828 legacy classification files pending deletion\n- **`lsl-paths.js`** updated to align with new path conventions\n- **Private history repo per project**: `ensure_private_history_repo` in `scripts/agent-common-setup.sh` sets up a `<project>-history` GHE repo for every managed project (see Git Repository Hygiene insight for details)\n- **Coordinator management**: global LSL coordinator must be explicitly killed and restarted after path changes\n- Post-restart pattern: 9 transcript monitors respawn; supervisor race condition may create ~8 duplicates; clean state = 1 supervisor + 1 monitor per project\n- **`live-logging-coordinator.js`** kept (not retired) due to active references in `start-services.sh`, `stop-services.sh`, config files, and test files\n- **Planned**: LSL files reorganized into `YYYY/MM/*` subdirectory hierarchy — scoped but not yet implemented",
+    "confidence": 0.4999999999999997,
     "digestIds": [
-      "5ac48fcb-1477-44c4-bebe-e509b2f9b6a5"
+      "a2ce5159-8561-4c6a-a191-3c894ac3fef9",
+      "0589da2c-8232-49c8-95a5-67d0463978dd",
+      "2c2861b9-4122-4c98-bc7a-804c9fa6f016",
+      "582500f3-43f0-4f2d-b2d0-0944459ff21a",
+      "f8e809c2-1b16-4940-9676-d08a288e8e06",
+      "fed84267-52e6-499f-971a-c665b7bfb290",
+      "eeb76f5c-e9e9-4656-9084-670adb40e460",
+      "d8f1bd7e-97c3-4a00-af01-0f1d6e269a29",
+      "7286f89a-cf29-43cd-892a-1a864113d41c",
+      "896887cb-ba97-4251-9d02-06e6d460f50e",
+      "9da5ade1-cb39-474b-ac82-ec611f4a5933",
+      "4834a372-efdd-4614-b232-ee16d22c1399",
+      "57c75995-3803-4e85-9ce0-2e7ee4595032",
+      "a97072cd-108f-4af5-9fd5-90494be45710",
+      "5d2961ad-ab4c-47d2-8a4f-36cfd051fabf",
+      "583b0194-0fc3-440f-b495-96d753851822",
+      "7303c6d8-335a-41a6-9cf2-da201eab2b92",
+      "d182720e-c19f-4e65-8883-29b0bcff96b4",
+      "80feab7d-8f73-4548-bc10-b1d16cf31703",
+      "d9bda45b-b40f-44b7-a350-840df2970c4b",
+      "eb6ed09a-230e-4a4b-9566-c26ef88f4b1a",
+      "82339b7a-9d5a-431d-a7e6-da0c6881cb1f",
+      "1d01fef4-0df4-42ce-a2cf-bb29151766b9",
+      "04d1980c-bb3e-435a-8ad1-f8af1263f446",
+      "15896d9c-c343-4702-85b7-e6a2a0c68b0b",
+      "2b464294-772d-4908-805c-181f6e265a0a",
+      "adb19409-c689-4579-9877-d34049df450b",
+      "7387be12-11fd-429c-91f6-0cd9e596f169",
+      "3f416836-b5b7-4688-a295-fa40c76ea47d"
     ],
-    "lastUpdated": "2026-05-10T13:47:30.879Z",
-    "createdAt": "2026-05-10T13:47:30.879Z",
-    "metadata": {
-      "scope": "`enhanced-transcript-monitor.js` (LSL pipeline transcript monitoring component)"
-    },
-    "project": "sketcher"
-  },
-  {
-    "id": "f628015e-ac1b-4a29-ad2d-c2a392ce7b69",
-    "topic": "Sketcher Project Working Tree",
-    "summary": "- Uncommitted scaffolding files remain in the sketcher project's working tree as of 2026-05-10\n- No real feature activity has occurred in the sketcher project recently\n- These files should be reviewed: either committed, stashed, or cleaned up to avoid confusion in future sessions",
-    "confidence": 0.5,
-    "digestIds": [
-      "5ac48fcb-1477-44c4-bebe-e509b2f9b6a5"
-    ],
-    "lastUpdated": "2026-05-10T13:47:30.879Z",
-    "createdAt": "2026-05-10T13:47:30.879Z",
-    "metadata": {
-      "scope": "Sketcher project repository working tree (uncommitted scaffolding files)"
-    },
-    "project": "sketcher"
+    "lastUpdated": "2026-05-03T04:22:51.080Z",
+    "createdAt": "2026-05-02T09:57:31.330Z",
+    "metadata": {},
+    "project": "coding"
   },
   {
     "id": "3fc0cd6a-2905-4dee-887b-0f099032814e",
     "topic": "AI Kraken SPA",
     "summary": "Early-stage single-page application intended as a searchable information hub with an \"AI Kraken\" theme.\n\n- No files have been created yet; project is in pre-scaffolding phase\n- Intended content source: a skills marketplace page (company redacted), with metadata extracted from embedded JSON or structured HTML\n- Data ingestion stalled; fallback was reading a cached HTML file from the tool output directory\n- Next steps likely involve: settling on scaffold location, completing data extraction, and producing initial SPA artifacts",
-    "confidence": 0.5,
+    "confidence": 0.45,
     "digestIds": [
       "ff3793a7-5bb2-4282-9aca-ad5284b357d5"
     ],

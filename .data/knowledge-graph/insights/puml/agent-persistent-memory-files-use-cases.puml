@@ -1,74 +1,44 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title Agent Persistent Memory Files — Use Cases
+title Agent Persistent Memory Files - Use Case Diagram
 
-actor "Claude Agent" as Agent
-actor "Semantic Analysis\nPipeline" as SAP
-actor "Knowledge Management\nSystem" as KMS
-actor "Developer" as Dev
+actor "AI Agent" as Agent
+actor "Knowledge Manager" as KM
+actor "Semantic Analyzer" as SA
 
 rectangle "Agent Persistent Memory Files" {
-
-  rectangle "Memory Persistence" {
-    usecase "Write Memory File" as UC_Write
-    usecase "Read Memory File" as UC_Read
-    usecase "Update Existing Memory" as UC_Update
-    usecase "Delete Stale Memory" as UC_Delete
-  }
-
-  rectangle "Memory Organisation" {
-    usecase "Index Memory in MEMORY.md" as UC_Index
-    usecase "Categorise Memory by Type\n(user / feedback / project / reference)" as UC_Categorise
-    usecase "Detect Duplicate Memory" as UC_Dedup
-  }
-
-  rectangle "Memory Retrieval & Application" {
-    usecase "Load Relevant Memory\non Session Start" as UC_Load
-    usecase "Verify Memory Currency\nagainst Codebase" as UC_Verify
-    usecase "Apply Memory to\nCurrent Task" as UC_Apply
-  }
-
-  rectangle "Knowledge Integration" {
-    usecase "Persist Entity to\nKnowledge Graph" as UC_Persist
-    usecase "Consolidate Observations\ninto Memory" as UC_Consolidate
-    usecase "Refresh Stale Entity" as UC_Refresh
-  }
-
+    usecase "Store Memory File" as UC1
+    usecase "Retrieve Memory File" as UC2
+    usecase "Update Memory Content" as UC3
+    usecase "Delete Memory File" as UC4
+    usecase "Index Memory for Search" as UC5
+    usecase "Perform Semantic Search" as UC6
+    usecase "Analyze Knowledge Patterns" as UC7
+    usecase "Persist Session Context" as UC8
+    usecase "Load Historical Context" as UC9
+    usecase "Validate Memory Integrity" as UC10
 }
 
-' Agent interactions
-Agent --> UC_Write
-Agent --> UC_Read
-Agent --> UC_Update
-Agent --> UC_Delete
-Agent --> UC_Load
-Agent --> UC_Apply
-Agent --> UC_Verify
+Agent --> UC1 : writes
+Agent --> UC2 : reads
+Agent --> UC3 : modifies
+Agent --> UC8 : saves session
+Agent --> UC9 : restores context
 
-' SAP interactions
-SAP --> UC_Persist
-SAP --> UC_Consolidate
-SAP --> UC_Refresh
+KM --> UC4 : manages
+KM --> UC10 : validates
+KM --> UC3 : curates
 
-' KMS interactions
-KMS --> UC_Categorise
-KMS --> UC_Dedup
-KMS --> UC_Index
+SA --> UC5 : indexes
+SA --> UC6 : queries
+SA --> UC7 : analyzes
 
-' Developer interactions
-Dev --> UC_Read
-Dev --> UC_Delete
-
-' Include relationships
-UC_Write ..> UC_Index : <<include>>
-UC_Write ..> UC_Categorise : <<include>>
-UC_Update ..> UC_Dedup : <<include>>
-UC_Load ..> UC_Verify : <<include>>
-UC_Persist ..> UC_Consolidate : <<include>>
-
-' Extend relationships
-UC_Refresh ..> UC_Verify : <<extend>>
-UC_Dedup ..> UC_Delete : <<extend>>
+UC1 ..> UC5 : <<include>>
+UC2 ..> UC6 : <<include>>
+UC6 ..> UC7 : <<extend>>
+UC8 ..> UC1 : <<include>>
+UC9 ..> UC2 : <<include>>
+UC3 ..> UC10 : <<include>>
 
 @enduml

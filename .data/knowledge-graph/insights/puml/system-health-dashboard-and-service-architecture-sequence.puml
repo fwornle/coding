@@ -1,65 +1,146 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title System Health Dashboard — Service Interaction Sequence
+title System Health Dashboard and Service Architecture
 
-actor User as user
-participant "Health Dashboard\n:3032" as dashboard
-participant "Health API\n:3033" as healthapi
-participant "Semantic Analysis\nSSE :3848" as ssa
-participant "Constraint Monitor\n(Docker)" as constraint
-participant "Coding Services\n(Docker)" as docker
-database "LevelDB\nKnowledge Graph" as leveldb
-participant "VKB Viewer\n:8080" as vkb
+actor "User / Operator" as User
+participant "Health Dashboard\n(UI Layer)" as Dashboard
+participant "API Gateway" as Gateway
+participant "Health Monitor\nService" as HealthMonitor
+participant "Semantic Analysis\nEngine" as SemanticEngine
+participant "Knowledge\nManager" as KnowledgeManager
+participant "Metrics\nCollector" as Metrics
+database "Health\nData Store" as HealthDB
+database "Knowledge\nGraph" as KnowledgeGraph
 
-== Dashboard Load ==
-user -> dashboard : Open browser
-dashboard -> healthapi : GET /api/health
-healthapi -> docker : Check container status
-docker --> healthapi : services status map
-healthapi --> dashboard : JSON health payload
-dashboard --> user : Render service tiles
+== Dashboard Initialization ==
 
-== UKB Workflow Execution ==
-user -> dashboard : Trigger wave-analysis
-dashboard -> ssa : POST /workflow/wave-analysis\n{team: "coding"}
-activate ssa
-ssa -> docker : Spawn workflow runner
-ssa --> dashboard : 202 Accepted {workflow_id}
+User -> Dashboard : Open Health Dashboard
+activate Dashboard
 
-loop Progress polling
-    dashboard -> ssa : GET /progress
-    ssa --> dashboard : {status, currentStep, subSteps}
-    dashboard --> user : Update progress tiles
+Dashboard -> Gateway : GET /api/health/status
+activate Gateway
+
+Gateway -> HealthMonitor : requestSystemStatus()
+activate HealthMonitor
+
+HealthMonitor -> Metrics : collectAllMetrics()
+activate Metrics
+Metrics --> HealthMonitor : metricsSnapshot{}
+deactivate Metrics
+
+HealthMonitor -> HealthDB : queryLatestHealthRecords()
+activate HealthDB
+HealthDB --> HealthMonitor : healthRecords[]
+deactivate HealthDB
+
+HealthMonitor --> Gateway : systemStatusReport{}
+deactivate HealthMonitor
+
+Gateway --> Dashboard : HTTP 200 statusPayload{}
+deactivate Gateway
+
+Dashboard --> User : Render Health Overview
+deactivate Dashboard
+
+== Semantic Analysis Health Check ==
+
+User -> Dashboard : Request Semantic Engine Status
+activate Dashboard
+
+Dashboard -> Gateway : GET /api/semantic/health
+activate Gateway
+
+Gateway -> SemanticEngine : checkEngineHealth()
+activate SemanticEngine
+
+SemanticEngine -> KnowledgeManager : validateKnowledgeBase()
+activate KnowledgeManager
+
+KnowledgeManager -> KnowledgeGraph : runIntegrityCheck()
+activate KnowledgeGraph
+KnowledgeGraph --> KnowledgeManager : integrityReport{status, node Count, edgeCount}
+deactivate KnowledgeGraph
+
+KnowledgeManager --> SemanticEngine : knowledgeBaseStatus{}
+deactivate KnowledgeManager
+
+SemanticEngine --> Gateway : semanticEngineHealth{status, latency, accuracy}
+deactivate SemanticEngine
+
+Gateway --> Dashboard : HTTP 200 semanticHealthPayload{}
+deactivate Gateway
+
+Dashboard --> User : Render Semantic Analysis Panel
+deactivate Dashboard
+
+== Continuous Health Monitoring Loop ==
+
+loop Every 30 seconds
+    HealthMonitor -> Metrics : pollServiceMetrics()
+    activate HealthMonitor
+    activate Metrics
+    Metrics --> HealthMonitor : updatedMetrics{}
+    deactivate Metrics
+
+    alt Critical Threshold Exceeded
+        HealthMonitor -> HealthDB : logCriticalAlert(alert{})
+        activate HealthDB
+        HealthDB --> HealthMonitor : alertLogged
+        deactivate HealthDB
+
+        HealthMonitor -> Dashboard : pushAlert(criticalAlert{})
+        activate Dashboard
+        Dashboard --> User : Display Critical Alert Banner
+        deactivate Dashboard
+
+    else Warning Threshold Exceeded
+        HealthMonitor -> HealthDB : logWarning(warning{})
+        activate HealthDB
+        HealthDB --> HealthMonitor : warningLogged
+        deactivate HealthDB
+
+        HealthMonitor -> Dashboard : pushWarning(warningAlert{})
+        activate Dashboard
+        Dashboard --> User : Display Warning Notification
+        deactivate Dashboard
+
+    else All Systems Nominal
+        HealthMonitor -> Dashboard : pushHeartbeat(healthyStatus{})
+        activate Dashboard
+        Dashboard --> User : Update Status Indicators (Green)
+        deactivate Dashboard
+    end
+    deactivate HealthMonitor
 end
 
-ssa -> leveldb : Persist entities / relations
-ssa --> dashboard : {status: "completed"}
-deactivate ssa
+== Knowledge Management Sync ==
 
-== Constraint Check Flow ==
-user -> dashboard : Edit / write file
-dashboard -> constraint : POST /check {content, type}
-constraint -> constraint : Evaluate rules
-alt Violation found
-    constraint --> dashboard : {severity: "error", message}
-    dashboard --> user : Red badge + violation detail
-else All clear
-    constraint --> dashboard : {violations: []}
-    dashboard --> user : Green badge
-end
+opt Scheduled Knowledge Sync
+    KnowledgeManager -> SemanticEngine : requestAnalysisBatch()
+    activate KnowledgeManager
+    activate SemanticEngine
 
-== Knowledge Graph Inspection ==
-user -> vkb : Open VKB at :8080
-vkb -> leveldb : Query nodes + edges
-leveldb --> vkb : Graphology graph payload
-vkb --> user : Sigma.js interactive graph
+    SemanticEngine -> SemanticEngine : processSemanticBatch()
 
-== Health Heartbeat (background) ==
-loop Every 30 s
-    docker -> healthapi : POST /lsl_heartbeat {sid, project}
-    healthapi -> healthapi : Update state.lsl[sid:project]
-    healthapi --> docker : 200 OK
+    SemanticEngine --> KnowledgeManager : analysisResults{entities, relations}
+    deactivate SemanticEngine
+
+    KnowledgeManager -> KnowledgeGraph : updateKnowledgeGraph(results{})
+    activate KnowledgeGraph
+    KnowledgeGraph --> KnowledgeManager : graphUpdated{nodesAdded, edgesAdded}
+    deactivate KnowledgeGraph
+
+    KnowledgeManager -> HealthDB : recordSyncEvent(syncLog{})
+    activate HealthDB
+    HealthDB --> KnowledgeManager : syncRecorded
+    deactivate HealthDB
+
+    KnowledgeManager -> Dashboard : notifySyncComplete(syncSummary{})
+    activate Dashboard
+    Dashboard --> User : Knowledge Base Updated Badge
+    deactivate Dashboard
+    deactivate KnowledgeManager
 end
 
 @enduml

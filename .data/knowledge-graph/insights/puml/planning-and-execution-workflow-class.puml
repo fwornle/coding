@@ -1,138 +1,200 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Trigger Layer" {
-  interface MCPToolInterface <<interface>> {
-    +execute_workflow(name: String, params: Map): WorkflowResult
-    +get_workflow_status(workflowId: String): ProgressState
-    +heartbeat(): void
+package "MCP Tool Layer" {
+  class MCPToolHandler <<service>> {
+    +execute_workflow(params: Map): Result
+    +triggerIncrementalAnalysis(): void
+    +validateRequest(request: Request): boolean
   }
 
-  class IncrementalAnalysisTrigger <<service>> {
-    -checkpointFile: String
-    -team: String
-    +trigger(): void
-    +resetCheckpoint(timestamp: String): void
-  }
-}
-
-package "Workflow Engine" {
-  class WorkflowRunner <<service>> {
-    -workflowName: String
-    -asyncMode: Boolean
-    -debugMode: Boolean
-    -progressFile: String
-    +execute(params: Map): String
-    +writeProgress(state: ProgressState): void
-    +writeProgressPreservingDetails(state: ProgressState): void
+  class WorkflowTrigger <<service>> {
+    -triggerType: TriggerTypeEnum
+    -payload: Map
+    +fromMCPTool(tool: MCPToolHandler): WorkflowTrigger
+    +fromAutoIncremental(): WorkflowTrigger
+    +getPayload(): Map
   }
 
-  class WaveController <<service>> {
-    -team: String
-    -currentWave: Integer
-    -totalWaves: Integer
-    +runWave(entities: List): WaveResult
-    +runDedup(): void
-    +runPrediction(): void
-    +runMerge(): void
-  }
-
-  enum WorkflowMode <<enum>> {
-    PRODUCTION
-    DEBUG
-    SINGLE_STEP
-  }
-
-  class ProgressState <<file>> {
-    +status: String
-    +currentStep: String
-    +workflowId: String
-    +mockLLM: Boolean
-    +singleStepMode: Boolean
-    +stepPaused: Boolean
-    +pid: Integer
+  enum TriggerTypeEnum {
+    MCP_EXECUTE_WORKFLOW
+    AUTOMATIC_INCREMENTAL
   }
 }
 
-package "Analysis Pipeline" {
-  class Coordinator <<service>> {
-    -ontologySystem: OntologySystem
-    -team: String
-    +classifyEntities(entities: List): List
-    +hasValidPreClassification(entity: Entity): Boolean
-    +updateEntityType(entity: Entity, type: String): void
+package "Planning Layer" {
+  interface IPlanningEngine {
+    +createPlan(context: AnalysisContext): WorkflowPlan
+    +validatePlan(plan: WorkflowPlan): boolean
+    +refinePlan(plan: WorkflowPlan): WorkflowPlan
   }
 
-  class OntologySystem <<service>> {
-    -upperOntologyPath: String
-    -lowerOntologyPath: String
-    +classify(entity: Entity): String
-    +listClasses(type: String): List
-    +suggestExtension(team: String): void
+  class WorkflowPlanner <<service>> {
+    -knowledgeManager: KnowledgeManager
+    -contextAnalyzer: ContextAnalyzer
+    +createPlan(context: AnalysisContext): WorkflowPlan
+    +validatePlan(plan: WorkflowPlan): boolean
+    +refinePlan(plan: WorkflowPlan): WorkflowPlan
+    -resolveDependencies(steps: List): List
   }
 
-  class PersistenceAgent <<service>> {
-    -graphDB: GraphDatabase
-    +persistEntities(entities: List): void
-    +storeEntityToGraph(entity: Entity): void
-    +calculateNameSimilarity(a: String, b: String): Float
-    +findFuzzyMatch(name: String, existing: List): Entity
+  class WorkflowPlan {
+    -planId: String
+    -steps: List
+    -priority: Integer
+    -estimatedCost: Float
+    +addStep(step: ExecutionStep): void
+    +getOrderedSteps(): List
+    +toExecutionContext(): ExecutionContext
   }
 
-  class InsightGenerationAgent <<service>> {
-    -llmProvider: String
-    +generateInsight(entity: Entity): Insight
-    +generateMeaningfulNameAndTitle(pattern: Pattern): NameTitle
-    +buildInsightDocument(entity: Entity): String
-  }
-}
-
-package "Knowledge Store" {
-  class GraphDatabase <<service>> {
-    -storageBackend: String
-    -team: String
-    +mergeNodeAttributes(id: String, attrs: Map): void
-    +getEntities(filter: Map): List
-    +getRelations(): List
+  class ExecutionStep {
+    -stepId: String
+    -stepType: String
+    -dependencies: List
+    -parameters: Map
+    +isReady(completedSteps: Set): boolean
+    +getParameters(): Map
   }
 
-  class Entity <<file>> {
-    +id: String
-    +name: String
-    +type: String
-    +entity Type: String
-    +metadata: Map
-    +observations: List
+  class ContextAnalyzer <<service>> {
+    +analyzeContext(trigger: WorkflowTrigger): AnalysisContext
+    +detectChanges(): ChangeSet
+    +buildSemanticContext(): SemanticContext
   }
 
-  class Insight <<file>> {
-    +entity Name: String
-    +content: String
-    +confidence: Float
-    +diagramPaths: List
+  class AnalysisContext {
+    -semanticContext: SemanticContext
+    -changeSet: ChangeSet
+    -scope: ScopeEnum
+    +isIncremental(): boolean
+    +getAffectedEntities(): List
   }
 }
 
-MCPToolInterface ..> WorkflowRunner : triggers
-IncrementalAnalysisTrigger ..> WorkflowRunner : triggers
+package "Execution Layer" {
+  interface IExecutionEngine {
+    +execute(plan: WorkflowPlan): ExecutionResult
+    +pause(): void
+    +resume(): void
+    +cancel(): void
+  }
 
-WorkflowRunner *-- ProgressState : writes
-WorkflowRunner --> WaveController : delegates waves
-WorkflowRunner --> WorkflowMode : uses
+  class WorkflowExecutor <<service>> {
+    -currentPlan: WorkflowPlan
+    -stepExecutors: Map
+    -state: ExecutionStateEnum
+    +execute(plan: WorkflowPlan): ExecutionResult
+    +pause(): void
+    +resume(): void
+    +cancel(): void
+    -executeStep(step: ExecutionStep): StepResult
+    -handleFailure(step: ExecutionStep, error: Error): void
+  }
 
-WaveController --> Coordinator : classifies
-WaveController --> PersistenceAgent : persists
-WaveController --> InsightGenerationAgent : generates
+  class StepExecutor <<service>> {
+    -stepType: String
+    +canHandle(step: ExecutionStep): boolean
+    +run(step: ExecutionStep): StepResult
+    +rollback(step: ExecutionStep): void
+  }
 
-Coordinator --> OntologySystem : classifies via
-Coordinator --> Entity : updates
+  class ExecutionResult {
+    -resultId: String
+    -status: ExecutionStateEnum
+    -stepResults: List
+    -duration: Long
+    -errors: List
+    +isSuccess(): boolean
+    +getSummary(): String
+  }
 
-PersistenceAgent --> GraphDatabase : stores to
-PersistenceAgent --> Entity : deduplicates
+  class StepResult {
+    -stepId: String
+    -success: boolean
+    -output: Map
+    -errorMessage: String
+    +toMetric(): Metric
+  }
 
-InsightGenerationAgent --> Insight : produces
+  enum ExecutionStateEnum {
+    PENDING
+    RUNNING
+    PAUSED
+    COMPLETED
+    FAILED
+    CANCELLED
+  }
+}
 
-GraphDatabase --> Entity : contains
-GraphDatabase --> Insight : contains
+package "Knowledge Management" {
+  class KnowledgeManager <<service>> {
+    -semanticIndex: SemanticIndex
+    -analysisStore: AnalysisStore
+    +getContext(scope: ScopeEnum): SemanticContext
+    +updateKnowledge(result: ExecutionResult): void
+    +queryEntities(query: String): List
+  }
+
+  class SemanticIndex {
+    -entities: Map
+    -relationships: Map
+    +indexEntity(entity: Object): void
+    +findRelated(entity Id: String): List
+    +search(query: String): List
+  }
+
+  class AnalysisStore {
+    -results: Map
+    +persist(result: ExecutionResult): void
+    +retrieve(resultId: String): ExecutionResult
+    +getHistory(limit: Integer): List
+  }
+
+  class SemanticContext {
+    -entities: List
+    -relationships: List
+    -metadata: Map
+    +getEntities(): List
+    +getRelationships(): List
+  }
+
+  class ChangeSet {
+    -additions: List
+    -modifications: List
+    -deletions: List
+    +isEmpty(): boolean
+    +getAffectedIds(): Set
+  }
+}
+
+' Relationships
+MCPToolHandler --> WorkflowTrigger : creates
+WorkflowTrigger --> TriggerTypeEnum : uses
+WorkflowTrigger --> WorkflowPlanner : triggers
+
+WorkflowPlanner ..|> IPlanningEngine
+WorkflowPlanner --> ContextAnalyzer : uses
+WorkflowPlanner --> KnowledgeManager : queries
+WorkflowPlanner --> WorkflowPlan : produces
+
+WorkflowPlan "1" --* "many" ExecutionStep : contains
+ContextAnalyzer --> AnalysisContext : produces
+AnalysisContext --> SemanticContext : contains
+AnalysisContext --> ChangeSet : contains
+
+WorkflowExecutor ..|> IExecutionEngine
+WorkflowExecutor --> WorkflowPlan : executes
+WorkflowExecutor --> StepExecutor : delegates to
+WorkflowExecutor --> ExecutionResult : produces
+WorkflowExecutor --> ExecutionStateEnum : tracks
+StepExecutor --> StepResult : produces
+ExecutionResult "1" --* "many" StepResult : aggregates
+
+KnowledgeManager --> SemanticIndex : manages
+KnowledgeManager --> AnalysisStore : manages
+KnowledgeManager --> SemanticContext : provides
+
+WorkflowExecutor --> KnowledgeManager : updates after execution
 
 @enduml

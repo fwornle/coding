@@ -17339,7 +17339,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-11T14:32:18.688Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:00:53.857Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17353,7 +17353,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-11T14:32:18.688Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:00:53.857Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17367,7 +17367,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-11T14:32:18.688Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:00:53.857Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17381,7 +17381,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T04:56:57.293Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17397,7 +17397,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T04:59:00.833Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17413,7 +17413,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T05:01:13.283Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17429,7 +17429,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-12T05:03:50.405Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17446,7 +17446,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-12T05:03:50.405Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17464,7 +17464,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-12T05:03:50.405Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17483,7 +17483,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T05:07:02.683Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17499,7 +17499,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-05-12T05:07:02.683Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17515,7 +17515,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T05:11:03.004Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17534,7 +17534,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-12T05:11:45.025Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17550,7 +17550,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-05-12T05:12:12.755Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17566,7 +17566,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T05:13:08.222Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17582,7 +17582,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T05:13:25.534Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17598,7 +17598,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T05:13:25.534Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17614,7 +17614,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-05-12T05:15:20.743Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17630,7 +17630,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-05-12T05:15:20.743Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17646,7 +17646,7 @@
     "project": "rapid-automations",
     "quality": "high",
     "createdAt": "2026-05-12T05:20:41.691Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17662,7 +17662,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-12T05:22:08.515Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17678,7 +17678,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T05:22:16.666Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17689,17 +17689,35 @@
   },
   {
     "id": "04e391f5-7694-4eb2-8c5c-4a9998cfcdaf",
-    "summary": "Intent: Execute steps 1-5 of a previously outlined plan in the rapid-automations project.\nApproach: Attempted to initialize/update the submodule and switch to main branch, but SSH auth failures against the GHE remote blocked fetching required submodule commits.\nArtifacts: none\nResult: Steps were partially attempted but blocked by SSH authentication failure with <COMPANY_NAME_REDACTED>.ghe.com for the rapid-toolkit submodule; local submodule sits at an intermediate commit (d133df6) rather than the required pointer, and branch switching proceeded independently of submodule resolution.",
+    "summary": "Intent: Execute steps 1-5 of a previously outlined plan in the rapid-automations project.\nApproach: Attempted to initialize/update the submodule and switch to main branch, but SSH auth failures against the GHE remote blocked fetching required submodule commits.\nArtifacts: edited .gitmodules\nResult: Steps were partially attempted but blocked by SSH authentication failure with <COMPANY_NAME_REDACTED>.ghe.com for the rapid-toolkit submodule; local submodule sits at an intermediate commit (d133df6) rather than the required pointer, and branch switching proceeded independently of submodule resolution.",
     "agent": "claude",
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-12T05:22:16.666Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
     },
-    "modifiedFiles": null
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "3322d3d5-ea0c-458d-a9ad-acda3cb36d68",
+    "summary": "Intent: Execute steps 1-5 of a previously outlined plan for resolving a submodule/branch issue.\nApproach: Attempted sequential git operations (submodule init, branch switch to main, feature branch deletion) but encountered GHE SSH auth failures blocking remote fetches and a working directory issue inside the submodule.\nArtifacts: edited .gitmodules\nResult: Partially completed — already on main (up to date), feature branch deletion attempted, but submodule pointer remains at intermediate commit `d133df6` due to SSH auth failures preventing fetch from `<COMPANY_NAME_REDACTED>.ghe.com`; final state verification was blocked by CWD being inside the submodule directory.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:22:16.666Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
   },
   {
     "id": "da297d46-a122-41ce-8017-825169cb9443",
@@ -17708,7 +17726,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-12T05:23:56.454Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-12T12:01:49.471Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -17716,5 +17734,2319 @@
     "modifiedFiles": [
       "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
     ]
+  },
+  {
+    "id": "25be8a03-7644-4d3d-87ef-db4623af3f01",
+    "summary": "Intent: Commit accumulated drift (settings, knowledge base, and observations) to the coding project repository.\nApproach: Grouped changes into three semantically distinct commits following an established naming convention for settings, KB, and observation exports.\nArtifacts: edited .gitmodules\nResult: Three commits pushed — Bash allowlist additions, knowledge-export refresh, and observation-export refresh (+1438 lines); working tree left clean.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:26:21.915Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "4b2d536d-a3c6-45f2-93e2-e9a961609ad1",
+    "summary": "Intent: Execute the remaining steps (R3 and R4) to complete phase 34 of the proxy supervision and ETM cleanup work.\nApproach: Read the phase 34 summary to retrieve the R3/R4 runbooks before executing them in sequence, starting with the less destructive R3 (networkMode flap) followed by R4.\nArtifacts: edited .gitmodules\nResult: The assistant read the phase 34 summary and began executing R3 (networkMode flap test, ~30s) with R4 queued next (~7 min outage + ~5 min cooldown observation).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:26:59.030Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "efefbad7-638c-4eec-8793-59d11448ccc2",
+    "summary": "Intent: Execute R3 and R4 test runs to complete phase 34.\nApproach: Read the phase summary to find runbook instructions for R3 and R4, then attempt to fire them sequentially.\nArtifacts: edited .gitmodules\nResult: R3 execution was ambiguous — the `LLM_NETWORK_MODE` env var did not affect `state.proxy.networkMode` as expected, and the expected log path was missing; R4 was not yet fired pending investigation.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:26:59.030Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "81e8da4d-2448-40f5-af2f-9dc2286bfc0d",
+    "summary": "Intent: Test SSH authentication to a GitHub Enterprise host using a specific email/user.\nApproach: Running SSH test connection to diagnose authentication failures by comparing different usernames.\nArtifacts: edited .gitmodules\nResult: Discovered that git remote URLs using `<EMAIL_REDACTED>` override the SSH config's `User git` directive, causing auth failure since GHE only accepts user `git`.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:27:10.841Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "1d76f459-dd2d-4824-ae53-d56ad469e400",
+    "summary": "Intent: [developer asking whether HTTPS commits to the internal GitHub Enterprise host work from anywhere or require VPN/corporate network]\nApproach: Clarifying network topology — the internal GHE host is not internet-accessible regardless of protocol, so VPN/CN is required for any sync.\nArtifacts: edited .gitmodules\nResult: Confirmed that <COMPANY_NAME_REDACTED>.ghe.com requires VPN or corporate network access for both SSH and HTTPS; HTTPS only solved the SSH username mismatch, not the network reachability issue.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:28:29.212Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "b53748ee-38f3-485e-ad25-03c447f24534",
+    "summary": "Intent: [the developer asked why they can push to the rapid-automations-history repo outside VPN/corporate network, and whether it's hosted on the company's GitHub Enterprise]\nApproach: [Assistant investigated the git remotes of both repos to compare their hosting URLs and explain the discrepancy]\nArtifacts: edited .gitmodules\nResult: [Investigation was inconclusive due to a working directory bug in the assistant's commands; no definitive answer was reached about where rapid-automations-history is hosted]",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:31:08.198Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "28e08531-f08d-4365-9e9c-8376e989efdb",
+    "summary": "Intent: Understand why rapid-automations-history repo can be pushed to outside VPN/corporate network, and whether it's hosted on the same GHE instance.\nApproach: Investigated remote URLs across the three related repos to distinguish HTTPS vs SSH remotes, explaining that HTTPS on port 443 is publicly accessible while SSH requires VPN/intranet.\nArtifacts: edited .gitmodules\nResult: All repos are on <COMPANY_NAME_REDACTED>.ghe.com; HTTPS remotes work outside VPN because port 443 is publicly exposed, while the rapid-toolkit submodule fails due to SSH being firewalled and an incorrect `<COMPANY_NAME_REDACTED>@` user prefix (should be `git@`).",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:31:08.198Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "50fd72a9-8afb-41b3-a2ba-e6c5e0f76053",
+    "summary": "Intent: Fix the submodule remote URL in the rapid-automations project.\nApproach: Inspecting .gitmodules to identify incorrect remote URLs with a `<COMPANY_NAME_REDACTED>@` bug across multiple submodules before applying fixes.\nArtifacts: edited .gitmodules\nResult: Investigation revealed three submodules (rapid-toolkit, rapid-agentic-sandbox, operational-knowledge-management) share the same malformed remote URL pattern; fix not yet applied in this exchange.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T05:34:01.179Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "4e22e0ca-e0a4-499c-b232-bb260139a923",
+    "summary": "Intent: Fix incorrect remote URLs in git submodules\nApproach: Convert SSH (`<COMPANY_NAME_REDACTED>@`) URLs to HTTPS format across all affected submodules in `.gitmodules`, matching the already-working HTTPS pattern used by the OKM submodule.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.gitmodules\nResult: Updated `.gitmodules` to use HTTPS URLs for all three submodules (`rapid-toolkit`, `rapid-agentic-sandbox`, `operational-knowledge-management`), replacing broken `<COMPANY_NAME_REDACTED>@` SSH-style URLs.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T05:34:01.179Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "53d6b24e-5ca5-4ea6-baef-69b74308806a",
+    "summary": "Intent: Fix incorrect remote URLs in submodule configuration\nApproach: Converted SSH (`<COMPANY_NAME_REDACTED>@`) URLs to HTTPS format for all affected submodules, using OKM's existing HTTPS URL as the canonical pattern, since HTTPS works outside VPN.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.gitmodules\nResult: Updated `.gitmodules` to use HTTPS URLs for `rapid-toolkit`, `rapid-agentic-sandbox`, and `operational-knowledge-management` submodules, replacing broken SSH `<COMPANY_NAME_REDACTED>@` URLs.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T05:34:01.179Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/.gitmodules"
+    ]
+  },
+  {
+    "id": "8356e04a-b828-4c96-a9f0-94bd5f52cc92",
+    "summary": "Intent: [shared a screenshot showing a rendering artifact/residue in the terminal status line, likely showing a stale character leaking through from a previous render]\nApproach: Investigated the cell-width counting logic for emoji characters, particularly how ⚠️ is measured vs rendered in VS Code's xterm.js terminal.\nArtifacts: edited combined-status-line.js\nResult: Identified a potential 1-cell discrepancy between counted and rendered width of ⚠️, but the assistant's initial theory was invalidated after re-reading the `isAmbiguousNarrow` code — root cause of the residue remained unresolved at end of exchange.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T05:54:07.845Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "7ac173df-7ad1-490a-ae52-77dccc730791",
+    "summary": "Intent: Fix a rendering residue/ghost character issue visible in a screenshot of the status line display.\nApproach: Diagnosed a cell-width mismatch causing previous render content to leak through; applied a residue buffer fix to the padding/cell-width calculation logic.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: Applied a fix to combined-status-line.js to prevent residue characters from prior renders bleeding through during stable operation, addressing a cell-counting discrepancy in the left-padding logic.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T05:54:07.845Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "723cc66e-bb4a-4975-867b-758ee92f4236",
+    "summary": "Intent: Fix a terminal rendering artifact (residue from previous render leaking through) visible in the combined status line script.\nApproach: Identified a 1-cell width discrepancy between how `visibleCellWidth` counts the ⚠️ emoji versus how VS Code's xterm.js renders it, causing `leftPadToStableCellWidth` to over-predict and leave residue from prior renders.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: Applied a residue buffer fix to the combined status line script to prevent previous render characters from leaking through during stable operation, then committed the change.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T05:54:07.845Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "a1a8f1b1-46e1-45cb-98ab-f96ef7d52215",
+    "summary": "Intent: Verify that a +2 buffer fix is live in the blue pane's render code\nApproach: Searched for the buffer constant/expression in the relevant script files to confirm the fix is present.\nArtifacts: edited 34-VERIFICATION.md, edited STATE.md, edited 34-03-SUMMARY.md, edited project_phase34_close_gates.md, edited MEMORY.md\nResult: Developer checked whether the CELL_DRIFT_BUFFER or equivalent +2 offset is present in the rendering code; outcome of the grep was not shown in the exchange.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T06:03:26.882Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-VERIFICATION.md",
+      "/Users/Q284340/Agentic/coding/.planning/STATE.md",
+      "/Users/Q284340/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-03-SUMMARY.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/project_phase34_close_gates.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/MEMORY.md"
+    ]
+  },
+  {
+    "id": "4a7fad80-4fb0-423a-97b9-3d6876b78a32",
+    "summary": "Intent: [curl command to a connection string, likely checking a service health endpoint]\nApproach: Investigated a health endpoint response, identifying a typo in a jq field query.\nArtifacts: edited feedback_stale_runbooks_telemetry.md, edited feedback_gsd_state_milestone_drift.md\nResult: Discovered a typo (`kickstart_coun` vs `kickstart_count`) causing a null result from jq when querying the health state endpoint.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-12T06:04:56.111Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md"
+    ]
+  },
+  {
+    "id": "68856211-7a4b-4003-8a41-94d4cd8a9ba8",
+    "summary": "Intent: [checking proxy health state via curl command]\nApproach: User ran a curl against a local proxy health endpoint; assistant corrected a typo in a jq field query and displayed key health metrics.\nArtifacts: edited feedback_stale_runbooks_telemetry.md, edited feedback_gsd_state_milestone_drift.md\nResult: Proxy health state confirmed: kickstart_count=99, auto_heal_status=\"healthy\", consecutive_failures=0, semantic_ok=true; D-14 soak window ~1.6h elapsed of 24h.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-12T06:04:56.111Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md"
+    ]
+  },
+  {
+    "id": "a0022938-b1c2-443e-96f9-b9700980a85c",
+    "summary": "Intent: Save key learnings from the current session to persistent memory.\nApproach: Write discrete feedback/learning files per topic rather than one monolithic entry, keeping memory modular and indexed.\nArtifacts: edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md, edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md\nResult: Two new memory files created capturing learnings on stale runbooks/telemetry and GSD state/milestone drift; MEMORY.md index was queued for update to reference both files.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T06:06:12.964Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md"
+    ]
+  },
+  {
+    "id": "72d25c33-706a-4572-b984-8e188673efb6",
+    "summary": "Intent: Save key learnings from the current session to persistent memory.\nApproach: Created dedicated feedback memory files for two distinct lessons, then updated the MEMORY.md index to reference them.\nArtifacts: edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md, edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md, edited /Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/MEMORY.md\nResult: Two feedback memories persisted: one covering stale acceptance runbooks decaying as code evolves (verify test infra before reading telemetry), and one covering STATE.md milestone frontmatter needing sync with ROADMAP.md updates to avoid wrong milestone tags in working memory.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T06:06:12.964Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_stale_runbooks_telemetry.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_state_milestone_drift.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/MEMORY.md"
+    ]
+  },
+  {
+    "id": "91813864-337f-4354-a924-61dca5c5b480",
+    "summary": "Intent: [commit the memory updates to version control]\nApproach: Assistant checked if the memory directory was a git repo before attempting a commit.\nArtifacts: edited combined-status-line.js\nResult: The memory directory is not under git version control; files are saved to disk and persist for Claude's memory system without commits. No commit was performed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-12T06:12:24.442Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "f04ea020-804f-4c20-b2ea-9ad216939f46",
+    "summary": "Intent: [asking whether documentation has been updated to reflect removal of the trajectory system]\nApproach: [assistant searched codebase for trajectory references in docs]\nArtifacts: edited combined-status-line.js\nResult: [the exchange ended mid-investigation; no conclusion or update was made yet]",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T06:16:15.522Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "91158336-8f8f-4365-87c5-19b3777bfd12",
+    "summary": "Intent: Ask whether documentation has been updated to reflect the removal of the trajectory system.\nApproach: Audited the repository for stale trajectory references across docs, PUMLs, and README rather than making changes, to scope the cleanup work needed.\nArtifacts: none\nResult: Docs have NOT been updated; source code is clean but 10+ docs-content files, 17+ legacy docs files, root README, and ~20 PUML diagrams still reference the trajectory system. Three cleanup strategies were proposed (aggressive delete, deprecation notices, or phased docs-content-first approach).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T06:16:15.522Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "1e316ffc-c71c-45ce-8079-a6ec41312a24",
+    "summary": "Intent: [Select implementation option 1 for dedicated pages and option 3 phasing for remaining trajectory documentation work]\nApproach: User chose between previously presented options for restructuring trajectory documentation, combining dedicated pages approach with a specific phasing strategy.\nArtifacts: edited mkdocs.yml\nResult: Decision recorded to proceed with option 1 (dedicated pages) and option 3 (phasing) — assistant began investigating mkdocs.yml and preparing Phase A deletions but did not complete execution in this exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-12T06:19:57.079Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/mkdocs.yml"
+    ]
+  },
+  {
+    "id": "cc474c22-f154-4424-9eda-4480bf1804cf",
+    "summary": "Intent: Choose option 1 for dedicated pages and option 3 phasing for the remaining trajectory-related content.\nApproach: Applied a hybrid strategy combining two previously presented options for handling trajectory documentation reorganization in the mkdocs navigation.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/mkdocs.yml\nResult: Updated mkdocs.yml to implement option 1 for dedicated pages and option 3 phasing for the rest of the trajectory content, including removal of dedicated trajectory artifacts from the nav structure.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T06:19:57.079Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/mkdocs.yml"
+    ]
+  },
+  {
+    "id": "6afe62b5-7080-438e-9cbf-9fce48dab307",
+    "summary": "Intent: Choose option 1 (dedicated pages) and option 3 phasing for remaining trajectory-related documentation changes in the coding project.\nApproach: Applied a phased approach where dedicated trajectory pages get one treatment (option 1) and the rest of the documentation follows option 3 phasing, starting with nav cleanup in mkdocs.yml then moving to broader doc updates.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/mkdocs.yml\nResult: Updated mkdocs.yml navigation to reflect the selected options, with Phase A targeting dedicated trajectory artifacts for removal/restructuring and Phase B queued to handle general doc references to trajectory.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T06:19:57.079Z",
+    "digestedAt": "2026-05-12T12:01:49.471Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/mkdocs.yml"
+    ]
+  },
+  {
+    "id": "dd0d8adc-2fbb-420a-8029-518f345a4adc",
+    "summary": "Intent: Update architecture PUML diagram files to remove or replace trajectory references.\nApproach: Systematically identified all PUML files containing trajectory references, then edited each to remove/replace those references while preserving diagram accuracy.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/timezone-handling.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-monitoring-overview.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/cross-project-learning.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/constraint-monitor-dataflow.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/project-routing.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/statusline-architecture.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/constraint-monitor-data-model.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/coding-system-architecture.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/complete-system-overview.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/cross-project-data-flow.puml, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/integration-architecture.puml\nResult: All 11 architecture PUML files were updated to remove trajectory-related references, aligning the diagrams with the current system design after trajectory concept removal.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T11:59:30.850Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/timezone-handling.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/health-monitoring-overview.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/cross-project-learning.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/constraint-monitor-dataflow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/project-routing.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/statusline-architecture.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/constraint-monitor-data-model.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/coding-system-architecture.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/complete-system-overview.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/cross-project-data-flow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/integration-architecture.puml"
+    ]
+  },
+  {
+    "id": "73688c97-ed32-4417-a32e-d806077a4987",
+    "summary": "Intent: Monitor coding statusline for SYS:TIMEOUT and coordinator-cascade recurrence over ~60 minutes, checking failure logs, cache files, and tmux live renders each iteration.\nApproach: Dynamic mode loop with ScheduleWakeup for self-pacing, checking csl-failures.jsonl, combined-status-line-cache files, and tmux render health each iteration, stopping after 60 minutes of clean state.\nArtifacts: none\nResult: Monitoring declared complete after a clean window; no new failures, all cache files showed healthy status indicators, live tmux render confirmed healthy, and the monitor task was stopped with no further ScheduleWakeup scheduled.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T12:04:29.008Z",
+    "digestedAt": "2026-05-14T11:09:42.310Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "4438ac12-874c-411b-b819-4f96c3122ee8",
+    "summary": "Intent: Update legacy docs/ tree to remove or replace \"trajectory\" mentions\nApproach: Grep for all trajectory references across legacy docs files, then edit each affected file.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/README.md\nResult: Began updating legacy docs/ directory; edited README.md as first file in a batch pass across 16 identified files containing trajectory references.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T13:18:04.321Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/README.md"
+    ]
+  },
+  {
+    "id": "1c94ab2c-06ef-454a-a5bf-3ad9e9e1006a",
+    "summary": "Intent: Apply \"trajectory\" terminology replacement to the legacy docs/ directory tree\nApproach: Searched for all markdown files in docs/ containing trajectory-related terms, then edited the files with the most occurrences first.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/README.md, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/system-overview.md\nResult: Replaced trajectory terminology in the two highest-impact legacy docs files; remaining files in the 16-file docs tree were identified but not yet modified in this exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-12T13:18:04.321Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/system-overview.md"
+    ]
+  },
+  {
+    "id": "83fd8c76-3e92-4454-9399-50145701957f",
+    "summary": "Intent: Resume a previously started documentation update task.\nApproach: Continued from prior context by applying queued high-priority edits to the status-line guide covering residue troubleshooting, fast-path naming, configuration table additions, and a failure-logging section.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md\nResult: The status-line guide was updated with four additions: residue troubleshooting content, fast-path naming clarification, a `codepoint-widths` entry in the configuration table, and a new failure-logging section.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T13:18:48.369Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "046da9de-b662-4a0f-9396-5859877c6683",
+    "summary": "Intent: Resume a previously started documentation update for the status-line guide.\nApproach: Continued in-progress edits to the status-line docs by reading current file state and applying pending changes across multiple sections.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md\nResult: Partial resumption of doc updates covering residue troubleshooting, fast-path naming, codepoint-widths config table entry, and a failure-logging section; work was interrupted mid-session.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T13:18:48.369Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "db4309c1-7a7a-4b24-b482-750f58bdd572",
+    "summary": "Intent: Resume a docs update that was in progress.\nApproach: Continued editing the status-line guide, incorporating findings about idle vs degraded state semantics, badge behavior, and latency chain into the documentation.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md\nResult: Status-line guide updated with documentation on badge degradation during idle sessions, the 3-stage latency chain (~90s worst case), and the distinction between idle and broken pipeline states.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T13:18:48.369Z",
+    "digestedAt": "2026-05-14T11:09:42.310Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "57f57bde-d54c-42f8-b2f9-fe748dd36010",
+    "summary": "Intent: Implement both status badges with idle states and reduce the cache TTL.\nApproach: Add idle state rendering for both 📚 and 🧠 badges using a new `isUserActive()` helper, and drop the fast.cjs cache TTL from 60s to 30s for fresher status updates.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: Both badges now support an idle state via a new `isUserActive()` helper, and the cache TTL was halved to 30 seconds for more responsive status line updates.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T13:24:00.468Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "a9c8a06d-a1c9-4f2a-95c7-e079bbfe6c30",
+    "summary": "Intent: Implement idle-state badges for 📚 and 🧠 indicators, and reduce the cache TTL\nApproach: Added an `isUserActive()` helper to detect idle sessions and used it in `buildCombinedStatus()` to render ⚫ instead of warning badges when the user is idle; dropped cache TTL from 60s to 30s for fresher status data.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js, edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs\nResult: Both 📚 and 🧠 badges now show ⚫ (idle) instead of ⚠️/degraded states when user is inactive; cache TTL reduced from 60s to 30s; syntax checks and runtime tests confirmed correct behavior.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-12T13:24:00.468Z",
+    "digestedAt": "2026-05-13T04:45:59.612Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ]
+  },
+  {
+    "id": "b1650c90-dbcf-4a39-9c33-e13b5b897fe3",
+    "summary": "Intent: [push current commits to remote]\nApproach: Simple git push to origin main.\nArtifacts: none\nResult: Successfully pushed to origin/main; branches are in sync.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-12T13:33:52.535Z",
+    "digestedAt": "2026-05-14T11:09:42.310Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "89671d6f-f23d-4c1c-b914-2f974d2aab52",
+    "summary": "Intent: Commit the clean files while reverting any partial edits to keep the working tree clean.\nApproach: Identify which files were fully updated (no remaining trajectory references) and revert the partially edited file to HEAD to avoid committing incomplete work.\nArtifacts: edited 34-VERIFICATION.md, edited STATE.md, edited 34-03-SUMMARY.md, edited project_phase34_close_gates.md, edited MEMORY.md\nResult: Confirmed 14 files clean of trajectory references; reverted partial edit to `continuous-learning-system.md` to HEAD, leaving working tree in a clean state ready for commit.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T04:35:33.192Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-VERIFICATION.md",
+      "/Users/Q284340/Agentic/coding/.planning/STATE.md",
+      "/Users/Q284340/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-03-SUMMARY.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/project_phase34_close_gates.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/MEMORY.md"
+    ]
+  },
+  {
+    "id": "7b992e6e-08e9-4931-bc28-1eb25e116a10",
+    "summary": "Intent: Commit the 14 clean files from the trajectory cleanup phase D, deferring the 2 remaining files.\nApproach: Revert the partially edited file to keep the working tree clean, then commit only the confirmed clean files, leaving a clear resumable state.\nArtifacts: edited 34-VERIFICATION.md, edited STATE.md, edited 34-03-SUMMARY.md, edited project_phase34_close_gates.md, edited MEMORY.md\nResult: Commit `24d6db15e` pushed with 14 legacy `docs/` files cleaned of trajectory references (–72/+12 lines). Two files remain: `continuous-learning-system.md` (deferred, needs surgical edits) and `ukb-issues-analysis.md` (intentionally preserved as archive).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T04:35:33.192Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-VERIFICATION.md",
+      "/Users/Q284340/Agentic/coding/.planning/STATE.md",
+      "/Users/Q284340/Agentic/coding/.planning/phases/34-proxy-supervision-and-etm-cleanup/34-03-SUMMARY.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/project_phase34_close_gates.md",
+      "/Users/Q284340/.claude/projects/-Users-Q284340-Agentic-coding/memory/MEMORY.md"
+    ]
+  },
+  {
+    "id": "3dc185c0-467b-4e46-a14e-b2ebc91f91c1",
+    "summary": "Intent: Load and summarize recent Live Session Logs to establish context continuity for the current coding project session.\nApproach: Run a shell command to identify current directory and list recent history files before loading and summarizing them.\nArtifacts: edited continuous-learning-system.md\nResult: Session log loading initiated; listed recent `.specstory/history/` files to determine which LSL files to load for continuity summary.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T04:38:25.745Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/continuous-learning-system.md"
+    ]
+  },
+  {
+    "id": "fc3e584f-fe61-4e90-b17d-5edb6b924a8c",
+    "summary": "Intent: Load recent session logs to establish context continuity from previous work sessions.\nApproach: Read the most recent LSL files from the coding project's specstory history to summarize prior work and suggest next steps.\nArtifacts: edited continuous-learning-system.md\nResult: Sessions from 2026-05-12 to 2026-05-13 involved decommissioning the \"trajectory\" subsystem across docs (Phases A–D). Phase D-partial was committed; one file remains deferred: `docs/knowledge-management/continuous-learning-system.md` with 10 references needing surgical edits.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T04:38:25.745Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/continuous-learning-system.md"
+    ]
+  },
+  {
+    "id": "9c7aa450-e513-417a-8db0-31abdea76cd6",
+    "summary": "Intent: Complete the unfinished continuous-learning-system.md document\nApproach: Read the file to identify incomplete sections, then made targeted edits to fill in missing content at identified locations.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md\nResult: The continuous-learning-system.md file was completed by finishing incomplete sections throughout the document.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T04:39:27.549Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md"
+    ]
+  },
+  {
+    "id": "576c907a-3b8e-467c-810a-974a7b31c00d",
+    "summary": "Intent: [assess overlap between current work and the trajectory-scrub commits]\nApproach: Compared git diff stats of trajectory-scrub commits against local unstaged edits to identify file-level conflicts.\nArtifacts: edited status-line.md\nResult: Direct overlap identified on `docs-content/guides/status-line.md`; trajectory-scrub Phase B already deleted 58 lines from that file, and local edits sit on top of those changes requiring further review.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T04:40:47.170Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "948bb282-114d-4d29-93aa-e7d72abb3e64",
+    "summary": "Intent: Assess overlap between the developer's pending status-line.md edits and the trajectory-scrub commits.\nApproach: Git diffed the trajectory-scrub commit range against local unstaged changes to identify which sections each touched, determining Phase B handled content removal while local edits addressed technical accuracy updates needing post-Phase-34 corrections.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md\nResult: Overlap was complementary not conflicting — Phase B stripped trajectory content while local edits updated fast-path script names, coordinator probe docs, VS16 fix, failure log, TTL values corrected to 30s/10s, and added idle-suppression `⚫` state documentation; changes were committed.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-13T04:40:47.170Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "c466bd49-5a7b-42ba-ab15-a15b94735988",
+    "summary": "Intent: Commit changes to the repository\nApproach: Staged and committed the modified documentation file, then pushed to remote.\nArtifacts: edited docs/knowledge-management/continuous-learning-system.md\nResult: Changes committed and pushed as commit `9aa64b529`, completing the trajectory cleanup arc (Phases A → D-final).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T04:41:10.773Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "5d9df825-cced-4e80-8402-fc78132a15f2",
+    "summary": "Intent: Verify nothing broke after recent changes.\nApproach: Ran grep searches across docs and docs-content to check for stale references and orphaned files.\nArtifacts: edited status-line.md\nResult: Investigation found two potential issues with presentation PUMLs and stray references requiring further review.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T04:41:46.702Z",
+    "digestedAt": "2026-05-13T04:46:13.610Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "a492e00a-6327-4f67-8972-54ee531ef8ff",
+    "summary": "Intent: Execute \"phase E\" of a multi-phase task, which involved removing trajectory-related components from PlantUML diagrams.\nApproach: Identified all trajectory references across diagram files and surgically removed the trajectory system architecture file, its component from the overview diagram, and trajectory tracking package/edges from the continuous learning diagram.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/presentation/puml/complete-system-overview.puml\nResult: Trajectory component and its associated edge were removed from the complete system overview diagram as part of phase E cleanup; additional planned deletions of trajectory-system-architecture.puml and edits to continuous-learning-architecture.puml were identified but may not have been fully executed per ground truth.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T04:48:17.478Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/presentation/puml/complete-system-overview.puml"
+    ]
+  },
+  {
+    "id": "3f92ed35-8554-4c42-85a2-3bcefc8dad2d",
+    "summary": "Intent: [tackle the legacy docs/ tree to address remaining trajectory references]\nApproach: Searched for trajectory-related references in docs/ tree; found only one file in archive/historical which is a historical snapshot and should not be modified.\nArtifacts: edited status-line.md\nResult: Only one legacy docs file contained trajectory references, located in docs/archive/historical/ as a historical snapshot — determined it should be left unmodified to preserve the historical record.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T04:48:51.664Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "015be4fb-7cc0-4d2e-b40a-4f3fa3c37534",
+    "summary": "Intent: [user shared an image, likely showing documentation or code with budget/cost figures like $8.33/mo]\nApproach: Searched docs for specific dollar amounts and budget-related numerics, then verified whether a BudgetTracker class actually exists in source code to determine if the figures are hallucinated or backed by real implementation.\nArtifacts: edited knowledge-workflows.md\nResult: Investigation into whether cost/budget figures (e.g., $8.33/month) appearing in documentation are grounded in actual source code; checked for BudgetTracker class existence and any hardcoded monetary values across markdown files.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T04:53:45.597Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/guides/knowledge-workflows.md"
+    ]
+  },
+  {
+    "id": "44a4439c-cba5-4ad4-b2e2-e9f33d904159",
+    "summary": "Intent: Load recent session logs to establish context continuity from previous work sessions in the rapid-automations project.\nApproach: Followed the /sl command protocol to read recent LSL files from the current project and check for cross-project coding context within the same timeframe.\nArtifacts: edited knowledge-workflows.md, edited ukb-vkb.md, edited continuous-learning-system.md, edited system-comparison.md, edited README.md, edited cross-project-knowledge.md, edited complete-system-overview.puml, edited continuous-learning-architecture.puml\nResult: Session logs from 2026-05-11 through 2026-05-13 were read to produce a continuity summary of recent work in the rapid-automations project.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T04:54:57.177Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/guides/knowledge-workflows.md",
+      "/Users/Q284340/Agentic/coding/docs-content/core-systems/ukb-vkb.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/README.md",
+      "/Users/Q284340/Agentic/coding/docs/architecture/cross-project-knowledge.md",
+      "/Users/Q284340/Agentic/coding/docs/puml/complete-system-overview.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/continuous-learning-architecture.puml"
+    ]
+  },
+  {
+    "id": "af3952c3-f9f9-4da3-b3e8-d343224c7a5a",
+    "summary": "Intent: Developer shared a screenshot showing a visual bug in a status line display where a trailing digit appears when the books/OKB segment shows a warning emoji (⚠️) instead of a checkmark (✅).\nApproach: Investigating character width miscounting of the ⚠️ emoji in the OKB segment of the combined status line script, as multi-byte emoji width handling is a common source of off-by-one display errors.\nArtifacts: edited knowledge-workflows.md, edited ukb-vkb.md, edited continuous-learning-system.md, edited system-comparison.md, edited README.md, edited cross-project-knowledge.md, edited complete-system-overview.puml, edited continuous-learning-architecture.puml, edited three-systems-integration.puml, edited cross-project-knowledge-flow.puml, edited complete-system-overview.puml\nResult: Root cause identified as likely width miscalculation of the ⚠️ emoji in the books segment causing clock text to bleed over; no fix was applied yet.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:17:12.187Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/guides/knowledge-workflows.md",
+      "/Users/Q284340/Agentic/coding/docs-content/core-systems/ukb-vkb.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/README.md",
+      "/Users/Q284340/Agentic/coding/docs/architecture/cross-project-knowledge.md",
+      "/Users/Q284340/Agentic/coding/docs/puml/complete-system-overview.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/continuous-learning-architecture.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/three-systems-integration.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/cross-project-knowledge-flow.puml",
+      "/Users/Q284340/Agentic/coding/docs/presentation/puml/complete-system-overview.puml"
+    ]
+  },
+  {
+    "id": "dfb7c45b-213a-4573-a4b6-1010656cdb38",
+    "summary": "Intent: [shared a screenshot showing a status bar rendering bug with misaligned characters]\nApproach: Investigated the combined-status-line.js script to find a character width miscounting issue with the ⚠️ emoji in the OKB segment causing layout overflow.\nArtifacts: edited knowledge-workflows.md, edited ukb-vkb.md, edited continuous-learning-system.md, edited system-comparison.md, edited README.md, edited cross-project-knowledge.md, edited complete-system-overview.puml, edited continuous-learning-architecture.puml, edited three-systems-integration.puml, edited cross-project-knowledge-flow.puml, edited complete-system-overview.puml, edited llm-providers.md, edited llm-architecture.md, edited self-learning-layer.md\nResult: Identified that ⚠️ (warning emoji with VS16 variation selector) is being miscounted in cell width calculations for the OKB segment, causing trailing characters to bleed past the clock when the books status is degraded.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:17:12.187Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/guides/knowledge-workflows.md",
+      "/Users/Q284340/Agentic/coding/docs-content/core-systems/ukb-vkb.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/README.md",
+      "/Users/Q284340/Agentic/coding/docs/architecture/cross-project-knowledge.md",
+      "/Users/Q284340/Agentic/coding/docs/puml/complete-system-overview.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/continuous-learning-architecture.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/three-systems-integration.puml",
+      "/Users/Q284340/Agentic/coding/docs/puml/cross-project-knowledge-flow.puml",
+      "/Users/Q284340/Agentic/coding/docs/presentation/puml/complete-system-overview.puml",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/llm-providers.md",
+      "/Users/Q284340/Agentic/coding/docs-content/architecture/llm-architecture.md",
+      "/Users/Q284340/Agentic/coding/docs-content/reference/articles/self-learning-layer.md"
+    ]
+  },
+  {
+    "id": "0e6a4b13-5f98-4460-9aa9-8b398399bbc2",
+    "summary": "Intent: Commit the staged documentation changes.\nApproach: Used git add and commit on the docs/ and docs-content/ directories.\nArtifacts: edited system-comparison.md, edited continuous-learning-system.md, edited llm-providers.md\nResult: Commit `1b7d3398b` created with 23 files changed, 32 insertions, 33 deletions; commit message body contains escaped `\\$8.33` due to heredoc escaping issue but file changes are correct.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:34:06.414Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/llm-providers.md"
+    ]
+  },
+  {
+    "id": "8d75a35c-ff81-44f3-b9cb-6fd0cfe4bda3",
+    "summary": "Intent: Verify nothing broke after recent changes by running a strict build check.\nApproach: Ran mkdocs strict build and inspected files to catch any remaining issues.\nArtifacts: edited system-comparison.md, edited continuous-learning-system.md, edited llm-providers.md\nResult: Build check revealed 4 bare `8.33` hallucinated values in system-comparison.md that still needed fixing.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:34:59.504Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/llm-providers.md"
+    ]
+  },
+  {
+    "id": "dd287adb-3763-4478-bb01-129b163e2703",
+    "summary": "Intent: Verify no additional issues broke after previous changes.\nApproach: Ran a strict MkDocs build and grepped for remaining bare `8.33` literals across markdown and PUML files to catch any missed hallucinated values.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/system-comparison.md, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md, edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/llm-providers.md\nResult: Found 4 additional bare `8.33` occurrences (without `$` prefix) in the docs and fixed them; strict MkDocs build was used to confirm no other regressions.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:34:59.504Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/system-comparison.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/llm-providers.md"
+    ]
+  },
+  {
+    "id": "b55d1080-8dca-4570-bd28-a0292ab0f4f2",
+    "summary": "Intent: Switch to option B and prepare it in the combined status line script.\nApproach: Investigated the current state of the combined-status-line.js script to locate ⚠ emission points before making changes.\nArtifacts: edited combined-status-line.js, edited status-line-fast.cjs\nResult: Read the combined-status-line.js file and identified ⚠ usage locations; no changes were made yet, preparation work was still in progress.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:36:07.113Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/Q284340/Agentic/coding/scripts/status-line-fast.cjs"
+    ]
+  },
+  {
+    "id": "9aa7c188-3881-47a4-83f5-0a9f11aac7ee",
+    "summary": "Intent: Remove the docs/archive directory, which the developer believes contains wrong or outdated content.\nApproach: First inventory the archive contents and check for any inbound links from other docs before deleting.\nArtifacts: edited mcp-semantic-analysis.md\nResult: Investigation phase only — the assistant listed archive files and searched for references to the archive in other markdown/puml files; no deletion was performed yet.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:40:44.743Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/mcp-semantic-analysis.md"
+    ]
+  },
+  {
+    "id": "0112722c-3b17-401c-bc25-8dbcad0dc602",
+    "summary": "Intent: Remove the docs/archive directory and clean up any references to it.\nApproach: First inventoried archive contents, then found inbound links from other docs, scrubbed those references, then deleted the archive folder.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/mcp-semantic-analysis.md\nResult: Stale archive references were removed from mcp-semantic-analysis.md; the docs/archive directory was deleted.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:40:44.743Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/knowledge-management/mcp-semantic-analysis.md"
+    ]
+  },
+  {
+    "id": "4cee17f1-f79f-465f-ab62-2fcfddab26f9",
+    "summary": "Intent: Run the GSD update check to see if a newer version is available and install it if so.\nApproach: Executed the update workflow by reading the update.md instructions, detecting installation scope, and comparing local vs npm registry versions.\nArtifacts: edited mcp-semantic-analysis.md, edited ukb-update.md\nResult: GSD is already at the latest version (1.41.2 globally installed), so no update was performed.",
+    "agent": "claude",
+    "project": "sketcher",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:41:24.479Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/mcp-semantic-analysis.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/ukb-update.md"
+    ]
+  },
+  {
+    "id": "d770ea3b-fe55-47fd-af3e-b3530f984cf6",
+    "summary": "Intent: Load recent session logs to establish context continuity for the sketcher project.\nApproach: The /sl command reads recent LSL files from both the current project and the coding project to synthesize a continuity summary.\nArtifacts: edited slash-commands.md\nResult: Session log files were read from sketcher and coding projects (May 10–13, 2026) but no actionable continuity summary content was surfaced from the exchange.",
+    "agent": "claude",
+    "project": "sketcher",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:47:28.220Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs/slash-commands.md"
+    ]
+  },
+  {
+    "id": "574c7e9d-dd56-4562-907b-45a4151c3a74",
+    "summary": "Intent: Report that insights pages look like change logs instead of domain knowledge documents, and ask for a fix so insights contain synthesized topic knowledge suitable for context re-injection.\nApproach: Investigated the insight generation pipeline, observation formats, and LLM prompts to identify root causes: fallback (non-LLM) paths producing bullet-point logs, bad entity naming creating process/activity entities instead of domain topics, and observations being too generic or misrouted.\nArtifacts: none\nResult: Diagnosis complete — three root causes identified but no code changes made yet: ~587 insights use a fallback template instead of LLM synthesis, entity naming creates <COMPANY_NAME_REDACTED>-process entries (BugFixPattern, KnowledgeBaseUpdatesPattern) rather than domain topics, and observations are misrouted across unrelated entities.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ab153d9d-9b4a-422d-a9b7-45772bfde434",
+    "summary": "Intent: Fix insights system so it generates coherent domain knowledge documents instead of chronological logs of changes/bugfixes\nApproach: Investigated the full pipeline from observation generation through insight synthesis, identifying three root causes: overly generic entity naming (BugFixPattern etc.), fallback insight generation producing raw bullet lists, and no <USER_ID_REDACTED> gate filtering process-activity entities from domain-knowledge entities.\nArtifacts: none\nResult: Diagnosed the problem but no code changes made yet; proposed fixes include constraining entity naming prompts with negative examples, adding regex-based entity type filtering, and improving or skipping the fallback insight generation path.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "2ed61f76-2c7b-490b-90c9-3bf189998c28",
+    "summary": "Intent: Fix insights from reading like chronological logs/bugfix lists to being proper domain knowledge documents suitable for context re-injection.\nApproach: Diagnosed three root causes: LLM generating generic process-activity entity names (BugFixPattern, etc.), 587 fallback insights that just bullet-list raw observations, and no <USER_ID_REDACTED> gate filtering <COMPANY_NAME_REDACTED>-activity entities. Fixed by adding entity name filtering, improving generation prompts, and addressing the fallback template.\nArtifacts: edited observation-generation-agent.ts\nResult: Added `isProcessActivityName` filter to reject entities named after activities rather than domain concepts, improved insight generation prompt to explicitly discourage chronological/log-style writing, and patched the fallback insight template to produce better-structured output when LLM synthesis fails.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "b4b434f2-61ed-4fa4-a9e8-7653def28e30",
+    "summary": "Intent: Fix insights from reading like chronological logs/changelogs to instead be structured domain knowledge documents suitable for context re-injection.\nApproach: Traced the problem to entity naming generating process-activity names (BugFixPattern, UpdatePattern) rather than domain concepts, fallback insight generation dumping raw observations as bullet lists, and insight synthesis not explicitly preventing chronological writing style.\nArtifacts: edited observation-generation-agent.ts\nResult: Added `isProcessActivityName` filter to reject process-activity entity names, added negative naming examples to entity generation prompts, and enhanced insight generation prompt to explicitly synthesize knowledge documents rather than chronological logs.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "d06cb628-57f0-40f4-93a9-ac3c6c734ae3",
+    "summary": "Intent: Investigate and fix insights that read like activity logs instead of synthesized domain knowledge documents.\nApproach: Diagnose root causes in observation generation and insight synthesis pipeline, then add entity name filtering to reject process-activity names (BugFixPattern, etc.), improve LLM prompts to discourage chronological reporting, and fix fallback template behavior.\nArtifacts: edited src/observation-generation-agent.ts\nResult: Added `isProcessActivityName` filter to reject generic process/activity entity names, enhanced insight generation prompts with explicit anti-log instructions, and improved the fallback template path to prevent raw bullet-listed observations from being written as insights.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "5a5e002b-ee0d-4180-a38a-2eeffa206f30",
+    "summary": "Intent: Fix online-learned insights that read like logs/changelogs instead of synthesized knowledge documents about topic areas.\nApproach: Investigated the insight generation pipeline to find root causes: ~587 entities hit a fallback path (LLM synthesis failed) producing raw bullet-pointed observations, and bad entity names like \"BugFixPattern\" were created before naming guards were added. The `isProcessActivityName` filter and improved prompts already existed but entities predated them.\nArtifacts: edited observation-generation-agent.ts (added isProcessActivityName filter, improved insight generation prompt with anti-log instructions)\nResult: Identified three root causes: fallback template producing log-like docs when LLM synthesis fails, process-activity entity names (BugFixPattern etc.), and stale entities predating guardrails. Proposed purging bad-named entities and batch-refreshing remaining ones to regenerate through the improved LLM prompt path.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "f4ed0076-5ca2-4149-a09e-056de0f01c7e",
+    "summary": "Intent: Fix insights page from reading like a log of changes to instead show collected domain knowledge about topic areas (e.g., tmux statusline configuration details, implementation info, features).\nApproach: Investigated the full insight generation pipeline — entity naming, observation synthesis, LLM insight generation, and fallback templates — to identify why insights look like activity logs rather than knowledge documents.\nArtifacts: edited observation-generation-agent.ts\nResult: Root cause identified: ~587 entities hit LLM fallback path producing raw bullet-list observations; bad entity names (BugFixPattern, etc.) predate the isProcessActivityName filter. Good entities like TmuxIntegration already produce proper knowledge docs. Proposed next steps: purge process-activity-named entities and batch refresh remaining ones, and suppress fallback template output when LLM synthesis fails.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "60f2790c-ae5b-4177-a186-8ae17ed401de",
+    "summary": "Intent: Fix the insights system to generate collected knowledge documents about topic areas rather than chronological logs of bugfixes and incremental changes.\nApproach: Diagnosed that ~587 entities hit the fallback path (LLM failed) producing bullet-point observation dumps, and bad entity names like \"BugFixPattern\" existed from before naming guards were added. The fix focuses on suppressing garbage fallback output by returning null instead of writing low-<USER_ID_REDACTED> template content.\nArtifacts: edited server/src/intelligence/knowledge-synthesis.ts\nResult: Changed the fallback template path to return null instead of writing a garbage bullet-list document when LLM insight generation fails, preventing log-like content from appearing in the insights dashboard. Bad process-activity entity names still need purging separately.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ec5f111a-b8ac-41d9-a4dc-c293230a0d20",
+    "summary": "Intent: Fix insights page that shows log-like/chronological content instead of synthesized knowledge documents about topic areas.\nApproach: Investigated the insight generation pipeline, found that ~587 entities hit a fallback template path (when LLM synthesis fails) producing raw bullet-point observation dumps instead of proper knowledge docs; fixed by making the fallback return null instead of writing garbage files, and ensuring the isProcessActivityName filter prevents process-activity entities from being created.\nArtifacts: edited services/intelligence/insight-generator or similar insight generation file (fallback template logic and null return), edited entity documentation generation caller to handle null return\nResult: The fallback path in insight generation now returns null instead of writing low-<USER_ID_REDACTED> bullet-point documents; bad entity names (BugFixPattern, SemanticAnalysisWorkflowIssue, etc.) are filtered by existing isProcessActivityName guard; existing bad entities need purging and batch refresh to fully clean up the insights page.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "e3972c57-d9a1-4c01-bbbd-74981f5e4d11",
+    "summary": "Intent: Fix the insights page so entries read as collected domain knowledge (what a topic is, how it works, details) rather than chronological logs of dates/bugfixes/incremental changes.\nApproach: Identified that LLM synthesis was failing for many entities and falling back to a bullet-point template dumping raw observations, and that naming filters/prompt anti-log instructions were added after bad entities already existed; fixed by making the fallback return null instead of writing garbage, and strengthening prompts to synthesize reference-style knowledge.\nArtifacts: edited integrations/mcp-server-semantic-analysis/insight-generation-agent.ts, edited integrations/mcp-server-semantic-analysis/observation-generation-agent.ts\nResult: Fallback path now returns null (no file written) when LLM synthesis fails; deep insight prompt explicitly instructs against chronological/log-style output; naming guard already filters process-activity entity names; existing bad entities need purging and rebuild/redeploy to take effect.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:28.273Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "eb37d7aa-93b0-4bc1-a4a7-bee33f44a186",
+    "summary": "Intent: Investigate how UKB insights are generated, updated, and how \"insights\", \"digests\", and \"observations\" differ in the codebase.\nApproach: Searched the codebase using glob, grep, and file reads targeting the mcp-server-semantic-analysis integration for LLM prompts, entity update logic, and terminology distinctions.\nArtifacts: none\nResult: Found insight generation in integrations/mcp-server-semantic-analysis/src/; no \"digest\" concept exists in the codebase. Key distinctions and update mechanics (append vs rewrite) were partially explored but full findings were cut off before completion.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:52:39.817Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "328f46e0-d32c-4e96-b6a7-40fd4fd0399c",
+    "summary": "Intent: Verify that recent changes didn't break anything (docs build or reintroduce scrubbed content)\nApproach: Ran mkdocs strict build to catch broken links and grep sweeps to confirm hallucinated cost/trajectory references were not reintroduced by the 9 modified files.\nArtifacts: edited release-notes.md, edited health-monitoring.md, edited knowledge-workflows.md, edited status-line.md, edited constraints.md, edited continuous-learning-system.md, edited README.md, edited status-line.md, edited enhanced-health-monitoring.md\nResult: Mkdocs strict build passed with exit 0; no occurrences of scrubbed terms (`$8.33`, `8.33`, `trajectory`, `$X/month`) were found in the modified files.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:54:33.315Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/release-notes.md",
+      "/Users/Q284340/Agentic/coding/docs-content/architecture/health-monitoring.md",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/knowledge-workflows.md",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md",
+      "/Users/Q284340/Agentic/coding/docs-content/core-systems/constraints.md",
+      "/Users/Q284340/Agentic/coding/docs/knowledge-management/continuous-learning-system.md",
+      "/Users/Q284340/Agentic/coding/docs/constraints/README.md",
+      "/Users/Q284340/Agentic/coding/docs/health-system/status-line.md",
+      "/Users/Q284340/Agentic/coding/docs/health-system/enhanced-health-monitoring.md"
+    ]
+  },
+  {
+    "id": "1093cff4-fc36-4137-beea-3918d045cb68",
+    "summary": "Intent: Commit the staged changes to the repository.\nApproach: Used git to stage and commit documentation files with emoji substitutions and narrative updates.\nArtifacts: edited docs/constraints/README.md, edited docs/health-system/enhanced-health-monitoring.md\nResult: Committed as c3bf15df0; 9 files changed with emoji substitutions (⚠️ → 🟡) and a rewritten \"Right-edge stability\" section documenting the codepoint-width approach replacing the retired VS16 lookahead.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T05:55:29.462Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "e32aaa80-8cae-42a2-aa0a-8f72f5b797d1",
+    "summary": "Intent: Commit the current staged/modified files in the project.\nApproach: Used git add and git commit to capture the changes, resulting in a clean working tree for the relevant files.\nArtifacts: edited combined-status-line.js\nResult: Two commits landed on main (not pushed): one for 9 doc files swapping ⚠️ to 🟡, one for 2 code files (`combined-status-line.js`, `status-line-fast.cjs`) with the same emoji fix.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:57:20.400Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "e051421b-19ef-4038-87eb-90b5a4797383",
+    "summary": "Intent: Push local commits to the remote repository.\nApproach: Direct git push to origin/main.\nArtifacts: edited combined-status-line.js\nResult: Two commits pushed successfully to origin/main (c3bf15df0..5c5f5d8e4).",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T05:59:43.985Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "f149287e-c420-4469-9a4b-a19199d1fdd3",
+    "summary": "Intent: [shared a screenshot, likely showing a UI or terminal display issue with the combined status line]\nApproach: Assistant investigated live rendering of the combined status line script and examined session display code to diagnose visual artifacts or rendering bugs.\nArtifacts: edited combined-status-line.js\nResult: Investigation was in progress examining two distinct issues with the combined status line display, capturing live renders and reviewing session state display code — no fixes implemented yet.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:07:36.862Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "d70ca213-ffb1-4481-b16f-da4f1ec871dc",
+    "summary": "Intent: [user shared a screenshot, likely showing a visual bug or rendering issue in the combined status line]\nApproach: Investigated two distinct rendering issues by examining live output, width calculations, emoji codepoint handling, and tmux configuration.\nArtifacts: edited combined-status-line.js\nResult: Diagnosis in progress — identified potential emoji width miscalculation and tmux codepoint-widths configuration as contributing factors to the status line display issues shown in the screenshot.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T06:07:36.862Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "a7897957-e2af-46a2-be45-bbb82af1d4b4",
+    "summary": "Intent: [build and deploy the current project]\nApproach: Fix TypeScript type errors encountered during build, including null return types, wrong log level strings, and mismatched return types against function signatures.\nArtifacts: edited multiple files in the coding project (specific paths not provided in exchange)\nResult: Iteratively resolving type errors: changing return types to `Promise<string | null>`, handling null call sites, fixing \"warn\" to \"warning\" log level, and aligning early-return shapes with `InsightDocument` signature — build not yet confirmed successful at exchange end.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:08:14.796Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "12f17041-8b8d-4600-9dd0-69226ba32d40",
+    "summary": "Intent: Build and deploy the current codebase\nApproach: Iterative TypeScript compilation error fixing across return types, null handling, and log level strings before deploying.\nArtifacts: edited (multiple files with type fixes for InsightDocument return types, generateInsightContent null returns, log level \"warn\"→\"warning\")\nResult: Fixed TypeScript errors including wrong return types on generateInsightDocument (changed to return null instead of incorrect object literal), updated generateInsightContent to return string|null with null handling at call sites, corrected log level string, then proceeded to build and deploy.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:08:14.796Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "50237dda-2fcc-4105-9f5e-12737d635f80",
+    "summary": "Intent: Build and deploy the project\nApproach: Iteratively fixed TypeScript type errors from a series of prior edits, adjusting return types and null handling across multiple functions.\nArtifacts: edited multiple source files in the coding project (InsightDocument-related service file)\nResult: Fixed type mismatches where functions returning `InsightDocument` were returning incorrect object shapes; changed returns to `null`, updated method signatures to return nullable types, and handled null at call sites; fixed log level \"warn\" → \"warning\"; build errors reduced iteratively across multiple compile attempts.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:08:14.796Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "583495e5-5dc8-447f-8348-299aa779a99c",
+    "summary": "Intent: Build and deploy the project, fixing TypeScript type errors encountered during the build process.\nApproach: Iteratively fixed type mismatches by changing return types to include null, updating call sites to handle null values, and correcting log level strings from \"warn\" to \"warning\".\nArtifacts: edited multiple files in the coding project (insight generation service files)\nResult: Resolved type errors related to `generateInsightContent` returning `string | null`, `generateInsightDocument` returning `InsightDocument | null`, and `generateTechnicalDocumentation` returning `string | null`, with null handling added at all call sites.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:08:14.796Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "96a830e4-a51f-4ced-97b3-311d54d7ef09",
+    "summary": "Intent: Build and deploy the project after type-related fixes.\nApproach: Fixed TypeScript type mismatches where functions returning `string | null` or `InsightDocument | null` needed proper handling at call sites, corrected log level strings, and updated return types throughout the call chain.\nArtifacts: none\nResult: Build succeeded and deployment was initiated after resolving type errors across insight document generation functions.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:08:14.796Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ce7fe18a-9366-4fd1-ba39-f5c034d0bc61",
+    "summary": "Intent: Build and deploy the project after making code fixes\nApproach: Fixed TypeScript type errors from earlier changes: wrong return types in `generateInsightDocument` (returning null instead of incorrect object), wrong log level string (\"warn\" → \"warning\"), and null handling for `generateTechnicalDocumentation` returning `string | null`.\nArtifacts: none\nResult: Build succeeded and deployment was initiated after fixing type mismatches and null safety issues introduced by prior refactoring.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:08:14.796Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "57ab8766-a703-4c1c-9293-0bd8f55b06d2",
+    "summary": "Intent: [build and deploy the project]\nApproach: Fixed TypeScript type errors before building — changed incorrect return objects to null, updated return type signatures, fixed log level string, and handled null values at call sites.\nArtifacts: none\nResult: Build succeeded after fixing type mismatches in InsightDocument return type, null handling for generateInsightContent/generateDeepInsight, and log level string. Deployment was initiated but still in progress (downloading packages).",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:08:14.796Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "4883dc5d-acd0-43af-8b5c-9c640d1ba70e",
+    "summary": "Intent: Build and deploy the current changes to the coding project.\nApproach: Fix TypeScript compilation errors (wrong return types, invalid property names) blocking the build, then deploy via Docker with no-cache rebuild.\nArtifacts: edited src/insight-generator.ts (multiple locations for return type fixes, null handling, and prompt changes)\nResult: Build succeeded and service deployed healthy; key changes include fallback insight returning null instead of garbage markdown, deep insight prompt updated to generate reference-style docs, and entity naming rules rejecting process-activity names.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:08:14.796Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "175dd8b6-861d-41ad-875d-ff1a2b4dfd21",
+    "summary": "Intent: Prepare a heartbeat fix for the status line scripts.\nApproach: Read existing status line scripts to understand current heartbeat/age logic before implementing a fix.\nArtifacts: edited combined-status-line.js\nResult: Investigation phase completed; scripts were read to understand heartbeat tracking logic, but no changes were made yet.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T06:38:19.714Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "117116d2-b30a-4461-92e4-c5ffe7c499ca",
+    "summary": "Intent: Approve preparation of the heartbeat fix\nApproach: Confirmed that 'healthy' rollup status implies a fresh heartbeat, so the fix promotes any healthy project to 🟢 icon regardless of transcript-derived status.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: combined-status-line.js updated so that projects with a 'healthy' lifecycle rollup are always shown with a 🟢 icon, overriding any stale transcript-based icon.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:38:19.714Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "ba50f5ce-1db9-4f09-b365-0bd86d2e5f4d",
+    "summary": "Intent: Approve and prepare the heartbeat fix for the combined status line script.\nApproach: Leveraged the fact that a 'healthy' rollup state already implies a fresh heartbeat, so any healthy project with a non-green icon gets promoted to green without needing separate heartbeat age checks.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: combined-status-line.js updated so that projects reporting a 'healthy' rollup state are always displayed with a green icon, regardless of what the transcript-based icon logic would have produced.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:38:19.714Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "c30223dc-7cdb-49a9-a2cd-6a6871e12cc8",
+    "summary": "Intent: [diagnose or investigate a visual issue shown in a screenshot, likely related to tmux status line emoji/character widths]\nApproach: Assistant read the combined-status-line.js script and checked tmux config for codepoint-width settings to understand emoji rendering.\nArtifacts: edited combined-status-line.js, edited status-line-fast.cjs, edited status-line.md\nResult: Investigation only; no changes made. Assistant examined the status line script and tmux config to identify potential emoji width/rendering issues visible in the screenshot.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T06:41:13.767Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/Q284340/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "75c3725c-cfd7-48f8-a224-df2e14c5b4ce",
+    "summary": "Intent: Fix emoji rendering/width issues in the tmux status line, replacing problematic newer Unicode emojis (🫒🪨) with a new ladder sequence.\nApproach: Identified that Unicode 13+ emojis cause cell-width mismatches in tmux's wcwidth tables; replaced the project-status emoji ladder with simpler, widely-supported emojis and planned tmux codepoint-widths overrides.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: Updated the project-status emoji ladder in combined-status-line.js from the old set (including 🫒 and 🪨) to 🟢→🟡→🟠→🟤→⚫→💤 to avoid Unicode 13 rendering width problems in tmux.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:41:13.767Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "fd6f230f-0bde-4277-9dc0-0224f4ececc1",
+    "summary": "Intent: Align the local rapid-automations repo with the remote.\nApproach: Checked local git status, fetched remote, and compared local vs remote commits to assess divergence before taking action.\nArtifacts: edited combined-status-line.js, edited status-line-fast.cjs, edited .tmux.conf, edited status-line.md, edited health-monitoring.md, edited release-notes.md\nResult: Gathered repo state info (status, fetch, log comparison) to determine what sync is needed; no alignment action completed yet.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "normal",
+    "createdAt": "2026-05-13T06:51:45.367Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/Q284340/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/Q284340/.tmux.conf",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md",
+      "/Users/Q284340/Agentic/coding/docs-content/architecture/health-monitoring.md",
+      "/Users/Q284340/Agentic/coding/docs-content/release-notes.md"
+    ]
+  },
+  {
+    "id": "30cd7882-3c51-4390-b7c6-714f1db3a693",
+    "summary": "Intent: Fix a display issue shown in a screenshot, likely related to formatting of the compliance/violations status segment in the combined status line script.\nApproach: Inspected the combined-status-line.js script to locate the formatting logic for the lock/compliance/violation indicators, then edited to correct the display format.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: Updated the compliance segment formatting in the status line script, likely removing extra spaces or fixing the display pattern around the 🔒 emoji and violation/percentage indicators.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:56:55.149Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "e0f82a6a-bcd9-4ca3-a331-ce1a22e455de",
+    "summary": "Intent: [user approved proceeding with a pending action, likely resolving a git rebase conflict]\nApproach: Rebased against origin/main, identified a submodule pointer conflict on integrations/rapid-toolkit, and resolved by accepting origin's version.\nArtifacts: edited combined-status-line.js\nResult: Git rebase conflict on the rapid-toolkit submodule was resolved by taking origin's newer pointer, allowing the rebase to continue.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:57:04.812Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "4b0bed88-46ca-4f2a-97ad-cc1edb689886",
+    "summary": "Intent: [user approved proceeding with the git rebase conflict resolution]\nApproach: Resolved a submodule pointer conflict during rebase by directly updating the index entry to keep origin's newer commit hash, avoiding accidental regression from a faulty `git checkout --ours` that silently failed.\nArtifacts: edited combined-status-line.js\nResult: Rebased commit amended to correctly point `integrations/rapid-toolkit` submodule at origin's newer `e0365c0` hash and updated commit message to reflect it as a URL fix only.",
+    "agent": "claude",
+    "project": "rapid-automations",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:57:04.812Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "219f7d0f-d39d-4902-bf10-6c20e5563e99",
+    "summary": "Intent: [check the current workflow status]\nApproach: [called the workflow status tool directly]\nArtifacts: none\nResult: [workflow status was retrieved via semantic-analysis tool]",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T06:57:35.320Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "31671973-6786-423a-a281-ec59945d1453",
+    "summary": "Intent: [the developer asked why the semantic analysis MCP server is used in the workflow]\nApproach: The assistant explained the architectural reason — the workflow engine runs inside the MCP server's Docker container, making MCP tools the only interface.\nArtifacts: none\nResult: Clarified that the `wave-analysis` workflow lives in `integrations/mcp-server-semantic-analysis` and runs as a long-lived async process, with `execute_workflow` and `get_workflow_status` as the sole API since no CLI equivalent exists.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T06:58:03.504Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "bbcf85fb-c6b3-4caf-a619-88f22d2bff79",
+    "summary": "Intent: Remove the blank/space after the padlock symbol in the status line output.\nApproach: Direct edit to remove the trailing space after the 🔒 character in the combined status line script.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: Removed the extra space that appeared after the padlock (🔒) symbol in the status line formatting.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:58:48.659Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "7fbd20db-7607-4235-8561-56b1f10f13f7",
+    "summary": "Intent: Remove the blank/space after the padlock symbol in the combined status line display.\nApproach: Edited the status line script to strip the space between the 🔒 emoji and the percentage value in the constraint segment bracket.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js\nResult: Status line now renders `[🔒61%🟡95]` without a space after the padlock symbol.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T06:58:48.659Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ]
+  },
+  {
+    "id": "1aa50149-fb2c-48af-8313-63178f17c994",
+    "summary": "Intent: [asking whether a running process is progressing or stuck]\nApproach: Checked workflow status, container logs, and progress files to diagnose why the new workflow wasn't advancing.\nArtifacts: none\nResult: The workflow was stuck — the container went idle ~16 minutes prior, the previous workflow had finished, and the new workflow never started (likely rejected due to overlap or silent failure). A fresh execution was attempted.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T07:00:06.379Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "41829e22-62c4-47c6-9950-31d78fe9a9d5",
+    "summary": "Intent: Fix remaining issues in the slash-commands.md documentation file.\nApproach: Applied multiple sequential edits to address stale formatting or content identified in a prior review pass, then verified no leftovers remained.\nArtifacts: edited <AWS_SECRET_REDACTED>-commands.md\nResult: Multiple stale format references were removed or corrected in slash-commands.md, with a final grep sweep confirming no remaining issues.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T07:01:52.831Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "<AWS_SECRET_REDACTED>-commands.md"
+    ]
+  },
+  {
+    "id": "49d1b4cb-3884-4a40-b1c8-47890cb37f39",
+    "summary": "Intent: [developer shared two screenshots of a system health dashboard showing service failures and asked for diagnosis]\nApproach: Investigated running container state vs host config files and port listeners to identify stale Docker image and missing host process as root causes.\nArtifacts: edited combined-status-line.js, edited status-line-fast.cjs, edited status-line.md\nResult: Three issues identified: browser-access and health-verifier failures stem from stale coding-services container image not reflecting supervisord.conf changes (fix: rebuild container); obs_api is not running on host because port 12436 isn't listening after reboot (fix: run coding --claude to restart host services).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T10:41:42.570Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/Q284340/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "7eeb769d-3431-4135-a3e9-4caddf2e5294",
+    "summary": "Intent: Approve steps 1 and 3 from a previously proposed action plan.\nApproach: Investigated obs_api crash logs and initiated a Docker service rebuild concurrently to address the identified issues.\nArtifacts: edited combined-status-line.js, edited status-line-fast.cjs, edited status-line.md\nResult: Root cause of obs_api crash identified as a SIGTERM during power outage triggering a mutex error in better-sqlite3 cleanup; Docker rebuild of coding-services initiated. Also flagged a non-fatal Qdrant client/server version mismatch (1.15.1 vs 1.17.0).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T10:49:20.094Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/Q284340/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "7d3de2f5-eaff-4bc5-856f-0931390fcdeb",
+    "summary": "Intent: Approve items 1 and 3 from a prior list of proposed actions.\nApproach: Read the observations-api log to diagnose the crash and trigger a Docker rebuild of coding-services concurrently.\nArtifacts: edited combined-status-line.js, edited status-line-fast.cjs, edited status-line.md\nResult: Diagnosed obs_api crash as a better-sqlite3 mutex exception during SIGTERM shutdown (not a runtime bug); Docker rebuild of coding-services was initiated. Also noted a non-fatal Qdrant client/server version mismatch (1.15.1 vs 1.17.0).",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T10:49:20.094Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/Q284340/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "25593e86-1c66-46e0-b173-d333e460d9a0",
+    "summary": "Intent: Check on the status of an ongoing Docker rebuild\nApproach: Checked build output log file and <USER_ID_REDACTED> Docker images directly to get live status.\nArtifacts: edited combined-status-line.js, edited status-line-fast.cjs, edited status-line.md\nResult: Build was still in progress (started at 12:49); output log was empty due to buffering, and Docker image list showed no new completed build yet.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T10:51:02.694Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/Q284340/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "783322f4-167d-42f7-981d-e580fa61d4e6",
+    "summary": "Intent: Notification that the coding-services Docker container rebuild/recreate completed.\nApproach: Assistant verified the rebuild by checking supervisord status in the new container to confirm removed program blocks no longer appear.\nArtifacts: edited combined-status-line.js, edited status-line-fast.cjs, edited status-line.md\nResult: New container confirmed clean — `mcp-servers:browser-access` and `monitoring:health-verifier` program blocks are gone; remaining services running normally. Host `obs_api` still needs restart via `coding --claude`.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T10:52:37.392Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/Q284340/Agentic/coding/scripts/status-line-fast.cjs",
+      "/Users/Q284340/Agentic/coding/docs-content/guides/status-line.md"
+    ]
+  },
+  {
+    "id": "971093dc-2444-4568-9c6b-e4c03509499e",
+    "summary": "Intent: Fix the rapid-llm-proxy so it correctly detects the corporate network and uses the proxy settings.\nApproach: The detection function only checked RFC1918 ranges, missing <COMPANY_NAME_REDACTED>'s internal `160.50.x.x` range, causing the proxy to run in \"public\" mode and bypass corporate proxy settings.\nArtifacts: edited the coding startup/proxy script to add <COMPANY_NAME_REDACTED>'s `160.50.x.x` range to the corporate network detection regex\nResult: The proxy now correctly identifies the <COMPANY_NAME_REDACTED> corporate network, sets `LLM_NETWORK_MODE=corporate`, and uses `px` on `127.0.0.1:3128` for outbound LLM requests.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T11:26:32.468Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "00a43769-692b-4770-b7f2-5db011652d0d",
+    "summary": "Intent: Find the files responsible for rendering the terminal status bar with emoji indicators like [🏗️✅], [RA🟢C🟢], [🔒 61%], [📚 🟡]\nApproach: Searched the coding project directory using grep for emoji patterns, \"statusline\", \"status_bar\", and prompt customization keywords across shell scripts and config files.\nArtifacts: none\nResult: Identified `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js` as the main file responsible for building the status line indicators.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-13T12:05:52.361Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ab273dcf-5fb0-4a72-b11d-21bdc55a2537",
+    "summary": "Intent: Fix network mode labeling to distinguish between \"corporate network (CN)\" and \"VPN\" instead of using \"vpn\" as a catch-all.\nApproach: Updated the NetworkMode type to include 'corporate' alongside 'vpn' and 'public', renamed detection functions, added <COMPANY_NAME_REDACTED>'s IP range, and updated all comparison logic to accept the new mode.\nArtifacts: edited network detection source files, edited bridge/server.mjs, edited startup script\nResult: NetworkMode now has three distinct values ('corporate', 'vpn', 'public'); corporate network detection includes <COMPANY_NAME_REDACTED>'s 160.50.x.x IP range; all mode comparisons updated to handle 'corporate' separately from 'vpn'.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:06:05.710Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "cb165fbf-f509-4ad1-8ca5-8f0db7941547",
+    "summary": "Intent: Question why the network mode showed \"vpn\" instead of \"corporate\" when on CN (corporate network)\nApproach: Renamed the conflated \"vpn\" network mode to \"corporate\" throughout the codebase, updated type definitions, IP detection logic, and all comparison references to distinguish corporate network from actual VPN.\nArtifacts: edited network-detect module, types.ts, provider-registry.ts, server.mjs, startup script\nResult: NetworkMode type expanded from 'vpn'|'public' to include 'corporate', IP detection updated to recognize <COMPANY_NAME_REDACTED>'s 160.50.x.x range, and all \"vpn\" labels/comparisons updated to \"corporate\" for accurate network identification.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:06:05.710Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "fbfcb4c0-46f5-457f-b67e-e08a7d0afc44",
+    "summary": "Intent: Question why \"vpn\" was used as the network mode label when the developer is on a corporate network (CN), not VPN.\nApproach: Rename the \"vpn\" network mode to \"corporate\" throughout the codebase, update type definitions, IP detection logic (adding <COMPANY_NAME_REDACTED>'s 160.50.x.x range), and ensure backward compatibility in comparisons.\nArtifacts: edited network-detect.ts, edited types.ts, edited provider-registry.ts, edited server.mjs\nResult: NetworkMode type updated from `'vpn' | 'public'` to `'corporate' | 'public'`, with detection logic renamed from `isPrivateIP` to `isCorporateIP` and <COMPANY_NAME_REDACTED> corporate IP ranges explicitly included; server comparison updated to accept both legacy `'vpn'` and new `'corporate'` values.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:06:05.710Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "41693448-647e-4078-af8b-bcd4e048b547",
+    "summary": "Intent: Questioned why the network mode was labeled \"vpn\" when on corporate network (CN), not VPN.\nApproach: Renamed the conflated \"vpn\" network mode to \"corporate\" throughout the codebase, updated IP detection to include <COMPANY_NAME_REDACTED>'s corporate IP range, and fixed compatibility checks to accept both labels.\nArtifacts: edited network-detect.ts, edited provider-registry.ts, edited server.mjs, edited types.ts\nResult: NetworkMode type changed from `'vpn'|'public'` to `'corporate'|'public'`, corporate IP detection updated to recognize <COMPANY_NAME_REDACTED>'s `160.50.x.x` range, and a pre-existing TypeScript error in the `initialize` method signature was also addressed.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:06:05.710Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "a88561bf-5bf6-48ed-b052-d54d22d9ff52",
+    "summary": "Intent: Fix the proxy network mode label from \"vpn\" to \"corporate\" to accurately reflect <COMPANY_NAME_REDACTED> corporate network (CN) usage.\nApproach: Updated the NetworkMode type and detection logic across multiple files, adding <COMPANY_NAME_REDACTED>'s 160.50.x.x IP range to corporate detection, and fixed a pre-existing TypeScript error in provider-registry.ts to allow a clean build.\nArtifacts: edited src/types.ts, edited src/network-detect.ts, edited src/provider-registry.ts, edited proxy-bridge/server.mjs, edited bin/start-llm-proxy.sh\nResult: networkMode now reports \"corporate\" instead of \"vpn\"; <COMPANY_NAME_REDACTED> 160.50.x.x range added to corporate IP detection; pre-existing TS error in initialize() call signature fixed; proxy rebuilt and restarted successfully.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:06:05.710Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "d3e20485-753f-49b5-9f64-6e547f0f98c2",
+    "summary": "Intent: Questioned why the network mode showed \"vpn\" instead of something more appropriate given the CN/corporate network context.\nApproach: Renamed the \"vpn\" network mode label to \"corporate\" throughout the codebase to accurately reflect <COMPANY_NAME_REDACTED> corporate network detection, and added the 160.50.x.x IP range to corporate detection logic.\nArtifacts: edited src/types.ts, edited src/network-detect.ts, edited src/provider-registry.ts, edited proxy-bridge/server.mjs, edited bin/start-llm-proxy.sh\nResult: Network mode now correctly displays \"corporate\" instead of \"vpn\"; fixed a pre-existing TypeScript error in provider-registry.ts where initialize() was called with an argument not declared in the interface.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:06:05.710Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "c6942937-ce58-4534-aed5-59563d5708d1",
+    "summary": "Intent: Report that something is broken, showing two screenshots of issues\nApproach: Investigated dashboard and statusline code to find that \"corporate\" network mode wasn't recognized in type unions and conditional checks, only \"vpn\" and \"public\" were handled.\nArtifacts: edited health-coordinator.js, edited dashboard file (network mode rendering)\nResult: Added \"corporate\" to the recognized network modes in both the health coordinator and dashboard, preventing it from falling through to \"unknown\" and displaying warnings/errors.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:12:59.644Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "30555874-8848-456e-a95a-5a8675523376",
+    "summary": "Intent: Report that the dashboard and statusline appear broken (network mode showing \"unknown\"/warning and LLM proxy showing red X)\nApproach: Traced the root cause to the health coordinator only accepting \"vpn\" or \"public\" as valid network modes, causing \"corporate\" to fall through to \"unknown\" and cascade into proxy appearing unreachable.\nArtifacts: edited health-coordinator.js, edited combined-status-line (file)\nResult: Added \"corporate\" to the valid network modes set in health-coordinator.js so it's recognized correctly, and updated related type comments and dashboard rendering logic to handle the corporate network mode without triggering warnings.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:12:59.644Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "00835ffc-0d1a-4d0f-9797-e6fda50d356a",
+    "summary": "Intent: Fix broken dashboard and statusline showing \"unknown\" network mode and broken LLM proxy status\nApproach: The root cause was that \"corporate\" network mode wasn't included in the valid modes union types or conditionals across multiple files, causing cascade failures in health checks and display components.\nArtifacts: edited rapid-llm-proxy/bin/start-llm-proxy.sh, edited rapid-llm-proxy/src/types.ts, edited rapid-llm-proxy/src/network-detect.ts, edited scripts/health-coordinator.js, rebuilt system-health-dashboard\nResult: Added \"corporate\" as a valid NetworkMode type across the proxy and health coordinator; added <COMPANY_NAME_REDACTED> IP range (160.50.*) detection; restarted health coordinator now correctly reports networkMode as \"corporate\" with semantic_ok true.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:12:59.644Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "76ac6e21-701e-4225-a84f-780b00bbdcd6",
+    "summary": "Intent: Fix broken health dashboard/statusline showing unhealthy status\nApproach: The root cause was `corporate` network mode not being recognized as a valid value across the health pipeline, causing cascade failures into the proxy health display.\nArtifacts: edited rapid-llm-proxy/bin/start-llm-proxy.sh, edited rapid-llm-proxy/src/types.ts, edited rapid-llm-proxy/src/network-detect.ts, edited scripts/health-coordinator.js, edited system-health-dashboard\nResult: Added `corporate` as a valid NetworkMode throughout the stack — IP detection, type definitions, health coordinator validation, and dashboard rendering — so the statusline correctly shows healthy status on corporate networks.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:12:59.644Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "868fb9fe-043a-4739-af44-e082c7e74cfe",
+    "summary": "Intent: Reported something was broken, sharing two images as evidence.\nApproach: Diagnosed a network mode detection issue where corporate network (<COMPANY_NAME_REDACTED> IP range 160.50.*) was not recognized, causing downstream health checks and dashboard to fail.\nArtifacts: edited rapid-llm-proxy/bin/start-llm-proxy.sh, edited rapid-llm-proxy/src/types.ts, edited rapid-llm-proxy/src/network-detect.ts, edited scripts/health-coordinator.js, edited system-health-dashboard\nResult: Added corporate network detection for <COMPANY_NAME_REDACTED> IP range 160.50.*, added 'corporate' as a valid NetworkMode type, and updated the health coordinator and dashboard to recognize corporate mode; system now correctly reports networkMode as corporate with semantic_ok true.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-13T12:12:59.644Z",
+    "digestedAt": "2026-05-14T11:10:56.334Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "d9e6fa7c-4c43-494a-a642-1121313dae60",
+    "summary": "Intent: Retry a previous operation (likely fixing a broken service/proxy setup)\nApproach: Investigated multiple failing services including a LevelDB/Qdrant backend, a proxied API, and an LLM CLI proxy managed by launchd, discovering that network detection in the startup script was unreliable because DNS couldn't resolve internal corporate hosts.\nArtifacts: none\nResult: Root cause identified: the launchd-managed `com.coding.llm-cli-proxy` agent always detects as `public` network because DNS cannot resolve the <COMPANY_NAME_REDACTED> internal PAC host from the home router context; proposed fix is to detect corporate network by checking if `px` is running on 127.0.0.1:3128 instead.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T09:42:46.600Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "77d32b96-7f09-4dc2-b7c8-589ecdec49a1",
+    "summary": "Intent: Retry a previous failed operation to fix the LLM proxy and related services.\nApproach: Diagnosed that the proxy's network detection (corp vs public) fails because DNS can't resolve the PAC host; proposed checking if `px` is running on localhost:3128 as a more reliable corporate network indicator.\nArtifacts: edited start-llm-proxy.sh\nResult: Root cause identified: launchd-spawned proxy always detects \"public\" network because DNS probe fails; fix requires adding localhost:3128 px-process check as fallback corporate network detection. 502 errors on observations/consolidation APIs are separate — those backend services aren't running.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T09:42:46.600Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ae1e1b88-645b-48e8-9361-97f499e7c5b5",
+    "summary": "Intent: Define network/proxy detection requirements and auto-configuration behavior for the coding/bin/coding script across different network contexts (home, VPN, corporate).\nApproach: Map the matrix of location/VPN/proxy combinations to determine when HTTPS_PROXY should be enabled or disabled, then plan auto-detection logic to handle all cases.\nArtifacts: none\nResult: Requirements captured: three network states (home-no-VPN, home+VPN, office/CN) require different proxy configurations; coding script should auto-detect network+proxy status, display in statusline, and toggle proxy settings accordingly.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T09:52:52.884Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "2997fcde-d1f6-468c-a900-64731190f0f4",
+    "summary": "Intent: Add network/proxy status to statusline and health monitoring board, refactor network/proxy detection into a single general service that feeds all dependents (LLM proxy config, statusline, health board) via the health endpoint as the single source of truth, without reintroducing emoji-width bugs.\nApproach: Audit existing architecture across health coordinator, statusline, and detect-network.sh before making changes, planning to centralize network detection in the health coordinator's tick loop and expose it via the health endpoint so all consumers read from one place.\nArtifacts: none\nResult: Planning/investigation phase only — no files modified yet. The approach identified is to move network/proxy detection into the health coordinator service, expose it through the existing health state endpoint, and have statusline and health board consume that shared state rather than doing independent detection.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T09:59:30.618Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "1bb88463-ed5b-4a78-88c5-e6acc0840520",
+    "summary": "Intent: Add network location/proxy detection as a centralized service consumed by statusline, health board, and other dependents — with a single-source health endpoint, and no emoji-width issues.\nApproach: Refactor network/proxy detection into the health coordinator as a polled service, expose state via `/health/state`, and have statusline and dashboard consume this shared state rather than detecting independently. Text-only badges avoid emoji-width rendering bugs.\nArtifacts: edited health coordinator service, edited statusline builder, edited health monitoring dashboard\nResult: Network status polling (`location`, `proxy_running`, `proxy_functional`, `internet_reachable`) added to health coordinator with 30s interval; statusline `buildCombinedStatus` updated to accept and render `[N:HOME]`/`[N:CN]` and `[P:ON]`/`[P:OFF]` badges; dashboard updated to read from coordinator's network state. Debugging revealed the coordinator inherits stale `HTTPS_PROXY` env vars causing proxy probe failures when `px` restarts.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T09:59:30.618Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "28e7de16-34d1-46cb-b47f-af608209761e",
+    "summary": "Intent: Explain what the `px` command/script does — toggling proxy environment variables and restarting proxydetox.\nApproach: Used the proxy script context to diagnose why the coordinator's `pollNetworkStatus` was returning false; traced the issue to ESM module context where `require()` is unavailable.\nArtifacts: edited coordinator source file to replace `require()` calls with ESM imports\nResult: Fixed a runtime crash in the coordinator caused by using CommonJS `require()` inside an ESM module; replaced inline `require('net')`, `require('http')` etc. with already-imported ESM equivalents so `pollNetworkStatus` can run correctly.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:18:09.656Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "7d7fceec-b6dd-4967-a07e-dedfd90148b9",
+    "summary": "Intent: The developer pointed out that the health monitoring system and PSM auto-respawns essential processes, suggesting this context helps with debugging why killed processes kept restarting.\nApproach: Recognized that PSM was correctly doing its job by respawning the health coordinator, so the fix needed to be in the code itself rather than fighting the process lifecycle.\nArtifacts: edited health coordinator file (multiple ESM import fixes and `net.` → `netState.` variable rename corrections)\nResult: Fixed ESM import issues and resolved a variable collision where `net` (Node.js module) conflicted with the local network state object, renaming state references to `netState` throughout lines 934-988; waiting for PSM to respawn the coordinator with fixed code.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:21:10.663Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "81f8705b-3132-467b-b880-cc1b9e8688b2",
+    "summary": "Intent: Fix the LLM proxy's network mode detection to consume the coordinator's state first, with autonomous fallback detection.\nApproach: The coordinator checks actual service state (proxydetox listening on 3128) which is more reliable than env vars that only reflect a single shell's state; LLM proxy updated to query coordinator first then fall back to local detection.\nArtifacts: edited server.mjs\nResult: LLM proxy's `detectNetworkMode()` now <USER_ID_REDACTED> the coordinator for network state first; if unavailable, falls back to autonomous local detection. The `networkMode` comparison already handled both `'vpn'` and `'corporate'` cases. LLM proxy restarted via PSM to apply changes.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:27:05.789Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "f489e640-5e36-4f2e-bf22-afd99f88ac2e",
+    "summary": "Intent: [debug why the health monitoring board is not loading]\nApproach: [Investigated the issue by running bash commands to check service status, likely looking at Docker container states and logs.]\nArtifacts: none\nResult: [Determined the dashboard is not running and is deployed in Docker, but no fix was implemented in this exchange.]",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:36:42.762Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "1c592c55-3521-4af6-8132-ff1bb22a5b5a",
+    "summary": "Intent: Fix the health monitoring board that wasn't loading\nApproach: Diagnosed the issue by investigating the running state of the dashboard service and Docker environment.\nArtifacts: none\nResult: Identified that Docker daemon wasn't running; provided two options: start Docker Desktop and bring up the coding-services container, or run the dashboard standalone with Node.js directly.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T10:36:42.762Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "1badbc7b-887c-4de8-872e-f4fef604e51d",
+    "summary": "Intent: Investigate health dashboard issues showing LevelDB, Qdrant, Stale PIDs, local proxy, Internet, and obs_api as offline/erroring.\nApproach: Diagnosed each failing component by inspecting running processes, Docker containers, supervisor status, and the health coordinator API to distinguish real failures from display/reporting issues.\nArtifacts: none\nResult: obs_api was down and was restarted manually. LevelDB and Qdrant are actually healthy; their \"Offline\" display is a frontend issue where unknown sub-check statuses from the health coordinator are rendered as offline instead of using the aggregate healthy status.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T10:48:42.152Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "7ab36452-43cb-4606-bc88-3b03365a9bd8",
+    "summary": "Intent: Investigate health dashboard showing multiple services as offline\nApproach: Diagnosed real vs. false failures by checking processes, containers, and health check logic; traced \"Offline\" display bug to frontend `mapCheckStatus` function treating `unknown` status as `offline`.\nArtifacts: none\nResult: obs_api was genuinely stopped and was restarted; LevelDB, Qdrant, and Stale PIDs showing \"Offline\" are false negatives caused by the frontend mapping `unknown` sub-check statuses to `offline` — the databases are actually healthy at the aggregate level.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T10:48:42.152Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "8c35183d-3ccb-4849-aeb0-33e293d81407",
+    "summary": "Intent: Diagnose and fix health dashboard issues shown in a screenshot\nApproach: Investigated each offline service — found obs_api wasn't running and needed manual start, while LevelDB/Qdrant/Stale PIDs showing \"Offline\" was a frontend display bug where `mapCheckStatus` mapped `'unknown'` status to `'offline'` instead of a neutral state.\nArtifacts: edited frontend health status component (mapCheckStatus function and badge renderer)\nResult: Started obs_api process to resolve 502 errors; fixed frontend to treat `'unknown'` sub-check status as \"Unknown\" rather than \"Offline\", correcting false offline reports for LevelDB, Qdrant, and Stale PIDs.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:48:42.152Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "979864cd-670c-493d-81da-97d30a116012",
+    "summary": "Intent: Investigate three issues: false \"internet unreachable\" claim in health dashboard, why stopped obs_api wasn't restarted by health monitoring, and why obs_api stopped initially.\nApproach: Systematic investigation using bash tools to examine health monitoring code, dashboard logic, and service restart mechanisms to find bugs contradicting the actual network/proxy state shown in the statusline.\nArtifacts: none\nResult: Investigation was initiated but no conclusions or fixes were reached within this exchange; the assistant began running diagnostic commands to trace the dashboard's network reachability check and proxy detection logic against the actual health endpoint state on port 3034.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "15313aaa-2fa0-48aa-b442-162acc3abd0c",
+    "summary": "Intent: Investigate why the health monitoring dashboard incorrectly shows internet unreachable and proxy offline, and why obs_api wasn't auto-restarted when it stopped.\nApproach: Traced data flow from health coordinator through server.js to frontend, finding the dashboard transforms coordinator state but omits fields, and checked AUTO_HEAL_MAP for missing service entries.\nArtifacts: none\nResult: Two bugs found: (1) `handleGetHealthStatus` passes `proxy` but never passes `network` data to the frontend, so `healthStatus.network` is always undefined, causing false \"Internet Unreachable\" and \"Local proxy Offline\" displays despite the coordinator correctly detecting both as operational. (2) `obs_api` is missing from `AUTO_HEAL_MAP`, so the health monitoring system never attempts to auto-restart it when it goes down.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "549fc8e9-b822-4777-9fde-115e33316575",
+    "summary": "Intent: Investigate three bugs: why the dashboard shows internet as unreachable, why obs_api wasn't auto-restarted by health monitoring, and why obs_api stopped in the first place.\nApproach: Traced data flow from health coordinator through server.js to frontend dashboard, comparing what data the coordinator collects vs. what gets passed to the frontend response handler.\nArtifacts: none\nResult: Found that `handleGetHealthStatus` passes `proxy` data but never passes `network` data to the frontend, so `healthStatus.network` is always undefined, causing false \"Internet Unreachable\" and \"Local proxy Offline\" indicators. Also found `obs_api` is missing from `AUTO_HEAL_MAP`, so the health system never auto-restarts it. Root cause of obs_api stopping was still under investigation via log review.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "13aa0b84-cf19-4fe2-8633-77dc2a758376",
+    "summary": "Intent: Investigate three issues: false \"internet unreachable\" and \"proxy offline\" warnings on health dashboard, obs_api not being auto-restarted by health monitoring, and why obs_api stopped in the first place.\nApproach: Traced data flow from health coordinator through server.js to frontend to find where network status was dropped; audited AUTO_HEAL_MAP and remediation actions for obs_api coverage; checked obs_api logs for crash cause.\nArtifacts: edited server.js, edited health-remediation-actions.js\nResult: Found three bugs: (1) `handleGetHealthStatus` never forwarded the `network` object to the frontend, causing always-undefined network status; (2) `obs_api` was missing from `AUTO_HEAL_MAP` and had no remediation action — both added; (3) obs_api stopped due to Qdrant client/server version mismatch and a SIGTERM from a dead parent process causing a native fastembed crash during cleanup.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "173bc03a-0f07-4616-a2b3-deb81ac4e3ec",
+    "summary": "Intent: Diagnose why the health dashboard shows incorrect network status, why obs_api wasn't auto-restarted, and why obs_api stopped\nApproach: Traced the network data through the coordinator→dashboard→frontend pipeline, found the backend wasn't passing network data due to stale running Node process, investigated obs_api crash logs and auto-heal configuration.\nArtifacts: edited server.js, edited health-remediation-actions.js\nResult: Dashboard showed wrong network status because the running Docker Node process was serving a stale version of server.js that lacked the network passthrough fix — restarting the container resolved it. obs_api stopped due to Qdrant client/server version mismatch and a SIGTERM from an orphaned parent process, followed by a native fastembed crash during cleanup. Auto-heal investigation for obs_api was ongoing at exchange end.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ed527d12-82a8-4077-aba7-0a32b1455824",
+    "summary": "Intent: Debug why the health monitoring dashboard incorrectly shows internet as unreachable and local proxy offline, and why obs_api didn't auto-restart when it failed.\nApproach: Traced the data flow from coordinator endpoint through Docker container to dashboard API response, finding a stale Node process serving old code without the `network` field, and investigated the auto-heal system to understand its actual behavior.\nArtifacts: none\nResult: Dashboard showed incorrect network status because the Docker Node process was serving a stale version of server.js that didn't pass the `network` field; restarting the container fixed data flow. The obs_api didn't auto-restart because the `auto_heal` flag only enables a manual \"Restart\" button in the UI — there is no automatic restart loop for obs_api (only the LLM proxy has an automated FSM-based auto-heal in the coordinator).",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "f5d4715f-0f18-4cfd-b56e-6d6b7169545f",
+    "summary": "Intent: Why does the health monitoring dashboard incorrectly show internet unreachable and local proxy offline, why didn't the health system auto-restart obs_api, and why did obs_api stop?\nApproach: Traced the bug chain from coordinator API through Redux store to frontend component, discovering the `network` field was dropped by the reducer and never stored in state, and confirmed auto-heal only covers the LLM proxy, not obs_api.\nArtifacts: edited health status Redux slice to include network field, edited frontend health dashboard component to use typed network field\nResult: The \"Internet Unreachable\" bug was caused by the Redux reducer not persisting the `network` field from the API response, so the frontend always read `undefined`. The fix adds `network` to the Redux state and removes the `any` cast. Auto-heal for obs_api doesn't exist — the `auto_heal` flag only shows a manual Restart button; automatic restart logic only covers the LLM proxy.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "2c743bc3-312f-4265-85cc-803acbe3b9c6",
+    "summary": "Intent: Investigate why the health monitoring dashboard incorrectly reports internet unreachable and local proxy offline (contradicting actual VPN/proxy status), why obs_api wasn't auto-restarted when it stopped, and why it stopped in the first place.\nApproach: Traced the network status null through the dashboard API pipeline, fixed a Redux type cast bug hiding the network field, and investigated the auto-heal system to find missing implementation of restart_obs_api and no watchdog/auto-restart loop in PSM.\nArtifacts: none\nResult: Three bugs identified: (1) dashboard frontend was casting healthStatus with `as any` hiding the network field, causing incorrect \"Internet Unreachable\" display — fixed with proper typing and rebuild; (2) `restartObsApi` method is referenced in auto-heal actions but never implemented; (3) PSM has no watchdog/auto-restart loop — auto-heal is manual-only, explaining why obs_api wasn't restarted automatically.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "073ebce5-fa54-4ec5-8b0d-0d0936c6ffe9",
+    "summary": "Intent: Investigate why the health monitoring dashboard incorrectly reports internet unreachable and local proxy offline despite VPN/proxy being active, why obs_api didn't auto-restart when it stopped, and why obs_api stopped.\nApproach: Traced the data flow from coordinator health endpoint through dashboard server API handler to Redux store and frontend component, identifying stale Docker container cache and a missing `restartObsApi` method as root causes.\nArtifacts: edited coordinator or dashboard server handler files, edited remediation dispatcher to add restartObsApi method\nResult: Fixed `restartObsApi` method that was referenced but never defined (causing Restart button to throw), identified that `state.network` was null due to stale Node process caching old handler code requiring container restart, and confirmed network data flows correctly after restart. Auto-heal for obs_api was not yet wired into the FSM polling loop.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T10:58:13.847Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "c1c45fe9-0af2-4647-99d1-cc934996237c",
+    "summary": "Intent: Locate specific code sections in the system-health-dashboard project related to internet reachability checks, proxy (px) status checks, health verification logic, and auto-heal functionality for services like obs_api.\nApproach: Searched codebase using grep for keywords across server.js, verifier files, and static/ directory to identify relevant code snippets and file paths.\nArtifacts: none\nResult: Investigation identified that internet/proxy health state (internet_reachable, proxy_running) originates from a health coordinator rather than the dashboard itself; relevant code was located across server.js and verifier files, with remediation/restart handler also found, but the network state producer is external to the dashboard.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T10:59:20.511Z",
+    "digestedAt": "2026-05-14T11:11:21.529Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "c2dd9392-627e-463c-96aa-0f663a9f2d27",
+    "summary": "Intent: Update Qdrant and migrate data if necessary, then resume the existing plan.\nApproach: Checked current Qdrant server (1.17.0) and client (1.15.1) versions, determined latest compatible client is 1.18.0, and noted Qdrant handles data migration automatically on server startup so no manual migration needed.\nArtifacts: none\nResult: Qdrant server already running 1.17.0 with existing data intact; client update to 1.18.0 was identified as needed; investigation was ongoing to check if semantic-analysis submodule also uses the Qdrant client.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:44:41.740Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "bc98e843-9964-4dae-ac27-19f0402b332e",
+    "summary": "Intent: Update Qdrant client and resume the existing plan\nApproach: Checked running Qdrant server version (1.17.0) against client version (1.15.1), updated client to 1.18.0 which supports 1.17.x, relying on Qdrant's automatic data migration on server startup rather than manual migration steps.\nArtifacts: none\nResult: Qdrant client updated to 1.18.0, compatible with the running 1.17.0 server; obs_api restarted successfully with no version mismatch errors and data intact via automatic migration.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T11:44:41.740Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "169b20fc-3db4-4784-ba80-df0e1674ef29",
+    "summary": "Intent: Understand why LevelDB/Qdrant show \"unknown\" status, why there are stale PIDs, why CGR doesn't show commits-behind count, and why online learning is yellow but not reflected on the health board.\nApproach: Deep investigation across coordinator, dashboard frontend, health-verifier, and PSM to trace data flow — comparing actual probe results stored in one data structure vs. legacy sub-check keys read by the frontend that never get updated.\nArtifacts: none\nResult: Root causes identified but not yet fixed: LevelDB/Qdrant always show \"unknown\" because the coordinator probes databases and stores results in `levelDB.available`/`qdrant.available` but never maps them to the legacy sub-check keys (`leveldb_lock_check`, `qdrant_availability`) that the frontend reads. Stale PIDs are similarly never updated. CGR actually shows correctly (0 commits behind displays as hash). Online learning yellow and dashboard discrepancy still under investigation.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T12:07:11.750Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ac5d0f3d-9d48-465b-a3c9-3bca327f44ee",
+    "summary": "Intent: Understand and fix unknown status for LevelDB/Qdrant, stale PIDs, missing commit-behind count in CGR, and online learning system yellow indicator not reflected on health board.\nApproach: Investigated coordinator state update logic, finding the LevelDB/Qdrant sub-checks were set to 'unknown' once and never updated due to a conditional that skipped already-set keys, and a restarted coordinator was needed to pick up existing code fixes. Stale PIDs and other issues require deeper PSM integration work.\nArtifacts: none\nResult: Restarting the health coordinator resolved LevelDB and Qdrant showing 'unknown' — they now show 'passed'. Stale PIDs remain unresolved as the process check loop never probes actual process liveness. The knowledge pipeline yellow state isn't reflected on the health board because the dashboard has no knowledge pipeline section. Commit-behind count in CGR is a separate gap not yet addressed.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T12:07:11.750Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "3736f2d2-3c75-4057-86d8-be2069dfd735",
+    "summary": "Intent: Diagnose multiple health system issues: unknown status for LevelDB/Qdrant, stale PIDs, missing commit-behind count in CGR, and knowledge pipeline showing yellow without dashboard reflection.\nApproach: Investigated coordinator logic for process checks, database sub-checks, stale PID cleanup, and dashboard coverage gaps; fixed unimplemented placeholder process rules by disabling them and patched stale_pids handling in the coordinator.\nArtifacts: edited coordinator config/rules files, edited health coordinator source, edited dashboard frontend component, edited process rules config\nResult: Stale PIDs now resolve as \"passed\" after coordinator restart; unimplemented placeholder process rules (process_uptime, high_cpu_usage, etc.) disabled to eliminate unknown-status noise; knowledge pipeline dashboard section identified as missing and queued for addition; LevelDB/Qdrant unknowns traced to missing probe implementations.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T12:07:11.750Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "09c7ba64-e429-4705-ab95-ab523ba74686",
+    "summary": "Intent: Investigate four health dashboard issues: LevelDB/Qdrant showing \"unknown\" status, stale PIDs check origin, CGR cache missing commits-behind count, and online learning system yellow indicator not reflected on dashboard.\nApproach: Systematic file exploration across health coordinator, PSM, scripts, shell configs, and starship configs to trace data flow and identify gaps in health reporting pipelines.\nArtifacts: none\nResult: Exploratory investigation only — the assistant searched and read files but the exchange was cut off before producing findings or conclusions.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T12:07:39.223Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "8f60db99-6804-4ea8-a613-020c0ca9f644",
+    "summary": "Intent: Noted that the network status label shows CN (Corporate Network) when actually on VPN, suggesting the label is inaccurate.\nApproach: Investigated the network detection logic and found VPN detection was an else-if branch that only triggered when PAC URL didn't resolve, but VPN also resolves the PAC URL, so it was never reached.\nArtifacts: none\nResult: Root cause identified: VPN check needs priority over corporate network check, or corporate check must exclude VPN scenarios. No fix was applied yet.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T12:39:53.788Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "f34bcf7b-13e9-4bbf-b32f-676aa7b7ea8b",
+    "summary": "Intent: Correct faulty VPN detection logic where proxy ON + corporate network should equal VPN.\nApproach: Simplified the conditional: proxy running + pacResolved (corporate network DNS) = VPN tunnel, since the proxy is only needed when tunneling in remotely, not when physically on the corporate network.\nArtifacts: edited network detection source file, removed unused hasVpn variable\nResult: VPN detection now correctly identifies the VPN state as proxy-enabled + corporate network, with dead code (`hasVpn`) removed.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T12:41:10.791Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ccfb82f8-bb47-401d-8942-2134405fd6d7",
+    "summary": "Intent: [asked whether the dashboard fix was completed]\nApproach: [assistant investigated current state by running diagnostic commands]\nArtifacts: none\nResult: [fix was not complete — dashboard still shows stale data with empty databases/processes and zero checks, root cause identified as health-verifier not running its check cycle]",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T12:42:45.238Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "1e11b040-6e8b-4837-9292-86d451b7e2e3",
+    "summary": "Intent: Asked whether the dashboard fix had been completed.\nApproach: Investigated why dashboard showed stale/empty health data by tracing the data flow from coordinator through the dashboard's `toUiStatus()` mapping function.\nArtifacts: edited server.js\nResult: Root cause found: `toUiStatus('passed')` fell through to `return 'unknown'` because `'passed'` was not in the function's recognized value mappings; fix was applied and container restarted.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T12:42:45.238Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
   }
 ]

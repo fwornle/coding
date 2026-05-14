@@ -1,84 +1,107 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title Planning and Execution Workflow — Sequence
+title Planning and Execution Workflow\nDetail View
 
-actor "User / Agent" as User
-participant "MCP Tool\n(execute_workflow)" as MCP
-participant "SSE Server\n:3848" as SSE
-participant "WorkflowRunner" as Runner
-participant "Coordinator" as Coord
-participant "LLM Provider" as LLM
-participant "PersistenceAgent" as Persist
-database "LevelDB\nKnowledge Graph" as KG
-participant "ProgressTracker\n(workflow-progress.json)" as Progress
+participant "External Client" as Client
+participant "MCP Server" as MCP
+participant "Workflow Orchestrator" as Orchestrator
+participant "Planner" as Planner
+participant "Execution Engine" as Executor
+participant "Semantic Analyzer" as Semantic
+participant "Knowledge Store" as Knowledge
+participant "Incremental Monitor" as Monitor
 
-== Trigger ==
+== Trigger: MCP Tool Invocation ==
 
-User -> MCP : execute_workflow(wave-analysis,\nteam: coding, async_mode: true)
-MCP -> SSE : POST /workflow/start
-SSE -> Progress : reset / initialize progress
-SSE -> Runner : spawn workflow process
-Runner --> SSE : workflow_id
+Client -> MCP : execute_workflow(params)
+activate MCP
 
-SSE --> MCP : { workflow_id, status: "running" }
-MCP --> User : workflow started
+MCP -> Orchestrator : dispatch(workflow_request)
+activate Orchestrator
 
-== Wave Initialization ==
+Orchestrator -> Planner : create_plan(context)
+activate Planner
 
-Runner -> Coord : loadTeamConfig(coding)
-Coord -> KG : read existing entities & relations
-KG --> Coord : entity graph snapshot
-Coord -> Progress : update(step: "initialize", status: running)
+Planner -> Knowledge : query_existing_knowledge()
+activate Knowledge
+Knowledge --> Planner : knowledge_context
+deactivate Knowledge
 
-== Analysis Wave ==
+Planner -> Planner : build_execution_plan()
+Planner --> Orchestrator : execution_plan
+deactivate Planner
 
-group loop [for each observation batch]
-  Coord -> LLM : analyzeObservations(batch)
-  LLM --> Coord : raw patterns + insights
-  Coord -> Coord : classifyEntities(ontology)
-  Coord -> Progress : update(step: "analyze", substep: batchN)
+== Execution Phase ==
+
+Orchestrator -> Executor : run(execution_plan)
+activate Executor
+
+loop For each plan step
+    Executor -> Semantic : analyze_step(step)
+    activate Semantic
+
+    Semantic -> Knowledge : retrieve_relevant_data(step)
+    activate Knowledge
+    Knowledge --> Semantic : relevant_data
+    deactivate Knowledge
+
+    Semantic --> Executor : analysis_result
+    deactivate Semantic
+
+    Executor -> Executor : process_step(analysis_result)
+
+    alt Step succeeded
+        Executor -> Knowledge : update_knowledge(result)
+        activate Knowledge
+        Knowledge --> Executor : ack
+        deactivate Knowledge
+    else Step failed
+        Executor -> Orchestrator : report_failure(step, error)
+        Orchestrator -> Planner : replan(failed_step)
+        activate Planner
+        Planner --> Orchestrator : revised_plan
+        deactivate Planner
+    end
 end
 
-== Classification ==
+Executor --> Orchestrator : execution_complete(summary)
+deactivate Executor
 
-Coord -> LLM : classifyWithOntology(entities)
-LLM --> Coord : typed entities (Detail / Component / ...)
-Coord -> Coord : validateClassification()
-Coord -> Progress : update(step: "classify", status: done)
+Orchestrator --> MCP : workflow_result
+deactivate Orchestrator
 
-== KG Operations ==
+MCP --> Client : response(workflow_result)
+deactivate MCP
 
-group KG-Ops [dedup → predict → merge]
-  Coord -> Coord : deduplicateEntities()
-  Coord -> Coord : predictRelations()
-  Coord -> Coord : mergeGraph()
-  Coord -> Progress : update(step: "kg-ops", substeps: 3/3)
-end
+== Trigger: Automatic Incremental Analysis ==
 
-== Persistence ==
+Monitor -> Monitor : detect_change(codebase / data)
+activate Monitor
 
-Coord -> Persist : persistEntities(entities, relations)
-Persist -> KG : upsert nodes + edges
-KG --> Persist : confirmed write count
-Persist -> Progress : update(step: "persist", entities: N)
+Monitor -> Orchestrator : trigger_incremental_analysis(delta)
+activate Orchestrator
 
-== Insight Generation ==
+Orchestrator -> Semantic : incremental_analyze(delta)
+activate Semantic
 
-Coord -> LLM : generateInsights(finalGraph)
-LLM --> Coord : insight documents
-Coord -> KG : storeInsights()
-Coord -> Progress : update(step: "insights", status: done)
+Semantic -> Knowledge : fetch_baseline()
+activate Knowledge
+Knowledge --> Semantic : baseline_context
+deactivate Knowledge
 
-== Completion ==
+Semantic -> Semantic : compute_diff_analysis()
 
-Runner -> Progress : update(status: "completed", totalEntities: N)
-Runner --> SSE : workflow finished
+Semantic -> Knowledge : persist_incremental_updates()
+activate Knowledge
+Knowledge --> Semantic : ack
+deactivate Knowledge
 
-SSE -> User : SSE event: workflow_complete
-User -> MCP : get_workflow_status(workflow_id)
-MCP -> Progress : read final state
-Progress --> MCP : { status, entities, relations, orphans }
-MCP --> User : summary report
+Semantic --> Orchestrator : incremental_analysis_done
+deactivate Semantic
+
+Orchestrator --> Monitor : analysis_ack
+deactivate Orchestrator
+deactivate Monitor
 
 @enduml
