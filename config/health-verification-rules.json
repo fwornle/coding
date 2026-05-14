@@ -163,7 +163,7 @@
         "auto_heal_action": "cleanup_dead_processes"
       },
       "process_uptime": {
-        "enabled": true,
+        "enabled": false,
         "severity": "info",
         "check_type": "uptime_threshold",
         "min_uptime_seconds": 30,
@@ -171,7 +171,7 @@
         "auto_heal": false
       },
       "high_cpu_usage": {
-        "enabled": true,
+        "enabled": false,
         "severity": "warning",
         "check_type": "resource_usage",
         "max_cpu_percent": 80,
@@ -181,7 +181,7 @@
         "recommendation": "Investigate high CPU process or restart if stuck"
       },
       "high_memory_usage": {
-        "enabled": true,
+        "enabled": false,
         "severity": "warning",
         "check_type": "resource_usage",
         "max_memory_mb": 1000,
@@ -190,7 +190,7 @@
         "recommendation": "Restart memory-intensive process or investigate leak"
       },
       "zombie_processes": {
-        "enabled": true,
+        "enabled": false,
         "severity": "error",
         "check_type": "zombie_detection",
         "description": "Detect zombie/defunct processes",

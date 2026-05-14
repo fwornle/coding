@@ -168,6 +168,9 @@ export class HealthRemediationActions {
         case 'restart_llm_cli_proxy':
           result = await this.restartLLMCLIProxy(issueDetails);
           break;
+        case 'restart_obs_api':
+          result = await this.restartObsApi(issueDetails);
+          break;
         case 'check_llm_cli_proxy':
           result = await this.checkLLMCLIProxy(issueDetails);
           break;
@@ -598,6 +601,41 @@ export class HealthRemediationActions {
       });
     } catch (error) {
       this.log(`[HealthRemediationActions] restartLLMCLIProxy threw: ${error.message}`, 'ERROR');
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Restart the observations API server via the dedicated restart script.
+   * The obs_api runs on the host (not Docker) and is supervised by PSM.
+   * Uses scripts/restart-obs-api.mjs which handles graceful shutdown of any
+   * existing instance, spawns a new one, and re-registers with PSM.
+   */
+  async restartObsApi(details) {
+    try {
+      const reason = details?.reason ?? 'unspecified';
+      this.log(`[HealthRemediationActions] Restarting obs_api (reason: ${reason})...`);
+
+      const { execFile } = await import('node:child_process');
+      const scriptPath = `${this.codingRoot}/scripts/restart-obs-api.mjs`;
+
+      return await new Promise((resolve) => {
+        execFile('node', [scriptPath], {
+          cwd: this.codingRoot,
+          timeout: 30000,
+          env: { ...process.env, HOME: process.env.HOME || '/root' }
+        }, (error, stdout, stderr) => {
+          if (error) {
+            this.log(`[HealthRemediationActions] restartObsApi failed: ${error.message}`, 'ERROR');
+            resolve({ success: false, message: `obs_api restart failed: ${error.message}`, stdout, stderr });
+          } else {
+            this.log(`[HealthRemediationActions] obs_api restarted successfully`);
+            resolve({ success: true, message: 'obs_api restarted via restart-obs-api.mjs', stdout });
+          }
+        });
+      });
+    } catch (error) {
+      this.log(`[HealthRemediationActions] restartObsApi threw: ${error.message}`, 'ERROR');
       return { success: false, message: error.message };
     }
   }

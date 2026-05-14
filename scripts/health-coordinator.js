@@ -37,6 +37,11 @@ import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { probeHttpHealth, probeTcpPort } from '../lib/utils/service-probe.js';
+import net from 'node:net';
+import http from 'node:http';
+import https from 'node:https';
+import dns from 'node:dns';
+import os from 'node:os';
 import ProcessStateManager from './process-state-manager.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -178,13 +183,23 @@ const currentState = {
   proxy: {
     semantic_ok: null,                   // null until first probe; true|false after
     last_round_trip_ms: null,            // int, last completion latency
-    networkMode: 'unknown',              // 'vpn' | 'public' | 'unknown'
+    networkMode: 'unknown',              // 'vpn' | 'corporate' | 'public' | 'unknown'
     auto_heal_status: 'healthy',         // 'healthy'|'kickstart_pending'|'cooldown'|'disabled' (Plan 34-03 transitions)
     kickstart_count: 0,                  // running counter since coordinator boot (D-14 soak gate)
     kickstart_timestamps: [],            // sliding window for D-06 cooldown FSM
     consecutive_failures: 0,             // resets on success
     last_probe_end: null,                // ISO timestamp of last semantic probe completion
     reason: null                         // last failure classification: 'http_<code>'|'timeout'|'empty_content'|'oksub_missing'|null
+  },
+  // Network environment detection — single source of truth for CN/VPN/home
+  // and local proxy (px/proxydetox) status. Polled every 30s.
+  // Consumers: LLM proxy, statusline, dashboard.
+  network: {
+    location: 'unknown',                 // 'corporate' | 'vpn' | 'home' | 'unknown'
+    proxy_running: false,                // true if px/proxydetox listening on 127.0.0.1:3128
+    proxy_functional: false,             // true if proxy can actually reach external hosts
+    internet_reachable: false,           // true if we can reach github.com (directly or via proxy)
+    last_probe_end: null                 // ISO timestamp
   },
   generated_at: new Date(STARTED_AT).toISOString(),
   coordinator_uptime_s: 0
@@ -640,7 +655,7 @@ async function pollProxyMode() {
     }
     const body = await r.json();
     const mode = body?.networkMode;
-    currentState.proxy.networkMode = (mode === 'vpn' || mode === 'public') ? mode : 'unknown';
+    currentState.proxy.networkMode = (mode === 'vpn' || mode === 'corporate' || mode === 'public') ? mode : 'unknown';
 
     // Phase 34 R3 / D-05: VPN/CN flap re-detection.
     // Trigger kickstart ONLY on real-value <-> real-value transitions
@@ -649,7 +664,7 @@ async function pollProxyMode() {
     // are NOT actionable. Flap kickstart does NOT push to
     // kickstart_timestamps — flap is a USER ACTION (network changed),
     // not a proxy-failure response, so cooldown does not gate it.
-    const realModes = new Set(['vpn', 'public']);
+    const realModes = new Set(['vpn', 'corporate', 'public']);
     if (
       realModes.has(prevMode) &&
       realModes.has(currentState.proxy.networkMode) &&
@@ -877,7 +892,117 @@ function refreshLslStaleness() {
  *   - databases — PSM checkDatabaseHealth aggregate
  *   - per-rule entries (databases/services/processes/files) via forEachEnabledRule
  */
+// ---------------------------------------------------------------------------
+// Network environment detection — single source of truth
+// ---------------------------------------------------------------------------
+const NETWORK_PROBE_INTERVAL_MS = 30_000;
+
+/**
+ * Detect network location and proxy status.
+ * Logic ported from coding/scripts/detect-network.sh:
+ *   1. Check if px/proxydetox is listening on 127.0.0.1:3128
+ *   2. Check if BMW PAC host resolves (→ corporate/CN)
+ *   3. Check VPN interfaces (utun*)
+ *   4. Determine: corporate | vpn | home
+ */
+async function pollNetworkStatus() {
+  const netState = currentState.network;
+
+  // 1. Is px/proxydetox listening on 127.0.0.1:3128?
+  //    Use raw TCP connect to avoid HTTP_PROXY env interference
+  netState.proxy_running = await new Promise(resolve => {
+    const sock = net.connect({ host: '127.0.0.1', port: 3128, timeout: 2000 });
+    sock.once('connect', () => { sock.destroy(); resolve(true); });
+    sock.once('error', () => resolve(false));
+    sock.once('timeout', () => { sock.destroy(); resolve(false); });
+  });
+
+  // 2. Can we resolve BMW PAC host? (indicates CN)
+  const pacResolved = await new Promise(resolve => {
+    dns.resolve4('muc.proxy-pac.bmwgroup.net', { timeout: 3000 }, (err, addrs) => {
+      resolve(!err && addrs && addrs.length > 0);
+    });
+  });
+
+  // 3. Determine location
+  //    PAC resolves = corporate network reachable (physically or via VPN)
+  //    proxy running on CN = VPN (physical CN doesn't need the local proxy)
+  if (pacResolved && netState.proxy_running) {
+    netState.location = 'vpn';        // corporate network + proxy = VPN tunnel
+  } else if (pacResolved) {
+    netState.location = 'corporate';  // physical corporate network (no proxy needed)
+  } else {
+    netState.location = 'home';       // direct internet, no corporate access
+  }
+
+  // 5. Check if proxy is functional (can reach external host via proxy)
+  if (netState.proxy_running) {
+    netState.proxy_functional = await new Promise(resolve => {
+      const req = http.get('http://127.0.0.1:3128/', {
+        timeout: 5000,
+        headers: { Host: 'api.github.com' }
+      }, res => {
+        res.resume();
+        // Any response from the proxy (even 407) means it's functional
+        resolve(res.statusCode < 502);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+    });
+  } else {
+    netState.proxy_functional = false;
+  }
+
+  // 6. Can we reach the internet? (either directly or via proxy)
+  netState.internet_reachable = await new Promise(resolve => {
+    const opts = { timeout: 5000, method: 'HEAD' };
+    if (netState.proxy_running) {
+      // Via proxy
+      const proxyReq = http.request({
+        host: '127.0.0.1', port: 3128,
+        method: 'CONNECT', path: 'api.github.com:443',
+        timeout: 5000
+      });
+      proxyReq.on('connect', (res) => {
+        resolve(res.statusCode === 200);
+        proxyReq.destroy();
+      });
+      proxyReq.on('error', () => resolve(false));
+      proxyReq.on('timeout', () => { proxyReq.destroy(); resolve(false); });
+      proxyReq.end();
+    } else {
+      // Direct
+      const req = https.get('https://api.github.com/', opts, res => {
+        res.resume();
+        resolve(res.statusCode < 500);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+    }
+  });
+
+  netState.last_probe_end = new Date().toISOString();
+
+  // Also update proxy.networkMode to match (backwards compat for dashboard)
+  currentState.proxy.networkMode = net.location === 'home' ? 'public' : net.location;
+
+  log(`network: location=${net.location} proxy_running=${net.proxy_running} proxy_functional=${net.proxy_functional} internet=${net.internet_reachable}`);
+}
+
 async function runAllChecks() {
+  // ----- Network environment detection (every 30s) -----
+  const _netProbeAge = currentState.network.last_probe_end
+    ? Date.now() - new Date(currentState.network.last_probe_end).getTime()
+    : Infinity;
+  if (_netProbeAge >= NETWORK_PROBE_INTERVAL_MS) {
+    try {
+      await pollNetworkStatus();
+    } catch (err) {
+      log(`network probe threw: ${err.message}`, 'ERROR');
+      currentState.network.last_probe_end = new Date().toISOString();
+    }
+  }
+
   // ----- Container healthcheck (SPEC R7) -----
   try {
     currentState.container = pollDockerHealth();
@@ -1033,8 +1158,29 @@ async function runAllChecks() {
         ...(currentState.databases || {}),
         status: aggregate,
         levelDB: dbStatus?.levelDB,
-        qdrant: dbStatus?.qdrant
+        qdrant: dbStatus?.qdrant,
+        // Map PSM probe results to the rule-keyed sub-checks that the
+        // dashboard reads (leveldb_lock_check, qdrant_availability, etc.).
+        // Without this, sub-checks stay at their 'unknown' default forever.
+        leveldb_lock_check: levelDbOk ? 'passed' : (dbStatus?.levelDB?.locked ? 'failed' : 'unknown'),
+        leveldb_accessibility: dbStatus?.levelDB?.available !== false ? 'passed' : 'failed',
+        qdrant_availability: qdrantOk ? 'passed' : 'failed',
       };
+
+      // Probe Memgraph for graph_integrity (TCP port check on bolt 7687)
+      try {
+        const net = await import('net');
+        await new Promise((resolve, reject) => {
+          const sock = net.default.createConnection(7687, 'localhost');
+          sock.setTimeout(2000);
+          sock.on('connect', () => { sock.destroy(); resolve(); });
+          sock.on('timeout', () => { sock.destroy(); reject(new Error('timeout')); });
+          sock.on('error', reject);
+        });
+        currentState.databases.graph_integrity = 'passed';
+      } catch {
+        currentState.databases.graph_integrity = 'failed';
+      }
     }
   } catch (err) {
     log(`db_health check threw: ${err.message}`, 'ERROR');
@@ -1185,13 +1331,43 @@ async function runAllChecks() {
     else currentState.files[idx] = entry;
   });
 
-  // processes: signal-driven (existing path). Rule iteration ensures each
-  // enabled rule has an entry in currentState.processes even before its
-  // first signal.
+  // processes: probe stale PIDs from consolidation heartbeat, and ensure
+  // each enabled rule has an entry.
   if (!Array.isArray(currentState.processes)) currentState.processes = [];
+
+  // Probe stale_pids: check consolidation heartbeat for orphaned processes
+  const heartbeatPath = path.join(REPO_ROOT, '.observations', 'consolidation-heartbeat.json');
+  let stalePidStatus = 'passed';
+  let stalePidDetail = 'No stale PIDs';
+  try {
+    if (fs.existsSync(heartbeatPath)) {
+      const hb = JSON.parse(fs.readFileSync(heartbeatPath, 'utf8'));
+      const pid = hb?.pid;
+      const ts = hb?.timestamp ? Date.parse(hb.timestamp) : 0;
+      const ageMs = ts ? Date.now() - ts : Infinity;
+      let alive = false;
+      if (pid) { try { process.kill(pid, 0); alive = true; } catch { alive = false; } }
+      if (pid && !alive) {
+        stalePidStatus = 'passed';
+        stalePidDetail = `Cleaned stale heartbeat (dead PID ${pid})`;
+        try { fs.unlinkSync(heartbeatPath); } catch { /* ignore */ }
+      } else if (pid && alive && ageMs > 6 * 60 * 1000) {
+        stalePidStatus = 'warning';
+        stalePidDetail = `Stale heartbeat: PID ${pid} alive but ${Math.round(ageMs / 1000)}s old`;
+      } else if (pid && alive) {
+        stalePidStatus = 'passed';
+        stalePidDetail = `Active consolidation (PID ${pid})`;
+      }
+    }
+  } catch { /* ignore read errors */ }
+
   await forEachEnabledRule('processes', async (name, _rule) => {
     const idx = currentState.processes.findIndex(p => p.name === name);
-    if (idx < 0) {
+    if (name === 'stale_pids') {
+      const entry = { name, pid: null, status: stalePidStatus, detail: stalePidDetail };
+      if (idx < 0) currentState.processes.push(entry);
+      else currentState.processes[idx] = entry;
+    } else if (idx < 0) {
       currentState.processes.push({ name, pid: null, status: 'unknown' });
     }
   });

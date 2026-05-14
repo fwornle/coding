@@ -64,6 +64,8 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Warning</Badge>
       case 'error':
         return <Badge variant="destructive">Error</Badge>
+      case 'unknown':
+        return <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">Unknown</Badge>
       default:
         return <Badge variant="outline">Offline</Badge>
     }

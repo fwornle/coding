@@ -202,15 +202,16 @@ class CombinedStatusLine {
       const redirectStatus        = await timeStep('redirect',        () => this.getRedirectStatus());
       const globalHealthStatus    = await timeStep('globalHealth',    () => this.getGlobalHealthStatus());
       const healthVerifierStatus  = await timeStep('healthVerifier',  () => this.getHealthVerifierStatus());
-      const ukbStatus             = this.getUKBStatus();
+       const ukbStatus             = this.getUKBStatus();
+       const networkStatus         = await timeStep('network',         () => this.getNetworkStatus());
 
-      // Phase 33 plan 07: launchd's com.coding.health-coordinator KeepAlive
-      // is the authoritative supervisor for the host-side health stack;
-      // combined-status-line is purely display-only post-cutover. The
-      // legacy ensure*Running spawn paths and the GPS heartbeat probe were
-      // removed along with the four legacy daemons.
+       // Phase 33 plan 07: launchd's com.coding.health-coordinator KeepAlive
+       // is the authoritative supervisor for the host-side health stack;
+       // combined-status-line is purely display-only post-cutover. The
+       // legacy ensure*Running spawn paths and the GPS heartbeat probe were
+       // removed along with the four legacy daemons.
 
-      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, proxyStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus, ukbStatus);
+       const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, proxyStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus, ukbStatus, networkStatus);
 
       this.statusCache = status;
       this.lastUpdate = now;
@@ -748,6 +749,16 @@ class CombinedStatusLine {
       kickstart_count: p.kickstart_count,
       reason: p.reason,
     };
+  }
+
+  async getNetworkStatus() {
+    // Network environment detection from health coordinator.
+    // Drives [N:...] and [P:...] badges in the statusline.
+    const result = await this.getCoordinatorState();
+    if (!result.ok) return { location: 'unknown', proxy_running: false, proxy_functional: false, internet_reachable: false };
+    const n = result.state.network;
+    if (!n) return { location: 'unknown', proxy_running: false, proxy_functional: false, internet_reachable: false };
+    return n;
   }
 
   async getHealthVerifierStatus() {
@@ -1708,7 +1719,7 @@ class CombinedStatusLine {
   // `.health/supervisor-heartbeat.json` dependency. combined-status-line
   // is now display-only.
 
-  async buildCombinedStatus(constraint, semantic, knowledge, proxy, liveLogTarget, redirectStatus, globalHealth, healthVerifier, ukbStatus) {
+  async buildCombinedStatus(constraint, semantic, knowledge, proxy, liveLogTarget, redirectStatus, globalHealth, healthVerifier, ukbStatus, network) {
     const parts = [];
     let overallColor = 'green';
 
@@ -1881,6 +1892,27 @@ class CombinedStatusLine {
         parts.push('[📚❌]');
         if (overallColor === 'green') overallColor = 'yellow';
         break;
+    }
+
+    // Network location badge: [N:CN] / [N:VPN] / [N:HOME] / [N:??]
+    // Uses ASCII-only to avoid emoji-width issues.
+    {
+      const loc = network?.location || 'unknown';
+      const locMap = { corporate: 'CN', vpn: 'VPN', home: 'HOME', unknown: '??' };
+      const locLabel = locMap[loc] || loc.toUpperCase().slice(0, 4);
+      parts.push(`[N:${locLabel}]`);
+    }
+
+    // Proxy status badge: [P:ON] / [P:OFF]
+    // Reflects whether the local proxy (px/proxydetox) is running and functional.
+    {
+      const pxOn = network?.proxy_running && network?.proxy_functional;
+      const pxLabel = network?.proxy_running ? (network?.proxy_functional ? 'ON' : 'ERR') : 'OFF';
+      parts.push(`[P:${pxLabel}]`);
+      if (network?.location === 'corporate' && !pxOn) {
+        // On CN without working proxy — problem
+        if (overallColor === 'green') overallColor = 'yellow';
+      }
     }
 
     // Phase 34 (D-12): proxy semantic readiness drives [🧠] badge.

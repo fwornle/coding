@@ -10,12 +10,19 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 interface ProxyHealth {
   semantic_ok?: boolean | null
   last_round_trip_ms?: number | null
-  networkMode?: 'vpn' | 'public' | 'unknown' | null
+  networkMode?: 'vpn' | 'corporate' | 'public' | 'unknown' | null
   auto_heal_status?: 'healthy' | 'kickstart_pending' | 'cooldown' | 'disabled' | null
   kickstart_count?: number
   kickstart_timestamps?: number[]
   consecutive_failures?: number
   reason?: string | null
+}
+
+interface NetworkHealth {
+  internet_reachable?: boolean | null
+  proxy_running?: boolean | null
+  proxy_functional?: boolean | null
+  location?: 'corporate' | 'vpn' | 'public' | 'unknown' | null
 }
 
 interface HealthStatusState {
@@ -30,6 +37,7 @@ interface HealthStatusState {
   loading: boolean
   error: string | null
   proxy: ProxyHealth | null
+  network: NetworkHealth | null
 }
 
 const initialState: HealthStatusState = {
@@ -44,6 +52,7 @@ const initialState: HealthStatusState = {
   loading: false,
   error: null,
   proxy: null,
+  network: null,
 }
 
 const healthStatusSlice = createSlice({
@@ -67,6 +76,7 @@ const healthStatusSlice = createSlice({
       // slice null (e.g. proxy unreachable), we want the dashboard card to
       // see null too, not the previous successful read.
       state.proxy = action.payload.proxy ?? null
+      state.network = action.payload.network ?? null
       state.loading = false
       state.error = null
     },

@@ -103,10 +103,11 @@ export default function SystemHealthDashboard() {
   }, [])
 
   // Map check status to UI status
-  const mapCheckStatus = (check: any): 'operational' | 'warning' | 'error' | 'offline' => {
+  const mapCheckStatus = (check: any): 'operational' | 'warning' | 'error' | 'offline' | 'unknown' => {
     if (check.status === 'passed') return 'operational'
     if (check.status === 'warning') return 'warning'
     if (check.status === 'failed' || check.status === 'error') return 'error'
+    if (check.status === 'unknown') return 'unknown'
     return 'offline'
   }
 
@@ -156,7 +157,9 @@ export default function SystemHealthDashboard() {
       if (isReindexing) {
         description = 'Re-indexing coding...'
       } else if (commitsBehind !== undefined && commitsBehind > 0) {
-        description = `${repoName}: ${commitsBehind} behind`
+        description = `${repoName}: ${commitsBehind} commit${commitsBehind > 1 ? 's' : ''} behind`
+      } else if (cachedCommit && commitsBehind === 0) {
+        description = `${repoName} @ ${cachedCommit.substring(0, 7)} (current)`
       } else if (cachedCommit) {
         description = `${repoName} @ ${cachedCommit.substring(0, 7)}`
       }
@@ -354,6 +357,7 @@ export default function SystemHealthDashboard() {
   // pragmatic narrowing avoids a type-only follow-up gating this commit.
   const getProxyHealthItems = () => {
     const proxy = (healthStatus as any)?.proxy
+    const net = healthStatus.network
     if (!proxy) {
       return [{ name: 'Proxy semantic', status: 'offline' as const, description: 'No data yet — coordinator unreachable or proxy slice missing' }]
     }
@@ -374,9 +378,19 @@ export default function SystemHealthDashboard() {
         tooltip: proxy.reason ?? 'OK'
       },
       {
-        name: 'Network mode',
-        status: (proxy.networkMode === 'unknown' ? 'warning' : 'operational') as 'warning' | 'operational',
-        description: proxy.networkMode ?? 'unknown'
+        name: 'Network location',
+        status: (net?.location === 'unknown' ? 'warning' : 'operational') as 'warning' | 'operational',
+        description: ({ corporate: 'Corporate (CN)', vpn: 'VPN', home: 'Home', unknown: 'Unknown' } as Record<string, string>)[net?.location ?? 'unknown'] ?? net?.location ?? 'unknown'
+      },
+      {
+        name: 'Local proxy (px)',
+        status: (net?.proxy_running ? (net?.proxy_functional ? 'operational' : 'error') : (net?.location === 'corporate' ? 'error' : 'offline')) as 'operational' | 'error' | 'offline',
+        description: net?.proxy_running ? (net?.proxy_functional ? 'Running & functional' : 'Running but not functional') : 'Not running'
+      },
+      {
+        name: 'Internet',
+        status: (net?.internet_reachable ? 'operational' : 'error') as 'operational' | 'error',
+        description: net?.internet_reachable ? 'Reachable' : 'Unreachable'
       },
       {
         name: 'Auto-heal',

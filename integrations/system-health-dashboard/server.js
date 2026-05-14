@@ -45,7 +45,8 @@ const AUTO_HEAL_MAP = {
     dashboard_server: { action: 'restart_dashboard_server', recommendation: 'Restart dashboard frontend.' },
     health_dashboard_api: { action: 'restart_health_api', recommendation: 'Restart health dashboard API.' },
     health_dashboard_frontend: { action: 'restart_health_frontend', recommendation: 'Restart health dashboard frontend.' },
-    llm_cli_proxy: { action: 'restart_llm_cli_proxy', recommendation: 'Restart LLM CLI proxy.' }
+    llm_cli_proxy: { action: 'restart_llm_cli_proxy', recommendation: 'Restart LLM CLI proxy.' },
+    obs_api: { action: 'restart_obs_api', recommendation: 'Restart observations API server (host process).' }
 };
 
 /**
@@ -401,7 +402,12 @@ class SystemHealthAPIServer {
                     // slice so the dashboard's LLM Proxy Health card has data
                     // to render. Without this the card would only ever see
                     // the "no data" fallback even when state.proxy is fresh.
-                    proxy: state && state.proxy ? state.proxy : null
+                    proxy: state && state.proxy ? state.proxy : null,
+                    // Pass through network state so the frontend can render
+                    // internet reachability and proxy status correctly.
+                    // Without this, healthStatus.network is undefined and
+                    // the LLM Proxy Health card shows "Unreachable" / "Not running".
+                    network: state && state.network ? state.network : null
                 }
             });
         } catch (err) {
@@ -464,7 +470,7 @@ class SystemHealthAPIServer {
             // healthy services render "operational", explicit failures render "error",
             // and unknown stays neutral.
             const toUiStatus = (raw) => {
-                if (raw === 'healthy' || raw === 'running' || raw === 'ok' || raw === 'present') return 'passed';
+                if (raw === 'healthy' || raw === 'running' || raw === 'ok' || raw === 'present' || raw === 'passed') return 'passed';
                 if (raw === 'stopped' || raw === 'unhealthy' || raw === 'failed' || raw === 'error') return 'failed';
                 if (raw === 'degraded' || raw === 'stale' || raw === 'warning') return 'warning';
                 return 'unknown';
