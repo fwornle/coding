@@ -12145,12 +12145,12 @@
       "name": "System Health Dashboard and Service Architecture",
       "entityType": "Container",
       "observations": [
-        "**Services and ports:**\n- `localhost:3030` — constraint-dashboard Next.js frontend\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server\n- `localhost:3033` — health API / live-logging dashboard server\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker)\n- `localhost:12435` — LLM CLI proxy\n- `localhost:12436` — Observations API (`obs_api`)\n\n**Architectural rule:** All port values from `.env.ports` — no hardcoding. Docker runs headless backend services; host runs tools requiring host networking or hot-reload dev UIs.\n\n**Phase 34 — LLM proxy supervision (current state):**\n- Plans 34-01 through 34-05 complete; plan 34-06 queued (plist cleanup: remove `INJECT_THROW`, `TICK_MS`, `HEALTH_COORDINATOR_URL`; retain `PATH`, `HEALTH_COORDINATOR_PORT`)\n- Proxy health card added as fifth `HealthStatusCard`; **known bug**: displays \"No data yet\" — `healthStatus.proxy` is `null` due to `state.proxy` slice being dropped in reducer/fetch path\n- **R3/R4 operator-gated steps**: R3 (networkMode flap test) ambiguous — `LLM_NETWORK_MODE` env var did not affect `state.proxy.networkMode`; R4 held\n\n**Infrastructure issues fixed (May 13–14):**\n- `browser-access` and `health-verifier` failures: stale `coding-services` container image — fixed by rebuild\n- `obs_api` crash: `better-sqlite3` mutex exception from SIGTERM during power outage (not a runtime bug)\n- Qdrant client/server version mismatch (1.15.1 vs 1.17.0) — noted, not yet fixed\n- Frontend `mapCheckStatus` function mapped `'unknown'` sub-check status to `'offline'` instead of neutral \"Unknown\" — fixed\n- `obs_api` missing from `AUTO_HEAL_MAP` and `health-remediation-actions.js` — both added; note `auto_heal` flag only enables manual UI button, not an automatic restart loop\n\n**obs_api auto-restart note:** Only the LLM proxy has FSM-based auto-heal in the coordinator; `obs_api` requires manual restart via `coding --claude`"
+        "**Services and ports:**\n- `localhost:3030` — constraint-dashboard Next.js frontend\n- `localhost:3031` — constraint-dashboard API (`dashboard-server.js`, Docker via supervisord)\n- `localhost:3032` — observations viewer / health dashboard static server\n- `localhost:3033` — health API / live-logging dashboard server\n- `localhost:3034` — `health-coordinator.js` (Express; LaunchAgent plist)\n- `localhost:3848` — SSE workflow server\n- `localhost:8080` — OKB (Docker)\n- `localhost:12435` — LLM CLI proxy\n- `localhost:12436` — Observations API (`obs_api`)\n\n**Architectural rule:** All port values from `.env.ports` — no hardcoding.\n\n**Phase 34 status:**\n- Plans 34-01 through 34-05 complete; plan 34-06 queued (plist cleanup: remove `INJECT_THROW`, `TICK_MS`, `HEALTH_COORDINATOR_URL`; retain `PATH`, `HEALTH_COORDINATOR_PORT`)\n- **R3/R4 operator-gated steps**: R3 (networkMode flap test) ambiguous — `LLM_NETWORK_MODE` env var did not affect `state.proxy.networkMode`; R4 held\n\n**Bugs fixed (May 14):**\n- Redux reducer dropped `network` field from API response — frontend always read `undefined`; fixed by adding `network` to Redux state shape and removing unsafe `as any` cast\n- `toUiStatus('passed')` fell through to `return 'unknown'` — `'passed'` was not in recognized value mappings in `server.js`; fixed and container restarted\n- LevelDB/Qdrant always showed \"unknown\" — coordinator stored probe results in `levelDB.available`/`qdrant.available` but never mapped to legacy sub-check keys (`leveldb_lock_check`, `qdrant_availability`); restarting coordinator resolved\n- `restartObsApi` referenced in auto-heal dispatch but never implemented — now added\n- Unimplemented placeholder process rules (`process_uptime`, `high_cpu_usage`, etc.) disabled to eliminate spurious \"unknown\" noise\n\n**Remaining gaps:**\n- Stale PID handling: process check loop never probes actual process liveness; patch applied but not fully resolved\n- Knowledge pipeline yellow state has no dashboard section — queued\n- CGR commits-behind count displays as hash rather than count\n- Statusline and dashboard do not surface shared network detection state"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.849Z",
-        "last_updated": "2026-05-14T11:13:47.061Z"
+        "last_updated": "2026-05-14T14:13:08.414Z"
       },
       "id": "mc4flkg3oje83q"
     },
@@ -12297,23 +12297,14 @@
     },
     {
       "name": "Diagrams and Documentation Conventions",
-      "entityType": "Detail",
+      "entityType": "File",
       "observations": [
-        {
-          "type": "insight",
-          "content": "Diagrams and Documentation Conventions is part of the semantic analysis and knowledge management infrastructure",
-          "date": "2026-05-13T07:12:38.511Z",
-          "metadata": {
-            "confidence": 0.75,
-            "source": "entity-refresh",
-            "refreshedAt": "2026-05-13T07:12:38.520Z"
-          }
-        }
+        "- PlantUML diagrams: kebab-case filenames, standard style file includes, consistent stereotypes, layout guidelines, arrow macros; validated with `plantuml` CLI\n- `mkdocs --strict` is the standard verification step after documentation changes; exit 0 = clean build\n- `docs-content/` holds MkDocs source; images go to `docs/images/`; `health-mon.png` copied to `docs-content` for MkDocs rendering (May 14)\n\n**Diagrams created/updated:**\n- `lsl-repo-split.puml` — updated May 3; PNG in `docs/images/lsl-repo-split.png`; referenced in all 8 private `*-history` repo READMEs on GHE\n- `knowledge-context-injection.puml`, `retrieval-service-pipeline.puml`, `observation-memory-hierarchy.puml`\n- `docs/puml/health-coordinator-architecture.puml` — full style guide compliance May 8–9; PNG 93 KB\n- `health-system-classes.puml`, `lsl-components.puml`, `multi-session-health-architecture.puml` — updated May 11\n- `health-verification-flow.puml` — update identified as incomplete as of May 14\n\n**Documentation updates (May 14):**\n- Statusline docs and health monitoring docs updated to cover new network/proxy status fields\n- MkDocs config and content updated; PlantUML `.puml` files refreshed and PNGs regenerated where applicable\n- Remaining: regenerating remaining PUMLs to PNGs, updating MkDocs nav if new pages added, `status-line.md` update still pending\n\n**Content hygiene:**\n- `local_cache/` (fastembed ONNX model cache) in `.gitignore`\n- Terms to watch for reintroduction: `trajectory`, `$X/month`, bare `8.33` cost literals"
       ],
-      "source": "manual",
+      "source": "online",
       "metadata": {
         "created_at": "2026-04-26T10:34:49.956Z",
-        "last_updated": "2026-05-13T07:12:38.598Z"
+        "last_updated": "2026-05-14T14:13:08.679Z"
       },
       "id": "mc4flkg1c37dsd"
     },
@@ -12434,12 +12425,12 @@
       "name": "LLM Proxy and Network Detection",
       "entityType": "Process",
       "observations": [
-        "**Key files:**\n- `proxy-bridge/server.mjs` — main proxy bridge\n- `bin/start-llm-proxy.sh` — startup script with network detection\n- `src/network-detect.ts` / `dist/network-detect.js` — compiled network detection\n- `src/types.ts`, `src/provider-registry.ts` — type definitions and routing config\n- `llm-providers.yaml` — provider routing config\n\n**Fixes applied:**\n- **macOS VPN false positive (May 7)**: `server.mjs` matched any `utun*` interface, triggering false VPN for iCloud/iMessage tunnels — fixed by importing `dist/network-detect.js`\n- **Corporate network detection (May 13)**: `isPrivateIP` only checked RFC1918 ranges, missing `160.50.x.x` — extended to `isCorporateIP` covering internal ranges\n- **`'vpn'` → `'corporate'` rename (May 13)**: `NetworkMode` type renamed throughout `src/types.ts`, `src/network-detect.ts`, `src/provider-registry.ts`, `proxy-bridge/server.mjs`, `bin/start-llm-proxy.sh`; backward-compatible checks accept both `'vpn'` and `'corporate'`\n- **Cascade fix**: `health-coordinator.js` and system health dashboard updated to recognize `'corporate'` as a valid mode alongside `'vpn'`/`'public'`\n- **launchd DNS fix (May 14)**: `com.coding.llm-cli-proxy` agent always detected \"public\" because DNS couldn't resolve corporate PAC host; fix: detect corporate network by checking if `px` is running on `127.0.0.1:3128` instead of DNS resolution\n- **`server.mjs` coordination (May 14)**: `detectNetworkMode()` now queries health coordinator for network state first, falling back to local detection if unavailable\n\n**Current state:** Network mode correctly reports `\"corporate\"` with `semantic_ok: true` on corporate network; `start-llm-proxy.sh` uses `px` process check as fallback"
+        "**Key files:**\n- `proxy-bridge/server.mjs` — main proxy bridge\n- `bin/start-llm-proxy.sh` — startup script with network detection\n- `src/network-detect.ts` / `dist/network-detect.js` — compiled network detection\n- `coding/scripts/detect-network.sh` and `launch-agent-common.sh` — shared detection scripts (LLM proxy re-detects independently rather than consuming shared result)\n\n**Fixes applied:**\n- **macOS VPN false positive**: `server.mjs` matched any `utun*` interface — fixed by importing `dist/network-detect.js`\n- **Corporate network detection (May 13)**: `isPrivateIP` only checked RFC1918, missing `160.50.x.x` — extended to `isCorporateIP`\n- **`'vpn'` → `'corporate'` rename**: throughout `src/types.ts`, `src/network-detect.ts`, `src/provider-registry.ts`, `proxy-bridge/server.mjs`, `bin/start-llm-proxy.sh`; backward-compatible checks accept both\n- **launchd DNS fix (May 14)**: agent always detected \"public\" because DNS couldn't resolve corporate PAC host; fix: detect corporate network by checking if `px` is running on `127.0.0.1:3128`\n- **VPN branch fix (May 14)**: old `else-if` only triggered when PAC URL failed to resolve — VPN traffic also resolves PAC URL so branch was never reached; simplified: proxy running + `pacResolved` = VPN/corporate\n- **`server.mjs` coordination**: `detectNetworkMode()` now queries health coordinator for network state first, falling back to local detection\n\n**Keychain/DNS/launchd debugging (May 13):**\n- `rapid-llm-proxy` (port 12435) had `LLM_NETWORK_MODE=public` hardcoded in launchd plist, blocking corporate proxy routing\n- Root cause: `probe_corp_network` misclassified `160.50.x.x` as public (outside RFC1918); fixed by adding range to private IP detection regex\n\n**Current state:** Network mode correctly reports `\"corporate\"` on corporate network; `start-llm-proxy.sh` uses `px` process check as fallback detection"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-05-07T05:30:27.229Z",
-        "last_updated": "2026-05-14T11:13:46.971Z"
+        "last_updated": "2026-05-14T14:13:08.492Z"
       },
       "id": "mc4flkg9ltxut"
     },
@@ -12502,14 +12493,14 @@
     },
     {
       "name": "Observations API Service Hardening",
-      "entityType": "Process",
+      "entityType": "Fault",
       "observations": [
-        "The observations API (`obs_api`) runs at `localhost:12436`, spawned by `start-services-robust.js`.\n\n**Restart script:** `scripts/restart-obs-api.mjs` written as proper `.mjs` module; PSM registers new process; retrieve latency ~73 ms.\n\n**Stale heartbeat fix:** Treats heartbeats as stale if age > 30s **or** if recorded PID is no longer alive — deletes file and returns `null`.\n\n**EADDRINUSE and SIGTERM fixes:** `start-services-robust.js` has EADDRINUSE retry logic and `parentPid` in SIGTERM logging.\n\n**Crash causes identified:**\n- `better-sqlite3` mutex exception triggered by SIGTERM during power outage (not a runtime bug)\n- Qdrant client/server version mismatch (1.15.1 vs 1.17.0) causes crashes\n- SIGTERM from orphaned parent process followed by native fastembed crash during cleanup\n\n**Auto-heal gap:** `obs_api` was missing from `AUTO_HEAL_MAP` and `health-remediation-actions.js` — both added May 14; however auto-heal only enables a manual UI \"Restart\" button, not an automatic loop.\n\n**Known open issues:**\n- `libc++abi` shutdown mutex crash documented at `2026-05-10-obs-api-libcxx-mutex-shutdown-crash.md`\n- Qdrant client version pin deferred as TODO"
+        "The observations API (`obs_api`) runs at `localhost:12436`, managed under launchd with `KeepAlive=true` for automatic restart on failure.\n\n**Crash root cause (resolved May 14):**\n- `detached: true` + `unref()` orphaned process to PID 1; macOS launchd sent SIGTERM, triggering a C++ mutex crash inside the `fastembed` native module during Node.js cleanup\n- `nohup`/`disown` approaches failed — bash tool's shell exits immediately, orphaning the process before it stabilizes\n- Fix: SIGTERM handler changed to call `SIGKILL` / `process.exit(1)` to bypass native destructor execution\n\n**Process supervision:**\n- Moved from ad-hoc `nohup` spawning to a launchd plist with `KeepAlive=true`\n- Coordinator auto-heal FSM added (mirroring LLM proxy pattern) — triggers restart on \"unreachable\" status\n- `auto_heal: true` enabled for obs_api in rules config; `restartObsApi` method added to remediation dispatcher\n\n**Restart script:** `scripts/restart-obs-api.mjs` — proper `.mjs` module; PSM registers new process; retrieve latency ~73 ms\n\n**Stale heartbeat fix:** Treats heartbeats as stale if age > 30s **or** recorded PID is no longer alive\n\n**Observation backfill (May 14):**\n- 21–120 sessions (May 1–14) had zero observations due to crash downtime\n- Backfill strategy: `SpecstoryBatchConverter` with `TranscriptNormalizer.parseSpecstory()` → `/api/observations/messages`, deduplicating by final ETM snapshot per session\n- Timestamp-based matching needed (no `sourceFile` in observations DB); 3 `[Raw]` obs re-summarized; 8 stubs confirmed genuinely low-content\n\n**Known open issues:**\n- `libc++abi` shutdown mutex crash documented at `2026-05-10-obs-api-libcxx-shutdown-crash.md`\n- Qdrant client updated to 1.18.0 (server 1.17.0); `semantic-analysis` submodule also checked for compatibility"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-05-10T13:47:31.749Z",
-        "last_updated": "2026-05-14T11:13:47.133Z"
+        "last_updated": "2026-05-14T14:13:08.406Z"
       },
       "id": "mc4flkg1ybjyx0"
     },
@@ -12599,14 +12590,14 @@
     },
     {
       "name": "Health Coordinator: Network/Proxy Detection Centralization",
-      "entityType": "Container",
+      "entityType": "Process",
       "observations": [
-        "**Architecture (May 14):** Network/proxy detection refactored into health coordinator as a centralized polled service; all consumers read from `/health/state` instead of detecting independently.\n\n**Polled fields (30s interval):** `location`, `proxy_running`, `proxy_functional`, `internet_reachable`\n\n**Bugs fixed during implementation:**\n- CommonJS `require()` calls inside an ESM module replaced with proper ESM imports (`require('net')`, `require('http')`, etc.)\n- Variable collision: Node.js `net` module conflicted with local network state object — state references renamed to `netState` throughout lines 934–988\n- Coordinator inherits stale `HTTPS_PROXY` env vars causing probe failures when `px` restarts; PSM respawn cycle required to apply fixes\n- `handleGetHealthStatus` in `server.js` was passing `proxy` data to frontend but never passing the `network` object — `healthStatus.network` was always `undefined`; fixed and container restarted\n\n**Text badge design:** `[N:HOME]`/`[N:CN]`, `[P:ON]`/`[P:OFF]` in statusline — text-only to avoid emoji-width rendering bugs"
+        "**Architecture (May 14):** Network/proxy detection centralized in health coordinator as a polled service; consumers read from `/health/state` instead of detecting independently.\n\n**Polled fields (30s interval):** `location`, `proxy_running`, `proxy_functional`, `internet_reachable`\n\n**Bugs fixed:**\n- CommonJS `require()` calls inside ESM module replaced with proper ESM imports\n- Variable collision: Node.js `net` module conflicted with local network state object — renamed to `netState` throughout lines 934–988\n- Coordinator inherits stale `HTTPS_PROXY` env vars causing probe failures when `px` restarts — PSM respawn cycle required\n- `handleGetHealthStatus` in `server.js` passed `proxy` data to frontend but never passed `network` object — `healthStatus.network` always `undefined`; fixed\n\n**obs_api auto-heal FSM added (May 14):**\n- Mirrors existing LLM proxy auto-heal pattern in the coordinator\n- Triggers restart on \"unreachable\" status; `auto_heal: true` in rules config\n\n**Remaining gap:** Statusline and dashboard do not surface the shared detection state\n\n**Text badge design:** `[N:HOME]`/`[N:CN]`, `[P:ON]`/`[P:OFF]` in statusline — text-only to avoid emoji-width rendering bugs"
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-05-14T11:13:47.038Z",
-        "last_updated": "2026-05-14T11:13:47.038Z"
+        "last_updated": "2026-05-14T14:13:08.572Z"
       },
       "id": "mc4flkg2tknp9t"
     }
@@ -19120,7 +19111,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-05-14T11:13:52.195Z",
+    "exported_at": "2026-05-14T14:13:13.977Z",
     "total_entities": 688,
     "total_relations": 1084,
     "description": "Coding project infrastructure and patterns"
