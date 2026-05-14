@@ -43,6 +43,16 @@ note right of Coord
   blocks. The hook only reads
   state — it does not trigger
   remediation.
+
+  Network state (internet, proxy,
+  VPN location) probed every tick
+  and passed through to dashboard
+  via /health/state → network{}.
+  
+  Database sub-checks (leveldb,
+  qdrant, graph_integrity) probed
+  directly and mapped to
+  passed/failed status.
 end note
 
 note over Services

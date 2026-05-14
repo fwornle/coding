@@ -70,10 +70,20 @@ PORT=3030 npm run dashboard
 
 | Endpoint | Description |
 |----------|-------------|
-| `/api/health` | Overall system health |
+| `/api/health` | Dashboard's own self-healthcheck |
+| `/api/health-verifier/status` | Pass-through to coordinator `/health/state` (includes `network`, `databases` sub-checks) |
+| `/api/health-verifier/report` | Full health report with all checks (databases, services, processes, CGR cache) |
+| `/api/cgr/freshness` | CGR cache freshness; probes Memgraph reachability |
 | `/api/services` | Individual service status |
 | `/api/metrics` | Health metrics history |
 | `/api/alerts` | Recent alerts |
+
+!!! note "Dashboard data pipeline"
+    The dashboard server reads the coordinator's `/health/state` and transforms it for the frontend. Key transformations:
+
+    - **Database sub-checks** (`leveldb_lock_check`, `qdrant_availability`, `graph_integrity`): mapped via `toUiStatus()` — values `passed`, `healthy`, `running`, `ok`, `present` all map to `passed`; other values map to `warning`, `failed`, `error`, or `unknown`.
+    - **Network state** (`network.internet_reachable`, `network.proxy_running`, `network.location`): passed through directly to the LLM Proxy Health card.
+    - **CGR cache**: synthesized from `.cgr/cache-metadata.json` + `git rev-list` for commits-behind count.
 
 ## Memgraph Lab
 

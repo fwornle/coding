@@ -22,6 +22,14 @@ rectangle "Status Line Components" {
     label "🔀→coding" as Arrow
   }
   
+  rectangle "Network\nLocation" as NetLoc {
+    label "[N:VPN]" as NetBadge
+  }
+  
+  rectangle "Proxy\nStatus" as ProxyStat {
+    label "[P:ON]" as ProxyBadge
+  }
+  
   rectangle "Session\nStatus" as Session {
     rectangle "Normal State" {
       label "📋1530-1630-session" as Normal
@@ -40,12 +48,14 @@ rectangle "Data Sources" {
   database ".services-running.json" as Services
   database ".redirect-status" as RedirectFile
   database ".specstory/history" as History
+  database "Health coordinator\n:3034 /health/state" as CoordState
 }
 
 StatusScript -> Services : Check service health
 StatusScript -> RedirectFile : Check routing status
 StatusScript -> History : Find current session
 StatusScript -> Session : Calculate time remaining
+StatusScript -> CoordState : Network location\n+ proxy status
 
 ' Status line updates every 5 seconds. Project detection via TRANSCRIPT_SOURCE_PROJECT, Current working directory, Coding repo directory
 

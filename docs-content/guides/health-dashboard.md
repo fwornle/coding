@@ -121,12 +121,12 @@ The system includes a real-time web-based health dashboard accessible at `http:/
 
 **1. Databases** (LevelDB, Qdrant, CGR Cache)
 
-- Real-time connection status
+- Real-time connection status via coordinator sub-checks (`leveldb_lock_check`, `qdrant_availability`, `graph_integrity`)
 - Lock detection and ownership tracking
 - Availability monitoring
-- CGR Cache staleness tracking (commits behind, threshold-based alerts)
+- CGR Cache staleness tracking (commits behind HEAD, "up to date" when 0 behind)
 
-**2. Services** (VKB Server, Constraint Monitor, Dashboard)
+**2. Services** (VKB Server, Constraint Monitor, Dashboard, Semantic Analysis)
 
 - Port connectivity checks
 - Process health validation
@@ -135,8 +135,16 @@ The system includes a real-time web-based health dashboard accessible at `http:/
 **3. Processes** (Process Registry, Stale PIDs)
 
 - Process State Manager (PSM) status
-- Automatic stale PID cleanup
-- Process lifecycle tracking
+- Stale PID detection (probes for orphaned consolidation heartbeat files)
+- Automatic cleanup reporting
+
+**4. LLM Proxy Health** (Internet, Proxy, Network Location)
+
+- Internet reachability (from coordinator `network.internet_reachable`)
+- Proxy status (from coordinator `network.proxy_running`)
+- Network location: VPN / Corporate / Home (from coordinator `network.location`)
+- Local proxy (px) running status
+- Auto-heal status
 
 ### Dashboard Actions
 

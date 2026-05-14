@@ -9,7 +9,7 @@ Real-time visual indicators of system health and development activity rendered v
 ### Example Display
 
 ```
-[🏥✅] [RA⚫C🟢] [🔒77% ⚙️IMP] [📚✅] [📋18-19] 18:34
+[🏥✅] [RA⚫C🟢] [🔒77% ⚙️IMP] [📚✅] [N:VPN] [P:ON] [📋18-19] 18:34
 ```
 
 The current pane's project is rendered with an underline (`#[underscore]…#[nounderscore]`) so each parallel tmux window highlights its own project.
@@ -22,6 +22,8 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | Active Sessions | `[RA⚫C🟢]` | Per-project abbreviations with graduated activity icons |
 | Constraint | `[🔒77%]` | Code quality % (with optional `🟡N` violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
+| Network Location | `[N:VPN]` | Network environment: VPN / CN / HOME / ?? |
+| Proxy Status | `[P:ON]` | Local proxy running & functional: ON / ERR / OFF |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
 
@@ -71,6 +73,30 @@ The "time since last activity" signal is the project's Claude `.jsonl` transcrip
 !!! warning "Not-Found Transcript Guard"
     Agents that don't produce Claude-compatible transcripts (e.g., OpenCode) have `transcriptInfo.status: 'not_found'`. The age cap logic skips these sessions — they correctly display as ⚫ inactive instead of falsely showing as 🟢 active.
 
+### Network & Proxy Indicators
+
+Two ASCII-only badges reflect the network environment detected by the coordinator every tick. They avoid emoji to prevent cell-width issues in tmux.
+
+| Display | Meaning | Action |
+|---------|---------|--------|
+| `[N:VPN]` | Connected via corporate VPN (PAC resolves AND proxy running) | Normal remote-work state |
+| `[N:CN]` | On the physical corporate network (PAC resolves, proxy not running) | Normal on-site state |
+| `[N:HOME]` | Home / public network (PAC does not resolve) | Expected off-VPN |
+| `[N:??]` | Network location unknown (coordinator just started or probe failed) | Transient — clears on next tick |
+
+| Display | Meaning | Action |
+|---------|---------|--------|
+| `[P:ON]` | Local proxy (px / proxydetox) running and functional | Normal |
+| `[P:ERR]` | Proxy process running but not functional (port open, requests fail) | Check proxy logs |
+| `[P:OFF]` | Proxy not running | Expected on CN or HOME; problem on VPN |
+
+!!! note "VPN detection logic"
+    The coordinator determines `location` by probing the corporate PAC URL and checking proxy status:
+    **PAC resolves + proxy running → `vpn`** (tunneling in remotely requires the proxy).
+    **PAC resolves + proxy not running → `corporate`** (on-site, proxy unnecessary).
+    **PAC does not resolve → `home`**.
+    The statusline warns (yellow) when on VPN without a working proxy.
+
 ### Knowledge Pipeline Indicators
 
 The badge reflects the freshness of the **observation → digest → insight** pipeline (the `obs_api` service backed by `.observations/observations.db`). Verdict is driven by *observation* freshness only — digest and insight cadences are intentionally slower and don't gate the badge. Source: `state.knowledge_pipeline` at the coordinator's `/health/state` (populated by `pollKnowledgePipeline`, which calls `obs_api`'s `/api/consolidation/status`).
@@ -101,10 +127,11 @@ curl -fs http://localhost:3034/health/state | jq .
 |--------------|---------|
 | `container.healthcheck` | Docker `coding-services` container probe result |
 | `services` | List of probed services with `status`, `last_seen`, `latency_ms`, `probe_error` |
-| `databases` | LevelDB / Qdrant / Memgraph availability + lock state |
+| `databases` | LevelDB / Qdrant / Memgraph availability + lock state (sub-checks: `leveldb_lock_check`, `qdrant_availability`, `graph_integrity` — probed every tick and mapped to `passed`/`failed`) |
+| `network` | Network environment: `internet_reachable`, `proxy_running`, `location` (`vpn` / `corporate` / `home` / `unknown`) |
 | `lsl` | Per-session ETM heartbeats (sessionId, projectName, transcriptPath, lastBeat) |
 | `lsl_by_project` | 3-state rollup per project: `healthy` / `degraded` / `stopped` |
-| `processes` | Stale-PID / uptime / CPU / memory / zombie checks |
+| `processes` | Stale-PID check (probes for orphaned consolidation heartbeat files) |
 | `files` | Disk space, log file size, services-running file freshness |
 | `generated_at` | Coordinator's last refresh — drives the `[🏥⏰]` staleness check |
 

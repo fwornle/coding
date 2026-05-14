@@ -6,12 +6,13 @@ How the Coding launcher handles corporate VPN, proxy detection, and agent-specif
 
 ## Overview
 
-The Coding system operates in two network environments:
+The Coding system operates in three network environments:
 
-- **Inside VPN / Corporate Network (CN)** — all external API calls must go through the corporate proxy (proxydetox on `127.0.0.1:3128`)
-- **Outside VPN / Public Network** — direct internet access, no proxy needed
+- **VPN** — connected to corporate network via VPN tunnel; proxy (proxydetox on `127.0.0.1:3128`) is running and required for external API calls
+- **Corporate Network (CN)** — physically on the corporate network (e.g. office ethernet/Wi-Fi); PAC URL resolves but proxy is not needed
+- **Home / Public Network** — direct internet access, no proxy needed
 
-The launcher automatically detects the environment and configures each agent accordingly.
+The launcher automatically detects the environment and configures each agent accordingly. The health coordinator also tracks the network state and exposes it via `/health/state` → `network` slice.
 
 ![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
 
@@ -35,14 +36,28 @@ The launcher automatically detects the environment and configures each agent acc
 
 ## Detection Flow
 
-The detection runs early in the startup pipeline (`detect-network.sh`), before any agent-specific configuration:
+### Launcher Detection (`detect-network.sh`)
+
+The detection runs early in the startup pipeline, before any agent-specific configuration:
 
 1. **Corporate network probe** — `curl https://cc-github.bmwgroup.net` (2s timeout)
 2. **Proxy configuration**:
-    - Inside CN: verify/auto-configure proxydetox (`127.0.0.1:3128`)
+    - Inside CN/VPN: verify/auto-configure proxydetox (`127.0.0.1:3128`)
     - Outside CN: **clear** proxy env vars (`unset HTTP_PROXY HTTPS_PROXY`)
 3. **Connectivity test** — verify the chosen API endpoint is actually reachable
 4. **Agent model selection** — OpenCode picks GitHub Copilot or Anthropic
+
+### Coordinator Network Detection (`health-coordinator.js`)
+
+The health coordinator independently detects the network environment on every tick and exposes it in the `/health/state` response under the `network` key. The detection logic distinguishes three states:
+
+| Condition | Location | Rationale |
+|-----------|----------|-----------|
+| PAC URL resolves **AND** proxy running | `vpn` | On VPN — the proxy is only needed when tunnelling in remotely |
+| PAC URL resolves **AND** proxy NOT running | `corporate` | Physically on the corporate network — proxy not required |
+| PAC URL does NOT resolve | `home` | Off-network — direct internet |
+
+The `network` slice is consumed by the dashboard's **LLM Proxy Health** card and the statusline's `[N:xx]` / `[P:xx]` badges.
 
 ### Startup Sequence
 
@@ -149,3 +164,28 @@ CODING_FORCE_CN=true coding --opencode --dry-run
 | `PROXY_REQUIRED` | detect-network.sh | `true` when proxy is needed (= inside CN) |
 | `CODING_FORCE_CN` | User override | Force `true`/`false` to skip detection |
 | `OPENCODE_CONFIG_CONTENT` | opencode.sh | JSON config for model/provider selection |
+
+---
+
+## Health Coordinator Network State
+
+The coordinator exposes live network state at `GET http://localhost:3034/health/state` → `network`:
+
+```json
+{
+  "network": {
+    "internet_reachable": true,
+    "proxy_running": true,
+    "location": "vpn",
+    "last_check": "2026-05-14T10:48:52.982Z"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `internet_reachable` | boolean | Whether external endpoints (PAC URL) are reachable |
+| `proxy_running` | boolean | Whether proxydetox is listening on `:3128` |
+| `location` | string | `vpn`, `corporate`, `home`, or `unknown` |
+
+The dashboard's **LLM Proxy Health** card reads this state and displays Internet reachability, proxy status, and network location. The statusline renders `[N:VPN]` / `[N:CN]` / `[N:HM]` and `[P:ON]` / `[P:OFF]` from the same data.

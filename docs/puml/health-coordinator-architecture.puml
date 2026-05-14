@@ -25,7 +25,7 @@ package "Consumers (read state)" {
 }
 
 package "Healable host services" {
-  rectangle "ETM, VKB,\nconstraint-monitor,\nllm_cli_proxy, ..." as TARGETS <<infra>>
+  rectangle "ETM, VKB,\nconstraint-monitor,\nllm_cli_proxy,\nobs_api, ..." as TARGETS <<infra>>
 }
 
 ETM -[#green,dashed]-> COORD : POST /signals\nlsl_heartbeat\n(every ~2s)
@@ -47,6 +47,22 @@ note right of COORD
   (dashboard, vkb, semantic-
   analysis SSE, llm_cli_proxy)
   directly.
+
+  Database sub-checks
+  (leveldb_lock_check,
+  qdrant_availability,
+  graph_integrity) probed
+  every tick and mapped to
+  passed/failed.
+
+  Network detection every tick:
+  PAC resolves + proxy ON → vpn
+  PAC resolves + proxy OFF → corporate
+  PAC fails → home
+
+  Stale PID check: probes for
+  orphaned consolidation
+  heartbeat files.
 
   ETM safety net (every tick):
   ensureEtmForActiveProjects()

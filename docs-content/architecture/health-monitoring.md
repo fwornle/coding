@@ -39,7 +39,8 @@ Coordinator-centric health architecture (Phase 33). One process — the **health
   },
   "lsl_by_project": { "coding": "healthy", "rapid-automations": "healthy" },
   "processes": [],
-  "databases": { "status": "healthy", "levelDB": {}, "qdrant": {} },
+  "databases": { "status": "healthy", "levelDB": {}, "qdrant": {}, "leveldb_lock_check": "passed", "qdrant_availability": "passed", "graph_integrity": "passed" },
+  "network": { "internet_reachable": true, "proxy_running": true, "location": "vpn" },
   "files": [],
   "generated_at": "..."
 }
@@ -50,6 +51,9 @@ Coordinator-centric health architecture (Phase 33). One process — the **health
 - One writer (`health-coordinator.js`); no other process writes to `/health/state`.
 - LSL entries are marked `status=stopped` automatically after **>15 s** without a fresh `lsl_heartbeat` from their reporter.
 - ETM service status is **derived** from `lsl_heartbeats` — there is no `service_status` signal kind for ETM. Other services are probed directly by the coordinator.
+- Database sub-checks (`leveldb_lock_check`, `qdrant_availability`, `graph_integrity`) are probed on every coordinator tick and mapped to `passed` / `failed`. The dashboard's `toUiStatus()` function maps these to UI-friendly states.
+- Network environment (`network.location`: `vpn` / `corporate` / `home`) is detected every tick by probing the corporate PAC URL and checking proxy status. VPN is detected as: PAC resolves AND proxy running.
+- Process checks (`stale_pids`) actively probe for orphaned consolidation heartbeat files; placeholder rules without implementations (`process_uptime`, `high_cpu_usage`, `memory_usage`, `disk_usage`) are disabled.
 - `generated_at` is updated on every state refresh; consumers use it for staleness detection (`>180 s` is a `[🏥⏰]` stale badge).
 
 ## Reporters
@@ -154,10 +158,11 @@ When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Reme
 
 | Card | Source |
 |------|--------|
-| Databases (LevelDB / Qdrant / CGR Cache) | coordinator `databases` + dashboard `cgr_cache` synthesis |
+| Databases (LevelDB / Qdrant / CGR Cache) | coordinator `databases` sub-checks (`leveldb_lock_check`, `qdrant_availability`, `graph_integrity`) + dashboard `cgr_cache` synthesis |
 | Services (VKB / Constraint Monitor / Dashboard / Semantic Analysis SSE) | coordinator `services` |
-| Processes (Process Registry / Stale PIDs) | coordinator `processes` |
+| Processes (Process Registry / Stale PIDs) | coordinator `processes.stale_pids` (probes for orphaned heartbeat files) |
 | UKB Workflows (status / capacity / history) | semantic-analysis SSE server (:3848) |
+| LLM Proxy Health (Internet / Proxy / Network location) | coordinator `network` (VPN detection, internet reachability, proxy status) |
 | Service Detail (Port Liveness / Supervisord Processes) | dashboard server probes ports + queries supervisorctl |
 
 ### Key API endpoints
@@ -191,6 +196,7 @@ The proxy hop is necessary because the dashboard runs *inside* the `coding-servi
 | `constraint_monitor` | `restart_constraint_monitor` | `restartConstraintMonitor()` |
 | `dashboard_server`, `health_dashboard_*` | `restart_dashboard_server` / `restart_health_*` | corresponding handlers |
 | `llm_cli_proxy` | `restart_llm_cli_proxy` | `restartLLMCLIProxy()` |
+| `obs_api` | `restart_obs_api` | `restartObsApi()` — runs `scripts/restart-obs-api.mjs` on the host |
 
 If the coordinator proxy fails (network or coordinator down) the dashboard falls back to the legacy local `restartCommands` map (`supervisorctl` inside the container, `npm`/`bin` paths on host), so a coordinator outage does not strand the Restart button.
 

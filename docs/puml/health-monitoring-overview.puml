@@ -51,8 +51,25 @@ package "Probed services" {
   component "Constraint Monitor\n:3030 / :3031" as CM <<infra>>
   component "Semantic Analysis SSE\n:3848" as SA <<infra>>
   component "LLM CLI Proxy\n:12435" as PROXY <<infra>>
+  component "obs_api\n:3035" as OBS <<infra>>
   component "Memgraph / LevelDB\nQdrant" as DBS <<storage>>
   component "Container healthcheck" as CONTAINER <<infra>>
+  component "Network (PAC URL\n+ proxy :3128)" as NET <<infra>>
+  note bottom of NET
+    **VPN detection**
+    PAC resolves + proxy ON → vpn
+    PAC resolves + proxy OFF → corporate
+    PAC fails → home
+  end note
+  note bottom of DBS
+    **Sub-check probes**
+    leveldb_lock_check: LevelDB lock file
+    qdrant_availability: Qdrant REST :6333
+    graph_integrity: Memgraph TCP :7687
+    stale_pids: orphan heartbeat files
+    All probed every coordinator tick
+    and mapped to passed/failed.
+  end note
 }
 
 ETM -[#green,dashed]-> COORD : POST /signals\nlsl_heartbeat
@@ -64,6 +81,9 @@ COORD -[#orange,dashed]-> SA
 COORD -[#orange,dashed]-> PROXY
 COORD -[#orange,dashed]-> DBS
 COORD -[#orange,dashed]-> CONTAINER
+
+COORD -[#orange,dashed]-> OBS
+COORD -[#orange,dashed]-> NET
 
 STATUSLINE -[#blue]-> COORD : GET /health/state\n(per render)
 DASHBOARD  -[#blue]-> COORD : GET /health/state\n(card refresh)
