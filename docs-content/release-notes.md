@@ -113,7 +113,7 @@ See [Observational Memory](core-systems/observational-memory.md).
 
 ---
 
-![Digests page after the fix — clean list, redaction tokens shown as small sky-blue spans](images/digests-page.png)
+![Digests page after the fix — clean list, redaction tokens shown as small sky-blue spans](images/log-digests.png)
 
 ![Observations page with project filter, time-range selector, and the same redaction-token treatment in compact summaries](images/observations-page.png)
 

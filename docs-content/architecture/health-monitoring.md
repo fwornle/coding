@@ -254,7 +254,7 @@ nohup env -i HOME=$HOME PATH=$PATH \
 
 ### Status line shows residual chars (`12:411`, `13:0656`)
 
-See [Status Line / Right-edge stability](../guides/status-line.md#right-edge-stability-nbsp-terminator--codepoint-padding) — verify the wrapper preserves trailing whitespace and the producer pads to ≥220 codepoints + NBSP terminator.
+See [Status Line / Right-edge stability](../guides/status-line.md#right-edge-stability-cell-width-consistency) — verify the wrapper preserves trailing whitespace and the producer pads to ≥220 codepoints + NBSP terminator.
 
 ### Project shows 🟢 despite hours idle
 

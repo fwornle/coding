@@ -216,7 +216,7 @@ The recurring trailing-digit residue at the right edge (`07:538`, `12:411`, `07:
 1. **Shared coordinator probe**: a single memoized `fetch(:3034/health/state)` per render (with one retry @ 1.5 s) feeds five `getXxxStatus()` methods — replaces the previous pattern of 5 independent `execSync(curl)` calls per render
 2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🟠 / 🟤 / ⚫ / 💤). A fresh ETM heartbeat (< 5 min) promotes a non-Active band to 🟢 (captures long-running agent turns and non-Claude sessions).
 3. **Constraint compliance**: separate call to constraint-monitor API (port 3031)
-4. **Render**: assemble parts, pad to paneWidth cells via `leftPadToStableCellWidth()` using VS16-aware `visibleCellWidth()` — see [Right-edge stability](#right-edge-stability-vs16-aware-cell-counting) above
+4. **Render**: assemble parts, pad to paneWidth cells via `leftPadToStableCellWidth()` using VS16-aware `visibleCellWidth()` — see [Right-edge stability](#right-edge-stability-cell-width-consistency) above
 5. **Cache write**: save to `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt`
 6. **Failure logging**: any 8 s SYS:TIMEOUT or fast.cjs spawn failure appends a JSON record to `.logs/csl-failures.jsonl` with per-step timings so future Claude sessions can see which sub-step blocked
 
