@@ -14107,5 +14107,168 @@
       "sourceCount": 8
     },
     "project": "sketcher"
+  },
+  {
+    "id": "8a7e96e1-474b-4a48-8dda-5e2c2c4cdbd2",
+    "date": "2026-05-14",
+    "theme": "Teams Chat History Pagination Fix for Complete Retrieval",
+    "summary": "Investigated why Teams channel message retrieval was capped at ~50 messages (back to March 23). Root cause was the CLI ignoring `nextLink`/`skipToken` pagination tokens returned by the API. Added a pagination loop to `cmd_channel_messages` that follows `nextLink` tokens until exhausted, enabling full message history retrieval.",
+    "observationIds": [
+      "99aafd80-300e-447e-b634-69f0c740bcbd"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [
+      "cmd_channel_messages implementation file"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T15:49:19.166Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "f85bcb23-3b8d-4c78-8b6f-b7196dc824d5",
+    "date": "2026-05-14",
+    "theme": "Teams Channel Analysis Report Generation and Formatting",
+    "summary": "Loaded a \"documentation-style\" skill from `~/Agentic/coding` and applied its conventions — Mermaid `graph TD`, subgraphs, and clear labels — to a Teams channel analysis report. The final report was saved to `~/Downloads/agentic-ai-channel-report.md`.",
+    "observationIds": [
+      "f8de15a6-7dbf-403c-b562-25391b17e9ea",
+      "379983b8-9ca3-4d7a-9802-e9de9b386378"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T15:49:19.166Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "e0bb40ed-5ced-414e-a5bf-6ec67d00afc9",
+    "date": "2026-05-14",
+    "theme": "Mermaid Diagram Rendering Issues in Channel Report",
+    "summary": "Investigated rendering failures (\"No diagram type detected\") for the **Contributor Distribution**, **Monthly Activity Chart**, and **Top Contributor Activity Timeline** sections in `~/Downloads/agentic-ai-channel-report.md`.\n- Root cause: `xychart-beta` and `gantt` diagram types are unsupported by the local VS Code Mermaid extension\n- Secondary issue: YAML frontmatter config syntax was incompatible; proposed switching to `%%{init}%%` directives\n- Session was interrupted by a crash; context was recovered by inspecting recent files and bash history\n- Final proposal: replace unsupported Mermaid blocks with externally pre-rendered PNG images via **kroki.io** for PDF conversion compatibility\n- A follow-up query for VSCode Mermaid renderer recommendations yielded no clear result",
+    "observationIds": [
+      "3a3a88ae-439f-409d-9e46-955a27789b4d",
+      "2368a84a-ec00-47b4-a100-c9cc26f06516",
+      "f79804b4-93bb-4c19-a01e-67badf0f80ca",
+      "55b172cb-f7a2-45cd-91e3-d13bd59e82a9",
+      "f2794b0a-5dd4-4eda-9bd1-8cd0668048da"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T15:49:19.166Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "4a4de57a-13be-43bd-820b-a13f4c62a51b",
+    "date": "2026-05-14",
+    "theme": "Link Index URL Resolution with Descriptive Titles",
+    "summary": "Goal was to enrich the report's link index so entries display descriptive titles rather than bare URLs or contributor names.\n- Initially the assistant was fetching external sites; developer flagged that Teams message HTML already contained link preview titles\n- Pivoted to extracting titles from Teams message metadata, yielding 299 title mappings and resolving 43 of 204 bare URLs immediately\n- Remaining URLs resolved progressively using: URL slug parsing (93), YouTube oEmbed API (28), GitHub CLI, and arXiv API\n- A background resolution process stalled on slow arXiv/GitHub API calls (121 resolved, 40 remaining at that point)\n- Assistant debugged the stuck state and completed remaining work manually\n- Final result: all 290 links in the index resolved with descriptive titles; Mermaid chart frontmatter also corrected from broken YAML syntax to `%%{init}%%` directives as a side effect",
+    "observationIds": [
+      "89b4c331-6304-4835-87ac-13928ef4756a",
+      "935fa14a-b5e8-49c1-9846-dfd3ef55d39e",
+      "2868e833-4222-4f48-93db-4cf04fbc09ef",
+      "b1ce03c9-3d7e-40db-84a0-157db16c53be",
+      "b5f0316f-82e4-4701-b526-8a8e0311c2f1",
+      "88a88a96-1678-4f40-ad3f-08904ed01514",
+      "0417e56d-e515-4feb-8f7c-68f6088cc31e",
+      "beea244e-ba4c-4fe4-bb22-fd45914e4353",
+      "5f19cc6b-67df-4307-bffa-2ac8b79929a8"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T15:49:19.166Z",
+    "metadata": {
+      "sourceCount": 9
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "17d86ec3-2988-4996-891f-06f0260112df",
+    "date": "2026-05-14",
+    "theme": "Commit Staged Changes Across Two Logical Groups",
+    "summary": "Staged and committed all pending changes into two logical commits:\n- `81c7526`: OBS API SIGKILL shutdown fix, auto-heal FSM, and rules config updates\n- `30fba2d`: Knowledge base observation exports after backfill",
+    "observationIds": [
+      "ef440b6e-91c5-468a-b458-9610055d3225",
+      "daa5c1ca-53f0-4f87-8dde-80ae38ee0097"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T15:49:19.166Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f1f5e774-5b5c-46e2-b867-b739db359565",
+    "date": "2026-05-14",
+    "theme": "Verify Todo List Reflects All Completed Work",
+    "summary": "Checked the current state of the todo list and confirmed all 14 items were completed. No files modified.",
+    "observationIds": [
+      "d7013819-41f0-4772-8a03-8f4cffe1927b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T15:49:19.166Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a029b2b9-2c51-491f-8c6b-27ced6b0cca1",
+    "date": "2026-05-14",
+    "theme": "Fix VKB Insight Format to Reference-Style Articles",
+    "summary": "Goal was to replace changelog/digest-style summaries in the VKB dashboard with structured reference-article insights (Purpose, Architecture, Use Cases, Troubleshooting sections).\n\n**Initial misdiagnosis (obs 4):** Updated the insight generation prompt in `src/analysis/insight-generator.ts` and rebuilt the Docker image, regenerating 50 wave-analysis insights — but the VKB dashboard still showed old-format content.\n\n**Root cause identified (obs 5, 6):** The VKB dashboard does not display wave-analysis LevelDB entities; it displays output from a separate **online consolidation pipeline** (Pipeline 1: ETM session logs → SQLite observations DB via obs_api → `ObservationConsolidator.js` → VKB). The previous fix only addressed Pipeline 2 (`insight-generator.ts`).\n\n**Correct fix applied (obs 8–13):** Traced the full pipeline architecture and updated `_buildInsightPrompt()` in `src/live-logging/ObservationConsolidator.js` to produce structured reference-article summaries. All 47 existing changelog-style insights were deleted from `observations.db` (SQLite), and re-synthesis was triggered across 609 digests (14 chunks for the coding project alone).\n\n**Status at end of day (obs 13, 14):** Re-synthesis was still in progress — 0 new insights written yet pending transaction completion. A further broad codebase investigation (obs 14) was begun to fully map the ingestion pipeline but ended mid-search without delivering findings.",
+    "observationIds": [
+      "3afa8476-a2cf-4093-b926-b0095a273efa",
+      "861f9533-3231-4e5e-a393-e8506b6e6843",
+      "72338d00-6be7-4f3b-8391-21fb1af6da23",
+      "c2d8812c-cca2-4030-a809-c128bf6f474c",
+      "2e7cd6f8-6adc-43b2-afb6-f3bbb2ba3d1e",
+      "667c0f1a-6300-46fc-96fb-00a2887a964a",
+      "88c19b90-427c-4a0d-b9a9-74eed19c022a",
+      "3e85049b-f322-4c8b-8dfe-13b98be31ee1",
+      "b176c026-8996-464d-86a4-793bbb3c13d9",
+      "ac7f97c5-c9c1-4e8a-8323-618494a6ec09",
+      "fda57959-00dd-4807-8569-2b6986b41bdd"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "src/analysis/insight-generator.ts",
+      "src/live-logging/ObservationConsolidator.js",
+      "all 47 existing insights from observations.db via SQLite"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T15:49:19.166Z",
+    "metadata": {
+      "sourceCount": 11
+    },
+    "project": "coding"
   }
 ]
