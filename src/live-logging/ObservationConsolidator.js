@@ -1484,36 +1484,61 @@ Produce the digests.`,
 
   _buildInsightPrompt(digestBlock, existingBlock, count) {
     return {
-      system: `You are the long-term memory of a software project. You consolidate daily work digests into persistent knowledge.
+      system: `You are the long-term memory of a software project. You consolidate daily work digests into persistent, reusable REFERENCE ARTICLES — not changelogs, not timelines.
 
 INPUT: Daily digests describing work sessions, plus existing insights (if any).
 
-TASK: Extract or update persistent project knowledge from the digests. Focus on:
-- What components/systems have been built or changed
-- Recurring problems and their solutions
-- Architectural decisions and their rationale
-- Tools, patterns, and workflows the team uses
-- Known issues and technical debt
+TASK: Synthesize persistent project knowledge from the digests. Each insight is a SELF-CONTAINED REFERENCE ARTICLE that a developer can consult to understand a subsystem without reading any other document.
+
+CRITICAL — WHAT TO PRODUCE:
+✅ Timeless reference knowledge: "The coordinator probes LevelDB/Qdrant every 30s via PSM and maps results to sub-check keys"
+✅ Architecture: "Health verification runs in 3 layers: coordinator (:3034), dashboard server (:3033), frontend (Next.js :3030)"
+✅ File locations: "Key files: \`src/health-coordinator.js\`, \`integrations/system-health-dashboard/server.js\`"
+✅ Troubleshooting: "If sub-checks show 'unknown', restart the coordinator to force re-probe"
+
+CRITICAL — WHAT NOT TO PRODUCE:
+❌ Dated entries: "Fix applied on 2026-05-14: ..."
+❌ Changelog items: "Bug fix: toUiStatus now handles 'passed' status"
+❌ Session narratives: "Developer investigated and found that..."
+❌ Commit references: "Committed as abc123"
 
 OUTPUT FORMAT — respond with one or more insight blocks:
 
 <insight>
-<topic>Component or area name (e.g. "Dashboard Observations System", "Docker Build Pipeline")</topic>
-<scope>One concrete subsystem, tool, or workflow this insight is about. Must be narrow enough that someone reading it could point at one folder, one binary, or one external service. Examples: "scripts/combined-status-line.js (tmux statusline renderer)", "GSD planning framework (~/.claude/skills/gsd-*)", "Docker compose stack for coding-services", "ObservationConsolidator pipeline". NOT acceptable: "statusline and hooks", "various tools", "configuration".</scope>
-<confidence>0.0-1.0 — how well-established this knowledge is</confidence>
+<topic>Component or area name (e.g. "Health Monitoring System", "Docker Build Pipeline")</topic>
+<scope>One concrete subsystem, tool, or workflow. Must be narrow enough to point at one folder, binary, or service.</scope>
+<confidence>0.0-1.0</confidence>
 <summary>
-What we know about this topic. Written as reference documentation someone could consult to understand the current state.
-Use markdown formatting: bullet lists (- item) for enumerating components/issues/steps, \`backticks\` for file paths and code. Structure long summaries with bullet lists rather than dense paragraphs. 3-15 lines.
+Structure the summary as a REFERENCE ARTICLE with these sections (use ## headings):
+
+## Purpose
+What this component/system does and why it exists. 1-3 sentences.
+
+## Architecture
+How it's built — key modules, data flow, protocols. Include file paths with \`backticks\`.
+Use bullet lists for components/layers.
+
+## Key Files
+- \`path/to/file.js\` — role description
+- \`path/to/other.js\` — role description
+
+## Usage
+How/where/by whom this is used. What triggers it, what consumes its output.
+
+## Troubleshooting
+Common failure modes and how to diagnose/fix them. Include log locations, test commands, restart procedures.
+
+Keep each section concise (2-5 lines). Total summary: 10-30 lines.
 </summary>
 </insight>
 
 RULES:
-- **One insight = one subsystem.** Each <insight> block must describe a single coherent component, tool, or workflow. If digests cover unrelated subsystems (e.g. GSD planning framework AND tmux statusline rendering, even when both happen to touch \`~/.claude/settings.json\`), emit SEPARATE insights — never merge them under a pan-topic title like "X and Y Integration".
-- **Shared vocabulary is not a merge signal.** Two digests both mentioning "statusline", "hook", or "settings.json" do NOT belong together unless they describe the same code path or feature. Verify by writing the <scope> first: if you cannot name one concrete subsystem in <scope>, split into multiple insights.
-- If an existing insight's topic matches new digest content, produce an UPDATED version (same topic name) with merged knowledge — but only when the new digest is actually about the same subsystem.
+- **One insight = one subsystem.** Each <insight> block must describe a single coherent component, tool, or workflow. If digests cover unrelated subsystems, emit SEPARATE insights.
+- **Shared vocabulary is not a merge signal.** Two digests both mentioning "statusline" or "settings.json" do NOT belong together unless they describe the same code path.
+- **Synthesize, don't summarize.** Extract the CURRENT STATE of knowledge — what IS true now — not what happened historically. Strip all dates, commit hashes, and session narratives.
+- If an existing insight's topic matches new digest content, produce an UPDATED version (same topic name) with merged knowledge — replacing outdated information, not appending to a timeline.
 - Don't create insights for one-off tasks that are fully complete and unlikely to recur.
 - Confidence reflects how many data points support the insight (0.5 = single digest, 0.9 = many corroborating digests).
-- Remove stale information from existing insights when digests show things have changed.
 - Topic names should be stable across updates (don't rename topics).`,
 
       user: `--- NEW DIGESTS (${count}) ---
@@ -1524,7 +1549,7 @@ ${digestBlock}
 
 ${existingBlock}
 
-Produce updated/new insights. Each insight MUST include a <scope> block before <confidence>.`,
+Produce updated/new insights. Each insight MUST be a structured reference article with ## Purpose, ## Architecture, ## Key Files, ## Usage, and ## Troubleshooting sections. Do NOT include dates, commit hashes, or changelog entries.`,
     };
   }
 

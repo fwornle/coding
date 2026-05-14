@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 
 /**
  * Lightweight markdown renderer for observation summaries/insights.
- * Handles: bullet lists, inline code (`backticks`), bold (**text**), line breaks.
+ * Handles: headers (##), bullet lists, inline code (`backticks`), bold (**text**), line breaks.
  *
  * Also styles redaction tokens emitted by the LSL pipeline
  * (e.g. <USER_ID_REDACTED>, <AWS_SECRET_REDACTED>) as smaller, light-blue
@@ -95,10 +95,24 @@ export function MarkdownText({ text, className = '' }: { text: string; className
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+    const headerMatch = line.match(/^(#{1,4})\s+(.+)/)
     const bulletMatch = line.match(/^\s*[-*•]\s+(.+)/)
     const numberedMatch = line.match(/^\s*\d+[.)]\s+(.+)/)
 
-    if (bulletMatch) {
+    if (headerMatch) {
+      flushList()
+      const level = headerMatch[1].length
+      const text = headerMatch[2]
+      const Tag = (`h${Math.min(level + 1, 6)}`) as keyof JSX.IntrinsicElements
+      const sizeClass = level === 1 ? 'text-base font-semibold' :
+                        level === 2 ? 'text-sm font-semibold' :
+                                      'text-sm font-medium'
+      elements.push(
+        <Tag key={`h-${i}`} className={`${sizeClass} text-foreground mt-3 mb-1`}>
+          {renderInline(text)}
+        </Tag>
+      )
+    } else if (bulletMatch) {
       listItems.push(bulletMatch[1])
     } else if (numberedMatch) {
       listItems.push(numberedMatch[1])

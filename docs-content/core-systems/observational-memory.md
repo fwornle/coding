@@ -71,7 +71,7 @@ All four agents generate observations:
 
 Access at `http://localhost:3032/observations`.
 
-![Observation Viewer — list view with filters](../images/observation-viewer.png)
+![Observation Viewer — list view with filters](../images/log-observations.png)
 
 - **Agent filter** -- checkbox per agent (claude, copilot, opencode, mastra)
 - **Time range** -- date pickers for from/to
@@ -293,7 +293,7 @@ Digests group same-day observations by cognitive topic and produce consolidated 
 
 **Output**: Thematic summaries like "ETM pollCount Hardening and Dead Code Removal" or "Frontend Dashboard Observations Display Debugging", each linking back to their source observation IDs.
 
-![Digests page grouped by date](../images/digests-page.png)
+![Digests page grouped by date](../images/log-digests.png)
 
 ### Insights (Tier 3)
 
@@ -305,13 +305,15 @@ Insights extract persistent project knowledge from accumulated digests.
 
 1. Load all unsynthesized digests + existing insights for context
 2. Chunk into batches of 30 digests per LLM call
-3. LLM produces topic-keyed knowledge entries with confidence scores
+3. LLM produces structured reference articles per topic — each with Purpose, Architecture, Key Files, Usage, and Troubleshooting sections — optimized for context-priming injection into a reserved 2K token window
 4. Existing insights with matching topics are updated (merged), new topics create new entries
 5. Confidence decay: -0.05 per week of inactivity, floor at 0.3
 
-**Output**: Living knowledge entries like "Enhanced Transcript Monitor (ETM) Architecture and Known Failure Modes" (confidence: 0.95) or "LLM CLI Proxy and Provider Health Tracking" (confidence: 0.92).
+**Output**: Structured reference articles like "Enhanced Transcript Monitor (ETM) Architecture and Known Failure Modes" (confidence: 0.95) — each a self-contained knowledge document rather than a changelog.
 
-![Insights page with confidence bars](../images/insights-page.png)
+![Insights page with confidence bars](../images/log-insights.png)
+
+Insights are now generated as structured reference articles with `## Purpose`, `## Architecture`, `## Key Files`, `## Usage`, and `## Troubleshooting` sections — optimized for context-priming injection rather than changelog-style summaries.
 
 ### Running Consolidation
 
