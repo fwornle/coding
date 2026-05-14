@@ -14270,5 +14270,154 @@
       "sourceCount": 11
     },
     "project": "coding"
+  },
+  {
+    "id": "af0fe062-6398-46cb-bf5c-a550c842dbd5",
+    "date": "2026-05-14",
+    "theme": "Fixing Insight Pipeline to Generate Reference Articles",
+    "summary": "Developer noted that the online learning system and MySQL intermediate storage were components not yet accounted for in the insight pipeline. Investigation revealed `ObservationConsolidator.js` was generating changelog-style insights rather than structured reference articles.\n\n- Fixed `_buildInsightPrompt()` in `src/live-logging/ObservationConsolidator.js` to produce structured articles with Purpose, Architecture, Key Files, Usage, and Troubleshooting sections\n- Deleted 47 old changelog-style insights and re-synthesized 58 new reference-article insights from 609 digests\n- VKB dashboard now displays proper reference content",
+    "observationIds": [
+      "364c79b8-47a5-4b49-af7b-45298b4986aa"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T16:46:18.600Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "bc2982fb-dada-4eb0-a8e1-ee9e3e57b4dd",
+    "date": "2026-05-14",
+    "theme": "Identifying and Deleting Corrupted SQLite Backup Files",
+    "summary": "Developer asked about `.corrupted-{timestamp}` files visible in the project. These were identified as auto-generated safety backups created by `obs_api` during a crash loop caused by the fastembed SIGTERM bug (since fixed).\n\n- Current `observations.db` confirmed healthy at 5.4MB\n- 31MB of stale `.corrupted-{timestamp}` SQLite backup files were deleted as safe to remove",
+    "observationIds": [
+      "3a84cb88-e0a2-42a4-9501-65dbbafc2e0d",
+      "5a48d787-e727-49b0-a49d-9840c34dec21"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T16:46:18.600Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "32fbfd0e-c618-4d41-b90c-ed66793ffae2",
+    "date": "2026-05-14",
+    "theme": "Updating MkDocs Docs with New Screenshot Filenames",
+    "summary": "Goal was to sync updated screenshots and ensure MkDocs documentation referenced them correctly. Several issues were found and resolved across multiple exchanges.\n\n- Updated screenshots: `log-insights.png`, `log-observations.png`, `log-digests.png`, `observation-viewer.png`, `observation-viewer-item.png` were confirmed synced to the docs-content repo\n- Fixed outdated references in the observational-memory MkDocs page, replacing `digests-page.png` → `log-digests.png` and `insights-page.png` → `log-insights.png`, and added missing `log-observations.png`\n- Fixed MkDocs build failures in `release-notes.md`, `health-monitoring.md`, and `status-line.md`: broken image reference (`digests-page.png` → `log-digests.png`) and two incorrect anchor links in `status-line.md` corrected",
+    "observationIds": [
+      "d7f50779-e007-4cae-9f6c-35789016a51e",
+      "ded7d9c6-f153-4cda-99d8-8f6504807abc",
+      "6b59084e-dce0-4db3-bbc9-8f93b23da5e6"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "docs observational-memory MkDocs page to replace old screenshot references with new log-*.png filenames and add log-observations.png",
+      "release-notes.md",
+      "health-monitoring.md",
+      "status-line.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T16:46:18.600Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b90c2644-11a3-4309-a60d-c94cd0905498",
+    "date": "2026-05-14",
+    "theme": "Investigating Markdown Header Rendering in Insights View",
+    "summary": "Developer reported that `##` headers were not rendering properly in the insights view. Investigation identified that the insights page uses a `MarkdownText` component at line 72 to render `insight.summary`, but examination of the component's header handling was still in progress at the end of the exchange — no fix was applied.",
+    "observationIds": [
+      "3059221e-0aa3-412a-a97f-2eb787514aa8"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T16:46:18.600Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fda219cd-9998-4233-af12-42605a19037b",
+    "date": "2026-05-14",
+    "theme": "Pushing Submodules and Main Repo; Resolving SSH Auth Issues",
+    "summary": "Multiple attempts were made to push integration submodules and the main repository to GitHub, uncovering SSH authentication problems.\n\n- `code-graph-rah` was already up-to-date; `mcp-server-semantic-analysis` and the main repo were successfully pushed via HTTPS after switching remotes from SSH\n- `constraint-monitor` and `mcp-constraint-monitor` failed due to SSH access denied for the QCOM work account (`Frank-Woernle-<COMPANY_NAME_REDACTED>-de_QCOM`)\n- Root cause identified as SSH key resolving to the work account instead of the personal account (`fwornle`) — traced to SSH config rather than OpenCode config, but no fix was applied\n- SSH push remains broken for the QCOM account; HTTPS workaround used where possible",
+    "observationIds": [
+      "8a898658-139b-491b-9d54-5e997b056f91",
+      "04d4bab2-41cb-4a7e-9b70-da7b172c2374",
+      "89574d56-ba9d-4926-89ea-303d46342ba3",
+      "89c4d52e-c4cb-4150-8da5-6757b79a0d91"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T16:46:18.600Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "22a50dd7-8b63-40ed-a9b1-48b2573b2a3b",
+    "date": "2026-05-14",
+    "theme": "Resolving Mermaid Rendering Conflicts in VS Code",
+    "summary": "The goal was to improve Mermaid diagram rendering in VS Code and restore proper diagram code in a markdown report file.\n\n- Identified a conflict between the legacy `bierner.markdown-mermaid` extension and the official `mermaidchart.vscode-mermaid-chart` extension\n- Restored 3 Mermaid code blocks in the markdown report file that had previously been converted to static images\n- Removed all image references, returning the file to native Mermaid syntax\n- Recommended disabling `bierner.markdown-mermaid` so the official extension handles `xychart-beta` block rendering correctly",
+    "observationIds": [
+      "c26d4d8d-3b3d-4c3e-abaa-9257fb79bf21",
+      "d511d3d9-0cc4-4ccf-8e83-e2988a9dfcc7"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [
+      "(markdown report file containing the Mermaid diagrams)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T16:46:18.600Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "9d1d6e0a-ad19-44fd-a22c-78d55bf4641d",
+    "date": "2026-05-14",
+    "theme": "Investigating Statusline Proxy and Online Learning Indicators",
+    "summary": "Developer <USER_ID_REDACTED> why the online learning system appeared degraded (yellow) in the statusline and why `P:ON` persisted after disabling VPN and proxy.\n\n- Codebase search revealed the statusline in `sketcher` is a **static placeholder** displaying only `\"Status: Ready\"`\n- No proxy detection, connectivity monitoring, or online learning health logic is implemented\n- The described yellow degraded state and `P:ON` indicator have no corresponding implementation in this codebase, suggesting the developer may be referencing a different project or environment",
+    "observationIds": [
+      "781ab858-918f-4861-a0fd-989cd957dfd3"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T16:46:18.600Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "sketcher"
   }
 ]

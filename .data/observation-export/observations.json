@@ -21120,7 +21120,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T14:45:36.072Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T16:46:18.600Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -21316,7 +21316,7 @@
     "project": "sketcher",
     "quality": "high",
     "createdAt": "2026-05-14T15:23:26.778Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T16:46:18.600Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -21330,7 +21330,7 @@
     "project": "sketcher",
     "quality": "high",
     "createdAt": "2026-05-14T15:55:20.489Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T16:46:18.600Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -21344,7 +21344,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T15:59:02.503Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T16:46:18.600Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -21358,7 +21358,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T15:59:02.503Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T16:46:18.600Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -21372,7 +21372,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T16:01:00.524Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T16:46:18.600Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -21386,7 +21386,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T16:01:58.916Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T16:46:18.600Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -21400,6 +21400,104 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T16:03:00.885Z",
+    "digestedAt": "2026-05-14T16:46:18.600Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "8a898658-139b-491b-9d54-5e997b056f91",
+    "summary": "Intent: Push changes to both the integration submodules and the main repository.\nApproach: Check each submodule for unpushed commits and push them individually alongside the main repo.\nArtifacts: none\nResult: Attempted to push three submodules (code-graph-rag, constraint-monitor, semantic-analysis) and the main repo; encountered permission issues on two submodules and a branch mismatch on code-graph-rag — resolution was in progress.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T16:29:07.631Z",
+    "digestedAt": "2026-05-14T16:46:18.600Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "04d4bab2-41cb-4a7e-9b70-da7b172c2374",
+    "summary": "Intent: Push local commits to remote for both integration submodules and the main repository.\nApproach: Attempted to push all submodules with unpushed commits plus the main repo, encountering SSH permission issues on some submodules and a non-default branch on code-graph-rag.\nArtifacts: none\nResult: code-graph-rag was already up-to-date; constraint-monitor and semantic-analysis failed to push due to SSH access denied for the QCOM account; main repo push status unresolved pending auth fix.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T16:29:07.631Z",
+    "digestedAt": "2026-05-14T16:46:18.600Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "89574d56-ba9d-4926-89ea-303d46342ba3",
+    "summary": "Intent: Push the integration submodules and main repository to GitHub.\nApproach: Diagnosed SSH key authorization failures for the QCOM account, then switched affected remotes from SSH to HTTPS to leverage cached credentials.\nArtifacts: none\nResult: Successfully pushed mcp-server-semantic-analysis and the main coding repo to GitHub via HTTPS; mcp-constraint-monitor and code-graph-rag were already up-to-date. SSH push remains broken for the QCOM account.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T16:29:07.631Z",
+    "digestedAt": "2026-05-14T16:46:18.600Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "781ab858-918f-4861-a0fd-989cd957dfd3",
+    "summary": "Intent: Understand why the online learning system shows as degraded (yellow) in the statusline and why the proxy indicator still shows \"P:ON\" after disabling VPN and proxy.\nApproach: Investigated the statusline and proxy/online-learning logic by searching the codebase for relevant indicators.\nArtifacts: none\nResult: The current statusline in sketcher is a static placeholder showing only \"Status: Ready\" with no proxy detection, connectivity monitoring, or online learning health logic implemented — the yellow degraded state and \"P:ON\" indicator described do not correspond to anything in this codebase.",
+    "agent": "copilot",
+    "project": "sketcher",
+    "quality": "high",
+    "createdAt": "2026-05-14T16:32:14.485Z",
+    "digestedAt": "2026-05-14T16:46:18.600Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "89c4d52e-c4cb-4150-8da5-6757b79a0d91",
+    "summary": "Intent: Understand why GitHub SSH authentication switched from personal account (fwornle) to work account, and whether OpenCode config is responsible.\nApproach: Investigated SSH key resolution to determine the source of the account switch, checking both SSH config and OpenCode configuration.\nArtifacts: none\nResult: SSH key was resolving to the work account (Frank-Woernle-<COMPANY_NAME_REDACTED>-de_QCOM) rather than the personal account (fwornle); identified as an SSH config issue rather than an OpenCode configuration issue, but no fix was applied in this exchange.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T16:36:40.027Z",
+    "digestedAt": "2026-05-14T16:46:18.600Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "6b59084e-dce0-4db3-bbc9-8f93b23da5e6",
+    "summary": "Intent: Fix MkDocs build failures shown in the error screenshot.\nApproach: Identified three broken references — a renamed image, and two incorrect anchor links — then corrected them in the relevant markdown files.\nArtifacts: edited release-notes.md, edited health-monitoring.md, edited status-line.md\nResult: Fixed broken image reference from `digests-page.png` to `log-digests.png`, and corrected two broken anchor links pointing to the wrong heading ID in `status-line.md`.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T16:37:36.030Z",
+    "digestedAt": "2026-05-14T16:46:18.600Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "4faca91a-2f0f-46fe-815f-8b6ca7a9d43f",
+    "summary": "Intent: Fix a failing MkDocs build\nApproach: Identified three causes: a renamed image file, and two broken anchor links pointing to a non-existent heading slug.\nArtifacts: edited release-notes.md, edited health-monitoring.md, edited status-line.md\nResult: Fixed image reference from `digests-page.png` to `log-digests.png` and corrected two broken anchor links to `#right-edge-stability-cell-width-consistency`; also restored SSH submodule remotes and re-added personal SSH key to agent.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T16:37:36.030Z",
     "digestedAt": null,
     "llm": {
       "model": "Claude Sonnet 4.6",
