@@ -11011,6 +11011,25 @@
     "project": "rapid-automations"
   },
   {
+    "id": "da0fc95d-dcde-4ee7-b5bd-89883e7aff4a",
+    "date": "2026-05-08",
+    "theme": "Mishandled Style Guide Input, Unrelated Tmux Investigation",
+    "summary": "The developer provided a documentation style guide as context/instructions. Instead of acknowledging or applying the style guide, the assistant misinterpreted the input as a trigger to investigate unrelated tmux status-line tooling issues.\n\n- No documentation work was performed\n- No artifacts were created or modified\n- The assistant's response was entirely off-topic, investigating tmux/status-line issues irrelevant to the input\n- Root issue: failure to correctly parse developer intent from the incoming message",
+    "observationIds": [
+      "a2fbb440-1415-4cca-aafb-dd0ec402f829"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:29.404Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
     "id": "e681763b-9178-44cd-93cf-a3213eb07b55",
     "date": "2026-05-09",
     "theme": "Context7 MCP Server False Failure Diagnosis",
@@ -11552,6 +11571,25 @@
     "createdAt": "2026-05-10T04:56:00.650Z",
     "metadata": {
       "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c6608904-5e8f-46c9-b28c-a4eb9aee868b",
+    "date": "2026-05-09",
+    "theme": "ETM Restart and Server.js Investigation",
+    "summary": "At 04:17, the claude agent restarted the Enhanced Transcript Monitor (ETM) as a background process and began investigating remediation/auto-heal logic in `server.js`. No files were modified during this session — the `server.js` investigation remained incomplete at the end of the exchange.",
+    "observationIds": [
+      "cd1d0646-3a17-49a6-bec3-fde607f9e8f2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:32.766Z",
+    "metadata": {
+      "sourceCount": 1
     },
     "project": "coding"
   },
@@ -12138,6 +12176,44 @@
     "project": "coding"
   },
   {
+    "id": "969bfa4d-3099-4d96-9f9d-ded7858423c6",
+    "date": "2026-05-10",
+    "theme": "Memory Visualizer SourceFilter Component Investigation",
+    "summary": "A screenshot was shared (likely depicting a UI or code issue) prompting an investigation into the relevant codebase.\n- Agent searched for VKB references, memory-visualizer project files, and `DataSource` component patterns.\n- Investigation narrowed to the **memory-visualizer integration project**, specifically the `SourceFilter` component and `DataSource`-related code.\n- No concrete fix or conclusion was reached; the session ended at the exploratory stage.",
+    "observationIds": [
+      "c2997bec-2850-4ada-8427-051906397809"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:39.715Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "6ad57752-8429-4b00-af9c-80787fcb164c",
+    "date": "2026-05-10",
+    "theme": "Cherry-Pick Approval to Unblock Phase 34-03",
+    "summary": "Developer approved proceeding with the cherry-pick plan (option a) to unblock phase 34-03 implementation.\n\n- No code changes were made during this exchange\n- Plan involves cherry-picking stranded `34-01` and `34-02` worktree commits onto `main` prior to implementing `34-03`\n- Session ended with confirmation received; execution of the cherry-pick is the expected next step",
+    "observationIds": [
+      "bda01618-a293-4945-959a-318ecbf576b5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:39.715Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
     "id": "811e44a1-bd63-48ec-9634-7e1cd5bbe557",
     "date": "2026-05-11",
     "theme": "Bug Fixes for Status Line and Health Coordinator Scripts",
@@ -12567,6 +12643,28 @@
       "sourceCount": 3
     },
     "project": "coding"
+  },
+  {
+    "id": "425e21a6-09a0-4d19-bb27-352be4f5ae8e",
+    "date": "2026-05-11",
+    "theme": "Commit Status Line Script Changes to Main",
+    "summary": "Committed working changes to the repository on `main` branch (commit `2fd9301fa`), targeting two status line scripts while deliberately excluding unrelated modifications.\n- `scripts/combined-status-line.js`\n- `scripts/status-line-fast.cjs`\n\nBranch is now 3 commits ahead of `origin/main`, indicating pending push to remote.",
+    "observationIds": [
+      "1559840d-517c-488e-9de4-692173bd59a3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/combined-status-line.js",
+      "scripts/status-line-fast.cjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:43.718Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
   },
   {
     "id": "bf3738b1-06e5-46e0-bf0c-903f85cb1753",
@@ -13521,6 +13619,96 @@
     "project": "sketcher"
   },
   {
+    "id": "e509361d-fc66-4485-b0be-54d8cfc3d850",
+    "date": "2026-05-13",
+    "theme": "Session Continuity Load and Cross-Project Summary",
+    "summary": "The agent loaded recent session logs at the start of the day to re-establish context from prior work.\n\n- Used `/sl` command to read LSL files from both `rapid-automations` and `coding` projects\n- Synthesized a cross-project continuity summary covering sessions from **2026-05-13 08:00–13:00 CEST**\n- Key open item identified: **PR #13** on `rapid-automations`, fixing submodule URLs from SSH to HTTPS — awaiting CI checks before merge\n- No files were modified; this was a read-only orientation step",
+    "observationIds": [
+      "c767c83e-e7e0-49c1-b8d7-e92bf33697c7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:10:00.397Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "c5b8cf50-a397-45d4-8738-535da92aca25",
+    "date": "2026-05-13",
+    "theme": "Session Log Loading for Context Continuity",
+    "summary": "Two back-to-back attempts to load recent session logs via the `/sl` command to establish context continuity from prior work. Both exchanges ended before a full continuity summary was produced, though LSL files from 2026-05-13 were located and partially read.",
+    "observationIds": [
+      "0ecab8a7-bd17-462e-be5e-464d281ef256",
+      "3468a66a-7264-4768-98ff-2af55b47cf47"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:10:00.397Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e00db72e-4cf9-4edf-9b29-bdce122a6ff0",
+    "date": "2026-05-13",
+    "theme": "obs_api Service Restart and Health Check",
+    "summary": "`obs_api` was restarted as a background process (via `nohup`) on its designated port. Across three near-simultaneous observations, claude confirmed:\n- PID 99751 listening on port 12436\n- `/health` endpoint returning `ok`\n\nThis was initiated alongside the Copilot/keychain investigation below.",
+    "observationIds": [
+      "f14b53cf-59b7-4c92-a108-260fdcbde891",
+      "e2713375-3152-46b9-9283-3198d937637f",
+      "21c5c499-de88-4cac-a51a-eebe8b991dd1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:10:00.397Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f74fe6e9-e6ae-4d4b-a086-b8d65110b3c0",
+    "date": "2026-05-13",
+    "theme": "LLM Proxy Failures: Keychain, DNS, Corporate Proxy, and Network Mode Detection",
+    "summary": "A sustained multi-agent (opencode) debugging session traced LLM proxy failures through several layers of root cause:\n\n- **Keychain investigation (obs 6–7):** Initially suspected a corporate password change had left the macOS login keychain out of sync, requiring `security set-keychain-password` and `gh auth login` re-authentication; keychain was then confirmed healthy and unlocked with no timeout.\n- **DNS/proxy misconfiguration (obs 8–10):** `curl` failures revealed DNS not resolving due to missing `HTTP_PROXY`/`HTTPS_PROXY` env vars; proxy was started during a hotspot session without corporate proxy settings and needed a restart to pick up CN network config.\n- **Supervision and hardcoded env vars (obs 11–14):** Attempts to restart `rapid-llm-proxy` (port 12435) were blocked by a launchd-supervised process (PID 42494) with `LLM_NETWORK_MODE=public` hardcoded, preventing corporate proxy routing; the controlling launch daemon was identified but not yet resolved in several exchanges.\n- **Root cause and fix (obs 15):** Final root cause identified — the company uses `160.50.x.x` internal IPs which fall outside RFC1918 ranges, causing `probe_corp_network` to misclassify the network as public and strip proxy env vars. Fix involved editing the proxy startup/detection script to add the `160.50.x.x` range to the private IP detection regex.",
+    "observationIds": [
+      "64a23471-c260-4d24-954a-87071aa52a0f",
+      "e84d3275-9f4e-406f-8d89-3bc26d3d6ce9",
+      "0d743eee-91bc-4e8f-afcd-4343a24a7128",
+      "34e239ac-30f6-455c-a3c9-238d2bdf1406",
+      "53a823ff-b778-4298-ac2d-bfa8553d6aed",
+      "3e9bec8c-3657-4fb1-b09f-0c1fcaf75096",
+      "92c1a4e3-aad5-429c-9817-3ed738ec4cfc",
+      "029c7d3d-24a6-4d9f-88d5-9f11d318776e",
+      "9d8deceb-9e53-4679-a940-be51fa0457a8",
+      "0b8837a3-e98f-40bd-9202-503f37848fc1"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "(proxy startup/detection script to add company internal IP range)"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:10:00.397Z",
+    "metadata": {
+      "sourceCount": 10
+    },
+    "project": "coding"
+  },
+  {
     "id": "e9ede659-6858-49f6-afd7-b948872301cb",
     "date": "2026-05-14",
     "theme": "LLM CLI Proxy Network Detection Fix",
@@ -13625,5 +13813,299 @@
       "sourceCount": 7
     },
     "project": "coding"
+  },
+  {
+    "id": "e3aea92c-6c19-4a78-83a7-92ced246e065",
+    "date": "2026-05-14",
+    "theme": "Network and VPN Detection Logic Investigation and Fix",
+    "summary": "Investigated the existing network/proxy detection infrastructure and corrected a faulty VPN classification bug.\n\n- Confirmed `coding/scripts/detect-network.sh` and `launch-agent-common.sh` already contain detection logic; the LLM proxy re-detects independently instead of consuming the shared result\n- Root cause of incorrect \"CN\" label when on VPN: the VPN branch was an `else-if` that only triggered when PAC URL failed to resolve, but VPN traffic also resolves the PAC URL, so the branch was never reached\n- Fix simplified the conditional: proxy running + `pacResolved` (corporate DNS) = VPN, since the proxy is only active when tunneling remotely\n- Removed dead code (`hasVpn` variable) left over from the old logic\n- Statusline and dashboard still don't surface the shared detection state — identified as a remaining gap",
+    "observationIds": [
+      "6d0db4fe-eb19-4e38-93f2-8e85bc98f0c7",
+      "8f60db99-6804-4ea8-a613-020c0ca9f644",
+      "f34bcf7b-13e9-4bbf-b32f-676aa7b7ea8b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "network detection source file"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6f625fab-1f79-473c-9a0e-62b4b45cf4fd",
+    "date": "2026-05-14",
+    "theme": "Health Dashboard Network Field Redux Bug and Auto-Heal Gaps",
+    "summary": "Traced and fixed a chain of bugs causing the health dashboard to incorrectly report \"Internet Unreachable\" and \"Local Proxy Offline\" despite both being active.\n\n- Root cause: Redux reducer dropped the `network` field from the API response, so the frontend always read `undefined`; compounded by an `as any` cast that hid the type error\n- Fixed by adding `network` to the Redux state shape and removing the unsafe cast; frontend health dashboard component updated to use the typed field\n- Secondary finding: `restartObsApi` was referenced in auto-heal action dispatch but never implemented, causing the Restart button to throw\n- `restartObsApi` method added to the remediation dispatcher\n- Auto-heal for obs_api was not wired into the FSM polling loop — only the LLM proxy had automatic restart logic; obs_api only showed a manual Restart button\n- Stale Node process cache required a container restart for network data to flow correctly after the code fix",
+    "observationIds": [
+      "f5d4715f-0f18-4cfd-b56e-6d6b7169545f",
+      "2c743bc3-312f-4265-85cc-803acbe3b9c6",
+      "073ebce5-fa54-4ec5-8b0d-0d0936c6ffe9"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "health status Redux slice to include network field",
+      "frontend health dashboard component to use typed network field",
+      "coordinator or dashboard server handler files",
+      "remediation dispatcher to add restartObsApi method"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8f096ba3-ddbe-4069-b348-767468b1cb38",
+    "date": "2026-05-14",
+    "theme": "Qdrant Client Version Update",
+    "summary": "Audited and updated the Qdrant client to match the running server version.\n\n- Qdrant server was already at 1.17.0 with existing data intact; client was lagging at 1.15.1\n- Updated client to 1.18.0, which supports the 1.17.x server; Qdrant handles data migration automatically on server startup so no manual migration was required\n- `obs_api` restarted successfully with no version mismatch errors and data intact\n- Noted that the `semantic-analysis` submodule also uses the Qdrant client and was checked for compatibility",
+    "observationIds": [
+      "c2dd9392-627e-463c-96aa-0f663a9f2d27",
+      "bc98e843-9964-4dae-ac27-19f0402b332e"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "320e1268-e951-4332-92f1-ea4c44e6e3f2",
+    "date": "2026-05-14",
+    "theme": "Health Dashboard Unknown Statuses, Stale PIDs, and Missing Sections",
+    "summary": "Deep investigation into four health system reporting gaps: LevelDB/Qdrant \"unknown\" status, stale PIDs, missing CGR commits-behind count, and online learning yellow state not reflected on the dashboard.\n\n- LevelDB/Qdrant always showed \"unknown\" because the coordinator stored probe results in `levelDB.available`/`qdrant.available` but never mapped them to the legacy sub-check keys (`leveldb_lock_check`, `qdrant_availability`) that the frontend reads; restarting the coordinator resolved this\n- Stale PIDs remained unresolved — the process check loop never probes actual process liveness; a patch to the coordinator's stale_pids handling was applied\n- Unimplemented placeholder process rules (`process_uptime`, `high_cpu_usage`, etc.) were disabled to eliminate spurious \"unknown\" noise\n- Knowledge pipeline yellow state has no corresponding dashboard section — queued for addition\n- CGR commits-behind count identified as a separate gap; `0 commits behind` displays as a hash rather than a count",
+    "observationIds": [
+      "169b20fc-3db4-4784-ba80-df0e1674ef29",
+      "ac5d0f3d-9d48-465b-a3c9-3bca327f44ee",
+      "3736f2d2-3c75-4057-86d8-be2069dfd735",
+      "09c7ba64-e429-4705-ab95-ab523ba74686"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "coordinator config/rules files",
+      "health coordinator source",
+      "dashboard frontend component",
+      "process rules config"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2359c237-6979-4e60-9a26-6a8e7b0b0554",
+    "date": "2026-05-14",
+    "theme": "Dashboard `toUiStatus` Mapping Bug Fix",
+    "summary": "Investigated why the dashboard continued to show stale/empty health data after earlier fixes.\n\n- Root cause: `toUiStatus('passed')` fell through to `return 'unknown'` because `'passed'` was not in the function's recognized value mappings in `server.js`\n- Fix applied to `server.js` to handle `'passed'` correctly; container restarted to pick up the change\n- Prior to this fix the health-verifier check cycle appeared to not be running, but the real issue was all check results being silently mapped to `'unknown'`",
+    "observationIds": [
+      "ccfb82f8-bb47-401d-8942-2134405fd6d7",
+      "1e11b040-6e8b-4837-9292-86d451b7e2e3"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "server.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "672de754-cf09-41fc-ac78-2dddf1a9d02a",
+    "date": "2026-05-14",
+    "theme": "Committing Health Monitoring and Network Detection Changes",
+    "summary": "Organized and committed all accumulated changes from the day's health monitoring and network detection work.\n\n- Commits split into separate groups to satisfy pre-commit hook validation requiring KB files to be committed independently from other changes",
+    "observationIds": [
+      "ad8c829a-35ac-42df-b08b-58b279f6d8bc"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1181667f-22d1-4e29-bad2-a87b1eb85995",
+    "date": "2026-05-14",
+    "theme": "Documentation Updates for Network Status and Health Monitoring",
+    "summary": "Updated project documentation to reflect the day's network status, proxy status, and health monitoring changes.\n\n- Edited statusline docs and health monitoring docs to cover new network/proxy status fields\n- Updated MkDocs config and content; copied `health-mon.png` to `docs-content` for MkDocs rendering\n- Refreshed PlantUML (`.puml`) and regenerated PNG diagrams where applicable\n- Remaining incomplete items identified: updating `health-verification-flow.puml`, regenerating remaining PUMLs to PNGs, and updating MkDocs nav if new pages were added",
+    "observationIds": [
+      "fa93892a-fb29-44be-976a-301b6c59575c",
+      "c94b38fc-e29e-4ef8-a3ba-26384686d561"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "(statusline docs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a6e198e4-6161-48b2-ac81-4ded316c687b",
+    "date": "2026-05-14",
+    "theme": "obs_api Recurring Crash Diagnosis, Auto-Heal, and Observation Backfill",
+    "summary": "Extended investigation into why obs_api repeatedly crashed, followed by hardening the service and recovering missed observations from the downtime window.\n\n**Root cause of crashes:**\n- `detached: true` + `unref()` orphaned the process to PID 1; macOS launchd sent SIGTERM, which triggered a C++ mutex crash inside the fastembed native module during Node.js cleanup\n- `nohup`/`disown` approaches failed because the bash tool's shell exits immediately, orphaning the process before it stabilizes\n\n**Fixes applied:**\n- SIGTERM handler changed to use `SIGKILL` (or `process.exit(1)`) to bypass native destructor execution and avoid the fastembed mutex crash\n- Switched to launchd with `KeepAlive: true` for persistent process management and automatic restart on crash\n- Added obs_api auto-heal FSM to the health coordinator (mirroring the existing LLM proxy pattern), triggering restart on \"unreachable\" status\n- Enabled `auto_heal: true` for obs_api in the rules config\n- Created a launchd plist for obs_api\n\n**Observation backfill:**\n- obs_api downtime caused 21–120 sessions (May 1–14) to have zero observations recorded\n- Most `[Raw]`-tagged sessions were correctly classified as low-value; genuine missed sessions required a different recovery path\n- Backfill strategy: use `SpecstoryBatchConverter` with `TranscriptNormalizer.parseSpecstory()` feeding into `/api/observations/messages`, deduplicating by selecting the final ETM snapshot per session\n- Timestamp-based matching needed since `sourceFile` metadata is not stored in the observations database; backfill script not yet executed",
+    "observationIds": [
+      "dbd40ad5-f696-4df4-be8b-595f51082884",
+      "4e386822-1f1d-43b9-9f1d-4112298048a7",
+      "2bc1103a-24d6-4577-bc3b-a338f6f5254e",
+      "b56183bc-192a-43f1-b37c-a5c0a079dbba",
+      "0630da24-6324-4d3e-947a-5e9ebd0959a2",
+      "be21ddc5-d9e6-48dc-ad5c-76fcdd26c4dd",
+      "1860f112-9df3-4ce0-8f06-b9b58a3d1ea2",
+      "427bd353-2b00-45b6-8f02-f4d1be7ad83d",
+      "ae671bea-e289-4edf-b137-b1138c66e980",
+      "be04ee7d-e227-4a4c-a1b8-1221773c4010",
+      "df72b36b-ed0a-425d-ae72-298e695df798",
+      "9c04666c-d1f9-484d-8351-b826ae1daad2",
+      "0d3a3995-5199-43fd-9920-033d6bb30c9d",
+      "e90b77de-8f2c-4bab-b897-3087ba7317ef",
+      "eec25749-2383-4d25-a3dd-6980c86499da",
+      "ac2910b3-5069-47f2-b264-07242c28f14e",
+      "367a58fe-bff8-442f-9ead-835308fda21d",
+      "1442c825-c02c-4c3e-a03d-3d77cb678300"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "obs_api signal handler",
+      "coordinator to add obs_api auto-heal FSM",
+      "rules config to enable auto_heal for obs_api",
+      "obs_api server shutdown handler",
+      "launchd plist for obs_api KeepAlive",
+      "coordinator source (auto-heal logic after pollKnowledgePipeline)",
+      "rules config (auto_heal: true for obs_api)",
+      "launchd plist for obs_api"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 18
+    },
+    "project": "coding"
+  },
+  {
+    "id": "95f896b6-6c87-4bdd-b82f-72aeaf47ecde",
+    "date": "2026-05-14",
+    "theme": "Diagnosing and Fixing obs_api Downtime and Backfill",
+    "summary": "Both observations address the same work session: diagnosing recurring `obs_api` crashes and recovering missing observations from the outage window.\n\n- **Root cause**: `fastembed` native code crashed on `SIGTERM` during C++ mutex cleanup; fixed by switching the `SIGTERM` handler to use `SIGKILL` to bypass crashing native destructors.\n- **Process supervision**: `obs_api` moved under `launchd` with `KeepAlive=true` for automatic restart on failure; confirmed healthy on port `12436`.\n- **Backfill**: 3 previously `Raw` observations were re-summarized; 8 remaining stubs confirmed as genuinely low-content (2-message sessions), not outage casualties.\n- **Resilience**: A coordinator auto-heal FSM was added to handle the `obs_api` unreachable state going forward.",
+    "observationIds": [
+      "e6bd7fb3-441e-4fa7-bab4-ca144fc959f4",
+      "79e4d623-2dfd-4617-9ce4-2e17e8b672d4"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2885e411-4b25-4510-b06f-66506e7c8781",
+    "date": "2026-05-14",
+    "theme": "Initial Teams Channel Access Feasibility Discussion",
+    "summary": "User asked whether Claude could directly extract data from a <COMPANY_NAME_REDACTED> Teams channel. Claude clarified it has no direct Teams access but outlined programmatic options via the **<COMPANY_NAME_REDACTED> Graph API**, offering to help write scripts if provided Azure AD credentials and channel IDs. No code or files were produced.",
+    "observationIds": [
+      "671a7f5a-a9df-4b93-a880-f73cd58b3690"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "7c7379c3-ea8e-4248-9b30-47931fddd1f5",
+    "date": "2026-05-14",
+    "theme": "Rapid-Toolkit Repository Exploration and Inventory",
+    "summary": "Explored and inventoried the `rapid-toolkit` repository located at `~/Agentic/_work/rapid-automations/integrations/rapid-toolkit` through systematic directory traversal, README inspection, and plugin manifest scanning.\n- Cataloged **142+ components**: 33 tools, 15 plugins, and 94+ skills\n- Coverage includes reprocessing platform APIs, RCA diagnostics, product owner workflows, Jira/Confluence/ServiceNow, CodeBeamer traceability, data analytics, PowerPoint generation, and AI agent <COMPANY_NAME_REDACTED>-skills\n- Notable for Teams/M365 integration via `m365cli` and webhook-based Adaptive Card posting\nNo files were modified; this was a read-only discovery phase.",
+    "observationIds": [
+      "bc32c775-585f-455c-8b73-64ca639b4be1",
+      "38ac9d19-0fc3-47f5-a529-3a9b41776c80",
+      "1be193e5-e8d9-4219-9587-301d90e3cf31",
+      "f2cda843-a05e-4c32-89c8-bf0aaef7a953"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "b48ae3cc-8898-49e6-824c-b037c4ab2d8a",
+    "date": "2026-05-14",
+    "theme": "Teams Channel Message Extraction, Auth, and Pagination",
+    "summary": "End-to-end effort to extract and report on messages from a <COMPANY_NAME_REDACTED> Teams Agentic AI channel using the Graph API via CLI tooling.\n- Authentication initiated via **device-code OAuth flow**, requiring browser-based sign-in before data could be retrieved\n- Initial fetch returned only 20 messages due to default `--limit` parameter; raised to 50, which is the **Graph API `ListChannelMessages` hard cap per request**\n- Discovered message history was truncating at ~March 23 due to lack of pagination support in the CLI\n- Investigated `nextLink`/`skipToken` pagination tokens returned by the MCP proxy; added full pagination support to `cmd_channel_messages` to follow tokens and retrieve all historical messages\n- Final report saved as `agentic-ai-channel-report.md` and copied to `~/Downloads/`",
+    "observationIds": [
+      "0190c847-83f4-4ac4-b83a-fbb25cae695f",
+      "9b02ef0c-ffd4-4dee-ae9e-d49cd2974c7d",
+      "0d6caa29-51c5-4c40-b88c-c8eb4b84ae3c",
+      "554e87b7-0f2e-4edd-bd7d-843be321f2d2",
+      "9c68db84-700d-461e-a684-a8e736003b72",
+      "5dcc0503-8f62-4468-91b3-ed5c3f942515",
+      "b237ed7a-25e9-4e62-9867-68aea92a0fe6",
+      "ddc46eef-ca53-4271-8d6f-397f4ea1e985"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [
+      "(CLI tool fetch command default limit)",
+      "cmd_channel_messages (sketcher project file)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T14:11:03.699Z",
+    "metadata": {
+      "sourceCount": 8
+    },
+    "project": "sketcher"
   }
 ]

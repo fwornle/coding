@@ -13750,7 +13750,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-08T11:09:15.647Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:09:29.404Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -13972,7 +13972,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-09T04:17:17.646Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:09:32.766Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -16141,7 +16141,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-10T13:43:38.085Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:09:39.715Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -16171,7 +16171,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-10T13:50:01.711Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:09:39.715Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -17327,7 +17327,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-11T14:28:02.552Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:09:43.718Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19482,7 +19482,7 @@
     "project": "rapid-automations",
     "quality": "normal",
     "createdAt": "2026-05-13T10:57:58.951Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19496,7 +19496,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:00:46.397Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19510,7 +19510,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:00:46.397Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19524,7 +19524,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:08:49.033Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19538,7 +19538,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:08:49.033Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19552,7 +19552,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:08:49.033Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19566,7 +19566,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:17:12.652Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19580,7 +19580,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:19:27.591Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19594,7 +19594,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:20:27.906Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19608,7 +19608,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:22:17.934Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19622,7 +19622,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:25:29.627Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19636,7 +19636,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:26:32.468Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19650,7 +19650,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:26:32.468Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19664,7 +19664,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:26:32.468Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19678,7 +19678,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:26:32.468Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19692,7 +19692,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-13T11:26:32.468Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:10:00.397Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -19930,7 +19930,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T09:54:34.349Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20168,7 +20168,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T10:58:13.847Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20182,7 +20182,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T10:58:13.847Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20196,7 +20196,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T10:58:13.847Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20224,7 +20224,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T11:44:41.740Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20238,7 +20238,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T11:44:41.740Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20252,7 +20252,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T12:07:11.750Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20266,7 +20266,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T12:07:11.750Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20280,7 +20280,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T12:07:11.750Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20294,7 +20294,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T12:07:39.223Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20308,7 +20308,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T12:39:53.788Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20322,7 +20322,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T12:41:10.791Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20336,7 +20336,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T12:42:45.238Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20350,7 +20350,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T12:42:45.238Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20364,7 +20364,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T12:49:48.634Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20378,7 +20378,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T12:52:40.421Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20392,7 +20392,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:24:53.389Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20406,7 +20406,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20420,7 +20420,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20434,7 +20434,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20448,7 +20448,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20462,7 +20462,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20476,7 +20476,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20490,7 +20490,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20504,7 +20504,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20518,7 +20518,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20532,7 +20532,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20546,7 +20546,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20560,7 +20560,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20574,7 +20574,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20588,7 +20588,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20602,7 +20602,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20616,7 +20616,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20630,7 +20630,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20644,7 +20644,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20658,7 +20658,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20672,7 +20672,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-14T13:26:51.336Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20686,7 +20686,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:34:48.193Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20700,7 +20700,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:41:38.839Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20714,7 +20714,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:41:38.839Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20728,7 +20728,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:41:38.839Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20742,7 +20742,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:41:38.839Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20756,7 +20756,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:53:35.565Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20770,7 +20770,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:53:35.565Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20784,7 +20784,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:53:35.565Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20798,7 +20798,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T13:59:53.255Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20812,7 +20812,7 @@
     "project": "sketcher",
     "quality": "high",
     "createdAt": "2026-05-14T13:59:53.255Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20826,7 +20826,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T14:05:08.680Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20840,7 +20840,7 @@
     "project": "sketcher",
     "quality": "normal",
     "createdAt": "2026-05-14T14:05:51.633Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-14T14:11:03.699Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -20854,6 +20854,104 @@
     "project": "sketcher",
     "quality": "high",
     "createdAt": "2026-05-14T14:05:51.633Z",
+    "digestedAt": "2026-05-14T14:11:03.699Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "99aafd80-300e-447e-b634-69f0c740bcbd",
+    "summary": "Intent: Investigate why chat history retrieval is limited to ~50 messages (back to March 23) and find a way to fetch all messages\nApproach: Discovered the CLI wasn't following the `nextLink`/`skipToken` pagination tokens returned by the API, so added pagination support to loop through all pages until exhausted.\nArtifacts: edited cmd_channel_messages implementation file\nResult: Added pagination loop to `cmd_channel_messages` that follows `nextLink` tokens, enabling retrieval of the complete message history beyond the previous 50-message limit.",
+    "agent": "copilot",
+    "project": "sketcher",
+    "quality": "high",
+    "createdAt": "2026-05-14T14:05:51.633Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ef440b6e-91c5-468a-b458-9610055d3225",
+    "summary": "Intent: Commit staged changes to the repository.\nApproach: Ran git operations to stage and commit files across two logical groupings.\nArtifacts: none\nResult: Two commits created: `81c7526` fixing OBS API with SIGKILL shutdown, auto-heal FSM, and rules config; `30fba2d` adding knowledge base observation exports after backfill.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-14T14:09:03.013Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "d7013819-41f0-4772-8a03-8f4cffe1927b",
+    "summary": "Intent: [verify whether the todo list is current and reflects completed work]\nApproach: Checked the todo list state directly.\nArtifacts: none\nResult: All 14 todo items were confirmed as completed.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:15:16.518Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "f8de15a6-7dbf-403c-b562-25391b17e9ea",
+    "summary": "Intent: [troubleshoot a missing \"documentation-style\" skill that should be located in ~/Agentic/coding]\nApproach: The assistant searched for and loaded the skill file from the specified path to apply its documentation conventions to the report being generated.\nArtifacts: none\nResult: The documentation-style skill was located and loaded; its conventions (Mermaid `graph TD`, clear labels, subgraphs) were applied to a channel analysis report saved to `/Users/<USER_ID_REDACTED>/Downloads/agentic-ai-channel-report.md`.",
+    "agent": "copilot",
+    "project": "sketcher",
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:16:12.034Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "379983b8-9ca3-4d7a-9802-e9de9b386378",
+    "summary": "Intent: [Load and apply the \"documentation-style\" skill from ~/Agentic/coding for use in the current task]\nApproach: Located and read the skill file, then applied its conventions (Mermaid graph TD, subgraphs, clear labels) to the report being generated.\nArtifacts: none\nResult: The documentation-style skill was successfully loaded and its formatting conventions were applied to a Slack channel analysis report saved at ~/Downloads/agentic-ai-channel-report.md.",
+    "agent": "copilot",
+    "project": "sketcher",
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:16:12.034Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "3a3a88ae-439f-409d-9e46-955a27789b4d",
+    "summary": "Intent: Fix diagram rendering issues for \"Contributor Distribution\", \"Monthly Activity Chart\", and \"Top Contributor Activity Timeline\" sections where no diagram type was detected.\nApproach: Identified that VS Code's built-in Markdown preview has limited Mermaid support, with xychart-beta and gantt chart types failing to render, so switching to more universally supported diagram types.\nArtifacts: none\nResult: Investigation identified the root cause as unsupported Mermaid diagram types; solution pending replacement with compatible diagram types.",
+    "agent": "copilot",
+    "project": "sketcher",
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:24:27.799Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "2368a84a-ec00-47b4-a100-c9cc26f06516",
+    "summary": "Intent: Resume work on fixing rendering issues in Mermaid graphs in the teams-channel report after a crash.\nApproach: Recovered session context by inspecting recent files and SQL/bash history to determine prior state before crash.\nArtifacts: none\nResult: Session context was recovered; assistant identified it was mid-fix on Mermaid graph rendering in `~/Downloads/agentic-ai-channel-report.md` and prepared to continue.",
+    "agent": "copilot",
+    "project": "sketcher",
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:29:28.383Z",
     "digestedAt": null,
     "llm": {
       "model": "Claude Sonnet 4.6",
