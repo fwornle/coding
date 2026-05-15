@@ -4423,6 +4423,24 @@ class SystemHealthAPIServer {
         try {
             const upstream = await fetch(url, { method: 'GET' });
             const body = await upstream.text();
+            // Phase 35: non-mutating tap on the response body. If body parses as JSON AND
+            // declares cold-store participation, emit one stderr line. The `body` string is
+            // NOT re-stringified — `res.send(body)` below sends the exact bytes received from
+            // upstream, preserving non-JSON 4xx bodies and any whitespace/ordering nuances.
+            try {
+                const parsed = JSON.parse(body);
+                if (parsed && parsed._metadata && parsed._metadata.fromColdStore === true) {
+                    const coldRows = parsed._metadata.coldRows || 0;
+                    const sqliteRows = parsed._metadata.sqliteRows || 0;
+                    process.stderr.write(
+                        `[Dashboard:ColdStore] ${pathAndQuery.split('?')[0]} served ${coldRows} cold + ${sqliteRows} sqlite (boundary=${parsed._metadata.retentionBoundary})\n`
+                    );
+                }
+            } catch {
+                // body is not JSON (e.g. 4xx HTML error page from upstream). That is fine —
+                // we just do not emit a cold-store line for it. The body still flows through
+                // unchanged below.
+            }
             res.status(upstream.status).type(upstream.headers.get('content-type') || 'application/json').send(body);
         } catch (err) {
             process.stderr.write(`[ObservationsAPI] forward to ${url} failed: ${err.message}\n`);
