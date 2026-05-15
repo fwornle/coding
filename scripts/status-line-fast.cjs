@@ -132,11 +132,13 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     if (mt > cacheMtimeMs) anyNewer = true;
     let newIcon = ageToActivityIcon(now - mt);
     // Mirror combined-status-line.js's heartbeat promotion: a fresh ETM
-    // heartbeat (<5min) overrides a non-Active transcript-derived icon.
-    // Without this, the fast-path would actively undo the CSL's
-    // promoted icon on every tmux tick — flipping 🟢 back to 🟠/🟤
-    // until the next 30s cache regen.
-    if (newIcon !== '🟢' && hbTs > 0 && (now - hbTs) < 5 * 60_000) {
+    // heartbeat (<5min) overrides a non-Active transcript-derived icon,
+    // but ONLY when the transcript is moderately stale (<45min). When
+    // the transcript is hours old (e.g. after laptop wake from sleep),
+    // the ETM heartbeat just means the monitor is alive, not that the
+    // user is active — so we don't promote.
+    const transcriptAge = now - mt;
+    if (newIcon !== '🟢' && hbTs > 0 && (now - hbTs) < 5 * 60_000 && transcriptAge < 45 * 60_000) {
       newIcon = '🟢';
     }
     // Match: <ABBREV>(?![A-Z]) optionally followed by a #[nounderscore]

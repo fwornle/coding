@@ -877,49 +877,64 @@ class CombinedStatusLine {
       const lslEntries = Object.values(state.lsl || {});
       const agenticDir = dirname(process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir);
       const claudeProjectsDir = process.env.HOME ? join(process.env.HOME, '.claude', 'projects') : null;
-      const transcriptAgeMs = (projectName) => {
-        // Preferred: state.lsl carries an explicit transcriptPath that the
-        // ETM heartbeats. Stat it and return the age.
-        const entry = lslEntries.find(e => e?.projectName === projectName && e?.transcriptPath);
-        if (entry?.transcriptPath) {
+       const transcriptAgeMs = (projectName) => {
+        // Preferred: state.lsl carries explicit transcriptPaths from ETM
+        // heartbeats. When multiple sessions target the same project
+        // (e.g. Claude + OpenCode), pick the FRESHEST transcript — the
+        // most recently active session should drive the project icon.
+        let freshestAge = null;
+        for (const entry of lslEntries) {
+          if (entry?.projectName !== projectName || !entry?.transcriptPath) continue;
           try {
-            return Date.now() - fs.statSync(entry.transcriptPath).mtimeMs;
-          } catch { /* fall through to dir-scan fallback */ }
+            const age = Date.now() - fs.statSync(entry.transcriptPath).mtimeMs;
+            if (freshestAge === null || age < freshestAge) freshestAge = age;
+          } catch { /* skip unreadable paths */ }
         }
-        // Fallback: scan the project's Claude transcript dir directly.
-        // Some ETMs heartbeat without a transcriptPath (e.g. before any
-        // session activity has been observed in this ETM's lifetime, or
-        // when the ETM was just spawned by health-coordinator's tmux
-        // discovery for an idle session). Without this fallback the age
-        // is null and ageToActivityIcon below would return 🟢 — making
-        // a 19h-idle session render as Active, which is the opposite of
-        // what the lifecycle bands are supposed to convey.
+        // Fallback: scan the project's Claude transcript dir and specstory
+        // history directly. Some ETMs heartbeat without a transcriptPath
+        // (e.g. before any session activity has been observed). Without
+        // this fallback, the age is null → ⚫ for sessions with no signal.
         //
         // Path encoding: forward-encode (`/` and `_` → `-`), mirroring
-        // health-coordinator.js's encodeClaudeProjectDir (the reverse
-        // direction is lossy — see feedback_claude_path_encoding.md).
-        if (!claudeProjectsDir || !agenticDir) return null;
-        // Try both layouts: Agentic/<name> and Agentic/_work/<name>.
-        const candidates = [
-          join(agenticDir, projectName),
-          join(agenticDir, '_work', projectName),
-        ];
-        for (const projectPath of candidates) {
-          const encoded = projectPath.replace(/[\/_]/g, '-');
-          const dir = join(claudeProjectsDir, encoded);
-          if (!existsSync(dir)) continue;
-          try {
-            const jsonls = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
-            if (jsonls.length === 0) continue;
-            let latest = 0;
-            for (const f of jsonls) {
-              const m = fs.statSync(join(dir, f)).mtimeMs;
-              if (m > latest) latest = m;
-            }
-            if (latest > 0) return Date.now() - latest;
-          } catch { /* try next candidate */ }
+        // health-coordinator.js's encodeClaudeProjectDir.
+        if (claudeProjectsDir && agenticDir) {
+          const candidates = [
+            join(agenticDir, projectName),
+            join(agenticDir, '_work', projectName),
+          ];
+          // Claude .jsonl transcripts
+          for (const projectPath of candidates) {
+            const encoded = projectPath.replace(/[\/_]/g, '-');
+            const dir = join(claudeProjectsDir, encoded);
+            if (!existsSync(dir)) continue;
+            try {
+              const jsonls = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+              for (const f of jsonls) {
+                const age = Date.now() - fs.statSync(join(dir, f)).mtimeMs;
+                if (freshestAge === null || age < freshestAge) freshestAge = age;
+              }
+            } catch { /* try next candidate */ }
+          }
+          // OpenCode / specstory transcripts — these live in the project's
+          // .specstory/history/<YYYY>/<MM>/ dir as .md files, written in
+          // real time by OpenCode sessions.
+          for (const projectPath of candidates) {
+            const specstoryDir = join(projectPath, '.specstory', 'history');
+            if (!existsSync(specstoryDir)) continue;
+            try {
+              const now = new Date();
+              const yearMonth = join(String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0'));
+              const monthDir = join(specstoryDir, yearMonth);
+              if (!existsSync(monthDir)) continue;
+              const mds = fs.readdirSync(monthDir).filter(f => f.endsWith('.md'));
+              for (const f of mds) {
+                const age = Date.now() - fs.statSync(join(monthDir, f)).mtimeMs;
+                if (freshestAge === null || age < freshestAge) freshestAge = age;
+              }
+            } catch { /* skip */ }
+          }
         }
-        return null;
+        return freshestAge;
       };
       const ageToActivityIcon = (ageMs) => {
         // null age (no transcript anywhere on disk) is genuinely unknown.
@@ -960,8 +975,12 @@ class CombinedStatusLine {
           // boundaries, so a session in the middle of a long agent turn
           // looks idle by mtime but is actually in full swing. The
           // heartbeat is the canonical "user/agent is here right now"
-          // signal — when it's fresh, that overrides the cooling band.
-          if (icon !== '🟢') {
+          // signal — but ONLY when the transcript is moderately stale
+          // (< 45min, i.e. a long agent turn). When the transcript is
+          // hours old, the user is genuinely idle — the ETM heartbeat
+          // just means the monitor process is alive (e.g. after laptop
+          // wake from sleep), not that the user is active.
+          if (icon !== '🟢' && activityAgeMs !== null && activityAgeMs < 45 * 60_000) {
             const hbAge = heartbeatAgeMs(projectName);
             if (hbAge !== null && hbAge < 5 * 60_000) {
               icon = '🟢';
@@ -1007,15 +1026,25 @@ class CombinedStatusLine {
             freshestBeat.set(e.projectName, e.lastBeat);
           }
         }
+        // When multiple sessions target the same project (e.g. Claude +
+        // OpenCode), pick the FRESHEST transcript so the most recently
+        // active session drives the project icon in the fast-path patcher.
         for (const entry of lslEntries) {
-          if (entry?.projectName && entry?.transcriptPath) {
+          if (!entry?.projectName || !entry?.transcriptPath) continue;
+          let mt = 0;
+          try { mt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { continue; }
+          const prev = mapping[entry.projectName];
+          if (!prev || mt > prev._mt) {
             mapping[entry.projectName] = {
               tp: entry.transcriptPath,
               hbTs: freshestBeat.get(entry.projectName) || 0,
+              _mt: mt,  // internal; stripped before write
             };
-            seen.add(entry.projectName);
           }
+          seen.add(entry.projectName);
         }
+        // Strip internal _mt before persisting
+        for (const v of Object.values(mapping)) delete v._mt;
         // Fallback: for projects in rollup but with no transcriptPath,
         // look up via the same forward-encoded dir scan as transcriptAgeMs.
         for (const projectName of Object.keys(rollup)) {
@@ -1025,28 +1054,41 @@ class CombinedStatusLine {
             join(agenticDir, projectName),
             join(agenticDir, '_work', projectName),
           ];
+          let bestPath = null;
+          let bestMtime = 0;
+          // Claude .jsonl transcripts
           for (const projectPath of candidates) {
             const encoded = projectPath.replace(/[\/_]/g, '-');
             const dir = join(claudeProjectsDir, encoded);
             if (!existsSync(dir)) continue;
             try {
-              const jsonls = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
-              if (jsonls.length === 0) continue;
-              let latestPath = null;
-              let latestMtime = 0;
-              for (const f of jsonls) {
+              for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'))) {
                 const p = join(dir, f);
                 const m = fs.statSync(p).mtimeMs;
-                if (m > latestMtime) { latestMtime = m; latestPath = p; }
-              }
-              if (latestPath) {
-                mapping[projectName] = {
-                  tp: latestPath,
-                  hbTs: freshestBeat.get(projectName) || 0,
-                };
-                break;
+                if (m > bestMtime) { bestMtime = m; bestPath = p; }
               }
             } catch { /* try next candidate */ }
+          }
+          // OpenCode .specstory transcripts
+          for (const projectPath of candidates) {
+            const specDir = join(projectPath, '.specstory', 'history');
+            if (!existsSync(specDir)) continue;
+            try {
+              const now = new Date();
+              const monthDir = join(specDir, String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0'));
+              if (!existsSync(monthDir)) continue;
+              for (const f of fs.readdirSync(monthDir).filter(f => f.endsWith('.md'))) {
+                const p = join(monthDir, f);
+                const m = fs.statSync(p).mtimeMs;
+                if (m > bestMtime) { bestMtime = m; bestPath = p; }
+              }
+            } catch { /* skip */ }
+          }
+          if (bestPath) {
+            mapping[projectName] = {
+              tp: bestPath,
+              hbTs: freshestBeat.get(projectName) || 0,
+            };
           }
         }
         writeFileSync(projectsFile, JSON.stringify(mapping), 'utf8');
