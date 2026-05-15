@@ -203,9 +203,11 @@ export function TokenUsagePage() {
       avgLatency: p.avg_latency,
     }))
 
-  // Prepare timeline data (2-minute buckets, zero-filled by the backend)
+  // Prepare timeline data (2-minute buckets, zero-filled by the backend).
+  // The `hour` field arrives as full UTC ISO (e.g. 2026-05-15T12:06:00.000Z);
+  // convert to the viewer's local time zone before stripping to HH:MM.
   const hourlyData = (summary.by_hour || []).map(h => ({
-    hour: h.hour.replace(/^\d{4}-\d{2}-\d{2}T/, '').replace(/:\d{2}$/, ''),
+    hour: new Date(h.hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
     input: h.input_tokens,
     output: h.output_tokens,
     calls: h.calls,

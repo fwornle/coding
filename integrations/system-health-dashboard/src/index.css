@@ -18,9 +18,12 @@
 }
 
 body {
+  /* `display: flex; place-items: center` was a Vite scaffolded default that
+     vertically centers #root inside the viewport whenever its content is
+     shorter than 100vh. This pushed the NavBar down on pages that don't
+     fill the viewport themselves (Token Usage, in particular). For a
+     multi-page app the natural top-aligned block flow is what we want. */
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }

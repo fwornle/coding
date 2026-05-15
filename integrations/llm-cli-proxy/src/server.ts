@@ -583,7 +583,10 @@ app.get('/api/token-usage/summary', (_req, res) => {
     for (let s = startSec; s <= endSec; s += bucketSeconds) {
       const b = bucketMap.get(s);
       by_hour.push({
-        hour: new Date(s * 1000).toISOString().replace(/\.\d{3}Z$/, ''),
+        // Full UTC ISO with Z — frontend converts to viewer's local time for display.
+        // Without Z, `new Date(str)` in the browser would interpret as local time and
+        // double-shift the offset.
+        hour: new Date(s * 1000).toISOString(),
         input_tokens: b?.input_tokens ?? 0,
         output_tokens: b?.output_tokens ?? 0,
         calls: b?.calls ?? 0,
