@@ -3,21 +3,19 @@
  * `.data/observation-export/{observations,digests}.json`.
  *
  * Phase 35 plan 35-03. The cold tier is populated by ObservationExporter on a
- * 10s debounced cadence and preserves rows that have already been pruned out
- * of SQLite by ObservationPruner. This module gives the 35-04 range-merge
- * helper in `obs_api` a way to pull historical rows without re-opening SQLite
- * for rows that no longer live there.
+ * 10s debounced cadence and preserves rows already pruned out of SQLite by
+ * ObservationPruner. 35-04's range-merge helper uses this to pull historical
+ * rows without re-opening SQLite for rows that no longer live there.
  *
  * Invariant #3 (CONTEXT.md L6): this module is read-only. The 35-03 test
- * source-greps the file for write-API references and will fail the build if
- * any are introduced — keep this constraint when refactoring.
+ * source-greps the file for write-API references and fails the build if any
+ * are introduced — keep this constraint when refactoring.
  *
- * Cache strategy: a day-bucketed LRU keyed by `${kind}:${YYYY-MM-DD}` where
- * `kind` is `obs` or `dig`. The JSON file is parsed once per call (not per
- * day-bucket — it is a flat array spanning all days), then split into
- * per-day buckets and inserted into the Map. Map insertion order doubles as
- * LRU order, so eviction is `delete(keys().next().value)`. Default capacity
- * is 16 buckets (per CONTEXT.md G2 — ~16d of history hot in memory at peak).
+ * Cache: a day-bucketed LRU keyed by `${kind}:${YYYY-MM-DD}` (`obs` or `dig`).
+ * The JSON file is parsed once per call (it's a flat array across all days),
+ * then split into per-day buckets. Map insertion order doubles as LRU order;
+ * eviction is `delete(keys().next().value)`. Default capacity 16 (CONTEXT.md
+ * G2 — ~16d of history hot in memory at peak).
  *
  * @module ColdStoreReader
  */
@@ -46,13 +44,9 @@ export class ColdStoreReader {
   }
 
   /**
-   * Return observations whose `createdAt` falls in `[from, to)`.
-   * Tolerates a missing/malformed JSON file by returning `[]` and writing a
-   * single stderr warning.
-   *
-   * @param {Object} [range]
-   * @param {string} [range.from] - ISO-8601 lower bound (inclusive). Defaults to epoch.
-   * @param {string} [range.to]   - ISO-8601 upper bound (exclusive). Defaults to now.
+   * Observations whose `createdAt` is in `[from, to)`. Missing/malformed JSON
+   * → `[]` + one stderr warning, no throw.
+   * @param {{from?: string, to?: string}} [range] - ISO-8601 strings.
    * @returns {Array<Object>}
    */
   readObservations({ from, to } = {}) {
@@ -62,11 +56,9 @@ export class ColdStoreReader {
   }
 
   /**
-   * Return digests whose `date` (YYYY-MM-DD) falls in `[from, to)`.
-   *
-   * @param {Object} [range]
-   * @param {string} [range.from] - Lower bound (inclusive). Either ISO-8601 or `YYYY-MM-DD`.
-   * @param {string} [range.to]   - Upper bound (exclusive). Either ISO-8601 or `YYYY-MM-DD`.
+   * Digests whose `date` (YYYY-MM-DD) is in `[from, to)`. Accepts ISO-8601 or
+   * `YYYY-MM-DD` for the bounds.
+   * @param {{from?: string, to?: string}} [range]
    * @returns {Array<Object>}
    */
   readDigests({ from, to } = {}) {
@@ -75,10 +67,7 @@ export class ColdStoreReader {
     return this._readRange('dig', 'digests.json', fromDate, toDate, (r) => r.date, (k) => k);
   }
 
-  /**
-   * Test-only introspection: running counters + current cache size.
-   * @returns {Object}
-   */
+  /** Test-only introspection: running counters + cache size. */
   _stats() {
     return { ...this._statsObj, cacheKeys: this._cache.size };
   }
@@ -93,32 +82,47 @@ export class ColdStoreReader {
       return [];
     }
 
-    const missing = buckets.filter((d) => !this._cache.has(`${kind}:${d}`));
-    if (missing.length > 0) {
-      this._statsObj.cacheMisses += missing.length;
+    const missDays = buckets.filter((d) => !this._cache.has(`${kind}:${d}`));
+
+    // For misses, parse the file once and group rows by day. The freshByDay
+    // Map lets the current query read directly even when its window exceeds
+    // `cacheSize` and the LRU would have evicted the data.
+    let freshByDay = new Map();
+    if (missDays.length > 0) {
+      this._statsObj.cacheMisses += missDays.length;
       const parsed = this._parseFile(fileName, kind);
       if (parsed === null) return [];
-      this._bucketAndCache(kind, parsed, keyOfRow);
-      // Insert empty placeholders for buckets that have no rows on disk so
-      // subsequent identical queries hit the cache instead of re-parsing.
-      for (const day of missing) {
-        const cacheKey = `${kind}:${day}`;
-        if (!this._cache.has(cacheKey)) this._setCache(cacheKey, []);
-      }
+      freshByDay = this._groupByDay(parsed, keyOfRow);
     }
 
     const out = [];
     for (const day of buckets) {
-      const cacheKey = `${kind}:${day}`;
-      const entry = this._cache.get(cacheKey);
-      if (!entry) continue;
-      this._statsObj.cacheHits++;
-      // Refresh LRU recency by re-inserting.
-      this._cache.delete(cacheKey);
-      this._cache.set(cacheKey, entry);
-      for (const row of entry.rows) {
+      let rows;
+      if (this._cache.has(`${kind}:${day}`)) {
+        const entry = this._cache.get(`${kind}:${day}`);
+        this._statsObj.cacheHits++;
+        rows = entry.rows;
+        // Refresh LRU recency by re-inserting.
+        this._cache.delete(`${kind}:${day}`);
+        this._cache.set(`${kind}:${day}`, entry);
+      } else {
+        rows = freshByDay.get(day) || [];
+      }
+      for (const row of rows) {
         const k = keyOfRow(row);
         if (typeof k === 'string' && k >= from && k < to) out.push(row);
+      }
+    }
+
+    // Update cache: seed off-query buckets first, then current-query misses
+    // last so they are most-recently-used and survive LRU eviction.
+    if (missDays.length > 0) {
+      const missSet = new Set(missDays);
+      for (const [day, rows] of freshByDay) {
+        if (!missSet.has(day)) this._setCache(`${kind}:${day}`, rows);
+      }
+      for (const day of missDays) {
+        this._setCache(`${kind}:${day}`, freshByDay.get(day) || []);
       }
     }
 
@@ -128,6 +132,18 @@ export class ColdStoreReader {
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
     return out;
+  }
+
+  _groupByDay(rows, keyOfRow) {
+    const grouped = new Map();
+    for (const row of rows) {
+      const k = keyOfRow(row);
+      if (typeof k !== 'string') continue;
+      const day = k.slice(0, 10);
+      if (!grouped.has(day)) grouped.set(day, []);
+      grouped.get(day).push(row);
+    }
+    return grouped;
   }
 
   /** @private */
@@ -173,22 +189,6 @@ export class ColdStoreReader {
     return parsed;
   }
 
-  /** @private */
-  _bucketAndCache(kind, rows, keyOfRow) {
-    const grouped = new Map();
-    for (const row of rows) {
-      const k = keyOfRow(row);
-      if (typeof k !== 'string') continue;
-      const day = k.slice(0, 10);
-      if (!grouped.has(day)) grouped.set(day, []);
-      grouped.get(day).push(row);
-    }
-    for (const [day, dayRows] of grouped) {
-      this._setCache(`${kind}:${day}`, dayRows);
-    }
-  }
-
-  /** @private */
   _setCache(key, rows) {
     if (this._cache.has(key)) this._cache.delete(key);
     this._cache.set(key, { rows, parsedAt: Date.now() });
