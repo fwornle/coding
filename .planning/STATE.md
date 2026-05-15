@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Health Monitoring Consolidation
 status: executing
-stopped_at: Phase 34 — all 6 plans on main; R3/R4 closed via production-telemetry acceptance 2026-05-12; D-14 24h soak gate pending (time-only, expires 2026-05-13T04:26Z)
-last_updated: "2026-05-12T07:35:00.000Z"
-last_activity: 2026-05-12 -- Phase 34: R3 networkMode flap PASS via code review + transitive proof; R4 cooldown PASS via production telemetry (cooldown engaged at 2026-05-11T17:18Z, 22 throttled dispatches across 6h, clean recovery to healthy)
+stopped_at: Phase 35 Wave 1 complete (35-01 + 35-03 on main); Wave 2 (35-02 + 35-04) pending
+last_updated: "2026-05-15T10:20:00.000Z"
+last_activity: 2026-05-15 -- Phase 35 Wave 1 closed: 35-01 (retentionDays config + invariant) and 35-03 (ColdStoreReader) both green; 24/24 Jest cases pass on main
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 2
-  total_plans: 21
-  completed_plans: 21
-  percent: 100
+  total_plans: 26
+  completed_plans: 23
+  percent: 88
 ---
 
 # Project State

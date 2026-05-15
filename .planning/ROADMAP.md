@@ -9,7 +9,7 @@
 - v4.0 -- Mastra Integration & LSL Observational Memory (Phases 20-23, shipped 2026-04-05)
 - v5.0 -- Service Reliability & Health System Overhaul (Phases 24-27, in progress)
 - v6.0 -- Knowledge Context Injection (Phases 28-32, shipped 2026-04-25) -> [archive](milestones/v6.0-ROADMAP.md)
-- v7.0 -- Health Monitoring Consolidation (Phases 33-34, in progress)
+- v7.0 -- Health Monitoring Consolidation (Phases 33-35, in progress)
 
 ---
 
@@ -157,6 +157,25 @@ Plans:
 - [x] 34-03-PLAN.md — Auto-heal FSM (D-06 cooldown) + VPN/CN flap kickstart (D-05) wired into pollProxySemantic + pollProxyMode; rewrite restartLLMCLIProxy() in scripts/health-remediation-actions.js to use launchctl kickstart -k (PATTERNS.md anomaly #3) — Task 1 PID-change + D-07 kill-switch verified live; R3/R4 destructive tests deferred per SUMMARY operator runbook
 - [x] 34-05-PLAN.md — ETM Plan B + surface: delete 6 source files + clean dead readers in scripts/combined-status-line.js (Task 2(d) closed 2026-05-11 — methods 1+2 refactored to PSM-only; method 3 sync-constraint deferred; net -54 LoC) + add [🧠] proxy badge (collision-resolved with UKB indicator per anomaly #1) + add LLM Proxy Health card to system-health-dashboard (D-11 + FUSE caveat); W-1 live tmux render operator-verified 2026-05-11
 </details>
+
+### Phase 35: Observation & Digest Retention with JSON Cold-Store Fallback
+
+**Goal:** Cap the SQLite `observations` and `digests` tables to a configurable retention window (default 7 days) while transparently merging older rows from `.data/observation-export/{observations,digests}.json` on dashboard queries so historical data stays browsable. Insights table untouched (long-term memory for prompt injection).
+
+**Plans:** 5 plans across 3 waves
+
+Plans:
+
+**Wave 1 (parallel — disjoint files)** — DONE 2026-05-15
+- [x] 35-01-PLAN.md — `retentionDays: 7` added to `.observations/config.json`; `ObservationWriter` exposes `this.retentionDays` with constructor-time throw on `< 1` (CONTEXT.md L4 dedup-floor invariant); 5-case Jest suite; also restored empty `test/setup.js` blocker (Rule-3 deviation, noted in SUMMARY) — commits `c470b8c05` + `b16f5ca2a` + SUMMARY `0c0500fe9`
+- [x] 35-03-PLAN.md — `ColdStoreReader` read-only range query over `.data/observation-export/{observations,digests}.json` with day-bucketed LRU + fresh-rows-Map decoupling for windows larger than cacheSize; 7-case Jest suite includes source-grep invariant #3 (zero write-API references); commits `47cd10b9f` + `cbd32dd86` + `97ef09118` + SUMMARY `121b02dfc`
+
+**Wave 2** *(sequenced — 35-04 wires both into obs-api)*
+- [ ] 35-02-PLAN.md — `ObservationPruner` module: stateless, DI'd open DB handle, single `.prune()` method returning deletion-count summary; FTS5 virtual table + triggers respected; standalone Jest suite seeds 14-day spread and asserts post-prune state
+- [ ] 35-04-PLAN.md — Wire pruner + reader into `scripts/observations-api-server.mjs`: 1h pruner interval on boot; `/api/observations` + `/api/digests` merge SQLite + ColdStoreReader rows on `offset === 0` when `from` is older than retention boundary (Option B — SQLite-only on `offset > 0` preserves pagination semantics); requires `launchctl kickstart` of obs-api to deploy
+
+**Wave 3**
+- [ ] 35-05-PLAN.md — Dashboard backend pass-through verify (`_forwardObsApi` byte-pipe is shape-agnostic, no code change required) + add non-mutating `JSON.parse` tap that logs `[Dashboard:ColdStore]` when `_metadata.fromColdStore === true`, preserving byte-for-byte body fidelity; FUSE-cache-aware rollout via `docker-compose restart coding-services`
 
 ---
 
