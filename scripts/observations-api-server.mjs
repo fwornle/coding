@@ -29,6 +29,12 @@ import { fileURLToPath } from 'node:url';
 import { ObservationWriter } from '../src/live-logging/ObservationWriter.js';
 import { ObservationConsolidator } from '../src/live-logging/ObservationConsolidator.js';
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
+import { ObservationPruner } from '../src/live-logging/ObservationPruner.js';
+import { ColdStoreReader } from '../src/live-logging/ColdStoreReader.js';
+// Phase 35 plan 35-04 - pure merge helpers extracted into a sibling module so
+// the Jest integration test can import them without dragging in RetrievalService
+// and its TS dist deps.  Re-exported below for backwards-compatible discovery.
+import { _computeRetentionBoundary, _mergeObservations, _mergeDigests } from './observations-api-merge.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -41,6 +47,14 @@ const HEARTBEAT_PATH = path.join(path.dirname(DB_PATH), 'consolidation-heartbeat
 // boundary that previously caused WAL/SHM corruption.
 let _writer = null;
 let _writerInit = null; // pending init promise
+
+// Phase 35 plan 35-04 wiring — module-level state for the in-process pruner
+// (1h interval, per CONTEXT.md G3 option a) and the read-only cold-store reader
+// used by the range-merge handlers below.
+let _pruner = null;
+let _pruneInterval = null;
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
+let _coldStore = null;
 
 async function ensureWriter() {
   if (_writer && _writer.db) return _writer;
@@ -77,6 +91,39 @@ function ensureRetrieval() {
     process.stderr.write(`[obs-api] retrieval init failed (lazy retry on first request): ${err.message}\n`);
   });
   return _retrieval;
+}
+
+// Phase 35 plan 35-04 - pruner factory + 1h interval scheduler.
+// The pruner is constructed lazily after ensureWriter resolves (so _writer.db
+// and _writer.retentionDays are populated). First prune fires immediately on
+// boot so an already-oversized DB shrinks without a 1h wait. Errors are logged
+// to stderr but never thrown - obs-api boot must remain crash-free even if the
+// pruner cannot run.
+function ensurePruner() {
+  if (_pruner) return _pruner;
+  if (!_writer || !_writer.db || !_writer.retentionDays) return null;
+  _pruner = new ObservationPruner({ db: _writer.db, retentionDays: _writer.retentionDays });
+  try {
+    const r = _pruner.prune();
+    process.stderr.write(`[obs-api] initial prune: ${JSON.stringify(r)}\n`);
+  } catch (err) {
+    process.stderr.write(`[obs-api] initial prune failed: ${err.message}\n`);
+  }
+  _pruneInterval = setInterval(() => {
+    try { _pruner.prune(); } catch (err) {
+      process.stderr.write(`[obs-api] periodic prune failed: ${err.message}\n`);
+    }
+  }, PRUNE_INTERVAL_MS);
+  _pruneInterval.unref?.();
+  return _pruner;
+}
+
+// Phase 35 plan 35-04 - cold-store reader factory. Defaults to .data/observation-export
+// (the JSON files maintained by ObservationExporter on a 10s debounced cadence).
+function ensureColdStore() {
+  if (_coldStore) return _coldStore;
+  _coldStore = new ColdStoreReader({});
+  return _coldStore;
 }
 
 function invalidateDb() {
@@ -458,7 +505,28 @@ app.get('/api/observations', (req, res) => {
       };
     });
 
-    res.json({ data, total, limit, offset });
+    // Phase 35 plan 35-04 - range-merge with cold store ONLY when from is historical
+    // AND request is on first page. Cold rows are not contributed on offset>0 to keep
+    // pagination semantics correct without re-sorting the entire historical window per
+    // page (checker WARNING 1 - Option B).
+    let _metadata = { fromColdStore: false };
+    if (from && offset === 0 && _writer?.retentionDays) {
+      const retentionBoundary = _computeRetentionBoundary(db, _writer.retentionDays);
+      if (from < retentionBoundary) {
+        const coldRows = ensureColdStore().readObservations({
+          from,
+          to: to || new Date().toISOString(),
+        });
+        // Response _metadata carries coldOnFirstPageOnly:true on the merged result
+        // (set by _mergeObservations). See PLAN.md invariant #5.
+        const merged = _mergeObservations(data, coldRows, retentionBoundary);
+        // Re-slice to the caller's limit. The merged data is already DESC-sorted.
+        const paginated = merged.data.slice(0, limit);
+        const mergedTotal = total + merged._metadata.coldRows;
+        return res.json({ data: paginated, total: mergedTotal, limit, offset, _metadata: merged._metadata });
+      }
+    }
+    res.json({ data, total, limit, offset, _metadata });
   } catch (err) {
     process.stderr.write(`[obs-api] /observations error: ${err.message}\n`);
     if (isCorruptionError(err)) invalidateDb();
@@ -523,7 +591,25 @@ app.get('/api/digests', (req, res) => {
       filesTouched: JSON.parse(row.filesTouched || '[]'),
     }));
 
-    res.json({ data, total, limit, offset });
+    // Phase 35 plan 35-04 - range-merge with cold-store digests on first page only.
+    let _metadata = { fromColdStore: false };
+    if (from && offset === 0 && _writer?.retentionDays) {
+      const retentionBoundary = _computeRetentionBoundary(db, _writer.retentionDays);
+      const retentionBoundaryDate = retentionBoundary.slice(0, 10);
+      const fromDatePart = from.length >= 10 ? from.slice(0, 10) : from;
+      if (fromDatePart < retentionBoundaryDate) {
+        const coldRows = ensureColdStore().readDigests({
+          from: fromDatePart,
+          to: (to || new Date().toISOString()).slice(0, 10),
+        });
+        // Response _metadata.coldOnFirstPageOnly:true is set by _mergeDigests.
+        const merged = _mergeDigests(data, coldRows, retentionBoundaryDate);
+        const paginated = merged.data.slice(0, limit);
+        const mergedTotal = total + merged._metadata.coldRows;
+        return res.json({ data: paginated, total: mergedTotal, limit, offset, _metadata: merged._metadata });
+      }
+    }
+    res.json({ data, total, limit, offset, _metadata });
   } catch (err) {
     process.stderr.write(`[obs-api] /digests error: ${err.message}\n`);
     if (isCorruptionError(err)) invalidateDb();
@@ -740,7 +826,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
   // doesn't pay a multi-second cold start.
   ensureWriter()
-    .then(() => { ensureRetrieval(); })
+    .then(() => { ensureRetrieval(); ensurePruner(); })
     .catch((err) => {
       process.stderr.write(`[obs-api] startup init failed: ${err.message}\n`);
     });
@@ -762,6 +848,7 @@ async function shutdown(signal) {
       new Promise((r) => setTimeout(r, 20_000)),
     ]);
   }
+  if (_pruneInterval) { clearInterval(_pruneInterval); _pruneInterval = null; }
   _clearHeartbeat();
   server.close(async () => {
     if (_writer) {
@@ -778,3 +865,7 @@ async function shutdown(signal) {
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Phase 35 plan 35-04 - re-export merge helpers for any caller that imports the
+// obs-api server module directly (back-compat with the original plan contract).
+export { _mergeObservations, _mergeDigests, _computeRetentionBoundary };
