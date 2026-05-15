@@ -228,9 +228,15 @@ export function TokenUsagePage() {
             LLM token consumption across all cognitive processes
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => fetchData()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchData()}
+          disabled={loading}
+          aria-busy={loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Refreshing…' : 'Refresh'}
         </Button>
       </div>
 
