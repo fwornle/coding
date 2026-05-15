@@ -139,14 +139,22 @@ export function DigestsPage() {
     setLoading(false)
   }, [])
 
+  const [consolidationError, setConsolidationError] = useState<string | null>(null)
+
   const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/consolidation/status`)
-      if (res.ok) setStatus(await res.json())
+      if (res.ok) {
+        setStatus(await res.json())
+        // A successful status read proves the API IS reachable. Any
+        // earlier "Observations API unreachable" banner is now stale —
+        // clear it so the operator isn't shown a phantom error after
+        // the underlying transient (obs-api bounce, dashboard forward
+        // timeout) has resolved itself.
+        setConsolidationError(null)
+      }
     } catch { /* ignore */ }
   }, [])
-
-  const [consolidationError, setConsolidationError] = useState<string | null>(null)
 
   const runConsolidation = useCallback(async () => {
     setConsolidating(true)
