@@ -171,7 +171,7 @@ Plans:
 - [x] 35-03-PLAN.md — `ColdStoreReader` read-only range query over `.data/observation-export/{observations,digests}.json` with day-bucketed LRU + fresh-rows-Map decoupling for windows larger than cacheSize; 7-case Jest suite includes source-grep invariant #3 (zero write-API references); commits `47cd10b9f` + `cbd32dd86` + `97ef09118` + SUMMARY `121b02dfc`
 
 **Wave 2** *(sequenced — 35-04 wires both into obs-api)*
-- [ ] 35-02-PLAN.md — `ObservationPruner` module: stateless, DI'd open DB handle, single `.prune()` method returning deletion-count summary; FTS5 virtual table + triggers respected; standalone Jest suite seeds 14-day spread and asserts post-prune state
+- [x] 35-02-PLAN.md — `ObservationPruner` module landed: stateless class, duck-typed DB handle, single transactional `.prune()`; FTS5 trigger drives `observations_fts` sync transparently; 5-case Jest suite (HAS_FTS5-gated) including source-grep invariant #2 — commits `f7ef097fd` + `3fcff881a` + SUMMARY `249954ea0`
 - [ ] 35-04-PLAN.md — Wire pruner + reader into `scripts/observations-api-server.mjs`: 1h pruner interval on boot; `/api/observations` + `/api/digests` merge SQLite + ColdStoreReader rows on `offset === 0` when `from` is older than retention boundary (Option B — SQLite-only on `offset > 0` preserves pagination semantics); requires `launchctl kickstart` of obs-api to deploy
 
 **Wave 3**

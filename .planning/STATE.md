@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Health Monitoring Consolidation
 status: executing
-stopped_at: Phase 35 Wave 1 complete (35-01 + 35-03 on main); Wave 2 (35-02 + 35-04) pending
-last_updated: "2026-05-15T10:20:00.000Z"
-last_activity: 2026-05-15 -- Phase 35 Wave 1 closed: 35-01 (retentionDays config + invariant) and 35-03 (ColdStoreReader) both green; 24/24 Jest cases pass on main
+stopped_at: Phase 35 — 35-01, 35-02, 35-03 all on main; 35-04 (obs-api wiring, autonomous=false) is the only Wave 2 item left; 35-05 (dashboard) is Wave 3
+last_updated: "2026-05-15T10:30:00.000Z"
+last_activity: 2026-05-15 -- Phase 35: ObservationPruner (35-02) landed alongside Wave-1 closeout; 3 of 5 plans done
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 26
-  completed_plans: 23
-  percent: 88
+  completed_plans: 24
+  percent: 92
 ---
 
 # Project State
