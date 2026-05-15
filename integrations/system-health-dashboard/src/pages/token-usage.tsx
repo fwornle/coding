@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { RefreshCw, Zap, TrendingUp, Clock, ArrowUpDown } from 'lucide-react'
+import { RefreshCw, Zap, TrendingUp, Clock, ArrowUpDown, Settings } from 'lucide-react'
+import { TokenUsageSettingsDialog } from './token-usage-settings-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -143,6 +144,7 @@ export function TokenUsagePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sortField, setSortField] = useState<'total_tokens' | 'calls'>('total_tokens')
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchData = useCallback(async (isAuto = false) => {
@@ -228,17 +230,34 @@ export function TokenUsagePage() {
             LLM token consumption across all cognitive processes
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fetchData()}
-          disabled={loading}
-          aria-busy={loading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            title="Provider/model routing per service"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchData()}
+            disabled={loading}
+            aria-busy={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
       </div>
+
+      <TokenUsageSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        proxyBase={PROXY_BASE}
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-4">
