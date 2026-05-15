@@ -4,7 +4,8 @@
     "model": "anthropic/claude-haiku-4-5",
     "observation": {
       "messageTokens": 20000,
-      "bufferTokens": 0.2
+      "bufferTokens": 0.2,
+      "retentionDays": 7
     },
     "reflection": {
       "observationTokens": 90000,

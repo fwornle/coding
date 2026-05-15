@@ -32,7 +32,7 @@ function loadConfig(configPath) {
     return {
       defaults: {
         model: 'anthropic/claude-haiku-4-5',
-        observation: { messageTokens: 20000, bufferTokens: 0.2 },
+        observation: { messageTokens: 20000, bufferTokens: 0.2, retentionDays: 7 },
       },
     };
   }
@@ -59,6 +59,20 @@ export class ObservationWriter {
     this.provider = options.provider || null;
     this.batchSize = options.batchSize || 10;
     this.messageTokenLimit = config.defaults?.observation?.messageTokens || 20000;
+    const rawRetentionDays = config.defaults?.observation?.retentionDays;
+    const retentionDays = Number.isFinite(rawRetentionDays) ? rawRetentionDays : 7;
+    // CONTEXT.md L4: dedup window in _isSemanticallyDuplicate is 4h. retentionDays must
+    // translate to a cutoff strictly later than 4h ago, i.e. retentionDays >= 1 day (24h).
+    // Refuse to construct if the configured value would collapse the dedup window —
+    // silently clamping would mask operator misconfiguration and trip the 35-04 pruner.
+    if (retentionDays < 1) {
+      throw new Error(
+        `[ObservationWriter] retentionDays must be >= 1 (got ${rawRetentionDays}) — ` +
+        `the 4h dedup window in _isSemanticallyDuplicate would be invalidated. ` +
+        `See .planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/CONTEXT.md L4.`
+      );
+    }
+    this.retentionDays = retentionDays;
     this.db = null;
     /** @type {Map<string, number>} Recent content hashes → timestamp for dedup */
     this._recentHashes = new Map();
