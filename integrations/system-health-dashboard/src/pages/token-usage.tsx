@@ -101,6 +101,16 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
+// observation-writer (and similar callers) wrap prompts in XML-like tags
+// (`<project>`, `<exchange>`, `<user>`, `<assistant>` …) so the LLM can parse
+// structure. The tags are intentional in the prompt body but pure noise in the
+// 200px-wide dashboard preview column. Strip simple tag tokens and collapse
+// resulting whitespace — leave bracketed content like `[Image: ...]` intact.
+function stripPromptPreview(s: string): string {
+  if (!s) return ''
+  return s.replace(/<\/?[a-zA-Z][a-zA-Z0-9-]*>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 function formatLatency(ms: number): string {
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`
   return `${Math.round(ms)}ms`
@@ -550,7 +560,7 @@ export function TokenUsagePage() {
                       <TableCell className="text-right font-mono text-xs text-emerald-400">{formatTokens(call.output_tokens)}</TableCell>
                       <TableCell className="text-right font-mono text-xs">{formatLatency(call.latency_ms)}</TableCell>
                       <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
-                        {call.prompt_preview}
+                        {stripPromptPreview(call.prompt_preview)}
                       </TableCell>
                     </TableRow>
                   ))}
