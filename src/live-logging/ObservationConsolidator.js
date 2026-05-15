@@ -1419,9 +1419,18 @@ export class ObservationConsolidator {
    * @returns {Promise<string|null>}
    */
   async _callLLM(prompt, processName = 'consolidator') {
+    // Per-call deadline budget for consolidation. Stage-2 insight prompts
+    // can stuff 8-11 digests into a single LLM call, and the claude CLI on
+    // sonnet routinely needs 2-3 minutes for those. Give the proxy 5 min
+    // (via body.timeout — proxy default is 2 min) and the local fetch
+    // 6 min so the proxy's own timeout always fires first with a usable
+    // QUOTA/AUTH/PARSE error rather than the fetch aborting blind.
+    const PROXY_TIMEOUT_MS = 300_000;
+    const FETCH_TIMEOUT_MS = 360_000;
     const requestBody = {
       process: processName,
       ...(this.provider ? { provider: this.provider } : {}),
+      timeout: PROXY_TIMEOUT_MS,
       messages: [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
@@ -1429,11 +1438,11 @@ export class ObservationConsolidator {
     };
 
     try {
-      // Compose two abort sources: the per-call 3-min timeout AND any
+      // Compose two abort sources: the per-call fetch timeout AND any
       // shutdown-time abort the caller (obs-api) passed in. Either firing
-      // cancels the fetch — and via req.on('close') on the proxy, kills
+      // cancels the fetch — and via res.on('close') on the proxy, kills
       // the spawned claude CLI subprocess.
-      const timeoutSignal = AbortSignal.timeout(180000);
+      const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
       const signal = this.abortSignal
         ? AbortSignal.any([timeoutSignal, this.abortSignal])
         : timeoutSignal;
