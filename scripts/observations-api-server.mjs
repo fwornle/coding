@@ -157,14 +157,28 @@ let _lastStderrLine = '';
 let _lastStderrAt = null;
 let _shuttingDown = false;
 
+// Keep-alive threshold: how long real stderr can be silent before _bumpHeartbeat
+// refreshes _lastStderrAt anyway. The consolidator's insight stage logs once
+// per chunk start, then sleeps inside a single LLM call for 1-3 min — during
+// which the dashboard's "stuck" rule (stderrAgeMs > 60s) would otherwise fire
+// a false-positive red banner. A genuinely wedged JS event loop cannot fire
+// this timer, so lastHeartbeat going stale is the real wedge signal (caught
+// by the obs-api stale-heartbeat sweep — readConsolidationHeartbeat).
+const STDERR_KEEPALIVE_MS = 30_000;
+
 function _bumpHeartbeat() {
   if (!_consolidationStartedAt) return;
   try {
+    const now = new Date();
+    const lastReal = _lastStderrAt ? new Date(_lastStderrAt).getTime() : 0;
+    if (now.getTime() - lastReal > STDERR_KEEPALIVE_MS) {
+      _lastStderrAt = now.toISOString();
+    }
     fs.mkdirSync(path.dirname(HEARTBEAT_PATH), { recursive: true });
     fs.writeFileSync(HEARTBEAT_PATH, JSON.stringify({
       pid: process.pid,
       startedAt: _consolidationStartedAt,
-      lastHeartbeat: new Date().toISOString(),
+      lastHeartbeat: now.toISOString(),
       lastStderrAt: _lastStderrAt || _consolidationStartedAt,
       lastMessage: _lastStderrLine.slice(0, 240),
       args: _consolidationArgs || [],
