@@ -99,6 +99,91 @@ describe('Phase 35-04: _mergeObservations', () => {
   });
 });
 
+describe('Phase 35-06: paginable-total accounting for _mergeObservations', () => {
+  const BOUNDARY = '2026-05-08T00:00:00.000Z';
+
+  // Helper: generate N cold rows older than the boundary, in DESC timestamp order.
+  function makeColdRows(n, prefix = 'c') {
+    const rows = [];
+    for (let i = 0; i < n; i++) {
+      // Stagger backwards from 2026-04-30 so all are strictly older than BOUNDARY.
+      const day = String(20 - (i % 20)).padStart(2, '0');  // 20..01 cycles
+      const month = String(4 - Math.floor(i / 20)).padStart(2, '0');  // 04, 03, ...
+      rows.push({
+        id: `${prefix}${i}`,
+        summary: `cold ${i}`,
+        agent: 'claude',
+        project: null,
+        createdAt: `2026-${month}-${day}T00:00:00.${String(i % 1000).padStart(3, '0')}Z`,
+        quality: 'normal',
+        llm: null,
+      });
+    }
+    return rows;
+  }
+
+  // Helper: generate N SQLite rows newer than the boundary (page-sized).
+  function makeSqliteRows(n, prefix = 's') {
+    const rows = [];
+    for (let i = 0; i < n; i++) {
+      rows.push({
+        id: `${prefix}${i}`,
+        content: `sqlite ${i}`,
+        agent: 'claude',
+        timestamp: `2026-05-12T00:00:0${i}.000Z`,
+      });
+    }
+    return rows;
+  }
+
+  test('Phase 35-06: paginable total reflects offset=0 cold contribution, not raw cold count', () => {
+    // 5 SQLite rows + 100 cold rows. Limit = 10, offset = 0. sqliteTotalInRange = 5.
+    // After SQLite consumes 5 of 10 page slots, only 5 cold slots remain on page 0.
+    // Expected total = 5 + 5 = 10 (paginable), NOT 5 + 100 = 105 (raw sum).
+    const sqliteRows = makeSqliteRows(5);
+    const coldRows = makeColdRows(100);
+    const result = _mergeObservations(sqliteRows, coldRows, BOUNDARY, {
+      limit: 10, offset: 0, sqliteTotalInRange: 5,
+    });
+    expect(result.total).toBe(10);
+    // Raw cold count still surfaced for observability.
+    expect(result._metadata.coldRows).toBe(100);
+    // Legacy fields unchanged.
+    expect(result._metadata.fromColdStore).toBe(true);
+    expect(result._metadata.coldOnFirstPageOnly).toBe(true);
+  });
+
+  test('Phase 35-06: paginable total = sqliteTotal when offset > 0 (cold absent on subsequent pages)', () => {
+    // 50 SQLite rows in range total, but server passes the offset=10 page slice (10 rows).
+    // Limit = 10, offset = 10. Cold rows are not paginable past page 0.
+    // Expected total = 50 (SQLite-only).
+    const sqliteRows = makeSqliteRows(10);  // page slice
+    const coldRows = makeColdRows(100);
+    const result = _mergeObservations(sqliteRows, coldRows, BOUNDARY, {
+      limit: 10, offset: 10, sqliteTotalInRange: 50,
+    });
+    expect(result.total).toBe(50);
+    // Raw cold count still reported even though it does not contribute to total at offset>0.
+    expect(result._metadata.coldRows).toBe(100);
+  });
+
+  test('Phase 35-06 edge: paginable total = min(coldRows, limit) when sqliteTotalInRange == 0 (range entirely older than retention)', () => {
+    // 0 SQLite rows + 100 cold rows. Limit = 10, offset = 0, sqliteTotalInRange = 0.
+    // Page 0 fills with 10 cold rows; cold contributes only on page 0, so total = 10.
+    // (No subsequent pages — the lone page contains every paginable row.)
+    const coldRows = makeColdRows(100);
+    const result = _mergeObservations([], coldRows, BOUNDARY, {
+      limit: 10, offset: 0, sqliteTotalInRange: 0,
+    });
+    expect(result.total).toBe(10);
+    expect(result._metadata.coldRows).toBe(100);
+    expect(result._metadata.fromColdStore).toBe(true);
+    // Sanity: legacy 3-arg call still works (no `total` field).
+    const legacy = _mergeObservations([], coldRows, BOUNDARY);
+    expect(legacy.total).toBeUndefined();
+  });
+});
+
 describe('Phase 35-04: _mergeDigests', () => {
   const BOUNDARY_DATE = '2026-05-08';
 
