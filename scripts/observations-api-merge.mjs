@@ -10,7 +10,14 @@
  * (RetrievalService -> embedding-service.js, which is a TS dist file that the
  * Jest moduleNameMapper cannot resolve at test time).
  *
- * Phase 35 plan 35-04.
+ * Phase 35 plan 35-04 introduced the helpers (offset==0-only-cold contract).
+ * Phase 35 plan 35-06 added paginable-total accounting for that contract.
+ * Phase 35 plan 35-07 REPLACES the offset==0 contract with full-union
+ * pagination: cold rows can appear on any page; total is the size of the full
+ * deduplicated union; the slice returned in `data` is `[offset, offset+limit)`
+ * of the timestamp-DESC-sorted union. The server now passes the FULL SQLite
+ * range (no LIMIT/OFFSET) when cold is in play, so both sides are fully in
+ * memory and the merge module owns sorting+slicing.
  */
 
 /**
@@ -32,19 +39,28 @@ export function _computeRetentionBoundary(db, retentionDays) {
  * happens to land on the boundary. DO NOT remove or refactor this Set away.
  * See .planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/PLAN.md invariant #5.
  *
- * Phase 35 plan 35-06 gap closure: optional `opts` arg enables paginable-total
- * accounting. When provided, the return includes a `total` field that the
- * dashboard's last-page math can trust: total = sqliteTotalInRange + min(
- *   coldRowsAfterFilter, max(0, limit - sqliteRowsContributedToPage0)
- * ). Without `opts`, the legacy 3-arg return shape is preserved (no `total`).
+ * Phase 35 plan 35-07 contract: full-union pagination.
+ *  - Caller passes the FULL SQLite-in-range rows (no LIMIT/OFFSET) and the
+ *    full cold-in-range rows.
+ *  - Merge filters cold to strictly older than retentionBoundary, dedups via
+ *    the LOAD-BEARING Set, tags each row with `_origin`, sorts by timestamp
+ *    DESC, and slices to [offset, offset+limit).
+ *  - `total` is the size of the dedup'd union (what pagination walks).
+ *  - `_metadata.coldOnFirstPageOnly` is `false` under this contract (the
+ *    field is retained for back-compat; consumers should not rely on it).
+ *  - `opts.sqliteTotalInRange` is accepted but IGNORED — kept in the signature
+ *    for backwards-compatible callers from 35-06. The full-union math derives
+ *    total from the merged array itself.
+ *  - If `opts` is absent (legacy 3-arg call), `total` is omitted and only the
+ *    legacy shape `{ data, _metadata }` is returned. Existing tests that did
+ *    not pass `opts` still see the pre-35-06 return shape.
  *
- * @param {Object[]} sqliteRows  already-shaped rows from the existing SQL query
+ * @param {Object[]} sqliteRows  full SQLite-in-range rows (no LIMIT/OFFSET when cold is in play)
  * @param {Object[]} coldRows    raw rows from ColdStoreReader.readObservations()
  * @param {string}   retentionBoundary ISO-8601 cutoff
  * @param {Object}   [opts]
- * @param {number}   [opts.limit]              page size; required for paginable total
- * @param {number}   [opts.offset]             current page offset (cold contributes only at 0)
- * @param {number}   [opts.sqliteTotalInRange] COUNT(*) over the SQLite WHERE clause
+ * @param {number}   [opts.limit]   page size (required for slicing)
+ * @param {number}   [opts.offset]  current page offset (default 0)
  * @returns {{ data: Object[], _metadata: Object, total?: number }}
  */
 export function _mergeObservations(sqliteRows, coldRows, retentionBoundary, opts) {
@@ -76,29 +92,21 @@ export function _mergeObservations(sqliteRows, coldRows, retentionBoundary, opts
     data: merged,
     _metadata: {
       fromColdStore: reshaped.length > 0,
-      coldOnFirstPageOnly: true,
+      // Phase 35 plan 35-07: full-union pagination — cold rows appear on every
+      // page, not only page 0. Field retained for back-compat with frontends
+      // that may still read it.
+      coldOnFirstPageOnly: false,
       sqliteRows: sqliteRows.length,
       coldRows: reshaped.length,
       retentionBoundary,
     },
   };
-  // Phase 35 plan 35-06 - paginable-total accounting. Only compute when caller
-  // supplies the bookkeeping inputs; otherwise preserve the legacy 3-arg shape.
-  if (opts && typeof opts.limit === 'number' && typeof opts.sqliteTotalInRange === 'number') {
-    const { limit, offset = 0, sqliteTotalInRange } = opts;
-    // Cold rows only contribute to offset=0, so total must reflect what
-    // pagination actually walks: SQLite's full range count + however many cold
-    // rows fit on page 0 after SQLite consumed its slots.
-    if (offset === 0) {
-      const pageRows = merged.slice(0, limit);
-      const sqliteOnThisPage = pageRows.filter(r => r._origin === 'sqlite').length;
-      const coldCapacityOnPage0 = Math.max(0, limit - sqliteOnThisPage);
-      const paginableCold = Math.min(reshaped.length, coldCapacityOnPage0);
-      result.total = sqliteTotalInRange + paginableCold;
-    } else {
-      // offset > 0 - cold absent on subsequent pages, total is SQLite-only.
-      result.total = sqliteTotalInRange;
-    }
+  // Phase 35 plan 35-07: full-union pagination. When the caller supplies
+  // pagination opts, slice the union and report the union size as total.
+  if (opts && typeof opts.limit === 'number') {
+    const { limit, offset = 0 } = opts;
+    result.total = merged.length;
+    result.data = merged.slice(offset, offset + limit);
   }
   return result;
 }
@@ -109,16 +117,14 @@ export function _mergeObservations(sqliteRows, coldRows, retentionBoundary, opts
  * Same LOAD-BEARING Set-based id dedup as _mergeObservations (invariant #5).
  * The cold-row filter is keyed on date (YYYY-MM-DD) instead of createdAt.
  *
- * Phase 35 plan 35-06: paginable-total accounting via optional `opts` arg
- * (same shape and semantics as _mergeObservations).
+ * Phase 35 plan 35-07 contract: full-union pagination (see _mergeObservations).
  *
- * @param {Object[]} sqliteRows  already-shaped digest rows
+ * @param {Object[]} sqliteRows  full SQLite-in-range digest rows
  * @param {Object[]} coldRows    raw rows from ColdStoreReader.readDigests()
  * @param {string}   retentionBoundaryDate YYYY-MM-DD cutoff
  * @param {Object}   [opts]
  * @param {number}   [opts.limit]
  * @param {number}   [opts.offset]
- * @param {number}   [opts.sqliteTotalInRange]
  */
 export function _mergeDigests(sqliteRows, coldRows, retentionBoundaryDate, opts) {
   const safeCold = coldRows.filter(r => r.date < retentionBoundaryDate);
@@ -148,24 +154,18 @@ export function _mergeDigests(sqliteRows, coldRows, retentionBoundaryDate, opts)
     data: merged,
     _metadata: {
       fromColdStore: reshaped.length > 0,
-      coldOnFirstPageOnly: true,
+      // Phase 35 plan 35-07: full-union pagination (see _mergeObservations).
+      coldOnFirstPageOnly: false,
       sqliteRows: sqliteRows.length,
       coldRows: reshaped.length,
       retentionBoundary: retentionBoundaryDate,
     },
   };
-  // Phase 35 plan 35-06 - paginable-total accounting (see _mergeObservations).
-  if (opts && typeof opts.limit === 'number' && typeof opts.sqliteTotalInRange === 'number') {
-    const { limit, offset = 0, sqliteTotalInRange } = opts;
-    if (offset === 0) {
-      const pageRows = merged.slice(0, limit);
-      const sqliteOnThisPage = pageRows.filter(r => r._origin === 'sqlite').length;
-      const coldCapacityOnPage0 = Math.max(0, limit - sqliteOnThisPage);
-      const paginableCold = Math.min(reshaped.length, coldCapacityOnPage0);
-      result.total = sqliteTotalInRange + paginableCold;
-    } else {
-      result.total = sqliteTotalInRange;
-    }
+  // Phase 35 plan 35-07: full-union pagination.
+  if (opts && typeof opts.limit === 'number') {
+    const { limit, offset = 0 } = opts;
+    result.total = merged.length;
+    result.data = merged.slice(offset, offset + limit);
   }
   return result;
 }
