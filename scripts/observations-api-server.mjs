@@ -519,11 +519,16 @@ app.get('/api/observations', (req, res) => {
         });
         // Response _metadata carries coldOnFirstPageOnly:true on the merged result
         // (set by _mergeObservations). See PLAN.md invariant #5.
-        const merged = _mergeObservations(data, coldRows, retentionBoundary);
+        // Phase 35 plan 35-06: pass {limit, offset, sqliteTotalInRange} so the
+        // merge helper returns a paginable `total` (cold rows only contribute on
+        // offset=0; reporting total = sqlite + raw-cold walks the dashboard's
+        // last-page math past the SQLite tail into empty offset territory).
+        const merged = _mergeObservations(data, coldRows, retentionBoundary, {
+          limit, offset, sqliteTotalInRange: total,
+        });
         // Re-slice to the caller's limit. The merged data is already DESC-sorted.
         const paginated = merged.data.slice(0, limit);
-        const mergedTotal = total + merged._metadata.coldRows;
-        return res.json({ data: paginated, total: mergedTotal, limit, offset, _metadata: merged._metadata });
+        return res.json({ data: paginated, total: merged.total, limit, offset, _metadata: merged._metadata });
       }
     }
     res.json({ data, total, limit, offset, _metadata });
@@ -603,10 +608,12 @@ app.get('/api/digests', (req, res) => {
           to: (to || new Date().toISOString()).slice(0, 10),
         });
         // Response _metadata.coldOnFirstPageOnly:true is set by _mergeDigests.
-        const merged = _mergeDigests(data, coldRows, retentionBoundaryDate);
+        // Phase 35 plan 35-06: pass paginable-total inputs (see /observations).
+        const merged = _mergeDigests(data, coldRows, retentionBoundaryDate, {
+          limit, offset, sqliteTotalInRange: total,
+        });
         const paginated = merged.data.slice(0, limit);
-        const mergedTotal = total + merged._metadata.coldRows;
-        return res.json({ data: paginated, total: mergedTotal, limit, offset, _metadata: merged._metadata });
+        return res.json({ data: paginated, total: merged.total, limit, offset, _metadata: merged._metadata });
       }
     }
     res.json({ data, total, limit, offset, _metadata });
