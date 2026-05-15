@@ -959,14 +959,19 @@ const NETWORK_PROBE_INTERVAL_MS = 30_000;
 async function pollNetworkStatus() {
   const netState = currentState.network;
 
-  // 1. Is px/proxydetox listening on 127.0.0.1:3128?
-  //    Use raw TCP connect to avoid HTTP_PROXY env interference
-  netState.proxy_running = await new Promise(resolve => {
+  // 1. Is the local proxy active?
+  //    px-toggle unsets proxy env vars when disabling, but may leave the
+  //    process listening on :3128. Treat proxy as inactive when none of the
+  //    standard env vars point to it — that's the user's intent signal.
+  const proxyEnvSet = !!(process.env.http_proxy || process.env.https_proxy ||
+                         process.env.HTTP_PROXY || process.env.HTTPS_PROXY);
+  const portListening = await new Promise(resolve => {
     const sock = net.connect({ host: '127.0.0.1', port: 3128, timeout: 2000 });
     sock.once('connect', () => { sock.destroy(); resolve(true); });
     sock.once('error', () => resolve(false));
     sock.once('timeout', () => { sock.destroy(); resolve(false); });
   });
+  netState.proxy_running = proxyEnvSet && portListening;
 
   // 2. Can we resolve BMW PAC host? (indicates CN)
   const pacResolved = await new Promise(resolve => {
@@ -1035,9 +1040,9 @@ async function pollNetworkStatus() {
   netState.last_probe_end = new Date().toISOString();
 
   // Also update proxy.networkMode to match (backwards compat for dashboard)
-  currentState.proxy.networkMode = net.location === 'home' ? 'public' : net.location;
+  currentState.proxy.networkMode = netState.location === 'home' ? 'public' : netState.location;
 
-  log(`network: location=${net.location} proxy_running=${net.proxy_running} proxy_functional=${net.proxy_functional} internet=${net.internet_reachable}`);
+  log(`network: location=${netState.location} proxy_env=${proxyEnvSet} port_listening=${portListening} proxy_running=${netState.proxy_running} proxy_functional=${netState.proxy_functional} internet=${netState.internet_reachable}`);
 }
 
 async function runAllChecks() {
