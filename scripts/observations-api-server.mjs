@@ -202,6 +202,10 @@ let _consolidationArgs = null;
 let _heartbeatInterval = null;
 let _lastStderrLine = '';
 let _lastStderrAt = null;
+// Abort controller for any in-flight LLM HTTP call the consolidator makes.
+// Aborted in shutdown() so the proxy can kill its spawned claude CLI children
+// instead of leaving them orphaned past obs-api's exit.
+let _consolidationAbort = null;
 let _shuttingDown = false;
 
 // Keep-alive threshold: how long real stderr can be silent before _bumpHeartbeat
@@ -284,8 +288,12 @@ function runConsolidation(options = {}) {
     return origStderrWrite(chunk, ...rest);
   };
 
+  _consolidationAbort = new AbortController();
   _consolidationPromise = (async () => {
-    const consolidator = new ObservationConsolidator({ dbPath: DB_PATH });
+    const consolidator = new ObservationConsolidator({
+      dbPath: DB_PATH,
+      abortSignal: _consolidationAbort.signal,
+    });
     try {
       await consolidator.init();
       let result;
@@ -307,6 +315,7 @@ function runConsolidation(options = {}) {
       _consolidationStartedAt = null;
       _consolidationArgs = null;
       _consolidationPromise = null;
+      _consolidationAbort = null;
     }
   })();
 
@@ -874,13 +883,25 @@ async function shutdown(signal) {
   process.stderr.write(`[obs-api] ${signal} — shutting down (pid=${process.pid}, ppid=${process.ppid})\n`);
   _shuttingDown = true;
   // Wait briefly for in-flight consolidation to drain. Bound the wait so a
-  // wedged LLM call can't outlast the supervisor's SIGKILL grace.
+  // wedged LLM call can't outlast the supervisor's SIGKILL grace. We give
+  // the consolidator 10s to finish its current chunk gracefully; if it's
+  // still running after that, we abort the LLM HTTP call so the proxy
+  // tears down its spawned claude CLI subprocess. Then wait up to 10 more
+  // seconds for the consolidator promise itself to settle.
   if (_consolidationPromise) {
-    process.stderr.write(`[obs-api] waiting up to 20s for in-flight consolidation\n`);
-    await Promise.race([
-      _consolidationPromise.catch(() => { /* surfaced in handler */ }),
-      new Promise((r) => setTimeout(r, 20_000)),
+    process.stderr.write(`[obs-api] waiting up to 10s for in-flight consolidation to drain naturally\n`);
+    const gracefulDrain = await Promise.race([
+      _consolidationPromise.catch(() => 'errored').then(() => 'done'),
+      new Promise((r) => setTimeout(() => r('timeout'), 10_000)),
     ]);
+    if (gracefulDrain === 'timeout' && _consolidationAbort) {
+      process.stderr.write(`[obs-api] graceful drain timed out — aborting LLM HTTP calls to reap orphan CLI children\n`);
+      _consolidationAbort.abort(new Error('obs-api shutting down'));
+      await Promise.race([
+        _consolidationPromise.catch(() => { /* surfaced in handler */ }),
+        new Promise((r) => setTimeout(r, 10_000)),
+      ]);
+    }
   }
   if (_pruneInterval) { clearInterval(_pruneInterval); _pruneInterval = null; }
   _clearHeartbeat();

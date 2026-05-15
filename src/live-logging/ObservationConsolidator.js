@@ -53,6 +53,10 @@ export class ObservationConsolidator {
     const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
     this.proxyUrl = options.proxyUrl || process.env.LLM_CLI_PROXY_URL || `http://localhost:${proxyPort}`;
     this.provider = options.provider || null;
+    // Optional caller-owned AbortSignal. When triggered (typically obs-api
+    // SIGTERM), in-flight LLM HTTP calls are cancelled and the proxy kills
+    // their spawned claude CLI subprocesses so they don't outlive us.
+    this.abortSignal = options.abortSignal || null;
     this.db = null;
     /** @type {import('ioredis').default|null} Redis publisher for embedding events (lazy-init, fire-and-forget) */
     this._redisPub = null;
@@ -1425,11 +1429,19 @@ export class ObservationConsolidator {
     };
 
     try {
+      // Compose two abort sources: the per-call 3-min timeout AND any
+      // shutdown-time abort the caller (obs-api) passed in. Either firing
+      // cancels the fetch — and via req.on('close') on the proxy, kills
+      // the spawned claude CLI subprocess.
+      const timeoutSignal = AbortSignal.timeout(180000);
+      const signal = this.abortSignal
+        ? AbortSignal.any([timeoutSignal, this.abortSignal])
+        : timeoutSignal;
       const response = await fetch(`${this.proxyUrl}/api/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(180000), // 3min — consolidation prompts can be large
+        signal,
       });
 
       if (!response.ok) {
