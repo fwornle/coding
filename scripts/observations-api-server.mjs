@@ -475,6 +475,46 @@ app.get('/api/observations', (req, res) => {
 
     const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
+    // Phase 35 plan 35-07: full-union pagination. When `from` reaches past the
+    // retention boundary, fetch the FULL SQLite-in-range slice (no LIMIT/OFFSET)
+    // and pass it with the full cold-in-range list to the merge module. The
+    // merge module does union+sort+slice and reports total = union size, so
+    // pagination can walk into cold rows on any page (not just page 0).
+    if (from && _writer?.retentionDays) {
+      const retentionBoundary = _computeRetentionBoundary(db, _writer.retentionDays);
+      if (from < retentionBoundary) {
+        const fullRows = db.prepare(`
+          SELECT id, summary as content, agent,
+                 session_id as sessionId,
+                 json_extract(metadata, '$.project') as project,
+                 created_at as timestamp,
+                 source_file as source,
+                 metadata,
+                 COALESCE(quality, 'normal') as quality
+          FROM observations ${whereClause}
+          ORDER BY created_at DESC
+        `).all(params);
+        const fullData = fullRows.map(row => {
+          let meta = {};
+          try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
+          const { metadata: _raw, ...rest } = row;
+          return {
+            ...rest,
+            llmModel: meta.llmModel || null,
+            llmProvider: meta.llmProvider || null,
+            llmTokens: meta.llmTokens || null,
+            llmLatencyMs: meta.llmLatencyMs || null,
+          };
+        });
+        const coldRows = ensureColdStore().readObservations({
+          from,
+          to: to || new Date().toISOString(),
+        });
+        const merged = _mergeObservations(fullData, coldRows, retentionBoundary, { limit, offset });
+        return res.json({ data: merged.data, total: merged.total, limit, offset, _metadata: merged._metadata });
+      }
+    }
+
     const { total } = db.prepare(`SELECT COUNT(*) as total FROM observations ${whereClause}`).get(params);
 
     params.limit = limit;
@@ -505,32 +545,7 @@ app.get('/api/observations', (req, res) => {
       };
     });
 
-    // Phase 35 plan 35-04 - range-merge with cold store ONLY when from is historical
-    // AND request is on first page. Cold rows are not contributed on offset>0 to keep
-    // pagination semantics correct without re-sorting the entire historical window per
-    // page (checker WARNING 1 - Option B).
-    let _metadata = { fromColdStore: false };
-    if (from && offset === 0 && _writer?.retentionDays) {
-      const retentionBoundary = _computeRetentionBoundary(db, _writer.retentionDays);
-      if (from < retentionBoundary) {
-        const coldRows = ensureColdStore().readObservations({
-          from,
-          to: to || new Date().toISOString(),
-        });
-        // Response _metadata carries coldOnFirstPageOnly:true on the merged result
-        // (set by _mergeObservations). See PLAN.md invariant #5.
-        // Phase 35 plan 35-06: pass {limit, offset, sqliteTotalInRange} so the
-        // merge helper returns a paginable `total` (cold rows only contribute on
-        // offset=0; reporting total = sqlite + raw-cold walks the dashboard's
-        // last-page math past the SQLite tail into empty offset territory).
-        const merged = _mergeObservations(data, coldRows, retentionBoundary, {
-          limit, offset, sqliteTotalInRange: total,
-        });
-        // Re-slice to the caller's limit. The merged data is already DESC-sorted.
-        const paginated = merged.data.slice(0, limit);
-        return res.json({ data: paginated, total: merged.total, limit, offset, _metadata: merged._metadata });
-      }
-    }
+    const _metadata = { fromColdStore: false };
     res.json({ data, total, limit, offset, _metadata });
   } catch (err) {
     process.stderr.write(`[obs-api] /observations error: ${err.message}\n`);
@@ -576,6 +591,37 @@ app.get('/api/digests', (req, res) => {
     if (project) { where.push('project = @project'); params.project = project; }
 
     const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+
+    // Phase 35 plan 35-07: full-union pagination (see /api/observations for
+    // detail). Fetch FULL SQLite-in-range when `from` crosses the retention
+    // boundary; the merge module owns sort+slice and reports the union total.
+    if (from && _writer?.retentionDays) {
+      const retentionBoundary = _computeRetentionBoundary(db, _writer.retentionDays);
+      const retentionBoundaryDate = retentionBoundary.slice(0, 10);
+      const fromDatePart = from.length >= 10 ? from.slice(0, 10) : from;
+      if (fromDatePart < retentionBoundaryDate) {
+        const fullRows = db.prepare(`
+          SELECT id, date, theme, summary, observation_ids as observationIds,
+                 agents, files_touched as filesTouched, quality, created_at as createdAt,
+                 project
+          FROM digests ${whereClause}
+          ORDER BY date DESC, created_at DESC
+        `).all(params);
+        const fullData = fullRows.map(row => ({
+          ...row,
+          observationIds: JSON.parse(row.observationIds || '[]'),
+          agents: JSON.parse(row.agents || '[]'),
+          filesTouched: JSON.parse(row.filesTouched || '[]'),
+        }));
+        const coldRows = ensureColdStore().readDigests({
+          from: fromDatePart,
+          to: (to || new Date().toISOString()).slice(0, 10),
+        });
+        const merged = _mergeDigests(fullData, coldRows, retentionBoundaryDate, { limit, offset });
+        return res.json({ data: merged.data, total: merged.total, limit, offset, _metadata: merged._metadata });
+      }
+    }
+
     const { total } = db.prepare(`SELECT COUNT(*) as total FROM digests ${whereClause}`).get(params);
 
     params.limit = limit;
@@ -596,26 +642,7 @@ app.get('/api/digests', (req, res) => {
       filesTouched: JSON.parse(row.filesTouched || '[]'),
     }));
 
-    // Phase 35 plan 35-04 - range-merge with cold-store digests on first page only.
-    let _metadata = { fromColdStore: false };
-    if (from && offset === 0 && _writer?.retentionDays) {
-      const retentionBoundary = _computeRetentionBoundary(db, _writer.retentionDays);
-      const retentionBoundaryDate = retentionBoundary.slice(0, 10);
-      const fromDatePart = from.length >= 10 ? from.slice(0, 10) : from;
-      if (fromDatePart < retentionBoundaryDate) {
-        const coldRows = ensureColdStore().readDigests({
-          from: fromDatePart,
-          to: (to || new Date().toISOString()).slice(0, 10),
-        });
-        // Response _metadata.coldOnFirstPageOnly:true is set by _mergeDigests.
-        // Phase 35 plan 35-06: pass paginable-total inputs (see /observations).
-        const merged = _mergeDigests(data, coldRows, retentionBoundaryDate, {
-          limit, offset, sqliteTotalInRange: total,
-        });
-        const paginated = merged.data.slice(0, limit);
-        return res.json({ data: paginated, total: merged.total, limit, offset, _metadata: merged._metadata });
-      }
-    }
+    const _metadata = { fromColdStore: false };
     res.json({ data, total, limit, offset, _metadata });
   } catch (err) {
     process.stderr.write(`[obs-api] /digests error: ${err.message}\n`);
