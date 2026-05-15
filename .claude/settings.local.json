@@ -391,7 +391,14 @@
       "Bash(/usr/bin/tail -30)",
       "Bash(tmux info *)",
       "Bash(tmux source-file *)",
-      "Bash(CODING_REPO=/Users/Q284340/Agentic/coding TMUX_PANE_WIDTH=200 node scripts/combined-status-line.js)"
+      "Bash(CODING_REPO=/Users/Q284340/Agentic/coding TMUX_PANE_WIDTH=200 node scripts/combined-status-line.js)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules --no-warnings' npx jest tests/live-logging/ObservationWriter.retention-floor.test.js --no-coverage)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules --no-warnings' npx jest tests/live-logging/ObservationPruner.test.js tests/live-logging/ColdStoreReader.test.js --no-coverage)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules --no-warnings' npx jest tests/scripts/observations-api-server.merge.test.js --no-coverage)",
+      "Bash(curl -fs 'http://localhost:3032/api/observations?from=2026-04-01T00:00:00Z&to=2026-05-15T23:59:59Z&limit=50&offset=__TRACKED_VAR__')",
+      "Bash(curl -fs \"http://localhost:3032/api/observations?from=2026-04-01T00:00:00Z&to=2026-05-15T23:59:59Z&limit=50&offset=1850\")",
+      "Bash(/opt/homebrew/bin/claude -p \"reply OK\" --output-format json --model sonnet --tools \"\" --no-session-persistence)",
+      "Bash(/opt/homebrew/bin/node --version)"
     ],
     "deny": [],
     "ask": []
