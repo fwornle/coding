@@ -11,14 +11,16 @@
     "test": "tsx --test src/server.test.ts"
   },
   "dependencies": {
-    "express": "^4.21.0",
-    "cors": "^2.8.5"
+    "better-sqlite3": "^12.10.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
-    "typescript": "^5.7.0",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
   }
 }

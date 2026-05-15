@@ -288,7 +288,21 @@ class SystemHealthAPIServer {
         this.app.get('/api/cgr/progress', this.handleGetCGRProgress.bind(this));
         this.app.post('/api/cgr/reindex', this.handleCGRReindex.bind(this));
 
-        // Observations API (Phase 23)
+         // Token Usage API (proxy to LLM proxy)
+         this.app.get('/api/token-usage/:endpoint', async (req, res) => {
+             try {
+                 const endpoint = req.params.endpoint;
+                 const qs = new URLSearchParams(req.query).toString();
+                 const url = `http://host.docker.internal:12435/api/token-usage/${endpoint}${qs ? '?' + qs : ''}`;
+                 const resp = await fetch(url);
+                 const data = await resp.json();
+                 res.json(data);
+             } catch (err) {
+                 res.status(502).json({ error: 'LLM proxy unreachable', details: err.message });
+             }
+         });
+
+         // Observations API (Phase 23)
         this.app.get('/api/observations', this.handleGetObservations.bind(this));
         this.app.get('/api/observations/projects', this.handleGetObservationProjects.bind(this));
 

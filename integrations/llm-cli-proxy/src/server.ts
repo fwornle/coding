@@ -10,6 +10,9 @@
 import express from 'express';
 import cors from 'cors';
 import { spawn, type ChildProcess } from 'child_process';
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
 
 // --- Logging (uses stdout/stderr directly per project conventions) ---
 
@@ -31,6 +34,8 @@ interface CompletionRequest {
   temperature?: number;
   tier?: 'fast' | 'standard' | 'premium';
   timeout?: number;
+  process?: string;         // cognitive process identifier (e.g. 'observation-writer', 'consolidator')
+  subscription?: string;    // subscription context (e.g. 'copilot-subscription', 'max-subscription')
 }
 
 interface CompletionResponse {
@@ -240,6 +245,66 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+// --- Token Usage SQLite Persistence ---
+
+const CODING_ROOT = process.env.CODING_ROOT || path.resolve(import.meta.dirname, '../../..');
+const TOKEN_DB_PATH = path.join(CODING_ROOT, '.observations', 'token-usage.db');
+
+let tokenDb: Database.Database | null = null;
+let insertStmt: Database.Statement | null = null;
+
+function initTokenDb(): void {
+  try {
+    fs.mkdirSync(path.dirname(TOKEN_DB_PATH), { recursive: true });
+    tokenDb = new Database(TOKEN_DB_PATH);
+    tokenDb.pragma('journal_mode = WAL');
+    tokenDb.pragma('synchronous = NORMAL');
+    tokenDb.exec(`
+      CREATE TABLE IF NOT EXISTS token_usage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        process TEXT NOT NULL DEFAULT 'unknown',
+        subscription TEXT NOT NULL DEFAULT 'unknown',
+        input_tokens INTEGER NOT NULL,
+        output_tokens INTEGER NOT NULL,
+        total_tokens INTEGER NOT NULL,
+        latency_ms INTEGER NOT NULL DEFAULT 0,
+        prompt_preview TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_token_usage_timestamp ON token_usage(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_token_usage_process ON token_usage(process);
+      CREATE INDEX IF NOT EXISTS idx_token_usage_provider ON token_usage(provider);
+    `);
+    insertStmt = tokenDb.prepare(`
+      INSERT INTO token_usage (timestamp, provider, model, process, subscription, input_tokens, output_tokens, total_tokens, latency_ms, prompt_preview)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    log('[TOKEN-DB] Initialized at ' + TOKEN_DB_PATH);
+  } catch (err) {
+    logError('[TOKEN-DB] Failed to initialize: ' + (err as Error).message);
+  }
+}
+
+function logTokenUsage(
+  provider: string, model: string, process: string, subscription: string,
+  inputTokens: number, outputTokens: number, latencyMs: number, promptPreview: string
+): void {
+  try {
+    insertStmt?.run(
+      new Date().toISOString(), provider, model, process, subscription,
+      inputTokens, outputTokens, inputTokens + outputTokens,
+      latencyMs, promptPreview.slice(0, 200)
+    );
+  } catch (err) {
+    logError('[TOKEN-DB] Insert failed: ' + (err as Error).message);
+  }
+}
+
+// Initialize on import
+initTokenDb();
+
 async function checkProviderAvailable(providerName: string): Promise<ProviderStatus> {
   const config = CLI_CONFIGS[providerName];
   if (!config) {
@@ -380,6 +445,94 @@ app.get('/health', (_req, res) => {
   res.json(response);
 });
 
+// Token usage query endpoints
+app.get('/api/token-usage/summary', (_req, res) => {
+  if (!tokenDb) return res.json({ error: 'Token DB not initialized' });
+  try {
+    const hours = parseInt((_req.query.hours as string) || '24', 10);
+    const since = new Date(Date.now() - hours * 3600000).toISOString();
+
+    const totals = tokenDb.prepare(`
+      SELECT COUNT(*) as calls,
+        COALESCE(SUM(input_tokens), 0) as input_tokens,
+        COALESCE(SUM(output_tokens), 0) as output_tokens,
+        COALESCE(SUM(total_tokens), 0) as total_tokens,
+        COALESCE(ROUND(AVG(latency_ms)), 0) as avg_latency_ms
+      FROM token_usage WHERE timestamp >= ?
+    `).get(since) as Record<string, number>;
+
+    const by_process = tokenDb.prepare(`
+      SELECT process,
+        COUNT(*) as calls,
+        SUM(input_tokens) as input_tokens,
+        SUM(output_tokens) as output_tokens,
+        SUM(total_tokens) as total_tokens,
+        ROUND(AVG(latency_ms)) as avg_latency
+      FROM token_usage WHERE timestamp >= ?
+      GROUP BY process ORDER BY total_tokens DESC
+    `).all(since);
+
+    const by_provider = tokenDb.prepare(`
+      SELECT provider,
+        COUNT(*) as calls,
+        SUM(input_tokens) as input_tokens,
+        SUM(output_tokens) as output_tokens,
+        SUM(total_tokens) as total_tokens
+      FROM token_usage WHERE timestamp >= ?
+      GROUP BY provider ORDER BY total_tokens DESC
+    `).all(since);
+
+    const by_model = tokenDb.prepare(`
+      SELECT model,
+        COUNT(*) as calls,
+        SUM(total_tokens) as total_tokens
+      FROM token_usage WHERE timestamp >= ?
+      GROUP BY model ORDER BY total_tokens DESC
+    `).all(since);
+
+    const by_subscription = tokenDb.prepare(`
+      SELECT subscription,
+        COUNT(*) as calls,
+        SUM(total_tokens) as total_tokens
+      FROM token_usage WHERE timestamp >= ?
+      GROUP BY subscription ORDER BY total_tokens DESC
+    `).all(since);
+
+    const by_hour = tokenDb.prepare(`
+      SELECT strftime('%Y-%m-%dT%H:00:00', timestamp) as hour,
+        SUM(input_tokens) as input_tokens,
+        SUM(output_tokens) as output_tokens,
+        COUNT(*) as calls
+      FROM token_usage WHERE timestamp >= ?
+      GROUP BY hour ORDER BY hour
+    `).all(since);
+
+    res.json({
+      total_calls: totals.calls,
+      total_input: totals.input_tokens,
+      total_output: totals.output_tokens,
+      total_tokens: totals.total_tokens,
+      avg_latency_ms: totals.avg_latency_ms,
+      by_process, by_provider, by_model, by_subscription, by_hour,
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+app.get('/api/token-usage/recent', (_req, res) => {
+  if (!tokenDb) return res.json({ error: 'Token DB not initialized' });
+  try {
+    const limit = Math.min(parseInt((_req.query.limit as string) || '50', 10), 500);
+    const rows = tokenDb.prepare(`
+      SELECT * FROM token_usage ORDER BY timestamp DESC LIMIT ?
+    `).all(limit);
+    res.json({ data: rows });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // Completion endpoint
 app.post('/api/complete', async (req, res) => {
   const body = req.body as CompletionRequest;
@@ -471,6 +624,12 @@ app.post('/api/complete', async (req, res) => {
         tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens },
         latencyMs,
       };
+
+      // Persist token usage
+      const processName = body.process || 'unknown';
+      const subscription = body.subscription || (provider === 'copilot' ? 'copilot-subscription' : provider === 'claude-code' ? 'max-subscription' : 'api-key');
+      const firstUserMsg = body.messages?.find(m => m.role === 'user')?.content || '';
+      logTokenUsage(provider, resolvedModel, processName, subscription, inputTokens, outputTokens, latencyMs, firstUserMsg);
 
       res.json(response);
       return;

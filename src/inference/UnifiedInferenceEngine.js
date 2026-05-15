@@ -117,6 +117,7 @@ export class UnifiedInferenceEngine extends EventEmitter {
 
     try {
       const result = await this._callBridge({
+        process: 'inference-engine',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: options.maxTokens || context.maxTokens || 500,
         temperature: options.temperature ?? context.temperature ?? 0.3,

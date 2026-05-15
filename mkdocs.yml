@@ -86,6 +86,7 @@ nav:
     - Knowledge Injection: architecture/knowledge-injection.md
     - LLM Architecture: architecture/llm-architecture.md
     - Health Monitoring: architecture/health-monitoring.md
+    - Token Usage: architecture/token-usage.md
     - Data Flow: architecture/data-flow.md
   - Integrations:
     - Overview: integrations/index.md

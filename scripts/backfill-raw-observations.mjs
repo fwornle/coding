@@ -59,6 +59,7 @@ function buildSummaryRequest(messages, projectName) {
     .join('\n');
 
   return {
+    process: 'backfill',
     messages: [
       {
         role: 'system',

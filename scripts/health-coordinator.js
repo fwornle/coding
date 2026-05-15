@@ -548,6 +548,7 @@ async function pollProxySemantic() {
     const probeEndedAt = () => new Date().toISOString();
     const start = Date.now();
     const probeBody = {
+      process: 'health-coordinator',
       messages: [{ role: 'user', content: 'reply with the single token: OK' }],
       provider: 'copilot',
       tier: 'haiku',

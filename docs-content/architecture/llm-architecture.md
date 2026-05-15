@@ -504,9 +504,72 @@ export SEMANTIC_ANALYSIS_MODE=local
 
 ---
 
-## Metrics and Monitoring
+## Token Usage Monitoring
 
-The LLM layer tracks:
+All LLM calls pass through the **LLM Proxy Bridge** (`:12435`), which logs every request to a persistent SQLite database for usage analytics and cost attribution.
+
+![Token Usage Architecture](../images/token-usage-architecture.png)
+
+### How It Works
+
+Every cognitive process that calls the LLM proxy includes a `process` identifier in the request body. The proxy logs the call with provider, model, token counts, latency, and subscription type to `.observations/token-usage.db`.
+
+### Logged Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `provider` | LLM provider used | `copilot`, `claude-code`, `anthropic` |
+| `model` | Specific model | `claude-sonnet-4-5`, `claude-haiku-4.5` |
+| `process` | Cognitive process identifier | `observation-writer`, `consolidator`, `wave1-analysis` |
+| `input_tokens` | Prompt tokens consumed | `1,200` |
+| `output_tokens` | Completion tokens generated | `450` |
+| `latency_ms` | Round-trip time | `2,340` |
+| `subscription` | Billing source | `copilot-subscription`, `max-subscription`, `api-key` |
+
+### Cognitive Process Identifiers
+
+| Process | Description | Typical Volume |
+|---------|-------------|----------------|
+| `observation-writer` | Session observation classification + summary | High (every session event) |
+| `consolidator` | Digest → insight synthesis | Medium (batch, periodic) |
+| `insight-generator` | Entity insight generation | Low (batch, on refresh) |
+| `content-validator` | Entity content validation + refresh | Low (on demand) |
+| `wave1-analysis` | Code analysis agents | Medium (batch workflows) |
+| `constraint-check` | Constraint rule evaluation | Low |
+| `auto-heal` | Service recovery decisions | Rare |
+| `health-check` | Proxy liveness pings | High (every 30s) |
+
+### Dashboard
+
+The **Token Usage** page on the Health Dashboard (`:3032/token-usage`) provides:
+
+- **Token distribution by process** — treemap showing biggest consumers
+- **Provider breakdown** — donut chart of provider usage
+- **Timeline** — hourly token consumption area chart
+- **Recent calls** — sortable table with process, model, tokens, latency
+
+See [Token Usage Dashboard](token-usage.md) for full documentation.
+
+### API Endpoints
+
+The proxy exposes query endpoints for programmatic access:
+
+```
+GET /api/token-usage/summary?hours=24    # Aggregated stats
+GET /api/token-usage/recent?limit=50     # Recent calls
+```
+
+### Storage
+
+- **Database**: `.observations/token-usage.db` (SQLite)
+- **Retention**: All calls logged indefinitely
+- **Size**: ~1KB per logged call
+
+---
+
+## In-Memory Metrics
+
+The LLM layer also tracks in-memory metrics per session:
 
 - **Request metrics**: Total calls per provider, success/failure rates
 - **Performance**: Latency per provider, throughput
@@ -548,6 +611,7 @@ Logger.log('info', `Cached: ${result.cached}`);            // Was it from cache?
 
 ## Related Documentation
 
+- [Token Usage Dashboard](token-usage.md) - Detailed token usage monitoring documentation
 - [LLM Provider Guide](../guides/llm-providers.md) - User guide for working with providers
 - [Semantic Analysis Integration](../integrations/semantic-analysis.md) - SA consumer usage
 - [Getting Started](../getting-started/index.md) - Installation and API key setup

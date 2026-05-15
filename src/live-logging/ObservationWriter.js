@@ -261,6 +261,7 @@ export class ObservationWriter {
 
     try {
       const requestBody = {
+        process: 'observation-writer',
         ...(this.provider ? { provider: this.provider } : {}),
         messages: [
           {
@@ -610,7 +611,9 @@ export class ObservationWriter {
    * Intent-only dedup requires both Intents to carry >= 4 meaningful keywords
    * to avoid false positives on terse Intents (e.g. "Restart the obs-api
    * service via PSM" vs "Restart the llm-proxy service via PSM" — different
-   * services, similar wording).
+   * services, similar wording). Above that floor, Intents collapse on either
+   * Jaccard > 0.45 OR stem-aware containment > 0.7 (containment catches the
+   * asymmetric case where one Intent extends the other with qualifiers).
    */
   _isSemanticallyDuplicate(agent, summary) {
     if (!this.db) return false;
@@ -657,8 +660,20 @@ export class ObservationWriter {
       // where Intent is near-identical but Approach paraphrasing dilutes the
       // combined score. Both Intents must carry >= 4 meaningful keywords so
       // terse near-matches like "Restart obs-api via PSM" vs "Restart
-      // llm-proxy via PSM" don't false-positive (those land at jaccard ≈ 0.5
-      // because the discriminating service names are short identifiers).
+      // llm-proxy via PSM" don't false-positive (those collapse to fewer
+      // than 4 keywords after stop-word / length filtering, so the floor
+      // alone gates them out).
+      //
+      // Both Jaccard and containment are evaluated on the *stemmed* keyword
+      // sets produced by _extractKeywords. Containment (intersection /
+      // min-side size) catches the asymmetric paraphrase case where one
+      // Intent extends the other with extra qualifiers — e.g.
+      //   A: "Run the GSD update skill to check for available updates and
+      //       display changelog"  → {update, skill, available, updates,
+      //       show, changelog} (size 6)
+      //   B: "Run GSD update check and install available updates"
+      //       → {update, install, available, updates} (size 4)
+      // Intersection 3, union 7 → Jaccard 0.43, containment 0.75.
       if (newIntentKw.size >= 4 && existingIntent) {
         const existingIntentKw = this._extractKeywords(existingIntent);
         if (existingIntentKw.size >= 4) {
@@ -668,7 +683,9 @@ export class ObservationWriter {
           }
           const intentUnion = new Set([...newIntentKw, ...existingIntentKw]).size;
           const intentJaccard = intentInter / intentUnion;
-          if (intentJaccard > 0.7) return true;
+          const intentMinSize = Math.min(newIntentKw.size, existingIntentKw.size);
+          const intentContainment = intentInter / intentMinSize;
+          if (intentJaccard > 0.45 || intentContainment > 0.7) return true;
         }
       }
     }

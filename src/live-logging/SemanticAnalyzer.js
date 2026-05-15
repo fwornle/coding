@@ -57,7 +57,7 @@ export class SemanticAnalyzer {
    * Shared LLM completion via bridge server
    */
   async _complete(messages, maxTokens = 200) {
-    const data = await this._callBridge({ messages, model: this.model, max_tokens: maxTokens });
+    const data = await this._callBridge({ process: 'semantic-analyzer', messages, model: this.model, max_tokens: maxTokens });
     return data.choices?.[0]?.message?.content?.trim() || data.text?.trim() || '';
   }
 

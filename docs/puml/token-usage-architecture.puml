@@ -1,0 +1,99 @@
+@startuml token-usage-architecture
+!include _standard-style.puml
+
+top to bottom direction
+title Cognitive Process Token Flow
+
+' === User Layer ===
+actor "Developer" as dev
+
+' === Session Layer ===
+package "Active Sessions" {
+  component [Claude Code] <<cli>> as claude
+  component [OpenCode] <<cli>> as opencode
+}
+
+' === LLM Proxy (Single Gateway) ===
+package "LLM Proxy\n:12435" <<core>> {
+  component [Request Router] <<core>> as router
+  component [Token Logger] <<core>> as logger
+  database "token-usage.db\n(SQLite)" <<storage>> as tokendb
+}
+
+' === Provider Layer ===
+cloud "LLM Providers" {
+  component [Claude Code\nMax Subscription] <<external>> as ccmax
+  component [Copilot\nSubscription] <<external>> as copilot
+  component [Anthropic\nAPI Key] <<external>> as anthropic
+}
+
+' === Cognitive Processes ===
+package "Online Learning Pipeline" {
+  component [ETM\nEvent-Time Monitor] <<agent>> as etm
+  component [Observation Writer\n(classification + summary)] <<agent>> as obswriter
+  component [Consolidator\n(digest → insight)] <<agent>> as consolidator
+}
+
+package "Wave Analysis" {
+  component [Wave-1 Agent\n(code analysis)] <<agent>> as wave1
+  component [Insight Generator\n(entity synthesis)] <<agent>> as insightgen
+  component [Content Validator\n(entity refresh)] <<agent>> as validator
+}
+
+package "Health & Monitoring" {
+  component [Auto-Heal FSM\n(service recovery)] <<agent>> as autoheal
+  component [Constraint Monitor\n(rule checking)] <<agent>> as constraints
+}
+
+' === Dashboard ===
+package "Health Dashboard\n:3032" {
+  component [Token Usage Page] <<api>> as dashboard
+}
+
+' === Flow: Sessions to Proxy ===
+dev --> claude : coding session
+dev --> opencode : coding session
+claude --> router : LLM calls\n(provider selection)
+opencode --> router : LLM calls
+
+' === Flow: Cognitive Processes to Proxy ===
+obswriter --> router : process="observation-writer"
+consolidator --> router : process="consolidator"
+wave1 --> router : process="wave1-analysis"
+insightgen --> router : process="insight-generator"
+validator --> router : process="content-validator"
+autoheal --> router : process="auto-heal"
+constraints --> router : process="constraint-check"
+
+' === Flow: Proxy to Providers ===
+router --> ccmax : Claude Max
+router --> copilot : GitHub Copilot
+router --> anthropic : API key
+
+' === Token Logging ===
+router -[#FF9800,thickness=2]-> logger : every response
+logger -[#FF9800,thickness=2]-> tokendb : log(provider, model,\nprocess, tokens,\nlatency, subscription)
+
+' === Dashboard reads ===
+dashboard -[#43A047,thickness=2,dashed]-> tokendb : /api/token-usage/*
+dev --> dashboard : view stats
+
+' === ETM triggers ===
+etm -[#757575,thickness=1,dotted]-> obswriter : session events
+
+note right of tokendb
+  Schema: timestamp, provider, model,
+  process, input/output tokens,
+  latency_ms, subscription,
+  prompt_preview (100 chars)
+end note
+
+note bottom of dashboard
+  Visualizations:
+  • Token distribution by process (treemap)
+  • Provider breakdown (donut chart)
+  • Timeline (area chart, hourly)
+  • Recent calls table
+end note
+
+@enduml

@@ -51,6 +51,7 @@ for (let i = 0; i < rawObs.length; i++) {
   }
 
   const requestBody = {
+    process: 'backfill',
     messages: [
       {
         role: 'system',

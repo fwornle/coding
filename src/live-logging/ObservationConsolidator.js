@@ -824,7 +824,7 @@ export class ObservationConsolidator {
         }).join('\n\n');
 
         const prompt = this._buildConsolidationPrompt(date, obsBlock, chunk.length);
-        const result = await this._callLLM(prompt);
+        const result = await this._callLLM(prompt, 'consolidator-digest');
 
         if (!result) {
           process.stderr.write(`[Consolidator] LLM call failed for ${date}/${project} chunk ${ci + 1}/${chunks.length}, skipping chunk\n`);
@@ -1098,7 +1098,7 @@ export class ObservationConsolidator {
         process.stderr.write(`[Consolidator] Insight synthesis ${project} chunk ${ci + 1}/${digestChunks.length} (${chunk.length} digests)\n`);
 
         const prompt = this._buildInsightPrompt(digestBlock, existingBlock, chunk.length);
-        const result = await this._callLLM(prompt);
+        const result = await this._callLLM(prompt, 'consolidator-insight');
 
         if (!result) {
           process.stderr.write(`[Consolidator] LLM call failed for ${project} insight chunk ${ci + 1}, skipping\n`);
@@ -1414,8 +1414,9 @@ export class ObservationConsolidator {
    * @param {{system: string, user: string}} prompt
    * @returns {Promise<string|null>}
    */
-  async _callLLM(prompt) {
+  async _callLLM(prompt, processName = 'consolidator') {
     const requestBody = {
+      process: processName,
       ...(this.provider ? { provider: this.provider } : {}),
       messages: [
         { role: 'system', content: prompt.system },
