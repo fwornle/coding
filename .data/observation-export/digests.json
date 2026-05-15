@@ -14419,5 +14419,1297 @@
       "sourceCount": 1
     },
     "project": "sketcher"
+  },
+  {
+    "id": "ab35d4bd-6f4f-47f8-8deb-a11a7aedf9fd",
+    "date": "2026-05-14",
+    "theme": "Tmux Proxy Badge Not Updating After Toggle",
+    "summary": "Investigated why the tmux status line continued showing `P:ON` after running `px-toggle` to disable the local proxy.\n\n- The health coordinator detects proxy state via a raw TCP connect to `127.0.0.1:3128`, not by reading a config flag or process name — so toggling config alone doesn't change the badge.\n- `px-toggle` appears to only modify configuration, leaving the proxy process (and port `3128`) still listening.\n- Resolution: verify the proxy process actually stopped with `lsof -i :3128` and kill it manually if needed.\n- Status badge has up to ~60 s lag due to polling intervals before it reflects the change.\n- No files were modified during this investigation.",
+    "observationIds": [
+      "e35b9481-c49c-422c-9a21-48a5a95dcdc8"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-15T07:07:31.453Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "63fdd269-381d-4cb3-b84a-0266dc72e091",
+    "date": "2026-05-14",
+    "theme": "MkDocs Build Fixes and Repository Maintenance",
+    "summary": "The session focused on repairing a failing MkDocs build and committing pending data exports.\n\n- Identified three root causes of the broken build: a renamed image file and two broken anchor links\n- Fixed image reference from `digests-page.png` → `log-digests.png` in `release-notes.md`\n- Corrected two broken anchor links pointing to `#right-edge-stability-cell-width-consistency` in `health-monitoring.md` and `status-line.md`\n- Restored SSH submodule remotes and re-added personal SSH key to agent\n- Followed up by staging and pushing two commits: observation exports (`8d11c11da`) and knowledge export (`4ae157a8a`)",
+    "observationIds": [
+      "4faca91a-2f0f-46fe-815f-8b6ca7a9d43f",
+      "242cb111-61e7-4760-9210-74049014a383"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "release-notes.md",
+      "health-monitoring.md",
+      "status-line.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:07:31.453Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8353b6b5-084e-4656-8948-e4ed87707def",
+    "date": "2026-05-15",
+    "theme": "Proxy Detection Enhanced With Environment Variable Check",
+    "summary": "Both observations (copilot, 04:28) describe the same change: augmenting proxy detection logic to treat absent proxy environment variables (`HTTP_PROXY`, `HTTPS_PROXY`, etc.) as the authoritative signal that the proxy is inactive, overriding port-based detection.\n\n- **Motivation:** `px-toggle` unsets env vars but leaves the proxy process running on the port, causing false positives in the old port-only detection approach.\n- **Change:** Env var presence check added to `src/menu.ts` (or equivalent proxy detection script); proxy reports `P:OFF` when relevant env vars are unset, regardless of port status.\n- **Bug fix:** Corrected a pre-existing issue where `net.location` incorrectly referenced the Node.js `net` module instead of `netState.location`.",
+    "observationIds": [
+      "9fe47847-8f24-471f-9ef2-13cac5b69d72",
+      "a4c812e3-c44e-4958-8d3a-c07392876cfa"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [
+      "sketcher proxy detection script/file (specific filename not confirmed in exchange)",
+      "src/menu.ts (or equivalent proxy detection file)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "abf8b60d-f09a-4b43-8134-a4b2c4c73a31",
+    "date": "2026-05-15",
+    "theme": "Statusline False Active Status After Sleep/Wake",
+    "summary": "Investigated why project status icons showed 🟢 (active) after extended inactivity, ultimately tracing the cause to the ETM heartbeat firing immediately on laptop wake, falsely promoting stale projects to active.\n\n- Root cause: heartbeat promotion logic had no guard on transcript age, so any heartbeat (including post-sleep wake events) could override hours of inactivity\n- Fix applied in `status-line-fast.cjs`: heartbeat promotion now only overrides transcript-derived status when the transcript is moderately stale (45-minute gate)\n- Projects idle during laptop sleep now correctly show ⚫/💤 instead of being falsely promoted to 🟢 on wake",
+    "observationIds": [
+      "5c8e16f7-793c-4dc0-8d14-204597012516",
+      "a1629f1c-ad36-4991-a03a-4f0fcd0425b5",
+      "29d13298-56f0-4112-9c3c-673323df849d"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "statusline script(s) to limit heartbeat promotion to moderately stale transcripts only",
+      "status-line-fast.cjs",
+      "(coordinator or statusline file with heartbeat promotion logic)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9a6fc704-7129-4756-9583-726721eed367",
+    "date": "2026-05-15",
+    "theme": "Statusline Multi-Session Freshness: First-Match to Best-Match",
+    "summary": "Fixed a bug where multiple concurrent sessions (e.g., Claude + OpenCode) targeting the same project caused the statusline to reflect a stale session instead of the most recently active one.\n\n- Root cause: session discovery used `.find()` (first match) rather than selecting the session with the most recent transcript mtime\n- Fixed `transcriptAgeMs()` in `csl.js` / `status-line-fast.cjs` to iterate all sessions and pick the freshest transcript mtime\n- Sidecar writer updated to select the freshest transcript per project, preventing a dormant Claude session from overriding an active OpenCode session's status indicator",
+    "observationIds": [
+      "31b9cc58-d93a-466c-8eac-5aee5666f023",
+      "dc8eba3a-572b-4814-95c9-7a50599746e4"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "status-line-fast.cjs",
+      "csl.js (or equivalent statusline script)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c7450044-ff71-482c-90e5-2983642bd17b",
+    "date": "2026-05-15",
+    "theme": "OpenCode Specstory Transcripts Invisible to Activity Monitor",
+    "summary": "Diagnosed and fixed the statusline showing 💤 instead of 🟢 for an actively running OpenCode session.\n\n- Root cause: the ETM/CSL only scanned Claude `.jsonl` transcript files, completely ignoring OpenCode's `.specstory/history/` markdown files\n- Fixed `transcriptAgeMs()` by removing early returns and accumulating freshness across both `.jsonl` and `.specstory/history/` sources, taking the minimum (freshest) age\n- Sidecar writer similarly updated to consider specstory files as a transcript source\n- Active OpenCode sessions now correctly register as 🟢 in the tmux statusline",
+    "observationIds": [
+      "8ea1831c-ec0b-4603-821c-39657e1ebd5a",
+      "b0fbdd60-7f9f-4211-bdaa-2a5c629a59dd",
+      "6637cb59-5d07-41ab-bf3e-a7297566c6f5"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "CSL transcript age detection file (removing early returns so specstory files are also scanned)",
+      "csl (or equivalent status line script)",
+      "sidecar writer component"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7db0088e-aa55-4925-8f08-1339f9966369",
+    "date": "2026-05-15",
+    "theme": "Git Commit and Push of Statusline Fixes",
+    "summary": "Staged and committed all statusline changes into two logical commits and pushed to the repository:\n- One commit covering multi-session support and the sleep-wake heartbeat fix\n- One commit for observation export changes",
+    "observationIds": [
+      "97f97120-08b3-4fd5-85a0-1fb329a95324",
+      "4f0f6d82-d3b2-4677-a99a-6326c1de50eb"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9692cc7e-a3bf-4322-a37a-62a9bbaf0430",
+    "date": "2026-05-15",
+    "theme": "GSD Update from 1.41.2 to 1.42.2",
+    "summary": "Claude loaded session context via `/sl` and then ran the GSD update workflow, upgrading GSD from 1.41.2 to 1.42.2.\n\n- Changelog highlights: phase directory naming consistency fixes and nested plan file counting fixes\n- User-added skill symlinks were verified and preserved during the clean install\n- GSD-managed directories were wiped and replaced as part of the clean-install process\n- `ObservationWriter.js` was touched as a side effect of the session/update workflow",
+    "observationIds": [
+      "2fbb87e9-6e13-446e-b472-00fa58819e22",
+      "7fbf96e4-43e9-48a8-8705-346ebec38545",
+      "3eaaf1c7-cd34-403c-9616-4cd4814fa096"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d7e7ecfe-9cdd-461d-bd3e-96ad6294d12f",
+    "date": "2026-05-15",
+    "theme": "LLM Token Usage Logging and Dashboard Implementation",
+    "summary": "Planned and implemented end-to-end token usage tracking for all LLM proxy calls, with a new dashboard page for visualization. Multiple agents (opencode, claude, copilot) contributed across overlapping exchanges.\n\n- **Proxy instrumentation**: added `logTokenUsage()` to `integrations/llm-cli-proxy/src/server.ts` / `server.mjs`, persisting model, provider, subscription, process name, input/output token counts, latency, and prompt preview to a local SQLite database on every completion\n- **API endpoints**: added `/summary`, `/timeline`, `/recent` query endpoints to the proxy; added a forwarding proxy route in `integrations/system-health-dashboard/server.js` to bridge port 3033 → port 12435\n- **Dashboard UI**: created `integrations/system-health-dashboard/src/pages/token-usage.tsx` with Recharts-based bar/line charts showing per-process, per-model, and per-provider breakdowns; integrated into nav and router via `App.tsx` and `nav-bar.tsx`\n- **Architecture documentation**: created `docs/puml/token-usage-architecture.puml` and rendered PNG, added `docs-content/architecture/token-usage.md`, updated `mkdocs.yml` and `llm-architecture.md`\n- **Call-site audit**: grepped all callers of `/api/complete`, `LLMService`, and `_callLLM` across `src/live-logging/`, `integrations/mcp-server-semantic-analysis/src/`, and `scripts/` — none yet passed `process` identifiers; instrumentation of call sites was planned but not fully completed within these exchanges\n- Initial testing captured 60+ calls / 73K tokens; refresh button on dashboard received a spinner animation for visual feedback; \"unknown\" process classification for proxy health checks was identified for follow-up",
+    "observationIds": [
+      "20c9c686-dd92-43fa-8548-175fe81a0ce5",
+      "7345b399-707b-46a8-93a6-d295c639daf4",
+      "ccbe1cfb-225c-4dc8-a8f9-86e8206d8f06",
+      "61c0a2ed-dfd5-4138-825d-4abb3f4f779d",
+      "ef2a3eff-b177-4107-9424-61f0a595f5bc",
+      "1816643e-f2a5-4591-bfc9-b70834babb60",
+      "d4b32245-0012-46e6-a369-ae83749c44fd",
+      "31719935-aa98-47ef-a8f3-59a203e51154",
+      "642b2410-a82f-462c-a3f7-dcdb9f5ee0ba",
+      "2d1f6a2c-aab8-4f91-ad33-67dcb998042a",
+      "5faa0bf3-b426-4d5d-be8a-047d97b08f65",
+      "16dc368d-8cd2-472e-ad37-47c684f8e30b",
+      "05436417-f253-46df-b718-8fa4b1efa34b",
+      "e41eb13e-41a4-44e4-aa46-e97f2ef34c67",
+      "2b719196-d7c4-42e9-8d3f-042c4556281c",
+      "70755533-0748-4ff7-9696-dc38ac6f3d8a",
+      "759b1f36-e677-4845-ae87-a6a2112f08af",
+      "5a639f9e-25e4-4587-9151-db2520fca6c0",
+      "076eebd4-65af-47b8-80fb-77f6ba78a881"
+    ],
+    "agents": [
+      "opencode",
+      "claude",
+      "copilot"
+    ],
+    "filesTouched": [
+      "integrations/llm-cli-proxy/src/server.ts",
+      "integrations/llm-cli-proxy/src/server.mjs",
+      "integrations/system-health-dashboard/src/pages/token-usage.tsx",
+      "integrations/system-health-dashboard/src/App.tsx",
+      "integrations/system-health-dashboard/src/components/nav-bar.tsx",
+      "integrations/system-health-dashboard/server.js",
+      "docs/puml/token-usage-architecture.puml",
+      "docs/puml/token-usage-architecture.png",
+      "docs-content/architecture/token-usage.md",
+      "docs-content/architecture/llm-architecture.md",
+      "mkdocs.yml",
+      "integrations/llm-cli-proxy/package.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 12
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3d851efb-bdd0-4213-85a6-527c4ff07162",
+    "date": "2026-05-15",
+    "theme": "CGR and Context7 MCP Server Connection Failure Investigation",
+    "summary": "Claude investigated why the CGR (code-graph-rag) and context7 MCP servers failed to load/connect.\n\n- Diagnosis approach: checked MCP server list, attempted direct server startup, reviewed logs, and tested Neo4j connectivity on `localhost:7687`\n- Root cause was not conclusively established within the exchange; Neo4j database connectivity on port 7687 was the primary suspect for CGR failure\n- `ObservationWriter.js` was modified as a side effect of the session context",
+    "observationIds": [
+      "63187722-f276-4ec3-8667-2f5e9e4c6138"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fe5badb8-9477-4b00-a6c4-43cedbe563d5",
+    "date": "2026-05-15",
+    "theme": "ObservationWriter Deduplication Threshold Tuning",
+    "summary": "Improved observation deduplication accuracy in `ObservationWriter.js` by lowering similarity thresholds and adding stem-aware containment logic.\n\n- Intent-only Jaccard similarity threshold lowered from 0.7 to **0.45**\n- Added a stem-aware containment branch that triggers at **>0.7** containment ratio with a ≥4 keyword floor to gate false positives\n- Docstrings and inline comments updated to reflect new values; syntax verified clean\n- File: `/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js`",
+    "observationIds": [
+      "dd1de297-d06c-4eeb-a5aa-939472cb4d5d",
+      "5553727d-7c29-4055-a719-834614ae4d45"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "086cd76f-f496-4789-af74-7d2fdf575849",
+    "date": "2026-05-15",
+    "theme": "obs_api Service Restart After Code Changes",
+    "summary": "Restarted the `obs_api` service to apply recent changes to ObservationWriter and related code.\n\n- Used `launchctl kickstart -k` targeting the user's GUI domain service\n- Polled the health endpoint on `localhost:12436` to confirm the service came back up healthy\n- `ROADMAP.md` was incidentally edited during these exchanges",
+    "observationIds": [
+      "baaf16ab-ec9b-4442-b4c0-72d5e9571b3f",
+      "59914657-6d95-4bdf-8aaf-0b88a55ecfc6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e35dfd7b-8282-4c4e-9d34-8382d66268de",
+    "date": "2026-05-15",
+    "theme": "Duplicate Observation Investigation Post-Restart",
+    "summary": "Investigated apparent duplicate observation pairs visible in a screenshot, diagnosing whether they represented a deduplication bug.\n\n- Suspect duplicate pairs appeared at timestamps 07:05, 07:02, 06:58, and 06:43 local time\n- Correlated timestamps against obs-api restart time (07:09:32 local, PID 63949 → 95040): all suspect pairs **predate** the restart and were written under the old `intentJaccard > 0.7` gate\n- Manually re-ran new Jaccard/cosine thresholds against the pairs: three of four would now merge correctly; the 06:43 pair is correctly non-merged (different operations)\n- **Conclusion**: no active bug — historical clutter from the old threshold only; new logic is in effect for all post-restart writes",
+    "observationIds": [
+      "58ecce5d-9ad3-468c-b90b-d682b357c45a",
+      "77ee988e-7292-45bf-964b-6932dbda94fc",
+      "5d77f4ef-b1f2-4483-9be7-aaa4f1bcbab4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b0383f26-d5a4-422b-a36b-162ab4595cfa",
+    "date": "2026-05-15",
+    "theme": "Observation and Digest Retention with JSON Cold-Store Planning",
+    "summary": "Designed and initiated planning for a new phase to cap SQLite `observations` and `digests` tables to a configurable retention window while providing transparent JSON cold-store fallback for older data.\n\n- Architecture outlined: nightly pruner removes rows beyond the retention boundary (default 7 days); `insights` table kept permanently; dashboard API extended to merge SQLite results with JSON cold-store for range <USER_ID_REDACTED> that span the boundary\n- Open design choices identified: cold-store logic placement (API layer vs. separate service), LRU memoization for merged results, pruner schedule\n- `gsd-plan-phase` skill invoked to orchestrate researcher + planner agents with `ROADMAP.md` as input",
+    "observationIds": [
+      "d168f8b0-3246-4445-8f30-1557163067fe",
+      "f878ba0a-4e94-4933-a121-33b1e680a2d8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8d487c88-8e83-4c62-8877-076df9fd79ae",
+    "date": "2026-05-15",
+    "theme": "Fixing Unknown Token Attribution via LLMService Event Hooks",
+    "summary": "Following the audit, multiple agents converged on eliminating \"unknown\" entries in the token usage dashboard by addressing two root causes.\n\n- **Historical unknowns**: 81 `health-coordinator` probe DB entries lacking a `process` field were reclassified directly in SQLite, reducing unknowns to zero.\n- **Structural bypass**: 17 semantic-analysis agents (UKB wave agents, insight generators) use `LLMService` from `@rapid/llm-proxy` as a library, routing directly to Claude/Copilot providers and completely bypassing the HTTP proxy bridge at port 12435 — making them invisible to token tracking.\n- **Solution**: A centralized token logger was created at `integrations/llm-cli-proxy/src/token-logger.ts`, hooking into the `'complete'` events emitted by `MetricsTracker` inside each `LLMService` instance to write provider, model, token counts, and latency to the same SQLite DB used by the proxy bridge.\n- Hooks were applied to all 6 `LLMService` instantiation sites:\n  - `integrations/mcp-server-semantic-analysis/src/semantic-analyzer.ts`\n  - `integrations/mcp-server-semantic-analysis/src/agents/wave2-component-agent.ts`\n  - `integrations/mcp-server-semantic-analysis/src/agents/wave3-detail-agent.ts`\n  - `wave1-understanding-agent.ts`, `consolidator-agent.ts`, `ontology-agent.ts`, `relation-agent.ts`, `wave-analysis-orchestrator.ts` (across agent variants)\n- `UnifiedInferenceEngine` was confirmed to already route through the HTTP proxy, avoiding double-counting.\n- TypeScript compilation errors (duplicate imports, missing type declarations) were resolved during integration. Docker container was rebuilt and restarted.",
+    "observationIds": [
+      "443fc939-9af8-438e-bac5-1fc61e448f3d",
+      "13db8110-d577-4032-835a-1208fb185287",
+      "e4b93e1d-e09a-4439-8d7d-24205fe4d3b3",
+      "ca407556-9b70-4bae-9189-23351e46d50a",
+      "32e5e02e-ac4a-4e5e-9103-f62878694cce",
+      "c7f046af-372b-4c26-b30e-ee9496b8d014",
+      "0c41a1e1-a1c5-4582-90ea-396d9afed3bc"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "integrations/llm-cli-proxy/src/token-logger.ts",
+      "integrations/mcp-server-semantic-analysis/src/server.ts (and up to 5 other LLMService instantiation sites)",
+      "centralized token logger utility",
+      "wave1-understanding-agent.ts",
+      "token logger utility",
+      "integrations/mcp-server-semantic-analysis/src/semantic-analyzer.ts",
+      "integrations/mcp-server-semantic-analysis/src/agents/wave2-component-agent.ts",
+      "integrations/mcp-server-semantic-analysis/src/agents/wave3-detail-agent.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 7
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fa8b94a6-8e2a-475f-b7a3-4d2fb1c40f6d",
+    "date": "2026-05-15",
+    "theme": "Exclude Planning Documents from No-Parallel-Files Constraint",
+    "summary": "A standalone task to modify `mcp-constraint-monitor` so that `.planning` documents are excluded from the `no-parallel-files` constraint check, which is intended to apply only to code files.\n\n- Agent searched for the constraint configuration using grep/find to locate where `no-parallel-files` is defined.\n- Edited `.constraint-monitor.yaml` to add the exclusion scope for planning files.\n- Investigation was still in progress at exchange end; the specific rule syntax and final diff were not confirmed.",
+    "observationIds": [
+      "43064f7b-bcd3-4b2c-80e3-2e465c98b58b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.constraint-monitor.yaml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e8885965-ac4e-496f-8983-19b33c003b48",
+    "date": "2026-05-15",
+    "theme": "Nav Bar Clipping Issue on Token Usage Tab",
+    "summary": "Investigated a UI clipping/layout-shift bug where the navigation bar appears shifted up by a few pixels on the Token Usage tab, causing the \"Health\" text to be clipped at the top viewport edge.\n\n- Examined `App.tsx`, `nav-bar.tsx`, and the Token Usage page component to compare layout structure against other tabs\n- Determined the purple hatching visible in the screenshot is Chrome DevTools gap visualization, not a real background artifact\n- Identified the nav bar shift as specific to the Token Usage tab; relevant component files located for follow-up fix\n- Updated `.constraint-monitor.yaml`, `constraints.yaml`, and `CONTEXT.md` as part of the session\n- Investigation was read-only — no fix applied yet",
+    "observationIds": [
+      "d16cc07e-e40e-49e5-a0ac-a3180c5d6eea",
+      "502ebf08-4cf9-4137-8e5e-27022c581406"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.constraint-monitor.yaml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/constraints.yaml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/CONTEXT.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T07:08:59.401Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "1085d964-a0cf-444f-a476-38761def9c65",
+    "date": "2026-05-15",
+    "theme": "Online Learning System Health Status Diagnostic",
+    "summary": "Resumed investigation into why the online learning system shows as impaired (yellow) in the statusline.\n\n- Agent re-ran diagnostic commands and grep/bash <USER_ID_REDACTED> to reconstruct context after a crashed session\n- Examined database state and logs related to the online learning system's health check\n- No root cause or resolution identified within the session; data gathering was still in progress when the exchange ended\n- No artifacts modified",
+    "observationIds": [
+      "530043f7-34b3-4b5a-8fe9-5c278aef360f"
+    ],
+    "agents": [
+      "copilot"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-15T11:31:03.513Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "sketcher"
+  },
+  {
+    "id": "df222607-2808-4ce1-bbf4-7dc428dff923",
+    "date": "2026-05-15",
+    "theme": "Session Continuity Load Across Coding and Rapid-Automations",
+    "summary": "At session start, the agent loaded recent LSL files from both the `rapid-automations` and `coding` projects (May 13–15 2026) to re-establish cross-project context.\n\n- **rapid-automations:** submodule URL fixes landed in PR #13 (open), three dirty submodule pointers remain\n- **coding:** prior sessions covered heartbeat/statusline fixes and LLM proxy/token-usage dashboard work\n- Artifacts touched: `PLAN.md`, `35-04-PLAN.md`, `35-05-PLAN.md`",
+    "observationIds": [
+      "f057ab42-7935-4c77-931c-f5ec82c8b166"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-04-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-05-PLAN.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T16:12:45.439Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "03510a49-3752-436a-b98c-78682e34b0bc",
+    "date": "2026-05-15",
+    "theme": "Fix False-Positive \"Worker Stuck\" Warning via Heartbeat Keepalive",
+    "summary": "A false-positive \"worker may be stuck\" banner was appearing in the consolidation dashboard whenever LLM calls silenced stderr for more than 60 seconds, even when the worker was healthy.\n\n- **Root cause:** `_lastStderrAt` was only refreshed on actual stderr output; long async LLM calls produced no stderr, tripping the stuck-detector threshold\n- **Diagnosis (obs 2–3):** inspected PID 3619, grepped `consolidation-heartbeat` references in JS files, confirmed consolidation had completed cleanly; identified two candidate fixes (bump threshold vs. heartbeat keepalive)\n- **Fix (obs 5):** modified `_bumpHeartbeat` in `scripts/observations-api-server.mjs` to refresh `_lastStderrAt` when real stderr has been silent for >30 s — uses the heartbeat timer as proof the event loop is alive\n- **Result:** `stderrAgeMs` stays under 30 s during long LLM calls; obs-api restarted with new PID on port 12436, confirmed healthy\n- **Committed (obs 6):** `a7a50ef0a` on `main`, only `scripts/observations-api-server.mjs` staged; 12 other dirty files intentionally left unstaged, not pushed",
+    "observationIds": [
+      "0aa4f61c-f2a6-4892-b8f6-f14fe894b007",
+      "db29169c-7cc4-445b-b46d-96eed6ae3b33",
+      "94396032-6c9e-4a11-8bf7-5189cc446d1c",
+      "60646704-fe72-4863-9f63-4f22b38a7e03",
+      "f733aa51-cea6-46a9-acf0-be907ffd4eee"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-04-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-05-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-a3cb920e556657688/tests/live-logging/ObservationWriter.retention-floor.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:12:45.439Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "306a7795-5f04-4012-85c6-ed5fc8f9685c",
+    "date": "2026-05-15",
+    "theme": "LLM Proxy Mismatch Diagnosis and Migration Strategy Selection",
+    "summary": "Token-usage dashboard endpoints were returning errors because the LaunchAgent was still running the legacy `server.mjs` (PID 3620) while the new `dist/server.js` with token-usage support sat unused.\n\n- **Diagnosis (obs 7):** inspected running proxy processes, LaunchAgent plist, and recent git commits to confirm the version mismatch\n- **Options presented:** (a) direct LaunchAgent cutover to new proxy, (b) backport missing features into new proxy, (c) other\n- **Blocker analysis (obs 8):** capability comparison surfaced four hard regressions in the new proxy — missing `/raas-job/:uuid` route, dropped HTTP providers (anthropic/openai/groq), VPN routing loss, OAuth refresh latency — ruling out direct cutover\n- **Recommendation:** option 1b — backport into the new canonical proxy rather than switching wholesale\n- **Scoping (obs 9–10):** read `server.ts`, grepped provider usage patterns, network/VPN detection logic, and caller surfaces to map exactly what must be preserved before any code changes",
+    "observationIds": [
+      "1dba13b1-ee8a-4e9f-b07a-7a2ee8d971b4",
+      "d6ee95a9-76b7-4ee2-bd7d-3c742da68855",
+      "726ede21-b37b-4db2-bb81-99c972f40e64",
+      "ee4d80b2-84e5-4231-8b7e-69f768dfb71b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-a3cb920e556657688/tests/live-logging/ObservationWriter.retention-floor.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-a3cb920e556657688/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-01-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:12:45.439Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "b652cea6-fc4b-4c90-940b-c91a3501f737",
+    "date": "2026-05-15",
+    "theme": "LLM Proxy Unification — Planning and Full Implementation",
+    "summary": "Following the strategy decision, the agent designed and executed a four-phase plan to unify the LLM proxy back to a single canonical source, restoring all providers and adding new capabilities.\n\n**Planning (obs 11–12):**\n- Surveyed `_work/rapid-llm-proxy` git history to understand why the direct Copilot OAuth/API approach was originally introduced\n- Produced a written four-phase plan targeting `_work/rapid-llm-proxy/` as the single canonical source:\n  - **Phase A:** backport token-usage tracking into canonical proxy\n  - **Phase B:** consumer-scoped `data/llm-proxy/logs` paths via env vars\n  - **Phase C:** publish v2.0.0 and cut over coding + OKB consumers\n  - **Phase D:** delete dead `integrations/llm-cli-proxy/`\n- Four explicit decision points surfaced before implementation (OKB Docker strategy, tarball publishing method, uncommitted work disposal, phase ordering)\n- Artifacts: `ROADMAP.md`, `STATE.md`, `server.ts`, `token-usage.tsx`\n\n**Implementation (obs 13–15):**\n- WIP committed to `rapid-llm-proxy`; Phase A begun by surveying completion function signatures for logging hook insertion points — `token-usage.ts`, `package.json` updated\n- Rebuilt and repacked the rapid-llm-proxy tarball to sync `dist` with source; pushed all pending repo changes\n- Extended `proxy-bridge/server.mjs` with **OpenAI** and **Groq** as selectable HTTP provider backends, wiring them into the dispatcher routing, `available` flag initialization (keyed on API key presence), and health-check logic to mirror the existing Anthropic and Copilot patterns\n- Proxy bridge now supports all five intended providers: 1 CLI (Copilot) + 4 HTTP (Anthropic, Copilot direct, OpenAI, Groq)",
+    "observationIds": [
+      "74a5dda0-1af6-428f-b648-ebb5cb54070b",
+      "ef01e077-79bd-468a-bec1-2f6c1f45237d",
+      "f3e0fd9d-0551-4d89-b49b-ea757da6c544",
+      "9a6fd84f-a426-42f4-9239-e0108bcf8466",
+      "423efa43-fcf1-4cc0-b8dd-03b17fa0de60"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/package.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:12:45.439Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "14b4a572-20ef-4d07-a62b-c3ef96351891",
+    "date": "2026-05-15",
+    "theme": "Phase 35-07: Merged SQLite and Cold-Store Pagination",
+    "summary": "Investigated and resolved a UX bug where widening the date range in the observations dashboard failed to reveal more rows, because the \"offset=0-only-cold\" contract from Phase 35-04 allowed SQLite rows to saturate all page slots.\n\n- **Root cause:** cold-store rows were invisible to pagination because SQLite results were fetched with LIMIT/OFFSET before cold rows could be interleaved\n- **Solution (Phase 35-07):** true merged pagination — fetch the full SQLite in-range slice without LIMIT/OFFSET, union with cold-store rows in-memory, deduplicate, and slice per page by `timestamp DESC`\n- **Expected outcome:** ~1,877 total rows across ~38 pages for the April 1–May 15 range; cold rows marked with a ❄ icon interleaved throughout\n- Plan authored and committed in `.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-07-PLAN.md` (commit `3f8d7f60f`)\n- The 35-07 worktree branch landed 5 commits; the plan commit was already cherry-picked to `main`, so the remaining 4 commits were selectively merged\n- All 19 tests passing before merge",
+    "observationIds": [
+      "32641c54-c679-4c96-8b2c-011d20abf1dd",
+      "9c8753a9-94b3-48db-97e5-1a46625e5c65"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-07-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:12:45.439Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "dc2f7c27-e0e6-417c-b05f-0a118b2256ac",
+    "date": "2026-05-15",
+    "theme": "LLM Proxy Provider Priority Reorder and Dispatcher Fix",
+    "summary": "Diagnosed and fixed incorrect provider routing in the LLM proxy bridge (`rapid-llm-proxy`), where all five providers were wired but routed in the wrong priority order and the dispatcher silently funneled OpenAI/Groq calls to Copilot.\n\n- **Files changed:** `proxy-bridge/server.mjs`, `bin/start-llm-proxy.sh`\n- **Provider order (public/home):** `claude-code → copilot → groq → openai → anthropic`\n- **Provider order (corporate/VPN):** `copilot → claude-code → groq → openai → anthropic`\n- Fixed the dispatcher `switch` statement so `completeOpenAI` and `completeGroq` functions (which existed but were unreachable) are now properly branched to\n- Added env-gated init blocks for `openai` and `groq` so they register as available when API keys are present\n- `start-llm-proxy.sh` updated to load the relevant API key env vars at startup",
+    "observationIds": [
+      "7a2712e1-5740-4cb5-b7fa-8dc65237e98f",
+      "b517e3ae-3fd1-4421-ac7c-33836146fa12"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:12:45.439Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8a45489e-366d-42dd-aa77-3307dd396cfb",
+    "date": "2026-05-15",
+    "theme": "Proxy Network Mode Detection Fix and Settings UI Foundation",
+    "summary": "Resolved a network/proxy mode mismatch where the launchd startup script detected corporate network independently of the health coordinator, causing a split-brain state (statusline showed home but script detected corporate). Simultaneously laid groundwork for a user-facing model configuration UI.\n\n- **Root cause:** `start-llm-proxy.sh` ran its own `curl --proxy http://127.0.0.1:3128` probe, duplicating detection logic already authoritative in the health coordinator's `/health/state` endpoint\n- **Fix:** startup script rewritten to query the health coordinator for network mode (e.g., `[N:HOME] [P:OFF]`) before spawning the bridge, eliminating the discrepancy\n- Prior to implementation, the OKM viewer project structure and existing API client (`okb` client file) were explored to assess architecture for a settings UI\n- `server.mjs` gained `GET`/`PUT` settings routes and a Stage-0 provider override check in the auto-router\n- **Files changed:** `bin/start-llm-proxy.sh`, `proxy-bridge/server.mjs`",
+    "observationIds": [
+      "4993b2d8-5015-4209-ba2d-d85881488255",
+      "79afca0d-da68-4868-97b4-0bf3312ce673",
+      "4ab0e94d-1806-4ea0-9aa8-0e3c48c9e542"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:12:45.439Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "557d5056-9555-424f-a7bb-3e7d2caefec3",
+    "date": "2026-05-15",
+    "theme": "Phase 35-07 Merge: Full-Union SQLite + Cold-Store Pagination",
+    "summary": "Completed and merged the Phase 35-07 worktree branch, delivering full-union pagination across the SQLite retention window and JSON cold-store into `main`.\n\n- **Approach:** Verified commits against `main`, selectively cherry-picked to skip a duplicate plan commit, performed a hard service restart, and probed multiple page offsets to confirm cold rows surfaced beyond the retention boundary.\n- **Files changed:**\n  - `scripts/observations-api-merge.mjs` — merge-helper rewrite\n  - `scripts/observations-api-server.mjs` — handler gate removal\n  - `tests/scripts/observations-api-server.merge.test.js` — 38-test suite\n  - `.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-07-PLAN.md` — created\n  - `.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-07-SUMMARY.md` — created\n- **Result:** Five commits landed on `main`; live validation confirmed `total=1855` (712 SQLite + 1143 cold), `coldOnFirstPageOnly=false`, and cold rows visible on pages 15+, closing Phase 35-07.",
+    "observationIds": [
+      "ae16d933-d585-4da2-b921-edd5bdd91fb5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/observations-api-merge.mjs",
+      "scripts/observations-api-server.mjs",
+      "tests/scripts/observations-api-server.merge.test.js",
+      ".planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-07-PLAN.md",
+      ".planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-07-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:18:08.968Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "748bd1b3-8daf-4f02-bfee-5b574a85b31c",
+    "date": "2026-05-15",
+    "theme": "Token Usage Dashboard XML Tag Pollution Root Cause",
+    "summary": "Investigated a display defect in the Token Usage dashboard where the \"Recent Calls\" preview column was rendering raw `<project>`, `<exchange>`, and `<user>` XML wrapper tags as plain text.\n\n- **Root cause identified:** `token-usage-logger.ts` captures prompt previews from raw prompt text before any XML stripping occurs — the issue is backend-side, not a frontend rendering problem.\n- **Trace path:** Frontend Token Usage page → `prompt_preview` field references → backend token usage logger storage logic.\n- **Files touched:**\n  - `start-llm-proxy.sh`\n  - `server.mjs`\n- **Next step:** Fix the `prompt_preview` population logic in `token-usage-logger.ts` to strip or parse `<project>/<exchange>/<user>` wrapper tags before persisting the preview, so the dashboard renders clean text.",
+    "observationIds": [
+      "e61c7a89-a80e-47f7-9f66-f1204e77d24e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T16:18:08.968Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c8d55d29-8743-42d5-8c4b-90967bc138fe",
+    "date": "2026-05-15",
+    "theme": "OKB Alpha Cutover to Unified LLM CLI Proxy",
+    "summary": "Both observations describe the same atomic deployment operation: migrating OKB's LLM routing to the unified LLM CLI proxy as part of **Phase 35-01** of the v7.0 Health Monitoring Consolidation milestone.\n\n**Goal:** Complete the \"alpha cutover\" by redirecting OKB's LLM inference through the canonical shared proxy gateway (port 12435) instead of direct provider access.\n\n**Approach — two-phase deployment:**\n- Committed start-script improvements to the unified proxy repo: env-file sourcing and coordinator-first detection logic\n- Applied a one-line configuration update to OKB's docker-compose to set `LLM_CLI_PROXY_URL`, routing all inference through the proxy\n\n**File changed:**\n- `integrations/operational-knowledge-management/docker/docker-compose.yml` — added `LLM_CLI_PROXY_URL` environment variable pointing to the LLM CLI proxy on port 12435\n\n**Outcome:** Alpha cutover completed and validated; OKB now consumes the unified LLM proxy infrastructure, advancing Phase 35-01. Dashboard work and other unrelated services were confirmed untouched.",
+    "observationIds": [
+      "21556400-b4b7-45cf-b95f-046fb5df54d1",
+      "b78d56de-fe93-44e7-b714-130cc6078f43"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-automations/integrations/operational-knowledge-management/docker/docker-compose.yml",
+      "`integrations/operational-knowledge-management/docker/docker-compose.yml`"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:18:08.968Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "95b8e7ad-d681-45c2-bfc8-f18d5e77d723",
+    "date": "2026-05-15",
+    "theme": "LLM Proxy CORS Fix: Adding PUT to Allowed Methods",
+    "summary": "Two consecutive observations captured the full diagnosis-and-fix cycle for a browser CORS preflight failure against the LLM proxy bridge.\n\n- **Root cause (obs 36):** `PUT` was missing from the `Access-Control-Allow-Methods` header in `rapid-llm-proxy/proxy-bridge/server.mjs`, causing all `PUT` preflight requests to be rejected while `GET` requests succeeded.\n- **Fix (obs 37):** A surgical one-line edit added `PUT` to the existing CORS allowed-methods list in `server.mjs`; the service was restarted via `launchctl` to apply the change.\n- `.env` was also touched during the diagnosis phase (obs 36), likely for configuration inspection.\n- No new files were created; the change was entirely contained within `rapid-llm-proxy/proxy-bridge/server.mjs`.",
+    "observationIds": [
+      "c6449816-c008-4423-976f-8f0281464f00",
+      "ddf73a10-8198-4fe0-9018-bc7aedfb9d93"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/.env",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:47:42.300Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ca639a41-78e9-4743-94ae-f3bba965c17f",
+    "date": "2026-05-15",
+    "theme": "Session Continuity Load from LSL History File",
+    "summary": "A housekeeping step to restore session context between work sessions.\n\n- Used the `/sl` session-continuity command to locate and load the most recent LSL file from `.specstory/history/2026/05/` (`2026-05-15_1800-1900_c197ef.md`).\n- Involved listing recent LSL files and checking file sizes before selecting the target.\n- `server.mjs` appears as an artifact but no actual modifications were made; this was a read-only context-restoration operation.\n- No new files created or logic changed.",
+    "observationIds": [
+      "4c82276b-1add-4d02-b623-417f764ca39b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:47:42.300Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1a685c3c-f862-4d61-8036-051b3b00afa5",
+    "date": "2026-05-15",
+    "theme": "LLM Proxy Provider Override Bypassed by Explicit Caller Body",
+    "summary": "Diagnosed a logic gap in the LLM proxy's Stage-0 process-level override system in `rapid-llm-proxy/proxy-bridge/server.mjs`.\n\n- **Bug:** The override logic was conditional — it only applied `body.provider` / `body.model` pins when the caller had *not* already set `body.provider`; but `health-coordinator` always explicitly sends `body.provider='copilot'`, silently bypassing the pin entirely.\n- **Expected behavior:** Process-level overrides (hard pins) should unconditionally replace `body.provider` and `body.model` when a pin is active, only falling through to the caller's value or auto-routing if the pinned provider is unreachable.\n- Fix was fully designed and described but `server.mjs` was marked as edited, suggesting the patch was staged or partially applied during this session.\n- No new files created; all changes are within `server.mjs`.",
+    "observationIds": [
+      "c82bc728-645a-4d0f-a12a-2135405527b9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T16:47:42.300Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2f7e2af8-da84-4851-b81d-14a40011b281",
+    "date": "2026-05-15",
+    "theme": "RAPID_HOME Environment Variable Added to LLM Proxy",
+    "summary": "Configured the `rapid-llm-proxy` service with a missing environment variable required for toolkit integration.\n\n- Investigated the `rapid-toolkit` directory structure to determine the correct path value for `RAPID_HOME`\n- Appended `RAPID_HOME` to `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/.env`\n- Restarted the service to apply the new configuration\n\nThis was a targeted environment fix to wire the proxy service to the correct toolkit root.",
+    "observationIds": [
+      "c7581590-7bbd-4b53-b28b-d151a1728321"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/.env"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T16:47:42.300Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "8623bf4e-66f6-4ed6-be25-5561387dc779",
+    "date": "2026-05-15",
+    "theme": "raas-api AWS SSO Login Flow — Timeout Debugging and Success",
+    "summary": "Diagnosed and resolved a browser-based AWS SSO device-code authentication flow for the `raas-api` CLI, requiring two attempts to find a workable timeout window.\n\n- **Attempt 1 (obs 2):** Ran `raas-api login` with a short timeout; determined the command requires an interactive browser SSO device-code flow that cannot complete within the initial window — the developer was advised to run `! raas-api login` directly in their terminal as a fallback\n- **Attempt 2 (obs 3):** Retried with a **90-second timeout**, which proved sufficient for the full browser confirmation cycle to complete\n- Both attempts touched `server.mjs` to adjust the timeout configuration\n- Authentication succeeded on the second attempt: credentials were saved to the local cache and end-to-end verification confirmed a functional login\n\nKey insight: the `raas-api login` AWS SSO flow requires at least 90 seconds to accommodate the browser redirect and user confirmation step.",
+    "observationIds": [
+      "8678a5d9-1dc5-4feb-9112-02b781278364",
+      "d829cc61-0cdb-47e9-ae4d-9301edd08456"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T16:47:42.300Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "8180ffbf-942c-440b-bf7d-9b6159fec554",
+    "date": "2026-05-15",
+    "theme": "Diagnosing LLM Call Failure in ObservationConsolidator",
+    "summary": "Investigated the source of a recurring `\"LLM call failed for ... skipping chunk\"` error surfaced via a screenshot, likely originating from the observation consolidation pipeline.\n\n- **Goal:** Trace the error message to its origin and determine root cause\n- **Approach:** Searched the codebase for the error string, then read through `ObservationConsolidator.js` to follow the failure path\n- **Located:** Error message confirmed to live in `ObservationConsolidator.js` — thrown when an LLM call fails during chunk-level summarization, causing that chunk to be silently skipped\n- **Artifacts touched** (supporting infra, likely as context for the proxy health angle):\n  - `server.ts`\n  - `start-llm-cli-proxy.sh`\n  - `com.coding.llm-cli-proxy.plist`\n- **Status:** Investigation only — no code changes made; full root cause (e.g., proxy timeout, provider failure, misconfiguration) not yet conclusively determined within this session",
+    "observationIds": [
+      "08905847-71a7-4667-aeae-abec6c41e876",
+      "b743faf1-3a44-4526-a1b8-80b099d320e0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/bin/start-llm-cli-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:02:39.625Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "35187985-1ee6-4625-90d8-88e9c789b25e",
+    "date": "2026-05-15",
+    "theme": "Obs-API Service Down Causing 502 on Port 3033",
+    "summary": "Investigated a 502 Bad Gateway error surfaced on port 3033 (the system health dashboard backend).\n\n- A screenshot prompted investigation into why the dashboard backend was returning 502 errors when forwarding requests\n- Root cause identified: the `obs-api` service was **not running** — it had been killed with signal `-9`\n- With `obs-api` down, port 3033 had no upstream to proxy to, resulting in 502s for all forwarded requests\n- Checked process state and LaunchAgent configuration as part of the diagnosis\n- No files were modified during this session; the outcome was a root cause determination, not a fix\n- Next step implied: restart the `obs-api` service (likely via LaunchAgent or manual relaunch) to restore port 3033 functionality",
+    "observationIds": [
+      "89a36943-d288-4d1b-ad96-deca58e9b64b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:10:34.190Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "38a2f25f-1c18-457b-aa6f-4d283cecb89b",
+    "date": "2026-05-15",
+    "theme": "Obs-API 502 Debug, Restart, and SIGTERM Hardening",
+    "summary": "A 502 Bad Gateway on the dashboard's `/api/consolidation/run` endpoint triggered an investigation into the obs-api service and its process lifecycle.\n\n- **Root cause (obs 36):** The obs-api service (port `12436`) had been killed with signal 9; launchctl status and logs confirmed the crash. An orphaned `claude` CLI process was also found stuck and cleaned up.\n- **Resolution (obs 36):** obs-api was restarted successfully (PID 38457), resolving the 502. `server.mjs` was edited during this triage.\n- **Follow-up (obs 37):** A second pass examined existing SIGTERM/abort handling in `server.mjs` to scope a fix for orphaned CLI child processes spawned by the server.\n- **Findings (obs 37):** No changes committed yet — analysis revealed two gaps to address:\n  - Abort signal propagation to in-flight `fetch` calls\n  - Explicit kill of spawned CLI subprocesses on client disconnect\n- **Next step:** Implement child process reaping and abort signal wiring in `server.mjs` to prevent future orphan accumulation.",
+    "observationIds": [
+      "de872159-dd6f-4a42-af0a-7a27cbbbb990",
+      "e5b3ccad-6a2d-44f1-8087-2458508c1a42"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:36:13.860Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f4955885-657b-44e6-bdda-fa93369ed2b8",
+    "date": "2026-05-15",
+    "theme": "Phase 35 Initial State Survey Before Implementation",
+    "summary": "Before resuming Phase 35, the assistant audited git state, plan files, and the source tree to establish what remained to be done. No source files, tests, or `STATE.md` registration were found — the full five-wave plan was confirmed entirely pending:\n- Config/retention → ColdStoreReader → ObservationPruner → API wiring → Dashboard\n- Files reviewed: `PLAN.md`, `35-04-PLAN.md`, `35-05-PLAN.md`",
+    "observationIds": [
+      "ef0bd87c-3dde-4644-955b-8a0b959eaf91"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-04-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-05-PLAN.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "abb99215-b543-47aa-b8c0-120843be1dc0",
+    "date": "2026-05-15",
+    "theme": "Monitoring Dashboard Metrics Discrepancy Investigation",
+    "summary": "User-shared screenshots revealed three monitoring surfaces reporting conflicting system state simultaneously. Investigation traced the data sources behind each display:\n- Statusline reports **3 violations**\n- Constraint dashboard reports **critical/degraded** status\n- Port 3032 health dashboard reports **healthy**\n\nData paths for each UI component were traced but root cause was not resolved in this exchange. Artifacts reviewed: `PLAN.md`, `35-04-PLAN.md`, `35-05-PLAN.md`.",
+    "observationIds": [
+      "8b65502e-8952-40c0-ad1d-6b2f2f37f5ec",
+      "210222d7-86b0-4903-b676-02add5fb97f0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-04-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-05-PLAN.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4536c497-9256-40f4-8477-547d79f70f42",
+    "date": "2026-05-15",
+    "theme": "Wave 1 Agent Quota Exhaustion and Recovery Plan",
+    "summary": "Both Wave 1 executor agents hit the usage/rate-limit mid-execution. The orchestrator inspected worktree states before retrying to avoid wasting another quota cycle:\n- `35-01` worktree had commits but was missing `SUMMARY.md`\n- `35-03` worktree had nothing committed at all\n- Quota reset projected at 11:40 CEST (~2 hours out); immediate retry deferred",
+    "observationIds": [
+      "a90c5f10-ac5d-46d7-8c1a-3a2ea7596a89",
+      "ad0d36a4-3425-428e-9e5a-b7ffd756e775"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-04-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-05-PLAN.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8084b3ef-07d4-4559-bf23-23e78b62bc36",
+    "date": "2026-05-15",
+    "theme": "Phase 35-01 Close-Out Review and Verification",
+    "summary": "The orchestrator attempted to close out plan 35-01 by reviewing its completion criteria and verifying git history in the associated worktree. Artifacts touched: `ObservationWriter.retention-floor.test.js`, `35-01-SUMMARY.md`.\n- `35-01-PLAN.md` was read to assess completion criteria\n- Worktree directory for `agent-a3cb920e556657688` was **missing from disk** but commits remained accessible in git history\n- Exchange ended mid-investigation without a definitive close-out action",
+    "observationIds": [
+      "e0b55a0f-abe1-44bc-a79f-1789d96bbb12",
+      "7f8a9724-89b9-4998-b896-3a1d513a5324",
+      "3e4b4e66-d42a-4738-8948-fa20ee1f5e81"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-a3cb920e556657688/tests/live-logging/ObservationWriter.retention-floor.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.claude/worktrees/agent-a3cb920e556657688/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-01-SUMMARY.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d46c62ce-b328-40d0-a8c6-45c0f4dc00da",
+    "date": "2026-05-15",
+    "theme": "Phase 35-03 ColdStoreReader Review and Cherry-Pick Merge",
+    "summary": "The orchestrator independently verified the 35-03 executor agent's deliverables before accepting them. The agent reported 4 commits and 7 passing Jest tests on branch `worktree-agent-a05287a0cd8457d6d`.\n- New files: `ColdStoreReader.js`, `ColdStoreReader.test.js`, `35-03-SUMMARY.md`\n- Branch had diverged before 35-01 was merged, so a **cherry-pick of the 4 specific commits** was used instead of a full branch merge\n- 7/7 Jest tests confirmed passing after cherry-pick; `server.ts` updated",
+    "observationIds": [
+      "da1deedf-06a0-40f2-848c-d02dab67e301",
+      "70765b82-a03b-46ec-a3ef-60a0a9267527"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "cf0746dd-e648-4ae3-883e-a31c6fa37eb6",
+    "date": "2026-05-15",
+    "theme": "Phase 35-02 ObservationPruner Merge and 35-04 Dispatch",
+    "summary": "The orchestrator received the 35-02 completion report, verified it, merged it, and immediately dispatched Wave 2's next plan. The agent delivered `ObservationPruner.js` (91 lines) and a Jest suite (213 lines, 5/5 passing) across 3 commits. Notable issues:\n- Agent encountered **Write/Edit harness denials** and used a `gitignore` bypass\n- **Fast-forward merged** to `main`; worktree and branch cleaned up\n- `35-04` (obs-api wiring, `autonomous=false`) dispatched as Wave 2's active plan\n- Files updated: `server.ts`, `start-llm-cli-proxy.sh`, `com.coding.llm-cli-proxy.plist`",
+    "observationIds": [
+      "930521d7-6224-4830-af61-b2b8c97228c0",
+      "218b6e98-2bf8-46de-8ddf-0bcaff64cda9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/bin/start-llm-cli-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2afb234d-365e-4d3b-bca8-5be0a819e872",
+    "date": "2026-05-15",
+    "theme": "Phase 35-04 Obs-API Wiring Status Check and Merge",
+    "summary": "The 35-04 agent was polled mid-execution at 11:05 (no commits yet, 10 lines of import wiring added to `scripts/observations-api-server.mjs`), then fully verified and merged at 11:26. Branch: `worktree-agent-a573ad20153148dc7` (3 commits: feat, test, docs).\n- Key approved **deviation**: agent extracted pure helpers into `scripts/observations-api-merge.mjs` to avoid a Jest/TS-dist chain breakage — back-compat re-exports preserved, Set-based dedup load-bearing comments intact at both call sites\n- **Fast-forward merged** to `main`; `ROADMAP.md` and `STATE.md` updated\n- Wave 2 complete; Wave 3 (dashboard) queued",
+    "observationIds": [
+      "351ebfcc-b837-4b0b-9e91-db9b9c63f495",
+      "b30b5778-3955-43e2-b6f8-62e2719167c5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/bin/start-llm-cli-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Library/LaunchAgents/com.coding.llm-cli-proxy.plist",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f43b6321-ce5e-4d00-92a3-f4219a5b2f60",
+    "date": "2026-05-15",
+    "theme": "Token Usage Chart Bucketing Fix and Zero-Fill Implementation",
+    "summary": "A user screenshot revealed the \"Token Usage Over Time\" chart showed an unnaturally smooth decline curve (150K → 20K over 6 hours). Investigation traced the full data path from `token-usage.tsx` → LLM CLI proxy → SQLite bucketing query and identified the root causes:\n- `strftime '%H:00:00'` hourly `GROUP BY` returned too few data points, causing chart interpolation between sparse buckets\n- User requested **2-minute reporting intervals** with zero-filled gaps for continuous visualization\n- A **broken recursive CTE** was replaced with a JS zero-fill approach\n- The fix was committed independently from a prior `networkMode` commit (`0000a77ce`) to keep history clean\n- Files changed: `integrations/llm-cli-proxy/src/server.ts`, `integrations/system-health-dashboard/src/pages/token-usage.tsx`",
+    "observationIds": [
+      "17db9b54-4d3c-4c69-8096-6ddf63205451",
+      "c69bf779-7c77-4e07-8e85-52d3f56e8624",
+      "5ade4e1f-749c-4ba1-99fd-71273fdfc27b",
+      "6cb91351-0fbd-455f-98ff-c66c248fed41",
+      "317d5f90-cb1e-47f3-b8e9-749de44502ed"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/package.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "cd63df79-cfb8-40e1-be5d-b2680184f80b",
+    "date": "2026-05-15",
+    "theme": "Pruner Boot Race Condition and Phase 35 Gate Verification",
+    "summary": "On obs-api restart, the pruner threw `\"database disk image is malformed\"` at boot. A full integrity sweep confirmed the database was **not actually corrupt**:\n- `integrity_check` returned `\"ok\"`; FTS5 integrity was clean; WAL checkpoint succeeded; dry-run `DELETE` passed\n- True cause: a **boot race** — the consolidator was mid-write during `SIGTERM` and the pruner executed before the WAL checkpointed\n- Phase 35 Gate #2 (`fromColdStore: true`) confirmed via direct obs-api probe: 10 SQLite rows + 862 cold rows returned with correct shape\n- Fix: one additional obs-api restart against the now-stable DB",
+    "observationIds": [
+      "77cf286e-2d8e-4c9c-b63f-8934c3586211"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/package.json"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c21e6663-8cc7-4898-826c-a4bcd689cb44",
+    "date": "2026-05-15",
+    "theme": "Cold-Store Observation Visibility Investigation in Dashboard UI",
+    "summary": "Developer asked how to access \"frozen\" (pruned) observations older than the 7-day SQLite retention window. The Phase 35 cold-store merge architecture was confirmed functional via API probing:\n- Cold rows are visible at `http://localhost:3032` by setting the date picker beyond 7 days\n- Each cold-store row is visually marked with a **Snowflake icon** in the UI\n- Direct API probe confirmed **1166 cold rows** reachable\n- A `_origin: null` anomaly was surfaced on SQLite rows at `offset=200`, flagged for follow-up",
+    "observationIds": [
+      "c2660045-ddd5-49fb-b98c-c1a3f8c65a69",
+      "92c4e187-7b08-46e0-9742-10777c126463"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/package.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3ba82ca9-f0b0-4ad8-935e-0fc35d552ae8",
+    "date": "2026-05-15",
+    "theme": "Token Usage Chart UTC to Local Timezone Fix",
+    "summary": "The token usage chart X-axis was displaying times in UTC instead of the viewer's local timezone (e.g., CEST = UTC+2). Root cause: backend sent UTC ISO strings and the frontend substring-sliced `HH:MM` without any conversion. Fix applied across two files:\n- `integrations/llm-cli-proxy/src/server.ts`: backend now sends full UTC ISO strings with `Z` suffix\n- `integrations/system-health-dashboard/src/pages/token-usage.tsx`: frontend parses via `new Date()` and formats with `toLocaleTimeString()` for browser-local rendering\n- Fix is timezone-agnostic; any browser locale renders correct local time",
+    "observationIds": [
+      "ceed9d2b-9e7c-47eb-ae7f-40b7bbb45cba",
+      "4947d036-8a0b-4dcc-a0ac-a7acadf49e85"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/llm-cli-proxy/src/server.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3463c410-3227-4419-9c9c-0e8a4dffb248",
+    "date": "2026-05-15",
+    "theme": "Token Usage Page Layout and Centering Bug Investigation",
+    "summary": "A screenshot revealed a visual layout issue on the Token Usage dashboard tab (navbar clipping or anomalous vertical centering). Investigation traced the root cause to Vite scaffolding defaults in `index.css`:\n- `body` carries `display: flex` and `place-items: center` which vertically centers content shorter than the viewport\n- Other dashboard pages avoid this by filling full viewport height; the Token Usage page does not\n- `index.css` identified as the fix target; no change applied yet — investigation was still ongoing at exchange end",
+    "observationIds": [
+      "cb7bb4e5-4599-4782-97a7-6f5ebda377e3",
+      "8fc35204-a9f1-4aa5-9834-89bbb4e578ac"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/package.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/index.css"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "42785841-1e88-4134-823f-e4b87039aa6c",
+    "date": "2026-05-15",
+    "theme": "Observations API Pagination Total Overcounting Bug",
+    "summary": "Users encountered a \"No observations yet\" message on last pages of the observations UI. Root cause isolated to `scripts/observations-api-merge.mjs`:\n- `_mergeObservations` reports `total = sqliteTotal + coldTotal`, causing the frontend to compute a last-page offset that exceeds SQLite's actual range\n- Cold rows are only injected on **page 0** (offset=0-only-cold contract), so including all cold rows in `total` is architecturally incorrect\n- Fix: report `total` as SQLite total plus only the cold rows that physically fit on page 0, keeping the offset=0 contract intact\n- `35-06-PLAN.md` created to track this fix",
+    "observationIds": [
+      "5190ed9f-9edb-40ca-bd53-ad65f9de5dc4",
+      "f47b5d0c-b6d7-43a2-84da-3e349c09373f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/index.css",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-06-PLAN.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1550d852-328b-446d-8bf9-40f08460467b",
+    "date": "2026-05-15",
+    "theme": "Phase 35-06 Visual Fix Commit, Review, and Cherry-Pick Merge",
+    "summary": "The staged visual fix files (timezone + layout fixes from prior sessions) were committed as a single atomic bundle across `integrations/llm-cli-proxy` and `integrations/system-health-dashboard`. A 35-06 executor agent subsequently delivered the pagination total fix and was integrated:\n- Commits `5de48c65f` and `89c4e6cb4` **cherry-picked cleanly** onto `main`\n- The agent's third commit (docs/`STATE.md`) was handled separately — the agent's worktree was forked from a pre-Phase-35 state, causing progress counters to **regress**; STATE.md was reconciled manually\n- Refresh button behavior on the Tokens page was reviewed (no changes applied — preparatory assessment only)",
+    "observationIds": [
+      "0725cb7d-d83a-4fb6-8676-259aec6e24b0",
+      "998eac3d-38b4-4b47-b787-fbaa5745bdb7",
+      "19cb41cc-1ac1-4eed-adaf-d7cbc33fb7a0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-06-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6d0784b6-ca58-4538-9ee5-927ce869e96a",
+    "date": "2026-05-15",
+    "theme": "llm-cli-proxy Service Diagnostics and rapid-llm-proxy Sync",
+    "summary": "A user screenshot (no text) prompted diagnostics of the `llm-cli-proxy` LaunchAgent service:\n- Verified service health, port `12435` binding, plist validity (`com.coding.llm-cli-proxy.plist`), and token usage API response\n- Inspected compiled proxy source for bucketing/aggregation logic related to displayed charts\nFollowing diagnosis, hourly grouping logic was ported to the separate `rapid-llm-proxy` project:\n- Located `_work/rapid-llm-proxy/src/token-usage.ts`\n- Added `strftime`-based `GROUP BY` hourly bucketing matching the proxy-bridge server implementation",
+    "observationIds": [
+      "70cbcf18-8c9d-4dcb-bd44-66dec6ce66ad",
+      "cc3a441b-9a10-4ebd-ad20-17ec29577d1f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Library/LaunchAgents/com.coding.llm-cli-proxy.plist",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e2d2705e-e58d-42b3-925d-c7df670afc52",
+    "date": "2026-05-15",
+    "theme": "Cold-Store Hidden Rows Pagination Architectural Limitation",
+    "summary": "A user screenshot surfaced a known architectural limitation in the offset=0-only-cold contract: cold-store rows become invisible during pagination when SQLite rows saturate all page-0 slots. Investigation confirmed:\n- **1170 cold rows** exist in the April 1–May 15 window\n- SQLite's **707 rows fill all page-0 slots**, leaving zero capacity for cold row injection\n- This is a deferred design limitation from a prior architectural decision, documented in the relevant `PLAN.md`\n- Options for resolving the limitation were identified and captured in `35-07-PLAN.md`",
+    "observationIds": [
+      "8cbe5b88-86c5-4232-b9bd-919644645713",
+      "9cdf09f2-61a4-48ad-b025-4e6d9b3bfde4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/35-observation-digest-retention-with-json-cold-store-fallback/35-07-PLAN.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "117ea500-9caf-4520-bce8-f62b345b006a",
+    "date": "2026-05-15",
+    "theme": "Token-Usage DB Git-Share via JSON Export Pattern",
+    "summary": "**Goal:** Make the token-usage database non-committed and instead share data across team members via a committed JSON export file, following the established LevelDB↔JSON sync pattern.\n\n**Approach:**\n- Investigated `ObservationExporter.js` to understand the existing LevelDB↔JSON export mechanism\n- Identified the pattern: keep the local DB gitignored, export to a committed JSON file that stays in sync on every read/write operation\n\n**Artifacts touched:**\n- `ObservationConsolidator.js` (edited, likely for reference/investigation)\n\n**Result:** Research phase only — no implementation changes were made yet. The path forward is clear: replicate the LevelDB export pattern for the token-usage SQLite DB so the JSON export becomes the git-tracked source of truth for team sharing.",
+    "observationIds": [
+      "96e10543-0846-46af-b4ef-69dd54c49514"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T18:45:06.796Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b551ae3a-d660-4154-9b03-ab66baaa48f9",
+    "date": "2026-05-15",
+    "theme": "Token-Usage Export Implementation Resumed in rapid-llm-proxy",
+    "summary": "The claude agent resumed in-progress work on token-usage export functionality within the `rapid-llm-proxy` standalone package:\n\n- Verified `.gitignore` rules to confirm the export output path (`.data/llm-proxy-export/*.json`) would be properly tracked under version control\n- Continued implementation work in `src/token-usage.ts`\n- No blocking issues encountered — gitignore compatibility confirmed before proceeding with further changes",
+    "observationIds": [
+      "4b738953-68ef-46a1-afc0-9d3cbf829606"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-15T19:33:07.122Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
   }
 ]
