@@ -60,7 +60,10 @@ interface HealthResponse {
   providers: Record<string, ProviderStatus>;
   uptime: number;
   inFlightRequests: number;
+  networkMode: NetworkMode;
 }
+
+type NetworkMode = 'public' | 'corporate' | 'unknown';
 
 // --- Configuration ---
 
@@ -70,6 +73,53 @@ const PROVIDER_CHECK_INTERVAL_MS = 60_000;
 const DEFAULT_TIMEOUT_MS = 120_000;
 const PER_PROVIDER_TIMEOUT_MS = 15_000; // Per-provider timeout during fallback — reduced from 30s to avoid burning the caller's budget on a hung provider
 const MAX_CLI_ARG_LENGTH = 200_000; // Use stdin for prompts exceeding this
+
+// --- Network mode detection (backported from rapid-llm-proxy) ---
+//
+// On VPN/corporate, the claude-code CLI cannot reach Anthropic's endpoints
+// directly and times out before falling back. Filtering it out of auto-select
+// avoids a per-provider-timeout slowdown (15s) on every request. Explicit
+// `provider: 'claude-code'` is still honored — the caller asked for it.
+//
+// Source of truth: health-coordinator's /health/state.network.location. We
+// cache for 30s to match the coordinator's own poll cadence, and default to
+// 'public' on probe failure (no harm — claude-code is tried first on public
+// anyway, and the cooldown FSM handles the unlikely case where it's wedged).
+
+const COORDINATOR_URL = process.env.HEALTH_COORDINATOR_URL || 'http://127.0.0.1:3034';
+const NETWORK_CACHE_TTL_MS = 30_000;
+
+let _cachedNetworkMode: NetworkMode = 'unknown';
+let _networkModeCheckedAt = 0;
+
+async function detectNetworkMode(): Promise<NetworkMode> {
+  const now = Date.now();
+  if (_cachedNetworkMode !== 'unknown' && (now - _networkModeCheckedAt) < NETWORK_CACHE_TTL_MS) {
+    return _cachedNetworkMode;
+  }
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 1000);
+    const r = await fetch(`${COORDINATOR_URL}/health/state`, { signal: controller.signal });
+    clearTimeout(t);
+    if (r.ok) {
+      const state = await r.json() as { network?: { location?: string } };
+      const loc = state?.network?.location;
+      _cachedNetworkMode = (loc === 'corporate' || loc === 'vpn') ? 'corporate' : 'public';
+      _networkModeCheckedAt = now;
+      return _cachedNetworkMode;
+    }
+  } catch { /* coordinator unreachable — fall through to default */ }
+  _cachedNetworkMode = 'public';
+  _networkModeCheckedAt = now;
+  return _cachedNetworkMode;
+}
+
+function networkModeSync(): NetworkMode {
+  // Cheap synchronous read of the cached value for /health and routing.
+  // The async detectNetworkMode() refresh runs out-of-band on a timer.
+  return _cachedNetworkMode === 'unknown' ? 'public' : _cachedNetworkMode;
+}
 
 // --- State ---
 
@@ -136,11 +186,17 @@ function selectBestProvider(): string | null {
 
 function getOrderedProviders(preferredProvider?: string): string[] {
   const all = Object.keys(CLI_CONFIGS);
+  // On corporate/VPN networks, claude-code CLI can't reach Anthropic and just
+  // burns the per-provider timeout (15s) before falling back. Filter it out
+  // of auto-select entirely. Explicit preferredProvider='claude-code' is still
+  // honored below — the caller asked for it, so let them eat the timeout.
+  const onCorporate = networkModeSync() === 'corporate';
   if (!preferredProvider) {
     // Sort: healthy first, then by fewer consecutive failures
     // Filter out providers in cooldown entirely — don't waste time on them
     return all
       .filter(p => {
+        if (onCorporate && p === 'claude-code') return false;
         const status = providerStatuses[p];
         if (!status?.available) return false;
         // Skip providers deep in cooldown (failed recently with many consecutive failures)
@@ -441,6 +497,7 @@ app.get('/health', (_req, res) => {
     providers: { ...providerStatuses },
     uptime: Math.floor((Date.now() - startTime) / 1000),
     inFlightRequests: inFlightProcesses.size,
+    networkMode: networkModeSync(),
   };
   res.json(response);
 });
@@ -498,14 +555,31 @@ app.get('/api/token-usage/summary', (_req, res) => {
       GROUP BY subscription ORDER BY total_tokens DESC
     `).all(since);
 
+    // Bucket size in minutes (default 2, clamped 1..60). Series is generated
+    // via recursive CTE from `since` (floored to bucket boundary) to `now` so
+    // empty buckets render as 0 instead of being interpolated across — which
+    // was hiding multi-hour silence gaps in the proxy-routed traffic.
+    const bucketMinutes = Math.max(1, Math.min(60, parseInt((_req.query.bucketMinutes as string) || '2', 10)));
+    const bucketSeconds = bucketMinutes * 60;
     const by_hour = tokenDb.prepare(`
-      SELECT strftime('%Y-%m-%dT%H:00:00', timestamp) as hour,
-        SUM(input_tokens) as input_tokens,
-        SUM(output_tokens) as output_tokens,
-        COUNT(*) as calls
-      FROM token_usage WHERE timestamp >= ?
-      GROUP BY hour ORDER BY hour
-    `).all(since);
+      WITH RECURSIVE series(bucket) AS (
+        SELECT (strftime('%s', ?) / ${bucketSeconds}) * ${bucketSeconds}
+        UNION ALL
+        SELECT bucket + ${bucketSeconds} FROM series
+        WHERE bucket + ${bucketSeconds} <= strftime('%s', 'now')
+      )
+      SELECT
+        strftime('%Y-%m-%dT%H:%M:%S', series.bucket, 'unixepoch') as hour,
+        COALESCE(SUM(t.input_tokens), 0) as input_tokens,
+        COALESCE(SUM(t.output_tokens), 0) as output_tokens,
+        COUNT(t.id) as calls
+      FROM series
+      LEFT JOIN token_usage t
+        ON (strftime('%s', t.timestamp) / ${bucketSeconds}) * ${bucketSeconds} = series.bucket
+        AND t.timestamp >= ?
+      GROUP BY series.bucket
+      ORDER BY series.bucket
+    `).all(since, since);
 
     res.json({
       total_calls: totals.calls,
@@ -705,10 +779,17 @@ const server = app.listen(PORT, HOST, async () => {
   log(`[llm-cli-proxy] Docker access: http://host.docker.internal:${PORT}`);
   log('[llm-cli-proxy] Checking CLI availability...');
   await refreshProviderStatuses();
+  // Warm the network-mode cache so the first /api/complete request doesn't
+  // pay the coordinator round-trip; cache TTL (30s) keeps subsequent calls
+  // synchronous via networkModeSync().
+  detectNetworkMode().then(mode => log(`[llm-cli-proxy] Network mode: ${mode}`)).catch(() => { /* default 'public' kicks in */ });
 });
 
 // Re-check provider availability periodically
 setInterval(refreshProviderStatuses, PROVIDER_CHECK_INTERVAL_MS);
+// Refresh network-mode cache from the coordinator at the same cadence as its
+// own polling — keeps VPN/corporate detection responsive without spamming.
+setInterval(() => { detectNetworkMode().catch(() => { /* default kicks in */ }); }, NETWORK_CACHE_TTL_MS);
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
