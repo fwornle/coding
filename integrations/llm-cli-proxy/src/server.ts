@@ -555,31 +555,40 @@ app.get('/api/token-usage/summary', (_req, res) => {
       GROUP BY subscription ORDER BY total_tokens DESC
     `).all(since);
 
-    // Bucket size in minutes (default 2, clamped 1..60). Series is generated
-    // via recursive CTE from `since` (floored to bucket boundary) to `now` so
-    // empty buckets render as 0 instead of being interpolated across — which
-    // was hiding multi-hour silence gaps in the proxy-routed traffic.
+    // Bucket size in minutes (default 2, clamped 1..60). SQL groups only
+    // populated buckets; JS then zero-fills the full series from `since`
+    // (floored to bucket boundary) to `now` so empty buckets render as 0
+    // instead of being interpolated across — which was hiding multi-hour
+    // silence gaps in the proxy-routed traffic.
     const bucketMinutes = Math.max(1, Math.min(60, parseInt((_req.query.bucketMinutes as string) || '2', 10)));
     const bucketSeconds = bucketMinutes * 60;
-    const by_hour = tokenDb.prepare(`
-      WITH RECURSIVE series(bucket) AS (
-        SELECT (strftime('%s', ?) / ${bucketSeconds}) * ${bucketSeconds}
-        UNION ALL
-        SELECT bucket + ${bucketSeconds} FROM series
-        WHERE bucket + ${bucketSeconds} <= strftime('%s', 'now')
-      )
+    const populated = tokenDb.prepare(`
       SELECT
-        strftime('%Y-%m-%dT%H:%M:%S', series.bucket, 'unixepoch') as hour,
-        COALESCE(SUM(t.input_tokens), 0) as input_tokens,
-        COALESCE(SUM(t.output_tokens), 0) as output_tokens,
-        COUNT(t.id) as calls
-      FROM series
-      LEFT JOIN token_usage t
-        ON (strftime('%s', t.timestamp) / ${bucketSeconds}) * ${bucketSeconds} = series.bucket
-        AND t.timestamp >= ?
-      GROUP BY series.bucket
-      ORDER BY series.bucket
-    `).all(since, since);
+        (strftime('%s', timestamp) / ${bucketSeconds}) * ${bucketSeconds} as bucket_sec,
+        SUM(input_tokens) as input_tokens,
+        SUM(output_tokens) as output_tokens,
+        COUNT(*) as calls
+      FROM token_usage
+      WHERE timestamp >= ?
+      GROUP BY bucket_sec
+      ORDER BY bucket_sec
+    `).all(since) as Array<{bucket_sec: number; input_tokens: number; output_tokens: number; calls: number}>;
+
+    const bucketMap = new Map<number, typeof populated[0]>();
+    for (const b of populated) bucketMap.set(Number(b.bucket_sec), b);
+
+    const startSec = Math.floor(Date.parse(since) / 1000 / bucketSeconds) * bucketSeconds;
+    const endSec = Math.floor(Date.now() / 1000 / bucketSeconds) * bucketSeconds;
+    const by_hour: Array<{hour: string; input_tokens: number; output_tokens: number; calls: number}> = [];
+    for (let s = startSec; s <= endSec; s += bucketSeconds) {
+      const b = bucketMap.get(s);
+      by_hour.push({
+        hour: new Date(s * 1000).toISOString().replace(/\.\d{3}Z$/, ''),
+        input_tokens: b?.input_tokens ?? 0,
+        output_tokens: b?.output_tokens ?? 0,
+        calls: b?.calls ?? 0,
+      });
+    }
 
     res.json({
       total_calls: totals.calls,

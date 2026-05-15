@@ -203,9 +203,9 @@ export function TokenUsagePage() {
       avgLatency: p.avg_latency,
     }))
 
-  // Prepare hourly timeline data
+  // Prepare timeline data (2-minute buckets, zero-filled by the backend)
   const hourlyData = (summary.by_hour || []).map(h => ({
-    hour: h.hour.replace(/^\d{4}-\d{2}-\d{2}T/, '').replace(/:00:00.*$/, ':00'),
+    hour: h.hour.replace(/^\d{4}-\d{2}-\d{2}T/, '').replace(/:\d{2}$/, ''),
     input: h.input_tokens,
     output: h.output_tokens,
     calls: h.calls,
@@ -449,7 +449,7 @@ export function TokenUsagePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Token Usage Over Time</CardTitle>
-              <CardDescription>Hourly input/output token consumption</CardDescription>
+              <CardDescription>2-minute input/output token consumption (gaps render as zero)</CardDescription>
             </CardHeader>
             <CardContent>
               {hourlyData.length > 0 ? (
@@ -470,7 +470,7 @@ export function TokenUsagePage() {
                 </ResponsiveContainer>
               ) : (
                 <div className="text-center text-muted-foreground py-12">
-                  No hourly data available yet. Token usage will appear here as LLM calls are made.
+                  No timeline data available yet. Token usage will appear here as LLM calls are made.
                 </div>
               )}
             </CardContent>
