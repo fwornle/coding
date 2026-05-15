@@ -88,6 +88,10 @@ constraints:
   applies_to: file_path
   tool_filter:
   - Write
+  # Restrict to code files only. Planning docs, markdown, yaml, json, and
+  # other non-code paths often contain substrings like "cold-store" or
+  # "new-feature" that are false positives for the parallel-version pattern.
+  file_pattern: \.(js|ts|jsx|tsx|mjs|cjs|py|sh|rb|go|rs|java|kt|swift|c|cc|cpp|h|hpp|m|mm|php|pl|lua|dart|scala)$
   suggestion: Debug and fix the original file instead of creating parallel versions
 - id: debug-not-speculate
   group: architecture
