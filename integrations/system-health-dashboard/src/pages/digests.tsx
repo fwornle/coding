@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, ChevronDown, ChevronRight, Calendar, Users, FileText } from 'lucide-react'
+import { RefreshCw, ChevronDown, ChevronRight, Calendar, Users, FileText, Snowflake } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +22,8 @@ interface Digest {
   quality: string
   createdAt: string
   project?: string | null
+  /** Phase 35: 'cold' rows from JSON cold store, 'sqlite' from primary DB. */
+  _origin?: 'cold' | 'sqlite'
 }
 
 interface DigestResponse {
@@ -52,6 +54,9 @@ function DigestCard({ digest, isExpanded, onToggle }: { digest: Digest; isExpand
           {isExpanded ? <ChevronDown className="w-4 h-4 mt-1 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 mt-1 shrink-0 text-muted-foreground" />}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
+              {digest._origin === 'cold' && (
+                <Snowflake className="w-3.5 h-3.5 text-sky-400/80 shrink-0" aria-label="From cold storage"><title>Older than retention window — served from JSON cold store.</title></Snowflake>
+              )}
               <span className="text-sm font-medium">{digest.theme}</span>
               <Badge variant="outline" className="text-xs shrink-0">
                 {digest.observationIds.length} obs

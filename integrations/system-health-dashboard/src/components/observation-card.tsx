@@ -1,3 +1,4 @@
+import { Snowflake } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AgentBadge } from '@/components/agent-badge'
@@ -30,6 +31,8 @@ export interface Observation {
   llmTokens?: string | LlmTokens | null
   llmLatencyMs?: number | null
   quality?: 'high' | 'normal' | 'low'
+  /** Phase 35: 'cold' rows from JSON cold store, 'sqlite' from primary DB. */
+  _origin?: 'cold' | 'sqlite'
 }
 
 interface ObservationCardProps {
@@ -126,7 +129,10 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
         onClick={onToggle}
       >
         <AgentBadge agent={observation.agent} />
-        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+        <span className="text-[11px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
+          {observation._origin === 'cold' && (
+            <Snowflake className="w-3 h-3 text-sky-400/80 shrink-0" aria-label="From cold storage"><title>Older than retention window — served from JSON cold store.</title></Snowflake>
+          )}
           {formatTimestamp(observation.timestamp, true)}
         </span>
         {observation.project && (
@@ -159,7 +165,10 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
           <div className="px-4 py-3 cursor-pointer">
             <div className="flex items-center gap-3 mb-0.5">
               <AgentBadge agent={observation.agent} />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                {observation._origin === 'cold' && (
+                  <Snowflake className="w-3.5 h-3.5 text-sky-400/80 shrink-0" aria-label="From cold storage"><title>Older than retention window — served from JSON cold store.</title></Snowflake>
+                )}
                 {formatTimestamp(observation.timestamp)}
               </span>
               {observation.project && (
