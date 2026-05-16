@@ -145,6 +145,46 @@ changes yet)
 | `.gitignore` | WAL/SHM coverage (Wave 5) |
 | `scripts/migrate-token-usage-export.mjs` (new) | One-shot bucketing (Wave 5) |
 | `.data/llm-proxy-export/token-usage.json` | Removed in migration commit (Wave 5) |
+| `_work/rapid-llm-proxy/proxy-bridge/server.mjs` | Add `canonicalizeModelName` + apply at logTokenCall site (Plan 36-06, Wave 5) |
+| `_work/rapid-llm-proxy/src/token-usage.ts` | Add `model_raw` column + idempotent backfill (Plan 36-06, Wave 5) |
+| `integrations/system-health-dashboard/src/pages/token-usage.tsx` | Treemap hover tooltip + SVG `<title>` fallback (Plan 36-07, Wave 5) |
+
+## Polish additions (2026-05-16) — Plans 36-06 + 36-07
+
+After plans 36-01..05 landed the export work, two adjacent token-usage
+quality issues surfaced from live dashboard inspection:
+
+**36-06 — Model-name canonicalization.** The 'By Model' panel was
+showing 8 rows for what is really 3 Claude models, because each
+provider returns its own spelling and the proxy records it verbatim:
+- `claude-sonnet-4-6` (CLI dash-version) vs `claude-sonnet-4.6`
+  (Copilot dot-version) vs `Claude Sonnet 4.6` (Anthropic title-case)
+  vs bare `sonnet` (CLI fallback when `modelUsage` is empty).
+- `claude-haiku-4-5-20251001` (Copilot dated snapshot) vs
+  `claude-haiku-4.5` vs `Claude Haiku 4.5`.
+
+Root cause: `server.mjs:1204` `logTokenCall({ model: result.model, ...})`
+has no normalization. Fix: pure-function `canonicalizeModelName(raw)`
+in the existing model-mapping block (~line 414), applied once at the
+persistence boundary. Raw upstream identifier preserved in a new
+`model_raw` column (PRAGMA-guarded ALTER, same pattern as 36-04's
+user_hash migration). Idempotent backfill on proxy boot rewrites
+pre-existing rows once.
+
+**36-07 — Treemap hover tooltip.** The "Hover for details" subtitle
+on the Token Consumption by Process treemap was aspirational — the
+custom `TreemapContent` only renders inline text for boxes ≥ 40×30 px
+(line 133 returns null below that), and no `<Tooltip>` was wired as a
+child of `<Treemap>`. Smaller boxes were silent. Fix: a custom
+`TreemapTooltip` component showing process / total / in-out split /
+calls / avg latency, wired as a recharts Tooltip child. Plus an SVG
+`<title>` element inside `TreemapContent` for accessibility +
+browser-native hover fallback.
+
+Both plans are Wave 5 (independent files, can run in parallel).
+36-06 `depends_on: [36-04]` to avoid `server.mjs` co-edit races with
+the export wiring. 36-07 has no dependencies and could land at any
+wave, but Wave 5 keeps the "polish" phase clearly delimited.
 
 ## Out of scope (deferred / explicit non-goals)
 
@@ -154,3 +194,9 @@ changes yet)
   (we add the field; consumers stay on local computation in v1).
 - Backfilling `user_hash='c197ef'` on legacy rows is automatic via
   the migration script's bucketing; no separate UPDATE pass needed.
+- (36-06) Mapping the older `claude-sonnet-4.5` family — it IS its own
+  canonical name, not an alias of Sonnet 4.6. Rows stay as-is.
+- (36-06) Touching the `result.model` return values of the
+  `completeXxx` provider functions — raw strings stay raw at source,
+  canonicalization happens only at persistence.
+- (36-07) Tooltips on other charts (already wired) or palette changes.
