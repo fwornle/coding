@@ -2,7 +2,7 @@
 !include _standard-style.puml
 
 top to bottom direction
-title Cognitive Process Token Flow
+title Cognitive Process Token Flow (Phase 35)
 
 ' === User Layer ===
 actor "Developer" as dev
@@ -13,87 +13,122 @@ package "Active Sessions" {
   component [OpenCode] <<cli>> as opencode
 }
 
-' === LLM Proxy (Single Gateway) ===
-package "LLM Proxy\n:12435" <<core>> {
+' === LLM Proxy ===
+package "LLM Proxy :12435 (@rapid/llm-proxy 2.0)" <<core>> {
   component [Request Router] <<core>> as router
-  component [Token Logger] <<core>> as logger
-  database "token-usage.db\n(SQLite)" <<storage>> as tokendb
+  component [SettingsStore\n(per-process pins)] <<core>> as settings
+  component [TokenUsageStore\n(logCall)] <<core>> as logger
+  component [JSON Exporter\n(2 s debounce)] <<core>> as exporter
+  database "token-usage.db\n(SQLite, untracked)" <<storage>> as tokendb
+  file "token-usage.json\n(git-trackable)" <<storage>> as tokenjson
+  file "settings.json\n(persisted pins)" <<storage>> as settingsjson
 }
 
 ' === Provider Layer ===
 cloud "LLM Providers" {
   component [Claude Code\nMax Subscription] <<external>> as ccmax
   component [Copilot\nSubscription] <<external>> as copilot
-  component [Anthropic\nAPI Key] <<external>> as anthropic
+  component [OpenAI / Groq / Anthropic\n(API-key, public-only)] <<external>> as apikey
 }
 
 ' === Cognitive Processes ===
 package "Online Learning Pipeline" {
   component [ETM\nEvent-Time Monitor] <<agent>> as etm
-  component [Observation Writer\n(classification + summary)] <<agent>> as obswriter
-  component [Consolidator\n(digest → insight)] <<agent>> as consolidator
+  component [Observation Writer] <<agent>> as obswriter
+  component [Consolidator Digest] <<agent>> as digest
+  component [Consolidator Insight] <<agent>> as insight
 }
 
 package "Wave Analysis" {
-  component [Wave-1 Agent\n(code analysis)] <<agent>> as wave1
-  component [Insight Generator\n(entity synthesis)] <<agent>> as insightgen
-  component [Content Validator\n(entity refresh)] <<agent>> as validator
+  component [Wave-1 Agent] <<agent>> as wave1
+  component [Insight Generator] <<agent>> as insightgen
+  component [Content Validator] <<agent>> as validator
 }
 
 package "Health & Monitoring" {
-  component [Auto-Heal FSM\n(service recovery)] <<agent>> as autoheal
-  component [Constraint Monitor\n(rule checking)] <<agent>> as constraints
+  component [Auto-Heal FSM] <<agent>> as autoheal
+  component [Constraint Monitor] <<agent>> as constraints
+  component [Health Coordinator\n(low-token probes)] <<agent>> as coord
 }
 
 ' === Dashboard ===
-package "Health Dashboard\n:3032" {
-  component [Token Usage Page] <<api>> as dashboard
+package "Health Dashboard :3032 / :3033" {
+  component [Token Usage page\n(4 tabs)] <<api>> as page
+  component [LLM Routing dialog\n(Settings button)] <<api>> as dialog
+  component [server.js reverse-proxy] <<api>> as fwd
 }
 
 ' === Flow: Sessions to Proxy ===
 dev --> claude : coding session
 dev --> opencode : coding session
-claude --> router : LLM calls\n(provider selection)
+claude --> router : LLM calls
 opencode --> router : LLM calls
 
 ' === Flow: Cognitive Processes to Proxy ===
 obswriter --> router : process="observation-writer"
-consolidator --> router : process="consolidator"
+digest --> router : process="consolidator-digest"
+insight --> router : process="consolidator-insight"
 wave1 --> router : process="wave1-analysis"
 insightgen --> router : process="insight-generator"
 validator --> router : process="content-validator"
 autoheal --> router : process="auto-heal"
 constraints --> router : process="constraint-check"
+coord --> router : process="health-coordinator"
+
+' === Pin lookup ===
+router -[#9C27B0,thickness=2]-> settings : lookup(process)
+settings -[#9C27B0,thickness=2]-> settingsjson : load + persist
 
 ' === Flow: Proxy to Providers ===
 router --> ccmax : Claude Max
 router --> copilot : GitHub Copilot
-router --> anthropic : API key
+router --> apikey : when on public network
 
 ' === Token Logging ===
 router -[#FF9800,thickness=2]-> logger : every response
-logger -[#FF9800,thickness=2]-> tokendb : log(provider, model,\nprocess, tokens,\nlatency, subscription)
+logger -[#FF9800,thickness=2]-> tokendb : INSERT row
+logger -[#FF9800,thickness=2]-> exporter : schedule
+exporter -[#FF9800,thickness=2]-> tokenjson : debounced write\n+ safety merge
 
 ' === Dashboard reads ===
-dashboard -[#43A047,thickness=2,dashed]-> tokendb : /api/token-usage/*
-dev --> dashboard : view stats
+page -[#43A047,thickness=2,dashed]-> fwd : /api/token-usage/*
+dialog -[#43A047,thickness=2,dashed]-> fwd : GET/PUT /api/llm/settings
+fwd -[#43A047,thickness=2,dashed]-> router : reverse-proxy
+dev --> page : view stats
 
 ' === ETM triggers ===
 etm -[#757575,thickness=1,dotted]-> obswriter : session events
 
 note right of tokendb
-  Schema: timestamp, provider, model,
-  process, input/output tokens,
-  latency_ms, subscription,
-  prompt_preview (100 chars)
+  Schema: id, timestamp, provider, model,
+  process, subscription, input/output tokens,
+  latency_ms, prompt_preview (XML-stripped),
+  tokens_estimated.
 end note
 
-note bottom of dashboard
-  Visualizations:
-  • Token distribution by process (treemap)
-  • Provider breakdown (donut chart)
-  • Timeline (area chart, hourly)
-  • Recent calls table
+note right of tokenjson
+  Mirrors the LevelDB/observations
+  dual-store contract: DB untracked,
+  JSON committed. Safety merge keeps
+  historic rows missing from a freshly
+  reset local DB.
+end note
+
+note bottom of page
+  Four tabs sharing summary cards:
+    Overview (treemap + donut)
+    By Process (sortable table)
+    Timeline (2-min buckets, zero-fill,
+              viewer's local timezone)
+    Recent Calls (last 50, XML-stripped preview)
+  Header: Settings + Refresh (busy-state).
+end note
+
+note bottom of dialog
+  Per-process pin is a hard override:
+  wins over body.provider, falls through
+  to auto-route only if the pinned
+  provider becomes unreachable.
 end note
 
 @enduml
