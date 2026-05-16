@@ -43,6 +43,7 @@ import https from 'node:https';
 import dns from 'node:dns';
 import os from 'node:os';
 import ProcessStateManager from './process-state-manager.js';
+import { getTimeWindow, utcToLocalTime } from './timezone-utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -63,6 +64,30 @@ const FORBIDDEN_RULE_NAMES = new Set(['bind_mount_freshness', 'supervisord_statu
 const HEARTBEAT_STALENESS_MS = 15_000;
 // Eviction window after entering 'stopped' (D-10): drop after 5 min in stopped
 const EVICT_AFTER_STOPPED_MS = 5 * 60 * 1000;
+
+// Phase 36-01: cache session_duration once at module init. timezone-utils'
+// getTimeWindow() re-reads config/live-logging-config.json on EVERY call — at
+// 5s tick × 24h = 17 280 reads/day. This cached value is used as a fallback
+// when getTimeWindow throws AND is wired as a future hand-off for any consumer
+// that needs the value without paying the per-call I/O cost. The standalone
+// callers of getTimeWindow (statusline, LSL filename generation) are
+// unchanged — per CLAUDE.md "Never modify working APIs for TypeScript
+// compliance; fix types instead" we don't touch timezone-utils.js.
+// Default: 60 min = 3 600 000 ms. Matches config/live-logging-config.json.
+let LSL_SESSION_DURATION_MS = 3_600_000;
+try {
+  const _lslConfigPath = path.join(
+    process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || REPO_ROOT,
+    'config',
+    'live-logging-config.json'
+  );
+  const _lslConfig = JSON.parse(fs.readFileSync(_lslConfigPath, 'utf8'));
+  if (_lslConfig?.live_logging?.session_duration) {
+    LSL_SESSION_DURATION_MS = _lslConfig.live_logging.session_duration;
+  }
+} catch (_err) {
+  // Keep default; bootstrap log not yet available at this point in module init.
+}
 
 // Test-only injection hook (RESEARCH §10, used by injection.test.sh).
 // When set, the named check throws on next tick. Coordinator surfaces 'unknown',
@@ -159,6 +184,15 @@ const currentState = {
   services: [],
   lsl: {},
   lsl_by_project: {},
+  // Phase 36-01: canonical LSL time-window for the current poll tick (HHMM-HHMM,
+  // e.g. '0900-1000'). Published so future consumers (LLM proxy / dashboard /
+  // statusline) can drop their per-call getTimeWindow() reads in favour of a
+  // single canonical source. Wave 1 is observation-only — existing consumers
+  // continue local computation (see CONTEXT.md "Out of scope"). Reads 'unknown'
+  // on any compute error (SPEC R6 — never substitute synthetic 'healthy').
+  // Top-level sibling of `lsl` and `lsl_by_project` to avoid colliding with the
+  // sid:project keys inside `lsl` (PATTERNS.md Section 1 anomaly).
+  lsl_meta: { current_window: 'unknown' },
   processes: [],
   databases: { status: 'unknown' },
   files: [],
@@ -1125,6 +1159,26 @@ async function runAllChecks() {
       rollup[name] = 'unknown';
     }
     currentState.lsl_by_project = rollup;
+  }
+
+  // ----- LSL canonical time-window (Phase 36-01, cheap clock-only compute) -----
+  // Publishes currentState.lsl_meta.current_window as the single source of truth
+  // for 'which HHMM-HHMM window are we in right now?'. Wave 1 is observation-only;
+  // statusline and dashboard continue computing locally (CONTEXT.md "Out of scope").
+  //
+  // CRITICAL: always go through utcToLocalTime() first. Passing a bare new Date()
+  // into getTimeWindow() would read .getHours() in launchd's default UTC, drifting
+  // the published window from the statusline-side computation by the project TZ
+  // offset (PATTERNS.md Section 1 landmine #2 — would be 1-2h off in Europe/Berlin).
+  //
+  // SPEC R6: on any throw, set the field to literal 'unknown' — never
+  // substitute synthetic 'healthy' or a last-good cached value.
+  try {
+    const local = utcToLocalTime(new Date());
+    currentState.lsl_meta.current_window = getTimeWindow(local);
+  } catch (err) {
+    log(`lsl current_window compute threw: ${err.message}`, 'ERROR');
+    currentState.lsl_meta.current_window = 'unknown';
   }
 
   // ----- Knowledge pipeline freshness (drives [📚] statusline badge) -----
