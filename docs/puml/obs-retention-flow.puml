@@ -1,0 +1,61 @@
+@startuml obs-retention-flow
+!include _standard-style.puml
+
+title Observation Retention — Two-tier read path (Phase 35)
+
+actor "Dashboard user" as user
+
+rectangle "system-health-dashboard\nport 3032/3033" as dash <<api>> {
+  component "_forwardObsApi" as forward
+  component "Observation card\n(snowflake icon)" as card
+}
+
+rectangle "observations-api-server\nport 12436" as obsapi <<core>> {
+  component "Query handler\n(/api/observations)" as handler
+  component "SQLite writer\n+ retention boundary" as writer
+  component "ObservationPruner\n(1h interval)" as pruner
+  component "ColdStoreReader\n(read-only)" as reader
+  component "_mergeObservations\n(pure helper)" as merge
+}
+
+database "observations.db\n(hot tier)" as sqlite <<storage>>
+folder ".data/observation-export/*.json\n(retention tier — git-trackable)" as retention <<storage>>
+file ".observations/observations.db.preswap.*\n(one-off snapshot)" as preswap <<storage>>
+
+user --> card : scrolls back past\nretention window
+card --> forward : GET /api/observations?from=...
+forward --> handler : reverse-proxy
+handler --> writer : compute retentionBoundary
+handler --> sqlite : SELECT in-range rows\n(no LIMIT/OFFSET when retention in play)
+handler --> reader : readObservations({from, to})
+reader --> retention : read JSON snapshots
+handler --> merge : (sqliteRows, retentionRows, boundary, {limit, offset})
+
+merge --> handler : { data, total, _metadata }\ndata = sorted DESC union slice\ntotal = full union size
+
+handler --> forward : { data, total, _metadata }
+forward -[#FF9800]-> forward : non-mutating tap on _metadata\n(log [Dashboard:ColdStore] line)
+forward --> card : exact bytes from upstream
+
+' Pruner side path
+pruner -[#F44336]-> sqlite : DELETE where created_at < boundary\n(every 1h, unref'd timer)
+pruner ..> preswap : (writer rolls DB occasionally,\nleaves preswap snapshot)
+
+note right of merge
+  Load-bearing Set dedup:
+  any retention row whose id is
+  already in SQLite is dropped
+  (boundary-straggler safety net).
+
+  Each row tagged with _origin:
+  'sqlite' | 'cold' so the frontend
+  can render the snowflake icon.
+end note
+
+note right of retention
+  Same JSON files we already commit
+  for cross-machine sync.
+  No separate retention-only artifact.
+end note
+
+@enduml

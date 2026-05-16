@@ -154,6 +154,16 @@ The system includes a real-time web-based health dashboard accessible at `http:/
 - **Violation Tracking**: Detailed view of active system violations
 - **Recommendations**: Actionable suggestions for system health improvement
 
+### Observations and digests — cold-store rendering
+
+Older rows that have been pruned from the live SQLite DB are served from the JSON cold tier (the same `.data/observation-export/*.json` files we commit for cross-machine sync). The dashboard tells you when this happens:
+
+- **Snowflake icon** (sky-blue `Snowflake` from `lucide-react`) on every observation card and digest row whose `_origin === 'cold'`. Hover for the tooltip `Older than retention window — served from JSON cold store.`
+- The icon appears in two places per item — once on the card header and once inline next to the timestamp — so the cue is visible whichever way the operator is scanning.
+- Pagination walks across both tiers (Phase 35-07 full-union pagination). Cold rows can appear on **any** page, not just the first.
+
+If you see a sticky `Observations API unreachable` banner *and* a row of snowflake-tagged items, the banner is left over from a single transient 502 — it now self-clears on the next successful `/api/consolidation/status` poll (which happens every 2 s while the page is open). For the architectural side of this, see [Health Monitoring — Observation cold storage](../architecture/health-monitoring.md).
+
 ---
 
 ## UKB Workflow Monitor

@@ -175,6 +175,55 @@ When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Reme
 | `/api/health-verifier/report` | Same, verbose |
 | `/api/ukb/*` | UKB workflow control + history |
 
+## Observation cold storage (Phase 35)
+
+The observations DB is bounded — older-than-retention rows are pruned from SQLite by a 1-hour in-process job (`ObservationPruner`) so queries stay fast on a growing corpus. But the dashboard still needs to surface old rows when an operator scrolls back, so the JSON export (`.data/observation-export/*.json` — the same files we already commit for cross-machine sync) is the second tier of the same store. SQLite is the **hot tier**; the JSON snapshots are the **cold tier**; queries that span the boundary go through a pure merge helper.
+
+![Two-tier observation store](../images/obs-retention-flow.png)
+
+### Components
+
+| File | Role |
+|---|---|
+| `scripts/observations-api-server.mjs` | Hosts both tiers in-process: holds the SQLite writer, schedules the pruner, lazy-inits `ColdStoreReader` |
+| `ObservationPruner.prune()` | DELETEs rows where `created_at < now - retentionDays`. First prune fires immediately on init; subsequent prunes every 1 h via `setInterval(...).unref()` so the timer never holds the process open. |
+| `ColdStoreReader` | Read-only reader for `.data/observation-export/*.json`. Defaults to `<repo>/.data/observation-export`. |
+| `scripts/observations-api-merge.mjs` | Pure (side-effect-free) merge helpers — lives in its own file so the Jest integration test can import them without dragging in the obs-api server's transitive deps. |
+| `integrations/system-health-dashboard/server.js: _forwardObsApi` | Reverse-proxies obs-api requests on dashboard port 3033 and **non-mutatively** taps `_metadata.fromColdStore` on the response to emit a `[Dashboard:ColdStore]` stderr line. The response body is *not* re-stringified — bytes flow through unchanged. |
+
+### Retention boundary
+
+`_computeRetentionBoundary(db, retentionDays)` returns an ISO-8601 UTC cutoff. SQLite holds anything with `created_at >= boundary`; cold-store holds anything strictly older. The boundary is computed via `SELECT datetime('now', '-N days')` inside SQLite so it stays consistent with the DB's notion of "now," then normalized through `new Date(...).toISOString()` so byte-for-byte string comparison against cold-row `createdAt` (full ISO with ms + Z) lines up.
+
+### Full-union pagination (Phase 35-07)
+
+When a query's `from` timestamp reaches past the retention boundary, the server:
+
+1. Fetches the **full** SQLite-in-range slice (no `LIMIT`/`OFFSET`)
+2. Reads the **full** cold-in-range rows from `ColdStoreReader`
+3. Hands both to `_mergeObservations(sqliteRows, coldRows, retentionBoundary, { limit, offset })`
+
+The merge helper then:
+
+- Filters cold rows to strictly `< retentionBoundary`
+- Builds a `Set` of SQLite ids — **load-bearing** safety net against any straggler from the cold tier whose `createdAt` happens to land on the boundary
+- Tags each row with `_origin: 'sqlite' | 'cold'` so the frontend can render a snowflake icon (see [Health Dashboard](../guides/health-dashboard.md))
+- Sorts the dedup'd union by `timestamp DESC`
+- Slices to `[offset, offset + limit)`
+- Returns `{ data, total: <union size>, _metadata: { fromColdStore, sqliteRows, coldRows, retentionBoundary } }`
+
+`total` is the size of the dedup'd union — pagination walks across both tiers, not just the hot one. Cold rows can appear on **any** page, not only the first. The `_metadata.coldOnFirstPageOnly` field is retained for back-compat with frontends that may still read it but is always `false` under this contract.
+
+### Why a separate merge module
+
+The merge helpers live in `observations-api-merge.mjs` rather than inside the server so the Jest integration tests (`tests/scripts/observations-api-server.merge.test.js`) can import them directly. The server module's transitive dependency graph includes `RetrievalService → embedding-service.js` (a TS dist file), which the Jest `moduleNameMapper` cannot resolve at test time.
+
+### Operator surface
+
+- `[Dashboard:ColdStore]` stderr line — one per request that served cold rows; reports `<path> served <coldRows> cold + <sqliteRows> sqlite (boundary=<ISO>)`
+- Snowflake icon (`lucide-react` `Snowflake`, sky-400/80) on every observation card and digest row whose `_origin === 'cold'`
+- Pre-swap snapshot — when the writer rolls SQLite, it leaves `.observations/observations.db.preswap.<YYYYMMDD-HHMMSS>` as a one-off safety copy. These are untracked; the operator decides when to delete them.
+
 ## Auto-healing
 
 Two complementary paths bring failed services back without operator action:
