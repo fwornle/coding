@@ -28,7 +28,7 @@ The header cards plus two side-by-side panels:
 
 ### By Process tab
 
-![By Process tab](../images/health-mon-token-by-process.png)
+![By Process tab](../images/health-mon-tokens-by-process.png)
 
 Sortable table — one row per cognitive process — with columns Calls · Input · Output · Total · Avg Latency · Share %. Share is computed against the window total. `observation-writer` typically holds 75–85 %; `health-coordinator` accounts for hundreds of calls but only a fraction of a percent of tokens (its calls are 14-token health-check probes).
 
