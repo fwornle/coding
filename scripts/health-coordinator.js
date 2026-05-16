@@ -549,7 +549,7 @@ async function pollProxySemantic() {
     const start = Date.now();
     const probeBody = {
       process: 'health-coordinator',
-      messages: [{ role: 'user', content: 'reply with the single token: OK' }],
+      messages: [{ role: 'user', content: 'say OK' }],
       provider: 'copilot',
       tier: 'haiku',
       maxTokens: 5
@@ -600,7 +600,7 @@ async function pollProxySemantic() {
       if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (empty_content)`, 'INFO');
       return;
     }
-    if (!content.includes('OK')) {
+    if (!/ok/i.test(content)) {
       currentState.proxy.semantic_ok = false;
       currentState.proxy.reason = 'oksub_missing';
       if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (oksub_missing — got: ${String(content).slice(0, 80)})`, 'INFO');
