@@ -2,7 +2,7 @@
 !include _standard-style.puml
 
 top to bottom direction
-title Cognitive Process Token Flow (Phase 35)
+title Cognitive Process Token Flow (Phase 36)
 
 ' === User Layer ===
 actor "Developer" as dev
@@ -17,10 +17,12 @@ package "Active Sessions" {
 package "LLM Proxy :12435 (@rapid/llm-proxy 2.0)" <<core>> {
   component [Request Router] <<core>> as router
   component [SettingsStore\n(per-process pins)] <<core>> as settings
+  component [canonicalizeModelName\n(MODEL_CANONICAL_MAP)] <<util>> as canon
   component [TokenUsageStore\n(logCall)] <<core>> as logger
-  component [JSON Exporter\n(2 s debounce)] <<core>> as exporter
-  database "token-usage.db\n(SQLite, untracked)" <<storage>> as tokendb
-  file "token-usage.json\n(git-trackable)" <<storage>> as tokenjson
+  component [Per-Window Exporter\n(Map<window, Timer> debounce)] <<core>> as exporter
+  component [currentWindow()\n(coordinator fetch + 30s cache)] <<util>> as window
+  database "token-usage.db\n(SQLite, untracked,\nuser_hash + model_raw)" <<storage>> as tokendb
+  file "YYYY/MM/\nDATE_HHMM-HHMM_<hash6>.json\n(per-(window, user), git-trackable)" <<storage>> as tokenjson
   file "settings.json\n(persisted pins)" <<storage>> as settingsjson
 }
 
@@ -85,10 +87,12 @@ router --> copilot : GitHub Copilot
 router --> apikey : when on public network
 
 ' === Token Logging ===
-router -[#FF9800,thickness=2]-> logger : every response
-logger -[#FF9800,thickness=2]-> tokendb : INSERT row
+router -[#FF9800,thickness=2]-> canon : result.model\n(every response)
+canon -[#FF9800,thickness=2]-> logger : {model: canonical,\n model_raw: verbatim}
+logger -[#FF9800,thickness=2]-> tokendb : INSERT row\n(user_hash, model, model_raw, …)
 logger -[#FF9800,thickness=2]-> exporter : schedule
-exporter -[#FF9800,thickness=2]-> tokenjson : debounced write\n+ safety merge
+exporter -[#FF9800,thickness=2]-> window : compute window key
+exporter -[#FF9800,thickness=2]-> tokenjson : per-window debounced\nwrite + safety merge by\n(user_hash, id)
 
 ' === Dashboard reads ===
 page -[#43A047,thickness=2,dashed]-> fwd : /api/token-usage/*
@@ -99,29 +103,65 @@ dev --> page : view stats
 ' === ETM triggers ===
 etm -[#757575,thickness=1,dotted]-> obswriter : session events
 
+' === Time-window source of truth (Phase 36-01) ===
+package "Health Coordinator :3034" <<infra>> {
+  component [/health/state\nlsl_meta.current_window] <<api>> as coordstate
+}
+window -[#2196F3,thickness=2,dashed]-> coordstate : HHMM-HHMM\n(local-time, cached 30 s)
+
+' === Cross-user hydration on boot (Phase 36-03/04) ===
+tokenjson -[#9C27B0,thickness=2,dashed]-> logger : hydrateFromExports()\nrecursive walk +\nON CONFLICT(user_hash, id)\nDO NOTHING
+logger -[#9C27B0,thickness=2,dashed]-> tokendb : merge peers' rows
+
 note right of tokendb
-  Schema: id, timestamp, provider, model,
+  Schema: id, **user_hash**, timestamp, provider,
+  **model** (canonical), **model_raw** (verbatim),
   process, subscription, input/output tokens,
   latency_ms, prompt_preview (XML-stripped),
   tokens_estimated.
+
+  UNIQUE INDEX idx_token_usage_user_id
+    ON token_usage(user_hash, id)
+  — the cross-user merge key.
+
+  WAL/SHM/journal all gitignored.
 end note
 
 note right of tokenjson
-  Mirrors the LevelDB/observations
-  dual-store contract: DB untracked,
-  JSON committed. Safety merge keeps
-  historic rows missing from a freshly
-  reset local DB.
+  Phase 36 layout: per-(date, time-window,
+  user-hash) under YYYY/MM/. Mirrors LSL's
+  filename convention so multi-user teams
+  compose files instead of merging a
+  monolith. Hydrated into the DB on every
+  proxy boot.
+
+  user_hash sourced from
+  LLM_PROXY_USER_HASH wrapper export.
+  Time-window sourced from coordinator's
+  lsl_meta.current_window (with local
+  fallback).
 end note
 
 note bottom of page
   Four tabs sharing summary cards:
-    Overview (treemap + donut)
+    Overview (treemap with hover tooltip
+              showing in/out/calls/avg
+              + SVG <title> a11y fallback,
+              plus donut by provider)
     By Process (sortable table)
     Timeline (2-min buckets, zero-fill,
               viewer's local timezone)
     Recent Calls (last 50, XML-stripped preview)
   Header: Settings + Refresh (busy-state).
+end note
+
+note bottom of canon
+  Collapses 8 upstream spellings of
+  Sonnet 4.6 / Haiku 4.5 into single
+  canonical names. Unrecognized models
+  pass through unchanged. Raw upstream
+  identifier preserved in model_raw for
+  forensic debugging.
 end note
 
 note bottom of dialog

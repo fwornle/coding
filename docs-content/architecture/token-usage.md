@@ -6,7 +6,7 @@ The Token Usage page provides real-time visibility into LLM token consumption ac
 
 **Dashboard URL:** [http://localhost:3032/token-usage](http://localhost:3032/token-usage)
 
-![Token Usage — Overview tab](../images/health-mon-token-usage.png)
+![Token Usage — Overview tab](../images/health-mon-tokens-usage.png)
 
 ---
 
@@ -22,9 +22,9 @@ The page is organized into four tabs sharing a single header bar:
 
 The header cards plus two side-by-side panels:
 
-- **Token Consumption by Process** — a treemap where larger rectangles mean more tokens. Top of the page in the screenshot above shows `observation-writer` (≈ 2.1 M tokens) dominating, with `consolidator-digest` and `consolidator-insight` as distant runners-up.
-- **By Provider** — a donut chart split by provider (claude-code 83 % / copilot 17 % under normal conditions on this host).
-- **By Model** — the same totals broken down by the specific model alias the provider used (`claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-6`, etc.).
+- **Token Consumption by Process** — a treemap where larger rectangles mean more tokens. Top of the page in the screenshot above shows `observation-writer` (≈ 2.6 M tokens) dominating, with `consolidator-digest` and `consolidator-insight` as distant runners-up. **Hover any box** for a tooltip with process, total tokens, input/output split, call count, and avg latency — including the small boxes that don't fit an inline label. The same payload is also rendered as an SVG `<title>` element so screen readers and native-browser hover work even when the recharts tooltip is unavailable.
+- **By Provider** — a donut chart split by provider (claude-code 67 % / copilot 33 % under normal conditions on this host).
+- **By Model** — the same totals broken down by canonical model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`). The proxy canonicalizes whatever spelling each upstream returns — `claude-sonnet-4-6` (Claude CLI dash-version), `claude-sonnet-4.6` (Copilot dot-version), `Claude Sonnet 4.6` (Anthropic title-case), bare `sonnet` (CLI fallback when `modelUsage` is empty), `claude-haiku-4-5-20251001` (Copilot dated snapshot) all collapse to the same row. The raw upstream identifier is preserved per call in the `model_raw` column.
 
 ### By Process tab
 
@@ -67,23 +67,27 @@ The Settings button opens a modal that pins individual services (cognitive proce
 
 ## Storage and the JSON-export pattern
 
-The Token Usage page reads from a **two-store** setup that mirrors the LevelDB knowledge graph and the observations DB:
+The Token Usage page reads from a **two-store** setup that mirrors LSL's filesystem convention — git-trackable per-hour JSON files alongside an untracked SQLite WAL DB. Phase 36 moved the export away from a single monolithic JSON to a per-`(date, time-window, user-hash)` layout so multiple users sharing the project via git push their own hourly snapshots without merge conflicts:
 
 | Path | Role | Tracked in git? |
 |---|---|---|
-| `.data/llm-proxy/token-usage.db` | SQLite WAL DB — authoritative locally | **No** — untracked |
-| `.data/llm-proxy-export/token-usage.json` | Debounced JSON snapshot (2 s coalescing window) | **Yes** — committed |
+| `.data/llm-proxy/token-usage.db` | SQLite WAL DB — authoritative locally | **No** — untracked (`*.db`, `.db-wal`, `.db-shm`, `.db-journal` all gitignored) |
+| `.data/llm-proxy-export/YYYY/MM/YYYY-MM-DD_HHMM-HHMM_<hash6>.json` | Per-hour, per-user JSON snapshot | **Yes** — committed |
 
-**Why both?** The DB stays untracked because SQLite WAL files don't merge cleanly across machines, but the JSON snapshot does. Teammates share token-usage history via `git pull`. On startup the proxy will merge rows from the existing JSON back into the live DB if the DB was wiped locally — see `src/token-usage.ts:exportToJson` in `rapid-llm-proxy` for the **safety merge** logic. Same contract as `ObservationExporter._mergeWithExisting`: rows whose IDs are missing from the DB but present in the JSON are preserved on the next write.
+**Why both?** SQLite WAL files don't merge cleanly across machines; per-hour JSON files do. Teammates share token-usage history via `git pull`. Filename anatomy: the `HHMM-HHMM` time-window is the same one LSL uses (sourced from the health coordinator's `/health/state.lsl_meta.current_window` with a local fallback); the 6-char hex `<hash6>` is the deterministic per-user identifier exported by the proxy wrapper as `LLM_PROXY_USER_HASH` before `exec node`.
+
+**Cross-user merge contract.** On every proxy boot, `hydrateFromExports()` walks `<baseDir>/**/*.json` and inserts every row with `INSERT … ON CONFLICT(user_hash, id) DO NOTHING`. After `git pull` brings down a peer's `..._<other-hash>.json` file, the next proxy kickstart ingests it and the peer's rows appear in your dashboard alongside yours. Cold-start hydration is always-on (no `count > 0 → return` early exit) — the composite unique index supplies idempotency, not skipping.
 
 The schema is one `token_usage` table:
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | INTEGER PK | Monotonic, used by the safety merge to detect missing rows |
+| `id` | INTEGER PK | Monotonic per-instance |
+| `user_hash` | TEXT NOT NULL DEFAULT `'unknown'` | 6-char hex hash identifying the contributor. Together with `id` forms `UNIQUE INDEX idx_token_usage_user_id(user_hash, id)` — the cross-user merge key |
 | `timestamp` | TEXT | ISO-8601 with ms + Z |
 | `provider` | TEXT | One of `claude-code`, `copilot`, `openai`, `groq`, `anthropic` |
-| `model` | TEXT | Full model name (`Claude Sonnet 4.6`, etc.) |
+| `model` | TEXT | **Canonical** model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`). The proxy normalizes the upstream-returned spelling at the persistence boundary via `canonicalizeModelName()` so the dashboard's By-Model panel doesn't fragment across 8 spellings of 3 models. |
+| `model_raw` | TEXT | The verbatim upstream spelling (`Claude Sonnet 4.6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`, bare `sonnet`, etc.) — preserved for forensic debugging. Never used by the UI; queryable via `SELECT model_raw, COUNT(*) FROM token_usage GROUP BY model_raw`. |
 | `process` | TEXT | Caller's `process` field; empty rows are labeled `unknown` |
 | `subscription` | TEXT | `claude-max`, `github-copilot`, or the API-key tier name |
 | `input_tokens` / `output_tokens` / `total_tokens` | INTEGER | |
@@ -128,9 +132,12 @@ sqlite3 .data/llm-proxy/token-usage.db \
 
 | File | Role |
 |---|---|
-| `_work/rapid-llm-proxy/src/token-usage.ts` | DB schema, `logCall()`, `exportToJson()` with safety merge |
-| `_work/rapid-llm-proxy/proxy-bridge/server.mjs` | `/api/token-usage/{summary,recent}`, `GET/PUT /api/llm/settings` endpoints |
-| `integrations/system-health-dashboard/src/pages/token-usage.tsx` | Frontend page (tabs + Settings dialog) |
+| `_work/rapid-llm-proxy/src/token-usage.ts` | DB schema + idempotent `user_hash` / `model_raw` ALTER, `logCall()`, `exportToHourFile()` (per-window debounced), `hydrateFromExports()` (always-on recursive walk), `backfillCanonicalModelNames()` |
+| `_work/rapid-llm-proxy/proxy-bridge/server.mjs` | `/api/token-usage/{summary,recent}`, `GET/PUT /api/llm/settings`, `canonicalizeModelName()` + `MODEL_CANONICAL_MAP`, `currentWindow()` (30 s-cached fetch from `/health/state` with local fallback) |
+| `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` | Exports `LLM_PROXY_USER_HASH` (from `scripts/user-hash-generator.js`) and `LSL_TIMEZONE` before `exec node` |
+| `scripts/health-coordinator.js` | Publishes `lsl_meta.current_window` (HHMM-HHMM, local-time) on `/health/state` — single source of truth for time-window |
+| `scripts/migrate-token-usage-export.mjs` | One-shot, `--dry-run`, idempotent. Used once to bucket the legacy monolithic `.data/llm-proxy-export/token-usage.json` into the per-hour layout. |
+| `integrations/system-health-dashboard/src/pages/token-usage.tsx` | Frontend page (tabs + Settings dialog); custom `TreemapTooltip` + SVG `<title>` fallback |
 | `integrations/system-health-dashboard/server.js` | Reverse-proxy to the proxy |
 
 ---
@@ -177,7 +184,7 @@ GET /api/token-usage/recent?limit=50
     "timestamp": "2026-05-15T19:24:01.412Z",
     "process": "observation-writer",
     "provider": "copilot",
-    "model": "Claude Sonnet 4.6",
+    "model": "claude-sonnet-4.6",
     "input_tokens": 2700,
     "output_tokens": 142,
     "latency_ms": 5100,

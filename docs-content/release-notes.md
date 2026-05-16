@@ -121,6 +121,32 @@ See [Observational Memory](core-systems/observational-memory.md).
 
 ---
 
+## Token Usage
+
+### Phase 36: per-(window, user) hourly exports + model-name canonicalization + treemap hover (May 16)
+
+The Token Usage dashboard had two structural problems and one cosmetic one. All three closed in Phase 36 (7 plans).
+
+**Per-(window, user) hourly exports.** The single `.data/llm-proxy-export/token-usage.json` blob ballooned past 600 KB / 1457 rows after ~24 h on a single contributor and would have caused git merge conflicts as soon as a second user pushed exports. Switched to the same filesystem convention LSL uses: `YYYY/MM/YYYY-MM-DD_HHMM-HHMM_<hash6>.json`. The time-window string is now sourced from the health coordinator's new `/health/state.lsl_meta.current_window` field (single source of truth, computed by `getTimeWindow(utcToLocalTime(now))`); the proxy fetches with a 30 s cache + local fallback. The 6-char user-hash is exported by the wrapper script (`_work/rapid-llm-proxy/bin/start-llm-proxy.sh`) as `LLM_PROXY_USER_HASH` before `exec node`, derived from `scripts/user-hash-generator.js` — same hash logic used everywhere else in the project so it cross-machine-reproduces deterministically.
+
+**Cross-user merge contract.** A `user_hash` column and `UNIQUE INDEX (user_hash, id)` discriminate rows. `hydrateFromExports()` runs on every proxy boot (the old `count > 0 → return` early-exit is gone) and recursively walks `<baseDir>/**/*.json`, inserting with `ON CONFLICT(user_hash, id) DO NOTHING`. After `git pull` brings down a peer's `..._<other-hash>.json`, the next proxy kickstart ingests it and the peer's rows appear in the dashboard alongside yours. The composite key supplies idempotency, not skipping.
+
+**`.gitignore` cleanup.** `.db-wal` / `.db-shm` / `.db-journal` weren't covered by the old `*.db` rule, so `.data/llm-proxy/` kept showing dirty in `git status` whenever the SQLite WAL had data. Replaced the single `*.db` line with explicit per-suffix entries matching the existing `.data/knowledge.db` precedent. `!.data/llm-proxy-export/` allow-list preserves the new per-hour files for git.
+
+**Model-name canonicalization.** The "By Model" panel was showing 8 rows for what is really 3 Claude models — each provider returns its own spelling and the proxy was recording the raw string verbatim. `canonicalizeModelName(raw)` now lives next to the existing model-maps in `proxy-bridge/server.mjs` and is applied once at the `logTokenCall` site. The raw spelling is preserved per row in a new `model_raw` column (same PRAGMA-guarded ALTER pattern as `user_hash`) so debugging "did Copilot serve the dated snapshot or the rolling alias?" still works. An idempotent backfill on proxy init rewrites pre-existing rows once (`WHERE model_raw IS NULL`); re-runs are no-ops.
+
+| Family | Variants seen pre-canonicalization | Canonical |
+|---|---|---|
+| Sonnet 4.6 | `claude-sonnet-4-6` (CLI), `claude-sonnet-4.6` (Copilot), `Claude Sonnet 4.6` (Anthropic), bare `sonnet` (CLI fallback) | `claude-sonnet-4.6` |
+| Haiku 4.5 | `claude-haiku-4-5-20251001` (Copilot dated), `claude-haiku-4.5`, `Claude Haiku 4.5` | `claude-haiku-4.5` |
+| Opus 4.6 | (proactive) | `claude-opus-4.6` |
+
+**Treemap hover tooltip.** The "Hover for details" subtitle on the Token Consumption by Process treemap was aspirational — `recharts.Treemap` had no `<Tooltip>` child, and the inline label only renders for boxes ≥ 40×30 px so smaller processes were silent. Added a `TreemapTooltip` component (process / total / in/out split / calls / avg latency) wired as a Tooltip child, plus an SVG `<title>` element inside each rect for screen-reader/native-browser fallback. Playwright-verified on both small (`reap-final`, 81×44 px) and large (`observation-writer`, 981×352 px) boxes.
+
+See [Token Usage](architecture/token-usage.md) and the updated [`token-usage-architecture.png`](images/token-usage-architecture.png) / [`health-mon-tokens-usage.png`](images/health-mon-tokens-usage.png) diagrams.
+
+---
+
 ## Dashboard / VKB rendering
 
 | Fix | Symptom |
