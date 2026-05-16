@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Health Monitoring Consolidation
 status: executing
-stopped_at: Phase 34 context gathered
-last_updated: "2026-05-16T07:42:48.584Z"
-last_activity: 2026-05-16 -- Phase 36 planning complete
+stopped_at: Completed 36-07-PLAN.md
+last_updated: "2026-05-16T09:27:56.184Z"
+last_activity: 2026-05-16 -- Phase 36 execution started
 progress:
   total_phases: 2
   completed_phases: 2
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 34 — proxy-supervision-and-etm-cleanup
+**Current focus:** Phase 36 — token-usage-per-user-hourly-exports-mirror-lsl-conventions-f
 
 ## Current Position
 
-Phase: 34 (proxy-supervision-and-etm-cleanup) — CLOSED PENDING D-14 ELAPSED-TIME GATE
-Plan: 6 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ 34-05 ✅ 34-06 ✅ on main. R3 networkMode flap (SPEC AC #3) closed 2026-05-12 via code review + transitive proof from R4. R4 cooldown (SPEC AC #4 + AC #5) closed 2026-05-12 via production telemetry (cooldown engaged at `2026-05-11T17:18:28Z`, 22 throttled dispatches over 6h, clean recovery `proxy auto_heal -> healthy` at `2026-05-12T04:27:24Z`). D-14 24h soak gate is the only remaining item — PASS when 24h has elapsed without further auto-heal dispatches (window started 2026-05-12T04:26Z, expires 2026-05-13T04:26Z).
-Status: Ready to execute
-Last activity: 2026-05-16 -- Phase 36 planning complete
+Phase: 36 (token-usage-per-user-hourly-exports-mirror-lsl-conventions-f) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 36
+Last activity: 2026-05-16 -- Phase 36 execution started
 
 Progress: [██████████] 100%
 
@@ -75,6 +75,7 @@ Progress: [██████████] 100%
 - Per-agent RRF scoring profiles: agent identity flows from adapters through context.agent to rrf-fusion for two-pass tier weighting
 - Session state written to .coding/session-state.json with 2-hour staleness window for cross-agent continuity
 - [33-05]: Three consumer migrations done — prompt-hook + system-health-dashboard + constraint-monitor dashboard all fetch /health/state from coordinator instead of readFileSync of `.health/*.json`. SPEC AC #7 grep gate clean. Coordinator unreachable surfaces as `overallStatus: 'unknown'` (NEVER 'healthy'). Q3 graceful no-op preserved when prompt-hook is invoked outside the coding repo (empty additionalContext). Dashboard frontend `dist/` NOT rebuilt — backward-compat preserved per SPEC R8.
+- [Phase ?]: [36-07]: TreemapTooltip uses recharts <Tooltip content={...}/> child-of-Treemap pattern; SVG <title> as native-browser/screen-reader fallback for sub-60x40 boxes
 
 ### Blockers/Concerns
 
@@ -96,9 +97,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | verification | Phase 30.1 (30.1-VERIFICATION.md) | human_needed |
 | todo | llm-based-semantic-deduplication | pending |
 | todo | replace-console-log-with-proper-logging | pending |
+| Phase 36 P07 | 32 | 1 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-05-09T12:17:38.939Z
-Stopped at: Phase 34 context gathered
+Last session: 2026-05-16T09:27:46.505Z
+Stopped at: Completed 36-07-PLAN.md
 Resume with: `/gsd-new-milestone`

@@ -183,22 +183,26 @@ Plans:
 
 **Requirements**: N/A (no .planning/REQUIREMENTS.md in this project; coverage gate satisfied by CONTEXT.md decisions + PATTERNS.md landmines)
 **Depends on:** Phase 35
-**Plans:** 5 plans across 4 waves
+**Plans:** 4/7 plans executed
 
 Plans:
 
 **Wave 1 (parallel — disjoint files)**
-- [ ] 36-01-PLAN.md — Coordinator publishes `currentState.lsl_meta.current_window` at `/health/state` (HHMM-HHMM, via `getTimeWindow(utcToLocalTime(new Date()))`, cached `sessionDurationMs`, R6 'unknown' on error). Touches `scripts/health-coordinator.js` only.
-- [ ] 36-02-PLAN.md — `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` exports `LLM_PROXY_USER_HASH` before `exec node` (ESM `import()` of `scripts/user-hash-generator.js`, regex-validated, fallback to `'unknown'`). Wrapper IS what launchd invokes — `bin/coding` is NOT modified.
+- [x] 36-01-PLAN.md — Coordinator publishes `currentState.lsl_meta.current_window` at `/health/state` (HHMM-HHMM, via `getTimeWindow(utcToLocalTime(new Date()))`, cached `sessionDurationMs`, R6 'unknown' on error). Touches `scripts/health-coordinator.js` only.
+- [x] 36-02-PLAN.md — `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` exports `LLM_PROXY_USER_HASH` before `exec node` (ESM `import()` of `scripts/user-hash-generator.js`, regex-validated, fallback to `'unknown'`). Wrapper IS what launchd invokes — `bin/coding` is NOT modified.
 
 **Wave 2** *(depends on Wave 1 — needs both coordinator window publish AND env-side hash)*
-- [ ] 36-03-PLAN.md — Proxy writer rewrite in `_work/rapid-llm-proxy/src/token-usage.ts`: `resolveTokenExportDir`, `currentWindow` (coordinator-curl with 30s cache + local fallback, module-init warm), `exportToHourFile` (right-exclusive `[windowStart, windowEnd)` SELECT + `(user_hash, id)` safety-merge), per-window-keyed `Map<windowKey, Timer>` debounce. Defensive `// TODO(36-04)` fallback for the pre-migration SELECT. Build + kickstart.
+- [x] 36-03-PLAN.md — Proxy writer rewrite in `_work/rapid-llm-proxy/src/token-usage.ts`: `resolveTokenExportDir`, `currentWindow` (coordinator-curl with 30s cache + local fallback, module-init warm), `exportToHourFile` (right-exclusive `[windowStart, windowEnd)` SELECT + `(user_hash, id)` safety-merge), per-window-keyed `Map<windowKey, Timer>` debounce. Defensive `// TODO(36-04)` fallback for the pre-migration SELECT. Build + kickstart.
 
 **Wave 3** *(depends on Wave 2 — adds schema + replaces hydrate path on the same file)*
 - [ ] 36-04-PLAN.md — Schema migration in `initTokenDb`: `ALTER TABLE token_usage ADD COLUMN user_hash TEXT NOT NULL DEFAULT 'unknown'` + `CREATE UNIQUE INDEX idx_token_usage_user_id ON token_usage(user_hash, id)` + `wal_checkpoint(TRUNCATE)` (all idempotent, PRAGMA-guarded). Replace `restoreFromJsonIfEmpty` with always-on `hydrateFromExports` (recursive walker port + `ON CONFLICT(user_hash, id) DO NOTHING`); old `count > 0 → return` guard removed (semantic flip per CONTEXT.md L72). Remove Plan 36-03's defensive fallback. Update `proxy-bridge/server.mjs` call site. Build + kickstart.
 
 **Wave 4** *(depends on Waves 2+3 — filesystem cleanup after the proxy can write/read the new layout)*
 - [ ] 36-05-PLAN.md — Two-commit close: (a) `.gitignore` adds explicit `*.db-wal` / `*.db-shm` / `*.db-journal` lines (matching existing knowledge.db precedent), preserves `!.data/llm-proxy-export/` allow-list, lands as own commit FIRST; (b) NEW `scripts/migrate-token-usage-export.mjs` (one-shot, --dry-run, idempotent) buckets the legacy monolithic file into per-(date, window, user) files under YYYY/MM/, deletes the monolith in the same commit. Final proxy kickstart confirms `SELECT COUNT(*) WHERE user_hash='unknown'` returns 0.
+
+**Wave 5 (parallel — disjoint files, polish)** *(36-06 depends_on 36-04 for server.mjs co-edit ordering; 36-07 fully independent)*
+- [ ] 36-06-PLAN.md — Model-name canonicalization at the proxy persistence boundary. Add `canonicalizeModelName(raw)` pure function next to existing model-maps in `_work/rapid-llm-proxy/proxy-bridge/server.mjs` (~line 414); apply once at the `logTokenCall({ model: ... })` site so every new row stores a canonical spelling (`claude-sonnet-4.6` / `claude-haiku-4.5` / `claude-opus-4.6`). Add `model_raw` column to `token_usage` via PRAGMA-guarded ALTER (same pattern as 36-04 user_hash) so raw upstream identifiers (`Claude Sonnet 4.6`, `claude-haiku-4-5-20251001`, bare `sonnet`) stay queryable for debugging. Idempotent backfill on proxy init rewrites pre-existing rows once (`WHERE model_raw IS NULL`). Dashboard 'By Model' panel collapses from 8 Claude rows to ≤ 3.
+- [x] 36-07-PLAN.md — Treemap hover tooltip in `integrations/system-health-dashboard/src/pages/token-usage.tsx`. Add `TreemapTooltip` custom component (process / total / in-out split / calls / avg latency) wired as `<Tooltip content={...}>` child of the existing `<Treemap>` at line ~354 — currently NO Tooltip is wired and the "Hover for details" subtitle is aspirational. Plus SVG `<title>` inside `TreemapContent` for native-browser/screen-reader fallback. Browser-verified via /playwright-cli per CLAUDE.md E2E memory.
 
 ---
 
