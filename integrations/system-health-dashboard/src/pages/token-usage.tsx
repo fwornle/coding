@@ -133,6 +133,7 @@ function TreemapContent(props: {
   if (width < 40 || height < 30) return null
   return (
     <g>
+      <title>{`${name} — ${formatTokens(value)} tokens`}</title>
       <rect x={x} y={y} width={width} height={height} fill={fill} stroke="#1e1e2e" strokeWidth={2} rx={4} />
       {width > 60 && height > 40 && (
         <>
@@ -145,6 +146,32 @@ function TreemapContent(props: {
         </>
       )}
     </g>
+  )
+}
+
+// Custom tooltip for the process treemap — shows process name + total + in/out split + calls + avg latency.
+// Receives `{ active, payload }` from recharts; payload[0].payload is the original treemapData leaf.
+function TreemapTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: any }> }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0].payload
+  return (
+    <div className="bg-background border rounded-md shadow-md px-3 py-2 text-sm space-y-0.5">
+      <div className="font-semibold">{d.name}</div>
+      <div className="text-muted-foreground text-xs">
+        {formatTokens(d.value)} tokens total
+      </div>
+      <div className="text-xs">
+        <span className="text-blue-500">{formatTokens(d.input ?? 0)} in</span>
+        {' · '}
+        <span className="text-green-500">{formatTokens(d.output ?? 0)} out</span>
+      </div>
+      <div className="text-muted-foreground text-xs">
+        {d.calls} {d.calls === 1 ? 'call' : 'calls'}
+        {typeof d.avgLatency === 'number' && (
+          <> · avg {(d.avgLatency / 1000).toFixed(1)}s</>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -213,6 +240,8 @@ export function TokenUsagePage() {
       fill: getProcessColor(p.process),
       calls: p.calls,
       avgLatency: p.avg_latency,
+      input: p.input_tokens,
+      output: p.output_tokens,
     }))
 
   // Prepare timeline data (2-minute buckets, zero-filled by the backend).
@@ -356,7 +385,9 @@ export function TokenUsagePage() {
                     dataKey="value"
                     aspectRatio={4 / 3}
                     content={<TreemapContent x={0} y={0} width={0} height={0} name="" value={0} fill="" />}
-                  />
+                  >
+                    <Tooltip content={<TreemapTooltip />} />
+                  </Treemap>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -367,7 +398,7 @@ export function TokenUsagePage() {
                 <CardTitle className="text-base">By Provider</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
                     <Pie
                       data={summary.by_provider.map(p => ({
@@ -378,15 +409,25 @@ export function TokenUsagePage() {
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
-                      cy="50%"
-                      outerRadius={60}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      cy="40%"
+                      outerRadius={55}
+                      label={false}
                     >
                       {summary.by_provider.map(p => (
                         <Cell key={p.provider} fill={getProviderColor(p.provider)} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(val: number) => formatTokens(val)} />
+                    <Legend
+                      verticalAlign="bottom"
+                      wrapperStyle={{ paddingTop: '12px' }}
+                      formatter={(value, entry: any) => {
+                        const item = summary.by_provider.find(p => p.provider === value);
+                        const total = summary.by_provider.reduce((s, p) => s + p.total_tokens, 0);
+                        const pct = item ? ((item.total_tokens / total) * 100).toFixed(0) : '0';
+                        return `${value} ${pct}%`;
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
 
