@@ -330,9 +330,33 @@ The renderer reads a small set of environment variables and the coordinator endp
 | Background refresh threshold | `status-line-fast.cjs` `BG_REFRESH_THRESHOLD_MS` | 10 s |
 | Tmux refresh interval | `~/.tmux.conf` `status-interval` | 5 s |
 | `status-right-length` | `~/.tmux.conf` | 200 |
-| `codepoint-widths` | `~/.tmux.conf` | `U+26A0=2,U+FE0F=0` |
+| `codepoint-widths` | `~/.tmux.conf` | see [Tmux codepoint-widths](#tmux-codepoint-widths) below |
 
-**`codepoint-widths` is required** for residue-free rendering: tmux's default wcwidth disagrees with xterm.js on `⚠` (U+26A0) and `U+FE0F` (VS16). The override anchors tmux's count to what xterm.js renders. If you see trailing-digit residue after badge transitions, this is the first thing to check.
+### Tmux codepoint-widths
+
+Every Unicode-10+ emoji the statusline can emit needs an explicit width override in tmux because tmux's bundled `wcwidth` table predates Unicode 10 and silently treats new codepoints as width=1, even when they are East-Asian-Width Wide. Each disagreement leaks one cell of the previous render through to the right edge, producing the recurring trailing-digit residue (`07:538`, `08:054`, `16:3175`). Add this to `~/.tmux.conf`:
+
+```tmux
+set -g codepoint-widths "U+26A0=2,U+FE0F=0,U+1F7E0=2,U+1F7E1=2,U+1F7E2=2,U+1F7E4=2,U+1F9E0=2,U+1F9EE=2,U+1F976=2"
+```
+
+After editing, run `tmux source-file ~/.tmux.conf`. New tmux sessions inherit it immediately. The full mapping:
+
+| Codepoint | Glyph | Block | Reason for override |
+|---|---|---|---|
+| `U+26A0=2` | ⚠ | Misc Symbols (Unicode 4) | EAW=Ambiguous — tmux counts 1, terminals render 2 |
+| `U+FE0F=0` | (VS16) | Variation Selectors | Variation selector; tmux counts 1, renderer treats as part of the previous codepoint |
+| `U+1F7E0=2` | 🟠 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table |
+| `U+1F7E1=2` | 🟡 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table |
+| `U+1F7E2=2` | 🟢 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table |
+| `U+1F7E4=2` | 🟤 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table |
+| `U+1F9E0=2` | 🧠 | Supplemental Symbols (Unicode 10) | Predates tmux's wcwidth table |
+| `U+1F9EE=2` | 🧮 | Supplemental Symbols (Unicode 11) | Predates tmux's wcwidth table |
+| `U+1F976=2` | 🥶 | Supplemental Symbols (Unicode 11) | Predates tmux's wcwidth table |
+
+**Why fix in tmux, not the script.** Several earlier attempts modified `visibleCellWidth()` in `scripts/combined-status-line.js` to compensate for the disagreement and introduced new disagreements each time. The script's count is correct for the codepoints it currently handles — the issue is downstream in tmux's wcwidth table, fixable only via `codepoint-widths`. **Do not touch the script's width math.** If a new Ambiguous emoji enters the statusline repertoire and residue returns, probe its tmux-vs-terminal width with the snippet in [Troubleshooting → Right-edge residue](#right-edge-shows-residual-chars-eg-12411-130656) and append it to the override.
+
+**Retired lifecycle emojis.** `🌲` (Unicode 6, OK), `🫒` (U+1FAD2, Unicode 13), and `🪨` (U+1FAA8, Unicode 13) used to sit in the cooling/fading/dormant tiers. The Unicode-13 codepoints were too new for tmux's wcwidth table to know about even with `codepoint-widths` overrides (tmux 3.4 silently ignores codepoints it can't normalize). They have been replaced by the colored circles (🟠/🟤) listed above, which are all on stable Geometric-Shapes-Ext blocks that every renderer agrees about.
 
 ---
 
@@ -424,18 +448,40 @@ ps aux | grep enhanced-transcript-monitor | grep PROJECT_NAME
 
 ### Right edge shows residual chars (e.g. `12:411`, `13:0656`)?
 
-This was the symptom of two stacked bugs that have been fixed; if you still see it, your installed code is pre-Phase-33 or pre-`914c69423`. Verify:
+The persistent fix is `set -g codepoint-widths "..."` in `~/.tmux.conf` — see [Tmux codepoint-widths](#tmux-codepoint-widths) for the full mapping. Verify yours matches:
+
+```bash
+# Verify the override is loaded (should print 9 codepoints, all =2 or =0)
+tmux show-options -g codepoint-widths
+
+# If it's missing entirely, add the line from the docs and reload:
+tmux source-file ~/.tmux.conf
+```
+
+If the override is present and residue still appears, a *new* emoji has entered the statusline repertoire whose width tmux doesn't know about. Probe its tmux-vs-terminal width with the snippet below — if `truncate(1)` returns the emoji itself (rather than empty), tmux is counting 1 cell and needs a `U+XXXX=2` entry appended:
+
+```bash
+emoji_vs=$(node -e "process.stdout.write(String.fromCodePoint(0xXXXX) + String.fromCodePoint(0xFE0F) + 'XYZ')")
+tmux set-environment -g TT "$emoji_vs"
+for n in 1 2 3 4; do
+  out=$(tmux display-message -p "#{=$n:TT}")
+  printf "truncate(%d) = %q\n" "$n" "$out"
+done
+```
+
+**Do not modify `scripts/combined-status-line.js`'s `visibleCellWidth()`** to compensate — multiple past attempts (2026-05-09, 10, 12) introduced new disagreements. The script's count is correct for its repertoire; the fix is always in tmux config.
+
+You can also verify the legacy script-side mitigations are still in place (they're defense-in-depth, not load-bearing now):
 
 ```bash
 # Wrapper preserves trailing whitespace (must NOT do .trim())
 grep -n 'rstrip\|trim()' scripts/combined-status-line-wrapper.js
 
-# Producer pads to 220 codepoints + NBSP terminator
-grep -n 'STATUS_LINE_TARGET_CODEPOINTS\|ANTI_STRIP_TERMINATOR' scripts/combined-status-line.js
+# Producer pads to TMUX_PANE_WIDTH (or 200) via leftPadToStableCellWidth
+grep -n 'leftPadToStableCellWidth' scripts/combined-status-line.js
 
-# Cache file ends with NBSP (UTF-8 c2 a0)
-xxd .logs/combined-status-line-cache-coding.txt | tail -1
-# Expect the last 2 non-newline bytes to be: c2 a0
+# Cache file isn't truncated mid-codepoint
+xxd .logs/combined-status-line-cache-coding-w*.txt | tail -1
 ```
 
 ---
