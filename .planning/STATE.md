@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Health Monitoring Consolidation
 status: executing
-stopped_at: Phase 35 — 35-01, 35-02, 35-03 all on main; 35-04 (obs-api wiring, autonomous=false) is the only Wave 2 item left; 35-05 (dashboard) is Wave 3
-last_updated: "2026-05-15T10:30:00.000Z"
-last_activity: 2026-05-15 -- Phase 35: ObservationPruner (35-02) landed alongside Wave-1 closeout; 3 of 5 plans done
+stopped_at: Phase 34 context gathered
+last_updated: "2026-05-16T07:42:48.584Z"
+last_activity: 2026-05-16 -- Phase 36 planning complete
 progress:
-  total_phases: 3
+  total_phases: 2
   completed_phases: 2
-  total_plans: 26
-  completed_plans: 24
-  percent: 92
+  total_plans: 21
+  completed_plans: 21
+  percent: 100
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 Phase: 34 (proxy-supervision-and-etm-cleanup) — CLOSED PENDING D-14 ELAPSED-TIME GATE
 Plan: 6 of 6 done — 34-01 ✅ 34-02 ✅ 34-03 ✅ 34-04 ✅ 34-05 ✅ 34-06 ✅ on main. R3 networkMode flap (SPEC AC #3) closed 2026-05-12 via code review + transitive proof from R4. R4 cooldown (SPEC AC #4 + AC #5) closed 2026-05-12 via production telemetry (cooldown engaged at `2026-05-11T17:18:28Z`, 22 throttled dispatches over 6h, clean recovery `proxy auto_heal -> healthy` at `2026-05-12T04:27:24Z`). D-14 24h soak gate is the only remaining item — PASS when 24h has elapsed without further auto-heal dispatches (window started 2026-05-12T04:26Z, expires 2026-05-13T04:26Z).
-Status: Phase 34 functionally and acceptance-complete; D-14 elapsed-time observation in progress.
-Last activity: 2026-05-12 -- Phase 34: R3/R4 closed via telemetry; 34-VERIFICATION.md updated with cooldown evidence + recovery trace
+Status: Ready to execute
+Last activity: 2026-05-16 -- Phase 36 planning complete
 
 Progress: [██████████] 100%
 
@@ -47,6 +47,7 @@ Progress: [██████████] 100%
 ### Roadmap Evolution
 
 - Phase 30.1 inserted after Phase 30: Cross-Project Agent-Agnostic Knowledge Injection (URGENT) — make injection work across all projects and agents with focused relevance
+- Phase 36 added: token-usage per-user hourly exports (mirror LSL conventions for git-trackable JSON)
 
 ### Decisions
 
