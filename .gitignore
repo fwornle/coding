@@ -178,6 +178,9 @@ integrations/browser-access/logs/
 
 # Database files
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 *.sqlite
 *.sqlite3
 
@@ -197,6 +200,7 @@ integrations/browser-access/logs/
 !.data/
 !.data/knowledge-export/
 !.data/observation-export/
+!.data/llm-proxy-export/
 !.data/knowledge-config.json
 
 # PlantUML validation errors (transient, regenerated on diagram validation)
