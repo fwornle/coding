@@ -1198,74 +1198,59 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
         print_fixed "Constraint monitor configuration created"
     fi
     
-    print_check "Global LSL Registry Integration (Enhanced Multi-Project Monitoring)"
-    LSL_REGISTRY="$CODING_ROOT/.global-lsl-registry.json"
-    if [ -f "$LSL_REGISTRY" ]; then
-        print_pass "Global LSL registry found"
-        
-        # Test registry structure
-        if jq -e '.projects' "$LSL_REGISTRY" >/dev/null 2>&1; then
-            PROJECT_COUNT=$(jq -r '.projects | length' "$LSL_REGISTRY" 2>/dev/null || echo "0")
-            print_pass "LSL registry structure valid ($PROJECT_COUNT projects)"
-            
-            # Check for specific project entries
-            if jq -e '.projects.coding' "$LSL_REGISTRY" >/dev/null 2>&1; then
-                print_pass "Main coding project registered in LSL"
-                
-                # Check project status tracking
-                PROJECT_STATUS=$(jq -r '.projects.coding.status // "unknown"' "$LSL_REGISTRY" 2>/dev/null)
-                if [ "$PROJECT_STATUS" = "active" ] || [ "$PROJECT_STATUS" = "monitoring" ]; then
-                    print_pass "Coding project status: $PROJECT_STATUS"
+    print_check "Health Coordinator Integration (Multi-Project Monitoring)"
+    # Multi-project monitoring used to read .global-lsl-registry.json (written
+    # by the retired global-service-coordinator). Phase 36 follow-up migrated
+    # all readers to the canonical health-coordinator's /health/state HTTP
+    # endpoint. lsl_by_project is the per-project rollup; lsl entries
+    # (Record<sid:project, entry>) carry path + lastBeat for active sessions.
+    HEALTH_STATE_URL="${HEALTH_COORDINATOR_URL:-http://127.0.0.1:3034}/health/state"
+    HEALTH_STATE=$(curl -sf --max-time 2 "$HEALTH_STATE_URL" 2>/dev/null)
+    if [ -n "$HEALTH_STATE" ]; then
+        print_pass "Health coordinator reachable at $HEALTH_STATE_URL"
+
+        if echo "$HEALTH_STATE" | jq -e '.lsl_by_project' >/dev/null 2>&1; then
+            PROJECT_COUNT=$(echo "$HEALTH_STATE" | jq -r '.lsl_by_project | length' 2>/dev/null || echo "0")
+            print_pass "Coordinator lsl_by_project rollup valid ($PROJECT_COUNT projects)"
+
+            # Check for the main coding project
+            CODING_ROLLUP=$(echo "$HEALTH_STATE" | jq -r '.lsl_by_project.coding // empty' 2>/dev/null)
+            if [ -n "$CODING_ROLLUP" ]; then
+                print_pass "Main coding project tracked by coordinator"
+
+                if [ "$CODING_ROLLUP" = "healthy" ]; then
+                    print_pass "Coding project rollup: $CODING_ROLLUP"
                 else
-                    print_warning "Coding project status unclear: $PROJECT_STATUS"
+                    print_warning "Coding project rollup: $CODING_ROLLUP"
                 fi
-                
-                # Check for constraint monitoring integration
-                if jq -e '.projects.coding.monitorPid' "$LSL_REGISTRY" >/dev/null 2>&1; then
-                    MONITOR_PID=$(jq -r '.projects.coding.monitorPid // null' "$LSL_REGISTRY" 2>/dev/null)
-                    if [ "$MONITOR_PID" != "null" ] && [ "$MONITOR_PID" != "0" ]; then
-                        print_pass "Constraint monitoring process tracked (PID: $MONITOR_PID)"
-                        
-                        # Verify if the monitoring process is actually running
-                        if kill -0 "$MONITOR_PID" 2>/dev/null; then
-                            print_pass "Constraint monitoring process is active"
-                        else
-                            print_warning "Constraint monitoring process not running (stale PID)"
-                        fi
-                    else
-                        print_warning "No active constraint monitoring process tracked"
-                    fi
+
+                # Check for at least one active session under coding
+                CODING_SESSIONS=$(echo "$HEALTH_STATE" | jq -r '[.lsl | to_entries[] | select(.value.projectName == "coding")] | length' 2>/dev/null || echo "0")
+                if [ "$CODING_SESSIONS" -gt 0 ]; then
+                    FRESHEST_BEAT=$(echo "$HEALTH_STATE" | jq -r '[.lsl | to_entries[] | select(.value.projectName == "coding") | .value.lastBeat // 0] | max' 2>/dev/null || echo "0")
+                    print_pass "Coding sessions active: $CODING_SESSIONS (freshest beat ms=$FRESHEST_BEAT)"
                 else
-                    print_info "Constraint monitoring PID tracking not configured"
+                    print_info "No active coding sessions currently reporting"
                 fi
             else
-                print_warning "Main coding project not found in LSL registry"
+                print_warning "Main coding project not found in coordinator rollup"
             fi
-            
-            # Test multi-project constraint monitoring capability
+
+            # Multi-project capability
             if [ "$PROJECT_COUNT" -gt 1 ]; then
                 print_pass "Multi-project monitoring capability available"
-                
-                # List projects with constraint monitoring
-                MONITORED_PROJECTS=$(jq -r '.projects | to_entries | map(select(.value.monitorPid != null)) | length' "$LSL_REGISTRY" 2>/dev/null || echo "0")
-                print_info "Projects with active constraint monitoring: $MONITORED_PROJECTS"
+                HEALTHY_PROJECTS=$(echo "$HEALTH_STATE" | jq -r '[.lsl_by_project | to_entries[] | select(.value == "healthy")] | length' 2>/dev/null || echo "0")
+                print_info "Projects currently healthy: $HEALTHY_PROJECTS / $PROJECT_COUNT"
             else
                 print_info "Single project monitoring mode"
             fi
         else
-            print_warning "LSL registry structure invalid - multi-project monitoring may fail"
-        fi
-        
-        # Test registry file permissions
-        if [ -w "$LSL_REGISTRY" ]; then
-            print_pass "LSL registry writable for dynamic updates"
-        else
-            print_warning "LSL registry not writable - status updates may fail"
+            print_warning "Coordinator response missing lsl_by_project field — multi-project monitoring may be unavailable"
         fi
     else
-        print_warning "Global LSL registry not found - multi-project monitoring unavailable"
-        print_info "Registry should be at: $LSL_REGISTRY"
-        print_info "Multi-project constraint monitoring requires LSL registry for project coordination"
+        print_warning "Health coordinator unreachable at $HEALTH_STATE_URL - multi-project monitoring unavailable"
+        print_info "Coordinator runs under launchd as com.coding.health-coordinator on port 3034"
+        print_info "Multi-project constraint monitoring requires the coordinator to be live"
     fi
     
     print_check "Dashboard API endpoints test"
@@ -2101,10 +2086,12 @@ else
     echo -e "  ${RED}❌ Next.js Professional Dashboard${NC} - Missing"
 fi
 
-if [ -f "$CODING_ROOT/.global-lsl-registry.json" ]; then
-    echo -e "  ${GREEN}✅ Global LSL Registry${NC} - Multi-project Support"
+HEALTH_STATE_SUMMARY=$(curl -sf --max-time 2 "${HEALTH_COORDINATOR_URL:-http://127.0.0.1:3034}/health/state" 2>/dev/null)
+if [ -n "$HEALTH_STATE_SUMMARY" ] && echo "$HEALTH_STATE_SUMMARY" | jq -e '.lsl_by_project | length > 0' >/dev/null 2>&1; then
+    PROJ_COUNT_SUMMARY=$(echo "$HEALTH_STATE_SUMMARY" | jq -r '.lsl_by_project | length' 2>/dev/null)
+    echo -e "  ${GREEN}✅ Health Coordinator${NC} - Multi-project Support ($PROJ_COUNT_SUMMARY projects)"
 else
-    echo -e "  ${YELLOW}⚠️  Global LSL Registry${NC} - Limited Monitoring"
+    echo -e "  ${YELLOW}⚠️  Health Coordinator${NC} - Limited Monitoring (coordinator unreachable or no projects)"
 fi
 
 if [ -f "$CODING_ROOT/integrations/mcp-constraint-monitor/constraints.yaml" ]; then
