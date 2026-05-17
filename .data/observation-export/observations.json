@@ -24828,5 +24828,37 @@
     "modifiedFiles": [
       "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
     ]
+  },
+  {
+    "id": "a4f74647-4ea0-46a6-a82f-c7fae4768c9d",
+    "summary": "Intent: Clean up stale/low-ratio insights and confirm whether automated truthfulness mechanisms exist for the knowledge base.\nApproach: Applied surgical edits to repair low-ratio insights, merged a zero-ratio duplicate, then wired auto-verification into the consolidation run loop with a 7-day cadence guard and fixed a path-resolution bug in the verifier.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: Corpus reduced from 62 to 61 insights with avg verification ratio improving from 0.877 to 0.9; auto-verification now runs by default with cadence guard; remaining gap is that retrieval ranking and confidence decay don't yet weight by verificationRatio.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T14:54:01.942Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "7ef2c396-13d7-48ba-8e68-5a73ca9329cb",
+    "summary": "Intent: Wire both freshness reranking and topic relevance into the retrieval service pipeline.\nApproach: Located insertion points in the existing retrieval service by grepping for related methods, then edited the file to add and wire the new reranking methods into the scoring pipeline.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/retrieval/retrieval-service.js\nResult: Added `_applyFreshnessRerank` method inserted after `_applyContextBoost`, with both freshness and topic relevance reranking wired into the retrieval pipeline.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T15:05:21.343Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/retrieval/retrieval-service.js"
+    ]
   }
 ]

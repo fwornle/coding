@@ -2347,103 +2347,6 @@
     "project": "coding"
   },
   {
-    "id": "2058cb1e-5625-4d8f-b82e-7f1b65168ea6",
-    "topic": "OKB Viewer — Graph Visualization and Tour Feature",
-    "summary": "## Purpose\nA React + Sigma.js/react-sigma web application for exploring the OKB knowledge graph, providing node detail inspection, a guided reading tour, trending patterns, and an Issue Triage dashboard.\n\n## Architecture\n- **Graph rendering**: `GraphVisualization.tsx` drives Sigma.js; node visual priority order (highest first): starsign membership (seed + direct neighbors) → active tour node dependents at 0.5 opacity → unrelated nodes at 0.15 opacity and `transform: scale(0.5)`\n- **Redux store slices**: `navigationSlice.ts` (tour state: start/stop/next/back/goTo, `tourPreviewKey` for pre-tour animation), `graphSlice.ts` (selected entity), `uiSlice.ts` (`activeView` for triage vs. graph tab)\n- **Guided tour**: `viewer/src/utils/guidedTraversal.ts` computes direct-neighbor-only sequence using edge-type priority tiers (causal→resolution→structural→operational→data-flow); CORRELATED_WITH edges are excluded; sequence cycles back to index 0 (seed starsign) at tour end\n- **Pre-tour preview**: `tourPreviewKey` cycles through neighbors at 900ms intervals, driving pulsing violet ring animations in `GraphVisualization.tsx` and a color-shifting glow on the Tour button in `NodeDetails.tsx`\n- **Issue Triage view**: `IssueTriage.tsx` walks a 2-hop BFS from Incident nodes through RCA chain edge types (`HAS_SYMPTOM`, `HAS_ROOT_CAUSE`, `CAUSED`, `MITIGATED_BY`, `ADDRESSES`), grouping into Symptoms → Failure Patterns → Root Causes → Resolutions\n- **Viewport**: Zoom-on-click uses `pendingZoomKeyRef` to defer execution to the D3 tick-120 handler because simulation positions are asynchronous\n\n## Key Files\n- `viewer/src/utils/guidedTraversal.ts` — BFS neighbor sequence computation, excludes CORRELATED_WITH\n- `viewer/src/components/KnowledgeGraph/GraphVisualization.tsx` — node rendering, opacity/scale, tour ring animations\n- `viewer/src/components/NodeDetails.tsx` — tour control bar, Sources & Evidence panel, preview button\n- `viewer/src/store/navigationSlice.ts` — tour Redux reducers\n- `viewer/src/store/uiSlice.ts` — `activeView` tab state\n- `viewer/src/pages/IssueTriage.tsx` — triage dashboard with RCA chain BFS and evidence aggregation\n- `viewer/src/index.css` — keyframe animations for tour rings and node highlights\n- `viewer/dist/` — compiled output bind-mounted read-only into Docker container\n\n## Usage\n- Served via Docker on port 8080 (not 3000); the dev server is not running in production — changes require `npm run build` to write to `dist/`\n- The \"Recent Entities\" right sidebar is conditionally hidden when `activeView` is in triage mode\n- Evidence links in IssueTriage are collected by 3-hop graph traversal from the incident node and sorted to surface operational links (Argo, Grafana, RaaS) before documentation links\n- Documentation nodes are visually distinguished by a green stroke border derived from the `sourceAuthority` field\n\n## Troubleshooting\n- **Tour shows 100+ nodes**: CORRELATED_WITH edges are being included — verify they are filtered in `guidedTraversal.ts`\n- **Stale UI after code changes**: Container serves from bind-mounted `dist/`; run `npm run build` inside the viewer directory and hard-refresh the browser\n- **Triage shows empty sections**: Edge lookups use prefixed entity keys (e.g., `evidence:uuid`) — ensure `entityByKey` and `handleViewInGraph` dispatches use `entity.key`, not bare UUIDs\n- **Trending patterns show doc entities**: `temporal.ts:getTrendingPatterns` must whitelist valid types (`FailurePattern`, `Resolution`, `RootCause`, `Decision`, `Requirement`, `Risk`)\n- **Click zoom does nothing**: D3 simulation positions asynchronously; zoom must be deferred via `pendingZoomKeyRef` to tick-120",
-    "confidence": 0.9,
-    "digestIds": [
-      "3da049dc-8ba9-436f-ba89-f23c76817fd4",
-      "df95f3b0-fba8-499f-a47e-70d7920f6089",
-      "4d6c9e08-1376-4b74-8ea3-70ce77b3a8a0",
-      "47df3e07-e2a1-45d1-b787-4d962e9f3160",
-      "fecb1ea8-8206-45b0-9f59-c67811fef43d",
-      "9ee2e1e4-2852-4faf-b558-8f0293cb46fe",
-      "beaade18-f7c2-4c9e-9284-20bdc7631e81",
-      "3a504b79-743b-431a-9b45-d7f453aa7e00",
-      "189604f3-5fce-41ab-98ce-74cfd2162508",
-      "5088f74c-613a-48e6-ad05-548495674a79",
-      "70e74f13-e72e-4287-a5b2-46b90b0e180d",
-      "1548e6d5-49e6-47d0-9196-23fadf43dca8",
-      "1eafaabc-5197-4b94-b098-1cfdea19f44f",
-      "0133cea8-f720-4199-8752-0aeb7eed2869",
-      "810c245f-29e8-47ee-a643-870f5448acba",
-      "a4adf45b-5116-44b1-92c0-bc023742a4a2",
-      "fe68935c-4885-49a9-9fdf-cc65764b200f",
-      "35e8685d-f079-4a5e-9921-b85c9b03df58",
-      "b6eece93-fb0d-4455-b2cd-26187fb423b0",
-      "feafdda3-bca9-4b3a-bbac-a3d9b64782ce",
-      "59cf82e0-7ce5-48d0-8b2c-48c30be73947",
-      "a2dc6854-1ed8-4903-acf4-3286e76071c4",
-      "e8ada8fe-d79b-43b7-9ed2-5790e1118d20",
-      "b5516592-7188-4422-951e-f42796edbdc8",
-      "e9f27d35-6bbf-49cb-97b8-69debcd28c5e",
-      "0f68021f-de02-425d-b415-83c6dbb85499",
-      "e2a9f147-9fc4-4412-b0d3-b58842ec53bb",
-      "df7357b5-0488-4325-83cf-eecdaaac406c",
-      "64b12e86-be94-4343-96aa-f5ca5a914511",
-      "a3e03272-0155-4a98-b798-e94a86b46912"
-    ],
-    "lastUpdated": "2026-05-14T15:27:35.876Z",
-    "createdAt": "2026-05-14T15:27:35.876Z",
-    "metadata": {
-      "scope": "The React/Sigma.js viewer application under `integrations/operational-knowledge-management/viewer/`",
-      "codeVerification": {
-        "verifiedAt": "2026-05-17T15:01:01.901Z",
-        "totalClaims": 14,
-        "verifiedClaims": 6,
-        "verificationRatio": 0.429,
-        "staleClaims": [
-          {
-            "raw": "viewer/src/utils/guidedTraversal.ts",
-            "type": "PATH"
-          },
-          {
-            "raw": "viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
-            "type": "PATH"
-          },
-          {
-            "raw": "viewer/src/components/NodeDetails.tsx",
-            "type": "PATH"
-          },
-          {
-            "raw": "viewer/src/store/navigationSlice.ts",
-            "type": "PATH"
-          },
-          {
-            "raw": "viewer/src/store/uiSlice.ts",
-            "type": "PATH"
-          },
-          {
-            "raw": "viewer/src/pages/IssueTriage.tsx",
-            "type": "PATH"
-          },
-          {
-            "raw": "viewer/src/index.css",
-            "type": "PATH"
-          },
-          {
-            "raw": "viewer/dist/",
-            "type": "PATH"
-          }
-        ],
-        "searchRoots": [
-          "/Users/Q284340/Agentic/coding",
-          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
-          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
-          "/Users/Q284340/Agentic/_work/dyn-arch",
-          "/Users/Q284340/Agentic/_work/iso-9001",
-          "/Users/Q284340/Agentic/_work/onboarding-repro",
-          "/Users/Q284340/Agentic/_work/rapid-automations",
-          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
-          "/Users/Q284340/Agentic/_work/resi",
-          "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
-        ]
-      }
-    },
-    "project": "rapid-automations"
-  },
-  {
     "id": "ff4f4a88-83eb-46f6-8359-7c5c6a8d26d6",
     "topic": "OKB Viewer — Issue Triage RCA Chain and Evidence Collection",
     "summary": "## Purpose\nDisplays a structured RCA chain (Incidents → Symptoms → Failure Patterns → Root Causes → Resolutions) for selected incident nodes, aggregating operational evidence links from graph neighbors.\n\n## Architecture\n- **RCA chain BFS**: Walks from an Incident node through typed edges (`HAS_SYMPTOM`, `HAS_ROOT_CAUSE`, `CAUSED`, `MITIGATED_BY`, `ADDRESSES`) to group connected entities into triage sections\n- **Isolated node handling**: If an entity has 0 actual edges (common for nodes ingested from MkDocs documentation rather than RCA findings), no RCA chain can be surfaced — the apparent connection count in metadata may be non-zero but reflect stale/phantom data\n- **Evidence collection**: Collects evidence by BFS hop traversal from the incident node; BFS hop distance must be kept small (≤2 hops) — 3 hops across a 900+-node graph over-broadens collection\n- **Domain fuzzy matching pitfall**: Entities without a matched domain fall into a `\"general\"` catch-all domain; querying all `general`-domain entities can inflate evidence sources to 148+ entries — the domain sweep logic was removed as a fix; BFS neighbors and direct `sourceRefs` are the correct evidence sources\n- **Ops refs propagation gap**: 109+ entities ingested from MkDocs documentation have no operational refs (Argo/RaaS/Grafana links); single-hop neighbor propagation is insufficient — a 2-hop BFS-based data-level backfill is the proposed fix\n\n## Key Files\n- `integrations/operational-knowledge-management/src/components/KnowledgeGraph/IssueTriage.tsx` — RCA chain BFS, evidence aggregation, domain sweep (removed)\n- `integrations/mcp-constraint-monitor/dashboard/` — hosts the triage view UI\n- `scripts/backfill-evidence-links.ts` — ops ref backfill utility\n\n## Usage\n- Activated when `activeView` is set to triage mode in the Redux `uiSlice`\n- Evidence links are sorted to surface operational links (Argo, Grafana, RaaS) before documentation links\n- Entities with 0 actual edges produce empty triage sections — this is correct behavior for isolated nodes\n\n## Troubleshooting\n- **Empty RCA chain for a node with listed connections**: Verify the entity actually has edges in LevelDB — apparent connection counts can be stale; use the API to confirm `edges` array length\n- **Evidence sources inflated (100+)**: Domain sweep logic is pulling `general`-domain entities; ensure domain sweep is removed and evidence is sourced only from BFS neighbors and direct `sourceRefs`\n- **No operational refs (Argo/RaaS/Grafana) on documentation-sourced entities**: These were never linked at ingest time; run `scripts/backfill-evidence-links.ts` or implement 2-hop BFS propagation at the data level\n- **UI fix not reflected after edit**: Rebuild `viewer/dist/` with `npm run build` and hard-refresh the browser (`Cmd+Shift+R`) — the container serves from the compiled bundle",
@@ -2753,6 +2656,105 @@
       }
     },
     "project": "coding"
+  },
+  {
+    "id": "2058cb1e-5625-4d8f-b82e-7f1b65168ea6",
+    "topic": "OKB Viewer — Graph Visualization and Tour Feature",
+    "summary": "## Purpose\nA React + Sigma.js/react-sigma web application for exploring the OKB knowledge graph, providing node detail inspection, a guided reading tour, trending patterns, and an Issue Triage dashboard.\n\n## Architecture\n- **Graph rendering**: `GraphVisualization.tsx` drives Sigma.js; node visual priority order (highest first): starsign membership (seed + direct neighbors) → active tour node dependents at 0.5 opacity → unrelated nodes at 0.15 opacity and `transform: scale(0.5)`\n- **Redux store slices**: `navigationSlice.ts` (tour state: start/stop/next/back/goTo, `tourPreviewKey` for pre-tour animation), `graphSlice.ts` (selected entity), `uiSlice.ts` (`activeView` for triage vs. graph tab)\n- **Guided tour**: `viewer/src/utils/guidedTraversal.ts` computes direct-neighbor-only sequence using edge-type priority tiers (causal→resolution→structural→operational→data-flow); CORRELATED_WITH edges are excluded; sequence cycles back to index 0 (seed starsign) at tour end\n- **Pre-tour preview**: `tourPreviewKey` cycles through neighbors at 900ms intervals, driving pulsing violet ring animations in `GraphVisualization.tsx` and a color-shifting glow on the Tour button in `NodeDetails.tsx`\n- **Issue Triage view**: `IssueTriage.tsx` walks a 2-hop BFS from Incident nodes through RCA chain edge types (`HAS_SYMPTOM`, `HAS_ROOT_CAUSE`, `CAUSED`, `MITIGATED_BY`, `ADDRESSES`), grouping into Symptoms → Failure Patterns → Root Causes → Resolutions\n- **Viewport**: Zoom-on-click uses `pendingZoomKeyRef` to defer execution to the D3 tick-120 handler because simulation positions are asynchronous\n\n## Key Files\n- `viewer/src/utils/guidedTraversal.ts` — BFS neighbor sequence computation, excludes CORRELATED_WITH\n- `viewer/src/components/KnowledgeGraph/GraphVisualization.tsx` — node rendering, opacity/scale, tour ring animations\n- `viewer/src/components/NodeDetails.tsx` — tour control bar, Sources & Evidence panel, preview button\n- `viewer/src/store/navigationSlice.ts` — tour Redux reducers\n- `viewer/src/store/uiSlice.ts` — `activeView` tab state\n- `viewer/src/pages/IssueTriage.tsx` — triage dashboard with RCA chain BFS and evidence aggregation\n- `viewer/src/index.css` — keyframe animations for tour rings and node highlights\n- `viewer/dist/` — compiled output bind-mounted read-only into Docker container\n\n## Usage\n- Served via Docker on port 8080 (not 3000); the dev server is not running in production — changes require `npm run build` to write to `dist/`\n- The \"Recent Entities\" right sidebar is conditionally hidden when `activeView` is in triage mode\n- Evidence links in IssueTriage are collected by 3-hop graph traversal from the incident node and sorted to surface operational links (Argo, Grafana, RaaS) before documentation links\n- Documentation nodes are visually distinguished by a green stroke border derived from the `sourceAuthority` field\n\n## Troubleshooting\n- **Tour shows 100+ nodes**: CORRELATED_WITH edges are being included — verify they are filtered in `guidedTraversal.ts`\n- **Stale UI after code changes**: Container serves from bind-mounted `dist/`; run `npm run build` inside the viewer directory and hard-refresh the browser\n- **Triage shows empty sections**: Edge lookups use prefixed entity keys (e.g., `evidence:uuid`) — ensure `entityByKey` and `handleViewInGraph` dispatches use `entity.key`, not bare UUIDs\n- **Trending patterns show doc entities**: `temporal.ts:getTrendingPatterns` must whitelist valid types (`FailurePattern`, `Resolution`, `RootCause`, `Decision`, `Requirement`, `Risk`)\n- **Click zoom does nothing**: D3 simulation positions asynchronously; zoom must be deferred via `pendingZoomKeyRef` to tick-120",
+    "confidence": 0.8716,
+    "digestIds": [
+      "3da049dc-8ba9-436f-ba89-f23c76817fd4",
+      "df95f3b0-fba8-499f-a47e-70d7920f6089",
+      "4d6c9e08-1376-4b74-8ea3-70ce77b3a8a0",
+      "47df3e07-e2a1-45d1-b787-4d962e9f3160",
+      "fecb1ea8-8206-45b0-9f59-c67811fef43d",
+      "9ee2e1e4-2852-4faf-b558-8f0293cb46fe",
+      "beaade18-f7c2-4c9e-9284-20bdc7631e81",
+      "3a504b79-743b-431a-9b45-d7f453aa7e00",
+      "189604f3-5fce-41ab-98ce-74cfd2162508",
+      "5088f74c-613a-48e6-ad05-548495674a79",
+      "70e74f13-e72e-4287-a5b2-46b90b0e180d",
+      "1548e6d5-49e6-47d0-9196-23fadf43dca8",
+      "1eafaabc-5197-4b94-b098-1cfdea19f44f",
+      "0133cea8-f720-4199-8752-0aeb7eed2869",
+      "810c245f-29e8-47ee-a643-870f5448acba",
+      "a4adf45b-5116-44b1-92c0-bc023742a4a2",
+      "fe68935c-4885-49a9-9fdf-cc65764b200f",
+      "35e8685d-f079-4a5e-9921-b85c9b03df58",
+      "b6eece93-fb0d-4455-b2cd-26187fb423b0",
+      "feafdda3-bca9-4b3a-bbac-a3d9b64782ce",
+      "59cf82e0-7ce5-48d0-8b2c-48c30be73947",
+      "a2dc6854-1ed8-4903-acf4-3286e76071c4",
+      "e8ada8fe-d79b-43b7-9ed2-5790e1118d20",
+      "b5516592-7188-4422-951e-f42796edbdc8",
+      "e9f27d35-6bbf-49cb-97b8-69debcd28c5e",
+      "0f68021f-de02-425d-b415-83c6dbb85499",
+      "e2a9f147-9fc4-4412-b0d3-b58842ec53bb",
+      "df7357b5-0488-4325-83cf-eecdaaac406c",
+      "64b12e86-be94-4343-96aa-f5ca5a914511",
+      "a3e03272-0155-4a98-b798-e94a86b46912"
+    ],
+    "lastUpdated": "2026-05-14T15:27:35.876Z",
+    "createdAt": "2026-05-14T15:27:35.876Z",
+    "metadata": {
+      "scope": "The React/Sigma.js viewer application under `integrations/operational-knowledge-management/viewer/`",
+      "codeVerification": {
+        "verifiedAt": "2026-05-17T15:01:01.901Z",
+        "totalClaims": 14,
+        "verifiedClaims": 6,
+        "verificationRatio": 0.429,
+        "staleClaims": [
+          {
+            "raw": "viewer/src/utils/guidedTraversal.ts",
+            "type": "PATH"
+          },
+          {
+            "raw": "viewer/src/components/KnowledgeGraph/GraphVisualization.tsx",
+            "type": "PATH"
+          },
+          {
+            "raw": "viewer/src/components/NodeDetails.tsx",
+            "type": "PATH"
+          },
+          {
+            "raw": "viewer/src/store/navigationSlice.ts",
+            "type": "PATH"
+          },
+          {
+            "raw": "viewer/src/store/uiSlice.ts",
+            "type": "PATH"
+          },
+          {
+            "raw": "viewer/src/pages/IssueTriage.tsx",
+            "type": "PATH"
+          },
+          {
+            "raw": "viewer/src/index.css",
+            "type": "PATH"
+          },
+          {
+            "raw": "viewer/dist/",
+            "type": "PATH"
+          }
+        ],
+        "searchRoots": [
+          "/Users/Q284340/Agentic/coding",
+          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
+          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
+          "/Users/Q284340/Agentic/_work/dyn-arch",
+          "/Users/Q284340/Agentic/_work/iso-9001",
+          "/Users/Q284340/Agentic/_work/onboarding-repro",
+          "/Users/Q284340/Agentic/_work/rapid-automations",
+          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
+          "/Users/Q284340/Agentic/_work/resi",
+          "/Users/Q284340/Agentic/_work/sketcher",
+          "/Users/Q284340/Agentic/_work/ui-template"
+        ]
+      },
+      "staleDragApplied": true,
+      "staleDragAt": "2026-05-17T15:08:20.308Z"
+    },
+    "project": "rapid-automations"
   },
   {
     "id": "b19446bf-efb4-4a2d-b138-c42b9a2525ed",
