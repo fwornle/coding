@@ -16387,5 +16387,187 @@
       "sourceCount": 1
     },
     "project": "coding"
+  },
+  {
+    "id": "635ec764-aede-4440-a4c7-5542f35ada53",
+    "date": "2026-05-17",
+    "theme": "Token Usage Dashboard: Data Reconciliation and Enhancement Planning",
+    "summary": "Two back-to-back sessions focused on the token usage dashboard.\n\n- **Observation 1** diagnosed a discrepancy between the displayed ~593K token figure and the underlying data by querying the SQLite token-usage database and export log files, checking per-day rollups and date ranges — `token-usage.ts` was edited during investigation.\n- **Observation 2** was a planning phase to extend the dashboard with a time window selector, total overview section, consumption trends, model usage breakdown, and top consumer evolution. The existing `token-usage.tsx` was read but no implementation was committed.\n\nBoth sessions touched `token-usage.ts`/`token-usage.tsx`; the reconciliation work preceded the enhancement scoping.",
+    "observationIds": [
+      "d49407b3-ffb0-433c-8dc0-6d5ec5acf3bc",
+      "430c7aff-ae85-42b0-9fda-d033309708a4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T15:15:45.719Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fa5849ea-813b-458f-bc53-08acde30f012",
+    "date": "2026-05-17",
+    "theme": "Knowledge Pipeline Audit and Insights Overlap Detection Fix",
+    "summary": "A four-observation arc moving from strategic discussion to concrete analysis of the insights corpus.\n\n- **Observation 3** produced an architectural recommendation (no files changed): treat insights as *observations-of-entities*, anchor both the online-learned and UKB pipelines to a shared hierarchical entity graph, with a dedup audit as the immediate next step. `server.mjs` was also touched.\n- **Observation 4** launched the audit: baseline counts and entity-type distributions were established for `insights.json` and `coding.json`; `token-usage.tsx` was edited.\n- **Observations 5 & 6** fixed the overlap detection script (`audit-knowledge-overlap.mjs`) after full-text Jaccard similarity produced false negatives. Switching to **topic-only token comparison** surfaced real signal: **19 of 70 insights (27%)** belong to multi-member clusters across 8 topic groups, split between genuine evolutionary duplicates (merge candidates) and related facets (parent-child restructuring candidates).",
+    "observationIds": [
+      "1dbd07e7-98d1-4910-8b2f-4d81f186ae94",
+      "296a3a7b-1eb8-41de-a9ef-f8e1007a7ddd",
+      "986d9e8a-dda6-490d-80c9-bc67c9ee5a8f",
+      "33b906a9-0c8c-4a24-ad22-ac3927768842"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/audit-knowledge-overlap.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T15:15:45.719Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b3c5d48e-7b7f-4c27-bcb1-724dbd04cdea",
+    "date": "2026-05-17",
+    "theme": "Documentation Style Guide Review for Diagram Artifacts",
+    "summary": "A standalone session where the user provided a style guide for consistent formatting across PlantUML, Mermaid, markdown, and PNG diagram artifacts.\n\n- The assistant acknowledged the guide and located existing documentation artifacts for compliance reference: `docs/images/health-mon-tokens-evolution.png` and `docs-content/architecture/token-usage.md`.\n- Only `token-usage.md` was edited (likely a note or annotation); no structural changes were made to the codebase.",
+    "observationIds": [
+      "c5831e8b-5481-44ce-b3ea-257977854b73"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/token-usage.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-17T15:15:45.719Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e6edb9f5-e4f7-4e8c-996b-ae43d32abcf4",
+    "date": "2026-05-17",
+    "theme": "Insight Cluster Consolidation — Algorithm, Migration, and Deployment",
+    "summary": "The largest single work unit of the day: designing, executing, and deploying the insights consolidation.\n\n- **Observation 8** delivered the full implementation:\n  - Created `.data/insight-consolidation-plan.md` classifying each cluster\n  - Created `scripts/consolidate-insight-clusters.mjs` as a one-time migration script\n  - Updated `ObservationConsolidator.js` — `_findSimilarInsightId` now returns a structured verdict object (`merge` / `facet` / `none`) with `TOPIC_STOPWORDS` filtering; `synthesizeInsights` honors the new shape for automatic merging and facet cross-linking going forward\n  - Migration reduced insights from **70 → 62**, merging 8 duplicate clusters and cleaning up Qdrant orphans\n- **Observation 9** completed the cycle: the observations API was restarted, health and data integrity were verified (62 insights, 5 facet-linked), and all changes were committed.",
+    "observationIds": [
+      "3d1f3179-23aa-4564-beb8-f9935aa8b729",
+      "356d8390-dc2f-4379-b37f-f8d303b9fda4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.data/insight-consolidation-plan.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/consolidate-insight-clusters.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T15:15:45.719Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "16161e88-00cb-4895-8ce5-8432a8452ec8",
+    "date": "2026-05-17",
+    "theme": "ObservationExporter Tombstone Resurrection Bug Fix",
+    "summary": "A tightly scoped, same-timestamp pair of observations repairing `ObservationExporter.js`.\n\n- Two bugs were identified and patched via targeted edits to `src/live-logging/ObservationExporter.js`.\n- The critical fix prevents **tombstoned/deleted observation IDs from being resurrected** during export — a data-integrity regression that could silently reintroduce deleted records.\n- Syntax check passed; fix was committed. Both observations describe the same session (diagnosis → patch → commit).",
+    "observationIds": [
+      "2077f8f3-927d-49f6-ab6c-36069e3311a9",
+      "d23d373b-529e-4f74-8dfb-f19d0f3876e5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationExporter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T15:15:45.719Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ffefff0c-a258-4c6d-9ac3-6873f4210541",
+    "date": "2026-05-17",
+    "theme": "LLM CLI Proxy Insights Truthfulness Audit",
+    "summary": "Two consecutive (same-timestamp) sessions attempting a cross-reference audit of the four overlapping \"LLM CLI Proxy\" insights against the actual codebase — results were incomplete as both exchanges were cut off.\n\n- **Observation 12** began tooling but did not produce findings before the exchange ended.\n- **Observation 13** progressed further: retrieved all four LLM-CLI-Proxy records from the observations database, identified **contradictions between insights on canonical paths and provider ordering**, and detected that prior compaction had not fully resolved the overlap. A correctness report was being compiled into `llm-proxy-insight-truthfulness-audit.md` but was not completed.\n- Key findings in-progress: stale path references and inconsistent provider ordering claims across the four insight entries.",
+    "observationIds": [
+      "76388705-093c-4ae6-bd60-0b9da984899b",
+      "6dea90ed-3cb3-4dfe-99af-644bb0c221de"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.data/llm-proxy-insight-truthfulness-audit.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-17T15:15:45.719Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "313dad79-29a2-490b-a4ae-b93a980db5f8",
+    "date": "2026-05-17",
+    "theme": "ObservationConsolidator Code Verification and Auto-Verification Cadence",
+    "summary": "Two afternoon sessions hardening the consolidation pipeline with automated truthfulness checking.\n\n- **Observation 14** wired code-verification logic into `ObservationConsolidator.js` by adding extraction and verification methods upstream of the existing prompt-building methods — enabling verification during observation consolidation/compaction.\n- **Observation 15** extended this further with surgical edits to `ObservationConsolidator.js`:\n  - Repaired several low-ratio insights; merged a zero-ratio duplicate, reducing the corpus from **62 → 61 insights**\n  - Average verification ratio improved from **0.877 → 0.9**\n  - **Auto-verification** now runs by default with a **7-day cadence guard**\n  - Fixed a path-resolution bug in the verifier\n  - Remaining gap noted: retrieval ranking and confidence decay do not yet weight by `verificationRatio`",
+    "observationIds": [
+      "2f857113-829b-410c-a1c8-86d8e18e6a97",
+      "a4f74647-4ea0-46a6-a82f-c7fae4768c9d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T15:15:45.719Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "53c6cc4d-caa2-4204-9846-75dd66c5ef38",
+    "date": "2026-05-17",
+    "theme": "Retrieval Service Freshness and Topic Relevance Reranking",
+    "summary": "A focused afternoon session extending the retrieval pipeline in `src/retrieval/retrieval-service.js`.\n\n- Located insertion points by grepping for related methods, then added a new `_applyFreshnessRerank` method inserted after the existing `_applyContextBoost` step.\n- Both **freshness decay** and **topic relevance** reranking are now wired into the scoring pipeline.\n- This directly addresses the gap noted in observation 15 — retrieval results will now factor in how recently an insight was verified and how topically relevant it is, rather than relying on raw similarity scores alone.",
+    "observationIds": [
+      "7ef2c396-13d7-48ba-8e68-5a73ca9329cb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/retrieval/retrieval-service.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T15:15:45.719Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
   }
 ]
