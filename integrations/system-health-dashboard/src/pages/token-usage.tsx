@@ -8,6 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select'
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, Treemap, AreaChart, Area
 } from 'recharts'
@@ -15,6 +18,24 @@ import {
 const PROXY_PORT = '12435'
 const PROXY_BASE = `http://localhost:${PROXY_PORT}`
 const REFRESH_INTERVAL = 30_000
+
+// Window options for the time-range selector. `value` is what we send as
+// ?hours= (the literal string 'all' is a backend sentinel for "everything").
+const WINDOW_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '24',  label: 'Last 24h' },
+  { value: '48',  label: 'Last 48h' },
+  { value: '168', label: 'Last 7 days' },
+  { value: '720', label: 'Last 30 days' },
+  { value: 'all', label: 'All time' },
+]
+
+// Stable color palette for the stacked-area Evolution chart. Cycles when
+// the number of stacked series exceeds the palette length.
+const EVOLUTION_PALETTE = [
+  '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444',
+  '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#a855f7',
+  '#14b8a6', '#eab308',
+]
 
 // Colors for process categories
 const PROCESS_COLORS: Record<string, string> = {
@@ -79,6 +100,16 @@ interface TokenSummary {
     input_tokens: number
     output_tokens: number
   }>
+  // New in Phase 36 follow-up: pivoted stacked series for the Evolution tab.
+  // Each row is one time bucket; each non-`hour` key is a process/model name
+  // mapped to its total tokens in that bucket. process_keys / model_keys
+  // give the column order (ranked by total tokens descending).
+  hours?: number
+  bucket_minutes?: number
+  process_keys?: string[]
+  model_keys?: string[]
+  by_process_hour?: Array<Record<string, number | string>>
+  by_model_hour?: Array<Record<string, number | string>>
 }
 
 interface RecentCall {
@@ -181,6 +212,11 @@ export function TokenUsagePage() {
   const [error, setError] = useState<string | null>(null)
   const [sortField, setSortField] = useState<'total_tokens' | 'calls'>('total_tokens')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Time window for the summary endpoint. '24'/'48'/'168'/'720' are hour
+  // counts; 'all' is a backend sentinel that picks every retained row.
+  const [hoursWindow, setHoursWindow] = useState<string>('24')
+  // Evolution chart can stack tokens by process (purpose) or by model.
+  const [evoGroupBy, setEvoGroupBy] = useState<'process' | 'model'>('process')
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchData = useCallback(async (isAuto = false) => {
@@ -188,7 +224,7 @@ export function TokenUsagePage() {
     setError(null)
     try {
       const [sumRes, recRes] = await Promise.all([
-        fetch(`${PROXY_BASE}/api/token-usage/summary`),
+        fetch(`${PROXY_BASE}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}`),
         fetch(`${PROXY_BASE}/api/token-usage/recent?limit=50`)
       ])
       if (!sumRes.ok || !recRes.ok) throw new Error(`HTTP ${sumRes.status}/${recRes.status}`)
@@ -201,7 +237,7 @@ export function TokenUsagePage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [hoursWindow])
 
   useEffect(() => {
     fetchData()
@@ -258,6 +294,55 @@ export function TokenUsagePage() {
     sortField === 'total_tokens' ? b.total_tokens - a.total_tokens : b.calls - a.calls
   )
 
+  // Evolution chart data. Picks process-stacked vs model-stacked from the
+  // toggle. The backend's process_keys/model_keys include every value seen
+  // in the window (incl. test/reap-* / fake-* outliers); restrict to the
+  // "main consumers" — series contributing at least 0.5% of the window's
+  // total tokens — so the legend and stacked area stay focused.
+  const evoKeysRaw = (evoGroupBy === 'process'
+    ? summary.process_keys
+    : summary.model_keys) || []
+  const evoSeriesRaw = (evoGroupBy === 'process'
+    ? summary.by_process_hour
+    : summary.by_model_hour) || []
+  const MAIN_CONSUMER_THRESHOLD = 0.005   // 0.5% of window total
+  const evoGrandTotal = summary.total_tokens || 1
+  const evoKeyTotals = new Map<string, number>()
+  for (const k of evoKeysRaw) {
+    let t = 0
+    for (const row of evoSeriesRaw) t += Number(row[k] || 0)
+    evoKeyTotals.set(k, t)
+  }
+  const evoKeys = evoKeysRaw
+    .filter(k => (evoKeyTotals.get(k) || 0) / evoGrandTotal >= MAIN_CONSUMER_THRESHOLD)
+    .sort((a, b) => (evoKeyTotals.get(b) || 0) - (evoKeyTotals.get(a) || 0))
+  // Bucket label format adapts to window width — short windows show HH:MM,
+  // multi-day windows show MM/DD HH:MM so the X-axis stays readable.
+  const isMultiDay = (summary.hours ?? 24) > 36
+  const evoData = evoSeriesRaw.map(row => {
+    const d = new Date(String(row.hour))
+    const label = isMultiDay
+      ? `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    const out: Record<string, number | string> = { label }
+    for (const k of evoKeys) out[k] = Number(row[k] || 0)
+    return out
+  })
+  const evoColorFor = (key: string, idx: number): string => {
+    // Reuse the canonical process palette when stacking by process so a
+    // process keeps the same color across all charts. Processes not in the
+    // canonical map (test/reap-*/etc.) fall back to the rotating palette
+    // by their stack index — beats every unknown process collapsing to a
+    // single gray slab. Models always use the rotating palette.
+    if (evoGroupBy === 'process') {
+      const canonical = PROCESS_COLORS[key]
+      if (canonical) return canonical
+      return EVOLUTION_PALETTE[idx % EVOLUTION_PALETTE.length]
+    }
+    return EVOLUTION_PALETTE[idx % EVOLUTION_PALETTE.length]
+  }
+  const windowLabel = WINDOW_OPTIONS.find(o => o.value === hoursWindow)?.label || hoursWindow
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -269,6 +354,16 @@ export function TokenUsagePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={hoursWindow} onValueChange={setHoursWindow}>
+            <SelectTrigger className="w-[140px] h-9" title="Time window">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {WINDOW_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"
@@ -358,6 +453,7 @@ export function TokenUsagePage() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="evolution">Evolution</TabsTrigger>
           <TabsTrigger value="processes">By Process</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="recent">Recent Calls</TabsTrigger>
@@ -442,6 +538,129 @@ export function TokenUsagePage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Evolution Tab - stacked area chart over the selected window */}
+        <TabsContent value="evolution" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Consumption Evolution
+                  </CardTitle>
+                  <CardDescription>
+                    {windowLabel} · {summary.bucket_minutes ?? '?'}-minute buckets ·
+                    {' '}stacked by {evoGroupBy === 'process' ? 'purpose' : 'model'}
+                  </CardDescription>
+                </div>
+                <Select
+                  value={evoGroupBy}
+                  onValueChange={(v) => setEvoGroupBy(v as 'process' | 'model')}
+                >
+                  <SelectTrigger className="w-[160px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="process">By Process</SelectItem>
+                    <SelectItem value="model">By Model</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {evoData.length > 0 && evoKeys.length > 0 ? (
+                <ResponsiveContainer width="100%" height={420}>
+                  <AreaChart data={evoData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} minTickGap={24} />
+                    <YAxis tickFormatter={formatTokens} tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      formatter={(val: number, name: string) => [formatTokens(val), name]}
+                      labelStyle={{ color: '#999' }}
+                      contentStyle={{ backgroundColor: '#1e1e2e', border: '1px solid #333' }}
+                    />
+                    <Legend />
+                    {evoKeys.map((k, i) => (
+                      <Area
+                        key={k}
+                        type="monotone"
+                        dataKey={k}
+                        stackId="evo"
+                        stroke={evoColorFor(k, i)}
+                        fill={evoColorFor(k, i)}
+                        fillOpacity={0.7}
+                        name={k}
+                      />
+                    ))}
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-muted-foreground py-12">
+                  No data in this window. Pick a wider time range or wait for new LLM calls.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Per-series rollup table — total tokens contributed by each stacked
+              series in the window, so the user can see who the top consumers
+              are at a glance without hovering through the chart. */}
+          {evoKeys.length > 0 && (
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Top Consumers ({windowLabel})
+                </CardTitle>
+                <CardDescription>
+                  Totals across the selected window, ranked by token volume
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{evoGroupBy === 'process' ? 'Process' : 'Model'}</TableHead>
+                      <TableHead className="text-right">Total Tokens</TableHead>
+                      <TableHead className="w-[300px]">Share</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {evoKeys
+                      .map((k, i) => {
+                        const total = evoData.reduce((s, row) => s + Number(row[k] || 0), 0)
+                        return { key: k, total, color: evoColorFor(k, i) }
+                      })
+                      .sort((a, b) => b.total - a.total)
+                      .map(({ key, total, color }) => {
+                        const grandTotal = summary.total_tokens || 1
+                        const pct = (total / grandTotal) * 100
+                        return (
+                          <TableRow key={key}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                                <span className="font-medium">{key}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">{formatTokens(total)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                                </div>
+                                <span className="text-xs text-muted-foreground w-12 text-right">{pct.toFixed(1)}%</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Processes Tab - detailed table */}
