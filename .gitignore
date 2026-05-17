@@ -203,6 +203,10 @@ integrations/browser-access/logs/
 !.data/llm-proxy-export/
 !.data/knowledge-config.json
 
+# Per-machine local — proxy settings (dashboard's Settings dialog persists
+# routing choices here; should NOT be shared across clones).
+.data/llm-proxy/llm-settings.json
+
 # PlantUML validation errors (transient, regenerated on diagram validation)
 knowledge-management/insights/plantuml_errors.json
 
