@@ -111,11 +111,6 @@ services:
       # dashboard (reader) must see the same file so what's logged appears on
       # the dashboard.
       - ${CODING_REPO:-.}/.mcp-sync:/coding/.mcp-sync:rw
-      # LSL coordinator registry — bind-mounted so the constraint-monitor
-      # dashboard inside the container can read coordinator/project
-      # heartbeat timestamps. Without this, system-health always
-      # reports "coordinator: unknown" because the file isn't visible.
-      - ${CODING_REPO:-.}/.global-lsl-registry.json:/coding/.global-lsl-registry.json:ro
       # VKB visualizer build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
       # Observation pipeline (live-mounted as a directory so new files like
