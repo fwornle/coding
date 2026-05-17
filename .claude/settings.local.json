@@ -405,7 +405,9 @@
       "Bash(cp -v docs/images/log-observations.png docs-content/images/log-observations.png)",
       "Bash(cp -v docs/images/health-mon-tokens-usage.png docs-content/images/health-mon-tokens-usage.png)",
       "Bash(cp -v docs/images/log-digests.png docs-content/images/log-digests.png)",
-      "Bash(cp -v docs/images/log-insights.png docs-content/images/log-insights.png)"
+      "Bash(cp -v docs/images/log-insights.png docs-content/images/log-insights.png)",
+      "Bash(mv -v docs/puml/token-usage-architecture.png docs/images/token-usage-architecture.png)",
+      "Bash(cp -v docs/images/token-usage-architecture.png docs-content/images/token-usage-architecture.png)"
     ],
     "deny": [],
     "ask": []
