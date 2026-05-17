@@ -2,7 +2,7 @@
   {
     "id": "9499e97a-d284-4b39-957b-2f5697dff4f1",
     "topic": "LLM Token Usage Tracking — Proxy Instrumentation and Dashboard",
-    "summary": "## Purpose\n`rapid-llm-proxy`'s token usage module records per-process LLM token consumption in hourly bucketed JSON files, keyed by user hash and time window, so the system health dashboard can visualise token spend without requiring centralised aggregation.\n\n## Architecture\n- **`src/token-usage.ts`** — core tracking module. Key functions:\n  - `resolveTokenExportDir()` — determines the export directory path; overridden by `LLM_PROXY_TOKEN_EXPORT_DIR` env var\n  - `currentWindow()` — computes the current hourly time window string using `LSL_TIMEZONE`\n  - `lslWritePath()` — constructs the full path for the current hour's JSON file, incorporating `LLM_PROXY_USER_HASH` in the filename\n  - `exportToHourFile()` — writes/appends token usage data to the hourly JSON file; SELECT and INSERT OR IGNORE statements both include `model_raw`; files missing `model_raw` fall back to the `model` field for backward compatibility\n  - Per-window-keyed debounce `Map` — throttles writes so that high-frequency completions within the same hour do not produce excessive I/O; each window key tracks its own debounce state independently\n- **Startup wrapper** (`bin/start-llm-proxy.sh`) — sets `LLM_PROXY_TOKEN_EXPORT_DIR` to `.specstory/history/logs/llm-proxy-export/` (under the private coding-history repo), co-locating token exports with LSL transcripts; also exports:\n  - `LLM_PROXY_USER_HASH` — deterministic short hash (e.g., `c197ef`) computed via env-var-driven dynamic import of `src/user-hash-generator.js`; the dynamic-import pattern (not `import(process.argv[1])`) prevents stdout contamination\n  - `LSL_TIMEZONE` — user's local timezone (e.g., `Europe/Berlin`); inserted between the final `fi` block and the `exec node` log line in `start-llm-proxy.sh`\n- **Export layout**: per-hour JSON files in `year-month/` subdirectories under the `LLM_PROXY_TOKEN_EXPORT_DIR` path (default: `.specstory/history/logs/llm-proxy-export/`); filename includes `LLM_PROXY_USER_HASH` for user-scoped attribution; format mirrors LSL conventions\n- **Schema**: export rows include `model_raw` (raw provider model string) alongside canonicalized `model`; `model_raw` survives full export → hydrate round-trips without data loss\n- **Dashboard visualisation**: `integrations/system-health-dashboard/src/pages/token-usage.tsx` — Recharts-based view including treemap; treemap currently has no `Tooltip` component (smaller boxes non-interactive)\n- **PlantUML diagrams** (`docs/diagrams/`): three in-place diagrams (kebab-case, no versioned copies) — `component-model.puml`, `request-flow.puml`, `architecture-overview.puml`\n\n## Key Files\n- `rapid-llm-proxy/src/token-usage.ts` — hourly bucketing; `resolveTokenExportDir`, `currentWindow`, `lslWritePath`, `exportToHourFile`, per-window debounce `Map`; `model_raw` in SELECT and INSERT OR IGNORE\n- `rapid-llm-proxy/bin/start-llm-proxy.sh` — sets `LLM_PROXY_TOKEN_EXPORT_DIR` to private history repo path; exports `LLM_PROXY_USER_HASH` and `LSL_TIMEZONE` before bridge spawn\n- `rapid-llm-proxy/src/user-hash-generator.js` — hash computation; imported dynamically in startup script\n- `rapid-llm-proxy/proxy-bridge/server.mjs` — main bridge; routes completions, records token counts\n- `integrations/system-health-dashboard/src/pages/token-usage.tsx` — dashboard visualisation; treemap missing `Tooltip`\n- `rapid-llm-proxy/docs/diagrams/` — architecture PlantUML sources; updated in-place, PNGs regenerated alongside\n\n## Usage\n`token-usage.ts` runs inside the bridge process. `LLM_PROXY_USER_HASH`, `LSL_TIMEZONE`, and `LLM_PROXY_TOKEN_EXPORT_DIR` must be present in the bridge environment for correct per-user, per-timezone hourly file naming and correct output location — all three are injected by `start-llm-proxy.sh`. Export files accumulate under `.specstory/history/logs/llm-proxy-export/<year-month>/` in the private coding-history repo. The dashboard reads them at render time. Restart via `launchctl` after changes to `start-llm-proxy.sh` or `token-usage.ts` (TypeScript must be rebuilt first).\n\n## Troubleshooting\n- **`LLM_PROXY_USER_HASH` is a multi-line garbage string**: `start-llm-proxy.sh` was using `import(process.argv[1])`, which triggered `runIfMain()` and contaminated stdout — verify the env-var-driven `user-hash-generator.js` import pattern is in place; revert via `git checkout` if corrupted and restart launchd\n- **`LSL_TIMEZONE` missing from bridge environment**: Check that the export line in `start-llm-proxy.sh` is placed between the final `fi` and the `exec node` log line; verify `launchctl` restarted after the change\n- **Token export files writing to wrong location**: `LLM_PROXY_TOKEN_EXPORT_DIR` not set or overridden — verify `start-llm-proxy.sh` exports it pointing to `.specstory/history/logs/llm-proxy-export/`; confirm `launchctl` restarted after the change\n- **`model_raw` missing from exported rows**: Verify `token-usage.ts` SELECT statement includes `model_raw` and INSERT OR IGNORE includes it; legacy files without `model_raw` should fall back to `model` — ensure fallback is present in hydration logic\n- **Hourly export files not created / empty**: Confirm `LLM_PROXY_USER_HASH` and `LSL_TIMEZONE` are non-empty in the bridge process; verify `resolveTokenExportDir()` resolves to a writable path; check that `exportToHourFile()` is being called after each completion\n- **Per-window debounce suppressing expected writes**: Each hourly window key maintains an independent debounce timer; if a window rolls over mid-session, the first write of the new window fires immediately — verify window key computation in `currentWindow()` matches `LSL_TIMEZONE`\n- **Treemap boxes not interactive / no tooltip**: No `Tooltip` component in the Recharts treemap in `token-usage.tsx` — add a `<Tooltip>` wrapper to make smaller boxes interactive\n- **Model names show inconsistent spellings in token usage view**: Raw strings from uncanonicalized call sites in `server.mjs` — implement `canonicalizeModelName()` at each log call site\n- **PlantUML diagrams out of date after architecture changes**: Diagrams live in `docs/diagrams/`; update in-place (no versioned copies) and regenerate PNGs alongside source changes",
+    "summary": "## Purpose\n`rapid-llm-proxy`'s token usage module records per-process LLM token consumption in hourly bucketed JSON files, keyed by user hash and time window, so the system health dashboard can visualise token spend without requiring centralised aggregation.\n\n## Architecture\n- **`src/token-usage.ts`** — core tracking module. Key functions:\n  - `resolveTokenExportDir()` — determines the export directory path; overridden by `LLM_PROXY_TOKEN_EXPORT_DIR` env var\n  - `currentWindow()` — computes the current hourly time window string using `LSL_TIMEZONE`\n  - `lslWritePath()` — constructs the full path for the current hour's JSON file, incorporating `LLM_PROXY_USER_HASH` in the filename\n  - `exportToHourFile()` — writes/appends token usage data to the hourly JSON file; SELECT and INSERT OR IGNORE statements both include `model_raw`; files missing `model_raw` fall back to the `model` field for backward compatibility\n  - Per-window-keyed debounce `Map` — throttles writes so that high-frequency completions within the same hour do not produce excessive I/O; each window key tracks its own debounce state independently\n- **Startup wrapper** (`bin/start-llm-proxy.sh`) — sets `LLM_PROXY_TOKEN_EXPORT_DIR` to `.specstory/history/logs/llm-proxy-export/` (under the private coding-history repo), co-locating token exports with LSL transcripts; also exports:\n  - `LLM_PROXY_USER_HASH` — deterministic short hash (e.g., `c197ef`) computed via env-var-driven dynamic import of `src/user-hash-generator.js`; the dynamic-import pattern (not `import(process.argv[1])`) prevents stdout contamination\n  - `LSL_TIMEZONE` — user's local timezone (e.g., `Europe/Berlin`); inserted between the final `fi` block and the `exec node` log line in `start-llm-proxy.sh`\n- **Export layout**: per-hour JSON files in `year-month/` subdirectories under the `LLM_PROXY_TOKEN_EXPORT_DIR` path (default: `.specstory/history/logs/llm-proxy-export/`); filename includes `LLM_PROXY_USER_HASH` for user-scoped attribution; format mirrors LSL conventions\n- **Schema**: export rows include `model_raw` (raw provider model string) alongside canonicalized `model`; `model_raw` survives full export → hydrate round-trips without data loss\n- **Dashboard visualisation**: `integrations/system-health-dashboard/src/pages/token-usage.tsx` — Recharts-based view including treemap; treemap currently has no `Tooltip` component (smaller boxes non-interactive)\n- **PlantUML diagrams** (`docs/diagrams/`): three in-place diagrams (kebab-case, no versioned copies) — `component-model.puml`, `request-flow.puml`, `architecture-overview.puml`\n\n## Key Files\n- `rapid-llm-proxy/src/token-usage.ts` — hourly bucketing; `resolveTokenExportDir`, `currentWindow`, `lslWritePath`, `exportToHourFile`, per-window debounce `Map`; `model_raw` in SELECT and INSERT OR IGNORE\n- `rapid-llm-proxy/bin/start-llm-proxy.sh` — sets `LLM_PROXY_TOKEN_EXPORT_DIR` to private history repo path; exports `LLM_PROXY_USER_HASH` and `LSL_TIMEZONE` before bridge spawn\n- `coding/scripts/user-hash-generator.js` — hash computation in the coding repo; imported dynamically by `start-llm-proxy.sh` via `node -e \"import(process.env.USER_HASH_SCRIPT)...\"` to avoid stdout pollution from `runIfMain` blocks\n- `rapid-llm-proxy/proxy-bridge/server.mjs` — main bridge; routes completions, records token counts\n- `integrations/system-health-dashboard/src/pages/token-usage.tsx` — dashboard visualisation; treemap missing `Tooltip`\n- `rapid-llm-proxy/docs/diagrams/` — architecture PlantUML sources; updated in-place, PNGs regenerated alongside\n\n## Usage\n`token-usage.ts` runs inside the bridge process. `LLM_PROXY_USER_HASH`, `LSL_TIMEZONE`, and `LLM_PROXY_TOKEN_EXPORT_DIR` must be present in the bridge environment for correct per-user, per-timezone hourly file naming and correct output location — all three are injected by `start-llm-proxy.sh`. Export files accumulate under `.specstory/history/logs/llm-proxy-export/<year-month>/` in the private coding-history repo. The dashboard reads them at render time. Restart via `launchctl` after changes to `start-llm-proxy.sh` or `token-usage.ts` (TypeScript must be rebuilt first).\n\n## Troubleshooting\n- **`LLM_PROXY_USER_HASH` is a multi-line garbage string**: `start-llm-proxy.sh` was using `import(process.argv[1])`, which triggered `runIfMain()` and contaminated stdout — verify the env-var-driven `user-hash-generator.js` import pattern is in place; revert via `git checkout` if corrupted and restart launchd\n- **`LSL_TIMEZONE` missing from bridge environment**: Check that the export line in `start-llm-proxy.sh` is placed between the final `fi` and the `exec node` log line; verify `launchctl` restarted after the change\n- **Token export files writing to wrong location**: `LLM_PROXY_TOKEN_EXPORT_DIR` not set or overridden — verify `start-llm-proxy.sh` exports it pointing to `.specstory/history/logs/llm-proxy-export/`; confirm `launchctl` restarted after the change\n- **`model_raw` missing from exported rows**: Verify `token-usage.ts` SELECT statement includes `model_raw` and INSERT OR IGNORE includes it; legacy files without `model_raw` should fall back to `model` — ensure fallback is present in hydration logic\n- **Hourly export files not created / empty**: Confirm `LLM_PROXY_USER_HASH` and `LSL_TIMEZONE` are non-empty in the bridge process; verify `resolveTokenExportDir()` resolves to a writable path; check that `exportToHourFile()` is being called after each completion\n- **Per-window debounce suppressing expected writes**: Each hourly window key maintains an independent debounce timer; if a window rolls over mid-session, the first write of the new window fires immediately — verify window key computation in `currentWindow()` matches `LSL_TIMEZONE`\n- **Model names show inconsistent spellings in token usage view**: Raw strings from uncanonicalized call sites in `server.mjs` — implement `canonicalizeModelName()` at each log call site\n- **PlantUML diagrams out of date after architecture changes**: Diagrams live in `docs/diagrams/`; update in-place (no versioned copies) and regenerate PNGs alongside source changes",
     "confidence": 0.97,
     "digestIds": [
       "63fdd269-381d-4cb3-b84a-0266dc72e091",
@@ -72,15 +72,15 @@
       "fcfd2256-8ad0-4115-954f-2f4831636391",
       "e11dee37-bbe1-447d-ab8d-dccdb54e702d"
     ],
-    "lastUpdated": "2026-05-17T10:28:15.067Z",
+    "lastUpdated": "2026-05-17T15:00:02.309Z",
     "createdAt": "2026-05-15T07:10:45.433Z",
     "metadata": {
       "scope": "Token usage recording, export pipeline, and dashboard visualisation in `rapid-llm-proxy`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:46.112Z",
+        "verifiedAt": "2026-05-17T15:00:11.274Z",
         "totalClaims": 22,
-        "verifiedClaims": 18,
-        "verificationRatio": 0.818,
+        "verifiedClaims": 20,
+        "verificationRatio": 0.909,
         "staleClaims": [
           {
             "raw": "src/user-hash-generator.js",
@@ -88,14 +88,6 @@
           },
           {
             "raw": "year-month/",
-            "type": "PATH"
-          },
-          {
-            "raw": "rapid-llm-proxy/src/user-hash-generator.js",
-            "type": "PATH"
-          },
-          {
-            "raw": "rapid-llm-proxy/docs/diagrams/",
             "type": "PATH"
           }
         ],
@@ -112,7 +104,9 @@
           "/Users/Q284340/Agentic/_work/sketcher",
           "/Users/Q284340/Agentic/_work/ui-template"
         ]
-      }
+      },
+      "repairedAt": "2026-05-17T15:00:02.309Z",
+      "repairReason": "post-audit: fix user-hash path + drop stale Treemap-no-Tooltip troubleshooting"
     },
     "project": "coding"
   },
@@ -229,22 +223,52 @@
       "99ce3e7b-226f-46e3-8efc-b998e0c3ceae",
       "85959867-464f-4f73-b3a2-f70c5c9ac7a2",
       "2aa564dd-df2f-4f34-ad27-d93037f5857c",
-      "e9b83828-d81c-4bfa-a2f5-fae7f08a7b57"
+      "e9b83828-d81c-4bfa-a2f5-fae7f08a7b57",
+      "baa49b86-e902-4a7f-8023-a9a3fde2f476",
+      "c2958c94-d8f1-4eeb-8b62-1a810a4c7332",
+      "f97c37f0-7863-4fb8-941d-0906af2f020a",
+      "70f9c2d7-c297-4e08-aa61-0a548d12e733",
+      "34768617-c5a2-47c2-b582-cf9c8e27dc26",
+      "836454cb-b75e-40ed-8e8a-6f29d9004a8c",
+      "ff0e40ba-6b26-4ecc-9da6-4eee4d769a0f",
+      "2a7f0a64-6d63-4e65-ac68-30245605fc0b",
+      "c9b326ae-bb6e-4ab6-9998-ed88da5144ae",
+      "c453e39b-eee6-4d79-8c84-3c097f70142b",
+      "48fe32e4-9c18-45fe-a7fe-5234d33fc8fe",
+      "ef6c33fe-1796-495f-84d0-336e2a5140f5",
+      "c096b406-1b7d-48b9-a6bf-9ff1cbee95cb",
+      "6ccf5423-afad-4f07-b051-793cc914754f",
+      "b1609cb0-d6af-4dde-b5c1-759ab25122cf",
+      "a1dac8b8-da6b-44b7-bd8c-9a8db0a29a34",
+      "f7cfd1cb-329c-42af-be4d-934df147a7b9",
+      "228c32a3-ba19-4bc6-8523-33c3f3574dbb",
+      "bffb004c-1d2b-43b0-98e4-0a01de63a0e4",
+      "16a024a2-3de5-40eb-8a96-dc0c97e9b74b",
+      "b44afba5-693d-487e-9b15-bb2d055fe886",
+      "f0165a22-5181-4ed7-87b8-96d9dd85481f",
+      "d3f7eb0a-e657-4ba0-978b-2eefb3adbb53",
+      "d7d0311e-99b3-4250-ba6e-f205687a76a8",
+      "1727210e-fd45-4f4c-bdb2-19170fe3d0b4",
+      "b1094174-d13a-4dc1-8bca-671828007d5f",
+      "0010ee53-0885-44b0-a3f3-a522c10b9ab0",
+      "0f5db830-4715-47ab-9512-635d8d1a257c",
+      "b3bb590d-9285-4219-a50f-99960f8e2ca8",
+      "31fba63e-6319-41df-acc0-ac399fe78e95"
     ],
-    "lastUpdated": "2026-05-17T11:30:35.573Z",
+    "lastUpdated": "2026-05-17T14:55:09.596Z",
     "createdAt": "2026-05-14T15:27:35.876Z",
     "metadata": {
       "scope": "The `rapid-llm-proxy` proxy bridge (`proxy-bridge/server.mjs`) and its startup wrapper (`bin/start-llm-proxy.sh`), including network mode detection, provider routing, and per-process environment variable injection.",
       "absorbed": [
         {
-          "id": "722fb941-55dc-4456-ac86-841febf814da",
-          "topic": "LLM CLI Proxy"
+          "id": "1e91533b-0c7c-4db7-a833-7c04e0045f64",
+          "topic": "LLM CLI Proxy — Provider Health Tracking and Fallback"
         }
       ],
-      "consolidatedAt": "2026-05-17T11:30:35.573Z",
-      "consolidationReason": "LLM CLI Proxy is a narrower-scope version of LLM CLI Proxy — VPN/Corporate Network Detection",
+      "consolidatedAt": "2026-05-17T14:55:09.596Z",
+      "consolidationReason": "Post-audit cleanup: 1e91533b had 0/4 verified claims (all references to deleted code: selectBestProvider/recordProviderResult/integrations/llm-{cli-,}proxy/). Digests refold into the canonical VPN/Corporate Network Detection insight.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:42.972Z",
+        "verifiedAt": "2026-05-17T15:00:08.925Z",
         "totalClaims": 12,
         "verifiedClaims": 11,
         "verificationRatio": 0.917,
@@ -437,7 +461,7 @@
     "metadata": {
       "scope": "Coordinator daemon, service probing, health state API, and registry management",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:41.953Z",
+        "verifiedAt": "2026-05-17T15:00:08.132Z",
         "totalClaims": 12,
         "verifiedClaims": 12,
         "verificationRatio": 1,
@@ -513,7 +537,7 @@
     "metadata": {
       "scope": "Five-wave Phase 35 implementation: ObservationPruner, ColdStoreReader, obs-api merge helper, full-union pagination, and pagination total fix across `src/live-logging/` and `scripts/`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:46.183Z",
+        "verifiedAt": "2026-05-17T15:00:11.346Z",
         "totalClaims": 7,
         "verifiedClaims": 7,
         "verificationRatio": 1,
@@ -614,7 +638,7 @@
     "metadata": {
       "scope": "tmux statusline rendering chain: `status-line-fast.cjs` → `combined-status-line.js`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:48.508Z",
+        "verifiedAt": "2026-05-17T15:01:02.243Z",
         "totalClaims": 5,
         "verifiedClaims": 4,
         "verificationRatio": 0.8,
@@ -809,7 +833,7 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:38.284Z",
+        "verifiedAt": "2026-05-17T15:00:04.655Z",
         "totalClaims": 12,
         "verifiedClaims": 10,
         "verificationRatio": 0.833,
@@ -839,6 +863,79 @@
       }
     },
     "project": "coding"
+  },
+  {
+    "id": "4c51c90e-4c55-4230-a27e-aed9ce0e5049",
+    "topic": "rapid-llm-proxy Standalone Package",
+    "summary": "## Purpose\n`@rapid/llm-proxy` is a domain-agnostic LLM abstraction layer shared across the OKB and coding projects. It normalizes multiple LLM providers behind a single interface, handles corporate proxy routing, VPN-aware provider selection, exposes a local HTTP proxy bridge for sandboxed Docker consumers, and tracks token usage. `_work/rapid-llm-proxy/` is the single canonical source; `integrations/llm-cli-proxy/` is dead code slated for deletion.\n\n## Architecture\n- **Providers** (`src/providers/`): `copilot-provider.ts` (reads the OAuth refresh token from `~/.local/share/opencode/auth.json` and uses it directly as Bearer — there is **no** token-exchange step; enterprise vs public routing is selected by API base URL only), `claude-code-provider.ts` (CLI-based), plus API-key providers (OpenAI, Anthropic, Groq, Gemini, GitHub Models)\n- **Proxy bridge** (`proxy-bridge/server.mjs`): Local HTTP server for Docker consumers; supports **5 provider backends**: 1 CLI (Copilot) + 4 HTTP (Anthropic, Copilot direct, OpenAI, Groq); each HTTP provider is keyed on API key presence for the `available` flag; uses undici `fetch` with `ProxyAgent` dispatcher for corporate proxy tunneling\n- **Network detection** (`src/network-detect.ts`): three signals in priority order — env override `LLM_NETWORK_MODE`, VPN tunnel interfaces (`utun`/`tun`/`ppp`/`wg`) with private-range routes, and DNS resolution of `LLM_VPN_PROBE_HOST`. Result gates provider initialization via `network_overrides` in YAML config; on a VPN/corporate network only Copilot and (for the premium tier) claude-code are initialized — Groq/OpenAI/Anthropic are firewall-blocked\n- **Token-usage tracking** (`src/token-usage.ts`): per-hour JSON exports under `LLM_PROXY_TOKEN_EXPORT_DIR` (default `.specstory/history/logs/llm-proxy-export/`); `model_raw` column preserves raw provider model strings across export → hydrate round-trips\n- **LaunchAgent** (`~/Library/LaunchAgents/com.coding.llm-cli-proxy.plist`): runs `bin/start-llm-proxy.sh` which execs `proxy-bridge/server.mjs` — `server.mjs` is the canonical entry point (no compiled `dist/server.js` exists in this repo)\n- **Copilot enterprise**: Enterprise tokens must NOT go through the token exchange step — use OAuth token directly as Bearer; versioned model names like `claude-sonnet-4-20250514` unsupported; use `claude-sonnet-4.6`\n- **Config** (`src/config.ts`): Reads YAML config; `network_overrides` applies per-network provider preference lists; auto-routing selects highest-priority available provider when no explicit `provider` field is supplied\n- **`RAPID_HOME`** env var: Required in `.env` for toolkit integration; must be set to the correct toolkit root path\n\n## Key Files\n- `_work/rapid-llm-proxy/proxy-bridge/server.mjs` — HTTP bridge; all 5 provider backends wired with `available` flag and health-check logic\n- `_work/rapid-llm-proxy/src/providers/copilot-provider.ts` — OAuth session token exchange, caching, enterprise routing\n- `_work/rapid-llm-proxy/src/providers/` — all provider implementations\n- `_work/rapid-llm-proxy/src/network-detect.ts` — VPN/public network detection (interface scan + DNS probe)\n- `_work/rapid-llm-proxy/src/config.ts` + `src/types.ts` — YAML config loading and `network_overrides` types\n- `_work/rapid-llm-proxy/.env` — includes `RAPID_HOME` for toolkit integration\n_(historical: `integrations/llm-cli-proxy/` was the predecessor in-tree implementation — it has been deleted; the canonical proxy now lives in the standalone `_work/rapid-llm-proxy` repo)_\n\n## Usage\n- OKB vendors the package as a local tarball under `vendor/`; `Dockerfile` has `COPY vendor/ vendor/` before `npm ci`\n- OKB routes all LLM inference through the proxy bridge via `LLM_CLI_PROXY_URL` env var (set in `docker/docker-compose.yml`), pointing to port 12435\n- Coding project's MCP server (`semantic-analysis`) consumes the package; stale `dist/` must be rebuilt after package updates\n- The proxy bridge must be running on the host before Docker containers start; pass its URL to containers via `LLM_CLI_PROXY_URL`\n- `/raas-job/:uuid` route must be preserved in the canonical proxy server\n\n## Troubleshooting\n- **401 from Copilot API**: OAuth token in `~/.local/share/opencode/auth.json` may be expired — re-authenticate via OpenCode; do not send enterprise tokens through the `/copilot_internal/v2/token` exchange endpoint\n- **Docker build fails on `@rapid/llm-proxy`**: GHE auth unavailable inside Docker; ensure `vendor/` tarball exists and `Dockerfile` has `COPY vendor/ vendor/` before `npm ci`; rebuild and repack the tarball when `dist/` is out of sync with source\n- **LaunchAgent running legacy proxy**: LaunchAgent plist must point to `dist/server.js`, not `server.mjs`; version mismatch causes token-usage endpoints to return errors\n- **LLM calls hang on VPN**: Non-VPN providers (Groq, OpenAI, Anthropic direct) are firewall-blocked; ensure `network_overrides` restricts VPN mode to copilot-only, and `AbortController` timeouts cancel stuck TCP sockets\n- **OpenAI or Groq provider not listed as available**: Provider `available` flag is keyed on API key presence — verify the key is set in `.env` and the proxy bridge was restarted after adding it",
+    "confidence": 0.9,
+    "digestIds": [
+      "b0317e37-aafe-40f6-9acb-b263085b3e21",
+      "24747a95-b65e-41ae-84dc-181cea4a7106",
+      "a5d013cb-288e-4747-a857-04084bbf3b4b",
+      "a9786531-7480-48b9-b69c-36729b6518f2",
+      "b32d1f9a-7662-49d0-a0c3-635fe2b48fc4",
+      "e51c2e29-63ed-4cd3-82a7-7c613c0c9ed2",
+      "996f5c69-2d96-4073-ba55-d19bb6d899d3",
+      "4ebd3003-41af-4abd-993b-c3240aeafdd3",
+      "ebd99e54-0918-42ed-9b39-82ec0a586d21",
+      "4ed8ab04-a0bc-467b-8091-e1d67a23d603",
+      "5ef51d2f-d35c-4a15-b59f-512f848b8c64",
+      "8f848cf5-01f0-4bb1-8a07-049e2c17bfe3",
+      "5b696643-d199-437b-b109-156df11a79fb",
+      "43ba3013-1c66-49c5-a1a6-337b13d21b52",
+      "b3c90a95-278c-489d-857f-e23783cdb03f",
+      "01beb715-dd4c-4f61-aac2-cec0a7a1d8d5",
+      "b839192a-0a54-4485-a836-6c80e9a1b419",
+      "940f322b-56f6-4c8e-8cdf-eade3d62d6b3",
+      "d594ca13-3e65-4c4d-9009-81aeddae47bf",
+      "0a9297ee-018f-4e24-8c5f-aaaa6d7791e8",
+      "4841a243-662b-4340-85ff-e4e029e86fd1",
+      "0e439739-b9e3-41ed-a37b-a42d9e6ddf18",
+      "e9a1efa5-6150-4495-bfd5-5175e4ffda86",
+      "261302bb-792a-4647-b0cf-b7155a5cba4f",
+      "5f6d098a-fc68-4d37-81bc-ad57c1c5c9a2",
+      "bb7b96b4-4aa6-4ea6-886e-5834d14b92bb",
+      "43f616b2-1f91-4996-9e2b-e5b81d77862c",
+      "db195306-480f-48e6-9793-51fe4d75ae90",
+      "4a0d669f-47da-40b6-94c8-243541202774",
+      "9b566d28-5273-47e5-9fd3-3605cc5053c8",
+      "df222607-2808-4ce1-bbf4-7dc428dff923",
+      "03510a49-3752-436a-b98c-78682e34b0bc",
+      "306a7795-5f04-4012-85c6-ed5fc8f9685c",
+      "b652cea6-fc4b-4c90-940b-c91a3501f737",
+      "c8d55d29-8743-42d5-8c4b-90967bc138fe",
+      "2f7e2af8-da84-4851-b81d-14a40011b281",
+      "8623bf4e-66f6-4ed6-be25-5561387dc779"
+    ],
+    "lastUpdated": "2026-05-17T15:00:56.369Z",
+    "createdAt": "2026-05-14T15:27:35.876Z",
+    "metadata": {
+      "scope": "The `@rapid/llm-proxy` npm package and its proxy bridge at `_work/rapid-llm-proxy/`, providing unified LLM provider routing for OKB, coding MCP server, and Docker consumers.",
+      "codeVerification": {
+        "verifiedAt": "2026-05-17T15:01:03.547Z",
+        "totalClaims": 27,
+        "verifiedClaims": 27,
+        "verificationRatio": 1,
+        "staleClaims": [],
+        "searchRoots": [
+          "/Users/Q284340/Agentic/coding",
+          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
+          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
+          "/Users/Q284340/Agentic/_work/dyn-arch",
+          "/Users/Q284340/Agentic/_work/iso-9001",
+          "/Users/Q284340/Agentic/_work/onboarding-repro",
+          "/Users/Q284340/Agentic/_work/rapid-automations",
+          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
+          "/Users/Q284340/Agentic/_work/resi",
+          "/Users/Q284340/Agentic/_work/sketcher",
+          "/Users/Q284340/Agentic/_work/ui-template"
+        ]
+      },
+      "repairedAt": "2026-05-17T15:00:02.309Z",
+      "repairReason": "post-audit: Copilot OAuth no-exchange; renames (network-detect, config); server.mjs canonical; drop ROADMAP/STATE/legacy refs"
+    },
+    "project": "rapid-automations"
   },
   {
     "id": "e843400b-c6d9-41a1-966f-a4389eb0335f",
@@ -1014,7 +1111,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Three regenerations of the same ETM daemon description — same subsystem, drifting topic name",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:35.478Z",
+        "verifiedAt": "2026-05-17T15:00:02.970Z",
         "totalClaims": 5,
         "verifiedClaims": 5,
         "verificationRatio": 1,
@@ -1250,7 +1347,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Both insights cover ObservationWriter+SQLite — same scope, different emphasis",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:36.616Z",
+        "verifiedAt": "2026-05-17T15:00:02.970Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -1362,7 +1459,7 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:39.820Z",
+        "verifiedAt": "2026-05-17T15:00:06.147Z",
         "totalClaims": 9,
         "verifiedClaims": 6,
         "verificationRatio": 0.667,
@@ -1445,7 +1542,7 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:39.820Z",
+        "verifiedAt": "2026-05-17T15:00:06.147Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -1582,7 +1679,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Host-API Pattern and Host-Side HTTP Wrapper describe the same observations-api-server.mjs",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:54.254Z",
+        "verifiedAt": "2026-05-17T15:01:05.321Z",
         "totalClaims": 2,
         "verifiedClaims": 2,
         "verificationRatio": 1,
@@ -1683,7 +1780,7 @@
     "metadata": {
       "scope": "The OKB graph-structured knowledge base: ingestion, LevelDB storage, correlation engine, Docker configuration, and LLM integration.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:45.051Z",
+        "verifiedAt": "2026-05-17T15:00:58.768Z",
         "totalClaims": 19,
         "verifiedClaims": 16,
         "verificationRatio": 0.842,
@@ -1719,122 +1816,6 @@
     "project": "rapid-automations"
   },
   {
-    "id": "4c51c90e-4c55-4230-a27e-aed9ce0e5049",
-    "topic": "rapid-llm-proxy Standalone Package",
-    "summary": "## Purpose\n`@rapid/llm-proxy` is a domain-agnostic LLM abstraction layer shared across the OKB and coding projects. It normalizes multiple LLM providers behind a single interface, handles corporate proxy routing, VPN-aware provider selection, exposes a local HTTP proxy bridge for sandboxed Docker consumers, and tracks token usage. `_work/rapid-llm-proxy/` is the single canonical source; `integrations/llm-cli-proxy/` is dead code slated for deletion.\n\n## Architecture\n- **Providers** (`src/providers/`): `copilot-provider.ts` (OAuth → session token exchange via `api.github.com/copilot_internal/v2/token`, 5-min cache), `claude-code-provider.ts` (CLI-based), plus API-key providers (OpenAI, Anthropic, Groq)\n- **Proxy bridge** (`proxy-bridge/server.mjs`): Local HTTP server for Docker consumers; supports **5 provider backends**: 1 CLI (Copilot) + 4 HTTP (Anthropic, Copilot direct, OpenAI, Groq); each HTTP provider is keyed on API key presence for the `available` flag; uses undici `fetch` with `ProxyAgent` dispatcher for corporate proxy tunneling\n- **VPN detection** (`src/vpn-detection.ts`): Inspects `utun` routes and DNS suffixes; result gates provider initialization via `network_overrides` in YAML config; on VPN, only the Copilot provider is active\n- **Token-usage tracking**: Backported into the canonical proxy (Phase A of unification); consumer-scoped log paths configurable via env vars (`data/llm-proxy/logs`, Phase B)\n- **LaunchAgent**: Should run `dist/server.js` (compiled from `server.ts`), not the legacy `server.mjs`\n- **Copilot enterprise**: Enterprise tokens must NOT go through the token exchange step — use OAuth token directly as Bearer; versioned model names like `claude-sonnet-4-20250514` unsupported; use `claude-sonnet-4.6`\n- **Config** (`src/config-loader.ts`): Reads YAML config; `network_overrides` applies per-network provider preference lists; auto-routing selects highest-priority available provider when no explicit `provider` field is supplied\n- **`RAPID_HOME`** env var: Required in `.env` for toolkit integration; must be set to the correct toolkit root path\n\n## Key Files\n- `_work/rapid-llm-proxy/proxy-bridge/server.mjs` — HTTP bridge; all 5 provider backends wired with `available` flag and health-check logic\n- `_work/rapid-llm-proxy/src/providers/copilot-provider.ts` — OAuth session token exchange, caching, enterprise routing\n- `_work/rapid-llm-proxy/src/providers/` — all provider implementations\n- `_work/rapid-llm-proxy/src/vpn-detection.ts` — VPN/public network detection\n- `_work/rapid-llm-proxy/src/config-loader.ts` + `src/types.ts` — YAML config loading and `network_overrides` types\n- `_work/rapid-llm-proxy/ROADMAP.md` — unification plan (Phases A–D)\n- `_work/rapid-llm-proxy/STATE.md` — current unification state\n- `_work/rapid-llm-proxy/.env` — includes `RAPID_HOME` for toolkit integration\n- `integrations/llm-cli-proxy/` — **dead/legacy**; pending deletion (Phase D)\n\n## Usage\n- OKB vendors the package as a local tarball under `vendor/`; `Dockerfile` has `COPY vendor/ vendor/` before `npm ci`\n- OKB routes all LLM inference through the proxy bridge via `LLM_CLI_PROXY_URL` env var (set in `docker/docker-compose.yml`), pointing to port 12435\n- Coding project's MCP server (`semantic-analysis`) consumes the package; stale `dist/` must be rebuilt after package updates\n- The proxy bridge must be running on the host before Docker containers start; pass its URL to containers via `LLM_CLI_PROXY_URL`\n- `/raas-job/:uuid` route must be preserved in the canonical proxy server\n\n## Troubleshooting\n- **401 from Copilot API**: OAuth token in `~/.local/share/opencode/auth.json` may be expired — re-authenticate via OpenCode; do not send enterprise tokens through the `/copilot_internal/v2/token` exchange endpoint\n- **Docker build fails on `@rapid/llm-proxy`**: GHE auth unavailable inside Docker; ensure `vendor/` tarball exists and `Dockerfile` has `COPY vendor/ vendor/` before `npm ci`; rebuild and repack the tarball when `dist/` is out of sync with source\n- **LaunchAgent running legacy proxy**: LaunchAgent plist must point to `dist/server.js`, not `server.mjs`; version mismatch causes token-usage endpoints to return errors\n- **LLM calls hang on VPN**: Non-VPN providers (Groq, OpenAI, Anthropic direct) are firewall-blocked; ensure `network_overrides` restricts VPN mode to copilot-only, and `AbortController` timeouts cancel stuck TCP sockets\n- **OpenAI or Groq provider not listed as available**: Provider `available` flag is keyed on API key presence — verify the key is set in `.env` and the proxy bridge was restarted after adding it\n- **MCP server still imports old path**: Check `dist/` for stale references to `../../../../lib/llm/dist/index.js`; rebuild the MCP server after updating imports to `@rapid/llm-proxy`",
-    "confidence": 0.9,
-    "digestIds": [
-      "b0317e37-aafe-40f6-9acb-b263085b3e21",
-      "24747a95-b65e-41ae-84dc-181cea4a7106",
-      "a5d013cb-288e-4747-a857-04084bbf3b4b",
-      "a9786531-7480-48b9-b69c-36729b6518f2",
-      "b32d1f9a-7662-49d0-a0c3-635fe2b48fc4",
-      "e51c2e29-63ed-4cd3-82a7-7c613c0c9ed2",
-      "996f5c69-2d96-4073-ba55-d19bb6d899d3",
-      "4ebd3003-41af-4abd-993b-c3240aeafdd3",
-      "ebd99e54-0918-42ed-9b39-82ec0a586d21",
-      "4ed8ab04-a0bc-467b-8091-e1d67a23d603",
-      "5ef51d2f-d35c-4a15-b59f-512f848b8c64",
-      "8f848cf5-01f0-4bb1-8a07-049e2c17bfe3",
-      "5b696643-d199-437b-b109-156df11a79fb",
-      "43ba3013-1c66-49c5-a1a6-337b13d21b52",
-      "b3c90a95-278c-489d-857f-e23783cdb03f",
-      "01beb715-dd4c-4f61-aac2-cec0a7a1d8d5",
-      "b839192a-0a54-4485-a836-6c80e9a1b419",
-      "940f322b-56f6-4c8e-8cdf-eade3d62d6b3",
-      "d594ca13-3e65-4c4d-9009-81aeddae47bf",
-      "0a9297ee-018f-4e24-8c5f-aaaa6d7791e8",
-      "4841a243-662b-4340-85ff-e4e029e86fd1",
-      "0e439739-b9e3-41ed-a37b-a42d9e6ddf18",
-      "e9a1efa5-6150-4495-bfd5-5175e4ffda86",
-      "261302bb-792a-4647-b0cf-b7155a5cba4f",
-      "5f6d098a-fc68-4d37-81bc-ad57c1c5c9a2",
-      "bb7b96b4-4aa6-4ea6-886e-5834d14b92bb",
-      "43f616b2-1f91-4996-9e2b-e5b81d77862c",
-      "db195306-480f-48e6-9793-51fe4d75ae90",
-      "4a0d669f-47da-40b6-94c8-243541202774",
-      "9b566d28-5273-47e5-9fd3-3605cc5053c8",
-      "df222607-2808-4ce1-bbf4-7dc428dff923",
-      "03510a49-3752-436a-b98c-78682e34b0bc",
-      "306a7795-5f04-4012-85c6-ed5fc8f9685c",
-      "b652cea6-fc4b-4c90-940b-c91a3501f737",
-      "c8d55d29-8743-42d5-8c4b-90967bc138fe",
-      "2f7e2af8-da84-4851-b81d-14a40011b281",
-      "8623bf4e-66f6-4ed6-be25-5561387dc779"
-    ],
-    "lastUpdated": "2026-05-15T18:40:08.856Z",
-    "createdAt": "2026-05-14T15:27:35.876Z",
-    "metadata": {
-      "scope": "The `@rapid/llm-proxy` npm package and its proxy bridge at `_work/rapid-llm-proxy/`, providing unified LLM provider routing for OKB, coding MCP server, and Docker consumers.",
-      "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:52.495Z",
-        "totalClaims": 25,
-        "verifiedClaims": 14,
-        "verificationRatio": 0.56,
-        "staleClaims": [
-          {
-            "raw": "api.github.com/copilot_internal/v2/token",
-            "type": "PATH"
-          },
-          {
-            "raw": "src/vpn-detection.ts",
-            "type": "PATH"
-          },
-          {
-            "raw": "data/llm-proxy/logs",
-            "type": "PATH"
-          },
-          {
-            "raw": "src/config-loader.ts",
-            "type": "PATH"
-          },
-          {
-            "raw": "_work/rapid-llm-proxy/src/providers/copilot-provider.ts",
-            "type": "PATH"
-          },
-          {
-            "raw": "_work/rapid-llm-proxy/src/providers/",
-            "type": "PATH"
-          },
-          {
-            "raw": "_work/rapid-llm-proxy/src/vpn-detection.ts",
-            "type": "PATH"
-          },
-          {
-            "raw": "_work/rapid-llm-proxy/src/config-loader.ts",
-            "type": "PATH"
-          },
-          {
-            "raw": "_work/rapid-llm-proxy/ROADMAP.md",
-            "type": "PATH"
-          },
-          {
-            "raw": "_work/rapid-llm-proxy/STATE.md",
-            "type": "PATH"
-          },
-          {
-            "raw": "../../../../lib/llm/dist/index.js",
-            "type": "PATH"
-          }
-        ],
-        "searchRoots": [
-          "/Users/Q284340/Agentic/coding",
-          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
-          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
-          "/Users/Q284340/Agentic/_work/dyn-arch",
-          "/Users/Q284340/Agentic/_work/iso-9001",
-          "/Users/Q284340/Agentic/_work/onboarding-repro",
-          "/Users/Q284340/Agentic/_work/rapid-automations",
-          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
-          "/Users/Q284340/Agentic/_work/resi",
-          "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
-        ]
-      }
-    },
-    "project": "rapid-automations"
-  },
-  {
     "id": "dc7fe941-f82b-4b14-b7d7-8b5a1b577c1a",
     "topic": "Tmux Proxy Badge Detection",
     "summary": "## Purpose\nDisplays current proxy status (`P:ON` / `P:OFF`) in the tmux status line, reflecting whether the local corporate proxy is active.\n\n## Architecture\n- **Primary signal:** Presence/absence of proxy environment variables (`HTTP_PROXY`, `HTTPS_PROXY`, etc.). If these are unset, proxy is reported as OFF regardless of port state.\n- **Secondary signal (legacy):** Raw TCP connect to `127.0.0.1:3128`. Retained but subordinate to env var check.\n- **Why env vars are authoritative:** `px-toggle` unsets env vars but leaves the proxy process running on port 3128, so port-only detection produces false positives after toggling off.\n- **Polling lag:** Badge reflects state changes with up to ~60 s delay due to polling intervals.\n\n## Key Files\n- `src/menu.ts` — contains proxy detection logic; env var check overrides port-based detection\n\n## Usage\nThe badge is rendered in the tmux status line and updated on each polling cycle. `px-toggle` is the user-facing command to enable/disable the proxy; it unsets env vars and modifies config but may not terminate the proxy process.\n\n## Troubleshooting\n- **Badge shows `P:ON` after `px-toggle` disable:** Verify env vars are actually unset with `env | grep -i proxy`. If vars are unset and badge still shows ON, wait up to 60 s for next poll.\n- **Port still occupied after toggle:** `px-toggle` does not kill the proxy process. Check with `lsof -i :3128` and kill manually if needed. This no longer causes a false `P:ON` since env vars take precedence.\n- **Badge never updates:** Check that polling loop in `src/menu.ts` is running and that the env var detection code path is being reached.",
@@ -1849,7 +1830,7 @@
     "metadata": {
       "scope": "Proxy status detection logic and `P:ON`/`P:OFF` badge rendering in the tmux status line.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:57.177Z",
+        "verifiedAt": "2026-05-17T14:57:03.962Z",
         "totalClaims": 3,
         "verifiedClaims": 2,
         "verificationRatio": 0.667,
@@ -1962,7 +1943,7 @@
     "metadata": {
       "scope": "Statusline rendering scripts: `scripts/combined-status-line.js`, `scripts/status-line-fast.cjs`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:43.765Z",
+        "verifiedAt": "2026-05-17T15:00:09.703Z",
         "totalClaims": 10,
         "verifiedClaims": 10,
         "verificationRatio": 1,
@@ -2091,92 +2072,11 @@
     "metadata": {
       "scope": "MkDocs site build and `docs-content/` source tree",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:38.739Z",
+        "verifiedAt": "2026-05-17T15:00:05.103Z",
         "totalClaims": 6,
         "verifiedClaims": 6,
         "verificationRatio": 1,
         "staleClaims": [],
-        "searchRoots": [
-          "/Users/Q284340/Agentic/coding",
-          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
-          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
-          "/Users/Q284340/Agentic/_work/dyn-arch",
-          "/Users/Q284340/Agentic/_work/iso-9001",
-          "/Users/Q284340/Agentic/_work/onboarding-repro",
-          "/Users/Q284340/Agentic/_work/rapid-automations",
-          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
-          "/Users/Q284340/Agentic/_work/resi",
-          "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
-        ]
-      }
-    },
-    "project": "coding"
-  },
-  {
-    "id": "1e91533b-0c7c-4db7-a833-7c04e0045f64",
-    "topic": "LLM CLI Proxy — Provider Health Tracking and Fallback",
-    "summary": "## Purpose\nActs as a local HTTP proxy for LLM completions, abstracting over multiple CLI providers (claude-code, copilot, Groq, OpenAI, Anthropic). Prevents single-provider failures (rate limits, hangs) from silently breaking downstream consumers like the ETM observation pipeline.\n\n## Architecture\n- Provider selection via `selectBestProvider()`, which consults a `providerHealth` tracking map populated by `recordProviderResult()` after each completion attempt\n- Completion endpoint iterates providers in a fallback loop; per-provider timeout is 30s\n- Provider preference order depends on network context:\n  - **Outside VPN/CN**: `claude-code` preferred\n  - **Inside VPN/CN**: Copilot (work subscription) → Groq → OpenAI → Anthropic\n- When all providers fail or time out, observations fall back to `[Raw]` storage in the DB\n- A secondary proxy exists at `integrations/llm-proxy/src/proxy.js` (JS variant); the primary TypeScript version is the canonical one\n\n## Key Files\n- `integrations/llm-cli-proxy/src/index.ts` — main proxy server, provider health map, fallback loop, completion endpoint\n- `integrations/llm-proxy/src/proxy.js` — parallel JS implementation (secondary)\n\n## Usage\nConsumed by the ETM/ObservationWriter pipeline to summarize raw observations. Also used by any agent or script needing provider-agnostic LLM completions. The proxy must be running for observations to receive LLM summaries rather than `[Raw]` placeholders.\n\n## Troubleshooting\n- **Observations saved as `[Raw]`**: Proxy is unreachable, all providers are failing/timing out, or `claude-code` is hanging without returning an error — check proxy logs; copilot is the recommended fallback\n- **claude-code hangs**: Per-provider timeout (30s) will expire and the fallback loop will try the next provider (~41s total round-trip observed)\n- **Backfill raw observations**: Run a backfill script querying `WHERE summary LIKE '%[Raw]%'` and re-submitting to the proxy; use `LIKE '[Raw]%'` (prefix match) to avoid re-processing already-summarized entries that quote raw text\n- **Rate limit from Claude**: Switch active provider order to copilot-first in the health map or temporarily disable claude-code entry",
-    "confidence": 0.9,
-    "digestIds": [
-      "baa49b86-e902-4a7f-8023-a9a3fde2f476",
-      "c2958c94-d8f1-4eeb-8b62-1a810a4c7332",
-      "f97c37f0-7863-4fb8-941d-0906af2f020a",
-      "70f9c2d7-c297-4e08-aa61-0a548d12e733",
-      "34768617-c5a2-47c2-b582-cf9c8e27dc26",
-      "836454cb-b75e-40ed-8e8a-6f29d9004a8c",
-      "ff0e40ba-6b26-4ecc-9da6-4eee4d769a0f",
-      "2a7f0a64-6d63-4e65-ac68-30245605fc0b",
-      "c9b326ae-bb6e-4ab6-9998-ed88da5144ae",
-      "c453e39b-eee6-4d79-8c84-3c097f70142b",
-      "48fe32e4-9c18-45fe-a7fe-5234d33fc8fe",
-      "ef6c33fe-1796-495f-84d0-336e2a5140f5",
-      "c096b406-1b7d-48b9-a6bf-9ff1cbee95cb",
-      "6ccf5423-afad-4f07-b051-793cc914754f",
-      "b1609cb0-d6af-4dde-b5c1-759ab25122cf",
-      "a1dac8b8-da6b-44b7-bd8c-9a8db0a29a34",
-      "f7cfd1cb-329c-42af-be4d-934df147a7b9",
-      "228c32a3-ba19-4bc6-8523-33c3f3574dbb",
-      "bffb004c-1d2b-43b0-98e4-0a01de63a0e4",
-      "16a024a2-3de5-40eb-8a96-dc0c97e9b74b",
-      "b44afba5-693d-487e-9b15-bb2d055fe886",
-      "f0165a22-5181-4ed7-87b8-96d9dd85481f",
-      "d3f7eb0a-e657-4ba0-978b-2eefb3adbb53",
-      "d7d0311e-99b3-4250-ba6e-f205687a76a8",
-      "1727210e-fd45-4f4c-bdb2-19170fe3d0b4",
-      "b1094174-d13a-4dc1-8bca-671828007d5f",
-      "0010ee53-0885-44b0-a3f3-a522c10b9ab0",
-      "0f5db830-4715-47ab-9512-635d8d1a257c",
-      "b3bb590d-9285-4219-a50f-99960f8e2ca8",
-      "31fba63e-6319-41df-acc0-ac399fe78e95"
-    ],
-    "lastUpdated": "2026-05-14T15:27:35.876Z",
-    "createdAt": "2026-05-14T15:27:35.876Z",
-    "metadata": {
-      "scope": "The `integrations/llm-cli-proxy/` service that routes LLM completion requests across multiple CLI-based providers with automatic fallback.",
-      "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:36.616Z",
-        "totalClaims": 4,
-        "verifiedClaims": 0,
-        "verificationRatio": 0,
-        "staleClaims": [
-          {
-            "raw": "selectBestProvider()",
-            "type": "FUNCTION"
-          },
-          {
-            "raw": "recordProviderResult()",
-            "type": "FUNCTION"
-          },
-          {
-            "raw": "integrations/llm-proxy/src/proxy.js",
-            "type": "PATH"
-          },
-          {
-            "raw": "integrations/llm-cli-proxy/src/index.ts",
-            "type": "PATH"
-          }
-        ],
         "searchRoots": [
           "/Users/Q284340/Agentic/coding",
           "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
@@ -2266,7 +2166,7 @@
     "metadata": {
       "scope": "`scripts/launch-agent-common.sh` and `free-coding-ports.sh` — host-side container launch and port conflict resolution",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:37.171Z",
+        "verifiedAt": "2026-05-17T15:00:03.553Z",
         "totalClaims": 3,
         "verifiedClaims": 3,
         "verificationRatio": 1,
@@ -2360,7 +2260,7 @@
     "metadata": {
       "scope": "SafeDatabase.js and the SQLite corruption/restore pipeline",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:39.963Z",
+        "verifiedAt": "2026-05-17T15:00:06.290Z",
         "totalClaims": 8,
         "verifiedClaims": 8,
         "verificationRatio": 1,
@@ -2424,7 +2324,7 @@
     "metadata": {
       "scope": "integrations/system-health-dashboard/server.js — the port 3033 API backend",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:43.399Z",
+        "verifiedAt": "2026-05-17T15:00:09.335Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -2488,7 +2388,7 @@
     "metadata": {
       "scope": "The React/Sigma.js viewer application under `integrations/operational-knowledge-management/viewer/`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:48.172Z",
+        "verifiedAt": "2026-05-17T15:01:01.901Z",
         "totalClaims": 14,
         "verifiedClaims": 6,
         "verificationRatio": 0.429,
@@ -2585,7 +2485,7 @@
     "metadata": {
       "scope": "The `IssueTriage.tsx` component and its BFS-based RCA chain rendering and evidence aggregation logic",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:54.254Z",
+        "verifiedAt": "2026-05-17T15:01:05.321Z",
         "totalClaims": 9,
         "verifiedClaims": 6,
         "verificationRatio": 0.667,
@@ -2692,7 +2592,7 @@
     "metadata": {
       "scope": "`scripts/health-coordinator.js` — ETM process lifecycle manager and coordinator tick loop",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:54.599Z",
+        "verifiedAt": "2026-05-17T15:01:05.665Z",
         "totalClaims": 6,
         "verifiedClaims": 5,
         "verificationRatio": 0.833,
@@ -2768,7 +2668,7 @@
     "metadata": {
       "scope": "Git repo structure, SSH/HTTPS auth, submodule management, rebase conflicts for `rapid-automations`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:54.783Z",
+        "verifiedAt": "2026-05-17T15:01:05.846Z",
         "totalClaims": 5,
         "verifiedClaims": 5,
         "verificationRatio": 1,
@@ -2832,7 +2732,7 @@
     "metadata": {
       "scope": "The directory structure for LSL classification logs, system logs, and coordinator output files under `.specstory/`.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:40.378Z",
+        "verifiedAt": "2026-05-17T15:00:06.690Z",
         "totalClaims": 12,
         "verifiedClaims": 12,
         "verificationRatio": 1,
@@ -2934,7 +2834,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Same MCP server config topic, agent-scoping is implicit in the canonical version",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:37.171Z",
+        "verifiedAt": "2026-05-17T15:00:03.553Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -3004,7 +2904,7 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:39.820Z",
+        "verifiedAt": "2026-05-17T15:00:06.147Z",
         "totalClaims": 2,
         "verifiedClaims": 2,
         "verificationRatio": 1,
@@ -3044,7 +2944,7 @@
     "metadata": {
       "scope": "Constraint rule definitions enforcing canonical PlantUML output paths, and the documentation-style skill that distributes those rules to all coding agents.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:55.796Z",
+        "verifiedAt": "2026-05-17T15:01:06.846Z",
         "totalClaims": 6,
         "verifiedClaims": 4,
         "verificationRatio": 0.667,
@@ -3243,7 +3143,7 @@
     "metadata": {
       "scope": "`src/live-logging/ObservationConsolidator.js`: daily digest and weekly insight synthesis, LLM call failure handling, chunk-level error propagation, and connection lifecycle",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:37.026Z",
+        "verifiedAt": "2026-05-17T15:00:03.412Z",
         "totalClaims": 7,
         "verifiedClaims": 6,
         "verificationRatio": 0.857,
@@ -3312,7 +3212,7 @@
     "metadata": {
       "scope": "The `coding.code-workspace` file and git extension settings controlling which repositories appear in the VS Code SCM panel.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:40.235Z",
+        "verifiedAt": "2026-05-17T15:00:06.551Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -3376,7 +3276,7 @@
     "metadata": {
       "scope": "The system that captures, routes, and stores real-time coding session logs into `.specstory/history/` markdown files.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:53.729Z",
+        "verifiedAt": "2026-05-17T14:57:00.498Z",
         "totalClaims": 3,
         "verifiedClaims": 3,
         "verificationRatio": 1,
@@ -3447,7 +3347,7 @@
     "metadata": {
       "scope": "Plugin that pre-truncates oversized compaction payloads before OpenCode sends them to the Copilot API",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:54.490Z",
+        "verifiedAt": "2026-05-17T14:57:01.132Z",
         "totalClaims": 6,
         "verifiedClaims": 4,
         "verificationRatio": 0.667,
@@ -3520,7 +3420,7 @@
     "metadata": {
       "scope": "The Next.js dashboard and its supervisor/Docker configuration at `integrations/mcp-constraint-monitor/dashboard/`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:52.496Z",
+        "verifiedAt": "2026-05-17T15:01:03.547Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -3584,7 +3484,7 @@
     "metadata": {
       "scope": "The mechanism for storing LSL/SpecStory session history in a separate private `<project>-history` repo, and the tooling to migrate existing public repos to this pattern.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:41.182Z",
+        "verifiedAt": "2026-05-17T15:00:07.358Z",
         "totalClaims": 10,
         "verifiedClaims": 8,
         "verificationRatio": 0.8,
@@ -3657,7 +3557,7 @@
     "metadata": {
       "scope": "Performance tuning of the `coding-services` Docker container to reduce CPU usage during idle periods (no active clients).",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:41.670Z",
+        "verifiedAt": "2026-05-17T15:00:07.839Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -3733,7 +3633,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Auto-refresh is a feature of the dashboard, not a separate concept",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:53.574Z",
+        "verifiedAt": "2026-05-17T14:57:00.426Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -3773,7 +3673,7 @@
     "metadata": {
       "scope": "Catalog of reusable automation components (tools, plugins, skills) for enterprise workflows.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:56.761Z",
+        "verifiedAt": "2026-05-17T14:57:03.533Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -3817,7 +3717,7 @@
     "metadata": {
       "scope": "Programmatic extraction of full Teams channel message history using the Microsoft Graph API.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:56.761Z",
+        "verifiedAt": "2026-05-17T14:57:03.534Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -3858,7 +3758,7 @@
     "metadata": {
       "scope": "Pipeline for extracting, enriching, and rendering a full Teams channel message history into a formatted markdown report.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:56.762Z",
+        "verifiedAt": "2026-05-17T14:57:03.534Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -3922,7 +3822,7 @@
     "metadata": {
       "scope": "`.specstory/history/` session log files — their storage, size management, and use for context continuity.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:37.515Z",
+        "verifiedAt": "2026-05-17T15:00:03.895Z",
         "totalClaims": 3,
         "verifiedClaims": 3,
         "verificationRatio": 1,
@@ -3986,7 +3886,7 @@
     "metadata": {
       "scope": "The `mcp-constraint-monitor` dashboard service split between Docker and host",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:38.559Z",
+        "verifiedAt": "2026-05-17T15:00:04.927Z",
         "totalClaims": 5,
         "verifiedClaims": 4,
         "verificationRatio": 0.8,
@@ -4055,7 +3955,7 @@
     "metadata": {
       "scope": "The VKB API entity endpoints and GraphDatabaseService that back the working memory module's KG <USER_ID_REDACTED>.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:39.820Z",
+        "verifiedAt": "2026-05-17T15:00:06.147Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -4119,7 +4019,7 @@
     "metadata": {
       "scope": "The shared `consolidation-progress.tsx` component and its integration with the digests/insights dashboard pages",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:40.235Z",
+        "verifiedAt": "2026-05-17T15:00:06.551Z",
         "totalClaims": 3,
         "verifiedClaims": 2,
         "verificationRatio": 0.667,
@@ -4188,7 +4088,7 @@
     "metadata": {
       "scope": "The refactor that eliminated all native/Docker-mode branching from service scripts, treating Docker as the only supported runtime.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:41.595Z",
+        "verifiedAt": "2026-05-17T15:00:07.766Z",
         "totalClaims": 6,
         "verifiedClaims": 5,
         "verificationRatio": 0.833,
@@ -4257,7 +4157,7 @@
     "metadata": {
       "scope": "`config/health-verification-rules.json` and the `bind_mount_freshness` rule type that can trigger container recreate loops when stale.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:43.258Z",
+        "verifiedAt": "2026-05-17T15:00:09.195Z",
         "totalClaims": 4,
         "verifiedClaims": 3,
         "verificationRatio": 0.75,
@@ -4326,7 +4226,7 @@
     "metadata": {
       "scope": "The `okb-ingest` agent skill definition hardlinked at `integrations/rapid-toolkit/.agents/skills/okb-ingest/SKILL.md` and `.opencode/skills/okb-ingest/SKILL.md`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:48.172Z",
+        "verifiedAt": "2026-05-17T15:01:01.901Z",
         "totalClaims": 2,
         "verifiedClaims": 2,
         "verificationRatio": 1,
@@ -4368,7 +4268,7 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:55.797Z",
+        "verifiedAt": "2026-05-17T15:01:06.846Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -4432,7 +4332,7 @@
     "metadata": {
       "scope": "Process for removing leaked secrets from git history and configuring ongoing redaction",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:38.739Z",
+        "verifiedAt": "2026-05-17T15:00:05.104Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -4496,7 +4396,7 @@
     "metadata": {
       "scope": "The `brandschutz-agent/` TypeScript + Mastra system that automates the <COMPANY_NAME_REDACTED> SuccessFactors fire safety e-learning course.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:55.980Z",
+        "verifiedAt": "2026-05-17T14:57:02.653Z",
         "totalClaims": 9,
         "verifiedClaims": 5,
         "verificationRatio": 0.556,
@@ -4550,7 +4450,7 @@
     "metadata": {
       "scope": "All Python tool packages under `rapid-toolkit/tools/`, specifically the `uv.lock` lockfile commit policy.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:55.245Z",
+        "verifiedAt": "2026-05-17T15:01:06.309Z",
         "totalClaims": 2,
         "verifiedClaims": 1,
         "verificationRatio": 0.5,
@@ -4649,7 +4549,7 @@
     "metadata": {
       "scope": "OKB BASELINE GUARD hook in the `operational-knowledge-management` submodule",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:37.444Z",
+        "verifiedAt": "2026-05-17T15:00:03.827Z",
         "totalClaims": 2,
         "verifiedClaims": 1,
         "verificationRatio": 0.5,
@@ -4718,7 +4618,7 @@
     "metadata": {
       "scope": "Context window percentage field in the GSD toolbar/statusline hook",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:38.739Z",
+        "verifiedAt": "2026-05-17T15:00:05.104Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -4782,7 +4682,7 @@
     "metadata": {
       "scope": "Log rotation configuration for health monitor daemons and cleanup of stale `.health/` JSON files from abandoned projects.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:43.326Z",
+        "verifiedAt": "2026-05-17T15:00:09.266Z",
         "totalClaims": 5,
         "verifiedClaims": 5,
         "verificationRatio": 1,
@@ -4823,7 +4723,7 @@
     "metadata": {
       "scope": "How skills, commands, and instructions are distributed to and discovered by each coding agent (Claude, OpenCode, Copilot, Mastra, GSD)",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:56.240Z",
+        "verifiedAt": "2026-05-17T14:57:02.936Z",
         "totalClaims": 4,
         "verifiedClaims": 3,
         "verificationRatio": 0.75,
@@ -4864,7 +4764,7 @@
     "metadata": {
       "scope": "Self-contained browser game submission in `teams/daFrankTeam/`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:56.598Z",
+        "verifiedAt": "2026-05-17T14:57:03.310Z",
         "totalClaims": 7,
         "verifiedClaims": 7,
         "verificationRatio": 1,
@@ -4928,7 +4828,7 @@
     "metadata": {
       "scope": "Schema migration and backfill logic to attribute observations to their source project and filter out cross-project contamination.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:39.963Z",
+        "verifiedAt": "2026-05-17T15:00:06.290Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -4992,7 +4892,7 @@
     "metadata": {
       "scope": "`scripts/start-services-robust.js` — service startup and port-binding reliability",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:54.783Z",
+        "verifiedAt": "2026-05-17T15:01:05.846Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -5027,7 +4927,7 @@
     "metadata": {
       "scope": "The online learning sub-system (code graph ingestion, batch analysis, knowledge persistence) and its health indicator in the tmux statusline.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:57.177Z",
+        "verifiedAt": "2026-05-17T14:57:03.962Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -5062,7 +4962,7 @@
     "metadata": {
       "scope": "UI layout bug in `App.tsx` / `nav-bar.tsx` specific to the Token Usage tab",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:43:54.783Z",
+        "verifiedAt": "2026-05-17T15:01:05.846Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -5101,7 +5001,7 @@
     "metadata": {
       "scope": "Git remote push workflow for `integrations/` submodules to GitHub",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:42:43.765Z",
+        "verifiedAt": "2026-05-17T15:00:09.703Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -5139,7 +5039,7 @@
     "metadata": {
       "scope": "HTTP retrieval endpoint combining vector and keyword search with RRF fusion and token budgeting",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:56.348Z",
+        "verifiedAt": "2026-05-17T14:57:03.066Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -5174,7 +5074,7 @@
     "metadata": {
       "scope": "Single-page application scaffold for a searchable skills/information hub (AI Kraken project)",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:45:57.271Z",
+        "verifiedAt": "2026-05-17T14:57:04.641Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
