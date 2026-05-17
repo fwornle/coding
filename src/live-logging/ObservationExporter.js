@@ -105,6 +105,11 @@ export class ObservationExporter {
    * Merge DB records with existing export files to prevent data loss.
    * If the existing export has records not in the DB (DB was reset),
    * those records are preserved and new DB records are appended.
+   *
+   * Tombstones: when consolidation merges insight A into insight B, B's
+   * metadata.absorbed records A's id as a tombstone. Tombstoned IDs are
+   * NEVER preserved — they were intentionally deleted and resurrecting
+   * them would re-introduce the duplicate the consolidation removed.
    */
   _mergeWithExisting(dbObs, dbDigests, dbInsights) {
     const result = { observations: dbObs, digests: dbDigests, insights: dbInsights };
@@ -116,12 +121,19 @@ export class ObservationExporter {
         if (!Array.isArray(existing)) return dbRecords;
         if (existing.length <= dbRecords.length) return dbRecords;
 
-        // Existing export has more records — merge by ID
+        // Build tombstone set from canonicals' metadata.absorbed lists.
+        // Any existing record whose id appears here was intentionally
+        // deleted by consolidation and must not be resurrected.
+        const tombstoned = this._collectTombstones(dbRecords);
+
         const dbIds = new Set(dbRecords.map(r => r.id));
-        const preserved = existing.filter(r => !dbIds.has(r.id));
+        const preserved = existing.filter(r => !dbIds.has(r.id) && !tombstoned.has(r.id));
+        const resurrected = existing.filter(r => !dbIds.has(r.id) && tombstoned.has(r.id));
         const merged = [...preserved, ...dbRecords];
         process.stderr.write(
-          `[ObservationExporter] Safety merge for ${filename}: kept ${preserved.length} historic + ${dbRecords.length} current = ${merged.length} total\n`
+          `[ObservationExporter] Safety merge for ${filename}: kept ${preserved.length} historic + ${dbRecords.length} current = ${merged.length} total` +
+            (resurrected.length > 0 ? ` (skipped ${resurrected.length} tombstoned)` : '') +
+            `\n`
         );
         return merged;
       } catch { return dbRecords; }
@@ -132,6 +144,33 @@ export class ObservationExporter {
     result.insights = mergeArrays(dbInsights, 'insights.json') ?? result.insights;
 
     return result;
+  }
+
+  /**
+   * Scan a record list for tombstone IDs. Looks at each record's
+   * `metadata.absorbed` array (written by ObservationConsolidator when
+   * merging insights) and returns the union of every id mentioned there.
+   *
+   * The tombstone pattern generalises to any future consolidator that
+   * uses the same `metadata.absorbed: [{id, topic}, ...]` convention.
+   *
+   * @param {Array<{metadata?: Object}>} records
+   * @returns {Set<string>}
+   */
+  _collectTombstones(records) {
+    const tombstoned = new Set();
+    for (const r of records || []) {
+      const meta = r.metadata;
+      if (!meta || typeof meta !== 'object') continue;
+      const absorbed = meta.absorbed;
+      if (!Array.isArray(absorbed)) continue;
+      for (const entry of absorbed) {
+        if (entry && typeof entry === 'object' && typeof entry.id === 'string') {
+          tombstoned.add(entry.id);
+        }
+      }
+    }
+    return tombstoned;
   }
 
 
@@ -245,12 +284,17 @@ export class ObservationExporter {
     try { digestCnt = this.db.prepare('SELECT COUNT(*) as c FROM digests').get().c; } catch { /* ok */ }
     try { insightCnt = this.db.prepare('SELECT COUNT(*) as c FROM insights').get().c; } catch { /* ok */ }
 
-    // Use the larger of DB count vs existing export count (safety against DB reset)
+    // Trust the DB count after consolidation legitimately drops rows — the
+    // previous Math.max heuristic kept the higher number forever, so a single
+    // consolidation that deleted 8 rows would leave the metadata count
+    // permanently inflated by 8 until another insight was created. Only fall
+    // back to the existing count if the DB returned 0 (likely a transient
+    // table-missing or empty-DB error, not a legitimate drop).
     try {
       const existing = JSON.parse(fs.readFileSync(path.join(this.exportDir, 'metadata.json'), 'utf-8'));
-      obsCnt = Math.max(obsCnt, existing.counts?.observations || 0);
-      digestCnt = Math.max(digestCnt, existing.counts?.digests || 0);
-      insightCnt = Math.max(insightCnt, existing.counts?.insights || 0);
+      if (obsCnt === 0 && existing.counts?.observations > 0) obsCnt = existing.counts.observations;
+      if (digestCnt === 0 && existing.counts?.digests > 0) digestCnt = existing.counts.digests;
+      if (insightCnt === 0 && existing.counts?.insights > 0) insightCnt = existing.counts.insights;
     } catch { /* first export or corrupted metadata */ }
 
     this._writeJSON('metadata.json', {
