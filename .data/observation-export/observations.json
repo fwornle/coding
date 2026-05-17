@@ -24735,7 +24735,7 @@
   },
   {
     "id": "356d8390-dc2f-4379-b37f-f8d303b9fda4",
-    "summary": "Intent: Restart the observations API and commit the current state.\nApproach: Restarted the API server via script, verified health and data integrity, then committed.\nArtifacts: none\nResult: Observations API restarted successfully, confirmed serving migrated data (62 insights, 5 facet-linked), and changes committed.",
+    "summary": "Intent: Restart the observations API and commit the current state.\nApproach: Restarted the API server via script, verified health and data integrity, then committed.\nArtifacts: edited observations-api-server.mjs\nResult: Observations API restarted successfully, confirmed serving migrated data (62 insights, 5 facet-linked), and changes committed.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
@@ -24745,6 +24745,88 @@
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
     },
-    "modifiedFiles": null
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/scripts/observations-api-server.mjs"
+    ]
+  },
+  {
+    "id": "2077f8f3-927d-49f6-ab6c-36069e3311a9",
+    "summary": "Intent: Fix the ObservationExporter so it works correctly.\nApproach: Read the existing exporter to identify bugs, applied two edits to correct the issues, and verified syntax was valid.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationExporter.js\nResult: ObservationExporter.js was patched with two fixes; syntax check passed, and the fix was verified to prevent tombstoned/deleted observation IDs from being resurrected during export.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T11:53:55.469Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationExporter.js"
+    ]
+  },
+  {
+    "id": "d23d373b-529e-4f74-8dfb-f19d0f3876e5",
+    "summary": "Intent: Fix the ObservationExporter.js file\nApproach: Diagnosed and patched bugs in the exporter, verified syntax, tested that tombstoned IDs are not resurrected during export, and committed the fix.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationExporter.js\nResult: ObservationExporter.js was fixed and committed; the export process no longer resurrects deleted/tombstoned observation IDs.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T11:53:55.469Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationExporter.js"
+    ]
+  },
+  {
+    "id": "76388705-093c-4ae6-bd60-0b9da984899b",
+    "summary": "Intent: Audit the truthfulness and accuracy of \"LLM CLI Proxy\" insights from the insights database against the actual codebase and standalone repo, and investigate why multiple overlapping entries exist despite a previous reduction from 70 to 62 insights.\nApproach: Query the observations database to retrieve LLM CLI Proxy entries, then cross-reference each insight's claims against the actual source code in both the coding project and the associated standalone repository.\nArtifacts: edited llm-proxy-insight-truthfulness-audit.md\nResult: Exchange was cut off before any findings or report were produced; the assistant began tooling but did not complete the analysis or deliver conclusions.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-17T12:06:23.202Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.data/llm-proxy-insight-truthfulness-audit.md"
+    ]
+  },
+  {
+    "id": "6dea90ed-3cb3-4dfe-99af-644bb0c221de",
+    "summary": "Intent: Audit the truthfulness of LLM CLI Proxy insights from the insights page against the actual codebase, explain why multiple overlapping insights still exist, and produce a comprehensive report of correct/incorrect statements and gaps.\nApproach: Retrieved all four LLM-CLI-Proxy insight records from the observations database, then cross-referenced their claims against both the coding project integration files and the standalone rapid-llm-proxy repo to identify contradictions, stale information, and unsupported claims.\nArtifacts: edited llm-proxy-insight-truthfulness-audit.md\nResult: Analysis was in progress — four overlapping LLM CLI Proxy insights were identified (not yet fully consolidated despite prior compaction), and contradictions between insights on canonical paths and provider ordering were detected; a full correctness report was being compiled but the exchange ended before completion.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-17T12:06:23.202Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.data/llm-proxy-insight-truthfulness-audit.md"
+    ]
+  },
+  {
+    "id": "2f857113-829b-410c-a1c8-86d8e18e6a97",
+    "summary": "Intent: [confirmed proceeding with a previous plan]\nApproach: Wired code-verification logic into the ObservationConsolidator by adding extraction and verification methods before existing prompt-building methods.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: New extraction and verification methods added to ObservationConsolidator.js to support code verification during observation consolidation/compaction.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T14:19:16.079Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
   }
 ]
