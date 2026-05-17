@@ -55,7 +55,7 @@ package "Health & Monitoring" {
 
 ' === Dashboard ===
 package "Health Dashboard :3032 / :3033" {
-  component [Token Usage page\n(4 tabs)] <<api>> as page
+  component [Token Usage page\n(5 tabs + window selector)] <<api>> as page
   component [LLM Routing dialog\n(Settings button)] <<api>> as dialog
   component [server.js reverse-proxy] <<api>> as fwd
 }
@@ -143,16 +143,24 @@ note right of tokenjson
 end note
 
 note bottom of page
-  Four tabs sharing summary cards:
+  Five tabs sharing summary cards:
     Overview (treemap with hover tooltip
-              showing in/out/calls/avg
-              + SVG <title> a11y fallback,
+              showing in/out/calls/avg,
               plus donut by provider)
+    Evolution (stacked area by process or
+               by model; main-consumers
+               filter @ >=0.5%; Top
+               Consumers rollup table)
     By Process (sortable table)
-    Timeline (2-min buckets, zero-fill,
+    Timeline (adaptive buckets, zero-fill,
               viewer's local timezone)
     Recent Calls (last 50, XML-stripped preview)
-  Header: Settings + Refresh (busy-state).
+  Header: time-window selector
+    (24h / 48h / 7d / 30d / All) +
+    Settings + Refresh (busy-state).
+  Window drives ?hours= on every fetch;
+  bucket size scales with the window
+  (2 / 10 / 30 / 120 / 360 minutes).
 end note
 
 note bottom of canon

@@ -12,11 +12,17 @@ The Token Usage page provides real-time visibility into LLM token consumption ac
 
 ## Page layout
 
-The page is organized into four tabs sharing a single header bar:
+The page is organized into five tabs sharing a single header bar:
 
-- **Summary cards** (always visible): Total Tokens, Total Calls, Avg Latency per LLM call, and a Subscription summary (Claude Max + GitHub Copilot quotas).
-- **Tabs:** Overview · By Process · Timeline · Recent Calls.
-- **Header actions:** ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh (re-fetches summary + recent; shows a busy spinner while the request is in flight).
+- **Summary cards** (always visible): Total Tokens, Total Calls, Avg Latency per LLM call, and a Subscription summary (Claude Max + GitHub Copilot quotas). Every card respects the active **time window** (see header actions below).
+- **Tabs:** Overview · Evolution · By Process · Timeline · Recent Calls.
+- **Header actions:** **Time window** dropdown (`Last 24h · 48h · 7 days · 30 days · All time`) · ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh (re-fetches summary + recent; shows a busy spinner while the request is in flight).
+
+### Time window selector
+
+The window dropdown drives `?hours=` on the `/api/token-usage/summary` request. Every metric on the page — summary cards, treemap, By-Process table, Timeline, and the Evolution stacked chart — re-aggregates for the chosen window. The default is `Last 24h` so the page matches the historical "trailing 24 h" behavior on first load; switching to `All time` aggregates the full retained DB without changing any other UI.
+
+Bucket size for the stacked chart **adapts to the window** so the timeline never balloons past ~500 data points: 2-min buckets for `Last 24h`, 10-min for `48h`, 30-min for `7 days`, 2-hour for `30 days`, 6-hour for `All time`. The active bucket size is shown beneath the Evolution chart's title (e.g. *"Last 7 days · 30-minute buckets"*).
 
 ### Overview tab
 
@@ -25,6 +31,20 @@ The header cards plus two side-by-side panels:
 - **Token Consumption by Process** — a treemap where larger rectangles mean more tokens. Top of the page in the screenshot above shows `observation-writer` (≈ 2.6 M tokens) dominating, with `consolidator-digest` and `consolidator-insight` as distant runners-up. **Hover any box** for a tooltip with process, total tokens, input/output split, call count, and avg latency — including the small boxes that don't fit an inline label. The same payload is also rendered as an SVG `<title>` element so screen readers and native-browser hover work even when the recharts tooltip is unavailable.
 - **By Provider** — a donut chart split by provider (claude-code 67 % / copilot 33 % under normal conditions on this host).
 - **By Model** — the same totals broken down by canonical model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`). The proxy canonicalizes whatever spelling each upstream returns — `claude-sonnet-4-6` (Claude CLI dash-version), `claude-sonnet-4.6` (Copilot dot-version), `Claude Sonnet 4.6` (Anthropic title-case), bare `sonnet` (CLI fallback when `modelUsage` is empty), `claude-haiku-4-5-20251001` (Copilot dated snapshot) all collapse to the same row. The raw upstream identifier is preserved per call in the `model_raw` column.
+
+### Evolution tab
+
+![Evolution tab — 30-day window, stacked by purpose](../images/health-mon-tokens-evolution.png)
+
+The Evolution tab is the answer to "**how does my consumption evolve over time, and who are the main consumers?**" It renders a **stacked area chart** across the selected window, with one band per cognitive process (or per model, via the chart's own *By Process / By Model* toggle).
+
+Three design rules keep the visual focused:
+
+- **Main-consumer threshold.** The chart only renders series contributing **≥ 0.5 %** of the window's total tokens. Test/diagnostic processes (`reap-test`, `reap-final`, `fake-process`, `export-test`, …) routinely satisfy `> 0` but contribute fractions of a percent — they're dropped here to keep the legend readable. The full unfiltered breakdown is still available via the `summary.process_keys` API field for callers that want it.
+- **Stable colors per process.** Canonical processes (`observation-writer`, `consolidator-digest`, etc.) keep the same color across every chart on the page via `PROCESS_COLORS`. Unmapped processes fall through to a rotating palette — never the all-gray fallback that used to make competing stacks indistinguishable.
+- **Adaptive bucket size.** Driven by the header time window (see above). The bucket-minutes value is echoed in the card subtitle so the reader can sanity-check the granularity.
+
+Below the chart, **Top Consumers** is a compact table showing each visible series's total tokens in the window plus its share bar — same data the chart stacks, but in tabular form so you can read exact totals without hovering through the chart.
 
 ### By Process tab
 
@@ -36,7 +56,7 @@ Sortable table — one row per cognitive process — with columns Calls · Input
 
 ![Timeline tab](../images/health-mon-tokens-timeline.png)
 
-`Token Usage Over Time` plotted as **2-minute input/output token consumption (gaps render as zero)**. The bucket width is fixed at 2 minutes so a multi-day window stays a single chart rather than re-rendering at multiple zoom levels. Empty buckets are zero-filled in the backend response so the chart never invents missing data on the client.
+`Token Usage Over Time` plotted as **input + output token consumption per bucket** (gaps render as zero). The bucket width is **adaptive** to the active time window (2 min ≤ 24 h, 10 min ≤ 72 h, 30 min ≤ 7 d, 2 h ≤ 30 d, 6 h for All time) so a multi-day window stays a single chart rather than re-rendering at multiple zoom levels. Empty buckets are zero-filled in the backend response so the chart never invents missing data on the client.
 
 X-axis timestamps render in the **viewer's local timezone**, not UTC — the underlying timestamps in the export are ISO-with-Z but the chart converts to the browser locale for readability. The chart was fixed to do this conversion correctly during Phase 35 (prior versions occasionally wedged the navbar when timezone math threw).
 
@@ -149,25 +169,36 @@ These are served by the proxy bridge; the dashboard's `server.js` proxies them t
 ### Summary
 
 ```
-GET /api/token-usage/summary?hours=24&bucketMinutes=2
+GET /api/token-usage/summary?hours=24[&bucketMinutes=N]
 ```
 
-Returns aggregated statistics for the window:
+Aggregates the trailing `hours` window. `hours` accepts an integer (e.g. `24`, `168`, `720`) or the literal sentinel `all` — the latter falls back to the full retained DB and clamps the timeline start to the earliest persisted row so wide windows don't emit thousands of empty buckets. `bucketMinutes` is optional; when omitted, the bucket size scales with the window (2 / 10 / 30 / 120 / 360 minutes for 24h / 72h / 7d / 30d / All).
+
+Response shape (snake_case throughout, dashboard reads it directly):
 
 ```json
 {
-  "totals": { "calls": 1335, "inputTokens": 2320000, "outputTokens": 178600, "avgLatencyMs": 8230 },
-  "byProvider": [
-    { "provider": "claude-code", "calls": 389, "inputTokens": 1900000, "outputTokens": 96000 },
-    { "provider": "copilot",     "calls": 946, "inputTokens":  420000, "outputTokens": 82600 }
-  ],
-  "byProcess": [
-    { "process": "observation-writer",   "calls": 592, "totalTokens": 2100000, "share": 0.832 }
-  ],
-  "timeline": [
-    { "ts": "2026-05-15T18:00:00Z", "input": 12400, "output":  860 },
-    { "ts": "2026-05-15T18:02:00Z", "input":     0, "output":    0 }
-  ]
+  "hours": 168,
+  "bucket_minutes": 30,
+  "total_calls": 2615,
+  "total_input": 3920000,
+  "total_output": 336000,
+  "total_tokens": 4256000,
+  "avg_latency_ms": 5830,
+  "by_provider":     [{ "provider": "copilot",     "calls": 2250, "input_tokens": …, "output_tokens": …, "total_tokens": … }],
+  "by_process":      [{ "process":  "observation-writer", "calls": 1280, "input_tokens": …, "output_tokens": …, "total_tokens": …, "avg_latency": … }],
+  "by_model":        [{ "model":    "claude-sonnet-4.6", "calls": …, "total_tokens": … }],
+  "by_subscription": [{ "subscription": "claude-max",    "calls": …, "total_tokens": … }],
+  "by_hour":         [{ "hour": "2026-05-15T18:00:00.000Z", "input_tokens": 12400, "output_tokens": 860, "calls": 4 }],
+
+  // Stacked series for the Evolution tab — pivoted so recharts can stack
+  // columns directly (one row per bucket, one column per process / model).
+  // `process_keys` / `model_keys` give the column order ranked by total
+  // tokens descending.
+  "process_keys":    ["observation-writer", "consolidator-insight", …],
+  "model_keys":      ["claude-sonnet-4.6", "claude-haiku-4.5", …],
+  "by_process_hour": [{ "hour": "2026-05-15T18:00:00.000Z", "observation-writer": 12400, "consolidator-insight": 0, … }],
+  "by_model_hour":   [{ "hour": "2026-05-15T18:00:00.000Z", "claude-sonnet-4.6": 12400, "claude-haiku-4.5": 0, … }]
 }
 ```
 
@@ -245,7 +276,7 @@ A `process` of `unknown` means the caller did not send a `process` field. These 
 
 1. Verify the proxy bridge is up: `curl http://localhost:12435/health | jq`
 2. Check the DB exists and has rows: `sqlite3 .data/llm-proxy/token-usage.db 'SELECT COUNT(*) FROM token_usage'`
-3. Verify the dashboard server can reach the proxy: `curl http://localhost:3033/api/token-usage/summary?hours=1 | jq .totals`
+3. Verify the proxy summary endpoint responds (the frontend hits it directly): `curl 'http://localhost:12435/api/token-usage/summary?hours=1' | jq '{total_calls, total_tokens, bucket_minutes}'`
 
 ### Refresh button stays busy
 
