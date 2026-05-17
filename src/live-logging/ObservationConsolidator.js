@@ -16,6 +16,7 @@
 
 import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ObservationExporter } from './ObservationExporter.js';
@@ -1820,9 +1821,19 @@ export class ObservationConsolidator {
     let separated = 0;
     const now = new Date().toISOString();
 
+    // Verify each cluster's insights against the code BEFORE prompting the
+    // LLM. The verification result is passed into the prompt so the model
+    // can favor SEPARATE for highly-stale clusters (where merging would
+    // pollute fresh insights with bad facts) and prefer the freshest
+    // member as canonical when MERGE is correct.
+    const searchRoots = this._defaultSearchRoots();
+
     for (const clusterIds of clusters) {
       const members = clusterIds.map((id) => insightById.get(id));
-      const prompt = this._buildCompactionPrompt(members);
+      const verifications = members.map((m) =>
+        this.verifyInsight(m, { roots: searchRoots, persist: false })
+      );
+      const prompt = this._buildCompactionPrompt(members, verifications);
       const response = await this._callLLM(prompt, 'consolidator-compaction');
       if (!response) {
         process.stderr.write(`[Compaction] LLM call failed for cluster of ${members.length} — skipping\n`);
@@ -1916,19 +1927,304 @@ export class ObservationConsolidator {
   }
 
   /**
-   * Build the compaction LLM prompt for a cluster of related insights.
+   * Extract structured "claims" from an insight summary — backticked references
+   * that name code artifacts and can be verified against the filesystem.
+   *
+   * Classification rules:
+   *   PACKAGE  — starts with '@' and contains '/' (npm scoped package)
+   *   ROUTE    — HTTP verb + slash-prefixed path (`GET /api/...`)
+   *   PATH     — contains '/' and either has an extension or trailing slash
+   *   FUNCTION — bare identifier ending with `()`
+   *   SYMBOL   — ALL_CAPS_WITH_UNDERSCORES identifier (env var, constant, column)
+   *   (other backticked tokens are dropped — too ambiguous to verify)
+   *
+   * @param {string} summary
+   * @returns {Array<{ raw: string, type: 'PACKAGE'|'ROUTE'|'PATH'|'FUNCTION'|'SYMBOL', needle: string }>}
    */
-  _buildCompactionPrompt(members) {
+  _extractCodeClaims(summary) {
+    if (!summary || typeof summary !== 'string') return [];
+    const claims = [];
+    const seen = new Set();
+    const ROUTE_VERBS = /^(GET|POST|PUT|PATCH|DELETE)\s+(\/\S+)$/;
+    const PATH_RX = /^[A-Za-z0-9_.@-][A-Za-z0-9_./@-]*$/;
+    const FUNC_RX = /^([A-Za-z_$][A-Za-z0-9_$]*)\(\)$/;
+    const SYMBOL_RX = /^[A-Z][A-Z0-9_]{3,}$/;
+
+    for (const m of summary.matchAll(/`([^`\n]+)`/g)) {
+      const raw = m[1].trim();
+      if (!raw || raw.length > 200 || seen.has(raw)) continue;
+      seen.add(raw);
+
+      // PACKAGE
+      if (raw.startsWith('@') && raw.includes('/')) {
+        claims.push({ raw, type: 'PACKAGE', needle: raw });
+        continue;
+      }
+      // ROUTE — "VERB /path"
+      const routeMatch = ROUTE_VERBS.exec(raw);
+      if (routeMatch) {
+        claims.push({ raw, type: 'ROUTE', needle: routeMatch[2] });
+        continue;
+      }
+      // PATH — contains slash, looks pathy (no spaces, file-ish chars)
+      if (raw.includes('/') && PATH_RX.test(raw)) {
+        // Skip URLs
+        if (/^https?:\/\//.test(raw)) continue;
+        claims.push({ raw, type: 'PATH', needle: raw });
+        continue;
+      }
+      // FUNCTION — identifier()
+      const funcMatch = FUNC_RX.exec(raw);
+      if (funcMatch) {
+        claims.push({ raw, type: 'FUNCTION', needle: funcMatch[1] });
+        continue;
+      }
+      // SYMBOL — ALL_CAPS, length >= 4
+      if (SYMBOL_RX.test(raw)) {
+        claims.push({ raw, type: 'SYMBOL', needle: raw });
+        continue;
+      }
+      // skip other backticked tokens
+    }
+    return claims;
+  }
+
+  /**
+   * Verify a list of extracted claims against one or more codebase roots.
+   *
+   * PATH claims: filesystem existence check across roots.
+   * Other types: `git grep -l -F <needle>` across roots — verified if any
+   * tracked file in any root contains the term.
+   *
+   * Verification is best-effort and fails open (a missing/unavailable root
+   * does not mark claims as stale). Costs ~one subprocess per non-PATH claim,
+   * which is acceptable for periodic/manual runs but not per-write.
+   *
+   * @param {ReturnType<typeof this._extractCodeClaims>} claims
+   * @param {string[]} roots  absolute repo paths to search
+   * @returns {Array<{ raw: string, type: string, verified: boolean }>}
+   */
+  _verifyCodeClaims(claims, roots) {
+    const results = [];
+    for (const c of claims) {
+      let verified = false;
+      if (c.type === 'PATH') {
+        for (const root of roots) {
+          if (fs.existsSync(path.join(root, c.needle))) { verified = true; break; }
+        }
+        // Also try as a tracked-file lookup in case the path is relative to
+        // some nested directory (e.g. "src/token-usage.ts" lives in a sibling
+        // repo under that exact relative path).
+        if (!verified) {
+          for (const root of roots) {
+            if (this._gitGrepHasMatch(root, c.needle)) { verified = true; break; }
+          }
+        }
+      } else if (c.type === 'PACKAGE') {
+        // Search any package.json under each root for this name.
+        for (const root of roots) {
+          if (this._gitGrepHasMatch(root, `"${c.needle}"`)) { verified = true; break; }
+        }
+      } else {
+        // FUNCTION / SYMBOL / ROUTE — token-grep across all roots.
+        for (const root of roots) {
+          if (this._gitGrepHasMatch(root, c.needle)) { verified = true; break; }
+        }
+      }
+      results.push({ raw: c.raw, type: c.type, verified });
+    }
+    return results;
+  }
+
+  /**
+   * Non-code paths that produce false positives when verifying claims against
+   * the codebase. These are exported snapshots of the insights themselves
+   * (observation-export, knowledge-export), session transcripts that quote
+   * removed code (.specstory/history), historical planning artifacts that
+   * may reference deleted symbols (.planning), and irrelevant content
+   * (node_modules, dist, .claude/worktrees). Without this filter the
+   * verifier finds claim text inside its own insight export and reports
+   * the claim as "verified" — a circular check.
+   */
+  static EXCLUDED_PATHS = [
+    ':!.data',
+    ':!.planning',
+    ':!.specstory',
+    ':!.claude/worktrees',
+    ':!node_modules',
+    ':!**/node_modules',
+    ':!dist',
+    ':!**/dist',
+    ':!.data/observation-export',
+    ':!.data/knowledge-export',
+  ];
+
+  /**
+   * Run `git grep -l -F` for an exact term in one repo root, with non-code
+   * paths excluded so a claim's own export doesn't count as a verification.
+   * Returns true if any tracked source file contains the term. Failures
+   * (no git, not a repo, no matches) all return false.
+   */
+  _gitGrepHasMatch(root, term) {
+    if (!root || !term) return false;
+    try {
+      // git grep syntax: pattern BEFORE `--`, pathspecs AFTER. Earlier placement
+      // ('-- pattern path...') makes git treat the pattern as a path and the
+      // exclusion pathspecs as both paths and pattern fragments — fails on any
+      // non-existent path before searching anything.
+      const out = execFileSync(
+        'git',
+        ['-C', root, 'grep', '-l', '-F', term, '--', ...ObservationConsolidator.EXCLUDED_PATHS],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }
+      );
+      return out.trim().length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Resolve the default set of search roots. The coding repo is the project
+   * root (derived from this.dbPath). Sibling repos under /Users/.../Agentic/_work/
+   * are included so cross-repo claims (e.g. `_work/rapid-llm-proxy/...`) can
+   * be verified.
+   */
+  _defaultSearchRoots() {
+    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+    const roots = [projectRoot];
+    // Best-effort: look for sibling _work/ checkouts.
+    const workParent = path.resolve(projectRoot, '..', '_work');
+    if (fs.existsSync(workParent)) {
+      try {
+        for (const name of fs.readdirSync(workParent)) {
+          const candidate = path.join(workParent, name);
+          if (fs.existsSync(path.join(candidate, '.git'))) {
+            roots.push(candidate);
+          }
+        }
+      } catch { /* unreadable — fall back to project root only */ }
+    }
+    return roots;
+  }
+
+  /**
+   * Verify a single insight: extract claims from its summary, check each
+   * against the codebase, persist the verification result into the insight's
+   * metadata, and return the verdict.
+   *
+   * @param {{ id: string, summary: string, metadata?: string | Object }} insight
+   * @param {Object} [options]
+   * @param {string[]} [options.roots]   override default search roots
+   * @param {boolean}  [options.persist=true]  write result back to SQLite
+   * @returns {{ id: string, totalClaims: number, verifiedClaims: number, ratio: number, staleClaims: Array<{raw:string, type:string}> }}
+   */
+  verifyInsight(insight, { roots, persist = true } = {}) {
+    const searchRoots = roots || this._defaultSearchRoots();
+    const claims = this._extractCodeClaims(insight.summary || '');
+    const results = this._verifyCodeClaims(claims, searchRoots);
+    const verifiedClaims = results.filter((r) => r.verified).length;
+    const staleClaims = results
+      .filter((r) => !r.verified)
+      .map((r) => ({ raw: r.raw, type: r.type }));
+    const ratio = results.length === 0 ? 1 : verifiedClaims / results.length;
+
+    const verification = {
+      verifiedAt: new Date().toISOString(),
+      totalClaims: results.length,
+      verifiedClaims,
+      verificationRatio: Number(ratio.toFixed(3)),
+      staleClaims,
+      searchRoots,
+    };
+
+    if (persist && this.db) {
+      try {
+        this.db.prepare(`
+          UPDATE insights
+          SET metadata = json_patch(COALESCE(metadata, '{}'), ?)
+          WHERE id = ?
+        `).run(JSON.stringify({ codeVerification: verification }), insight.id);
+      } catch (err) {
+        process.stderr.write(`[verifier] Persist failed for ${insight.id}: ${err.message}\n`);
+      }
+    }
+
+    return { id: insight.id, ...verification };
+  }
+
+  /**
+   * Bulk-verify every insight in the given project. Useful as a periodic
+   * maintenance pass alongside compactInsights().
+   *
+   * @param {Object} [options]
+   * @param {string} [options.project='coding']
+   * @param {boolean} [options.persist=true]
+   * @returns {Promise<{ scanned: number, freshCount: number, staleCount: number, avgRatio: number, results: Array }>}
+   */
+  async verifyInsights({ project = 'coding', persist = true } = {}) {
+    if (!this.db) throw new Error('Not initialized');
+    const insights = this.db.prepare(
+      'SELECT id, topic, summary, metadata FROM insights WHERE project = ?'
+    ).all(project);
+    if (insights.length === 0) {
+      return { scanned: 0, freshCount: 0, staleCount: 0, avgRatio: 1, results: [] };
+    }
+    const roots = this._defaultSearchRoots();
+    process.stderr.write(`[verifier] Verifying ${insights.length} insights against ${roots.length} root(s)\n`);
+    const results = [];
+    for (const ins of insights) {
+      results.push({ topic: ins.topic, ...this.verifyInsight(ins, { roots, persist }) });
+    }
+    // "Fresh" = ratio >= 0.7; "Stale" = ratio < 0.5; in-between is partial.
+    const freshCount = results.filter((r) => r.verificationRatio >= 0.7).length;
+    const staleCount = results.filter((r) => r.verificationRatio < 0.5).length;
+    const avgRatio = results.reduce((s, r) => s + r.verificationRatio, 0) / results.length;
+    return { scanned: insights.length, freshCount, staleCount, avgRatio: Number(avgRatio.toFixed(3)), results };
+  }
+
+  /**
+   * Build the compaction LLM prompt for a cluster of related insights.
+   *
+   * @param {Array} members      insight rows from SQLite
+   * @param {Array} [verifications]  optional per-insight verification results
+   *   from verifyInsight(); when supplied, the prompt includes freshness
+   *   signals so the LLM can bias against merging stale insights into fresh ones.
+   */
+  _buildCompactionPrompt(members, verifications = null) {
     const cluster = members.map((m, i) => {
       const digests = JSON.parse(m.digest_ids || '[]').length;
+      const ver = verifications && verifications[i];
+      let freshnessBlock = '';
+      if (ver) {
+        const staleSample = (ver.staleClaims || [])
+          .slice(0, 6)
+          .map((s) => `${s.type}:${s.raw}`)
+          .join(', ');
+        freshnessBlock = `
+verification: ${ver.verifiedClaims}/${ver.totalClaims} code claims still exist (ratio=${ver.verificationRatio})${
+          ver.staleClaims && ver.staleClaims.length > 0
+            ? `\nstale_claims_sample: ${staleSample}`
+            : ''
+        }`;
+      }
       return `--- INSIGHT ${i + 1} ---
 id: ${m.id}
 topic: ${m.topic}
 confidence: ${m.confidence}
-digest_count: ${digests}
+digest_count: ${digests}${freshnessBlock}
 summary:
 ${(m.summary || '').slice(0, 1500)}`;
     }).join('\n\n');
+
+    const hasVerification = verifications && verifications.some((v) => v && v.totalClaims > 0);
+    const freshnessGuidance = hasVerification
+      ? `
+
+FRESHNESS SIGNAL — each insight has a verification ratio (fraction of its backticked file paths / function names / env vars / routes that still exist in the codebase). Use it to bias your verdict:
+- If one insight has a HIGH ratio (>= 0.7) and another in the cluster has a LOW ratio (< 0.5), prefer MERGE with the HIGH-ratio insight as canonical (its facts are still true).
+- If ALL insights in the cluster have LOW ratios, lean toward SEPARATE — merging stale content into stale content just creates a confidently-wrong canonical. Note it in your reason.
+- Stale-claim samples show what no longer exists; if they're load-bearing in the summary, the insight is dangerous to preserve as-is.`
+      : '';
 
     return {
       system: `You are reviewing a cluster of insights that an automated similarity check flagged as potentially related. Decide one of three verdicts:
@@ -1937,7 +2233,7 @@ MERGE — The insights describe the same subsystem, tool, or workflow. Different
 
 FACET — The insights describe distinct sub-topics of one larger concept. Each is a coherent, useful reference article on its own. Keep them all, but link them as facets of a shared parent.
 
-SEPARATE — The cluster is a false positive. The insights share vocabulary but cover unrelated subsystems. Do nothing.
+SEPARATE — The cluster is a false positive. The insights share vocabulary but cover unrelated subsystems. Do nothing.${freshnessGuidance}
 
 Respond with EXACTLY this structure:
 
