@@ -2288,6 +2288,17 @@ export class ObservationConsolidator {
     const staleClaims = results
       .filter((r) => !r.verified)
       .map((r) => ({ raw: r.raw, type: r.type }));
+    // Deduped list of PATH-type claims that verified — this is the input to
+    // per-project coverage aggregation ("which files does any insight in
+    // this project reference"). Only verified PATHs go in; stale ones would
+    // inflate coverage with phantom files.
+    const referencedFiles = [
+      ...new Set(
+        results
+          .filter((r) => r.verified && r.type === 'PATH')
+          .map((r) => r.raw)
+      ),
+    ];
     const ratio = results.length === 0 ? 1 : verifiedClaims / results.length;
 
     const verification = {
@@ -2296,6 +2307,7 @@ export class ObservationConsolidator {
       verifiedClaims,
       verificationRatio: Number(ratio.toFixed(3)),
       staleClaims,
+      referencedFiles,
       searchRoots,
     };
 

@@ -762,6 +762,160 @@ app.get('/api/projects', (_req, res) => {
 });
 
 /**
+ * GET /api/projects/:project/coverage
+ *
+ * Per-project truthfulness + coverage summary used by the dashboard's
+ * Project Coverage tab.
+ *
+ * Response shape:
+ *   {
+ *     project: "coding",
+ *     computedAt: "ISO",
+ *     insights: { total, fresh, partial, stale, unverified, avgRatio },
+ *     coverage: {
+ *       filesReferenced: number,           // distinct verified PATH claims
+ *       componentsMentioned: string[],     // from working-memory taxonomy
+ *       componentsMissing: string[]
+ *     },
+ *     perInsight: [
+ *       { id, topic, confidence, ratio, totalClaims, verifiedClaims, staleClaimCount, lastUpdated, parentTopic, relatedInsightIds, referencedFiles }
+ *     ]
+ *   }
+ */
+/**
+ * Per-project component taxonomy with search aliases.
+ *
+ * Working-memory tags are CamelCase identifiers ("LiveLoggingSystem")
+ * but insights use natural language ("live logging", "LSL"). Each entry
+ * lists the canonical name plus alternate spellings that should count
+ * as a mention. Match is case-insensitive substring against
+ * topic + summary across all insights in the project.
+ */
+const PROJECT_COMPONENT_TAXONOMY = {
+  coding: [
+    { name: 'SemanticAnalysis', aliases: ['semantic analysis', 'semantic-analysis', 'wave-analysis'] },
+    { name: 'KnowledgeManagement', aliases: ['knowledge management', 'knowledge graph', 'insight', 'digest', 'okb', 'ukb'] },
+    { name: 'ConstraintSystem', aliases: ['constraint', 'constraints'] },
+    { name: 'DockerizedServices', aliases: ['docker', 'container', 'compose'] },
+    { name: 'CodingPatterns', aliases: ['coding pattern', 'pattern'] },
+    { name: 'LiveLoggingSystem', aliases: ['live logging', 'lsl', 'specstory', 'transcript monitor', 'etm'] },
+    { name: 'LLMAbstraction', aliases: ['llm proxy', 'llm cli', 'rapid-llm-proxy', 'llmservice'] },
+  ],
+  'rapid-automations': [
+    { name: 'OKB', aliases: ['operational knowledge base', 'okb'] },
+    { name: 'OKM', aliases: ['operational-knowledge-management', 'okm'] },
+    { name: 'rapid-toolkit', aliases: ['rapid-toolkit', 'rapid toolkit'] },
+    { name: 'rapid-agentic-sandbox', aliases: ['rapid-agentic-sandbox', 'sandbox'] },
+    { name: 'rapidscribe-meeting', aliases: ['rapidscribe', 'meeting'] },
+  ],
+};
+
+app.get('/api/projects/:project/coverage', (req, res) => {
+  const db = getDb();
+  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+  const { project } = req.params;
+  if (!project) return res.status(400).json({ error: 'project required' });
+  try {
+    try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch {
+      return res.json({
+        project,
+        computedAt: new Date().toISOString(),
+        insights: { total: 0, fresh: 0, partial: 0, stale: 0, unverified: 0, avgRatio: 1 },
+        coverage: { filesReferenced: 0, componentsMentioned: [], componentsMissing: [] },
+        perInsight: [],
+      });
+    }
+    const rows = db.prepare(
+      `SELECT id, topic, confidence, summary, digest_ids as digestIds,
+              last_updated as lastUpdated, created_at as createdAt, project, metadata
+       FROM insights WHERE project = ?
+       ORDER BY last_updated DESC`
+    ).all(project);
+
+    const perInsight = [];
+    const allReferencedFiles = new Set();
+    let fresh = 0, partial = 0, stale = 0, unverified = 0;
+    let ratioSum = 0, ratioCount = 0;
+
+    for (const r of rows) {
+      let metadata = {};
+      try { metadata = r.metadata ? JSON.parse(r.metadata) : {}; } catch { /* keep empty */ }
+      const cv = metadata.codeVerification || null;
+      const ratio = cv && typeof cv.verificationRatio === 'number' ? cv.verificationRatio : null;
+
+      if (ratio === null) {
+        unverified++;
+      } else {
+        ratioSum += ratio;
+        ratioCount++;
+        if (ratio >= 0.7) fresh++;
+        else if (ratio >= 0.5) partial++;
+        else stale++;
+      }
+
+      const referencedFiles = Array.isArray(cv?.referencedFiles) ? cv.referencedFiles : [];
+      for (const f of referencedFiles) allReferencedFiles.add(f);
+
+      perInsight.push({
+        id: r.id,
+        topic: r.topic,
+        confidence: r.confidence,
+        ratio,
+        totalClaims: cv?.totalClaims ?? null,
+        verifiedClaims: cv?.verifiedClaims ?? null,
+        staleClaimCount: Array.isArray(cv?.staleClaims) ? cv.staleClaims.length : 0,
+        verifiedAt: cv?.verifiedAt ?? null,
+        lastUpdated: r.lastUpdated,
+        parentTopic: metadata.parentTopic ?? null,
+        relatedInsightIds: Array.isArray(metadata.relatedInsightIds) ? metadata.relatedInsightIds : [],
+        referencedFiles,
+      });
+    }
+
+    // Component taxonomy match — case-insensitive substring of EITHER the
+    // canonical name OR any alias (split-camelCase form) against the union
+    // of every insight's topic+summary in the project.
+    const taxonomy = PROJECT_COMPONENT_TAXONOMY[project] || [];
+    const componentsMentioned = [];
+    const componentsMissing = [];
+    if (taxonomy.length > 0) {
+      const haystack = rows
+        .map((r) => `${r.topic} ${r.summary || ''}`)
+        .join(' ')
+        .toLowerCase();
+      for (const c of taxonomy) {
+        const probes = [c.name, ...(c.aliases || [])].map((s) => s.toLowerCase());
+        if (probes.some((p) => haystack.includes(p))) componentsMentioned.push(c.name);
+        else componentsMissing.push(c.name);
+      }
+    }
+
+    res.json({
+      project,
+      computedAt: new Date().toISOString(),
+      insights: {
+        total: rows.length,
+        fresh,
+        partial,
+        stale,
+        unverified,
+        avgRatio: ratioCount > 0 ? Number((ratioSum / ratioCount).toFixed(3)) : 1,
+      },
+      coverage: {
+        filesReferenced: allReferencedFiles.size,
+        componentsMentioned,
+        componentsMissing,
+      },
+      perInsight,
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /projects/${project}/coverage error: ${err.message}\n`);
+    if (isCorruptionError(err)) invalidateDb();
+    res.status(500).json({ error: 'Failed to compute project coverage' });
+  }
+});
+
+/**
  * POST /api/retrieve — retrieve relevant knowledge for a query.
  * Body: { query: string, budget?: number, threshold?: number, context?: any }
  * Returns: { markdown: string, meta: { ... } }

@@ -311,6 +311,7 @@ class SystemHealthAPIServer {
         this.app.get('/api/digests/projects', this.handleGetDigestProjects.bind(this));
         this.app.get('/api/insights', this.handleGetInsights.bind(this));
         this.app.get('/api/insights/projects', this.handleGetInsightProjects.bind(this));
+        this.app.get('/api/projects/:project/coverage', this.handleGetProjectCoverage.bind(this));
         this.app.get('/api/projects', this.handleGetAllProjects.bind(this));
         this.app.get('/api/consolidation/status', this.handleGetConsolidationStatus.bind(this));
         this.app.post('/api/consolidation/run', this.handleRunConsolidation.bind(this));
@@ -4512,6 +4513,15 @@ class SystemHealthAPIServer {
      */
     handleGetInsights(req, res) {
         return this._forwardObsApi(req, res, `/api/insights${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
+    }
+
+    /**
+     * GET /api/projects/:project/coverage — per-project truthfulness + coverage
+     * summary used by the dashboard's Coverage tab. Forwards to obs-api.
+     */
+    handleGetProjectCoverage(req, res) {
+        const project = encodeURIComponent(req.params.project || '');
+        return this._forwardObsApi(req, res, `/api/projects/${project}/coverage`);
     }
 
     /**

@@ -5,6 +5,7 @@ import SystemHealthDashboard from './components/system-health-dashboard'
 import { ObservationsPage } from './pages/observations'
 import { DigestsPage } from './pages/digests'
 import { InsightsPage } from './pages/insights'
+import { CoveragePage } from './pages/coverage'
 import { TokenUsagePage } from './pages/token-usage'
 import { NavBar } from './components/nav-bar'
 import { useEffect } from 'react'
@@ -26,6 +27,7 @@ function AppContent() {
         <Route path="/observations" element={<ObservationsPage />} />
         <Route path="/digests" element={<DigestsPage />} />
         <Route path="/insights" element={<InsightsPage />} />
+        <Route path="/coverage" element={<CoveragePage />} />
         <Route path="/token-usage" element={<TokenUsagePage />} />
       </Routes>
     </>

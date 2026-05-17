@@ -31,6 +31,7 @@ export function NavBar() {
     { label: 'Observations', path: '/observations', count: obsCount },
     { label: 'Digests', path: '/digests', count: digestCount },
     { label: 'Insights', path: '/insights', count: insightCount },
+    { label: 'Coverage', path: '/coverage' },
     { label: 'Token Usage', path: '/token-usage' },
   ]
 

@@ -12,6 +12,27 @@ import { ClipboardButton } from '@/components/clipboard-button'
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
 
+interface StaleClaim {
+  raw: string
+  type: 'PATH' | 'FUNCTION' | 'SYMBOL' | 'ROUTE' | 'PACKAGE'
+}
+
+interface CodeVerification {
+  verifiedAt?: string
+  totalClaims?: number
+  verifiedClaims?: number
+  verificationRatio?: number
+  staleClaims?: StaleClaim[]
+  referencedFiles?: string[]
+}
+
+interface InsightMetadata {
+  codeVerification?: CodeVerification
+  parentTopic?: string
+  relatedInsightIds?: string[]
+  consolidationReason?: string
+}
+
 interface Insight {
   id: string
   topic: string
@@ -21,6 +42,7 @@ interface Insight {
   lastUpdated: string
   createdAt: string
   project?: string | null
+  metadata?: InsightMetadata
 }
 
 interface InsightResponse {
@@ -42,17 +64,107 @@ function confidenceBar(c: number): string {
   return 'bg-orange-500'
 }
 
+/**
+ * Freshness pill — surfaces metadata.codeVerification.verificationRatio.
+ *
+ *   ratio >= 0.7  → FRESH   (emerald)
+ *   0.5–0.7       → PARTIAL (amber)
+ *   < 0.5         → STALE   (rose)
+ *   undefined     → not rendered (insight has never been verified)
+ */
+function freshnessClass(ratio: number): string {
+  if (ratio >= 0.7) return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+  if (ratio >= 0.5) return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+  return 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+}
+
+function freshnessLabel(ratio: number): string {
+  if (ratio >= 0.7) return 'FRESH'
+  if (ratio >= 0.5) return 'PARTIAL'
+  return 'STALE'
+}
+
+function formatVerifiedAgo(iso?: string): string {
+  if (!iso) return 'never verified'
+  const ms = Date.now() - new Date(iso).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return 'verified just now'
+  const days = Math.floor(ms / 86400000)
+  if (days === 0) return 'verified today'
+  if (days === 1) return 'verified yesterday'
+  return `verified ${days}d ago`
+}
+
+function FreshnessBadge({ cv }: { cv?: CodeVerification }) {
+  if (!cv || typeof cv.verificationRatio !== 'number') return null
+  const ratio = cv.verificationRatio
+  const verified = cv.verifiedClaims ?? 0
+  const total = cv.totalClaims ?? 0
+  const ago = formatVerifiedAgo(cv.verifiedAt)
+  return (
+    <Badge
+      variant="outline"
+      className={`text-xs ${freshnessClass(ratio)}`}
+      title={`${verified}/${total} backticked code claims still exist in the repo (${ago})`}
+    >
+      {freshnessLabel(ratio)} {Math.round(ratio * 100)}%
+    </Badge>
+  )
+}
+
+function TruthfulnessPanel({ cv }: { cv?: CodeVerification }) {
+  if (!cv || typeof cv.verificationRatio !== 'number') return null
+  const ratio = cv.verificationRatio
+  const verified = cv.verifiedClaims ?? 0
+  const total = cv.totalClaims ?? 0
+  const stale = cv.staleClaims ?? []
+  return (
+    <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Truthfulness
+        </div>
+        <div className="text-xs text-muted-foreground">{formatVerifiedAgo(cv.verifiedAt)}</div>
+      </div>
+      <div className="flex items-center gap-3 text-sm mb-2">
+        <div className={`font-mono ${ratio >= 0.7 ? 'text-emerald-500' : ratio >= 0.5 ? 'text-amber-500' : 'text-rose-500'}`}>
+          {Math.round(ratio * 100)}%
+        </div>
+        <div className="text-muted-foreground text-xs">
+          {verified} of {total} code claims verify against the codebase
+        </div>
+      </div>
+      {stale.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+            {stale.length} stale claim{stale.length === 1 ? '' : 's'}
+          </summary>
+          <ul className="mt-2 space-y-1 font-mono">
+            {stale.map((s, i) => (
+              <li key={i} className="text-rose-400/80">
+                <span className="text-rose-500/60 mr-2">[{s.type}]</span>
+                {s.raw}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  )
+}
+
 function InsightCard({ insight }: { insight: Insight }) {
   const updated = new Date(insight.lastUpdated)
   const daysAgo = Math.floor((Date.now() - updated.getTime()) / 86400000)
   const clipboardText = `# ${insight.topic}\n\nConfidence: ${Math.round(insight.confidence * 100)}%\n\n${insight.summary}`
+  const cv = insight.metadata?.codeVerification
 
   return (
-    <Card className="hover:bg-accent/20 transition-colors">
+    <Card id={`insight-${insight.id}`} className="hover:bg-accent/20 transition-colors scroll-mt-24">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="text-base leading-tight">{insight.topic}</CardTitle>
           <div className="flex items-center gap-2 shrink-0">
+            <FreshnessBadge cv={cv} />
             <Badge variant="outline" className={`text-xs ${confidenceColor(insight.confidence)}`}>
               {Math.round(insight.confidence * 100)}%
             </Badge>
@@ -70,6 +182,7 @@ function InsightCard({ insight }: { insight: Insight }) {
       </CardHeader>
       <CardContent className="pt-0">
         <MarkdownText text={insight.summary} />
+        <TruthfulnessPanel cv={cv} />
       </CardContent>
     </Card>
   )
