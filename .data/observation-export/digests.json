@@ -11011,25 +11011,6 @@
     "project": "rapid-automations"
   },
   {
-    "id": "da0fc95d-dcde-4ee7-b5bd-89883e7aff4a",
-    "date": "2026-05-08",
-    "theme": "Mishandled Style Guide Input, Unrelated Tmux Investigation",
-    "summary": "The developer provided a documentation style guide as context/instructions. Instead of acknowledging or applying the style guide, the assistant misinterpreted the input as a trigger to investigate unrelated tmux status-line tooling issues.\n\n- No documentation work was performed\n- No artifacts were created or modified\n- The assistant's response was entirely off-topic, investigating tmux/status-line issues irrelevant to the input\n- Root issue: failure to correctly parse developer intent from the incoming message",
-    "observationIds": [
-      "a2fbb440-1415-4cca-aafb-dd0ec402f829"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-05-14T14:09:29.404Z",
-    "metadata": {
-      "sourceCount": 1
-    },
-    "project": "coding"
-  },
-  {
     "id": "e681763b-9178-44cd-93cf-a3213eb07b55",
     "date": "2026-05-09",
     "theme": "Context7 MCP Server False Failure Diagnosis",
@@ -11471,6 +11452,25 @@
     "createdAt": "2026-05-09T10:48:18.863Z",
     "metadata": {
       "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "da0fc95d-dcde-4ee7-b5bd-89883e7aff4a",
+    "date": "2026-05-08",
+    "theme": "Mishandled Style Guide Input, Unrelated Tmux Investigation",
+    "summary": "The developer provided a documentation style guide as context/instructions. Instead of acknowledging or applying the style guide, the assistant misinterpreted the input as a trigger to investigate unrelated tmux status-line tooling issues.\n\n- No documentation work was performed\n- No artifacts were created or modified\n- The assistant's response was entirely off-topic, investigating tmux/status-line issues irrelevant to the input\n- Root issue: failure to correctly parse developer intent from the incoming message",
+    "observationIds": [
+      "a2fbb440-1415-4cca-aafb-dd0ec402f829"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:29.404Z",
+    "metadata": {
+      "sourceCount": 1
     },
     "project": "coding"
   },
@@ -16207,6 +16207,184 @@
     "createdAt": "2026-05-16T11:38:46.161Z",
     "metadata": {
       "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3017b74e-eb96-4b39-8491-078876924b78",
+    "date": "2026-05-16",
+    "theme": "Token Export Directory Redirect and Submodule Push",
+    "summary": "The token usage export path was redirected from the public coding repo to the private coding-history repo, and the rapid-llm-proxy submodule was subsequently pushed to its remote.\n\n- Modified `rapid-llm-proxy/bin/start-llm-proxy.sh` to set `LLM_PROXY_TOKEN_EXPORT_DIR=/Users/<USER_ID_REDACTED>/Agentic/coding/.specstory/history/logs/llm-proxy-export/`, co-locating token exports with LSL transcripts in the private repo\n- Pushed rapid-llm-proxy to `<COMPANY_NAME_REDACTED>.ghe.com/adpnext-apps/rapid-llm-proxy`, advancing 4 commits (36-02 through 36-06 implementation)\n- Also pushed updated screenshot images to the coding repo and updated `token-usage.md`",
+    "observationIds": [
+      "e211cba3-44d4-4d46-b0e2-960d7eef8cad",
+      "73349dab-2256-42f6-8df9-279a0e25978b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/token-usage.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T10:26:01.253Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "908af7d4-ddbd-4880-aed4-38b9ca399601",
+    "date": "2026-05-16",
+    "theme": "MkDocs Documentation Screenshot Sync (Incomplete)",
+    "summary": "An attempt was made to update MkDocs documentation with two newly provided screenshots by syncing files from `docs/images/` into the appropriate documentation paths. The exchange was incomplete — the assistant was mid-investigation with no confirmed file updates recorded. Changes were targeted at `token-usage.md`.",
+    "observationIds": [
+      "2ea5c3b2-398d-4794-bcfb-ec6ac92469b7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/token-usage.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T10:26:01.253Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ecebeb61-bb45-427d-9662-24eb44dd2861",
+    "date": "2026-05-16",
+    "theme": "token-usage.ts model_raw Column Fix and Chore Commit",
+    "summary": "Two closely related chore commits cleaned up and fixed `model_raw` persistence in the token-usage export/hydrate pipeline within rapid-llm-proxy.\n\n- Edited `rapid-llm-proxy/src/token-usage.ts` to add `model_raw` to the export `SELECT` statement and include it in the `INSERT OR IGNORE` hydration logic\n- Added a fallback to the `model` field for legacy export files that predate the `model_raw` column\n- Changes verified live and committed as `4fe85f2` on rapid-llm-proxy `main`\n- Ensures `model_raw` now survives full export → hydrate round-trips without data loss",
+    "observationIds": [
+      "c1b26dd3-66fd-4e55-b297-a2843e83723b",
+      "46aba94b-1275-4783-8788-fa91d8c90a51"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T10:26:01.253Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "debdd5c1-8f82-44fd-b834-10c289281154",
+    "date": "2026-05-16",
+    "theme": "Preswap Observations DB Backup Retention Investigation",
+    "summary": "The developer asked whether a preswap backup of the observations database could be safely deleted. The agent investigated by comparing the backup's schema and row count against both the current live DB and the cold-store export to check for unique data. The investigation was inconclusive due to incomplete tool outputs; no definitive deletion recommendation was reached. Incidentally touched `start-llm-proxy.sh` and `36-02-SUMMARY.md` during the session.",
+    "observationIds": [
+      "25d5e821-059b-4206-bc57-afce3e954d94"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/36-02-SUMMARY.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-17T10:26:01.253Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3f02605c-7ebc-4f40-96d7-e6603241ae93",
+    "date": "2026-05-16",
+    "theme": "Dashboard Degraded Coordinator Status Root Cause Identified",
+    "summary": "A screenshot showing the system dashboard with a \"degraded\" coordinator status triggered an investigation into the health endpoint logic of the `mcp-constraint-monitor` server.\n\n- Obs 7 began tracing the health endpoint in `server.js`; investigation was in progress\n- Obs 8 identified the root cause: the registry file contains a stale entry for coordinator **PID 5299** (last heartbeat May 3, **13 days prior**); that PID no longer exists, so the dashboard correctly computes degraded status\n- The misleading **341h uptime** display was explained: it uses `startTime`-to-now rather than last heartbeat time\n- Touched `start-llm-proxy.sh` and `36-02-SUMMARY.md` as side artifacts during the session\n- Fix implied: either clear the stale registry entry or update the uptime calculation to use last heartbeat",
+    "observationIds": [
+      "fb9e9d3f-ea83-4ba9-a171-b311b972fd59",
+      "42a00c07-3ca4-482a-9b96-a16057170143"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/36-02-SUMMARY.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-17T10:26:01.253Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e61dfb8b-6e99-4af4-b083-9b8c63c85e04",
+    "date": "2026-05-17",
+    "theme": "Day-Long Git Commit and Push Workflow",
+    "summary": "Multiple sessions throughout the morning were dedicated to staging and committing outstanding changes in the coding project repository, working through an iterative investigation-then-commit pattern.\n\n- **09:06** — Initial attempt to check git status and unpushed commits before committing; also aimed to migrate a reader and delete its file. Exchange ended incomplete with no commit made; `dashboard-server.js` was edited but not committed.\n- **09:57** — Resumed commit workflow; staged modified files in logical groups and pushed to remote. `.gitignore` was among the modified files.\n- **10:05** — Follow-up investigation into remaining git changeset; inspected `.data/llm-proxy/` to determine tracked vs. untracked vs. ignored state. `.gitignore` revisited but no final conclusion reached within the exchange.\n- **10:22** — Final commit of the day successfully completed: staged and pushed `.data/observation-export/metadata.json` and `.data/observation-export/observations.js`, along with specstory history files. Repo landed at commit `179a66640` (coding) and `6823c3b5` (coding-history), with a clean working tree.",
+    "observationIds": [
+      "bdd175ae-8ca9-4999-bebb-ef6d4df0b2f2",
+      "f892e862-024c-4190-b575-d027c5f07edb",
+      "a48c531a-362e-4f78-bf06-755352782f21",
+      "ec052f03-5b30-4fb8-91a3-dff226f07239"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-constraint-monitor/src/dashboard-server.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore",
+      ".data/observation-export/metadata.json",
+      ".data/observation-export/observations.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T10:26:33.289Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fcfd2256-8ad0-4115-954f-2f4831636391",
+    "date": "2026-05-17",
+    "theme": "Replacing Deleted Registry Checks in Test Script",
+    "summary": "A targeted cleanup was applied to `scripts/test-coding.sh` to remove references to a now-deleted registry.\n\n- Two blocks that previously probed a deleted registry endpoint were replaced with equivalent checks against the canonical `/health/state` endpoint.\n- Change was surgical — no other logic in the test script was altered.\n- Result was fully completed within the exchange, unlike the surrounding commit sessions.",
+    "observationIds": [
+      "c74e967f-129e-49a0-9b98-7272d3049611"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/test-coding.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-17T10:26:33.289Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e11dee37-bbe1-447d-ab8d-dccdb54e702d",
+    "date": "2026-05-17",
+    "theme": "Session Context Loading via Recent Log Lookup",
+    "summary": "A brief context-continuity step was taken at 10:23 to re-establish awareness of prior work sessions.\n\n- The `/sl` command was run to identify the current project and load LSL files from the specstory history directory.\n- Bash lookups were executed against recent session history files.\n- No artifacts were modified and no summary output was produced within the exchange; the step served purely as orientation before continuing work.",
+    "observationIds": [
+      "e45f4e8b-12d9-4231-9f24-886b519ead08"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-17T10:26:33.289Z",
+    "metadata": {
+      "sourceCount": 1
     },
     "project": "coding"
   }

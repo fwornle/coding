@@ -24350,7 +24350,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-16T11:18:37.529Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:01.253Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -24398,7 +24398,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-16T11:46:55.572Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:01.253Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -24414,7 +24414,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-16T12:11:56.348Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:01.253Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -24430,7 +24430,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-16T13:00:08.721Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:01.253Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -24446,7 +24446,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-16T13:00:08.721Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:01.253Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -24462,7 +24462,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-16T13:05:52.540Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:01.253Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -24479,7 +24479,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-16T13:10:16.946Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:01.253Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -24496,7 +24496,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-16T13:10:16.946Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:01.253Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -24513,7 +24513,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-17T09:06:39.887Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:33.289Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -24529,7 +24529,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-17T09:37:40.333Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:33.289Z",
     "llm": {
       "model": "claude-sonnet-4.6",
       "provider": "copilot"
@@ -24540,12 +24540,44 @@
   },
   {
     "id": "f892e862-024c-4190-b575-d027c5f07edb",
-    "summary": "Intent: Commit and push current changes in the coding project repository.\nApproach: Stage modified files and commit in logical groups before pushing to remote.\nArtifacts: none\nResult: Git commit and push workflow was initiated for the coding project, handling dirty working tree and unpushed commits.",
+    "summary": "Intent: Commit and push current changes in the coding project repository.\nApproach: Stage modified files and commit in logical groups before pushing to remote.\nArtifacts: edited .gitignore\nResult: Git commit and push workflow was initiated for the coding project, handling dirty working tree and unpushed commits.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-17T09:57:14.294Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-17T10:26:33.289Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.gitignore"
+    ]
+  },
+  {
+    "id": "a48c531a-362e-4f78-bf06-755352782f21",
+    "summary": "Intent: Ask whether remaining files in the git changeset need to be committed.\nApproach: Inspected git status and examined contents of .data/llm-proxy/ to determine which files were tracked, untracked, or ignored.\nArtifacts: edited .gitignore\nResult: Investigation was in progress but not completed in the exchange; no conclusion reached about which files need committing.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T10:05:16.922Z",
+    "digestedAt": "2026-05-17T10:26:33.289Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/.gitignore"
+    ]
+  },
+  {
+    "id": "ec052f03-5b30-4fb8-91a3-dff226f07239",
+    "summary": "Intent: [commit the recently modified observation export files]\nApproach: Stage and commit the metadata and observations export files in the coding repo, along with history files in the specstory subdir.\nArtifacts: edited .data/observation-export/metadata.json, edited .data/observation-export/observations.js\nResult: Both files committed and pushed; coding repo at 179a66640 and coding-history at 6823c3b5, with clean git status at time of commit.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T10:22:03.142Z",
+    "digestedAt": "2026-05-17T10:26:33.289Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -24553,12 +24585,161 @@
     "modifiedFiles": null
   },
   {
-    "id": "a48c531a-362e-4f78-bf06-755352782f21",
-    "summary": "Intent: Ask whether remaining files in the git changeset need to be committed.\nApproach: Inspected git status and examined contents of .data/llm-proxy/ to determine which files were tracked, untracked, or ignored.\nArtifacts: none\nResult: Investigation was in progress but not completed in the exchange; no conclusion reached about which files need committing.",
+    "id": "e45f4e8b-12d9-4231-9f24-886b519ead08",
+    "summary": "Intent: Load recent session logs to establish context continuity from previous work sessions.\nApproach: Run the /sl command to identify current project and load LSL files from the specstory history directory.\nArtifacts: edited token-usage.ts\nResult: Command executed bash lookups for recent session history files; no summary output shown in the exchange.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-17T10:23:27.007Z",
+    "digestedAt": "2026-05-17T10:26:33.289Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts"
+    ]
+  },
+  {
+    "id": "d49407b3-ffb0-433c-8dc0-6d5ec5acf3bc",
+    "summary": "Intent: [user shared a screenshot, likely of a token usage dashboard, prompting investigation of the data]\nApproach: <USER_ID_REDACTED> SQLite token-usage database and export log files to reconcile dashboard figures against raw data, checking date ranges and record counts.\nArtifacts: edited token-usage.ts\nResult: Assistant began diagnosing a discrepancy between a displayed ~593K token figure and underlying data, checking per-day rollups and whether recent data was still present in the database.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-17T10:33:11.137Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts"
+    ]
+  },
+  {
+    "id": "430c7aff-ae85-42b0-9fda-d033309708a4",
+    "summary": "Intent: Add a time window selector and a total overview section to the token usage dashboard, showing consumption trends over time, model usage breakdown, and evolution of main token consumers.\nApproach: The assistant began by reading the existing token-usage page to understand the current tab/component structure before making changes.\nArtifacts: edited token-usage.ts\nResult: Planning phase only; the existing token-usage.tsx was read but no changes were implemented yet.",
     "agent": "claude",
     "project": "coding",
     "quality": "high",
-    "createdAt": "2026-05-17T10:05:16.922Z",
+    "createdAt": "2026-05-17T10:42:33.127Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts"
+    ]
+  },
+  {
+    "id": "1dbd07e7-98d1-4910-8b2f-4d81f186ae94",
+    "summary": "Intent: [asking whether 70 insights need consolidation, entity resolution, deduplication, and how to unify the online-learned vs UKB-learned knowledge pipelines into a coherent strategy]\nApproach: Recommended a two-phase approach: a cheap one-shot audit using existing fuzzy-match logic to quantify overlap, followed by full unification by anchoring both pipelines to a shared hierarchical entity graph where insights become evidence attached to entity IDs rather than competing first-class objects.\nArtifacts: edited token-usage.ts, edited server.mjs\nResult: No files changed; the exchange produced an architectural recommendation to treat insights as observations-of-entities, letting UKB own the structural backbone and the online pipeline contribute timestamped evidence to the same identity space, with a dedup audit as the immediate next step.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-17T10:47:06.869Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ]
+  },
+  {
+    "id": "296a3a7b-1eb8-41de-a9ef-f8e1007a7ddd",
+    "summary": "Intent: [Begin an audit of the project's data pipeline, specifically examining insights, knowledge exports, and entity distributions]\nApproach: Systematically inspect stored data files to quantify the contents, structure, and potential issues like duplicates across insights and knowledge-export entities.\nArtifacts: edited token-usage.ts, edited server.mjs, edited token-usage.tsx\nResult: Audit initiated; baseline counts and structure established for insights.json and coding.json entities, including entity-type distribution — further analysis of duplicate clusters and cross-pipeline overlap queued.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-17T10:51:03.239Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx"
+    ]
+  },
+  {
+    "id": "986d9e8a-dda6-490d-80c9-bc67c9ee5a8f",
+    "summary": "Intent: Challenge the overlap detection script's false negative finding when filtering for \"LLM CLI Proxy\" shows 3 clearly related insight entries\nApproach: Switched from full-text Jaccard similarity (which diluted signal with summary text) to topic-only comparison to better identify duplicate insights.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/audit-knowledge-overlap.mjs\nResult: Modified the overlap audit script to use topic strings alone as the identity signal rather than including summary text, which was drowning out topical similarity in Jaccard calculations.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T11:09:22.707Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/audit-knowledge-overlap.mjs"
+    ]
+  },
+  {
+    "id": "33b906a9-0c8c-4a24-ad22-ac3927768842",
+    "summary": "Intent: Challenge the assistant's claim of no overlap in insights, specifically pointing to 4 \"LLM CLI Proxy\" entries as evidence\nApproach: Re-ran overlap detection using topic-only tokens instead of topic+summary to avoid signal dilution, which surfaced real clustering.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/audit-knowledge-overlap.mjs\nResult: Fixed script to tokenize topic strings only; found 19 of 70 insights (27%) in multi-member clusters across 8 topic groups, with two patterns: genuine evolutionary duplicates needing merging and related facets needing parent-child restructuring.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T11:09:22.707Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/audit-knowledge-overlap.mjs"
+    ]
+  },
+  {
+    "id": "c5831e8b-5481-44ce-b3ea-257977854b73",
+    "summary": "Intent: Provide a documentation style guide for enforcing consistent styling across PlantUML, Mermaid, markdown, and PNG diagram artifacts.\nApproach: The assistant acknowledged the style guide and investigated existing documentation artifacts to verify compliance.\nArtifacts: edited token-usage.md\nResult: Style guide received; assistant located `docs/images/health-mon-tokens-evolution.png` and `docs-content/architecture/token-usage.md` for reference but made no changes.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-17T11:15:12.991Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/docs-content/architecture/token-usage.md"
+    ]
+  },
+  {
+    "id": "3d1f3179-23aa-4564-beb8-f9935aa8b729",
+    "summary": "Intent: Classify insight clusters, adjust the consolidation algorithm to auto-merge/generalize, and fix the existing insights data.\nApproach: Analyzed insight clusters, designed a multi-verdict similarity system (merge/facet/none) with lowered thresholds and Jaccard band checks, wrote a one-time migration script to collapse duplicates, then updated the consolidation engine to handle the new return shape automatically going forward.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/.data/insight-consolidation-plan.md, created /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/consolidate-insight-clusters.mjs, edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: Migration reduced insights from 70 to 62 by merging 8 duplicate clusters and updating canonical digest_id lists; Qdrant orphans cleaned up. ObservationConsolidator's `_findSimilarInsightId` now returns a structured verdict object (merge/facet/none) with TOPIC_STOPWORDS filtering, and `synthesizeInsights` was updated to honor the new return shape for automatic merging and facet cross-linking on future runs.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T11:18:07.788Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.data/insight-consolidation-plan.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/consolidate-insight-clusters.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "356d8390-dc2f-4379-b37f-f8d303b9fda4",
+    "summary": "Intent: Restart the observations API and commit the current state.\nApproach: Restarted the API server via script, verified health and data integrity, then committed.\nArtifacts: none\nResult: Observations API restarted successfully, confirmed serving migrated data (62 insights, 5 facet-linked), and changes committed.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T11:45:14.735Z",
     "digestedAt": null,
     "llm": {
       "model": "Claude Sonnet 4.6",
