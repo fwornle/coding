@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Brain, TrendingUp, Search } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { RefreshCw, Brain, TrendingUp, Search, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -99,14 +100,52 @@ function FreshnessBadge({ cv }: { cv?: CodeVerification }) {
   const ratio = cv.verificationRatio
   const verified = cv.verifiedClaims ?? 0
   const total = cv.totalClaims ?? 0
+  const stale = total - verified
   const ago = formatVerifiedAgo(cv.verifiedAt)
+  // Browser tooltip — appears on hover. Explains the metric concretely so a
+  // user encountering the badge for the first time understands what 60%
+  // means (60% of the backticked file paths / function names / env vars
+  // mentioned in this insight still exist in the codebase).
+  const tooltip =
+    `Truthfulness: ${verified} of ${total} code claims in this insight still ` +
+    `exist in the codebase (${stale} stale). ` +
+    `A "claim" is anything in backticks — a file path, function name, env var, ` +
+    `route, or package. The verifier checks them against the live repo + ` +
+    `submodules + sibling _work/* repos every 7 days. ${ago}.`
   return (
     <Badge
       variant="outline"
       className={`text-xs ${freshnessClass(ratio)}`}
-      title={`${verified}/${total} backticked code claims still exist in the repo (${ago})`}
+      title={tooltip}
     >
       {freshnessLabel(ratio)} {Math.round(ratio * 100)}%
+    </Badge>
+  )
+}
+
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  // Confidence is the OLDER, separate metric — set initially by the LLM
+  // during synthesis (reflects how many digests supported the insight at
+  // birth), then decayed over time:
+  //   - Age drag:           −0.05 per full week without an update
+  //   - Truthfulness drag:  if verificationRatio < 0.5, additional one-shot
+  //                         penalty up to −0.20
+  //   - Floor:              0.30
+  // Higher = more trustworthy by the LLM-and-decay heuristic; the freshness
+  // badge is the orthogonal "is the content still factually current" signal.
+  const tooltip =
+    `Confidence: how strongly this insight was supported by source digests at ` +
+    `synthesis time, decayed since. Base value was set by the LLM (more ` +
+    `corroborating digests → higher start); it loses 0.05 per week of ` +
+    `inactivity and up to 0.20 more if truthfulness drops below 50%. ` +
+    `Floor is 0.30. Independent of the FRESH / PARTIAL / STALE badge.`
+  return (
+    <Badge
+      variant="outline"
+      className={`text-xs ${confidenceColor(confidence)}`}
+      title={tooltip}
+    >
+      {Math.round(confidence * 100)}%
     </Badge>
   )
 }
@@ -117,11 +156,35 @@ function TruthfulnessPanel({ cv }: { cv?: CodeVerification }) {
   const verified = cv.verifiedClaims ?? 0
   const total = cv.totalClaims ?? 0
   const stale = cv.staleClaims ?? []
+  // Methodology tooltip on the Info icon — fuller version of the badge
+  // tooltip with the band thresholds and consequences for retrieval/decay.
+  const methodologyTooltip =
+    `What this measures: fraction of backticked code claims in the summary ` +
+    `(file paths, function names like funcName(), env vars like LLM_TIMEOUT, ` +
+    `HTTP routes like "GET /api/...", scoped packages like @scope/name) that ` +
+    `still resolve against the codebase.
+
+` +
+    `How it's checked: filesystem existence for paths (with submodule + ` +
+    `path-suffix fallbacks); git grep -F for symbols, routes, env vars. ` +
+    `Search roots: the project repo, every submodule of it, and sibling ` +
+    `_work/* repos. Re-runs every 7 days on a cadence guard.
+
+` +
+    `Bands: FRESH ≥ 70%, PARTIAL 50–70%, STALE < 50%.
+
+` +
+    `Consequences: retrieval scales rrfScore by (0.3 + 0.7 × ratio) for ` +
+    `insight-tier results, so stale insights drop in rank. When ratio < 50%, ` +
+    `confidence loses up to 0.20 (one-shot, cleared on recovery).`
   return (
     <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Truthfulness
+          <span title={methodologyTooltip} className="inline-flex cursor-help opacity-60 hover:opacity-100">
+            <Info className="w-3 h-3" />
+          </span>
         </div>
         <div className="text-xs text-muted-foreground">{formatVerifiedAgo(cv.verifiedAt)}</div>
       </div>
@@ -165,9 +228,7 @@ function InsightCard({ insight }: { insight: Insight }) {
           <CardTitle className="text-base leading-tight">{insight.topic}</CardTitle>
           <div className="flex items-center gap-2 shrink-0">
             <FreshnessBadge cv={cv} />
-            <Badge variant="outline" className={`text-xs ${confidenceColor(insight.confidence)}`}>
-              {Math.round(insight.confidence * 100)}%
-            </Badge>
+            <ConfidenceBadge confidence={insight.confidence} />
             <ClipboardButton text={clipboardText} title="Copy insight" />
           </div>
         </div>
@@ -189,6 +250,7 @@ function InsightCard({ insight }: { insight: Insight }) {
 }
 
 export function InsightsPage() {
+  const location = useLocation()
   const [insights, setInsights] = useState<Insight[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -266,6 +328,40 @@ export function InsightsPage() {
     fetchProjects()
     fetchStatus()
   }, [fetchProjects, fetchStatus])
+
+  // Hash-anchored scroll-into-view. Coverage tab tiles deep-link via
+  // /insights#insight-<uuid>; React Router doesn't auto-scroll, so we
+  // wait for the insights list to render then scroll the target card
+  // into view and pulse it briefly. Also clears any active project
+  // filter — a tile is always for an insight that should be visible
+  // regardless of the user's previous filter state.
+  useEffect(() => {
+    if (loading || insights.length === 0) return
+    const hash = location.hash
+    if (!hash || !hash.startsWith('#insight-')) return
+    const targetId = hash.slice(1)
+    // Defer one tick so card refs are mounted in the DOM.
+    const handle = window.requestAnimationFrame(() => {
+      const el = document.getElementById(targetId)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-background')
+      window.setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-background')
+      }, 2400)
+    })
+    return () => window.cancelAnimationFrame(handle)
+  }, [loading, insights, location.hash])
+
+  // When arriving with a deep-link hash, force the project filter to ""
+  // so the targeted insight is in the rendered set even if the user had
+  // previously filtered to a different project.
+  useEffect(() => {
+    if (location.hash.startsWith('#insight-') && projectFilter !== '') {
+      setProjectFilter('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.hash])
 
   // Poll heartbeat while a run is alive (or while we just kicked one off).
   // Detect completion via inflight transition so the insight list refreshes

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Map, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Map, RefreshCw, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -119,7 +119,18 @@ function ProjectCoverageCard({ data }: { data: CoverageResponse }) {
               key={t.id}
               to={`/insights#insight-${t.id}`}
               className={`group relative h-16 rounded border ${tileColor(t.ratio)} px-2 py-1 flex flex-col justify-between text-left transition hover:brightness-110 hover:scale-[1.02]`}
-              title={`${t.topic}\n${t.verifiedClaims ?? 0}/${t.totalClaims ?? 0} claims verify · confidence ${Math.round(t.confidence * 100)}%`}
+              title={
+                `${t.topic}\n\n` +
+                `Truthfulness: ${t.ratio === null ? 'not yet verified' : `${Math.round(t.ratio * 100)}% — ${t.verifiedClaims ?? 0} of ${t.totalClaims ?? 0} code claims still exist in the repo`}` +
+                `${t.staleClaimCount > 0 ? ` (${t.staleClaimCount} stale)` : ''}\n` +
+                `Confidence: ${Math.round(t.confidence * 100)}% (LLM synthesis support, decayed by age + truthfulness)\n\n` +
+                `Tile color = truthfulness band:\n` +
+                `  green   ≥ 70% (FRESH)\n` +
+                `  amber 50–70% (PARTIAL)\n` +
+                `  rose   < 50% (STALE)\n` +
+                `  gray   not yet verified\n\n` +
+                `Click to jump to the full insight.`
+              }
             >
               <div className="text-[10px] leading-tight font-medium line-clamp-2">
                 {shortTopic(t.topic)}
@@ -227,9 +238,30 @@ export function CoveragePage() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Map className="w-6 h-6" />
             Project Coverage
+            <span
+              className="inline-flex cursor-help opacity-50 hover:opacity-100"
+              title={
+                `Two metrics per project:\n\n` +
+                `1) TRUTHFULNESS — for each insight, the verifier extracts backticked ` +
+                `code claims (file paths, function names, env vars, routes, packages) ` +
+                `from the summary and checks each against the live codebase (filesystem + ` +
+                `git grep across the project repo, its submodules, and sibling _work/* repos). ` +
+                `The ratio is verified/total claims. Bands: FRESH ≥ 70%, PARTIAL 50–70%, STALE < 50%. ` +
+                `Re-runs every 7 days on a cadence guard.\n\n` +
+                `2) COVERAGE — distinct files referenced across all insights in the project ` +
+                `(numerator) versus the project's component taxonomy (denominator). ` +
+                `"Components mentioned" matches taxonomy names + aliases against ` +
+                `insight topic+summary, so e.g. LiveLoggingSystem matches ` +
+                `"LSL"/"transcript monitor"/"specstory".\n\n` +
+                `Per-insight tile: color = truthfulness band, ×N badge = stale-claim count, ` +
+                `click jumps to the full insight on the Insights tab.`
+              }
+            >
+              <Info className="w-4 h-4" />
+            </span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            How well each project is represented by its insights — and how truthful those insights still are against the codebase.
+            How well each project is represented by its insights — and how truthful those insights still are against the codebase. Hover the <Info className="w-3 h-3 inline" /> for methodology.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={loadAll} disabled={loading}>
