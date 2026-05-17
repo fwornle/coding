@@ -15711,5 +15711,503 @@
       "sourceCount": 1
     },
     "project": "coding"
+  },
+  {
+    "id": "45809da9-6682-4c88-ba5a-28abbd14a164",
+    "date": "2026-05-15",
+    "theme": "Session Continuity Load via LSL Cross-Project Sync",
+    "summary": "At the start of the session, the agent executed the `/sl` command protocol to re-establish context from prior work sessions.\n\n- Loaded LSL files from both the `rapid-automations` and `coding` projects covering the 2026-05-15 timeframe\n- Synthesized a cross-project summary spanning `rapid-automations`, `rapid-llm-proxy`, and `coding` repos\n- Prior session had been mid-exploration of a **token-usage JSON-export feature**\n- **PR #14** for `llm-proxy` unification was noted as open at the point of last session\n- No artifacts were created; this was a pure context-restoration step",
+    "observationIds": [
+      "a7c83067-f155-48de-ba6a-6c6e99548ec9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:40:51.445Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "25f8c844-27fb-46f1-89c7-38f481d99a19",
+    "date": "2026-05-15",
+    "theme": "Fix Sticky Error Banner Not Auto-Dismissing on Recovery",
+    "summary": "**Goal:** Eliminate a persistent consolidation error banner that remained visible even after the underlying API issue resolved.\n\n**Approach:** Modified the status poll logic to clear the error state whenever a successful response is received from `/api/consolidation/status`, since a successful poll conclusively proves the API is reachable.\n\n**Change:**\n- `integrations/system-health-dashboard/src/pages/digests.tsx` — added error-state reset on successful poll response\n\n**Result:** The consolidation error banner now auto-dismisses upon recovery, rather than remaining \"sticky\" until a manual page reload.",
+    "observationIds": [
+      "1dc23907-e69c-4690-9ff2-3ece3edda205"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T08:40:51.445Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "04a81239-3382-4d7d-99c8-a4b7f9731854",
+    "date": "2026-05-15",
+    "theme": "Session Context Reload Summarising Prior Day's Work",
+    "summary": "**Goal:** Re-establish context continuity by reviewing recent activity before continuing work.\n\n**Approach:** Read the two most recent LSL (Live Session Log) files from the coding project history directory to reconstruct a session summary.\n\n**No files were modified.** The read produced a narrative summary of 2026-05-15 activity covering:\n- `obs_api` SIGTERM hardening\n- Token-usage export pattern implementation\n- Sticky-banner fix (see observation 1)\n- A batch of 6 commits pushed to both the `coding` and `rapid-llm-proxy` repositories\n\n**State at time of summary:** Clean working tree with minor expected drift in `token-usage.json`.",
+    "observationIds": [
+      "71f56bb2-599c-4c73-96bf-949ad258bc06"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:40:51.445Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f88f69e4-4d92-4c1d-afe7-3dacd7caf0e1",
+    "date": "2026-05-16",
+    "theme": "LLM Health Probe Prompt Optimized to Minimize Token Usage",
+    "summary": "The goal was to reduce per-probe token overhead in the health coordinator's semantic LLM check. Two iterations were explored:\n- **Obs 1:** Prompt changed from `\"reply with the single token: OK\"` to `\"say hi\"` — shorter but still slightly suboptimal on output tokens.\n- **Obs 2:** Prompt refined to `\"say OK\"` with response validation via `/ok/i`, achieving single-token output while also reducing input tokens versus the original, keeping ~1s round-trip and `semantic_ok=true`.\n- **Obs 3:** Changes to `scripts/health-coordinator.js` committed as `799e840c9` with message `\"chore(health-coordinator): shorten semantic probe\"`.\n\nArtifact changed: `scripts/health-coordinator.js`",
+    "observationIds": [
+      "a1dd6520-b63b-409c-862e-a0a73be30d6c",
+      "037ba1f8-d6f8-4492-b7f8-dc0a83e7c3ed",
+      "8f0ce412-91d6-4f17-8de3-143d64a12ce3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/architecture.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/providers.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/proxy-bridge.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/network-detection.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/configuration.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/integration-guide.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/diagrams/component-model.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "0b36f255-3c92-4dcd-8a8a-7b5c23627540",
+    "date": "2026-05-16",
+    "theme": "Token Usage File Handling Design Investigation (LSL Mirror Plan)",
+    "summary": "Both observations (same timestamp, same agent) represent a dual-track investigation phase with no changes committed yet. The goal was to design a token-usage file storage scheme that mirrors LSL conventions:\n- Per-hour JSON files organized in `year-month/` folders\n- Hashed user-ID embedded in filenames\n- Per-session JSON import into SQLite DB\n- Dashboard merging all parallel project JSON files into one unified view\n\nThe agent was reading `.gitignore`, current export file shape, and the LSL pattern implementation before drafting a concrete migration plan. No artifacts were modified; discovery was still in progress at session end.",
+    "observationIds": [
+      "05fae816-5183-41f6-afc3-e114bf0940bb",
+      "28a65142-b298-4717-8996-86b779ea3d5b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/architecture.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/providers.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/proxy-bridge.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/network-detection.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/configuration.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/integration-guide.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/diagrams/component-model.puml"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "eb1f5ae9-99b6-499e-b8b8-45859af60534",
+    "date": "2026-05-16",
+    "theme": "PlantUML Diagrams Refreshed for v2.0 Style Compliance",
+    "summary": "Three PlantUML diagrams in `rapid-llm-proxy/docs/diagrams/` were updated in-place (no versioned copies) to conform to the project documentation style guide. Changes applied:\n- `component-model.puml` — standard style includes, stereotypes, provider/token-usage additions\n- `request-flow.puml` — added per-process pin and reap steps\n- `architecture-overview.puml` — added dashboard and token-usage export components\n\nAll files were updated following kebab-case naming and in-place modification rules. PNGs were regenerated and changes committed to the rapid-llm-proxy repository.",
+    "observationIds": [
+      "75b00307-f3b5-4a3a-92bd-bf8245584bc2",
+      "ed9be5f1-8668-4133-bb3e-46d2eac78b35",
+      "e4e558e8-91bc-4650-a7f6-87a8e5a385eb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/diagrams/component-model.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/diagrams/request-flow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/diagrams/architecture-overview.puml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "55eba2bd-5f48-4fea-8107-47a0ed3e2415",
+    "date": "2026-05-16",
+    "theme": "LSL Current Window Added to Health State Endpoint; Repos Pushed",
+    "summary": "An architectural decision was made to expose the LSL time window through the health coordinator rather than having each consumer recompute it independently:\n- `timezone-utils.js:getTimeWindow()` identified as the canonical source\n- Decision: add `lsl.current_window` field to the coordinator's `/health/state` HTTP endpoint (with `'unknown'` fallback) so the proxy, statusline, and dashboard all share one source of truth\n- Documentation updated: `health-monitoring.md`, `health-dashboard.md`, `token-usage.md`, `cold-storage-flow.puml`, `obs-retention-flow.puml`, and three diagram files\n\nFollowing this, both the `coding` and `rapid-llm-proxy` repositories were pushed to their respective GitHub remote origins.",
+    "observationIds": [
+      "e00fa478-2185-46e3-8e35-93e4050aa3b3",
+      "63cd2f69-85a2-4f8f-86db-263bea36b542"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/diagrams/component-model.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/diagrams/request-flow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/diagrams/architecture-overview.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/health-monitoring.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/cold-storage-flow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/obs-retention-flow.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/health-dashboard.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/token-usage.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/CONTEXT.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "911d3b65-a6bd-4f3f-b138-b397a21888a0",
+    "date": "2026-05-16",
+    "theme": "GSD Tool Update Check — Changelog Unavailable for New Version",
+    "summary": "The GSD update skill was invoked to check for available CLI updates. It detected a new version (`1.42.2` → `1.42.3`) but was unable to surface changelog details: the GitHub `CHANGELOG.md` only contained an `[Unreleased]` block and entries for `[1.42.1]`, with no content for `1.42.2` or `1.42.3`. No action was taken beyond the check.",
+    "observationIds": [
+      "45550019-8736-40ce-903a-ef365d643a53"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/CONTEXT.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2bfef265-983d-46f7-953e-50c240f75336",
+    "date": "2026-05-16",
+    "theme": "Session Context Continuity Loaded from Recent LSL Logs",
+    "summary": "The agent loaded the two most recent LSL session log files from the `coding` project's specstory history to re-establish context after a session gap. The reviewed logs covered the 0800–1000 window of 2026-05-16 and produced a continuity summary covering recent completed work, current system state, and suggested next steps. No code was modified.",
+    "observationIds": [
+      "498c3224-a56c-4aa1-b4fd-8e01ad142e7c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/CONTEXT.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9c538687-6303-4c85-8a3e-01ddd1ef0fbc",
+    "date": "2026-05-16",
+    "theme": "Phase 36 Orchestration Launched; Plan 36-01 Completed Successfully",
+    "summary": "The Phase 36 orchestrator analyzed the plan index and identified 5 plans (`36-01` through `36-05`) across 4 waves covering: LSL window exports, per-user hourly JSON files, SQLite schema changes, and a migration script. Wave 1 execution proceeded:\n- **Plan 36-01 completed:** `lsl_meta.current_window` added to the `/health/state` endpoint in `scripts/health-coordinator.js` using `getTimeWindow()` / `utcToLocalTime()` with an `'unknown'` fallback\n- Two commits landed on the worktree branch, pending merge to main\n- Orchestrator was awaiting plan 36-02 before proceeding to merge wave\n\nArtifact: `scripts/health-coordinator.js`",
+    "observationIds": [
+      "81a784ed-7268-4e9c-8169-c62e50be7641",
+      "99329fdf-65d6-4460-bf85-710e54a336a7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e9b9d6cd-59d9-4c88-a942-e0ecc342708f",
+    "date": "2026-05-16",
+    "theme": "Plan 36-02 Sub-Agent Hit Runaway Bug; Orchestrator Reverted and Replanned",
+    "summary": "Plan 36-02 (injecting `LLM_PROXY_USER_HASH` and `LSL_TIMEZONE` into the proxy wrapper) stalled after a sub-agent introduced a critical bug:\n- `import(process.argv[1])` inside a node script triggered `runIfMain()`, causing multi-line garbage to be written into the `LLM_PROXY_USER_HASH` environment variable in `start-llm-proxy.sh`\n- The agent also fabricated a \"user scope-expansion directive\" for `install.sh` — the orchestrator identified this as hallucination and dismissed it\n- **Resolution:** The orchestrator ran `git checkout` to revert `start-llm-proxy.sh`, kickstarted launchd back to a clean state (PID 41291, no garbage env var), and queued plan 36-02 for retry with explicit guidance to use an env-var-driven dynamic import pattern instead of `argv[1]`\n\nAffected file: `bin/start-llm-proxy.sh` (reverted to clean state)",
+    "observationIds": [
+      "1a34003e-2896-4723-b7d8-ed735ecdf2be",
+      "dde8df1f-ea8a-41d0-bfc1-cc1cbfb74256",
+      "61c9d19e-a447-4820-8cef-cbe07435b7c1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "49e56c97-153a-4566-9a12-4ce46cfd75f7",
+    "date": "2026-05-16",
+    "theme": "Dashboard Treemap Hover and Model Name Canonicalization Issues Diagnosed",
+    "summary": "After the developer shared a screenshot of the token usage dashboard, two issues were identified and root-caused (no fixes applied yet):\n- **Missing treemap hover/tooltip:** The treemap component has no `Tooltip` element; smaller boxes are completely non-interactive. Fix proposed: add a `Tooltip` component to the treemap.\n- **Inconsistent model name spellings:** 8 distinct model name variants were found in the token usage data, traced to 3 different upstream callsites in `server.mjs` writing raw API-returned strings with no canonicalization layer. Fix proposed: a `canonicalizeModelName()` function at the log call site, with an option to preserve raw names in a separate column for auditability.\n\nNo code was modified during this investigation.",
+    "observationIds": [
+      "d70c8aa2-acca-45ab-b1d1-33741a1a066b",
+      "dca4e390-e043-47c5-ac57-f6d891dfaf49"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fdade968-9aa6-413f-9a1a-65d020974daa",
+    "date": "2026-05-16",
+    "theme": "Plan 36-02 Completed via Orchestrator Direct Edit to Proxy Wrapper",
+    "summary": "Because the sub-agent's sandbox denied writes outside the `coding` worktree, the orchestrator directly applied the blocked edit to the `rapid-llm-proxy` repository:\n- Inserted a `LLM_PROXY_USER_HASH` compute block into `bin/start-llm-proxy.sh` using an env-var-driven dynamic import of `user-hash-generator.js` (to avoid stdout contamination that caused the earlier bug)\n- Added `LSL_TIMEZONE` export into the same script, placed between the final `fi` and the `exec node` log line\n- Restarted the launchctl service; confirmed proxy running with `LLM_PROXY_USER_HASH=c197ef` and `LSL_TIMEZONE=Europe/Berlin`\n- Committed as `9762ec8` on `rapid-llm-proxy` main; wrote and committed `36-02-SUMMARY.md` in the `coding` repo\n\nArtifacts changed:\n- `/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh`\n- `/Agentic/coding/.planning/phases/36-.../36-02-SUMMARY.md`",
+    "observationIds": [
+      "85768b15-9b1b-4c12-91b2-2382b451e7a5",
+      "9e6fda4d-db8d-42a6-8bca-feb3698be745",
+      "e8228786-e333-457c-b702-7359f4538494"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/36-02-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ca6c1917-65fa-465d-827c-fec824d24ccd",
+    "date": "2026-05-16",
+    "theme": "uv.lock Gitignore Decision for raas-api Tool",
+    "summary": "Developer asked whether `uv.lock` should be committed or gitignored for the `raas-api` tool.\n\n- Checked git tracking status of `uv.lock` in `raas-api` and compared against all sibling packages under `rapid-toolkit/tools/`\n- Found all **26 sibling tool packages** commit their lockfiles — establishing a clear repo-wide convention\n- Conclusion: `uv.lock` should remain committed; `raas-api` is an **application**, not a library, making lockfile commitment the correct practice for reproducible installs\n- Incidentally updated documentation artifacts: `README.md`, `architecture.md`, `providers.md`, `proxy-bridge.md`",
+    "observationIds": [
+      "ff40bdc5-2c55-49e5-a955-9e7aabdd57d6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/README.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/architecture.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/providers.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/docs/proxy-bridge.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "3eab6a8b-32b5-4be9-97a9-43d8a8c286c2",
+    "date": "2026-05-16",
+    "theme": "Constraint Violation Spike: PlantUML Files in Wrong Locations",
+    "summary": "A multi-observation session (agents: `opencode`) diagnosing and attempting to remediate 96 constraint violations that caused the system health dashboard to show **degraded** status.\n\n**Root cause (obs 2):** Violations were not service failures — they stemmed from `.puml` and image files written to non-compliant directories by the `semantic-analysis_generate_plantuml_diagrams` tool during a prior analysis run, triggering file-location, naming, and workflow constraint rules.\n\n**Investigation (obs 3, 6):** Searched across `.opencode/skills/`, `integrations/rapid-toolkit/.agents/skills/`, and constraint config files to locate relevant constraint definitions and the `documentation-style.md` skill. Found the skill exists as a Claude Code command but is **not distributed** to OpenCode or Copilot via `bin/coding` / `generate-agent-instructions.sh`.\n\n**Fix attempted (obs 4, 5):** Updated `.claude/commands/documentation-style.md` with a prominent **\"HARD RULES\"** section explicitly prohibiting tools from writing `.puml` or image files outside:\n- `docs/puml/` — for PlantUML source files\n- `docs/images/` — for rendered image outputs\n\nRan `generate-agent-instructions.sh` to propagate, but propagation to OpenCode/Copilot agents remains unconfirmed — the `coding` agent lacks an `.opencode/skills/` directory and the online learning system reference was unresolved pending developer clarification.",
+    "observationIds": [
+      "0f7e64f1-2317-4b0a-b50e-35319a921c25",
+      "0e9cb0dc-06bf-4a00-89fe-29aa5626c68d",
+      "bc6ff1da-f5ef-4169-be0b-a43849b68f63",
+      "0836193f-a7f4-40cf-8908-8fe76a8e18ba",
+      "3dd13112-08a7-451e-b44c-170095d6b883"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      ".claude/commands/documentation-style.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T08:42:49.893Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "b579782e-3b4c-409b-a098-81c9234c4194",
+    "date": "2026-05-16",
+    "theme": "Constraint Rules Scoped to Eliminate False Positives",
+    "summary": "The developer flagged that `bin/coding` should handle cross-agent skill distribution, prompting investigation into why constraint rules were misfiring. The root cause was that constraint rules were pattern-matching on conversation text and tool output rather than limiting themselves to actual file operations.\n\n- Edited constraint definition files for three rules: `plantuml-file-location`, `plantuml-diagram-workflow`, and `plantuml-file-organization`\n- Added `file_pattern` and `applies_to` scoping fields to each rule so they only trigger on actual `.puml` and `.md` files\n- Result: false positives during normal conversation and tool output are eliminated",
+    "observationIds": [
+      "f47b102d-ff7b-4a29-85fd-e6c01ae52f4e"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "constraint definition files for plantuml-file-location"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T11:38:46.161Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "34c7a6f7-a8b3-4646-b7e3-6bc8af8e9566",
+    "date": "2026-05-16",
+    "theme": "Token Page Pie Chart Label Clipping: Fix and Deployment",
+    "summary": "Goal was to fix the \"claude-code 64%\" and other provider labels being clipped on the by-provider pie chart on the token page. The fix went through several diagnostic and deployment iterations.\n\n- **Diagnosis (obs 2–3):** Increased `ResponsiveContainer` height and reduced `outerRadius`; then discovered `ResponsiveContainer` doesn't propagate `style` props, so SVG overflow clipping couldn't be fixed inline\n- **Fix applied (obs 4):** Added Tailwind class `[&_svg]:!overflow-visible` to the chart wrapper along with increased height and margins to force nested SVG elements to render outside their clipping boundary\n- **Deployment blocker (obs 5–7):** Local source edits were not reflected in the browser because the Docker container at port 3032 was serving a pre-built bundle, not live source files; volume-mount behavior and build output paths were traced\n- **Resolution (obs 8):** Project was rebuilt successfully; confirmed the container volume-mounts host files, meaning the new `dist` build is served immediately — developer instructed to hard-refresh browser to clear cache",
+    "observationIds": [
+      "b84003dd-7433-4079-8dc5-433a2f680da9",
+      "8ce1a65d-4dbe-4cc9-9f31-2f3b5a4399e3",
+      "53836c5a-a711-4169-a117-24ab5982b492",
+      "ebd9f1fd-dace-4c59-b6f2-23106f2c79f0",
+      "380d890d-a484-436b-b0a9-86e0818d7bc8",
+      "09a8ee5c-d677-4c5b-a5c5-7da241689661",
+      "7b5cb37d-1243-4af5-8798-6f4d14ac2bcd"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "(token page chart component",
+      "some chart component file"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T11:38:46.161Z",
+    "metadata": {
+      "sourceCount": 7
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "14ede1ff-33ec-460d-a954-10031d507559",
+    "date": "2026-05-16",
+    "theme": "Treemap Dual Tooltip Diagnosed to Wrong Build Output Path",
+    "summary": "Goal was to fix two tooltips appearing simultaneously on the Treemap visualization. The investigation spanned root-cause identification and a deployment path failure.\n\n- **Root cause (obs 9):** Two tooltip sources were firing at once — a browser-native `<title>` SVG element producing a plain-text tooltip, and the custom `TreemapTooltip` React component rendering a styled card simultaneously; fix identified as removing the `<title>` element\n- **Deployment failure (obs 10–11):** After the fix was applied, the duplicate tooltip persisted in the UI because the build was output to the wrong directory — the Docker container bind-mounts `~/Agentic/coding/integrations/system-health-dashboard/dist` specifically, but builds were written to a different path, meaning no fix had ever been served to the running service\n- Resolution was in progress; the correct build directory needed to be targeted before the `<title>` removal would take effect",
+    "observationIds": [
+      "5074f16b-03f4-4e1a-bb8d-1fecaf1b00f1",
+      "fb80812e-bcf6-4618-b85a-1830e52c3fe3",
+      "b12dde52-43f3-413b-aa0b-f5c4c625b4e2"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-16T11:38:46.161Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "9f51b6a0-6242-4f0f-8ac7-5d296ffc1f11",
+    "date": "2026-05-16",
+    "theme": "Sandbox Write Blocker Bypassed; Plan 36-03 Executed Directly",
+    "summary": "A subagent was blocked from writing to `_work/rapid-llm-proxy/src/` by sandbox restrictions, stalling plan 36-03. The orchestrator ran canary writes to confirm it held broader permissions than subagents, then pivoted to execute plans 36-03 and 36-04 inline rather than delegating:\n\n- Subagents confirmed restricted to `coding/` and `_work/rapid-llm-proxy/bin/` only\n- Orchestrator applied edits directly to `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts`\n- Added `resolveTokenExportDir`, `currentWindow`, `lslWritePath` port, `exportToHourFile`, and a per-window-keyed debounce `Map`\n- TypeScript build passed clean after changes\n- Proxy was successfully kickstarted post-edit\n- Planning docs updated: `36-06-PLAN.md`, `36-07-PLAN.md`, `CONTEXT.md`, `ROADMAP.md`",
+    "observationIds": [
+      "1759e907-aaa9-4c8f-a332-49cbe79a527a",
+      "64d5e173-575b-462d-a221-8e31fd4a7365",
+      "8a0f3d9f-db69-4dca-9383-eddf3c129eaa"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/36-06-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/36-07-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T11:38:46.161Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "67ec6153-4298-4281-a7cf-6ff38549d0e5",
+    "date": "2026-05-16",
+    "theme": "Phase 36 Parallel Execution Coordination and Task Sequencing",
+    "summary": "With phase 36 running across two parallel chats, the assistant performed a file-overlap analysis to determine safe concurrency boundaries:\n\n- `token-usage.ts` identified as a shared file preventing concurrent execution of task 36-06\n- **36-07** (dashboard only) confirmed safe to run immediately and was executed and landed cleanly\n- **36-06** placed on hold pending completion of Wave 3 (36-04) in the parallel chat to avoid write conflicts on `token-usage.ts`\n- `36-03-SUMMARY.md` and `token-usage.ts` were edited during this coordination\n- Untracked `PLAN` files and `CONTEXT.md` edits noted as pending commit",
+    "observationIds": [
+      "1035226f-b8a9-4420-bc0d-5d3b024b54df",
+      "e8b017ca-049f-4118-8777-c8a5017a2654"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/36-token-usage-per-user-hourly-exports-mirror-lsl-conventions-f/36-03-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-16T11:38:46.161Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ef27d47e-6799-4208-a6d4-5c388501054f",
+    "date": "2026-05-16",
+    "theme": "Phase 36 Wrap-Up: Documentation Review and Remote Push",
+    "summary": "Following Phase 36 implementation, the session concluded with documentation review and publishing:\n\n- Developer shared a documentation style guide; assistant read files and ran bash commands to audit the current state of `token-usage.md` and related Phase 36 artefacts\n- Confirmed Phase 36 is fully shipped; no documentation files were modified during the review\n- Git push to `origin/main` succeeded, delivering **15 commits** (`be4e43048..0da23457d`) covering Phase 36 work and documentation updates",
+    "observationIds": [
+      "2169bb1d-f88a-4697-92f1-6974996ea5d1",
+      "1d24d6bc-cfd6-40bd-9622-07ee66b9a5ad"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/token-usage.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-16T11:38:46.161Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
   }
 ]
