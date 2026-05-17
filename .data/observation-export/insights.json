@@ -175,16 +175,11 @@
     "metadata": {
       "scope": "src/live-logging/ObservationConsolidator.js and the consolidation pipeline that produces Digests and Insights from raw observations",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:03.412Z",
-        "totalClaims": 7,
-        "verifiedClaims": 6,
-        "verificationRatio": 0.857,
-        "staleClaims": [
-          {
-            "raw": "src/analysis/insight-generator.ts",
-            "type": "PATH"
-          }
-        ],
+        "verifiedAt": "2026-05-17T16:31:55.561Z",
+        "totalClaims": 11,
+        "verifiedClaims": 11,
+        "verificationRatio": 1,
+        "staleClaims": [],
         "searchRoots": [
           "/Users/Q284340/Agentic/coding",
           "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
@@ -196,7 +191,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -280,7 +283,7 @@
     "metadata": {
       "scope": "Token usage recording, export pipeline, and dashboard visualisation in `rapid-llm-proxy`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:11.274Z",
+        "verifiedAt": "2026-05-17T16:32:11.499Z",
         "totalClaims": 22,
         "verifiedClaims": 20,
         "verificationRatio": 0.909,
@@ -305,7 +308,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       },
       "repairedAt": "2026-05-17T15:00:02.309Z",
@@ -471,7 +482,7 @@
       "consolidatedAt": "2026-05-17T14:55:09.596Z",
       "consolidationReason": "Post-audit cleanup: 1e91533b had 0/4 verified claims (all references to deleted code: selectBestProvider/recordProviderResult/integrations/llm-{cli-,}proxy/). Digests refold into the canonical VPN/Corporate Network Detection insight.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:08.925Z",
+        "verifiedAt": "2026-05-17T16:32:07.104Z",
         "totalClaims": 12,
         "verifiedClaims": 11,
         "verificationRatio": 0.917,
@@ -492,7 +503,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -664,7 +683,7 @@
     "metadata": {
       "scope": "Coordinator daemon, service probing, health state API, and registry management",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:08.132Z",
+        "verifiedAt": "2026-05-17T16:32:05.236Z",
         "totalClaims": 12,
         "verifiedClaims": 12,
         "verificationRatio": 1,
@@ -680,7 +699,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -740,7 +767,7 @@
     "metadata": {
       "scope": "Five-wave Phase 35 implementation: ObservationPruner, ColdStoreReader, obs-api merge helper, full-union pagination, and pagination total fix across `src/live-logging/` and `scripts/`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:11.346Z",
+        "verifiedAt": "2026-05-17T16:32:11.569Z",
         "totalClaims": 7,
         "verifiedClaims": 7,
         "verificationRatio": 1,
@@ -756,7 +783,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -841,7 +876,7 @@
     "metadata": {
       "scope": "tmux statusline rendering chain: `status-line-fast.cjs` → `combined-status-line.js`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:19.301Z",
+        "verifiedAt": "2026-05-17T16:32:16.441Z",
         "totalClaims": 5,
         "verifiedClaims": 4,
         "verificationRatio": 0.8,
@@ -1098,9 +1133,9 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Both insights cover ObservationWriter+SQLite — same scope, different emphasis",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:02.970Z",
-        "totalClaims": 0,
-        "verifiedClaims": 0,
+        "verifiedAt": "2026-05-17T16:31:55.268Z",
+        "totalClaims": 3,
+        "verifiedClaims": 3,
         "verificationRatio": 1,
         "staleClaims": [],
         "searchRoots": [
@@ -1114,7 +1149,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -1176,9 +1219,9 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.147Z",
-        "totalClaims": 2,
-        "verifiedClaims": 2,
+        "verifiedAt": "2026-05-17T16:32:00.961Z",
+        "totalClaims": 3,
+        "verifiedClaims": 3,
         "verificationRatio": 1,
         "staleClaims": [],
         "searchRoots": [
@@ -1192,7 +1235,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -1366,20 +1417,11 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:04.655Z",
+        "verifiedAt": "2026-05-17T16:31:57.153Z",
         "totalClaims": 12,
-        "verifiedClaims": 10,
-        "verificationRatio": 0.833,
-        "staleClaims": [
-          {
-            "raw": "src/pages/digests.tsx",
-            "type": "PATH"
-          },
-          {
-            "raw": "src/pages/insights.tsx",
-            "type": "PATH"
-          }
-        ],
+        "verifiedClaims": 12,
+        "verificationRatio": 1,
+        "staleClaims": [],
         "searchRoots": [
           "/Users/Q284340/Agentic/coding",
           "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
@@ -1391,7 +1433,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -1439,7 +1489,7 @@
     "metadata": {
       "scope": "The `IssueTriage.tsx` component and its BFS-based RCA chain rendering and evidence aggregation logic",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:21.958Z",
+        "verifiedAt": "2026-05-17T16:32:19.109Z",
         "totalClaims": 9,
         "verifiedClaims": 9,
         "verificationRatio": 1,
@@ -1520,7 +1570,7 @@
     "metadata": {
       "scope": "The `@rapid/llm-proxy` npm package and its proxy bridge at `_work/rapid-llm-proxy/`, providing unified LLM provider routing for OKB, coding MCP server, and Docker consumers.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:20.986Z",
+        "verifiedAt": "2026-05-17T16:32:18.108Z",
         "totalClaims": 27,
         "verifiedClaims": 27,
         "verificationRatio": 1,
@@ -1726,7 +1776,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Three regenerations of the same ETM daemon description — same subsystem, drifting topic name",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:02.970Z",
+        "verifiedAt": "2026-05-17T16:31:55.266Z",
         "totalClaims": 5,
         "verifiedClaims": 5,
         "verificationRatio": 1,
@@ -1742,7 +1792,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -1838,7 +1896,7 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.147Z",
+        "verifiedAt": "2026-05-17T16:32:00.961Z",
         "totalClaims": 9,
         "verifiedClaims": 6,
         "verificationRatio": 0.667,
@@ -1867,7 +1925,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -1921,7 +1987,7 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.147Z",
+        "verifiedAt": "2026-05-17T16:32:00.961Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -1937,7 +2003,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -2058,7 +2132,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Host-API Pattern and Host-Side HTTP Wrapper describe the same observations-api-server.mjs",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:21.958Z",
+        "verifiedAt": "2026-05-17T16:32:19.109Z",
         "totalClaims": 2,
         "verifiedClaims": 2,
         "verificationRatio": 1,
@@ -2167,7 +2241,7 @@
     "metadata": {
       "scope": "The OKB graph-structured knowledge base: ingestion, LevelDB storage, correlation engine, Docker configuration, and LLM integration.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:17.874Z",
+        "verifiedAt": "2026-05-17T16:32:14.932Z",
         "totalClaims": 19,
         "verifiedClaims": 18,
         "verificationRatio": 0.947,
@@ -2217,7 +2291,7 @@
     "metadata": {
       "scope": "Proxy status detection logic and `P:ON`/`P:OFF` badge rendering in the tmux status line.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:03.962Z",
+        "verifiedAt": "2026-05-17T16:32:29.529Z",
         "totalClaims": 3,
         "verifiedClaims": 2,
         "verificationRatio": 0.667,
@@ -2238,7 +2312,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -2330,7 +2412,7 @@
     "metadata": {
       "scope": "Statusline rendering scripts: `scripts/combined-status-line.js`, `scripts/status-line-fast.cjs`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:09.703Z",
+        "verifiedAt": "2026-05-17T16:32:08.421Z",
         "totalClaims": 10,
         "verifiedClaims": 10,
         "verificationRatio": 1,
@@ -2346,7 +2428,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -2459,7 +2549,7 @@
     "metadata": {
       "scope": "MkDocs site build and `docs-content/` source tree",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:05.103Z",
+        "verifiedAt": "2026-05-17T16:31:58.392Z",
         "totalClaims": 6,
         "verifiedClaims": 6,
         "verificationRatio": 1,
@@ -2475,7 +2565,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -2553,7 +2651,7 @@
     "metadata": {
       "scope": "`scripts/launch-agent-common.sh` and `free-coding-ports.sh` — host-side container launch and port conflict resolution",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:03.553Z",
+        "verifiedAt": "2026-05-17T16:31:55.722Z",
         "totalClaims": 3,
         "verifiedClaims": 3,
         "verificationRatio": 1,
@@ -2569,7 +2667,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -2647,7 +2753,7 @@
     "metadata": {
       "scope": "SafeDatabase.js and the SQLite corruption/restore pipeline",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.290Z",
+        "verifiedAt": "2026-05-17T16:32:01.106Z",
         "totalClaims": 8,
         "verifiedClaims": 8,
         "verificationRatio": 1,
@@ -2663,7 +2769,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -2711,7 +2825,7 @@
     "metadata": {
       "scope": "integrations/system-health-dashboard/server.js — the port 3033 API backend",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:09.335Z",
+        "verifiedAt": "2026-05-17T16:32:08.041Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -2727,7 +2841,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -2805,7 +2927,7 @@
     "metadata": {
       "scope": "`scripts/health-coordinator.js` — ETM process lifecycle manager and coordinator tick loop",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:22.521Z",
+        "verifiedAt": "2026-05-17T16:32:19.648Z",
         "totalClaims": 6,
         "verifiedClaims": 5,
         "verificationRatio": 0.833,
@@ -2889,7 +3011,7 @@
     "metadata": {
       "scope": "Git repo structure, SSH/HTTPS auth, submodule management, rebase conflicts for `rapid-automations`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:22.944Z",
+        "verifiedAt": "2026-05-17T16:32:20.071Z",
         "totalClaims": 5,
         "verifiedClaims": 5,
         "verificationRatio": 1,
@@ -2961,7 +3083,7 @@
     "metadata": {
       "scope": "The directory structure for LSL classification logs, system logs, and coordinator output files under `.specstory/`.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.690Z",
+        "verifiedAt": "2026-05-17T16:32:01.896Z",
         "totalClaims": 12,
         "verifiedClaims": 12,
         "verificationRatio": 1,
@@ -2977,7 +3099,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3025,7 +3155,7 @@
     "metadata": {
       "scope": "The React/Sigma.js viewer application under `integrations/operational-knowledge-management/viewer/`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:18.802Z",
+        "verifiedAt": "2026-05-17T16:32:15.905Z",
         "totalClaims": 14,
         "verifiedClaims": 14,
         "verificationRatio": 1,
@@ -3137,7 +3267,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Same MCP server config topic, agent-scoping is implicit in the canonical version",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:03.553Z",
+        "verifiedAt": "2026-05-17T16:31:55.722Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -3153,7 +3283,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3177,7 +3315,7 @@
     "metadata": {
       "scope": "Constraint rule definitions enforcing canonical PlantUML output paths, and the documentation-style skill that distributes those rules to all coding agents.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:24.471Z",
+        "verifiedAt": "2026-05-17T16:32:21.650Z",
         "totalClaims": 6,
         "verifiedClaims": 4,
         "verificationRatio": 0.667,
@@ -3258,7 +3396,7 @@
     "metadata": {
       "scope": "The `coding.code-workspace` file and git extension settings controlling which repositories appear in the VS Code SCM panel.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.551Z",
+        "verifiedAt": "2026-05-17T16:32:01.125Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -3274,7 +3412,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3322,7 +3468,7 @@
     "metadata": {
       "scope": "The system that captures, routes, and stores real-time coding session logs into `.specstory/history/` markdown files.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:00.498Z",
+        "verifiedAt": "2026-05-17T16:32:23.066Z",
         "totalClaims": 3,
         "verifiedClaims": 3,
         "verificationRatio": 1,
@@ -3338,7 +3484,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3393,7 +3547,7 @@
     "metadata": {
       "scope": "Plugin that pre-truncates oversized compaction payloads before OpenCode sends them to the Copilot API",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:01.132Z",
+        "verifiedAt": "2026-05-17T16:32:24.049Z",
         "totalClaims": 6,
         "verifiedClaims": 4,
         "verificationRatio": 0.667,
@@ -3418,7 +3572,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3466,7 +3628,7 @@
     "metadata": {
       "scope": "The Next.js dashboard and its supervisor/Docker configuration at `integrations/mcp-constraint-monitor/dashboard/`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:20.987Z",
+        "verifiedAt": "2026-05-17T16:32:18.109Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -3538,7 +3700,7 @@
     "metadata": {
       "scope": "The mechanism for storing LSL/SpecStory session history in a separate private `<project>-history` repo, and the tooling to migrate existing public repos to this pattern.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:07.358Z",
+        "verifiedAt": "2026-05-17T16:32:03.552Z",
         "totalClaims": 10,
         "verifiedClaims": 8,
         "verificationRatio": 0.8,
@@ -3563,7 +3725,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3611,7 +3781,7 @@
     "metadata": {
       "scope": "Performance tuning of the `coding-services` Docker container to reduce CPU usage during idle periods (no active clients).",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:07.839Z",
+        "verifiedAt": "2026-05-17T16:32:04.952Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -3627,7 +3797,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3687,7 +3865,7 @@
       "consolidatedAt": "2026-05-17T11:30:35.573Z",
       "consolidationReason": "Auto-refresh is a feature of the dashboard, not a separate concept",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:00.426Z",
+        "verifiedAt": "2026-05-17T16:32:22.996Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -3703,7 +3881,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3727,7 +3913,7 @@
     "metadata": {
       "scope": "Catalog of reusable automation components (tools, plugins, skills) for enterprise workflows.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:03.533Z",
+        "verifiedAt": "2026-05-17T16:32:28.622Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -3743,7 +3929,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3771,7 +3965,7 @@
     "metadata": {
       "scope": "Programmatic extraction of full Teams channel message history using the Microsoft Graph API.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:03.534Z",
+        "verifiedAt": "2026-05-17T16:32:28.623Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -3787,7 +3981,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3812,7 +4014,7 @@
     "metadata": {
       "scope": "Pipeline for extracting, enriching, and rendering a full Teams channel message history into a formatted markdown report.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:03.534Z",
+        "verifiedAt": "2026-05-17T16:32:28.623Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -3828,7 +4030,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3876,7 +4086,7 @@
     "metadata": {
       "scope": "`.specstory/history/` session log files — their storage, size management, and use for context continuity.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:03.895Z",
+        "verifiedAt": "2026-05-17T16:31:56.961Z",
         "totalClaims": 3,
         "verifiedClaims": 3,
         "verificationRatio": 1,
@@ -3892,7 +4102,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -3940,7 +4158,7 @@
     "metadata": {
       "scope": "The `mcp-constraint-monitor` dashboard service split between Docker and host",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:04.927Z",
+        "verifiedAt": "2026-05-17T16:31:57.971Z",
         "totalClaims": 5,
         "verifiedClaims": 4,
         "verificationRatio": 0.8,
@@ -3961,7 +4179,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4009,7 +4235,7 @@
     "metadata": {
       "scope": "The VKB API entity endpoints and GraphDatabaseService that back the working memory module's KG <USER_ID_REDACTED>.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.147Z",
+        "verifiedAt": "2026-05-17T16:32:00.961Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -4025,7 +4251,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4073,16 +4307,11 @@
     "metadata": {
       "scope": "The shared `consolidation-progress.tsx` component and its integration with the digests/insights dashboard pages",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.551Z",
+        "verifiedAt": "2026-05-17T16:32:01.124Z",
         "totalClaims": 3,
-        "verifiedClaims": 2,
-        "verificationRatio": 0.667,
-        "staleClaims": [
-          {
-            "raw": "src/components/consolidation-progress.tsx",
-            "type": "PATH"
-          }
-        ],
+        "verifiedClaims": 3,
+        "verificationRatio": 1,
+        "staleClaims": [],
         "searchRoots": [
           "/Users/Q284340/Agentic/coding",
           "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
@@ -4094,7 +4323,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4142,16 +4379,11 @@
     "metadata": {
       "scope": "The refactor that eliminated all native/Docker-mode branching from service scripts, treating Docker as the only supported runtime.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:07.766Z",
+        "verifiedAt": "2026-05-17T16:32:04.592Z",
         "totalClaims": 6,
-        "verifiedClaims": 5,
-        "verificationRatio": 0.833,
-        "staleClaims": [
-          {
-            "raw": "SIGUSR",
-            "type": "SYMBOL"
-          }
-        ],
+        "verifiedClaims": 6,
+        "verificationRatio": 1,
+        "staleClaims": [],
         "searchRoots": [
           "/Users/Q284340/Agentic/coding",
           "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
@@ -4163,7 +4395,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4211,7 +4451,7 @@
     "metadata": {
       "scope": "`config/health-verification-rules.json` and the `bind_mount_freshness` rule type that can trigger container recreate loops when stale.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:09.195Z",
+        "verifiedAt": "2026-05-17T16:32:07.897Z",
         "totalClaims": 4,
         "verifiedClaims": 3,
         "verificationRatio": 0.75,
@@ -4232,7 +4472,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4280,7 +4528,7 @@
     "metadata": {
       "scope": "The `okb-ingest` agent skill definition hardlinked at `integrations/rapid-toolkit/.agents/skills/okb-ingest/SKILL.md` and `.opencode/skills/okb-ingest/SKILL.md`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:18.802Z",
+        "verifiedAt": "2026-05-17T16:32:15.906Z",
         "totalClaims": 2,
         "verifiedClaims": 2,
         "verificationRatio": 1,
@@ -4330,7 +4578,7 @@
       ],
       "facetGroupedAt": "2026-05-17T11:30:35.573Z",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:24.472Z",
+        "verifiedAt": "2026-05-17T16:32:21.650Z",
         "totalClaims": 4,
         "verifiedClaims": 4,
         "verificationRatio": 1,
@@ -4402,7 +4650,7 @@
     "metadata": {
       "scope": "Process for removing leaked secrets from git history and configuring ongoing redaction",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:05.104Z",
+        "verifiedAt": "2026-05-17T16:31:58.392Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -4418,7 +4666,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4466,15 +4722,11 @@
     "metadata": {
       "scope": "The `brandschutz-agent/` TypeScript + Mastra system that automates the <COMPANY_NAME_REDACTED> SuccessFactors fire safety e-learning course.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:02.653Z",
+        "verifiedAt": "2026-05-17T16:32:26.780Z",
         "totalClaims": 9,
-        "verifiedClaims": 5,
-        "verificationRatio": 0.556,
+        "verifiedClaims": 6,
+        "verificationRatio": 0.667,
         "staleClaims": [
-          {
-            "raw": "src/llm/provider.ts",
-            "type": "PATH"
-          },
           {
             "raw": "buildProxyFetch()",
             "type": "FUNCTION"
@@ -4499,7 +4751,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4520,7 +4780,7 @@
     "metadata": {
       "scope": "All Python tool packages under `rapid-toolkit/tools/`, specifically the `uv.lock` lockfile commit policy.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:22.944Z",
+        "verifiedAt": "2026-05-17T16:32:20.071Z",
         "totalClaims": 2,
         "verifiedClaims": 2,
         "verificationRatio": 1,
@@ -4622,7 +4882,7 @@
     "metadata": {
       "scope": "OKB BASELINE GUARD hook in the `operational-knowledge-management` submodule",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:03.827Z",
+        "verifiedAt": "2026-05-17T16:31:56.587Z",
         "totalClaims": 2,
         "verifiedClaims": 1,
         "verificationRatio": 0.5,
@@ -4643,7 +4903,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4691,7 +4959,7 @@
     "metadata": {
       "scope": "Context window percentage field in the GSD toolbar/statusline hook",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:05.104Z",
+        "verifiedAt": "2026-05-17T16:31:58.392Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -4707,7 +4975,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4755,7 +5031,7 @@
     "metadata": {
       "scope": "Log rotation configuration for health monitor daemons and cleanup of stale `.health/` JSON files from abandoned projects.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:09.266Z",
+        "verifiedAt": "2026-05-17T16:32:07.970Z",
         "totalClaims": 5,
         "verifiedClaims": 5,
         "verificationRatio": 1,
@@ -4771,7 +5047,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4796,7 +5080,7 @@
     "metadata": {
       "scope": "How skills, commands, and instructions are distributed to and discovered by each coding agent (Claude, OpenCode, Copilot, Mastra, GSD)",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:02.936Z",
+        "verifiedAt": "2026-05-17T16:32:27.250Z",
         "totalClaims": 4,
         "verifiedClaims": 3,
         "verificationRatio": 0.75,
@@ -4817,7 +5101,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4837,7 +5129,7 @@
     "metadata": {
       "scope": "Self-contained browser game submission in `teams/daFrankTeam/`",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:03.310Z",
+        "verifiedAt": "2026-05-17T16:32:32.357Z",
         "totalClaims": 7,
         "verifiedClaims": 7,
         "verificationRatio": 1,
@@ -4853,7 +5145,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4901,7 +5201,7 @@
     "metadata": {
       "scope": "Schema migration and backfill logic to attribute observations to their source project and filter out cross-project contamination.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:06.290Z",
+        "verifiedAt": "2026-05-17T16:32:01.106Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -4917,7 +5217,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -4965,7 +5273,7 @@
     "metadata": {
       "scope": "`scripts/start-services-robust.js` — service startup and port-binding reliability",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:22.944Z",
+        "verifiedAt": "2026-05-17T16:32:20.071Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -5008,7 +5316,7 @@
     "metadata": {
       "scope": "The online learning sub-system (code graph ingestion, batch analysis, knowledge persistence) and its health indicator in the tmux statusline.",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:03.962Z",
+        "verifiedAt": "2026-05-17T16:32:29.529Z",
         "totalClaims": 1,
         "verifiedClaims": 1,
         "verificationRatio": 1,
@@ -5024,7 +5332,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -5043,7 +5359,7 @@
     "metadata": {
       "scope": "UI layout bug in `App.tsx` / `nav-bar.tsx` specific to the Token Usage tab",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T16:12:22.944Z",
+        "verifiedAt": "2026-05-17T16:32:20.071Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -5090,7 +5406,7 @@
     "metadata": {
       "scope": "Git remote push workflow for `integrations/` submodules to GitHub",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T15:00:09.703Z",
+        "verifiedAt": "2026-05-17T16:32:08.421Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -5106,7 +5422,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -5128,7 +5452,7 @@
     "metadata": {
       "scope": "HTTP retrieval endpoint combining vector and keyword search with RRF fusion and token budgeting",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:03.066Z",
+        "verifiedAt": "2026-05-17T16:32:33.776Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -5144,7 +5468,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },
@@ -5163,7 +5495,7 @@
     "metadata": {
       "scope": "Single-page application scaffold for a searchable skills/information hub (AI Kraken project)",
       "codeVerification": {
-        "verifiedAt": "2026-05-17T14:57:04.641Z",
+        "verifiedAt": "2026-05-17T16:32:30.871Z",
         "totalClaims": 0,
         "verifiedClaims": 0,
         "verificationRatio": 1,
@@ -5179,7 +5511,15 @@
           "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
           "/Users/Q284340/Agentic/_work/resi",
           "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template"
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
         ]
       }
     },

@@ -24892,5 +24892,114 @@
     "modifiedFiles": [
       "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
     ]
+  },
+  {
+    "id": "72ad032c-0f71-4394-88c0-8ba74e55e802",
+    "summary": "Intent: Fix both identified issues and apply decay to observations.\nApproach: Applied fixes and decay logic to the observation consolidator, then verified corpus-wide stats improved.\nArtifacts: edited src/live-logging/ObservationConsolidator.js\nResult: Corpus now has 0 stale, 7 partial, 54 fresh observations with an average freshness ratio of 0.925.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T16:11:46.161Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "dee7d373-4284-45f0-addf-6c04853f8e19",
+    "summary": "Intent: Fix two stale/partial observation entries and run confidence decay\nApproach: Extended verifier with submodule traversal and path-suffix fallback to find files in subprojects, then repaired artifact paths for two observations, and ran decay to clear stale flags when ratios recovered.\nArtifacts: edited src/live-logging/ObservationConsolidator.js\nResult: Corpus went from 1 stale to 0 stale, 9 partial to 7 partial, average ratio improved from 0.9 to 0.925; two observations fixed to FRESH (1.00); stale drag flag cleared on recovery but confidence held at 0.87 with no refund.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T16:11:46.161Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "d562b992-8e79-433d-afd8-44f589f95714",
+    "summary": "Intent: Run the knowledge base verifier across all projects in the corpus.\nApproach: Executed verification scripts against all 7 projects in the SQLite observations database, checking freshness ratios for each stored insight.\nArtifacts: edited ObservationConsolidator.js\nResult: All 61 insights verified with 0 stale entries; 55 fresh, 6 partial (ratios 0.50–0.67); overall average ratio 0.94. Six partial insights identified as candidates for next compaction cycle.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-17T16:31:28.471Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "df89dfbd-39b9-4d66-9aea-f9aa6c52f403",
+    "summary": "Intent: Design and implement an insights viewer extension showing truthfulness/coverage metrics, a per-project heatmap of insight <USER_ID_REDACTED>, and clickable insight elements linking to detail reports.\nApproach: Leverage existing `metadata.codeVerification` data already stored in SQLite for per-insight badges and detail panels (pure frontend), add `referencedFiles` to verification metadata, and compute project-level aggregates on-demand via a new API endpoint to avoid schema migrations or sync jobs.\nArtifacts: edited ObservationConsolidator.js\nResult: A design was proposed (not yet implemented) covering: colored truthfulness badges on insight rows, an expandable detail panel with claim breakdowns and stale claims, a per-project heatmap tab with clickable tiles, a new `GET /api/projects/:project/coverage` endpoint, and extending `codeVerification` with `referencedFiles`. No code was written; the assistant awaited approval to begin.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T16:35:54.881Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "9e5bb008-ef3d-46b2-b555-f64c423575a1",
+    "summary": "Intent: [confirmed building a previously discussed feature]\nApproach: Extended the ObservationConsolidator verifier to capture referencedFiles as part of the consolidation logic.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: ObservationConsolidator updated to capture and track referencedFiles during observation verification/consolidation.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T16:40:37.648Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "b2aa3a58-1913-4ea6-88d8-cc404efdab80",
+    "summary": "Intent: Approve and build a previously discussed feature or implementation\nApproach: Built the planned solution by implementing changes to the ObservationConsolidator.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: ObservationConsolidator.js was modified, likely to extend observation consolidation logic with referencedFiles backfill support; syntax verified successfully.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T16:40:37.648Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "81d9a120-6364-471d-856f-a7b5488fcf7e",
+    "summary": "Intent: [user approved building a feature — context suggests adding referencedFiles capture to ObservationConsolidator and exposing it via API]\nApproach: Extended the consolidator to capture referencedFiles data, then added or updated an API endpoint in the observations server to expose it.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js, edited /Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs\nResult: ObservationConsolidator now tracks referencedFiles in observations, and the API server was updated to support querying this data via an endpoint.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-17T16:40:37.648Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ]
   }
 ]
