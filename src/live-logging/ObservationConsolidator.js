@@ -1676,39 +1676,91 @@ export class ObservationConsolidator {
   }
 
   /**
-   * Decay confidence of insights that haven't been updated recently.
-   * Reduces confidence by 0.05 per week of inactivity, flooring at 0.3.
+   * Decay confidence of insights, combining two pressures:
+   *
+   *   - Age drag: -0.05 per full week since `last_updated`.
+   *   - Truthfulness drag: when `metadata.codeVerification.verificationRatio`
+   *     is below 0.5, apply an additional one-shot subtractor proportional
+   *     to (0.5 - ratio) * 0.4. A 0.0-ratio insight loses up to 0.2 from
+   *     confidence, on top of age decay. We track `staleDragApplied: true`
+   *     in metadata so re-running this pass doesn't repeatedly subtract
+   *     for the same stale state — it only fires once per stale verdict
+   *     and resets when the ratio climbs back above 0.5.
+   *
+   * Floor stays at 0.3 (matches the previous behaviour).
    */
   _decayConfidence() {
     if (!this.db) return;
 
     const DECAY_PER_WEEK = 0.05;
     const MIN_CONFIDENCE = 0.3;
+    const STALE_PENALTY_THRESHOLD = 0.5;
+    const STALE_PENALTY_MAX = 0.2;  // (0.5 - 0) * 0.4
 
     const insights = this.db.prepare(
-      'SELECT id, confidence, last_updated FROM insights'
+      `SELECT id, confidence, last_updated,
+              json_extract(metadata, '$.codeVerification.verificationRatio') AS ratio,
+              json_extract(metadata, '$.staleDragApplied') AS staleDragApplied
+       FROM insights`
     ).all();
 
     const now = Date.now();
-    const update = this.db.prepare(
+    const updateConfidence = this.db.prepare(
       'UPDATE insights SET confidence = ? WHERE id = ?'
+    );
+    const updateMeta = this.db.prepare(
+      "UPDATE insights SET metadata = json_patch(COALESCE(metadata, '{}'), ?) WHERE id = ?"
     );
 
     let decayed = 0;
+    let stalePenalised = 0;
+    let staleReset = 0;
+
     for (const ins of insights) {
+      let next = ins.confidence;
+
+      // 1. Age drag.
       const lastUpdated = new Date(ins.last_updated).getTime();
       const weeksStale = (now - lastUpdated) / (7 * 86400000);
-      if (weeksStale < 1) continue;
+      if (weeksStale >= 1) {
+        next = Math.max(MIN_CONFIDENCE, next - (DECAY_PER_WEEK * Math.floor(weeksStale)));
+      }
 
-      const newConfidence = Math.max(MIN_CONFIDENCE, ins.confidence - (DECAY_PER_WEEK * Math.floor(weeksStale)));
-      if (newConfidence < ins.confidence) {
-        update.run(newConfidence, ins.id);
+      // 2. Truthfulness drag — only when verification ratio is set and below
+      // the threshold AND the penalty hasn't already been applied for this
+      // stale state.
+      const ratio = Number(ins.ratio);
+      const alreadyPenalised = Boolean(ins.staleDragApplied);
+      let metaPatch = null;
+
+      if (Number.isFinite(ratio) && ratio < STALE_PENALTY_THRESHOLD) {
+        if (!alreadyPenalised) {
+          const penalty = (STALE_PENALTY_THRESHOLD - ratio) * 0.4;
+          next = Math.max(MIN_CONFIDENCE, next - penalty);
+          metaPatch = { staleDragApplied: true, staleDragAt: new Date(now).toISOString() };
+          stalePenalised++;
+        }
+      } else if (alreadyPenalised) {
+        // Ratio recovered to >= 0.5 — clear the flag so a future drop
+        // re-applies the penalty. (No confidence refund: confidence only
+        // decays; refresh requires re-synthesis.)
+        metaPatch = { staleDragApplied: null, staleDragAt: null };
+        staleReset++;
+      }
+
+      if (next < ins.confidence) {
+        updateConfidence.run(next, ins.id);
         decayed++;
+      }
+      if (metaPatch) {
+        updateMeta.run(JSON.stringify(metaPatch), ins.id);
       }
     }
 
-    if (decayed > 0) {
-      process.stderr.write(`[Consolidator] Decayed confidence on ${decayed} stale insights\n`);
+    if (decayed > 0 || stalePenalised > 0 || staleReset > 0) {
+      process.stderr.write(
+        `[Consolidator] Confidence decay: ${decayed} aged, ${stalePenalised} newly-stale-penalised, ${staleReset} stale-flag-reset\n`
+      );
     }
   }
 

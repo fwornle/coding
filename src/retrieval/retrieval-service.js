@@ -143,6 +143,17 @@ export class RetrievalService {
     // cluster at 0.75-0.82 for single-project docs, so vector similarity alone
     // cannot discriminate topics. This step uses keyword overlap as a proxy.
     this._applyTopicRelevance(fused, query);
+
+    // Step 4.7: Freshness rerank — demote insights whose backticked code
+    // claims no longer exist on disk. The verifier (ObservationConsolidator.
+    // verifyInsights) writes metadata.codeVerification.verificationRatio for
+    // every insight on a 7-day cadence. We multiply rrfScore by
+    // 0.3 + 0.7 * ratio so a 1.0-ratio insight is unaffected, a 0.5-ratio
+    // insight gets ~0.65×, and a 0.0-ratio insight is heavily demoted (0.3×)
+    // without being filtered out entirely. Only applies to the `insights`
+    // tier; digests/kg_entities/observations don't have a verification field.
+    this._applyFreshnessRerank(fused);
+
     fused.sort((a, b) => b.rrfScore - a.rrfScore);
 
     // Step 5: Token-budgeted markdown assembly (semantic budget after WM)
@@ -285,6 +296,73 @@ export class RetrievalService {
           }
         }
       }
+    }
+  }
+
+  /**
+   * Demote insights whose verification ratio is below 1.0. The consolidator's
+   * verifier persists `metadata.codeVerification.verificationRatio` for every
+   * insight; we look it up via the supplied SQLite handle and scale the
+   * rrfScore by a floored linear function of the ratio.
+   *
+   *   ratio == 1.0 → multiplier 1.0   (no penalty)
+   *   ratio == 0.5 → multiplier 0.65  (mild)
+   *   ratio == 0.0 → multiplier 0.30  (heavy but still rankable)
+   *
+   * Only applies to results from the `insights` tier — digests/kg_entities/
+   * observations don't have a code-claim verification signal. Fails open: if
+   * no DB getter is configured, or the lookup raises, the results pass
+   * through unchanged.
+   *
+   * @param {Array<object>} results - Fused results with rrfScore
+   */
+  _applyFreshnessRerank(results) {
+    if (!Array.isArray(results) || results.length === 0) return;
+    if (!this.dbGetter) return;
+
+    const insightResults = results.filter(
+      (r) => r.tier === 'insights' && r.rrfScore && r.id != null
+    );
+    if (insightResults.length === 0) return;
+
+    let db;
+    try {
+      db = this.dbGetter();
+    } catch {
+      return;
+    }
+    if (!db) return;
+
+    // Batch-fetch verification ratios for every insight in scope.
+    const ids = [...new Set(insightResults.map((r) => String(r.id)))];
+    const placeholders = ids.map(() => '?').join(',');
+    let rows;
+    try {
+      rows = db.prepare(
+        `SELECT id,
+                json_extract(metadata, '$.codeVerification.verificationRatio') AS ratio
+         FROM insights
+         WHERE id IN (${placeholders})`
+      ).all(...ids);
+    } catch (err) {
+      process.stderr.write(
+        `[RetrievalService] Freshness rerank lookup failed (non-fatal): ${err.message}\n`
+      );
+      return;
+    }
+
+    const ratioById = new Map();
+    for (const row of rows) {
+      const r = Number(row.ratio);
+      if (Number.isFinite(r)) ratioById.set(String(row.id), r);
+    }
+
+    for (const result of insightResults) {
+      const ratio = ratioById.get(String(result.id));
+      if (ratio === undefined) continue;       // never verified — leave alone
+      if (ratio >= 1) continue;                // no penalty if fully fresh
+      const multiplier = 0.3 + 0.7 * Math.max(0, Math.min(1, ratio));
+      result.rrfScore *= multiplier;
     }
   }
 
