@@ -25,10 +25,42 @@ import Redis from 'ioredis';
 
 /**
  * Cosine threshold for treating a new insight as a near-duplicate of an
- * existing one. MiniLM-L6-v2 cosines for "any two project documents" floor
- * around 0.89-0.92, so genuine same-topic duplicates only emerge above ~0.93.
+ * existing one. MiniLM-L6-v2 cosines for any two project documents floor
+ * around 0.89-0.92 (shared project vocabulary lifts everything), so the
+ * dedup gate must sit above that to avoid false merges. 0.88 was the
+ * original calibration; we keep that for the embedding-only signal and
+ * rely on the topic-Jaccard secondary band to catch paraphrases that
+ * dip below it.
  */
-const INSIGHT_DEDUP_THRESHOLD = 0.93;
+const INSIGHT_DEDUP_THRESHOLD = 0.88;
+
+/**
+ * Floor for the *borderline* band: matches above this but below the strict
+ * dedup threshold are written as facets (cross-linked siblings) rather than
+ * merged. Sits just above the project-document floor so it surfaces only
+ * genuinely-related pairs, not the entire corpus.
+ */
+const INSIGHT_FACET_THRESHOLD = 0.83;
+
+/**
+ * Topic-Jaccard secondary band. Identifier-style tokenisation of the topic
+ * string (camelCase + space + hyphen split). Catches paraphrases where the
+ * embedding cosine is below threshold but the topics share core tokens
+ * (e.g. "LLM CLI Proxy" vs "LLM CLI Proxy — VPN/Corporate Network Detection").
+ */
+const INSIGHT_TOPIC_JACCARD_MERGE = 0.60;
+const INSIGHT_TOPIC_JACCARD_FACET = 0.30;
+
+/**
+ * Stopwords stripped from topic-tokenisation. Generic structural words
+ * ("system", "module", "service") are filtered because every architectural
+ * topic mentions them, so they contribute noise rather than identity.
+ */
+const TOPIC_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'into', 'via',
+  'system', 'module', 'service', 'component', 'subcomponent', 'detail',
+  'project', 'file', 'process', 'integration', 'integrations',
+]);
 
 /**
  * Cosine threshold for treating two same-date digests as a near-duplicate.
@@ -157,15 +189,52 @@ export class ObservationConsolidator {
   }
 
   /**
-   * Find an existing insight whose embedding is similar enough to the new
-   * entry that they should be treated as the same topic (entity resolution).
+   * Identifier-aware tokenisation for topic strings. Splits camelCase,
+   * snake_case, and hyphenated identifiers so "LLMProxy" matches "llm proxy".
+   * Used by the topic-Jaccard secondary dedup band.
+   */
+  _tokeniseTopic(text) {
+    if (!text) return new Set();
+    const split = String(text)
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+      .replace(/[_\-—]/g, ' ');
+    return new Set(
+      split
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((t) => t.length >= 3 && !TOPIC_STOPWORDS.has(t))
+    );
+  }
+
+  /**
+   * Jaccard similarity of two token sets.
+   */
+  _jaccard(a, b) {
+    if (!a || !b || a.size === 0 || b.size === 0) return 0;
+    let intersection = 0;
+    for (const t of a) if (b.has(t)) intersection++;
+    const union = a.size + b.size - intersection;
+    return intersection / union;
+  }
+
+  /**
+   * Find an existing insight similar enough to the new entry to warrant
+   * either a merge or a facet cross-link. Two signals are combined:
    *
-   * Embeds the entry's topic + summary via fastembed, queries the Qdrant
-   * `insights` collection, returns the top hit's id if cosine score is at
-   * or above INSIGHT_DEDUP_THRESHOLD. Returns null on any error or miss.
+   *   1. Embedding cosine over (topic + summary), via Qdrant.
+   *   2. Topic-string Jaccard with identifier-aware tokenisation.
    *
-   * @param {{ topic: string, summary: string }} entry
-   * @returns {Promise<string|null>}
+   * Cosine is the primary signal because it captures paraphrase; Jaccard
+   * is the safety net for short or LLM-renamed topics where the cosine
+   * sometimes dips below 0.82 despite obvious topical overlap.
+   *
+   * Returns a verdict object so callers can distinguish "absorb-into" vs
+   * "link-as-facet". `null` means no significant relationship.
+   *
+   * @param {{ topic: string, summary: string, project?: string }} entry
+   * @returns {Promise<{ id: string, verdict: 'merge' | 'facet', cosine: number, jaccard: number } | null>}
    */
   async _findSimilarInsightId(entry) {
     const tools = await this._getEmbedder();
@@ -179,15 +248,53 @@ export class ObservationConsolidator {
     const project = entry.project || 'unknown';
     const search = {
       vector,
-      limit: 1,
-      score_threshold: INSIGHT_DEDUP_THRESHOLD,
-      with_payload: false,
+      // Top-5: the strongest cosine match may still lose the verdict to a
+      // weaker-cosine sibling with a much stronger Jaccard. We pick the
+      // best combined verdict across the top-5.
+      limit: 5,
+      score_threshold: INSIGHT_FACET_THRESHOLD,
+      with_payload: true,
       with_vector: false,
       filter: { must: [{ key: 'project', match: { value: project } }] },
     };
     const results = await tools.qdrant.search('insights', search);
     if (!results || results.length === 0) return null;
-    return String(results[0].id);
+
+    const entryTopicTokens = this._tokeniseTopic(entry.topic || '');
+    let best = null;
+    for (const r of results) {
+      const candidateTopic = r.payload?.topic || '';
+      const candidateTokens = this._tokeniseTopic(candidateTopic);
+      const jac = this._jaccard(entryTopicTokens, candidateTokens);
+      const cos = Number(r.score) || 0;
+
+      // Verdict precedence (strongest wins):
+      //   cosine >= MERGE_THRESHOLD  OR  jaccard >= TOPIC_JACCARD_MERGE → 'merge'
+      //   cosine >= FACET_THRESHOLD  OR  jaccard >= TOPIC_JACCARD_FACET → 'facet'
+      let verdict = null;
+      if (cos >= INSIGHT_DEDUP_THRESHOLD || jac >= INSIGHT_TOPIC_JACCARD_MERGE) {
+        verdict = 'merge';
+      } else if (
+        cos >= INSIGHT_FACET_THRESHOLD ||
+        jac >= INSIGHT_TOPIC_JACCARD_FACET
+      ) {
+        verdict = 'facet';
+      } else {
+        continue;
+      }
+
+      // Among multiple candidates, prefer merges over facets; within the
+      // same verdict tier, pick the highest combined signal.
+      const combined = Math.max(cos, jac);
+      if (
+        !best ||
+        (verdict === 'merge' && best.verdict === 'facet') ||
+        (verdict === best.verdict && combined > Math.max(best.cosine, best.jaccard))
+      ) {
+        best = { id: String(r.id), verdict, cosine: cos, jaccard: jac };
+      }
+    }
+    return best;
   }
 
   /**
@@ -1147,10 +1254,10 @@ export class ObservationConsolidator {
     // awaits — so we precompute the merge targets here.
     for (const entry of insightEntries) {
       try {
-        entry._mergeTargetId = await this._findSimilarInsightId(entry);
+        entry._similarMatch = await this._findSimilarInsightId(entry);
       } catch (err) {
         process.stderr.write(`[Consolidator] Similarity check failed (non-fatal): ${err.message}\n`);
-        entry._mergeTargetId = null;
+        entry._similarMatch = null;
       }
 
       // Sanitize summary against any in-row corruption. Insights have no
@@ -1164,31 +1271,35 @@ export class ObservationConsolidator {
       } catch { /* fail open */ }
     }
 
+    let facetLinked = 0;
+
     const transaction = this.db.transaction(() => {
       for (const entry of insightEntries) {
         const project = entry.project || 'unknown';
         const entryDigestIds = entry._digestIds || [];
 
-        // Prefer embedding-based merge target (catches "Service" vs "System"
-        // type rewordings). Fall back to exact topic match — but scope by
-        // project so a same-named topic from another project can't capture
-        // this one.
+        // Resolve the similar-insight match into a 'merge' or 'facet' decision.
+        // Project scoping in _findSimilarInsightId already filters to the same
+        // project; we still re-validate here as defense-in-depth.
         let existing = null;
-        if (entry._mergeTargetId) {
+        let verdict = null;
+        if (entry._similarMatch) {
           existing = this.db.prepare(
-            'SELECT id, digest_ids, project FROM insights WHERE id = ?'
-          ).get(entry._mergeTargetId);
-          // Defense-in-depth: if the matched row's project disagrees,
-          // refuse the merge and fall back to insert.
+            'SELECT id, topic, digest_ids, metadata, project FROM insights WHERE id = ?'
+          ).get(entry._similarMatch.id);
           if (existing && (existing.project || 'unknown') !== project) existing = null;
+          if (existing) verdict = entry._similarMatch.verdict;
         }
+        // Fall back to exact topic-string match (cheap, catches the
+        // LLM-honoured "topic names should be stable" path).
         if (!existing) {
           existing = this.db.prepare(
-            'SELECT id, digest_ids, project FROM insights WHERE topic = ? AND project = ?'
+            'SELECT id, topic, digest_ids, metadata, project FROM insights WHERE topic = ? AND project = ?'
           ).get(entry.topic, project);
+          if (existing) verdict = 'merge';
         }
 
-        if (existing) {
+        if (existing && verdict === 'merge') {
           let existingDigestIds = [];
           try { existingDigestIds = JSON.parse(existing.digest_ids || '[]'); } catch { /* ok */ }
           const mergedDigestIds = [...new Set([...existingDigestIds, ...entryDigestIds])];
@@ -1210,6 +1321,66 @@ export class ObservationConsolidator {
           );
           embeddingQueue.push({ id: existing.id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
           updated++;
+        } else if (existing && verdict === 'facet') {
+          // Insert as a NEW insight, then cross-link both the new one and
+          // the existing match as facets of a shared parent topic. The
+          // parent topic is derived from the longest common identifier-prefix
+          // of the two topics; falls back to the existing topic if no
+          // meaningful prefix exists.
+          const newId = crypto.randomUUID();
+          this.db.prepare(`
+            INSERT INTO insights (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata, project)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            newId, this._redact(entry.topic), this._redact(entry.summary),
+            entry.confidence, JSON.stringify(entryDigestIds),
+            now, now,
+            this._redactPaths(JSON.stringify(entry.metadata || {})),
+            project
+          );
+
+          const parentTopic = this._deriveParentTopic(entry.topic, existing.topic);
+          const existingMeta = (() => {
+            try { return JSON.parse(existing.metadata || '{}'); } catch { return {}; }
+          })();
+          const existingRelated = new Set(
+            Array.isArray(existingMeta.relatedInsightIds) ? existingMeta.relatedInsightIds : []
+          );
+          existingRelated.add(newId);
+
+          // Patch the existing row's metadata to add the new sibling.
+          this.db.prepare(`
+            UPDATE insights
+            SET last_updated = ?,
+                metadata = json_patch(COALESCE(metadata, '{}'), ?)
+            WHERE id = ?
+          `).run(
+            now,
+            JSON.stringify({
+              parentTopic,
+              relatedInsightIds: [...existingRelated],
+              facetGroupedAt: now,
+            }),
+            existing.id
+          );
+
+          // Patch the new row with its own facet metadata.
+          this.db.prepare(`
+            UPDATE insights
+            SET metadata = json_patch(COALESCE(metadata, '{}'), ?)
+            WHERE id = ?
+          `).run(
+            JSON.stringify({
+              parentTopic,
+              relatedInsightIds: [existing.id, ...existingRelated].filter((x) => x !== newId),
+              facetGroupedAt: now,
+            }),
+            newId
+          );
+
+          embeddingQueue.push({ id: newId, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
+          created++;
+          facetLinked++;
         } else {
           const id = crypto.randomUUID();
           this.db.prepare(`
@@ -1257,15 +1428,91 @@ export class ObservationConsolidator {
 
     try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ok */ }
 
-    process.stderr.write(`[Consolidator] Insights: ${created} created, ${updated} updated (mirrored to KG as 'online' entities)\n`);
-    return { created, updated };
+    process.stderr.write(`[Consolidator] Insights: ${created} created, ${updated} updated, ${facetLinked} facet-linked (mirrored to KG as 'online' entities)\n`);
+    return { created, updated, facetLinked };
+  }
+
+  /**
+   * Derive a shared "parent topic" string from two sibling-facet topics.
+   *
+   * Looks for the longest common word-prefix using the same em-dash/colon
+   * convention the LLM uses (e.g. "Knowledge Context Injection — Embedding
+   * Pipeline" and "Knowledge Context Injection — Hook and Agent Adapters"
+   * share the prefix "Knowledge Context Injection"). When no meaningful
+   * prefix exists, falls back to the first topic so cross-links still have
+   * a coherent label.
+   *
+   * @param {string} topicA
+   * @param {string} topicB
+   * @returns {string}
+   */
+  _deriveParentTopic(topicA, topicB) {
+    if (!topicA || !topicB) return topicA || topicB || 'Related Topics';
+    // Split on word boundaries but preserve punctuation that matters for
+    // hierarchical topics (em-dash, en-dash, colon, slash).
+    const splitter = /\s+/;
+    const a = topicA.trim().split(splitter);
+    const b = topicB.trim().split(splitter);
+    const prefix = [];
+    const maxLen = Math.min(a.length, b.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (a[i].toLowerCase() === b[i].toLowerCase()) {
+        prefix.push(a[i]);
+      } else {
+        break;
+      }
+    }
+    if (prefix.length === 0) return topicA;
+    // Strip a trailing dash/colon/slash so "Foo —" becomes "Foo".
+    let result = prefix.join(' ').replace(/[—–:/-]+\s*$/, '').trim();
+    if (result.length < 3) return topicA;
+    return result;
+  }
+
+  /**
+   * Compaction cadence guard. Returns true if compactInsights() hasn't
+   * been run for at least COMPACTION_MIN_DAYS days for this project.
+   * Sentinel is a per-project file under `.data/`.
+   */
+  _isCompactionDue(project) {
+    const COMPACTION_MIN_DAYS = 7;
+    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+    const sentinelPath = path.join(projectRoot, '.data', `last-compaction-${project}.iso`);
+    try {
+      const raw = fs.readFileSync(sentinelPath, 'utf8').trim();
+      const last = new Date(raw).getTime();
+      if (Number.isFinite(last)) {
+        const daysSince = (Date.now() - last) / 86400000;
+        return daysSince >= COMPACTION_MIN_DAYS;
+      }
+    } catch { /* missing or unreadable -> due */ }
+    return true;
+  }
+
+  /**
+   * Record a successful compaction so subsequent run() invocations within
+   * COMPACTION_MIN_DAYS skip the LLM-expensive pass.
+   */
+  _markCompactionDone(project) {
+    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+    const sentinelPath = path.join(projectRoot, '.data', `last-compaction-${project}.iso`);
+    try {
+      fs.writeFileSync(sentinelPath, new Date().toISOString() + '\n');
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Compaction sentinel write failed (non-fatal): ${err.message}\n`);
+    }
   }
 
   /**
    * Run full consolidation pipeline: digests then insights.
+   *
+   * @param {Object} [options]
+   * @param {boolean} [options.includeToday=false]
+   * @param {boolean} [options.compaction=false]  enable periodic compactInsights() pass
+   * @param {string}  [options.compactionProject='coding']
    * @returns {Promise<Object>}
    */
-  async run({ includeToday = false } = {}) {
+  async run({ includeToday = false, compaction = false, compactionProject = 'coding' } = {}) {
     const digestResult = await this.consolidateAll({ includeToday });
     let insightResult = { created: 0, updated: 0 };
 
@@ -1284,6 +1531,24 @@ export class ObservationConsolidator {
 
     // Apply confidence decay to existing insights
     this._decayConfidence();
+
+    // Optional cadence-guarded compaction pass. Makes LLM calls per cluster,
+    // so gated to once per COMPACTION_MIN_DAYS by default and only run when
+    // explicitly opted in (via run({compaction: true})). Failures don't block
+    // the rest of the pipeline.
+    if (compaction && this._isCompactionDue(compactionProject)) {
+      try {
+        const compactResult = await this.compactInsights({ project: compactionProject, dryRun: false });
+        if (compactResult.merges > 0 || compactResult.facets > 0) {
+          process.stderr.write(
+            `[Consolidator] Compaction: ${compactResult.merges} merge(s), ${compactResult.facets} facet group(s), ${compactResult.separated} false-positive(s)\n`
+          );
+        }
+        this._markCompactionDone(compactionProject);
+      } catch (err) {
+        process.stderr.write(`[Consolidator] Compaction failed (non-fatal): ${err.message}\n`);
+      }
+    }
 
     // Self-heal any source='online' entities in the KG that lack an
     // incoming has_insight edge. Possible causes (all observed):
@@ -1409,6 +1674,295 @@ export class ObservationConsolidator {
     if (decayed > 0) {
       process.stderr.write(`[Consolidator] Decayed confidence on ${decayed} stale insights\n`);
     }
+  }
+
+  /**
+   * Periodic compaction pass over the entire insights corpus.
+   *
+   * Unlike synthesizeInsights() — which only sees freshly-unsynthesized
+   * digests — this method re-examines all stored insights, clusters them
+   * by embedding cosine + topic-Jaccard, and asks the LLM to decide for
+   * each multi-member cluster whether to MERGE, FACET-link, or treat as
+   * a false-positive (SEPARATE).
+   *
+   * Not auto-wired into run(); call explicitly (e.g. weekly cron) via
+   * scripts/compact-insights.mjs.
+   *
+   * @param {Object} [options]
+   * @param {string} [options.project='coding']  scope to one project
+   * @param {boolean} [options.dryRun=true]      preview only, no writes
+   * @param {boolean} [options.clustersOnly=false]  stop after clustering, no LLM calls
+   * @returns {Promise<{ clusters: number, merges: number, facets: number, separated: number, dryRun: boolean, clusterTopics?: string[][] }>}
+   */
+  async compactInsights({ project = 'coding', dryRun = true, clustersOnly = false } = {}) {
+    if (!this.db) throw new Error('Not initialized');
+
+    const insights = this.db.prepare(
+      'SELECT id, topic, summary, confidence, digest_ids, metadata, project FROM insights WHERE project = ?'
+    ).all(project);
+
+    if (insights.length < 2) {
+      return { clusters: 0, merges: 0, facets: 0, separated: 0, dryRun };
+    }
+
+    process.stderr.write(`[Compaction] Scanning ${insights.length} insights in project=${project}\n`);
+
+    // Pairwise similarity: prefer Qdrant for embedding cosine, fall back to
+    // local topic-Jaccard if the embedder is unavailable. Build adjacency
+    // at the facet threshold so both merge-candidates and facet-candidates
+    // end up in the same connected component (the LLM disambiguates).
+    const tools = await this._getEmbedder();
+    const adjacency = new Map(insights.map((i) => [i.id, new Set()]));
+
+    // Pre-compute topic tokens for the Jaccard signal. We require BOTH a
+    // non-trivial topic overlap (jaccard >= 0.15) AND a strong cosine
+    // (>= FACET_THRESHOLD) before an embedding-only edge is added.
+    // Cosine on its own connects too much because MiniLM lifts every pair
+    // of same-project documents into the 0.85-0.92 band.
+    const COSINE_EDGE_JACCARD_FLOOR = 0.15;
+    const topicTokens = new Map(
+      insights.map((i) => [i.id, this._tokeniseTopic(i.topic || '')])
+    );
+
+    if (tools) {
+      // For each insight, query Qdrant top-K and add edges above the facet
+      // threshold AND with non-trivial topic overlap. Saves an O(n^2)
+      // pairwise embed compared to the local path.
+      for (const ins of insights) {
+        const text = `${ins.topic ?? ''}\n\n${ins.summary ?? ''}`.trim();
+        if (!text) continue;
+        let vector;
+        try { vector = await tools.embed(text); } catch { continue; }
+        let results;
+        try {
+          results = await tools.qdrant.search('insights', {
+            vector,
+            limit: 8,
+            score_threshold: INSIGHT_FACET_THRESHOLD,
+            with_payload: false,
+            with_vector: false,
+            filter: { must: [{ key: 'project', match: { value: project } }] },
+          });
+        } catch { continue; }
+        for (const r of results || []) {
+          const otherId = String(r.id);
+          if (otherId === ins.id) continue;
+          if (!adjacency.has(otherId)) continue;  // stale Qdrant point
+          const jac = this._jaccard(topicTokens.get(ins.id), topicTokens.get(otherId));
+          if (jac < COSINE_EDGE_JACCARD_FLOOR) continue;
+          adjacency.get(ins.id).add(otherId);
+          adjacency.get(otherId).add(ins.id);
+        }
+      }
+    }
+
+    // Local topic-Jaccard augmentation — even if embeddings ran, this catches
+    // identifier-name overlap the embedder misses on short topic strings.
+    // The Jaccard alone must clear INSIGHT_TOPIC_JACCARD_FACET (0.30) — much
+    // stronger than the COSINE_EDGE_JACCARD_FLOOR used as a Jaccard sanity
+    // check above.
+    for (let i = 0; i < insights.length; i++) {
+      for (let j = i + 1; j < insights.length; j++) {
+        const jac = this._jaccard(
+          topicTokens.get(insights[i].id),
+          topicTokens.get(insights[j].id)
+        );
+        if (jac >= INSIGHT_TOPIC_JACCARD_FACET) {
+          adjacency.get(insights[i].id).add(insights[j].id);
+          adjacency.get(insights[j].id).add(insights[i].id);
+        }
+      }
+    }
+
+    // Connected-components clustering. Single-element components are dropped.
+    const visited = new Set();
+    const clusters = [];
+    for (const ins of insights) {
+      if (visited.has(ins.id)) continue;
+      const queue = [ins.id];
+      const cluster = [];
+      while (queue.length) {
+        const cur = queue.shift();
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        cluster.push(cur);
+        for (const n of adjacency.get(cur) || []) {
+          if (!visited.has(n)) queue.push(n);
+        }
+      }
+      if (cluster.length >= 2) clusters.push(cluster);
+    }
+
+    process.stderr.write(`[Compaction] Found ${clusters.length} multi-insight cluster(s)\n`);
+    if (clusters.length === 0) {
+      return { clusters: 0, merges: 0, facets: 0, separated: 0, dryRun };
+    }
+
+    const insightById = new Map(insights.map((i) => [i.id, i]));
+
+    // Early return for cluster-preview mode — no LLM calls, no DB writes.
+    if (clustersOnly) {
+      const clusterTopics = clusters.map((ids) =>
+        ids.map((id) => insightById.get(id).topic)
+      );
+      return {
+        clusters: clusters.length,
+        merges: 0,
+        facets: 0,
+        separated: 0,
+        dryRun,
+        clusterTopics,
+      };
+    }
+
+    let merges = 0;
+    let facets = 0;
+    let separated = 0;
+    const now = new Date().toISOString();
+
+    for (const clusterIds of clusters) {
+      const members = clusterIds.map((id) => insightById.get(id));
+      const prompt = this._buildCompactionPrompt(members);
+      const response = await this._callLLM(prompt, 'consolidator-compaction');
+      if (!response) {
+        process.stderr.write(`[Compaction] LLM call failed for cluster of ${members.length} — skipping\n`);
+        continue;
+      }
+      const verdict = this._parseCompactionVerdict(response);
+      if (!verdict) {
+        process.stderr.write(`[Compaction] Unparseable verdict for cluster of ${members.length} — skipping\n`);
+        continue;
+      }
+
+      const memberTopics = members.map((m) => `"${m.topic}"`).join(', ');
+      process.stderr.write(`[Compaction] Cluster verdict=${verdict.action}: ${memberTopics}\n`);
+
+      if (verdict.action === 'SEPARATE') {
+        separated++;
+        continue;
+      }
+
+      if (dryRun) {
+        if (verdict.action === 'MERGE') merges++;
+        else if (verdict.action === 'FACET') facets++;
+        continue;
+      }
+
+      // Pick canonical = highest digest count, breaking ties by confidence.
+      members.sort((a, b) => {
+        const dc = (JSON.parse(b.digest_ids || '[]').length) - (JSON.parse(a.digest_ids || '[]').length);
+        if (dc !== 0) return dc;
+        return b.confidence - a.confidence;
+      });
+      const canonical = members[0];
+      const others = members.slice(1);
+
+      const tx = this.db.transaction(() => {
+        if (verdict.action === 'MERGE') {
+          const allDigests = new Set(JSON.parse(canonical.digest_ids || '[]'));
+          for (const o of others) {
+            for (const d of JSON.parse(o.digest_ids || '[]')) allDigests.add(d);
+          }
+          this.db.prepare(`
+            UPDATE insights
+            SET digest_ids = ?, last_updated = ?,
+                metadata = json_patch(COALESCE(metadata, '{}'), ?)
+            WHERE id = ?
+          `).run(
+            JSON.stringify([...allDigests]),
+            now,
+            JSON.stringify({
+              absorbed: others.map((o) => ({ id: o.id, topic: o.topic })),
+              consolidatedAt: now,
+              consolidationReason: verdict.reason || 'compactInsights MERGE',
+            }),
+            canonical.id
+          );
+          for (const o of others) {
+            this.db.prepare('DELETE FROM insights WHERE id = ?').run(o.id);
+          }
+          merges++;
+        } else if (verdict.action === 'FACET') {
+          const parentTopic = verdict.parentTopic
+            || members.reduce((acc, m) => acc ? this._deriveParentTopic(acc, m.topic) : m.topic, '');
+          const ids = members.map((m) => m.id);
+          for (const m of members) {
+            const others = ids.filter((x) => x !== m.id);
+            this.db.prepare(`
+              UPDATE insights
+              SET last_updated = ?,
+                  metadata = json_patch(COALESCE(metadata, '{}'), ?)
+              WHERE id = ?
+            `).run(
+              now,
+              JSON.stringify({
+                parentTopic,
+                relatedInsightIds: others,
+                facetGroupedAt: now,
+              }),
+              m.id
+            );
+          }
+          facets++;
+        }
+      });
+      tx();
+    }
+
+    process.stderr.write(
+      `[Compaction] ${dryRun ? '(dry run)' : 'applied'}: ${merges} merge(s), ${facets} facet group(s), ${separated} false-positive(s)\n`
+    );
+    return { clusters: clusters.length, merges, facets, separated, dryRun };
+  }
+
+  /**
+   * Build the compaction LLM prompt for a cluster of related insights.
+   */
+  _buildCompactionPrompt(members) {
+    const cluster = members.map((m, i) => {
+      const digests = JSON.parse(m.digest_ids || '[]').length;
+      return `--- INSIGHT ${i + 1} ---
+id: ${m.id}
+topic: ${m.topic}
+confidence: ${m.confidence}
+digest_count: ${digests}
+summary:
+${(m.summary || '').slice(0, 1500)}`;
+    }).join('\n\n');
+
+    return {
+      system: `You are reviewing a cluster of insights that an automated similarity check flagged as potentially related. Decide one of three verdicts:
+
+MERGE — The insights describe the same subsystem, tool, or workflow. Different phrasings of one concept. Collapse into a single canonical insight.
+
+FACET — The insights describe distinct sub-topics of one larger concept. Each is a coherent, useful reference article on its own. Keep them all, but link them as facets of a shared parent.
+
+SEPARATE — The cluster is a false positive. The insights share vocabulary but cover unrelated subsystems. Do nothing.
+
+Respond with EXACTLY this structure:
+
+<verdict>
+<action>MERGE|FACET|SEPARATE</action>
+<reason>One sentence explaining the choice.</reason>
+<parentTopic>If FACET: the shared parent concept (e.g. "Knowledge Context Injection System"). Otherwise omit.</parentTopic>
+</verdict>`,
+      user: `Cluster of ${members.length} insights to review:\n\n${cluster}\n\nProvide your verdict.`,
+    };
+  }
+
+  /**
+   * Parse the LLM compaction response into a structured verdict.
+   * @returns {{action: 'MERGE'|'FACET'|'SEPARATE', reason: string, parentTopic?: string} | null}
+   */
+  _parseCompactionVerdict(response) {
+    const m = /<verdict>([\s\S]*?)<\/verdict>/i.exec(response || '');
+    if (!m) return null;
+    const block = m[1];
+    const action = (/<action>\s*(MERGE|FACET|SEPARATE)\s*<\/action>/i.exec(block) || [])[1];
+    const reason = ((/<reason>([\s\S]*?)<\/reason>/i.exec(block) || [])[1] || '').trim();
+    const parentTopic = ((/<parentTopic>([\s\S]*?)<\/parentTopic>/i.exec(block) || [])[1] || '').trim() || undefined;
+    if (!action) return null;
+    return { action: action.toUpperCase(), reason, parentTopic };
   }
 
   // --- LLM interaction ---
