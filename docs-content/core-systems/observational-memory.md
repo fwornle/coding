@@ -315,6 +315,43 @@ Insights extract persistent project knowledge from accumulated digests.
 
 Insights are now generated as structured reference articles with `## Purpose`, `## Architecture`, `## Key Files`, `## Usage`, and `## Troubleshooting` sections — optimized for context-priming injection rather than changelog-style summaries.
 
+### Truthfulness and Project Coverage
+
+Insights age. A file gets renamed, a function disappears, a route moves — and the LLM-synthesized prose that referenced it silently rots. The verifier (`scripts/verify-insight-claims.mjs`, backed by `ObservationConsolidator.verifyInsight`) extracts every backticked code claim from an insight summary and checks each against the live codebase. The dashboard surfaces the result.
+
+**What is verified.** A "claim" is anything in backticks — file paths, function names (`funcName()`), environment variables (`LLM_TIMEOUT`), HTTP routes (`GET /api/...`), and scoped packages (`@scope/name`). Each is resolved against:
+
+- the project repo itself
+- every submodule of it (so `integrations/operational-knowledge-management/viewer/...` resolves)
+- sibling `_work/*` checkouts (so cross-repo claims like `_work/rapid-llm-proxy/...` resolve)
+
+Paths use filesystem existence with a path-suffix fallback (handles insights written relative-to-subproject). Symbols, routes, env vars, and packages use `git grep -F`. The verifier re-runs every 7 days on a cadence guard; on-demand via the CLI script.
+
+**Bands.** `verificationRatio = verifiedClaims / totalClaims` is bucketed:
+
+| Band     | Ratio        | Pill colour | Consequence                                                   |
+|----------|--------------|-------------|---------------------------------------------------------------|
+| FRESH    | ≥ 0.70       | emerald     | full retrieval weight                                         |
+| PARTIAL  | 0.50 – 0.70  | amber       | retrieval `rrfScore *= 0.3 + 0.7 × ratio` for insight tier    |
+| STALE    | < 0.50       | rose        | additional one-shot confidence penalty up to `-0.20` (floor 0.30); cleared on recovery |
+
+**Where you see this in the dashboard.** The **Insights** page now renders a `FRESH N%` / `PARTIAL N%` / `STALE N%` pill next to the confidence pill on every insight card. Below the summary, a collapsible **Truthfulness** panel lists each stale claim by type (PATH, FUNCTION, ROUTE, …) so you can fix the insight or the underlying code. The freshness pill and the confidence pill are orthogonal — confidence is "how strongly was this supported at synthesis time, decayed since", freshness is "does what it says still exist".
+
+The new **Coverage** tab aggregates this per project: a tile grid (one tile per insight, sorted stalest-first, colour = ratio), aggregate FRESH/PARTIAL/STALE counts, distinct files referenced across all insights (`metadata.codeVerification.referencedFiles`), and component coverage against a hardcoded taxonomy with aliases — so e.g. `LiveLoggingSystem` is satisfied by mentions of "LSL", "transcript monitor", or "specstory". Tiles are deep-links: clicking one navigates to `/insights#insight-<uuid>`, which scrolls the target card into view and briefly highlights it.
+
+![Project Coverage tab with per-insight verification heatmap](../images/health-mon-insights-verification.png)
+
+**API.** `GET /api/projects/:project/coverage` (exposed on both `localhost:12436` and the dashboard's `localhost:3033`) returns:
+
+```jsonc
+{
+  "project": "coding",
+  "insights":  { "total": 33, "fresh": 31, "partial": 2, "stale": 0, "unverified": 0, "avgRatio": 0.95 },
+  "coverage":  { "filesReferenced": 101, "componentsMentioned": [...], "componentsMissing": [] },
+  "perInsight": [ { "id", "topic", "ratio", "totalClaims", "verifiedClaims", "staleClaimCount", "verifiedAt", "referencedFiles", ... } ]
+}
+```
+
 ### Running Consolidation
 
 ```bash
@@ -359,6 +396,8 @@ All endpoints below are exposed by **both** the host obs-api server (`localhost:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/insights` | GET | All insights, filterable by topic or text search |
+| `/api/insights/projects` | GET | Distinct project names for the insights filter dropdown |
+| `/api/projects/:project/coverage` | GET | Per-project truthfulness + coverage summary used by the Coverage tab (see [Truthfulness and Project Coverage](#truthfulness-and-project-coverage)) |
 
 ### Consolidation
 
