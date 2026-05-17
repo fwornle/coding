@@ -696,7 +696,8 @@ app.get('/api/insights', (req, res) => {
 
     const rows = db.prepare(`
       SELECT id, topic, summary, confidence, digest_ids as digestIds,
-             last_updated as lastUpdated, created_at as createdAt, project
+             last_updated as lastUpdated, created_at as createdAt, project,
+             metadata
       FROM insights ${whereClause}
       ORDER BY confidence DESC, last_updated DESC
     `).all(params);
@@ -704,6 +705,9 @@ app.get('/api/insights', (req, res) => {
     const data = rows.map(row => ({
       ...row,
       digestIds: JSON.parse(row.digestIds || '[]'),
+      metadata: row.metadata ? (() => {
+        try { return JSON.parse(row.metadata); } catch { return {}; }
+      })() : {},
     }));
 
     res.json({ data, total: data.length });
