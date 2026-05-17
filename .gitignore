@@ -284,3 +284,7 @@ logs/
 
 # fastembed ONNX model cache
 local_cache/
+
+# Per-machine sentinels for cadence-guarded consolidator passes
+.data/last-compaction-*.iso
+.data/last-verification-*.iso

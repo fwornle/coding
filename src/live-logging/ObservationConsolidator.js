@@ -1471,38 +1471,44 @@ export class ObservationConsolidator {
   }
 
   /**
-   * Compaction cadence guard. Returns true if compactInsights() hasn't
-   * been run for at least COMPACTION_MIN_DAYS days for this project.
-   * Sentinel is a per-project file under `.data/`.
+   * Generic cadence guard. Returns true when `<sentinelName>.iso` is missing,
+   * unreadable, or older than `minDays` for the given project.
+   *
+   * @param {string} sentinelName  e.g. 'last-compaction' or 'last-verification'
+   * @param {string} project
+   * @param {number} minDays
    */
-  _isCompactionDue(project) {
-    const COMPACTION_MIN_DAYS = 7;
+  _isCadenceDue(sentinelName, project, minDays) {
     const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
-    const sentinelPath = path.join(projectRoot, '.data', `last-compaction-${project}.iso`);
+    const sentinelPath = path.join(projectRoot, '.data', `${sentinelName}-${project}.iso`);
     try {
       const raw = fs.readFileSync(sentinelPath, 'utf8').trim();
       const last = new Date(raw).getTime();
       if (Number.isFinite(last)) {
-        const daysSince = (Date.now() - last) / 86400000;
-        return daysSince >= COMPACTION_MIN_DAYS;
+        return (Date.now() - last) / 86400000 >= minDays;
       }
-    } catch { /* missing or unreadable -> due */ }
+    } catch { /* missing/unreadable -> due */ }
     return true;
   }
 
   /**
-   * Record a successful compaction so subsequent run() invocations within
-   * COMPACTION_MIN_DAYS skip the LLM-expensive pass.
+   * Record that a cadence-guarded pass ran successfully.
    */
-  _markCompactionDone(project) {
+  _markCadenceDone(sentinelName, project) {
     const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
-    const sentinelPath = path.join(projectRoot, '.data', `last-compaction-${project}.iso`);
+    const sentinelPath = path.join(projectRoot, '.data', `${sentinelName}-${project}.iso`);
     try {
       fs.writeFileSync(sentinelPath, new Date().toISOString() + '\n');
     } catch (err) {
-      process.stderr.write(`[Consolidator] Compaction sentinel write failed (non-fatal): ${err.message}\n`);
+      process.stderr.write(`[Consolidator] ${sentinelName} sentinel write failed (non-fatal): ${err.message}\n`);
     }
   }
+
+  // Thin wrappers preserved so existing call sites keep working.
+  _isCompactionDue(project) { return this._isCadenceDue('last-compaction', project, 7); }
+  _markCompactionDone(project) { this._markCadenceDone('last-compaction', project); }
+  _isVerificationDue(project) { return this._isCadenceDue('last-verification', project, 7); }
+  _markVerificationDone(project) { this._markCadenceDone('last-verification', project); }
 
   /**
    * Run full consolidation pipeline: digests then insights.
@@ -1511,9 +1517,17 @@ export class ObservationConsolidator {
    * @param {boolean} [options.includeToday=false]
    * @param {boolean} [options.compaction=false]  enable periodic compactInsights() pass
    * @param {string}  [options.compactionProject='coding']
+   * @param {boolean} [options.verification=true]  enable periodic code-claim verification (default ON — cheap)
+   * @param {string[]} [options.verificationProjects=['coding']]
    * @returns {Promise<Object>}
    */
-  async run({ includeToday = false, compaction = false, compactionProject = 'coding' } = {}) {
+  async run({
+    includeToday = false,
+    compaction = false,
+    compactionProject = 'coding',
+    verification = true,
+    verificationProjects = ['coding'],
+  } = {}) {
     const digestResult = await this.consolidateAll({ includeToday });
     let insightResult = { created: 0, updated: 0 };
 
@@ -1548,6 +1562,27 @@ export class ObservationConsolidator {
         this._markCompactionDone(compactionProject);
       } catch (err) {
         process.stderr.write(`[Consolidator] Compaction failed (non-fatal): ${err.message}\n`);
+      }
+    }
+
+    // Cadence-guarded code-claim verification. Cheap (no LLM, just filesystem
+    // + git grep) and the only signal that catches insights silently going
+    // stale against codebase moves. ON by default; cadence keeps it from
+    // re-grepping the world on every consolidation.
+    if (verification) {
+      for (const proj of verificationProjects) {
+        if (!this._isVerificationDue(proj)) continue;
+        try {
+          const verResult = await this.verifyInsights({ project: proj, persist: true });
+          if (verResult.scanned > 0) {
+            process.stderr.write(
+              `[Consolidator] Verification (${proj}): ${verResult.freshCount} fresh, ${verResult.staleCount} stale, avg ratio ${verResult.avgRatio}\n`
+            );
+          }
+          this._markCadenceDone('last-verification', proj);
+        } catch (err) {
+          process.stderr.write(`[Consolidator] Verification failed for ${proj} (non-fatal): ${err.message}\n`);
+        }
       }
     }
 
@@ -2010,7 +2045,24 @@ export class ObservationConsolidator {
       let verified = false;
       if (c.type === 'PATH') {
         for (const root of roots) {
+          // Direct: root/claim
           if (fs.existsSync(path.join(root, c.needle))) { verified = true; break; }
+          // Path-claims often include the repo-name prefix (e.g.
+          // "rapid-llm-proxy/src/providers/foo.ts" when the search root is
+          // "/Users/.../_work/rapid-llm-proxy"). Strip the prefix and retry
+          // against the same root so the claim verifies inside its own repo.
+          const rootName = path.basename(root);
+          if (rootName && c.needle.startsWith(rootName + '/')) {
+            const stripped = c.needle.slice(rootName.length + 1);
+            if (fs.existsSync(path.join(root, stripped))) { verified = true; break; }
+          }
+          // Same shape but with one extra leading dir: "_work/rapid-llm-proxy/..."
+          // matches a root at ".../Agentic/_work/rapid-llm-proxy".
+          const parent = path.basename(path.dirname(root));
+          if (parent && c.needle.startsWith(parent + '/' + rootName + '/')) {
+            const stripped = c.needle.slice(parent.length + 1 + rootName.length + 1);
+            if (fs.existsSync(path.join(root, stripped))) { verified = true; break; }
+          }
         }
         // Also try as a tracked-file lookup in case the path is relative to
         // some nested directory (e.g. "src/token-usage.ts" lives in a sibling
