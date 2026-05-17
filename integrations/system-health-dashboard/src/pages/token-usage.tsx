@@ -133,7 +133,6 @@ function TreemapContent(props: {
   if (width < 40 || height < 30) return null
   return (
     <g>
-      <title>{`${name} — ${formatTokens(value)} tokens`}</title>
       <rect x={x} y={y} width={width} height={height} fill={fill} stroke="#1e1e2e" strokeWidth={2} rx={4} />
       {width > 60 && height > 40 && (
         <>
