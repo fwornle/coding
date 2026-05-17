@@ -8,6 +8,39 @@ When creating or modifying documentation artifacts, follow these guidelines stri
 
 ---
 
+## HARD RULES — File Placement (Constraint-Monitored)
+
+These rules are enforced by the constraint monitor. Violations trigger system health degradation.
+
+| Artifact | MUST be placed in | NEVER place in |
+|----------|-------------------|----------------|
+| `.puml` files | `docs/puml/` | Root, `src/`, temp dirs, or anywhere else |
+| Generated `.png` | `docs/images/` | Same dir as `.puml`, root, or temp dirs |
+| Image references in markdown | `![alt](docs/images/file.png)` | `![alt](./file.png)` or absolute paths |
+
+**When using tools that generate diagrams** (e.g., `semantic-analysis_generate_plantuml_diagrams`, `create_insight_report`):
+- Always specify output paths pointing to `docs/puml/` for `.puml` files
+- Always specify `docs/images/` for rendered PNG output
+- Use the `name` parameter as kebab-case without path — the tool writes to CWD, so run from `docs/puml/` or move files after generation
+- If a tool does NOT support specifying output directory, move the generated files immediately after creation
+
+**`semantic-analysis_generate_plantuml_diagrams` specific workflow:**
+1. Call the tool with `name` set to a kebab-case descriptor (e.g., `"constraint-monitor-architecture"`)
+2. After generation, immediately move output: `mv *.puml docs/puml/ && mv *.png docs/images/`
+3. Verify the generated `.puml` contains `!include _standard-style.puml` — add it if missing
+4. Update any markdown references to point to `docs/images/`
+
+**`semantic-analysis_create_insight_report` specific workflow:**
+- Insight reports with diagrams write to `.sa/insights/` by default — this is fine for internal analysis
+- If diagrams from insights need to be committed to docs, copy them to `docs/puml/` and `docs/images/`
+
+**PlantUML file naming** — MUST use `component-purpose.puml` kebab-case convention:
+- `constraint-monitor-architecture.puml` ✓
+- `ConstraintMonitorArchitecture.puml` ✗
+- `diagram-v2.puml` ✗ (incremental naming forbidden)
+
+---
+
 ## PlantUML Diagrams (.puml)
 
 ### File Naming Convention

@@ -398,7 +398,14 @@
       "Bash(curl -fs 'http://localhost:3032/api/observations?from=2026-04-01T00:00:00Z&to=2026-05-15T23:59:59Z&limit=50&offset=__TRACKED_VAR__')",
       "Bash(curl -fs \"http://localhost:3032/api/observations?from=2026-04-01T00:00:00Z&to=2026-05-15T23:59:59Z&limit=50&offset=1850\")",
       "Bash(/opt/homebrew/bin/claude -p \"reply OK\" --output-format json --model sonnet --tools \"\" --no-session-persistence)",
-      "Bash(/opt/homebrew/bin/node --version)"
+      "Bash(/opt/homebrew/bin/node --version)",
+      "Skill(gsd-phase)",
+      "Bash(touch /Users/Q284340/Agentic/_work/rapid-llm-proxy/src/.canary-write-test)",
+      "Bash(rm /Users/Q284340/Agentic/_work/rapid-llm-proxy/src/.canary-write-test)",
+      "Bash(cp -v docs/images/log-observations.png docs-content/images/log-observations.png)",
+      "Bash(cp -v docs/images/health-mon-tokens-usage.png docs-content/images/health-mon-tokens-usage.png)",
+      "Bash(cp -v docs/images/log-digests.png docs-content/images/log-digests.png)",
+      "Bash(cp -v docs/images/log-insights.png docs-content/images/log-insights.png)"
     ],
     "deny": [],
     "ask": []
