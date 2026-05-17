@@ -2116,9 +2116,17 @@ export class ObservationConsolidator {
             if (fs.existsSync(path.join(root, stripped))) { verified = true; break; }
           }
         }
-        // Also try as a tracked-file lookup in case the path is relative to
-        // some nested directory (e.g. "src/token-usage.ts" lives in a sibling
-        // repo under that exact relative path).
+        // Path-suffix lookup — handles insights using a relative-to-subproject
+        // convention (e.g. `viewer/src/index.css` for a file actually tracked
+        // at `integrations/<sub>/viewer/src/index.css`).
+        if (!verified) {
+          for (const root of roots) {
+            if (this._gitFileSuffixExists(root, c.needle)) { verified = true; break; }
+          }
+        }
+        // Last resort: tracked-file content match (catches cases where the
+        // path is mentioned in source/docs even though no file exactly at
+        // that path exists — usually a docs reference).
         if (!verified) {
           for (const root of roots) {
             if (this._gitGrepHasMatch(root, c.needle)) { verified = true; break; }
@@ -2188,15 +2196,18 @@ export class ObservationConsolidator {
   }
 
   /**
-   * Resolve the default set of search roots. The coding repo is the project
-   * root (derived from this.dbPath). Sibling repos under /Users/.../Agentic/_work/
-   * are included so cross-repo claims (e.g. `_work/rapid-llm-proxy/...`) can
-   * be verified.
+   * Resolve the default set of search roots. Includes:
+   *   - the coding project root (derived from this.dbPath)
+   *   - sibling repos under ../Agentic/_work/ (so cross-repo claims like
+   *     `_work/rapid-llm-proxy/...` can be verified)
+   *   - submodules of each of the above (so claims naming files inside
+   *     `integrations/operational-knowledge-management/viewer/...` resolve
+   *     even though the parent repo's `git ls-files` only shows the
+   *     submodule pointer, not its contents)
    */
   _defaultSearchRoots() {
     const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
     const roots = [projectRoot];
-    // Best-effort: look for sibling _work/ checkouts.
     const workParent = path.resolve(projectRoot, '..', '_work');
     if (fs.existsSync(workParent)) {
       try {
@@ -2208,7 +2219,54 @@ export class ObservationConsolidator {
         }
       } catch { /* unreadable — fall back to project root only */ }
     }
-    return roots;
+    // Submodule expansion: for each top-level root, list submodules and add
+    // them as their own search roots so files inside submodules verify too.
+    const submoduleRoots = [];
+    for (const root of roots) {
+      try {
+        const out = execFileSync(
+          'git', ['-C', root, 'submodule', 'status'],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }
+        );
+        for (const line of out.split('\n')) {
+          // Format: " <sha> <path> (...)" or "-<sha> <path>" or "+<sha> <path> (...)"
+          const m = /^[\s+\-U]?[0-9a-f]+\s+(\S+)/.exec(line);
+          if (m) {
+            const sub = path.join(root, m[1]);
+            if (fs.existsSync(path.join(sub, '.git'))) submoduleRoots.push(sub);
+          }
+        }
+      } catch { /* not a git repo, no submodules, or git unavailable */ }
+    }
+    return [...roots, ...submoduleRoots];
+  }
+
+  /**
+   * Path-suffix lookup: does any tracked file in this repo end with the
+   * claimed path? Used as a last resort when a PATH claim uses a relative
+   * convention (e.g. `viewer/src/utils/foo.ts` in an insight about an
+   * embedded sub-project, when the actual tracked file lives at
+   * `integrations/operational-knowledge-management/viewer/src/utils/foo.ts`).
+   *
+   * Requires at least 2 path segments in the claim — single-segment matches
+   * are too generic ("index.css" alone would verify everywhere).
+   */
+  _gitFileSuffixExists(root, pathClaim) {
+    const claim = String(pathClaim || '').replace(/\/+$/, '');
+    if (!claim) return false;
+    const segments = claim.split('/').filter(Boolean);
+    if (segments.length < 2) return false;
+    try {
+      const out = execFileSync(
+        'git', ['-C', root, 'ls-files'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024 * 1024 }
+      );
+      for (const line of out.split('\n')) {
+        if (line === claim) return true;
+        if (line.endsWith('/' + claim)) return true;
+      }
+    } catch { /* not a repo or too big */ }
+    return false;
   }
 
   /**
