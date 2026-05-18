@@ -2676,9 +2676,23 @@ export class ObservationConsolidator {
         ).all(...digestIds)
       : [];
 
-    if (digests.length === 0) {
-      const err = new Error(`Cannot re-synthesize ${insightId}: no source digests available (digest_ids may have been pruned)`);
-      err.code = 'NO_DIGESTS';
+    // Two source modes:
+    //   'digests' — normal path: re-synthesize from the surviving source
+    //               digests (the ground-truth narrative the insight was
+    //               originally built from).
+    //   'summary' — fallback: digests have been pruned (e.g. retention or
+    //               consolidation cleared them) but the insight summary
+    //               itself is preserved. Re-synthesize from the summary
+    //               alone, treating it as the source of truth. The post-
+    //               LLM verifier still validates output against the live
+    //               codebase, so false-claim risk is contained.
+    // Hard fail only when BOTH are missing — nothing left to regenerate from.
+    const sourceMode = digests.length > 0 ? 'digests' : 'summary';
+    if (sourceMode === 'summary' && (!insight.summary || insight.summary.trim().length < 50)) {
+      const err = new Error(
+        `Cannot re-synthesize ${insightId}: no source digests AND existing summary is empty/too short`
+      );
+      err.code = 'NO_SOURCE';
       throw err;
     }
 
@@ -2687,19 +2701,24 @@ export class ObservationConsolidator {
     // summary at the end of the pipeline so SQLite state stays consistent.
     const preVerify = this.verifyInsight(insight, { persist: false });
 
-    const digestBlock = digests
-      .map((d) => `[${d.date}] ${d.theme}\n${d.summary}`)
-      .join('\n\n---\n\n');
+    const digestBlock = sourceMode === 'digests'
+      ? digests.map((d) => `[${d.date}] ${d.theme}\n${d.summary}`).join('\n\n---\n\n')
+      : null;
 
     const prompt = this._buildResynthesisPrompt({
       topic: insight.topic,
       currentSummary: insight.summary || '',
       staleClaims: preVerify.staleClaims || [],
       digestBlock,
+      sourceMode,
       project: insight.project || 'unknown',
     });
 
-    process.stderr.write(`[Consolidator] Re-synthesizing insight ${insightId.slice(0, 8)} (${insight.topic}) from ${digests.length} digest(s); ${preVerify.staleClaims?.length || 0} stale claim(s) to drop\n`);
+    process.stderr.write(
+      `[Consolidator] Re-synthesizing insight ${insightId.slice(0, 8)} (${insight.topic}) — source=${sourceMode} `
+      + (sourceMode === 'digests' ? `(${digests.length} digest(s))` : `(summary fallback; ${digestIds.length} digest_id(s) reference pruned rows)`)
+      + `; ${preVerify.staleClaims?.length || 0} stale claim(s) to drop\n`
+    );
     const llmResponse = await this._callLLM(prompt, 'consolidator-resynthesize');
     if (!llmResponse) {
       const err = new Error(`LLM call failed during re-synthesis of ${insightId}`);
@@ -2798,6 +2817,9 @@ export class ObservationConsolidator {
       kgPushed,
       preStaleCount: preVerify.staleClaims?.length || 0,
       postStaleCount: postVerify.staleClaims?.length || 0,
+      sourceMode,  // 'digests' or 'summary' — what the LLM was grounded in
+      digestsAvailable: digests.length,
+      digestIdsReferenced: digestIds.length,
     };
   }
 
@@ -2805,29 +2827,85 @@ export class ObservationConsolidator {
    * Single-insight re-synthesis prompt. Same structured-reference-article
    * contract as the bulk path, but constrained to one insight and given
    * the explicit list of claims that need to be dropped or replaced.
+   *
+   * Two source modes:
+   *   'digests' — full path: the LLM gets the original source digests
+   *               as ground truth + the existing summary + stale list.
+   *   'summary' — fallback path when digests have been pruned: the LLM
+   *               gets ONLY the existing summary + stale list. The
+   *               prompt tightens to "use the summary itself as ground
+   *               truth, do not invent new facts, drop stale claims
+   *               unless you can confirm a replacement against the
+   *               surviving summary text". Post-LLM verifier validates
+   *               against the live codebase, so any hallucinated paths
+   *               surface as stale on the next pass.
    */
-  _buildResynthesisPrompt({ topic, currentSummary, staleClaims, digestBlock, project }) {
+  _buildResynthesisPrompt({ topic, currentSummary, staleClaims, digestBlock, sourceMode = 'digests', project }) {
     const staleBlock = (staleClaims || []).length === 0
-      ? '(verifier found no stale claims — the user is regenerating for another reason; refresh the summary against the source digests but keep the existing structure if it is still accurate)'
+      ? '(verifier found no stale claims — the user is regenerating for another reason; refresh the summary but keep the existing structure if it is still accurate)'
       : staleClaims.map((s) => `- [${s.type}] ${s.raw}`).join('\n');
 
-    return {
-      system: `You are the long-term memory of a software project. You are regenerating ONE existing insight because its content has decayed against the live codebase.
+    const isSummaryOnly = sourceMode === 'summary';
 
-CRITICAL CONSTRAINTS:
+    const constraintsBlock = isSummaryOnly
+      ? `CRITICAL CONSTRAINTS (SUMMARY-ONLY MODE — source digests pruned):
+- Produce EXACTLY ONE <insight> block, on the same topic as the input insight.
+- Keep the topic name STABLE — do not rename it.
+- DROP every claim listed under STALE CLAIMS. Do NOT replace them with new paths unless those exact paths/symbols also appear in the CURRENT SUMMARY's non-stale portions — the source digests are NOT available, so you have no other ground truth.
+- DO NOT invent file paths, function names, env vars, routes, or packages that don't appear verbatim in the current summary. Phantom claims will be flagged as stale on the next verification pass.
+- Structure the new summary as a REFERENCE ARTICLE: ## Purpose, ## Architecture, ## Key Files, ## Usage, ## Troubleshooting. Same contract as bulk synthesis.
+- It is BETTER to ship a shorter, more conservative insight than one padded with invented details. Confidence should reflect this — if you had to drop many claims and could not replace them, lower it accordingly.
+- No dates, no commit hashes, no changelog entries, no "previously..." narration.`
+      : `CRITICAL CONSTRAINTS:
 - Produce EXACTLY ONE <insight> block, on the same topic as the input insight.
 - Keep the topic name STABLE — do not rename it.
 - DROP every claim listed under STALE CLAIMS unless you can replace it with a current path/symbol/route that the source digests support.
 - DO NOT invent file paths, function names, env vars, or routes that don't appear in the source digests or in the existing (non-stale) summary.
 - Structure the new summary as a REFERENCE ARTICLE: ## Purpose, ## Architecture, ## Key Files, ## Usage, ## Troubleshooting. Same contract as bulk synthesis.
-- No dates, no commit hashes, no changelog entries, no "previously..." narration.
+- No dates, no commit hashes, no changelog entries, no "previously..." narration.`;
+
+    const confidenceGuidance = isSummaryOnly
+      ? '0.0-1.0 — without source digests, default toward 0.50–0.70. Higher only if the existing summary was already detailed and you dropped few claims.'
+      : '0.0-1.0 — set this based on how well the source digests still support the topic. If most claims were stale and digests are sparse, lower it; if digests strongly corroborate, raise it.';
+
+    const userBlock = isSummaryOnly
+      ? `Project: ${project}
+
+--- EXISTING INSIGHT (regenerate this — its source digests have been pruned, so the summary itself is now the ground truth) ---
+TOPIC: ${topic}
+CURRENT SUMMARY:
+${(currentSummary || '').slice(0, 6000)}
+
+--- STALE CLAIMS (the verifier could not find these in the codebase; drop them; replace only when a non-stale section of the current summary already names the replacement) ---
+${staleBlock}
+
+Produce ONE updated insight on the topic "${topic}". You are operating in SUMMARY-ONLY MODE: no source digests are available. Drop the stale claims. Do not invent new paths/symbols. Keep the same reference-article structure.`
+      : `Project: ${project}
+
+--- EXISTING INSIGHT (regenerate this) ---
+TOPIC: ${topic}
+CURRENT SUMMARY:
+${(currentSummary || '').slice(0, 4000)}
+
+--- STALE CLAIMS (the verifier could not find these in the codebase; drop or replace) ---
+${staleBlock}
+
+--- SOURCE DIGESTS (the ground-truth narrative this insight was built from) ---
+${digestBlock}
+
+Produce ONE updated insight on the topic "${topic}". Drop the stale claims. Replace them only with paths/symbols actually mentioned in the source digests or in the existing summary's non-stale portions. Keep the same reference-article structure.`;
+
+    return {
+      system: `You are the long-term memory of a software project. You are regenerating ONE existing insight because its content has decayed against the live codebase.
+
+${constraintsBlock}
 
 OUTPUT FORMAT:
 
 <insight>
 <topic>${topic}</topic>
 <scope>One concrete subsystem, tool, or workflow.</scope>
-<confidence>0.0-1.0 — set this based on how well the source digests still support the topic. If most claims were stale and digests are sparse, lower it; if digests strongly corroborate, raise it.</confidence>
+<confidence>${confidenceGuidance}</confidence>
 <summary>
 ## Purpose
 ...
@@ -2846,20 +2924,7 @@ OUTPUT FORMAT:
 </summary>
 </insight>`,
 
-      user: `Project: ${project}
-
---- EXISTING INSIGHT (regenerate this) ---
-TOPIC: ${topic}
-CURRENT SUMMARY:
-${(currentSummary || '').slice(0, 4000)}
-
---- STALE CLAIMS (the verifier could not find these in the codebase; drop or replace) ---
-${staleBlock}
-
---- SOURCE DIGESTS (the ground-truth narrative this insight was built from) ---
-${digestBlock}
-
-Produce ONE updated insight on the topic "${topic}". Drop the stale claims. Replace them only with paths/symbols actually mentioned in the source digests or in the existing summary's non-stale portions. Keep the same reference-article structure.`,
+      user: userBlock,
     };
   }
 

@@ -966,7 +966,12 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
   } catch (err) {
     process.stderr.write(`[obs-api] /insights/${id}/resynthesize error: ${err.message}\n`);
     if (err.code === 'NOT_FOUND') return res.status(404).json({ error: err.message });
-    if (err.code === 'NO_DIGESTS') return res.status(409).json({ error: err.message });
+    // NO_SOURCE: both the source digests AND a usable summary are missing.
+    // We can no longer fall back to summary-only synthesis. 409 because
+    // it's a conflict with current state, not a server error.
+    if (err.code === 'NO_SOURCE' || err.code === 'NO_DIGESTS') {
+      return res.status(409).json({ error: err.message });
+    }
     if (err.code === 'LLM_FAILED' || err.code === 'PARSE_FAILED') {
       return res.status(502).json({ error: err.message });
     }
