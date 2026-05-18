@@ -12668,14 +12668,14 @@
     },
     {
       "name": "MCP Server Configuration",
-      "entityType": "File",
+      "entityType": "Config",
       "observations": [
-        "## Purpose\nDefines which MCP (Model Context Protocol) servers are available to coding agents, scoped to the minimal set needed for semantic analysis, code graph querying, and constraint monitoring.\n\n## Architecture\nThree active MCP servers retained across all agent configs:\n- `mcp-server-semantic-analysis`\n- `code-graph-rag`\n- `constraint-monitor`\n\nAll other servers (browser-access, serena, serena-docs, spec-workflow, shadcn, context7, playwright, mcp-git-ingest, MCP_DOCKER) have been removed.\n\n## Key Files\n- `claude-code-mcp.json` — Claude agent MCP config\n- `claude-code-mcp-processed.json` — processed variant\n- `claude-code-mcp-docker.json` — Docker-mode variant\n- `install.sh` / `uninstall.sh` — installer; dead install functions for removed servers have been deleted\n- `~/.claude/settings.local.json` — local Claude settings\n\n## Usage\nAgent processes read these configs at startup to register available tools. Changes require agent restart to take effect.\n\n## Troubleshooting\n- **Agent attempts to call a removed MCP server**: Verify the config file no longer contains the server entry; check all four config variants\n- **install.sh references missing server**: Dead installer functions (`install_browserbase`, `install_mcp_servers`, `install_serena`, `install_shadcn_mcp`) have been removed; do not re-add without updating all four agent JSON configs simultaneously"
+        "## Purpose\nDefines which MCP (Model Context Protocol) servers are available to coding agents, scoped to the minimal set needed for semantic analysis, code graph querying, and constraint monitoring.\n\n## Architecture\nThree active MCP servers retained across all agent configs:\n- `mcp-server-semantic-analysis`\n- `code-graph-rag`\n- `constraint-monitor`\n\nAll other servers (browser-access, serena, serena-docs, spec-workflow, shadcn, context7, playwright, mcp-git-ingest, MCP_DOCKER) have been removed from the configuration.\n\n## Key Files\n- `claude-code-mcp.json` — primary Claude agent MCP config\n- `claude-code-mcp-processed.json` — processed variant of the config\n- `claude-code-mcp-docker.json` — Docker-mode variant\n- `install.sh` / `uninstall.sh` — installer scripts; dead install functions for removed servers have been deleted\n- `~/.claude/settings.local.json` — local Claude settings\n\n## Usage\nAgent processes read these configs at startup to register available tools. Changes to any config file require an agent restart to take effect. All four config variants (`claude-code-mcp.json`, `claude-code-mcp-processed.json`, `claude-code-mcp-docker.json`, and `~/.claude/settings.local.json`) must be kept in sync when adding or removing servers.\n\n## Troubleshooting\n- **Agent attempts to call a removed MCP server**: Verify the config file no longer contains the server entry; check all four config variants for consistency.\n- **install.sh references a missing server**: Dead installer functions (e.g., for browser-access, serena, shadcn, context7) have been removed; do not re-add without updating all four agent JSON configs simultaneously.\n- **Server fails to connect at startup**: Confirm the server binary/package is installed and reachable; context7 and code-graph-rag have previously shown connection failures that required separate diagnosis."
       ],
       "source": "online",
       "metadata": {
         "created_at": "2026-05-14T15:27:43.330Z",
-        "last_updated": "2026-05-14T15:27:43.330Z"
+        "last_updated": "2026-05-18T06:16:20.142Z"
       },
       "id": "mc4flkg3a8d03j"
     },
@@ -19814,7 +19814,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-05-17T15:18:33.712Z",
+    "exported_at": "2026-05-18T06:16:25.222Z",
     "total_entities": 725,
     "total_relations": 1121,
     "description": "Coding project infrastructure and patterns"
