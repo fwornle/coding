@@ -27,11 +27,28 @@ interface CodeVerification {
   referencedFiles?: string[]
 }
 
+interface DecayBreakdown {
+  baseConfidence: number
+  ageDrag: number
+  emergentDrag: number
+  truthfulnessDrag: number
+  totalDrag: number
+  finalConfidence: number
+  weeksOld: number
+  churnedSinceLastUpdate: boolean
+  latestChurnTs: string | null
+  churnedFilesSample: string[]
+  measurable: boolean
+  computedAt: string
+}
+
 interface InsightMetadata {
   codeVerification?: CodeVerification
   parentTopic?: string
   relatedInsightIds?: string[]
   consolidationReason?: string
+  baseConfidence?: number
+  decayBreakdown?: DecayBreakdown
 }
 
 interface Insight {
@@ -141,22 +158,76 @@ function FreshnessBadge({ cv }: { cv?: CodeVerification }) {
   )
 }
 
-function ConfidenceBadge({ confidence }: { confidence: number }) {
-  // Confidence is the OLDER, separate metric — set initially by the LLM
-  // during synthesis (reflects how many digests supported the insight at
-  // birth), then decayed over time:
-  //   - Age drag:           −0.05 per full week without an update
-  //   - Truthfulness drag:  if verificationRatio < 0.5, additional one-shot
-  //                         penalty up to −0.20
-  //   - Floor:              0.30
-  // Higher = more trustworthy by the LLM-and-decay heuristic; the freshness
-  // badge is the orthogonal "is the content still factually current" signal.
-  const tooltip =
-    `Confidence: how strongly this insight was supported by source digests at ` +
-    `synthesis time, decayed since. Base value was set by the LLM (more ` +
-    `corroborating digests → higher start); it loses 0.05 per week of ` +
-    `inactivity and up to 0.20 more if truthfulness drops below 50%. ` +
-    `Floor is 0.30. Independent of the FRESH / PARTIAL / STALE badge.`
+function ConfidenceBadge({
+  confidence,
+  decay,
+}: {
+  confidence: number
+  decay?: DecayBreakdown
+}) {
+  // Confidence model (post-churn-gating):
+  //   final = max(0.30, base − ageDrag − emergentDrag − truthfulnessDrag)
+  //
+  // Each drag is recomputed on every decay pass — no cumulative state.
+  //   - ageDrag (churn-gated): only when a referenced file actually
+  //     changed since last_updated. Pure age does NOT decay confidence
+  //     for a frozen codebase.
+  //   - emergentDrag: small slow hedge (max 0.10) when an insight is 90+
+  //     days old AND none of its referenced files have changed — covers
+  //     unknown side-effects in the broader system.
+  //   - truthfulnessDrag: up to 0.20 when verificationRatio < 0.5.
+  //     Recovers naturally if the ratio climbs back.
+  //
+  // The badge tooltip shows the breakdown when available so the displayed
+  // confidence is fully auditable.
+  let tooltip: string
+  if (decay) {
+    const dragLine = (label: string, val: number, note?: string) => {
+      if (val <= 0.001) return null
+      const sign = '−'
+      const pct = val.toFixed(2).replace(/^0/, '')
+      return `  ${sign}${pct}  ${label}${note ? ` (${note})` : ''}`
+    }
+    const lines: (string | null)[] = [
+      `Confidence: ${decay.finalConfidence.toFixed(2)}`,
+      `  base: ${decay.baseConfidence.toFixed(2)} (LLM-assigned at synthesis)`,
+      decay.totalDrag > 0 ? `  drags applied:` : `  no drags applied`,
+      dragLine(
+        'churn-gated age drag',
+        decay.ageDrag,
+        decay.churnedSinceLastUpdate && decay.latestChurnTs
+          ? `${Math.round(decay.weeksOld)}w old, files changed ${formatVerifiedAgo(decay.latestChurnTs).replace('verified ', '')}`
+          : undefined
+      ),
+      dragLine(
+        'emergent drag',
+        decay.emergentDrag,
+        `${Math.round(decay.weeksOld)}w old, no referenced-file churn`
+      ),
+      dragLine(
+        'truthfulness drag',
+        decay.truthfulnessDrag,
+        decay.measurable ? 'verificationRatio below 50%' : undefined
+      ),
+      ``,
+      `Age decay is CHURN-GATED: a stable insight against a frozen codebase ` +
+      `does not lose confidence over time. Only when one of this insight's ` +
+      `referenced files is touched in any search root does age drag kick in. ` +
+      `Past 90 days with zero churn, a tiny "emergent" drag (capped at 0.10) ` +
+      `hedges against unknown side-effects in the wider system.`,
+      ``,
+      `Computed ${formatVerifiedAgo(decay.computedAt).replace('verified ', '')}.`,
+    ]
+    tooltip = lines.filter((l) => l !== null).join('\n')
+  } else {
+    tooltip =
+      `Confidence: how strongly this insight was supported by source digests at ` +
+      `synthesis time. Decay model recomputes drags on each consolidation pass: ` +
+      `churn-gated age drag (only when referenced files change), emergent drag ` +
+      `(small slow hedge after 90d of zero churn), and truthfulness drag when ` +
+      `verificationRatio drops below 50%. Floor 0.30. ` +
+      `(Decay breakdown will appear here after the next consolidation pass.)`
+  }
   return (
     <Badge
       variant="outline"
@@ -394,7 +465,7 @@ function InsightCard({
           <CardTitle className="text-base leading-tight">{insight.topic}</CardTitle>
           <div className="flex items-center gap-2 shrink-0">
             <FreshnessBadge cv={cv} />
-            <ConfidenceBadge confidence={insight.confidence} />
+            <ConfidenceBadge confidence={insight.confidence} decay={insight.metadata?.decayBreakdown} />
             <UpdateButton insightId={insight.id} onUpdated={onUpdated} />
             <ClipboardButton text={clipboardText} title="Copy insight" />
           </div>
