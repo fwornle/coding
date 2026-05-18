@@ -1274,6 +1274,15 @@ export class ObservationConsolidator {
 
     let facetLinked = 0;
 
+    // Helper — merge the LLM-assigned confidence into the entry's metadata
+    // as baseConfidence. baseConfidence is the anchor for the churn-gated
+    // decay model in _decayConfidence: confidence = max(0.3, base - drags).
+    // Set once at synthesis (here) and replaced on resynthesis.
+    const withBaseConfidence = (entry) => {
+      const meta = entry.metadata || {};
+      return { ...meta, baseConfidence: Number((entry.confidence ?? 0.8).toFixed(3)) };
+    };
+
     const transaction = this.db.transaction(() => {
       for (const entry of insightEntries) {
         const project = entry.project || 'unknown';
@@ -1317,7 +1326,7 @@ export class ObservationConsolidator {
           `).run(
             this._redact(entry.summary), JSON.stringify(mergedDigestIds),
             now, entry.confidence,
-            this._redactPaths(JSON.stringify(entry.metadata || {})),
+            this._redactPaths(JSON.stringify(withBaseConfidence(entry))),
             existing.id
           );
           embeddingQueue.push({ id: existing.id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
@@ -1336,7 +1345,7 @@ export class ObservationConsolidator {
             newId, this._redact(entry.topic), this._redact(entry.summary),
             entry.confidence, JSON.stringify(entryDigestIds),
             now, now,
-            this._redactPaths(JSON.stringify(entry.metadata || {})),
+            this._redactPaths(JSON.stringify(withBaseConfidence(entry))),
             project
           );
 
@@ -1390,7 +1399,7 @@ export class ObservationConsolidator {
           `).run(
             id, this._redact(entry.topic), this._redact(entry.summary),
             entry.confidence, JSON.stringify(entryDigestIds),
-            now, now, this._redactPaths(JSON.stringify(entry.metadata || {})),
+            now, now, this._redactPaths(JSON.stringify(withBaseConfidence(entry))),
             project
           );
           embeddingQueue.push({ id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
@@ -1692,81 +1701,264 @@ export class ObservationConsolidator {
   _decayConfidence() {
     if (!this.db) return;
 
-    const DECAY_PER_WEEK = 0.05;
+    // Drag coefficients — kept as module-local constants so the breakdown
+    // recorded on each insight remains interpretable months later.
     const MIN_CONFIDENCE = 0.3;
-    const STALE_PENALTY_THRESHOLD = 0.5;
-    const STALE_PENALTY_MAX = 0.2;  // (0.5 - 0) * 0.4
+    const AGE_DRAG_PER_WEEK = 0.05;        // only when referenced files churned
+    const AGE_DRAG_CAP = 0.40;             // absolute cap so age alone can't bury an insight
+    const EMERGENT_DRAG_START_WEEKS = 13;  // ≈ 90 days of zero churn before emergent kicks in
+    const EMERGENT_DRAG_PER_QUARTER = 0.02;
+    const EMERGENT_DRAG_CAP = 0.10;        // hedges unknown-emergent-effects without dominating
+    const TRUTHFULNESS_THRESHOLD = 0.5;
+    const TRUTHFULNESS_MAX = 0.20;         // (0.5 - 0) * 0.4
 
     const insights = this.db.prepare(
-      `SELECT id, confidence, last_updated,
-              json_extract(metadata, '$.codeVerification.verificationRatio') AS ratio,
-              json_extract(metadata, '$.codeVerification.totalClaims') AS totalClaims,
-              json_extract(metadata, '$.staleDragApplied') AS staleDragApplied
-       FROM insights`
+      `SELECT id, confidence, last_updated, metadata FROM insights`
     ).all();
+    if (insights.length === 0) return;
+
+    // Parse metadata once + compute the oldest last_updated across all
+    // insights so we know how far back the per-root git log needs to reach.
+    const parsed = insights.map((ins) => {
+      let meta = {};
+      try { meta = ins.metadata ? JSON.parse(ins.metadata) : {}; } catch { meta = {}; }
+      const referencedFiles = Array.isArray(meta?.codeVerification?.referencedFiles)
+        ? meta.codeVerification.referencedFiles
+        : [];
+      const ratio = typeof meta?.codeVerification?.verificationRatio === 'number'
+        ? meta.codeVerification.verificationRatio
+        : null;
+      const totalClaims = typeof meta?.codeVerification?.totalClaims === 'number'
+        ? meta.codeVerification.totalClaims
+        : null;
+      return {
+        id: ins.id,
+        currentConfidence: ins.confidence,
+        baseConfidence: typeof meta.baseConfidence === 'number' ? meta.baseConfidence : null,
+        lastUpdatedMs: new Date(ins.last_updated).getTime(),
+        referencedFiles,
+        ratio,
+        totalClaims,
+      };
+    });
 
     const now = Date.now();
-    const updateConfidence = this.db.prepare(
-      'UPDATE insights SET confidence = ? WHERE id = ?'
-    );
+    const oldestLastUpdatedMs = parsed.reduce((min, p) => Math.min(min, p.lastUpdatedMs), now);
+    const churnIndex = this._computeChurnIndex(this._defaultSearchRoots(), oldestLastUpdatedMs);
+
+    const updateConfidence = this.db.prepare('UPDATE insights SET confidence = ? WHERE id = ?');
     const updateMeta = this.db.prepare(
       "UPDATE insights SET metadata = json_patch(COALESCE(metadata, '{}'), ?) WHERE id = ?"
     );
 
-    let decayed = 0;
-    let stalePenalised = 0;
-    let staleReset = 0;
+    let adjusted = 0;
+    let backfilled = 0;
+    let churnGated = 0;
+    let emergentApplied = 0;
+    let truthfulnessApplied = 0;
 
-    for (const ins of insights) {
-      let next = ins.confidence;
-
-      // 1. Age drag.
-      const lastUpdated = new Date(ins.last_updated).getTime();
-      const weeksStale = (now - lastUpdated) / (7 * 86400000);
-      if (weeksStale >= 1) {
-        next = Math.max(MIN_CONFIDENCE, next - (DECAY_PER_WEEK * Math.floor(weeksStale)));
+    for (const p of parsed) {
+      // Backfill baseConfidence on first run — capture the current
+      // confidence value as the new model's anchor so existing rows don't
+      // jump. From this point forward, decays compute as
+      //   final = base - sum(drags)
+      // rather than the prior in-place subtractive model. A subsequent
+      // re-synthesis will overwrite baseConfidence with the LLM-assigned
+      // value for that fresh content.
+      let baseConfidence = p.baseConfidence;
+      const baseMissing = baseConfidence === null;
+      if (baseMissing) {
+        baseConfidence = p.currentConfidence;
+        backfilled++;
       }
 
-      // 2. Truthfulness drag — only when verification ratio is set and below
-      // the threshold AND the penalty hasn't already been applied for this
-      // stale state. Skip insights with zero claims (totalClaims === 0):
-      // these are unverifiable, not stale — penalising them would punish
-      // insights for not having any backticked code references.
-      const totalClaims = ins.totalClaims == null ? null : Number(ins.totalClaims);
-      const ratio = ins.ratio == null ? null : Number(ins.ratio);
-      const alreadyPenalised = Boolean(ins.staleDragApplied);
-      let metaPatch = null;
-      const measurable = ratio !== null && Number.isFinite(ratio) && totalClaims !== null && totalClaims > 0;
-
-      if (measurable && ratio < STALE_PENALTY_THRESHOLD) {
-        if (!alreadyPenalised) {
-          const penalty = (STALE_PENALTY_THRESHOLD - ratio) * 0.4;
-          next = Math.max(MIN_CONFIDENCE, next - penalty);
-          metaPatch = { staleDragApplied: true, staleDragAt: new Date(now).toISOString() };
-          stalePenalised++;
-        }
-      } else if (alreadyPenalised && measurable) {
-        // Ratio recovered to >= 0.5 — clear the flag so a future drop
-        // re-applies the penalty. (No confidence refund: confidence only
-        // decays; refresh requires re-synthesis.)
-        metaPatch = { staleDragApplied: null, staleDragAt: null };
-        staleReset++;
+      // --- Churn-gated age drag ---------------------------------------
+      // Pure wall-clock decay is wrong for stable code. The age drag now
+      // only applies when at least one referenced file has actually been
+      // touched in any search root since the insight's last_updated. No
+      // churn → no age decay, no matter how old the insight is.
+      const churn = this._hasChurnSince(p.referencedFiles, churnIndex, p.lastUpdatedMs);
+      const weeksOld = Math.max(0, (now - p.lastUpdatedMs) / (7 * 86400000));
+      let ageDrag = 0;
+      if (churn.churnedSinceLastUpdate) {
+        ageDrag = Math.min(AGE_DRAG_CAP, Math.floor(weeksOld) * AGE_DRAG_PER_WEEK);
+        churnGated++;
       }
 
-      if (next < ins.confidence) {
-        updateConfidence.run(next, ins.id);
-        decayed++;
+      // --- Emergent drag (slow, capped) -------------------------------
+      // Even with zero churn in known files, complex systems develop
+      // emergent behaviour over time (dependency upgrades, new callers,
+      // environment shifts). A small, capped quarterly drag hedges this.
+      // Suppressed entirely whenever churn IS detected — in that case the
+      // age drag is already doing the work and adding emergent on top
+      // would double-count.
+      let emergentDrag = 0;
+      if (!churn.churnedSinceLastUpdate && weeksOld > EMERGENT_DRAG_START_WEEKS) {
+        const quartersBeyond = Math.floor((weeksOld - EMERGENT_DRAG_START_WEEKS) / 13);
+        emergentDrag = Math.min(EMERGENT_DRAG_CAP, quartersBeyond * EMERGENT_DRAG_PER_QUARTER);
+        if (emergentDrag > 0) emergentApplied++;
       }
-      if (metaPatch) {
-        updateMeta.run(JSON.stringify(metaPatch), ins.id);
+
+      // --- Truthfulness drag ------------------------------------------
+      // Now applied each run as a function of the CURRENT ratio (no more
+      // one-shot staleDragApplied flag). Recovery to ratio >= 0.5 clears
+      // the drag naturally on the next decay pass. Skip insights with
+      // totalClaims === 0 (unverifiable, not stale).
+      const measurable = p.ratio !== null
+        && Number.isFinite(p.ratio)
+        && p.totalClaims !== null
+        && p.totalClaims > 0;
+      let truthfulnessDrag = 0;
+      if (measurable && p.ratio < TRUTHFULNESS_THRESHOLD) {
+        truthfulnessDrag = Math.min(TRUTHFULNESS_MAX, (TRUTHFULNESS_THRESHOLD - p.ratio) * 0.4);
+        truthfulnessApplied++;
+      }
+
+      const totalDrag = ageDrag + emergentDrag + truthfulnessDrag;
+      const finalConfidence = Math.max(MIN_CONFIDENCE, baseConfidence - totalDrag);
+
+      // Persist the breakdown so the dashboard tooltip can explain
+      // exactly how the displayed confidence was arrived at. Keys are
+      // deliberately verbose — these objects survive across versions.
+      // Single-name "ageDrag" — the value is *already* churn-gated (only
+      // non-zero when some referenced file changed since last_updated), so
+      // a separate "churnDrag" field would just duplicate it and confuse
+      // the UI. The breakdown labels it "Churn-gated age drag" in the
+      // tooltip to make the gating semantics explicit.
+      const decayBreakdown = {
+        baseConfidence: Number(baseConfidence.toFixed(3)),
+        ageDrag: Number(ageDrag.toFixed(3)),
+        emergentDrag: Number(emergentDrag.toFixed(3)),
+        truthfulnessDrag: Number(truthfulnessDrag.toFixed(3)),
+        totalDrag: Number(totalDrag.toFixed(3)),
+        finalConfidence: Number(finalConfidence.toFixed(3)),
+        weeksOld: Number(weeksOld.toFixed(1)),
+        churnedSinceLastUpdate: churn.churnedSinceLastUpdate,
+        latestChurnTs: churn.latestChurnTs ? new Date(churn.latestChurnTs).toISOString() : null,
+        churnedFilesSample: churn.churnedFiles.slice(0, 5),
+        measurable,
+        computedAt: new Date(now).toISOString(),
+      };
+
+      const metaPatch = { decayBreakdown };
+      if (baseMissing) metaPatch.baseConfidence = Number(baseConfidence.toFixed(3));
+      // Clear the legacy staleDragApplied flag — new model recomputes
+      // truthfulness drag every run, so the one-shot bookkeeping is dead.
+      metaPatch.staleDragApplied = null;
+      metaPatch.staleDragAt = null;
+
+      updateMeta.run(JSON.stringify(metaPatch), p.id);
+
+      if (Math.abs(finalConfidence - p.currentConfidence) >= 0.005) {
+        updateConfidence.run(finalConfidence, p.id);
+        adjusted++;
       }
     }
 
-    if (decayed > 0 || stalePenalised > 0 || staleReset > 0) {
+    if (adjusted > 0 || backfilled > 0 || churnGated > 0 || emergentApplied > 0 || truthfulnessApplied > 0) {
       process.stderr.write(
-        `[Consolidator] Confidence decay: ${decayed} aged, ${stalePenalised} newly-stale-penalised, ${staleReset} stale-flag-reset\n`
+        `[Consolidator] Confidence decay (churn-gated): ${adjusted} adjusted, `
+        + `${backfilled} baseConfidence backfilled, `
+        + `${churnGated} churn-gated age drag, `
+        + `${emergentApplied} emergent drag, `
+        + `${truthfulnessApplied} truthfulness drag\n`
       );
     }
+  }
+
+  /**
+   * Build a per-search-root index of recent commits with their changed
+   * files. One git log invocation per root with a NUL-delimited format so
+   * a single decay pass can answer "any referenced file churned since this
+   * insight's last_updated?" via in-memory filtering.
+   *
+   * @param {string[]} roots
+   * @param {number} sinceMs  oldest insight last_updated across the corpus
+   * @returns {Map<string, Array<{ ts: number, files: Set<string> }>>}
+   */
+  _computeChurnIndex(roots, sinceMs) {
+    const index = new Map();
+    const sinceIso = new Date(Math.max(0, sinceMs - 86400000)).toISOString();
+
+    for (const root of roots) {
+      const commits = [];
+      try {
+        const out = execFileSync(
+          'git',
+          // \x00<unix-ts>\n<file>\n<file>\n...\x00<unix-ts>\n... — the
+          // leading NUL terminates the previous commit's file block so
+          // the parser can split unambiguously.
+          ['-C', root, 'log', '--since', sinceIso, '--pretty=format:%x00%ct', '--name-only'],
+          {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 8000,
+            maxBuffer: 32 * 1024 * 1024,
+          }
+        );
+        const blocks = out.split('\0').slice(1); // first split is empty
+        for (const block of blocks) {
+          const lines = block.split('\n');
+          const tsStr = lines.shift();
+          const ts = Number(tsStr) * 1000;
+          if (!Number.isFinite(ts)) continue;
+          const files = new Set(lines.map((l) => l.trim()).filter(Boolean));
+          if (files.size > 0) commits.push({ ts, files });
+        }
+      } catch {
+        // root is not a git repo, git is unavailable, or the call timed
+        // out. Treat as "no churn detected here" — caller falls back to
+        // emergent drag for old insights.
+      }
+      index.set(root, commits);
+    }
+    return index;
+  }
+
+  /**
+   * Does any referenced file appear in any commit after `sinceMs`?
+   *
+   * Match logic: path-suffix. A referenced file like
+   * `viewer/src/index.css` matches a committed path
+   * `integrations/operational-knowledge-management/viewer/src/index.css`
+   * (same convention the verifier uses for resolution).
+   *
+   * @returns {{ churnedSinceLastUpdate: boolean, latestChurnTs: number|null, churnedFiles: string[] }}
+   */
+  _hasChurnSince(referencedFiles, churnIndex, sinceMs) {
+    if (!referencedFiles || referencedFiles.length === 0) {
+      return { churnedSinceLastUpdate: false, latestChurnTs: null, churnedFiles: [] };
+    }
+    const suffixes = referencedFiles
+      .map((f) => String(f || '').replace(/\/+$/, ''))
+      .filter((f) => f.length > 0 && f.split('/').filter(Boolean).length >= 2);
+    if (suffixes.length === 0) {
+      return { churnedSinceLastUpdate: false, latestChurnTs: null, churnedFiles: [] };
+    }
+
+    let latestChurnTs = null;
+    const churnedFiles = new Set();
+    for (const commits of churnIndex.values()) {
+      for (const commit of commits) {
+        if (commit.ts < sinceMs) continue;
+        for (const changedPath of commit.files) {
+          for (const suffix of suffixes) {
+            if (changedPath === suffix || changedPath.endsWith('/' + suffix)) {
+              churnedFiles.add(suffix);
+              if (latestChurnTs === null || commit.ts > latestChurnTs) {
+                latestChurnTs = commit.ts;
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+    return {
+      churnedSinceLastUpdate: churnedFiles.size > 0,
+      latestChurnTs,
+      churnedFiles: [...churnedFiles],
+    };
   }
 
   /**
@@ -2542,8 +2734,14 @@ export class ObservationConsolidator {
 
     // Clear stale-drag + auto-archive bookkeeping — the content is brand
     // new, so any prior penalty/archive state is no longer applicable.
-    // codeVerification gets overwritten by the re-verify call below.
+    // baseConfidence is replaced with the LLM-assigned value for the new
+    // content, anchoring the churn-gated decay model at the resynthesis
+    // point. decayBreakdown is dropped so the next decay pass recomputes
+    // from scratch against weeksOld=0 (no drags). codeVerification gets
+    // overwritten by the re-verify call below.
     const metaPatch = JSON.stringify({
+      baseConfidence: Number(newConfidence.toFixed(3)),
+      decayBreakdown: null,
       staleDragApplied: null,
       staleDragAt: null,
       archivedAt: null,
