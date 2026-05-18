@@ -25084,7 +25084,7 @@
   },
   {
     "id": "ce40e4a3-e538-42e3-bad5-b4882133d588",
-    "summary": "Intent: Discuss whether age-based decay for truthfulness scores should be replaced or refined with codebase activity signals, and whether adding such complexity would over-engineer the system.\nApproach: The assistant proposed gating age decay on actual file churn from git history using already-tracked referenced files, with a small residual \"emergent decay\" for unknown side effects, stored as an auditable breakdown field.\nArtifacts: none\nResult: Conceptual design decision reached: replace pure wall-clock decay with churn-gated decay (no churn = no age drag), add small residual emergent decay capped at -0.10, and expose a `decayBreakdown` metadata field for transparency. Two implementation paths offered: churn-gated model or dropping age decay entirely.",
+    "summary": "Intent: Discuss whether age-based decay for truthfulness scores should be replaced or refined with codebase activity signals, and whether adding such complexity would over-engineer the system.\nApproach: The assistant proposed gating age decay on actual file churn from git history using already-tracked referenced files, with a small residual \"emergent decay\" for unknown side effects, stored as an auditable breakdown field.\nArtifacts: edited ObservationConsolidator.js\nResult: Conceptual design decision reached: replace pure wall-clock decay with churn-gated decay (no churn = no age drag), add small residual emergent decay capped at -0.10, and expose a `decayBreakdown` metadata field for transparency. Two implementation paths offered: churn-gated model or dropping age decay entirely.",
     "agent": "claude",
     "project": "coding",
     "quality": "normal",
@@ -25094,6 +25094,56 @@
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
     },
-    "modifiedFiles": null
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "a06fb6ce-daac-457f-a406-b67e6b315222",
+    "summary": "Intent: [developer shared two screenshots, likely showing a bug or UI state related to insight re-synthesis]\nApproach: The assistant diagnosed that the `NO_DIGESTS` error occurs when source digests for an insight have been pruned, causing the Update button to fail; proposed falling back to summary-only re-synthesis using the insight's current content.\nArtifacts: edited ObservationConsolidator.js\nResult: No code changes made; the assistant identified the root cause and proposed a fix strategy but did not implement it.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-18T06:11:03.987Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "d59c9402-b233-48e6-95bc-283ec3d4be61",
+    "summary": "Intent: Fix a bug where the \"Update\" button dead-ends when an insight's source digests have been pruned, throwing a NO_DIGESTS error.\nApproach: Rather than requiring original source digests to be present, fall back to summary-only re-synthesis using the insight's current content as the source of truth, allowing the verifier to validate the result.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: The NO_DIGESTS error path now falls back gracefully to re-synthesizing from the insight's existing content when source digests are unavailable, preventing the Update button from dead-ending on pruned insights.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T06:11:03.987Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
+  },
+  {
+    "id": "3d53aff2-6db7-403c-811c-01480b87f6f1",
+    "summary": "Intent: Fix a dead-end error when updating insights whose source digests have been pruned, by falling back to summary-only re-synthesis.\nApproach: Introduced a `sourceMode` branch in the prompt builder so that when source digests are unavailable, the insight's own current content serves as the source of truth instead of throwing a fatal error.\nArtifacts: edited /Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js\nResult: The `_buildResynthesisPrompt` method now handles a `NO_DIGESTS` case gracefully by using summary-only mode, and `sourceMode` is surfaced in the response so callers can distinguish which path was taken.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T06:11:03.987Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ]
   }
 ]
