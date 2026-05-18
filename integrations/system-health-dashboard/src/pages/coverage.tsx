@@ -43,15 +43,21 @@ interface CoverageResponse {
 }
 
 function tileColor(ratio: number | null): string {
-  if (ratio === null) return 'bg-zinc-700/40 border-zinc-600/40 text-zinc-400'
-  if (ratio >= 0.9) return 'bg-emerald-600/70 border-emerald-500/60 text-emerald-50'
-  if (ratio >= 0.7) return 'bg-emerald-500/40 border-emerald-500/40 text-emerald-100'
-  if (ratio >= 0.5) return 'bg-amber-500/50 border-amber-500/40 text-amber-50'
-  return 'bg-rose-500/60 border-rose-500/40 text-rose-50'
+  // Single text colour (white) across all bands; vary saturation/opacity of
+  // the background to encode the band. The earlier pastel-on-pastel scheme
+  // (text-emerald-100 on bg-emerald-500/40, text-emerald-50 on /70 etc.)
+  // produced unreadable tiles in the 70–89% and 50–69% ranges. Each
+  // background here is opaque enough that white text reaches WCAG AA on
+  // the dark dashboard surface AND on lighter system themes.
+  if (ratio === null) return 'bg-slate-500/80 border-slate-400/60 text-white'
+  if (ratio >= 0.9) return 'bg-emerald-700/80 border-emerald-500/60 text-white'
+  if (ratio >= 0.7) return 'bg-emerald-600/75 border-emerald-500/50 text-white'
+  if (ratio >= 0.5) return 'bg-amber-600/80 border-amber-500/50 text-white'
+  return 'bg-rose-600/80 border-rose-500/50 text-white'
 }
 
 function tileLabel(p: PerInsightSummary): string {
-  if (p.ratio === null) return '–'
+  if (p.ratio === null) return 'N/A'
   return `${Math.round(p.ratio * 100)}%`
 }
 
@@ -101,7 +107,7 @@ function ProjectCoverageCard({ data }: { data: CoverageResponse }) {
               </Badge>
             )}
             {i.unverified > 0 && (
-              <Badge variant="outline" className="bg-zinc-500/20 text-zinc-400 border-zinc-500/30">
+              <Badge variant="outline" className="bg-slate-500/30 text-slate-100 border-slate-400/40">
                 {i.unverified} unverified
               </Badge>
             )}

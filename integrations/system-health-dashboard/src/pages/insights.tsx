@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
-import { RefreshCw, Brain, TrendingUp, Search, Info } from 'lucide-react'
+import { RefreshCw, Brain, TrendingUp, Search, Info, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -96,16 +96,34 @@ function formatVerifiedAgo(iso?: string): string {
 }
 
 function FreshnessBadge({ cv }: { cv?: CodeVerification }) {
-  if (!cv || typeof cv.verificationRatio !== 'number') return null
-  const ratio = cv.verificationRatio
-  const verified = cv.verifiedClaims ?? 0
+  // Three states:
+  //   - cv missing entirely         → no badge (insight never went through verifier)
+  //   - cv present, totalClaims === 0 → UNVERIFIABLE pill (zero backticked claims to measure)
+  //   - cv present with a numeric ratio → FRESH / PARTIAL / STALE band
+  if (!cv) return null
   const total = cv.totalClaims ?? 0
+  const verified = cv.verifiedClaims ?? 0
   const stale = total - verified
   const ago = formatVerifiedAgo(cv.verifiedAt)
-  // Browser tooltip — appears on hover. Explains the metric concretely so a
-  // user encountering the badge for the first time understands what 60%
-  // means (60% of the backticked file paths / function names / env vars
-  // mentioned in this insight still exist in the codebase).
+  if (typeof cv.verificationRatio !== 'number') {
+    // UNVERIFIABLE: solid slate, high contrast — avoids the green-by-default
+    // illusion that a 0/0 insight is "100% true". Distinct from the band
+    // colors so a quick scan reads it as "no measurement", not "low score".
+    return (
+      <Badge
+        variant="outline"
+        className="text-xs bg-slate-500/30 text-slate-100 border-slate-400/40"
+        title={
+          `Unverifiable: this insight has no backticked code claims — no file paths, ` +
+          `function names, env vars, routes, or packages to check against the codebase. ` +
+          `Re-synthesis (Update button) may regenerate the summary with concrete references. ${ago}.`
+        }
+      >
+        UNVERIFIABLE
+      </Badge>
+    )
+  }
+  const ratio = cv.verificationRatio
   const tooltip =
     `Truthfulness: ${verified} of ${total} code claims in this insight still ` +
     `exist in the codebase (${stale} stale). ` +
@@ -215,7 +233,155 @@ function TruthfulnessPanel({ cv }: { cv?: CodeVerification }) {
   )
 }
 
-function InsightCard({ insight }: { insight: Insight }) {
+/**
+ * Server response shape for POST /api/insights/:id/resynthesize. We don't
+ * type the entire row again — only the fields the endpoint actually returns
+ * so we know what to merge into local state.
+ */
+interface ResynthesizeResponse {
+  id: string
+  topic: string
+  summary: string
+  confidence: number
+  lastUpdated: string
+  codeVerification?: CodeVerification
+  kgPushed?: boolean
+  preStaleCount?: number
+  postStaleCount?: number
+  durationMs?: number
+}
+
+type UpdateState =
+  | { kind: 'idle' }
+  | { kind: 'loading'; startedAt: number }
+  | { kind: 'success'; message: string; until: number }
+  | { kind: 'error'; message: string }
+
+function UpdateButton({
+  insightId,
+  onUpdated,
+}: {
+  insightId: string
+  onUpdated: (resp: ResynthesizeResponse) => void
+}) {
+  const [state, setState] = useState<UpdateState>({ kind: 'idle' })
+
+  // Auto-dismiss success/error chip after a few seconds so the row visually
+  // settles back to its updated form without manual clearing.
+  useEffect(() => {
+    if (state.kind === 'success') {
+      const t = window.setTimeout(() => setState({ kind: 'idle' }), state.until - Date.now())
+      return () => window.clearTimeout(t)
+    }
+    if (state.kind === 'error') {
+      const t = window.setTimeout(() => setState({ kind: 'idle' }), 8000)
+      return () => window.clearTimeout(t)
+    }
+  }, [state])
+
+  const onClick = useCallback(async () => {
+    setState({ kind: 'loading', startedAt: Date.now() })
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/insights/${encodeURIComponent(insightId)}/resynthesize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(errBody.error || `HTTP ${res.status}`)
+      }
+      const data: ResynthesizeResponse = await res.json()
+      onUpdated(data)
+      const droppedStale = (data.preStaleCount ?? 0) - (data.postStaleCount ?? 0)
+      const msg = droppedStale > 0
+        ? `Updated · ${droppedStale} stale claim${droppedStale === 1 ? '' : 's'} resolved`
+        : `Updated · ${data.kgPushed ? 'synced to VKB' : 'VKB sync skipped'}`
+      setState({ kind: 'success', message: msg, until: Date.now() + 6000 })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setState({ kind: 'error', message })
+    }
+  }, [insightId, onUpdated])
+
+  if (state.kind === 'loading') {
+    const elapsed = Math.floor((Date.now() - state.startedAt) / 1000)
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        disabled
+        className="h-7 px-2 text-xs gap-1 cursor-wait"
+        title="Re-synthesizing with LLM — typically 5-30s. The summary is regenerated from this insight's source digests, then re-verified against the current codebase, then mirrored into the VKB knowledge graph."
+      >
+        <RefreshCw className="w-3 h-3 animate-spin" />
+        {elapsed > 0 ? `${elapsed}s` : '…'}
+      </Button>
+    )
+  }
+
+  if (state.kind === 'success') {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 px-2 text-xs gap-1 bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30"
+        title={state.message}
+        onClick={onClick}
+      >
+        <CheckCircle2 className="w-3 h-3" />
+        {state.message.length > 32 ? 'Updated' : state.message}
+      </Button>
+    )
+  }
+
+  if (state.kind === 'error') {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 px-2 text-xs gap-1 bg-rose-500/20 text-rose-400 border-rose-500/30 hover:bg-rose-500/30"
+        title={`Re-synthesis failed: ${state.message}\n\nClick to retry.`}
+        onClick={onClick}
+      >
+        <AlertCircle className="w-3 h-3" />
+        Retry
+      </Button>
+    )
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-7 px-2 text-xs gap-1"
+      title={
+        `Re-synthesize this insight from scratch.\n\n` +
+        `What happens:\n` +
+        `  1. The verifier identifies which backticked claims (paths, ` +
+        `functions, env vars, routes) no longer exist in the codebase.\n` +
+        `  2. The LLM regenerates the summary from the insight's source ` +
+        `digests + the current code, dropping or replacing stale claims.\n` +
+        `  3. The new summary is re-verified and the result is mirrored ` +
+        `into the VKB graph (LevelDB) so retrieval picks up the fresh wording.\n\n` +
+        `Costs one LLM call — typically 5-30 seconds. Use this when an ` +
+        `insight has decayed content (STALE / PARTIAL pill) or when the ` +
+        `underlying code has moved or been refactored.`
+      }
+      onClick={onClick}
+    >
+      <Sparkles className="w-3 h-3" />
+      Update
+    </Button>
+  )
+}
+
+function InsightCard({
+  insight,
+  onUpdated,
+}: {
+  insight: Insight
+  onUpdated: (resp: ResynthesizeResponse) => void
+}) {
   const updated = new Date(insight.lastUpdated)
   const daysAgo = Math.floor((Date.now() - updated.getTime()) / 86400000)
   const clipboardText = `# ${insight.topic}\n\nConfidence: ${Math.round(insight.confidence * 100)}%\n\n${insight.summary}`
@@ -229,6 +395,7 @@ function InsightCard({ insight }: { insight: Insight }) {
           <div className="flex items-center gap-2 shrink-0">
             <FreshnessBadge cv={cv} />
             <ConfidenceBadge confidence={insight.confidence} />
+            <UpdateButton insightId={insight.id} onUpdated={onUpdated} />
             <ClipboardButton text={clipboardText} title="Copy insight" />
           </div>
         </div>
@@ -472,7 +639,29 @@ export function InsightsPage() {
       <ScrollArea className="h-[calc(100vh-220px)]">
         <div className="grid gap-4">
           {insights.map(ins => (
-            <InsightCard key={ins.id} insight={ins} />
+            <InsightCard
+              key={ins.id}
+              insight={ins}
+              onUpdated={(resp) => {
+                // Patch the row in place — preserves scroll position and
+                // filter state. The Update button is per-card, so a full
+                // refetch would be wasteful and visually jarring.
+                setInsights(prev => prev.map(p => p.id === resp.id
+                  ? {
+                      ...p,
+                      topic: resp.topic,
+                      summary: resp.summary,
+                      confidence: resp.confidence,
+                      lastUpdated: resp.lastUpdated,
+                      metadata: {
+                        ...(p.metadata || {}),
+                        codeVerification: resp.codeVerification || p.metadata?.codeVerification,
+                      },
+                    }
+                  : p
+                ))
+              }}
+            />
           ))}
         </div>
       </ScrollArea>
