@@ -2230,9 +2230,30 @@ export class ObservationConsolidator {
     const claims = [];
     const seen = new Set();
     const ROUTE_VERBS = /^(GET|POST|PUT|PATCH|DELETE)\s+(\/\S+)$/;
-    const PATH_RX = /^[A-Za-z0-9_.@-][A-Za-z0-9_./@-]*$/;
+    // PATH_RX accepts `~` as a valid first char so `~/.claude/settings.local.json`
+    // and similar home-relative paths classify as PATH (verifier will only
+    // resolve them inside repos, but the claim is preserved for stale-list
+    // diagnostics).
+    const PATH_RX = /^[A-Za-z0-9_.@~-][A-Za-z0-9_./@~-]*$/;
     const FUNC_RX = /^([A-Za-z_$][A-Za-z0-9_$]*)\(\)$/;
     const SYMBOL_RX = /^[A-Z][A-Z0-9_]{3,}$/;
+    // FILE_BASENAME: backticked filename WITHOUT a directory prefix
+    // (e.g. `install.sh`, `claude-code-mcp.json`). The earlier extractor
+    // required a slash to classify as PATH, so these slid into the
+    // "skip other backticked tokens" branch and the insight ended up
+    // UNVERIFIABLE despite naming many real files. Must have a clear
+    // extension (1–8 alnum chars) to avoid catching prose like
+    // `mode` or `state` as basenames.
+    const FILE_BASENAME_RX = /^[A-Za-z0-9_-]+\.[A-Za-z0-9]{1,8}$/;
+    // DIR_BASENAME: kebab-case identifier with at least 2 segments — used
+    // for project/submodule/service names like `mcp-server-semantic-analysis`,
+    // `code-graph-rag`, `constraint-monitor`, `rapid-llm-proxy`. Single-word
+    // kebab tokens (`tools`, `system`) are still excluded. Prose like
+    // `pull-request` or `error-handling` will technically match here but
+    // gets filtered out at the verifier step — no directory with that name
+    // exists in any search root, so it surfaces as STALE rather than
+    // inflating the verified count.
+    const DIR_BASENAME_RX = /^[a-z][a-z0-9]+(?:-[a-z0-9]+)+$/;
 
     for (const m of summary.matchAll(/`([^`\n]+)`/g)) {
       const raw = m[1].trim();
@@ -2257,6 +2278,11 @@ export class ObservationConsolidator {
         claims.push({ raw, type: 'PATH', needle: raw });
         continue;
       }
+      // FILE_BASENAME — `*.ext` with no directory prefix
+      if (FILE_BASENAME_RX.test(raw)) {
+        claims.push({ raw, type: 'FILE_BASENAME', needle: raw });
+        continue;
+      }
       // FUNCTION — identifier()
       const funcMatch = FUNC_RX.exec(raw);
       if (funcMatch) {
@@ -2266,6 +2292,11 @@ export class ObservationConsolidator {
       // SYMBOL — ALL_CAPS, length >= 4
       if (SYMBOL_RX.test(raw)) {
         claims.push({ raw, type: 'SYMBOL', needle: raw });
+        continue;
+      }
+      // DIR_BASENAME — kebab-case, 3+ segments
+      if (DIR_BASENAME_RX.test(raw)) {
+        claims.push({ raw, type: 'DIR_BASENAME', needle: raw });
         continue;
       }
       // skip other backticked tokens
@@ -2334,6 +2365,34 @@ export class ObservationConsolidator {
         for (const root of roots) {
           if (this._gitGrepHasMatch(root, `"${c.needle}"`)) { verified = true; break; }
         }
+      } else if (c.type === 'FILE_BASENAME') {
+        // Exact basename match against tracked files in any root. This
+        // verifies bare filenames like `install.sh` or `claude-code-mcp.json`
+        // that the extractor would otherwise have to drop because they
+        // carry no directory prefix.
+        for (const root of roots) {
+          if (this._gitFileBasenameExists(root, c.needle)) { verified = true; break; }
+        }
+        // Fall back to grep — catches docs/README references to a renamed
+        // basename, same way the PATH path does.
+        if (!verified) {
+          for (const root of roots) {
+            if (this._gitGrepHasMatch(root, c.needle)) { verified = true; break; }
+          }
+        }
+      } else if (c.type === 'DIR_BASENAME') {
+        // Match any tracked file whose path contains the directory name
+        // as an intermediate segment (`/<basename>/`) OR as the top-level
+        // component (`<basename>/...`). Verifies project/submodule/service
+        // names like `code-graph-rag`.
+        for (const root of roots) {
+          if (this._gitDirBasenameExists(root, c.needle)) { verified = true; break; }
+        }
+        if (!verified) {
+          for (const root of roots) {
+            if (this._gitGrepHasMatch(root, c.needle)) { verified = true; break; }
+          }
+        }
       } else {
         // FUNCTION / SYMBOL / ROUTE — token-grep across all roots.
         for (const root of roots) {
@@ -2343,6 +2402,53 @@ export class ObservationConsolidator {
       results.push({ raw: c.raw, type: c.type, verified });
     }
     return results;
+  }
+
+  /**
+   * Does any tracked file in `root` have exactly `basename` as its final
+   * path segment? Backs FILE_BASENAME verification for backticked file
+   * references that carry no directory prefix.
+   */
+  _gitFileBasenameExists(root, basename) {
+    const b = String(basename || '').trim();
+    if (!b || b.includes('/')) return false;
+    try {
+      const out = execFileSync(
+        'git', ['-C', root, 'ls-files'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024 * 1024 }
+      );
+      for (const line of out.split('\n')) {
+        if (line === b) return true;
+        if (line.endsWith('/' + b)) return true;
+      }
+    } catch { /* not a repo or too large */ }
+    return false;
+  }
+
+  /**
+   * Does any tracked file in `root` contain `dirname` as a directory
+   * segment? Backs DIR_BASENAME verification for project/submodule/service
+   * names like `code-graph-rag` or `mcp-server-semantic-analysis`.
+   */
+  _gitDirBasenameExists(root, dirname) {
+    const d = String(dirname || '').trim();
+    if (!d || d.includes('/')) return false;
+    try {
+      const out = execFileSync(
+        'git', ['-C', root, 'ls-files'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024 * 1024 }
+      );
+      // Use String.includes for the common '/dirname/' case, then check
+      // the top-level '<dirname>/' case explicitly so we don't miss
+      // root-level directories.
+      const slashed = '/' + d + '/';
+      const topLevel = d + '/';
+      for (const line of out.split('\n')) {
+        if (line.includes(slashed)) return true;
+        if (line.startsWith(topLevel)) return true;
+      }
+    } catch { /* not a repo or too large */ }
+    return false;
   }
 
   /**
@@ -2487,12 +2593,14 @@ export class ObservationConsolidator {
       .map((r) => ({ raw: r.raw, type: r.type }));
     // Deduped list of PATH-type claims that verified — this is the input to
     // per-project coverage aggregation ("which files does any insight in
-    // this project reference"). Only verified PATHs go in; stale ones would
-    // inflate coverage with phantom files.
+    // this project reference"). Only verified PATHs and FILE_BASENAMEs go in;
+    // stale ones would inflate coverage with phantom files. DIR_BASENAMEs are
+    // excluded because they're directories, not files (counting them would
+    // double-count via the files they contain).
     const referencedFiles = [
       ...new Set(
         results
-          .filter((r) => r.verified && r.type === 'PATH')
+          .filter((r) => r.verified && (r.type === 'PATH' || r.type === 'FILE_BASENAME'))
           .map((r) => r.raw)
       ),
     ];
