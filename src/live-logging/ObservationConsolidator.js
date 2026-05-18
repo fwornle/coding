@@ -1700,6 +1700,7 @@ export class ObservationConsolidator {
     const insights = this.db.prepare(
       `SELECT id, confidence, last_updated,
               json_extract(metadata, '$.codeVerification.verificationRatio') AS ratio,
+              json_extract(metadata, '$.codeVerification.totalClaims') AS totalClaims,
               json_extract(metadata, '$.staleDragApplied') AS staleDragApplied
        FROM insights`
     ).all();
@@ -1728,19 +1729,23 @@ export class ObservationConsolidator {
 
       // 2. Truthfulness drag — only when verification ratio is set and below
       // the threshold AND the penalty hasn't already been applied for this
-      // stale state.
-      const ratio = Number(ins.ratio);
+      // stale state. Skip insights with zero claims (totalClaims === 0):
+      // these are unverifiable, not stale — penalising them would punish
+      // insights for not having any backticked code references.
+      const totalClaims = ins.totalClaims == null ? null : Number(ins.totalClaims);
+      const ratio = ins.ratio == null ? null : Number(ins.ratio);
       const alreadyPenalised = Boolean(ins.staleDragApplied);
       let metaPatch = null;
+      const measurable = ratio !== null && Number.isFinite(ratio) && totalClaims !== null && totalClaims > 0;
 
-      if (Number.isFinite(ratio) && ratio < STALE_PENALTY_THRESHOLD) {
+      if (measurable && ratio < STALE_PENALTY_THRESHOLD) {
         if (!alreadyPenalised) {
           const penalty = (STALE_PENALTY_THRESHOLD - ratio) * 0.4;
           next = Math.max(MIN_CONFIDENCE, next - penalty);
           metaPatch = { staleDragApplied: true, staleDragAt: new Date(now).toISOString() };
           stalePenalised++;
         }
-      } else if (alreadyPenalised) {
+      } else if (alreadyPenalised && measurable) {
         // Ratio recovered to >= 0.5 — clear the flag so a future drop
         // re-applies the penalty. (No confidence refund: confidence only
         // decays; refresh requires re-synthesis.)
@@ -2299,16 +2304,39 @@ export class ObservationConsolidator {
           .map((r) => r.raw)
       ),
     ];
-    const ratio = results.length === 0 ? 1 : verifiedClaims / results.length;
+    // ratio is null when the insight has zero backticked code claims — there
+    // is simply no evidence to measure. Previously this defaulted to 1.0,
+    // which painted unverifiable insights green and obscured the gap. The
+    // UI now renders these as UNVERIFIABLE (gray) and they neither count
+    // toward fresh/partial/stale bands nor trigger staleness penalties.
+    const ratio = results.length === 0 ? null : verifiedClaims / results.length;
+
+    // Track stuck-at-zero state for the auto-archive sweep. Only set
+    // firstZeroAt when ratio is genuinely 0 (insight names code that no
+    // longer exists). Clears on any recovery so a transient miss after a
+    // file rename doesn't start the clock.
+    let zeroTracking = null;
+    if (ratio === 0) {
+      const prior = (insight.metadata && (() => {
+        try {
+          const m = typeof insight.metadata === 'string' ? JSON.parse(insight.metadata) : insight.metadata;
+          return m?.codeVerification?.firstZeroAt;
+        } catch { return null; }
+      })()) || null;
+      zeroTracking = { firstZeroAt: prior || new Date().toISOString() };
+    } else if (ratio !== null) {
+      zeroTracking = { firstZeroAt: null };
+    }
 
     const verification = {
       verifiedAt: new Date().toISOString(),
       totalClaims: results.length,
       verifiedClaims,
-      verificationRatio: Number(ratio.toFixed(3)),
+      verificationRatio: ratio === null ? null : Number(ratio.toFixed(3)),
       staleClaims,
       referencedFiles,
       searchRoots,
+      ...(zeroTracking || {}),
     };
 
     if (persist && this.db) {
@@ -2341,7 +2369,7 @@ export class ObservationConsolidator {
       'SELECT id, topic, summary, metadata FROM insights WHERE project = ?'
     ).all(project);
     if (insights.length === 0) {
-      return { scanned: 0, freshCount: 0, staleCount: 0, avgRatio: 1, results: [] };
+      return { scanned: 0, freshCount: 0, staleCount: 0, unverifiableCount: 0, archivedCount: 0, avgRatio: 1, results: [] };
     }
     const roots = this._defaultSearchRoots();
     process.stderr.write(`[verifier] Verifying ${insights.length} insights against ${roots.length} root(s)\n`);
@@ -2349,11 +2377,292 @@ export class ObservationConsolidator {
     for (const ins of insights) {
       results.push({ topic: ins.topic, ...this.verifyInsight(ins, { roots, persist }) });
     }
-    // "Fresh" = ratio >= 0.7; "Stale" = ratio < 0.5; in-between is partial.
-    const freshCount = results.filter((r) => r.verificationRatio >= 0.7).length;
-    const staleCount = results.filter((r) => r.verificationRatio < 0.5).length;
-    const avgRatio = results.reduce((s, r) => s + r.verificationRatio, 0) / results.length;
-    return { scanned: insights.length, freshCount, staleCount, avgRatio: Number(avgRatio.toFixed(3)), results };
+    // Bands. Null ratio = UNVERIFIABLE (no claims to measure); not counted
+    // toward fresh/partial/stale and excluded from avgRatio.
+    const measured = results.filter((r) => typeof r.verificationRatio === 'number');
+    const freshCount = measured.filter((r) => r.verificationRatio >= 0.7).length;
+    const staleCount = measured.filter((r) => r.verificationRatio < 0.5).length;
+    const unverifiableCount = results.length - measured.length;
+    const avgRatio = measured.length === 0
+      ? 1
+      : measured.reduce((s, r) => s + r.verificationRatio, 0) / measured.length;
+
+    // Auto-archive sweep — flag insights stuck at ratio=0 for >= 30 days as
+    // archived. Reversible by clearing metadata.archivedAt. Default
+    // /api/insights queries hide archived rows so they stop polluting the
+    // Coverage tab + Insights list. Persist guard: only run when we're
+    // actually writing metadata back this pass.
+    let archivedCount = 0;
+    if (persist && this.db) {
+      const ARCHIVE_THRESHOLD_MS = 30 * 86400 * 1000;
+      const now = Date.now();
+      const archiveStmt = this.db.prepare(
+        "UPDATE insights SET metadata = json_patch(COALESCE(metadata, '{}'), ?) WHERE id = ?"
+      );
+      for (const r of results) {
+        if (r.verificationRatio !== 0) continue;
+        if (!r.firstZeroAt) continue;
+        const stuckMs = now - new Date(r.firstZeroAt).getTime();
+        if (!Number.isFinite(stuckMs) || stuckMs < ARCHIVE_THRESHOLD_MS) continue;
+        // Re-read to avoid double-archiving on every sweep.
+        const row = this.db.prepare(
+          "SELECT json_extract(metadata, '$.archivedAt') AS archivedAt FROM insights WHERE id = ?"
+        ).get(r.id);
+        if (row && row.archivedAt) continue;
+        try {
+          archiveStmt.run(JSON.stringify({
+            archivedAt: new Date(now).toISOString(),
+            archiveReason: `stuck at verificationRatio=0 for ${Math.floor(stuckMs / 86400000)} days — code claims no longer exist`,
+          }), r.id);
+          archivedCount++;
+        } catch (err) {
+          process.stderr.write(`[verifier] Archive failed for ${r.id}: ${err.message}\n`);
+        }
+      }
+      if (archivedCount > 0) {
+        process.stderr.write(`[verifier] Auto-archived ${archivedCount} insight(s) stuck at zero for >= 30 days\n`);
+      }
+    }
+
+    return {
+      scanned: insights.length,
+      freshCount,
+      staleCount,
+      unverifiableCount,
+      archivedCount,
+      avgRatio: Number(avgRatio.toFixed(3)),
+      results,
+    };
+  }
+
+  /**
+   * Re-synthesize a single insight from its source digests against the
+   * CURRENT codebase. Used by the dashboard's per-insight "Update" button
+   * when the verifier has flagged stale claims and the user wants the
+   * summary rewritten rather than just re-measured.
+   *
+   * Pipeline:
+   *   1. Load the insight row + the digests it was originally built from.
+   *   2. Run a verifier pass on the existing summary so the LLM knows
+   *      exactly which claims it must drop or replace.
+   *   3. Call the LLM with a constrained single-insight prompt — the
+   *      same reference-article structure used in bulk synthesis, but
+   *      grounded in this one insight's history + the stale-claim list.
+   *   4. UPDATE the row in SQLite (preserves id, created_at, project,
+   *      digest_ids; bumps last_updated; resets stale-drag flags;
+   *      clears the auto-archive countdown).
+   *   5. Re-verify the new summary so the returned row carries fresh
+   *      codeVerification metadata.
+   *   6. Mirror the result to the VKB graph via _pushInsightToKG so the
+   *      LevelDB-backed knowledge store and the SQLite store stay in sync.
+   *
+   * Failure handling: LLM/parse failures throw so the API surfaces a
+   * clear 5xx; VKB push failure is logged but non-fatal (matches the
+   * synthesis pipeline's stance — VKB outages must not block SQLite work).
+   *
+   * @param {string} insightId
+   * @returns {Promise<{ id, topic, summary, confidence, codeVerification, kgPushed: boolean }>}
+   */
+  async resynthesizeInsight(insightId) {
+    if (!this.db) throw new Error('Not initialized');
+    const insight = this.db.prepare(
+      'SELECT id, topic, summary, confidence, digest_ids, project, metadata FROM insights WHERE id = ?'
+    ).get(insightId);
+    if (!insight) {
+      const err = new Error(`Insight not found: ${insightId}`);
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+
+    let digestIds = [];
+    try { digestIds = JSON.parse(insight.digest_ids || '[]'); } catch { /* keep empty */ }
+    const digests = digestIds.length > 0
+      ? this.db.prepare(
+          `SELECT id, date, theme, summary FROM digests
+           WHERE id IN (${digestIds.map(() => '?').join(',')})
+           ORDER BY date ASC`
+        ).all(...digestIds)
+      : [];
+
+    if (digests.length === 0) {
+      const err = new Error(`Cannot re-synthesize ${insightId}: no source digests available (digest_ids may have been pruned)`);
+      err.code = 'NO_DIGESTS';
+      throw err;
+    }
+
+    // Pre-flight verifier pass — gives the LLM the explicit stale list.
+    // We don't persist this one; we'll re-verify and persist the NEW
+    // summary at the end of the pipeline so SQLite state stays consistent.
+    const preVerify = this.verifyInsight(insight, { persist: false });
+
+    const digestBlock = digests
+      .map((d) => `[${d.date}] ${d.theme}\n${d.summary}`)
+      .join('\n\n---\n\n');
+
+    const prompt = this._buildResynthesisPrompt({
+      topic: insight.topic,
+      currentSummary: insight.summary || '',
+      staleClaims: preVerify.staleClaims || [],
+      digestBlock,
+      project: insight.project || 'unknown',
+    });
+
+    process.stderr.write(`[Consolidator] Re-synthesizing insight ${insightId.slice(0, 8)} (${insight.topic}) from ${digests.length} digest(s); ${preVerify.staleClaims?.length || 0} stale claim(s) to drop\n`);
+    const llmResponse = await this._callLLM(prompt, 'consolidator-resynthesize');
+    if (!llmResponse) {
+      const err = new Error(`LLM call failed during re-synthesis of ${insightId}`);
+      err.code = 'LLM_FAILED';
+      throw err;
+    }
+
+    const parsed = this._parseInsights(llmResponse, digests);
+    // The LLM may emit multiple <insight> blocks; pick the one whose topic
+    // best matches the original (case-insensitive equality, then substring,
+    // then first). Keeps the topic stable so the UI doesn't appear to
+    // create a new insight under a different name.
+    const pickInsight = (candidates, target) => {
+      const t = (target || '').toLowerCase();
+      return candidates.find((c) => (c.topic || '').toLowerCase() === t)
+        || candidates.find((c) => (c.topic || '').toLowerCase().includes(t.split(' ')[0]))
+        || candidates[0];
+    };
+    const replacement = pickInsight(parsed, insight.topic);
+    if (!replacement || !replacement.summary) {
+      const err = new Error(`LLM response had no parsable insight for ${insightId}`);
+      err.code = 'PARSE_FAILED';
+      throw err;
+    }
+
+    const now = new Date().toISOString();
+    const newSummary = this._redact(replacement.summary);
+    const newTopic = this._redact(replacement.topic || insight.topic);
+    const newConfidence = typeof replacement.confidence === 'number'
+      ? Math.max(0.3, Math.min(1, replacement.confidence))
+      : Math.max(insight.confidence, 0.7);
+
+    // Clear stale-drag + auto-archive bookkeeping — the content is brand
+    // new, so any prior penalty/archive state is no longer applicable.
+    // codeVerification gets overwritten by the re-verify call below.
+    const metaPatch = JSON.stringify({
+      staleDragApplied: null,
+      staleDragAt: null,
+      archivedAt: null,
+      archiveReason: null,
+      lastResynthesisAt: now,
+      ...(replacement.metadata || {}),
+    });
+
+    this.db.prepare(`
+      UPDATE insights
+      SET topic = ?, summary = ?, confidence = ?, last_updated = ?,
+          metadata = json_patch(COALESCE(metadata, '{}'), ?)
+      WHERE id = ?
+    `).run(newTopic, newSummary, newConfidence, now, metaPatch, insightId);
+
+    // Re-verify the brand-new summary; persists fresh codeVerification.
+    const postVerify = this.verifyInsight(
+      { id: insightId, summary: newSummary, metadata: null },
+      { persist: true }
+    );
+
+    // Fire-and-forget VKB mirror — failure must not roll back the SQLite
+    // write. Same contract as the bulk synthesis path.
+    let kgPushed = false;
+    try {
+      await this._pushInsightToKG({
+        topic: newTopic,
+        summary: newSummary,
+        project: insight.project || 'coding',
+        confidence: newConfidence,
+        _digestIds: digestIds,
+      });
+      kgPushed = true;
+    } catch (err) {
+      process.stderr.write(`[Consolidator] VKB push failed for ${insightId}: ${err.message}\n`);
+    }
+
+    // Republish an embedding event so retrieval picks up the new wording.
+    try {
+      this._publishEmbeddingEvent('insight', insightId, newSummary, {
+        topic: newTopic,
+        confidence: newConfidence,
+        project: insight.project || 'unknown',
+      });
+    } catch { /* non-fatal */ }
+
+    return {
+      id: insightId,
+      topic: newTopic,
+      summary: newSummary,
+      confidence: newConfidence,
+      lastUpdated: now,
+      codeVerification: postVerify,
+      kgPushed,
+      preStaleCount: preVerify.staleClaims?.length || 0,
+      postStaleCount: postVerify.staleClaims?.length || 0,
+    };
+  }
+
+  /**
+   * Single-insight re-synthesis prompt. Same structured-reference-article
+   * contract as the bulk path, but constrained to one insight and given
+   * the explicit list of claims that need to be dropped or replaced.
+   */
+  _buildResynthesisPrompt({ topic, currentSummary, staleClaims, digestBlock, project }) {
+    const staleBlock = (staleClaims || []).length === 0
+      ? '(verifier found no stale claims — the user is regenerating for another reason; refresh the summary against the source digests but keep the existing structure if it is still accurate)'
+      : staleClaims.map((s) => `- [${s.type}] ${s.raw}`).join('\n');
+
+    return {
+      system: `You are the long-term memory of a software project. You are regenerating ONE existing insight because its content has decayed against the live codebase.
+
+CRITICAL CONSTRAINTS:
+- Produce EXACTLY ONE <insight> block, on the same topic as the input insight.
+- Keep the topic name STABLE — do not rename it.
+- DROP every claim listed under STALE CLAIMS unless you can replace it with a current path/symbol/route that the source digests support.
+- DO NOT invent file paths, function names, env vars, or routes that don't appear in the source digests or in the existing (non-stale) summary.
+- Structure the new summary as a REFERENCE ARTICLE: ## Purpose, ## Architecture, ## Key Files, ## Usage, ## Troubleshooting. Same contract as bulk synthesis.
+- No dates, no commit hashes, no changelog entries, no "previously..." narration.
+
+OUTPUT FORMAT:
+
+<insight>
+<topic>${topic}</topic>
+<scope>One concrete subsystem, tool, or workflow.</scope>
+<confidence>0.0-1.0 — set this based on how well the source digests still support the topic. If most claims were stale and digests are sparse, lower it; if digests strongly corroborate, raise it.</confidence>
+<summary>
+## Purpose
+...
+
+## Architecture
+...
+
+## Key Files
+- \`path/to/file.js\` — role
+
+## Usage
+...
+
+## Troubleshooting
+...
+</summary>
+</insight>`,
+
+      user: `Project: ${project}
+
+--- EXISTING INSIGHT (regenerate this) ---
+TOPIC: ${topic}
+CURRENT SUMMARY:
+${(currentSummary || '').slice(0, 4000)}
+
+--- STALE CLAIMS (the verifier could not find these in the codebase; drop or replace) ---
+${staleBlock}
+
+--- SOURCE DIGESTS (the ground-truth narrative this insight was built from) ---
+${digestBlock}
+
+Produce ONE updated insight on the topic "${topic}". Drop the stale claims. Replace them only with paths/symbols actually mentioned in the source digests or in the existing summary's non-stale portions. Keep the same reference-article structure.`,
+    };
   }
 
   /**
