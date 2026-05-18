@@ -16569,5 +16569,98 @@
       "sourceCount": 1
     },
     "project": "coding"
+  },
+  {
+    "id": "316ff2cf-a031-4063-bf09-1fde782e5a69",
+    "date": "2026-05-17",
+    "theme": "Git Push of Accumulated Local Commits to Remote",
+    "summary": "The claude agent pushed a batch of locally accumulated commits to the remote repository.\n\n- Executed a direct `git push` to `origin main`\n- Advanced the branch from `989e2fa89` → `1df5a6a7e`, pushing 7 commits in total\n- `audit-knowledge-overlap.mjs` was among the artifacts touched prior to the push",
+    "observationIds": [
+      "f5d527ec-f3df-4c05-8c8d-af778ba0cf95"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/audit-knowledge-overlap.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-18T00:11:41.331Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b15307b1-2ebe-4986-b8bb-4d8f86463655",
+    "date": "2026-05-17",
+    "theme": "ObservationConsolidator: Stale Entry Repair and Confidence Decay",
+    "summary": "A multi-step session focused on diagnosing and resolving stale/partial observation entries in the SQLite corpus, then verifying the full knowledge base post-repair.\n\n- **Observation 2** kicked off the session by querying the database and inspecting the `rapid-automations` project structure to locate a stale entry (ended before findings were surfaced)\n- **Observations 3 & 4** applied the actual fixes: extended the verifier with submodule traversal and path-suffix fallback to resolve artifact paths in subprojects; decay logic was updated so stale drag flags clear on ratio recovery (confidence held at 0.87 with no refund)\n- Corpus improved from **1 stale → 0 stale**, **9 partial → 7 partial**, average freshness ratio **0.90 → 0.925**; two observations promoted to FRESH (ratio 1.00)\n- **Observation 5** ran the full cross-project verifier against all 7 projects: **61 insights verified**, 55 fresh, 6 partial (ratios 0.50–0.67), overall average ratio **0.94**; 6 partials flagged as candidates for the next compaction cycle\n- Primary artifact: `src/live-logging/ObservationConsolidator.js`",
+    "observationIds": [
+      "c363fbfd-4d1b-49f3-a072-3f8372b4fa41",
+      "72ad032c-0f71-4394-88c0-8ba74e55e802",
+      "dee7d373-4284-45f0-addf-6c04853f8e19",
+      "d562b992-8e79-433d-afd8-44f589f95714"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-18T00:11:41.331Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7fd4e1b8-9310-40a7-93ca-88d10cc48bcd",
+    "date": "2026-05-17",
+    "theme": "Insights Viewer Design and referencedFiles Feature Implementation",
+    "summary": "A design-then-build session to extend the insights viewer with truthfulness/coverage metrics and wire `referencedFiles` tracking end-to-end from the consolidator to the API.\n\n- **Observation 6** produced a detailed design proposal (pending approval): colored truthfulness badges on insight rows, expandable detail panels with per-claim breakdowns, a per-project heatmap tab with clickable tiles, a new `GET /api/projects/:project/coverage` endpoint, and extending `codeVerification` metadata with `referencedFiles` — all using existing SQLite data, no schema migrations required\n- **Observations 7 & 8** implemented the consolidator side: `ObservationConsolidator.js` was extended to capture and track `referencedFiles` during observation verification/consolidation; syntax verified successfully\n- **Observation 9** completed the full stack: `ObservationConsolidator.js` now persists `referencedFiles` data, and `scripts/observations-api-server.mjs` was updated with a new endpoint to expose it for querying\n- Key artifacts:\n  - `src/live-logging/ObservationConsolidator.js`\n  - `scripts/observations-api-server.mjs`",
+    "observationIds": [
+      "df89dfbd-39b9-4d66-9aea-f9aa6c52f403",
+      "9e5bb008-ef3d-46b2-b555-f64c423575a1",
+      "b2aa3a58-1913-4ea6-88d8-cc404efdab80",
+      "81d9a120-6364-471d-856f-a7b5488fcf7e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-18T00:11:41.331Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "bd1d8b4b-3525-4c68-b133-e4945716627f",
+    "date": "2026-05-17",
+    "theme": "Fix Hash-Fragment Navigation on React Insights Page",
+    "summary": "Three closely related observations (likely from the same continuous exchange, possibly triggered by a shared screenshot) all address the same root cause: React Router does not natively scroll to URL fragment targets.\n\n- Added a `useEffect` hook to `insights.tsx` that reads `window.location.hash` on load and re-fires on hash changes\n- Scrolls the matching DOM element into view and applies a brief highlight animation to draw attention to the target section\n- Enables deep-link navigation (e.g., `/insights#some-section`) that previously silently failed\n- Primary artifact: `integrations/system-health-dashboard/src/pages/insights.tsx`",
+    "observationIds": [
+      "82139bd4-9c69-4071-86a5-366991c35bef",
+      "4f08170e-1580-4232-9b78-0a514b8bb856",
+      "10471a82-8be4-44cc-990b-cc54ce24c3dc"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-18T00:11:41.331Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
   }
 ]
