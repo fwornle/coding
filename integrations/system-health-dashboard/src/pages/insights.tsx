@@ -320,6 +320,12 @@ interface ResynthesizeResponse {
   preStaleCount?: number
   postStaleCount?: number
   durationMs?: number
+  // 'digests' = re-synthesized from the original source digests
+  // 'summary' = source digests were pruned; re-synthesized from the
+  //             insight's own existing summary as the ground truth
+  sourceMode?: 'digests' | 'summary'
+  digestsAvailable?: number
+  digestIdsReferenced?: number
 }
 
 type UpdateState =
@@ -364,9 +370,14 @@ function UpdateButton({
       const data: ResynthesizeResponse = await res.json()
       onUpdated(data)
       const droppedStale = (data.preStaleCount ?? 0) - (data.postStaleCount ?? 0)
+      // Surface the source mode in the success chip when it's the
+      // summary-fallback path — users should know the regeneration was
+      // grounded in the insight's own content rather than fresh digests.
+      const fromSummary = data.sourceMode === 'summary'
+      const summarySuffix = fromSummary ? ' (summary-only)' : ''
       const msg = droppedStale > 0
-        ? `Updated · ${droppedStale} stale claim${droppedStale === 1 ? '' : 's'} resolved`
-        : `Updated · ${data.kgPushed ? 'synced to VKB' : 'VKB sync skipped'}`
+        ? `Updated${summarySuffix} · ${droppedStale} stale claim${droppedStale === 1 ? '' : 's'} resolved`
+        : `Updated${summarySuffix} · ${data.kgPushed ? 'synced to VKB' : 'VKB sync skipped'}`
       setState({ kind: 'success', message: msg, until: Date.now() + 6000 })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
