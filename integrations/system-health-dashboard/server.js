@@ -311,6 +311,7 @@ class SystemHealthAPIServer {
         this.app.get('/api/digests/projects', this.handleGetDigestProjects.bind(this));
         this.app.get('/api/insights', this.handleGetInsights.bind(this));
         this.app.get('/api/insights/projects', this.handleGetInsightProjects.bind(this));
+        this.app.post('/api/insights/:id/resynthesize', this.handleResynthesizeInsight.bind(this));
         this.app.get('/api/projects/:project/coverage', this.handleGetProjectCoverage.bind(this));
         this.app.get('/api/projects', this.handleGetAllProjects.bind(this));
         this.app.get('/api/consolidation/status', this.handleGetConsolidationStatus.bind(this));
@@ -4450,6 +4451,35 @@ class SystemHealthAPIServer {
     }
 
     /**
+     * Forward a POST/PUT/DELETE to the host obs-api with an optional JSON
+     * body. Streams the upstream status + body back to the client. Used
+     * by mutation endpoints (e.g. /api/insights/:id/resynthesize). Long
+     * timeouts here are deliberate — re-synthesis triggers a fresh LLM
+     * call which can take 5–30s.
+     */
+    async _forwardObsApiMutation(req, res, pathAndQuery, method = 'POST') {
+        const base = process.env.OBS_API_URL || 'http://host.docker.internal:12436';
+        const url = `${base}${pathAndQuery}`;
+        try {
+            const upstream = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: req.body ? JSON.stringify(req.body) : undefined,
+                // 90s — covers the slowest single-insight LLM re-synthesis
+                // (≈30s typical) with margin. The obs-api side has its own
+                // 360s fetch timeout against the LLM proxy; we cap shorter
+                // here so the browser doesn't hold an open socket forever.
+                signal: AbortSignal.timeout(90_000),
+            });
+            const body = await upstream.text();
+            res.status(upstream.status).type(upstream.headers.get('content-type') || 'application/json').send(body);
+        } catch (err) {
+            process.stderr.write(`[ObservationsAPI] ${method} to ${url} failed: ${err.message}\n`);
+            res.status(502).json({ error: 'Observations API unreachable or timed out' });
+        }
+    }
+
+    /**
      * Fetch JSON from the host Observations API. Returns null on failure.
      * Used by in-process consumers (e.g. AutoConsolidate daemon).
      */
@@ -4522,6 +4552,16 @@ class SystemHealthAPIServer {
     handleGetProjectCoverage(req, res) {
         const project = encodeURIComponent(req.params.project || '');
         return this._forwardObsApi(req, res, `/api/projects/${project}/coverage`);
+    }
+
+    /**
+     * POST /api/insights/:id/resynthesize — regenerate one insight's
+     * summary from its source digests against the current codebase.
+     * Triggered by the Insights page's per-card Update button.
+     */
+    handleResynthesizeInsight(req, res) {
+        const id = encodeURIComponent(req.params.id || '');
+        return this._forwardObsApiMutation(req, res, `/api/insights/${id}/resynthesize`, 'POST');
     }
 
     /**

@@ -680,7 +680,7 @@ app.get('/api/insights', (req, res) => {
   const db = getDb();
   if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
 
-  const { topic, q, project } = req.query;
+  const { topic, q, project, includeArchived } = req.query;
   try {
     try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch {
       return res.json({ data: [], total: 0 });
@@ -691,6 +691,12 @@ app.get('/api/insights', (req, res) => {
     if (topic) { where.push('topic = @topic'); params.topic = topic; }
     if (q) { where.push('(topic LIKE @q OR summary LIKE @q)'); params.q = `%${q}%`; }
     if (project) { where.push('project = @project'); params.project = project; }
+    // Auto-archived insights (stuck at ratio=0 for 30+ days) are hidden by
+    // default — they're conceptually deleted from the user's perspective.
+    // `?includeArchived=true` surfaces them again (for restoration or audit).
+    if (includeArchived !== 'true') {
+      where.push("(json_extract(metadata, '$.archivedAt') IS NULL)");
+    }
 
     const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
@@ -825,10 +831,14 @@ app.get('/api/projects/:project/coverage', (req, res) => {
         perInsight: [],
       });
     }
+    // Auto-archived insights are filtered out of Coverage — they're treated
+    // as deleted from the user's perspective. The /api/insights list
+    // applies the same default, so the two views stay consistent.
     const rows = db.prepare(
       `SELECT id, topic, confidence, summary, digest_ids as digestIds,
               last_updated as lastUpdated, created_at as createdAt, project, metadata
-       FROM insights WHERE project = ?
+       FROM insights
+       WHERE project = ? AND json_extract(metadata, '$.archivedAt') IS NULL
        ORDER BY last_updated DESC`
     ).all(project);
 
@@ -912,6 +922,59 @@ app.get('/api/projects/:project/coverage', (req, res) => {
     process.stderr.write(`[obs-api] /projects/${project}/coverage error: ${err.message}\n`);
     if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: 'Failed to compute project coverage' });
+  }
+});
+
+/**
+ * POST /api/insights/:id/resynthesize
+ *
+ * Regenerates an insight's summary from its source digests, grounded in
+ * the current codebase. Mirrors the new content into the VKB graph so the
+ * LevelDB-backed knowledge store stays in sync with SQLite. Called by the
+ * Insights page's per-card Update button when the verifier has flagged
+ * stale claims.
+ *
+ * Single-flight: only one re-synthesis at a time per process, since the
+ * consolidator opens its own DB handle and an LLM call is in flight.
+ * Returns 409 if a re-synthesis (or the bulk consolidation) is already
+ * running.
+ *
+ * Response (200):
+ *   { id, topic, summary, confidence, lastUpdated, codeVerification,
+ *     kgPushed, preStaleCount, postStaleCount, durationMs }
+ */
+let _resynthesizeInflight = false;
+
+app.post('/api/insights/:id/resynthesize', async (req, res) => {
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ error: 'insight id required' });
+  if (_consolidationPromise) {
+    return res.status(409).json({ error: 'Bulk consolidation in progress; try again when it completes' });
+  }
+  if (_resynthesizeInflight) {
+    return res.status(409).json({ error: 'Another insight re-synthesis is already running; try again shortly' });
+  }
+  _resynthesizeInflight = true;
+  const startedAt = Date.now();
+
+  const consolidator = new ObservationConsolidator({ dbPath: DB_PATH });
+  try {
+    await consolidator.init();
+    const updated = await consolidator.resynthesizeInsight(id);
+    const durationMs = Date.now() - startedAt;
+    res.json({ ...updated, durationMs });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /insights/${id}/resynthesize error: ${err.message}\n`);
+    if (err.code === 'NOT_FOUND') return res.status(404).json({ error: err.message });
+    if (err.code === 'NO_DIGESTS') return res.status(409).json({ error: err.message });
+    if (err.code === 'LLM_FAILED' || err.code === 'PARSE_FAILED') {
+      return res.status(502).json({ error: err.message });
+    }
+    if (isCorruptionError(err)) invalidateDb();
+    res.status(500).json({ error: `Re-synthesis failed: ${err.message}` });
+  } finally {
+    try { consolidator.close(); } catch { /* best-effort */ }
+    _resynthesizeInflight = false;
   }
 });
 
