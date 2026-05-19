@@ -2,6 +2,7 @@
 created: 2026-03-09T12:22:45.169Z
 title: LLM-based semantic deduplication
 area: pipeline
+resolves_phase: 40
 files:
   - integrations/mcp-server-semantic-analysis/src/agents/kg-operators.ts
   - integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts
