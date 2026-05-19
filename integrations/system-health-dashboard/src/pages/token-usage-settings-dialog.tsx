@@ -109,8 +109,8 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl flex flex-col max-h-[85vh]">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>LLM Routing Settings</DialogTitle>
           <DialogDescription>
             Optionally pin a service (cognitive process) to a specific provider and model. Unpinned services
@@ -120,6 +120,7 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
           </DialogDescription>
         </DialogHeader>
 
+        <div className="flex-1 overflow-y-auto min-h-0 -mx-6 px-6">
         {loading && (
           <div className="flex items-center justify-center py-8">
             <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -221,8 +222,9 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
             </div>
           </div>
         )}
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
