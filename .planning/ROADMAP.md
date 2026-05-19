@@ -105,37 +105,46 @@
 
 Plans:
 **Wave 1**
+
 - [x] 33-01-PLAN.md — Wave 0 foundation: extract `lib/utils/log-rotator.js` and create test harness scaffold (10 files under `scripts/__tests__/health-coordinator/`)
 - [x] 33-02-PLAN.md — Coordinator skeleton: `scripts/health-coordinator.js` (Express on `0.0.0.0:3034`, in-memory state, 4 endpoints, EADDRINUSE handler) + launchd plist (NOT loaded yet)
 
 **Wave 2** *(blocked on Wave 1 completion)*
+
 - [x] 33-03-PLAN.md — Coordinator behavior: rules loader + check registry + 5s tick + Docker `.State.Health.Status` passthrough + per-check error isolation (R6)
 
 **Wave 3** *(blocked on Wave 2 completion)*
+
 - [x] 33-04-PLAN.md — Reporter conversion: reduce `health-verifier.js` and `statusline-health-monitor.js` to reporter mode; add `lsl_heartbeat` POST to `enhanced-transcript-monitor.js`
 
 **Wave 4** *(blocked on Wave 3 completion)*
+
 - [x] 33-05-PLAN.md — Reader migration: rewrite `health-prompt-hook.js`, dashboard backend (`server.js`, 4 routes), and constraint-monitor backend (`dashboard-server.js`, 2 routes) to fetch from coordinator
 
 **Wave 5** *(blocked on Wave 4 completion)*
+
 - [x] 33-06-PLAN.md — Rules cleanup: delete `bind_mount_freshness` and `supervisord_status` from `health-verification-rules.json`; delete `refreshBindMounts()` and any `--force-recreate` from `health-remediation-actions.js`
 - [x] 33-07-PLAN.md — Cutover: add `HEALTH_COORDINATOR_URL` to `docker-compose.yml`; rebuild container; delete 4 legacy daemon scripts; bootout legacy plist + bootstrap new plist; clean stale `.health/*.json`; human verify
 
 **Wave 6** *(blocked on Wave 5 completion)*
+
 - [x] 33-08-PLAN.md — Acceptance: run all 13 SPEC AC checks against the cutover system; write `33-VERIFICATION-PRECHECK.md`; human verify
 
 **Gap closure (from 33-08 acceptance failures, 6 plans):**
 
 **Wave 1 (gap-closure parallel — disjoint files)**
+
 - [x] 33-09-PLAN.md — G1 (HIGH): port liveness probes (HTTP + TCP) into coordinator's check registry; add `obs_api` rule so AC#6 detection-latency test can find it. Touches `scripts/health-coordinator.js`, NEW `lib/utils/service-probe.js`, NEW `scripts/__tests__/health-coordinator/service-liveness.test.sh`
 - [x] 33-10-PLAN.md — G2 (HIGH): mount `/api/*` reverse-proxy in `integrations/system-health-dashboard/static-server.js` BEFORE the SPA `*` catch-all so port 3032 returns JSON for `/api/health-verifier/*`. Unblocks AC#5 and AC#9
 - [x] 33-12-PLAN.md — G7 (HIGH, NEW from 33-08): declare `HEALTH_COORDINATOR_INJECT_THROW` (and friends) in plist `EnvironmentVariables` dict so `launchctl setenv` overrides reach child process. Unblocks AC#13. Includes human-verify checkpoint
 - [x] 33-14-PLAN.md — G5+G6+G8 (LOW bundle): cleanup stale refs in `free-coding-ports.sh`; remove `--auto-heal` from `start-services-robust.js` spawn; bump `eviction.test.sh` sleep 17s→22s; remove `start_global_lsl_monitoring` no-op stub from `agent-common-setup.sh`
 
 **Wave 2 (gap-closure — depends on 33-09 because both touch `scripts/health-coordinator.js`)**
+
 - [x] 33-11-PLAN.md — G4 (MED): rename `pollDockerHealth()` output key `status` → `healthcheck` to match SPEC AC #4 / AC #12 jq paths AND existing readers (statusline daemon, dashboard reshape). Unblocks AC#4 + AC#12
 
 **Wave 3 (gap-closure — depends on 33-09 + 33-11; option-c may touch `scripts/health-coordinator.js`)**
+
 - [x] 33-13-PLAN.md — G3 (MED): canonical session-id form for LSL keying — **starts with `checkpoint:decision`** (4 options: ETM normalizes / per-pane reads env / coordinator fuzzy / project-rollup canonical). Includes human-verify checkpoint for two-pane tmux scenario
 
 **Acceptance gate after gap-closure:** re-run `bash scripts/__tests__/health-coordinator/run-all.sh` + re-execute plan 33-08's acceptance suite. Phase 33 declared complete when SPEC AC pass count goes from 7 → 13 (or 13 with documented deviations for AC#2 LLM-CLI-proxy out-of-scope).
@@ -149,14 +158,17 @@ Plans:
 Plans:
 
 **Wave 1 (parallel — disjoint files)**
+
 - [x] 34-01-PLAN.md — Update llm_cli_proxy rule in config/health-verification-rules.json: flip auto_heal=true + add cooldown 3/5min (D-06 + D-07 kill-switch via existing POST /health/refresh)
 - [x] 34-02-PLAN.md — Add state.proxy slice + pollProxySemantic (60s, D-01 payload, D-02 four-mode classification) + pollProxyMode (every tick) to scripts/health-coordinator.js — observation only, no FSM
 - [x] 34-04-PLAN.md — ETM strip (D-08 Plan A): delete ~80 LoC of dead online-learning paths from scripts/enhanced-transcript-monitor.js + checkpoint cross-project ETM smoke verify (D-09 + D-10) — cherry-picked clean from `worktree-agent-a2ca353f2ad671350`; auto-merge resolved both 34-04's strip and this session's per-exchange tranche routing + lock fix; structural grep gates pass; live ETM smoke (D-09/D-10 hard-restart with prompt-flow check) deferred to operator window since the plan is `autonomous: false`
 - [x] 34-06-PLAN.md — Phase 33 leftover closure: AC #6 detection-latency P95 ≤ 10s + AC #11 destructive kill -9 respawn ≤ 30s + plist dead-key cleanup (D-15 + D-16 + D-17) — Option B applied; bootout/bootstrap re-applied plist (uptime 4326s → 3s); AC #6 PASS (50 trials, both assertions green); AC #11 PASS (1s respawn vs 30s threshold); Phase 33 re-run halts on pre-existing two-session-agreement test-side bug from `8f304038e` compound-key migration — NOT a 34-06 regression; D-14 24h soak gate PENDING by design (post-merge)
 
 **Wave 2** *(depends on Wave 1 — Plan 34-03 reads RULES from 34-01 + adds FSM on top of 34-02; Plan 34-05 deletes files orphaned by 34-04 + surfaces state.proxy from 34-02)*
+
 - [x] 34-03-PLAN.md — Auto-heal FSM (D-06 cooldown) + VPN/CN flap kickstart (D-05) wired into pollProxySemantic + pollProxyMode; rewrite restartLLMCLIProxy() in scripts/health-remediation-actions.js to use launchctl kickstart -k (PATTERNS.md anomaly #3) — Task 1 PID-change + D-07 kill-switch verified live; R3/R4 destructive tests deferred per SUMMARY operator runbook
 - [x] 34-05-PLAN.md — ETM Plan B + surface: delete 6 source files + clean dead readers in scripts/combined-status-line.js (Task 2(d) closed 2026-05-11 — methods 1+2 refactored to PSM-only; method 3 sync-constraint deferred; net -54 LoC) + add [🧠] proxy badge (collision-resolved with UKB indicator per anomaly #1) + add LLM Proxy Health card to system-health-dashboard (D-11 + FUSE caveat); W-1 live tmux render operator-verified 2026-05-11
+
 </details>
 
 ### Phase 35: Observation & Digest Retention with JSON Cold-Store Fallback
@@ -168,14 +180,17 @@ Plans:
 Plans:
 
 **Wave 1 (parallel — disjoint files)** — DONE 2026-05-15
+
 - [x] 35-01-PLAN.md — `retentionDays: 7` added to `.observations/config.json`; `ObservationWriter` exposes `this.retentionDays` with constructor-time throw on `< 1` (CONTEXT.md L4 dedup-floor invariant); 5-case Jest suite; also restored empty `test/setup.js` blocker (Rule-3 deviation, noted in SUMMARY) — commits `c470b8c05` + `b16f5ca2a` + SUMMARY `0c0500fe9`
 - [x] 35-03-PLAN.md — `ColdStoreReader` read-only range query over `.data/observation-export/{observations,digests}.json` with day-bucketed LRU + fresh-rows-Map decoupling for windows larger than cacheSize; 7-case Jest suite includes source-grep invariant #3 (zero write-API references); commits `47cd10b9f` + `cbd32dd86` + `97ef09118` + SUMMARY `121b02dfc`
 
 **Wave 2** *(sequenced — 35-04 wires both into obs-api)*
+
 - [x] 35-02-PLAN.md — `ObservationPruner` module landed: stateless class, duck-typed DB handle, single transactional `.prune()`; FTS5 trigger drives `observations_fts` sync transparently; 5-case Jest suite (HAS_FTS5-gated) including source-grep invariant #2 — commits `f7ef097fd` + `3fcff881a` + SUMMARY `249954ea0`
 - [ ] 35-04-PLAN.md — Wire pruner + reader into `scripts/observations-api-server.mjs`: 1h pruner interval on boot; `/api/observations` + `/api/digests` merge SQLite + ColdStoreReader rows on `offset === 0` when `from` is older than retention boundary (Option B — SQLite-only on `offset > 0` preserves pagination semantics); requires `launchctl kickstart` of obs-api to deploy
 
 **Wave 3**
+
 - [ ] 35-05-PLAN.md — Dashboard backend pass-through verify (`_forwardObsApi` byte-pipe is shape-agnostic, no code change required) + add non-mutating `JSON.parse` tap that logs `[Dashboard:ColdStore]` when `_metadata.fromColdStore === true`, preserving byte-for-byte body fidelity; FUSE-cache-aware rollout via `docker-compose restart coding-services`
 
 ### Phase 36: token-usage per-user hourly exports (mirror LSL conventions for git-trackable JSON)
@@ -190,19 +205,24 @@ Plans:
 Plans:
 
 **Wave 1 (parallel — disjoint files)**
+
 - [x] 36-01-PLAN.md — Coordinator publishes `currentState.lsl_meta.current_window` at `/health/state` (HHMM-HHMM, via `getTimeWindow(utcToLocalTime(new Date()))`, cached `sessionDurationMs`, R6 'unknown' on error). Touches `scripts/health-coordinator.js` only.
 - [x] 36-02-PLAN.md — `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` exports `LLM_PROXY_USER_HASH` before `exec node` (ESM `import()` of `scripts/user-hash-generator.js`, regex-validated, fallback to `'unknown'`). Wrapper IS what launchd invokes — `bin/coding` is NOT modified.
 
 **Wave 2** *(depends on Wave 1 — needs both coordinator window publish AND env-side hash)*
+
 - [x] 36-03-PLAN.md — Proxy writer rewrite in `_work/rapid-llm-proxy/src/token-usage.ts`: `resolveTokenExportDir`, `currentWindow` (coordinator-curl with 30s cache + local fallback, module-init warm), `exportToHourFile` (right-exclusive `[windowStart, windowEnd)` SELECT + `(user_hash, id)` safety-merge), per-window-keyed `Map<windowKey, Timer>` debounce. Defensive `// TODO(36-04)` fallback for the pre-migration SELECT. Build + kickstart.
 
 **Wave 3** *(depends on Wave 2 — adds schema + replaces hydrate path on the same file)*
+
 - [x] 36-04-PLAN.md — Schema migration in `initTokenDb`. Plan defect discovered during execution: SQLite refuses `ON CONFLICT(user_hash, id)` while `id` is `INTEGER PRIMARY KEY` (ROWID-aliased). User authorised composite-PK rebuild path: `PRIMARY KEY (user_hash, id)` instead of UNIQUE INDEX, INSERT OR IGNORE instead of ON CONFLICT, JS-managed `handle.nextLocalId()` instead of AUTOINCREMENT. Retag folded into the COPY's SELECT. Always-on `hydrateFromExports` (recursive walker port). Remove Plan 36-03's defensive fallback. Build + kickstart. Cross-user simulation verified.
 
 **Wave 4** *(depends on Waves 2+3 — filesystem cleanup after the proxy can write/read the new layout)*
+
 - [x] 36-05-PLAN.md — Two-commit close: (a) `.gitignore` adds explicit `*.db-wal` / `*.db-shm` / `*.db-journal` lines, preserves `!.data/llm-proxy-export/` allow-list, lands as own commit FIRST; (b) NEW `scripts/migrate-token-usage-export.mjs` (one-shot, --dry-run, idempotent) buckets the legacy monolithic file into per-(date, window, user) files under YYYY/MM/, deletes the monolith in the same commit. Idempotent re-run prints `monolith already removed`.
 
 **Wave 5 (parallel — disjoint files, polish)** *(36-06 depends_on 36-04 for server.mjs co-edit ordering; 36-07 fully independent)*
+
 - [x] 36-06-PLAN.md — Model-name canonicalization at the proxy persistence boundary. `canonicalizeModelName(raw)` pure function + `MODEL_CANONICAL_MAP` (17 entries) defined ABOVE `_tokenDb` init (TDZ fix). `model_raw TEXT` column via PRAGMA-guarded ALTER. Idempotent backfill at proxy init rewrote 1027 pre-existing rows (matches variant-table sum exactly); second boot scans 0. Dashboard "By Model" panel collapsed from 8 Claude rows to 3.
 - [x] 36-07-PLAN.md — Treemap hover tooltip in `integrations/system-health-dashboard/src/pages/token-usage.tsx`. Add `TreemapTooltip` custom component (process / total / in-out split / calls / avg latency) wired as `<Tooltip content={...}>` child of the existing `<Treemap>` at line ~354 — currently NO Tooltip is wired and the "Hover for details" subtitle is aspirational. Plus SVG `<title>` inside `TreemapContent` for native-browser/screen-reader fallback. Browser-verified via /playwright-cli per CLAUDE.md E2E memory.
 
@@ -234,11 +254,34 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Nothing (first v7.1 phase)
 **Requirements:** CORE-01, CORE-02, CORE-03
 **Success Criteria** (what must be TRUE):
+
   1. A developer can import `Entity` and `Relation` types from KM-Core in both `coding/` and `rapid-automations/` and get identical type definitions.
   2. The `GraphKMStore` adapter passes parity tests against the existing Graphology+LevelDB stores currently used by B and C (same read/write/export semantics).
   3. Every KM-Core entity carries a stable UUID identifier that survives export → restore round-trips.
   4. The `.data/knowledge-export/coding.json` and `.data/exports/*.json` paths still load via KM-Core without breaking the established two-commit / OKB-baseline guard hygiene.
-**Plans:** TBD
+
+**Plans:** 5 plans across 5 waves
+
+Plans:
+**Wave 1**
+
+- [ ] 37-01-PLAN.md — Wave 1: bootstrap ~/Agentic/km-core/ repo skeleton (package.json/tsconfig/vitest/MIT/README/CI), capture 4 frozen JSON fixtures from B+C, write all RED test scaffolds (5 unit + 1 integration TS + 1 integration shell). Sets Wave 0 harness per 37-VALIDATION.md.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 37-02-PLAN.md — Wave 2: land canonical Entity/Relation types + branded EntityId + mintEntityId/parseEntityId (UUIDv7) + BatchOp/FilterObject/event payload types + OntologyValidator stub. Closes type half of CORE-01 + CORE-03.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 37-03-PLAN.md — Wave 3: extract PersistenceManager (LevelDB+JSON-fallback+atomic temp-rename) and build Exporter (5s debounce + per-domain bucketing) from OKM + B's GraphKnowledgeExporter analogs. Closes storage primitives half of CORE-02.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 37-04-PLAN.md — Wave 4: compose GraphKMStore (extends EventEmitter; repository API; UUIDv7 stamp; D-14..D-19) and wire the public barrel src/index.ts. Closes CORE-01/CORE-02/CORE-03 from inside the km-core repo; round-trip parity green across all 4 frozen fixtures.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 37-05-PLAN.md — Wave 5 (autonomous:false, has human-verify checkpoint): coding-side wiring — submodule mount at lib/km-core/, Dockerfile install/rebuild/build, docker-compose bind-mount, BC symlink migration for .data/knowledge-export/coding.json -> .data/exports/coding.json (D-21), and a checkpoint verifying cross-repo TS import + OKB-baseline-guard hygiene end-to-end.
 
 #### Phase 38: Ontology Registry
 
@@ -247,10 +290,12 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 37
 **Requirements:** ONTO-01, ONTO-02
 **Success Criteria** (what must be TRUE):
+
   1. Dropping a new `ontology/<domain>.json` file into the configured directory makes its classes available to KM-Core consumers without code changes.
   2. A lower ontology declaring `"extends": "<upper>"` exposes the merged class catalog (upper + lower) to the registry's consumers, with lower-ontology properties overriding upper ones on conflict.
   3. The existing B component-manifest (8 L1 + 5 L2) loads cleanly as a lower ontology against the upper ontology used by C.
   4. The registry surfaces ontology metadata (class list, parent chain, extension provenance) via a stable programmatic API.
+
 **Plans:** TBD
 
 #### Phase 39: Entity Data Model
@@ -260,10 +305,12 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 37
 **Requirements:** DATA-01, DATA-02
 **Success Criteria** (what must be TRUE):
+
   1. Every KM-Core entity surfaces `validFrom`, `validUntil`, and `supersedes` fields, and an entity superseded by another is reachable via the supersedes chain from query API.
   2. Every KM-Core entity surfaces `createdBy`, `lastConfirmedBy`, `confirmationCount`, and per-segment provenance fields, populated by the writer rather than computed downstream.
   3. The B `KGEntity`/`SharedMemoryEntity` (`type`/`entityType` split, `persistence-agent.ts:583`) is replaced by the canonical KM-Core entity in the shared types; no consumer compiles against the old dual shape.
   4. A backfill operation can stamp `validFrom = createdAt` (A) or `validFrom = first-seen` (B) on legacy entities without losing existing observations or relations.
+
 **Plans:** TBD
 
 #### Phase 40: Ingest Pipeline & Layered Dedup
@@ -273,10 +320,12 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 38, Phase 39
 **Requirements:** PIPE-01, DEDUP-01
 **Success Criteria** (what must be TRUE):
+
   1. A developer can wire a new ingest adapter into KM-Core by implementing the four named stage interfaces and registering it — no fork of the pipeline code required.
   2. Running the layered dedup pipeline on a synthetic batch with a known exact-name collision, a known embedding-cosine collision, and a known LLM-semantic collision catches all three at the correct layer in order.
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
+
 **Plans:** TBD
 
 #### Phase 41: Online Learning Adapter & Post-Hoc Resolution
@@ -286,10 +335,12 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 40
 **Requirements:** INT-01, PIPE-02
 **Success Criteria** (what must be TRUE):
+
   1. A user can query A's observations / digests / insights through the KM-Core entity API and get the same content currently served by `/api/observations|digests|insights`, typed as ontology classes.
   2. A's SQLite hot write path remains unchanged — ETM writes still complete at the same latency and the cold-store JSON export contract is preserved.
   3. Triggering the post-hoc resolve-entities maintenance operation on a graph containing known cross-batch duplicates of a single ontology class collapses them into one canonical entity with merged provenance.
   4. The same post-hoc resolution API endpoint is callable against A's adapter-fronted graph (proving the operation works on KM-Core regardless of whether the underlying store is graph-native or SQLite-fronted).
+
 **Plans:** TBD
 
 #### Phase 42: Offline UKB Migration (B)
@@ -299,11 +350,13 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 40
 **Requirements:** INT-02
 **Success Criteria** (what must be TRUE):
+
   1. Running `ukb full` end-to-end produces a KM-Core-shaped knowledge graph (canonical entity, ontology registry, layered dedup, temporal validity) with the existing MCP interface unchanged.
   2. After a `wave-analysis` run completes, every persisted KG entity has its embedding present in the GraphDB (the Phase 10 issue no longer reproduces).
   3. The `workflow-runner.ts:469–530` race condition no longer fires "Race condition detected (0/0 steps) but no valid cache available" in Docker logs, and the dashboard reflects the workflow's true terminal state instead of staying "running" after completion.
   4. Wave-controller progress updates and KM-Core writes never deadlock or clobber each other — the dashboard's wave-stage view stays consistent with `.data/workflow-progress.json` throughout the run.
   5. B's existing component-manifest works unchanged as a lower ontology against KM-Core's `OntologyRegistry`.
+
 **Plans:** TBD
 
 #### Phase 43: OKM Cross-Repo Migration (C)
@@ -313,10 +366,12 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 40
 **Requirements:** INT-03
 **Success Criteria** (what must be TRUE):
+
   1. The `rapid-automations` CI pipeline is green on the migration branch and on `main` after merge.
   2. OKM consumes KM-Core via the agreed packaging strategy (decided during this phase's discuss phase — submodule, npm package, or vendored copy) without copying or forking KM-Core source.
   3. Existing OKM REST consumers (VOKB viewer, `/api/entities`, `/api/relations`, `/api/search`, `/api/clusters`, `/api/rca-lookup`) continue to return the same shape they did before migration.
   4. OKM's per-domain JSON exports under `.data/exports/{domain}.json` continue to land with the same commit hygiene as before the migration.
+
 **Plans:** TBD
 
 #### Phase 44: REST API & Git Snapshots
@@ -326,10 +381,12 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 41, Phase 42, Phase 43
 **Requirements:** API-01, API-02
 **Success Criteria** (what must be TRUE):
+
   1. The same REST request (e.g. `GET /api/entities?ontologyClass=...`) returns shape-identical responses against A, B, and C — only the data and ontology classes differ.
   2. A user can take a git snapshot of `.data/exports/` in any of the three systems and restore an earlier state via the shared snapshot/restore endpoint, with the resulting graph identical to the snapshot.
   3. A's existing `/api/observations|digests|insights` endpoints remain callable but resolve internally to typed views over `/api/entities?ontologyClass=...` (no consumer breakage during transition).
   4. The git two-commit pattern and OKB-baseline guard from existing export hygiene still hold under the unified snapshot endpoint.
+
 **Plans:** TBD
 
 #### Phase 45: Unified Web Viewer
@@ -339,10 +396,12 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 42, Phase 44
 **Requirements:** UI-01
 **Success Criteria** (what must be TRUE):
+
   1. A user can open the unified viewer pointed at A, B, or C's REST API and see the graph rendered with that system's ontology classes, colors, and hierarchy.
   2. Every interactive feature currently used by VKB users (entity click, expand, filter, search) and VOKB users (force-directed view, cluster overlays, RCA lookup) is present in the unified viewer.
   3. A VKB or VOKB user can switch to the unified viewer for daily work and not regress on any task they used to perform in the legacy viewer.
   4. The viewer's data layer reads exclusively through the Phase 44 REST contract — no direct LevelDB or SQLite access from the frontend.
+
 **Plans:** TBD
 **UI hint**: yes
 
@@ -353,10 +412,12 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Depends on:** Phase 45
 **Requirements:** DOC-01
 **Success Criteria** (what must be TRUE):
+
   1. A new contributor reading A's, B's, or C's README can locate within five minutes the exact config file(s) they would edit to add a new ontology class or LLM provider for that system.
   2. KM-Core's architecture diagram clearly distinguishes shared core (types, store, registry, pipeline, dedup, REST, viewer) from per-system configuration (ontology files, LLM config, ingest adapters, domain eval).
   3. The onboarding guide walks a new developer from clone → run KM-Core tests → register a new lower ontology → ingest a sample entity, with each step verifiable.
   4. Each system's README cross-references the others and KM-Core, so a contributor entering through any of the four doors can navigate to the others.
+
 **Plans:** TBD
 
 ### Progress
@@ -385,4 +446,5 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (promote with /gsd-review-backlog when ready)

@@ -728,24 +728,24 @@ store.on('entity:put', (event) => {
 | A6 | The `domain` field exists in `entity.metadata.domain` for OKM entities (verified in C's persistence.ts line 106) but does NOT exist in B's current `KGEntity`/`SharedMemoryEntity` shape | Pattern 3 | When B migrates in Phase 42, its entities must gain a `metadata.domain` field. For Phase 37 (no B migration), the exporter defaults missing domains to `'general'` — same behavior as C (line 106). |
 | A7 | The `level` umbrella to `classic-level` substitution is transparent to B's existing `level@^10.0.0` consumers in coding/integrations/mcp-server-semantic-analysis | Pitfall 6 | If something in B uses umbrella-only API, the substitution isn't transparent. NPM published metadata shows level 10 is essentially an alias loader for classic-level — LOW risk. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does `lib/` need to be added to coding's `.gitignore` somewhere?**
+1. **RESOLVED: Does `lib/` need to be added to coding's `.gitignore` somewhere?** — deferred to Plan 01 Wave 0 — see Plan 01 Task 1 `<acceptance_criteria>` for the gitignore-propagation check.
    - What we know: `lib/llm`, `lib/agent-api`, etc. are in-repo dirs (not gitignored). They have `node_modules/` which IS gitignored at the root level by `node_modules/` pattern.
    - What's unclear: Does the existing root `node_modules/` exclusion catch `lib/km-core/node_modules/` recursively?
    - Recommendation: Verify with `git check-ignore -v lib/km-core/node_modules/foo`. If not caught, add an explicit `lib/km-core/node_modules/` line — but this is a code-level concern for plan execution, not phase planning.
 
-2. **Should `EntityId` be a discriminated union (`EvidenceId | PatternId`) keyed by `layer`?**
+2. **RESOLVED: Should `EntityId` be a discriminated union (`EvidenceId | PatternId`) keyed by `layer`?** — D-11 picks plain UUIDv7 branded string, no discriminated union.
    - What we know: C's keys use `"evidence:" + uuid` and `"pattern:" + uuid` prefixes (verified by persistence.test.ts line 58).
    - What's unclear: Whether KM-Core canonicalizes to plain UUID strings or keeps the prefix.
    - Recommendation: **Plain UUIDv7 strings**. The `layer` field on `Entity` already discriminates. Prefix-encoding is a C artifact that should not propagate. C's migration in Phase 43 strips prefixes during read.
 
-3. **What does Phase 37's "manual publish workflow" actually do?**
+3. **RESOLVED: What does Phase 37's "manual publish workflow" actually do?** — Manual `workflow_dispatch` produces an `npm pack` tarball artifact only; no `npm publish` in v0.1 — see Plan 01 Task 1 `.github/workflows/publish.yml`.
    - What we know: D-07 says "manual-trigger npm publish workflow (not auto-fired in v7.1)".
    - What's unclear: Does it `npm publish` to the public registry, to GitHub Packages, or just produce a `.tgz` artifact?
    - Recommendation: `workflow_dispatch` trigger that produces a `.tgz` via `npm pack` as a GitHub Actions artifact. No actual `npm publish` — that's deferred entirely. Avoids accidental publication during the v7.1 window.
 
-4. **Should KM-Core ship a Python sister package or REST shim for A (online learning)?**
+4. **RESOLVED: Should KM-Core ship a Python sister package or REST shim for A (online learning)?** — Phase 41 wires A's adapter as a direct Node import per D-04 mount convention; out of v7.1 to formalize the contract.
    - What we know: A keeps SQLite per CONTEXT.md and the "What stays per-system" section of the milestone research. A's adapter (Phase 41) is "a thin KM-Core adapter exposes observations/digests/insights as KM-Core entities."
    - What's unclear: Is the adapter purely in Node (importing `@fwornle/km-core` directly), or does it call into KM-Core via REST?
    - Recommendation: **Direct Node import** — A's hot path stays SQLite-native, but the read-side adapter (the part that surfaces observations as KM-Core entities) is a Node module that imports km-core types. No REST shim needed. Phase 41 detail.
