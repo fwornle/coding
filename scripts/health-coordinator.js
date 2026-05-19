@@ -690,6 +690,49 @@ async function pollProxySemantic() {
  * has to clear the slowest configured route by a comfortable margin or the
  * brain will flap amber every probe cycle.
  */
+/**
+ * Query the LLM proxy for the most recent observation-writer call timestamp.
+ * Returns the age in ms since that call, or null when no row exists or the
+ * call fails. Used as the "real-traffic" gate that decides whether to fire
+ * the synthetic strong probe (which costs ~14-22K tokens on the CLI fallback
+ * path) or skip it because real traffic has already proven the pipeline works.
+ *
+ * Short timeout (3s) because the proxy's token-usage endpoints are sub-10ms
+ * SQL reads — anything slower is a sign of trouble and we should fail open
+ * and fall through to the synthetic probe.
+ */
+async function fetchLastObservationWriterCallAge() {
+  try {
+    // limit=10 gives us headroom to skip over our own recent probe calls
+    // (which also appear in the proxy's token-usage DB as observation-writer
+    // rows with the same routing). A real call has output_tokens >> 4; the
+    // probe always emits "OK" → 4 tokens. Threshold of 10 cleanly separates.
+    const res = await fetch(
+      `${PROXY_URL}/api/token-usage/recent?process=observation-writer&limit=10`,
+      { signal: AbortSignal.timeout(3000) },
+    );
+    if (!res.ok) return null;
+    const body = await res.json();
+    const rows = body?.data || [];
+    // Find the most recent row that looks like a REAL call (substantial
+    // output, ruling out the probe's 4-token "OK"). Without this filter the
+    // probe would self-attest and never fire again — a worse failure mode
+    // than burning tokens.
+    const row = rows.find(r =>
+      Number(r.output_tokens) > 10 &&
+      r.timestamp && (r.prompt_preview || '').toLowerCase() !== 'say ok'
+    );
+    if (!row?.timestamp) return null;
+    const t = new Date(row.timestamp).getTime();
+    if (!Number.isFinite(t)) return null;
+    return Date.now() - t;
+  } catch (err) {
+    // Re-throw so the caller can distinguish "proxy unreachable" from
+    // "proxy says no observation-writer calls".
+    throw err;
+  }
+}
+
 async function pollProxySemanticStrong() {
   const probeEndedAt = () => new Date().toISOString();
   const start = Date.now();
@@ -1366,26 +1409,42 @@ async function runAllChecks() {
     ? Date.now() - new Date(currentState.proxy.semantic_strong_last_probe_end).getTime()
     : Infinity;
   if (_strongAge >= PROXY_STRONG_PROBE_INTERVAL_MS) {
-    const _lastObsIso = currentState.knowledge_pipeline?.lastObservationAt;
-    const realObsAge = _lastObsIso ? Date.now() - new Date(_lastObsIso).getTime() : null;
-    if (realObsAge !== null && realObsAge < PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS) {
-      // Recent real observation-writer traffic proves the configured pipeline
-      // works. Adopt that as the strong-probe success signal without spending
-      // tokens on a synthetic probe.
-      const prev = currentState.proxy.semantic_strong_ok;
-      currentState.proxy.semantic_strong_ok = true;
-      currentState.proxy.semantic_strong_reason = 'recent-real-traffic';
-      currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
-      currentState.proxy.semantic_strong_round_trip_ms = null; // n/a — no synthetic call
-      if (prev !== true) log(`proxy semantic_strong_ok flip -> true (recent-real-traffic age=${Math.round(realObsAge/1000)}s)`, 'INFO');
-    } else {
+    // Query the proxy's token-usage DB for the most recent observation-writer
+    // call. That timestamp is set the instant the LLM call completes — much
+    // tighter than knowledge_pipeline.lastObservationAt which lags by 10-15s
+    // (the observation-writer's own LLM call is itself slow via CLI fallback,
+    // so by the time the DB row lands the synthetic-probe window has elapsed).
+    fetchLastObservationWriterCallAge().then(realObsAgeMs => {
+      if (realObsAgeMs !== null && realObsAgeMs < PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS) {
+        // Recent real observation-writer LLM call proves the configured pipeline
+        // works. Adopt that as the strong-probe success signal without spending
+        // tokens on a synthetic say-OK.
+        const prev = currentState.proxy.semantic_strong_ok;
+        currentState.proxy.semantic_strong_ok = true;
+        currentState.proxy.semantic_strong_reason = 'recent-real-traffic';
+        currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
+        currentState.proxy.semantic_strong_round_trip_ms = null;
+        if (prev !== true) log(`proxy semantic_strong_ok flip -> true (recent-real-traffic age=${Math.round(realObsAgeMs/1000)}s)`, 'INFO');
+        return;
+      }
+      // No recent real traffic — fall back to the synthetic probe.
       pollProxySemanticStrong().catch(err => {
         log(`proxy semantic_strong probe threw: ${err.message}`, 'ERROR');
         currentState.proxy.semantic_strong_ok = false;
         currentState.proxy.semantic_strong_reason = `exception_${err.message || 'unknown'}`;
         currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
       });
-    }
+    }).catch(err => {
+      // If the proxy probe itself is unreachable, don't silently skip — fall
+      // through to the synthetic probe path (which will set its own state).
+      log(`proxy token-usage probe threw: ${err.message}; firing synthetic`, 'WARN');
+      pollProxySemanticStrong().catch(probeErr => {
+        log(`proxy semantic_strong probe threw: ${probeErr.message}`, 'ERROR');
+        currentState.proxy.semantic_strong_ok = false;
+        currentState.proxy.semantic_strong_reason = `exception_${probeErr.message || 'unknown'}`;
+        currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
+      });
+    });
   }
 
   // ----- Service liveness via PSM (host services only — D-08 drops container supervisorctl) -----
