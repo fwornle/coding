@@ -11456,25 +11456,6 @@
     "project": "coding"
   },
   {
-    "id": "da0fc95d-dcde-4ee7-b5bd-89883e7aff4a",
-    "date": "2026-05-08",
-    "theme": "Mishandled Style Guide Input, Unrelated Tmux Investigation",
-    "summary": "The developer provided a documentation style guide as context/instructions. Instead of acknowledging or applying the style guide, the assistant misinterpreted the input as a trigger to investigate unrelated tmux status-line tooling issues.\n\n- No documentation work was performed\n- No artifacts were created or modified\n- The assistant's response was entirely off-topic, investigating tmux/status-line issues irrelevant to the input\n- Root issue: failure to correctly parse developer intent from the incoming message",
-    "observationIds": [
-      "a2fbb440-1415-4cca-aafb-dd0ec402f829"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-05-14T14:09:29.404Z",
-    "metadata": {
-      "sourceCount": 1
-    },
-    "project": "coding"
-  },
-  {
     "id": "f5d53227-792a-412c-9457-99761b9ac92d",
     "date": "2026-05-09",
     "theme": "Tmux Status Line Residue Bug Investigation and Fix",
@@ -11571,25 +11552,6 @@
     "createdAt": "2026-05-10T04:56:00.650Z",
     "metadata": {
       "sourceCount": 5
-    },
-    "project": "coding"
-  },
-  {
-    "id": "c6608904-5e8f-46c9-b28c-a4eb9aee868b",
-    "date": "2026-05-09",
-    "theme": "ETM Restart and Server.js Investigation",
-    "summary": "At 04:17, the claude agent restarted the Enhanced Transcript Monitor (ETM) as a background process and began investigating remediation/auto-heal logic in `server.js`. No files were modified during this session — the `server.js` investigation remained incomplete at the end of the exchange.",
-    "observationIds": [
-      "cd1d0646-3a17-49a6-bec3-fde607f9e8f2"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-05-14T14:09:32.766Z",
-    "metadata": {
-      "sourceCount": 1
     },
     "project": "coding"
   },
@@ -11996,6 +11958,44 @@
       "sourceCount": 1
     },
     "project": "sketcher"
+  },
+  {
+    "id": "da0fc95d-dcde-4ee7-b5bd-89883e7aff4a",
+    "date": "2026-05-08",
+    "theme": "Mishandled Style Guide Input, Unrelated Tmux Investigation",
+    "summary": "The developer provided a documentation style guide as context/instructions. Instead of acknowledging or applying the style guide, the assistant misinterpreted the input as a trigger to investigate unrelated tmux status-line tooling issues.\n\n- No documentation work was performed\n- No artifacts were created or modified\n- The assistant's response was entirely off-topic, investigating tmux/status-line issues irrelevant to the input\n- Root issue: failure to correctly parse developer intent from the incoming message",
+    "observationIds": [
+      "a2fbb440-1415-4cca-aafb-dd0ec402f829"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:29.404Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c6608904-5e8f-46c9-b28c-a4eb9aee868b",
+    "date": "2026-05-09",
+    "theme": "ETM Restart and Server.js Investigation",
+    "summary": "At 04:17, the claude agent restarted the Enhanced Transcript Monitor (ETM) as a background process and began investigating remediation/auto-heal logic in `server.js`. No files were modified during this session — the `server.js` investigation remained incomplete at the end of the exchange.",
+    "observationIds": [
+      "cd1d0646-3a17-49a6-bec3-fde607f9e8f2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:32.766Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
   },
   {
     "id": "b2aa736b-c3d4-4c45-994c-76bb559cf722",
@@ -16660,6 +16660,149 @@
     "createdAt": "2026-05-18T00:11:41.331Z",
     "metadata": {
       "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "34d1bcae-2c0f-4c1c-8751-80519dcf6931",
+    "date": "2026-05-18",
+    "theme": "Investigating 0/0 Ratio Bug and VKB Sync Issues",
+    "summary": "Triggered by shared screenshots, the session investigated two issues: a 0/0 ratio bug in claim verification and questions around knowledge graph/VKB sync integration.\n\n- <USER_ID_REDACTED> the database and ran grep searches across the codebase to locate relevant code paths\n- Identified areas in `ObservationConsolidator.js` related to claim verification ratios and VKB sync integration points\n- No conclusions or fixes were reached; the session ended at the preliminary investigation stage",
+    "observationIds": [
+      "1eef84f4-a88a-4d6e-964c-a09efa857a0f",
+      "d33f1393-5b32-4aec-a975-70f472685104"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-18T15:00:29.335Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "577b3c37-4bd3-4d83-8486-9a2fc5b942ad",
+    "date": "2026-05-18",
+    "theme": "Designing Churn-Gated Age Decay for Truthfulness Scores",
+    "summary": "A design discussion evaluated whether wall-clock age decay for truthfulness scores should be replaced with a signal derived from actual codebase activity.\n\n- Proposed replacing pure time-based decay with **churn-gated decay**: no file churn in git history = no age drag applied\n- Added a small residual \"emergent decay\" capped at `-0.10` to account for unknown side effects from untracked changes\n- Decision: expose a `decayBreakdown` metadata field in `ObservationConsolidator.js` for auditability\n- Two implementation paths offered: churn-gated model or dropping age decay entirely",
+    "observationIds": [
+      "ce40e4a3-e538-42e3-bad5-b4882133d588"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-18T15:00:29.335Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5d90d04f-0fc3-40aa-b24f-14483319a2ca",
+    "date": "2026-05-18",
+    "theme": "Fixing NO_DIGESTS Dead-End When Updating Pruned Insights",
+    "summary": "Screenshots revealed that the \"Update\" button on insights failed fatally when source digests had been pruned, throwing a `NO_DIGESTS` error with no recovery path.\n\n- Root cause: the re-synthesis prompt builder required original source digests to be present and had no fallback\n- Fix introduced a `sourceMode` branch in `_buildResynthesisPrompt` within `ObservationConsolidator.js` so that when digests are unavailable, the insight's own current content serves as the source of truth\n- `sourceMode` is surfaced in the response so callers can distinguish summary-only re-synthesis from full digest re-synthesis\n- The Update button no longer dead-ends on pruned insights",
+    "observationIds": [
+      "a06fb6ce-daac-457f-a406-b67e6b315222",
+      "d59c9402-b233-48e6-95bc-283ec3d4be61",
+      "3d53aff2-6db7-403c-811c-01480b87f6f1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-18T15:00:29.335Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "206bdff5-5839-4f1b-92da-e63ecbe3bacd",
+    "date": "2026-05-18",
+    "theme": "Fixing Claim Extractor Producing Zero Claims After Resynthesis",
+    "summary": "After the re-synthesis fallback was added, resynthesized insights still showed `totalClaims = 0` on the Coverage page despite containing backtick-wrapped file references.\n\n- Root cause: `_extractCodeClaims` required a `/` character to recognize a path, silently dropping bare filenames (e.g. `` `install.sh` ``) and kebab-case names (e.g. `` `mcp-server-semantic-analysis` ``)\n- Fix added two new claim types — `FILE_BASENAME` and `DIR_BASENAME` — to the extractor in `ObservationConsolidator.js`\n- Backtick-wrapped filenames and directory/server names without slashes are now recognized as valid claims\n- Resynthesized observations now produce non-zero `totalClaims` and Coverage page verification state reflects accurate data",
+    "observationIds": [
+      "2c4bc38a-51cd-49dd-a70e-d0b7314d6628",
+      "5cd080c6-b162-4695-863f-ad1f0487423c",
+      "8b008b4d-102e-44a3-9e1d-752b8a172e2c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-18T15:00:29.335Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "464298ab-2fd0-46ed-9618-2b39b517ba1c",
+    "date": "2026-05-18",
+    "theme": "Health Dashboard Network Detection and Proxy Auto-Enable Fixes",
+    "summary": "A cascading set of health monitoring failures were diagnosed and fixed across multiple observations, all driven by `opencode`.\n\n**Root causes identified:**\n- Long-running coordinator process (started Saturday) had stale DNS resolver state, causing PAC DNS lookups to fail silently and location to report `HOME` instead of `CN`\n- `proxy_running` logic was too strict: required both env vars set AND port 3128 listening\n- Overall `overallStatus` computation ignored proxy/network health entirely\n- Dashboard API used `host.docker.internal` instead of `localhost` in a non-Docker context, causing \"Failed to fetch\" errors\n- Port conflicts between coordinator (3034), dashboard API (3033), and frontend (3032)\n- Multiple stale coordinator instances running simultaneously\n\n**Fixes applied:**\n- Restarting the coordinator immediately resolved DNS staleness and restored `N:CN` detection\n- Auto-enable logic added: when corporate network detected and port 3128 is listening but proxy env vars are absent, they are set automatically\n- Latency-based heuristic added to distinguish physical corporate LAN (`N:CN`, <5ms) from VPN tunnel (`N:VPN`, 20–100ms+) using ping to a CN-internal host\n- Network state `HOME` renamed to `OPEN`; valid states are now `N:OPEN`, `N:CN`, `N:VPN`\n- `host.docker.internal` URL corrected to `localhost`; port conflicts resolved\n- Edited: health-coordinator source, network detection/auto-proxy logic, dashboard health computation, `health-coordinator.js`, statusline rendering",
+    "observationIds": [
+      "3c75e6f6-fa3a-47a0-b16d-e8901e599b3a",
+      "034b6553-eb95-4201-b5dc-ebe39d610080",
+      "66fa4542-1da9-49ab-b12c-7b5136b62739",
+      "26886bee-4fd1-4135-8566-fa53a7dedea2",
+      "9a15fd84-0cd8-4ca4-9b40-9c141397cea2",
+      "199d97ff-53a1-47c7-ac78-4a001cd9578d",
+      "d4b9e3a5-8a65-47b0-bec6-766fdc9ac8ff",
+      "ecfc83c7-ad15-4a1f-9f2f-949dad15e31e",
+      "0c7a7592-3db9-41a7-ab21-d184e5c55da6"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "health-coordinator source file (network detection and overall status logic)",
+      "health-coordinator source (network detection and auto-proxy logic)",
+      "dashboard health computation logic",
+      "coordinator network status polling file (location logic update)",
+      "(network-related config/coordinator and statusline files",
+      "health-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-18T15:00:29.335Z",
+    "metadata": {
+      "sourceCount": 9
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5ce982d1-0dc6-486a-9b47-db010d2e7e08",
+    "date": "2026-05-18",
+    "theme": "Docker Engine Crash Bringing Down Dependent Services",
+    "summary": "A Docker Desktop restart caused multiple dependent services to go offline simultaneously.\n\n- Services affected: VKB, Constraint Monitor, Dashboard, Semantic Analysis, and Qdrant\n- Despite Docker Desktop GUI reporting \"Engine running,\" nothing was listening on the Docker socket — attributed to a known crash in Docker Desktop v4.73's socket forwarding process\n- Assistant checked Docker socket connectivity and proxy configuration to confirm the diagnosis\n- Recovery of affected services was initiated but not fully resolved within these observations",
+    "observationIds": [
+      "a769ef5a-2d54-4f72-ad2c-46d6fca60643",
+      "90a6b6a5-c403-4d48-8955-58ae59e54da1"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-18T15:00:29.335Z",
+    "metadata": {
+      "sourceCount": 2
     },
     "project": "coding"
   }

@@ -25057,7 +25057,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-18T04:49:37.486Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25073,7 +25073,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-18T04:49:37.486Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25089,7 +25089,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-18T05:54:52.874Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25105,7 +25105,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-18T06:11:03.987Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25121,7 +25121,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-18T06:11:03.987Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25137,7 +25137,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-18T06:11:03.987Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25153,7 +25153,7 @@
     "project": "coding",
     "quality": "normal",
     "createdAt": "2026-05-18T06:21:17.409Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25169,7 +25169,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-18T06:21:17.409Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25185,7 +25185,7 @@
     "project": "coding",
     "quality": "high",
     "createdAt": "2026-05-18T06:21:17.409Z",
-    "digestedAt": null,
+    "digestedAt": "2026-05-18T15:00:29.335Z",
     "llm": {
       "model": "Claude Sonnet 4.6",
       "provider": "copilot"
@@ -25193,5 +25193,247 @@
     "modifiedFiles": [
       "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationConsolidator.js"
     ]
+  },
+  {
+    "id": "3c75e6f6-fa3a-47a0-b16d-e8901e599b3a",
+    "summary": "Intent: Investigate and fix inconsistent health dashboard state showing issues while reporting \"healthy\", and fix network detection reporting HOME instead of CN with proxy not auto-enabling.\nApproach: Traced the cascade: PAC DNS resolution fails in the long-running coordinator process (stale DNS state since Saturday), causing location to report \"home\"; additionally overall health status computation ignores proxy/network state entirely; proxy_running logic requires both env vars AND port listening, but port 3128 is up without env vars set.\nArtifacts: none\nResult: Root causes identified but not yet fixed: coordinator process has stale DNS resolver state (started Saturday, network changed), causing N:HOME instead of N:CN; proxy_running logic too strict (requires env vars + port); dashboard overallStatus ignores proxy/network health. Coordinator restart was being attempted to verify DNS staleness fix.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T13:14:38.190Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "034b6553-eb95-4201-b5dc-ebe39d610080",
+    "summary": "Intent: Fix inconsistent health dashboard state where network detection shows HOME instead of CN, proxy shows OFF despite being on corporate network, and dashboard reports \"no degradation\" despite actual issues.\nApproach: Investigated root cause as DNS resolver staleness in long-running Node.js process (running since Saturday), which caused PAC DNS lookup to fail and cascade into wrong location/proxy detection. Fix involves DNS refresh, auto-proxy enabling when on CN with port 3128 listening, and factoring proxy/network into overall health status.\nArtifacts: edited health-coordinator source file (network detection and overall status logic)\nResult: Restarting the coordinator immediately fixed N:CN detection by resolving DNS staleness. Permanent fixes in progress: periodic DNS cache invalidation, auto-enable proxy env vars when on CN with proxy port listening, and including proxy/network state in dashboard overall health computation.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T13:14:38.190Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "66fa4542-1da9-49ab-b12c-7b5136b62739",
+    "summary": "Intent: Fix inconsistent health board state where LLM proxy issues were shown but \"no degradation\" reported, network detection showing HOME/P:OFF when it should show CN/P:ON, and request auto-proxy switching when inside CN network.\nApproach: Diagnosed stale DNS resolver state in long-running Node.js process (running since Saturday), which caused PAC DNS resolution to fail silently, cascading into wrong location detection and proxy disabled state. Fixed by restarting coordinator and adding auto-enable logic for proxy when on CN with port 3128 listening but env vars unset.\nArtifacts: edited health-coordinator source (network detection and auto-proxy logic), edited dashboard health computation logic\nResult: Restarting the coordinator restored correct location detection (corporate/VPN). Auto-enable logic was added so when CN is detected and port 3128 is listening but proxy env vars are absent, they are automatically set — resulting in proxy_running=true, proxy_functional=true, and statusline showing correct N:VPN/P:ON state.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T13:14:38.190Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "26886bee-4fd1-4135-8566-fa53a7dedea2",
+    "summary": "Intent: Distinguish between being physically on CN (corporate network) vs. connected via VPN when both require proxy usage.\nApproach: Use latency-based heuristic to differentiate physical LAN presence (low latency <5ms) from VPN tunnel (higher latency 20-100ms+) when PAC resolves and proxy is running.\nArtifacts: edited coordinator network status polling file (location logic update)\nResult: Updated location detection logic so that physically being on CN shows as `[N:CN]` while remote VPN connections show as `[N:VPN]`, using ping latency to a CN-internal host as the distinguishing signal.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T14:16:29.250Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "9a15fd84-0cd8-4ca4-9b40-9c141397cea2",
+    "summary": "Intent: Fix incorrect network state label from \"HOME\" to \"OPEN\" and ensure network states are correctly named as N:OPEN, N:CN, and N:VPN.\nApproach: Update the network state value and its display mapping across the coordinator logic and statusline rendering.\nArtifacts: edited (network-related config/coordinator and statusline files, specific paths not captured)\nResult: Network state previously labeled \"HOME\" renamed to \"OPEN\" throughout, with the three valid states now being N:OPEN, N:CN, and N:VPN.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T14:26:08.014Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "199d97ff-53a1-47c7-ac78-4a001cd9578d",
+    "summary": "Intent: Report severely degraded health dashboard showing \"Offline\" and \"Failed to fetch\" errors.\nApproach: Diagnosed cascading issues: stale coordinator process, wrong host (host.docker.internal vs localhost), and port conflict between dashboard API and coordinator.\nArtifacts: none\nResult: Root causes identified — coordinator was unreachable due to host.docker.internal resolution failure in non-Docker context, and port 3033 conflict between dashboard API and coordinator; fix in progress by restarting with HEALTH_COORDINATOR_URL=http://localhost:3034.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-18T14:27:06.778Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "d4b9e3a5-8a65-47b0-bec6-766fdc9ac8ff",
+    "summary": "Intent: Fix severely degraded health monitoring system shown in screenshot\nApproach: Diagnosed port conflicts between coordinator (3034), dashboard API (3033), and frontend (3032), fixed `host.docker.internal` URL to `localhost`, and improved network location detection using TCP latency thresholds to distinguish physical corporate from VPN.\nArtifacts: edited health-coordinator.js\nResult: Health coordinator correctly detects `location=corporate` using 30ms TCP latency threshold to PAC host, proxy auto-enables on corporate network, dashboard restored on ports 3032/3033, and statusline now shows `N:CN`/`N:VPN`/`N:OPEN` correctly.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T14:27:06.778Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ecfc83c7-ad15-4a1f-9f2f-949dad15e31e",
+    "summary": "Intent: Debug and fix a downed health monitoring system showing no data in the dashboard.\nApproach: Investigated running processes and port bindings to identify that multiple coordinator instances were running and the dashboard was only binding one of its two required ports.\nArtifacts: none\nResult: Found that the previous coordinator process (PID 4917) was still running alongside a new one, and the dashboard process had only bound port 3033 (API) but not 3032 (frontend); both ports were restored to listening state during the investigation.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-18T14:38:16.730Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "0c7a7592-3db9-41a7-ab21-d184e5c55da6",
+    "summary": "Intent: [user shared a screenshot, likely showing an error or system state related to a running service/dashboard]\nApproach: Diagnosed a cascade failure where dashboard API couldn't reach coordinator due to stale coordinator state, requiring clean restart in dependency order.\nArtifacts: none\nResult: Coordinator restarted successfully with correct state on port 3034; dashboard API on 3033 came up but frontend on 3032 failed to bind, investigation ongoing.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-18T14:40:01.861Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "a769ef5a-2d54-4f72-ad2c-46d6fca60643",
+    "summary": "Intent: Report that restarting the Docker engine caused system services to go down, as shown in a screenshot.\nApproach: Diagnose which services were affected by the Docker restart and bring them back up.\nArtifacts: none\nResult: Docker restart caused VKB, Constraint Monitor, Dashboard, Semantic Analysis, and Qdrant services to go down; assistant identified the issues and began restoring them.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-18T14:46:19.741Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "90a6b6a5-c403-4d48-8955-58ae59e54da1",
+    "summary": "Intent: [user shared a screenshot, likely showing a Docker Desktop or terminal error for diagnosis]\nApproach: Assistant checked Docker socket connectivity and proxy configuration to diagnose why Docker CLI couldn't communicate with the engine despite the GUI showing it as running.\nArtifacts: none\nResult: Identified that nothing was listening on the Docker socket despite Docker Desktop showing \"Engine running,\" attributed to a known issue in Docker Desktop v4.73 where the socket forwarding process may have crashed.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-18T14:50:36.787Z",
+    "digestedAt": "2026-05-18T15:00:29.335Z",
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "cab10f44-2064-440f-bc9f-e857a946d581",
+    "summary": "Intent: [debugging impaired health check status for Docker container services showing ports not mapped to host]\nApproach: Identified that the `coding-services` container was running but without port bindings published to host, requiring force-recreation via docker compose and stopping a conflicting host-side dashboard process occupying port 3033.\nArtifacts: none\nResult: Container was force-recreated with proper port mappings for services on 3030, 3031, 3848, and 8080; a conflicting host dashboard process was stopped to free port 3033, allowing the container's ports to bind correctly.",
+    "agent": "opencode",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-18T14:57:49.573Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "92167117-5ea3-4cc3-a66f-832d24faf89b",
+    "summary": "Intent: Load recent session logs to establish continuity context from previous work sessions.\nApproach: Read the most recent LSL file from the coding project's specstory history directory to summarize prior session activity.\nArtifacts: edited settings.json\nResult: Loaded and reviewed the session log file from 2026-05-18 (1600-1700) in the coding project to produce a session continuity summary.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-19T04:22:13.763Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/Q284340/.claude/settings.json"
+    ]
+  },
+  {
+    "id": "1ae64854-a1dc-4a96-b94f-81bb2ec57ee3",
+    "summary": "Intent: [raise skills budget from 1% to 2%]\nApproach: [Direct configuration change to skills budget parameter.]\nArtifacts: [none]\nResult: [Insufficient information — the exchange is incomplete and no file changes or outcomes are visible.]",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-19T04:25:10.001Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "8f81ee12-4dcd-4a12-9338-fb40124d100b",
+    "summary": "Intent: Raise the skill listing budget fraction from 1% to 2% in Claude Code settings\nApproach: Updated the global user settings file directly since `skillListingBudgetFraction` is a complex settings field not manageable via `/config`, merging with existing settings.\nArtifacts: edited /Users/<USER_ID_REDACTED>/.claude/settings.json\nResult: Set `skillListingBudgetFraction` to `0.02` in `~/.claude/settings.json`, doubling the context window fraction reserved for skill listings from the default 1% to 2%.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-19T04:25:17.485Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "Claude Sonnet 4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": [
+      "/Users/<USER_ID_REDACTED>/.claude/settings.json"
+    ]
+  },
+  {
+    "id": "a7191d0e-f4b5-40f1-8345-bfbf729a1add",
+    "summary": "Intent: Developer asked the assistant to run git diff to review what changes had been made.\nApproach: Running git diff to inspect working tree changes before committing, categorizing changes by theme and logical commit boundaries.\nArtifacts: none\nResult: Diff revealed changes across health-coordinator.js (CN/VPN detection via TCP latency, location rename home→open, fresh DNS resolver, auto-enable proxy env vars), system-health-dashboard server.js (new network/proxy violation kinds), combined-status-line.js (location map update), settings.local.json (allowlist addition), plus auto-generated data export files.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "normal",
+    "createdAt": "2026-05-19T04:36:16.936Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
+  },
+  {
+    "id": "ef337979-ac25-43bf-9d79-19b9adab2940",
+    "summary": "Intent: [commit staged files in two logical groups]\nApproach: Files were grouped logically and committed separately.\nArtifacts: none\nResult: Staged and committed files in two logical groups as requested.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-05-19T04:37:37.931Z",
+    "digestedAt": null,
+    "llm": {
+      "model": "claude-sonnet-4.6",
+      "provider": "copilot"
+    },
+    "modifiedFiles": null
   }
 ]
