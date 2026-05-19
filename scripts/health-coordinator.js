@@ -455,11 +455,18 @@ let obsApiLastRestartAt = 0;
 
 // ----- Proxy supervision constants (Phase 34 D-01 / D-02 / D-06) -----
 const PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:12435';
-const PROXY_PROBE_INTERVAL_MS = 60_000;          // D-01: every 60s
+const PROXY_PROBE_INTERVAL_MS = 60_000;          // D-01: cheap probe every 60s
 const PROXY_PROBE_TIMEOUT_MS = 10_000;            // D-02: 10s round-trip threshold
 const PROXY_MODE_POLL_TIMEOUT_MS = 2_000;         // GET /health is fast; 2s budget
 const PROXY_KICKSTART_WINDOW_MS = 5 * 60_000;     // D-06: 5 min sliding window
 const PROXY_KICKSTART_MAX = 3;                    // D-06: 3 kickstarts then cooldown
+// 3b strong probe runs much less often than the cheap probe (5 min vs 60s)
+// because under the per-model 429 rate-limit it falls through to the CLI path
+// and burns ~14-22K cache_creation tokens PER PROBE. Combined with the
+// "skip if recent real traffic" check, the synthetic probe usually doesn't
+// fire at all during active sessions.
+const PROXY_STRONG_PROBE_INTERVAL_MS = 5 * 60_000;       // every 5 min
+const PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000; // real obs within 5 min counts as proof
 
 async function pollKnowledgePipeline() {
   const probeEndedAt = () => new Date().toISOString();
@@ -686,6 +693,12 @@ async function pollProxySemantic() {
 async function pollProxySemanticStrong() {
   const probeEndedAt = () => new Date().toISOString();
   const start = Date.now();
+  // Set last_probe_end up-front so the scheduler's _strongAge check sees a
+  // recent "attempt" and doesn't stack concurrent probes while this one is
+  // in flight (the CLI fallback path can take 14s+, which is longer than
+  // multiple tick cycles). The timestamp is overwritten at completion with
+  // the real end time.
+  currentState.proxy.semantic_strong_last_probe_end = probeEndedAt();
   const probeBody = {
     process: 'observation-writer',     // route through the configured pipeline
     messages: [{ role: 'user', content: 'say OK' }],
@@ -1338,17 +1351,41 @@ async function runAllChecks() {
       currentState.proxy.reason = err.message;
       currentState.proxy.last_probe_end = new Date().toISOString();
     }
-    // 3b multi-tier: run the strong probe on the same 60s cadence as the
-    // cheap one, BUT fire-and-forget — the strong probe can take ~14s on
-    // a CLI-fallback path and we don't want it serializing the tick loop.
-    // Errors are swallowed: pollProxySemanticStrong sets state internally
-    // on every return path.
-    pollProxySemanticStrong().catch(err => {
-      log(`proxy semantic_strong probe threw: ${err.message}`, 'ERROR');
-      currentState.proxy.semantic_strong_ok = false;
-      currentState.proxy.semantic_strong_reason = `exception_${err.message || 'unknown'}`;
+  }
+
+  // 3b multi-tier: strong probe runs on a SEPARATE, much slower cadence
+  // (5 min vs 60s) because under the per-model 429 rate-limit it falls
+  // through to the CLI path and bills ~14-22K cache_creation tokens per
+  // probe. Plus we SKIP the synthetic probe entirely when an actual
+  // observation-writer call has succeeded in the last 5 minutes — real
+  // traffic is a strictly stronger proof than a synthetic say-OK, and
+  // it costs nothing because the user is already paying for those calls.
+  // Fire-and-forget — the CLI fallback can take ~14s and must not serialize
+  // the tick loop.
+  const _strongAge = currentState.proxy.semantic_strong_last_probe_end
+    ? Date.now() - new Date(currentState.proxy.semantic_strong_last_probe_end).getTime()
+    : Infinity;
+  if (_strongAge >= PROXY_STRONG_PROBE_INTERVAL_MS) {
+    const _lastObsIso = currentState.knowledge_pipeline?.lastObservationAt;
+    const realObsAge = _lastObsIso ? Date.now() - new Date(_lastObsIso).getTime() : null;
+    if (realObsAge !== null && realObsAge < PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS) {
+      // Recent real observation-writer traffic proves the configured pipeline
+      // works. Adopt that as the strong-probe success signal without spending
+      // tokens on a synthetic probe.
+      const prev = currentState.proxy.semantic_strong_ok;
+      currentState.proxy.semantic_strong_ok = true;
+      currentState.proxy.semantic_strong_reason = 'recent-real-traffic';
       currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
-    });
+      currentState.proxy.semantic_strong_round_trip_ms = null; // n/a — no synthetic call
+      if (prev !== true) log(`proxy semantic_strong_ok flip -> true (recent-real-traffic age=${Math.round(realObsAge/1000)}s)`, 'INFO');
+    } else {
+      pollProxySemanticStrong().catch(err => {
+        log(`proxy semantic_strong probe threw: ${err.message}`, 'ERROR');
+        currentState.proxy.semantic_strong_ok = false;
+        currentState.proxy.semantic_strong_reason = `exception_${err.message || 'unknown'}`;
+        currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
+      });
+    }
   }
 
   // ----- Service liveness via PSM (host services only — D-08 drops container supervisorctl) -----
