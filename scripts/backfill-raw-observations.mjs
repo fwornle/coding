@@ -33,6 +33,7 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const LIMIT = parseIntArg(args, '--limit');
 const ONLY_ID = parseStrArg(args, '--id');
+const SINCE = parseStrArg(args, '--since'); // ISO timestamp; rows older than this are skipped
 
 const DB_PATH = process.env.OBSERVATIONS_DB
   || path.resolve('.observations/observations.db');
@@ -155,6 +156,11 @@ async function main() {
              WHERE id = ?`;
     params.push(ONLY_ID);
   } else {
+    if (SINCE) {
+      query += ` AND created_at >= ?`;
+      params.push(SINCE);
+      process.stderr.write(`[backfill] Since: ${SINCE}\n`);
+    }
     query += ` ORDER BY created_at ASC`;
     if (LIMIT) query += ` LIMIT ${parseInt(LIMIT, 10)}`;
   }
