@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification
 status: planning
-last_updated: "2026-05-19T06:57:07.207Z"
+last_updated: "2026-05-19T07:30:00.000Z"
 last_activity: 2026-05-19
 progress:
-  total_phases: 0
+  total_phases: 10
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 36 — token-usage-per-user-hourly-exports-mirror-lsl-conventions-f
+**Current focus:** v7.1 — Knowledge Management Unification (Phases 37-46); roadmap created, awaiting Phase 37 plan-phase.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 37 — KM-Core Foundation (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-19 — Milestone v7.1 started
+Status: Roadmap created; ready for `/gsd:plan-phase 37`
+Last activity: 2026-05-19 — v7.1 roadmap created (10 phases, 17/17 requirements mapped)
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ Last activity: 2026-05-19 — Milestone v7.1 started
 
 - Phase 30.1 inserted after Phase 30: Cross-Project Agent-Agnostic Knowledge Injection (URGENT) — make injection work across all projects and agents with focused relevance
 - Phase 36 added: token-usage per-user hourly exports (mirror LSL conventions for git-trackable JSON)
+- v7.1 roadmap created 2026-05-19: 10 phases (37–46) covering KM-Core extraction across A/B/C systems; CORE→ONTO→DATA→PIPE foundation, then INT-01+PIPE-02→INT-02→INT-03 migration order, capped by API→UI→DOC. Phase 42 (B migration) folds in Phase 10 embeddings bug + workflow-runner.ts:469-530 race condition. Phase 43 (C migration) is cross-repo into rapid-automations.
 
 ### Decisions
 
@@ -73,12 +74,18 @@ Last activity: 2026-05-19 — Milestone v7.1 started
 - Session state written to .coding/session-state.json with 2-hour staleness window for cross-agent continuity
 - [33-05]: Three consumer migrations done — prompt-hook + system-health-dashboard + constraint-monitor dashboard all fetch /health/state from coordinator instead of readFileSync of `.health/*.json`. SPEC AC #7 grep gate clean. Coordinator unreachable surfaces as `overallStatus: 'unknown'` (NEVER 'healthy'). Q3 graceful no-op preserved when prompt-hook is invoked outside the coding repo (empty additionalContext). Dashboard frontend `dist/` NOT rebuilt — backward-compat preserved per SPEC R8.
 - [Phase ?]: [36-07]: TreemapTooltip uses recharts <Tooltip content={...}/> child-of-Treemap pattern; SVG <title> as native-browser/screen-reader fallback for sub-60x40 boxes
+- [v7.1 roadmap]: DATA (39) lands before INT-02/03 (42/43) so migrations stamp the canonical entity shape once, not twice
+- [v7.1 roadmap]: PIPE-01 + DEDUP-01 combined into Phase 40 — dedup IS the second stage of the 4-stage pipeline; splitting them creates artificial seams
+- [v7.1 roadmap]: INT-01 (A's SQLite adapter) bundled with PIPE-02 in Phase 41 — exercises the KM-Core surface before B/C bet on it, and A's long-running insight corpus is the first proving ground for post-hoc resolution
+- [v7.1 roadmap]: API (44) lands AFTER migrations so REST contracts are shaped against real KM-Core consumers, not in a vacuum
 
 ### Blockers/Concerns
 
 - [Phase 28]: Verify Docker base image supports fastembed (requires glibc/Debian, not Alpine)
 - [Phase 32]: OpenCode plugin injection API needs runtime validation before implementation
 - [Phase 32]: Copilot per-prompt injection may not be supported -- may need refresh daemon approach
+- [v7.1 Phase 43]: OKM cross-repo packaging strategy (submodule vs published npm vs vendored) — must be decided in INT-03's discuss phase
+- [v7.1 Phase 45]: D3 (VOKB) vs sigma.js (VKB) viewer choice — open question, research seed leans D3
 
 ## Deferred Items
 
@@ -98,6 +105,6 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-05-16T09:27:46.505Z
-Stopped at: Completed 36-07-PLAN.md
-Resume with: `/gsd-new-milestone`
+Last session: 2026-05-19T07:30:00.000Z
+Stopped at: v7.1 roadmap created — 10 phases, 17/17 requirements mapped, 0 plans
+Resume with: `/gsd:plan-phase 37`

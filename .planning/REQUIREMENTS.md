@@ -70,4 +70,24 @@
 
 ## Traceability
 
-(Filled by roadmapper)
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CORE-01 | Phase 37 | Pending |
+| CORE-02 | Phase 37 | Pending |
+| CORE-03 | Phase 37 | Pending |
+| ONTO-01 | Phase 38 | Pending |
+| ONTO-02 | Phase 38 | Pending |
+| DATA-01 | Phase 39 | Pending |
+| DATA-02 | Phase 39 | Pending |
+| PIPE-01 | Phase 40 | Pending |
+| DEDUP-01 | Phase 40 | Pending |
+| INT-01 | Phase 41 | Pending |
+| PIPE-02 | Phase 41 | Pending |
+| INT-02 | Phase 42 | Pending |
+| INT-03 | Phase 43 | Pending |
+| API-01 | Phase 44 | Pending |
+| API-02 | Phase 44 | Pending |
+| UI-01 | Phase 45 | Pending |
+| DOC-01 | Phase 46 | Pending |
+
+**Coverage:** 17/17 v7.1 requirements mapped, no orphans.

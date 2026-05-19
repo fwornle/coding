@@ -9,7 +9,8 @@
 - v4.0 -- Mastra Integration & LSL Observational Memory (Phases 20-23, shipped 2026-04-05)
 - v5.0 -- Service Reliability & Health System Overhaul (Phases 24-27, in progress)
 - v6.0 -- Knowledge Context Injection (Phases 28-32, shipped 2026-04-25) -> [archive](milestones/v6.0-ROADMAP.md)
-- v7.0 -- Health Monitoring Consolidation (Phases 33-35, in progress)
+- v7.0 -- Health Monitoring Consolidation (Phases 33-36, in progress)
+- v7.1 -- Knowledge Management Unification (Phases 37-46, in progress)
 
 ---
 
@@ -204,6 +205,174 @@ Plans:
 **Wave 5 (parallel — disjoint files, polish)** *(36-06 depends_on 36-04 for server.mjs co-edit ordering; 36-07 fully independent)*
 - [x] 36-06-PLAN.md — Model-name canonicalization at the proxy persistence boundary. `canonicalizeModelName(raw)` pure function + `MODEL_CANONICAL_MAP` (17 entries) defined ABOVE `_tokenDb` init (TDZ fix). `model_raw TEXT` column via PRAGMA-guarded ALTER. Idempotent backfill at proxy init rewrote 1027 pre-existing rows (matches variant-table sum exactly); second boot scans 0. Dashboard "By Model" panel collapsed from 8 Claude rows to 3.
 - [x] 36-07-PLAN.md — Treemap hover tooltip in `integrations/system-health-dashboard/src/pages/token-usage.tsx`. Add `TreemapTooltip` custom component (process / total / in-out split / calls / avg latency) wired as `<Tooltip content={...}>` child of the existing `<Treemap>` at line ~354 — currently NO Tooltip is wired and the "Hover for details" subtitle is aspirational. Plus SVG `<title>` inside `TreemapContent` for native-browser/screen-reader fallback. Browser-verified via /playwright-cli per CLAUDE.md E2E memory.
+
+---
+
+## v7.1 Knowledge Management Unification -- Phases 37-46
+
+Extract a shared **KM-Core** from the three knowledge-management systems (A: Online Learning, B: Offline UKB, C: OKM) so each application uses a common codebase parameterized by per-system configuration (ontologies, ingest adapters, eval logic). Research seed: `.planning/research/v7.1-km-unification.md`.
+
+### Phases
+
+- [ ] **Phase 37: KM-Core Foundation** - Canonical TS types, GraphKMStore adapter, UUID identifier scheme — the shared package B and C both consume.
+- [ ] **Phase 38: Ontology Registry** - Auto-discovered upper + lower ontologies with `extends`-based property merging.
+- [ ] **Phase 39: Entity Data Model** - Provenance fields and `validFrom`/`validUntil`/`supersedes` temporal validity on the canonical entity (locked before migrations).
+- [ ] **Phase 40: Ingest Pipeline & Layered Dedup** - 4-stage `extract → dedup → store → synthesize` framework with the layered dedup pipeline B and C will implement against.
+- [ ] **Phase 41: Online Learning Adapter & Post-Hoc Resolution** - INT-01 (A's SQLite hot path exposed as KM-Core entities) + PIPE-02 (post-hoc cross-class entity resolution as a shared maintenance op).
+- [ ] **Phase 42: Offline UKB Migration (B)** - Full migration of `mcp-server-semantic-analysis` to KM-Core; folds in Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition.
+- [ ] **Phase 43: OKM Cross-Repo Migration (C)** - Cross-repo refactor of `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` onto KM-Core; rapid-automations CI stays green.
+- [ ] **Phase 44: REST API & Git Snapshots** - Common entity/search/clusters/snapshots/ontology REST contract + git-snapshot/restore identical across A/B/C.
+- [ ] **Phase 45: Unified Web Viewer** - Single viewer parameterized by ontology config; VKB (B) and VOKB (C) users migrate without functional regression.
+- [ ] **Phase 46: Per-System Documentation & Onboarding** - Each system's README documents which configs it owns; KM-Core ships an architecture diagram + onboarding guide.
+
+### Phase Details
+
+#### Phase 37: KM-Core Foundation
+
+**Goal:** Land the shared KM-Core package (canonical TypeScript entity/relation types, `GraphKMStore` adapter wrapping Graphology + LevelDB + git-tracked JSON export, UUID-keyed cross-system identifier scheme) so B and C have a single dependency to consume in subsequent migrations.
+
+**Depends on:** Nothing (first v7.1 phase)
+**Requirements:** CORE-01, CORE-02, CORE-03
+**Success Criteria** (what must be TRUE):
+  1. A developer can import `Entity` and `Relation` types from KM-Core in both `coding/` and `rapid-automations/` and get identical type definitions.
+  2. The `GraphKMStore` adapter passes parity tests against the existing Graphology+LevelDB stores currently used by B and C (same read/write/export semantics).
+  3. Every KM-Core entity carries a stable UUID identifier that survives export → restore round-trips.
+  4. The `.data/knowledge-export/coding.json` and `.data/exports/*.json` paths still load via KM-Core without breaking the established two-commit / OKB-baseline guard hygiene.
+**Plans:** TBD
+
+#### Phase 38: Ontology Registry
+
+**Goal:** Land a single `OntologyRegistry` implementation that auto-discovers upper + N lower ontologies from a configured `ontology/` directory and supports lower-ontology `extends`-based property merging, so the pipeline (Phase 40) and per-system migrations (Phases 42–43) can classify entities against a uniform abstraction.
+
+**Depends on:** Phase 37
+**Requirements:** ONTO-01, ONTO-02
+**Success Criteria** (what must be TRUE):
+  1. Dropping a new `ontology/<domain>.json` file into the configured directory makes its classes available to KM-Core consumers without code changes.
+  2. A lower ontology declaring `"extends": "<upper>"` exposes the merged class catalog (upper + lower) to the registry's consumers, with lower-ontology properties overriding upper ones on conflict.
+  3. The existing B component-manifest (8 L1 + 5 L2) loads cleanly as a lower ontology against the upper ontology used by C.
+  4. The registry surfaces ontology metadata (class list, parent chain, extension provenance) via a stable programmatic API.
+**Plans:** TBD
+
+#### Phase 39: Entity Data Model
+
+**Goal:** Lock the canonical KM-Core entity shape with first-class temporal validity (`validFrom`, `validUntil`, `supersedes`) and structured provenance (`createdBy`, `lastConfirmedBy`, `confirmationCount`, per-segment provenance) before B and C migrate, so neither has to backfill twice.
+
+**Depends on:** Phase 37
+**Requirements:** DATA-01, DATA-02
+**Success Criteria** (what must be TRUE):
+  1. Every KM-Core entity surfaces `validFrom`, `validUntil`, and `supersedes` fields, and an entity superseded by another is reachable via the supersedes chain from query API.
+  2. Every KM-Core entity surfaces `createdBy`, `lastConfirmedBy`, `confirmationCount`, and per-segment provenance fields, populated by the writer rather than computed downstream.
+  3. The B `KGEntity`/`SharedMemoryEntity` (`type`/`entityType` split, `persistence-agent.ts:583`) is replaced by the canonical KM-Core entity in the shared types; no consumer compiles against the old dual shape.
+  4. A backfill operation can stamp `validFrom = createdAt` (A) or `validFrom = first-seen` (B) on legacy entities without losing existing observations or relations.
+**Plans:** TBD
+
+#### Phase 40: Ingest Pipeline & Layered Dedup
+
+**Goal:** Define the 4-stage ingest-time consolidation framework (`extract → dedup → store → synthesize`) and the layered dedup pipeline (exact-name → embedding cosine → LLM semantic) in KM-Core, exposing pluggable stage hooks so A's digest/insight roll-up and B's wave-agents can both implement against the shared abstraction without code duplication.
+
+**Depends on:** Phase 38, Phase 39
+**Requirements:** PIPE-01, DEDUP-01
+**Success Criteria** (what must be TRUE):
+  1. A developer can wire a new ingest adapter into KM-Core by implementing the four named stage interfaces and registering it — no fork of the pipeline code required.
+  2. Running the layered dedup pipeline on a synthetic batch with a known exact-name collision, a known embedding-cosine collision, and a known LLM-semantic collision catches all three at the correct layer in order.
+  3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
+  4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
+**Plans:** TBD
+
+#### Phase 41: Online Learning Adapter & Post-Hoc Resolution
+
+**Goal:** Land INT-01 — A's SQLite hot path stays on its existing transactional writes but exposes observations / digests / insights as KM-Core entities via a thin adapter — and ship PIPE-02 (post-hoc cross-class entity resolution) as a shared KM-Core maintenance operation that scans the graph by `ontologyClass` and LLM-merges duplicates that escaped per-batch dedup.
+
+**Depends on:** Phase 40
+**Requirements:** INT-01, PIPE-02
+**Success Criteria** (what must be TRUE):
+  1. A user can query A's observations / digests / insights through the KM-Core entity API and get the same content currently served by `/api/observations|digests|insights`, typed as ontology classes.
+  2. A's SQLite hot write path remains unchanged — ETM writes still complete at the same latency and the cold-store JSON export contract is preserved.
+  3. Triggering the post-hoc resolve-entities maintenance operation on a graph containing known cross-batch duplicates of a single ontology class collapses them into one canonical entity with merged provenance.
+  4. The same post-hoc resolution API endpoint is callable against A's adapter-fronted graph (proving the operation works on KM-Core regardless of whether the underlying store is graph-native or SQLite-fronted).
+**Plans:** TBD
+
+#### Phase 42: Offline UKB Migration (B)
+
+**Goal:** Migrate B (the Offline UKB wave-analysis pipeline in `integrations/mcp-server-semantic-analysis`) to KM-Core while simultaneously fixing the long-running **Phase 10 embeddings-not-reaching-GraphDB issue** and the **`workflow-runner.ts:469–530` wave-analysis race condition** so the migration also discharges two carry-forward bugs flagged in active memory.
+
+**Depends on:** Phase 40
+**Requirements:** INT-02
+**Success Criteria** (what must be TRUE):
+  1. Running `ukb full` end-to-end produces a KM-Core-shaped knowledge graph (canonical entity, ontology registry, layered dedup, temporal validity) with the existing MCP interface unchanged.
+  2. After a `wave-analysis` run completes, every persisted KG entity has its embedding present in the GraphDB (the Phase 10 issue no longer reproduces).
+  3. The `workflow-runner.ts:469–530` race condition no longer fires "Race condition detected (0/0 steps) but no valid cache available" in Docker logs, and the dashboard reflects the workflow's true terminal state instead of staying "running" after completion.
+  4. Wave-controller progress updates and KM-Core writes never deadlock or clobber each other — the dashboard's wave-stage view stays consistent with `.data/workflow-progress.json` throughout the run.
+  5. B's existing component-manifest works unchanged as a lower ontology against KM-Core's `OntologyRegistry`.
+**Plans:** TBD
+
+#### Phase 43: OKM Cross-Repo Migration (C)
+
+**Goal:** Execute the cross-repo refactor that migrates C (`~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) onto KM-Core; this is a **separate repository** with its own CI, release cycle, and packaging story, so success means landing KM-Core in OKM via the agreed packaging strategy without breaking rapid-automations' green build.
+
+**Depends on:** Phase 40
+**Requirements:** INT-03
+**Success Criteria** (what must be TRUE):
+  1. The `rapid-automations` CI pipeline is green on the migration branch and on `main` after merge.
+  2. OKM consumes KM-Core via the agreed packaging strategy (decided during this phase's discuss phase — submodule, npm package, or vendored copy) without copying or forking KM-Core source.
+  3. Existing OKM REST consumers (VOKB viewer, `/api/entities`, `/api/relations`, `/api/search`, `/api/clusters`, `/api/rca-lookup`) continue to return the same shape they did before migration.
+  4. OKM's per-domain JSON exports under `.data/exports/{domain}.json` continue to land with the same commit hygiene as before the migration.
+**Plans:** TBD
+
+#### Phase 44: REST API & Git Snapshots
+
+**Goal:** Land the common REST contract (entity CRUD, search, clusters, snapshots, ontology metadata) and the git-snapshot/restore pattern over `.data/exports/` so all three systems expose the same query surface — necessary precondition for the unified viewer.
+
+**Depends on:** Phase 41, Phase 42, Phase 43
+**Requirements:** API-01, API-02
+**Success Criteria** (what must be TRUE):
+  1. The same REST request (e.g. `GET /api/entities?ontologyClass=...`) returns shape-identical responses against A, B, and C — only the data and ontology classes differ.
+  2. A user can take a git snapshot of `.data/exports/` in any of the three systems and restore an earlier state via the shared snapshot/restore endpoint, with the resulting graph identical to the snapshot.
+  3. A's existing `/api/observations|digests|insights` endpoints remain callable but resolve internally to typed views over `/api/entities?ontologyClass=...` (no consumer breakage during transition).
+  4. The git two-commit pattern and OKB-baseline guard from existing export hygiene still hold under the unified snapshot endpoint.
+**Plans:** TBD
+
+#### Phase 45: Unified Web Viewer
+
+**Goal:** Replace the two divergent viewers (VKB sigma.js for B, VOKB D3 for C) with a single web viewer parameterized by ontology configuration, so VKB and VOKB users migrate without losing functionality and KM-Core has one frontend surface to maintain.
+
+**Depends on:** Phase 42, Phase 44
+**Requirements:** UI-01
+**Success Criteria** (what must be TRUE):
+  1. A user can open the unified viewer pointed at A, B, or C's REST API and see the graph rendered with that system's ontology classes, colors, and hierarchy.
+  2. Every interactive feature currently used by VKB users (entity click, expand, filter, search) and VOKB users (force-directed view, cluster overlays, RCA lookup) is present in the unified viewer.
+  3. A VKB or VOKB user can switch to the unified viewer for daily work and not regress on any task they used to perform in the legacy viewer.
+  4. The viewer's data layer reads exclusively through the Phase 44 REST contract — no direct LevelDB or SQLite access from the frontend.
+**Plans:** TBD
+**UI hint**: yes
+
+#### Phase 46: Per-System Documentation & Onboarding
+
+**Goal:** Each of A, B, C ships a README documenting which configurations it owns (ontology files, LLM provider config, ingest adapter config, domain eval logic), and KM-Core ships an architecture diagram + onboarding guide — so future contributors can tell at a glance where to add a new ontology class, LLM provider, or ingest source without reading source.
+
+**Depends on:** Phase 45
+**Requirements:** DOC-01
+**Success Criteria** (what must be TRUE):
+  1. A new contributor reading A's, B's, or C's README can locate within five minutes the exact config file(s) they would edit to add a new ontology class or LLM provider for that system.
+  2. KM-Core's architecture diagram clearly distinguishes shared core (types, store, registry, pipeline, dedup, REST, viewer) from per-system configuration (ontology files, LLM config, ingest adapters, domain eval).
+  3. The onboarding guide walks a new developer from clone → run KM-Core tests → register a new lower ontology → ingest a sample entity, with each step verifiable.
+  4. Each system's README cross-references the others and KM-Core, so a contributor entering through any of the four doors can navigate to the others.
+**Plans:** TBD
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 37. KM-Core Foundation | 0/? | Not started | - |
+| 38. Ontology Registry | 0/? | Not started | - |
+| 39. Entity Data Model | 0/? | Not started | - |
+| 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |
+| 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
+| 42. Offline UKB Migration (B) | 0/? | Not started | - |
+| 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
+| 44. REST API & Git Snapshots | 0/? | Not started | - |
+| 45. Unified Web Viewer | 0/? | Not started | - |
+| 46. Per-System Documentation & Onboarding | 0/? | Not started | - |
 
 ---
 
