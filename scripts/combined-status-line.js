@@ -445,6 +445,34 @@ class CombinedStatusLine {
   }
 
   /**
+   * Freshest project-activity age (ms) across all tracked projects, derived
+   * from the coordinator's `lsl[*].transcriptPath` mtime — the same signal
+   * that drives the per-project activity bubbles. Used to map coordinator
+   * "stale obs" verdicts onto the bubble lifecycle (🟢/🟠/🟤/⚫/💤) so a
+   * cooling-down project doesn't fire a yellow alarm on the [📚] badge.
+   * Returns null when no project has any observable signal.
+   */
+  async _freshestProjectActivityAgeMs() {
+    if (this._freshestActivityAgePromise) return this._freshestActivityAgePromise;
+    this._freshestActivityAgePromise = (async () => {
+      const result = await this.getCoordinatorState();
+      if (!result.ok) return null;
+      const lslEntries = Object.values(result.state.lsl || {});
+      let freshest = null;
+      const now = Date.now();
+      for (const entry of lslEntries) {
+        if (!entry?.transcriptPath) continue;
+        try {
+          const age = now - fs.statSync(entry.transcriptPath).mtimeMs;
+          if (freshest === null || age < freshest) freshest = age;
+        } catch { /* skip unreadable paths */ }
+      }
+      return freshest;
+    })();
+    return this._freshestActivityAgePromise;
+  }
+
+  /**
    * Check LSL transcript monitor health for the CURRENT pane.
    *
    * Lookup precedence in coordinator state:
@@ -1897,30 +1925,43 @@ class CombinedStatusLine {
     }
 
     // Knowledge pipeline (observation/digest/insight freshness via coordinator).
-    // Replaces the legacy ETM-extraction signal that stopped flowing at the
-    // Phase 33 cutover. Source: state.knowledge_pipeline at /health/state.
+    // Source: state.knowledge_pipeline at /health/state.
+    //
+    // Cool-down alignment: when the coordinator reports stale/stalled obs we
+    // mirror the project-activity bubble lifecycle (🟢/🟠/🟤/⚫/💤) instead
+    // of always firing yellow/red. Rationale: "no observation in 15 min" on
+    // a project that hasn't been prompted in an hour is EXPECTED cool-down,
+    // not impairment — the next prompt will produce an observation. Yellow
+    // and red are reserved for "broken and won't recover on next prompt":
+    // pipeline silent while a project is Active (transcript < 5 min old),
+    // or the obs_api itself is unreachable.
+    const freshestActivityAge = await this._freshestProjectActivityAgeMs();
+    const projectActive = freshestActivityAge !== null && freshestActivityAge < 5 * 60_000;
+    const coolDownIcon = (() => {
+      if (freshestActivityAge === null) return '⚫';
+      if (freshestActivityAge < 30 * 60_000) return '🟠';
+      if (freshestActivityAge < 6 * 60 * 60_000) return '🟤';
+      if (freshestActivityAge < 24 * 60 * 60_000) return '⚫';
+      return '💤';
+    })();
     switch (knowledge.status) {
       case 'healthy':
         parts.push('[📚✅]');
         break;
       case 'stale':
-        // Idle suppression: if no Claude session is active, "stale obs" just
-        // means the user walked away — show ⚫ (idle), not ⚠️ (warning).
-        if (!userActive) {
-          parts.push('[📚⚫]');
-        } else {
+        if (projectActive) {
           parts.push('[📚🟡]');
           if (overallColor === 'green') overallColor = 'yellow';
+        } else {
+          parts.push(`[📚${coolDownIcon}]`);
         }
         break;
       case 'stalled':
-        // Same idle suppression for the >6h band — only a true alarm if the
-        // user is actively working and the pipeline isn't ingesting.
-        if (!userActive) {
-          parts.push('[📚⚫]');
-        } else {
+        if (projectActive) {
           parts.push('[📚🔴]');
-          if (overallColor === 'green') overallColor = 'yellow';
+          overallColor = 'red';
+        } else {
+          parts.push(`[📚${coolDownIcon}]`);
         }
         break;
       case 'disabled':
