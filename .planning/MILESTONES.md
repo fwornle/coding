@@ -1,5 +1,17 @@
 # Milestones
 
+## v7.2 LLM Proxy Performance — Claude CLI Worker Pool (QUEUED, not active)
+
+**Why:** The `claude-code` direct OAuth path (~0.9s, real token counts) handles haiku perfectly, but Anthropic rate-limits the bearer endpoint per-model. Sonnet/opus on Max-OAuth hit HTTP 429, and the proxy now falls back to the `claude` CLI subprocess — which works against the same Max subscription via a different rate-limit bucket but costs ~10-14s per call due to per-request CLI spawn + the ~16-22K cache_creation system prompt the CLI auto-injects.
+
+**Goal:** Maintain a small persistent pool of warm `claude` CLI workers communicating over stream-JSON stdin/stdout, eliminating the per-call spawn (~3-5s) and keeping Anthropic's prompt-cache warm for the auto-injected system prompt (~2-3× cheaper + faster on cache hits). Expected: 7-15s → ~2-3s per CLI-fallback call.
+
+**Research seed:** `.planning/research/v7.2-llm-proxy-perf-worker-pool.md`
+
+**Status:** Queued. Do NOT activate while v7.1 (KM Unification) is in progress. Plan-phase work to begin after v7.1 ships.
+
+---
+
 ## v6.0 v6.0 (Shipped: 2026-04-25)
 
 **Phases completed:** 7 phases, 11 plans, 25 tasks
