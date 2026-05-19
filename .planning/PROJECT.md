@@ -48,7 +48,28 @@ Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), liv
 
 ### Active
 
-(Next milestone not yet defined — run `/gsd-new-milestone`)
+## Current Milestone: v7.1 Knowledge Management Unification
+
+**Goal:** Extract a shared KM-Core from the three knowledge-management systems (Online Learning, Offline UKB, OKM) so each application uses a common codebase parameterized by per-system configuration (ontologies, ingest adapters, eval logic).
+
+**Target features:**
+- Shared KM-Core types + GraphKMStore (Graphology + LevelDB + JSON exports)
+- Uniform entity shape — kills the KGEntity/SharedMemoryEntity (`type`/`entityType`) split
+- OntologyRegistry with dynamic upper + lower ontology discovery
+- 4-stage consolidation framework (extract → dedup → store → synthesize)
+- Layered dedup pipeline (exact-name → embedding cosine → LLM semantic)
+- Provenance + temporal validity (`validFrom`/`validUntil`/`supersedes`)
+- Common REST query API + git-snapshot/restore pattern
+- Unified web viewer parameterized by ontology config
+- Online-learning SQLite integration via thin KM-Core adapter
+- Per-system documentation + onboarding (which configs each system owns)
+
+**Key context:**
+- Source-of-truth comparison: `.planning/research/v7.1-km-unification.md`
+- A (Online Learning) — SQLite hot path stays as-is; expose content via KM-Core entity adapter
+- B (Offline UKB) — full migration; folds in Phase 10 embeddings issue + wave-analysis race condition
+- C (OKM) lives in `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` — cross-repo refactor
+- Open decisions: repo layout (monorepo vs shared pkg), viewer (D3 vs sigma.js), backwards-compat for `.data/*.json` export paths, migration cutover order
 
 ### Shipped in v4.0
 
