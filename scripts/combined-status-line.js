@@ -1927,18 +1927,21 @@ class CombinedStatusLine {
     // Knowledge pipeline (observation/digest/insight freshness via coordinator).
     // Source: state.knowledge_pipeline at /health/state.
     //
-    // Cool-down alignment: when the coordinator reports stale/stalled obs we
-    // mirror the project-activity bubble lifecycle (🟢/🟠/🟤/⚫/💤) instead
-    // of always firing yellow/red. Rationale: "no observation in 15 min" on
-    // a project that hasn't been prompted in an hour is EXPECTED cool-down,
-    // not impairment — the next prompt will produce an observation. Yellow
-    // and red are reserved for "broken and won't recover on next prompt":
-    // pipeline silent while a project is Active (transcript < 5 min old),
-    // or the obs_api itself is unreachable.
+    // ObservationWriter fires on prompt-set completion, not continuously.
+    // During a long-running assistant turn, obs age past 15 min is normal —
+    // the next completion will write a fresh obs and the badge self-heals.
+    // Mirror the project-activity bubble lifecycle (🟢/🟠/🟤/⚫/💤) for any
+    // status within the natural async window (stale = 15 min–6 h, any
+    // activity level; stalled = >6 h on a cooling project). Reserve loud
+    // signals for truly broken cases:
+    //   stalled + Active (>6 h with no obs while transcript is fresh)  → 🔴
+    //   unreachable (obs_api itself down)                              → ❌ (yellow)
+    // Per spec: yellow only for "broken and won't recover on next prompt".
     const freshestActivityAge = await this._freshestProjectActivityAgeMs();
     const projectActive = freshestActivityAge !== null && freshestActivityAge < 5 * 60_000;
-    const coolDownIcon = (() => {
+    const lifecycleIcon = (() => {
       if (freshestActivityAge === null) return '⚫';
+      if (freshestActivityAge < 5 * 60_000) return '🟢';
       if (freshestActivityAge < 30 * 60_000) return '🟠';
       if (freshestActivityAge < 6 * 60 * 60_000) return '🟤';
       if (freshestActivityAge < 24 * 60 * 60_000) return '⚫';
@@ -1949,19 +1952,17 @@ class CombinedStatusLine {
         parts.push('[📚✅]');
         break;
       case 'stale':
-        if (projectActive) {
-          parts.push('[📚🟡]');
-          if (overallColor === 'green') overallColor = 'yellow';
-        } else {
-          parts.push(`[📚${coolDownIcon}]`);
-        }
+        // 15 min – 6 h gap — within natural latency window. No alarm.
+        parts.push(`[📚${lifecycleIcon}]`);
         break;
       case 'stalled':
+        // >6 h gap. If a project is Active right now, the obs pipe is
+        // broken (next prompt won't fix it after that long).
         if (projectActive) {
           parts.push('[📚🔴]');
           overallColor = 'red';
         } else {
-          parts.push(`[📚${coolDownIcon}]`);
+          parts.push(`[📚${lifecycleIcon}]`);
         }
         break;
       case 'disabled':
