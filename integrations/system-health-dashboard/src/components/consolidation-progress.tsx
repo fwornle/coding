@@ -17,6 +17,16 @@ export interface InflightInfo {
   lastMessage?: string
 }
 
+// F1: surfaced by obs-api so the polling frontend can render the result of an
+// asynchronously-completed run. lastJob.id increments on each new run start;
+// when (id !== prev AND inflight === null) the frontend renders result.* / error.*.
+export interface LastJobInfo {
+  id: number
+  finishedAt: string | null
+  result: { digests: number; observations: number; days: number; [k: string]: unknown } | null
+  error: { message: string } | null
+}
+
 export interface ConsolidationStatusBase {
   totalDigests: number
   totalInsights: number
@@ -24,6 +34,7 @@ export interface ConsolidationStatusBase {
   pendingPast?: number
   pendingToday?: number
   inflight?: InflightInfo | null
+  lastJob?: LastJobInfo | null
 }
 
 interface NMatch {

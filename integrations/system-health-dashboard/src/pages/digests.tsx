@@ -114,6 +114,10 @@ export function DigestsPage() {
   const [consolidationResult, setConsolidationResult] = useState<string | null>(null)
   const [projects, setProjects] = useState<string[]>([])
   const [projectFilter, setProjectFilter] = useState<string>('')
+  // F1: jobId of the run THIS page kicked off, so the polling loop can
+  // distinguish "we triggered this and want the result" from "someone else's
+  // run is finishing while we happen to be on this page".
+  const [activeJobId, setActiveJobId] = useState<number | null>(null)
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -160,26 +164,37 @@ export function DigestsPage() {
     setConsolidating(true)
     setConsolidationError(null)
     setConsolidationResult(null)
+    // F1: POST returns 202 immediately with a jobId. We do NOT await the run
+    // itself here — consolidation can take many minutes when each LLM call
+    // falls back to the claude CLI at ~10-14s, which used to outlast the
+    // reverse-proxy timeout and surface as a bogus 502. The existing polling
+    // effect below watches status.lastJob and clears `consolidating` when the
+    // job whose id we captured here completes.
     try {
       const res = await fetch(`${API_BASE_URL}/api/consolidation/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
       const data = await res.json()
-      if (!res.ok) {
+      if (!res.ok && res.status !== 202) {
         setConsolidationError(data.error || `HTTP ${res.status}`)
-      } else if (data.digests === 0) {
-        setConsolidationResult('No new digests — observations may already be consolidated or too few to group')
-      } else {
-        setConsolidationResult(`Created ${data.digests} digests from ${data.observations} observations across ${data.days} days`)
+        setConsolidating(false)
+        return
       }
+      // Capture the jobId so the polling loop knows which run to wait for.
+      // Server returns { jobId } in the 202 body; fall back to "anything that
+      // finishes after now" if absent.
+      if (typeof data.jobId === 'number') {
+        setActiveJobId(data.jobId)
+      }
+      // Refresh status immediately so the inflight indicator appears without
+      // waiting for the next 2s tick.
+      await fetchStatus()
     } catch (err) {
       setConsolidationError(err instanceof Error ? err.message : 'Network error')
+      setConsolidating(false)
     }
-    await fetchDigests(projectFilter)
-    await fetchStatus()
-    setConsolidating(false)
-  }, [fetchDigests, fetchStatus, projectFilter])
+  }, [fetchStatus])
 
   useEffect(() => {
     fetchDigests(projectFilter)
@@ -192,9 +207,10 @@ export function DigestsPage() {
 
   // Heartbeat-driven progress polling. While the consolidator is alive,
   // poll /api/consolidation/status every 2s to surface progress and to
-  // detect completion even when the original POST response was lost
-  // (dashboard restart, network blip). When inflight goes null we clear
-  // the consolidating flag and refresh the digest list.
+  // detect completion. With F1 the POST returns 202 immediately and the
+  // run finishes asynchronously, so this loop is the ONLY signal of
+  // completion. When inflight goes null AND lastJob.id matches the run
+  // this page kicked off (activeJobId), surface the result and stop.
   useEffect(() => {
     if (!consolidating && !status?.inflight) return
     const id = setInterval(async () => {
@@ -207,13 +223,30 @@ export function DigestsPage() {
         // exited (cleanly or via the dashboard's orphan sweep), so the
         // UI should stop showing "Consolidating…".
         if (consolidating && !data.inflight) {
+          // F1: try to surface the result of OUR job if the status payload
+          // carries it. data.lastJob.id === activeJobId means the run we
+          // triggered finished; data.lastJob.error / .result tells us how.
+          const job = data.lastJob
+          if (job && (activeJobId === null || job.id === activeJobId)) {
+            if (job.error) {
+              setConsolidationError(job.error.message || 'Consolidation failed')
+            } else if (job.result) {
+              const r = job.result
+              if (r.digests === 0) {
+                setConsolidationResult('No new digests — observations may already be consolidated or too few to group')
+              } else {
+                setConsolidationResult(`Created ${r.digests} digests from ${r.observations} observations across ${r.days} days`)
+              }
+            }
+          }
           setConsolidating(false)
+          setActiveJobId(null)
           fetchDigests(projectFilter)
         }
       } catch { /* keep polling */ }
     }, 2000)
     return () => clearInterval(id)
-  }, [consolidating, status?.inflight, fetchDigests, projectFilter])
+  }, [consolidating, status?.inflight, fetchDigests, projectFilter, activeJobId])
 
   // Group digests by date
   const byDate = digests.reduce<Record<string, Digest[]>>((acc, d) => {

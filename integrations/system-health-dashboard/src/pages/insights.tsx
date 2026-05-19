@@ -503,11 +503,14 @@ export function InsightsPage() {
   const [insights, setInsights] = useState<Insight[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<{ totalInsights: number; totalDigests: number; undigested: number; inflight?: InflightInfo | null } | null>(null)
+  const [status, setStatus] = useState<{ totalInsights: number; totalDigests: number; undigested: number; inflight?: InflightInfo | null; lastJob?: { id: number; finishedAt: string | null; result: { digests: number; created: number; updated: number; observations?: number; days?: number; [k: string]: unknown } | null; error: { message: string } | null } | null } | null>(null)
   const [consolidating, setConsolidating] = useState(false)
   const [consolidationResult, setConsolidationResult] = useState<string | null>(null)
   const [projects, setProjects] = useState<string[]>([])
   const [projectFilter, setProjectFilter] = useState<string>('')
+  // F1: jobId of the run THIS page kicked off; the polling loop renders the
+  // result when status.lastJob.id matches and inflight transitions to null.
+  const [activeJobId, setActiveJobId] = useState<number | null>(null)
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -546,28 +549,28 @@ export function InsightsPage() {
     setConsolidating(true)
     setConsolidationError(null)
     setConsolidationResult(null)
+    // F1: POST returns 202 immediately. Don't await the run — the polling
+    // loop watches status.lastJob.id and renders the result on completion.
     try {
       const res = await fetch(`${API_BASE_URL}/api/consolidation/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
       const data = await res.json()
-      if (!res.ok) {
+      if (!res.ok && res.status !== 202) {
         setConsolidationError(data.error || `HTTP ${res.status}`)
-      } else {
-        const parts = []
-        if (data.digests > 0) parts.push(`${data.digests} digests`)
-        if (data.created > 0) parts.push(`${data.created} new insights`)
-        if (data.updated > 0) parts.push(`${data.updated} insights updated`)
-        setConsolidationResult(parts.length > 0 ? parts.join(', ') : 'No new content to consolidate')
+        setConsolidating(false)
+        return
       }
+      if (typeof data.jobId === 'number') {
+        setActiveJobId(data.jobId)
+      }
+      await fetchStatus()
     } catch (err) {
       setConsolidationError(err instanceof Error ? err.message : 'Network error')
+      setConsolidating(false)
     }
-    await fetchInsights(query, projectFilter)
-    await fetchStatus()
-    setConsolidating(false)
-  }, [fetchInsights, fetchStatus, query, projectFilter])
+  }, [fetchStatus])
 
   useEffect(() => {
     fetchInsights('', projectFilter)
@@ -614,7 +617,9 @@ export function InsightsPage() {
 
   // Poll heartbeat while a run is alive (or while we just kicked one off).
   // Detect completion via inflight transition so the insight list refreshes
-  // even if the original POST response was lost to a network blip / restart.
+  // — with F1 this is the ONLY signal of completion because the POST is
+  // now fire-and-forget (202 immediately). When inflight transitions to null
+  // AND lastJob.id matches the run we triggered, render result and stop.
   useEffect(() => {
     if (!consolidating && !status?.inflight) return
     const id = setInterval(async () => {
@@ -624,13 +629,27 @@ export function InsightsPage() {
         const data = await res.json()
         setStatus(data)
         if (consolidating && !data.inflight) {
+          const job = data.lastJob
+          if (job && (activeJobId === null || job.id === activeJobId)) {
+            if (job.error) {
+              setConsolidationError(job.error.message || 'Consolidation failed')
+            } else if (job.result) {
+              const r = job.result
+              const parts: string[] = []
+              if (r.digests > 0) parts.push(`${r.digests} digests`)
+              if (r.created > 0) parts.push(`${r.created} new insights`)
+              if (r.updated > 0) parts.push(`${r.updated} insights updated`)
+              setConsolidationResult(parts.length > 0 ? parts.join(', ') : 'No new content to consolidate')
+            }
+          }
           setConsolidating(false)
+          setActiveJobId(null)
           fetchInsights(query, projectFilter)
         }
       } catch { /* keep polling */ }
     }, 2000)
     return () => clearInterval(id)
-  }, [consolidating, status?.inflight, fetchInsights, query, projectFilter])
+  }, [consolidating, status?.inflight, fetchInsights, query, projectFilter, activeJobId])
 
   const handleSearch = () => fetchInsights(query, projectFilter)
 
