@@ -762,20 +762,26 @@ class CombinedStatusLine {
     if (!p) {
       return { status: 'unreachable', reason: 'no proxy slice in /health/state' };
     }
-    // Map (semantic_ok, auto_heal_status) → 6-state enum per D-12.
+    // Map (semantic_ok, semantic_strong_ok, auto_heal_status) → 7-state enum.
+    // 3b: 'partial' is new — cheap haiku/copilot probe OK, but the configured
+    // semantic pipeline (typically observation-writer's claude-code/sonnet)
+    // is failing. Renders amber; cheap probe failure still shows red.
     let status;
     if (p.auto_heal_status === 'disabled') status = 'disabled';
     else if (p.auto_heal_status === 'cooldown') status = 'cooling';
     else if (p.semantic_ok === null) status = 'unknown';
-    else if (p.semantic_ok === true) status = 'healthy';
-    else status = 'degraded';
+    else if (p.semantic_ok !== true) status = 'degraded';
+    else if (p.semantic_strong_ok === false) status = 'partial'; // 3b
+    else status = 'healthy';
     return {
       status,
       semantic_ok: p.semantic_ok,
+      semantic_strong_ok: p.semantic_strong_ok,
       networkMode: p.networkMode,
       auto_heal_status: p.auto_heal_status,
       kickstart_count: p.kickstart_count,
       reason: p.reason,
+      semantic_strong_reason: p.semantic_strong_reason,
     };
   }
 
@@ -2011,6 +2017,15 @@ class CombinedStatusLine {
     switch (proxy?.status) {
       case 'healthy':
         parts.push('[🧠✅]');
+        break;
+      case 'partial':
+        // 3b: cheap haiku probe OK, configured semantic pipeline failing
+        // (typically observation-writer's claude-code/sonnet hitting an
+        // Anthropic 429 with no in-bucket fallback). Always rendered amber
+        // — this is real silent breakage, not a probe-window artifact, so
+        // idle suppression doesn't apply.
+        parts.push('[🧠⚠️]');
+        if (overallColor === 'green') overallColor = 'yellow';
         break;
       case 'degraded':
         // Idle suppression: a degraded proxy semantic-probe during idle is

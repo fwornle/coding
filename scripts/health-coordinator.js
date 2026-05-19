@@ -215,7 +215,7 @@ const currentState = {
   // "OK". networkMode mirrors the proxy's published value (vpn|public|unknown).
   // auto_heal_status follows D-06 cooldown FSM (wired in Plan 34-03).
   proxy: {
-    semantic_ok: null,                   // null until first probe; true|false after
+    semantic_ok: null,                   // null until first probe; true|false after — cheap haiku/copilot probe (drives auto-heal FSM)
     last_round_trip_ms: null,            // int, last completion latency
     networkMode: 'unknown',              // 'vpn' | 'corporate' | 'public' | 'unknown'
     auto_heal_status: 'healthy',         // 'healthy'|'kickstart_pending'|'cooldown'|'disabled' (Plan 34-03 transitions)
@@ -223,7 +223,17 @@ const currentState = {
     kickstart_timestamps: [],            // sliding window for D-06 cooldown FSM
     consecutive_failures: 0,             // resets on success
     last_probe_end: null,                // ISO timestamp of last semantic probe completion
-    reason: null                         // last failure classification: 'http_<code>'|'timeout'|'empty_content'|'oksub_missing'|null
+    reason: null,                        // last failure classification: 'http_<code>'|'timeout'|'empty_content'|'oksub_missing'|null
+    // 3b multi-tier semantic-readiness — does the ACTUALLY CONFIGURED semantic
+    // pipeline work, not just "is the proxy reachable on a cheap path". Probe
+    // sends process: 'observation-writer' so the proxy's processOverrides logic
+    // picks the same route observations would take. Informational only — does
+    // NOT drive the auto-heal FSM (an Anthropic 429 on sonnet is not a proxy
+    // outage; restarting wouldn't help).
+    semantic_strong_ok: null,            // null until first probe; true|false after — heavy-tier probe via configured route
+    semantic_strong_round_trip_ms: null,
+    semantic_strong_last_probe_end: null,
+    semantic_strong_reason: null
   },
   // Network environment detection — single source of truth for CN/VPN/home
   // and local proxy (px/proxydetox) status. Polled every 30s.
@@ -652,6 +662,88 @@ async function pollProxySemantic() {
     // FSM always sees the latest decision.
     evaluateAutoHealFSM();
   }
+}
+
+/**
+ * 3b multi-tier strong probe — does the *actually configured* semantic pipeline
+ * still work, not just "is the proxy reachable on a cheap path"?
+ *
+ * Sends process: 'observation-writer' so the proxy's processOverrides logic
+ * routes the call through the SAME provider/model observation-writer would
+ * use. That makes "is observation-writer effectively healthy?" the question
+ * the brain badge answers, instead of the previous "is copilot/haiku
+ * reachable" (which is true even when sonnet is being 429'd, leaving the
+ * brain badge green while semantic work is silently broken).
+ *
+ * Important: this probe is INFORMATIONAL ONLY. It does NOT drive the
+ * auto-heal FSM. An Anthropic 429 on sonnet is not a proxy outage — the
+ * proxy is doing its job — and restarting it wouldn't help.
+ *
+ * Timeout 30s: CLI fallback for rate-limited sonnet runs ~14s; the cap
+ * has to clear the slowest configured route by a comfortable margin or the
+ * brain will flap amber every probe cycle.
+ */
+async function pollProxySemanticStrong() {
+  const probeEndedAt = () => new Date().toISOString();
+  const start = Date.now();
+  const probeBody = {
+    process: 'observation-writer',     // route through the configured pipeline
+    messages: [{ role: 'user', content: 'say OK' }],
+    maxTokens: 5
+  };
+  const prev = currentState.proxy.semantic_strong_ok;
+  let r;
+  try {
+    r = await fetch(`${PROXY_URL}/api/complete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(probeBody),
+      signal: AbortSignal.timeout(30_000)
+    });
+  } catch (err) {
+    const elapsed = Date.now() - start;
+    const reason = (err && (err.name === 'TimeoutError' || /aborted|timeout/i.test(err.message)))
+      ? 'timeout' : `network_${err.message || 'error'}`;
+    currentState.proxy.semantic_strong_ok = false;
+    currentState.proxy.semantic_strong_round_trip_ms = elapsed;
+    currentState.proxy.semantic_strong_reason = reason;
+    currentState.proxy.semantic_strong_last_probe_end = probeEndedAt();
+    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (${reason})`, 'INFO');
+    return;
+  }
+  const elapsed = Date.now() - start;
+  currentState.proxy.semantic_strong_round_trip_ms = elapsed;
+  currentState.proxy.semantic_strong_last_probe_end = probeEndedAt();
+  if (!r.ok) {
+    currentState.proxy.semantic_strong_ok = false;
+    currentState.proxy.semantic_strong_reason = `http_${r.status}`;
+    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (http_${r.status})`, 'INFO');
+    return;
+  }
+  let body;
+  try { body = await r.json(); }
+  catch (err) {
+    currentState.proxy.semantic_strong_ok = false;
+    currentState.proxy.semantic_strong_reason = 'empty_content';
+    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (empty_content/json-parse: ${err.message})`, 'INFO');
+    return;
+  }
+  const content = (body?.choices?.[0]?.message?.content) ?? body?.content ?? body?.text ?? '';
+  if (!content || typeof content !== 'string') {
+    currentState.proxy.semantic_strong_ok = false;
+    currentState.proxy.semantic_strong_reason = 'empty_content';
+    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (empty_content)`, 'INFO');
+    return;
+  }
+  if (!/ok/i.test(content)) {
+    currentState.proxy.semantic_strong_ok = false;
+    currentState.proxy.semantic_strong_reason = 'oksub_missing';
+    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (oksub_missing — got: ${String(content).slice(0, 80)})`, 'INFO');
+    return;
+  }
+  currentState.proxy.semantic_strong_ok = true;
+  currentState.proxy.semantic_strong_reason = null;
+  if (prev !== true) log(`proxy semantic_strong_ok flip -> true (${elapsed}ms)`, 'INFO');
 }
 
 /**
@@ -1246,6 +1338,17 @@ async function runAllChecks() {
       currentState.proxy.reason = err.message;
       currentState.proxy.last_probe_end = new Date().toISOString();
     }
+    // 3b multi-tier: run the strong probe on the same 60s cadence as the
+    // cheap one, BUT fire-and-forget — the strong probe can take ~14s on
+    // a CLI-fallback path and we don't want it serializing the tick loop.
+    // Errors are swallowed: pollProxySemanticStrong sets state internally
+    // on every return path.
+    pollProxySemanticStrong().catch(err => {
+      log(`proxy semantic_strong probe threw: ${err.message}`, 'ERROR');
+      currentState.proxy.semantic_strong_ok = false;
+      currentState.proxy.semantic_strong_reason = `exception_${err.message || 'unknown'}`;
+      currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
+    });
   }
 
   // ----- Service liveness via PSM (host services only — D-08 drops container supervisorctl) -----
