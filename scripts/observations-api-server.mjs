@@ -198,6 +198,14 @@ function readConsolidationHeartbeat() {
 
 let _consolidationPromise = null;
 let _consolidationStartedAt = null;
+// F1: async consolidation — POST /api/consolidation/run returns 202 immediately
+// and the frontend polls /api/consolidation/status. We track the last completed
+// run so the polling loop can detect "just finished" and surface the result.
+let _lastConsolidationJobId = null;     // monotonic counter, surfaced in 202 + status
+let _lastConsolidationResult = null;    // { digests, observations, days, ... } from runConsolidation
+let _lastConsolidationError = null;     // { message } if last run threw
+let _lastConsolidationFinishedAt = null; // ISO timestamp, set in the finally of runConsolidation
+let _consolidationJobCounter = 0;       // bump on each new run start
 let _consolidationArgs = null;
 let _heartbeatInterval = null;
 let _lastStderrLine = '';
@@ -265,6 +273,10 @@ function runConsolidation(options = {}) {
   _consolidationArgs = args;
   _lastStderrLine = 'starting…';
   _lastStderrAt = _consolidationStartedAt;
+  // F1: bump jobId on each new run start so the frontend can detect a fresh
+  // completion (lastJobId increments + lastFinishedAt advances).
+  _consolidationJobCounter += 1;
+  _lastConsolidationJobId = _consolidationJobCounter;
 
   _bumpHeartbeat();
   _heartbeatInterval = setInterval(_bumpHeartbeat, 2000);
@@ -304,8 +316,18 @@ function runConsolidation(options = {}) {
       } else {
         result = await consolidator.run({ includeToday: options.includeToday !== false });
       }
+      // F1: capture for /api/consolidation/status. Don't reset to null on the
+      // next run start — the polling frontend reads lastFinishedAt to decide
+      // "is this a NEW completion since I last looked?".
+      _lastConsolidationResult = result;
+      _lastConsolidationError = null;
       return { ok: true, ...result };
+    } catch (err) {
+      _lastConsolidationError = { message: err?.message || String(err) };
+      _lastConsolidationResult = null;
+      throw err;
     } finally {
+      _lastConsolidationFinishedAt = new Date().toISOString();
       try { consolidator.close(); } catch { /* best-effort */ }
       if (stderrTapped) {
         process.stderr.write = origStderrWrite;
@@ -1024,19 +1046,32 @@ app.post('/api/retrieve', async (req, res) => {
  * Body: { date?: string, includeToday?: boolean, insightsOnly?: boolean }
  * Coalesces concurrent triggers — second caller attaches to the in-flight run.
  */
-app.post('/api/consolidation/run', async (req, res) => {
+app.post('/api/consolidation/run', (req, res) => {
   if (_shuttingDown) {
     return res.status(503).json({ error: 'Server is shutting down' });
   }
+  // F1: fire-and-forget. Each consolidation run can take many minutes
+  // (every digest/insight call may fall back to the claude CLI at ~10-14s),
+  // which exceeded the dashboard's reverse-proxy timeout and surfaced as a
+  // bogus 502 even though the work completed server-side. Return 202 immediately
+  // with the job id; the frontend polls /api/consolidation/status to detect
+  // completion + read the result. runConsolidation() coalesces concurrent
+  // triggers, so a second click during an in-flight run just attaches.
   const attached = !!_consolidationPromise;
-  try {
-    const result = await runConsolidation(req.body || {});
-    res.json({ success: true, attached, ...result });
-  } catch (err) {
-    process.stderr.write(`[obs-api] /consolidation/run error: ${err.message}\n`);
+  // Kick off (or attach to) the run. Swallow the rejection here — the error
+  // lands in _lastConsolidationError where the status endpoint surfaces it.
+  // Without the .catch we'd get an unhandledRejection log on every failed run.
+  runConsolidation(req.body || {}).catch(err => {
+    process.stderr.write(`[obs-api] /consolidation/run async error: ${err.message}\n`);
     if (isCorruptionError(err)) invalidateDb();
-    res.status(500).json({ error: err.message || 'Consolidation failed' });
-  }
+  });
+  res.status(202).json({
+    success: true,
+    accepted: true,
+    attached,
+    jobId: _lastConsolidationJobId,
+    startedAt: _consolidationStartedAt,
+  });
 });
 
 app.get('/api/consolidation/status', (_req, res) => {
@@ -1081,6 +1116,15 @@ app.get('/api/consolidation/status', (_req, res) => {
       totalDigests, totalInsights,
       lastObservationAt, lastDigestAt, lastInsightAt,
       inflight,
+      // F1: last-completed run surface for the polling frontend. lastJob.id
+      // advances on every new run; when (id !== prevId AND inflight === null)
+      // the frontend renders the result and stops polling.
+      lastJob: _lastConsolidationJobId === null ? null : {
+        id: _lastConsolidationJobId,
+        finishedAt: _lastConsolidationFinishedAt,
+        result: _lastConsolidationResult,   // null while running, or on error
+        error: _lastConsolidationError,     // null on success
+      },
     });
   } catch (err) {
     process.stderr.write(`[obs-api] /consolidation/status error: ${err.message}\n`);
