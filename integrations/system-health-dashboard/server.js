@@ -404,6 +404,17 @@ class SystemHealthAPIServer {
                     }
                 }
             }
+            // Factor in LLM proxy / internet state: on corporate/VPN networks,
+            // internet unreachable or proxy not running is a degradation.
+            if (state && state.network) {
+                const loc = state.network.location;
+                if ((loc === 'corporate' || loc === 'vpn') && state.network.internet_reachable === false) {
+                    violations.push({ kind: 'network.internet_unreachable', severity: 'high' });
+                }
+                if (state && state.proxy && state.proxy.semantic_ok === false && state.proxy.auto_heal_status !== 'disabled') {
+                    violations.push({ kind: 'proxy.semantic_readiness', severity: 'high' });
+                }
+            }
             const overallStatus = violations.length === 0 ? 'healthy' :
                 violations.some(v => v.severity === 'critical') ? 'unhealthy' : 'degraded';
             res.json({

@@ -229,7 +229,7 @@ const currentState = {
   // and local proxy (px/proxydetox) status. Polled every 30s.
   // Consumers: LLM proxy, statusline, dashboard.
   network: {
-    location: 'unknown',                 // 'corporate' | 'vpn' | 'home' | 'unknown'
+    location: 'unknown',                 // 'corporate' | 'vpn' | 'open' | 'unknown'
     proxy_running: false,                // true if px/proxydetox listening on 127.0.0.1:3128
     proxy_functional: false,             // true if proxy can actually reach external hosts
     internet_reachable: false,           // true if we can reach github.com (directly or via proxy)
@@ -1009,21 +1009,49 @@ async function pollNetworkStatus() {
   netState.proxy_running = proxyEnvSet && portListening;
 
   // 2. Can we resolve BMW PAC host? (indicates CN)
+  //    Use a fresh DNS resolver to avoid stale libc resolver cache in long-running processes.
   const pacResolved = await new Promise(resolve => {
-    dns.resolve4('muc.proxy-pac.bmwgroup.net', { timeout: 3000 }, (err, addrs) => {
+    const resolver = new dns.Resolver();
+    resolver.setServers(dns.getServers());
+    resolver.resolve4('muc.proxy-pac.bmwgroup.net', (err, addrs) => {
       resolve(!err && addrs && addrs.length > 0);
     });
+    setTimeout(() => resolve(false), 3000);
   });
 
   // 3. Determine location
-  //    PAC resolves = corporate network reachable (physically or via VPN)
-  //    proxy running on CN = VPN (physical CN doesn't need the local proxy)
-  if (pacResolved && netState.proxy_running) {
-    netState.location = 'vpn';        // corporate network + proxy = VPN tunnel
+  //    PAC resolves = corporate network reachable (physically on CN or via VPN)
+  //    Distinguish CN vs VPN by latency to a CN-internal host:
+  //      < 30ms = physical CN (LAN/Wi-Fi), > 30ms = VPN tunnel (remote)
+  let onPhysicalCN = false;
+  if (pacResolved) {
+    onPhysicalCN = await new Promise(resolve => {
+      const start = Date.now();
+      const sock = net.connect({ host: 'muc.proxy-pac.bmwgroup.net', port: 80, timeout: 2000 });
+      sock.once('connect', () => { const ms = Date.now() - start; log(`network: PAC TCP latency=${ms}ms (threshold=30ms)`, 'DEBUG'); sock.destroy(); resolve(ms < 30); });
+      sock.once('error', () => resolve(false));
+      sock.once('timeout', () => { sock.destroy(); resolve(false); });
+    });
+  }
+
+  if (pacResolved && onPhysicalCN) {
+    netState.location = 'corporate';  // physically on CN (proxy needed for internet)
   } else if (pacResolved) {
-    netState.location = 'corporate';  // physical corporate network (no proxy needed)
+    netState.location = 'vpn';        // CN reachable but high latency = VPN tunnel
   } else {
-    netState.location = 'home';       // direct internet, no corporate access
+    netState.location = 'open';       // open internet, no corporate access
+  }
+
+  // 3b. Auto-enable proxy: on CN or VPN, if proxy port is listening but env vars
+  //     aren't set, auto-adopt it (the user likely forgot to re-enable after a toggle).
+  if ((netState.location === 'corporate' || netState.location === 'vpn') && portListening && !proxyEnvSet) {
+    const proxyUrl = 'http://127.0.0.1:3128';
+    process.env.http_proxy = proxyUrl;
+    process.env.https_proxy = proxyUrl;
+    process.env.HTTP_PROXY = proxyUrl;
+    process.env.HTTPS_PROXY = proxyUrl;
+    netState.proxy_running = true;
+    log(`network: auto-enabled proxy env vars (on ${netState.location} with port 3128 listening)`, 'INFO');
   }
 
   // 5. Check if proxy is functional (can reach external host via proxy)
@@ -1075,7 +1103,7 @@ async function pollNetworkStatus() {
   netState.last_probe_end = new Date().toISOString();
 
   // Also update proxy.networkMode to match (backwards compat for dashboard)
-  currentState.proxy.networkMode = netState.location === 'home' ? 'public' : netState.location;
+  currentState.proxy.networkMode = netState.location === 'open' ? 'public' : netState.location;
 
   log(`network: location=${netState.location} proxy_env=${proxyEnvSet} port_listening=${portListening} proxy_running=${netState.proxy_running} proxy_functional=${netState.proxy_functional} internet=${netState.internet_reachable}`);
 }

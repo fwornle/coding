@@ -1940,7 +1940,7 @@ class CombinedStatusLine {
     // Uses ASCII-only to avoid emoji-width issues.
     {
       const loc = network?.location || 'unknown';
-      const locMap = { corporate: 'CN', vpn: 'VPN', home: 'HOME', unknown: '??' };
+      const locMap = { corporate: 'CN', vpn: 'VPN', open: 'OPEN', home: 'OPEN', unknown: '??' };
       const locLabel = locMap[loc] || loc.toUpperCase().slice(0, 4);
       parts.push(`[N:${locLabel}]`);
     }
