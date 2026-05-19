@@ -65,26 +65,32 @@ The system supports 14 LLM providers with tier-based model selection:
 
 ### Subscription Providers (Zero Cost)
 
-#### 1. Claude Code
-**CLI Command**: `claude`
-**Cost**: $0 per token (uses existing Claude max subscription)
+#### 1. Claude Code (Max subscription)
+**Path**: Direct OAuth → CLI fallback (since 2026-05-19)
+**Cost**: $0 per token (uses existing Claude Max subscription)
 
-| Tier | Model | Description |
-|------|-------|-------------|
-| Fast | `sonnet` | Claude Sonnet 4.5 (fast tier) |
-| Standard | `sonnet` | Claude Sonnet 4.5 (standard tier) |
-| Premium | `opus` | Claude Opus 4.6 (highest quality) |
+| Tier | Model alias | Anthropic model returned | Typical latency (direct → fallback) |
+|------|-------------|--------------------------|-----|
+| Fast | `claude-haiku-4.5` | `claude-haiku-4-5-20251001` | ~0.9s (direct path; rarely rate-limited) |
+| Standard | `claude-sonnet-4.6` | `claude-sonnet-4-6-...` | ~10-14s (typically falls back to CLI; bearer endpoint rate-limits sonnet) |
+| Premium | `claude-opus-4.6` | `claude-opus-4-6-...` | ~10-14s (same as sonnet — bearer rate-limited) |
+
+**Two-tier dispatch (`proxy-bridge/server.mjs`)**:
+
+1. **Direct OAuth (fast path)** — `completeClaudeCodeDirect()` POSTs to `api.anthropic.com/v1/messages` with `Authorization: Bearer <oauth>` read from the macOS keychain. Real token counts (9 in / 4 out for `say OK`). Bearer + `anthropic-version: 2023-06-01` + `anthropic-beta: oauth-2025-04-20`.
+2. **CLI fallback (slower)** — on 401/403/429, falls back to `completeClaudeCodeViaCLI()` which spawns `claude -p --output-format json --tools '' ...`. Uses the **same Max subscription** but a different Anthropic rate-limit bucket (sonnet/opus succeed via CLI when bearer 429s). Costs ~16-22K `cache_creation` tokens per call because the CLI auto-injects its full system prompt + tool definitions.
 
 **Requirements**:
-- Install Claude Code CLI: https://claude.ai/downloads
-- Authenticate: `claude login`
-- Verify: `claude --version`
+- The `claude` CLI on the host (only used for fallback path): `which claude && claude --version`
+- Authenticated: `env -u ANTHROPIC_API_KEY claude auth status` returns `loggedIn: true, authMethod: "claude.ai", subscriptionType: "max"`
+- Keychain entry `Claude Code-credentials` populated by the CLI
 
-**Features**:
-- Automatic quota tracking with persistent storage
-- Exponential backoff on exhaustion (5m → 15m → 1h)
-- Seamless fallback to API providers
-- **From containers**: Falls back to [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
+**Token cache** (proxy-side, in-memory):
+- Read on first claude-code call; cached until `expiresAt - now < 60s`
+- On 401: cache cleared, CLI fallback fires, the CLI rotates the keychain blob; next direct call reads the fresh token
+
+**Escape hatches**:
+- `LLM_PROXY_DISABLE_CLAUDE_DIRECT=1` — force every claude-code call through the legacy CLI path
 
 #### 2. GitHub Copilot (Primary Provider)
 **Method**: Direct HTTP POST to Copilot API

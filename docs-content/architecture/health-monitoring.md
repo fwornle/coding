@@ -97,6 +97,42 @@ The ETM also writes per-project LSL files to `.specstory/history/YYYY/MM/YYYY-MM
 
 The `start` daemon subcommand was removed when the coordinator took over lifecycle. The supervisord `[program:health-verifier]` block was likewise retired (the program ran `health-verifier.js start` which now exits with "Unknown command: start"; it was kept with `autostart=false` as a transitional shim until commit `58e968e45` removed it entirely).
 
+### Multi-tier proxy semantic probe (3b)
+
+The health coordinator probes the LLM proxy on a 60s cadence to drive the `[🧠]` statusline badge. Since 2026-05-19 this is a **two-probe** scheme — the original single probe was misleading because it only checked the cheapest path, leaving the badge green while the actually-configured semantic pipeline silently broke.
+
+| Probe | Function | Path | Purpose | Drives auto-heal FSM? |
+|---|---|---|---|---|
+| Cheap | `pollProxySemantic` | `POST /api/complete` with `provider: 'copilot', tier: 'haiku', maxTokens: 5` | "Is the proxy reachable on at least one path?" | **Yes** — sustained failures trigger `restart_llm_cli_proxy`. |
+| Strong | `pollProxySemanticStrong` | `POST /api/complete` with `process: 'observation-writer'` (no explicit provider/model — let processOverrides choose) | "Can the actually-configured semantic pipeline complete a call?" | **No** — an Anthropic 429 on sonnet is not a proxy outage; restarting wouldn't help. |
+
+State surface (under `state.proxy` at `/health/state`):
+
+```jsonc
+{
+  "proxy": {
+    "semantic_ok": true,                          // cheap probe
+    "last_round_trip_ms": 925,
+    "reason": null,
+    "semantic_strong_ok": true,                   // 3b strong probe
+    "semantic_strong_round_trip_ms": 8253,
+    "semantic_strong_reason": null,
+    "auto_heal_status": "healthy"
+  }
+}
+```
+
+Statusline mapping (`combined-status-line.js`):
+
+| `semantic_ok` | `semantic_strong_ok` | Badge | Meaning |
+|:-:|:-:|:-:|---|
+| `true` | `true` | `[🧠✅]` | Both probes pass. |
+| `true` | `false` | `[🧠⚠️]` (amber) | Cheap path fine, configured pipeline silently broken (typical example: observation-writer pinned to `claude-code/sonnet`, Anthropic 429 + no working fallback). |
+| `false` | any | `[🧠❌]` / `[🧠🟡]` per existing rules | Proxy itself is unreachable; auto-heal FSM engages. |
+| `null` | any | `[🧠❓]` | Pre-first-probe. |
+
+The strong probe runs **fire-and-forget** with a 30s timeout — the CLI-fallback path through claude-code/sonnet currently takes ~14s end-to-end, and we don't want the strong probe serializing the coordinator's tick loop. Errors are caught and write to `semantic_strong_reason` for diagnostics.
+
 ## Consumers
 
 ### Statusline (`combined-status-line.js`)

@@ -1,7 +1,7 @@
 @startuml llm-cli-proxy-architecture
 !include _standard-style.puml
 
-title LLM Subscription Provider Architecture (@rapid/llm-proxy)\nDirect HTTP + CLI Shell-Out with Proxy Bridge
+title LLM Subscription Provider Architecture (@rapid/llm-proxy)\nDirect HTTP + Claude Direct-OAuth with CLI Fallback\nv7.1 (2026-05-19)
 
 top to bottom direction
 
@@ -10,93 +10,99 @@ package "Docker Container (coding-services)" {
   component [LLM Service\n(Provider Registry)] as llmservice <<core>>
   component [Copilot Provider\n(proxy mode)] as copilotprov <<agent>>
   component [Claude Code Provider\n(proxy mode)] as claudeprov <<agent>>
-  component [Groq Provider] as groqprov <<api>>
-  component [Anthropic Provider] as anthropicprov <<api>>
+  component [Anthropic Provider\n(api-key)] as anthropicprov <<api>>
 
-  llmservice -down-> copilotprov : priority 1
-  llmservice -down-> groqprov : priority 2
-  llmservice -down-> claudeprov : priority 3
-  llmservice -down-> anthropicprov : priority 4
   semantic -down-> llmservice : LLM requests
+  llmservice -down-> copilotprov
+  llmservice -down-> claudeprov
+  llmservice -down-> anthropicprov
 }
 
-rectangle "host.docker.internal" {
-  package "Host: LLM Proxy Bridge (port 12435)" {
-    component [llm-proxy.mjs\nExpress Server] as proxy <<api>>
-    component [POST /api/complete] as complete <<api>>
+rectangle "host.docker.internal:12435" as hostbox {
+  package "LLM Proxy Bridge (proxy-bridge/server.mjs)" {
+    component [POST /api/complete\n(dispatcher)] as complete <<api>>
     component [GET /health] as health <<api>>
-
-    proxy -down-> complete
-    proxy -down-> health
+    component [/api/llm/settings\n(processOverrides)] as settings <<api>>
   }
 
-  package "Host: Direct Copilot HTTP" {
-    component [Direct HTTP POST\nto Copilot API] as copilothttp <<api>>
+  package "claude-code dispatcher" as claudebox {
+    component [completeClaudeCodeDirect\n(direct OAuth bearer)] as cccdirect <<core>>
+    component [completeClaudeCodeViaCLI\n(CLI subprocess, fallback)] as cccfall <<cli>>
+    note right of cccdirect
+      Path 1 — fast path
+      ~0.9s end-to-end
+      Real input/output tokens
+      Used for ALL claude-code calls first
+    end note
+    note right of cccfall
+      Path 2 — fallback only
+      ~10-14s end-to-end
+      Auto-injects ~16-22K system prompt
+      (billed as cache_creation; cache_read
+      on subsequent calls within 5 min)
+      Different Anthropic rate-limit bucket
+      than the bare OAuth bearer endpoint
+    end note
   }
 
-  package "Host: Claude CLI" {
-    component [claude -p\n--output-format json\n(Max OAuth)] as claudecli <<cli>>
-  }
-
-  complete -down-> copilothttp : copilot requests
-  complete -down-> claudecli : claude-code requests
+  component [Direct HTTP POST\nto Copilot API] as copilothttp <<api>>
 }
 
-cloud "External APIs" {
-  component [Copilot API\ncopilot-api.{enterprise}] as copilotapi <<external>>
-  component [Anthropic API] as anthropicapi <<external>>
-  component [Groq API] as groqapi <<external>>
+cloud "External APIs" as cloud {
+  component [api.anthropic.com\n/v1/messages] as anthropicapi <<external>>
+  component [Copilot API\ncopilot-api.{enterprise}\n/ api.githubcopilot.com] as copilotapi <<external>>
 }
 
-database "Host Auth Stores" {
+database "Host Auth Stores" as auth {
   component [~/.local/share/opencode/auth.json\nCopilot OAuth token] as copilotauth <<storage>>
-  component [macOS Keychain\nClaude Max OAuth] as keychain <<storage>>
+  component [macOS Keychain\nClaude Max OAuth\n(60s cache, expiry buffer)] as keychain <<storage>>
 }
 
 ' Cross-boundary connections
-copilotprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:12435
-claudeprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:12435
-groqprov ASYNC_LINE groqapi : HTTPS (direct)
-anthropicprov ASYNC_LINE anthropicapi : HTTPS (direct)
+copilotprov SYNC_LINE complete : HTTP via\nhost.docker.internal:12435
+claudeprov SYNC_LINE complete : HTTP via\nhost.docker.internal:12435
 
-' Host-side connections
+' Dispatcher routing
+complete -down-> copilothttp : copilot requests
+complete -down-> claudebox : claude-code requests
+
+' Direct OAuth → CLI fallback ladder (within claude-code dispatcher)
+cccdirect -down-> cccfall : 401 / 403 / 429\n(shouldFallbackToCLI)
+
+' External call paths
+cccdirect SYNC_LINE anthropicapi : HTTPS POST\nAuthorization: Bearer <oauth>\nanthropic-version: 2023-06-01
+cccfall SYNC_LINE anthropicapi : via `claude -p` subprocess\n(stream-JSON in worker pool — v7.2)
 copilothttp SYNC_LINE copilotapi : HTTPS POST\n/chat/completions
+
+' Auth flow
+cccdirect <.. keychain : reads access_token\n(re-reads when expiresAt - now < 60s\nOR on 401 from API)
+cccfall <.. keychain : reads via CLI\n(CLI auto-refreshes on every call)
 copilothttp <.. copilotauth : reads OAuth token\n(refresh every 60s)
-claudecli <.. keychain : reads OAuth\n(managed by CLI)
 
-note right of proxy
-  **Split Routing**
-  - Copilot: Direct HTTP POST (~2s)
-    No SDK, no subprocess, no JSON-RPC
-  - Claude: CLI shell-out (~12s)
-    JSON output, exact token counts
-    ANTHROPIC_API_KEY stripped from env
+note right of complete
+  **Dispatcher behaviour (v7.1)**
+  - Pinned provider goes first (Settings → processOverrides)
+  - claude-code: direct → CLI fallback on auth/rate-limit
+  - Same Max subscription on BOTH paths; only the
+    rate-limit bucket differs
+  - No cross-provider fallback for pinned providers —
+    pinning expresses user intent, not "anything that works"
 end note
 
-note right of copilothttp
-  **Copilot Auth**
-  Bearer token from auth.json
-  Enterprise: copilot-api.{host}
-  Public: api.githubcopilot.com
-end note
-
-note right of claudecli
-  **Claude Auth**
-  Max OAuth from Keychain
-  Cannot use OAuth directly
-  against api.anthropic.com
-  (server-side allowlisting)
+note bottom of claudebox
+  **Why fallback within claude-code instead of claude-code → copilot?**
+  Anthropic 429s the OAuth bearer endpoint per-model. Haiku is fine;
+  sonnet/opus get rate-limited on the bearer path. The CLI session
+  endpoint uses a different bucket and the same Max subscription, so
+  the call succeeds — just slower. v7.2 (queued) adds a persistent
+  worker pool to bring the CLI-fallback path from ~14s to ~2-3s.
 end note
 
 note bottom of llmservice
-  **Provider Priority**
-  1. copilot (proxy) — free, ~2s
-  2. groq — API key, fast
-  3. claude-code (proxy) — free, ~12s
-  4. anthropic — API key
-  5. openai — API key
-  6. gemini — API key
-  7. github-models — API key
+  **Auto-route preference**
+  Claude sessions → claude-code first, then copilot
+  OpenCode/corporate → copilot first, then groq → openai → anthropic
+  Per-process pinning overrides via /api/llm/settings
 end note
 
 @enduml
