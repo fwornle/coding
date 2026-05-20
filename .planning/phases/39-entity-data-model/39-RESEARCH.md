@@ -730,32 +730,39 @@ This research has no `[ASSUMED]` claims. Every factual claim is `[VERIFIED]` via
 
 **Empty Assumptions Log:** All claims in this research were verified against the actual source trees or cited from locked CONTEXT.md decisions — no user confirmation needed beyond what discuss-phase already locked.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All 5 open questions raised during research were resolved during planning. The implementation lives in plans 39-02, 39-03, 39-04 as cited below. Resolution lines added during the revision iteration (BLOCKER #1 fix from checker).
 
 1. **Inverse edge direction for `SUPERSEDED_BY`: `old to new` or `new to old`?**
    - What we know: D-35 says "walks backward via `supersedes` and forward via a reverse index built by the store." OKM uses `SUPERSEDES` from `new to old`. The reverse direction `SUPERSEDED_BY: old to new` makes the out-edges of `old` answer "what came after me," which is more natural for the forward walk.
    - What's unclear: Whether to also add the inverse `SUPERSEDES: new to old` edge for compatibility with OKM consumers.
    - Recommendation: Use `SUPERSEDED_BY: old to new` only. The attribute `entity.supersedes` already provides the backward-walk; the edge type provides the forward-walk. One edge, two pieces of information.
+   - **RESOLVED:** Direction is `old → new`. Forward walk from origin uses `forEachOutEdge(node, type='SUPERSEDED_BY')`; backward walk uses `entity.supersedes` attribute. Resolution lives in 39-03 Task 1 (the `getSupersessionChain` body lifts this verbatim — forward via `forEachOutEdge` filtered to `r.type === 'SUPERSEDED_BY'`, backward via the `supersedes` attribute walk with cycle guard).
 
 2. **Should `getSupersessionChain` accept `{ includeSuperseded: true }`?**
    - What we know: D-35 says the method walks both directions and returns the full chain.
    - What's unclear: Whether the active-only filter (D-34) applies inside `getSupersessionChain`. Almost certainly NOT — the entire point of the method is to surface history.
    - Recommendation: `getSupersessionChain` IGNORES the active-only filter unconditionally. The returned array contains every entity in the lineage regardless of `validUntil`. Document this in the JSDoc.
+   - **RESOLVED:** Chain query IGNORES the active-only filter — surfacing history is its purpose. Resolution lives in 39-03 Task 1: `getSupersessionChain` loads entities directly via `this.graph.getNodeAttributes(id)`, never via `iterate`/`findByOntologyClass`, so the D-34 filter cannot apply. The JSDoc on `getSupersessionChain` documents this.
 
 3. **Backfill checkpoint backwards-compat across schema versions.**
    - What we know: D-38 specifies a checkpoint file. CF-D29 specifies atomic write.
    - What's unclear: If Phase 41/42/43 need to evolve the checkpoint shape later (e.g., add per-domain progress for parallel backfills), how does Phase 39's reader handle a newer-schema checkpoint file?
    - Recommendation: Add a `"version": 1` field to the checkpoint. Phase 39 reader rejects unrecognized versions with a clear error message. Future phases can bump the version and add a migration step. The version field costs ~10 bytes and is worth it.
+   - **RESOLVED:** Single JSON object with `"version": 1` field for forward-compat. Resolution lives in 39-04 Task 1: the `Checkpoint` interface declares `version: 1` as a literal type, and `writeCheckpointAtomic` writes it on every flush. (Future phases bump the version and add a migration step; Phase 39 just lands the literal.)
 
 4. **`putEntity` on existing id with `supersedes` field — error or no-op?**
    - What we know: D-32 says "if the id exists: store updates `lastConfirmedBy`, increments `confirmationCount`, preserves `createdBy`, bumps `updatedAt`." D-33's supersession closure assumes the id is NEW.
    - What's unclear: What if a caller mistakenly passes `supersedes: someOldId` on a confirm-write (same id as existing)?
    - Recommendation: Throw an error: `"putEntity: supersedes can only be set on a NEW entity; ${id} already exists in the graph"`. Confirm writes have no business changing supersession lineage. Add a boundary test for this.
+   - **RESOLVED (deviation from research recommendation):** SILENT NO-OP via the `!existing` guard — supersession side-effects (predecessor closure + `SUPERSEDED_BY` edge write) ONLY fire on the create branch, never on the confirm-write branch. This deviates from RESEARCH's "recommend throw" — the planner chose no-op for symmetry with D-32's "store decides create vs confirm by id existence" (no separate API). The contract becomes: `supersedes` is meaningful ONLY when the id is new; on a confirm-write the field is accepted but has no side effect (the confirm-write itself — `lastConfirmedBy`/`confirmationCount` update — still happens). Resolution lives in 39-03 Task 1 (the `if (entity.supersedes !== undefined && !existing)` guard) and 39-03 Task 2 (the boundary test added during this revision iteration — `'putEntity confirm-write with supersedes set is a silent no-op on supersession branch (D-33 + OQ#4 resolution)'`).
 
 5. **Should the segment-merge helper validate that `newSegment.confirmations.length === 0`?**
    - What we know: D-40 says the helper appends a confirmation to an existing matching segment, or pushes the new segment.
    - What's unclear: A caller might pass a `DescriptionSegment` with pre-populated `confirmations[]`. Should the helper accept that?
    - Recommendation: Accept it silently — `{ ...newSegment, confirmations: newSegment.confirmations ?? [] }`. The caller might be doing a one-shot import. Don't throw on what looks like reasonable input. Note this in JSDoc.
+   - **RESOLVED:** Accept silently — caller may pre-populate (e.g., backfill replays). Resolution lives in 39-02 Task 1: `mergeDescriptionSegment` does `{ ...newSegment, confirmations: newSegment.confirmations ?? [] }` and the JSDoc notes pre-populated confirmations are accepted as-is.
 
 ## Environment Availability
 
