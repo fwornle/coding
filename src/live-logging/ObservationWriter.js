@@ -307,8 +307,15 @@ export class ObservationWriter {
           },
         ],
       };
-      // Retry loop: 2 attempts with 3s backoff
-      const MAX_RETRIES = 2;
+      // Retry loop: 4 attempts with exponential backoff (1s, 2s, 4s -> ~7s
+      // total wait + per-attempt fetch latency). The old 2-attempt / 3s budget
+      // couldn't cover a proxy auto-heal kickstart window (the proxy is
+      // unavailable for several seconds while launchd respawns + the new node
+      // process binds its listener) — observations submitted during a kickstart
+      // landed in _fallbackSummary() and were persisted as "[Raw] ... LLM
+      // summary unavailable" rows that later need backfilling.
+      const RETRY_BACKOFF_MS = [1000, 2000, 4000];
+      const MAX_RETRIES = RETRY_BACKOFF_MS.length + 1;
       let lastError = null;
 
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -327,7 +334,7 @@ export class ObservationWriter {
             lastError = `Proxy error ${response.status}: ${errBody.slice(0, 200)}`;
             process.stderr.write(`[ObservationWriter] ${lastError}\n`);
             if (attempt < MAX_RETRIES) {
-              await new Promise(r => setTimeout(r, 3000));
+              await new Promise(r => setTimeout(r, RETRY_BACKOFF_MS[attempt - 1]));
               continue;
             }
             return { summary: this._fallbackSummary(messages) };
@@ -344,7 +351,7 @@ export class ObservationWriter {
           lastError = err.message;
           process.stderr.write(`[ObservationWriter] Attempt ${attempt} failed: ${err.message}\n`);
           if (attempt < MAX_RETRIES) {
-            await new Promise(r => setTimeout(r, 3000));
+            await new Promise(r => setTimeout(r, RETRY_BACKOFF_MS[attempt - 1]));
           }
         }
       }
