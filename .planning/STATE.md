@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 38 Plan 03 complete -- OntologyRegistry class + sub-barrel + root re-exports + package.json exports map (km-core commits 5651142, f006e91)
-last_updated: "2026-05-20T10:01:10Z"
-last_activity: 2026-05-20 -- Phase 38 Plan 03 complete (OntologyRegistry class with 5 deltas vs OKM; Wave 2 done; Plans 38-04 + 38-05 + 38-06 unblocked in Wave 3)
+stopped_at: Phase 38 Plan 04 complete -- registryBackedValidator factory in src/validation/ontology.ts + root barrel re-export (km-core commits fe582ca, 3f9522f); Wave 3 partially advanced (04 done, 05 + 06 still pending)
+last_updated: "2026-05-20T10:07:00Z"
+last_activity: 2026-05-20 -- Phase 38 Plan 04 complete (registryBackedValidator factory bridges Phase 37 D-19 surface to Phase 38 registry; type-only import; error-message contract preserved verbatim; Plan 38-05 unblocked)
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 11
-  completed_plans: 8
-  percent: 12
+  completed_plans: 9
+  percent: 13
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 38 (ontology-registry) — EXECUTING
-Plan: 4 of 6 (Plans 01 + 02 + 03 complete; Waves 1 + 2 done — 38-04 + 38-05 + 38-06 unblocked in Wave 3)
+Plan: 5 of 6 (Plans 01 + 02 + 03 + 04 complete; Waves 1 + 2 done + Wave 3 plan 04 done — 38-05 unblocked next, 38-06 follows)
 Status: Executing Phase 38
-Last activity: 2026-05-20 -- Phase 38 Plan 03 complete (OntologyRegistry class + barrels + exports map in km-core)
+Last activity: 2026-05-20 -- Phase 38 Plan 04 complete (registryBackedValidator factory + root barrel re-export in km-core)
 
 ## Performance Metrics
 
@@ -104,6 +104,9 @@ Last activity: 2026-05-20 -- Phase 38 Plan 03 complete (OntologyRegistry class +
 - [Phase 38-03]: registerClasses signature refactored to `registerClasses(target, file, source)` with explicit target Map argument — both `loadFromDisk()` and `reload()` invoke it with their respective target maps (`this.classes` constructor path; local `newClasses` for reload). Avoids duplicating the loop body AND the pre-swap shared-state hazard during atomic rebuild.
 - [Phase 38-03]: FLAG-1 from 38-PLAN-CHECK addressed via option (a) — extended package.json `exports` map with `./ontology` entry so `'@fwornle/km-core/ontology'` resolves for external consumers. Verified by tmpdir smoke compile (`npm install` km-core + @types/node + typescript, NodeNext+ES2022 tsconfig, both root and sub-path imports compile clean).
 - [Phase 38-03]: All 33 Phase 37 vitest tests still pass after registry + barrel + package.json changes — zero regression.
+- [Phase 38-04]: registryBackedValidator(registry: OntologyRegistry): OntologyValidator factory appended to src/validation/ontology.ts as pure additive edit (27 → 75 lines). Type-only import (`import type { OntologyRegistry } from '../ontology/registry.js'`) erases at compile time so the validator module has zero runtime dependency on the registry; one-way dependency direction grep-verified (registry has 0 imports from validation/ontology.ts).
+- [Phase 38-04]: Error-message text VERBATIM `Unknown ontology class: ${entityType}` — load-bearing for Phase 37 test contract preservation (graph-store.test.ts:198 regex `/Unknown ontology class/`). Plan 38-05's auto-wired path is a drop-in replacement for the strict-stub at lines 187-192.
+- [Phase 38-04]: Root barrel re-export placed adjacent to existing noopOntologyValidator (group exports by source file). All 33 Phase 37 vitest tests still pass — zero regression. km-core commits fe582ca + 3f9522f.
 
 ### Blockers/Concerns
 
@@ -135,9 +138,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 38 P01 | 2min | 2 tasks | 2 files |
 | Phase 38 P02 | 3min | 2 tasks | 5 files |
 | Phase 38 P03 | 4min | 2 tasks | 4 files |
+| Phase 38 P04 | 3min | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-05-20T10:01:10Z
-Stopped at: Phase 38 Plan 03 complete -- OntologyRegistry class + sub-barrel + root re-exports + package.json exports map (km-core commits 5651142, f006e91); Waves 1 + 2 complete; Plans 38-04 (factory) + 38-05 (store wiring) + 38-06 (tests) unblocked in Wave 3 (sequential via depends_on chain 04 → 05 → 06)
+Last session: 2026-05-20T10:07:00Z
+Stopped at: Phase 38 Plan 04 complete -- registryBackedValidator factory in src/validation/ontology.ts + root barrel re-export (km-core commits fe582ca, 3f9522f); Waves 1 + 2 complete + Wave 3 plan 04 done; Plans 38-05 (GraphKMStore wiring) + 38-06 (tests) still pending in Wave 3 (sequential via depends_on chain 05 → 06)
 Resume with: `/gsd:execute-phase 38`
