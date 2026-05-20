@@ -461,7 +461,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
-| 39. Entity Data Model | 4/4 | Complete   | 2026-05-20 |
+| 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
 | 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
