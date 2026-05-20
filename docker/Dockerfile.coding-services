@@ -105,6 +105,11 @@ RUN cd lib/vkb-server && npm install --ignore-scripts 2>/dev/null || true
 # Install LLM service dependencies
 RUN cd lib/llm && npm install --ignore-scripts 2>/dev/null || true
 
+# Install KM-Core dependencies (Phase 37)
+# devDeps required for in-image fallback build (typescript). Primary delivery
+# path is the dist/ bind-mount; this RUN is the CI/fresh-image safety net.
+RUN cd lib/km-core && npm install --ignore-scripts 2>/dev/null || true
+
 # Re-install integration deps after source COPY (node-deps stage installs may
 # have been overwritten by COPY integrations/ since .dockerignore excludes node_modules)
 RUN cd integrations/mcp-constraint-monitor && npm install --ignore-scripts 2>/dev/null || true
@@ -122,8 +127,15 @@ RUN for f in $(find integrations/*/node_modules/@rapid/llm-proxy/dist -name "net
 # Rebuild native bindings for the container's architecture
 RUN npm rebuild better-sqlite3 classic-level 2>/dev/null || true
 
+# Defensive rebuild of km-core's classic-level binding (Pitfall 1: dedupe may fail across arch)
+RUN cd lib/km-core && npm rebuild classic-level 2>/dev/null || true
+
 # Build TypeScript projects (run build in each directory)
 RUN cd lib/llm && npm run build 2>/dev/null || true
+# KM-Core fallback build (CI/fresh-image). Host's dist/ bind-mount overrides at
+# runtime, but failures here must propagate (no `|| true`) so a broken fallback
+# fails the image build instead of producing a silently-broken container.
+RUN cd lib/km-core && npm run build
 RUN cd integrations/mcp-server-semantic-analysis && npm run build 2>/dev/null || true
 RUN cd integrations/system-health-dashboard && npm run build 2>/dev/null || true
 
