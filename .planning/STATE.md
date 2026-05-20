@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 38 Plan 01 complete -- types + loader in km-core (commits 4bea298, 88dff82)
-last_updated: "2026-05-20T09:47:21Z"
-last_activity: 2026-05-20 -- Phase 38 Plan 01 complete (ONTO-01/02 type foundation + loader)
+stopped_at: Phase 38 Plan 02 complete -- 5 fixture JSONs in km-core/tests/fixtures/ontology/ (commits 5e31b3e, 972bd3a)
+last_updated: "2026-05-20T11:55:00Z"
+last_activity: 2026-05-20 -- Phase 38 Plan 02 complete (4 verbatim OKM fixtures + synthetic coding-ontology.json B-shape proxy)
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 11
-  completed_plans: 6
-  percent: 10
+  completed_plans: 7
+  percent: 11
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 38 (ontology-registry) — EXECUTING
-Plan: 2 of 6 (Plan 01 complete; Wave 1 partial — 38-02 next in Wave 1)
+Plan: 3 of 6 (Plans 01 + 02 complete; Wave 1 done — 38-03 + 38-04 unblocked in Wave 2)
 Status: Executing Phase 38
-Last activity: 2026-05-20 -- Phase 38 Plan 01 complete (types + loader in km-core)
+Last activity: 2026-05-20 -- Phase 38 Plan 02 complete (5 fixture JSONs in km-core/tests/fixtures/ontology/)
 
 ## Performance Metrics
 
@@ -97,6 +97,9 @@ Last activity: 2026-05-20 -- Phase 38 Plan 01 complete (types + loader in km-cor
 - [Phase 38-01]: Adopted OKM ontology type analog (29 lines) verbatim with one delta — `OntologyClass.defaultLayer?: Layer` imports `Layer` from `./entity.js` instead of inlining `'evidence' | 'pattern'`. Single source of truth for the Layer union remains anchored in Phase 37 Plan 02's entity.ts.
 - [Phase 38-01]: Loader (`loadOntologyFile`) stays synchronous (Pattern S4) and throws on shape error. Plan 38-03 registry owns strict-mode policy (catch-and-rethrow OR warn-and-skip per D-29 atomicity). Loader is policy-free.
 - [Phase 38-01]: No barrel changes in this plan. Plan 38-03 owns the atomic root-barrel + sub-barrel update so the registry surface (class + types + factory) lands together.
+- [Phase 38-02]: 4 OKM ontology JSONs (upper/kpifw/business/raas) copied byte-identical into ~/Agentic/km-core/tests/fixtures/ontology/ via `cp` (PATTERNS.md verbatim-copy landmine respected); `cmp` exit 0 against each OKM source. Synthetic coding-ontology.json authored with 7 L1 + 5 L2 = 12 classes (on-disk component-manifest.yaml truth — CONTEXT/PATTERNS quoted 8 L1, doc-drift surfaced in SUMMARY).
+- [Phase 38-02]: Synthetic fixture exercises both kinds of `extends`: ontology-level (meta.extends:"upper") AND per-class (7 L1 each extends "Component" from upper; 5 L2 each extends their L1 parent). meta.description self-documents synthetic nature + Phase 42 ownership + source-count drift call-out (T-38-02-03 mitigation).
+- [Phase 38-02]: Empty relationships:{} on all 12 synthetic classes — type-valid for OKM's `Record<string,string[]>` contract, avoids inventing semantic content that Phase 42 would have to re-validate during the real YAML→JSON conversion.
 
 ### Blockers/Concerns
 
@@ -126,9 +129,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 37 P04 | 25min | 2 tasks | 5 files |
 | Phase 37 P05 | 5min | 4 tasks | 5 files |
 | Phase 38 P01 | 2min | 2 tasks | 2 files |
+| Phase 38 P02 | 3min | 2 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-05-20T09:47:21Z
-Stopped at: Phase 38 Plan 01 complete -- types + loader in km-core (commits 4bea298, 88dff82); Plan 02 (fixtures) next in Wave 1
+Last session: 2026-05-20T11:55:00Z
+Stopped at: Phase 38 Plan 02 complete -- 5 fixture JSONs in km-core/tests/fixtures/ontology/ (commits 5e31b3e, 972bd3a); Wave 1 complete; Plans 38-03 (registry) + 38-04 (factory) unblocked in Wave 2
 Resume with: `/gsd:execute-phase 38`

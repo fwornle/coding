@@ -296,14 +296,14 @@ Plans:
   3. The existing B component-manifest (8 L1 + 5 L2) loads cleanly as a lower ontology against the upper ontology used by C.
   4. The registry surfaces ontology metadata (class list, parent chain, extension provenance) via a stable programmatic API.
 
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 
 Plans:
 
 **Wave 1 (parallel — no dependencies)**
 
 - [x] 38-01-PLAN.md — Types + loader: create `~/Agentic/km-core/src/types/ontology.ts` (4 interfaces verbatim from OKM analog) + `~/Agentic/km-core/src/ontology/loader.ts` (sync JSON reader, throws on malformed input). [DONE 2026-05-20: km-core commits 4bea298 + 88dff82]
-- [ ] 38-02-PLAN.md — Test fixtures: 4 verbatim OKM ontology JSONs (upper/kpifw/business/raas) copied via `cp` + synthetic `coding-ontology.json` (B-shape proxy: 7 L1 + 5 L2 from `component-manifest.yaml`, D-26 SC#3 verification fixture).
+- [x] 38-02-PLAN.md — Test fixtures: 4 verbatim OKM ontology JSONs (upper/kpifw/business/raas) copied via `cp` + synthetic `coding-ontology.json` (B-shape proxy: 7 L1 + 5 L2 from `component-manifest.yaml`, D-26 SC#3 verification fixture). [DONE 2026-05-20: km-core commits 5e31b3e + 972bd3a; 5 files in `~/Agentic/km-core/tests/fixtures/ontology/`; source-count drift surfaced in SUMMARY — on-disk YAML is 7 L1 not 8 L1]
 
 **Wave 2** *(blocked on Wave 1)*
 
