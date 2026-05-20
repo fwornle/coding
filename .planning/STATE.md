@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 38 Plan 05 complete -- GraphKMStore constructor wires OntologyRegistry via new ontologyDir + ontologyStrict options + store.ontology getter + 3-way validator resolution chain (km-core commit 1094046); Wave 3 plan 06 (tests) still pending
-last_updated: "2026-05-20T12:14:00Z"
-last_activity: 2026-05-20 -- Phase 38 Plan 05 complete (GraphKMStore integration — pure additive extension; all 4 Phase 37 NO-CHANGE invariants preserved; all 33 vitest tests still green; Plan 38-06 unblocked)
+stopped_at: Phase 38 COMPLETE (6/6 plans) -- Plan 06 landed verification spine (tests/unit/ontology-registry.test.ts 581 lines / 21 tests + 2 appended graph-store tests = 56 total tests across 7 files; ALL 4 SCs verified by test assertions; all 11 Phase 37 protected graph-store names preserved; D-27 collision warning text grep-asserted VERBATIM). km-core HEAD b343a3b. Phase 38 ready to verify.
+last_updated: "2026-05-20T12:22:00Z"
+last_activity: 2026-05-20 -- Phase 38 Plan 06 complete (Plan 06 = final plan of Phase 38; SC#1-SC#4 all test-verified; 33→56 test count delta; zero Phase 37 regression; Phase 38 status: Ready to verify)
 progress:
   total_phases: 11
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 11
-  completed_plans: 10
-  percent: 14
+  completed_plans: 11
+  percent: 18
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 38 (ontology-registry) — EXECUTING
-Plan: 6 of 6 (Plans 01 + 02 + 03 + 04 + 05 complete; Waves 1 + 2 done + Wave 3 plan 04 + 05 done — 38-06 (tests) is the final plan)
-Status: Executing Phase 38
-Last activity: 2026-05-20 -- Phase 38 Plan 05 complete (GraphKMStore constructor wires OntologyRegistry; ontologyDir/ontologyStrict options + store.ontology getter + 3-way validator chain; km-core commit 1094046)
+Phase: 38 (ontology-registry) — COMPLETE (6/6 plans); Ready to verify
+Plan: 6 of 6 done (Plans 01 + 02 + 03 + 04 + 05 + 06 all landed on km-core/main; phase verification spine in place)
+Status: Phase 38 complete; awaiting `/gsd:verify-phase 38`
+Last activity: 2026-05-20 -- Phase 38 Plan 06 complete (test layer for SC#1-SC#4; 21 new ontology-registry tests + 2 new graph-store tests = 56 total across 7 files; D-27 collision warning verbatim grep-asserted; FLAG-2 OR-precedence neutralized; km-core HEAD b343a3b)
 
 ## Performance Metrics
 
@@ -109,6 +109,7 @@ Last activity: 2026-05-20 -- Phase 38 Plan 05 complete (GraphKMStore constructor
 - [Phase 38-04]: Root barrel re-export placed adjacent to existing noopOntologyValidator (group exports by source file). All 33 Phase 37 vitest tests still pass — zero regression. km-core commits fe582ca + 3f9522f.
 - [Phase 38-05]: GraphKMStore constructor extended with `ontologyDir?: string` + `ontologyStrict?: boolean` options (D-28 — no env-var/cwd pickup; consumer wires defaults at call site). When `ontologyDir` is set, the constructor instantiates `new OntologyRegistry({ ontologyDir, strict })` into a `private readonly registry` field; the validator is then resolved via a 3-way chain (most-specific wins): explicit `opts.ontologyValidator` > auto-wired `registryBackedValidator(registry)` > `noopOntologyValidator`. New public `get ontology(): OntologyRegistry | undefined` getter exposes the registry; the validator stays private (internal plumbing).
 - [Phase 38-05]: All 4 Phase 37 NO-CHANGE invariants preserved: PersistenceManager+Exporter ordering (awk p<e at lines 146,149 — gated), line 240-242 trusted-path `if (!trusted) validator.validate` block byte-identical (grep-verified), mergeAttributes ontology-skip untouched (T-37-04-06 accepted disposition stands), skipOntologyCheck BC-2 widening preserved (no separate skipIdCheck flag introduced). All 33 Phase 37 vitest tests still pass — zero regression. km-core commit 1094046.
+- [Phase 38-06]: Verification spine landed — `tests/unit/ontology-registry.test.ts` (581 lines, 21 tests across 6 describe-blocks + 1 top-level test) covers ALL FOUR SCs: SC#1 auto-discovery (5 tests in §auto-discovery + 1 reload-add test in §reload), SC#2 extends+merge (3 tests including verbatim child-relationship inheritance via kpifw.KPIPipeline→upper.Pipeline + synthetic-conflict child-wins property override), SC#3 B-shape coding-ontology fixture (2 tests in isolated tmpdir to avoid kpifw/business/raas cross-contamination — 7 L1 + 5 L2 names all valid; L2 parent chains correct; L1 inherit Component relationships), SC#4 stable API surface (5 accessor-tests + 1 top-level named-export witness test). D-27 collision warning text VERBATIM grep-asserted (full template string, stronger than the plan's substring-match minimum). Two appended graph-store tests verify Plan 38-05 auto-wired registry validator + Phase 37 BC-2 (skipOntologyCheck widening) preservation. Total final test count: 56 across 7 files (was 33 — +23 net). All 11 Phase 37 protected graph-store test names preserved verbatim. FLAG-2 OR-precedence neutralized by canonical `registry` variable name. km-core commits d624212 (ontology-registry.test.ts) + b343a3b (graph-store.test.ts append). Phase 38 complete (6/6) and ready for `/gsd:verify-phase 38`.
 
 ### Blockers/Concerns
 
@@ -142,9 +143,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 38 P03 | 4min | 2 tasks | 4 files |
 | Phase 38 P04 | 3min | 2 tasks | 2 files |
 | Phase 38 P05 | 2min | 1 task  | 1 file  |
+| Phase 38 P06 | 4min | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-05-20T12:14:00Z
-Stopped at: Phase 38 Plan 05 complete -- GraphKMStore wires OntologyRegistry via new ontologyDir + ontologyStrict options + store.ontology getter + 3-way validator chain (km-core commit 1094046); Waves 1 + 2 complete + Wave 3 plans 04 + 05 done; Plan 38-06 (tests — final plan in Wave 3) still pending
-Resume with: `/gsd:execute-phase 38`
+Last session: 2026-05-20T12:22:00Z
+Stopped at: Phase 38 COMPLETE (6/6 plans). Plan 06 landed verification spine — `tests/unit/ontology-registry.test.ts` (21 tests across 6 describe-blocks, all 4 SCs covered) + 2 appended graph-store tests (ontologyDir auto-wiring + BC-2 preservation). Final suite: 7 files / 56 tests / 56 passed (33 Phase 37 baseline + 23 new = 56). All 11 Phase 37 protected test names preserved; D-27 collision warning text grep-asserted verbatim. km-core HEAD b343a3b. Phase 38 ready for verification.
+Resume with: `/gsd:verify-phase 38` (then `/gsd:execute-phase 39` to start Entity Data Model)

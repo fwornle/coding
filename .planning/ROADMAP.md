@@ -235,7 +235,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 ### Phases
 
 - [x] **Phase 37: KM-Core Foundation** - Canonical TS types, GraphKMStore adapter, UUID identifier scheme — the shared package B and C both consume. (completed 2026-05-20)
-- [ ] **Phase 38: Ontology Registry** - Auto-discovered upper + lower ontologies with `extends`-based property merging.
+- [x] **Phase 38: Ontology Registry** - Auto-discovered upper + lower ontologies with `extends`-based property merging. (6/6 plans complete 2026-05-20; ready to verify)
 - [ ] **Phase 39: Entity Data Model** - Provenance fields and `validFrom`/`validUntil`/`supersedes` temporal validity on the canonical entity (locked before migrations).
 - [ ] **Phase 40: Ingest Pipeline & Layered Dedup** - 4-stage `extract → dedup → store → synthesize` framework with the layered dedup pipeline B and C will implement against.
 - [ ] **Phase 41: Online Learning Adapter & Post-Hoc Resolution** - INT-01 (A's SQLite hot path exposed as KM-Core entities) + PIPE-02 (post-hoc cross-class entity resolution as a shared maintenance op).
@@ -296,7 +296,7 @@ Plans:
   3. The existing B component-manifest (8 L1 + 5 L2) loads cleanly as a lower ontology against the upper ontology used by C.
   4. The registry surfaces ontology metadata (class list, parent chain, extension provenance) via a stable programmatic API.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans executed (Phase 38 COMPLETE 2026-05-20; ready to verify)
 
 Plans:
 
@@ -313,7 +313,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2)*
 
 - [x] 38-05-PLAN.md — Wire registry into `GraphKMStore` constructor: add `ontologyDir?` + `ontologyStrict?` options, instantiate registry internally, expose `store.ontology` getter, validator resolution chain (explicit > auto-wired > noop). Pure additive — Phase 37 BC-2 + T-37-04-06 + PersistenceManager/Exporter ordering all preserved. depends_on: 38-03, 38-04. [DONE 2026-05-20: km-core commit 1094046; 1 file modified (src/store/GraphKMStore.ts 519→575); all 4 Phase 37 NO-CHANGE invariants verified by grep+awk gates; all 33 Phase 37 vitest tests still pass — zero regression; Plan 38-06 unblocked]
-- [ ] 38-06-PLAN.md — Registry unit tests (`tests/unit/ontology-registry.test.ts`, 6 describe-blocks covering all 4 SCs) + 2 append-only tests in `tests/unit/graph-store.test.ts` (ontologyDir auto-wiring + skipOntologyCheck BC-2 preservation). depends_on: 38-02, 38-03, 38-05.
+- [x] 38-06-PLAN.md — Registry unit tests (`tests/unit/ontology-registry.test.ts`, 6 describe-blocks covering all 4 SCs) + 2 append-only tests in `tests/unit/graph-store.test.ts` (ontologyDir auto-wiring + skipOntologyCheck BC-2 preservation). depends_on: 38-02, 38-03, 38-05. [DONE 2026-05-20: km-core commits d624212 + b343a3b; 1 file created (581 lines, 21 tests) + 1 file modified (217→269 lines, 11→13 tests); final suite 7 files / 56 tests / 56 passed (33 Phase 37 baseline + 23 new); all 4 SCs verified by test-name mapping; D-27 collision warning text grep-asserted VERBATIM; all 11 Phase 37 protected graph-store names preserved; FLAG-2 OR-precedence neutralized; Phase 38 COMPLETE — ready for /gsd:verify-phase 38]
 
 
 #### Phase 39: Entity Data Model
