@@ -236,7 +236,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 
 - [x] **Phase 37: KM-Core Foundation** - Canonical TS types, GraphKMStore adapter, UUID identifier scheme — the shared package B and C both consume. (completed 2026-05-20)
 - [x] **Phase 38: Ontology Registry** - Auto-discovered upper + lower ontologies with `extends`-based property merging. (6/6 plans complete 2026-05-20; ready to verify)
-- [ ] **Phase 39: Entity Data Model** - Provenance fields and `validFrom`/`validUntil`/`supersedes` temporal validity on the canonical entity (locked before migrations).
+- [x] **Phase 39: Entity Data Model** - Provenance fields and `validFrom`/`validUntil`/`supersedes` temporal validity on the canonical entity (locked before migrations). (completed 2026-05-20)
 - [ ] **Phase 40: Ingest Pipeline & Layered Dedup** - 4-stage `extract → dedup → store → synthesize` framework with the layered dedup pipeline B and C will implement against.
 - [ ] **Phase 41: Online Learning Adapter & Post-Hoc Resolution** - INT-01 (A's SQLite hot path exposed as KM-Core entities) + PIPE-02 (post-hoc cross-class entity resolution as a shared maintenance op).
 - [ ] **Phase 42: Offline UKB Migration (B)** - Full migration of `mcp-server-semantic-analysis` to KM-Core; folds in Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition.
@@ -329,7 +329,7 @@ Plans:
   3. The B `KGEntity`/`SharedMemoryEntity` (`type`/`entityType` split, `persistence-agent.ts:583`) is replaced by the canonical KM-Core entity in the shared types; no consumer compiles against the old dual shape.
   4. A backfill operation can stamp `validFrom = createdAt` (A) or `validFrom = first-seen` (B) on legacy entities without losing existing observations or relations.
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 
@@ -344,7 +344,7 @@ Plans:
 
 **Wave 3** *(depends on Plans 01 + 03 — provenance writer + iterate opt-in)*
 
-- [ ] 39-04-PLAN.md — `backfillEntityDataModel` library function (D-36/D-37/D-38) + atomic checkpoint helper + path-traversal guard — closes ROADMAP SC#4
+- [x] 39-04-PLAN.md — `backfillEntityDataModel` library function (D-36/D-37/D-38) + atomic checkpoint helper + path-traversal guard — closes ROADMAP SC#4
 
 **SC#3 note:** `SharedMemoryEntity` replacement is Phase 42 (INT-02) — Phase 39 only verifies the canonical Entity is expressive enough.
 
@@ -461,7 +461,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
-| 39. Entity Data Model | 3/4 | In Progress|  |
+| 39. Entity Data Model | 4/4 | Complete   | 2026-05-20 |
 | 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
