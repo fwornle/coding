@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 38 Plan 04 complete -- registryBackedValidator factory in src/validation/ontology.ts + root barrel re-export (km-core commits fe582ca, 3f9522f); Wave 3 partially advanced (04 done, 05 + 06 still pending)
-last_updated: "2026-05-20T10:07:00Z"
-last_activity: 2026-05-20 -- Phase 38 Plan 04 complete (registryBackedValidator factory bridges Phase 37 D-19 surface to Phase 38 registry; type-only import; error-message contract preserved verbatim; Plan 38-05 unblocked)
+stopped_at: Phase 38 Plan 05 complete -- GraphKMStore constructor wires OntologyRegistry via new ontologyDir + ontologyStrict options + store.ontology getter + 3-way validator resolution chain (km-core commit 1094046); Wave 3 plan 06 (tests) still pending
+last_updated: "2026-05-20T12:14:00Z"
+last_activity: 2026-05-20 -- Phase 38 Plan 05 complete (GraphKMStore integration — pure additive extension; all 4 Phase 37 NO-CHANGE invariants preserved; all 33 vitest tests still green; Plan 38-06 unblocked)
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 11
-  completed_plans: 9
-  percent: 13
+  completed_plans: 10
+  percent: 14
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 38 (ontology-registry) — EXECUTING
-Plan: 5 of 6 (Plans 01 + 02 + 03 + 04 complete; Waves 1 + 2 done + Wave 3 plan 04 done — 38-05 unblocked next, 38-06 follows)
+Plan: 6 of 6 (Plans 01 + 02 + 03 + 04 + 05 complete; Waves 1 + 2 done + Wave 3 plan 04 + 05 done — 38-06 (tests) is the final plan)
 Status: Executing Phase 38
-Last activity: 2026-05-20 -- Phase 38 Plan 04 complete (registryBackedValidator factory + root barrel re-export in km-core)
+Last activity: 2026-05-20 -- Phase 38 Plan 05 complete (GraphKMStore constructor wires OntologyRegistry; ontologyDir/ontologyStrict options + store.ontology getter + 3-way validator chain; km-core commit 1094046)
 
 ## Performance Metrics
 
@@ -107,6 +107,8 @@ Last activity: 2026-05-20 -- Phase 38 Plan 04 complete (registryBackedValidator 
 - [Phase 38-04]: registryBackedValidator(registry: OntologyRegistry): OntologyValidator factory appended to src/validation/ontology.ts as pure additive edit (27 → 75 lines). Type-only import (`import type { OntologyRegistry } from '../ontology/registry.js'`) erases at compile time so the validator module has zero runtime dependency on the registry; one-way dependency direction grep-verified (registry has 0 imports from validation/ontology.ts).
 - [Phase 38-04]: Error-message text VERBATIM `Unknown ontology class: ${entityType}` — load-bearing for Phase 37 test contract preservation (graph-store.test.ts:198 regex `/Unknown ontology class/`). Plan 38-05's auto-wired path is a drop-in replacement for the strict-stub at lines 187-192.
 - [Phase 38-04]: Root barrel re-export placed adjacent to existing noopOntologyValidator (group exports by source file). All 33 Phase 37 vitest tests still pass — zero regression. km-core commits fe582ca + 3f9522f.
+- [Phase 38-05]: GraphKMStore constructor extended with `ontologyDir?: string` + `ontologyStrict?: boolean` options (D-28 — no env-var/cwd pickup; consumer wires defaults at call site). When `ontologyDir` is set, the constructor instantiates `new OntologyRegistry({ ontologyDir, strict })` into a `private readonly registry` field; the validator is then resolved via a 3-way chain (most-specific wins): explicit `opts.ontologyValidator` > auto-wired `registryBackedValidator(registry)` > `noopOntologyValidator`. New public `get ontology(): OntologyRegistry | undefined` getter exposes the registry; the validator stays private (internal plumbing).
+- [Phase 38-05]: All 4 Phase 37 NO-CHANGE invariants preserved: PersistenceManager+Exporter ordering (awk p<e at lines 146,149 — gated), line 240-242 trusted-path `if (!trusted) validator.validate` block byte-identical (grep-verified), mergeAttributes ontology-skip untouched (T-37-04-06 accepted disposition stands), skipOntologyCheck BC-2 widening preserved (no separate skipIdCheck flag introduced). All 33 Phase 37 vitest tests still pass — zero regression. km-core commit 1094046.
 
 ### Blockers/Concerns
 
@@ -139,9 +141,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 38 P02 | 3min | 2 tasks | 5 files |
 | Phase 38 P03 | 4min | 2 tasks | 4 files |
 | Phase 38 P04 | 3min | 2 tasks | 2 files |
+| Phase 38 P05 | 2min | 1 task  | 1 file  |
 
 ## Session Continuity
 
-Last session: 2026-05-20T10:07:00Z
-Stopped at: Phase 38 Plan 04 complete -- registryBackedValidator factory in src/validation/ontology.ts + root barrel re-export (km-core commits fe582ca, 3f9522f); Waves 1 + 2 complete + Wave 3 plan 04 done; Plans 38-05 (GraphKMStore wiring) + 38-06 (tests) still pending in Wave 3 (sequential via depends_on chain 05 → 06)
+Last session: 2026-05-20T12:14:00Z
+Stopped at: Phase 38 Plan 05 complete -- GraphKMStore wires OntologyRegistry via new ontologyDir + ontologyStrict options + store.ontology getter + 3-way validator chain (km-core commit 1094046); Waves 1 + 2 complete + Wave 3 plans 04 + 05 done; Plan 38-06 (tests — final plan in Wave 3) still pending
 Resume with: `/gsd:execute-phase 38`
