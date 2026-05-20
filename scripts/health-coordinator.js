@@ -456,7 +456,14 @@ let obsApiLastRestartAt = 0;
 // ----- Proxy supervision constants (Phase 34 D-01 / D-02 / D-06) -----
 const PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:12435';
 const PROXY_PROBE_INTERVAL_MS = 60_000;          // D-01: cheap probe every 60s
-const PROXY_PROBE_TIMEOUT_MS = 10_000;            // D-02: 10s round-trip threshold
+// D-02: round-trip threshold. Raised from 10s to 25s on 2026-05-20 because
+// the proxy's claude-code provider falls back to the `claude` CLI subprocess
+// when the direct API is rate-limited, which costs 5-12s per call. With a
+// 10s budget those CLI-fallback paths intermittently tripped 'timeout'
+// failures that drove an auto-heal cascade, then the kickstart momentarily
+// killed the listening port and the *next* probe failed with
+// 'network_fetch failed' — a classic self-inflicted feedback loop.
+const PROXY_PROBE_TIMEOUT_MS = 25_000;
 const PROXY_MODE_POLL_TIMEOUT_MS = 2_000;         // GET /health is fast; 2s budget
 const PROXY_KICKSTART_WINDOW_MS = 5 * 60_000;     // D-06: 5 min sliding window
 const PROXY_KICKSTART_MAX = 3;                    // D-06: 3 kickstarts then cooldown
@@ -861,11 +868,28 @@ function evaluateAutoHealFSM() {
     return;
   }
 
+  // Skip the kickstart action when the failure reason is upstream/LLM-side,
+  // not proxy-side. Restarting the proxy won't make a slow LLM faster, won't
+  // recover from rate-limit-driven 4xx, and won't fix empty-content / oksub-
+  // missing responses. Dispatching anyway just opens a 3-8s window where the
+  // listening port is gone and real ETM observation-writer calls land in
+  // _fallbackSummary() — exactly the failure mode this code is trying to
+  // prevent. Keep bookkeeping intact so the dashboard shows degraded but do
+  // NOT push to kickstart_timestamps (no cooldown debt) and do NOT dispatch.
+  const reason = currentState.proxy.reason || '';
+  const NON_ACTIONABLE_REASONS = new Set(['timeout', 'empty_content', 'oksub_missing']);
+  const isHttpClientError = /^http_4\d\d$/.test(reason);
+  if (NON_ACTIONABLE_REASONS.has(reason) || isHttpClientError) {
+    currentState.proxy.auto_heal_status = 'kickstart_pending';
+    log(`proxy auto-heal: skipping kickstart — reason='${reason}' is upstream/LLM-side, restart won't help (consecutive_failures=${currentState.proxy.consecutive_failures})`, 'INFO');
+    return;
+  }
+
   // Fire kickstart through the dispatcher (Pattern E — same code path as dashboard Restart button).
   currentState.proxy.kickstart_timestamps.push(now);
   currentState.proxy.kickstart_count += 1;
   currentState.proxy.auto_heal_status = 'kickstart_pending';
-  log(`proxy auto-heal: dispatching restart_llm_cli_proxy (consecutive_failures=${currentState.proxy.consecutive_failures}, kickstart_count=${currentState.proxy.kickstart_count})`, 'INFO');
+  log(`proxy auto-heal: dispatching restart_llm_cli_proxy (consecutive_failures=${currentState.proxy.consecutive_failures}, kickstart_count=${currentState.proxy.kickstart_count}, reason=${reason || 'unknown'})`, 'INFO');
   getRemediationDispatcher()
     .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'semantic_ok=false sustained' }))
     .catch(err => log(`proxy auto-heal kickstart failed: ${err.message}`, 'ERROR'));
