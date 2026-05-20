@@ -329,7 +329,24 @@ Plans:
   3. The B `KGEntity`/`SharedMemoryEntity` (`type`/`entityType` split, `persistence-agent.ts:583`) is replaced by the canonical KM-Core entity in the shared types; no consumer compiles against the old dual shape.
   4. A backfill operation can stamp `validFrom = createdAt` (A) or `validFrom = first-seen` (B) on legacy entities without losing existing observations or relations.
 
-**Plans:** TBD
+**Plans:** 4 plans across 3 waves
+
+Plans:
+
+**Wave 1 (parallel — disjoint files)**
+
+- [ ] 39-01-PLAN.md — Extend `GraphKMStore.putEntity` with writer-side stamping (D-30/D-31/D-32 + `PutEntityOpts` type + JSDoc tightening on `entity.ts`) — closes DATA-02 writer half (`createdBy`/`lastConfirmedBy`/`confirmationCount`)
+- [ ] 39-02-PLAN.md — `mergeDescriptionSegment` pure helper in `src/segments/merge.ts` (D-39/D-40/D-41 — whitespace-normalized identical-text test, stderr-warn at 100-segments/50-confirmations thresholds) — closes DATA-02 per-segment-provenance half
+
+**Wave 2** *(depends on Plan 01 — both touch GraphKMStore.ts)*
+
+- [ ] 39-03-PLAN.md — Atomic supersession closure (D-33) + active-only default filter (D-34) + `getSupersessionChain` reverse-walk query API (D-35) — closes DATA-01 + ROADMAP SC#1
+
+**Wave 3** *(depends on Plans 01 + 03 — provenance writer + iterate opt-in)*
+
+- [ ] 39-04-PLAN.md — `backfillEntityDataModel` library function (D-36/D-37/D-38) + atomic checkpoint helper + path-traversal guard — closes ROADMAP SC#4
+
+**SC#3 note:** `SharedMemoryEntity` replacement is Phase 42 (INT-02) — Phase 39 only verifies the canonical Entity is expressive enough.
 
 #### Phase 40: Ingest Pipeline & Layered Dedup
 
@@ -444,7 +461,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
-| 39. Entity Data Model | 0/? | Not started | - |
+| 39. Entity Data Model | 0/4 | In Progress | - |
 | 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
