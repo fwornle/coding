@@ -234,7 +234,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 
 ### Phases
 
-- [ ] **Phase 37: KM-Core Foundation** - Canonical TS types, GraphKMStore adapter, UUID identifier scheme — the shared package B and C both consume.
+- [x] **Phase 37: KM-Core Foundation** - Canonical TS types, GraphKMStore adapter, UUID identifier scheme — the shared package B and C both consume. (completed 2026-05-20)
 - [ ] **Phase 38: Ontology Registry** - Auto-discovered upper + lower ontologies with `extends`-based property merging.
 - [ ] **Phase 39: Entity Data Model** - Provenance fields and `validFrom`/`validUntil`/`supersedes` temporal validity on the canonical entity (locked before migrations).
 - [ ] **Phase 40: Ingest Pipeline & Layered Dedup** - 4-stage `extract → dedup → store → synthesize` framework with the layered dedup pipeline B and C will implement against.
@@ -260,7 +260,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
   3. Every KM-Core entity carries a stable UUID identifier that survives export → restore round-trips.
   4. The `.data/knowledge-export/coding.json` and `.data/exports/*.json` paths still load via KM-Core without breaking the established two-commit / OKB-baseline guard hygiene.
 
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 
 Plans:
 **Wave 1**
@@ -281,7 +281,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 37-05-PLAN.md — Wave 5 (autonomous:false, has human-verify checkpoint): coding-side wiring — submodule mount at lib/km-core/, Dockerfile install/rebuild/build, docker-compose bind-mount, BC symlink migration for .data/knowledge-export/coding.json -> .data/exports/coding.json (D-21), and a checkpoint verifying cross-repo TS import + OKB-baseline-guard hygiene end-to-end.
+- [x] 37-05-PLAN.md — Wave 5 (autonomous:false, has human-verify checkpoint): coding-side wiring — submodule mount at lib/km-core/, Dockerfile install/rebuild/build, docker-compose bind-mount, BC symlink migration for .data/knowledge-export/coding.json -> .data/exports/coding.json (D-21), and a checkpoint verifying cross-repo TS import + OKB-baseline-guard hygiene end-to-end.
 
 #### Phase 38: Ontology Registry
 
@@ -424,7 +424,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 37. KM-Core Foundation | 4/5 | In Progress|  |
+| 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 0/? | Not started | - |
 | 39. Entity Data Model | 0/? | Not started | - |
 | 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |

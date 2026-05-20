@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification
-status: executing
-stopped_at: Completed 37-03-PLAN.md (CORE-02 — PersistenceManager + Exporter both GREEN; km-core pushed cd3af5d)
-last_updated: "2026-05-20T05:31:28.587Z"
+status: verifying
+stopped_at: Completed 37-05-PLAN.md (km-core wired into coding/; Phase 37 READY-FOR-VERIFICATION)
+last_updated: "2026-05-20T05:42:46.988Z"
 last_activity: 2026-05-20
 progress:
   total_phases: 11
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
-  percent: 0
+  completed_plans: 5
+  percent: 9
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 Phase: 37 (km-core-foundation) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-20
 
 ## Performance Metrics
@@ -91,6 +91,9 @@ Last activity: 2026-05-20
 - [Phase ?]: [Phase 37-04]: addRelation skips parseEntityId on from/to (relies on hasNode safety check). Threat-model invariant preserved because trusted-bulk-import IS the path producing non-v7 ids.
 - [Phase ?]: [Phase 37-04]: _convert-b.ts uses entity name (not legacy nanoid id) as Graphology node key — B's relations reference entities by name not by id.
 - [Phase ?]: [Phase 37-04]: Round-trip test normalizes both sides (drop orphan edges + sort by key + strip undirected:false) — test asserts EXPORT FIDELITY not migration-cleanup behavior.
+- [Phase ?]: [Phase 37-05]: Task 3 split into two commits per the LIVE OKB-guard rule (KB-only OR non-KB-only allowed; mixed blocked) — D-23 (hook is source of truth) wins over plan text.
+- [Phase ?]: [Phase 37-05]: Step 3 (Docker rebuild) skipped via approved-skip-docker resume signal — Phase 42 will exercise container path when B consumes GraphKMStore.
+- [Phase ?]: [Phase 37-05]: Cross-repo TS smoke uses dev-side node_modules/@fwornle/km-core symlink. Phase 42 owns permanent wiring when B's adapter is swapped.
 
 ### Blockers/Concerns
 
@@ -118,9 +121,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 37 P02 | 14min | 2 tasks | 8 files |
 | Phase 37 P03 | 10 | 2 tasks | 2 files |
 | Phase 37 P04 | 25min | 2 tasks | 5 files |
+| Phase 37 P05 | 5min | 4 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-05-20T05:31:01.373Z
-Stopped at: Completed 37-03-PLAN.md (CORE-02 — PersistenceManager + Exporter both GREEN; km-core pushed cd3af5d)
+Last session: 2026-05-20T05:42:46.983Z
+Stopped at: Completed 37-05-PLAN.md (km-core wired into coding/; Phase 37 READY-FOR-VERIFICATION)
 Resume with: `/gsd:plan-phase 37`
