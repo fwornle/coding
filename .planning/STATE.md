@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 38 planned (6 plans, 3 waves, plan check PASS)
-last_updated: "2026-05-20T09:32:27.056Z"
-last_activity: 2026-05-20 -- Phase 37 complete (9/10 verified, Docker rebuild deferred to Phase 42)
+stopped_at: Phase 38 Plan 01 complete -- types + loader in km-core (commits 4bea298, 88dff82)
+last_updated: "2026-05-20T09:47:21Z"
+last_activity: 2026-05-20 -- Phase 38 Plan 01 complete (ONTO-01/02 type foundation + loader)
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 11
-  completed_plans: 5
-  percent: 9
+  completed_plans: 6
+  percent: 10
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 38 — Ontology Registry (Phase 37 complete; awaiting plan-phase)
+**Current focus:** Phase 38 — ontology-registry
 
 ## Current Position
 
-Phase: 37 — COMPLETE
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-05-20 -- Phase 37 complete (9/10 verified, Docker rebuild deferred to Phase 42)
+Phase: 38 (ontology-registry) — EXECUTING
+Plan: 2 of 6 (Plan 01 complete; Wave 1 partial — 38-02 next in Wave 1)
+Status: Executing Phase 38
+Last activity: 2026-05-20 -- Phase 38 Plan 01 complete (types + loader in km-core)
 
 ## Performance Metrics
 
@@ -94,6 +94,9 @@ Last activity: 2026-05-20 -- Phase 37 complete (9/10 verified, Docker rebuild de
 - [Phase ?]: [Phase 37-05]: Task 3 split into two commits per the LIVE OKB-guard rule (KB-only OR non-KB-only allowed; mixed blocked) — D-23 (hook is source of truth) wins over plan text.
 - [Phase ?]: [Phase 37-05]: Step 3 (Docker rebuild) skipped via approved-skip-docker resume signal — Phase 42 will exercise container path when B consumes GraphKMStore.
 - [Phase ?]: [Phase 37-05]: Cross-repo TS smoke uses dev-side node_modules/@fwornle/km-core symlink. Phase 42 owns permanent wiring when B's adapter is swapped.
+- [Phase 38-01]: Adopted OKM ontology type analog (29 lines) verbatim with one delta — `OntologyClass.defaultLayer?: Layer` imports `Layer` from `./entity.js` instead of inlining `'evidence' | 'pattern'`. Single source of truth for the Layer union remains anchored in Phase 37 Plan 02's entity.ts.
+- [Phase 38-01]: Loader (`loadOntologyFile`) stays synchronous (Pattern S4) and throws on shape error. Plan 38-03 registry owns strict-mode policy (catch-and-rethrow OR warn-and-skip per D-29 atomicity). Loader is policy-free.
+- [Phase 38-01]: No barrel changes in this plan. Plan 38-03 owns the atomic root-barrel + sub-barrel update so the registry surface (class + types + factory) lands together.
 
 ### Blockers/Concerns
 
@@ -122,9 +125,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 37 P03 | 10 | 2 tasks | 2 files |
 | Phase 37 P04 | 25min | 2 tasks | 5 files |
 | Phase 37 P05 | 5min | 4 tasks | 5 files |
+| Phase 38 P01 | 2min | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-05-20T09:32:27.038Z
-Stopped at: Phase 38 planned (6 plans, 3 waves, plan check PASS)
-Resume with: `/gsd:plan-phase 37`
+Last session: 2026-05-20T09:47:21Z
+Stopped at: Phase 38 Plan 01 complete -- types + loader in km-core (commits 4bea298, 88dff82); Plan 02 (fixtures) next in Wave 1
+Resume with: `/gsd:execute-phase 38`

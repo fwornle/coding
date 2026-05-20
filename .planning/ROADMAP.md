@@ -296,13 +296,13 @@ Plans:
   3. The existing B component-manifest (8 L1 + 5 L2) loads cleanly as a lower ontology against the upper ontology used by C.
   4. The registry surfaces ontology metadata (class list, parent chain, extension provenance) via a stable programmatic API.
 
-**Plans:** 6 plans across 3 waves
+**Plans:** 1/6 plans executed
 
 Plans:
 
 **Wave 1 (parallel — no dependencies)**
 
-- [ ] 38-01-PLAN.md — Types + loader: create `~/Agentic/km-core/src/types/ontology.ts` (4 interfaces verbatim from OKM analog) + `~/Agentic/km-core/src/ontology/loader.ts` (sync JSON reader, throws on malformed input).
+- [x] 38-01-PLAN.md — Types + loader: create `~/Agentic/km-core/src/types/ontology.ts` (4 interfaces verbatim from OKM analog) + `~/Agentic/km-core/src/ontology/loader.ts` (sync JSON reader, throws on malformed input). [DONE 2026-05-20: km-core commits 4bea298 + 88dff82]
 - [ ] 38-02-PLAN.md — Test fixtures: 4 verbatim OKM ontology JSONs (upper/kpifw/business/raas) copied via `cp` + synthetic `coding-ontology.json` (B-shape proxy: 7 L1 + 5 L2 from `component-manifest.yaml`, D-26 SC#3 verification fixture).
 
 **Wave 2** *(blocked on Wave 1)*
@@ -443,7 +443,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
-| 38. Ontology Registry | 0/? | Not started | - |
+| 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 0/? | Not started | - |
 | 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
