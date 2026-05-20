@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification
 status: executing
-stopped_at: Completed 37-02-PLAN.md (CORE-01 + CORE-03 — types + ID layer landed; km-core pushed)
-last_updated: "2026-05-20T05:02:44.647Z"
+stopped_at: Completed 37-03-PLAN.md (CORE-02 — PersistenceManager + Exporter both GREEN; km-core pushed cd3af5d)
+last_updated: "2026-05-20T05:10:42.818Z"
 last_activity: 2026-05-20
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 37 (km-core-foundation) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-05-20
 
@@ -82,6 +82,10 @@ Last activity: 2026-05-20
 - [Phase 37-02]: Adopted OKM Entity shape VERBATIM and applied 4 deltas: id->EntityId brand, Edge->Relation rename with from/to, legacyId for Phase 39 backfill, no bin types (D-11/D-13/D-14)
 - [Phase 37-02]: Defensive s.charAt(14) === '7' v7 variant check in parseEntityId rejects v4 UUIDs that UUID.parse would otherwise accept (37-PATTERNS DELTAS)
 - [Phase 37-02]: Per-module barrel src/types/index.ts re-exports EntityId alongside Entity/Relation so consumers can take a sub-surface import
+- [Phase ?]: [Phase 37-03]: Preserved OKM method names persistGraph/exportJson verbatim (not renamed) because RED test contract calls these names
+- [Phase ?]: [Phase 37-03]: Exporter exposes scheduleExport(snapshot)+exportJson(data) directly per RED test (no getSnapshot callback); event-wiring stays with Plan 04 GraphKMStore consumer
+- [Phase ?]: [Phase 37-03]: PersistenceManager.hydrate fallback always reads general.json even when consumer domains list omits it — protects against colleague-machine unknown-domain nodes
+- [Phase ?]: [Phase 37-03]: Atomic temp+rename lives as private writeAtomic per module (DRY-via-similarity, not extracted utility) — defer extraction to Plan 04 if duplication grows
 
 ### Blockers/Concerns
 
@@ -107,9 +111,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | todo | replace-console-log-with-proper-logging | pending |
 | Phase 36 P07 | 32 | 1 tasks | 1 files |
 | Phase 37 P02 | 14min | 2 tasks | 8 files |
+| Phase 37 P03 | 10 | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-05-20T05:02:44.642Z
-Stopped at: Completed 37-02-PLAN.md (CORE-01 + CORE-03 — types + ID layer landed; km-core pushed)
+Last session: 2026-05-20T05:10:42.812Z
+Stopped at: Completed 37-03-PLAN.md (CORE-02 — PersistenceManager + Exporter both GREEN; km-core pushed cd3af5d)
 Resume with: `/gsd:plan-phase 37`
