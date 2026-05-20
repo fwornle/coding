@@ -260,7 +260,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
   3. Every KM-Core entity carries a stable UUID identifier that survives export → restore round-trips.
   4. The `.data/knowledge-export/coding.json` and `.data/exports/*.json` paths still load via KM-Core without breaking the established two-commit / OKB-baseline guard hygiene.
 
-**Plans:** 3/5 plans executed
+**Plans:** 4/5 plans executed
 
 Plans:
 **Wave 1**
@@ -277,7 +277,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 37-04-PLAN.md — Wave 4: compose GraphKMStore (extends EventEmitter; repository API; UUIDv7 stamp; D-14..D-19) and wire the public barrel src/index.ts. Closes CORE-01/CORE-02/CORE-03 from inside the km-core repo; round-trip parity green across all 4 frozen fixtures.
+- [x] 37-04-PLAN.md — Wave 4: compose GraphKMStore (extends EventEmitter; repository API; UUIDv7 stamp; D-14..D-19) and wire the public barrel src/index.ts. Closes CORE-01/CORE-02/CORE-03 from inside the km-core repo; round-trip parity green across all 4 frozen fixtures.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -424,7 +424,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 37. KM-Core Foundation | 3/5 | In Progress|  |
+| 37. KM-Core Foundation | 4/5 | In Progress|  |
 | 38. Ontology Registry | 0/? | Not started | - |
 | 39. Entity Data Model | 0/? | Not started | - |
 | 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |

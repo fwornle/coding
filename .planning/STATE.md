@@ -4,13 +4,13 @@ milestone: v7.1
 milestone_name: Knowledge Management Unification
 status: executing
 stopped_at: Completed 37-03-PLAN.md (CORE-02 — PersistenceManager + Exporter both GREEN; km-core pushed cd3af5d)
-last_updated: "2026-05-20T05:10:42.818Z"
+last_updated: "2026-05-20T05:31:28.587Z"
 last_activity: 2026-05-20
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 37 (km-core-foundation) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-05-20
 
@@ -86,6 +86,11 @@ Last activity: 2026-05-20
 - [Phase ?]: [Phase 37-03]: Exporter exposes scheduleExport(snapshot)+exportJson(data) directly per RED test (no getSnapshot callback); event-wiring stays with Plan 04 GraphKMStore consumer
 - [Phase ?]: [Phase 37-03]: PersistenceManager.hydrate fallback always reads general.json even when consumer domains list omits it — protects against colleague-machine unknown-domain nodes
 - [Phase ?]: [Phase 37-03]: Atomic temp+rename lives as private writeAtomic per module (DRY-via-similarity, not extracted utility) — defer extraction to Plan 04 if duplication grows
+- [Phase ?]: [Phase 37-04]: GraphKMStore.restore(serialized) added as bulk-import escape hatch — no validation, no defaults, no events. Round-trip parity tests + Phase 39 backfill use it.
+- [Phase ?]: [Phase 37-04]: skipOntologyCheck:true extended to bypass parseEntityId (trusted-caller semantics). Plain putEntity path remains strict per CORE-03.
+- [Phase ?]: [Phase 37-04]: addRelation skips parseEntityId on from/to (relies on hasNode safety check). Threat-model invariant preserved because trusted-bulk-import IS the path producing non-v7 ids.
+- [Phase ?]: [Phase 37-04]: _convert-b.ts uses entity name (not legacy nanoid id) as Graphology node key — B's relations reference entities by name not by id.
+- [Phase ?]: [Phase 37-04]: Round-trip test normalizes both sides (drop orphan edges + sort by key + strip undirected:false) — test asserts EXPORT FIDELITY not migration-cleanup behavior.
 
 ### Blockers/Concerns
 
@@ -112,9 +117,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 36 P07 | 32 | 1 tasks | 1 files |
 | Phase 37 P02 | 14min | 2 tasks | 8 files |
 | Phase 37 P03 | 10 | 2 tasks | 2 files |
+| Phase 37 P04 | 25min | 2 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-05-20T05:10:42.812Z
+Last session: 2026-05-20T05:31:01.373Z
 Stopped at: Completed 37-03-PLAN.md (CORE-02 — PersistenceManager + Exporter both GREEN; km-core pushed cd3af5d)
 Resume with: `/gsd:plan-phase 37`
