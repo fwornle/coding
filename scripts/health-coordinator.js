@@ -1158,13 +1158,17 @@ async function pollNetworkStatus() {
 
   // 2. Can we resolve BMW PAC host? (indicates CN)
   //    Use a fresh DNS resolver to avoid stale libc resolver cache in long-running processes.
+  //    Guard: cancel resolver on timeout to prevent dangling callbacks that block the event loop.
   const pacResolved = await new Promise(resolve => {
+    let settled = false;
     const resolver = new dns.Resolver();
     resolver.setServers(dns.getServers());
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; resolver.cancel(); resolve(false); }
+    }, 3000);
     resolver.resolve4('muc.proxy-pac.bmwgroup.net', (err, addrs) => {
-      resolve(!err && addrs && addrs.length > 0);
+      if (!settled) { settled = true; clearTimeout(timer); resolve(!err && addrs && addrs.length > 0); }
     });
-    setTimeout(() => resolve(false), 3000);
   });
 
   // 3. Determine location
@@ -1263,7 +1267,12 @@ async function runAllChecks() {
     : Infinity;
   if (_netProbeAge >= NETWORK_PROBE_INTERVAL_MS) {
     try {
-      await pollNetworkStatus();
+      // Hard ceiling: pollNetworkStatus must complete within 15s or we abandon it.
+      // This prevents a single hanging socket/DNS from freezing the entire runAllChecks loop.
+      await Promise.race([
+        pollNetworkStatus(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('pollNetworkStatus timed out after 15s')), 15_000)),
+      ]);
     } catch (err) {
       log(`network probe threw: ${err.message}`, 'ERROR');
       currentState.network.last_probe_end = new Date().toISOString();
