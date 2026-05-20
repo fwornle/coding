@@ -296,7 +296,7 @@ Plans:
   3. The existing B component-manifest (8 L1 + 5 L2) loads cleanly as a lower ontology against the upper ontology used by C.
   4. The registry surfaces ontology metadata (class list, parent chain, extension provenance) via a stable programmatic API.
 
-**Plans:** 2/6 plans executed
+**Plans:** 3/6 plans executed
 
 Plans:
 
@@ -307,7 +307,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 38-03-PLAN.md — OntologyRegistry class + sub-barrel + root-barrel re-exports. Adopts OKM's 86-line registry as base with 5 deltas (constructor injection D-28, async atomic reload D-29, stderr warn + strict mode D-27, collision warning text-verbatim D-27, provenance/parent-chain accessors). depends_on: 38-01.
+- [x] 38-03-PLAN.md — OntologyRegistry class + sub-barrel + root-barrel re-exports. Adopts OKM's 86-line registry as base with 5 deltas (constructor injection D-28, async atomic reload D-29, stderr warn + strict mode D-27, collision warning text-verbatim D-27, provenance/parent-chain accessors). depends_on: 38-01. [DONE 2026-05-20: km-core commits 5651142 + f006e91; 4 files (2 created + 2 modified); package.json exports map extended for ./ontology sub-path per FLAG-1 option (a); external smoke compile clean for both root + sub-path imports; zero Phase 37 vitest regression]
 - [ ] 38-04-PLAN.md — `registryBackedValidator` factory in `src/validation/ontology.ts` + root barrel export. Bridges Phase 37's pluggable validator (D-19) to Phase 38's registry; preserves Phase 37 test regex `/Unknown ontology class/`. depends_on: 38-01.
 
 **Wave 3** *(blocked on Wave 2)*

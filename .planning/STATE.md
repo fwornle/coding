@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 38 Plan 02 complete -- 5 fixture JSONs in km-core/tests/fixtures/ontology/ (commits 5e31b3e, 972bd3a)
-last_updated: "2026-05-20T11:55:00Z"
-last_activity: 2026-05-20 -- Phase 38 Plan 02 complete (4 verbatim OKM fixtures + synthetic coding-ontology.json B-shape proxy)
+stopped_at: Phase 38 Plan 03 complete -- OntologyRegistry class + sub-barrel + root re-exports + package.json exports map (km-core commits 5651142, f006e91)
+last_updated: "2026-05-20T10:01:10Z"
+last_activity: 2026-05-20 -- Phase 38 Plan 03 complete (OntologyRegistry class with 5 deltas vs OKM; Wave 2 done; Plans 38-04 + 38-05 + 38-06 unblocked in Wave 3)
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 11
-  completed_plans: 7
-  percent: 11
+  completed_plans: 8
+  percent: 12
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 38 (ontology-registry) — EXECUTING
-Plan: 3 of 6 (Plans 01 + 02 complete; Wave 1 done — 38-03 + 38-04 unblocked in Wave 2)
+Plan: 4 of 6 (Plans 01 + 02 + 03 complete; Waves 1 + 2 done — 38-04 + 38-05 + 38-06 unblocked in Wave 3)
 Status: Executing Phase 38
-Last activity: 2026-05-20 -- Phase 38 Plan 02 complete (5 fixture JSONs in km-core/tests/fixtures/ontology/)
+Last activity: 2026-05-20 -- Phase 38 Plan 03 complete (OntologyRegistry class + barrels + exports map in km-core)
 
 ## Performance Metrics
 
@@ -100,6 +100,10 @@ Last activity: 2026-05-20 -- Phase 38 Plan 02 complete (5 fixture JSONs in km-co
 - [Phase 38-02]: 4 OKM ontology JSONs (upper/kpifw/business/raas) copied byte-identical into ~/Agentic/km-core/tests/fixtures/ontology/ via `cp` (PATTERNS.md verbatim-copy landmine respected); `cmp` exit 0 against each OKM source. Synthetic coding-ontology.json authored with 7 L1 + 5 L2 = 12 classes (on-disk component-manifest.yaml truth — CONTEXT/PATTERNS quoted 8 L1, doc-drift surfaced in SUMMARY).
 - [Phase 38-02]: Synthetic fixture exercises both kinds of `extends`: ontology-level (meta.extends:"upper") AND per-class (7 L1 each extends "Component" from upper; 5 L2 each extends their L1 parent). meta.description self-documents synthetic nature + Phase 42 ownership + source-count drift call-out (T-38-02-03 mitigation).
 - [Phase 38-02]: Empty relationships:{} on all 12 synthetic classes — type-valid for OKM's `Record<string,string[]>` contract, avoids inventing semantic content that Phase 42 would have to re-validate during the real YAML→JSON conversion.
+- [Phase 38-03]: OntologyRegistry class (249 lines) adopts OKM's 86-line analog as base with all 5 PATTERNS deltas applied: constructor-injected ontologyDir (D-28), async atomic reload with two-statement swap (D-29), stderr warn + strict-mode rethrow on malformed lower files (D-27 + no-console-log), collision warning text VERBATIM per D-27 spec, and provenance + parent-chain accessors (parentChainOf / provenanceOf / classCatalog ReadonlyMap / domains ReadonlySet).
+- [Phase 38-03]: registerClasses signature refactored to `registerClasses(target, file, source)` with explicit target Map argument — both `loadFromDisk()` and `reload()` invoke it with their respective target maps (`this.classes` constructor path; local `newClasses` for reload). Avoids duplicating the loop body AND the pre-swap shared-state hazard during atomic rebuild.
+- [Phase 38-03]: FLAG-1 from 38-PLAN-CHECK addressed via option (a) — extended package.json `exports` map with `./ontology` entry so `'@fwornle/km-core/ontology'` resolves for external consumers. Verified by tmpdir smoke compile (`npm install` km-core + @types/node + typescript, NodeNext+ES2022 tsconfig, both root and sub-path imports compile clean).
+- [Phase 38-03]: All 33 Phase 37 vitest tests still pass after registry + barrel + package.json changes — zero regression.
 
 ### Blockers/Concerns
 
@@ -130,9 +134,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 37 P05 | 5min | 4 tasks | 5 files |
 | Phase 38 P01 | 2min | 2 tasks | 2 files |
 | Phase 38 P02 | 3min | 2 tasks | 5 files |
+| Phase 38 P03 | 4min | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-05-20T11:55:00Z
-Stopped at: Phase 38 Plan 02 complete -- 5 fixture JSONs in km-core/tests/fixtures/ontology/ (commits 5e31b3e, 972bd3a); Wave 1 complete; Plans 38-03 (registry) + 38-04 (factory) unblocked in Wave 2
+Last session: 2026-05-20T10:01:10Z
+Stopped at: Phase 38 Plan 03 complete -- OntologyRegistry class + sub-barrel + root re-exports + package.json exports map (km-core commits 5651142, f006e91); Waves 1 + 2 complete; Plans 38-04 (factory) + 38-05 (store wiring) + 38-06 (tests) unblocked in Wave 3 (sequential via depends_on chain 04 → 05 → 06)
 Resume with: `/gsd:execute-phase 38`
