@@ -14,3 +14,6 @@
 	path = integrations/code-graph-rag
 	url = https://github.com/fwornle/code-graph-rag.git
 	branch = semantic-enhancements
+[submodule "lib/km-core"]
+	path = lib/km-core
+	url = git@github.com:fwornle/km-core.git
