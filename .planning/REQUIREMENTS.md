@@ -72,9 +72,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 37 | Pending |
+| CORE-01 | Phase 37 | Complete |
 | CORE-02 | Phase 37 | Pending |
-| CORE-03 | Phase 37 | Pending |
+| CORE-03 | Phase 37 | Complete |
 | ONTO-01 | Phase 38 | Pending |
 | ONTO-02 | Phase 38 | Pending |
 | DATA-01 | Phase 39 | Pending |

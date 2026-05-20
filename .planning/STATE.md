@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification
 status: executing
-stopped_at: Phase 37 context gathered
-last_updated: "2026-05-20T04:52:30.028Z"
+stopped_at: Completed 37-02-PLAN.md (CORE-01 + CORE-03 — types + ID layer landed; km-core pushed)
+last_updated: "2026-05-20T05:02:44.647Z"
 last_activity: 2026-05-20
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 37 (km-core-foundation) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-05-20
 
@@ -79,6 +79,9 @@ Last activity: 2026-05-20
 - [v7.1 roadmap]: PIPE-01 + DEDUP-01 combined into Phase 40 — dedup IS the second stage of the 4-stage pipeline; splitting them creates artificial seams
 - [v7.1 roadmap]: INT-01 (A's SQLite adapter) bundled with PIPE-02 in Phase 41 — exercises the KM-Core surface before B/C bet on it, and A's long-running insight corpus is the first proving ground for post-hoc resolution
 - [v7.1 roadmap]: API (44) lands AFTER migrations so REST contracts are shaped against real KM-Core consumers, not in a vacuum
+- [Phase 37-02]: Adopted OKM Entity shape VERBATIM and applied 4 deltas: id->EntityId brand, Edge->Relation rename with from/to, legacyId for Phase 39 backfill, no bin types (D-11/D-13/D-14)
+- [Phase 37-02]: Defensive s.charAt(14) === '7' v7 variant check in parseEntityId rejects v4 UUIDs that UUID.parse would otherwise accept (37-PATTERNS DELTAS)
+- [Phase 37-02]: Per-module barrel src/types/index.ts re-exports EntityId alongside Entity/Relation so consumers can take a sub-surface import
 
 ### Blockers/Concerns
 
@@ -103,9 +106,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | todo | llm-based-semantic-deduplication | pending |
 | todo | replace-console-log-with-proper-logging | pending |
 | Phase 36 P07 | 32 | 1 tasks | 1 files |
+| Phase 37 P02 | 14min | 2 tasks | 8 files |
 
 ## Session Continuity
 
-Last session: 2026-05-19T09:23:01.032Z
-Stopped at: Phase 37 context gathered
+Last session: 2026-05-20T05:02:44.642Z
+Stopped at: Completed 37-02-PLAN.md (CORE-01 + CORE-03 — types + ID layer landed; km-core pushed)
 Resume with: `/gsd:plan-phase 37`

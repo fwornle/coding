@@ -260,16 +260,16 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
   3. Every KM-Core entity carries a stable UUID identifier that survives export → restore round-trips.
   4. The `.data/knowledge-export/coding.json` and `.data/exports/*.json` paths still load via KM-Core without breaking the established two-commit / OKB-baseline guard hygiene.
 
-**Plans:** 5 plans across 5 waves
+**Plans:** 2/5 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 37-01-PLAN.md — Wave 1: bootstrap ~/Agentic/km-core/ repo skeleton (package.json/tsconfig/vitest/MIT/README/CI), capture 4 frozen JSON fixtures from B+C, write all RED test scaffolds (5 unit + 1 integration TS + 1 integration shell). Sets Wave 0 harness per 37-VALIDATION.md.
+- [x] 37-01-PLAN.md — Wave 1: bootstrap ~/Agentic/km-core/ repo skeleton (package.json/tsconfig/vitest/MIT/README/CI), capture 4 frozen JSON fixtures from B+C, write all RED test scaffolds (5 unit + 1 integration TS + 1 integration shell). Sets Wave 0 harness per 37-VALIDATION.md.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 37-02-PLAN.md — Wave 2: land canonical Entity/Relation types + branded EntityId + mintEntityId/parseEntityId (UUIDv7) + BatchOp/FilterObject/event payload types + OntologyValidator stub. Closes type half of CORE-01 + CORE-03.
+- [x] 37-02-PLAN.md — Wave 2: land canonical Entity/Relation types + branded EntityId + mintEntityId/parseEntityId (UUIDv7) + BatchOp/FilterObject/event payload types + OntologyValidator stub. Closes type half of CORE-01 + CORE-03.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -424,7 +424,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 37. KM-Core Foundation | 0/? | Not started | - |
+| 37. KM-Core Foundation | 2/5 | In Progress|  |
 | 38. Ontology Registry | 0/? | Not started | - |
 | 39. Entity Data Model | 0/? | Not started | - |
 | 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |
