@@ -296,7 +296,25 @@ Plans:
   3. The existing B component-manifest (8 L1 + 5 L2) loads cleanly as a lower ontology against the upper ontology used by C.
   4. The registry surfaces ontology metadata (class list, parent chain, extension provenance) via a stable programmatic API.
 
-**Plans:** TBD
+**Plans:** 6 plans across 3 waves
+
+Plans:
+
+**Wave 1 (parallel — no dependencies)**
+
+- [ ] 38-01-PLAN.md — Types + loader: create `~/Agentic/km-core/src/types/ontology.ts` (4 interfaces verbatim from OKM analog) + `~/Agentic/km-core/src/ontology/loader.ts` (sync JSON reader, throws on malformed input).
+- [ ] 38-02-PLAN.md — Test fixtures: 4 verbatim OKM ontology JSONs (upper/kpifw/business/raas) copied via `cp` + synthetic `coding-ontology.json` (B-shape proxy: 7 L1 + 5 L2 from `component-manifest.yaml`, D-26 SC#3 verification fixture).
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 38-03-PLAN.md — OntologyRegistry class + sub-barrel + root-barrel re-exports. Adopts OKM's 86-line registry as base with 5 deltas (constructor injection D-28, async atomic reload D-29, stderr warn + strict mode D-27, collision warning text-verbatim D-27, provenance/parent-chain accessors). depends_on: 38-01.
+- [ ] 38-04-PLAN.md — `registryBackedValidator` factory in `src/validation/ontology.ts` + root barrel export. Bridges Phase 37's pluggable validator (D-19) to Phase 38's registry; preserves Phase 37 test regex `/Unknown ontology class/`. depends_on: 38-01.
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 38-05-PLAN.md — Wire registry into `GraphKMStore` constructor: add `ontologyDir?` + `ontologyStrict?` options, instantiate registry internally, expose `store.ontology` getter, validator resolution chain (explicit > auto-wired > noop). Pure additive — Phase 37 BC-2 + T-37-04-06 + PersistenceManager/Exporter ordering all preserved. depends_on: 38-03, 38-04.
+- [ ] 38-06-PLAN.md — Registry unit tests (`tests/unit/ontology-registry.test.ts`, 6 describe-blocks covering all 4 SCs) + 2 append-only tests in `tests/unit/graph-store.test.ts` (ontologyDir auto-wiring + skipOntologyCheck BC-2 preservation). depends_on: 38-02, 38-03, 38-05.
+
 
 #### Phase 39: Entity Data Model
 
