@@ -871,6 +871,15 @@ function evaluateAutoHealFSM() {
     .catch(err => log(`proxy auto-heal kickstart failed: ${err.message}`, 'ERROR'));
 }
 
+// Hysteresis state for networkMode flip detection. The proxy's reported
+// networkMode can oscillate around a threshold (e.g. PAC TCP latency hovering
+// at ~47ms with a 30ms threshold) — without hysteresis every oscillation
+// dispatches a kickstart, which on 2026-05-20 produced ~30 kickstarts in
+// 30 minutes (08:08-08:37 CEST). Require 2 consecutive readings of the new
+// mode before dispatching.
+let pendingNetworkModeFlip = null;  // { from, to, count } or null
+const NETWORK_MODE_FLIP_CONFIRM_TICKS = 2;
+
 /**
  * Phase 34 R2: poll the proxy's networkMode every tick (~5s) and surface as
  * state.proxy.networkMode. Pattern A: any error -> 'unknown' (never silently
@@ -899,15 +908,41 @@ async function pollProxyMode() {
     // kickstart_timestamps — flap is a USER ACTION (network changed),
     // not a proxy-failure response, so cooldown does not gate it.
     const realModes = new Set(['vpn', 'corporate', 'public']);
-    if (
+    const newMode = currentState.proxy.networkMode;
+    const isRealTransition =
       realModes.has(prevMode) &&
-      realModes.has(currentState.proxy.networkMode) &&
-      prevMode !== currentState.proxy.networkMode
-    ) {
-      log(`proxy networkMode flip ${prevMode} -> ${currentState.proxy.networkMode}, dispatching restart_llm_cli_proxy`, 'INFO');
-      getRemediationDispatcher()
-        .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'networkMode-flip' }))
-        .catch(err => log(`networkMode-flip kickstart failed: ${err.message}`, 'ERROR'));
+      realModes.has(newMode) &&
+      prevMode !== newMode;
+
+    if (isRealTransition) {
+      // Hysteresis: confirm the flip is stable before dispatching a kickstart.
+      // Each consecutive tick that reports the same new mode increments the
+      // pending counter. Once it reaches NETWORK_MODE_FLIP_CONFIRM_TICKS we
+      // dispatch. An intervening reversion clears the pending state.
+      if (
+        pendingNetworkModeFlip &&
+        pendingNetworkModeFlip.from === prevMode &&
+        pendingNetworkModeFlip.to === newMode
+      ) {
+        pendingNetworkModeFlip.count += 1;
+      } else {
+        pendingNetworkModeFlip = { from: prevMode, to: newMode, count: 1 };
+      }
+
+      if (pendingNetworkModeFlip.count >= NETWORK_MODE_FLIP_CONFIRM_TICKS) {
+        log(`proxy networkMode flip ${prevMode} -> ${newMode} confirmed (${pendingNetworkModeFlip.count} consecutive ticks), dispatching restart_llm_cli_proxy`, 'INFO');
+        pendingNetworkModeFlip = null;
+        getRemediationDispatcher()
+          .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'networkMode-flip' }))
+          .catch(err => log(`networkMode-flip kickstart failed: ${err.message}`, 'ERROR'));
+      } else {
+        log(`proxy networkMode flip ${prevMode} -> ${newMode} pending (${pendingNetworkModeFlip.count}/${NETWORK_MODE_FLIP_CONFIRM_TICKS})`, 'DEBUG');
+      }
+    } else if (pendingNetworkModeFlip && newMode === pendingNetworkModeFlip.from) {
+      // Reversion: the new reading matches the prior stable mode, so the
+      // pending flip was oscillation noise — clear it without dispatching.
+      log(`proxy networkMode flip ${pendingNetworkModeFlip.from} -> ${pendingNetworkModeFlip.to} cancelled (mode reverted)`, 'DEBUG');
+      pendingNetworkModeFlip = null;
     }
   } catch (err) {
     currentState.proxy.networkMode = 'unknown';
