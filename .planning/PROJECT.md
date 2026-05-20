@@ -137,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-24 after v6.0 milestone start*
+*Last updated: 2026-05-20 — Phase 39 complete (Entity Data Model: temporal validity + structured provenance in km-core). Phases 37/38/39 of v7.1 shipped.*
