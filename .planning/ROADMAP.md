@@ -329,7 +329,7 @@ Plans:
   3. The B `KGEntity`/`SharedMemoryEntity` (`type`/`entityType` split, `persistence-agent.ts:583`) is replaced by the canonical KM-Core entity in the shared types; no consumer compiles against the old dual shape.
   4. A backfill operation can stamp `validFrom = createdAt` (A) or `validFrom = first-seen` (B) on legacy entities without losing existing observations or relations.
 
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 
@@ -340,7 +340,7 @@ Plans:
 
 **Wave 2** *(depends on Plan 01 — both touch GraphKMStore.ts)*
 
-- [ ] 39-03-PLAN.md — Atomic supersession closure (D-33) + active-only default filter (D-34) + `getSupersessionChain` reverse-walk query API (D-35) — closes DATA-01 + ROADMAP SC#1
+- [x] 39-03-PLAN.md — Atomic supersession closure (D-33) + active-only default filter (D-34) + `getSupersessionChain` reverse-walk query API (D-35) — closes DATA-01 + ROADMAP SC#1
 
 **Wave 3** *(depends on Plans 01 + 03 — provenance writer + iterate opt-in)*
 
@@ -461,7 +461,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
-| 39. Entity Data Model | 2/4 | In Progress|  |
+| 39. Entity Data Model | 3/4 | In Progress|  |
 | 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
