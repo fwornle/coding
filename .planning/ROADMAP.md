@@ -361,7 +361,7 @@ Plans:
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
 
-**Plans:** 4/8 plans executed
+**Plans:** 5/8 plans executed
 
 Plans:
 
@@ -377,7 +377,7 @@ Plans:
 
 **Wave 3 (orchestrator depends on the 3 layers)**
 
-- [ ] 40-05-PLAN.md — `LayeredDeduplicator` — wraps the 3 layer slots with short-circuit-on-first-match (D-44); Pitfall 1 defensive guard for entities without ontologyClass/entityType; 9 unit tests including 6 RESEARCH-named contracts. DEDUP-01 orchestrator.
+- [x] 40-05-PLAN.md — `LayeredDeduplicator` — wraps the 3 layer slots with short-circuit-on-first-match (D-44); Pitfall 1 defensive guard for entities without ontologyClass/entityType; 9 unit tests including 6 RESEARCH-named contracts. DEDUP-01 orchestrator.
 
 **Wave 4 (pipeline class + unit tests — IngestPipeline source on disk)**
 
@@ -492,7 +492,7 @@ Plans:
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
-| 40. Ingest Pipeline & Layered Dedup | 4/8 | In Progress|  |
+| 40. Ingest Pipeline & Layered Dedup | 5/8 | In Progress|  |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
