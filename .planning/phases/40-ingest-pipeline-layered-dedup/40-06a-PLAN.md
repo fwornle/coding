@@ -11,6 +11,7 @@ autonomous: true
 requirements: [PIPE-01]
 must_haves:
   truths:
+    - "D-42: IngestPipeline ctor uses options-object composition — `new IngestPipeline(store, { extractor, deduplicator, synthesizer, onPhase? })`. Store is positional (primary subject per CF-D14); stage impls are options-object fields. NO abstract base class; NO `extends IngestPipeline`."
     - "IngestPipeline.ingest(text, opts) runs 4 stages in order: extract → dedup → store → synthesize."
     - "skipStages: ['synthesize'] runs the other 3 and records 'synthesize' in IngestResult.skippedStages."
     - "skipStages: ['extract'] with non-empty text throws (per RESEARCH.md Pitfall 5 spec-defined behavior)."
