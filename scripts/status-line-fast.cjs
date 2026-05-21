@@ -298,7 +298,11 @@ child.on('exit', (code, signal) => {
   // surfacing them to the user. The user explicitly does not want to see
   // "SYS:TIMEOUT" / "SYS:ERR" in the statusline — those are diagnostic
   // markers, not user-facing content.
-  const isMarkerOnly = /^\s*⚠️?\s*SYS:(TIMEOUT|ERR)\b/.test(result.trimStart());
+  // Match both the legacy ⚠️ form and the current 🟡 form. ⚠️ (U+26A0+VS16)
+  // was swapped out because its tmux/terminal cell-width mismatch leaked
+  // trailing chars into the statusline; kept here defensively so stale
+  // caches written by older CSL builds are still recognised as markers.
+  const isMarkerOnly = /^\s*(?:⚠️?|🟡)\s*SYS:(TIMEOUT|ERR)\b/.test(result.trimStart());
 
   if (code === 0 && result.trimEnd() && !isMarkerOnly) {
     process.stdout.write(result + '\n');

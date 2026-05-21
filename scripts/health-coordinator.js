@@ -233,7 +233,15 @@ const currentState = {
     semantic_strong_ok: null,            // null until first probe; true|false after — heavy-tier probe via configured route
     semantic_strong_round_trip_ms: null,
     semantic_strong_last_probe_end: null,
-    semantic_strong_reason: null
+    semantic_strong_reason: null,
+    // Strong-probe escalation: count consecutive RECOVERABLE failures
+    // (network_* / http_5xx). Unlike the cheap-probe FSM at evaluateAutoHealFSM,
+    // this counter is the basis for kickstart dispatch when the cheap probe
+    // is passing but the configured pipeline is broken in a way a proxy
+    // restart can fix (e.g. stale HTTPS_PROXY from a launchd KeepAlive
+    // restart — the 2026-05-21 9-hr observation silence root cause).
+    // Resets on success or non-recoverable reason (timeout/4xx/empty/oksub).
+    consecutive_strong_network_failures: 0
   },
   // Network environment detection — single source of truth for CN/VPN/home
   // and local proxy (px/proxydetox) status. Polled every 30s.
@@ -755,58 +763,141 @@ async function pollProxySemanticStrong() {
     maxTokens: 5
   };
   const prev = currentState.proxy.semantic_strong_ok;
-  let r;
   try {
-    r = await fetch(`${PROXY_URL}/api/complete`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(probeBody),
-      signal: AbortSignal.timeout(30_000)
-    });
-  } catch (err) {
+    let r;
+    try {
+      r = await fetch(`${PROXY_URL}/api/complete`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(probeBody),
+        signal: AbortSignal.timeout(30_000)
+      });
+    } catch (err) {
+      const elapsed = Date.now() - start;
+      const reason = (err && (err.name === 'TimeoutError' || /aborted|timeout/i.test(err.message)))
+        ? 'timeout' : `network_${err.message || 'error'}`;
+      currentState.proxy.semantic_strong_ok = false;
+      currentState.proxy.semantic_strong_round_trip_ms = elapsed;
+      currentState.proxy.semantic_strong_reason = reason;
+      currentState.proxy.semantic_strong_last_probe_end = probeEndedAt();
+      if (prev !== false) log(`proxy semantic_strong_ok flip -> false (${reason})`, 'INFO');
+      return;
+    }
     const elapsed = Date.now() - start;
-    const reason = (err && (err.name === 'TimeoutError' || /aborted|timeout/i.test(err.message)))
-      ? 'timeout' : `network_${err.message || 'error'}`;
-    currentState.proxy.semantic_strong_ok = false;
     currentState.proxy.semantic_strong_round_trip_ms = elapsed;
-    currentState.proxy.semantic_strong_reason = reason;
     currentState.proxy.semantic_strong_last_probe_end = probeEndedAt();
-    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (${reason})`, 'INFO');
+    if (!r.ok) {
+      currentState.proxy.semantic_strong_ok = false;
+      currentState.proxy.semantic_strong_reason = `http_${r.status}`;
+      if (prev !== false) log(`proxy semantic_strong_ok flip -> false (http_${r.status})`, 'INFO');
+      return;
+    }
+    let body;
+    try { body = await r.json(); }
+    catch (err) {
+      currentState.proxy.semantic_strong_ok = false;
+      currentState.proxy.semantic_strong_reason = 'empty_content';
+      if (prev !== false) log(`proxy semantic_strong_ok flip -> false (empty_content/json-parse: ${err.message})`, 'INFO');
+      return;
+    }
+    const content = (body?.choices?.[0]?.message?.content) ?? body?.content ?? body?.text ?? '';
+    if (!content || typeof content !== 'string') {
+      currentState.proxy.semantic_strong_ok = false;
+      currentState.proxy.semantic_strong_reason = 'empty_content';
+      if (prev !== false) log(`proxy semantic_strong_ok flip -> false (empty_content)`, 'INFO');
+      return;
+    }
+    if (!/ok/i.test(content)) {
+      currentState.proxy.semantic_strong_ok = false;
+      currentState.proxy.semantic_strong_reason = 'oksub_missing';
+      if (prev !== false) log(`proxy semantic_strong_ok flip -> false (oksub_missing — got: ${String(content).slice(0, 80)})`, 'INFO');
+      return;
+    }
+    currentState.proxy.semantic_strong_ok = true;
+    currentState.proxy.semantic_strong_reason = null;
+    if (prev !== true) log(`proxy semantic_strong_ok flip -> true (${elapsed}ms)`, 'INFO');
+  } finally {
+    // Escalation gate — runs on every probe outcome (success, failure, throw).
+    // Lets the cheap-probe FSM stay informational while still recovering from
+    // failure modes a proxy restart actually fixes (the 2026-05-21 stale-env
+    // scenario where copilot/haiku probe passed but observation-writer's
+    // claude-code path returned 'fetch failed' in 3-7ms for 9+ hours).
+    evaluateStrongProbeEscalation();
+  }
+}
+
+// Recoverable-reason classifier shared between counter update + escalation.
+// network_*: DNS/fetch/socket failure — usually fixed by re-resolving env on
+//   restart. http_5xx: upstream/proxy temporary error — restart can clear
+//   stuck connections. NOT included: 'timeout' (probably slow LLM, restart
+//   won't help), 'empty_content'/'oksub_missing' (LLM scaffold problem),
+//   'http_4xx' (rate limit / auth — upstream, restart won't help).
+function isStrongProbeReasonRecoverable(reason) {
+  if (!reason) return false;
+  if (reason.startsWith('network_')) return true;
+  if (/^http_5\d\d$/.test(reason)) return true;
+  return false;
+}
+
+// Strong-probe escalation FSM — runs once per pollProxySemanticStrong outcome
+// (via try/finally in the caller). Bridges the gap between the cheap-probe
+// auto-heal FSM (which can miss stale-env / pipeline-only outages because
+// the cheap probe goes via copilot+haiku) and a dispatch action that
+// actually fixes them. Threshold of 2 consecutive failures keeps a single
+// flaky probe from triggering a restart.
+const STRONG_PROBE_ESCALATION_THRESHOLD = 2;
+function evaluateStrongProbeEscalation() {
+  // Same kill-switch as the cheap-probe FSM (D-07).
+  const rule = RULES?.rules?.services?.llm_cli_proxy;
+  if (!rule || rule.auto_heal !== true) return;
+
+  // Reset on success.
+  if (currentState.proxy.semantic_strong_ok === true) {
+    if (currentState.proxy.consecutive_strong_network_failures > 0) {
+      log(`proxy strong-probe network-failure counter reset (was ${currentState.proxy.consecutive_strong_network_failures})`, 'INFO');
+    }
+    currentState.proxy.consecutive_strong_network_failures = 0;
     return;
   }
-  const elapsed = Date.now() - start;
-  currentState.proxy.semantic_strong_round_trip_ms = elapsed;
-  currentState.proxy.semantic_strong_last_probe_end = probeEndedAt();
-  if (!r.ok) {
-    currentState.proxy.semantic_strong_ok = false;
-    currentState.proxy.semantic_strong_reason = `http_${r.status}`;
-    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (http_${r.status})`, 'INFO');
+
+  // Reset on non-recoverable failure — those mean restart wouldn't help.
+  const reason = currentState.proxy.semantic_strong_reason || '';
+  if (!isStrongProbeReasonRecoverable(reason)) {
+    if (currentState.proxy.consecutive_strong_network_failures > 0) {
+      log(`proxy strong-probe failed with non-recoverable reason '${reason}' — counter reset (was ${currentState.proxy.consecutive_strong_network_failures})`, 'INFO');
+    }
+    currentState.proxy.consecutive_strong_network_failures = 0;
     return;
   }
-  let body;
-  try { body = await r.json(); }
-  catch (err) {
-    currentState.proxy.semantic_strong_ok = false;
-    currentState.proxy.semantic_strong_reason = 'empty_content';
-    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (empty_content/json-parse: ${err.message})`, 'INFO');
+
+  // Recoverable failure — increment counter.
+  currentState.proxy.consecutive_strong_network_failures += 1;
+  const count = currentState.proxy.consecutive_strong_network_failures;
+  if (count < STRONG_PROBE_ESCALATION_THRESHOLD) {
+    log(`proxy strong-probe recoverable failure ${count}/${STRONG_PROBE_ESCALATION_THRESHOLD} (reason='${reason}') — not yet escalating`, 'INFO');
     return;
   }
-  const content = (body?.choices?.[0]?.message?.content) ?? body?.content ?? body?.text ?? '';
-  if (!content || typeof content !== 'string') {
-    currentState.proxy.semantic_strong_ok = false;
-    currentState.proxy.semantic_strong_reason = 'empty_content';
-    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (empty_content)`, 'INFO');
+
+  // Threshold reached — gate through the same cooldown window the cheap-probe
+  // FSM uses, so the two paths share kickstart-debt accounting.
+  const now = Date.now();
+  currentState.proxy.kickstart_timestamps = currentState.proxy.kickstart_timestamps
+    .filter(ts => (now - ts) < PROXY_KICKSTART_WINDOW_MS);
+  if (currentState.proxy.kickstart_timestamps.length >= PROXY_KICKSTART_MAX) {
+    log(`proxy strong-probe escalation suppressed — ${currentState.proxy.kickstart_timestamps.length} kickstarts in last ${PROXY_KICKSTART_WINDOW_MS/1000}s (cooldown)`, 'WARN');
     return;
   }
-  if (!/ok/i.test(content)) {
-    currentState.proxy.semantic_strong_ok = false;
-    currentState.proxy.semantic_strong_reason = 'oksub_missing';
-    if (prev !== false) log(`proxy semantic_strong_ok flip -> false (oksub_missing — got: ${String(content).slice(0, 80)})`, 'INFO');
-    return;
-  }
-  currentState.proxy.semantic_strong_ok = true;
-  currentState.proxy.semantic_strong_reason = null;
-  if (prev !== true) log(`proxy semantic_strong_ok flip -> true (${elapsed}ms)`, 'INFO');
+
+  // Dispatch through the same remediation path as the cheap-probe FSM. Reset
+  // the counter on dispatch so we don't fire on every subsequent probe within
+  // the same outage — let the cooldown window govern repeats.
+  currentState.proxy.kickstart_timestamps.push(now);
+  currentState.proxy.kickstart_count += 1;
+  currentState.proxy.consecutive_strong_network_failures = 0;
+  log(`proxy strong-probe escalation: dispatching restart_llm_cli_proxy (consecutive_strong_failures=${count}, reason='${reason}', kickstart_count=${currentState.proxy.kickstart_count})`, 'INFO');
+  getRemediationDispatcher()
+    .then(d => d.executeAction('restart_llm_cli_proxy', { reason: `strong-probe ${reason}` }))
+    .catch(err => log(`proxy strong-probe escalation kickstart failed: ${err.message}`, 'ERROR'));
 }
 
 /**

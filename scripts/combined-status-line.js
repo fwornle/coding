@@ -2023,8 +2023,11 @@ class CombinedStatusLine {
         // (typically observation-writer's claude-code/sonnet hitting an
         // Anthropic 429 with no in-bucket fallback). Always rendered amber
         // — this is real silent breakage, not a probe-window artifact, so
-        // idle suppression doesn't apply.
-        parts.push('[🧠⚠️]');
+        // idle suppression doesn't apply. Uses 🟡 (not ⚠️) to avoid the
+        // tmux/terminal cell-width mismatch on U+26A0+VS16 documented at
+        // lines 60-61 / 1912 of this file, which leaks trailing chars
+        // past the visible-drift threshold.
+        parts.push('[🧠🟡]');
         if (overallColor === 'green') overallColor = 'yellow';
         break;
       case 'degraded':
@@ -2384,7 +2387,7 @@ class CombinedStatusLine {
 
   getErrorStatus(error) {
     return {
-      text: '⚠️ SYS:ERR',
+      text: '🟡 SYS:ERR',
       color: 'red',
       tooltip: `System error: ${error.message || 'Unknown error'}`,
       onClick: 'open-dashboard'
@@ -2460,7 +2463,7 @@ async function main() {
       } catch { /* logging must never throw */ }
       console.error('⚠️ SYS:TIMEOUT - Status line generation took >8s');
       // Pad short marker output so it overwrites the previous render's cells.
-      const timeoutText = leftPadToStableCellWidth('⚠️ SYS:TIMEOUT', paneWidth);
+      const timeoutText = leftPadToStableCellWidth('🟡 SYS:TIMEOUT', paneWidth);
       process.stdout.write(timeoutText + '\n', () => process.exit(1));
     }, 8000);
 
@@ -2490,7 +2493,7 @@ async function main() {
     console.error(error.stack);
     // Pad the catch-all marker for the same reason as the success path.
     const errPaneWidth = process.env.TMUX_PANE_WIDTH || '';
-    const errText = leftPadToStableCellWidth('⚠️ SYS:ERR', errPaneWidth);
+    const errText = leftPadToStableCellWidth('🟡 SYS:ERR', errPaneWidth);
     process.stdout.write(errText + '\n', () => process.exit(1));
   }
 }
