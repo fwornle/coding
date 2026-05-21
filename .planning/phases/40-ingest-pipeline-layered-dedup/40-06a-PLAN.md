@@ -88,7 +88,7 @@ From src/store/GraphKMStore.ts (Phase 39 — DO NOT MODIFY):
 
 runStage signatures (LOCKED by RESEARCH.md Q2 RESOLVED — 4 typed function overloads, NOT a generic):
   runStage(name: 'extract', input: string, opts: { provenance: ProvenanceStamp }): Promise<Entity[]>
-  runStage(name: 'dedup', input: Entity, opts: { candidates: Entity[] }): Promise<DedupDecision>
+  runStage(name: 'dedup', input: Entity, opts: { candidates: Entity[] }): Promise<DedupResult>
   runStage(name: 'store', input: Entity[], opts: { provenance: ProvenanceStamp; supersedes?: Map<EntityId, EntityId> }): Promise<Entity[]>
   runStage(name: 'synthesize', input: EntityId[], opts: { provenance: ProvenanceStamp }): Promise<void>
   // Plus a single implementation signature at the end (the union — runtime body uses switch on `name`).
@@ -142,7 +142,7 @@ runStage signatures (LOCKED by RESEARCH.md Q2 RESOLVED — 4 typed function over
     File structure:
     1. SOURCE-comment header (Pattern F template, mirror the merge.ts:1-31 style) — SOURCE = OKM `pipeline.ts:76-316` (4-stage flow + onPhase); DELTAS = the 6 OKM-specific drops listed in RESEARCH.md Pitfall 7 (PII filter, populateEvidenceMetadata, createDerivedFromEdges, handleMetricEntities, handleSupersession, recordPatternOccurrences) + 4 split-mode entry-point drops (extractOnly, deduplicateAndStore, synthesizeAll, resolveEntities) + D-42 options-object ctor + D-43 skipStages + D-46 candidate-pool pre-load + CF-D30 provenance threading + no-console-log (all 6 OKM console.* lines at pipeline.ts:119, 124, 159, 269, 282 removed; observability via onPhase callback only) + RESEARCH Q2 RESOLVED runStage 4-overload form (NOT generic).
 
-    2. Imports: `import type { GraphKMStore } from '../store/GraphKMStore.js'; import type { Entity, EntityId, ProvenanceStamp } from '../types/entity.js'; import type { LayeredDeduplicator, DedupDecision } from '../dedup/LayeredDeduplicator.js'; import type { Extractor, Synthesizer, PhaseCallback, IngestResult, IngestOpts, IngestPipelineOpts, StageName } from './types.js';` (all type-only).
+    2. Imports: `import type { GraphKMStore } from '../store/GraphKMStore.js'; import type { Entity, EntityId, ProvenanceStamp } from '../types/entity.js'; import type { LayeredDeduplicator } from '../dedup/LayeredDeduplicator.js'; import type { DedupResult } from '../dedup/types.js'; import type { Extractor, Synthesizer, PhaseCallback, IngestResult, IngestOpts, IngestPipelineOpts, StageName } from './types.js';` (all type-only). `DedupResult` is the canonical type Plan 40-01 exports from `src/dedup/types.ts` and Plan 40-05's `LayeredDeduplicator.dedup()` returns — do NOT introduce a `DedupDecision` alias.
 
     3. Export `class IngestPipeline`:
        - Private fields: store, extractor, deduplicator, synthesizer, onPhase?.
@@ -160,10 +160,10 @@ runStage signatures (LOCKED by RESEARCH.md Q2 RESOLVED — 4 typed function over
 
        - `runStage` — declared as 4 typed function overloads (LOCKED by RESEARCH.md Q2 RESOLVED; copy these signatures verbatim — do NOT use a generic `<T>`):
          - Overload 1: `runStage(name: 'extract', input: string, opts: { provenance: ProvenanceStamp }): Promise<Entity[]>;`
-         - Overload 2: `runStage(name: 'dedup', input: Entity, opts: { candidates: Entity[] }): Promise<DedupDecision>;`
+         - Overload 2: `runStage(name: 'dedup', input: Entity, opts: { candidates: Entity[] }): Promise<DedupResult>;`
          - Overload 3: `runStage(name: 'store', input: Entity[], opts: { provenance: ProvenanceStamp; supersedes?: Map<EntityId, EntityId> }): Promise<Entity[]>;`
          - Overload 4: `runStage(name: 'synthesize', input: EntityId[], opts: { provenance: ProvenanceStamp }): Promise<void>;`
-         - Plus one implementation signature at the end whose param types are the union (e.g. `name: StageName`, `input: string | Entity | Entity[] | EntityId[]`, `opts: { provenance?: ProvenanceStamp; candidates?: Entity[]; supersedes?: Map<EntityId, EntityId> }`) returning `Promise<Entity[] | DedupDecision | void>`. Body switches on `name`:
+         - Plus one implementation signature at the end whose param types are the union (e.g. `name: StageName`, `input: string | Entity | Entity[] | EntityId[]`, `opts: { provenance?: ProvenanceStamp; candidates?: Entity[]; supersedes?: Map<EntityId, EntityId> }`) returning `Promise<Entity[] | DedupResult | void>`. Body switches on `name`:
            - case 'extract' → `return this.extractor.extract(input as string, undefined);`
            - case 'dedup' → guard `if (!opts.candidates) throw new Error("runStage('dedup') requires opts.candidates");` then `return this.deduplicator.dedup(input as Entity, opts.candidates);`
            - case 'store' → guard provenance; loop `input as Entity[]`; for each, apply `opts.supersedes?.get(entity.id)` if present (build `{ ...entity, supersedes }`); `await this.store.putEntity(...)`; return stored entities.

@@ -75,7 +75,7 @@ From src/pipeline/IngestPipeline.ts (Plan 40-06a):
     constructor(store: GraphKMStore, opts: IngestPipelineOpts);
     async ingest(text: string, opts: IngestOpts): Promise<IngestResult>;
     runStage(name: 'extract', ...): Promise<Entity[]>;
-    runStage(name: 'dedup', ...): Promise<DedupDecision>;
+    runStage(name: 'dedup', ...): Promise<DedupResult>;
     runStage(name: 'store', ...): Promise<Entity[]>;
     runStage(name: 'synthesize', ...): Promise<void>;
   }

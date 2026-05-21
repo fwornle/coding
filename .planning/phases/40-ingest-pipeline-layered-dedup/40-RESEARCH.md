@@ -1049,7 +1049,7 @@ The canonical SC#2 test is `tests/integration/layered-dedup-collision-catch.test
    - What's unclear: does `runStage` take a union type (`string | Entity[] | EntityId[]`), or a generic `runStage<T>(name, input: T, opts)`, or 4 overloads?
    - **RESOLVED:** **4 typed TypeScript function overloads** (cost: more declaration lines; benefit: IDE autocomplete picks the right input type per stage name). Plan 40-06 Task 1 MUST implement this as overloads, NOT as a generic `runStage<T>` (which would defeat the type-discoverability point). Signatures (locked):
      - `runStage(name: 'extract', input: string, opts: { provenance: ProvenanceStamp }): Promise<Entity[]>`
-     - `runStage(name: 'dedup', input: Entity, opts: { candidates: Entity[] }): Promise<DedupDecision>`
+     - `runStage(name: 'dedup', input: Entity, opts: { candidates: Entity[] }): Promise<DedupResult>` *(uses `DedupResult` from `src/dedup/types.ts` — Plan 40-01's canonical type, returned by `LayeredDeduplicator.dedup`)*
      - `runStage(name: 'store', input: Entity[], opts: { provenance: ProvenanceStamp; supersedes?: Map<EntityId, EntityId> }): Promise<Entity[]>`
      - `runStage(name: 'synthesize', input: EntityId[], opts: { provenance: ProvenanceStamp }): Promise<void>`
 
