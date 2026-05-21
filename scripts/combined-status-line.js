@@ -450,6 +450,17 @@ class CombinedStatusLine {
    * that drives the per-project activity bubbles. Used to map coordinator
    * "stale obs" verdicts onto the bubble lifecycle (🟢/🟠/🟤/⚫/💤) so a
    * cooling-down project doesn't fire a yellow alarm on the [📚] badge.
+   *
+   * Mirrors the bubble's ETM-heartbeat promotion (see
+   * `updateActivityRollup()` ~line 1017): when a transcript is moderately
+   * stale (5–45 min) but the ETM is heartbeating fresh (<5 min), treat
+   * the project as active. This is the canonical "user/agent is here
+   * right now" signal — it fires on every tool call and permission
+   * response inside a long-running assistant turn that wouldn't
+   * otherwise touch the transcript. Without this, the [📚] badge drifts
+   * to 🟠 during phases the per-project bubble has already promoted to
+   * 🟢, producing a visible inconsistency.
+   *
    * Returns null when no project has any observable signal.
    */
   async _freshestProjectActivityAgeMs() {
@@ -458,12 +469,28 @@ class CombinedStatusLine {
       const result = await this.getCoordinatorState();
       if (!result.ok) return null;
       const lslEntries = Object.values(result.state.lsl || {});
-      let freshest = null;
       const now = Date.now();
+      const heartbeatByProject = new Map();
+      for (const e of lslEntries) {
+        if (!e?.projectName) continue;
+        if (e.status === 'stopped') continue;
+        const lb = e.lastBeat || 0;
+        if (lb > (heartbeatByProject.get(e.projectName) || 0)) {
+          heartbeatByProject.set(e.projectName, lb);
+        }
+      }
+      let freshest = null;
       for (const entry of lslEntries) {
         if (!entry?.transcriptPath) continue;
         try {
-          const age = now - fs.statSync(entry.transcriptPath).mtimeMs;
+          let age = now - fs.statSync(entry.transcriptPath).mtimeMs;
+          if (age >= 5 * 60_000 && age < 45 * 60_000 && entry.projectName) {
+            const lb = heartbeatByProject.get(entry.projectName);
+            if (lb) {
+              const hbAge = now - lb;
+              if (hbAge < 5 * 60_000) age = hbAge;
+            }
+          }
           if (freshest === null || age < freshest) freshest = age;
         } catch { /* skip unreadable paths */ }
       }
