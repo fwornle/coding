@@ -361,7 +361,33 @@ Plans:
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
 
-**Plans:** TBD
+**Plans:** 7 plans across 5 waves
+
+Plans:
+
+**Wave 1 (foundation — types + test scaffolding; unblocks 3-way parallelism in Wave 2)**
+
+- [ ] 40-01-PLAN.md — Pipeline + dedup public type surfaces (`src/pipeline/types.ts`, `src/dedup/types.ts`) + shared test fakes (`tests/unit/_helpers/fakes.ts`). PIPE-01 + DEDUP-01 type contracts; downstream layer ports compile against these.
+
+**Wave 2 (parallel — 3 disjoint layer ports)**
+
+- [ ] 40-02-PLAN.md — `JaccardNameMatcher` — verbatim port of B's `calculateStringSimilarity` (deduplication.ts:436-445) + 7 unit tests. Default threshold 0.85. DEDUP-01 layer 1/3.
+- [ ] 40-03-PLAN.md — `CosineEmbeddingMatcher` + `EmbeddingClient` caller-injected interface — verbatim port of A's `cosine()` (dedup-insights-by-embedding.js:56-64) + 7 unit tests. Default threshold 0.90. DEDUP-01 layer 2/3.
+- [ ] 40-04-PLAN.md — `LLMSemanticMatcher` + `LLMClient` caller-injected interface — verbatim port of OKM's `batchLLMDedup` prompt + 5-stage JSON unwrap (deduplicator.ts:421-475) + 9 unit tests. Default threshold 0.70, onError 'skip'. DEDUP-01 layer 3/3.
+
+**Wave 3 (orchestrator depends on the 3 layers)**
+
+- [ ] 40-05-PLAN.md — `LayeredDeduplicator` — wraps the 3 layer slots with short-circuit-on-first-match (D-44); Pitfall 1 defensive guard for entities without ontologyClass/entityType; 9 unit tests including 6 RESEARCH-named contracts. DEDUP-01 orchestrator.
+
+**Wave 4 (pipeline depends on dedup orchestrator)**
+
+- [ ] 40-06-PLAN.md — `IngestPipeline` 4-stage orchestrator (extract → dedup → store → synthesize); pre-loads candidates via `store.findByOntologyClass` per D-46; threads `ProvenanceStamp` per CF-D30; supersession via Phase 39 `putEntity` (preserves CR-01 BatchOp.skipOntologyCheck); 10 unit tests + 4 supersession-integration tests + 4 candidate-pool-integration tests + ROADMAP SC#2 synthetic 3-collision test (LLM called === 1 proves both upper-layer short-circuits). PIPE-01 + DEDUP-01.
+
+**Wave 5 (barrel + final green gate)**
+
+- [ ] 40-07-PLAN.md — Amend `src/dedup/types.ts` with `EmbeddingClient` + `LLMClient` re-exports; create `src/pipeline/index.ts` + `src/dedup/index.ts` sub-barrels; append Phase 40 block to root `src/index.ts`; extend `package.json` exports map with `./pipeline` + `./dedup` sub-paths (mirrors Phase 38 `./ontology` precedent); external tmpdir smoke compile across root barrel + both sub-paths; final `npm run build` + `npm test` green gate. PIPE-01 + DEDUP-01.
+
+**Phase boundary:** All algorithm code lives in `~/Agentic/km-core/`. Co-exist mode (D-45) — A's `ObservationConsolidator` and B's `WaveController` are NOT modified by Phase 40. Phase 41 (INT-01) migrates A; Phase 42 (INT-02) migrates B; full SC#4 discharge at end of Phase 42 when B's local Jaccard copy is deleted.
 
 #### Phase 41: Online Learning Adapter & Post-Hoc Resolution
 
