@@ -37,7 +37,7 @@ created: 2026-05-21
 
 ## Per-Task Verification Map
 
-> Populated from RESEARCH.md `## Validation Architecture` (line 917+). Plan IDs map to the planner's wave structure: 40-01 (types/fakes), 40-02 (Jaccard), 40-03 (Cosine), 40-04 (LLM), 40-05 (LayeredDeduplicator), 40-06 (IngestPipeline + integration tests), 40-07 (barrel).
+> Populated from RESEARCH.md `## Validation Architecture` (line 917+). Plan IDs map to the planner's wave structure: 40-01 (types/fakes), 40-02 (Jaccard), 40-03 (Cosine + fakes-embedding.ts), 40-04 (LLM + fakes-llm.ts), 40-05 (LayeredDeduplicator), **40-06a (IngestPipeline class + unit tests — rows 40-T11..40-T18), 40-06b (3 integration tests — rows 40-T19..40-T22)**, 40-07 (barrel). The 40-06 split (Warning #3 fix) puts the class + unit tests in 40-06a (Wave 4) and the integration tests in 40-06b (Wave 4b — sequential after 40-06a).
 
 | Test ID | Plan | Wave | Requirement | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------------|-----------|-------------------|-------------|--------|
@@ -51,18 +51,18 @@ created: 2026-05-21
 | 40-T08 | 40-05 | 3 | DEDUP-01 | Short-circuit: first-layer match prevents downstream layers from being called | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/layered-dedup.test.ts -t "short-circuit on first match"` | ❌ W0 | ⬜ pending |
 | 40-T09 | 40-05 | 3 | DEDUP-01 | `shortCircuit: false`: all layers run; best match across layers wins | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/layered-dedup.test.ts -t "no-short-circuit aggregates"` | ❌ W0 | ⬜ pending |
 | 40-T10 | 40-05 | 3 | DEDUP-01 | Omitting a layer slot skips that layer cleanly (no null deref) | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/layered-dedup.test.ts -t "omitted layer"` | ❌ W0 | ⬜ pending |
-| 40-T11 | 40-06 | 4 | PIPE-01 | 4 stages run in order `extract → dedup → store → synthesize` | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "stage order"` | ❌ W0 | ⬜ pending |
-| 40-T12 | 40-06 | 4 | PIPE-01 | `onPhase` callback fires for each stage with `start` + `end` | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "onPhase observability"` | ❌ W0 | ⬜ pending |
-| 40-T13 | 40-06 | 4 | PIPE-01 | `skipStages: ['synthesize']` runs the other 3, records in `IngestResult.skippedStages` | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "skipStages synthesize"` | ❌ W0 | ⬜ pending |
-| 40-T14 | 40-06 | 4 | PIPE-01 | `skipStages: ['extract']` either throws or behaves spec-defined (RESEARCH Pitfall 5) | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "skipStages extract contract"` | ❌ W0 | ⬜ pending |
-| 40-T15 | 40-06 | 4 | PIPE-01 | `runStage('synthesize', entities, opts)` runs synthesize standalone | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "runStage synthesize"` | ❌ W0 | ⬜ pending |
-| 40-T16 | 40-06 | 4 | PIPE-01 | Pipeline threads caller's `provenance` to `store.putEntity` (never invents one) | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "provenance threading"` | ❌ W0 | ⬜ pending |
-| 40-T17 | 40-06 | 4 | PIPE-01 | `IngestResult` shape matches `{ extractedCount, mergedCount, storedCount, durations: {...}, skippedStages }` | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "IngestResult shape"` | ❌ W0 | ⬜ pending |
-| 40-T18 | 40-06 | 4 | PIPE-01 | Pipeline never invents a ProvenanceStamp; throws if caller omits `provenance` opt (CF-D30 enforcement) | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "provenance required"` | ❌ W0 | ⬜ pending |
-| 40-T19 | 40-06 | 4 | PIPE-01 + DEDUP-01 | **SC#2 canonical:** 3-collision synthetic batch — `exactName` catches #1, `embedding` catches #2, `llmSemantic` catches #3, all in correct order with short-circuit proven via mock call counts | integration | `cd ~/Agentic/km-core && npx vitest run tests/integration/layered-dedup-collision-catch.test.ts -t "3-collision order"` | ❌ W0 | ⬜ pending |
-| 40-T20 | 40-06 | 4 | PIPE-01 | Pipeline's `store` stage triggers Phase 39 D-33 supersession when survivor matched (active path) | integration | `cd ~/Agentic/km-core && npx vitest run tests/integration/pipeline-supersession.test.ts -t "supersedes via matched survivor"` | ❌ W0 | ⬜ pending |
-| 40-T21 | 40-06 | 4 | PIPE-01 | **CR-01 boundary:** Pipeline supersession of a legacy-id predecessor uses Phase 39 CR-01 per-op `skipOntologyCheck` (does NOT throw) | integration | `cd ~/Agentic/km-core && npx vitest run tests/integration/pipeline-supersession.test.ts -t "CR-01 legacy predecessor"` | ❌ W0 | ⬜ pending |
-| 40-T22 | 40-06 | 4 | PIPE-01 | Pipeline's `store` stage uses Phase 39 D-34 active-only filter when pre-loading candidates (D-46) | integration | `cd ~/Agentic/km-core && npx vitest run tests/integration/pipeline-candidate-pool.test.ts -t "active-only candidates"` | ❌ W0 | ⬜ pending |
+| 40-T11 | 40-06a | 4 | PIPE-01 | 4 stages run in order `extract → dedup → store → synthesize` | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "stage order"` | ❌ W0 | ⬜ pending |
+| 40-T12 | 40-06a | 4 | PIPE-01 | `onPhase` callback fires for each stage with `start` + `end` | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "onPhase observability"` | ❌ W0 | ⬜ pending |
+| 40-T13 | 40-06a | 4 | PIPE-01 | `skipStages: ['synthesize']` runs the other 3, records in `IngestResult.skippedStages` | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "skipStages synthesize"` | ❌ W0 | ⬜ pending |
+| 40-T14 | 40-06a | 4 | PIPE-01 | `skipStages: ['extract']` either throws or behaves spec-defined (RESEARCH Pitfall 5) | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "skipStages extract contract"` | ❌ W0 | ⬜ pending |
+| 40-T15 | 40-06a | 4 | PIPE-01 | `runStage('synthesize', entities, opts)` runs synthesize standalone | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "runStage synthesize"` | ❌ W0 | ⬜ pending |
+| 40-T16 | 40-06a | 4 | PIPE-01 | Pipeline threads caller's `provenance` to `store.putEntity` (never invents one) | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "provenance threading"` | ❌ W0 | ⬜ pending |
+| 40-T17 | 40-06a | 4 | PIPE-01 | `IngestResult` shape matches `{ extractedCount, mergedCount, storedCount, durations: {...}, skippedStages }` | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "IngestResult shape"` | ❌ W0 | ⬜ pending |
+| 40-T18 | 40-06a | 4 | PIPE-01 | Pipeline never invents a ProvenanceStamp; throws if caller omits `provenance` opt (CF-D30 enforcement) | unit | `cd ~/Agentic/km-core && npx vitest run tests/unit/pipeline.test.ts -t "provenance required"` | ❌ W0 | ⬜ pending |
+| 40-T19 | 40-06b | 4b | PIPE-01 + DEDUP-01 | **SC#2 canonical:** 3-collision synthetic batch — `exactName` catches #1, `embedding` catches #2, `llmSemantic` catches #3, all in correct order with short-circuit proven via mock call counts | integration | `cd ~/Agentic/km-core && npx vitest run tests/integration/layered-dedup-collision-catch.test.ts -t "3-collision order"` | ❌ W0 | ⬜ pending |
+| 40-T20 | 40-06b | 4b | PIPE-01 | Pipeline's `store` stage triggers Phase 39 D-33 supersession when survivor matched (active path) | integration | `cd ~/Agentic/km-core && npx vitest run tests/integration/pipeline-supersession.test.ts -t "supersedes via matched survivor"` | ❌ W0 | ⬜ pending |
+| 40-T21 | 40-06b | 4b | PIPE-01 | **CR-01 boundary:** Pipeline supersession of a legacy-id predecessor uses Phase 39 CR-01 per-op `skipOntologyCheck` (does NOT throw) | integration | `cd ~/Agentic/km-core && npx vitest run tests/integration/pipeline-supersession.test.ts -t "CR-01 legacy predecessor"` | ❌ W0 | ⬜ pending |
+| 40-T22 | 40-06b | 4b | PIPE-01 | Pipeline's `store` stage uses Phase 39 D-34 active-only filter when pre-loading candidates (D-46) | integration | `cd ~/Agentic/km-core && npx vitest run tests/integration/pipeline-candidate-pool.test.ts -t "active-only candidates"` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -70,15 +70,17 @@ created: 2026-05-21
 
 ## Wave 0 Requirements
 
-- [ ] `~/Agentic/km-core/tests/unit/_helpers/fakes.ts` — `FakeEmbeddingClient`, `MockLLMClient`, `BuildPipelineFixture`, `mkEntity`, `makeFakeExtractor`, `makeFakeSynthesizer`, `makeLayerStub`, `PROV` (created in Plan 40-01)
-- [ ] `~/Agentic/km-core/tests/unit/jaccard-matcher.test.ts` — covers `JaccardNameMatcher` (3 tests)
-- [ ] `~/Agentic/km-core/tests/unit/cosine-matcher.test.ts` — covers `CosineEmbeddingMatcher` (3 tests)
-- [ ] `~/Agentic/km-core/tests/unit/llm-matcher.test.ts` — covers `LLMSemanticMatcher` (4 tests)
-- [ ] `~/Agentic/km-core/tests/unit/layered-dedup.test.ts` — covers `LayeredDeduplicator` orchestration (6 tests)
-- [ ] `~/Agentic/km-core/tests/unit/pipeline.test.ts` — covers `IngestPipeline` contract (7 tests + 1 provenance-required throw test)
-- [ ] `~/Agentic/km-core/tests/integration/pipeline-supersession.test.ts` — Phase 39 D-33 + CR-01 integration (2 tests)
-- [ ] `~/Agentic/km-core/tests/integration/pipeline-candidate-pool.test.ts` — D-46 + Phase 39 D-34 integration (1 test)
-- [ ] `~/Agentic/km-core/tests/integration/layered-dedup-collision-catch.test.ts` — **SC#2 canonical 3-collision test** (1 test, see RESEARCH.md line 960)
+- [ ] `~/Agentic/km-core/tests/unit/_helpers/fakes.ts` — universal fakes only: `mkEntity`, `makeFakeExtractor`, `makeFakeSynthesizer`, `makeLayerStub`, `PROV` (created in Plan 40-01; per Warning #4 fix, client-specific fakes are NOT here)
+- [ ] `~/Agentic/km-core/tests/unit/_helpers/fakes-embedding.ts` — `makeFakeEmbeddingClient` (created in Plan 40-03 — co-located with EmbeddingClient interface per Warning #4)
+- [ ] `~/Agentic/km-core/tests/unit/_helpers/fakes-llm.ts` — `makeMockLLMClient` (created in Plan 40-04 — co-located with LLMClient interface per Warning #4)
+- [ ] `~/Agentic/km-core/tests/unit/jaccard-matcher.test.ts` — covers `JaccardNameMatcher` (3 tests; Plan 40-02)
+- [ ] `~/Agentic/km-core/tests/unit/cosine-matcher.test.ts` — covers `CosineEmbeddingMatcher` (3 tests; Plan 40-03)
+- [ ] `~/Agentic/km-core/tests/unit/llm-matcher.test.ts` — covers `LLMSemanticMatcher` (4 tests; Plan 40-04)
+- [ ] `~/Agentic/km-core/tests/unit/layered-dedup.test.ts` — covers `LayeredDeduplicator` orchestration (6 tests; Plan 40-05)
+- [ ] `~/Agentic/km-core/tests/unit/pipeline.test.ts` — covers `IngestPipeline` contract (7 tests + 1 provenance-required throw test; Plan 40-06a)
+- [ ] `~/Agentic/km-core/tests/integration/pipeline-supersession.test.ts` — Phase 39 D-33 + CR-01 integration (2 tests; Plan 40-06b)
+- [ ] `~/Agentic/km-core/tests/integration/pipeline-candidate-pool.test.ts` — D-46 + Phase 39 D-34 integration (1 test; Plan 40-06b)
+- [ ] `~/Agentic/km-core/tests/integration/layered-dedup-collision-catch.test.ts` — **SC#2 canonical 3-collision test** (1 test, see RESEARCH.md line 960; Plan 40-06b)
 
 **Framework install:** None — vitest 4.0.18 already pinned in km-core.
 
@@ -97,9 +99,11 @@ created: 2026-05-21
 
 - [ ] All tasks have `<automated>` verify or Wave 0 dependencies (verified by plan-checker against this map)
 - [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (9 new test files listed above)
+- [ ] Wave 0 covers all MISSING references (11 new test files listed above — 8 test files + 3 fakes helpers)
 - [ ] No watch-mode flags (`vitest run`, not bare `vitest`)
 - [ ] Feedback latency < 30s
 - [ ] `nyquist_compliant: true` set in frontmatter (gate: flip after `npm test` green at end of Phase 40 execution)
 
 **Approval:** pending (auto-flip to approved on `/gsd-verify-work` pass)
+</content>
+</invoke>
