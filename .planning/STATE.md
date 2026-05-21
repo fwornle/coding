@@ -47,6 +47,7 @@ Last activity: 2026-05-21 -- Phase 40 execution started
 - Phase 30.1 inserted after Phase 30: Cross-Project Agent-Agnostic Knowledge Injection (URGENT) — make injection work across all projects and agents with focused relevance
 - Phase 36 added: token-usage per-user hourly exports (mirror LSL conventions for git-trackable JSON)
 - v7.1 roadmap created 2026-05-19: 10 phases (37–46) covering KM-Core extraction across A/B/C systems; CORE→ONTO→DATA→PIPE foundation, then INT-01+PIPE-02→INT-02→INT-03 migration order, capped by API→UI→DOC. Phase 42 (B migration) folds in Phase 10 embeddings bug + workflow-runner.ts:469-530 race condition. Phase 43 (C migration) is cross-repo into rapid-automations.
+- Phase 47 added 2026-05-21: ObservationWriter drops user-prompt text when image attachments are present (only `[Image: source: …]` placeholders are stored). Surfaced when row `9a3e700c-…` failed automated backfill and required a manual summary; see `.planning/phases/47-…/47-CONTEXT.md` for the full bug write-up and scope.
 
 ### Decisions
 
