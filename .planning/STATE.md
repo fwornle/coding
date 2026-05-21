@@ -4,8 +4,8 @@ milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
 stopped_at: Phase 40 context gathered
-last_updated: "2026-05-21T16:16:40.235Z"
-last_activity: 2026-05-21 -- Phase 40 planning complete
+last_updated: "2026-05-21T16:27:47.204Z"
+last_activity: 2026-05-21 -- Phase 40 execution started
 progress:
   total_phases: 11
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 999.1 — extract shared llm adapter library
+**Current focus:** Phase 40 — ingest-pipeline-layered-dedup
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-21 -- Phase 40 planning complete
+Phase: 40 (ingest-pipeline-layered-dedup) — EXECUTING
+Plan: 1 of 8
+Status: Executing Phase 40
+Last activity: 2026-05-21 -- Phase 40 execution started
 
 ## Performance Metrics
 

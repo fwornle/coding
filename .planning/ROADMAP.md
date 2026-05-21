@@ -361,13 +361,13 @@ Plans:
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
 
-**Plans:** 8 plans across 6 waves *(Plan 40-06 split into 40-06a + 40-06b per planner-checker Warning #3 scope_sanity fix; Wave 4b is a sequential sub-wave after Wave 4)*
+**Plans:** 1/8 plans executed
 
 Plans:
 
 **Wave 1 (foundation — types + test scaffolding; unblocks 3-way parallelism in Wave 2)**
 
-- [ ] 40-01-PLAN.md — Pipeline + dedup public type surfaces (`src/pipeline/types.ts`, `src/dedup/types.ts`) + **universal** test fakes only (`tests/unit/_helpers/fakes.ts` — mkEntity / makeFakeExtractor / makeFakeSynthesizer / makeLayerStub / PROV). Client-specific fakes (EmbeddingClient + LLMClient) ship co-located with their matchers in Plans 40-03 / 40-04 per Warning #4 fix. PIPE-01 + DEDUP-01 type contracts; downstream layer ports compile against these.
+- [x] 40-01-PLAN.md — Pipeline + dedup public type surfaces (`src/pipeline/types.ts`, `src/dedup/types.ts`) + **universal** test fakes only (`tests/unit/_helpers/fakes.ts` — mkEntity / makeFakeExtractor / makeFakeSynthesizer / makeLayerStub / PROV). Client-specific fakes (EmbeddingClient + LLMClient) ship co-located with their matchers in Plans 40-03 / 40-04 per Warning #4 fix. PIPE-01 + DEDUP-01 type contracts; downstream layer ports compile against these.
 
 **Wave 2 (parallel — 3 disjoint layer ports)**
 
@@ -492,7 +492,7 @@ Plans:
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
-| 40. Ingest Pipeline & Layered Dedup | 0/? | Not started | - |
+| 40. Ingest Pipeline & Layered Dedup | 1/8 | In Progress|  |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
