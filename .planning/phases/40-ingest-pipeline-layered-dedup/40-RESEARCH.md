@@ -1035,27 +1035,33 @@ The canonical SC#2 test is `tests/integration/layered-dedup-collision-catch.test
 
 **If CONTEXT.md deferred-ideas PII + governance + cross-batch state are respected, the assumed claims above shrink to A1, A2, A3 — purely numeric tuning defaults that the planner can survey production configs to confirm.**
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All 4 questions locked 2026-05-21 to the researcher's recommendations. These RESOLVED choices are load-bearing for Plan 40-06 in particular (Q2 → `runStage` shape).
 
 1. **A's `ObservationConsolidator` uses an `INSIGHT_FACET_THRESHOLD` (0.83) for "facet linking" — different from "merge."** Phase 40's `LayeredDeduplicator` only has `matched: true | false`; no facet-link verdict.
    - What we know: A's facet vs merge distinction is per-system policy. The matcher can return `confidence` and let the caller decide thresholds for facet vs merge.
    - What's unclear: should `MatchResult` carry an optional `verdict: 'merge' | 'facet' | undefined` field to support A's pattern, or is that strictly Phase 41 caller-side logic?
-   - Recommendation: keep `MatchResult` minimal (`{ matched, survivor, confidence }`). Phase 41 wraps A's `CosineEmbeddingMatcher` use to interpret the confidence value as merge vs facet. Don't bake facet logic into Phase 40 — it's A-specific.
+   - **RESOLVED:** Keep `MatchResult` minimal: `{ matched: boolean, survivor?: Entity, confidence: number }`. NO `verdict` field. Phase 41 (A's migration) interprets `confidence` against `INSIGHT_FACET_THRESHOLD` caller-side. Phase 40 stays facet-agnostic.
 
 2. **D-43 `runStage(name, input, opts)` signature.** The CONTEXT example says A's daily cron calls `runStage('synthesize', todaysEntities, { provenance })`. But what's the `input` type for each stage?
    - What we know: `extract`'s input is `string`; `dedup`'s input is `Entity` + candidates; `store`'s input is `Entity[]`; `synthesize`'s input is entity IDs or entities.
    - What's unclear: does `runStage` take a union type (`string | Entity[] | EntityId[]`), or a generic `runStage<T>(name, input: T, opts)`, or 4 overloads?
-   - Recommendation: 4 typed overloads via TypeScript function overloads. Cleaner than generics, more discoverable in IDEs. Planner picks.
+   - **RESOLVED:** **4 typed TypeScript function overloads** (cost: more declaration lines; benefit: IDE autocomplete picks the right input type per stage name). Plan 40-06 Task 1 MUST implement this as overloads, NOT as a generic `runStage<T>` (which would defeat the type-discoverability point). Signatures (locked):
+     - `runStage(name: 'extract', input: string, opts: { provenance: ProvenanceStamp }): Promise<Entity[]>`
+     - `runStage(name: 'dedup', input: Entity, opts: { candidates: Entity[] }): Promise<DedupDecision>`
+     - `runStage(name: 'store', input: Entity[], opts: { provenance: ProvenanceStamp; supersedes?: Map<EntityId, EntityId> }): Promise<Entity[]>`
+     - `runStage(name: 'synthesize', input: EntityId[], opts: { provenance: ProvenanceStamp }): Promise<void>`
 
 3. **`onPhase` callback shape — should it carry `IngestResult` partial?** OKM emits only `{ stage, status, durationMs }`. CONTEXT.md adds `count?: number`. Should it also expose intermediate `IngestResult` (e.g., `extractedCount` after extract done)?
    - What we know: OKM doesn't — minimalism wins.
    - What's unclear: callers may want progress reporting (e.g., "extracted 50 entities, deduping now..."). Without intermediate counts, callers must wait for `IngestResult` at the end.
-   - Recommendation: match OKM verbatim (D-42 calls this verbatim port) — `{ stage, status, count?, durationMs? }`. Phase 41/42 can add their own callback wrappers if they need richer telemetry.
+   - **RESOLVED:** Match OKM verbatim: `(arg: { stage: 'extract'|'dedup'|'store'|'synthesize'; status: 'start'|'end'; count?: number; durationMs?: number }) => void`. NO intermediate `IngestResult`. Phase 41/42 can wrap with richer telemetry caller-side.
 
 4. **Layer order — locked or configurable?** D-44 says "Pipeline runs layers in declared order (`exactName -> embedding -> llmSemantic`)." But layers are passed as named slots in `LayeredDeduplicatorOpts`. The "declared order" is currently implicit (Jaccard first, then embedding, then LLM by cost ascending).
    - What we know: 3 named slots, run in cost-ascending order.
    - What's unclear: if a future use case wants embedding-first (e.g., paragraph-level semantic dedup where Jaccard would false-positive on shared technical vocabulary), is the order reconfigurable?
-   - Recommendation: hard-code the order in Phase 40 (matches D-44 wording). If a real use case emerges, reopen via a follow-on phase. Premature flexibility = bug factory.
+   - **RESOLVED:** **Order is hard-coded** in Phase 40: `exactName → embedding → llmSemantic` (cost-ascending). NO `order` ctor opt, NO runtime reordering. If a real use case for embedding-first emerges, reopen via a follow-on phase. Premature flexibility = bug factory.
 
 ## Sources
 
