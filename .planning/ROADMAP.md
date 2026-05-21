@@ -361,7 +361,7 @@ Plans:
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
 
-**Plans:** 1/8 plans executed
+**Plans:** 4/8 plans executed
 
 Plans:
 
@@ -371,9 +371,9 @@ Plans:
 
 **Wave 2 (parallel — 3 disjoint layer ports)**
 
-- [ ] 40-02-PLAN.md — `JaccardNameMatcher` — verbatim port of B's `calculateStringSimilarity` (deduplication.ts:436-445) + 7 unit tests. Default threshold 0.85. DEDUP-01 layer 1/3.
-- [ ] 40-03-PLAN.md — `CosineEmbeddingMatcher` + `EmbeddingClient` caller-injected interface + co-located `tests/unit/_helpers/fakes-embedding.ts` (Warning #4 fix) — verbatim port of A's `cosine()` (dedup-insights-by-embedding.js:56-64) + 7 unit tests. Default threshold 0.90. DEDUP-01 layer 2/3.
-- [ ] 40-04-PLAN.md — `LLMSemanticMatcher` + `LLMClient` caller-injected interface + co-located `tests/unit/_helpers/fakes-llm.ts` (Warning #4 fix) — verbatim port of OKM's `batchLLMDedup` prompt + 5-stage JSON unwrap (deduplicator.ts:421-475) + 9 unit tests. Default threshold 0.70, onError 'skip'. DEDUP-01 layer 3/3.
+- [x] 40-02-PLAN.md — `JaccardNameMatcher` — verbatim port of B's `calculateStringSimilarity` (deduplication.ts:436-445) + 7 unit tests. Default threshold 0.85. DEDUP-01 layer 1/3.
+- [x] 40-03-PLAN.md — `CosineEmbeddingMatcher` + `EmbeddingClient` caller-injected interface + co-located `tests/unit/_helpers/fakes-embedding.ts` (Warning #4 fix) — verbatim port of A's `cosine()` (dedup-insights-by-embedding.js:56-64) + 7 unit tests. Default threshold 0.90. DEDUP-01 layer 2/3.
+- [x] 40-04-PLAN.md — `LLMSemanticMatcher` + `LLMClient` caller-injected interface + co-located `tests/unit/_helpers/fakes-llm.ts` (Warning #4 fix) — verbatim port of OKM's `batchLLMDedup` prompt + 5-stage JSON unwrap (deduplicator.ts:421-475) + 9 unit tests. Default threshold 0.70, onError 'skip'. DEDUP-01 layer 3/3.
 
 **Wave 3 (orchestrator depends on the 3 layers)**
 
@@ -492,7 +492,7 @@ Plans:
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
-| 40. Ingest Pipeline & Layered Dedup | 1/8 | In Progress|  |
+| 40. Ingest Pipeline & Layered Dedup | 4/8 | In Progress|  |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
