@@ -361,7 +361,7 @@ Plans:
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
 
-**Plans:** 6/8 plans executed
+**Plans:** 7/8 plans executed
 
 Plans:
 
@@ -385,7 +385,7 @@ Plans:
 
 **Wave 4b (integration tests — sequential after 40-06a, depends on IngestPipeline class)**
 
-- [ ] 40-06b-PLAN.md — 3 integration test files exercising the cross-module boundaries: `pipeline-supersession.test.ts` (4 tests — Phase 39 D-33 atomic closure + CR-01 legacy-id path; VALIDATION rows 40-T20, 40-T21), `pipeline-candidate-pool.test.ts` (4 tests — D-46 + Phase 39 D-34 active-only filter; VALIDATION row 40-T22), `layered-dedup-collision-catch.test.ts` (1 test — **ROADMAP SC#2 synthetic 3-collision** with `llmClient.complete.mock.calls.length === 1` proving short-circuit through both upper layers; VALIDATION row 40-T19). PIPE-01 + DEDUP-01. No source-file changes — exercises 40-06a's IngestPipeline through real GraphKMStore instances.
+- [x] 40-06b-PLAN.md — 3 integration test files exercising the cross-module boundaries: `pipeline-supersession.test.ts` (4 tests — Phase 39 D-33 atomic closure + CR-01 legacy-id path; VALIDATION rows 40-T20, 40-T21), `pipeline-candidate-pool.test.ts` (4 tests — D-46 + Phase 39 D-34 active-only filter; VALIDATION row 40-T22), `layered-dedup-collision-catch.test.ts` (1 test — **ROADMAP SC#2 synthetic 3-collision** with `llmClient.complete.mock.calls.length === 1` proving short-circuit through both upper layers; VALIDATION row 40-T19). PIPE-01 + DEDUP-01. No source-file changes — exercises 40-06a's IngestPipeline through real GraphKMStore instances.
 
 **Wave 5 (barrel + final green gate)**
 
@@ -492,7 +492,7 @@ Plans:
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
-| 40. Ingest Pipeline & Layered Dedup | 6/8 | In Progress|  |
+| 40. Ingest Pipeline & Layered Dedup | 7/8 | In Progress|  |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
