@@ -361,7 +361,7 @@ Plans:
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
 
-**Plans:** 5/8 plans executed
+**Plans:** 6/8 plans executed
 
 Plans:
 
@@ -381,7 +381,7 @@ Plans:
 
 **Wave 4 (pipeline class + unit tests — IngestPipeline source on disk)**
 
-- [ ] 40-06a-PLAN.md — `IngestPipeline` 4-stage orchestrator class (extract → dedup → store → synthesize) + 10 unit tests (VALIDATION rows 40-T11..40-T18 + 2 extras). Pre-loads candidates via `store.findByOntologyClass` per D-46; threads `ProvenanceStamp` per CF-D30; supersession via Phase 39 `putEntity` (preserves CR-01 BatchOp.skipOntologyCheck). `runStage` declared as **4 typed function overloads** (LOCKED by RESEARCH Q2 RESOLVED — NOT a generic `<T>`). Synthesizer-input contract: matched-survivors-only per RESEARCH Example 5 line 646 verbatim. PIPE-01.
+- [x] 40-06a-PLAN.md — `IngestPipeline` 4-stage orchestrator class (extract → dedup → store → synthesize) + 10 unit tests (VALIDATION rows 40-T11..40-T18 + 2 extras). Pre-loads candidates via `store.findByOntologyClass` per D-46; threads `ProvenanceStamp` per CF-D30; supersession via Phase 39 `putEntity` (preserves CR-01 BatchOp.skipOntologyCheck). `runStage` declared as **4 typed function overloads** (LOCKED by RESEARCH Q2 RESOLVED — NOT a generic `<T>`). Synthesizer-input contract: matched-survivors-only per RESEARCH Example 5 line 646 verbatim. PIPE-01.
 
 **Wave 4b (integration tests — sequential after 40-06a, depends on IngestPipeline class)**
 
@@ -492,7 +492,7 @@ Plans:
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
-| 40. Ingest Pipeline & Layered Dedup | 5/8 | In Progress|  |
+| 40. Ingest Pipeline & Layered Dedup | 6/8 | In Progress|  |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
