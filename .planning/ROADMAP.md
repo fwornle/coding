@@ -418,7 +418,28 @@ Plans:
   3. Triggering the post-hoc resolve-entities maintenance operation on a graph containing known cross-batch duplicates of a single ontology class collapses them into one canonical entity with merged provenance.
   4. The same post-hoc resolution API endpoint is callable against A's adapter-fronted graph (proving the operation works on KM-Core regardless of whether the underlying store is graph-native or SQLite-fronted).
 
-**Plans:** TBD
+**Plans:** 7 plans across 4 waves
+
+Plans:
+
+**Wave 1 (parallel — disjoint files; no inter-plan dependencies)**
+
+- [ ] 41-01-PLAN.md — Land `/Users/Q284340/Agentic/km-core/ontology/upper.json` + `learning-artifacts.json` (LearningArtifact upper + Observation/Digest/Insight lowers via `extends`); auto-discovery + extends-chain unit tests (INT-01 + PIPE-02 — class scan default branch depends on these classes)
+- [ ] 41-02-PLAN.md — Pure mapper functions in `src/adapters/online/mapper.ts` (`mapObservationRow`/`mapDigestRow`/`mapInsightRow`) + fixture export rows + null-handling unit tests; top-level `entity.legacyId = { system: 'A', id }` per Phase 39 CF-D37 canonical placement + `entity.metadata.subsystem = 'online'` as separate discriminator (INT-01)
+- [ ] 41-03-PLAN.md — Add `GraphKMStore.getDegree(id): Promise<number>` public method + 3 unit tests pinning literal degree values; survivor-selection support for PIPE-02 (PIPE-02)
+- [ ] 41-05-PLAN.md — `mergeEntities(store, survivorId, duplicateIds, opts)` atomic primitive + 11 unit tests (atomic merge + self-loop + edge-type + WR-02 + segment fold + resolutionHistory + edge-dedupe-by-identity-key) (PIPE-02). Uses Phase 37/39 primitives only — no Phase 41 prerequisites; Plan 06 consumes this in Wave 3.
+
+**Wave 2** *(depends on Wave 1 — 41-04 depends_on 41-02 for mapper imports)*
+
+- [ ] 41-04-PLAN.md — `reprojectFromOnlineStore(store, opts)` library function + atomic checkpoint utility + adapter sub-barrel + 11 unit tests (idempotency via TOP-LEVEL legacyId scan + dryRun + resume + path-traversal + missing-dir-warning + provenance + canonical top-level legacyId + aggregation-edges + orphan-edge-warning + sources.sqlite-throw + sources.jsonExports-required-throw) (INT-01) — *depends_on: 41-02*
+
+**Wave 3** *(depends on 41-03 + 41-04 + 41-05)*
+
+- [ ] 41-06-PLAN.md — `resolveEntities(store, opts)` per-class LLM-scan orchestrator + maintenance sub-barrel + package.json `./maintenance` + `./adapters/online` exports + root barrel Phase 41 block + 11 unit tests (incl. parentChainOf-by-name default-class resolution + unmatchable-matchedTo + deterministic lex-id tie-break on name+description collisions) + external smoke-compile (PIPE-02 + INT-01)
+
+**Wave 4** *(depends on 41-06; autonomous: false — has human-verify checkpoint)*
+
+- [ ] 41-07-PLAN.md — `coding/scripts/reproject-online.mjs` operator CLI + km-core end-to-end integration test (`reproject → resolveEntities(dryRun) → real merge`) covering all 4 ROADMAP SCs + human-verify checkpoint against live `.data/observation-export/` (requires `npx tsc` exit-0 in km-core before script runs) (INT-01 + PIPE-02)
 
 #### Phase 42: Offline UKB Migration (B)
 
@@ -505,7 +526,7 @@ Plans:
 | 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
 | 40. Ingest Pipeline & Layered Dedup | 12/12 | Complete    | 2026-05-22 |
-| 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
+| 41. Online Learning Adapter & Post-Hoc Resolution | 0/7 | Planned     | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
 | 44. REST API & Git Snapshots | 0/? | Not started | - |
