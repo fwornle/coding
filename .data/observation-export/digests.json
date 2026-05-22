@@ -11960,44 +11960,6 @@
     "project": "sketcher"
   },
   {
-    "id": "da0fc95d-dcde-4ee7-b5bd-89883e7aff4a",
-    "date": "2026-05-08",
-    "theme": "Mishandled Style Guide Input, Unrelated Tmux Investigation",
-    "summary": "The developer provided a documentation style guide as context/instructions. Instead of acknowledging or applying the style guide, the assistant misinterpreted the input as a trigger to investigate unrelated tmux status-line tooling issues.\n\n- No documentation work was performed\n- No artifacts were created or modified\n- The assistant's response was entirely off-topic, investigating tmux/status-line issues irrelevant to the input\n- Root issue: failure to correctly parse developer intent from the incoming message",
-    "observationIds": [
-      "a2fbb440-1415-4cca-aafb-dd0ec402f829"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-05-14T14:09:29.404Z",
-    "metadata": {
-      "sourceCount": 1
-    },
-    "project": "coding"
-  },
-  {
-    "id": "c6608904-5e8f-46c9-b28c-a4eb9aee868b",
-    "date": "2026-05-09",
-    "theme": "ETM Restart and Server.js Investigation",
-    "summary": "At 04:17, the claude agent restarted the Enhanced Transcript Monitor (ETM) as a background process and began investigating remediation/auto-heal logic in `server.js`. No files were modified during this session — the `server.js` investigation remained incomplete at the end of the exchange.",
-    "observationIds": [
-      "cd1d0646-3a17-49a6-bec3-fde607f9e8f2"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-05-14T14:09:32.766Z",
-    "metadata": {
-      "sourceCount": 1
-    },
-    "project": "coding"
-  },
-  {
     "id": "b2aa736b-c3d4-4c45-994c-76bb559cf722",
     "date": "2026-05-10",
     "theme": "Memory Visualizer Bundle Rebuild and Server Restart",
@@ -12172,44 +12134,6 @@
     "createdAt": "2026-05-11T05:04:14.337Z",
     "metadata": {
       "sourceCount": 2
-    },
-    "project": "coding"
-  },
-  {
-    "id": "969bfa4d-3099-4d96-9f9d-ded7858423c6",
-    "date": "2026-05-10",
-    "theme": "Memory Visualizer SourceFilter Component Investigation",
-    "summary": "A screenshot was shared (likely depicting a UI or code issue) prompting an investigation into the relevant codebase.\n- Agent searched for VKB references, memory-visualizer project files, and `DataSource` component patterns.\n- Investigation narrowed to the **memory-visualizer integration project**, specifically the `SourceFilter` component and `DataSource`-related code.\n- No concrete fix or conclusion was reached; the session ended at the exploratory stage.",
-    "observationIds": [
-      "c2997bec-2850-4ada-8427-051906397809"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-05-14T14:09:39.715Z",
-    "metadata": {
-      "sourceCount": 1
-    },
-    "project": "rapid-automations"
-  },
-  {
-    "id": "6ad57752-8429-4b00-af9c-80787fcb164c",
-    "date": "2026-05-10",
-    "theme": "Cherry-Pick Approval to Unblock Phase 34-03",
-    "summary": "Developer approved proceeding with the cherry-pick plan (option a) to unblock phase 34-03 implementation.\n\n- No code changes were made during this exchange\n- Plan involves cherry-picking stranded `34-01` and `34-02` worktree commits onto `main` prior to implementing `34-03`\n- Session ended with confirmation received; execution of the cherry-pick is the expected next step",
-    "observationIds": [
-      "bda01618-a293-4945-959a-318ecbf576b5"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-05-14T14:09:39.715Z",
-    "metadata": {
-      "sourceCount": 1
     },
     "project": "coding"
   },
@@ -12645,28 +12569,6 @@
     "project": "coding"
   },
   {
-    "id": "425e21a6-09a0-4d19-bb27-352be4f5ae8e",
-    "date": "2026-05-11",
-    "theme": "Commit Status Line Script Changes to Main",
-    "summary": "Committed working changes to the repository on `main` branch (commit `2fd9301fa`), targeting two status line scripts while deliberately excluding unrelated modifications.\n- `scripts/combined-status-line.js`\n- `scripts/status-line-fast.cjs`\n\nBranch is now 3 commits ahead of `origin/main`, indicating pending push to remote.",
-    "observationIds": [
-      "1559840d-517c-488e-9de4-692173bd59a3"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [
-      "scripts/combined-status-line.js",
-      "scripts/status-line-fast.cjs"
-    ],
-    "quality": "normal",
-    "createdAt": "2026-05-14T14:09:43.718Z",
-    "metadata": {
-      "sourceCount": 1
-    },
-    "project": "rapid-automations"
-  },
-  {
     "id": "bf3738b1-06e5-46e0-bf0c-903f85cb1753",
     "date": "2026-05-12",
     "theme": "Combined Status Line Badge Failures Diagnosed and Fixed",
@@ -13033,47 +12935,6 @@
     "project": "rapid-automations"
   },
   {
-    "id": "bbb130f7-8bea-41e4-8e46-cc02cdca2335",
-    "date": "2026-05-12",
-    "theme": "Coding Statusline Health Monitoring Session",
-    "summary": "Ran a ~60-minute dynamic monitoring loop to watch for recurrence of `SYS:TIMEOUT` and coordinator-cascade failures in the coding statusline pipeline.\n- Checked `csl-failures.jsonl`, combined-status-line-cache files, and live tmux renders each iteration\n- Used `ScheduleWakeup` for self-pacing throughout the window\n- Concluded with a clean bill of health: no new failures, all cache files healthy, tmux render confirmed stable; monitoring was stopped with no further wakeups scheduled.",
-    "observationIds": [
-      "73688c97-ed32-4417-a32e-d806077a4987"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-05-14T11:09:42.310Z",
-    "metadata": {
-      "sourceCount": 1
-    },
-    "project": "rapid-automations"
-  },
-  {
-    "id": "aab7964b-780a-4657-b87f-bd2fa59de43c",
-    "date": "2026-05-12",
-    "theme": "Status-Line Docs Update and Push to Remote",
-    "summary": "Resumed and completed an in-progress documentation update for the status-line guide, then pushed changes to remote.\n- Edited `/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md`\n- Added documentation on badge degradation behavior during idle sessions\n- Documented the 3-stage latency chain (~90s worst-case end-to-end)\n- Clarified the semantic distinction between idle and broken pipeline states\n- Changes successfully pushed to `origin/main`; branches are now in sync.",
-    "observationIds": [
-      "db4309c1-7a7a-4b24-b482-750f58bdd572",
-      "b1650c90-dbcf-4a39-9c33-e13b5b897fe3"
-    ],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [
-      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
-    ],
-    "quality": "high",
-    "createdAt": "2026-05-14T11:09:42.310Z",
-    "metadata": {
-      "sourceCount": 2
-    },
-    "project": "rapid-automations"
-  },
-  {
     "id": "685de6cf-74fa-48de-84cc-5f12b1b625d3",
     "date": "2026-05-13",
     "theme": "Trajectory Cleanup Phase D: Commit Clean Files",
@@ -13181,6 +13042,145 @@
     ],
     "quality": "high",
     "createdAt": "2026-05-13T04:46:13.610Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "da0fc95d-dcde-4ee7-b5bd-89883e7aff4a",
+    "date": "2026-05-08",
+    "theme": "Mishandled Style Guide Input, Unrelated Tmux Investigation",
+    "summary": "The developer provided a documentation style guide as context/instructions. Instead of acknowledging or applying the style guide, the assistant misinterpreted the input as a trigger to investigate unrelated tmux status-line tooling issues.\n\n- No documentation work was performed\n- No artifacts were created or modified\n- The assistant's response was entirely off-topic, investigating tmux/status-line issues irrelevant to the input\n- Root issue: failure to correctly parse developer intent from the incoming message",
+    "observationIds": [
+      "a2fbb440-1415-4cca-aafb-dd0ec402f829"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:29.404Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c6608904-5e8f-46c9-b28c-a4eb9aee868b",
+    "date": "2026-05-09",
+    "theme": "ETM Restart and Server.js Investigation",
+    "summary": "At 04:17, the claude agent restarted the Enhanced Transcript Monitor (ETM) as a background process and began investigating remediation/auto-heal logic in `server.js`. No files were modified during this session — the `server.js` investigation remained incomplete at the end of the exchange.",
+    "observationIds": [
+      "cd1d0646-3a17-49a6-bec3-fde607f9e8f2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:32.766Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "969bfa4d-3099-4d96-9f9d-ded7858423c6",
+    "date": "2026-05-10",
+    "theme": "Memory Visualizer SourceFilter Component Investigation",
+    "summary": "A screenshot was shared (likely depicting a UI or code issue) prompting an investigation into the relevant codebase.\n- Agent searched for VKB references, memory-visualizer project files, and `DataSource` component patterns.\n- Investigation narrowed to the **memory-visualizer integration project**, specifically the `SourceFilter` component and `DataSource`-related code.\n- No concrete fix or conclusion was reached; the session ended at the exploratory stage.",
+    "observationIds": [
+      "c2997bec-2850-4ada-8427-051906397809"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:39.715Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "6ad57752-8429-4b00-af9c-80787fcb164c",
+    "date": "2026-05-10",
+    "theme": "Cherry-Pick Approval to Unblock Phase 34-03",
+    "summary": "Developer approved proceeding with the cherry-pick plan (option a) to unblock phase 34-03 implementation.\n\n- No code changes were made during this exchange\n- Plan involves cherry-picking stranded `34-01` and `34-02` worktree commits onto `main` prior to implementing `34-03`\n- Session ended with confirmation received; execution of the cherry-pick is the expected next step",
+    "observationIds": [
+      "bda01618-a293-4945-959a-318ecbf576b5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:39.715Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "425e21a6-09a0-4d19-bb27-352be4f5ae8e",
+    "date": "2026-05-11",
+    "theme": "Commit Status Line Script Changes to Main",
+    "summary": "Committed working changes to the repository on `main` branch (commit `2fd9301fa`), targeting two status line scripts while deliberately excluding unrelated modifications.\n- `scripts/combined-status-line.js`\n- `scripts/status-line-fast.cjs`\n\nBranch is now 3 commits ahead of `origin/main`, indicating pending push to remote.",
+    "observationIds": [
+      "1559840d-517c-488e-9de4-692173bd59a3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/combined-status-line.js",
+      "scripts/status-line-fast.cjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-14T14:09:43.718Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "bbb130f7-8bea-41e4-8e46-cc02cdca2335",
+    "date": "2026-05-12",
+    "theme": "Coding Statusline Health Monitoring Session",
+    "summary": "Ran a ~60-minute dynamic monitoring loop to watch for recurrence of `SYS:TIMEOUT` and coordinator-cascade failures in the coding statusline pipeline.\n- Checked `csl-failures.jsonl`, combined-status-line-cache files, and live tmux renders each iteration\n- Used `ScheduleWakeup` for self-pacing throughout the window\n- Concluded with a clean bill of health: no new failures, all cache files healthy, tmux render confirmed stable; monitoring was stopped with no further wakeups scheduled.",
+    "observationIds": [
+      "73688c97-ed32-4417-a32e-d806077a4987"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-14T11:09:42.310Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "rapid-automations"
+  },
+  {
+    "id": "aab7964b-780a-4657-b87f-bd2fa59de43c",
+    "date": "2026-05-12",
+    "theme": "Status-Line Docs Update and Push to Remote",
+    "summary": "Resumed and completed an in-progress documentation update for the status-line guide, then pushed changes to remote.\n- Edited `/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md`\n- Added documentation on badge degradation behavior during idle sessions\n- Documented the 3-stage latency chain (~90s worst-case end-to-end)\n- Clarified the semantic distinction between idle and broken pipeline states\n- Changes successfully pushed to `origin/main`; branches are now in sync.",
+    "observationIds": [
+      "db4309c1-7a7a-4b24-b482-750f58bdd572",
+      "b1650c90-dbcf-4a39-9c33-e13b5b897fe3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/guides/status-line.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-14T11:09:42.310Z",
     "metadata": {
       "sourceCount": 2
     },
@@ -15772,6 +15772,56 @@
     "project": "coding"
   },
   {
+    "id": "1daf4ef4-f196-42d2-84ef-512aaf6f99de",
+    "date": "2026-05-15",
+    "theme": "Fix Statusline Freshness: OpenCode Specstory Transcript Support",
+    "summary": "Diagnosed and fixed a bug where the tmux status bar displayed 💤 instead of 🟢 for an actively running OpenCode session in the \"coding\" project.\n\n- **Root cause:** `transcriptAgeMs()` in `combined-status-line.js` only scanned Claude `.jsonl` files, completely ignoring OpenCode's `.specstory/history/` files, causing it to read a stale 24h+ Claude transcript instead of the fresh OpenCode one.\n- **Fix:** Extended both `transcriptAgeMs()` and the sidecar writer in `combined-status-line.js` to scan `.specstory/history/` in addition to Claude `.jsonl` files, accumulating the freshest age across **all** sources before returning (no early exit on Claude-only hits).\n- Result: The sidecar now correctly selects the most recently modified transcript regardless of agent format; the statusline icon flipped to 🟢 on the next refresh cycle.",
+    "observationIds": [
+      "ab05766a-7f1b-4894-b134-7c5d8f1ee33b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "combined-status-line.js (transcriptAgeMs function and sidecar writer to include .specstory/history/ scanning)"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-19T10:04:20.151Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "68700dc0-5f15-4027-99cd-e5de009b1cd3",
+    "date": "2026-05-15",
+    "theme": "LLM Proxy Token Usage Logging and Dashboard Implementation",
+    "summary": "Across three closely related observation captures (all at 04:49), added end-to-end token usage telemetry to the LLM proxy and built a new health monitor dashboard tab to visualize consumption.\n\n**Backend instrumentation (`integrations/llm-proxy/server.ts` / `integrations/llm-cli-proxy/src/server.ts`):**\n- Added `initTokenDb` and `logTokenUsage` functions backed by `better-sqlite3` (already a dependency) to persist every LLM call with: model, provider, subscription type, logical `process` label, and input/output token counts.\n- Exposed new REST endpoints: `/api/token-usage/summary`, `/api/token-usage/recent`, `/api/tokens/timeline`, `/api/tokens/summary` for frontend aggregation.\n- Added `process` and `subscription` fields to the `CompletionRequest` type.\n- Updated multiple LLM caller files throughout the codebase to pass a `process` identifier on each request.\n\n**Frontend (`dashboard/src/pages/token-usage.tsx`, `dashboard/src/App.tsx`):**\n- Created a new \"Token Usage\" tab in the health monitor dashboard using Recharts (already installed).\n- Wired into the existing router and nav bar via edits to `dashboard/src/App.tsx`.\n- Visualizes totals, breakdowns by process/model/provider, and a recent-calls table.\n\n**Result:** 15 live calls were captured and confirmed in SQLite during implementation. Earlier attempts saw the dashboard page write fail; the final state (observation [4]) has the full page successfully scaffolded and the proxy instrumentation fully functional.",
+    "observationIds": [
+      "b08ebb28-5189-4102-92a8-d604e7cfd6eb",
+      "da5a0b47-0a8c-4f65-bfdd-4239aa16767c",
+      "6db7b48b-297d-42d0-82e3-dc4674872594"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "integrations/llm-cli-proxy/src/server.ts (SQLite init",
+      "integrations/llm-proxy/server.ts (added logTokenUsage",
+      "dashboard/src/pages/token-usage.tsx",
+      "dashboard router and nav to register new route",
+      "integrations/llm-proxy/server.ts",
+      "dashboard/src/App.tsx (router + nav)",
+      "multiple LLM caller files to pass process identifiers"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-19T10:04:20.151Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
     "id": "f88f69e4-4d92-4c1d-afe7-3dacd7caf0e1",
     "date": "2026-05-16",
     "theme": "LLM Health Probe Prompt Optimized to Minimize Token Usage",
@@ -16805,5 +16855,1033 @@
       "sourceCount": 2
     },
     "project": "coding"
+  },
+  {
+    "id": "f1ec2d99-aa54-47fe-9fcf-2bcb0d22a0da",
+    "date": "2026-05-18",
+    "theme": "Docker Container Port Mapping Recovery and Conflict Resolution",
+    "summary": "Investigated a health check failure where the `coding-services` Docker container was running but had no ports published to the host, causing service inaccessibility.\n\n**Root causes identified:**\n- Container was started without host port bindings (likely started without `docker compose up` or with a stale config)\n- A conflicting host-side dashboard process was occupying port `3033`, blocking container port binding\n\n**Actions taken:**\n- Force-recreated the container via `docker compose` to reapply port mappings\n- Stopped the conflicting host dashboard process to free port `3033`\n\n**Result:** Container restarted with correct port bindings restored:\n- `3030` — constraint-dashboard Next.js frontend\n- `3031` — dashboard API (`dashboard-server.js`)\n- `3848` — (service endpoint)\n- `8080` — (service endpoint)\n\nAgent: **opencode**",
+    "observationIds": [
+      "cab10f44-2064-440f-bc9f-e857a946d581"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:04:32.704Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "74cd99fb-c54c-4b3b-8913-b3c1beddd20b",
+    "date": "2026-05-19",
+    "theme": "Session continuity context loaded from LSL history files",
+    "summary": "At the start of the day (04:22) and again mid-session (07:20), the assistant loaded recent LSL files from `.specstory/history/` to re-establish context continuity from prior sessions. Both reads targeted the coding project's 2026-05-18/2026-05-19 session window. The 04:22 load incidentally touched `settings.json` as part of context setup; the 07:20 load covered the 0600–1000 timeframe to prime context before continuing Phase 37 architecture work.",
+    "observationIds": [
+      "92167117-5ea3-4cc3-a66f-832d24faf89b",
+      "207c86c9-f67d-412f-8a1e-c2026d9f2a0e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/settings.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/37-km-core-foundation/37-VALIDATION.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a1254fca-f14b-4f7d-87c0-861f025a666b",
+    "date": "2026-05-19",
+    "theme": "Claude Code skills budget fraction doubled to 2%",
+    "summary": "Two overlapping observations capture a single config change: `skillListingBudgetFraction` was raised from the default 1% to 2% in `~/.claude/settings.json`, doubling the context-window fraction reserved for skill listings. Obs 2 is an incomplete record; obs 3 is the confirmed outcome — the field was set to `0.02` via direct JSON merge because `/config` does not expose this setting.",
+    "observationIds": [
+      "1ae64854-a1dc-4a96-b94f-81bb2ec57ee3",
+      "8f81ee12-4dcd-4a12-9338-fb40124d100b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/settings.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "501b01b4-49b4-471a-bf19-64eb1b6227f1",
+    "date": "2026-05-19",
+    "theme": "Git diff review and three-way logical commits landed",
+    "summary": "The session opened with a `git diff` review to categorise uncommitted changes before committing. Changes spanned:\n- `scripts/health-coordinator.js`: CN/VPN detection via TCP latency, location rename `home→open`, fresh DNS resolver, auto-enable proxy env vars\n- `integrations/system-health-dashboard/server.js`: new network/proxy violation kinds\n- `scripts/combined-status-line.js`: location map update\n- Auto-generated data export files under `.data/observation-export/` and `.data/knowledge-export/`\n\nFiles were split into three logical commits per project convention: (1) health fix, (2) observation export refresh, (3) `coding.json` knowledge sync. The pre-commit hook rejected an initial combined attempt, forcing the knowledge/observation split.",
+    "observationIds": [
+      "a7191d0e-f4b5-40f1-8345-bfbf729a1add",
+      "ef337979-ac25-43bf-9d79-19b9adab2940",
+      "14fbd341-d61d-4bae-ae63-9584f7fd930f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "scripts/health-coordinator.js",
+      "integrations/system-health-dashboard/server.js",
+      ".data/observation-export/digests.json",
+      ".data/observation-export/insights.json",
+      ".data/observation-export/metadata.json",
+      ".data/knowledge-export/coding.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9dc705ea-590f-4021-9cac-2f348d84c463",
+    "date": "2026-05-19",
+    "theme": "Online learning `[📚]` badge adopts bubble lifecycle color semantics",
+    "summary": "The `[📚]` health badge in `scripts/combined-status-line.js` was redesigned so that a cooling-down project (no recent LSL input) displays bubble-lifecycle colors (🟠→🟤→⚫→💤) rather than yellow. Yellow/red are now reserved for genuine pipeline impairment during **active** sessions; `unreachable` still forces a yellow override. The implementation reuses the existing `lsl[*].transcriptPath` mtime signal already driving project bubbles. Committed as `af79fd15a` and verified live in tmux without width regression.",
+    "observationIds": [
+      "6b304663-c740-49ca-a6f9-6ea963dc89b5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8bd32ab0-5c55-4b7f-b0c8-f662e0f27c1e",
+    "date": "2026-05-19",
+    "theme": "v7.1 Knowledge Management Unification milestone and requirements created",
+    "summary": "The GSD `new-milestone` workflow was run end-to-end to initialise milestone v7.1 (Knowledge Management Unification):\n- Loaded `PROJECT.md` history, prompted for goals, and wrote a comparison research doc\n- `.planning/PROJECT.md` updated with the v7.1 milestone entry\n- `.planning/REQUIREMENTS.md` created with **16 requirements** across 9 categories: core types, ontology, consolidation pipeline, deduplication, data model, query API, viewer, per-system integration, documentation\n- Scope: extracting a shared KM-Core from three divergent knowledge-management systems\n\nObs 10 represents an early follow-on probe into whether the OKB ingestion pipeline has a distinct 5th entity-resolution step; the exchange was cut off before a conclusion, but `REQUIREMENTS.md` was touched — suggesting a requirement was added or amended as a result.",
+    "observationIds": [
+      "34f6e1d4-2c02-4dcb-ad8a-337914e71fd5",
+      "85b0820c-f97f-4f65-8b56-e949878a5537",
+      "88bf6275-8e89-4fb3-a33d-95a00724f339"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/REQUIREMENTS.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a7912145-f5d2-4a01-9db4-f2341f670161",
+    "date": "2026-05-19",
+    "theme": "Phase 37 KM-Core discuss-phase: architecture locked as public git submodule",
+    "summary": "The GSD `discuss-phase` workflow was run for Phase 37 (KM-Core Foundation). Obs 11 initiated the session, loading the ROADMAP and skipping already-decided items to focus on remaining open questions. Obs 13–20 are heavily overlapping records of a single converged architectural decision, likely reflecting several checkpoint-write retries.\n\n**Locked decisions captured in `.planning/phases/37-km-core-foundation/37-DISCUSS-CHECKPOINT.json`:**\n- KM-Core lives in its own **public standalone repo** at `~/Agentic/km-core/` — the public/corporate visibility conflict rules out embedding it in either consuming project\n- Consumed via **git submodule** mounted at `integrations/km-core`, following the existing `integrations/<name>` convention in `coding/.gitmodules`\n- Repository convention: `github.com/fwornle/km-core`; npm publishing deferred beyond v7.1\n- Carried-forward locked items: LevelDB+Graphology+JSON stack, ESM/Node 22/TS 5.8, `lib/` placement, backwards-compat paths, OKM packaging deferred to Phase 43\n\nUUID scheme and migration strategy identified as the next open decisions to resolve.",
+    "observationIds": [
+      "3fbf7bca-271e-4349-b134-21750c6bfde7",
+      "49f2d388-1b95-4c92-9363-0fd782d9fa1a",
+      "5abccb91-c222-4270-979f-e6f288b2c2fd",
+      "0333903e-caaa-4994-8b6e-7523270c022d",
+      "e57981e4-ebd2-4467-8ed5-f8822f711ee1",
+      "942ecc29-1de5-4cb3-a019-6ca928bfb845",
+      "c9457b3a-6ad6-4453-9106-df1be0b906a8",
+      "73b431d4-1dad-483b-9e5c-211fdae194ec",
+      "e6b1f55c-205c-470a-b359-7cecc2c01209"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_skill_naming.md",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_claude_cli_env_sanitize.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/37-km-core-foundation/37-DISCUSS-CHECKPOINT.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 9
+    },
+    "project": "coding"
+  },
+  {
+    "id": "eddfd5c9-12e5-4b3d-9df8-20944b744a3a",
+    "date": "2026-05-19",
+    "theme": "LLM routing settings dialog layout fixed and dashboard questions answered",
+    "summary": "Investigation and fix of the LLM Routing Settings dialog in `integrations/system-health-dashboard/src/pages/token-usage-settings-dialog.tsx`:\n- Obs 21–22: Located the relevant component; no changes made during discovery\n- Obs 23: Fixed clipping bug — switched to a flex-column layout with an overflow-scrollable middle region so the header and footer remain pinned while the table scrolls independently\n\nObs 28 committed this dialog fix alongside pending proxy-bridge changes, then answered three dashboard questions from code context:\n- **Model name inconsistency** in provider dropdown: stale legacy data from old subprocess path\n- **Plan E** (input / cache_read / cache_create 3-column split): **not yet implemented**\n- **~50:50 treemap split**: explained by the 24h window mixing pre-fix (14.9K token) and post-fix (13 token) records; switching to \"Last 1h\" shows correct post-fix data\n\nFollow-up tasks queued: refresh model map, unify dropdown names, implement Plan E.",
+    "observationIds": [
+      "348eb256-323d-453b-9b33-44553f962655",
+      "7767eb52-23d8-4232-af0d-baec1df98869",
+      "fc771110-6058-4fc2-a032-df9c7123b173",
+      "d04dad2e-c4bd-4702-90e2-b2a9a8c2285c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage-settings-dialog.tsx",
+      "proxy-bridge/server.mjs (rapid-llm-proxy repo)",
+      "integrations/system-health-dashboard/src/pages/token-usage-settings-dialog.ts (coding repo)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "eb990c13-06d1-4f96-b443-2c3d4b5646f7",
+    "date": "2026-05-19",
+    "theme": "LLM proxy OAuth probes, env-key bug, and intra-provider 429 fallback fix",
+    "summary": "A multi-phase investigation and fix session covering the proxy bridge and observation pipeline:\n\n**Phase 1 — CLI probes and env-key bug (obs 24–27):**\n- Probed `--bare` flag (incompatible with Max subscription; forces API key auth) and `--system-prompt` for overriding system prompts\n- Discovered the probe was invalid: `ANTHROPIC_API_KEY` present in env caused billing against API key prepay balance instead of the OAuth Max subscription\n- Saved env-sanitization lesson to `memory/feedback_claude_cli_env_sanitize.md`\n- Added OAuth keychain helpers and `completeClaudeCodeDirect()` to `rapid-llm-proxy/proxy-bridge/server.mjs`\n\n**Phase 2 — Observation pipeline failure diagnosed (obs 29–30):**\n- Observation summaries failing since 10:07 AM due to **HTTP 429 on claude-code/sonnet**, producing `[Raw]` placeholders\n- Brain probe (`🧠✅`) falsely reported healthy because it was hardcoded to test **haiku only**, masking the sonnet failure entirely\n\n**Phase 3 — Intra-provider fallback implemented (obs 31–34):**\n- Confirmed CLI/spawn path lands in a **different Anthropic rate-limit bucket** than direct OAuth bearer calls (~2.9s on sonnet via CLI vs. 429 on direct OAuth)\n- Updated `server.mjs` to distinguish 429 rate-limit errors from auth errors; fallback ladder is now: direct claude-code OAuth → CLI/spawn (same Max subscription) → Copilot cross-provider as last resort only\n- Sonnet confirmed working via CLI path with `cache_read` tokens; worker pool for CLI path deferred as a follow-up phase",
+    "observationIds": [
+      "a4a68820-1049-41f5-89d9-d573c2167e29",
+      "ac554604-9197-401c-a198-8744655e9948",
+      "0ddc807f-1d97-46f2-a6b4-ed68f0813ed7",
+      "a1a36dc2-d2cf-4a3e-bf46-6be89e141f85",
+      "d337aa4d-6455-4f39-b923-51e961112a3d",
+      "4cb56dbc-bbc7-46b8-8ded-8f52a0228acb",
+      "8b98834b-867c-4e8e-a4af-4f08b12cf985",
+      "8e58797a-2b75-4f6a-8ffa-8771f960f832",
+      "c555fc41-84a5-4df8-8983-6d3025fb8188",
+      "37ff3b04-609a-4d80-94db-c2584c0b944b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_claude_cli_env_sanitize.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/MILESTONES.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/research/v7.2-llm-proxy-perf-worker-pool.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs/puml/llm-cli-proxy-architecture.puml",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/integrations/llm-cli-proxy.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/health-monitoring.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/docs-content/architecture/llm-architecture.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/37-km-core-foundation/37-DISCUSS-CHECKPOINT.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-raw-observations.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 10
+    },
+    "project": "coding"
+  },
+  {
+    "id": "83f573e8-3873-48c4-bb62-8f6031e8501c",
+    "date": "2026-05-19",
+    "theme": "Phase 37 KM-Core plan-phase workflow invoked with forced research refresh",
+    "summary": "The GSD `plan-phase` workflow was invoked for Phase 37 with the `--research` flag to force re-research before generating `PLAN.md`. The orchestrator was intended to spawn `gsd-phase-researcher` unconditionally, then run the planner and verification loop. The exchange was truncated — tool calls were initiated but no completed artifacts or final `PLAN.md` were recorded. Files listed as edited (`server.mjs`, `health-coordinator.js`, `backfill-raw-observations.mjs`) appear to be carryover references from the prior proxy session rather than new changes from this workflow run.",
+    "observationIds": [
+      "d0f3d76f-8518-45ea-bea0-5219d39f9ec4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-raw-observations.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "dd3be278-38f8-4a5c-95c3-0dbbd5c80c44",
+    "date": "2026-05-19",
+    "theme": "Dual Semantic Probe with Three-State Statusline Indicator",
+    "summary": "**Goal:** Extend the health coordinator with a stronger semantic probe (sub-task 3b) and surface partial semantic failure distinctly in the tmux statusline.\n\n**Approach:**\n- Added `pollProxySemanticStrong()` to the health coordinator, scheduled in parallel with the existing cheap probe on the poll cycle\n- Exposed a new `semantic_strong_ok` boolean field in the coordinator's `/health/state` output\n- Updated the statusline to consume `semantic_strong_ok` and render a three-state semantic health signal:\n  - ✅ Full health: both probes pass\n  - 🧠⚠️ Partial (amber): cheap probe passes, strong probe fails\n  - ❌ Full failure: both probes fail\n\n**Files changed:**\n- `scripts/health-coordinator.js` — added `pollProxySemanticStrong()` function and scheduler integration\n- `scripts/combined-status-line.js` — added amber `[🧠⚠️]` rendering branch for partial semantic state\n\n**Result:** The statusline now distinguishes between three semantic health states, preventing false-green signals when the cheap probe passes but deeper LLM reasoning is degraded.",
+    "observationIds": [
+      "dcae7d4b-7fdb-4427-9fe9-d34d821ecce7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-19T10:06:59.157Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fc0ab621-b71e-4b4a-887c-73934eb381de",
+    "date": "2026-05-19",
+    "theme": "Consolidation Endpoint 502 Diagnosis and Async Fix Investigation",
+    "summary": "Two sequential sessions investigating a stuck \"Consolidating...\" spinner and 502 error on the `/api/consolidation/run` endpoint at port 3033.\n\n**Root cause (obs 1):** The system was not crashed — it was running slowly due to sonnet rate-limit 429s forcing CLI fallbacks (~10–14s per call). Both the consolidation process and the observation-writer were competing for the same LLM quota, causing the reverse-proxy to time out and return a 502. The frontend spinner was simply stale UI state while backend work continued normally.\n\n**Planned fix — F1 (obs 2):** Make the consolidation POST non-blocking by returning a `202 Accepted` immediately instead of awaiting the full run, then relying on the existing frontend polling loop to track progress.\n- Traced the full flow: frontend polling logic → dashboard backend forwarding → `observations-api-server.mjs` obs-api endpoint\n- Confirmed the frontend polling mechanism already exists and is compatible with a 202-based approach\n- Identified `observations-api-server.mjs` as the target for the async change\n- No code changes committed yet — investigation phase complete, implementation pending\n\n**Artifacts touched:** `37-VALIDATION.md`, `observations-api-server.mjs`",
+    "observationIds": [
+      "3d65c4f8-35a0-4bcc-a720-28188ccbbda2",
+      "a21f09e9-771e-4c06-a2cd-7562483d5660"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/37-km-core-foundation/37-VALIDATION.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-19T12:07:23.855Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ed760528-53fd-4dff-85ba-a0af68d93fde",
+    "date": "2026-05-19",
+    "theme": "Phase 37 Orchestration: Wave-Based Plan Discovery",
+    "summary": "The orchestrator agent initiated Phase 37 execution using the wave-based parallel execution strategy defined in the execute-phase workflow.\n\n- Read the GSD SDK context and phase plan index to discover available plans and analyze inter-plan dependencies\n- No active flags were present, so the full standard execution flow applied\n- Wave grouping was still in progress at the end of the exchange — **no plans were executed and no files were modified** during this session\n- Files identified for eventual modification include: `observations-api-server.mjs`, `digests.tsx`, `consolidation-progress.tsx`, `insights.tsx`, and `health-coordinator.js`\n\nThis observation captures the discovery/planning phase only; actual execution was deferred.",
+    "observationIds": [
+      "90f8e146-6e21-442e-a9d9-7ef8ad38e05a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/digests.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/consolidation-progress.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/insights.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:12:10.090Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9f46685f-6778-4db2-a6be-b48ed0208bf2",
+    "date": "2026-05-19",
+    "theme": "Health Coordinator Real-Traffic Gate Fixed via Synchronous Proxy Signal",
+    "summary": "The health coordinator's real-traffic gate was broken because it relied on `knowledge_pipeline.lastObservationAt` — a signal that lags actual LLM call completion by **10–15 seconds** due to the observation-writer's own internal LLM call before writing to the DB.\n\n**Root cause & fix:**\n- Replaced the lagged `lastObservationAt` DB signal with a query to the proxy's token-usage DB, which records call timestamps **synchronously on completion**\n- To enable targeted querying, an optional `process` query parameter was added to the `/api/token-usage/recent` endpoint via an in-memory filter on the server side\n\n**Files changed:**\n- `rapid-llm-proxy/proxy-bridge/server.mjs` — added `process` query filter to `/api/token-usage/recent`\n- `scripts/health-coordinator.js` — updated real-traffic gate to query the proxy endpoint for the last observation-writer call timestamp instead of reading `lastObservationAt`\n\nThe gate now uses an accurate, synchronous signal, ensuring it correctly engages after the cadence change fix. Both changes were made at 13:33 by the same agent in a coordinated, two-part fix.",
+    "observationIds": [
+      "6dc62336-ae0f-4057-aa75-dd5fcbe8817c",
+      "74eedead-bbf4-4881-be27-a7017714ff43"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:12:10.090Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "dbc79b3f-40c5-4b09-b30d-96da07035cbf",
+    "date": "2026-05-20",
+    "theme": "Phase 37 KM-Core Foundation: Context Recovery and Plan Execution",
+    "summary": "Following a machine crash, the session focused on recovering context and completing the remaining Phase 37 plans.\n\n- [1] Loaded recent LSL files to reestablish continuity: Phase 37 in progress, Plan 37-01 skeleton committed but Tasks 2–5 pending; a continuation agent's status was unconfirmed.\n- [2] Investigated git state of `km-core`: Task 1 committed, Task 2 files (4 fixtures + B→Graphology converter) present on disk but **uncommitted**, Task 3 not yet started.\n- [3] Orchestrated execution of plans 37-02 through 37-05; dependency analysis found a strict sequential chain with no parallelization opportunity, resulting in single-plan waves 2→3→4→5.\n- Primary artifact touched throughout: `server.mjs`.",
+    "observationIds": [
+      "bae4b5cf-3d87-4c96-b01c-7397d704f3c3",
+      "31d5a3b7-5c26-49e3-a382-4bd75206e608",
+      "538da826-3650-4feb-87b2-2816245ab6a2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "625d7b4d-0689-47db-821b-38a06a91b98d",
+    "date": "2026-05-20",
+    "theme": "Phase 38 Ontology Registry: Discuss-Phase Scouting and Plan-Phase Gate Resolution",
+    "summary": "This group covers the full setup pipeline for Phase 38 (Ontology Registry), from codebase scouting through context lock confirmation to plan-phase gate resolution.\n\n- [4] Ran the discuss-phase workflow: loaded discuss-phase.md, scouted ontology files, `ROADMAP.md`, `REQUIREMENTS.md`, and prior `CONTEXT.md` files — session ended mid-process before `38-CONTEXT.md` was written.\n- [5] A fresh context-load confirmed that Phase 37 is fully complete and Phase 38 context is now **locked** with four design decisions resolved (D-26 through D-29); project ready for `/gsd-plan-phase 38`.\n- [6] Ran `gsd-plan-phase` for Phase 38: gate resolution determined CONTEXT.md already exists (skip discuss-phase), research disabled in config (skip Nyquist), no UI/AI-SPEC/ORM indicators found; pattern-mapper queued to run before planner.\n- Files edited: `38-CONTEXT.md`, `health-coordinator.js`.",
+    "observationIds": [
+      "e1b77601-d27f-4eeb-a6b8-b12e3f6254e3",
+      "900076f2-4faa-4d8c-ae06-e874c4a41d62",
+      "d8ad6ed6-099b-4f37-866e-f1de5e2a1ac2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/38-ontology-registry/38-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6aa8883a-173c-48e5-bde4-5dba25e8bb1d",
+    "date": "2026-05-20",
+    "theme": "GSD Command Nomenclature Correction: Colon to Hyphen Format",
+    "summary": "Two near-simultaneous observations address the same recurring mistake: the agent was suggesting deprecated `/gsd:command` (colon) syntax instead of the correct `/gsd-command` (hyphen) format.\n\n- [7] Created a memory file at `feedback_gsd_command_nomenclature.md` documenting the correct convention (e.g. `/gsd-execute-phase` not `/gsd:execute-phase`).\n- [8] Discovered a pre-existing `feedback_gsd_skill_naming.md` already capturing the same rule; removed the duplicate and committed to translating any colon-form references found inside workflow files into hyphen-form before surfacing them to the user.\n- Both observations edited the same memory file: `/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_command_nomenclature.md`.",
+    "observationIds": [
+      "e93a3159-5a23-478b-b4eb-6a83fbf52657",
+      "701074e5-1eb0-49d0-a4dd-0f04b984d91e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_command_nomenclature.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "35872742-bac9-41b6-9c6f-998b74906afc",
+    "date": "2026-05-20",
+    "theme": "Phase 38 Ontology Registry: Full Sequential Execution and Remote Push",
+    "summary": "Completed Phase 38 end-to-end: all six plans executed and changes pushed to the remote `km-core` repository.\n\n- [9] Executed plans 38-01 through 38-06 sequentially across 5 waves (no parallelism allowed due to shared git index on the external km-core repo), covering: types/loader, test fixtures, `OntologyRegistry` class, `registryBackedValidator` factory, `GraphKMStore` integration, and the full test layer verifying all four success criteria.\n- [10] Confirmed 11 pending local commits, then pushed Phase 38 changes from local `km-core` `main` to `origin/main` successfully.\n- Files edited: `health-coordinator.js`, `ObservationWriter.js`.",
+    "observationIds": [
+      "102afa0d-814b-42f1-801c-e8e0cacca862",
+      "69d47737-a6b7-4502-8652-991ab2a691b5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2a157bf7-623e-4164-adea-103d5ea35d9d",
+    "date": "2026-05-20",
+    "theme": "Phase 39 Entity Data Model: Identification, Discuss-Phase, and CONTEXT.md Authoring",
+    "summary": "This group covers the full Phase 39 (Entity Data Model — temporal validity and structured provenance, requirements DATA-01/DATA-02) kickoff, from initial identification through discuss-phase execution and CONTEXT.md creation.\n\n- [11, 12] Duplicate identification step (both at 10:43): confirmed no phase 39 planning files exist yet; phase targets writer semantics for the already-declared entity shape and four provenance subtypes; standard discuss → plan → execute flow to follow.\n- [13] Ran the discuss-phase workflow at 10:46: scouted existing `km-core` structures locked in Phase 37, surfaced three undecided implementation areas — **writer stamping mechanics**, **supersession chain IDs**, and **legacy A/B entity backfill** — and presented them for user selection before writing any context file.\n- [14, 15] Retried the discuss-phase at 12:28 after apparent stall; successfully created `/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/39-entity-data-model/39-CONTEXT.md` scoped to the \"Per-segment provenance writer\" topic; prepared to write the accompanying `DISCUSSION-LOG.md`.\n- Files edited: `health-coordinator.js`, `ObservationWriter.js`, `39-CONTEXT.md`.",
+    "observationIds": [
+      "b85e35d0-d971-4f23-93d4-97a56f9bc430",
+      "e40bdd31-cf49-49ae-b981-f4abed79ed49",
+      "064276dc-22a0-4193-b015-a3403b81ddfe",
+      "88388b26-c5f1-42fd-8b95-b5ee74315472",
+      "d3f290b2-e154-49d6-9d96-83aaec7e9716"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/39-entity-data-model/39-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d829aa99-1768-4a70-b831-4240d195eb45",
+    "date": "2026-05-20",
+    "theme": "Phase 39 Entity Data Model: Plan-Phase Workflow Initiated",
+    "summary": "Kicked off the `plan-phase` orchestration workflow for Phase 39.\n\n- Read `plan-phase.md` orchestrator instructions and the existing `39-CONTEXT.md` to understand scope.\n- Confirmed phase is in **Pending** state: `CONTEXT.md` present, but neither `RESEARCH.md` nor `PLAN.md` exist yet.\n- Orchestrator is positioned to proceed into the research step next before spawning the planner and verifier subagents.\n- No artifacts were written during this observation.",
+    "observationIds": [
+      "5ba016a1-222c-4ab3-8290-17a59cf2f31b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "32c53e02-266d-44c3-9d20-b12a06977868",
+    "date": "2026-05-20",
+    "theme": "LLM Proxy CLI Subprocess Inflating Sonnet Input Tokens",
+    "summary": "The goal was to eliminate inflated input token counts on the Sonnet path of the rapid-llm-proxy. Investigation traced the root cause to the CLI subprocess invocation path auto-injecting Claude Code's large default system prompt (~22K tokens) when no `--system-prompt` flag is supplied. The fix stripped MCP servers, skills, hooks, and project memory from the subprocess invocation, collapsing CLI-path input tokens from **14.8K → 130** (99% reduction); remaining cost is dominated by cache reads billed at ~10%.\n\n- A separate pending change (\"A\") was also applied to `server.mjs` in the same session\n- Affected file: `/Users/.../rapid-llm-proxy/proxy-bridge/server.mjs`\n- Proxy restarted twice: once via `nohup` (new PID 20016), once via `launchctl kickstart -k` to pick up change \"A\"\n- All four observations involve the claude agent; obs 1 is diagnosis-only, obs 2–4 include code edits and restarts",
+    "observationIds": [
+      "ecee091c-db2f-4c20-943f-de734391f3fb",
+      "4c64225c-966f-4c21-bf87-bd482f7e8b4d",
+      "dee1e830-58c5-471e-a9ca-915946be0d8c",
+      "761a8ef4-db52-44ee-a172-27532a44a79a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "9c3b4311-42b8-4436-8f87-9afc2f01d019",
+    "date": "2026-05-20",
+    "theme": "Rapid-LLM-Proxy Claude Project Directory Deleted",
+    "summary": "The developer initiated a cleanup of the RLP project directory inside `~/.claude/projects/`. Obs 5 inventoried the directory before acting; obs 6 confirmed its contents were entirely trivial (`ai-title` artifacts, 21 single-line auto-generated transcripts, 84KB total) and deleted it entirely.\n\n- Deleted path: `~/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic--work-rapid-llm-proxy`\n- No session data of value was present\n- Side effect: `38-CONTEXT.md` edited in both observations (project context file updated)\n- Deletion was confirmed via directory listing check",
+    "observationIds": [
+      "dfda42a5-bc99-47b4-9b38-896a07388326",
+      "145e8eb0-451b-4aeb-ba78-026ebcf47d2e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/38-ontology-registry/38-CONTEXT.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "8b9d2b2c-0987-4788-886d-b3aacd65d944",
+    "date": "2026-05-20",
+    "theme": "Stale RLP Slot Persisting as Black Circle in Status Line",
+    "summary": "After the RLP directory deletion, a ⚫ indicator persisted in the tmux status line chip for the now-missing project. The assistant diagnosed this in three steps across the session:\n\n- Obs 7: `freshestProjectActivityAge` returns `null` for a missing directory, which maps directly to ⚫ rather than decaying through the normal 🟠/🟤 sequence — the signal evaporates rather than fades\n- Obs 8–9: Investigated `combined-status-line.js` to locate the sticky known-projects cache that was keeping the \"RLP\" slot alive; the cache file path was not definitively identified before the exchanges ended\n- No fix was applied; recommended workaround is reloading the tmux config so the project list rebuilds from `~/.claude/projects/` and drops the stale slot\n- Edited files: `38-CONTEXT.md`, `38-DISCUSSION-LOG.md`, `38-04-PLAN.md`",
+    "observationIds": [
+      "b91c496b-37a0-47b9-a26b-fb3b6a2bced2",
+      "4e5e37f9-e007-4228-8930-917644fca547",
+      "fb1c1311-d570-485a-9d06-8ccb41e35602"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/38-ontology-registry/38-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/38-ontology-registry/38-DISCUSSION-LOG.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/38-ontology-registry/38-04-PLAN.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "ef8c897e-6e5f-4e8c-ba5c-484bdb501a3a",
+    "date": "2026-05-20",
+    "theme": "Health Coordinator VPN Detection Bug and DNS Race Fix",
+    "summary": "The tmux statusline was displaying N:OPEN / P:OFF while the developer was actually on VPN with the proxy running. Obs 10 (opencode) confirmed true state via interface inspection: `utun` interfaces active, PAC configured, HTTP/HTTPS proxy set to `127.0.0.1:3128` and verified functional. Obs 13 (opencode) identified and fixed the root cause in `health-coordinator.js` — a frozen polling loop caused by two bugs:\n\n- Unreliable DNS resolver Promise handling with no `settled` guard, allowing dangling callbacks to race with the `setTimeout` fallback\n- No overall timeout ceiling on `pollNetworkStatus()`, meaning a hung socket/DNS call could freeze the entire `runAllChecks` loop permanently\n\nFixes applied: added `settled` guard + `resolver.cancel()` call, and wrapped `pollNetworkStatus()` in `Promise.race` with a **15-second hard timeout**. After restart, coordinator correctly reports `location: vpn`, `proxy_running: true`, `proxy_functional: true`.",
+    "observationIds": [
+      "b06ec48d-b9d2-47b8-b1f8-4c2d81db30be",
+      "b069f0ae-362c-49ea-934c-49318d59a384"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "health-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "9e25207c-6135-44f5-a58c-ab3f96c2643f",
+    "date": "2026-05-20",
+    "theme": "README Mermaid Diagram br Tag Fix and Multi-Repo Commits",
+    "summary": "A rendering error in the `README.md` Mermaid flowchart was traced to GitHub's Mermaid renderer not supporting `<br/>` HTML tags inside node labels. Obs 11 and 12 (both opencode, same timestamp) are duplicate observations of the same fix: replaced all `<br/>` tags with `\\n` inside double-quoted label strings (`[\"...\"]`).\n\n- Affected file: `README.md` in the `km-core` repo\n- Obs 14 committed km-core changes: Mermaid `<br/>` → `\\n` fix + `.gitignore` updates\n- Obs 15 committed both repos in the same session: km-core (Mermaid fix) and `coding` repo (DNS resolver race/timeout fix from obs 13 + observation export data update)\n- All four observations by the opencode agent",
+    "observationIds": [
+      "2345cf29-8b57-44cc-bf04-ce5e0f029c9d",
+      "37782fca-8603-4b93-add0-f769f3fc3ff5",
+      "65334731-ffe0-4ff0-98ac-26099b20ca2a",
+      "7f73e378-76fe-4f18-844d-c5e370262485"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "README.md",
+      ".gitignore"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "33f6e5f6-b1a3-4434-95f5-36e72290970e",
+    "date": "2026-05-20",
+    "theme": "Observation Backfill Reveals LLM Scaffold Placeholder Problem",
+    "summary": "A background backfill task completed and the result was reviewed. Of 20 rows processed, 15 received real summaries and 5 were skipped for unusable LLM output. A secondary issue was flagged: **9 rows received scaffold placeholder text verbatim** (the LLM echoed the prompt template instead of filling in content), indicating the `_isUsableContent` predicate in `health-coordinator.js` was not rejecting these responses. The assistant proposed tightening the predicate to catch placeholder echo patterns, but no code change was committed in this exchange.",
+    "observationIds": [
+      "bded461a-3684-41fd-a710-adfc61d46c41"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "d2b7cd73-6e5f-4244-9a1e-6483529fc871",
+    "date": "2026-05-20",
+    "theme": "Health Coordinator Hysteresis and ObservationWriter Retry Budget",
+    "summary": "Following ongoing health coordinator instability, two targeted fixes were diagnosed (obs 17 was diagnostic-only) and committed (obs 18) as separate conventional commits on `main`:\n\n- **`scripts/health-coordinator.js`**: Added hysteresis to the `networkMode`-flip kickstart dispatch to prevent rapid oscillation when network state toggles near a threshold\n- **`src/live-logging/ObservationWriter.js`**: Extended the retry budget to cover kickstart windows, preventing observation writes from failing during the brief service-restart gap triggered by mode flips\n- Working tree confirmed clean after both commits",
+    "observationIds": [
+      "db058336-4ae2-4a1d-b556-b0a6f1cc5400",
+      "d80121a6-f0e3-48d7-ba32-c94d34ee9a46"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "fc314c17-e01b-4128-bc9e-d8c837152290",
+    "date": "2026-05-20",
+    "theme": "LLM Proxy Stale Binary Caused 3.5-Hour VPN Misdetection",
+    "summary": "Investigated why the LLM proxy showed a stuck \"vpn\" state for 3.5 hours after going off-VPN. The architectural question was whether the proxy uses the central health coordinator or its own built-in DNS/utun heuristics.\n\n- Current design is **coordinator-first**: proxy <USER_ID_REDACTED> `/health/state` as the single source of truth, with local PAC-host DNS and `utun` interface checks only as fallback when the coordinator is unreachable\n- Root cause of the 3.5-hour stuck state: a **stale launchd process** running pre-commit binary `a741010a`, which predated the coordinator-first lookup and used only the local DNS heuristic — resolved naturally when launchd restarted the process at 08:07:56 CEST\n- Secondary finding: the PAC host DNS heuristic (`muc.proxy-pac.bmwgroup.net` resolves even off-VPN via caching/external DNS) is inherently unreliable regardless of the stale-binary issue\n- Follow-up items identified: bake a build commit hash into proxy startup logs; replace DNS heuristic with an active reachability probe (lives in a separate repo, deferred)\n- Edited files: `health-coordinator.js`, `ObservationWriter.js` (across multiple overlapping exchange windows)",
+    "observationIds": [
+      "a2c0585f-f2cb-4e38-a334-7b7a9eefce2d",
+      "4615c38b-4ee7-41ba-9379-56862ec384c4",
+      "c3cb1fd3-fd6b-4421-8eb3-46d6f22d34a5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "1a45d914-65e6-4cb0-a333-89bc8a74c1d0",
+    "date": "2026-05-20",
+    "theme": "Coordinator Reporting Open State While Developer on VPN",
+    "summary": "At 12:17, a screenshot prompted investigation into the coordinator reporting `location=open` (off-VPN) despite the developer being on VPN — a recurrence of the detection mismatch theme, distinct from the stale-binary cause identified earlier (obs 19–21). The assistant <USER_ID_REDACTED> the coordinator's `/health/state` endpoint and checked PAC probe DNS resolution, identifying the issue as residing in the coordinator's PAC probe logic rather than a stale tmux cache. No files were modified in this exchange; `health-coordinator.js` is the implied target for a follow-up fix.",
+    "observationIds": [
+      "63c8f676-2589-4dee-bc2c-c07d5f44645a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "446e872e-9a12-4923-8d8d-31f5f8947386",
+    "date": "2026-05-20",
+    "theme": "Brain-Yellow Warning Traced to Semantic Probe Timeout Cascades",
+    "summary": "A brain-yellow health warning and a fresh batch of raw observation rows appeared despite the earlier hysteresis fix (obs 17/18). Investigation confirmed this was a **different failure path** from the previously fixed `networkMode`-flip trigger:\n\n- The claude-code direct API was being **rate-limited**, forcing fallback to the CLI path (~5–10s latency per call)\n- CLI fallback latency exceeded the coordinator's **10-second semantic probe timeout**, causing `semantic_ok=false` flips\n- Each flip triggered an auto-heal kickstart, which in turn produced raw observation rows — 24 new kickstarts traced to this path\n- Recommended fixes: raise the semantic probe timeout above CLI-fallback latency; decouple probe timeouts from the auto-kickstart trigger to prevent cascading restarts\n- Affected file: `health-coordinator.js`; both observations by claude agent",
+    "observationIds": [
+      "23c92724-1569-48d6-a006-da7ba72cd50c",
+      "9ae03560-ca2c-4462-8397-18bc50cfd0b3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "2fb45f3e-b1f4-4dfc-bb80-939fcab8514d",
+    "date": "2026-05-20",
+    "theme": "Automated Backfill Completion Notification Acknowledged",
+    "summary": "An automated task notification delivered a backfill completion summary: 8 rows backfilled, 11 skipped, 0 failed out of 19 total. No developer question or action was requested. The assistant acknowledged the result, summarized current coordinator health status and recent commits, and edited `feedback_gsd_skill_naming.md` as part of the task output recording. No architectural decisions or code changes were made.",
+    "observationIds": [
+      "465cc83a-f30f-493f-a84d-ef4765f55536"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_skill_naming.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "5d703745-e2d6-4b43-878f-9eaf11ab1d5e",
+    "date": "2026-05-20",
+    "theme": "Observations Database Useless Row Bulk Deletion",
+    "summary": "The developer requested deletion of all unrecoverable/LLM-unavailable observation rows from the observations database. Obs 26 began scoping which rows qualified and planned a pre-deletion backup to `.observations/exports/`; obs 27 executed the deletion.\n\n- **75 rows deleted**, reducing total from 690 → 615\n- FTS index kept in sync with the deletion\n- Backup attempt to `.observations/exports/` **failed silently** — directory did not exist; deleted rows were not preserved (JSON cold-store may retain them)\n- Both observations by claude agent; `feedback_gsd_skill_naming.md` edited as context artifact",
+    "observationIds": [
+      "11532d1e-6e56-44c9-bbd7-d935a10ea4b2",
+      "7ec7b847-44ce-4dbf-a092-6619b9397a9a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/feedback_gsd_skill_naming.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-20T14:16:26.857Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "2b113157-7f70-444e-a49f-03501e746e29",
+    "date": "2026-05-20",
+    "theme": "Cleanup Script Finalized with Bug Fix and Dry-Run Mode",
+    "summary": "The goal was to finalize and prepare a standalone reusable cleanup utility for commit as a follow-up change.\n\n- Wrote `cleanup-useless-observations.mjs` following existing project conventions, modeled after `backfill-raw-observations.mjs`\n- Fixed a `mkdir -p` bug discovered during development\n- Added a `--dry-run` mode for safe, non-destructive execution\n- File edited: `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/cleanup-useless-observations.mjs`\n\nThe script is now finalized and ready to be committed as a follow-up change.",
+    "observationIds": [
+      "bb2f8a01-b7b5-4248-8d02-8a83c7ada797"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/cleanup-useless-observations.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-21T19:01:54.395Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "1ef78bd9-d1db-4275-b799-b68e170e7912",
+    "date": "2026-05-20",
+    "theme": "Phase 39 Entity Data Model Wave Execution",
+    "summary": "The orchestrator executed all four plans in phase 39 (Entity Data Model) against the external `~/Agentic/km-core/` repository using a wave-based parallel strategy.\n\n- Worktree isolation was disabled due to the external repo constraint; sequential execution within waves was used to prevent git-lock contention\n- **Wave 1 — 39-01:** `putEntity` provenance stamping, 61 tests green\n- **Wave 2 — 39-02:** `mergeDescriptionSegment` helper, 69 tests green\n- **Wave 3a — 39-03:** Supersession semantics + `getSupersessionChain`, 81 tests green\n- **Wave 3b — 39-04:** `backfillEntityDataModel` library function with dry-run and checkpoint support, 90 tests green\n\nAll 4 plans completed successfully; ROADMAP SC#4 was realized and ticket DATA-01 was closed.",
+    "observationIds": [
+      "56002357-80ea-4d6d-be18-973a853b17a0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-21T19:01:54.395Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7cdf3c42-bb1d-4050-a105-7338a88984d5",
+    "date": "2026-05-20",
+    "theme": "Phase 39 Code Review and Completion Gate",
+    "summary": "A code review for phase 39 (`entity-data-model`) was initiated and completed using the `gsd-code-review` skill, which dispatches to `gsd-code-reviewer` agent.\n\n- The dispatch layer <USER_ID_REDACTED> phase state via the GSD SDK, scoped relevant files from `SUMMARY.md` / git diff, and invoked the reviewer agent (observation 2 captured the initiation with no final output; observation 3 captured the completed result)\n- Review surfaced **2 blockers**, **4 warnings**, and **2 advisory info findings**\n- Regression gate confirmed **90/90 tests passing** across phases 37–39\n- Verification gate passed; `PROJECT.md` was updated and phase 39 was marked **complete**",
+    "observationIds": [
+      "cee59b07-d420-4a28-9542-dac8e41ee126",
+      "c84b726b-777c-476c-ba67-ee1fd63b3843"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-21T19:01:54.395Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fb5172d8-465f-44a2-8256-3f95e73929e9",
+    "date": "2026-05-21",
+    "theme": "Phase 39 GSD Code Review Auto-Fix Pass",
+    "summary": "The agent ran the GSD code-review workflow with the `--fix` flag for phase 39, with the goal of automatically remediating all Critical and Warning findings from the existing review.\n\n- Located `REVIEW.md` for phase 39 containing **2 blockers, 4 warnings, and 2 info** findings\n- Fix scope was bounded to **6 findings** (blockers + warnings); info items excluded because `--all` was not passed\n- Loaded the `gsd-code-fixer` agent definition to establish per-finding rollback discipline\n- Updated `40-CONTEXT.md` as a side effect of context tracking\n- Source files to be patched reside in the sibling repo `~/Agentic/km-core/`, outside the protected worktree — noted as a scoping constraint before fixes were applied",
+    "observationIds": [
+      "d6cc3392-5e97-4005-84e4-80aa35dd4f26"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-CONTEXT.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4312dd26-5e58-4cc1-99fa-d427e2799171",
+    "date": "2026-05-21",
+    "theme": "Phase 40 Ingest Pipeline: Discussion and Planning Setup",
+    "summary": "Two sequential preparation steps were executed to ready Phase 40 (Ingest Pipeline & Layered Dedup) for implementation.\n\n- **Discuss-phase** (05:00): Agent loaded prior context from phases 37–39, scouted `km-core` for reusable patterns, and identified the domain as lifting OKM's 4-stage ingest pipeline and layered dedup into `km-core`; the session ended mid-interaction before gray areas were resolved and `CONTEXT.md` was finalized\n- **Plan-phase** (14:41): Skill orchestrated research → plan → verify flow; read `CONTEXT.md` and confirmed locked decisions **D-42 through D-46**; no `PLAN.md` artifact was produced yet as the agent was still in context-gathering initialization\n- Both steps edited `40-CONTEXT.md` and incidentally touched `start-llm-proxy.sh` and `combined-status-line.js` as part of workflow scaffolding",
+    "observationIds": [
+      "897a8681-0216-420e-8a7d-b9c198bdd059",
+      "e69c4908-8960-4885-8776-d1a1ab7cdf1a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4010d25b-ef4d-4b88-aefc-ecbff5495fa6",
+    "date": "2026-05-21",
+    "theme": "Live Session Log Continuity Load (Incomplete)",
+    "summary": "The `/sl` (session load) command was invoked to establish continuity by summarizing recent activity from `.specstory/history/`.\n\n- Agent identified the current working directory and began listing LSL files sorted by modification time\n- The exchange was **cut off mid-execution** — tool output was not returned and no continuity summary was produced\n- No artifacts were created or modified",
+    "observationIds": [
+      "2cee0b91-51ce-46d5-91a8-1d21aa92e60e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5084e292-21be-42ec-b9f0-2ed53bebba73",
+    "date": "2026-05-21",
+    "theme": "Phase 40 Wave-Based Execution: Dedup Layers Implemented and Merged",
+    "summary": "Phase 40 was fully executed using the `gsd-execute-phase` skill with wave-based parallel sub-agent orchestration across 8 plans, with wave 2 (plans 40-02, 40-03, 40-04) completing during this session.\n\n**Execution initiated (obs 5):** Orchestrator loaded GSD SDK runtime config, confirmed no optional flags, and began dependency analysis to form waves.\n\n**Sub-agent completions (obs 6, 7, 8/9/10):**\n- `40-03` — **`CosineEmbeddingMatcher`**: Created `src/dedup/CosineEmbeddingMatcher.ts` implementing `EmbeddingLayer`, co-located fake helper `tests/unit/_helpers/fakes-embedding.ts`, and `tests/unit/cosine-matcher.test.ts` with 7 passing unit tests\n- `40-02` — **`JaccardNameMatcher`**: Exact-name dedup layer delivered with 7 new Jaccard unit tests; 2 km-core commits landed\n- `40-04` — **`LLMSemanticMatcher`**: 228 LOC third dedup layer committed with 9 new unit tests and a co-located fake helper\n\n**Post-merge gate (obs 9, 10):** All 3 wave-2 worktrees (40-02, 40-03, 40-04) merged cleanly into `km-core` main; full suite confirmed at **115/115 tests across 12 files**, `tsc` and build exit 0, zero regressions; `combined-status-line.js` updated to reflect 4/8 plans done in phase 40.",
+    "observationIds": [
+      "d66c28ef-7c00-4c43-9bd8-9734c9b68441",
+      "c970f9cb-ea35-4471-ad34-a767b0ab2d9c",
+      "fdd0e700-06c8-480e-8742-bd124281ed51",
+      "19f5902c-fecb-4a48-a5e1-69623d65f6f3",
+      "47aaa19f-ad33-421a-9d38-933490e56dff",
+      "4dffc8cb-e72b-4981-b0d5-9e7d18f7167f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/src/dedup/CosineEmbeddingMatcher.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/tests/unit/_helpers/fakes-embedding.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/tests/unit/cosine-matcher.test.ts",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-03-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f7240083-b00f-41fa-b9da-4625166cd09a",
+    "date": "2026-05-21",
+    "theme": "Proxy Pipeline Diagnosis and HTTPS_PROXY Configuration Fix",
+    "summary": "Investigation was triggered by a screenshot showing observations stopping after 07:00 AM on May 21. The goal was to identify why the recording pipeline failed and why `HTTPS_PROXY` was not configured to point at the local proxydetox instance (`127.0.0.1:3128`).\n\n- Parallel diagnostic <USER_ID_REDACTED> were run against the SQLite observations database, the proxy health endpoint, launchd job listings, and log files\n- `start-llm-proxy.sh` was examined (and flagged for editing) to understand why the proxydetox fallback on port 3128 was absent from the proxy startup logic\n- The related launchd plist and process state were also reviewed to correlate runtime config with the observed gap\n- No root cause was definitively confirmed and no file modifications were committed within these exchanges; investigation remained in progress at the end of this session segment",
+    "observationIds": [
+      "4558a4a7-9632-4a0e-bd9c-1c6b16db3491",
+      "000c90d1-bd32-48b8-883f-4d0035c9229d",
+      "5879ddca-a902-446e-8d70-61c25073562a",
+      "265d7935-f47c-4038-9d25-d92de142508c",
+      "d68c0b4d-0aaf-401b-885d-c1bb97db62c6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/bin/start-llm-proxy.sh"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "3862f3d1-85ce-4b3b-8640-f55b6b9b5c67",
+    "date": "2026-05-21",
+    "theme": "Backfilling Null-Summary Rows in Observations Database",
+    "summary": "With minimal activity recorded since 07:00 AM, the focus shifted to backfilling raw/null-summary rows in the observations database to bring it fully up to date.\n\n- The backfill script was run in targeted sweeps scoped to recent timestamps to process outstanding entries\n- Across runs, 5 of 6 raw rows were successfully backfilled with LLM-generated summaries\n- 1 row was intentionally skipped because it contained a scaffold-placeholder LLM response — a known edge case handled by the script\n- Final state: 38/39 sessions for the day had real summaries; `observations.db` at `/Users/<USER_ID_REDACTED>/Agentic/coding/.observations/observations.db` was left fully caught up\n- Observation 7 also notes the start of a badge end-to-end probe, which led to reading `health-coordinator.js` in preparation for the escalation work that followed",
+    "observationIds": [
+      "973389af-77dc-48b0-ab13-fcc48043f592",
+      "dcebed78-ade2-4a3a-83e1-671be5940d1f",
+      "c260df00-7010-459c-a408-2ab0eb3ff63c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.observations/observations.db"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "94457deb-f94a-46de-bd98-08dc7dd4d98e",
+    "date": "2026-05-21",
+    "theme": "Health Coordinator Auto-Heal Escalation Logic Added",
+    "summary": "Following the badge probe investigation that began during the backfill session, `health-coordinator.js` was updated with auto-heal escalation support.\n\n- Read the existing auto-heal FSM and proxy probe logic in `scripts/health-coordinator.js` to understand current structure\n- Added a new state field to track escalation status across probe cycles\n- Added a new helper function to handle escalation logic centrally\n- Wrapped `pollProxySemanticStrong` in a `try/finally` block to guarantee the escalation helper fires on every probe outcome, regardless of success or failure\n- Syntax was verified clean after changes; file edited at `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js`",
+    "observationIds": [
+      "e1a79e33-732e-4b52-8fac-7699b7694d5f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "4a6f34ad-9365-4ee0-b199-2306ab6d50f2",
+    "date": "2026-05-21",
+    "theme": "km-core Phase 39/40 Session Continuity Summary Produced",
+    "summary": "Following the `/sl` session-load command protocol, recent Live Session Log files were read from both the km-core and coding projects to produce a structured continuity summary.\n\n- Phase 39 fix-pack covered: five commits to `main` implementing checkpoint/supersedes machinery; commits are local but **not yet pushed**\n- Phase 40 design is in progress: a 4-stage ingest consolidation pipeline is being designed; open questions remain around cadence and A-B coupling\n- Artifacts edited: `40-RESEARCH.md` and `40-VALIDATION.md`",
+    "observationIds": [
+      "d90f6219-0815-42c6-b024-82c3211f8a74"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-RESEARCH.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-VALIDATION.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "8effbf6d-a286-42f4-a27c-7f2d0f439846",
+    "date": "2026-05-21",
+    "theme": "Selective Commit of combined-status-line.js Fix",
+    "summary": "A targeted git commit was made for a fix to `scripts/combined-status-line.js`, deliberately excluding unrelated working tree changes.\n\n- Only `scripts/combined-status-line.js` was staged to avoid accidentally committing `.data/` exports and phase documentation files\n- A fix commit message was applied; push was initiated\n- No other artifacts were modified in this operation",
+    "observationIds": [
+      "db5c4861-1304-4dca-98fe-bab7c2132007"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-21T19:03:21.708Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
   }
 ]
