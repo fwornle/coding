@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
+**Current focus:** Phase 41 — Online Learning Adapter & Post-Hoc Resolution (INT-01 + PIPE-02)
 
 ## Current Position
 
-Phase: 47
+Phase: 41
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-05-22
@@ -50,6 +50,7 @@ Last activity: 2026-05-22
 - Phase 47 added 2026-05-21: ObservationWriter drops user-prompt text when image attachments are present (only `[Image: source: …]` placeholders are stored). Surfaced when row `9a3e700c-…` failed automated backfill and required a manual summary; see `.planning/phases/47-…/47-CONTEXT.md` for the full bug write-up and scope.
 - Phase 48 added 2026-05-22: VKB graph viewer strips `entity_type='System'` nodes when their owning team is unchecked, because per-team `queryEntities` runs *before* the "System nodes belong to all teams" visualization filter. Root cause in `integrations/memory-visualizer/src/api/databaseClient.ts:262` (server-side fix preferred). See `.planning/phases/48-…/48-CONTEXT.md`.
 - Phase 49 added 2026-05-22: VKB graph data integrity — 187 of 797 entities (~24%) are orphans with zero relations. Two patterns: 122 online-learned Detail/SubComponent nodes lacking parent hierarchy edges, and 7 team-anchor Projects (every non-coding team) missing the `CollectiveKnowledge --includes-->` edge that exists only for `Coding`. Scope covers one-shot repair migration + writer-path fix + seed-script fix. See `.planning/phases/49-…/49-CONTEXT.md`.
+- Phase 41 directory scaffolded 2026-05-22: roadmap entry has existed since v7.1 was created (Online Learning Adapter & Post-Hoc Resolution — INT-01 + PIPE-02), but the `.planning/phases/41-online-learning-adapter-post-hoc-resolution/` directory was created only now after Phase 40 closure. STATE Current Position re-pointed from Phase 47 back to Phase 41 to reflect the milestone (v7.1) phase order. Phases 42–46 still need directories.
 
 ### Decisions
 
