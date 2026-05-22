@@ -79,8 +79,8 @@
 | ONTO-02 | Phase 38 | Pending |
 | DATA-01 | Phase 39 | Complete |
 | DATA-02 | Phase 39 | Complete |
-| PIPE-01 | Phase 40 | Pending |
-| DEDUP-01 | Phase 40 | Pending |
+| PIPE-01 | Phase 40 | Complete |
+| DEDUP-01 | Phase 40 | Complete |
 | INT-01 | Phase 41 | Pending |
 | PIPE-02 | Phase 41 | Pending |
 | INT-02 | Phase 42 | Pending |
