@@ -48,6 +48,8 @@ Last activity: 2026-05-21 -- Phase 40 execution started
 - Phase 36 added: token-usage per-user hourly exports (mirror LSL conventions for git-trackable JSON)
 - v7.1 roadmap created 2026-05-19: 10 phases (37–46) covering KM-Core extraction across A/B/C systems; CORE→ONTO→DATA→PIPE foundation, then INT-01+PIPE-02→INT-02→INT-03 migration order, capped by API→UI→DOC. Phase 42 (B migration) folds in Phase 10 embeddings bug + workflow-runner.ts:469-530 race condition. Phase 43 (C migration) is cross-repo into rapid-automations.
 - Phase 47 added 2026-05-21: ObservationWriter drops user-prompt text when image attachments are present (only `[Image: source: …]` placeholders are stored). Surfaced when row `9a3e700c-…` failed automated backfill and required a manual summary; see `.planning/phases/47-…/47-CONTEXT.md` for the full bug write-up and scope.
+- Phase 48 added 2026-05-22: VKB graph viewer strips `entity_type='System'` nodes when their owning team is unchecked, because per-team `queryEntities` runs *before* the "System nodes belong to all teams" visualization filter. Root cause in `integrations/memory-visualizer/src/api/databaseClient.ts:262` (server-side fix preferred). See `.planning/phases/48-…/48-CONTEXT.md`.
+- Phase 49 added 2026-05-22: VKB graph data integrity — 187 of 797 entities (~24%) are orphans with zero relations. Two patterns: 122 online-learned Detail/SubComponent nodes lacking parent hierarchy edges, and 7 team-anchor Projects (every non-coding team) missing the `CollectiveKnowledge --includes-->` edge that exists only for `Coding`. Scope covers one-shot repair migration + writer-path fix + seed-script fix. See `.planning/phases/49-…/49-CONTEXT.md`.
 
 ### Decisions
 
