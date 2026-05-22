@@ -361,7 +361,7 @@ Plans:
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
 
-**Plans:** 8/8 plans complete
+**Plans:** 8/12 plans complete (8 original + 4 gap-closure)
 
 Plans:
 
@@ -390,6 +390,18 @@ Plans:
 **Wave 5 (barrel + final green gate)**
 
 - [x] 40-07-PLAN.md — Amend `src/dedup/types.ts` with `EmbeddingClient` + `LLMClient` re-exports; create `src/pipeline/index.ts` + `src/dedup/index.ts` sub-barrels; append Phase 40 block to root `src/index.ts`; extend `package.json` exports map with `./pipeline` + `./dedup` sub-paths (mirrors Phase 38 `./ontology` precedent); external tmpdir smoke compile across root barrel + both sub-paths; final `npm run build` + `npm test` green gate. **depends_on:** 40-06b (not 40-06). PIPE-01 + DEDUP-01.
+
+**Gap closure (from 40-VERIFICATION.md — 4 BLOCKERS + SC#1 human-verification, 4 plans):**
+
+**Wave 7 (parallel — file-disjoint)**
+
+- [ ] 40-08-PLAN.md — CR-01 + CR-04 fix in `~/Agentic/km-core/src/pipeline/IngestPipeline.ts`. CR-01: hoist Pitfall-1 guard into the pipeline so `findByOntologyClass(undefined)` can never be called. CR-04: widen `runStage('extract')` overload to drop misleading `provenance` requirement + thread `opts?.domain` to `extractor.extract`. 2 new RED→GREEN unit tests. PIPE-01.
+- [ ] 40-09-PLAN.md — CR-02 fix across all 3 matchers (`JaccardNameMatcher.ts:53`, `CosineEmbeddingMatcher.ts:123`, `LLMSemanticMatcher.ts:132`). Remove the dead-on-happy-path + wrong-on-legacy-id-re-extraction self-id guard. 3 new RED→GREEN unit tests (one per matcher). DEDUP-01.
+- [ ] 40-11-PLAN.md — SC#1 closure: write `~/Agentic/km-core/examples/custom-adapter.ts` (~80-100 lines) demonstrating all 4 stage interfaces wired through the public-API barrel (no relative imports into `src/`). Companion integration test asserts the example compiles + runs end-to-end with `extractedCount > 0`. PIPE-01 + DEDUP-01. **depends_on:** 40-07.
+
+**Wave 8 (sequential after 40-09 — same file: LLMSemanticMatcher.ts)**
+
+- [ ] 40-10-PLAN.md — CR-03 + WR-08 bundle in `~/Agentic/km-core/src/dedup/LLMSemanticMatcher.ts`. Introduce typed `LLMDedupParseError` (with `raw` + `cause` fields, `instanceof`-discriminable from `SyntaxError`). Rewrite `parseDedupResponse` as candidate-list-of-tries (REVIEW.md offset 311-340 recipe) so the bare-brace stage gets a fair shot when the fence stage matches-but-emits-garbage. Graceful no-match fallback when all 4 candidates fail to parse. 3 new RED→GREEN unit tests. Plan 04 invariants (OOM verbatim, defaults) preserved. DEDUP-01.
 
 **Phase boundary:** All algorithm code lives in `~/Agentic/km-core/`. Co-exist mode (D-45) — A's `ObservationConsolidator` and B's `WaveController` are NOT modified by Phase 40. Phase 41 (INT-01) migrates A; Phase 42 (INT-02) migrates B; full SC#4 discharge at end of Phase 42 when B's local Jaccard copy is deleted.
 
@@ -492,7 +504,7 @@ Plans:
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
-| 40. Ingest Pipeline & Layered Dedup | 8/8 | Complete   | 2026-05-22 |
+| 40. Ingest Pipeline & Layered Dedup | 8/12 | Gap closure | 2026-05-22 (8 done; 4 gap-closure pending) |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
