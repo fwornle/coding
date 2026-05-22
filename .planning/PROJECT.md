@@ -137,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-20 — Phase 39 complete (Entity Data Model: temporal validity + structured provenance in km-core). Phases 37/38/39 of v7.1 shipped.*
+*Last updated: 2026-05-22 — Phase 40 complete (Ingest Pipeline & Layered Dedup: 4-stage extract→dedup→store→synthesize orchestrator + Jaccard/cosine/LLM dedup layers in km-core; PIPE-01 + DEDUP-01 satisfied). Phases 37/38/39/40 of v7.1 shipped.*
