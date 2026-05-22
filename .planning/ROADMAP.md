@@ -237,7 +237,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 - [x] **Phase 37: KM-Core Foundation** - Canonical TS types, GraphKMStore adapter, UUID identifier scheme — the shared package B and C both consume. (completed 2026-05-20)
 - [x] **Phase 38: Ontology Registry** - Auto-discovered upper + lower ontologies with `extends`-based property merging. (6/6 plans complete 2026-05-20; ready to verify)
 - [x] **Phase 39: Entity Data Model** - Provenance fields and `validFrom`/`validUntil`/`supersedes` temporal validity on the canonical entity (locked before migrations). (completed 2026-05-20)
-- [ ] **Phase 40: Ingest Pipeline & Layered Dedup** - 4-stage `extract → dedup → store → synthesize` framework with the layered dedup pipeline B and C will implement against.
+- [x] **Phase 40: Ingest Pipeline & Layered Dedup** - 4-stage `extract → dedup → store → synthesize` framework with the layered dedup pipeline B and C will implement against. (completed 2026-05-22)
 - [ ] **Phase 41: Online Learning Adapter & Post-Hoc Resolution** - INT-01 (A's SQLite hot path exposed as KM-Core entities) + PIPE-02 (post-hoc cross-class entity resolution as a shared maintenance op).
 - [ ] **Phase 42: Offline UKB Migration (B)** - Full migration of `mcp-server-semantic-analysis` to KM-Core; folds in Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition.
 - [ ] **Phase 43: OKM Cross-Repo Migration (C)** - Cross-repo refactor of `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` onto KM-Core; rapid-automations CI stays green.
@@ -361,7 +361,7 @@ Plans:
   3. A user can choose which stages execute on what cadence per system (per ingest / per wave / cron) via configuration, with the framework enforcing the four-stage order.
   4. The shared dedup pipeline reuses B's existing fuzzy-name Jaccard logic and A's embedding-cosine logic as plug-in implementations of the respective layers — no duplicated dedup code remains across A/B/C.
 
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans complete
 
 Plans:
 
@@ -389,7 +389,7 @@ Plans:
 
 **Wave 5 (barrel + final green gate)**
 
-- [ ] 40-07-PLAN.md — Amend `src/dedup/types.ts` with `EmbeddingClient` + `LLMClient` re-exports; create `src/pipeline/index.ts` + `src/dedup/index.ts` sub-barrels; append Phase 40 block to root `src/index.ts`; extend `package.json` exports map with `./pipeline` + `./dedup` sub-paths (mirrors Phase 38 `./ontology` precedent); external tmpdir smoke compile across root barrel + both sub-paths; final `npm run build` + `npm test` green gate. **depends_on:** 40-06b (not 40-06). PIPE-01 + DEDUP-01.
+- [x] 40-07-PLAN.md — Amend `src/dedup/types.ts` with `EmbeddingClient` + `LLMClient` re-exports; create `src/pipeline/index.ts` + `src/dedup/index.ts` sub-barrels; append Phase 40 block to root `src/index.ts`; extend `package.json` exports map with `./pipeline` + `./dedup` sub-paths (mirrors Phase 38 `./ontology` precedent); external tmpdir smoke compile across root barrel + both sub-paths; final `npm run build` + `npm test` green gate. **depends_on:** 40-06b (not 40-06). PIPE-01 + DEDUP-01.
 
 **Phase boundary:** All algorithm code lives in `~/Agentic/km-core/`. Co-exist mode (D-45) — A's `ObservationConsolidator` and B's `WaveController` are NOT modified by Phase 40. Phase 41 (INT-01) migrates A; Phase 42 (INT-02) migrates B; full SC#4 discharge at end of Phase 42 when B's local Jaccard copy is deleted.
 
@@ -492,7 +492,7 @@ Plans:
 | 37. KM-Core Foundation | 5/5 | Complete   | 2026-05-20 |
 | 38. Ontology Registry | 1/6 | In Progress|  |
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
-| 40. Ingest Pipeline & Layered Dedup | 7/8 | In Progress|  |
+| 40. Ingest Pipeline & Layered Dedup | 8/8 | Complete   | 2026-05-22 |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 0/? | Not started | - |
 | 42. Offline UKB Migration (B) | 0/? | Not started | - |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
