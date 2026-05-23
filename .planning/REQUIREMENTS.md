@@ -81,8 +81,8 @@
 | DATA-02 | Phase 39 | Complete |
 | PIPE-01 | Phase 40 | Complete |
 | DEDUP-01 | Phase 40 | Complete |
-| INT-01 | Phase 41 | Pending |
-| PIPE-02 | Phase 41 | Pending |
+| INT-01 | Phase 41 | Complete |
+| PIPE-02 | Phase 41 | Complete |
 | INT-02 | Phase 42 | Pending |
 | INT-03 | Phase 43 | Pending |
 | API-01 | Phase 44 | Pending |
