@@ -483,6 +483,35 @@ const PROXY_KICKSTART_MAX = 3;                    // D-06: 3 kickstarts then coo
 const PROXY_STRONG_PROBE_INTERVAL_MS = 5 * 60_000;       // every 5 min
 const PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000; // real obs within 5 min counts as proof
 
+// Idle-aware probe cadence: when no ETM heartbeat is fresh across any
+// project/pane, the user is AFK and there is no one watching the
+// dashboard. Stretch the probe intervals so we don't burn ~1700+
+// "say OK" calls/night during overnight idle. The next ETM heartbeat
+// flips us back to the fast cadence within one tick (≤TICK_MS).
+const PROXY_PROBE_INTERVAL_IDLE_MS = 10 * 60_000;        // 10 min when AFK (vs 60s active)
+const PROXY_STRONG_PROBE_INTERVAL_IDLE_MS = 30 * 60_000; // 30 min when AFK (vs 5 min active)
+// What counts as "active" — same threshold the [📚] badge uses for
+// ETM-heartbeat promotion in combined-status-line.js (~line 1019).
+const USER_ACTIVE_HEARTBEAT_MAX_AGE_MS = 5 * 60_000;
+
+/**
+ * True when at least one tracked ETM is heartbeating fresh. The ETM
+ * heartbeat fires on every tool call, permission response, and prompt-set
+ * boundary the monitor sees, so it is the canonical "user/agent is here
+ * right now" signal — same one the per-project lifecycle bubble and the
+ * [📚] badge use. Returns false when every monitor is stopped or every
+ * heartbeat is older than USER_ACTIVE_HEARTBEAT_MAX_AGE_MS.
+ */
+function userActiveNow() {
+  const now = Date.now();
+  for (const entry of Object.values(currentState.lsl || {})) {
+    if (!entry || entry.status === 'stopped') continue;
+    const lb = entry.lastBeat || 0;
+    if (lb > 0 && (now - lb) < USER_ACTIVE_HEARTBEAT_MAX_AGE_MS) return true;
+  }
+  return false;
+}
+
 async function pollKnowledgePipeline() {
   const probeEndedAt = () => new Date().toISOString();
   let body;
@@ -1540,11 +1569,12 @@ async function runAllChecks() {
     currentState.proxy.networkMode = 'unknown';
   }
 
-  // ----- Proxy semantic readiness (every 60s — Plan 34-02 R1; Plan 34-03 adds auto-heal FSM) -----
+  // ----- Proxy semantic readiness (every 60s active / 10 min idle — Plan 34-02 R1; Plan 34-03 adds auto-heal FSM) -----
   const _proxyProbeAge = currentState.proxy.last_probe_end
     ? Date.now() - new Date(currentState.proxy.last_probe_end).getTime()
     : Infinity;
-  if (_proxyProbeAge >= PROXY_PROBE_INTERVAL_MS) {
+  const _proxyProbeGate = userActiveNow() ? PROXY_PROBE_INTERVAL_MS : PROXY_PROBE_INTERVAL_IDLE_MS;
+  if (_proxyProbeAge >= _proxyProbeGate) {
     try {
       await pollProxySemantic();
     } catch (err) {
@@ -1567,7 +1597,8 @@ async function runAllChecks() {
   const _strongAge = currentState.proxy.semantic_strong_last_probe_end
     ? Date.now() - new Date(currentState.proxy.semantic_strong_last_probe_end).getTime()
     : Infinity;
-  if (_strongAge >= PROXY_STRONG_PROBE_INTERVAL_MS) {
+  const _strongGate = userActiveNow() ? PROXY_STRONG_PROBE_INTERVAL_MS : PROXY_STRONG_PROBE_INTERVAL_IDLE_MS;
+  if (_strongAge >= _strongGate) {
     // Query the proxy's token-usage DB for the most recent observation-writer
     // call. That timestamp is set the instant the LLM call completes — much
     // tighter than knowledge_pipeline.lastObservationAt which lags by 10-15s
