@@ -455,14 +455,14 @@ Plans:
   4. Wave-controller progress updates and KM-Core writes never deadlock or clobber each other — the dashboard's wave-stage view stays consistent with `.data/workflow-progress.json` throughout the run.
   5. B's existing component-manifest works unchanged as a lower ontology against KM-Core's `OntologyRegistry`.
 
-**Plans:** 1/7 plans executed
+**Plans:** 2/7 plans executed
 
 Plans:
 
 **Wave 1 (parallel — disjoint files/repos)**
 
 - [x] 42-01-PLAN.md — km-core GraphKMStore strangler adapter + feature flag (`KM_CORE_PERSISTENCE`); rewire wave-controller.ts:1373 bypass write through the new adapter's `mergeAttributes`. Phase 10 fix lands here (SC#2 anchor).
-- [ ] 42-02-PLAN.md — Race condition fix: coordinator.writeProgressFile gains field-preserving merge for the state-machine subscriber's allowlist (`stepPaused`, `mockLLM`, `singleStepMode`, etc.) — discharges SC#3 + SC#4.
+- [x] 42-02-PLAN.md — Race condition fix: coordinator.writeProgressFile gains field-preserving merge for the state-machine subscriber's allowlist (`stepPaused`, `mockLLM`, `singleStepMode`, etc.) — SC#3 discharged (0 race-condition warnings post-run); SC#4 escalated to Plan 7 (terminal-state defect is the workflow-runner-exits-early issue, requires fix #1 single-writer refactor).
 - [ ] 42-03-PLAN.md — Ontology subsystem migration: flatten `.data/ontologies/` (8 JSONs to root); replace B's OntologyManager with km-core's OntologyRegistry; preserve OntologyClassifier/Validator/QueryEngine (D-53). SC#5 anchor.
 - [ ] 42-04-PLAN.md — **CROSS-REPO (km-core)** — add `embedding?: number[]` to Entity (D-52); land `syncQdrantFromStore` maintenance op (D-52a); land `FastembedEmbeddingClient` default + new `./embeddings` sub-path (D-52c).
 

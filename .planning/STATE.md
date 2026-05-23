@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 42 planned (7 plans across 4 waves; checker PASS after rev 1)
-last_updated: "2026-05-23T12:07:15.604Z"
+stopped_at: Phase 42-02 complete (SC#3 PASS, SC#4 escalated to Plan 7)
+last_updated: "2026-05-23T12:36:00.000Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 15
   completed_phases: 5
   total_plans: 41
-  completed_plans: 35
-  percent: 33
+  completed_plans: 36
+  percent: 34
 ---
 
 # Project State
@@ -50,8 +50,8 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 ## Current Position
 
 Phase: 42 (offline-ukb-migration-b) — EXECUTING
-Plan: 2 of 7
-Status: Ready to execute
+Plan: 3 of 7
+Status: Ready to execute (Plans 01 + 02 complete)
 Last activity: 2026-05-23
 
 ## Performance Metrics
@@ -142,6 +142,8 @@ Last activity: 2026-05-23
 - [Phase ?]: [Phase 42-01]: km-core strangler adapter landed — KM_CORE_PERSISTENCE='km-core' literal env match flips bypass writes to GraphKMStore.mergeAttributes; legacy default preserved (Phase 10 fix wired, e2e deferred to Plan 7 SC#2)
 - [Phase ?]: [Phase 42-01]: km-core injected into Docker via bind-mount (${HOME}/Agentic/km-core → /coding/node_modules/@fwornle/km-core:ro), not package.json dep — matches existing strangler pattern; reverted in Phase 42 final cleanup plan
 - [Phase ?]: [Phase 42-01]: Adapter resolves entity names via store.iterate() scan (km-core 0.1.0 has no findByName) — O(n) acceptable for B's <1000-entity bypass loop; Plan 5+ may add name index if profiling warrants
+- [Phase ?]: [Phase 42-02]: Field-preserving merge landed in coordinator.writeProgressFile — PROGRESS_PRESERVE_KEYS allowlist mirrors workflow-state-machine.ts:117-162 verbatim (stepPaused/pausedAtStep/pausedAt/mockLLM/mockLLMDelay/singleStepMode/stepIntoSubsteps/llmState + nested config.singleStepMode). SC#3 PASS (0 race-condition warnings post-run); SC#4 escalated to Plan 7 (workflow-runner exits before terminal write — RESEARCH §2 fix #1 single-writer architecture)
+- [Phase ?]: [Phase 42-02]: preserveFromExisting helper exported from coordinator.ts as a module-level function (not a private method) so tests can import directly. Both writeFileSync(progressPath,...) call sites — writeProgressFile body + checkSingleStepPause — now route through the same allowlist guard
 
 ### Blockers/Concerns
 
@@ -177,9 +179,17 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 38 P05 | 2min | 1 task  | 1 file  |
 | Phase 38 P06 | 4min | 2 tasks | 2 files |
 | Phase 42 P01 | 16min | 3 tasks | 5 files |
+| Phase 42 P02 | 26min | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-05-23T12:06:55.911Z
-Stopped at: Phase 42 planned (7 plans across 4 waves; checker PASS after rev 1)
-Resume with: `/gsd:verify-phase 38` (then `/gsd:execute-phase 39` to start Entity Data Model)
+Last session: 2026-05-23T12:36:00.000Z
+Stopped at: Phase 42-02 complete (SC#3 PASS, SC#4 escalated to Plan 7)
+Resume with: `/gsd:execute-phase 42` to run Plan 3 (ontology subsystem migration)
+
+Plan 02 follow-up for Plan 7:
+- Read .planning/phases/42-offline-ukb-migration-b/42-02-VERIFY-FAIL.log
+- SC#4 (terminal-state consistency within 5s of process exit) requires the
+  RESEARCH §2 fix #1 single-writer architecture refactor. The workflow runner
+  process exits silently before any coordinator.writeProgressFile call fires
+  from a completed wave, so the dashboard sees a stuck "running" state.
