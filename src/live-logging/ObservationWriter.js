@@ -248,8 +248,56 @@ export class ObservationWriter {
    * @param {Object} [metadata] - Context metadata (project, agent, etc.)
    * @returns {Promise<{summary: string, llm?: {model: string, provider: string}}>}
    */
+  /**
+   * Fetch the last few observation Intents for the same agent+project so the
+   * summarizer can resolve context-dependent references ("it", "that", "the
+   * change", "implement it now") that otherwise produce content-free
+   * summaries like "Developer requested implementation of some previously
+   * discussed feature". Returns a small XML block ready to drop into the
+   * prompt, or an empty string when no recent prior observations exist.
+   *
+   * Scoped to the last 30 min — anything older is rarely the antecedent of
+   * a "temporal/local" pronoun and only adds noise. Returns at most 2 rows
+   * to keep the prompt small.
+   */
+  _buildPriorContext(metadata) {
+    try {
+      const agent = metadata.agent;
+      const project = metadata.project;
+      if (!agent || !project) return '';
+      const rows = this.db.prepare(
+        `SELECT summary, created_at FROM observations
+         WHERE agent = ?
+           AND json_extract(metadata, '$.project') = ?
+           AND created_at > datetime('now', '-30 minutes')
+         ORDER BY created_at DESC LIMIT 2`
+      ).all(agent, project);
+      if (!rows || rows.length === 0) return '';
+      const intents = rows
+        .map(r => this._extractIntent(r.summary))
+        .filter(Boolean);
+      if (intents.length === 0) return '';
+      // Oldest first so the LLM reads them chronologically. Truncate each
+      // intent at 200 chars to bound prompt growth.
+      intents.reverse();
+      const lines = intents
+        .map(s => '  - ' + (s.length > 200 ? s.slice(0, 200) + '…' : s))
+        .join('\n');
+      return `\n<prior_observations>\n` +
+        `The most recent observations for this agent+project (oldest first). ` +
+        `Use ONLY to resolve pronominal or implicit references in the exchange below ` +
+        `(e.g. "it", "that", "the change", "implement it now"). ` +
+        `Do NOT copy these into Intent unless the current exchange explicitly references them.\n` +
+        lines +
+        `\n</prior_observations>`;
+    } catch {
+      return ''; // never let context-fetch break summarization
+    }
+  }
+
   async summarize(messages, metadata = {}) {
     const projectName = metadata.project || 'unknown';
+    const priorContext = this._buildPriorContext(metadata);
 
     // Wrap the exchange in XML tags so the LLM treats it as data to analyze, not content to relay
     const exchangeBlock = messages
@@ -298,12 +346,13 @@ export class ObservationWriter {
               '- Approach should capture WHY this solution was chosen, not just WHAT was done.\n' +
               '- Result should be specific enough that someone can understand the change without reading the code.\n' +
               '- If the exchange has no real work (greetings, "yes", "proceed"), respond with only: "No actionable content."\n' +
-              '- CRITICAL: If GROUND TRUTH file data is provided below the exchange, you MUST use it for the Artifacts line. Do NOT override it with your own inference.' +
+              '- CRITICAL: If GROUND TRUTH file data is provided below the exchange, you MUST use it for the Artifacts line. Do NOT override it with your own inference.\n' +
+              '- If a <prior_observations> block is provided and the user message contains a context-dependent reference ("it", "that", "the change", "implement it now", etc.), resolve the reference against those observations and write the resolved noun phrase into Intent. Example: user says "implement it now" and the prior Intent was "Offered user option 2 (per-turn progress heartbeat)" → write "Intent: Implement option 2 — per-turn progress heartbeat (carried over from prior exchange)". Never write "some previously discussed feature" when a <prior_observations> block is present.' +
               (artifactHint || ''),
           },
           {
             role: 'user',
-            content: `<project>${projectName}</project>\n<exchange>\n` + exchangeBlock + '\n</exchange>\n\nProduce the observation summary.',
+            content: `<project>${projectName}</project>${priorContext}\n<exchange>\n` + exchangeBlock + '\n</exchange>\n\nProduce the observation summary.',
           },
         ],
       };
