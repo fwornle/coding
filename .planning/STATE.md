@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: Phase 42-06 complete (canonical emit + flag-gated km-core persistWithKmCore + mergeEntityGroup → km-core mergeEntities; 12 unit tests pass, container-side AC verified)
-last_updated: "2026-05-23T14:27:56.887Z"
+status: blocked
+stopped_at: Phase 42-07 Phase B1 + SC#4 fix COMPLETE; Phase C HALTED at Architectural Surprise #5 (require() not defined in semantic-analyzer.ts when loaded as ESM — pre-existing regression masked by empty Error log payload)
+last_updated: "2026-05-23T15:57:00.000Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 15
