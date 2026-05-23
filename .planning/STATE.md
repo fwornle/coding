@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: "Phase 42-02 complete (SC#3 PASS, SC#4 escalated to Plan 7)"
-last_updated: "2026-05-23T13:10:46.831Z"
+stopped_at: "Phase 42-04 complete (km-core INT-02 surfaces landed: D-52 + D-52a + D-52c)"
+last_updated: "2026-05-23T13:30:41.552Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 15
   completed_phases: 5
   total_plans: 41
-  completed_plans: 37
+  completed_plans: 38
   percent: 33
 ---
 
@@ -50,7 +50,7 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 ## Current Position
 
 Phase: 42 (offline-ukb-migration-b) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-05-23
 
@@ -145,6 +145,9 @@ Last activity: 2026-05-23
 - [Phase ?]: [Phase 42-02]: Field-preserving merge landed in coordinator.writeProgressFile — PROGRESS_PRESERVE_KEYS allowlist mirrors workflow-state-machine.ts:117-162 verbatim (stepPaused/pausedAtStep/pausedAt/mockLLM/mockLLMDelay/singleStepMode/stepIntoSubsteps/llmState + nested config.singleStepMode). SC#3 PASS (0 race-condition warnings post-run); SC#4 escalated to Plan 7 (workflow-runner exits before terminal write — RESEARCH §2 fix #1 single-writer architecture)
 - [Phase ?]: [Phase 42-02]: preserveFromExisting helper exported from coordinator.ts as a module-level function (not a private method) so tests can import directly. Both writeFileSync(progressPath,...) call sites — writeProgressFile body + checkSingleStepPause — now route through the same allowlist guard
 - [Phase ?]: [Phase 42-03]: km-core OntologyRegistry adopted via LegacyOntologyAdapter shim (100 lines) — Validator/Classifier/QueryEngine kept (D-53); B's 8 ontology JSONs flattened + structurally converted to km-core OntologyFile shape under D-53b (entities -> classes; hoist meta:{}); Detail class added to coding-ontology.json (D-53b minimal addition); team argument is silently dropped by adapter (single-team registry per instance)
+- [Phase ?]: [Phase 42-04]: km-core Phase 42 INT-02 surfaces landed — Entity.embedding?: number[] (D-52), syncQdrantFromStore maintenance op (D-52a), FastembedEmbeddingClient default + ./embeddings sub-path (D-52c). Cross-repo: 6 commits in /Users/Q284340/Agentic/km-core (TDD RED+GREEN per task); container-side bind-mount picks up new code with no Docker rebuild. 242/242 km-core tests pass (+18 net).
+- [Phase ?]: [Phase 42-04]: Real EmbeddingClient interface is single-text (Phase 40 contract); FastembedEmbeddingClient implements embed(text) and adds separate embedBatch(texts) for batch ergonomics — plan's <interfaces> block had the wrong signature. Documented as Rule 1 deviation.
+- [Phase ?]: [Phase 42-04]: QdrantClient is a structural interface defined inside syncQdrantFromStore.ts (not from @qdrant/*) — km-core stays Qdrant-agnostic at the type level (Phase 40 LLMClient precedent extended to vector stores). Caller wraps their concrete client to match upsert(collection, points).
 
 ### Blockers/Concerns
 
@@ -182,11 +185,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 42 P01 | 16min | 3 tasks | 5 files |
 | Phase 42 P02 | 26min | 2 tasks | 3 files |
 | Phase 42 P03 | 27m | 3 tasks | 13 files |
+| Phase 42 P04 | 12m | 4 tasks | 11 files |
 
 ## Session Continuity
 
-Last session: 2026-05-23T13:10:41.577Z
-Stopped at: Phase 42-02 complete (SC#3 PASS, SC#4 escalated to Plan 7)
+Last session: 2026-05-23T13:30:41.535Z
+Stopped at: Phase 42-04 complete (km-core INT-02 surfaces landed: D-52 + D-52a + D-52c)
 Resume with: `/gsd:execute-phase 42` to run Plan 3 (ontology subsystem migration)
 
 Plan 02 follow-up for Plan 7:

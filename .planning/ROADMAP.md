@@ -455,7 +455,7 @@ Plans:
   4. Wave-controller progress updates and KM-Core writes never deadlock or clobber each other — the dashboard's wave-stage view stays consistent with `.data/workflow-progress.json` throughout the run.
   5. B's existing component-manifest works unchanged as a lower ontology against KM-Core's `OntologyRegistry`.
 
-**Plans:** 3/7 plans executed
+**Plans:** 4/7 plans executed
 
 Plans:
 
@@ -464,7 +464,7 @@ Plans:
 - [x] 42-01-PLAN.md — km-core GraphKMStore strangler adapter + feature flag (`KM_CORE_PERSISTENCE`); rewire wave-controller.ts:1373 bypass write through the new adapter's `mergeAttributes`. Phase 10 fix lands here (SC#2 anchor).
 - [x] 42-02-PLAN.md — Race condition fix: coordinator.writeProgressFile gains field-preserving merge for the state-machine subscriber's allowlist (`stepPaused`, `mockLLM`, `singleStepMode`, etc.) — SC#3 discharged (0 race-condition warnings post-run); SC#4 escalated to Plan 7 (terminal-state defect is the workflow-runner-exits-early issue, requires fix #1 single-writer refactor).
 - [x] 42-03-PLAN.md — Ontology subsystem migration: flatten `.data/ontologies/` (8 JSONs to root); replace B's OntologyManager with km-core's OntologyRegistry; preserve OntologyClassifier/Validator/QueryEngine (D-53). SC#5 anchor.
-- [ ] 42-04-PLAN.md — **CROSS-REPO (km-core)** — add `embedding?: number[]` to Entity (D-52); land `syncQdrantFromStore` maintenance op (D-52a); land `FastembedEmbeddingClient` default + new `./embeddings` sub-path (D-52c).
+- [x] 42-04-PLAN.md — **CROSS-REPO (km-core)** — add `embedding?: number[]` to Entity (D-52); land `syncQdrantFromStore` maintenance op (D-52a); land `FastembedEmbeddingClient` default + new `./embeddings` sub-path (D-52c).
 
 **Wave 2** *(depends on 42-01)*
 
@@ -548,7 +548,7 @@ Plans:
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
 | 40. Ingest Pipeline & Layered Dedup | 12/12 | Complete    | 2026-05-22 |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
-| 42. Offline UKB Migration (B) | 3/7 | In Progress|  |
+| 42. Offline UKB Migration (B) | 4/7 | In Progress|  |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
 | 44. REST API & Git Snapshots | 0/? | Not started | - |
 | 45. Unified Web Viewer | 0/? | Not started | - |
