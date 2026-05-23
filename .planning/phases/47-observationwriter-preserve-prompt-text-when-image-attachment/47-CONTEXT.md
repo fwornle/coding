@@ -96,9 +96,7 @@ record has `content: [{type:'text', text:'...'}, {type:'image', ...}]`.
 
 ### Could
 
-5. Audit historical rows for the same pattern (`content` matches
-   `^\[Image:` with no preceding text) and produce a count + sample. If
-   meaningful, run the widened backfill from (4) across them.
+*(historical-row audit + bulk recovery moved to Phase 50 — see Related)*
 
 ---
 
@@ -106,11 +104,16 @@ record has `content: [{type:'text', text:'...'}, {type:'image', ...}]`.
 
 - [ ] A prompt sent with mixed text + images stores both in `messages[*].content`.
 - [ ] Regression test added under `tests/live-logging/` covers the mixed-content path.
-- [ ] (Optional) `backfill-raw-observations.mjs --recover-from-transcript` flag added; verified end-to-end on row `9a3e700c-…` (which currently has the manual backfill — the recovered text should match what the manual entry described).
 
 ---
 
 ## Related
 
+- **Phase 50 — LSL-grounded async observation resolver.** The bulk-recovery
+  pathway for already-broken historical rows (including row `9a3e700c-…`
+  which currently carries a manual backfill) is handled there via the
+  shared `getLSLWindow` primitive. This phase intentionally narrows to
+  the writer-path fix so the bug stops happening; Phase 50 handles
+  everything before the fix lands.
 - Commit `a607618a3` (2026-05-21): unrelated `[📚]` badge promotion fix from the same session — preserved here only because that session is what surfaced this bug.
 - See also: working memory entry "Tmux Status Bar and Status Line Fast Path" (separate concern).
