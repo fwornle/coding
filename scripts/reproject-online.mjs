@@ -45,15 +45,13 @@
 import path from 'node:path';
 import process from 'node:process';
 import { randomUUID } from 'node:crypto';
-import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import {
   GraphKMStore,
   reprojectFromOnlineStore,
   resolveEntities,
   LLMSemanticMatcher,
 } from '@fwornle/km-core';
-
-const require = createRequire(import.meta.url);
 
 const args = new Set(process.argv.slice(2));
 const DRY_RUN = args.has('--dry-run');
@@ -91,11 +89,15 @@ const llmProxyUrl =
 // Resolve the km-core ontology dir so resolveEntities can expand the
 // default `LearningArtifact` class to its lower subclasses (Plan 41-01).
 // The integration test sets this explicitly; the CLI auto-resolves it
-// from the @fwornle/km-core package root (works whether the package is
-// symlinked, npm-linked, or installed). Override via KM_ONTOLOGY_DIR.
-const kmCoreRoot = path.dirname(
-  require.resolve('@fwornle/km-core/package.json'),
-);
+// from the @fwornle/km-core main entry (works whether the package is
+// symlinked, npm-linked, or installed). The package's `exports` map
+// only declares the `import` condition (no `require`, no
+// `./package.json`), so we must use ESM resolution — `import.meta
+// .resolve` returns the entry's file:// URL; we walk up two levels
+// from `<root>/dist/index.js` to the package root. Override via
+// KM_ONTOLOGY_DIR.
+const kmCoreMainPath = fileURLToPath(import.meta.resolve('@fwornle/km-core'));
+const kmCoreRoot = path.dirname(path.dirname(kmCoreMainPath));
 const ontologyDir =
   process.env.KM_ONTOLOGY_DIR || path.join(kmCoreRoot, 'ontology');
 
