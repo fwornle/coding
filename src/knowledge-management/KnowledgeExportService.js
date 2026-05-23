@@ -13,7 +13,8 @@
 import crypto from 'crypto';
 
 /**
- * Knowledge types from KnowledgeStorageService
+ * Knowledge types — historical taxonomy enumerated locally now that
+ * KnowledgeStorageService.js was deleted in Phase 42 Plan 7 Phase B1.
  */
 const KNOWLEDGE_TYPES = {
   CODING_PATTERN: 'coding_pattern',
