@@ -455,7 +455,28 @@ Plans:
   4. Wave-controller progress updates and KM-Core writes never deadlock or clobber each other — the dashboard's wave-stage view stays consistent with `.data/workflow-progress.json` throughout the run.
   5. B's existing component-manifest works unchanged as a lower ontology against KM-Core's `OntologyRegistry`.
 
-**Plans:** TBD
+**Plans:** 1/7 plans executed
+
+Plans:
+
+**Wave 1 (parallel — disjoint files/repos)**
+
+- [x] 42-01-PLAN.md — km-core GraphKMStore strangler adapter + feature flag (`KM_CORE_PERSISTENCE`); rewire wave-controller.ts:1373 bypass write through the new adapter's `mergeAttributes`. Phase 10 fix lands here (SC#2 anchor).
+- [ ] 42-02-PLAN.md — Race condition fix: coordinator.writeProgressFile gains field-preserving merge for the state-machine subscriber's allowlist (`stepPaused`, `mockLLM`, `singleStepMode`, etc.) — discharges SC#3 + SC#4.
+- [ ] 42-03-PLAN.md — Ontology subsystem migration: flatten `.data/ontologies/` (8 JSONs to root); replace B's OntologyManager with km-core's OntologyRegistry; preserve OntologyClassifier/Validator/QueryEngine (D-53). SC#5 anchor.
+- [ ] 42-04-PLAN.md — **CROSS-REPO (km-core)** — add `embedding?: number[]` to Entity (D-52); land `syncQdrantFromStore` maintenance op (D-52a); land `FastembedEmbeddingClient` default + new `./embeddings` sub-path (D-52c).
+
+**Wave 2** *(depends on 42-01)*
+
+- [ ] 42-05-PLAN.md — One-shot D-54 LevelDB migration script (`scripts/migrate-leveldb-to-kmcore.mjs`): idempotent in-place rewrite of `.data/knowledge-graph/` entities to canonical km-core Entity shape (top-level legacyId, ontologyClass, layer='evidence', descriptionSegments, provenance stamping). Includes 10 integration tests covering property-based invariants + idempotency + error budget.
+
+**Wave 3** *(depends on 42-01 + 42-04 + 42-05)*
+
+- [ ] 42-06-PLAN.md — Wave-controller + wave1/wave2/wave3 agents + kg-operators emit canonical km-core Entity shape via new `canonical-mapper.ts` helper. `persistWaveResult` flag-gated to route through km-core adapter. `deduplication.ts:342 mergeEntityGroup` DELETED in favor of km-core `mergeEntities` (D-50a).
+
+**Wave 4** *(depends on all prior; autonomous: false — has human-verify checkpoint)*
+
+- [ ] 42-07-PLAN.md — Final cleanup + goal-backward verification gate. Atomic dir-swap of migrated LevelDB; DELETE GraphDatabaseService.js + KnowledgeStorageService.js + QdrantSyncService.js + persistence-agent.ts + graph-database-adapter.ts + persistence-flag.ts; remove KM_CORE_PERSISTENCE flag; rewire content-validation-agent.ts. Production wave-analysis workflow run + `syncQdrantFromStore` rebuild + SC#1-5 verification script + human-verify operator gate.
 
 #### Phase 43: OKM Cross-Repo Migration (C)
 
@@ -527,7 +548,7 @@ Plans:
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
 | 40. Ingest Pipeline & Layered Dedup | 12/12 | Complete    | 2026-05-22 |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
-| 42. Offline UKB Migration (B) | 0/? | Not started | - |
+| 42. Offline UKB Migration (B) | 1/7 | In Progress|  |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
 | 44. REST API & Git Snapshots | 0/? | Not started | - |
 | 45. Unified Web Viewer | 0/? | Not started | - |

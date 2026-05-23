@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: "Ready to discuss (next step: `/gsd-discuss-phase 42`)"
+status: executing
 stopped_at: Phase 42 planned (7 plans across 4 waves; checker PASS after rev 1)
-last_updated: "2026-05-23T10:23:54.205Z"
+last_updated: "2026-05-23T12:07:15.604Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 15
   completed_phases: 5
   total_plans: 41
-  completed_plans: 34
+  completed_plans: 35
   percent: 33
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 42 — Offline UKB Migration (B) — INT-02. Migrates `mcp-server-semantic-analysis` to km-core; folds in Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition.
+**Current focus:** Phase 42 — offline-ukb-migration-b
 
 **v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
 
@@ -49,9 +49,9 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 42 (offline-ukb-migration-b) — not yet scaffolded
-Plan: Not started
-Status: Ready to discuss (next step: `/gsd-discuss-phase 42`)
+Phase: 42 (offline-ukb-migration-b) — EXECUTING
+Plan: 2 of 7
+Status: Ready to execute
 Last activity: 2026-05-23
 
 ## Performance Metrics
@@ -139,6 +139,9 @@ Last activity: 2026-05-23
 - [Phase 38-05]: GraphKMStore constructor extended with `ontologyDir?: string` + `ontologyStrict?: boolean` options (D-28 — no env-var/cwd pickup; consumer wires defaults at call site). When `ontologyDir` is set, the constructor instantiates `new OntologyRegistry({ ontologyDir, strict })` into a `private readonly registry` field; the validator is then resolved via a 3-way chain (most-specific wins): explicit `opts.ontologyValidator` > auto-wired `registryBackedValidator(registry)` > `noopOntologyValidator`. New public `get ontology(): OntologyRegistry | undefined` getter exposes the registry; the validator stays private (internal plumbing).
 - [Phase 38-05]: All 4 Phase 37 NO-CHANGE invariants preserved: PersistenceManager+Exporter ordering (awk p<e at lines 146,149 — gated), line 240-242 trusted-path `if (!trusted) validator.validate` block byte-identical (grep-verified), mergeAttributes ontology-skip untouched (T-37-04-06 accepted disposition stands), skipOntologyCheck BC-2 widening preserved (no separate skipIdCheck flag introduced). All 33 Phase 37 vitest tests still pass — zero regression. km-core commit 1094046.
 - [Phase 38-06]: Verification spine landed — `tests/unit/ontology-registry.test.ts` (581 lines, 21 tests across 6 describe-blocks + 1 top-level test) covers ALL FOUR SCs: SC#1 auto-discovery (5 tests in §auto-discovery + 1 reload-add test in §reload), SC#2 extends+merge (3 tests including verbatim child-relationship inheritance via kpifw.KPIPipeline→upper.Pipeline + synthetic-conflict child-wins property override), SC#3 B-shape coding-ontology fixture (2 tests in isolated tmpdir to avoid kpifw/business/raas cross-contamination — 7 L1 + 5 L2 names all valid; L2 parent chains correct; L1 inherit Component relationships), SC#4 stable API surface (5 accessor-tests + 1 top-level named-export witness test). D-27 collision warning text VERBATIM grep-asserted (full template string, stronger than the plan's substring-match minimum). Two appended graph-store tests verify Plan 38-05 auto-wired registry validator + Phase 37 BC-2 (skipOntologyCheck widening) preservation. Total final test count: 56 across 7 files (was 33 — +23 net). All 11 Phase 37 protected graph-store test names preserved verbatim. FLAG-2 OR-precedence neutralized by canonical `registry` variable name. km-core commits d624212 (ontology-registry.test.ts) + b343a3b (graph-store.test.ts append). Phase 38 complete (6/6) and ready for `/gsd:verify-phase 38`.
+- [Phase ?]: [Phase 42-01]: km-core strangler adapter landed — KM_CORE_PERSISTENCE='km-core' literal env match flips bypass writes to GraphKMStore.mergeAttributes; legacy default preserved (Phase 10 fix wired, e2e deferred to Plan 7 SC#2)
+- [Phase ?]: [Phase 42-01]: km-core injected into Docker via bind-mount (${HOME}/Agentic/km-core → /coding/node_modules/@fwornle/km-core:ro), not package.json dep — matches existing strangler pattern; reverted in Phase 42 final cleanup plan
+- [Phase ?]: [Phase 42-01]: Adapter resolves entity names via store.iterate() scan (km-core 0.1.0 has no findByName) — O(n) acceptable for B's <1000-entity bypass loop; Plan 5+ may add name index if profiling warrants
 
 ### Blockers/Concerns
 
@@ -173,9 +176,10 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 38 P04 | 3min | 2 tasks | 2 files |
 | Phase 38 P05 | 2min | 1 task  | 1 file  |
 | Phase 38 P06 | 4min | 2 tasks | 2 files |
+| Phase 42 P01 | 16min | 3 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-05-23T10:23:54.198Z
+Last session: 2026-05-23T12:06:55.911Z
 Stopped at: Phase 42 planned (7 plans across 4 waves; checker PASS after rev 1)
 Resume with: `/gsd:verify-phase 38` (then `/gsd:execute-phase 39` to start Entity Data Model)
