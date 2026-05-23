@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: ready_to_plan
-stopped_at: Phase 41 complete (7/7) — ready to discuss Phase 47
-last_updated: 2026-05-23T05:43:31.003Z
-last_activity: 2026-05-22 -- Phase 41 execution started
+stopped_at: Phase 41 (A migration) complete — Phase 42 (B/UKB migration) is next in v7.1
+last_updated: 2026-05-23T09:30:00.000Z
+last_activity: 2026-05-23 -- Phase 41 closed; corrected next-phase pointer (was wrongly 47)
 progress:
-  total_phases: 14
-  completed_phases: 4
-  total_plans: 34
-  completed_plans: 34
-  percent: 29
+  total_phases: 10
+  completed_phases: 5
+  total_plans: 41
+  completed_plans: 41
+  percent: 50
 ---
 
 # Project State
@@ -21,13 +21,36 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
+**Current focus:** Phase 42 — Offline UKB Migration (B) — INT-02. Migrates `mcp-server-semantic-analysis` to km-core; folds in Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition.
+
+**v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
+
+| # | Title | System | Status |
+|---|-------|--------|--------|
+| 37 | KM-Core Foundation | shared | ✓ |
+| 38 | Ontology Registry | shared | ✓ |
+| 39 | Entity Data Model | shared | ✓ |
+| 40 | Ingest Pipeline & Layered Dedup | shared | ✓ |
+| 41 | Online Learning Adapter & Post-Hoc Resolution | A (ODI) | ✓ |
+| **42** | **Offline UKB Migration** | **B (mcp-server-semantic-analysis)** | **NEXT** |
+| 43 | OKM Cross-Repo Migration | C (rapid-automations/OKM) | pending |
+| 44 | REST API & Git Snapshots | shared (requires A+B+C) | pending |
+| 45 | Unified Web Viewer | shared (requires API) | pending |
+| 46 | Per-System Docs & Onboarding | shared | pending |
+
+**Out-of-milestone backlog (NOT v7.1 work — bug-fix phases that got slotted by number):**
+- Phase 47: ObservationWriter drops user-prompt text when image attachment present
+- Phase 48: VKB graph strips `entity_type='System'` nodes when their team is unchecked
+- Phase 49: 187 orphan VKB entities (~24%) lack project-anchor relations
+- Phase 50: LSL-grounded async observation resolver
+
+These are real bugs; address them after v7.1 closes, or as side-tracks between milestone phases if they become blocking.
 
 ## Current Position
 
-Phase: 47
+Phase: 42 (offline-ukb-migration-b) — not yet scaffolded
 Plan: Not started
-Status: Ready to plan
+Status: Ready to discuss (next step: `/gsd-discuss-phase 42`)
 Last activity: 2026-05-23
 
 ## Performance Metrics
