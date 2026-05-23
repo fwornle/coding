@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: ready_to_plan
-stopped_at: Phase 41 (A migration) complete — Phase 42 (B/UKB migration) is next in v7.1
-last_updated: 2026-05-23T09:30:00.000Z
-last_activity: 2026-05-23 -- Phase 41 closed; corrected next-phase pointer (was wrongly 47)
+status: "Ready to discuss (next step: `/gsd-discuss-phase 42`)"
+stopped_at: Phase 42 context gathered
+last_updated: "2026-05-23T08:01:24.707Z"
+last_activity: 2026-05-23
 progress:
-  total_phases: 10
+  total_phases: 15
   completed_phases: 5
-  total_plans: 41
-  completed_plans: 41
-  percent: 50
+  total_plans: 34
+  completed_plans: 34
+  percent: 33
 ---
 
 # Project State
@@ -39,6 +39,7 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 | 46 | Per-System Docs & Onboarding | shared | pending |
 
 **Out-of-milestone backlog (NOT v7.1 work — bug-fix phases that got slotted by number):**
+
 - Phase 47: ObservationWriter drops user-prompt text when image attachment present
 - Phase 48: VKB graph strips `entity_type='System'` nodes when their team is unchecked
 - Phase 49: 187 orphan VKB entities (~24%) lack project-anchor relations
@@ -175,6 +176,6 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-05-22T13:41:34.862Z
-Stopped at: Phase 41 context gathered
+Last session: 2026-05-23T08:01:24.693Z
+Stopped at: Phase 42 context gathered
 Resume with: `/gsd:verify-phase 38` (then `/gsd:execute-phase 39` to start Entity Data Model)
