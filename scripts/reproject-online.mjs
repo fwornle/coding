@@ -28,6 +28,8 @@
  * Env:
  *   OBSERVATION_EXPORT_DIR  default ./.data/observation-export
  *   KM_GRAPH_DIR            default /tmp/km-core-reproject-<runId>
+ *   KM_ONTOLOGY_DIR         default <km-core-pkg-root>/ontology (auto-resolved
+ *                           via require.resolve('@fwornle/km-core/package.json'))
  *   LLM_PROXY_URL           default http://localhost:12435/v1/chat/completions
  *
  * Output:
@@ -43,12 +45,15 @@
 import path from 'node:path';
 import process from 'node:process';
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
 import {
   GraphKMStore,
   reprojectFromOnlineStore,
   resolveEntities,
   LLMSemanticMatcher,
 } from '@fwornle/km-core';
+
+const require = createRequire(import.meta.url);
 
 const args = new Set(process.argv.slice(2));
 const DRY_RUN = args.has('--dry-run');
@@ -82,6 +87,17 @@ const kmGraphDir =
   path.join('/tmp', 'km-core-reproject-' + runId);
 const llmProxyUrl =
   process.env.LLM_PROXY_URL || 'http://localhost:12435/v1/chat/completions';
+
+// Resolve the km-core ontology dir so resolveEntities can expand the
+// default `LearningArtifact` class to its lower subclasses (Plan 41-01).
+// The integration test sets this explicitly; the CLI auto-resolves it
+// from the @fwornle/km-core package root (works whether the package is
+// symlinked, npm-linked, or installed). Override via KM_ONTOLOGY_DIR.
+const kmCoreRoot = path.dirname(
+  require.resolve('@fwornle/km-core/package.json'),
+);
+const ontologyDir =
+  process.env.KM_ONTOLOGY_DIR || path.join(kmCoreRoot, 'ontology');
 
 const REQUEST_TIMEOUT_MS = 60_000;
 
@@ -163,6 +179,7 @@ async function main() {
   const store = new GraphKMStore({
     dbPath: path.join(kmGraphDir, 'leveldb'),
     exportDir: path.join(kmGraphDir, 'exports'),
+    ontologyDir,
     debounceMs: 100,
   });
   await store.open();
