@@ -345,6 +345,29 @@ constraints:
   enabled: true
   suggestion: Use useReducer for complex state or separate into multiple useState
     calls
+- id: km-core-graphkmstore-needs-ontology-dir
+  group: framework_specific
+  pattern: new\s+GraphKMStore\s*\(\s*\{(?:(?!ontologyDir)[^}{])*\}\s*\)
+  message: 'GraphKMStore constructed without ontologyDir — resolveEntities default-class
+    expansion will throw at runtime. Pass `ontologyDir: defaultOntologyDir()` (both
+    exported from @fwornle/km-core) OR call resolveEntities with an explicit `classes:
+    [...]` arg. Phase 41 process learning — see CLAUDE.md.'
+  severity: warning
+  enabled: true
+  file_pattern: \.(js|mjs|cjs|ts|tsx|jsx)$
+  suggestion: |
+    Import the helper and use it:
+      import { GraphKMStore, defaultOntologyDir } from '@fwornle/km-core';
+      const store = new GraphKMStore({
+        dbPath: '...',
+        exportDir: '...',
+        ontologyDir: defaultOntologyDir(),
+      });
+
+    Exception: tests that deliberately omit ontologyDir to exercise the
+    default-class error path (e.g. tests/unit/ontology/default-dir.test.ts
+    Test D in km-core). These warnings are informational, not blocking
+    (warning severity, not error).
 - id: no-java-jar-plantuml
   group: plantuml
   pattern: java\s+.*-jar\s+.*plantuml
