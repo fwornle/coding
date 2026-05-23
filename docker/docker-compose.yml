@@ -85,6 +85,15 @@ services:
       - ${CODING_REPO:-.}/.git:/coding/.git:ro
       # Workspace access (host repos)
       - ${HOME}/Agentic:/workspace:ro
+      # km-core peer package — Phase 42 strangler adapter (Plan 01).
+      # Mounted at /coding/node_modules/@fwornle/km-core so that
+      # `import('@fwornle/km-core')` from the bind-mounted semantic-analysis
+      # dist resolves at runtime. The host project links km-core via a
+      # symlink in coding/node_modules — Docker's bind mount substitutes
+      # for that symlink inside the container without changing
+      # semantic-analysis's package.json. Removed in Phase 42's final
+      # cleanup plan along with the rest of the strangler scaffolding.
+      - ${HOME}/Agentic/km-core:/coding/node_modules/@fwornle/km-core:ro
       # Config files (live-mounted to avoid staleness)
       - ${CODING_REPO:-.}/.env:/coding/.env:ro
       - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:rw
