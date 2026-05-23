@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: "Phase 42-04 complete (km-core INT-02 surfaces landed: D-52 + D-52a + D-52c)"
-last_updated: "2026-05-23T13:30:41.552Z"
+stopped_at: "Phase 42-05 complete (D-54 LevelDB→km-core migration script + production dry-run verified: 802 entities, 0 errors, 19 unregistered class flags)"
+last_updated: "2026-05-23T14:30:00Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 15
   completed_phases: 5
   total_plans: 41
-  completed_plans: 38
-  percent: 33
+  completed_plans: 39
+  percent: 34
 ---
 
 # Project State
@@ -50,7 +50,7 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 ## Current Position
 
 Phase: 42 (offline-ukb-migration-b) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-05-23
 
@@ -148,6 +148,10 @@ Last activity: 2026-05-23
 - [Phase ?]: [Phase 42-04]: km-core Phase 42 INT-02 surfaces landed — Entity.embedding?: number[] (D-52), syncQdrantFromStore maintenance op (D-52a), FastembedEmbeddingClient default + ./embeddings sub-path (D-52c). Cross-repo: 6 commits in /Users/Q284340/Agentic/km-core (TDD RED+GREEN per task); container-side bind-mount picks up new code with no Docker rebuild. 242/242 km-core tests pass (+18 net).
 - [Phase ?]: [Phase 42-04]: Real EmbeddingClient interface is single-text (Phase 40 contract); FastembedEmbeddingClient implements embed(text) and adds separate embedBatch(texts) for batch ergonomics — plan's <interfaces> block had the wrong signature. Documented as Rule 1 deviation.
 - [Phase ?]: [Phase 42-04]: QdrantClient is a structural interface defined inside syncQdrantFromStore.ts (not from @qdrant/*) — km-core stays Qdrant-agnostic at the type level (Phase 40 LLMClient precedent extended to vector stores). Caller wraps their concrete client to match upsert(collection, points).
+- [Phase ?]: [Phase 42-05]: D-54 in-place LevelDB→km-core migration script lands at scripts/migrate-leveldb-to-kmcore.mjs (~395 LoC) + 10-case integration test. Idempotent via top-level legacyId.system==='B' AND parseable UUIDv7 id check (CF-D37 placement, mirrors Phase 41 reproject pattern). Fail-loud 5% error budget. Trusted-path bulk writes (skipOntologyCheck:true so ad-hoc B classes still land). Atomic dir swap deferred to Plan 7.
+- [Phase ?]: [Phase 42-05]: Production dry-run inside coding-services container: 802 entities (RESEARCH baseline 727; 75 added since), 0 errors, 19 ontologyClassUnregistered flags. The 19 are Project (11) + System (1) + Knowledge (7) — NOT the specialized Config/Port/Container classes RESEARCH §6 Risk 3 warned about (those ARE registered post-Plan-42-03). Surface area for Plan 7 to consider extending the ontology with Project/System/Knowledge classes.
+- [Phase ?]: [Phase 42-05]: Live container holds LOCK on .data/knowledge-graph LevelDB; dry-run requires snapshotting source to /tmp inside container + removing the LOCK file before opening. Read-only intent honored. Plan 7 e2e gate's real migration run must either stop the container first OR snapshot pre-migration.
+- [Phase ?]: [Phase 42-05]: B's LevelDB shape is single-blob, not key-per-entity (GraphDatabaseService._persistGraphToLevel writes all nodes under one key 'graph' as {nodes:[{key,attributes},...], edges:[], metadata:{}}). Plan text said "iterate all entries via streaming API" — actual implementation reads the blob and iterates nodes[]. Same end-result; documented as plan-text staleness.
 
 ### Blockers/Concerns
 
@@ -186,12 +190,13 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 42 P02 | 26min | 2 tasks | 3 files |
 | Phase 42 P03 | 27m | 3 tasks | 13 files |
 | Phase 42 P04 | 12m | 4 tasks | 11 files |
+| Phase 42 P05 | 30m | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-05-23T13:30:41.535Z
-Stopped at: Phase 42-04 complete (km-core INT-02 surfaces landed: D-52 + D-52a + D-52c)
-Resume with: `/gsd:execute-phase 42` to run Plan 3 (ontology subsystem migration)
+Last session: 2026-05-23T14:30:00Z
+Stopped at: Phase 42-05 complete (D-54 LevelDB→km-core migration script; production dry-run = 802 entities / 0 errors / 19 unregistered class flags)
+Resume with: `/gsd:execute-phase 42` to run Plan 6 (wave-controller emit-shape migration)
 
 Plan 02 follow-up for Plan 7:
 

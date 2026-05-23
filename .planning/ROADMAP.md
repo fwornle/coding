@@ -468,7 +468,7 @@ Plans:
 
 **Wave 2** *(depends on 42-01)*
 
-- [ ] 42-05-PLAN.md — One-shot D-54 LevelDB migration script (`scripts/migrate-leveldb-to-kmcore.mjs`): idempotent in-place rewrite of `.data/knowledge-graph/` entities to canonical km-core Entity shape (top-level legacyId, ontologyClass, layer='evidence', descriptionSegments, provenance stamping). Includes 10 integration tests covering property-based invariants + idempotency + error budget.
+- [x] 42-05-PLAN.md — One-shot D-54 LevelDB migration script (`scripts/migrate-leveldb-to-kmcore.mjs`): idempotent in-place rewrite of `.data/knowledge-graph/` entities to canonical km-core Entity shape (top-level legacyId, ontologyClass, layer='evidence', descriptionSegments, provenance stamping). Includes 10 integration tests covering property-based invariants + idempotency + error budget.
 
 **Wave 3** *(depends on 42-01 + 42-04 + 42-05)*
 
@@ -548,7 +548,7 @@ Plans:
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
 | 40. Ingest Pipeline & Layered Dedup | 12/12 | Complete    | 2026-05-22 |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
-| 42. Offline UKB Migration (B) | 4/7 | In Progress|  |
+| 42. Offline UKB Migration (B) | 5/7 | In Progress|  |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
 | 44. REST API & Git Snapshots | 0/? | Not started | - |
 | 45. Unified Web Viewer | 0/? | Not started | - |
