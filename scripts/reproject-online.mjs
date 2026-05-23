@@ -29,8 +29,11 @@
  *   OBSERVATION_EXPORT_DIR  default ./.data/observation-export
  *   KM_GRAPH_DIR            default /tmp/km-core-reproject-<runId>
  *   KM_ONTOLOGY_DIR         default <km-core-pkg-root>/ontology (auto-resolved
- *                           via require.resolve('@fwornle/km-core/package.json'))
- *   LLM_PROXY_URL           default http://localhost:12435/v1/chat/completions
+ *                           via import.meta.resolve('@fwornle/km-core'))
+ *   LLM_PROXY_URL           default http://localhost:12435/api/complete
+ *                           (rapid-llm-proxy native endpoint — returns
+ *                           { content, provider, model, tokens, latencyMs }
+ *                           directly; NOT OpenAI /v1/chat/completions shape)
  *
  * Output:
  *   - process.stdout: the JSON result object
@@ -84,7 +87,7 @@ const kmGraphDir =
   process.env.KM_GRAPH_DIR ||
   path.join('/tmp', 'km-core-reproject-' + runId);
 const llmProxyUrl =
-  process.env.LLM_PROXY_URL || 'http://localhost:12435/v1/chat/completions';
+  process.env.LLM_PROXY_URL || 'http://localhost:12435/api/complete';
 
 // Resolve the km-core ontology dir so resolveEntities can expand the
 // default `LearningArtifact` class to its lower subclasses (Plan 41-01).
@@ -111,10 +114,16 @@ const provenance = {
 };
 
 /**
- * Build an LLMClient (LLMSemanticMatcher dependency) that wraps the
- * local LLM proxy with an OpenAI-compatible chat-completions request.
- * Returns { content } per the LLMClient contract from
- * @fwornle/km-core/dedup.
+ * Build an LLMClient (LLMSemanticMatcher dependency) that posts to the
+ * local rapid-llm-proxy `/api/complete` endpoint and unwraps its native
+ * response shape (`{ content, provider, model, tokens, latencyMs }`) to
+ * the `{ content }` contract from @fwornle/km-core/dedup.
+ *
+ * The proxy is NOT OpenAI-compatible — it accepts `{ process, messages,
+ * taskType? }` and returns `{ content }` directly. Passing `taskType`
+ * routes dedup calls to a cheaper model (claude-haiku rather than
+ * sonnet). The analog is `scripts/backfill-raw-observations.mjs`
+ * (line 95: `callProxy` POSTs to `${PROXY_URL}/api/complete`).
  */
 function makeProxyLLMClient(url) {
   return {
@@ -129,11 +138,12 @@ function makeProxyLLMClient(url) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            process: 'reproject-online',
             messages: req.messages,
+            ...(req.taskType ? { taskType: req.taskType } : {}),
             ...(req.responseFormat
-              ? { response_format: req.responseFormat }
+              ? { responseFormat: req.responseFormat }
               : {}),
-            ...(req.taskType ? { task_type: req.taskType } : {}),
           }),
           signal: controller.signal,
         });
@@ -144,10 +154,7 @@ function makeProxyLLMClient(url) {
           );
         }
         const body = await resp.json();
-        // OpenAI-compatible payload shape: { choices: [{ message: { content } }] }.
-        // The proxy may also surface { content } directly for non-OpenAI tiers.
-        const content =
-          body?.choices?.[0]?.message?.content ?? body?.content ?? '';
+        const content = body?.content ?? '';
         return { content: typeof content === 'string' ? content : String(content) };
       } finally {
         clearTimeout(timer);
