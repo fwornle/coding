@@ -594,6 +594,16 @@ Plans:
 Plans:
 - [ ] TBD (run /gsd-plan-phase 50 to break down)
 
+### Phase 51: GSD wave-execution sub-agent transcripts are not captured as observations
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 50
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 51 to break down)
+
 ---
 
 ## Backlog
