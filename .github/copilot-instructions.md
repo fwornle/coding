@@ -16,6 +16,8 @@ Paths shown as `~` refer to the user's home directory.
 - **PlantUML**: Use `plantuml` CLI command. NEVER `java -jar plantuml.jar`
 - **TypeScript**: Mandatory with strict type checking
 - **API design**: Never modify working APIs for TypeScript compliance; fix types instead
+- **km-core scripts**: Any CLI or service that imports `resolveEntities` from `@fwornle/km-core` MUST construct `GraphKMStore` with an `ontologyDir` option — otherwise default-class resolution throws `opts.classes omitted but store has no ontology registry`. Resolve via `import.meta.resolve('@fwornle/km-core')` + walk up to package root. Integration tests pass this explicitly, so absent CLI greps will mask the gap (Phase 41 lesson, commits `87bc2f567` / `fd35c5350`). When authoring a new CLI plan, include an acceptance grep for `ontologyDir` in the script.
+- **km-core LLM proxy endpoint**: The local rapid-llm-proxy serves `POST /api/complete` (NOT OpenAI `/v1/chat/completions`). Request body: `{ process, messages, taskType? }`; response: `{ content, provider, model, tokens, latencyMs }` — not OpenAI-wrapped. See `scripts/backfill-raw-observations.mjs:95` for the canonical client. Passing `taskType` routes dedup calls to claude-haiku (cheaper).
 
 ## Startup & Services
 
