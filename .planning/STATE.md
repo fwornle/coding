@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 42-02 complete (SC#3 PASS, SC#4 escalated to Plan 7)
-last_updated: "2026-05-23T12:36:00.000Z"
+stopped_at: "Phase 42-02 complete (SC#3 PASS, SC#4 escalated to Plan 7)"
+last_updated: "2026-05-23T13:10:46.831Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 15
   completed_phases: 5
   total_plans: 41
-  completed_plans: 36
-  percent: 34
+  completed_plans: 37
+  percent: 33
 ---
 
 # Project State
@@ -50,8 +50,8 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 ## Current Position
 
 Phase: 42 (offline-ukb-migration-b) — EXECUTING
-Plan: 3 of 7
-Status: Ready to execute (Plans 01 + 02 complete)
+Plan: 4 of 7
+Status: Ready to execute
 Last activity: 2026-05-23
 
 ## Performance Metrics
@@ -144,6 +144,7 @@ Last activity: 2026-05-23
 - [Phase ?]: [Phase 42-01]: Adapter resolves entity names via store.iterate() scan (km-core 0.1.0 has no findByName) — O(n) acceptable for B's <1000-entity bypass loop; Plan 5+ may add name index if profiling warrants
 - [Phase ?]: [Phase 42-02]: Field-preserving merge landed in coordinator.writeProgressFile — PROGRESS_PRESERVE_KEYS allowlist mirrors workflow-state-machine.ts:117-162 verbatim (stepPaused/pausedAtStep/pausedAt/mockLLM/mockLLMDelay/singleStepMode/stepIntoSubsteps/llmState + nested config.singleStepMode). SC#3 PASS (0 race-condition warnings post-run); SC#4 escalated to Plan 7 (workflow-runner exits before terminal write — RESEARCH §2 fix #1 single-writer architecture)
 - [Phase ?]: [Phase 42-02]: preserveFromExisting helper exported from coordinator.ts as a module-level function (not a private method) so tests can import directly. Both writeFileSync(progressPath,...) call sites — writeProgressFile body + checkSingleStepPause — now route through the same allowlist guard
+- [Phase ?]: [Phase 42-03]: km-core OntologyRegistry adopted via LegacyOntologyAdapter shim (100 lines) — Validator/Classifier/QueryEngine kept (D-53); B's 8 ontology JSONs flattened + structurally converted to km-core OntologyFile shape under D-53b (entities -> classes; hoist meta:{}); Detail class added to coding-ontology.json (D-53b minimal addition); team argument is silently dropped by adapter (single-team registry per instance)
 
 ### Blockers/Concerns
 
@@ -180,14 +181,16 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 38 P06 | 4min | 2 tasks | 2 files |
 | Phase 42 P01 | 16min | 3 tasks | 5 files |
 | Phase 42 P02 | 26min | 2 tasks | 3 files |
+| Phase 42 P03 | 27m | 3 tasks | 13 files |
 
 ## Session Continuity
 
-Last session: 2026-05-23T12:36:00.000Z
+Last session: 2026-05-23T13:10:41.577Z
 Stopped at: Phase 42-02 complete (SC#3 PASS, SC#4 escalated to Plan 7)
 Resume with: `/gsd:execute-phase 42` to run Plan 3 (ontology subsystem migration)
 
 Plan 02 follow-up for Plan 7:
+
 - Read .planning/phases/42-offline-ukb-migration-b/42-02-VERIFY-FAIL.log
 - SC#4 (terminal-state consistency within 5s of process exit) requires the
   RESEARCH §2 fix #1 single-writer architecture refactor. The workflow runner
