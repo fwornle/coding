@@ -17,7 +17,10 @@ import {
   ValidationOptions,
   UnifiedInferenceEngine,
 } from './types.js';
-import { OntologyManager } from './OntologyManager.js';
+// Phase 42-03: legacy ontology-load class deleted; LegacyOntologyAdapter wraps
+// km-core's OntologyRegistry and exposes the slice of the old surface this
+// module needs (getAllEntityClasses + resolveEntityDefinition).
+import { LegacyOntologyAdapter } from './LegacyOntologyAdapter.js';
 import { OntologyValidator } from './OntologyValidator.js';
 import { HeuristicClassifier } from './heuristics/HeuristicClassifier.js';
 import { ontologyMetrics, startTimer } from './metrics.js';
@@ -48,7 +51,7 @@ export class OntologyClassifier {
   private inferenceEngine: UnifiedInferenceEngine;
 
   constructor(
-    private ontologyManager: OntologyManager,
+    private ontology: LegacyOntologyAdapter,
     private validator: OntologyValidator,
     heuristicClassifier: HeuristicClassifier,
     inferenceEngine: UnifiedInferenceEngine
@@ -223,7 +226,7 @@ export class OntologyClassifier {
 
     try {
       // Get available entity classes for context
-      const entityClasses = this.ontologyManager.getAllEntityClasses(team);
+      const entityClasses = this.ontology.getAllEntityClasses(team);
       console.log(`[OntologyClassifier] Available entity classes: ${entityClasses.length}`);
       debugLog('Available entity classes', { count: entityClasses.length });
 
@@ -442,7 +445,7 @@ Choose the most appropriate entity class and provide a confidence score between 
     try {
       // Get entity definition
       const team = ontology !== 'upper' ? ontology : undefined;
-      const entityDef = this.ontologyManager.resolveEntityDefinition(
+      const entityDef = this.ontology.resolveEntityDefinition(
         entityClass,
         team
       );
@@ -562,7 +565,7 @@ Respond with JSON containing the extracted properties. Only include properties t
   } {
     return {
       heuristicTeams: this.heuristicClassifier.getRegisteredTeams(),
-      totalEntityClasses: this.ontologyManager.getAllEntityClasses().length,
+      totalEntityClasses: this.ontology.getAllEntityClasses().length,
     };
   }
 }

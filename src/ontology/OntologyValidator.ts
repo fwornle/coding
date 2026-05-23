@@ -19,14 +19,17 @@ import {
   PropertyValidationResult,
   OntologyValidationError,
 } from './types.js';
-import { OntologyManager, ResolvedEntityDefinition } from './OntologyManager.js';
+// Phase 42-03: legacy ontology-load class deleted; LegacyOntologyAdapter wraps
+// km-core's OntologyRegistry and exposes the slice of the old surface this
+// module needs (hasEntityClass + resolveEntityDefinition).
+import { LegacyOntologyAdapter, ResolvedEntityDefinition } from './LegacyOntologyAdapter.js';
 import { ontologyMetrics } from './metrics.js';
 
 /**
  * OntologyValidator - Validates entity instances against ontology schemas
  */
 export class OntologyValidator {
-  constructor(private ontologyManager: OntologyManager) {}
+  constructor(private ontology: LegacyOntologyAdapter) {}
 
   /**
    * Validate an entity instance against its ontology definition
@@ -50,8 +53,8 @@ export class OntologyValidator {
     const warnings: ValidationError[] = [];
 
     try {
-      // Resolve entity definition with inheritance
-      const entityDef = this.ontologyManager.resolveEntityDefinition(
+      // Resolve entity definition with inheritance (via km-core registry adapter)
+      const entityDef = this.ontology.resolveEntityDefinition(
         entityClass,
         options.team
       );
@@ -354,7 +357,7 @@ export class OntologyValidator {
 
         if (propDef.targetEntityClass) {
           // Optional: Verify referenced entity class exists
-          const exists = this.ontologyManager.hasEntityClass(
+          const exists = this.ontology.hasEntityClass(
             propDef.targetEntityClass,
             options.team
           );

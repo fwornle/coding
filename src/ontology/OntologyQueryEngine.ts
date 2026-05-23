@@ -15,7 +15,12 @@ import {
   QueryOptions,
   OntologyQueryResult,
 } from './types.js';
-import { OntologyManager } from './OntologyManager.js';
+// Phase 42-03: legacy ontology-load class deleted. The field below is held but
+// never read (verified by grep on this file in Phase 42-03 research); kept
+// for source-compatibility with downstream callers that pass it in. Type
+// pointed at LegacyOntologyAdapter so the entire ontology subsystem shares
+// a single dependency.
+import { LegacyOntologyAdapter } from './LegacyOntologyAdapter.js';
 
 /**
  * Knowledge item with ontology metadata (interface for query results)
@@ -41,7 +46,7 @@ export interface KnowledgeWithOntology {
  */
 export class OntologyQueryEngine {
   constructor(
-    private ontologyManager: OntologyManager,
+    private ontology: LegacyOntologyAdapter,
     private graphDatabase: any // GraphDatabaseService (JavaScript)
   ) {}
 

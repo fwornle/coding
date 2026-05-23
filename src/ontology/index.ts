@@ -39,7 +39,7 @@
  */
 
 export * from './types.js';
-export * from './OntologyManager.js';
+export * from './LegacyOntologyAdapter.js';
 export * from './OntologyValidator.js';
 export * from './OntologyClassifier.js';
 export * from './OntologyConfigManager.js';
@@ -47,7 +47,7 @@ export * from './heuristics/index.js';
 export * from './metrics.js';
 
 import { OntologyConfig } from './types.js';
-import { OntologyManager } from './OntologyManager.js';
+import { LegacyOntologyAdapter } from './LegacyOntologyAdapter.js';
 import { OntologyValidator } from './OntologyValidator.js';
 import { OntologyClassifier } from './OntologyClassifier.js';
 import { createHeuristicClassifier } from './heuristics/index.js';
@@ -57,7 +57,13 @@ import type { UnifiedInferenceEngine } from './types.js';
  * Complete ontology system instance
  */
 export interface OntologySystem {
-  manager: OntologyManager;
+  /**
+   * Legacy adapter exposing hasEntityClass / getAllEntityClasses /
+   * resolveEntityDefinition on top of km-core's OntologyRegistry
+   * (Phase 42-03 D-53 — B's specific intelligence stays; the deleted
+   * legacy manager is replaced by this shim around km-core).
+   */
+  ontology: LegacyOntologyAdapter;
   validator: OntologyValidator;
   classifier: OntologyClassifier;
   config: OntologyConfig;
@@ -69,14 +75,21 @@ export interface OntologySystem {
  * IMPORTANT: inferenceEngine is REQUIRED. No mock fallback is provided.
  * Pass a real LLM inference engine from SemanticAnalyzer.
  *
+ * IMPORTANT: caller constructs the km-core OntologyRegistry and supplies the
+ * LegacyOntologyAdapter wrapper. This factory keeps the OntologyValidator
+ * + OntologyClassifier wiring identical to the pre-Phase-42-03 shape so
+ * existing call paths in persistence-agent.ts don't change.
+ *
  * @param config - Ontology system configuration
  * @param inferenceEngine - LLM inference engine (REQUIRED for classification)
+ * @param adapter - LegacyOntologyAdapter wrapping a km-core OntologyRegistry
  * @returns Initialized ontology system
- * @throws Error if inferenceEngine is not provided
+ * @throws Error if inferenceEngine or adapter is not provided
  */
 export async function createOntologySystem(
   config: OntologyConfig,
-  inferenceEngine: UnifiedInferenceEngine
+  inferenceEngine: UnifiedInferenceEngine,
+  adapter: LegacyOntologyAdapter,
 ): Promise<OntologySystem> {
   // Validate inference engine is provided - NO MOCK FALLBACK
   if (!inferenceEngine) {
@@ -86,26 +99,29 @@ export async function createOntologySystem(
     );
   }
 
-  // Create manager and initialize
-  const manager = new OntologyManager(config);
-  await manager.initialize();
+  if (!adapter) {
+    throw new Error(
+      'createOntologySystem requires a LegacyOntologyAdapter (Phase 42-03). ' +
+      'Caller must construct one around a km-core OntologyRegistry first.'
+    );
+  }
 
   // Create validator
-  const validator = new OntologyValidator(manager);
+  const validator = new OntologyValidator(adapter);
 
   // Create heuristic classifier
   const heuristicClassifier = createHeuristicClassifier();
 
   // Create main classifier with provided inference engine
   const classifier = new OntologyClassifier(
-    manager,
+    adapter,
     validator,
     heuristicClassifier,
     inferenceEngine
   );
 
   return {
-    manager,
+    ontology: adapter,
     validator,
     classifier,
     config,
