@@ -455,7 +455,7 @@ Plans:
   4. Wave-controller progress updates and KM-Core writes never deadlock or clobber each other — the dashboard's wave-stage view stays consistent with `.data/workflow-progress.json` throughout the run.
   5. B's existing component-manifest works unchanged as a lower ontology against KM-Core's `OntologyRegistry`.
 
-**Plans:** 4/7 plans executed
+**Plans:** 6/7 plans executed
 
 Plans:
 
@@ -472,7 +472,7 @@ Plans:
 
 **Wave 3** *(depends on 42-01 + 42-04 + 42-05)*
 
-- [ ] 42-06-PLAN.md — Wave-controller + wave1/wave2/wave3 agents + kg-operators emit canonical km-core Entity shape via new `canonical-mapper.ts` helper. `persistWaveResult` flag-gated to route through km-core adapter. `deduplication.ts:342 mergeEntityGroup` DELETED in favor of km-core `mergeEntities` (D-50a).
+- [x] 42-06-PLAN.md — Wave-controller + wave1/wave2/wave3 agents + kg-operators emit canonical km-core Entity shape via new `canonical-mapper.ts` helper. `persistWaveResult` flag-gated to route through km-core adapter. `deduplication.ts:342 mergeEntityGroup` DELETED in favor of km-core `mergeEntities` (D-50a).
 
 **Wave 4** *(depends on all prior; autonomous: false — has human-verify checkpoint)*
 
@@ -548,7 +548,7 @@ Plans:
 | 39. Entity Data Model | 4/4 | Complete    | 2026-05-20 |
 | 40. Ingest Pipeline & Layered Dedup | 12/12 | Complete    | 2026-05-22 |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
-| 42. Offline UKB Migration (B) | 5/7 | In Progress|  |
+| 42. Offline UKB Migration (B) | 6/7 | In Progress|  |
 | 43. OKM Cross-Repo Migration (C) | 0/? | Not started | - |
 | 44. REST API & Git Snapshots | 0/? | Not started | - |
 | 45. Unified Web Viewer | 0/? | Not started | - |

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: "Phase 42-05 complete (D-54 LevelDB→km-core migration script + production dry-run verified: 802 entities, 0 errors, 19 unregistered class flags)"
-last_updated: "2026-05-23T14:30:00Z"
+stopped_at: Phase 42-06 complete (canonical emit + flag-gated km-core persistWithKmCore + mergeEntityGroup → km-core mergeEntities; 12 unit tests pass, container-side AC verified)
+last_updated: "2026-05-23T14:27:56.887Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 15
   completed_phases: 5
   total_plans: 41
-  completed_plans: 39
-  percent: 34
+  completed_plans: 40
+  percent: 33
 ---
 
 # Project State
@@ -50,7 +50,7 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 ## Current Position
 
 Phase: 42 (offline-ukb-migration-b) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-05-23
 
@@ -152,6 +152,11 @@ Last activity: 2026-05-23
 - [Phase ?]: [Phase 42-05]: Production dry-run inside coding-services container: 802 entities (RESEARCH baseline 727; 75 added since), 0 errors, 19 ontologyClassUnregistered flags. The 19 are Project (11) + System (1) + Knowledge (7) — NOT the specialized Config/Port/Container classes RESEARCH §6 Risk 3 warned about (those ARE registered post-Plan-42-03). Surface area for Plan 7 to consider extending the ontology with Project/System/Knowledge classes.
 - [Phase ?]: [Phase 42-05]: Live container holds LOCK on .data/knowledge-graph LevelDB; dry-run requires snapshotting source to /tmp inside container + removing the LOCK file before opening. Read-only intent honored. Plan 7 e2e gate's real migration run must either stop the container first OR snapshot pre-migration.
 - [Phase ?]: [Phase 42-05]: B's LevelDB shape is single-blob, not key-per-entity (GraphDatabaseService._persistGraphToLevel writes all nodes under one key 'graph' as {nodes:[{key,attributes},...], edges:[], metadata:{}}). Plan text said "iterate all entries via streaming API" — actual implementation reads the blob and iterates nodes[]. Same end-result; documented as plan-text staleness.
+- [Phase ?]: [Phase 42-06]: canonical km-core Entity emit shape via toCanonicalEntity + augmentWithCanonical in src/agents/canonical-mapper.ts. Wave1/Wave2/Wave3 agents stamp ontologyClass + entityType + legacyId + metadata.{subsystem,descriptionSegments,provenance} onto every emitted entity at the wave's return point. KGEntity interface extended with 4 optional canonical fields; legacy 'type' field kept with deprecation note (Phase 43 removes it).
+- [Phase ?]: [Phase 42-06]: wave-controller persistWaveResult now flag-gated. When KM_CORE_PERSISTENCE=km-core AND kmCoreAdapter is bootstrapped, routes through new persistWithKmCore method that bypasses the 7-layer pipeline entirely (D-52b). Per-entity / per-relation errors fail-soft (Phase 41 resolveEntities precedent — T-42-06-03 mitigation). Legacy path preserved verbatim when flag is off.
+- [Phase ?]: [Phase 42-06]: DeduplicationAgent local mergeEntityGroup function DELETED (D-50a). Replacement mergeDuplicateGroup forwards to km-core mergeEntities (imported from '@fwornle/km-core' root barrel per Plan 42-01 SUMMARY exports-map deviation). New setKmCoreStore(store, runId) injector is opt-in — orphan callers without injection skip merges + log stderr without throwing.
+- [Phase ?]: [Phase 42-06]: Plan-text staleness — wave2 emits ONLY SubComponent entities (not Component AND SubComponent as plan's <interfaces> block suggested). The 7 Component entities in production all trace to wave1's L1 emit (wave1-project-agent.ts:497), NOT a wave2 sub-emit path. All wave2 entities mapped to ontologyClass='SubComponent' in Plan 6.
+- [Phase ?]: [Phase 42-06]: augmentation-over-substitution pattern P42-06-1 — wave agents stamp canonical fields ON the existing KGEntity (in-place augment via augmentWithCanonical) rather than substituting a new Entity object. Both shapes coexist during the strangler transition; Plan 7 cleanup deletes legacy fields after all readers migrate.
 
 ### Blockers/Concerns
 
@@ -191,11 +196,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 42 P03 | 27m | 3 tasks | 13 files |
 | Phase 42 P04 | 12m | 4 tasks | 11 files |
 | Phase 42 P05 | 30m | 2 tasks | 2 files |
+| Phase 42 P06 | 45m | - tasks | - files |
 
 ## Session Continuity
 
-Last session: 2026-05-23T14:30:00Z
-Stopped at: Phase 42-05 complete (D-54 LevelDB→km-core migration script; production dry-run = 802 entities / 0 errors / 19 unregistered class flags)
+Last session: 2026-05-23T14:27:56.879Z
+Stopped at: Phase 42-06 complete (canonical emit + flag-gated km-core persistWithKmCore + mergeEntityGroup → km-core mergeEntities; 12 unit tests pass, container-side AC verified)
 Resume with: `/gsd:execute-phase 42` to run Plan 6 (wave-controller emit-shape migration)
 
 Plan 02 follow-up for Plan 7:
