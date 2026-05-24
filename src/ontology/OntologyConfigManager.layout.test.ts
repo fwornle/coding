@@ -260,4 +260,70 @@ describe('Phase 42.1.1 Plan 01 Task 2 — OntologyConfigManager layout integrati
     assert.match(threw!.message, /nonexistent-team-xyz-ontology\.json/);
     OntologyConfigManager.resetInstance();
   });
+
+  // -------------------------------------------------------------------------
+  // Test E (CR-01 regression): injectOntology() with hotReload re-registers
+  // file watchers against the resolver-canonical path, not the two-tier hint
+  // the caller passed.
+  //
+  // Before the CR-01 fix: getStatus().watchedFiles still contained the
+  // two-tier path (which does not exist on disk) — runtime ontology swaps
+  // silently broke hot-reload.
+  // After the CR-01 fix: getStatus().watchedFiles contains the resolved flat
+  // path; the previous watcher is torn down; subsequent on-disk edits fire
+  // ontologyChanged events.
+  // -------------------------------------------------------------------------
+  it('Test E (CR-01): injectOntology with hotReload re-registers watchers against the resolved canonical path', async () => {
+    OntologyConfigManager.resetInstance();
+    // Construct with hotReload=true but do NOT call initialize() — that would
+    // start watchers from validatePaths() and complicate the before/after
+    // assertion. We want to drive injectOntology() directly and assert the
+    // watcher set transitions to the resolved path.
+    const manager = OntologyConfigManager.getInstance({
+      enabled: true,
+      upperOntologyPath: upperTwoTier(),
+      team: 'coding',
+      lowerOntologyPath: lowerTwoTier('coding'),
+      hotReload: true,
+      watchInterval: 60_000, // long enough that no callbacks fire during the test
+    });
+
+    // Drive the rewire path. The resolver-canonical path WILL differ from the
+    // two-tier hints (real on-disk layout is flat) — that is exactly the
+    // condition CR-01 was triggered by.
+    await manager.injectOntology({
+      upperOntologyPath: upperTwoTier(),
+      lowerOntologyPath: lowerTwoTier('coding'),
+      team: 'coding',
+    });
+
+    const status = manager.getStatus();
+    const watched = status.watchedFiles;
+    process.stderr.write(`[Test E] watchedFiles after inject: ${watched.join(', ')}\n`);
+
+    // The two-tier hint paths MUST NOT appear in watchedFiles — they do not
+    // exist on disk and watching them would silently lose hot-reload events.
+    assert.ok(
+      !watched.includes(upperTwoTier()),
+      `two-tier upper path must NOT be watched (CR-01 regression): ${upperTwoTier()}`,
+    );
+    assert.ok(
+      !watched.includes(lowerTwoTier('coding')),
+      `two-tier lower path must NOT be watched (CR-01 regression): ${lowerTwoTier('coding')}`,
+    );
+
+    // The resolved (flat) paths MUST be watched.
+    const resolvedUpper = manager.getConfig().upperOntologyPath;
+    const resolvedLower = manager.getConfig().lowerOntologyPath!;
+    assert.ok(
+      watched.includes(resolvedUpper),
+      `resolved upper path must be watched: ${resolvedUpper}; watched=${watched.join(', ')}`,
+    );
+    assert.ok(
+      watched.includes(resolvedLower),
+      `resolved lower path must be watched: ${resolvedLower}; watched=${watched.join(', ')}`,
+    );
+
+    OntologyConfigManager.resetInstance();
+  });
 });

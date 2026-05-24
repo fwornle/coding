@@ -336,7 +336,27 @@ export class OntologyConfigManager extends EventEmitter {
   }
 
   /**
-   * Inject a new ontology configuration (swap ontologies at runtime)
+   * Inject a new ontology configuration (swap ontologies at runtime).
+   *
+   * Phase 42.1.1 review fixes:
+   *
+   *   CR-01: rewires hot-reload file watchers when the resolver picks a
+   *          canonical absolute path that differs from the previously-watched
+   *          path. Without this rewire, the old polling watcher tracks a stale
+   *          (possibly non-existent) path and on-disk edits to the new
+   *          ontology never fire `ontologyChanged`.
+   *
+   *   WR-01: preserves the structured `OntologyPathNotFoundError` on re-throw
+   *          using the ES2022 `cause` option so callers retain access to
+   *          `kind` / `team` / `probedPaths`.
+   *
+   *   WR-02: emits one `ontologyInjected` event per kind that actually
+   *          changed (upper / lower / team), replacing the hard-coded
+   *          `type: 'upper'` that mis-routed lower-only or team-only swaps.
+   *
+   *   WR-03: when `options.team` changes the team but no `lowerOntologyPath`
+   *          is supplied, re-resolves the lower path under the new team so
+   *          `getStatus()` / `getConfig()` do not report a team/path mismatch.
    */
   async injectOntology(options: {
     upperOntologyPath?: string;
@@ -345,6 +365,8 @@ export class OntologyConfigManager extends EventEmitter {
     validationMode?: ValidationMode;
   }): Promise<void> {
     const previousConfig = { ...this.config };
+    const previousUpper = this.config.upperOntologyPath;
+    const previousLower = this.config.lowerOntologyPath;
 
     if (options.upperOntologyPath) {
       try {
@@ -353,16 +375,28 @@ export class OntologyConfigManager extends EventEmitter {
           team: options.team ?? this.config.team,
           configHint: options.upperOntologyPath,
         });
-        // Preserve the existing "Upper ontology not found:" prefix that
-        // callers may grep on, but include the full probed-path list as the
-        // suffix so layout drift surfaces immediately.
         this.config.upperOntologyPath = layout.resolvedPath;
         process.stderr.write(
           `[OntologyConfigManager] upper ontology injected: layout=${layout.layout} alias=${layout.alias} path=${layout.resolvedPath}\n`,
         );
       } catch (err) {
         if (err instanceof OntologyPathNotFoundError) {
-          throw new Error(`Upper ontology not found: ${err.message}`);
+          // WR-01: preserve the structured error via `cause` and surface the
+          // kind / team / probedPaths fields so the "Upper ontology not found:"
+          // prefix contract is honoured AND callers can still
+          // `instanceof OntologyPathNotFoundError` via err.cause.
+          const wrapped: Error & {
+            cause?: unknown;
+            probedPaths?: string[];
+            kind?: 'upper' | 'lower';
+            team?: string;
+          } = new Error(`Upper ontology not found: ${err.message}`, {
+            cause: err,
+          });
+          wrapped.probedPaths = err.probedPaths;
+          wrapped.kind = err.kind;
+          wrapped.team = err.team;
+          throw wrapped;
         }
         throw err;
       }
@@ -381,7 +415,58 @@ export class OntologyConfigManager extends EventEmitter {
         );
       } catch (err) {
         if (err instanceof OntologyPathNotFoundError) {
-          throw new Error(`Lower ontology not found: ${err.message}`);
+          // WR-01: same preserve-via-cause pattern as the upper arm above.
+          const wrapped: Error & {
+            cause?: unknown;
+            probedPaths?: string[];
+            kind?: 'upper' | 'lower';
+            team?: string;
+          } = new Error(`Lower ontology not found: ${err.message}`, {
+            cause: err,
+          });
+          wrapped.probedPaths = err.probedPaths;
+          wrapped.kind = err.kind;
+          wrapped.team = err.team;
+          throw wrapped;
+        }
+        throw err;
+      }
+    }
+
+    // WR-03: a team-only swap (no explicit lowerOntologyPath) must re-resolve
+    // the lower path under the new team — otherwise the manager reports a
+    // team/path mismatch via getStatus() and the hot-reload watcher continues
+    // polling the OLD team's file. Only attempt the re-resolve when the team
+    // is actually changing AND the caller did not already supply a lower path.
+    if (
+      options.team &&
+      options.team !== this.config.team &&
+      !options.lowerOntologyPath
+    ) {
+      try {
+        const layout: OntologyLayoutDetected = resolveOntologyPath({
+          kind: 'lower',
+          team: options.team,
+          configHint: this.config.lowerOntologyPath,
+        });
+        this.config.lowerOntologyPath = layout.resolvedPath;
+        process.stderr.write(
+          `[OntologyConfigManager] lower ontology re-resolved on team swap: team=${options.team} layout=${layout.layout} alias=${layout.alias} path=${layout.resolvedPath}\n`,
+        );
+      } catch (err) {
+        if (err instanceof OntologyPathNotFoundError) {
+          const wrapped: Error & {
+            cause?: unknown;
+            probedPaths?: string[];
+            kind?: 'upper' | 'lower';
+            team?: string;
+          } = new Error(`Lower ontology not found: ${err.message}`, {
+            cause: err,
+          });
+          wrapped.probedPaths = err.probedPaths;
+          wrapped.kind = err.kind;
+          wrapped.team = err.team;
+          throw wrapped;
         }
         throw err;
       }
@@ -395,13 +480,69 @@ export class OntologyConfigManager extends EventEmitter {
       this.config.validation.mode = options.validationMode;
     }
 
-    // Emit change event for listeners to reload
-    this.emit('ontologyInjected', {
-      type: 'upper',
-      previousValue: previousConfig,
-      newValue: this.config,
-      timestamp: new Date(),
-    } as ConfigChangeEvent);
+    // CR-01: re-wire hot-reload watchers when the resolver-canonical path
+    // differs from the previously-watched path. Phase 42.1.1's whole point is
+    // that the resolved path differs from what callers pass in (two-tier in,
+    // flat out), so the old watcher polls a path that no longer represents
+    // truth. Only `stopWatchingFile` + `watchFile` when the path actually
+    // changed — otherwise the existing watcher is correct and we avoid
+    // tearing down a healthy interval.
+    if (this.config.hotReload) {
+      if (previousUpper !== this.config.upperOntologyPath) {
+        if (previousUpper) {
+          this.stopWatchingFile(previousUpper);
+        }
+        if (this.config.upperOntologyPath) {
+          this.watchFile(this.config.upperOntologyPath, () => {
+            this.emit('ontologyChanged', {
+              type: 'upper',
+              timestamp: new Date(),
+            } as ConfigChangeEvent);
+          });
+        }
+      }
+      if (previousLower !== this.config.lowerOntologyPath) {
+        if (previousLower) {
+          this.stopWatchingFile(previousLower);
+        }
+        if (this.config.lowerOntologyPath) {
+          this.watchFile(this.config.lowerOntologyPath, () => {
+            this.emit('ontologyChanged', {
+              type: 'lower',
+              team: this.config.team,
+              timestamp: new Date(),
+            } as ConfigChangeEvent);
+          });
+        }
+      }
+    }
+
+    // WR-02: emit one `ontologyInjected` event per kind that actually changed
+    // so listeners discriminating on `type` route correctly. The previous
+    // implementation hard-coded `type: 'upper'` regardless of which arm of the
+    // injection ran, which mis-routed every lower-only and team-only swap.
+    const changedTypes: Array<'upper' | 'lower' | 'team'> = [];
+    if (options.upperOntologyPath) changedTypes.push('upper');
+    if (options.lowerOntologyPath) changedTypes.push('lower');
+    if (options.team && options.team !== previousConfig.team) {
+      changedTypes.push('team');
+    }
+    // Fallback — if only validationMode changed, still emit one event with the
+    // closest-fit type so existing listeners that count events do not silently
+    // miss the update. 'upper' was the historical default; preserve it here so
+    // the prior single-event contract is honoured for validationMode-only swaps.
+    if (changedTypes.length === 0 && options.validationMode) {
+      changedTypes.push('upper');
+    }
+    for (const t of changedTypes) {
+      this.emit('ontologyInjected', {
+        type: t,
+        team: t === 'team' || t === 'lower' ? this.config.team : undefined,
+        previousValue: previousConfig,
+        newValue: this.config,
+        timestamp: new Date(),
+      } as ConfigChangeEvent);
+    }
   }
 
   /**
