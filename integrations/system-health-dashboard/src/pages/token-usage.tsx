@@ -53,6 +53,24 @@ const PROCESS_COLORS: Record<string, string> = {
   'unknown': '#94a3b8',               // slate — distinct from PROCESS gray and from EVOLUTION_PALETTE[0] blue
 }
 
+// Palette slots that don't collide with any canonical PROCESS_COLORS value.
+// evoColorFor() prefers this subset when hashing non-canonical keys so an
+// unknown process can never accidentally render in the same color as a
+// known one (e.g. blue observation-writer vs. blue unknown at 1h window).
+const CANONICAL_PROCESS_COLOR_SET = new Set(Object.values(PROCESS_COLORS))
+const SAFE_EVOLUTION_PALETTE = EVOLUTION_PALETTE.filter(c => !CANONICAL_PROCESS_COLOR_SET.has(c))
+
+// Stable string-to-int hash (djb2-style). Used by evoColorFor so a given
+// key always lands on the same palette slot across re-renders.
+function hashKey(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h) + s.charCodeAt(i)
+    h |= 0
+  }
+  return Math.abs(h)
+}
+
 const PROVIDER_COLORS: Record<string, string> = {
   'copilot': '#2563eb',
   'claude-code': '#7c3aed',
@@ -330,18 +348,21 @@ export function TokenUsagePage() {
     for (const k of evoKeys) out[k] = Number(row[k] || 0)
     return out
   })
-  const evoColorFor = (key: string, idx: number): string => {
-    // Reuse the canonical process palette when stacking by process so a
-    // process keeps the same color across all charts. Processes not in the
-    // canonical map (test/reap-*/etc.) fall back to the rotating palette
-    // by their stack index — beats every unknown process collapsing to a
-    // single gray slab. Models always use the rotating palette.
+  const evoColorFor = (key: string, _idx: number): string => {
+    // Process colors are stable: canonical map first, then a hash of the
+    // key into a "safe palette" that excludes any color already used by
+    // PROCESS_COLORS. Hashing (instead of stack-index lookup) keeps a
+    // given key's color identical across re-renders even when the set of
+    // visible series changes — e.g. switching from 24h to 1h dropped
+    // 'unknown' from EVOLUTION_PALETTE[4] to [0] and made it collide with
+    // observation-writer. Models share the same logic so model series also
+    // keep stable colors.
     if (evoGroupBy === 'process') {
       const canonical = PROCESS_COLORS[key]
       if (canonical) return canonical
-      return EVOLUTION_PALETTE[idx % EVOLUTION_PALETTE.length]
     }
-    return EVOLUTION_PALETTE[idx % EVOLUTION_PALETTE.length]
+    const palette = SAFE_EVOLUTION_PALETTE.length > 0 ? SAFE_EVOLUTION_PALETTE : EVOLUTION_PALETTE
+    return palette[hashKey(key) % palette.length]
   }
   const windowLabel = WINDOW_OPTIONS.find(o => o.value === hoursWindow)?.label || hoursWindow
 
