@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 42-06 complete (canonical emit + flag-gated km-core persistWithKmCore + mergeEntityGroup → km-core mergeEntities; 12 unit tests pass, container-side AC verified)
-last_updated: "2026-05-24T13:57:41.847Z"
-last_activity: 2026-05-24 -- Phase 42.1.1 planning complete
+stopped_at: Phase 42.1.1-01 complete (ontologyPathResolver + OntologyConfigManager loader-path wiring + Test C softened per Option A; 18/18 node:test pass; layer-1 SC#6 unblocked; NEW known residual — Project class not on disk, layer-2 follow-up tracked separately)
+last_updated: "2026-05-24T17:30:00.000Z"
+last_activity: 2026-05-24 -- Phase 42.1.1 plan 01 complete (layer-1 of SC#6 root cause)
 progress:
   total_phases: 19
   completed_phases: 7
-  total_plans: 43
-  completed_plans: 42
-  percent: 37
+  total_plans: 44
+  completed_plans: 43
+  percent: 38
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 42.1 — ukb-project-anchor-parity
+**Current focus:** Phase 42.1.1 — ontology-layout-resolution-registry-empty-because-loader-exp
 
 **v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
 
@@ -49,11 +49,11 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 42.1 (ukb-project-anchor-parity) — EXECUTING
-Plan: 1 of 1
-Status: Ready to execute
-Next step: /gsd-plan-phase 42.1.1
-Last activity: 2026-05-24 -- Phase 42.1.1 planning complete
+Phase: 42.1.1 (ontology-layout-resolution-registry-empty-because-loader-exp) — COMPLETE (loader fix, layer 1 of SC#6)
+Plan: 1 of 1 complete
+Status: Phase 42.1.1 closed. Awaiting layer-2 follow-up (add `Project` class to `.data/ontologies/upper.json`) before `/gsd-verify-phase 42.1` will pass.
+Next step: Either (a) open a new bug-fix phase to register `Project` on disk, then `/gsd-verify-phase 42.1`; OR (b) continue with Phase 42 (Offline UKB Migration) and address the Project-class follow-up in parallel.
+Last activity: 2026-05-24 -- Phase 42.1.1 plan 01 complete (layer-1 SC#6 unblocked; 18/18 node:test pass; commits 6bde70ba0..00c6ca154; SUMMARY 42803f2b6)
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Last activity: 2026-05-24 -- Phase 42.1.1 planning complete
 - Phase 51 added 2026-05-23 (scope broadened same day): agent-agnostic sub-agent capture across LSL **and** observations. Original framing was Claude-Code-only observation backfill; real requirement is sub-agents must appear in both LSL (`.specstory/history/`) and observations panel, in real time, for claude/opencode/copilot/mastra alike. Live (spawn-time hook) + sweep (periodic backfill) tiers both needed. LSL naming convention proposed: `{YYYY-MM-DD}_{HHHH-HHHH}_S{slot}-{idx}-{hash}[-part{N}].md`. First plan-phase step is per-agent research into how each spawns sub-agents. See `.planning/phases/51-…/51-CONTEXT.md`. (Concrete trigger: 25 sub-agent transcripts under `<parent>/subagents/agent-*.jsonl` confirmed today during the Phase 42 wave — backfill running via `scripts/backfill-subagent-transcripts.mjs` proof-of-concept.)
 - Phase 52 added 2026-05-24: Dashboard LLM routing label + process tag observability fix. Two issues surfaced during the phase 42.1 production ukb run. (1) Wave-analysis HTTP calls don't set `body.process`, so all UKB sub-step calls land in `.data/llm-proxy/token-usage.db` with `process='unknown'` — operators can't pin per-sub-step provider/model via `processOverrides` in `llm-settings.json`. (2) Dashboard sub-step badges hardcode `'Groq: llama-3.3-70b-versatile'` (constants.ts:603 + 18 literals) although the proxy's auto-route preference order is `claude-code → copilot → groq → openai → anthropic`. Token-usage telemetry for the 2026-05-24 11:34Z run confirmed ZERO groq calls — all wave-analysis traffic went to copilot (6) + claude-code (4). Routing is correct; the dashboard label is misleading. Bug-fix style phase, outside v7.1 milestone scope. See `.planning/phases/52-…/NOTES.md` for evidence base.
 - Phase 42.1.1 inserted after Phase 42.1: Ontology layout resolution — registry empty because loader expects .data/ontologies/{upper,lower}/ subdirs but files live flat at .data/ontologies/. Blocks 42.1 SC#6 + Phase 40 dedup type signal. See .planning/forensics/report-20260524-130355.md (URGENT)
+- Phase 42.1.1 plan 01 complete 2026-05-24: layer-1 of SC#6 root cause unblocked (ontologyPathResolver helper + OntologyConfigManager.{validatePaths,injectOntology} wired through resolver). 18/18 node:test pass against real `.data/ontologies/` flat layout for all 7 teams. Path-a invariant preserved (zero caller modifications, zero `.data/ontologies/*` modifications). NEW known residual surfaced during execution: the `Project` class — which `ensureProjectAnchor('Coding')` mints at runtime — is NOT declared in any on-disk ontology JSON (upper.json exposes File/Service/Feature/Contract/RuntimeDiagnostics; team ontologies declare L2 team-specific classes). Test C was softened per user Option A (drop `isValidClass('Project')`, add `domains.length === 8` + keep `isValidClass('Component')`). A follow-up ticket is required to add `Project` to `.data/ontologies/upper.json` before `/gsd-verify-phase 42.1` will pass — this is layer 2 of the SC#6 cascade and is separate from both 42.1 and 42.1.1. See `.planning/phases/42.1.1-…/42.1.1-01-SUMMARY.md` § Known Residuals.
 
 ### Decisions
 
@@ -161,6 +162,9 @@ Last activity: 2026-05-24 -- Phase 42.1.1 planning complete
 - [Phase ?]: [Phase 42-06]: DeduplicationAgent local mergeEntityGroup function DELETED (D-50a). Replacement mergeDuplicateGroup forwards to km-core mergeEntities (imported from '@fwornle/km-core' root barrel per Plan 42-01 SUMMARY exports-map deviation). New setKmCoreStore(store, runId) injector is opt-in — orphan callers without injection skip merges + log stderr without throwing.
 - [Phase ?]: [Phase 42-06]: Plan-text staleness — wave2 emits ONLY SubComponent entities (not Component AND SubComponent as plan's <interfaces> block suggested). The 7 Component entities in production all trace to wave1's L1 emit (wave1-project-agent.ts:497), NOT a wave2 sub-emit path. All wave2 entities mapped to ontologyClass='SubComponent' in Plan 6.
 - [Phase ?]: [Phase 42-06]: augmentation-over-substitution pattern P42-06-1 — wave agents stamp canonical fields ON the existing KGEntity (in-place augment via augmentWithCanonical) rather than substituting a new Entity object. Both shapes coexist during the strangler transition; Plan 7 cleanup deletes legacy fields after all readers migrate.
+- [Phase 42.1.1-01]: Layout-tolerant ontology resolver lives at `src/ontology/ontologyPathResolver.ts` (NOT inside km-core) because km-core is consumer-agnostic by design — knowledge of the project's `.data/ontologies/` directory shape belongs in the consumer (B's mcp-server-semantic-analysis). Resolver is exposed via the ontology barrel so future consumers (insight-generation-agent cleanup) can adopt the same lookup without re-implementing the dirname-walk.
+- [Phase 42.1.1-01]: Probe-counter test-only API (`__resetProbeCounter`/`__getProbeCount`) chosen over the "delete file and retry" cache-hit assertion strategy because (a) it works against the real `.data/ontologies/` directory without filesystem mutation, (b) it's idempotent across parallel test runs, and (c) the plan locks it as "the single canonical assertion for cache behaviour". Double-underscore prefix marks it as non-public — documented as test-only in JSDoc.
+- [Phase 42.1.1-01]: Test C softened per user Option A — dropped `isValidClass('Project') === true`, kept Component canary + added `domains.length === 8`. Rationale: Project class is not declared in any on-disk ontology JSON; asserting on it would require either editing `.data/ontologies/upper.json` (path-b explicitly rejected by CONTEXT.md) or registering Project at runtime (out of scope for a loader fix). Per CONTEXT.md line 93-94, SC#6 promotion is owned by Phase 42.1's verifier, not 42.1.1. The new known residual (add Project to on-disk JSON) is layer-2 of the SC#6 cascade and tracked as a separate follow-up.
 
 ### Blockers/Concerns
 
@@ -169,6 +173,7 @@ Last activity: 2026-05-24 -- Phase 42.1.1 planning complete
 - [Phase 32]: Copilot per-prompt injection may not be supported -- may need refresh daemon approach
 - [v7.1 Phase 43]: OKM cross-repo packaging strategy (submodule vs published npm vs vendored) — must be decided in INT-03's discuss phase
 - [v7.1 Phase 45]: D3 (VOKB) vs sigma.js (VKB) viewer choice — open question, research seed leans D3
+- [Phase 42.1 SC#6 — layer 2 of the cascade — NEW 2026-05-24]: After Phase 42.1.1 plan 01 closed (loader layer 1 unblocked, 18/18 node:test pass), `ensureProjectAnchor('Coding')` will still raise `Unknown ontology class: Project` at runtime because the `Project` class is not declared in any on-disk `.data/ontologies/*.json`. `/gsd-verify-phase 42.1` will not pass until a follow-up phase adds `Project` to `.data/ontologies/upper.json` (or `coding-ontology.json`) with a minimal schema sufficient for the post-sweep anchor pass. Recommended title: "Phase 42.1.2 — register Project ontology class for ensureProjectAnchor". See `.planning/phases/42.1.1-…/42.1.1-01-SUMMARY.md` § Known Residuals.
 
 ## Deferred Items
 
@@ -201,12 +206,13 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 42 P04 | 12m | 4 tasks | 11 files |
 | Phase 42 P05 | 30m | 2 tasks | 2 files |
 | Phase 42 P06 | 45m | - tasks | - files |
+| Phase 42.1.1 P01 | ~50m (cross-session) | 3 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-05-24T13:06:22.000Z
-Stopped at: Phase 42-06 complete (canonical emit + flag-gated km-core persistWithKmCore + mergeEntityGroup → km-core mergeEntities; 12 unit tests pass, container-side AC verified)
-Resume with: `/gsd:execute-phase 42` to run Plan 6 (wave-controller emit-shape migration)
+Last session: 2026-05-24T17:30:00Z
+Stopped at: Phase 42.1.1-01 complete (ontologyPathResolver + OntologyConfigManager loader-path wiring + Test C softened per Option A; 18/18 node:test pass; layer-1 SC#6 unblocked; NEW known residual — Project class not on disk, layer-2 follow-up tracked separately)
+Resume with: Either open a new bug-fix phase (proposed 42.1.2) to register `Project` on disk and re-run `/gsd-verify-phase 42.1`, OR continue with Phase 42 (Offline UKB Migration) and address the Project-class follow-up in parallel.
 
 Plan 02 follow-up for Plan 7:
 

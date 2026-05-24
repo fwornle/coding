@@ -514,7 +514,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 42.1.1-01-PLAN.md — Implement ontologyPathResolver helper + unit tests; wire OntologyConfigManager.validatePaths() + injectOntology() through resolver + add integration test against real `.data/ontologies/` flat layout; public re-export + regression sweep.
+- [x] 42.1.1-01-PLAN.md — Implement ontologyPathResolver helper + unit tests; wire OntologyConfigManager.validatePaths() + injectOntology() through resolver + add integration test against real `.data/ontologies/` flat layout; public re-export + regression sweep. **COMPLETE 2026-05-24** (commits 6bde70ba0 + 6933264ed + ef9a4e9bd + e341152a8 + 00c6ca154; 18/18 node:test cases pass; layer-1 of SC#6 root cause unblocked; NEW known residual — Project class not on disk, layer-2 follow-up tracked separately. See 42.1.1-01-SUMMARY.md.)
 
 #### Phase 43: OKM Cross-Repo Migration (C)
 
