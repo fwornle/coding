@@ -1985,7 +1985,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] grid grid-rows-[auto_1fr] gap-3 overflow-hidden [&>button.absolute]:right-2 [&>button.absolute]:top-2 [&>button.absolute]:z-50">
         <DialogHeader className="pb-0">
-          <div className="flex items-center justify-between gap-4 pr-8">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pr-8">
             {/* Left side: Title + Tabs inline */}
             <div className="flex items-center gap-4 shrink-0">
               <DialogTitle className="flex items-center gap-2 shrink-0">
