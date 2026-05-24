@@ -674,12 +674,30 @@ export function TokenUsagePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {(() => {
+                  // Metadata lookup keyed by series name. by_process carries
+                  // calls + avg_latency; by_model carries calls only; tokens
+                  // mode (input/output) has no per-series metadata so those
+                  // cells render as em-dash.
+                  const meta = new Map<string, { calls?: number; avg_latency?: number }>()
+                  if (evoGroupBy === 'process') {
+                    for (const p of (summary.by_process || [])) {
+                      meta.set(p.process, { calls: p.calls, avg_latency: p.avg_latency })
+                    }
+                  } else if (evoGroupBy === 'model') {
+                    for (const m of (summary.by_model || [])) {
+                      meta.set(m.model, { calls: m.calls })
+                    }
+                  }
+                  return (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{evoGroupBy === 'process' ? 'Process' : 'Model'}</TableHead>
+                      <TableHead>{evoGroupBy === 'process' ? 'Process' : evoGroupBy === 'model' ? 'Model' : 'Token Type'}</TableHead>
+                      <TableHead className="text-right">Calls</TableHead>
                       <TableHead className="text-right">Total Tokens</TableHead>
-                      <TableHead className="w-[300px]">Share</TableHead>
+                      <TableHead className="text-right">Avg Latency</TableHead>
+                      <TableHead className="w-[240px]">Share</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -692,6 +710,7 @@ export function TokenUsagePage() {
                       .map(({ key, total, color }) => {
                         const grandTotal = summary.total_tokens || 1
                         const pct = (total / grandTotal) * 100
+                        const m = meta.get(key)
                         return (
                           <TableRow key={key}>
                             <TableCell>
@@ -700,7 +719,13 @@ export function TokenUsagePage() {
                                 <span className="font-medium">{key}</span>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right font-mono">{formatTokens(total)}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {m?.calls != null ? m.calls : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold">{formatTokens(total)}</TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">
+                              {m?.avg_latency != null ? formatLatency(m.avg_latency) : <span>—</span>}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
@@ -714,6 +739,8 @@ export function TokenUsagePage() {
                       })}
                   </TableBody>
                 </Table>
+                  )
+                })()}
               </CardContent>
             </Card>
           )}
