@@ -506,6 +506,16 @@ Plans:
 Plans:
 - [ ] 42.1-01-PLAN.md — Restore findBestParent + ensureProjectAnchor + post-sweep contains-edge pass in wave-controller.persistWithKmCore; extend SC verifier with SC#6 orphan check; rebuild Docker + validate via production wave-analysis workflow.
 
+### Phase 42.1.1: Ontology layout resolution — registry empty because loader expects .data/ontologies/{upper,lower}/ subdirs but files live flat at .data/ontologies/. Blocks 42.1 SC#6 + Phase 40 dedup. Forensic: .planning/forensics/report-20260524-130355.md (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 42.1
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 42.1.1 to break down)
+
 #### Phase 43: OKM Cross-Repo Migration (C)
 
 **Goal:** Execute the cross-repo refactor that migrates C (`~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) onto KM-Core; this is a **separate repository** with its own CI, release cycle, and packaging story, so success means landing KM-Core in OKM via the agreed packaging strategy without breaking rapid-automations' green build.
