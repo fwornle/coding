@@ -240,6 +240,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 - [x] **Phase 40: Ingest Pipeline & Layered Dedup** - 4-stage `extract → dedup → store → synthesize` framework with the layered dedup pipeline B and C will implement against. (completed 2026-05-22)
 - [x] **Phase 41: Online Learning Adapter & Post-Hoc Resolution** - INT-01 (A's SQLite hot path exposed as KM-Core entities) + PIPE-02 (post-hoc cross-class entity resolution as a shared maintenance op). (completed 2026-05-23)
 - [ ] **Phase 42: Offline UKB Migration (B)** - Full migration of `mcp-server-semantic-analysis` to KM-Core; folds in Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition.
+- [ ] **Phase 42.1: UKB Project-Anchor Parity** - Restore the `findBestParent` + post-sweep `contains`-edge pass that Phase 42-07 Phase B1 removed when replacing `persistence-agent.persistEntities` with `persistWithKmCore`. Without this, every `ukb full` orphans new entities from the `Coding` Project anchor (forensic 2026-05-24 evidence: +64 entities, 0 new edges to Coding).
 - [ ] **Phase 43: OKM Cross-Repo Migration (C)** - Cross-repo refactor of `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` onto KM-Core; rapid-automations CI stays green.
 - [ ] **Phase 44: REST API & Git Snapshots** - Common entity/search/clusters/snapshots/ontology REST contract + git-snapshot/restore identical across A/B/C.
 - [ ] **Phase 45: Unified Web Viewer** - Single viewer parameterized by ontology config; VKB (B) and VOKB (C) users migrate without functional regression.
@@ -477,6 +478,33 @@ Plans:
 **Wave 4** *(depends on all prior; autonomous: false — has human-verify checkpoint)*
 
 - [ ] 42-07-PLAN.md — Final cleanup + goal-backward verification gate. Atomic dir-swap of migrated LevelDB; DELETE GraphDatabaseService.js + KnowledgeStorageService.js + QdrantSyncService.js + persistence-agent.ts + graph-database-adapter.ts + persistence-flag.ts; remove KM_CORE_PERSISTENCE flag; rewire content-validation-agent.ts. Production wave-analysis workflow run + `syncQdrantFromStore` rebuild + SC#1-5 verification script + human-verify operator gate.
+
+#### Phase 42.1: UKB Project-Anchor Parity
+
+**Goal:** Restore the project-anchor `contains`-edge pass that Phase 42-07 Phase B1 inadvertently removed from B's wave-analysis persist path so newly-emitted wave entities are no longer orphaned from the `Coding` Project anchor. Forensic 2026-05-24 root cause: Phase 42-07 Phase B1 replaced `persistence-agent.persistEntities()` with `persistWithKmCore` in `wave-controller.ts`, dropping the legacy `findBestParent` lookup + post-sweep `contains`-relation insertion that ran after every batch. Online (`ObservationConsolidator._ensureProjectAnchor`) and legacy (`persistence-agent.findBestParent` at L1043-1110) persist paths both still attach new entities to the project root; only the km-core wave path doesn't. Empirical evidence from the 2026-05-24 overnight `ukb full`: +64 entities, +1 relation, **0 new edges to the Coding project anchor**.
+
+**Depends on:** Phase 42
+**Requirements:** INT-02 (continuation — closes a deliverable gap in Phase 42's INT-02 success criterion)
+**Success Criteria** (what must be TRUE):
+
+  1. After a fresh `ukb full` completes, every newly-persisted km-core entity whose `entityType ∉ {Project, System}` and that did not arrive with an incoming `contains`/`parent-child` relation has at least one incoming `contains` edge from either a matching Component/SubComponent or from the `Coding` Project root.
+  2. The `Coding` Project entity exists in the km-core store before the relation sweep runs (mint if absent — idempotent cold-start semantics matching the online path's `_ensureProjectAnchor`).
+  3. The `findBestParent` longest-match heuristic from `persistence-agent.ts:1043-1071` is preserved in behavior: prefer SubComponent over Component over project root, longest substring match wins, falls back to `Coding` when no Component/SubComponent matches the new entity's name.
+  4. The anchor pass is idempotent: re-running `ukb full` on the same store does not duplicate `contains` edges; existing parent relations are detected and skipped.
+  5. The anchor pass is fail-soft: a single failed `storeRelationship` call increments a counter and emits one stderr line but does not abort the persist sweep — matching the existing `persistWithKmCore` pattern (T-42-06-03 mitigation precedent).
+  6. The `42-07-end-to-end-verify.mjs` verifier (already in tree from Phase 42-07) reports `0 orphan entities` after a fresh `ukb full`, where "orphan" is defined as an entity with `entityType ∉ {Project, System}` that has no incoming `contains` edge.
+
+**Out of scope for this phase** (deferred to follow-up phases):
+  - Field-name reconciliation (`metadata.team` vs `metadata.domain` — the Exporter bucketing issue). Tracked separately.
+  - LLM proxy attribution fix (`proxy-provider.ts` doesn't forward `agentId` → process column shows `'unknown'`). Touches the `_work/rapid-llm-proxy` repo; deferred to its own phase.
+  - Legacy persistence trio retirement (Phase 42-07 deferral).
+  - Atomic LevelDB dir-swap (Phase 42-07 deferral).
+  - 802-entity back-fill for existing migrated entities (separate one-shot script — does not block this phase).
+
+**Plans:** 1 plan
+
+Plans:
+- [ ] 42.1-01-PLAN.md — Restore findBestParent + ensureProjectAnchor + post-sweep contains-edge pass in wave-controller.persistWithKmCore; extend SC verifier with SC#6 orphan check; rebuild Docker + validate via production wave-analysis workflow.
 
 #### Phase 43: OKM Cross-Repo Migration (C)
 

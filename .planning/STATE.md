@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: blocked
-stopped_at: Phase 42-07 PARTIAL — Phase A + B1 + SC#4 + Surprise#5 fix landed; Phase C deferred. Operator-observed Plan 42-06 gaps (no project linkage, LLM proxy attribution=unknown) block SC verification. Route to /gsd-forensics on canonical-mapper.ts before planning Phase 42.1.
-last_updated: "2026-05-24T20:25:00.000Z"
+stopped_at: Phase 42-07 PARTIAL — Phase A + B1 + SC#4 + Surprise#5 fix landed; Phase C deferred. Forensic .planning/forensics/report-20260524-073300.md identifies root causes for Plan 42-06 gaps. Load-bearing: Phase 42-07 Phase B1 replaced persistence-agent.persistEntities with persistWithKmCore, dropping findBestParent + post-sweep contains-edge pass — wave entities are now orphaned from the Coding Project anchor (+64 entities, 0 new edges to Coding). Parallel: canonical-mapper has no team/domain param + km-core-adapter underscore-discards team; LLM attribution unknown because proxy-provider doesn't forward agentId. Next step: /gsd-plan-phase 42.1 with Blocks 0-5 from the forensic report; Block 0 (anchor parity) is the urgent fix.
+last_updated: "2026-05-24T05:40:00.000Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 15
