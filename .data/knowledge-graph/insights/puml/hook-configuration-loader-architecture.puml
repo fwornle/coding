@@ -1,0 +1,33 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Configuration Sources" {
+    component "User-Level hooks.json" as userConfig <<storage>>
+    component "Project-Level hooks.json" as projectConfig <<storage>>
+}
+
+component "constraint-configuration.md" as schema <<external>>
+
+package "HookConfigurationLoader" as loaderPkg {
+    component "Config Parser & Validator" as parser <<core>>
+    component "Merge & Override Strategy" as merger <<core>>
+}
+
+package "Hook Execution Engine" {
+    component "UnifiedHookManager" as hookMgr <<core>>
+    component "Pre-Tool Hooks" as preHook <<api>>
+    component "Post-Tool Hooks" as postHook <<api>>
+}
+
+cloud "Claude Code" as claudeCode
+
+userConfig --> parser : "global defaults"
+projectConfig --> parser : "project-level overrides"
+schema ..> parser : "schema contract"
+parser --> merger : "parsed configs"
+merger --> hookMgr : "unified configuration"
+claudeCode --> hookMgr : "native hook events"
+hookMgr --> preHook : "fires"
+hookMgr --> postHook : "fires"
+
+@enduml

@@ -2,149 +2,69 @@
 
 **Type:** SubComponent
 
-OnlineLearning relies on the batch analysis pipeline to process data from git history, LSL sessions, and code analysis.
+The GraphDatabaseAdapter in integrations/mcp-server-semantic-analysis implements a fallback strategy: writes go to the VKB HTTP API when the server is running, or directly to LevelDB otherwise, preventing lock conflicts during batch runs.
 
-## What It Is  
+# OnlineLearning — Technical Insight Document
 
-OnlineLearning is a **sub‑component** of the larger **KnowledgeManagement** system. Its implementation lives primarily in the **`integrations/code-graph-rag/`** directory, where the Code Graph RAG (Retrieval‑Augmented Generation) system is defined. The component orchestrates a **batch analysis pipeline** that ingests three distinct data streams—Git history, LSL (Learning Session Log) sessions, and static code analysis results. Extracted entities are persisted through the **`GraphDatabaseAdapter`** (found at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) and later fed to the **`InsightGenerationModule`**, which produces actionable learning insights. Throughout the processing flow, the **UKB trace report** from the **UtilitiesModule** is used to log and audit each stage, ensuring traceability of the knowledge‑extraction lifecycle.  
+## What It Is
+
+OnlineLearning is a SubComponent of the `KnowledgeManagement` parent component, implemented primarily within `integrations/mcp-server-semantic-analysis` — the MCP semantic analysis server that acts as the orchestration layer for automated entity extraction. It is the automated counterpart to its sibling `ManualLearning`: where ManualLearning produces typed nodes through human authoring, OnlineLearning ingests from multiple programmatic sources — git history, LSL sessions, and code analysis — and produces typed nodes that conform to the same `GraphDatabaseService` schema (Graphology+LevelDB) used by manually authored entities.
+
+The sub-component is responsible for the full pipeline that turns raw signals into persisted, semantically enriched knowledge graph nodes. This includes routing extracted entities through a `PersistenceAgent`, hydrating ontology metadata fields, attaching embedding vectors for semantic similarity <USER_ID_REDACTED>, and applying bi-temporal staleness tracking so the broader lifecycle management layer can detect when knowledge needs refreshing. The integration patterns are documented in `agents.md` within the MCP server directory, which describes how the `PersistenceAgent` and `GraphDatabaseAdapter` cooperate.
 
 ![OnlineLearning — Architecture](images/online-learning-architecture.png)
 
----
+## Architecture and Design
 
-## Architecture and Design  
+The architecture follows a **pipeline-with-fallback** pattern. The batch analysis pipeline ingests from heterogeneous sources, normalizes extracted entities, routes them through a `PersistenceAgent` for metadata enrichment, and finally writes them via the `GraphDatabaseAdapter`. The adapter implements a **priority-ordered write path** rather than a dual-write or eventual-consistency model: writes target the VKB HTTP API when the server is running, and fall back to direct LevelDB access when it is not. This explicit prioritization — surfaced in the child component `VkbLevelDbPersistenceFallback` — is a deliberate design decision that prevents lock conflicts during batch runs, since LevelDB enforces single-process access to its data directory.
 
-The design of OnlineLearning is deliberately **modular** and **pipeline‑centric**. A clear separation exists between **data ingestion**, **knowledge extraction**, **persistence**, and **insight generation**:
+A second key architectural decision is the **separation of concerns between extraction and persistence**. The child component `OntologyMetadataMapper` reflects this: the `mapEntityToSharedMemory()` function is owned by the `PersistenceAgent`, not by the extraction logic. Extractors emit raw typed entities; the persistence layer is solely responsible for hydrating ontology fields before write. This keeps source-specific extractors (git history, LSL sessions, code analysis) small and decoupled from the evolving ontology schema.
 
-1. **Batch Analysis Pipeline** – Acts as the backbone, pulling data from version‑control (Git), runtime learning sessions (LSL), and code‑analysis tools. This pipeline is scheduled in batches, allowing the system to process large histories without overwhelming resources.  
+The third architectural pillar is **schema unification**. By writing into the same `GraphDatabaseService` schema used by `ManualLearning`, OnlineLearning ensures that downstream consumers — <USER_ID_REDACTED>, lifecycle management, semantic similarity searches — can treat automated and manual knowledge homogeneously. The shared entity types (System, Project, Component, SubComponent, Pattern, Detail) come directly from the parent `KnowledgeManagement` ontology.
 
-2. **Code Graph RAG Integration** – Encapsulated in `integrations/code-graph-rag/`, this child component provides a graph‑based retrieval layer that maps code entities to semantic representations. The RAG approach enables the system to answer “code‑centric” queries using the graph built from the batch pipeline.  
+## Implementation Details
 
-3. **GraphDatabaseAdapter** – Implemented in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`, this adapter abstracts the underlying **Graphology + LevelDB** store. Its presence is a textbook **Adapter pattern**, allowing OnlineLearning (and its siblings such as `GraphDatabaseModule`) to interact with the graph without coupling to a specific database implementation.  
+The pipeline begins with source-specific extractors that produce typed entity candidates. These candidates flow into the `PersistenceAgent`, which invokes `mapEntityToSharedMemory()` to pre-populate ontology metadata fields. This call is the canonical entry point for ontology hydration and is owned by the persistence layer rather than any individual extractor. After mapping, the agent hands the enriched entity to the `GraphDatabaseAdapter`.
 
-4. **InsightGenerationModule** – Shared with the sibling `InsightGenerationModule`, it consumes the entity graph and leverages the **UKB trace report** from the `UtilitiesModule` to produce insights. The reliance on a common utilities package demonstrates a **shared‑services** approach within the KnowledgeManagement family.  
+The `GraphDatabaseAdapter`, located in `integrations/mcp-server-semantic-analysis`, encapsulates the fallback logic. It first attempts to write through the **VKB HTTP API**; if the VKB server process is not running, it opens LevelDB directly. This is a runtime-detected fallback, not a configuration toggle, which means batch jobs can be launched without coordinating with a running VKB server while still benefiting from the HTTP path when one is present.
 
-5. **Traceability via UKB** – The UKB trace report is injected from `UtilitiesModule`, providing a lightweight observability layer that records processing timestamps, success/failure flags, and lineage information.  
-
-The component’s **relationship diagram** (shown below) visualizes these interactions, highlighting how OnlineLearning sits between the data ingestion side (Git, LSL, code analysis) and downstream consumers (InsightGenerationModule, GraphDatabaseAdapter).  
+Two enrichment steps are applied at write time. First, **embedding vectors are attached to automatically extracted entities**, enabling semantic similarity <USER_ID_REDACTED> against the Graphology+LevelDB store through the VKB HTTP API. Second, **bi-temporal staleness tracking** writes both valid-time and transaction-time fields onto every automatically extracted entity, allowing the lifecycle management layer to distinguish "when the fact was true" from "when we recorded it" and to schedule refreshes accordingly.
 
 ![OnlineLearning — Relationship](images/online-learning-relationship.png)
 
----
+## Integration Points
 
-## Implementation Details  
+OnlineLearning sits at the intersection of several systems. Upstream, it consumes from **git history**, **LSL sessions**, and **code analysis** — three distinct signal sources, each feeding the same downstream extraction-to-persistence pipeline. Downstream, it depends on the parent `KnowledgeManagement` component's `GraphDatabaseService` and the VKB HTTP API for persistence.
 
-### Batch Analysis Pipeline  
-The pipeline is orchestrated by scripts (not explicitly listed but implied by the “batch analysis” description). It sequentially executes three collectors:
+The primary integration contract is documented in `agents.md` within `integrations/mcp-server-semantic-analysis`, which describes the `PersistenceAgent` and `GraphDatabaseAdapter` patterns. The `PersistenceAgent` is the integration seam for extractors — anything that produces an entity must route through it to get ontology fields, embeddings, and bi-temporal stamps applied consistently. The `GraphDatabaseAdapter` is the integration seam for storage — it abstracts whether the underlying write goes over HTTP to VKB or directly to LevelDB.
 
-* **Git History Collector** – Parses commit metadata, file diffs, and author information.  
-* **LSL Session Collector** – Reads learning‑session logs, extracting timestamps, learner actions, and outcomes.  
-* **Code Analysis Collector** – Runs static analysis tools (e.g., ESLint, TypeScript compiler) to produce an AST‑level view of the codebase.
+OnlineLearning shares its storage substrate and entity-type vocabulary with the sibling `ManualLearning`, meaning the two sub-components are interchangeable from a query-consumer perspective. It also coexists with the sibling `EntityMigrationScripts` (notably `migrate-graph-db-entity-types.js`), which handles type-label consolidation across both automatically and manually authored entities without distinguishing their provenance.
 
-Each collector emits **entity records** (functions, classes, modules, learning events) that are fed into the **Code Graph RAG** engine.
+## Usage Guidelines
 
-### Code Graph RAG Integration (`integrations/code-graph-rag/`)  
-The README in this folder describes a **graph‑based RAG system** that builds a knowledge graph where nodes represent code entities and edges capture relationships (e.g., imports, inheritance, call‑graph links). The RAG layer stores these nodes in the same Graphology + LevelDB store accessed via the `GraphDatabaseAdapter`. Retrieval queries are expressed as graph traversals, enabling semantic searches like “find all functions that mutate a given state variable”.
+Developers extending OnlineLearning should respect the **separation between extraction and persistence**. New source-specific extractors should emit raw typed entities and delegate all ontology field population to the `PersistenceAgent.mapEntityToSharedMemory()` call — they should not attempt to set ontology metadata themselves. This keeps extractors stable when the ontology evolves.
 
-### GraphDatabaseAdapter (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`)  
-Key responsibilities:
+When running batch analyses, rely on the `GraphDatabaseAdapter` fallback rather than manually selecting a persistence target. The adapter's runtime detection is the supported mechanism for avoiding LevelDB lock conflicts; bypassing it risks corrupting the store if a VKB server is concurrently active. Conversely, when the VKB server is running, prefer routing writes through the HTTP API so that any in-process caches or hooks on the server side stay consistent.
 
-* **CRUD Operations** – `createEntity`, `readEntity`, `updateEntity`, `deleteEntity`.  
-* **Batch Upserts** – Optimized for the high‑volume writes produced by the batch pipeline.  
-* **JSON Export Sync** – Automatically serializes the graph to JSON after each batch, ensuring external tools can consume a snapshot without direct DB access.  
+Always ensure that **embeddings and bi-temporal fields** are produced for automatically extracted entities. These are not optional enrichments — they are required for the downstream semantic similarity <USER_ID_REDACTED> and lifecycle staleness detection to function. If a new extractor cannot produce content suitable for embedding, this should be treated as a gap in the extractor rather than a reason to skip the field.
 
-The adapter also exposes a **query interface** used by the InsightGenerationModule to fetch sub‑graphs for analysis.
+Finally, because OnlineLearning writes into the same schema as `ManualLearning`, treat the graph as a shared namespace. Coordinate with manual authoring conventions for entity naming and typing, and rely on `EntityMigrationScripts` (e.g., `migrate-graph-db-entity-types.js`) for any cross-cutting type consolidation rather than implementing ad-hoc renames in extractors.
 
-### InsightGenerationModule (Sibling)  
-Consumes the persisted graph and runs classification rules defined in the `OntologyClassificationModule`. It then produces **learning insights** (e.g., “this module has high churn but low test coverage”). The UKB trace report from `UtilitiesModule` logs each insight generation run, providing auditability.
-
-### UtilitiesModule – UKB Trace Report  
-A lightweight logging utility that records processing metadata. The trace is attached to each batch run and each insight generation cycle, enabling developers to trace back from an insight to the exact data slice that produced it.
-
----
-
-## Integration Points  
-
-| Integration | Direction | Interface / Path | Purpose |
-|-------------|-----------|------------------|---------|
-| **Parent – KnowledgeManagement** | Upward | Component hierarchy (OnlineLearning is a child of KnowledgeManagement) | Provides the overall knowledge‑graph context and shared persistence layer. |
-| **Sibling – GraphDatabaseModule** | Shared | `GraphDatabaseAdapter` (same file as above) | Both modules read/write to the same Graphology + LevelDB store, ensuring consistency. |
-| **Sibling – InsightGenerationModule** | Downward | Direct API calls to `generateInsights(entityGraph)` | Consumes the entity graph produced by OnlineLearning to emit insights. |
-| **Sibling – UtilitiesModule** | Side‑channel | `UKB trace report` (imported from UtilitiesModule) | Supplies observability data for each processing step. |
-| **Child – CodeGraphRAGIntegration** | Internal | `integrations/code-graph-rag/` files | Implements the graph‑based retrieval layer that powers the RAG queries used by OnlineLearning. |
-| **External – Git/LSL Sources** | Input | File system / remote repo APIs | Feed raw data into the batch analysis pipeline. |
-| **External – Static Code Analyzers** | Input | CLI tools invoked by the pipeline | Provide AST and metric data for graph construction. |
-
-These connections illustrate a **layered integration**: raw data → batch pipeline → graph construction (RAG) → persistence (adapter) → insight generation, all while being observed by the UKB trace utility.
-
----
-
-## Usage Guidelines  
-
-1. **Run the Batch Pipeline on Stable Snapshots** – Because the pipeline processes large histories, schedule it during low‑traffic windows and point it at a tagged Git commit or a frozen LSL export to avoid race conditions.  
-
-2. **Do Not Bypass the GraphDatabaseAdapter** – Directly manipulating the underlying LevelDB files circumvents the JSON export sync and can corrupt the knowledge graph. All reads/writes should go through the adapter’s public methods.  
-
-3. **Leverage the UKB Trace Report** – When adding new collectors or transformation steps, extend the UKB payload with custom fields (e.g., `collectorName`, `recordsProcessed`). This keeps the end‑to‑end trace complete and aids debugging.  
-
-4. **Version the Ontology** – The `OntologyClassificationModule` expects entity types to match a known schema. If you introduce new entity kinds (e.g., “workflow”), update the ontology definitions and run the `migrate-graph-db-entity-types.js` script (found in `scripts/`) to migrate existing records.  
-
-5. **Testing the RAG Layer** – Use the sample queries from the `integrations/code-graph-rag/README.md` to validate that newly added code entities are correctly indexed and retrievable.  
-
-6. **Monitoring Scalability** – Keep an eye on the size of the LevelDB store; when it exceeds a few gigabytes, consider archiving older snapshots (the JSON export can be stored in cold storage) to maintain query performance.  
-
----
-
-### Architectural Patterns Identified  
-
-1. **Adapter Pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB.  
-2. **Pipeline (Batch Processing) Pattern** – Sequential ingestion, transformation, and loading steps.  
-3. **Shared‑Service / Utility Pattern** – UKB trace report from `UtilitiesModule` is used across siblings.  
-4. **Modular Integration** – Child component (`CodeGraphRAGIntegration`) encapsulates a distinct capability (graph‑based RAG).  
-
-### Design Decisions and Trade‑offs  
-
-* **Batch vs. Real‑time** – Opting for batch processing simplifies handling of massive Git histories but introduces latency; real‑time insights are not possible without additional streaming infrastructure.  
-* **Graphology + LevelDB Storage** – Provides fast key‑value access and flexible graph traversals but limits horizontal scaling; sharding would require a different backend.  
-* **Adapter Centralization** – Guarantees a single point of change for storage concerns, at the cost of a potential bottleneck if many components issue high‑frequency writes.  
-
-### System Structure Insights  
-
-* OnlineLearning sits as a **mid‑tier** component within KnowledgeManagement, bridging raw learning data and higher‑level insight services.  
-* Its sibling modules share the same persistence layer, fostering data consistency but also coupling their lifecycles.  
-* The child `CodeGraphRAGIntegration` isolates the RAG logic, making it reusable for other sub‑components that may need code‑centric retrieval.  
-
-### Scalability Considerations  
-
-* **Horizontal Scaling** – The current LevelDB backend is not natively distributed; scaling out would require migrating to a distributed graph store (e.g., Neo4j, JanusGraph).  
-* **Batch Size Tuning** – Adjusting the size of each batch run can balance throughput against memory consumption.  
-* **Index Management** – Adding custom indexes in Graphology can improve query speed for frequently accessed entity types.  
-
-### Maintainability Assessment  
-
-* **High Cohesion** – Each module has a clear responsibility (e.g., ingestion, storage, insight generation).  
-* **Loose Coupling via Interfaces** – The `GraphDatabaseAdapter` and UKB trace utility act as contracts, reducing ripple effects of internal changes.  
-* **Documentation** – README files in `integrations/code-graph-rag/` and clear script locations (`scripts/migrate-graph-db-entity-types.js`) aid onboarding.  
-* **Potential Debt** – Reliance on a single‑node LevelDB store may become a maintenance bottleneck as data volume grows; proactive migration planning is advisable.
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides knowledge graph storage, query, and lifecycle management for the Coding project. It centers on a Graphology+LevelDB graph database (GraphDatabaseService) that stores entities as typed nodes with rich metadata, exposed through both a direct-access path and a VKB HTTP API. The component supports multiple entity types (System, Project, Component, SubComponent, Pattern, Detail) with ontology classification, bi-temporal staleness tracking, embedding vectors, and hierarchical parent/child relationships. It integrates with the MCP semantic analysis server via PersistenceAgent and GraphDatabaseAdapter, which route writes through the VKB API when the server is running or fall back to direct LevelDB access to avoid lock conflicts.
 
 ### Children
-- [CodeGraphRAGIntegration](./CodeGraphRAGIntegration.md) -- The integrations/code-graph-rag/README.md file describes the Graph-Code RAG system as a graph-based RAG system for any codebases.
+- [OntologyMetadataMapper](./OntologyMetadataMapper.md) -- PersistenceAgent (referenced in the OnlineLearning sub-component description) owns the mapEntityToSharedMemory() call, meaning ontology field hydration is a responsibility of the persistence layer, not the extraction layer — a deliberate separation of concerns.
+- [VkbLevelDbPersistenceFallback](./VkbLevelDbPersistenceFallback.md) -- The sub-component description explicitly names two persistence targets — 'VKB HTTP API' and 'direct LevelDB fallback' — confirming a priority-ordered write path rather than a dual-write or eventual-consistency model.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the migrateGraphDatabase script in scripts/migrate-graph-db-entity-types.js to update entity types in the live LevelDB/Graphology database.
-- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter to interact with the Graphology + LevelDB knowledge graph.
-- [OntologyClassificationModule](./OntologyClassificationModule.md) -- OntologyClassificationModule uses the OntologySystem to classify entities based on their types and properties.
-- [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the UKB trace report from the UtilitiesModule to generate insights.
-- [AgentFrameworkModule](./AgentFrameworkModule.md) -- AgentFrameworkModule uses the agent development guide in integrations/copi/docs/hooks.md to provide a framework for agent development.
-- [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
-- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
-- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are typed nodes in the GraphDatabaseService (Graphology+LevelDB) with entity types including System, Project, Component, SubComponent, Pattern, and Detail, each carrying rich metadata fields set at authoring time.
+- [EntityMigrationScripts](./EntityMigrationScripts.md) -- migrate-graph-db-entity-types.js handles type consolidation—renaming or merging entity type labels in the Graphology+LevelDB store without full data reconstruction.
+
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

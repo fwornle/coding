@@ -1,28 +1,48 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Semantic Analysis" {
-  component "SemanticAnalysis" as sa <<core>>
-  component "OntologyClassificationAgent" as oca <<agent>>
-  component "SemanticAnalysisAgent" as sia <<agent>>
-  component "CodeGraphAgent" as cga <<agent>>
-  component "ContentValidationAgent" as cva <<agent>>
+package "Pipeline Foundation" {
+  component "BaseAgent<TInput,TOutput>" as base <<core>>
 }
 
-package "Storage" {
-  component "GraphDatabaseAdapter" as gda <<storage>>
-  database "GraphDatabase" as gd
-  database "LevelDB" as ldb
+package "Extraction Stage" {
+  component "SemanticAnalysisAgent" as semantic <<agent>>
+  component "CodeGraphAgent" as codegraph <<agent>>
 }
 
-sa --> oca : uses
-sa --> sia : uses
-sa --> cga : uses
-sa --> cva : uses
-oca --> gd : uses
-sia --> gd : uses
-cga --> gd : uses
-cga --> ldb : uses
-cva --> gd : uses
+package "Qualification Stage" {
+  component "ContentValidationAgent" as validation <<agent>>
+  component "GitStalenessDetector" as stale <<core>>
+}
+
+package "Classification Stage" {
+  component "OntologyClassificationAgent" as onto <<agent>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  component "OntologyRegistry" as registry <<external>>
+}
+
+database "Memgraph" as memgraph <<storage>>
+database "Trace Log (JSON)" as trace <<storage>>
+
+' All agents implement the five-method BaseAgent lifecycle contract
+semantic ..> base : implements
+codegraph ..> base : implements
+validation ..> base : implements
+onto ..> base : implements
+
+' Pipeline data flow via generateRouting()
+semantic --> codegraph : routes output
+semantic --> validation : routes output
+codegraph --> validation : routes output
+validation --> onto : routes output
+
+' Internal component dependencies
+validation --> stale : deduplicates git lookups
+onto --> adapter : uses
+adapter --> registry : wraps API (node moduleResolution)
+
+' Infrastructure connections
+codegraph --> memgraph : TCP socket probe\n+ Bolt queries
+semantic --> trace : writes JSON trace\n(suppressed on I/O error)
 
 @enduml

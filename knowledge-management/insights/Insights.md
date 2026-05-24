@@ -2,138 +2,85 @@
 
 **Type:** SubComponent
 
-The KnowledgeReportAuthor uses the InsightGenerator to generate knowledge reports from the analyzed code and git history, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-report-author.ts file.
+The TIERED-MODEL-PROPOSAL.md in integrations/mcp-server-semantic-analysis/docs/ suggests insight generation agents are candidates for lower-cost model tiers, implying they operate on already-structured data requiring less LLM reasoning than raw classification
 
-## What It Is  
+# Insights — Technical Insight Document
 
-The **Insights** sub‑component lives inside the **SemanticAnalysis** module of the MCP server and is implemented across several TypeScript files under `integrations/mcp-server-semantic-analysis/src/agents/`.  Core files include:
+## What It Is
 
-* `insight-generator.ts` – orchestrates extraction of insights from source code and git history.  
-* `pattern-catalog.ts` – stores reusable insight patterns that can be instantiated on demand.  
-* `insight-ranker.ts` – applies a relevance‑based ranking to the generated insights.  
-* `insight-cache.ts` – caches frequently accessed insight metadata for fast retrieval.  
-* `knowledge-report-author.ts` and `knowledge-report-template.ts` – turn ranked insights into templated knowledge reports.
-
-Together these agents form a focused pipeline that turns raw code analysis (provided by the sibling **CodeAnalyzer**) into consumable, prioritized insights and, ultimately, into human‑readable reports. The sub‑component is a child of **SemanticAnalysis**, which itself follows a multi‑agent architecture, and it collaborates closely with siblings such as **Ontology**, **Pipeline**, and **KnowledgeGraphConstructor**.
+Insights is a SubComponent of the SemanticAnalysis system, documented architecturally in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. It represents a post-persistence concern within the broader agent pipeline: rather than transforming data in flight, it consumes Knowledge Graph (KG) entities that have already been written and committed, then produces derived analytical artifacts on top of them. Its responsibilities span two distinct sub-activities — pattern catalog extraction (identifying recurring structural patterns across KG entities) and knowledge report authoring (producing formatted, human-readable output documents).
 
 ![Insights — Architecture](images/insights-architecture.png)
 
----
+Architecturally, Insights sits at the boundary between machine-readable KG data and human-readable output. Where sibling subcomponents like Pipeline orchestrate mid-flight agent sequencing and Ontology / OntologySubsystem manage classification taxonomies, Insights operates strictly downstream of persistence. Its child component, PostPersistenceInsightTrigger, is the concrete mechanism that activates insight generation only after KG writes are committed — making Insights a deliberately decoupled, read-only consumer of the KG rather than a participant in the write path.
 
-## Architecture and Design  
+## Architecture and Design
 
-The design of **Insights** is driven by an **agent‑based modular architecture**. Each responsibility is encapsulated in its own agent (e.g., `InsightGenerator`, `InsightRanker`, `InsightCache`), mirroring the broader multi‑agent approach described for the parent **SemanticAnalysis** component. This modularity enables independent evolution of each concern while keeping the overall flow clear.
+The Insights subcomponent inherits the architectural rigor established by its parent SemanticAnalysis, namely the `BaseAgent<TInput, TOutput>` contract from `src/agents/base-agent.ts`. Every insight-generating agent must implement the same five-method lifecycle — `process()`, `calculateConfidence()`, `detectIssues()`, `generateRouting()`, and `applyCorrections()` — even though its input is already-persisted KG data rather than raw upstream artifacts like git commits or classification batches. This means insight agents fill the same `AgentResponse` envelope with timestamps, model metadata, routing suggestions, and corrections lists as any other agent in the system.
 
-* **Pattern Catalog** – `pattern-catalog.ts` implements a **catalog pattern**, acting as a repository of predefined insight templates. By decoupling pattern definitions from generation logic, the system can introduce new insight types without touching the core generator code.  
-* **Ranking Mechanism** – `insight-ranker.ts` introduces a **ranking strategy** that evaluates each insight’s relevance and importance. The ranking is applied after generation, ensuring that downstream consumers (e.g., `KnowledgeReportAuthor`) receive a prioritized list.  
-* **Caching Layer** – `insight-cache.ts` provides an in‑memory (or possibly persisted) cache for insight metadata. This follows a classic **cache‑aside** approach: the generator writes to the cache, and other agents read from it, reducing redundant analysis of unchanged code.  
-* **API Surface** – `insight-generator.ts` exposes a queryable API that other sub‑components can call to retrieve insights. The API is deliberately lightweight, returning only the data needed for downstream processing.  
-* **Templating Engine** – `knowledge-report-template.ts` supplies a **templating** mechanism (likely using a library such as Handlebars or Mustache) that transforms ranked insights into formatted knowledge reports, as orchestrated by `knowledge-report-author.ts`.
+A central design decision visible in the observations is the **post-persistence separation**. By deferring insight generation until after KG writes are committed (enforced by PostPersistenceInsightTrigger), the system avoids coupling derived analytics to the latency or failure modes of the primary write pipeline. This is in deliberate contrast to the sibling Pipeline subcomponent, which coordinates agents in a fixed DAG order defined in `batch-analysis.yaml` with explicit `depends_on` edges. Insights does not participate in that DAG — it activates afterwards, consuming the DAG's persisted output.
 
-The agents interact in a linear but loosely coupled sequence: **CodeAnalyzer → InsightGenerator → InsightRanker → InsightCache → KnowledgeReportAuthor**. This flow respects the **separation of concerns** principle and aligns with the DAG‑based execution model used by the sibling **Pipeline** component.
+A second design decision, suggested by `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`, is that insight agents are candidates for **lower-cost LLM model tiers**. The rationale is that they operate on already-structured KG data, which requires substantially less reasoning effort than raw classification or entity extraction. This is a cost-optimization trade-off: insight <USER_ID_REDACTED> is bounded by the upstream classification done by agents like OntologyClassificationAgent, so spending top-tier model budget on insights yields diminishing returns.
+
+## Implementation Details
+
+Insights decomposes into two distinct sub-responsibilities that form a small internal pipeline. First, **pattern catalog extraction** scans the KG for recurring structural patterns across entities and emits a catalog artifact. This catalog is itself structured data — a list of identified patterns with associated entities and frequencies — and serves as the input to the second stage.
+
+Second, **knowledge report authoring** consumes the pattern catalog and produces a formatted output document. Crucially, this output is not structured KG data; it is a human-readable artifact (likely Markdown or a similar narrative format). This is what places Insights at the KG/human boundary: the input is machine-readable, the output is not. Implementations of the report authoring agent must still conform to the `BaseAgent` contract, which means `generateRouting()` is non-trivial — the observations suggest routing likely directs the finished report to different delivery channels based on the report's confidence score computed by `calculateConfidence()`.
 
 ![Insights — Relationship](images/insights-relationship.png)
 
----
+Because Insights agents must populate all five `BaseAgent` lifecycle methods, `detectIssues()` and `applyCorrections()` cannot be left as empty stubs without consequence — the orchestrating pipeline branches on those fields. For insight generation specifically, `detectIssues()` likely flags low-confidence patterns or malformed KG references encountered during extraction, while `applyCorrections()` provides the self-healing path for recoverable issues (e.g., skipping a malformed entity rather than failing the whole report).
 
-## Implementation Details  
+## Integration Points
 
-### InsightGenerator (`insight-generator.ts`)  
-The generator imports the sibling **CodeAnalyzer** to parse source files and extract raw signals (e.g., function signatures, change logs). It also pulls git history to enrich insights with temporal context. After processing, it stores the resulting insight objects in the **PatternCatalog**, making them available for ranking.
+The primary integration boundary is the Knowledge Graph itself. Insights reads from the KG after writes are committed; it does not write back to it (at least not as a primary path). This read-only posture against persisted data is what justifies the "post-persistence concern" classification in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.
 
-### PatternCatalog (`pattern-catalog.ts`)  
-Implemented as a simple key‑value store, the catalog maps pattern identifiers to concrete insight definitions. New patterns can be registered at runtime, allowing the system to evolve its insight vocabulary without recompilation of the generator.
+The activation integration runs through the child component PostPersistenceInsightTrigger, which is the concrete event/hook mechanism that fires after KG commits. This trigger isolates Insights from needing to know about the write pipeline's internals — it simply responds to "writes have happened" signals.
 
-### InsightRanker (`insight-ranker.ts`)  
-The ranker consumes the list of generated insights and applies a scoring algorithm based on factors such as code churn, criticality annotations, and ontology relevance (the latter supplied by the **OntologyManager** sibling). The output is a sorted array where the most actionable insights appear first.
+Within Insights, pattern catalog extraction integrates with knowledge report authoring through the catalog artifact as a shared data contract. This is a classic producer/consumer split: changes to the catalog schema affect both sides, so the catalog format constitutes an internal API surface that should be versioned with care.
 
-### InsightCache (`insight-cache.ts`)  
-A thin wrapper around a map‑like structure, the cache checks whether an insight for a given file/version already exists. If a cache hit occurs, the generator skips re‑analysis, directly returning the cached metadata. Cache invalidation is tied to git commit hashes, ensuring freshness.
+Externally, the routing output from `generateRouting()` integrates Insights with downstream delivery channels (likely file outputs, MCP responses, or notification systems), with the routing decision conditioned on the confidence score. This makes the confidence calculation a first-class concern, not an afterthought — it directly affects where the report ends up.
 
-### KnowledgeReportAuthor (`knowledge-report-author.ts`) & Template (`knowledge-report-template.ts`)  
-The author agent fetches the ranked insights via the generator’s API, feeds them into the templating engine, and produces a knowledge report (e.g., Markdown or HTML). The template file defines placeholders for insight titles, descriptions, and severity scores, enabling consistent report formatting across the codebase.
+## Usage Guidelines
 
-### Interaction with Siblings  
-* **CodeAnalyzer** – provides the low‑level parsing needed for insight extraction.  
-* **OntologyManager** – supplies ontology classifications that the ranker can use to boost domain‑specific relevance.  
-* **Pipeline** – may schedule the insight generation step within a larger DAG, ensuring that it runs after code analysis and before report generation.
+When implementing a new insight agent within this subcomponent, developers should treat the `BaseAgent` contract as non-negotiable. Even though the input is already-structured KG data and the LLM reasoning burden is lighter, all five methods (`process()`, `calculateConfidence()`, `detectIssues()`, `generateRouting()`, `applyCorrections()`) must be meaningfully populated. Empty stubs will compile and run, but downstream branching — particularly the routing of completed reports — depends on these fields carrying real values.
+
+Respect the post-persistence boundary. Insights agents should not attempt to intercept or transform data mid-pipeline; that is the responsibility of the sibling Pipeline subcomponent and the agents it orchestrates. If a new analytical need requires data that is not yet in the KG, the correct response is to enrich the upstream classification or extraction agents (potentially via OntologySubsystem's `OntologyConfigManager` under `src/ontology/`), not to embed extraction logic inside an insight agent.
+
+When choosing model tiers for new insight agents, consult `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. The default assumption should be a lower-cost tier, with escalation justified only when the agent genuinely needs richer reasoning than what structured KG input affords.
+
+Finally, treat the boundary between pattern catalog extraction and knowledge report authoring as a real internal API. The catalog is the contract between the two sub-stages, so schema changes should be coordinated and ideally backward-compatible.
 
 ---
 
-## Integration Points  
+### Summary of Key Insights
 
-1. **CodeAnalyzer** (`code-analyzer.ts`) – The primary data source for `InsightGenerator`. The generator calls methods such as `analyzeFile` and `extractGitHistory` to build its raw insight payload.  
-2. **OntologyManager** – Supplies classification labels that the ranker consumes to adjust scores based on domain importance.  
-3. **Pipeline** – Orchestrates the execution order; the insight generation step declares a `depends_on` edge to the code analysis step, fitting the DAG model described for the parent component.  
-4. **KnowledgeReportAuthor** – Consumes the ranked insight list via the generator’s public API (`getInsights()`), then uses `knowledge-report-template.ts` to render final reports.  
-5. **External Consumers** – Any other sub‑component that needs insight data can query the generator’s API directly, benefiting from the caching layer to avoid duplicate work.
+1. **Architectural patterns identified**: Post-persistence consumer pattern, producer/consumer split between catalog extraction and report authoring, uniform agent lifecycle via `BaseAgent<TInput, TOutput>`, and trigger-based activation through PostPersistenceInsightTrigger.
 
-All interactions are mediated through well‑defined TypeScript interfaces, keeping compile‑time safety and encouraging loose coupling.
+2. **Design decisions and trade-offs**: Deferring insight generation until after KG commits decouples analytics from write-path latency at the cost of eventual (not immediate) consistency for derived artifacts. Adopting lower-cost LLM tiers reduces operational expense but caps insight <USER_ID_REDACTED> at the <USER_ID_REDACTED> of upstream classification.
 
----
+3. **System structure insights**: Insights sits as a leaf-style SubComponent under SemanticAnalysis, parallel to Pipeline, Ontology, and OntologySubsystem but distinct in that it operates downstream of persistence rather than within the DAG defined in `batch-analysis.yaml`. Its sole child, PostPersistenceInsightTrigger, mediates activation.
 
-## Usage Guidelines  
+4. **Scalability considerations**: Because Insights reads only committed KG data and does not block the write pipeline, it can scale horizontally and asynchronously without back-pressure on upstream agents. Lower model tiers further reduce per-invocation cost, making it feasible to run insight generation frequently or across large KG slices.
 
-* **Prefer the API over direct file access** – Retrieve insights through `InsightGenerator.getInsights()` to ensure you benefit from caching and ranking.  
-* **Register new patterns via `PatternCatalog`** – When extending the system with domain‑specific insights, add them to the catalog rather than modifying the generator logic. This keeps the generation pipeline stable.  
-* **Respect ranking semantics** – Downstream consumers should present insights in the order returned by `InsightRanker`; re‑ordering can dilute the relevance signal.  
-* **Invalidate cache on code changes** – If you manually modify source files outside of git, remember to call `InsightCache.invalidate(filePath)` to avoid stale results.  
-* **Leverage the templating engine** – Use `knowledge-report-template.ts` as the single source of formatting; custom report styles should extend this template rather than rewrite rendering code.
+5. **Maintainability assessment**: The rigid `BaseAgent` contract enforces structural consistency across all insight agents, making new additions predictable to implement. The internal catalog-to-report split provides a clean seam for evolving either stage independently. The main maintenance risk is implicit coupling to KG schema — since Insights reads persisted KG entities, schema changes upstream can silently degrade insight <USER_ID_REDACTED>, suggesting that integration tests across the persistence boundary are valuable.
 
----
-
-### Architectural patterns identified  
-
-1. **Agent‑based modular architecture** – each functional piece is an independent agent.  
-2. **Catalog pattern** – reusable insight patterns are stored in `PatternCatalog`.  
-3. **Cache‑aside pattern** – explicit read‑through/write‑through caching in `InsightCache`.  
-4. **Ranking/Scoring strategy** – relevance‑based ordering via `InsightRanker`.  
-5. **Template‑driven report generation** – separation of data and presentation in `knowledge-report-template.ts`.
-
-### Design decisions and trade‑offs  
-
-* **Modularity vs. orchestration overhead** – Breaking the pipeline into many agents improves testability and future extensibility, but introduces additional wiring (dependency injection) and potential latency between steps.  
-* **Caching for performance** – The cache dramatically reduces repeated analysis on unchanged code, at the cost of added complexity around invalidation logic tied to git hashes.  
-* **Pattern catalog flexibility** – Allows rapid addition of new insight types without touching core generation code, but requires disciplined naming and versioning to avoid pattern collisions.  
-* **Ranking algorithm opacity** – While ranking improves relevance, the scoring heuristics must be tuned; overly aggressive weighting could hide useful low‑score insights.
-
-### System structure insights  
-
-* **Vertical layering** – Low‑level parsing (CodeAnalyzer) → Insight creation (InsightGenerator) → Enrichment (PatternCatalog) → Prioritization (InsightRanker) → Persistence (InsightCache) → Presentation (KnowledgeReportAuthor).  
-* **Horizontal collaboration** – The sub‑component shares ontology data with siblings and integrates into the broader DAG managed by the Pipeline agent, illustrating a cohesive yet decoupled ecosystem within **SemanticAnalysis**.
-
-### Scalability considerations  
-
-* **Cache scalability** – The cache can be scaled horizontally (e.g., distributed Redis) if the codebase grows beyond a single node’s memory.  
-* **Parallel generation** – Since each file’s insight extraction is independent, the `InsightGenerator` can be parallelized across worker pools, leveraging the multi‑agent design.  
-* **Ranking complexity** – The ranking algorithm should remain O(n log n) to handle large insight sets; any heavyweight scoring (e.g., LLM inference) must be throttled or batched.
-
-### Maintainability assessment  
-
-* **High maintainability** – Clear separation of concerns, explicit TypeScript interfaces, and a catalog for patterns make the codebase easy to extend.  
-* **Testability** – Each agent can be unit‑tested in isolation (e.g., mock `CodeAnalyzer` for `InsightGenerator`).  
-* **Potential technical debt** – Cache invalidation tied to git history may become brittle if alternative version control systems are introduced; encapsulating this logic behind an abstraction would mitigate future risk.  
-
-Overall, the **Insights** sub‑component exhibits a well‑structured, agent‑centric design that balances extensibility, performance, and clarity, fitting neatly into the larger **SemanticAnalysis** ecosystem.
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The `BaseAgent<TInput, TOutput>` abstract class defined in `src/agents/base-agent.ts` establishes a rigid, five-method execution contract that every agent in the pipeline must implement: `process()`, `calculateConfidence()`, `detectIssues()`, `generateRouting()`, and `applyCorrections()`. This is not a loose interface — each method is called sequentially within a standardized envelope, meaning an agent cannot skip confidence calculation or issue detection even if it has nothing meaningful to report for those phases. The resulting `AgentResponse` envelope carries not just the domain output but also metadata (timestamps, model usage), routing suggestions for downstream agents, and a corrections list for self-healing. For a new developer, this means that implementing a new agent is less about writing a single processing function and more about correctly filling all five lifecycle slots; an agent that returns empty stubs for `detectIssues()` or `generateRouting()` will still compile and run, but the orchestrating pipeline likely depends on those fields being populated to make branching decisions. The generic type parameters `<TInput, TOutput>` allow the base class to be reused across wildly different domains — from raw git commit arrays (SemanticAnalysisAgent) to ontology classification batches (OntologyClassificationAgent) — without sacrificing static type safety on the input/output contracts.
 
 ### Children
-- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator is implemented in the insight-generator.ts file, which is part of the mcp-server-semantic-analysis module.
+- [PostPersistenceInsightTrigger](./PostPersistenceInsightTrigger.md) -- As stated in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md, insight generation is explicitly classified as a post-persistence concern, meaning it does not intercept or transform data mid-pipeline but instead activates after KG writes are committed.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis steps, each step declaring explicit depends_on edges, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
-- [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
-- [OntologyManager](./OntologyManager.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
-- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file.
-- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
-- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
-- [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
-- [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
+- [Pipeline](./Pipeline.md) -- The pipeline coordinator sequences agents in a fixed order defined in batch-analysis.yaml, with each step declaring explicit depends_on edges for DAG-based execution
+- [Ontology](./Ontology.md) -- The upper ontology defines broad abstract categories while lower ontology definitions provide concrete entity types, creating a two-tier classification hierarchy referenced by OntologyClassificationAgent
+- [OntologySubsystem](./OntologySubsystem.md) -- OntologyConfigManager centralizes all ontology configuration loading under src/ontology/, meaning changes to entity type hierarchies flow through a single managed entry point rather than being scattered across agents
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

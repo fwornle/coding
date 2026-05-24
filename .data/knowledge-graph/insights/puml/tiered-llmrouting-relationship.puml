@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TieredLLMRouting
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[TieredLLMRouting] as tiered_llmrouting #LightBlue
+[AgentConstructionPattern] as agent_construction_pattern #F0F0F0
+[ConfigDrivenBehavior] as config_driven_behavior #F0F0F0
+[HookExtensionSystem] as hook_extension_system #F0F0F0
+[MCPToolExposurePattern] as mcptool_exposure_pattern #F0F0F0
+[DiagramFirstDocumentation] as diagram_first_documentation #F0F0F0
+
+coding_patterns --> tiered_llmrouting
+agent_construction_pattern -[hidden]- tiered_llmrouting
+config_driven_behavior -[hidden]- tiered_llmrouting
+hook_extension_system -[hidden]- tiered_llmrouting
+mcptool_exposure_pattern -[hidden]- tiered_llmrouting
+diagram_first_documentation -[hidden]- tiered_llmrouting
+
+@enduml

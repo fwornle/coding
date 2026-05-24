@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DocumentationConventions
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[DocumentationConventions] as documentation_conventions #LightBlue
+[AgentLifecyclePatterns] as agent_lifecycle_patterns #F0F0F0
+[ServiceRegistrationPatterns] as service_registration_patterns #F0F0F0
+[AdapterAndWrapperPatterns] as adapter_and_wrapper_patterns #F0F0F0
+[ConfigurationSeparationConventions] as configuration_separation_conventions #F0F0F0
+[AvailabilityGuardPatterns] as availability_guard_patterns #F0F0F0
+[PlantUmlDiagramConvention] as plant_uml_diagram_convention #E8F5E8
+[LayeredDocsSubdirectoryStructure] as layered_docs_subdirectory_structure #E8F5E8
+
+coding_patterns --> documentation_conventions
+agent_lifecycle_patterns -[hidden]- documentation_conventions
+service_registration_patterns -[hidden]- documentation_conventions
+adapter_and_wrapper_patterns -[hidden]- documentation_conventions
+configuration_separation_conventions -[hidden]- documentation_conventions
+availability_guard_patterns -[hidden]- documentation_conventions
+documentation_conventions --> plant_uml_diagram_convention
+documentation_conventions --> layered_docs_subdirectory_structure
+
+@enduml

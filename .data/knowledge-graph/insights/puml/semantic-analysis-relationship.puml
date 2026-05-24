@@ -8,36 +8,24 @@ title Hierarchy Context: SemanticAnalysis
 [LiveLoggingSystem] as live_logging_system #F0F0F0
 [LLMAbstraction] as llmabstraction #F0F0F0
 [DockerizedServices] as dockerized_services #F0F0F0
-[Trajectory] as trajectory #F0F0F0
 [KnowledgeManagement] as knowledge_management #F0F0F0
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [Pipeline] as pipeline #E8F5E8
 [Ontology] as ontology #E8F5E8
 [Insights] as insights #E8F5E8
-[OntologyManager] as ontology_manager #E8F5E8
-[CodeAnalyzer] as code_analyzer #E8F5E8
-[InsightGenerator] as insight_generator #E8F5E8
-[KnowledgeGraphConstructor] as knowledge_graph_constructor #E8F5E8
-[EntityValidator] as entity_validator #E8F5E8
-[CodeGraphRAG] as code_graph_rag #E8F5E8
+[OntologySubsystem] as ontology_subsystem #E8F5E8
 
 coding --> semantic_analysis
 live_logging_system -[hidden]- semantic_analysis
 llmabstraction -[hidden]- semantic_analysis
 dockerized_services -[hidden]- semantic_analysis
-trajectory -[hidden]- semantic_analysis
 knowledge_management -[hidden]- semantic_analysis
 coding_patterns -[hidden]- semantic_analysis
 constraint_system -[hidden]- semantic_analysis
 semantic_analysis --> pipeline
 semantic_analysis --> ontology
 semantic_analysis --> insights
-semantic_analysis --> ontology_manager
-semantic_analysis --> code_analyzer
-semantic_analysis --> insight_generator
-semantic_analysis --> knowledge_graph_constructor
-semantic_analysis --> entity_validator
-semantic_analysis --> code_graph_rag
+semantic_analysis --> ontology_subsystem
 
 @enduml

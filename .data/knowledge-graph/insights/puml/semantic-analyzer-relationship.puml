@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SemanticAnalyzer
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[SemanticAnalyzer] as semantic_analyzer #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[TextPatternPrimitiveLibrary] as text_pattern_primitive_library #E8F5E8
+[QuadAgentSharedDependencyPattern] as quad_agent_shared_dependency_pattern #E8F5E8
+
+semantic_analysis --> semantic_analyzer
+pipeline -[hidden]- semantic_analyzer
+ontology -[hidden]- semantic_analyzer
+insights -[hidden]- semantic_analyzer
+semantic_analyzer --> text_pattern_primitive_library
+semantic_analyzer --> quad_agent_shared_dependency_pattern
+
+@enduml

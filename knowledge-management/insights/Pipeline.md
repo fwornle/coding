@@ -2,145 +2,106 @@
 
 **Type:** SubComponent
 
-The Pipeline's KG operators leverage the KnowledgeGraphConstructor to construct a knowledge graph of code entities using Memgraph and Tree-sitter AST parsing, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
+Each pipeline agent extends BaseAgent<TInput, TOutput> and must populate all five lifecycle slots (process, calculateConfidence, detectIssues, generateRouting, applyCorrections) even if some return stubs, because the coordinator uses routing output to make branching decisions
 
-## What It Is  
+# Pipeline — Technical Insight Document
 
-The **Pipeline** sub‑component lives inside the **SemanticAnalysis** package and is implemented across a set of tightly‑coupled agents under the path `integrations/mcp-server-semantic-analysis/src/agents/`.  Its primary responsibility is to orchestrate a multi‑stage, DAG‑driven workflow that transforms raw source‑code artefacts and git history into structured observations, validates and deduplicates them, builds a code‑centric knowledge graph, and finally persists the results into the ontology managed by the **OntologyManager**.  Key entry points include:
+## What It Is
 
-* `coordinator-agent.ts` – the central scheduler that drives the DAG execution.  
-* `observation-generation-agent.ts` – extracts raw observations using the **CodeAnalyzer** and enriches them with ontology metadata.  
-* `knowledge-graph-constructor.ts` – materialises a graph of code entities in Memgraph via Tree‑sitter AST parsing.  
-* `entity-validator.ts` – validates and de‑duplicates entities, detecting staleness.  
-* `ontology-manager.ts` – persists the final, classified entities into the ontology store.  
+The Pipeline is a sub-component of SemanticAnalysis that coordinates the sequenced execution of agents through a directed acyclic graph (DAG). Its topology is not encoded in application code but is instead declared in `batch-analysis.yaml`, the configuration artifact represented by the child component BatchAnalysisYamlConfig. The pipeline coordinator reads this YAML file, resolves each step's `depends_on` edges, and orchestrates execution in a fixed, deterministic order.
 
-Together these agents realise the Pipeline’s end‑to‑end processing chain, enabling the higher‑level **SemanticAnalysis** component to deliver actionable insights at scale.  
+Functionally, the Pipeline takes raw inputs — typically arrays of git commits consumed by agents like `SemanticAnalysisAgent` — and transforms them through a chain of specialized stages: semantic observation generation, ontology classification, deduplication, and finally persistence to the Memgraph knowledge graph. Every agent that participates in the Pipeline derives from the `BaseAgent<TInput, TOutput>` abstract class defined in `src/agents/base-agent.ts` (inherited from the parent SemanticAnalysis component), which guarantees a uniform execution envelope across heterogeneous processing concerns.
+
+![Pipeline — Architecture](images/pipeline-architecture.png)
+
+## Architecture and Design
+
+The Pipeline follows a **DAG-based orchestration pattern** with **configuration-driven topology**. By externalizing agent sequencing into `batch-analysis.yaml`, the design explicitly separates *what the pipeline does* (encoded in agent implementations) from *how the pipeline is wired together* (encoded in YAML). This is a deliberate inversion: re-ordering stages, inserting new agents, or branching execution does not require recompiling TypeScript — it requires editing a declarative config. This makes BatchAnalysisYamlConfig the single point of authority for pipeline topology.
+
+Each stage in the DAG declares its dependencies through explicit `depends_on` edges, which the coordinator uses to compute execution order and parallelization opportunities. This contrasts with implicit ordering schemes (such as registration order or alphabetical sorting) and ensures that the graph structure is auditable directly from the configuration file.
+
+Critically, the Pipeline depends on the **uniform agent contract** enforced by `BaseAgent<TInput, TOutput>`. Because every agent must populate all five lifecycle slots (`process`, `calculateConfidence`, `detectIssues`, `generateRouting`, `applyCorrections`), the coordinator can treat all stages polymorphically. The `generateRouting` output, in particular, is consumed by the coordinator to make branching decisions — meaning even agents with no meaningful routing logic must still return a (possibly empty) routing object. This rigidity is the price paid for a homogeneous orchestration layer.
+
+The Pipeline also enforces a **strict stage ordering for KG-related concerns**: deduplication is a discrete stage that sits *before* persistence, not bundled into it. This means deduplication agents receive entities that have already been ontology-classified by upstream stages, and they must resolve identity conflicts before any writes hit Memgraph. This separation reflects a deliberate trade-off — performing dedup pre-write keeps the graph clean but requires the deduplication agent to hold and compare classified entities in working memory.
+
+## Implementation Details
+
+The execution backbone is the `BaseAgent<TInput, TOutput>` abstract class, which every Pipeline-participating agent extends. The generic parameters allow the Pipeline to carry wildly different payload types between stages: `SemanticAnalysisAgent`, for example, declares `TInput` as a raw git commit array and produces structured observations as `TOutput`. Downstream KG operator agents then receive those observations and continue the transformation chain. Despite this heterogeneity, the response envelope (timestamps, model usage metadata, routing suggestions, corrections list) is identical across stages.
+
+Persistence is handled through dedicated KG operator agents that write to Memgraph using `MEMGRAPH_BATCH_SIZE` as a tuning parameter. This environment-controlled value governs how many entities are flushed per batch to the graph database, providing a direct lever for balancing throughput against memory pressure and transaction overhead. Increasing the batch size reduces round trips to Memgraph but increases the working set held in memory before flush.
+
+A subtle but important implementation detail lives in `PersistenceAgent.mapEntityToSharedMemory()`: this method pre-populates ontology metadata fields — specifically `entityType` and `metadata.ontologyClass` — into shared memory. The intent is to **prevent redundant LLM re-classification on subsequent pipeline runs**. Without this caching of classification results into the persisted representation, every re-run would force expensive LLM calls for entities whose ontology classification is already known. This is a deliberate optimization that couples the persistence layer to the ontology subsystem's vocabulary (the same vocabulary curated by the sibling Ontology component via its upper/lower hierarchy and managed through `OntologyConfigManager` in the OntologySubsystem sibling).
 
 ![Pipeline — Relationship](images/pipeline-relationship.png)
 
----
+Deduplication, as a discrete pre-persistence stage, receives the already-classified entity stream and applies identity resolution. Because it runs after classification but before persistence, it can use ontology class information as part of its matching heuristics, but it must complete before any Memgraph write occurs.
 
-## Architecture and Design  
+## Integration Points
 
-The Pipeline follows an **agent‑based modular architecture** where each logical step is encapsulated in a dedicated TypeScript class (e.g., `OntologyClassificationAgent`, `CodeAnalyzer`, `KnowledgeGraphConstructor`).  This mirrors the broader design of the **SemanticAnalysis** component, which groups related agents (OntologyClassificationAgent, SemanticAnalysisAgent, CodeGraphAgent) to keep concerns isolated and promote independent evolution.
+The Pipeline integrates upward with its parent **SemanticAnalysis** component, which provides the `BaseAgent<TInput, TOutput>` contract that all pipeline stages implement. Without that contract, the coordinator would have no uniform way to invoke heterogeneous agents.
 
-### DAG‑driven execution  
+Downward, the Pipeline integrates with its child **BatchAnalysisYamlConfig**, which defines the agent sequencing, dependency edges, and configuration parameters. Any change to pipeline topology is a change to this YAML file rather than to coordinator code.
 
-`coordinator-agent.ts` builds a **directed acyclic graph (DAG)** of batch‑analysis steps.  Each step declares its `depends_on` edges, and the coordinator performs a **topological sort** to determine a safe execution order.  This guarantees that, for example, the Knowledge Graph construction only runs after observations have been generated and validated.  The DAG model also makes the pipeline naturally extensible—new steps can be added by declaring additional dependencies without touching the scheduler.
+Laterally, the Pipeline connects to the sibling **Ontology** component (which defines the upper/lower ontology two-tier hierarchy) and the **OntologySubsystem** sibling (whose `OntologyConfigManager` under `src/ontology/` centralizes ontology configuration loading). When KG operator agents in the Pipeline classify or persist entities, they consume ontology definitions sourced from these siblings. The `PersistenceAgent.mapEntityToSharedMemory()` optimization specifically depends on the ontology vocabulary being stable across runs.
 
-### Work‑stealing concurrency  
+The Pipeline also has a downstream relationship with the sibling **Insights** component, which operates as a post-persistence concern. Insights does not read from the Pipeline's intermediate stages — it consumes already-written KG data from Memgraph, as documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. This means the Pipeline's contract with Insights is mediated entirely through the persisted graph state, not through in-memory handoff.
 
-To keep the DAG processing highly parallel, the coordinator maintains a **shared `nextIndex` counter**.  Worker threads (or async tasks) fetch the next available step by atomically incrementing this counter, implementing a classic **work‑stealing** pattern.  Idle workers immediately pull pending work, reducing latency and improving CPU utilisation, especially on large codebases where the number of steps can be substantial.
+Externally, the Pipeline integrates with **Memgraph** as its persistent sink, parameterized by `MEMGRAPH_BATCH_SIZE`, and with whatever **LLM providers** the upstream classification agents invoke.
 
-### Agent responsibilities and separation of concerns  
+## Usage Guidelines
 
-* **Observation Generation** (`observation-generation-agent.ts`) invokes the **CodeAnalyzer** (see `code-analyzer.ts`) to parse files and git history, then **pre‑populates** ontology fields (`entityType`, `metadata.ontologyClass`).  This avoids redundant LLM classification later in the pipeline.  
-* **Knowledge Graph Construction** (`knowledge-graph-constructor.ts`) uses **Tree‑sitter** to build ASTs and writes entities to **Memgraph**, forming a rich, queryable graph of code constructs.  
-* **Deduplication / Validation** (`entity-validator.ts`) employs the **EntityValidator** to compare incoming observations against existing ones, flagging stale or duplicate entries before persistence.  
-* **Persistence** (`ontology-manager.ts`) interacts with the ontology hierarchy (upper/lower ontology definitions) to store validated entities, leveraging the same manager used by sibling components such as **Ontology** and **Insights**.
+When implementing a new agent for the Pipeline, developers must extend `BaseAgent<TInput, TOutput>` and populate **all five lifecycle methods**, even if some return stub values. The coordinator depends on `generateRouting()` output for branching decisions, so returning empty stubs can cause silent routing failures rather than compile errors. Treat the five lifecycle slots as required slots, not optional hooks.
 
-The design deliberately avoids a monolithic processing loop; instead, each agent can be tested, versioned, and swapped independently, which aligns with the modular ethos of the sibling components (e.g., **InsightGenerator**, **CodeGraphRAG**).
+To add a new stage to the Pipeline, modify `batch-analysis.yaml` (the BatchAnalysisYamlConfig artifact) and declare the appropriate `depends_on` edges. Do not attempt to encode ordering in application logic — the configuration file is the single source of truth for topology, and bypassing it will produce a Pipeline whose actual behavior diverges from its declared structure.
 
----
+When tuning persistence performance, adjust `MEMGRAPH_BATCH_SIZE` rather than rewriting the flush logic. Larger values reduce database round trips but increase memory pressure; smaller values are safer for large entity sets but increase transactional overhead. Profile against actual commit workloads before changing the default.
 
-## Implementation Details  
+Respect the **deduplication-before-persistence** ordering. If you introduce a new entity-producing agent, ensure it runs upstream of the deduplication stage so that identity conflicts are resolved before any KG writes occur. Inserting persistence-writing agents before dedup will corrupt graph integrity and undermine the optimization guarantees of `PersistenceAgent.mapEntityToSharedMemory()`.
 
-### Coordinator (`coordinator-agent.ts`)  
+Finally, when designing agents that perform ontology classification, ensure that classification results are written into `entityType` and `metadata.ontologyClass` fields in shared memory. Skipping this step forces redundant LLM calls on subsequent Pipeline runs, defeating the caching optimization built into the persistence layer. This pattern is the contract that lets the Pipeline run cheaply on re-execution.
 
-* **DAG Construction** – Each batch step is represented as an object with a `depends_on` array.  The coordinator iterates over these definitions, building adjacency lists used by a topological sort routine (`topologicalSort()` function).  
-* **Task Dispatch** – After sorting, the coordinator spawns a pool of workers.  Workers repeatedly read the atomic `nextIndex` (implemented via a `SharedArrayBuffer` or simple `let nextIndex = 0;` guarded by a mutex) and fetch the corresponding step from the sorted list.  This “pull‑based” model is the core of the work‑stealing mechanism.  
+### Architectural patterns identified
+- **DAG orchestration** with explicit `depends_on` edges
+- **Configuration-driven topology** via `batch-analysis.yaml`
+- **Uniform agent contract** via `BaseAgent<TInput, TOutput>` and the five-method lifecycle
+- **Pipeline staging** with strict pre-persistence dedup
+- **Result caching via persisted metadata** to avoid redundant LLM work
 
-### Observation Generation (`observation-generation-agent.ts`)  
+### Design decisions and trade-offs
+- Externalizing topology to YAML trades runtime flexibility for slightly more indirection
+- Rigid five-method lifecycle trades implementation overhead for polymorphic coordination
+- Pre-write deduplication trades memory footprint for graph cleanliness
+- Batch-size tuning trades memory for throughput
 
-* Calls `CodeAnalyzer.analyze(filePath)` to retrieve raw code metrics and git change data.  
-* Immediately writes `entityType` and `metadata.ontologyClass` into the observation payload, leveraging the ontology schema defined in `ontology-manager.ts`.  This metadata is later consumed by the **OntologyClassificationAgent** without additional LLM calls.  
+### System structure insights
+- Pipeline is sandwiched between SemanticAnalysis (contract provider) and BatchAnalysisYamlConfig (topology declaration)
+- Memgraph acts as the boundary between Pipeline and the sibling Insights component
+- Ontology and OntologySubsystem siblings supply the classification vocabulary consumed mid-pipeline
 
-### Knowledge Graph Construction (`knowledge-graph-constructor.ts`)  
+### Scalability considerations
+- `MEMGRAPH_BATCH_SIZE` is the primary throughput lever
+- Pre-classified metadata caching eliminates LLM cost on re-runs — the dominant scalability win for repeat workloads
+- DAG structure permits parallel execution of independent stages, though parallelism depends on `depends_on` declarations in BatchAnalysisYamlConfig
 
-* Parses source files with **Tree‑sitter** to produce AST nodes.  
-* Transforms AST nodes into graph vertices/edges and streams them into **Memgraph** via its Bolt driver.  
-* The constructor also registers entity relationships (e.g., function‑calls, inheritance) that downstream agents (such as **CodeGraphRAG**) can query for retrieval‑augmented generation.  
+### Maintainability assessment
+- **High**: topology changes are config-only; agent contract is uniform; ordering is auditable from YAML
+- **Risk areas**: agents that return stub routing/issue values can silently break coordinator branching; ontology metadata field names are implicitly contracted between persistence and classification stages and should be treated as a stable interface
 
-### Deduplication (`entity-validator.ts`)  
-
-* Implements `EntityValidator.validate(observation)` which checks for content similarity, timestamp freshness, and ontology compliance.  
-* Stale observations are either marked for re‑analysis or dropped, ensuring the pipeline does not waste resources on already‑known facts.  
-
-### Persistence (`ontology-manager.ts`)  
-
-* Provides `OntologyManager.save(entity)` which inserts the entity into the hierarchical ontology store.  
-* Handles classification validation against upper‑level ontology definitions, guaranteeing semantic consistency across the **Ontology** sibling component.  
-
-All agents expose a minimal public API (e.g., `run()`, `processStep()`) that the coordinator invokes, keeping coupling low and allowing future replacement (e.g., swapping Memgraph for another graph DB) with minimal impact.
-
----
-
-## Integration Points  
-
-* **SemanticAnalysis (parent)** – The Pipeline is instantiated by the SemanticAnalysis orchestrator, which supplies the initial list of files and git commits to analyse.  SemanticAnalysis also consumes the final knowledge graph and persisted ontology entities to feed higher‑level insight generation.  
-* **CodeAnalyzer (sibling)** – Directly used by the Observation Generation agent to extract low‑level code signals.  The same CodeAnalyzer is also leveraged by the **InsightGenerator** to produce narrative insights, ensuring a single source of truth for code parsing.  
-* **OntologyManager (sibling)** – Both the Pipeline’s persistence agent and the OntologyClassificationAgent rely on the manager’s hierarchical schema to classify and store entities.  This shared dependency guarantees consistent ontology evolution across the system.  
-* **KnowledgeGraphConstructor (sibling)** – Supplies the graph that **CodeGraphRAG** later queries for retrieval‑augmented generation, creating a feedback loop where insights can be re‑contextualised with fresh graph data.  
-* **EntityValidator (sibling)** – The deduplication logic is also used by the **InsightGenerator** to avoid emitting duplicate insights, reinforcing data hygiene throughout the platform.  
-
-These integration points are realised through explicit TypeScript imports (e.g., `import { CodeAnalyzer } from './code-analyzer';`) and well‑defined interfaces (`IAnalyzer`, `IValidator`, `IGraphBuilder`), making the dependency graph clear and compile‑time safe.
-
----
-
-## Usage Guidelines  
-
-1. **Define DAG steps declaratively** – When extending the pipeline, add a new step object with a unique identifier and a `depends_on` list that reflects true data dependencies.  The coordinator will automatically place it in the correct execution order.  
-2. **Populate ontology metadata early** – Follow the pattern in `observation-generation-agent.ts` by setting `entityType` and `metadata.ontologyClass` as soon as an observation is created.  This prevents downstream LLM classification overhead and keeps the pipeline performant.  
-3. **Leverage work‑stealing** – Do not manually assign work to workers; rely on the shared `nextIndex` counter.  This ensures optimal load balancing, especially when step execution times vary widely.  
-4. **Validate before persisting** – Always run observations through `EntityValidator` to catch duplicates or stale data.  Skipping this step can lead to ontology bloat and misleading insights.  
-5. **Keep agents side‑effect free** – Agents should only modify the data they own and return results to the coordinator.  Avoid global mutable state beyond the controlled `nextIndex` counter; this preserves testability and simplifies reasoning about concurrency.  
-
----
-
-### Architectural patterns identified  
-
-* **Agent‑based modular architecture** – each functional concern is an isolated TypeScript class.  
-* **DAG‑driven workflow with topological sort** – guarantees correct execution ordering.  
-* **Work‑stealing task distribution** – shared counter enables dynamic load balancing.  
-* **Pre‑population of metadata** – reduces redundant LLM classification.  
-* **Separation of validation/deduplication** – dedicated `EntityValidator` ensures data quality.  
-
-### Design decisions and trade‑offs  
-
-* **Explicit DAG vs. ad‑hoc sequencing** – Choosing a DAG makes the pipeline deterministic and extensible, at the cost of upfront definition complexity.  
-* **Work‑stealing over static partitioning** – Improves utilisation for heterogeneous step runtimes, but introduces contention on the `nextIndex` counter (mitigated by atomic operations).  
-* **Agent isolation** – Enhances maintainability and testing, yet may increase inter‑agent communication overhead (mostly mitigated by in‑process calls).  
-* **Pre‑populating ontology fields** – Saves LLM compute, but requires tight coupling to the ontology schema; schema changes must be propagated to the generation agent.  
-
-### System structure insights  
-
-The Pipeline sits as a central orchestrator within **SemanticAnalysis**, bridging low‑level code parsing (CodeAnalyzer) and high‑level knowledge representation (OntologyManager, KnowledgeGraphConstructor).  Its agents form a vertical slice that mirrors the sibling components, reinforcing a consistent “agent‑per‑concern” pattern across the codebase.  
-
-### Scalability considerations  
-
-* **Horizontal scaling** – Because work is pulled via the shared counter, adding more worker threads or processes linearly increases throughput until the underlying resources (CPU, Memgraph I/O) saturate.  
-* **Graph size** – The Knowledge Graph constructor streams AST nodes directly to Memgraph; Memgraph’s native clustering can be leveraged for very large codebases without changing pipeline logic.  
-* **DAG size** – The topological sort runs in O(V+E) time, so even thousands of steps remain cheap; however, extremely deep dependency chains could increase latency for downstream steps.  
-
-### Maintainability assessment  
-
-The clear separation of responsibilities, coupled with explicit TypeScript interfaces, makes the Pipeline highly maintainable.  Adding new analysis steps or swapping out the graph backend requires only modifications to the corresponding agent, leaving the coordinator untouched.  The only maintenance hotspot is the shared `nextIndex` mechanism, which must remain atomic and correctly reset between pipeline runs.  Overall, the design balances extensibility with runtime efficiency, providing a solid foundation for future growth.
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The `BaseAgent<TInput, TOutput>` abstract class defined in `src/agents/base-agent.ts` establishes a rigid, five-method execution contract that every agent in the pipeline must implement: `process()`, `calculateConfidence()`, `detectIssues()`, `generateRouting()`, and `applyCorrections()`. This is not a loose interface — each method is called sequentially within a standardized envelope, meaning an agent cannot skip confidence calculation or issue detection even if it has nothing meaningful to report for those phases. The resulting `AgentResponse` envelope carries not just the domain output but also metadata (timestamps, model usage), routing suggestions for downstream agents, and a corrections list for self-healing. For a new developer, this means that implementing a new agent is less about writing a single processing function and more about correctly filling all five lifecycle slots; an agent that returns empty stubs for `detectIssues()` or `generateRouting()` will still compile and run, but the orchestrating pipeline likely depends on those fields being populated to make branching decisions. The generic type parameters `<TInput, TOutput>` allow the base class to be reused across wildly different domains — from raw git commit arrays (SemanticAnalysisAgent) to ontology classification batches (OntologyClassificationAgent) — without sacrificing static type safety on the input/output contracts.
+
+### Children
+- [BatchAnalysisYamlConfig](./BatchAnalysisYamlConfig.md) -- The Pipeline sub-component description explicitly names batch-analysis.yaml as the file where agent sequencing is defined, making it the single configuration point controlling pipeline topology rather than having order encoded in application logic.
 
 ### Siblings
-- [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
-- [Insights](./Insights.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
-- [OntologyManager](./OntologyManager.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
-- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file.
-- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
-- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
-- [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
-- [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
+- [Ontology](./Ontology.md) -- The upper ontology defines broad abstract categories while lower ontology definitions provide concrete entity types, creating a two-tier classification hierarchy referenced by OntologyClassificationAgent
+- [Insights](./Insights.md) -- Insight generation operates as a post-persistence concern, consuming already-written KG data rather than raw pipeline input, as described in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
+- [OntologySubsystem](./OntologySubsystem.md) -- OntologyConfigManager centralizes all ontology configuration loading under src/ontology/, meaning changes to entity type hierarchies flow through a single managed entry point rather than being scattered across agents
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

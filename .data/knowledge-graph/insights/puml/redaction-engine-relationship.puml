@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: RedactionEngine
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[RedactionEngine] as redaction_engine #LightBlue
+[SessionWindowManager] as session_window_manager #F0F0F0
+[TranscriptAdapterBase] as transcript_adapter_base #F0F0F0
+[LSLConfigValidator] as lslconfig_validator #E8F5E8
+[ExternalizedRuleStore] as externalized_rule_store #E8F5E8
+
+live_logging_system --> redaction_engine
+session_window_manager -[hidden]- redaction_engine
+transcript_adapter_base -[hidden]- redaction_engine
+redaction_engine --> lslconfig_validator
+redaction_engine --> externalized_rule_store
+
+@enduml

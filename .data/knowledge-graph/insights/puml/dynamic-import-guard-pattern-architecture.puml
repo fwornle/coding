@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "MCP Server Layer" {
+  component "mcp-server-semantic-analysis" as mcpServer <<core>>
+  component "MCP Tools" as mcpTools <<api>>
+}
+
+package "Guard Mechanism" {
+  component "isServerAvailable()" as guardFn <<core>>
+  component "dynamic import()" as dynImport <<core>>
+}
+
+package "Optional Backends" {
+  cloud "Memgraph" as memgraph <<external>>
+  cloud "code-graph-rag" as codeGraphRag <<external>>
+  cloud "External Analysis Server" as extServer <<external>>
+}
+
+package "Agent Layer" {
+  component "base-agent.ts" as baseAgent <<agent>>
+  component "Concrete Agent Subclass" as agentSubclass <<agent>>
+}
+
+mcpServer --> mcpTools : "registers"
+mcpTools --> guardFn : "probes before\ninvocation"
+guardFn --> dynImport : "gates on\navailability"
+dynImport ..> memgraph : "optional client\nload"
+dynImport ..> codeGraphRag : "optional client\nload"
+dynImport ..> extServer : "optional client\nload"
+baseAgent --> agentSubclass : "extended by"
+agentSubclass ..> guardFn : "parallel\nguard pattern"
+
+@enduml

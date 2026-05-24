@@ -17883,5 +17883,1293 @@
       "sourceCount": 1
     },
     "project": "km-core"
+  },
+  {
+    "id": "5047c6a7-a1ca-4a43-95bf-8e589f97368b",
+    "date": "2026-05-21",
+    "theme": "Fix Tmux Health Badge ETM-Heartbeat Promotion Gap",
+    "summary": "Investigated a visual inconsistency where the `[📚]` online-learning health badge in the tmux statusline displayed 🟠 (cooling) while the `/observations` dashboard simultaneously showed fresh Phase 40 coding activity.\n\n- Root cause traced in `scripts/combined-status-line.js`: the per-project bubble logic in `updateActivityRollup()` (~line 1017) already applies an ETM-heartbeat promotion (stale transcript + fresh heartbeat → 🟢), but the badge helper `_freshestProjectActivityAgeMs()` (~line 455) lacked the equivalent promotion.\n- Fix: mirrored the heartbeat promotion into the badge logic (option 2 of two proposed remediations).\n- Committed and pushed in `a607618a3`, advancing the branch from `6e1c10060`.\n- A backfill script was run post-commit to re-summarize failed observation rows; 3 of 4 were recovered; the 4th was skipped because its stored content contained only image placeholders with no summarizable text — surfacing a new bug.",
+    "observationIds": [
+      "9a3e700c-1bbd-4e47-8734-7df4c73bd228",
+      "85a52e8f-193d-4604-813f-c08faee48030"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/combined-status-line.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T03:38:46.253Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "e1d81c83-102e-4cf4-8562-c5f05c0c075c",
+    "date": "2026-05-21",
+    "theme": "File and Plan ObservationWriter Image-Attachment Text-Loss Bug",
+    "summary": "After the backfill run revealed that prompt text is silently dropped when image content is present in an observation, the issue was formally tracked and planned across two projects.\n\n- **km-core project**: bug filed as a tracked phase entry; `47-CONTEXT.md` updated via Skill tooling.\n- **Coding project v7.1 roadmap**: Phase 47 created via the `add-phase` / `gsd-sdk` workflow, scoped to:\n  - Fix `ObservationWriter.js` to retain both text and image references in mixed-content prompts.\n  - Add a regression test for mixed text+image inputs.\n  - Optional enhancement to the backfill script.\n- Planning commit `bdfe2483c` (\"docs(phase-47): file ObservationWriter image-attachment text-loss bug\") added 127 lines across `.planning/ROADMAP.md`, `.planning/STATE.md`, and `.planning/phases/47-observationwrite`; branch now 4 commits ahead of `origin/main`.",
+    "observationIds": [
+      "4fb3bf00-5e99-4e5f-94a1-0553ec230341",
+      "738c1df1-e4ed-4acc-bdc3-0ecdaf1c2b2b",
+      "6e50b7d1-fdea-42bf-8462-66de1be62ab3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/47-observationwriter-preserve-prompt-text-when-image-attachment/47-CONTEXT.md",
+      ".planning/ROADMAP.md",
+      ".planning/STATE.md",
+      ".planning/phases/47-observationwrite"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T03:38:46.253Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "e9c74967-55ad-4677-a7e8-0facdd4b99dc",
+    "date": "2026-05-21",
+    "theme": "Phase 40 Dedup/Pipeline Wave Planning and Iterative Verification",
+    "summary": "**Goal:** Design and validate the full implementation roadmap for Phase 40 (`ingest-pipeline-layered-dedup`) before any code execution began.\n\n**Approach:** The assistant decomposed Phase 40 into a 5-wave plan set (Wave 0–3) to maximize parallelism while avoiding shared-file write conflicts on `types.ts`. Three successive verification passes (Iter 1, 2, 3) were performed after each round of plan fixes.\n\n**Artifacts created:**\n- `.planning/phases/40-ingest-pipeline-layered-dedup/40-01-PLAN.md` through `40-07-PLAN.md` (7 plans, committed at `aed061d98`)\n- `.planning/ROADMAP.md` updated to list Phase 40's 7 plans\n\n**Key decisions and issues surfaced across verification rounds:**\n- Iter 1: Malformed JSON verify block in the last plan file; RESEARCH.md resolution lock and VALIDATION.md row mapping missing (2 blockers)\n- Iter 2: Warnings on Plan 40-06 split, cross-plan fake file placement, and Task 1 prose; new `runStage` 4-overload requirement added\n- Iter 3 (Obs 5): Blocker found — `DedupDecision` used in 4 places across 40-06a/40-06b but never defined; upstream plans define `DedupResult`; fix options proposed (rename, new type in 40-01, or alias from 40-05)\n- Iter 3 (Obs 6): Final verification file-load begun but no PASS verdict rendered within the session\n\n22 named vitest tests were distributed across all 7 plans, with requirement IDs `PIPE-01`, `DEDUP-01` and context decisions `D-42`–`D-46`, `CF-D30` fully covered.",
+    "observationIds": [
+      "929f901f-4532-44c8-8b26-ddd319584c4e",
+      "4c52018e-b786-4635-9126-c55922da8ee6",
+      "70f6d4f8-b252-4e22-8647-be021d45dacc",
+      "cac71f86-1605-4c16-b1b4-67a28c57eabb",
+      "055f590a-4ab6-4ba2-be3f-dc3cc15118b7",
+      "cede7a98-b79c-4041-a5c4-058f7370ed13"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-01-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-02-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-03-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-04-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-05-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-06-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-07-PLAN.md",
+      ".planning/ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T15:55:34.391Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6ca30c91-a450-477f-a636-9090e1e53a99",
+    "date": "2026-05-21",
+    "theme": "Wave 0 Type Scaffolding and Test Fake Helpers",
+    "summary": "**Goal:** Lay the foundational type contracts and test infrastructure for the Phase 40 dedup/pipeline module in `km-core`.\n\n**Approach:** Identified a forward-reference ordering problem in the original task sequence (Task 1 depended on files from Task 2) and invoked Rule 3 to reorder execution as Task 2 → Task 1 → Task 3. Import paths in `fakes.ts` were adjusted to use direct subpath imports since types were not yet re-exported from `index.ts`.\n\n**Files created:**\n- `src/dedup/types.ts` — layer contracts for the dedup module\n- `src/pipeline/types.ts` — pipeline interfaces importing from `dedup/types.ts`\n- `tests/unit/_helpers/fakes.ts` — shared test helpers with corrected subpath imports\n\nAll three files committed to `km-core` main branch in dependency-correct order, unblocking parallel Wave 1 layer-port plans.",
+    "observationIds": [
+      "eb16b503-d47b-498e-8b4d-4b676de34659"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "src/pipeline/types.ts",
+      "tests/unit/_helpers/fakes.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T15:55:34.391Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4d1e3f7c-08db-4564-a368-c9fef3556c0c",
+    "date": "2026-05-21",
+    "theme": "JaccardNameMatcher TDD Implementation and Build Verification",
+    "summary": "**Goal:** Implement and verify the `JaccardNameMatcher` dedup layer (Plan 40-02) under strict RED→GREEN TDD discipline.\n\n**Approach:** The RED test skeleton was landed first; the GREEN implementation was then authored. A math error in the test's numeric boundary expectation was corrected during GREEN (5/7 ≈ 0.714 had been mislabeled as 0.84; corrected to 11/13 ≈ 0.846), justified as a Rule 1 deviation since the erroneous assertion never executed in RED (module not found).\n\n**Files created/edited:**\n- `src/dedup/JaccardNameMatcher.ts` — production implementation with configurable threshold defaulting to 0.85\n- `tests/unit/jaccard-matcher.test.ts` — corrected boundary-value assertion\n\n**Verification (Obs 10):**\n- `dist/JaccardNameMatcher.js` and `.d.ts` confirmed present and loadable\n- 99 tests (92 baseline + 7 Jaccard) passed with zero failures in plan scope\n- 1 failing test file attributed to parallel agent 40-04's uncommitted GREEN work (LLMSemanticMatcher), not a regression\n- TypeScript strict build clean; working tree clean after Task 3 verification-only pass",
+    "observationIds": [
+      "13365b7f-abde-4456-b21a-045ee1509e1a",
+      "f1c0be04-b4cd-44bc-9c55-97b4fa97cd02"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "src/dedup/JaccardNameMatcher.ts",
+      "tests/unit/jaccard-matcher.test.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T15:55:34.391Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6de97d00-f22f-4132-87ad-a56f70368279",
+    "date": "2026-05-21",
+    "theme": "CosineEmbeddingMatcher TDD Green Phase Implementation",
+    "summary": "**Goal:** Complete the GREEN phase of Plan 40-03 by implementing `CosineEmbeddingMatcher` to satisfy the 7 pre-written RED tests.\n\n**Approach:** Followed the same wave-isolated TDD discipline established in 40-02: RED commit first, then production source authored to satisfy tests, then TypeScript compilation and acceptance criteria verified before committing GREEN.\n\n**File created:**\n- `src/dedup/CosineEmbeddingMatcher.ts`\n\nAll 7 unit tests passed GREEN; TypeScript compiled cleanly. The GREEN commit was staged following the same parallel-wave isolation strategy used across the Phase 40 layer ports.",
+    "observationIds": [
+      "d698ffea-0bd2-4f18-b8d7-6bad42fe7c78"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "src/dedup/CosineEmbeddingMatcher.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T15:55:34.391Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "052f435d-45c8-4f09-a4c6-8498cf9fd941",
+    "date": "2026-05-21",
+    "theme": "LayeredDeduplicator Orchestrator TDD Implementation",
+    "summary": "**Goal:** Implement `LayeredDeduplicator.ts` (Plan 40-05) — the three-layer dedup orchestrator that chains exactName → embedding → llmSemantic with configurable short-circuit behavior (Decision D-44).\n\n**Approach (Obs 11):** Session began with worktree branch check and file reads; no implementation landed in that exchange. Obs 12 completed the full TDD cycle:\n- **RED:** Wrote 9 failing tests for `LayeredDeduplicator` using `makeLayerStub`\n- **GREEN:** Implemented the class with `shortCircuit` logic; fixed a grep acceptance-criteria issue by collapsing a multi-line conditional to a single line\n- **Regression:** Full suite grew from 12 → 13 test files and 115 → 124 tests, all green\n\n**Constraints satisfied:**\n- All relative imports use `.js` extensions\n- `tsc --noEmit` clean\n- RED and GREEN committed atomically in separate commits per TDD workflow",
+    "observationIds": [
+      "357b0fff-b591-48c3-9f4e-adf185aa7e8c",
+      "bdbac1cd-8f39-4e32-aabd-14336dd09832"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-23T15:55:34.391Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "0fd7930d-e250-466e-934c-a286b38f71bc",
+    "date": "2026-05-21",
+    "theme": "IngestPipeline TDD Implementation and Acceptance Criteria Finalization",
+    "summary": "**Goal:** Implement `IngestPipeline` (Plan 40-06) using strict Red-Green-Refactor TDD, then finalize acceptance criteria grep compliance and produce `SUMMARY.md`.\n\n**Approach:**\n- **RED (Obs 13):** Failing test file committed first, confirming RED state\n- **GREEN (Obs 13):** `IngestPipeline` source written; 10 new tests added on top of 124-test baseline (total 134), all passing; TypeScript and build checks passed\n- **Cleanup (Obs 14):** Fixed grep-literal mismatches by rewording comments to eliminate duplicate `store.findByOntologyClass` and `store.batch` matches; reformatted multi-line `runStage` overload signatures to single-line for grep resolution\n\n**Files created:**\n- `km-core` IngestPipeline source file\n- `km-core` IngestPipeline test file\n\n**Outcome:** All 8 VALIDATION tests pass individually; full 134-test suite green; TypeScript strict build passes. One noted deviation documented in `SUMMARY.md`: `deduplicator.dedup` returns 2 (not spec's expected 1), justified by `runStage('dedup')` delegation requirement.",
+    "observationIds": [
+      "b748e35d-adea-44f0-a739-2b90c67d8bf3",
+      "dd041755-2d95-49d1-89e6-fc9968ab2b10"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "km-core IngestPipeline source file",
+      "km-core IngestPipeline test file"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T15:55:34.391Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5dbba5a5-aebe-4a4c-98ca-5ca5786d479a",
+    "date": "2026-05-22",
+    "theme": "Phase 40 Code Review: Path Conflicts and Final Clean Pass",
+    "summary": "Three attempts were made to run the `gsd-code-review` skill against Phase 40 (`40-ingest-pipeline-layered-dedup`) changes over the course of the day.\n\n- **Obs 1 (05:34):** The first attempt was blocked by the workflow's path-validation gate, which rejects cross-repo absolute paths sourced from `SUMMARY.md`. Files to be reviewed live in the external `km-core` repository. A workaround of directly spawning `gsd-code-reviewer` with absolute paths was identified but not yet executed. `48-CONTEXT.md` was updated.\n- **Obs 5 (07:49):** A second attempt hit the same external-repo scoping conflict; no `REVIEW.md` was produced. `PROJECT.md` was updated.\n- **Obs 6 (07:49):** The code-review workflow ultimately succeeded — the `gsd-code-reviewer` agent analyzed 10 changed files across `km-core`, producing a completed `REVIEW.md`. Findings: **0 Critical, 5 Warnings, 4 Info**; all 4 prior blockers confirmed closed; status reported as clean with no new blockers introduced by the gap-closure changes.",
+    "observationIds": [
+      "f9647b19-1a66-4183-aca6-cbd75dfad211",
+      "502aed8c-8f16-4716-9765-99d693691858",
+      "04087764-a972-4927-9aa2-c4338d5d2131"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/48-vkb-graph-viewer-system-type-nodes-vanish-when-their-owning-/48-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-23T05:40:53.405Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4ffc4540-510a-40f5-adf3-1f0ae4333960",
+    "date": "2026-05-22",
+    "theme": "Phase 40 Gap Closure: Planning and Wave Execution",
+    "summary": "A full gap-closure cycle was run for Phase 40 (`40-ingest-pipeline-layered-dedup`) using the `--gaps` / `--gaps-only` flags across the planning and execution workflows.\n\n- **Obs 2 & 3 (06:42):** The `gsd-plan-phase` skill was invoked with `--gaps`, triggering gap-closure mode — research was skipped and the orchestrator read `VERIFICATION.md` directly. It validated existing artifacts (`VALIDATION.md`, `PATTERNS.md`, `VERIFICATION.md`, `REVIEW.md`, 8 existing plans), confirmed no UI/schema gates fired, and handed off to the `gsd-planner` sub-agent. No output `PLAN.md` was confirmed written within the exchange. `48-CONTEXT.md` was updated.\n- **Obs 4 (07:16):** The `gsd-execute-phase` workflow was invoked with `PHASE_ARG=40` and `--gaps-only` active. Argument parsing completed; execution proceeded toward filtering plans with `gap_closure: true` in frontmatter, then into standard wave-based subagent spawning. `48-CONTEXT.md` was updated.",
+    "observationIds": [
+      "d94893e3-b039-4ed3-81f7-900306798370",
+      "1e40205d-c9b0-46f5-bf86-2895720b9a31",
+      "38a266c4-966e-41e4-bd2f-e64b91cbedcb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/48-vkb-graph-viewer-system-type-nodes-vanish-when-their-owning-/48-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T05:40:53.405Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1c8d5509-dae2-43be-9fc7-f16dacf038d0",
+    "date": "2026-05-22",
+    "theme": "Phase 41 Roadmap Entry Addition Hits Conflict",
+    "summary": "The `add-phase` workflow was invoked to append Phase 41 to the current milestone in `ROADMAP.md`.\n\n- The skill routed to the `add-phase` workflow (no flag token detected) and inspected the existing `ROADMAP.md` before writing.\n- Execution stalled when Phase 41 was found to **already exist** at line 408 of `ROADMAP.md`, creating a conflict with the append logic.\n- The assistant paused and asked the user a clarifying question before proceeding; no changes were written.\n- `STATE.md` was updated to reflect the mid-workflow state.",
+    "observationIds": [
+      "d477559f-9ee0-4375-af0a-a18f0bd714e4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-23T05:40:53.405Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4cfcca03-0249-42fd-ad30-e519e9b26ff2",
+    "date": "2026-05-22",
+    "theme": "KM Unification Status Audit: km-core On Track",
+    "summary": "The developer requested a status check on whether all three KM systems (online learning, UKB, OKM) remain on track for integration against the newly extracted `km-core` library.\n\n- **Obs 8 (09:09):** The assistant initiated a roadmap inspection of `planning/ROADMAP.md` targeting the v7.1 Knowledge Management Unification milestone but produced no findings within the exchange.\n- **Obs 9 (09:09):** A complete audit was performed across roadmap and on-disk artifacts. Confirmed **on track**: km-core (Phases 37–40) is complete and publishable with sub-path exports; Phases 41/42/43 map respectively to Online Learning, UKB, and OKM integration; all three dedup matchers in `km-core` are direct ports from the three target systems.\n- Noted risks: Phase 42 bundles pre-existing bugs, Phase 42–46 directories are unscaffolded, OKM packaging decision for Phase 43 is open, and Phase 40 SC#4 remains deferred until Phase 42.\n- `PROJECT.md` was updated.",
+    "observationIds": [
+      "25b2b6c0-e504-40e0-8508-01af9cc91959",
+      "ef209916-a31a-4d6a-a5a2-0ea1dff3dbc5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/PROJECT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T05:40:53.405Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f1cafa19-2e67-4d8e-8f58-7165e2e15b2c",
+    "date": "2026-05-22",
+    "theme": "Phase 41 Pre-Planning Discussion Session Initiated",
+    "summary": "The `discuss-phase` workflow was run for Phase 41 (online learning adapter / post-hoc resolution) to surface gray areas before formal planning begins.\n\n- The workflow routed to `discuss-phase.md` in \"discuss\" mode and loaded prior context from `REQUIREMENTS.md` and Phase 40's `CONTEXT.md` to avoid re-litigating settled decisions.\n- The exchange ended during the context-loading/scouting phase before any gray areas were surfaced to the user.\n- No `CONTEXT.md` for Phase 41 was written yet.\n- `41-CONTEXT.md` was created/edited as a working artifact.",
+    "observationIds": [
+      "1fef4a9d-c97d-4b6c-9a07-a9e935b814b5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/41-online-learning-adapter-post-hoc-resolution/41-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T05:40:53.405Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "06ff5f90-42d2-401b-be87-3320f96ac968",
+    "date": "2026-05-22",
+    "theme": "Planning Directory Cleanup and Milestone Archiving Initiated",
+    "summary": "The `gsd-cleanup` skill was invoked to archive completed milestone phase directories into `.planning/milestones/v{X.Y}-phases/`.\n\n- The assistant read the cleanup workflow file and began scanning `.planning/MILESTONES.md` and existing milestone archives to identify eligible phase directories for archiving.\n- A dry-run summary was being prepared for user confirmation before any destructive moves.\n- No archiving had been performed at the time the exchange ended.\n- Both `41-CONTEXT.md` and `41-DISCUSSION-LOG.md` were updated as the workflow touched Phase 41 artifacts during the scan.",
+    "observationIds": [
+      "e1af1d53-0da5-4bc8-abb6-6516899d4990"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/41-online-learning-adapter-post-hoc-resolution/41-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/41-online-learning-adapter-post-hoc-resolution/41-DISCUSSION-LOG.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-23T05:40:53.405Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ef236696-3f8b-42c1-b3b2-61d6746fd1fd",
+    "date": "2026-05-22",
+    "theme": "VKB Graph Viewer Investigation and Phase Planning Setup",
+    "summary": "The session focused on diagnosing and organizing work around issues in the VKB graph viewer project, spanning an initial investigation phase through to planning structure setup.\n\n- **Observation 1 (06:50):** Triggered by a screenshot (likely showing a UI/graph anomaly), the agent searched the local workspace for files referencing `CollectiveKnowledge` across JS/TS/TSX files and explored the `vkb-server` directory to understand filter logic and graph data exposure. No files were modified; the session ended at the investigation stage with candidate files located.\n- **Observation 2 (07:15):** Previously bundled items were split into two distinct planning phases, each given its own directory and context file under `.planning/phases/`:\n  - **Phase: system-type nodes vanish** — VKB graph viewer bug where system-type nodes disappear when their owning context changes.\n  - **Phase: 187 orphan nodes** — VKB graph data integrity issue where 187 nodes lack project-anchor relationships.\n- Key artifact updated: `/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/48-vkb-graph-viewer-system-type-nodes-vanish-when-their-owning-/48-CONTEXT.md`\n- The work moved from unstructured exploration to a structured two-phase plan, but no source fixes were applied yet.",
+    "observationIds": [
+      "0d647a00-a963-4f82-900f-488295908a8f",
+      "538f1c00-8194-4645-b906-65c422f4ce21"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/48-vkb-graph-viewer-system-type-nodes-vanish-when-their-owning-/48-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T05:40:53.405Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "83485050-869b-4cd8-aff1-1770f688d7c3",
+    "date": "2026-05-22",
+    "theme": "Online Adapter reprojectFromOnlineStore Implementation and Grep Fix",
+    "summary": "Work focused on implementing the `reprojectFromOnlineStore` function and its sub-barrel inside `km-core` as part of Plan 42-07 Tasks 1–2.\n\n- Created `src/adapters/online/reproject.ts` with the core reprojection logic\n- Created `src/adapters/online/index.ts` as a sub-barrel wiring the adapter into the layer\n- Discovered and fixed a relative import depth bug: corrected `../` to `../../` to account for the `src/adapters/online/` nesting level\n- Task 1 checkpoint utility landed at commit `85e16d7` with all acceptance criteria passing\n- A follow-on fix addressed a Task 3 acceptance-grep failure: the TypeScript non-null assertion `entity.legacyId!.system` did not match the required literal pattern `entity.legacyId.system`; resolved by capturing `legacyId` into a non-null local variable before asserting, satisfying both TypeScript's type narrower and the grep criterion without altering test semantics",
+    "observationIds": [
+      "07f258d1-20e7-4da4-9a67-97efb8cc0f0a",
+      "992506d2-3251-42ef-9fde-cc7b02dd69fc"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "src/adapters/online/reproject.ts",
+      "src/adapters/online/index.ts (sub-barrel)",
+      "src/adapters/online/reproject.ts (path depth bug fix)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:01:34.576Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "79cc3f07-b16b-4ea6-8f2d-7d66a084f9ea",
+    "date": "2026-05-22",
+    "theme": "resolveEntities Maintenance Function and km-core Public API Surface",
+    "summary": "Across Plan 42-06 / Plan 41-06, the `resolveEntities` post-hoc duplicate resolver was implemented under a new `maintenance` sub-barrel and then fully wired into km-core's public export surface.\n\n- Created `src/maintenance/resolveEntities.ts` with survivor-by-degree selection, `dryRun` support, `localeCompare`/`.id` tie-breaking, and an \"unmatchable\" defensive guard\n- Created `src/maintenance/index.ts` as the maintenance sub-barrel\n- Created `tests/unit/maintenance/resolveEntities.test.ts` (11 new tests, A–K), following TDD RED → GREEN protocol; RED gate confirmed before implementation\n- Auto-corrected a plan-spec contract mismatch: plan assumed OKM-style `MatchResult.matchedTo.name` but km-core exposes `survivor?: Entity` with `.id`; a defensive name+description reverse-lookup was added to honour both shapes\n- Extended `src/index.ts` and `package.json` to re-export Phase 41 types (`ReprojectCheckpoint`, `ObservationRow`, `DigestRow`, `InsightRow`, etc.) via the root barrel and `./adapters/online` sub-path\n- External smoke-compile validated all three import surfaces under NodeNext + strict; suite reached 213/213 passing\n- `41-06-SUMMARY.md` committed to the planning repo documenting the deviation",
+    "observationIds": [
+      "6036beba-908a-4470-bd31-0db0c086862c",
+      "7658f437-cf7a-411c-9b85-ff8cb37d5ce3",
+      "2fc49482-c2f3-4fe6-848c-97e61d81421e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/src/maintenance/resolveEntities.ts",
+      "src/maintenance/index.ts (maintenance sub-barrel)",
+      "a RED smoke test file (test/maintenance/resolveEntities.test.ts)",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/src/maintenance/index.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/package.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/tests/unit/maintenance/resolveEntities.test.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/41-online-learning-adapter-post-hoc-resolution/41-06-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:01:34.576Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fc93334f-a8ed-495b-9a16-c669b4f2e35f",
+    "date": "2026-05-22",
+    "theme": "CLI Script, Integration Test Suite, and Task 3 Checkpoint Gate",
+    "summary": "Plan 42-07 Tasks 1 and 2 were completed end-to-end, culminating in a blocking human-verify checkpoint for Task 3.\n\n- **Task 1:** Created CLI script `reproject-online.mjs` (committed at `d3e4c300b`), satisfying all 12 acceptance criteria: correct shebang, no `console` usage, proper imports from `@fwornle/km-core`, flags wired, `stderr`/`stdout` routing correct; a `node_modules` symlink fix was applied during verification\n- **Task 2:** Authored integration test suite `reproject-resolve-merge.test.ts` covering scenarios SC#1–SC#4 for the `resolveEntities`/`reprojectFromOnlineStore` merge flow\n- Diagnosed and resolved a test failure caused by the defensive `lookupSurvivorInCandidatePool` comparing full Entity descriptions against 200-char-truncated `EntitySummary` descriptions; fixed by pre-truncating mock `LLMSemanticMatcher` survivor descriptions to 200 chars, mirroring real-world matcher behaviour — no production code changed\n- All 7 new integration tests pass; suite grew from 213 to 220/220\n- The assistant emitted a structured blocking checkpoint summarising Task 1–2 completions and providing operator verification steps 1–7 for Task 3; no further developer input was present in that exchange",
+    "observationIds": [
+      "e40aa6e9-0945-4722-ada5-19df2b25e5fa",
+      "d82cb844-0327-4f3e-b352-de4f2be8747d",
+      "c9c63a83-a542-40e2-801e-6112bfb7ff3e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/reproject-cli.js (or equivalent CLI entry point)",
+      "packages/km-core integration test file for Task 2 (in progress at exchange end)"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:01:34.576Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ba6a2901-ae63-4059-b21c-bc15fa656c3a",
+    "date": "2026-05-22",
+    "theme": "Plan 42-07 Candidate Pool and SC#2 Collision Tests Complete",
+    "summary": "Completed Tasks 1–3 of Plan 42-07 using TDD with carefully calculated 5-dimensional unit vectors producing precise cosine similarities (0.93 for target pair, 0.40 for non-target, 0 for all others) to isolate Stage 1 Jaccard gating from Stage 2 embedding thresholds.\n\n- Task 1: candidate-pool integration tests committed to km-core at `307d427`\n- Task 2: SC#2 synthetic collision test committed at `7535f0f` with explicit `.mock.calls.length` assertion form to satisfy plan's grep check\n- Task 3: full regression confirmed 143 tests passing (+9 over prior baseline), all gates clean",
+    "observationIds": [
+      "818bd9ae-ab49-4d5d-a49d-ec2d90a39f27"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d96e514c-2545-4e15-934c-5612788555f3",
+    "date": "2026-05-22",
+    "theme": "Phase 40 Ingest Pipeline Static Code Review with 17 Findings",
+    "summary": "Two parallel review passes produced `40-REVIEW.md` at `.planning/phases/40-ingest-pipeline-layered-dedup/`, covering all 11 Phase 40 source files: pipeline types, `IngestPipeline`, dedup layers, `LayeredDeduplicator`, barrel exports, and `package.json`.\n\n- **4 BLOCKERs identified:** CR-01 (silent duplicate writes when `ontologyClass` absent), CR-02 (dead/inverted self-id guard in all 3 matchers), CR-03 (unhandled `SyntaxError` leaks in `parseDedupResponse`), CR-04 (`runStage` drops `opts.domain`)\n- **8 WARNINGs** including confidence gate redundancy, `as`-cast defeating the `Deduplicator` forward-reference design, non-null assertions lacking type enforcement, and wasteful single-element LLM prompt batching\n- **5 INFO items** covering surface drift between `ingest()` and `runStage('extract')` entry points and synthesizer receiving closed predecessor IDs\n- File written to planning directory without committing to km-core",
+    "observationIds": [
+      "764d78ad-ea04-4fd5-9840-b3e831f1a100",
+      "6ae1e748-2af1-4ff6-907c-47f5b3133748"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-REVIEW.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "18164239-cce9-48db-88af-8e3d4e29fd7b",
+    "date": "2026-05-22",
+    "theme": "Phase 40 Initial Verification Surfaces Blocker Gaps",
+    "summary": "Two verification passes produced `40-VERIFICATION.md` at `.planning/phases/40-ingest-pipeline-layered-dedup/`, assessing Phase 40 against success criteria and PIPE-01/DEDUP-01 requirements.\n\n- **3 of 4 SCs verified:** SC#4 partially deferred to Phase 42 per D-45 co-exist mode; SC#1 (example adapter) missing, flagged for human verification\n- 143 tests / 17 test files confirmed passing; `tsc` and build clean\n- All 4 REVIEW.md BLOCKERs (CR-01 missing `ontologyClass` guard, CR-02 dead self-id guard, CR-03 raw `SyntaxError` in `parseDedupResponse`, CR-04 `runStage` drops `opts.domain`) surfaced as gaps requiring disposition before Phase 41 begins",
+    "observationIds": [
+      "73480ec4-8715-46f4-a97f-88829bb83634",
+      "6b9fcb10-e0d8-4a92-83d9-e5334ea62eb1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-VERIFICATION.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6d8fc898-2752-49bc-b265-7bd53fc0562b",
+    "date": "2026-05-22",
+    "theme": "Phase 40 Gap-Closure Plans 40-08 to 40-11 Created and Iterated",
+    "summary": "Created four gap-closure plan files (`40-08-PLAN.md` through `40-11-PLAN.md`) grouped by file-disjointness for parallel wave 7 execution, then iterated through a checker pass and revision cycle.\n\n- **Plan 40-08:** CR-01 + CR-04 `IngestPipeline.ts` fixes; **40-09:** CR-02 self-id guard removal across 3 matchers; **40-10:** CR-03 typed `LLMDedupParseError` + graceful fallback; **40-11:** net-new custom-adapter example for SC#1 closure\n- Checker pass surfaced: malformed closing tag (40-08), missing `depends_on` entry (40-09), fixture/heuristic contradiction BLOCKER (40-10), over-narrow acceptance regex (40-11)\n- Revision adopted Contract A (`parsedTriedJson = response.content.includes('{')`) for 40-10, broadened regex to `[=({;]` in 40-11, appended `\"40-07\"` to `depends_on` in 40-09, repaired malformed tag in 40-08\n- All four plans committed at `3f6301988` with frontmatter and structure validation passing; two intermediate verification exchanges (obs 7, 10) ended before producing verdicts",
+    "observationIds": [
+      "08d65535-cc26-4496-8a59-15baed96a863",
+      "ca25c628-14e4-402e-a596-d867e6fb708e",
+      "4baa71e3-2544-48c8-91d0-95b7023f0014",
+      "68f5c973-a464-4b34-afdf-08485be83d3c",
+      "e71a2c8a-19e0-436c-9f98-e3afbbde7873"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-08-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-09-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-10-PLAN.md",
+      ".planning/phases/40-ingest-pipeline-layered-dedup/40-11-PLAN.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f6690bef-e09c-445a-88ba-0707b0ab91cc",
+    "date": "2026-05-22",
+    "theme": "Plan 40-08 CR-01/CR-04 IngestPipeline RED Tests Committed",
+    "summary": "Began TDD execution of Plan 40-08, targeting CR-01 (`ontologyClass` guard) and CR-04 (`opts.domain` propagation) in `IngestPipeline.ts`.\n\n- RED state committed with exactly 2 failing tests: one asserting `stderr` warn on missing `ontologyClass`, one asserting `domain` parameter is correctly forwarded through `runStage`\n- Exchange ended before the GREEN implementation edits were applied to `IngestPipeline.ts`; GREEN commit was still pending at close",
+    "observationIds": [
+      "f6191283-a86e-433f-9169-e19c89713958"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1293662e-8aae-4bf8-9009-f78da3aed954",
+    "date": "2026-05-22",
+    "theme": "Plan 40-09 CR-02 Self-Id Guards Removed from Matchers",
+    "summary": "Executed Plan 40-09 via a RED→GREEN TDD cycle, removing dead self-id guard conditions from `JaccardNameMatcher`, `CosineEmbeddingMatcher`, and `LLMSemanticMatcher`.\n\n- Plan incorrectly assumed no existing tests relied on the guard; legacy \"never matches self\" tests in `jaccard-matcher.test.ts` and `cosine-matcher.test.ts` were replaced with corrected-behavior assertions (`matched: true`, confidence 1.0) rather than added alongside them\n- A new CR-02 self-match test was appended to `llm-matcher.test.ts` where no conflicting legacy test existed\n- **Deviation documented:** net test increase was +1 (not plan-expected +3) since replacement kept per-file counts stable\n- GREEN commit landed with all 146 tests passing, `tsc` clean; `40-09-SUMMARY.md` written to `.planning/phases/40-ingest-pipeline-layered-dedup/`",
+    "observationIds": [
+      "c8f837af-3cee-4691-81cf-6ecb0a32b188",
+      "fef6c273-be9a-471c-a6f3-a68731d288ae",
+      "4f59e589-e748-46f8-8262-d477df72a7ea",
+      "e361babe-97e1-4349-9812-1f5ffbac9f5f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "jaccard-matcher.test.ts",
+      "cosine-matcher.test.ts",
+      "llm-matcher.test.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-09-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "cedaa59a-8316-4443-9172-cd2bb9a2f722",
+    "date": "2026-05-22",
+    "theme": "SC#1 Custom Adapter Example and Companion Integration Test",
+    "summary": "Created `examples/custom-adapter.ts` as a downstream-consumer-style reference adapter closing Phase 40 SC#1, then wrote its companion integration test.\n\n- Adapter implements all 4 stage interfaces (`Extractor`, `Synthesizer`, `EmbeddingClient`, `LLMClient`) and constructs `IngestPipeline` via options-object constructor with all 3 dedup thresholds (0.85, 0.90, 0.70), importing only from `@fwornle/km-core`\n- Local resolution achieved via `node_modules` symlink (equivalent to `npm link`) to avoid polluting `package.json` or git history; `node_modules` is gitignored\n- Task 1 committed at `8171a7f` after collapsing multi-line imports to single lines to satisfy grep acceptance criteria\n- Task 2 added 2–3 integration tests importing `runExampleAdapter` from the example file and verifying extracted/stored/merged counts; all 146 baseline tests remained passing",
+    "observationIds": [
+      "339d2422-4e7a-408f-bf2b-26e9185edce6",
+      "e15f094d-954d-4ff8-9ed2-4bda2cf46bb9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "examples/custom-adapter.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "39713d1b-8634-4982-b72c-f6ec596d2f12",
+    "date": "2026-05-22",
+    "theme": "Plan 40-10 CR-03 Typed LLMDedupParseError and Parse Refactor",
+    "summary": "Implemented typed error handling and rewrote `parseDedupResponse` in `LLMSemanticMatcher.ts` to close CR-03.\n\n- RED commit `441cd19` added 4 failing tests (14 total); GREEN introduced exported `LLMDedupParseError`, a `canonicalEmptyResponse` helper, and rewrote `parseDedupResponse` with a candidate-list-of-tries pattern so `match()` can discriminate parse failures via `parsedTriedJson` heuristic\n- **Deliberate deviation:** `canonicalEmptyResponse` was subsequently removed in favour of a discriminated-union return type (`{ ok: true, value } | { ok: false }`) from `parseDedupResponse`, eliminating spurious `[km-core/dedup/llm] parse error` warnings for prose-wrapped-fence canonical empty responses more cleanly than the plan's grep-checkable heuristic; deviation documented\n- Final suite: 153 tests passing (+4 for this plan), `tsc` clean, zero stderr noise regressions",
+    "observationIds": [
+      "839bc4b6-75b5-49be-89c0-acec8c1c968d",
+      "eea7cbdf-bb61-45b4-bfc4-b9a4fc3f06e6",
+      "8f04e209-6f5b-45b0-8aee-e63efbbd4cee"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "llm-matcher.test.ts",
+      "LLMSemanticMatcher.ts",
+      "km-core dedup LLM parsing module (refactored `parseDedupResponse` return type"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2dee5a1b-69e6-452a-9918-981db98af499",
+    "date": "2026-05-22",
+    "theme": "Phase 40 Post-Gap-Closure Re-Review and Final Verification",
+    "summary": "Two adversarial re-review passes and two verification passes confirmed the post-gap-closure state of Phase 40, replacing both planning artifacts with final-state documents.\n\n- `40-REVIEW.md` updated: all 4 BLOCKERs (CR-01–CR-04) confirmed genuinely closed in committed code; 0 new BLOCKERs introduced; 5 warnings carried forward (WR-01–WR-04 plus new WR-09: SC#1 example's synthesizer `receivedIds` is discarded, making matched-survivors-only contract unobservable end-to-end)\n- `40-VERIFICATION.md` replaced with final-pass report: **153/153 tests pass** (+10 from gap-closure RED→GREEN pairs), `tsc` and build clean, zero debt markers\n- CR-01–CR-04 and SC#1 all confirmed closed by direct source inspection (not SUMMARY narratives); SC#4 second half remains deferred to Phase 42 per D-45 co-exist mode\n- REQUIREMENTS.md rows PIPE-01 and DEDUP-01 recommended for flip to `Complete`",
+    "observationIds": [
+      "8ea15ed2-8f5e-4ea8-b3da-7f72d3c13cff",
+      "9399cfc2-fc2e-448b-8746-aa72a4bafefb",
+      "e90f9149-4735-4697-8bfd-afe84a84286b",
+      "93499a06-1a3f-4ca4-98d5-34742ebf5ada"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-REVIEW.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/40-ingest-pipeline-layered-dedup/40-VERIFICATION.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "277310e9-db1a-47d4-926d-7ce6ce764888",
+    "date": "2026-05-22",
+    "theme": "Phase 41 Online Learning Adapter Seven Plans Full Lifecycle",
+    "summary": "Full plan-create → check → revise → verify lifecycle for Phase 41 (Online Learning Adapter & Post-Hoc Resolution), producing 7 approved plan files across 4 dependency-ordered waves.\n\n- Plans cover: ontology files (41-01), row→Entity mappers (41-02/41-03), `GraphKMStore.getDegree` (41-03), `reprojectFromOnlineStore` (41-04), `mergeEntities` (41-05), `resolveEntities` (41-06), CLI + integration test (41-07); `ROADMAP.md` updated to 0/7 Planned\n- **Checker pass surfaced 6 blockers:** B1 wrong `parentChainOf` return type causing silent empty-match on `LearningArtifact` subclass; B2 Plan 05 declared `wave:2` with empty `depends_on`; B3/B6 Plans 02+04 stamped `legacyId` on `metadata` instead of typed top-level `entity.legacyId` (CF-D37 violation); B4 Plan 06 missing `MatchResult.matchedTo→EntityId` reverse-lookup; B5 Plan 01 missing PIPE-02 in frontmatter; plus 9 warnings\n- Revision iteration fixed all 15 issues: Plan 05 moved to Wave 1, `legacyId` canonicalized per CF-D37, test assertions pinned to concrete values, `41-PATTERNS.md` rewritten to supersede the incorrect metadata-only recommendation\n- Two intermediate verification exchanges (obs 26, 30) ended before producing verdicts; final verification pass (obs 31) cleared all 7 plans as structurally valid; committed at `69e49ca92`",
+    "observationIds": [
+      "66f23d64-c455-47df-abdd-8970bf67e289",
+      "6619ee26-f811-4ba6-9dea-d4a0605a0081",
+      "d99eab15-4f8e-4663-91b2-2a5b6edd59c5",
+      "5e4d402b-4007-4b31-aa2d-5002b9090c0b",
+      "7c3e934e-263a-4095-8eae-83dff3b78825",
+      "90e97a8c-9f7c-4b85-a110-4cee0b38c41c",
+      "9eef6b93-ab5a-44a6-9389-84283706772f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      ".planning/phases/41-online-learning-adapter-post-hoc-resolution/41-01-PLAN.md",
+      ".planning/phases/41-online-learning-adapter-post-hoc-resolution/41-02-PLAN.md",
+      ".planning/phases/41-online-learning-adapter-post-hoc-resolution/41-03-PLAN.md",
+      ".planning/phases/41-online-learning-adapter-post-hoc-resolution/41-04-PLAN.md",
+      ".planning/phases/41-online-learning-adapter-post-hoc-resolution/41-05-PLAN.md",
+      ".planning/phases/41-online-learning-adapter-post-hoc-resolution/41-06-PLAN.md",
+      ".planning/phases/41-online-learning-adapter-post-hoc-resolution/41-07-PLAN.md",
+      ".planning/ROADMAP.md",
+      ".planning/phases/41-online-learning-adapter-post-hoc-resolution/41-PATTERNS.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 7
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8b4c8067-0214-4727-be59-c05cece58e6c",
+    "date": "2026-05-22",
+    "theme": "Phase 41 Ontology JSON Files and OntologyRegistry Tests",
+    "summary": "Created the live ontology JSON files and unit tests for `OntologyRegistry` auto-discovery and extends-chain resolution.\n\n- `ontology/upper.json`: base schema (`name=\"upper\"`) at km-core root\n- `ontology/learning-artifacts.json`: extends `upper`, defines three lower classes (Digest, Insight, Observation in alphabetical order) — two with `\"aggregates\"`, three with `\"extends\":\"LearningArtifact\"`\n- `tests/ontology/ontology-registry.test.js`: 7 new unit tests; pass on first run by design since production JSON artifacts were created in the same task (intentionally inverted TDD order per plan)\n- Carefully avoided collision with existing test fixtures that use a separate `FIXTURE_DIR`; committed at `5c27334`; full suite remains green at 153+ tests with no regressions",
+    "observationIds": [
+      "a91cfa54-16b5-4a5d-996a-dd006d86b5ae"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "ontology/upper.json",
+      "ontology/learning-artifacts.json",
+      "tests/ontology/ontology-registry.test.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "bd67d592-6bc2-4e83-841d-990bce4672dc",
+    "date": "2026-05-22",
+    "theme": "Phase 41 getDegree Method TDD Implementation",
+    "summary": "Implemented the `getDegree` method on the km-core relation/graph service using a strict RED→GREEN TDD cycle.\n\n- Appended 3 failing tests confirming RED state before writing any implementation; method placed after `findRelations` in the graph service file\n- Verified with `tsc --noEmit` and full vitest suite; all 34 tests pass (31 baseline + 3 new) with no regressions",
+    "observationIds": [
+      "b9f9d2a3-39d8-4f54-b2da-1df15b4fde77"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b9b79ff3-22ef-4e74-bcfd-b64c2317ce76",
+    "date": "2026-05-22",
+    "theme": "Phase 41 mergeEntities TDD Implementation with Atomic Batch",
+    "summary": "Implemented the `mergeEntities` function in km-core using a single atomic `store.batch()` call, following a split-TDD approach where Task 1 owns implementation and a minimal smoke test while Task 2 will own comprehensive testing.\n\n- Exchange in obs 34 ended at the bootstrap/file-reading phase; full implementation was completed in obs 35\n- Verified exactly one `store.batch()` call site (comments excluded), all relative imports carry `.js` suffixes for ESM compatibility\n- `tsc` clean, smoke test passing; 180 baseline tests remain intact with no regressions",
+    "observationIds": [
+      "ff8e7a7b-e908-4ea1-af94-f7d0736429e0",
+      "e0c9fa4e-80b2-49b0-a857-c11f0ad8a3c2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:26:02.408Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5bb3484f-7120-4ccf-849e-cc0d294074db",
+    "date": "2026-05-23",
+    "theme": "Fix missing ontologyDir in GraphKMStore constructor",
+    "summary": "The goal was to debug and fix a failure in `reproject-online.mjs` where `resolveEntities` threw an error about a missing ontology registry.\n\n- **Root cause:** `GraphKMStore` was constructed without the `ontologyDir` option, which `resolveEntities` requires to expand class names (e.g., `LearningArtifact`) into their subclass hierarchies.\n- **Investigation:** Read script source and inspected git diffs to locate the problematic constructor call at line 190 of `reproject-online.mjs`.\n- **Fix:** Added `ontologyDir` to the `GraphKMStore` constructor options in `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/reproject-online.mjs`, mirroring the configuration already used in the integration test.\n- Agent `claude` handled both the investigation and the fix in the same minute (05:23).",
+    "observationIds": [
+      "255a4f9a-7bec-455d-862b-b8bd18eb8198",
+      "da064bd2-6a15-4237-a0fa-4836c1894cdf"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/reproject-online.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T05:41:27.132Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d4ee1529-9c8c-4a60-922d-b11fa8a0f0d6",
+    "date": "2026-05-23",
+    "theme": "Bypass ERR_PACKAGE_PATH_NOT_EXPORTED for km-core package.json",
+    "summary": "The goal was to debug and fix a Node.js `ERR_PACKAGE_PATH_NOT_EXPORTED` error crashing `reproject-online.mjs` during package version/path resolution.\n\n- **Root cause:** The script called `require.resolve('@fwornle/km-core/package.json')` (line 97), but the `@fwornle/km-core` package's `exports` map does not expose the `./package.json` subpath, making both `require.resolve` and CJS direct access impossible.\n- **Investigation:** Inspected the `km-core` `package.json` exports field to enumerate actually-exposed subpaths.\n- **Fix:** Rewrote the resolution logic in `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/reproject-online.mjs` to use `import.<COMPANY_NAME_REDACTED>.resolve` (stable since Node 20.6) to resolve the package entry point, then derive the package root by walking up the resolved path — entirely avoiding the restricted `./package.json` subpath.\n- Result: `--resolve-dry-run` can now proceed without crashing on the `ERR_PACKAGE_PATH_NOT_EXPORTED` error.\n- Agent `claude` handled both the investigation and the fix at 05:27.",
+    "observationIds": [
+      "573a6272-1cb6-438b-a89e-bd4b5032e3b9",
+      "0691f896-d835-4be1-b873-8de07eb9ad0a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/reproject-online.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T05:41:27.132Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e4b99901-4635-4a2b-b79b-978eab0d61c2",
+    "date": "2026-05-23",
+    "theme": "Reduce Excessive Overnight LLM Proxy Probes in Health-Coordinator",
+    "summary": "The session began with root-cause analysis of excessive overnight LLM proxy probes: two probe functions in `health-coordinator.js` were firing unconditionally during idle periods, producing ~1,700+ probes per night (~72/hour). The proposed fix was to use existing ETM `lastBeat` heartbeat timestamps as a user-presence signal to dynamically switch between fast (active) and slow (idle) probe intervals, reducing overnight probes to ~50–60.\n\nImplementation proceeded across several steps, all by the `claude` agent:\n- Read `health-coordinator.js` and ran `grep` searches for `consecutive failures`, `probe intervals`, `sustained states`, and `LSL`-related logic to understand dependencies before editing\n- Introduced a new helper function (likely `isUserActive` or equivalent, based on ETM `lastBeat`) and wired it into the two existing probe gate conditions\n- Replaced or augmented the fixed `PROXY_PROBE_INTERVAL_MS` value with dynamic interval selection tied to user-presence and consecutive-failure state\n- Validated syntax and ran a unit test suite (`/tmp/test-user-active.mjs`) covering 8 scenarios — all passed\n\nKey files changed:\n- `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js` — core probe interval and gate logic\n- `reproject-online.mjs` — touched during initial analysis\n- `/tmp/test-user-active.mjs` — new unit test file confirming correct behaviour across all scenarios",
+    "observationIds": [
+      "e4515702-6949-4fd1-a7dc-e84d8abb0186",
+      "1ee09238-698f-421b-9bb7-917cc45c89ba",
+      "f8c4af1a-a573-4f7b-9436-129440851a1e",
+      "3a1b29e6-7f40-4d83-9dbf-e3c3430a42ba",
+      "35453d6e-9631-477b-80b1-26b575c78e17"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/reproject-online.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/tmp/test-user-active.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T05:41:27.132Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "c106ee0f-ff0f-4fd1-a4aa-80032aa047ab",
+    "date": "2026-05-23",
+    "theme": "Phase 41 Closed Out with Cross-Agent Structural Fix",
+    "summary": "Phase 41 (Online Learning Adapter & Post-Hoc Resolution) was fully closed out with all 7 plans complete across 4 waves.\n\n- `41-07-SUMMARY.md` was authored covering all 4 commits, verification outcomes, and the `ontologyDir` fix-up process, then committed as `docs(41-07): plan completion summary for operator CLI + e2e test`\n- `41-VERIFICATION.md` was written confirming `status: passed` across all 4 success criteria: entity API→adapter→ontology-class trace intact (SC#1), adapter is read-only against SQLite exports (SC#2), `resolveEntities` collapses duplicates atomically (SC#3), and integration test confirms end-to-end correctness (SC#4)\n- km-core test suite confirmed at ≥220 passing tests; live data verified against 2,061 observations; notable findings: 8 orphan-edge warnings and an LLM proxy 404 during live verify\n- A structural follow-up fix was made: a `defaultOntologyDir()` helper was added to `km-core/src/ontology/defaultDir.ts` and exported from `src/index.ts` so any of the four coding agents (Claude, OpenCode, Copilot, Mastra) gets the correct ontology path without reading documentation\n- `resolveEntities.ts` error messaging was updated to suggest the helper; a unit test was added in `tests/unit/ontology/default-dir.test.ts`; the Copilot instruction file was synced via the existing generator script",
+    "observationIds": [
+      "ac876001-402c-4fd1-9e92-5b8ec04aa170",
+      "5bc38694-ef62-437f-9e2e-95a7a0da4518",
+      "bdcf09ef-38ff-4450-b4e0-b8c5a0f5a70a",
+      "9ff89986-9df7-4d0e-8884-549684818932",
+      "440fecae-4aff-49c0-9aef-5d2034b3a73f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/health-coordinator.js",
+      "/tmp/test-user-active.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/41-online-learning-adapter-post-hoc-resolution/41-07-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/41-online-learning-adapter-post-hoc-resolution/41-VERIFICATION.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/src/ontology/defaultDir.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/src/maintenance/resolveEntities.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/src/index.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/tests/unit/ontology/default-dir.test.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8809e2ca-e7ed-4dfd-8bbc-fd01e3d4d61d",
+    "date": "2026-05-23",
+    "theme": "STATE.md Corrected: Phase 42 Is the True Next Phase",
+    "summary": "After Phase 41 completed, the orchestrator's `next_phase` pointer incorrectly indicated Phase 47. The developer questioned this, triggering an audit of `ROADMAP.md` and `STATE.md`.\n\n- Investigation confirmed km-core is integrated into only 1 of 3 KM systems: ODI (Phase 41 complete), UKB and OKB migrations not yet started\n- Phase 42 (UKB / `mcp-server-semantic-analysis` migration, including two carry-forward bugs) and Phase 43 (OKB / `rapid-automations` cross-repo migration) were identified as the true sequential next steps\n- Phases 47–50 were reclassified as out-of-milestone backlog bug-fix phases and separated from the v7.1 milestone sequence\n- `STATE.md` was updated to point at Phase 42 as the current next phase",
+    "observationIds": [
+      "fe3a7ce3-2d17-4386-b245-65bd508e0f69",
+      "f336d340-e47f-4b1b-aba1-00da63e32463",
+      "7316ae3f-7117-4b87-a325-f1b312439204"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5a501f2e-658b-409e-8356-cc312600b4cf",
+    "date": "2026-05-23",
+    "theme": "Phase 42 Pre-Planning Scope Discussion and Deferral",
+    "summary": "The GSD `discuss-phase` workflow was run for Phase 42 (offline UKB migration of `mcp-server-semantic-analysis`), locking prior decisions from Phases 37–41 into `42-CONTEXT.md`.\n\n- Migration strategy gray areas were surfaced; \"strangler\" (migrating one agent/operator at a time) was selected over co-exist or full cutover\n- Developer raised whether project A had been fully migrated to km-core with legacy code cleaned up; investigation found it had **not** — Phase 41 added km-core primitives and a manual CLI but left A's entire write path unchanged (`ObservationWriter`, `ObservationConsolidator`, SQLite, JSON exports, API server all still present)\n- The two systems co-exist by Phase 41 design intent, with km-core only reading A's JSON exports on demand\n- The A-migration cleanup question was formally deferred and documented in `42-CONTEXT.md` before proceeding to planning",
+    "observationIds": [
+      "79fc50a0-7312-48fe-abe8-0a68b442b0e0",
+      "ce3e9cbf-e4ec-42c4-b170-1cdf6dad4513",
+      "70628eb7-0b81-4973-9da0-f7a7d3c416a3",
+      "9d5571ad-271d-4d54-8327-9d3c89183126"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42-offline-ukb-migration-b/42-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3d1de2ad-2381-4ec5-a79e-300ce31a2bd6",
+    "date": "2026-05-23",
+    "theme": "Phase 42 Research: B Pipeline and km-core Migration Analysis",
+    "summary": "Research for Phase 42 was initiated via the `gsd-plan-phase` workflow. A first researcher agent timed out after ~80 tool calls without writing output; a second narrower-scoped agent completed the task with incremental writes.\n\n`42-RESEARCH.md` was produced covering all critical areas, with these key findings:\n- `graphDB.mergeAttributes()` called at `wave-controller.ts:1373` does not exist in `GraphDatabaseService.js`, causing a silent catch-block failure resulting in **zero embeddings persisted** across 727 entities\n- The race condition is **dashboard-side**, not B-side — `coordinator.ts` and `workflow-runner` perform concurrent uncoordinated read-modify-write on the progress file; the dashboard treats `totalSteps === 0 && status === 'running'` as the race signal\n- `KnowledgeStorageService.js` and `QdrantSyncService.js` are **dead code** with zero references anywhere in the codebase, safe to delete\n- D-54 LevelDB key migration requires embedding + Qdrant sync steps to avoid a search outage\n- Ontology directory should be flattened (8 files) rather than extending km-core's registry\n- Every MCP tool return shape was catalogued to establish SC#1 invariance baselines",
+    "observationIds": [
+      "ec521d1b-e8cd-43f3-8571-bafe7e1f99ba",
+      "5a5959d4-4d89-4d72-9179-6afb0e8a2e64",
+      "f9085621-1806-46c7-8db6-682cc0253b25",
+      "9759c96c-f45f-46fe-bd99-7790edde8142",
+      "95219716-f237-43fe-9f6b-516674c31f63",
+      "ee351094-9bf9-438d-a084-8a59d616e94c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42-offline-ukb-migration-b/42-05-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42-offline-ukb-migration-b/42-RESEARCH.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 6
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f95aa3c8-6bef-441d-ae42-5af2ede7a531",
+    "date": "2026-05-23",
+    "theme": "Phase 42 Plan Files Authored, Validated, and Revised",
+    "summary": "Seven plan files (`42-01-PLAN.md` through `42-07-PLAN.md`) were authored and validated for Phase 42, organized into 4 waves:\n\n- **Wave 1** (Plans 1–3, 6 — independent): GraphKMStore adapter + SC#2 fix, race condition fix + SC#3/SC#4, ontology subsystem rewire, km-core embedding extension\n- **Wave 2** (Plan 4): LevelDB key migration script\n- **Wave 3** (Plan 5): canonical Entity shape emit + `mergeEntities` rewire\n- **Wave 4** (Plan 7): dead code deletion + full SC#1–5 end-to-end verification gate\n\nA first validation pass confirmed coverage of all 5 success criteria, 14 locked decisions, and RESEARCH §1–5. A second review identified **3 critical blockers**: all 4 test-bearing plans used `npx jest` and a non-existent `tests/` directory instead of B's native `node:test` runner and co-located `src/` layout; Plan 42-05 was missing `depends_on: 42-04` despite requiring the embedding field that plan introduces. `42-07-PLAN.md` was patched to add a missing `<action>` tag; `ROADMAP.md` was updated; a targeted revision-verification pass was initiated to confirm all fixes landed.",
+    "observationIds": [
+      "893581f7-c04d-4457-80bc-262037d703ce",
+      "4fc3ece8-5ba3-46d3-960b-11ed10287bd8",
+      "da3bbebf-f557-4a10-9de7-9c8e556c4e3c",
+      "6b354d7e-4611-4143-b664-037ea22b6cda"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      ".planning/phases/42-offline-ukb-migration-b/42-01-PLAN.md",
+      ".planning/phases/42-offline-ukb-migration-b/42-02-PLAN.md",
+      ".planning/phases/42-offline-ukb-migration-b/42-03-PLAN.md",
+      ".planning/phases/42-offline-ukb-migration-b/42-04-PLAN.md",
+      ".planning/phases/42-offline-ukb-migration-b/42-05-PLAN.md",
+      ".planning/phases/42-offline-ukb-migration-b/42-06-PLAN.md",
+      ".planning/phases/42-offline-ukb-migration-b/42-07-PLAN.md",
+      ".planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "64a8656e-09a5-44cb-ad33-b8b89068c089",
+    "date": "2026-05-23",
+    "theme": "Phase 42 Wave 1 Kickoff and Plan 42-01 km-core Adapter Fixes",
+    "summary": "Phase 42 full execution was initiated via the `execute-phase` workflow in wave-based parallel subagent mode (no optional flags active).\n\nPlan 42-01 (GraphKMStore adapter) was executed first:\n- Adapter rewired to use `iterate(filter)` instead of the non-existent `findByName` method\n- `putEntity` updated to consume its returned `EntityId` rather than minting externally\n- `BatchOp` type corrected to match the actual `deleteEntity` discriminant\n- All 10 Plan 42-01 tests passed; committed as `5f76eae`\n\nTask 2 (wave-controller `persistWithKmCore` rewire) completed with a clean build and all acceptance criteria passing, committed as `b7015af`. Task 3 (Docker submodule build and container rebuild) was then initiated to propagate changes into the live environment.",
+    "observationIds": [
+      "9c6d0794-d3e6-4787-ac55-453ecdd808be",
+      "778aea62-d55f-4274-b996-23650a973e36",
+      "c31e2bf0-6226-4bea-8859-5e29b65f3a4b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ca976f0d-1946-4a92-b3b6-f75e0caa5f23",
+    "date": "2026-05-23",
+    "theme": "Plan 42-06: Docker Bind-Mount Enables km-core Resolution",
+    "summary": "Plan 42-06 required `import('@fwornle/km-core/store')` to resolve successfully inside the Docker container without modifying the image.\n\n- A **read-only bind-mount** of the host km-core directory into the container at `/coding/node_modules/@fwornle/km-core` was added to `docker-compose.yml` — chosen over a `file:` dependency or full image rebuild as the least invasive path\n- Container restarted; import resolved successfully inside the container, satisfying AC#4 of Plan 42-06 Task 3\n- A deviation was noted: the plan AC text referenced the `/store` subpath which is absent from km-core's exports map; the root barrel was used instead and documented in `SUMMARY.md`\n- `INT-02` was found prematurely marked complete in `ROADMAP.md` (the requirement spans all of Phase 42) and reverted",
+    "observationIds": [
+      "38aabe5a-66c5-46d7-90c4-a0427388eaa0",
+      "b6b117ca-1491-414b-9a04-983fe93811f3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "docker-compose.yml",
+      "SUMMARY.md",
+      "STATE.md",
+      "ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5843ec2b-0404-4881-844f-9450c354804f",
+    "date": "2026-05-23",
+    "theme": "Plan 42-02: Race Condition TDD Fix and SC Verification",
+    "summary": "Plan 42-02 addressed the `coordinator.ts` race condition using strict RED→GREEN TDD discipline.\n\n- `preserveFromExisting` helper implemented and exported from `coordinator.ts`, wired into both `writeProgressFile` and `checkSingleStepPause` write sites\n- All 7 new tests and 31 prior regression tests passed; `dist/` confirmed 4 occurrences of `preserveFromExisting` after Docker rebuild\n- Production wave-analysis workflow triggered via direct SSE call on port 3848 (MCP tool unavailable in session)\n- **SC#3 passed**: zero race-condition warnings in output\n- **SC#4 failed**: workflow runner exited silently, leaving progress file stuck in `\"running\"` state — matching the terminal-state defect predicted by RESEARCH §2; escalated to Plan 7 (single-writer architecture fix) per documented protocol\n- `42-02-VERIFY-FAIL.log` was written and renamed to `.md` for git tracking; final superproject commit with submodule pointer bump staged",
+    "observationIds": [
+      "47efeb06-8767-4710-b8d9-c2b84cfb8080",
+      "097e3cca-a4f7-4d4b-9918-263c54b31fbd",
+      "63a1f3f6-9af1-4a9e-aa25-05d7c6e9ea58",
+      "94b7ec08-c2af-4117-bcf6-c94287fa54b2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "coordinator.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "42-02-VERIFY-FAIL.log"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8c58fbc9-25aa-4e27-8c21-d49ec1cb9b9e",
+    "date": "2026-05-23",
+    "theme": "Plan 42-03: OntologyManager Replaced by km-core OntologyRegistry",
+    "summary": "Plan 42-03 migrated B's `OntologyManager` to km-core's `OntologyRegistry` using strict TDD (RED→GREEN).\n\n- **Task 1**: 8 ontology files moved via `git mv` to a flattened directory structure and converted to km-core's `OntologyFile` schema with `_legacy` field preservation; `Detail` class added to `coding-ontology.json`; 134 classes load successfully across 8 domains — committed to superproject\n- **Task 2**: `LegacyOntologyAdapter` implemented to wrap `OntologyRegistry` and proxy existing call sites; plan-text API aliases (`hasClass`, `listClasses`, `listDomains`) were found not to exist in km-core — real API names (`isValidClass`, `getAllClassNames`, `getLoadedDomains`) used with documented deviation\n- ESM/CJS module resolution issue with km-core sub-path imports resolved by using root barrel `@fwornle/km-core`, following precedent from Plan 42-01\n- Symlink analysis revealed `src/ontology/` resolves to the superproject while agent/tools files live in the submodule — split commits required across both repos\n- A third unexpected caller (`persistence-agent.ts`) and a dead import in `tools.ts` were discovered and handled\n- All occurrences of the substring `OntologyManager` were systematically eliminated from `src/` (including comments, field names, and utility files), satisfying the plan's bare-substring grep acceptance criterion\n- Primary artifacts: `src/ontology/registry-adoption.test.ts` created; `backfill-subagent-transcripts.mjs` and multiple ontology source files edited",
+    "observationIds": [
+      "9c920fe6-bccf-4e47-8529-377ea02c608d",
+      "36de7b65-cec9-4bd0-bba6-2ec2272ccb61",
+      "9f9b7de0-c86f-4262-b7c1-8edf128495b5",
+      "24ccc6b2-58c1-4917-b272-49c36aa47454"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-subagent-transcripts.mjs",
+      "src/ontology/registry-adoption.test.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "980a50b8-b469-4220-a6fb-db0134a9f3fd",
+    "date": "2026-05-23",
+    "theme": "OntologyManager Rename: Purge Source and Compiled Artifacts",
+    "summary": "The goal was to complete the `OntologyManager` → `OntologySystem` rename by eliminating the last occurrences of the literal substring from production code and removing the orphaned compiled artifact.\n\n- Rewrote comments and docstrings in `LegacyOntologyAdapter.ts` to avoid the `OntologyManager` substring (test files were explicitly excluded from scope)\n- Updated call sites in `tools.ts` and `persistence-agent.ts` to match the new three-argument `createOntologySystem` signature and renamed property `.manager` → `.ontology`\n- Build confirmed clean after signature updates; `persistence-agent.ts` was verified to only reference `.classifier` and `.validator`, which were unaffected by the rename\n- Identified `dist/ontology/OntologyManager.js` as a stale orphaned artifact — `tsc` does not garbage-collect outputs whose sources have been deleted, so manual deletion was required to prevent the old class from remaining loadable at runtime",
+    "observationIds": [
+      "f013758c-3b2c-4798-88c8-d0c27343e492",
+      "6b66688a-add1-4220-a039-cd09b20f75fe"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "LegacyOntologyAdapter.ts",
+      "tools.ts",
+      "persistence-agent.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-subagent-transcripts.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "146767c3-7b1a-4c30-9bda-bd0be400a69c",
+    "date": "2026-05-23",
+    "theme": "syncQdrantFromStore TDD Red Phase Established",
+    "summary": "Following the red-green TDD cycle established in prior tasks, failing tests for `syncQdrantFromStore` were authored and committed in a RED state before any implementation was written.\n\n- Test files were written first and confirmed to fail at runtime (as expected at the RED phase)\n- The RED commit was made to lock in the failing baseline before the green (implementation) phase\n- The green phase — writing the actual `syncQdrantFromStore` source — was still pending at the end of this session",
+    "observationIds": [
+      "7672f8f8-61d3-4743-a0ef-7e9062445301"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-subagent-transcripts.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "eb9525b9-20fe-4b39-8716-92d6ed2514be",
+    "date": "2026-05-23",
+    "theme": "km-core Embeddings Module Added with fastembed",
+    "summary": "A new embeddings subpath was implemented in the `km-core` package using the `fastembed` library.\n\n- Created `packages/km-core/src/embeddings` source file implementing the embeddings client\n- Wired the new module into `packages/km-core/src/index.ts` (root barrel) and added a `./embeddings` subpath export to `packages/km-core/package.json`, alphabetically placed between `./dedup` and `./maintenance`\n- Installed `fastembed` as a dependency\n- Narrowed the `model` field type on `FastembedEmbeddingClientOpts` and related init types to statically exclude `EmbeddingModel.CUSTOM`, eliminating a stale runtime cast and keeping the build clean",
+    "observationIds": [
+      "0ce31d38-b75a-4914-ba9e-79c719224778"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "packages/km-core/src/embeddings (source file)",
+      "packages/km-core/src/index.ts",
+      "packages/km-core/package.json",
+      "packages/km-core/src/embeddings types/interfaces"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a13d2ea5-c142-4f2e-9c7b-7f5139d1ccf1",
+    "date": "2026-05-23",
+    "theme": "Plan 42-03 Ontology Migration Script: TDD and Live Execution",
+    "summary": "A full TDD red-green cycle was completed for the ontology migration script (Plan 42-03), followed by a successful dry-run and full migration against production data.\n\n- `src/migration/migrate-ontologies.test.ts` authored first and committed in a RED state (all tests failing with `MODULE_NOT_FOUND`) at commit `bb8f3c2`\n- `src/migration/migrate-ontologies.ts` implemented to reach GREEN, handling ontology flattening per Plan 42-03 conventions using `.data/ontologies` path patterns; TypeScript compilation verified before each test run\n- Because the live `GraphDatabaseService` holds the LevelDB lock, a safe copy of the database was made to a temp location before running the migration script\n- Dry-run and full migration both succeeded against **802 entities** (above the ≥700 threshold) with `errorCount: 0`\n- 19 entities (2.4%) flagged `ontologyClassUnregistered` due to `Project`/`System`/`Knowledge` not being defined in ontology files — within the 5% budget, satisfying Task 2 acceptance criteria",
+    "observationIds": [
+      "d135f7a4-6b10-4713-88f6-a19e28258423",
+      "9fb3a773-482c-4f7a-ad38-7c310ed182e9"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "src/migration/migrate-ontologies.test.ts",
+      "src/migration/migrate-ontologies.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-subagent-transcripts.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "513c87e4-3f31-4093-a0de-a7c1991cde2c",
+    "date": "2026-05-23",
+    "theme": "Plan 42-06: Canonical Emit in Wave Agents and Dedup Rewire",
+    "summary": "Plan 42-06 was completed end-to-end: canonical entity emission was wired into wave agents, the deduplication agent was rewired to use km-core's `mergeEntities`, and all documentation and commits were finalized.\n\n- Added `augmentWithCanonical` helper to `src/canonical-mapper.ts` to merge canonical fields onto the existing `KGEntity` shape, preserving all legacy fields (`type`, `level`, `parentId`, etc.) for downstream consumers like `mapEntityToSharedMemory`\n- `runId` added to `WaveController.execute()` in `src/wave-controller.ts` and threaded into Wave1/2/3 constructors\n- `src/wave1-project-agent.ts` and `src/wave2-component-agent.ts` updated to call `toCanonicalEntity`/`augmentWithCanonical` at the final return point (after all enrichment)\n- `src/deduplication.ts`: `mergeEntityGroup` (a non-mutating log-only stub) fully deleted; call site replaced with a new `mergeDuplicateGroup` helper that wraps km-core's `mergeEntities` and gracefully skips when no store reference is available\n- All 12 TDD tests pass with no regressions; plan closed with 4 submodule commits + 1 superproject commit; `STATE.md` and `ROADMAP.md` updated\n- Next planned work: Plan 7 (legacy pipeline deletion + e2e gate)",
+    "observationIds": [
+      "5120e800-4585-48e3-a4c8-2058c7d25a29",
+      "8ead6394-da33-47a7-975a-928f416e5d91",
+      "d3740ffe-f9f3-46cb-a48d-5b5624435f39"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "src/canonical-mapper.ts",
+      "src/wave-controller.ts",
+      "src/wave1-project-agent.ts",
+      "src/wave2-component-agent.ts",
+      "src/deduplication.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-subagent-transcripts.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "92158050-e2cb-4d42-9060-6afc3bf19a71",
+    "date": "2026-05-23",
+    "theme": "Plan 42-07: Three Architectural Checkpoints Blocking Execution",
+    "summary": "Plan 42-07 (legacy deletion and flag collapse) was halted three separate times due to unanticipated architectural dependencies, each surfaced via grep-based verification before any code was modified.\n\n- **Checkpoint 1 ([45], Phase B):** `GraphDatabaseService.js` was found to be live — it is imported by `graph-database-adapter.ts` — invalidating the prior assumption that it was an orphan. Four options presented: delete only `KnowledgeStorageService.js` + `QdrantSyncService.js` (Option 1), rewire `graph-database-adapter.ts` away from `GraphDatabaseService.js` (Option 2), abandon Phase B (Option 3), or delete despite expected build failure (Option 4). `51-CONTEXT.md` and `STATE.md` updated.\n- **Checkpoint 2 ([46], Phase A):** LevelDB layout mismatch discovered between the legacy `GraphDatabaseService` and km-core's `GraphKMStore`, blocking the planned atomic dir-swap. The migrated store exists at `.data/knowledge-graph-migrated/` (802 entities, 0 errors); three options presented with Option A (skip the swap, point km-core bootstrap at the migrated dir, leave legacy store untouched) recommended as smallest blast radius.\n- **Checkpoint 3 ([47], Phase B):** `QdrantSyncService.js` found to have live superproject consumers, blocking its deletion. Options B1/B2/B3 presented; no user decision received.\n- No code changes or git commits were made across all three checkpoints; all execution remains blocked pending user decisions.",
+    "observationIds": [
+      "a8136e2f-13a7-4411-91ae-d5e940fadc81",
+      "46bb2500-244c-4773-92a3-69c009899d7c",
+      "ed28cae1-2738-4548-a18d-4443c0b0b3b7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1a80eee1-7117-49a3-a396-2138a4d8ac26",
+    "date": "2026-05-23",
+    "theme": "Diagnosing and Fixing Pronominal Reference Loss in Observations",
+    "summary": "The session began with an investigation into why tier-1 observation summaries were losing pronoun antecedents (e.g., \"implement it now\" with no referent for \"it\"). The assistant first located `ObservationConsolidator._buildConsolidationPrompt` to understand what information the digester actually receives, then traced the root cause upstream to `ObservationWriter.js`.\n\n**Diagnosis:** The tier-2 consolidator could collapse near-identical pronominal observations but couldn't recover antecedents never preserved in tier-1 summaries.\n\n**Fix applied (Option 1):** `ObservationWriter.js` was updated to inject a 2-observation prior-context window (same project + agent, within 30 min) as `<prior_observations>` into the summarization prompt, enabling the LLM to resolve pronouns at write time. Committed as `2f4cbf7d7`.\n\n**Future work outlined:** A complementary async post-write LSL resolver was designed to handle cases where no prior observation exists — reading verbatim transcript files to backfill ambiguous rows, subsuming Phase 47's image-stripped row recovery.\n\n- `ObservationWriter.js` — main fix\n- `/tmp/test-prior-context.mjs`, `test-prior-context-tmp.mjs` — test scripts\n- `reproject-online.mjs` — referenced during investigation",
+    "observationIds": [
+      "2b5541a9-a1c9-479c-98f7-da96e30c08ec",
+      "b78b25bf-a312-474a-86b7-2b7f573efa53",
+      "a729763c-a1e3-40d6-8f91-070bb18296da"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/reproject-online.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js",
+      "/tmp/test-prior-context.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/test-prior-context-tmp.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "2189169f-86f2-444e-9440-e8d65ab86453",
+    "date": "2026-05-23",
+    "theme": "Filing Phase 50 and Cleaning Up Phase 47 Scope",
+    "summary": "Following the pronominal-reference fix, the LSL-grounded async resolver concept was formalised as **Phase 50** and Phase 47's scope was trimmed to remove deferred work now owned by Phase 50.\n\n**Phase 50 created** for the LSL-grounded async observation resolver (backfill ambiguous-reference and image-only rows):\n- Context window semantics were deliberately scoped to **active user interaction time**, not wall-clock time, to handle long-running autonomous agent tasks where a fixed last-N-exchanges fallback is used instead.\n- Files: `50-CONTEXT.md`, `STATE.md`, `defaultDir.ts`\n\n**Phase 47 cleaned up:**\n- The \"Could\" section (historical row recovery) was removed from `47-CONTEXT.md` and replaced with a cross-reference to Phase 50, keeping Phase 47 focused on its Must/Should items.\n- File: `47-CONTEXT.md`",
+    "observationIds": [
+      "1f921fe3-881f-4999-8aa9-6663168e1e37",
+      "80029a04-b35b-46f4-8205-4d2052bd165b",
+      "cdf24660-2860-40a6-9f8f-813db098c4d0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/km-core/src/ontology/defaultDir.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/50-lsl-grounded-async-observation-resolver-backfill-ambiguous-r/50-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/47-observationwriter-preserve-prompt-text-when-image-attachment/47-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "bcd7e666-94d7-42ca-90cd-29e6e246287e",
+    "date": "2026-05-23",
+    "theme": "Investigating Observation Data Gap and Running Sub-Agent Backfill",
+    "summary": "In the afternoon, a ~2-hour gap in the observations database (starting ~13:38 CEST) was discovered and investigated, then remediated via a dedicated backfill script.\n\n**Gap diagnosis (obs 7):**\n- SQLite DB confirmed no rows written since ~13:38 CEST.\n- Coding ETM process (PID 38345), which started at exactly that time, and a frozen `monitor-spawn-debug.log` were identified as likely culprits; coordinator state returned nothing.\n- Filed notes in `51-CONTEXT.md` and `STATE.md`.\n\n**Backfill script (obs 8):**\n- `backfill-subagent-transcripts.mjs` was created, referencing `convert-transcripts.js` for interface patterns.\n- Script adds missing metadata (`project`, `source` tag), calls `ObservationWriter.init()`, and applies a 1-day recency filter + file size cap to avoid processing large historical files unintentionally.\n- Launched against ~25 uncaptured sub-agent transcript files.\n\n**Backfill completion (obs 12):**\n- Ran for 34.5 minutes; processed 828 files (54 in scope).\n- Wrote **117 net new rows** tagged `source: sub-agent-backfill`; semantic dedup dropped 106 duplicates.\n- Phase 42-07 sub-agent turns are now visible in `/observations`; branch sits 25 commits ahead of `origin/main`.",
+    "observationIds": [
+      "549d1336-9e97-4611-b90d-1f29470b655f",
+      "818ac6ea-e185-421f-9202-2651cf816213",
+      "8a14a05b-4867-4f44-8f5d-89d963794145"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-subagent-transcripts.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "da9c3614-f3d5-439e-a933-ad16d39cfc8e",
+    "date": "2026-05-23",
+    "theme": "Expanding Phase 51 for Multi-Platform Sub-Agent Live Logging",
+    "summary": "Three overlapping observations — effectively a single extended discussion — assessed and substantially broadened the scope of Phase 51 to cover the full sub-agent logging requirement across both tiers and all agent platforms.\n\n**Original Phase 51 scope (too narrow):**\n- Observation-only (no LSL verbatim tier)\n- Claude Code only\n- Backfill-first, real-time not addressed\n\n**Expanded Phase 51 scope committed to `51-CONTEXT.md` and `STATE.md`:**\n- **Both tiers:** LSL verbatim logging + observations/online-learning\n- **Four agent frameworks:** Claude Code, OpenCode, Copilot, Mastra (agent-agnostic detection strategy)\n- **Real-time (live) capture** elevated to a first-class requirement alongside backfill\n- **Naming convention** adopted: `YYYY-MM-DD-HHHH-HHHH_S1_<index>-<ID-HASH>` for sub-agent log files\n- Files changed: `51-CONTEXT.md`, `STATE.md`",
+    "observationIds": [
+      "6bf21607-414e-41e1-98fd-b6b55d74c872",
+      "a4264b84-dd80-41bf-ae26-c1a6d63d8ae8",
+      "6f74cbe8-c2cc-438c-a32a-039233b37bef"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-23T16:06:40.460Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
   }
 ]

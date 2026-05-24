@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Docker Environment" {
+
+  package "Configuration Layer" {
+    component "LLMMockService" as llmMock <<core>>
+    database "workflow-progress.json" as wpJson <<storage>>
+  }
+
+  package "LLM Mode Targets" {
+    component "Mock Mode" as mockMode <<core>>
+    component "Local Model" as localModel <<core>>
+    cloud "Public LLM" as publicLLM <<external>>
+  }
+
+  package "mcp-server-semantic-analysis" {
+    component "Semantic Agent A" as agentA <<agent>>
+    component "Semantic Agent B" as agentB <<agent>>
+  }
+
+}
+
+llmMock --> wpJson : "persists mode state"
+wpJson ..> llmMock : "restores on restart"
+
+llmMock --> mockMode : "activates"
+llmMock --> localModel : "activates"
+llmMock --> publicLLM : "activates"
+
+agentA --> wpJson : "reads per-agent override"
+agentB --> wpJson : "reads per-agent override"
+
+@enduml

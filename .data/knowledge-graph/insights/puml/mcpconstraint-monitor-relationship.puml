@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MCPConstraintMonitor
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[MCPConstraintMonitor] as mcpconstraint_monitor #LightBlue
+[AgentLifecyclePattern] as agent_lifecycle_pattern #F0F0F0
+[ServiceStartupPattern] as service_startup_pattern #F0F0F0
+[ClosedVocabularyPattern] as closed_vocabulary_pattern #F0F0F0
+[StructuredEventEnvelopePattern] as structured_event_envelope_pattern #F0F0F0
+[DeferredDependencyPattern] as deferred_dependency_pattern #F0F0F0
+[DiagramAsDocumentation] as diagram_as_documentation #F0F0F0
+[MCPServerSemanticAnalysis] as mcpserver_semantic_analysis #F0F0F0
+[SemanticConstraintDetection] as semantic_constraint_detection #E8F5E8
+[ClaudeCodeHookDataFormat] as claude_code_hook_data_format #E8F5E8
+
+coding_patterns --> mcpconstraint_monitor
+agent_lifecycle_pattern -[hidden]- mcpconstraint_monitor
+service_startup_pattern -[hidden]- mcpconstraint_monitor
+closed_vocabulary_pattern -[hidden]- mcpconstraint_monitor
+structured_event_envelope_pattern -[hidden]- mcpconstraint_monitor
+deferred_dependency_pattern -[hidden]- mcpconstraint_monitor
+diagram_as_documentation -[hidden]- mcpconstraint_monitor
+mcpserver_semantic_analysis -[hidden]- mcpconstraint_monitor
+mcpconstraint_monitor --> semantic_constraint_detection
+mcpconstraint_monitor --> claude_code_hook_data_format
+
+@enduml

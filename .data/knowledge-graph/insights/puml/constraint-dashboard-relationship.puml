@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintDashboard
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ConstraintDashboard] as constraint_dashboard #LightBlue
+[McpConstraintMonitor] as mcp_constraint_monitor #F0F0F0
+[SemanticConstraintDetector] as semantic_constraint_detector #F0F0F0
+[DecoupledDeployableUnit] as decoupled_deployable_unit #E8F5E8
+[StatusLineIntegrationSurface] as status_line_integration_surface #E8F5E8
+
+constraint_system --> constraint_dashboard
+mcp_constraint_monitor -[hidden]- constraint_dashboard
+semantic_constraint_detector -[hidden]- constraint_dashboard
+constraint_dashboard --> decoupled_deployable_unit
+constraint_dashboard --> status_line_integration_surface
+
+@enduml

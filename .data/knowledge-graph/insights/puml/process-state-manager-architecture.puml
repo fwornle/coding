@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Orchestration" {
+  component "service-starter.js" as servicStarter <<cli>>
+  component "health-coordinator.js" as healthCoord <<core>>
+  component "ServiceProbe" as serviceProbe <<external>>
+}
+
+package "Service Wrappers" {
+  component "api-service.js" as apiWrapper <<api>>
+  component "dashboard-service.js" as dashWrapper <<api>>
+}
+
+package "Core Registry" {
+  component "ProcessStateManager" as psm <<core>>
+}
+
+servicStarter --> apiWrapper : "spawns & retries"
+servicStarter --> dashWrapper : "spawns & retries"
+
+apiWrapper --> psm : "registerService /\nunregisterService"
+dashWrapper --> psm : "registerService /\nunregisterService"
+
+healthCoord --> psm : "queries live state"
+healthCoord --> serviceProbe : "correlates results\nby stable name"
+
+@enduml

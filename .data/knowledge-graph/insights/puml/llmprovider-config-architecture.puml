@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Config Registry" {
+  component "llm-providers.yaml" as llmYaml <<storage>>
+  component "dmr-config.yaml" as dmrYaml <<storage>>
+}
+
+package "Config Loading Layer" {
+  component "Config Loader" as configLoader <<core>>
+  component "Multi-Path Discovery" as multiPath <<core>>
+  component "Env Var Expander" as envExpander <<core>>
+}
+
+cloud "Environment Variables" as envVars
+
+package "Runtime Layer" {
+  component "LLM Mock Service" as mockService <<core>>
+  component "LLMState / LLMMode" as llmStateMode <<api>>
+}
+
+component "MCP Server Semantic Analysis" as mcpServer <<external>>
+
+llmYaml --> configLoader : "provider definitions"
+dmrYaml --> configLoader : "DMR overrides"
+multiPath --> configLoader : "filesystem resolution"
+envVars ..> envExpander : "${ENV_VAR} tokens"
+envExpander --> configLoader : "resolved secrets"
+configLoader --> llmStateMode : "declared providers"
+mockService --> llmStateMode : "mode resolution"
+configLoader --> mcpServer : "provider config"
+llmStateMode --> mcpServer : "runtime state"
+
+@enduml

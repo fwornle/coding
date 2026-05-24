@@ -1,0 +1,35 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Constraint Enforcement" {
+    component "Migration Scripts" as migration <<core>>
+    component "Schema Validators" as validators <<core>>
+    component "Fixed Canonical Type Sets" as typeSets <<storage>>
+}
+
+package "Pattern Integration" {
+    component "ClosedVocabularyPattern" as cvp <<core>>
+    component "StructuredEventEnvelopePattern" as seep <<core>>
+    component "ServiceStartupPattern" as ssp <<core>>
+}
+
+package "MCP Infrastructure" {
+    component "mcp-constraint-monitor" as monitor <<api>>
+    component "mcp-server-semantic-analysis" as semanticAnalysis <<api>>
+}
+
+migration --> typeSets : "enforces"
+validators --> typeSets : "validates against"
+validators --> cvp : "prevents vocabulary drift"
+
+cvp --> seep : "works with"
+migration --> ssp : "used in conjunction with"
+ssp --> cvp : "ensures consistent vocabulary"
+
+monitor --> migration : "hosts"
+monitor --> validators : "hosts"
+semanticAnalysis --> cvp : "uses"
+
+typeSets --> cvp : "defines"
+
+@enduml

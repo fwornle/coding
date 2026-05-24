@@ -2,113 +2,61 @@
 
 **Type:** Detail
 
-The presence of CLAUDE-CODE-HOOK-FORMAT.md in the integrations/mcp-constraint-monitor/docs directory suggests that the service uses a specific hook format for constraint detection, possibly related to Claude Code.
+The presence of a dedicated design document (`semantic-detection-design.md`) alongside the operational spec (`semantic-constraint-detection.md`) suggests semantic detection was a deliberate architectural choice, likely selected over simpler rule-based matching to handle implicit or context-dependent constraint violations.
 
-## What It Is  
+# SemanticConstraintDetection
 
-**SemanticConstraintDetection** is a documented capability of the **SemanticAnalysisService** that identifies and enforces *semantic* constraints on incoming data. The primary source of truth for this feature lives under the integration package **`integrations/mcp-constraint-monitor/docs/`**. Three markdown files give us the only concrete artefacts we can reference:
+## What It Is
 
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – the main description of the detection logic and its role inside the **SemanticAnalysisService**.  
-* `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – defines a hook‑format that the detection engine expects when it is invoked, apparently tied to “Claude Code” payloads.  
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – outlines how the detection rules can be configured at runtime.
+SemanticConstraintDetection is a subsystem within the broader `MCPConstraintMonitor` module, documented across two complementary specifications located at `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` and `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md`. The dual-document structure — one operational guide and one design rationale — signals that this is a non-trivial component whose behavior cannot be fully captured by reference material alone, requiring separate articulation of the reasoning behind its architectural choices.
 
-Together these documents show that **SemanticConstraintDetection** is not a stand‑alone micro‑service but a *sub‑component* of **SemanticAnalysisService**, responsible for analysing the semantic correctness of data according to a set of configurable constraints. The feature is exposed through a hook mechanism that external callers (or other internal services) can trigger using the CLAUDE‑CODE format.
+As a child component of `MCPConstraintMonitor`, SemanticConstraintDetection is responsible for evaluating whether incoming operations or content violate established constraints based on semantic meaning rather than surface-level pattern matching. This positions it as the analytical core of the constraint enforcement pipeline: while the parent monitor orchestrates the overall workflow, SemanticConstraintDetection performs the actual interpretive work of recognizing constraint violations that may be implicit, contextual, or expressed in varied forms.
 
----
+The component operates within a documentation-rich ecosystem that includes its sibling `ClaudeCodeHookDataFormat` (specified in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) and the externally managed constraint definitions in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Together these define the input boundary, the rule corpus, and the detection logic respectively.
 
-## Architecture and Design  
+## Architecture and Design
 
-The architecture that emerges from the documentation is a **configuration‑driven rule engine** embedded inside the **SemanticAnalysisService**. The design can be summarised as follows:
+The architectural posture of SemanticConstraintDetection reflects a deliberate choice of semantic analysis over simpler rule-based matching. The existence of `semantic-detection-design.md` as a dedicated design document — separate from the operational specification — strongly suggests that this choice was justified by the need to handle implicit or context-dependent constraint violations that purely lexical or regex-based approaches would miss. This is consistent with the broader purpose of `MCPConstraintMonitor`, which "monitors and enforces constraints" in a manner that presumably needs to be robust across varied expressions of the same underlying intent.
 
-1. **Configuration Layer** – described in `constraint-configuration.md`, this layer stores the definition of each semantic constraint (e.g., allowed value ranges, required relationships, domain‑specific vocabularies). Because the file is a markdown spec rather than code, the actual storage format is likely a YAML/JSON file or a database table that the service reads at start‑up. The design decision to keep constraints externalised makes the system **extensible without code changes**.
+A key architectural decision evident from the observations is the **decoupling of detection logic from constraint definitions**. Constraint rules are managed externally in `constraint-configuration.md`, while detection mechanics live in their own documentation. This separation of concerns enables the system to be user-configurable: operators can modify, add, or remove constraints without touching the detection engine itself. This pattern is analogous to a rules-engine architecture where the inference logic and the rule base evolve independently.
 
-2. **Hook Interface** – the `CLAUDE-CODE-HOOK-FORMAT.md` file defines a **hook contract** that callers must adhere to. The contract includes the shape of the payload (presumably a JSON object containing the data to be analysed and metadata such as a constraint identifier). By using a hook rather than a direct method call, the system gains **decoupling**: any producer that can emit a correctly‑shaped hook can trigger detection, which supports future expansion to other LLM back‑ends or external pipelines.
+The component also sits downstream of a well-defined ingestion boundary. Its sibling `ClaudeCodeHookDataFormat` establishes the payload schema that Claude Code emits when invoking the constraint monitor as a hook consumer. SemanticConstraintDetection therefore operates on a stable, contract-driven input, which simplifies its implementation by allowing it to assume a known data shape rather than handling arbitrary input formats. This contract-first approach across siblings indicates an intentional layered design within `MCPConstraintMonitor`.
 
-3. **Detection Engine** – while no concrete classes or functions are listed, the `semantic-constraint-detection.md` file indicates that the engine lives inside **SemanticAnalysisService**. The engine likely follows a **pipeline pattern**: it receives a hook payload, resolves the applicable constraints from the configuration layer, and sequentially validates the payload against each rule. The outcome (pass/fail, detailed violation report) is then returned to the caller or logged for monitoring.
+## Implementation Details
 
-No explicit architectural patterns such as micro‑services, event‑driven queues, or CQRS are mentioned, so we restrict our description to the observable **configuration‑driven rule engine** and **hook‑based invocation** patterns.
+The current observations focus primarily on the documentation structure and design intent rather than specific code symbols — no code symbols were enumerated for this component. The implementation is described through two coordinated documents: `semantic-constraint-detection.md` covers the operational mechanics (what the system does and how to use it), while `semantic-detection-design.md` captures the rationale (why it was built this way and what alternatives were considered).
 
----
+From these documentation patterns, the implementation can be inferred to follow a pipeline shape: input arrives via the hook format established by `ClaudeCodeHookDataFormat`, is evaluated against rules loaded from `constraint-configuration.md`-specified definitions, and produces a detection verdict. The semantic dimension of this evaluation distinguishes it from rule-based predecessors — rather than matching strings or regex patterns, the detector reasons about the meaning of operations relative to constraint intent.
 
-## Implementation Details  
+Because the detection logic is decoupled from the constraint definitions, the implementation likely exposes a generic evaluation interface that consumes rule objects and content payloads rather than embedding domain-specific rule semantics directly into code. This indirection is what makes the user-configurability described in the observations possible.
 
-Because the source repository contains **zero code symbols** for this component, we can only infer implementation details from the documentation:
+## Integration Points
 
-* **SemanticConstraintDetection** is referenced as a *detail* of **SemanticAnalysisService**, implying that the detection logic is encapsulated in a class or module within the service’s codebase (e.g., `SemanticAnalysisService::ConstraintDetector`). The class would expose a public method that matches the CLAUDE‑CODE hook signature (e.g., `detectConstraints(payload: ClaudeHookPayload): DetectionResult`).
+SemanticConstraintDetection has three primary integration surfaces evident from the observations. First, it integrates **upward** with its parent `MCPConstraintMonitor`, which contains it and presumably invokes it as part of the monitoring workflow. The parent module is documented in `integrations/mcp-constraint-monitor/README.md` and provides the orchestration context within which detection occurs.
 
-* The **CLAUDE‑CODE hook format** likely specifies required fields such as `inputText`, `metadata`, and a `constraintId` array. The hook parser would validate the payload structure before passing it downstream. This parsing step serves as a defensive guard, ensuring malformed requests are rejected early.
+Second, it integrates **laterally** with its sibling `ClaudeCodeHookDataFormat`, which defines the schema of incoming payloads. SemanticConstraintDetection consumes data conforming to this format, making the hook format effectively its input contract. Any changes to the Claude Code hook payload structure would propagate through this interface and require corresponding adjustments in the detector's input handling.
 
-* The **constraint configuration** described in `constraint-configuration.md` probably follows a hierarchical schema: a top‑level list of constraint definitions, each containing a unique identifier, a human‑readable description, and the rule logic (e.g., regex patterns, numeric bounds, ontology references). At runtime the detection engine would load this configuration once (or watch for hot‑reloading) and cache it for fast lookup.
+Third, it integrates with the **constraint configuration layer** documented in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. This is a data-driven integration: the configuration provides the rule corpus that the detector evaluates against. Because this relationship is configuration-driven rather than code-coupled, the detector can adapt to new constraints without code changes, but it also depends on the configuration format remaining stable or versioned.
 
-* The detection algorithm itself would iterate over the applicable constraints, applying each rule to the incoming data. For simple syntactic checks (regex, range), the implementation could be a direct function call. For richer semantic checks (ontology validation, LLM‑assisted reasoning), the engine might delegate to an LLM service (the same LLM that powers **SemanticAnalysisService**) and interpret the response against the configured expectation.
+## Usage Guidelines
 
-* The output of the detection process is probably a structured result object containing a boolean `isValid` flag, a list of `violations` (each with a `constraintId` and a descriptive message), and possibly a `severity` level. This result can be consumed by downstream components (e.g., request throttlers, audit loggers) or returned to the original caller.
+Developers working with SemanticConstraintDetection should consult both documentation files: `semantic-constraint-detection.md` for operational usage and `semantic-detection-design.md` for understanding why the system behaves as it does. The presence of a separate design document is itself a signal — changes that conflict with the documented design rationale should be reviewed carefully, as they may undermine the reasons semantic detection was chosen over simpler alternatives.
 
----
+When defining new constraints, work within `constraint-configuration.md`'s specified format rather than modifying the detector itself. The decoupling between rules and detection logic is intentional, and bypassing it by hardcoding rules into the detector would erode the configurability that distinguishes this system. Treat the constraint configuration as the canonical place to express enforcement intent.
 
-## Integration Points  
+When integrating new input sources, respect the boundary established by `ClaudeCodeHookDataFormat`. If input must arrive in a different shape, transform it to conform to the hook format before passing it to the detector rather than building parallel input paths within SemanticConstraintDetection. This preserves the single, well-defined ingestion contract that the parent `MCPConstraintMonitor` system relies on.
 
-* **Parent – SemanticAnalysisService** – As a child detail, **SemanticConstraintDetection** is invoked by the broader analysis workflow. When the service receives an input payload, it first runs the standard semantic analysis (topic extraction, intent detection, etc.) and then calls the constraint detector to enforce business‑level rules before proceeding to downstream actions.
+Finally, recognize that semantic detection is more expensive and less predictable than lexical matching. Use it where its strengths are needed — implicit or context-dependent violations — and accept that test cases must cover semantic equivalence classes rather than just string variants. Maintainability of this component depends on keeping the rule corpus, the input contract, and the detection logic evolving in coordination rather than in isolation.
 
-* **Sibling Components** – Other details of **SemanticAnalysisService** (e.g., *EntityExtraction*, *IntentClassification*) likely share the same hook infrastructure and configuration loading mechanisms. They may also reuse the CLAUDE‑CODE hook format, providing a consistent integration surface across the service.
-
-* **External Callers** – Any component that can emit a CLAUDE‑CODE‑compliant hook can trigger detection. This includes:
-  * Front‑end gateways that forward user input.
-  * Batch processing pipelines that validate stored records.
-  * Other internal services that need to enforce constraints before persisting data.
-
-* **Configuration Management** – The `constraint-configuration.md` file suggests that constraints can be edited without code changes. In practice, this implies an operational integration with a configuration store (e.g., a Git‑backed config repo, a feature‑flag service, or a database). The detection engine must therefore expose a **reload** or **watch** capability to pick up changes without a full service restart.
-
-* **Monitoring & Auditing** – Although not documented, a typical integration point for constraint detection is a logging/auditing subsystem that records each violation for compliance reporting. The presence of a dedicated documentation folder (`mcp-constraint-monitor`) hints that monitoring is a first‑class concern.
-
----
-
-## Usage Guidelines  
-
-1. **Respect the CLAUDE‑CODE Hook Contract** – When invoking **SemanticConstraintDetection**, callers must construct payloads that conform exactly to the format described in `CLAUDE-CODE-HOOK-FORMAT.md`. Missing fields or incorrect data types will cause the hook parser to reject the request outright.
-
-2. **Define Constraints Declaratively** – All semantic rules should be expressed in `constraint-configuration.md` (or its underlying data store). Developers should avoid hard‑coding rule logic in code; instead, they should add or modify constraint entries, leveraging the configuration‑driven nature of the engine.
-
-3. **Version Constraints Carefully** – Because constraints are externalised, any change can affect all callers simultaneously. Use version identifiers or namespacing within the configuration file to roll out new constraints gradually and maintain backward compatibility.
-
-4. **Handle Detection Results Gracefully** – The detection result will contain a list of violations. Callers should treat a `false` `isValid` flag as a signal to abort or remediate the operation, and they should surface the human‑readable messages to operators or end‑users where appropriate.
-
-5. **Monitor Performance** – Since constraint checking may involve LLM calls for complex semantics, developers should benchmark the latency impact of each constraint type. If a particular rule proves too costly, consider simplifying it or moving it to an asynchronous validation stage.
-
-6. **Leverage Reload Mechanisms** – When updating the constraint configuration, ensure the service’s reload endpoint (if any) is invoked, or confirm that the hot‑reload watcher picks up the change. This avoids stale constraint sets persisting in memory.
-
----
-
-### Architectural Patterns Identified  
-
-* **Configuration‑Driven Rule Engine** – Constraints are externalised and loaded at runtime.  
-* **Hook‑Based Invocation** – A defined payload contract (`CLAUDE‑CODE`) decouples callers from the detection implementation.  
-
-### Design Decisions and Trade‑offs  
-
-* **Extensibility vs. Runtime Overhead** – Externalising constraints makes the system highly extensible but introduces a runtime lookup cost and the need for a reliable reload mechanism.  
-* **Decoupling via Hooks** – Hooks provide flexibility for multiple producers but require strict contract adherence and validation logic.  
-
-### System Structure Insights  
-
-* **SemanticConstraintDetection** sits as a child detail inside **SemanticAnalysisService**, sharing configuration and hook infrastructure with sibling analysis components.  
-* The documentation‑only presence suggests that the actual code resides in the service’s core module, likely hidden behind an internal API that respects the documented hook format.  
-
-### Scalability Considerations  
-
-* Because each detection may invoke LLM services, scaling horizontally (adding more instances of **SemanticAnalysisService**) is the primary way to handle increased load.  
-* The configuration store must be read‑optimised (cached) to avoid bottlenecks when many instances resolve constraints simultaneously.  
-
-### Maintainability Assessment  
-
-* **High maintainability** for business rule changes: developers edit the constraint configuration rather than code.  
-* **Potential fragility** in the hook contract: any deviation in payload shape forces a code change in the parser. Clear versioned documentation (as provided) mitigates this risk.  
-* Lack of visible code symbols makes onboarding harder; adding inline code comments or linking the documentation to concrete classes would improve traceability.
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService sub-component uses the LLM services to analyze the input data.
+- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/mcp-constraint-monitor/README.md monitors and enforces constraints
+
+### Siblings
+- [ClaudeCodeHookDataFormat](./ClaudeCodeHookDataFormat.md) -- Specified in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, this document establishes the payload schema that Claude Code emits when invoking the constraint monitor as a downstream hook consumer, forming the primary ingestion boundary of the system.
+
 
 ---
 

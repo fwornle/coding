@@ -2,103 +2,68 @@
 
 **Type:** SubComponent
 
-SemanticAnalyzer works closely with the ContentValidator and ViolationCapture sub-components for comprehensive constraint validation.
+src/agents/semantic-analyzer.ts is referenced by four distinct agents (OntologyClassificationAgent, CodeGraphAgent, ContentValidationAgent, SemanticAnalysisAgent), making it the single authoritative source for text pattern primitives across the semantic analysis subsystem
 
-## What It Is  
+# SemanticAnalyzer — Technical Insight Document
 
-SemanticAnalyzer is a **sub‑component** of the **ConstraintSystem** that lives inside the *semantic‑analysis* service of the code base.  Its implementation is tied to the **integrations/mcp‑server‑semantic‑analysis** package, where the surrounding infrastructure (e.g., the `GraphDatabaseAdapter` located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js`) resides.  The component’s primary responsibility is to apply natural‑language‑processing (NLP) techniques to entity content, surface semantic violations, and suggest corrective actions.  It does this by invoking domain‑specific machine‑learning models, consulting the graph‑based knowledge store via the adapter, and collaborating with the sibling sub‑components **ContentValidator** and **ViolationCapture**.  A child component, **NaturalLanguageProcessor**, provides the low‑level linguistic capabilities that SemanticAnalyzer builds upon.
+## What It Is
 
-## Architecture and Design  
+SemanticAnalyzer is implemented in `src/agents/semantic-analyzer.ts` and functions as the single authoritative source for text pattern primitives across the semantic analysis subsystem. Rather than being a full agent in its own right, it is a SubComponent — a utility module that supplies pattern-matching building blocks to four distinct agents: `OntologyClassificationAgent`, `CodeGraphAgent`, `ContentValidationAgent`, and `SemanticAnalysisAgent`. It sits within the broader SemanticAnalysis parent component, which itself participates in the agent pipeline architecture defined by `BaseAgent<TInput, TOutput>` in `src/agents/base-agent.ts`.
 
-The overall architecture follows a **modular, layered design** in which SemanticAnalyzer sits between the data‑access layer (the `GraphDatabaseAdapter`) and the validation layer (ContentValidator, ViolationCapture).  The presence of an explicit *adapter* class (`GraphDatabaseAdapter`) signals the **Adapter pattern**: SemanticAnalyzer does not interact directly with the underlying graph database; instead, it issues high‑level calls (e.g., “retrieve relationships”, “update constraints”) through the adapter’s well‑defined API.  This decouples the analysis logic from storage implementation details and makes it possible to swap the persistence mechanism without touching the analyzer.
+The module's purpose is deliberately narrow: it exposes reusable tokenization and matching primitives — embodied conceptually by its child TextPatternPrimitiveLibrary — that downstream agents incorporate into their own `process()` and lifecycle methods. By housing pattern logic in one location, SemanticAnalyzer enforces consistent semantic interpretation across multiple pipeline stages that would otherwise be tempted to re-implement similar logic locally.
 
-Extensibility is another design focus.  Observation 6 notes that SemanticAnalyzer can integrate external NLP services and models.  This is realized as a **Strategy‑like plug‑in mechanism**: the component delegates linguistic processing to the child **NaturalLanguageProcessor**, which can be replaced or extended with alternative services at runtime.  Because the child is mentioned only abstractly, the concrete plug‑in interface is not exposed, but the design intent is clear – the analyzer’s core does not hard‑code a single NLP library.
+![SemanticAnalyzer — Architecture](images/semantic-analyzer-architecture.png)
 
-Interaction flows are **incremental**.  Observation 4 states that the sub‑component supports incremental analysis, meaning that when entity content or relationships change, SemanticAnalyzer can re‑evaluate only the affected portions rather than recomputing the entire knowledge graph.  This incremental capability is facilitated by the graph‑database’s ability to emit fine‑grained updates (via the adapter) and by the analyzer’s internal caching of previously computed semantic states.
+## Architecture and Design
 
-Finally, the component participates in a **collaborative validation pipeline**.  It produces semantic violation data that is consumed by **ViolationCapture**, while **ContentValidator** may invoke SemanticAnalyzer to enrich its syntactic checks with semantic insight.  This shared‑service approach keeps responsibilities distinct yet tightly coordinated.
+The architectural decision driving SemanticAnalyzer is centralization of cross-cutting concerns. Where the sibling Pipeline, Ontology, and Insights components each rely on the `BaseAgent` abstract contract (which mandates the five lifecycle methods `process`, `calculateConfidence`, `detectIssues`, `generateRouting`, and `applyCorrections`), SemanticAnalyzer is intentionally *not* an agent. It is a shared dependency — a fact captured explicitly by its child QuadAgentSharedDependencyPattern, which names the four-way fan-out from this single module to consuming agents.
 
-## Implementation Details  
+This design follows the DRY principle in a strict form: pattern primitives are defined once and consumed many times. The alternative would have each agent's `process()` method carry its own tokenization rules, which would inevitably drift apart over time and yield inconsistent confidence scores and issue detection results across the pipeline. By centralizing pattern logic, the design ensures that, for example, `OntologyClassificationAgent.calculateConfidence()` and `ContentValidationAgent.detectIssues()` operate on identical semantic groundwork even though they serve different purposes.
 
-Although no concrete symbols were discovered in the source snapshot, the observations describe the key building blocks:
+The trade-off is coupling: because four agents import from `src/agents/semantic-analyzer.ts`, any breaking API change in the module propagates simultaneously to all four execution paths. This is the explicit warning embedded in the QuadAgentSharedDependencyPattern child — the module sits at the intersection of four independent agent flows, and its API stability is therefore disproportionately important relative to its file size.
 
-* **NaturalLanguageProcessor** – the child component that encapsulates tokenisation, part‑of‑speech tagging, entity extraction, and other NLP primitives.  SemanticAnalyzer calls into this processor to transform raw entity content into a structured linguistic representation.
+## Implementation Details
 
-* **Machine‑Learning Models** – domain‑specific models (likely hosted as separate artefacts or services) are invoked to detect semantic violations.  The models consume the structured output from NaturalLanguageProcessor together with contextual relationship data fetched from the graph.
+SemanticAnalyzer's implementation surface is the TextPatternPrimitiveLibrary it contains — a collection of pattern-matching utilities used in distinct ways by each consumer. In `OntologyClassificationAgent`, these primitives feed the entity type resolution step, with matched patterns flowing into `calculateConfidence()` scoring; this is how the agent decides how strongly to assert an ontology class on a given input before passing its `AgentResponse` envelope downstream to `PersistenceAgent`.
 
-* **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js`) – provides methods such as `getEntityRelationships(entityId)`, `addConstraint(node, edge)`, and `updateEdgeWeight()`.  SemanticAnalyzer uses these calls to retrieve the current graph context for an entity and to persist any new semantic constraints it discovers.
+`ContentValidationAgent` invokes SemanticAnalyzer's text analysis to populate its `detectIssues()` findings, scanning content for semantic anomalies before persistence occurs. This positioning is significant: validation runs *before* the data lands in storage, so any false negatives in SemanticAnalyzer's pattern coverage become false negatives in the validation layer as well. `CodeGraphAgent` uses the same primitives differently — it instantiates SemanticAnalyzer to identify candidate `DEFINES` and `DEFINES_METHOD` relationships within source tokens before writing edges to Memgraph, meaning the module's output directly influences the topology of the persisted code graph.
 
-* **Incremental Analysis Engine** – while not named, the engine likely maintains a change‑set queue.  When a content update arrives, the analyzer fetches only the impacted nodes/edges via the adapter, runs the NLP pipeline, and re‑evaluates the associated ML model predictions.  The result is a set of **feedback suggestions** (Observation 5) that can be presented to the author or stored for downstream processing.
+![SemanticAnalyzer — Relationship](images/semantic-analyzer-relationship.png)
 
-* **Feedback Mechanism** – the component emits correction suggestions, possibly as a structured object (`{entityId, suggestedChange, confidence}`) that is consumed by UI layers or by the **ViolationCapture** sub‑component for persistence.
+`SemanticAnalysisAgent` is the fourth consumer, and presumably the most direct: as the agent most thematically aligned with the SemanticAnalysis parent component, it likely uses the broadest surface of the primitive library. Because the module exposes primitives rather than complete analyses, each agent composes the building blocks differently while still benefiting from shared tokenization and matching rules.
 
-The design keeps the heavy‑weight ML inference and graph queries separate from the lightweight NLP preprocessing, allowing each concern to be scaled or swapped independently.
+## Integration Points
 
-## Integration Points  
+SemanticAnalyzer's integration footprint is defined by its four importers and one documentation reference. The four agents — `OntologyClassificationAgent`, `CodeGraphAgent`, `ContentValidationAgent`, and `SemanticAnalysisAgent` — all consume the module through direct import from `src/agents/semantic-analyzer.ts`. Each of these agents, in turn, implements the `BaseAgent<TInput, TOutput>` contract from the parent SemanticAnalysis layer, meaning SemanticAnalyzer's output is invariably wrapped into a structured `AgentResponse<TOutput>` envelope before propagation through `AgentExecutionContext.upstreamContexts`.
 
-SemanticAnalyzer’s primary integration surface is the **GraphDatabaseAdapter**.  All relationship and constraint queries flow through the adapter located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js`.  Because the adapter abstracts the underlying graph store, SemanticAnalyzer can be used in any environment where that adapter is configured (e.g., Neo4j, JanusGraph, etc.).
+Beyond the agent pipeline, the module's conceptual reach extends to the constraint monitoring subsystem. The `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` documentation references pattern-matching concepts that align with SemanticAnalyzer's primitives, suggesting the same tokenization and matching logic informs constraint detection. Whether this is a direct code import or merely a shared conceptual model is not stated in the observations, but the parallel is intentional.
 
-The component also integrates with its **siblings**:
+Within the sibling landscape, SemanticAnalyzer interacts indirectly with Pipeline (whose coordinator orchestrates the agents that consume it), Ontology (whose `OntologyClassificationAgent` is one of the four direct consumers), and Insights (whose agents could potentially adopt these primitives for their own `generateRouting()` decisions).
 
-* **ContentValidator** – calls SemanticAnalyzer to obtain semantic validation results that complement syntactic checks.  Both share the same adapter instance, ensuring a consistent view of the graph.
-* **ViolationCapture** – consumes the violation objects produced by SemanticAnalyzer, persisting them for audit or further analysis.
+## Usage Guidelines
 
-External integration is supported through the **NaturalLanguageProcessor** child.  Developers may plug in third‑party NLP services (e.g., spaCy, Hugging Face Transformers) by providing an implementation that conforms to the processor’s expected interface.  This extensibility point is explicitly mentioned in Observation 6.
+When working with SemanticAnalyzer, developers should treat it as a stable, shared library rather than as agent-specific logic. Adding pattern-matching code inside an individual agent's `process()` method is an anti-pattern when that logic could plausibly be shared — the design intent, as expressed by the TextPatternPrimitiveLibrary child component, is that patterns live in one canonical place. If a new agent needs text analysis capability that overlaps with existing usage, the correct approach is to extend SemanticAnalyzer's API rather than fork the logic locally.
 
-Finally, the parent **ConstraintSystem** orchestrates the overall workflow.  It contains SemanticAnalyzer, so any system‑wide configuration (such as model versioning, feature flags for incremental analysis, or graph connection parameters) is propagated down to the sub‑component.
+Because of the QuadAgentSharedDependencyPattern, any API modification to `src/agents/semantic-analyzer.ts` must be evaluated against all four consumer agents simultaneously. Changes that appear local to one agent's perspective can silently alter the behavior of the other three. When refactoring, it is essential to verify that `OntologyClassificationAgent.calculateConfidence()`, `ContentValidationAgent.detectIssues()`, and `CodeGraphAgent`'s edge-candidate identification all continue to produce equivalent results before and after the change.
 
-## Usage Guidelines  
+From a maintainability standpoint, the centralized design is a net positive: a single bug fix or pattern improvement automatically benefits every consumer, and unit tests against SemanticAnalyzer directly cover behaviors that would otherwise require integration tests across all four agents. From a scalability standpoint, the module's stateless utility design means it imposes no coordination overhead — each agent invokes it independently within its own `process()` lifecycle, and the module itself does not introduce shared mutable state that would constrain parallel agent execution. The principal scaling concern is API surface growth: as more agents adopt SemanticAnalyzer, discipline is required to keep the primitive library focused on truly shared concerns rather than absorbing agent-specific logic that merely happens to involve text.
 
-1. **Prefer Incremental Updates** – When modifying entity content, invoke SemanticAnalyzer with the minimal change set.  The component is optimized for incremental analysis; full re‑analysis should be reserved for bulk migrations or when the underlying graph schema changes.
-
-2. **Leverage the Adapter API** – All graph interactions must go through `GraphDatabaseAdapter`.  Direct database calls bypass caching and consistency checks built into the adapter, potentially leading to stale or conflicting constraint states.
-
-3. **Register NLP Processors Early** – If you need a custom NLP service, register it with the **NaturalLanguageProcessor** child at application start‑up.  Doing so ensures the analyzer uses the correct tokeniser and entity recogniser for all subsequent analyses.
-
-4. **Handle Feedback Gracefully** – The feedback objects returned by SemanticAnalyzer are suggestions, not hard enforcement rules.  UI layers should present them as optional improvements, and downstream services (e.g., ViolationCapture) should store them with a confidence score for later review.
-
-5. **Coordinate with ContentValidator** – When building validation pipelines, invoke ContentValidator first for quick syntactic checks, then call SemanticAnalyzer for deeper semantic insight.  This ordering reduces unnecessary graph queries if the content fails basic validation.
-
----
-
-### Architectural patterns identified
-* **Adapter pattern** – embodied by `GraphDatabaseAdapter`.
-* **Strategy / Plug‑in pattern** – used for interchangeable NLP services via the **NaturalLanguageProcessor** child.
-* **Incremental processing pipeline** – a design that processes only changed data rather than whole datasets.
-
-### Design decisions and trade‑offs
-* Decoupling analysis from storage (adapter) improves replaceability but adds an extra indirection layer.
-* Supporting external NLP models boosts flexibility at the cost of requiring a stable processor interface.
-* Incremental analysis reduces compute load but introduces complexity in change‑set tracking and cache invalidation.
-
-### System structure insights
-* SemanticAnalyzer is a middle‑tier service within **ConstraintSystem**, bridging graph persistence and validation layers.
-* It shares the same storage adapter as its siblings, guaranteeing a unified view of entity relationships.
-* Its child **NaturalLanguageProcessor** isolates language‑specific logic, keeping the analyzer focused on semantic rule evaluation.
-
-### Scalability considerations
-* The incremental design allows the component to scale horizontally; multiple analyzer instances can process disjoint change streams without re‑evaluating the entire graph.
-* Off‑loading heavy ML inference to dedicated model servers (implied by “machine learning models”) prevents CPU bottlenecks within the analyzer process.
-* The adapter abstraction permits scaling the underlying graph database independently (e.g., sharding, read replicas).
-
-### Maintainability assessment
-* Clear separation of concerns (adapter, NLP processor, ML model) makes the codebase easier to understand and evolve.
-* Extensibility points are explicit (plug‑in NLP, model versioning), reducing the need for invasive changes when upgrading capabilities.
-* However, the reliance on incremental state management introduces subtle bugs if change‑set handling is not rigorously tested; comprehensive unit and integration tests are essential to maintain reliability.
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to store and retrieve knowledge in a graph-based structure, which enables efficient querying and analysis of entity relationships. This choice of data storage allows for flexible and scalable management of complex constraints. Furthermore, the GraphDatabaseAdapter class provides methods for adding, removing, and updating graph nodes and edges, facilitating dynamic modifications to the knowledge graph.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The `BaseAgent<TInput, TOutput>` abstract class in `src/agents/base-agent.ts` establishes a rigorous contract that all pipeline agents must fulfill, enforcing consistency across what would otherwise be a heterogeneous collection of specialized processors. The five abstract lifecycle methods—`process`, `calculateConfidence`, `detectIssues`, `generateRouting`, and `applyCorrections`—are composed by the public `execute()` method into a single typed `AgentResponse<TOutput>` envelope. This design means that regardless of which agent runs (e.g., `GitHistoryAgent`, `VibeHistoryAgent`, `OntologyClassificationAgent`), the caller always receives a structurally identical response with confidence scores, detected issues, routing hints, and correction records. For a new developer, this is significant: you cannot partially implement an agent and have the pipeline silently degrade—the abstract methods enforce a minimum surface area of structured metadata that the orchestration layer depends on for routing decisions and downstream context propagation via `AgentExecutionContext.upstreamContexts`. This pattern also means unit testing any agent is straightforward, since every observable output is contained within the well-typed response envelope rather than scattered across side-effects or callbacks.
 
 ### Children
-- [NaturalLanguageProcessor](./NaturalLanguageProcessor.md) -- The integrations/code-graph-rag/README.md file mentions the use of natural language processing techniques, indicating the presence of a NaturalLanguageProcessor.
+- [TextPatternPrimitiveLibrary](./TextPatternPrimitiveLibrary.md) -- `src/agents/semantic-analyzer.ts` is described in parent context as 'the single authoritative source for text pattern primitives,' indicating it deliberately centralizes pattern definitions rather than allowing each consumer to maintain its own variants—a deliberate DRY architectural decision.
+- [QuadAgentSharedDependencyPattern](./QuadAgentSharedDependencyPattern.md) -- OntologyClassificationAgent, CodeGraphAgent, ContentValidationAgent, and SemanticAnalysisAgent all import from `src/agents/semantic-analyzer.ts` per the parent component description, meaning this file sits at the intersection of four separate agent execution paths and any breaking API change propagates to all four simultaneously.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
-- [ViolationCapture](./ViolationCapture.md) -- ViolationCapture works closely with the ContentValidator sub-component to capture validation failures and persist them for further analysis.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter implements a standardized data model for representing entities, relationships, and constraints in the graph database.
+- [Pipeline](./Pipeline.md) -- The coordinator agent composes five abstract lifecycle methods (process, calculateConfidence, detectIssues, generateRouting, applyCorrections) from BaseAgent into a single AgentResponse envelope, ensuring every pipeline stage emits structured metadata
+- [Ontology](./Ontology.md) -- OntologyClassificationAgent implements all five BaseAgent abstract methods, emitting an ontologyClass field in its AgentResponse output that PersistenceAgent consumes to avoid re-classification
+- [Insights](./Insights.md) -- Insight agents implement BaseAgent<TInput, TOutput> with generateRouting() hints that direct high-confidence patterns to the knowledge report authoring stage and low-confidence ones back for re-analysis
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

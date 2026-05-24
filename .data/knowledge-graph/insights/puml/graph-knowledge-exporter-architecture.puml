@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Write Sources" {
+  component "Manual Learning" as ml <<agent>>
+  component "Online Learning" as ol <<agent>>
+}
+
+package "Knowledge Base Core" {
+  component "GraphDatabaseService" as gds <<core>>
+  component "GraphKnowledgeExporter" as gke <<core>>
+}
+
+package "Export Storage (.data/knowledge-export)" {
+  database "Domain JSON Files" as domainFiles <<storage>>
+}
+
+package "External Consumers" {
+  component "RAG Integrations" as rag <<external>>
+  component "code-graph-rag" as cgr <<external>>
+  component "MCP Servers" as mcp <<external>>
+}
+
+ml --> gds : "writes entity"
+ol --> gds : "writes entity"
+gds --> gke : "entity:stored event"
+gke --> domainFiles : "debounced\nbatch write (per-domain)"
+domainFiles --> rag : "reads snapshot"
+domainFiles --> cgr : "reads snapshot"
+domainFiles --> mcp : "reads snapshot"
+
+@enduml

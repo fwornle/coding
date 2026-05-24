@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HealthCoordinator
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[HealthCoordinator] as health_coordinator #LightBlue
+[ServiceProbe] as service_probe #F0F0F0
+[ConstraintAPIWrapper] as constraint_apiwrapper #F0F0F0
+[DashboardWrapper] as dashboard_wrapper #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[ServiceStarter] as service_starter #F0F0F0
+[NameBasedServiceResolution] as name_based_service_resolution #E8F5E8
+[PSMStateReader] as psmstate_reader #E8F5E8
+
+dockerized_services --> health_coordinator
+service_probe -[hidden]- health_coordinator
+constraint_apiwrapper -[hidden]- health_coordinator
+dashboard_wrapper -[hidden]- health_coordinator
+llmmock_service -[hidden]- health_coordinator
+process_state_manager -[hidden]- health_coordinator
+service_starter -[hidden]- health_coordinator
+health_coordinator --> name_based_service_resolution
+health_coordinator --> psmstate_reader
+
+@enduml

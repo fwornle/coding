@@ -2,71 +2,85 @@
 
 **Type:** Detail
 
-The ProviderConfig class in provider-config.ts defines the configuration structure for each LLM provider, allowing the ProviderRegistry in provider-registry.ts to manage providers in a flexible and provider-agnostic manner.
+The three-mode architecture (public / private / local) described in the PublicProviderAdapter parent context requires distinct credential and endpoint configuration per public cloud provider, so the YAML schema serves as the single source of truth that all public adapters read from rather than embedding credentials inline.
 
-## What It Is  
+# ProviderConfig
 
-**ProviderConfig** is the concrete type‑level definition that describes how an individual Large Language Model (LLM) provider is configured inside the codebase. The class lives in **`provider-config.ts`**, and its shape is consumed by the **`ProviderRegistry`** implementation found in **`lib/llm/provider-registry.js`**. The registry treats each provider as a pluggable unit; the configuration object supplied by **ProviderConfig** supplies the provider‑specific credentials (for example the `ANTHROPIC_API_KEY` documented in the project’s README) and any other options required to initialise the underlying client. Because the registry is provider‑agnostic, **ProviderConfig** is the single source of truth for the “what” each provider needs, while the registry is the “how” those configurations are managed at runtime.
+## What It Is
 
-## Architecture and Design  
+ProviderConfig is the configuration schema and artifact that governs how public cloud provider adapters in the MCP semantic analysis server are credentialed, addressed, and parameterized at runtime. Its canonical materialization lives at `config/llm-providers.yaml`, which the parent component analysis explicitly identifies as the central configuration artifact for public provider adapters. The schema is documented in a dedicated configuration guide at `integrations/mcp-server-semantic-analysis/docs/configuration.md` ("Configuration Reference"), giving provider-level settings a standalone reference rather than scattering them across adapter source files.
 
-The architecture follows a **registry‑based, provider‑agnostic composition** pattern. The **ProviderRegistry** acts as a central catalogue that maps a provider identifier (e.g., “anthropic”, “openai”, “copi”) to a concrete implementation. Each entry in that catalogue is described by an instance of **ProviderConfig**. This separation of concerns mirrors a classic **Factory**‑style design: the registry knows *when* to create a provider, but the **ProviderConfig** tells the registry *what* data is required for that creation.
+Functionally, ProviderConfig serves as the single source of truth for per-provider secrets, model identifiers, and endpoint overrides that the `PublicProviderAdapter` family consumes. Rather than each cloud-specific adapter under `integrations/mcp-server-semantic-analysis/src/providers/` embedding credentials or hard-coding endpoints, all of them read from this externalized configuration layer — making ProviderConfig the integration seam between adapter code and the surrounding deployment environment.
 
-Observations of multiple integration READMEs (e.g., `integrations/browser-access/README.md`, `integrations/copi/README.md`) indicate that the system is expected to support a heterogeneous set of providers, each with its own set of environment variables or secret keys. By centralising those details in **ProviderConfig**, the code avoids scattering provider‑specific logic throughout the codebase. The design also encourages **extensibility**: adding a new provider only requires defining a new **ProviderConfig** shape and registering it with the **ProviderRegistry**, without touching the core registry logic.
+## Architecture and Design
 
-## Implementation Details  
+The design follows an externalized-configuration pattern in which a YAML file (`config/llm-providers.yaml`) is the declarative interface between deployment operators and the adapter runtime. This separation of concerns is deliberate: it allows the three-mode architecture (public / private / local) defined by the parent `PublicProviderAdapter` to vary credentials and endpoints per provider without requiring code changes. Each public cloud adapter has its own section in the YAML, keyed by provider, so the schema scales horizontally as new providers are added under `integrations/mcp-server-semantic-analysis/src/providers/`.
 
-The **`provider-config.ts`** file declares a TypeScript class (or interface) named **ProviderConfig**. Its fields capture the minimal configuration required for a provider to operate—most notably API keys such as `ANTHROPIC_API_KEY`. Because the source observation mentions “the ProviderConfig class … defines the configuration structure for each LLM provider,” we can infer that the class likely contains properties like `apiKey: string`, `endpoint?: string`, and possibly a `providerName: string` identifier.  
+A key architectural decision is making endpoint overrides part of the schema itself. This elevates non-production routing — staging endpoints, regional failover targets, or specific model version pinning — to a first-class configurable concern rather than a deployment hack. The configuration layer thereby decouples provider transport details from adapter business logic, which means the same adapter code path serves production, staging, and canary deployments based purely on what ProviderConfig declares.
 
-The **`lib/llm/provider-registry.js`** module imports **ProviderConfig** and stores a collection (e.g., a `Map` or plain object) keyed by provider name. When a consumer requests a provider instance, the registry looks up the corresponding **ProviderConfig**, validates that required fields are present (e.g., ensuring `ANTHROPIC_API_KEY` is defined for the Anthropic provider), and then forwards that configuration to the concrete provider implementation (which may reside in sibling modules not listed in the observations). The registry’s “provider‑agnostic” phrasing suggests that it does not contain provider‑specific branching logic; instead, it delegates to provider factories that each understand how to consume a **ProviderConfig**.
+ProviderConfig sits alongside its sibling `TieredModelSelection`, which is documented separately at `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. The split is meaningful: ProviderConfig answers *how to reach and authenticate with* a provider, while TieredModelSelection answers *which model tier to pick* once the connection is established. Together they form the two axes of public provider configuration under `PublicProviderAdapter`, with model identifiers in ProviderConfig serving as the concrete values that tier-selection logic resolves into.
 
-## Integration Points  
+## Implementation Details
 
-**ProviderConfig** sits at the intersection of three major system zones:
+The implementation centers on `config/llm-providers.yaml` as a structured, per-provider configuration document. Although no code symbols are catalogued for ProviderConfig directly, its shape is constrained by what the public adapters need: credentials (API keys or token references) and model identifiers (the specific model names each provider exposes), plus optional endpoint overrides. Each top-level entry in the YAML corresponds to one cloud provider adapter, mirroring the one-adapter-per-provider organization under `integrations/mcp-server-semantic-analysis/src/providers/`.
 
-1. **Environment / Secrets Layer** – The presence of `ANTHROPIC_API_KEY` in documentation signals that the configuration class reads values from environment variables or a secret store. This makes **ProviderConfig** the bridge between external credential management and internal provider usage.  
+Documentation in `integrations/mcp-server-semantic-analysis/docs/configuration.md` serves as the authoritative reference for the schema, meaning developers extending the system should treat that file as the contract definition. The fact that this configuration warrants a dedicated guide — rather than being a section inside a broader README — signals that the schema is non-trivial and expected to evolve as providers are added or extended.
 
-2. **ProviderRegistry (Parent)** – As the parent component, the registry consumes **ProviderConfig** instances to populate its internal catalogue. The registry’s API likely exposes methods such as `register(providerName, config)` and `getProvider(providerName)`.  
+Because ProviderConfig is loaded at adapter initialization, the YAML acts as input to the wiring layer that instantiates concrete public provider adapters. Endpoint overrides, when present, take precedence over default URLs baked into adapter code, enabling staging or version-pinned deployments. Model identifiers declared in ProviderConfig are the concrete strings that downstream selection logic — including the sibling `TieredModelSelection` mechanism — references when routing requests to a specific tier.
 
-3. **Integration Modules (Siblings/Children)** – Integration READMEs (browser‑access, copi, etc.) describe concrete use‑cases that rely on a particular provider. Those integration modules import the registry, which in turn supplies a ready‑to‑use provider instance configured via **ProviderConfig**. Thus, any new integration only needs to reference the registry; the underlying configuration details remain encapsulated.
+## Integration Points
 
-No additional external libraries are mentioned, so the integration surface appears limited to standard Node.js/TypeScript mechanisms for environment handling and module resolution.
+ProviderConfig integrates upward into its parent `PublicProviderAdapter`, which is the consumer of every value declared in `config/llm-providers.yaml`. The relationship is strictly directional: adapters read from ProviderConfig, but ProviderConfig has no awareness of adapter implementation details. This one-way dependency keeps the YAML schema stable even as adapter internals change.
 
-## Usage Guidelines  
+Laterally, ProviderConfig provides the data that `TieredModelSelection` operates on. Model identifiers configured per provider are the resolution targets for tier-selection decisions — so the two siblings are functionally coupled through shared vocabulary (model names) even though they remain architecturally distinct documents and concerns.
 
-When adding or updating a provider, developers should create or modify a **ProviderConfig** definition in `provider-config.ts`. All required keys (e.g., `ANTHROPIC_API_KEY`) must be documented in the project’s README and sourced from a secure location (environment variable, secret manager). After defining the configuration, the provider should be registered with **ProviderRegistry** using a clear, unique identifier. Because the registry is provider‑agnostic, avoid embedding provider‑specific conditionals inside the registry; instead, keep such logic inside the provider’s own factory or client wrapper.
+Externally, ProviderConfig is the integration seam with the deployment environment. Secrets management, environment-specific routing, and version pinning all flow through this YAML rather than through code-level changes. This makes ProviderConfig the boundary across which DevOps and application concerns meet: operators control the YAML, developers control the adapters, and the schema documented in `integrations/mcp-server-semantic-analysis/docs/configuration.md` is the contract between them.
 
-Consistent naming conventions are important: the provider name used in the registry key should match the identifier referenced in integration READMEs to avoid mismatches. When writing new integration modules (e.g., a new `integrations/xyz/README.md`), reference the registry’s `getProvider` method rather than constructing a provider directly; this ensures that any future changes to configuration handling remain transparent to the integration.
+## Usage Guidelines
+
+Developers adding a new public provider adapter under `integrations/mcp-server-semantic-analysis/src/providers/` should define its configuration block in `config/llm-providers.yaml` rather than embedding credentials, endpoints, or model names in source code. The schema in `integrations/mcp-server-semantic-analysis/docs/configuration.md` is the reference for what fields are recognized; extending it requires updating both the YAML structure and the configuration reference document in tandem.
+
+Endpoint overrides should be used for non-production routing scenarios — staging deployments, regional pinning, or testing against specific model versions — but production deployments should generally rely on adapter defaults unless an explicit operational need dictates otherwise. Secrets in `config/llm-providers.yaml` must be managed according to deployment-environment conventions; the YAML is the declared shape, not necessarily the storage mechanism for the secret values themselves.
+
+When the schema is extended, the change has ripple effects across every adapter in the public tier and potentially across `TieredModelSelection` if model identifier semantics shift. Treat changes to ProviderConfig as schema-level changes requiring coordinated updates to the configuration documentation, the YAML examples, and any adapters that consume the new fields.
 
 ---
 
-### Architectural patterns identified  
-* Registry / Service Locator pattern – central catalogue (`ProviderRegistry`) that resolves providers.  
-* Factory‑like separation – **ProviderConfig** supplies data; provider factories consume it.  
+## Architectural Patterns Identified
 
-### Design decisions and trade‑offs  
-* **Provider‑agnostic registry** improves extensibility but places the burden of accurate configuration on the **ProviderConfig** definition.  
-* Centralising API keys in **ProviderConfig** simplifies secret management but requires disciplined environment handling to avoid leaking credentials.  
+- **Externalized configuration**: provider-specific values live in `config/llm-providers.yaml` rather than in adapter source code.
+- **Single source of truth**: one YAML file consolidates all public-provider credentials, model identifiers, and endpoint overrides.
+- **Schema-as-contract**: `integrations/mcp-server-semantic-analysis/docs/configuration.md` formalizes the configuration interface separately from implementation.
+- **Separation of concerns between siblings**: ProviderConfig governs connectivity and identity; `TieredModelSelection` governs model choice.
 
-### System structure insights  
-* Hierarchy: `ProviderRegistry` (parent) → `ProviderConfig` (child) → concrete provider implementations (grandchildren).  
-* Sibling integrations consume the registry, not the config directly, preserving a clean separation of concerns.  
+## Design Decisions and Trade-offs
 
-### Scalability considerations  
-* Adding new providers scales linearly: only a new **ProviderConfig** entry and registration step are needed.  
-* Because the registry stores configurations in memory, the approach remains performant for the typical number of LLM providers (single‑digit to low‑double‑digit).  
+- Choosing YAML as the configuration medium prioritizes human readability and operator-friendliness over type safety; schema correctness is enforced by the configuration reference document rather than a compiled type system.
+- Making endpoint overrides first-class enables flexible environment routing but introduces a configuration surface that must be carefully managed to avoid drift between environments.
+- Centralizing all public providers in one file simplifies discovery and auditing but means changes to the file have wide blast radius across all `PublicProviderAdapter` instances.
 
-### Maintainability assessment  
-* High maintainability: configuration schema lives in a single file, making updates straightforward.  
-* The explicit link between environment variables (e.g., `ANTHROPIC_API_KEY`) and the config class reduces hidden dependencies, aiding code reviews and audits.  
+## System Structure Insights
 
-*No diagram images were provided in the source observations; therefore none are embedded.*
+ProviderConfig occupies a clear hierarchical position as a Detail under `PublicProviderAdapter`, peering with `TieredModelSelection`. The structure reveals an intentional split between *connection-level configuration* (ProviderConfig) and *runtime selection logic* (TieredModelSelection), both feeding into the same parent adapter family located under `integrations/mcp-server-semantic-analysis/src/providers/`.
+
+## Scalability Considerations
+
+The YAML schema scales horizontally with new providers — each addition is a new top-level block — but the file itself can grow large as more providers are onboarded. Endpoint overrides allow scaling deployments across environments (staging, regional, version-pinned) without code changes, which is the primary scalability lever this component provides.
+
+## Maintainability Assessment
+
+Maintainability is strong due to the externalization pattern: adapter code and configuration evolve independently, and the dedicated reference document at `integrations/mcp-server-semantic-analysis/docs/configuration.md` lowers the cost of onboarding new providers. The main maintenance risk is documentation drift — the YAML, the reference doc, and the consuming adapters must stay synchronized, since there is no compiled schema enforcing consistency. Disciplined updates to all three artifacts when extending the schema are essential.
+
 
 ## Hierarchy Context
 
 ### Parent
-- [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry class (lib/llm/provider-registry.js) uses a provider-agnostic approach to manage LLM providers.
+- [PublicProviderAdapter](./PublicProviderAdapter.md) -- Provider implementations are located under integrations/mcp-server-semantic-analysis/src/providers/, one adapter per cloud provider as implied by the three-mode architecture
+
+### Siblings
+- [TieredModelSelection](./TieredModelSelection.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered Model Selection Proposal') is an explicitly listed architecture document dedicated to model tier selection, confirming this is a first-class design concern for the public provider layer rather than an ad-hoc per-adapter decision.
+
 
 ---
 
-*Generated from 3 observations*
+*Generated from 4 observations*

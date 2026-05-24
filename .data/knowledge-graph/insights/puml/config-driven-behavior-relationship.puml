@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConfigDrivenBehavior
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ConfigDrivenBehavior] as config_driven_behavior #LightBlue
+[AgentConstructionPattern] as agent_construction_pattern #F0F0F0
+[HookExtensionSystem] as hook_extension_system #F0F0F0
+[MCPToolExposurePattern] as mcptool_exposure_pattern #F0F0F0
+[DiagramFirstDocumentation] as diagram_first_documentation #F0F0F0
+[TieredLLMRouting] as tiered_llmrouting #F0F0F0
+[AgentProfileSchema] as agent_profile_schema #E8F5E8
+
+coding_patterns --> config_driven_behavior
+agent_construction_pattern -[hidden]- config_driven_behavior
+hook_extension_system -[hidden]- config_driven_behavior
+mcptool_exposure_pattern -[hidden]- config_driven_behavior
+diagram_first_documentation -[hidden]- config_driven_behavior
+tiered_llmrouting -[hidden]- config_driven_behavior
+config_driven_behavior --> agent_profile_schema
+
+@enduml

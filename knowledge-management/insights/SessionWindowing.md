@@ -2,80 +2,68 @@
 
 **Type:** SubComponent
 
-SessionWindowing is a key component of the LiveLoggingSystem, working in conjunction with other sub-components like file routing and classification layers
+The getCurrentSession() contract in TranscriptAdapter (transcript-api.js) implicitly depends on SessionWindowing to distinguish live session entries from historical ones, since the polling loop uses the returned session object to filter by current window boundaries.
 
-## What It Is  
+# SessionWindowing — Technical Insight Document
 
-SessionWindowing is a **sub‑component** of the **LiveLoggingSystem** that is responsible for applying session‑based windowing to streams of log data. The implementation lives in the file **`session_windowing.py`**, where the core routine is the function **`window_session`**. This function encapsulates all the logic needed to group log entries into discrete sessions based on temporal or activity boundaries, enabling downstream processing (e.g., classification) to work on logically coherent chunks of data. Because SessionWindowing is listed alongside **FileRouting** and **ClassificationLayers**, it is one of the three primary functional pillars that the LiveLoggingSystem relies on to ingest, route, and interpret log information.
+## What It Is
 
-## Architecture and Design  
+SessionWindowing is a SubComponent within the `LiveLoggingSystem` that defines how agent conversation sessions are partitioned into discrete time buckets for storage and retrieval in the LSL (Live Session Log) pipeline. Its presence is encoded primarily through the `LSLMetadata.timeWindow` field, which is referenced across two key files: `lib/agent-api/transcript-api.js` (home of the `TranscriptAdapter` plugin contract) and `lib/agent-api/lsl-converter.js` (home of the LSL normalization logic). The `timeWindow` field encodes session time boundaries as hour-range strings such as `'0800-0900'`, establishing a fixed 60-minute bucketing granularity rather than supporting variable-length sessions.
 
-The architecture exposed by the observations follows a **modular, functional decomposition** style. Each major concern of the LiveLoggingSystem is isolated in its own Python module: `session_windowing.py` for session windowing, `file_routing.py` for routing, and `classification_layers.py` for classification. This separation of concerns is a classic **module‑level separation** pattern that promotes independent development and testing of each piece.  
+![SessionWindowing — Architecture](images/session-windowing-architecture.png)
 
-Interaction between modules is achieved through well‑defined function calls. For example, the LiveLoggingSystem orchestrator will invoke `window_session` from `session_windowing.py` to obtain session‑segmented log batches, then pass those batches to the `Classifier` class defined in `classification_layers.py`. Likewise, file‑level inputs are first directed by the `route_file` function in `file_routing.py` before reaching the session windowing stage. This linear pipeline—routing → session windowing → classification—reflects a **pipeline architecture**, where each stage consumes the output of the previous one without maintaining internal state across stages.
+The component is decomposed into two children: `HourlyBucketEncoder`, which is responsible for producing the canonical hour-range string format consumed by the LSL pipeline, and `SessionBoundaryDetector`, which determines whether the current moment still falls within a previously-assigned window. Together, these children implement the read and write halves of the windowing contract, while SessionWindowing itself acts as the schema authority that both the adapter layer and the serialization layer must honor.
 
-## Implementation Details  
+## Architecture and Design
 
-The only concrete implementation artifact identified for SessionWindowing is the **`window_session`** function inside **`session_windowing.py`**. While the source code is not provided, the naming convention strongly suggests that the function accepts a stream or collection of log records and returns a collection of session‑grouped logs. Typical responsibilities of such a function include:
+SessionWindowing follows a **shared-schema contract pattern**. Because both `transcript-api.js` and `lsl-converter.js` reference the `LSLMetadata.timeWindow` field, the windowing schema functions as a cross-cutting contract between the adapter layer (which owns session lifecycle through `getCurrentSession()`) and the serialization layer (which owns format normalization through `convertToLSL()`). Neither file owns the schema in isolation — they cooperate around it, which means any change to bucket granularity is by definition a cross-file breaking change.
 
-1. **Detecting session boundaries** – using timestamps, inactivity gaps, or explicit session identifiers.  
-2. **Aggregating logs** – collecting all records that belong to the same session into a list or other container.  
-3. **Emitting session objects** – returning a structure that downstream components (e.g., the `Classifier`) can consume.
+The architectural decision to perform window assignment **at conversion time** is significant. `lsl-converter.js` participates in window assignment during the `convertToLSL()` normalization step, meaning the `timeWindow` metadata is stamped onto each LSL typed-entry as it is produced, not patched in post-hoc by a separate batch job. This "stamp-on-write" design ensures that every entry in the LSL stream carries its own self-describing temporal coordinate, removing the need for downstream consumers to re-derive window membership from raw timestamps.
 
-Because SessionWindowing is a **functional module** rather than an object‑oriented one, it likely does not maintain persistent state between calls; any required configuration (e.g., maximum idle time for a session) would be passed as arguments or read from a shared configuration object managed by the LiveLoggingSystem. The lack of classes in this module aligns with a **single‑responsibility function** design, keeping the codebase simple and focused.
+The choice of a **fixed 60-minute hourly bucket** (rather than session-length-aware windows) is a deliberate trade-off. Hourly buckets give the system predictable storage partitioning and trivial cross-session query semantics — you can ask "what happened between 0800 and 0900" without needing to understand individual session boundaries. The cost is that long sessions crossing an hour boundary are mechanically split into multiple window segments, which `SessionBoundaryDetector` and the `getCurrentSession()` implementations in `TranscriptAdapter` subclasses must handle correctly during hour-edge and midnight rollover.
 
-## Integration Points  
+## Implementation Details
 
-SessionWindowing sits directly after **FileRouting** in the processing chain. The `route_file` function in **`file_routing.py`** determines the appropriate source or destination for incoming log files and hands the raw log records to `window_session`. The output of `window_session`—session‑segmented logs—is then consumed by the **ClassificationLayers** component, specifically by the `Classifier` class in **`classification_layers.py`**.  
+The core data structure is `LSLMetadata.timeWindow`, a string field formatted as `HHMM-HHMM` (e.g., `'0800-0900'`). The `HourlyBucketEncoder` child component, which the parent context locates in `lsl-converter.js`, is responsible for producing these strings — likely by taking a `Date` or timestamp input, rounding the start down to the hour, and computing the end as start + 1 hour, then formatting both as zero-padded `HHMM` values joined by a hyphen.
 
-Thus, the primary integration interfaces are:
+The `SessionBoundaryDetector` child component implements the read-side counterpart. Per the hierarchy context, this logic is most likely embedded in or invoked by `getCurrentSession()` within `TranscriptAdapter` in `transcript-api.js`. Its job is to read the existing `timeWindow` value on a candidate session and test whether `Date.now()` still falls within the encoded hour range. When the test fails (i.e., the clock has rolled past the upper bound of the window), the session is no longer "current" and the adapter must either begin a new window segment or signal that the live session has rotated.
 
-| Source | Interface | Destination |
-|--------|-----------|-------------|
-| `file_routing.route_file` | Returns raw log sequence | `session_windowing.window_session` |
-| `session_windowing.window_session` | Returns session‑grouped logs | `classification_layers.Classifier` |
+The `getCurrentSession()` contract in `TranscriptAdapter` implicitly depends on SessionWindowing to distinguish live session entries from historical ones. The polling loop described in the parent `LiveLoggingSystem` documentation uses the session object returned by `getCurrentSession()` to filter entries by current window boundaries — so a correctly-implemented `SessionBoundaryDetector` is essential for the polling loop to avoid both replaying historical entries and missing live ones at hour edges.
 
-No additional dependencies are mentioned, implying that SessionWindowing relies solely on standard Python data structures and any configuration supplied by the overarching LiveLoggingSystem orchestrator.
+## Integration Points
 
-## Usage Guidelines  
+![SessionWindowing — Relationship](images/session-windowing-relationship.png)
 
-When incorporating SessionWindowing into new processing pipelines, developers should adhere to the following conventions:
+SessionWindowing integrates with its parent `LiveLoggingSystem` through the `TranscriptAdapter` base class in `lib/agent-api/transcript-api.js`. Specifically, the five abstract methods that adapters must implement — `getAgentType()`, `getTranscriptDirectory()`, `readTranscripts()`, `convertToLSL()`, and `getCurrentSession()` — touch SessionWindowing at two points: `convertToLSL()` invokes the `HourlyBucketEncoder` to stamp `timeWindow` onto each typed entry, and `getCurrentSession()` invokes the `SessionBoundaryDetector` to determine session liveness.
 
-1. **Invoke `window_session` only after routing** – ensure that the log data has been pre‑filtered and directed by `route_file` to avoid mixing unrelated log streams.  
-2. **Provide explicit session parameters** – if the function accepts arguments such as inactivity timeout or maximum session length, these should be configured consistently across the system to guarantee deterministic session boundaries.  
-3. **Treat the output as immutable** – downstream components (e.g., `Classifier`) expect a stable session representation; avoid mutating the returned structures in place.  
-4. **Handle empty or malformed inputs gracefully** – `window_session` should be called with validated log records; callers should guard against passing `None` or corrupt data, as the function’s error handling is not documented in the observations.  
-5. **Unit‑test session logic in isolation** – because SessionWindowing is a pure function, it can be tested without the full LiveLoggingSystem, reinforcing the modular design.
+The sibling component `RedactionLayer` operates orthogonally to SessionWindowing: redaction rules from `.specstory/config/redaction-config.yaml` apply to entry content regardless of which window an entry falls into. The two SubComponents share the same LSL typed-entry pipeline but contribute different metadata facets — `RedactionLayer` modifies content, while SessionWindowing modifies temporal metadata. Both run during or around `convertToLSL()`, making that method the primary integration seam for cross-cutting concerns.
 
----
+On the serialization side, `lsl-converter.js` is the sole producer of `timeWindow` values, while `transcript-api.js` is the primary consumer for liveness checks. Any concrete adapter subclass (such as the Claude Code adapter reading from `~/.claude/projects/<project>/conversation.jsonl`, or the Copilot CLI adapter targeting its own directory) inherits this contract automatically — they do not need to implement windowing logic themselves, only ensure that timestamps fed into `convertToLSL()` are accurate.
 
-### Architectural patterns identified  
-1. **Modular decomposition** – each major concern lives in its own Python module.  
-2. **Pipeline architecture** – sequential processing stages (routing → session windowing → classification).  
-3. **Single‑responsibility function** – `window_session` encapsulates one focused task.
+## Usage Guidelines
 
-### Design decisions and trade‑offs  
-* **Function‑centric vs. class‑centric** – opting for a single function keeps the implementation lightweight and easy to test, but limits extensibility (e.g., adding stateful session policies would require redesign).  
-* **Strict ordering of stages** – enforces a clear data flow, simplifying reasoning about system behavior, but introduces a linear bottleneck; parallelism must be introduced upstream or downstream.  
+When implementing a new `TranscriptAdapter` subclass, developers must ensure that `getCurrentSession()` correctly accounts for hour-boundary rollover. Because the windowing scheme is fixed at 60 minutes, a session that begins at 08:55 and continues to 09:10 will be split into two segments: one with `timeWindow: '0800-0900'` and another with `timeWindow: '0900-1000'`. Adapters that naively cache a single "current session" object without re-checking the window against the wall clock will return stale results to the polling loop after an hour edge.
 
-### System structure insights  
-The LiveLoggingSystem is organized as a hierarchy: the top‑level component (LiveLoggingSystem) delegates to three sibling modules—**FileRouting**, **SessionWindowing**, and **ClassificationLayers**—each exposing a single public API (`route_file`, `window_session`, `Classifier`). This flat sibling structure promotes clear ownership of responsibilities and reduces inter‑module coupling.
+Do not attempt to introduce variable-length windows, sub-hour granularity, or multi-hour buckets without coordinated changes to both `lib/agent-api/transcript-api.js` and `lib/agent-api/lsl-converter.js`. The schema contract is shared, and partial changes will produce `timeWindow` values that one side cannot parse. If a different granularity is genuinely required, treat it as a versioned schema migration — introduce a new field rather than overloading the existing `timeWindow`.
 
-### Scalability considerations  
-Because SessionWindowing is a pure function, it can be parallelized across multiple worker processes or threads, provided that the input log stream is partitioned appropriately (e.g., by source file). The lack of internal state eliminates contention, making horizontal scaling straightforward. However, the overall pipeline remains sequential; scaling the entire system will require parallelizing the routing and classification stages as well.
+Always rely on `HourlyBucketEncoder` (in `lsl-converter.js`) to produce window strings rather than constructing them manually in adapter code. The canonical zero-padded `HHMM-HHMM` format is brittle to ad-hoc string concatenation — off-by-one errors at midnight (where the next window after `'2300-2400'` should arguably be `'0000-0100'`, not `'2400-2500'`) are exactly the kind of bug a centralized encoder prevents.
 
-### Maintainability assessment  
-The modular, function‑oriented design yields high maintainability: changes to session logic are confined to `session_windowing.py` and do not ripple to other modules. The clear naming (`window_session`) and limited public surface area simplify code reviews and onboarding. The primary risk to maintainability is the absence of explicit type contracts or documentation within the observations; adding docstrings and unit tests would further strengthen long‑term upkeep.
+Finally, when debugging missing or duplicate live entries, inspect the `timeWindow` field on the latest LSL entries first. Because the window is stamped at conversion time, mismatches between the stamped window and the wall-clock-derived window used by `getCurrentSession()` are the most common source of polling-loop filtering errors. A correct implementation will show monotonically advancing `timeWindow` values that align with the system clock as time progresses.
+
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for session windowing, file routing, and classification layers. This is evident in the 'session_windowing.py' and 'file_routing.py' files, which contain functions such as 'window_session' and 'route_file' that handle these specific tasks. The 'classification_layers.py' file contains classes such as 'Classifier' that handle the classification of logs.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The TranscriptAdapter class in lib/agent-api/transcript-api.js establishes a strict plugin contract for integrating new agent conversation sources into the LSL pipeline. It requires five abstract methods: getAgentType(), getTranscriptDirectory(), readTranscripts(), convertToLSL(), and getCurrentSession(). This design cleanly separates concerns — the base class owns the lifecycle and dispatch logic, while subclasses own the format-specific parsing. Claude Code transcripts live at ~/.claude/projects/<project>/conversation.jsonl, a JSONL file that grows append-only during a session; the Copilot CLI adapter targets a different directory structure. The convertToLSL() method is the normalization seam, responsible for mapping each agent's native message structure into the unified LSL typed-entry format with types: user, assistant, tool_use, tool_result, system, and error. A new developer adding a third agent integration (e.g., Cursor, Aider) only needs to subclass TranscriptAdapter and implement these five methods — no changes to the core LSL infrastructure are required. The getCurrentSession() method is particularly important: it must return the 'live' session object so the polling loop knows which entries are part of the current conversation versus a historical one, which implies adapters must implement their own session-boundary detection logic appropriate to their agent's format.
+
+### Children
+- [HourlyBucketEncoder](./HourlyBucketEncoder.md) -- The L2 parent context explicitly identifies lsl-converter.js as a primary file that references LSLMetadata.timeWindow, making it the likely home of the encoding logic that produces strings like '0800-0900'.
+- [SessionBoundaryDetector](./SessionBoundaryDetector.md) -- The L2 parent description references 'session time boundaries' encoded in LSLMetadata.timeWindow, implying that at least one function — likely getCurrentSession() in transcript-api.js — reads the existing timeWindow value and tests whether the current moment still falls within it.
 
 ### Siblings
-- [FileRouting](./FileRouting.md) -- FileRouting uses the 'route_file' function in 'file_routing.py' to handle file routing tasks
-- [ClassificationLayers](./ClassificationLayers.md) -- ClassificationLayers uses the 'Classifier' class in 'classification_layers.py' to handle log classification tasks
+- [RedactionLayer](./RedactionLayer.md) -- Redaction rules are declared in .specstory/config/redaction-config.yaml, externalizing privacy policy from code so operators can update patterns without modifying the adapter or converter logic.
+
 
 ---
 
-*Generated from 3 observations*
+*Generated from 5 observations*

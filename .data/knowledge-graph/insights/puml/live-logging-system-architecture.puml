@@ -1,25 +1,35 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Live Logging System" {
-  component "Logging Module" as logging <<core>>
-  component "Ontology Classification Agent" as agent <<agent>>
-  component "LSL Config Validator" as validator <<cli>>
-  component "Transcript Adapter" as adapter <<api>>
+package "Config & Validation" {
+  component "LSLConfigValidator" as validator <<cli>>
+  database "lsl-config.json" as lslcfg <<storage>>
+  database "redaction-config.yaml" as redactcfg <<storage>>
 }
 
-package "Data Processing" {
-  component "MCP Server Semantic Analysis" as mcp <<core>>
-  component "Graph-Code RAG Analysis" as graph <<external>>
-  component "Constraint Monitor" as monitor <<external>>
+package "Agent Integration Layer" {
+  component "TranscriptAdapter" as ta <<api>>
+  component "ClaudeCode Adapter" as cca <<agent>>
+  component "CopilotCLI Adapter" as copa <<agent>>
 }
 
-logging --> agent : uses
-agent --> adapter : processes
-adapter --> logging : provides
-validator --> logging : configures
-mcp --> logging : uses
-graph --> mcp : integrated
-monitor --> mcp : monitors
+package "Core LSL Pipeline" {
+  component "watchTranscripts\n(Poll Engine)" as wt <<core>>
+  component "LSLConverter" as conv <<core>>
+  component "LSLSession" as sess <<core>>
+}
+
+database "JSONL Session Files" as jsonlfiles <<storage>>
+
+validator --> lslcfg : "validates schema"
+validator --> redactcfg : "validates schema"
+validator ..> sess : "injects userHash\n(SHA-256 prefix)"
+
+cca --> ta : "implements contract"
+copa --> ta : "implements contract"
+wt --> ta : "polls readTranscripts()\ngetCurrentSession()"
+wt --> conv : "dispatches entry delta\n(1000ms interval)"
+conv --> sess : "serializes / deserializes"
+sess --> jsonlfiles : "toJSONL()\nmetadata-first layout"
 
 @enduml

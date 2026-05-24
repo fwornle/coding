@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DashboardWrapper
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[DashboardWrapper] as dashboard_wrapper #LightBlue
+[ServiceProbe] as service_probe #F0F0F0
+[ConstraintAPIWrapper] as constraint_apiwrapper #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[ServiceStarter] as service_starter #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[PSMRegistrationLifecycle] as psmregistration_lifecycle #E8F5E8
+[SignalForwarder] as signal_forwarder #E8F5E8
+
+dockerized_services --> dashboard_wrapper
+service_probe -[hidden]- dashboard_wrapper
+constraint_apiwrapper -[hidden]- dashboard_wrapper
+llmmock_service -[hidden]- dashboard_wrapper
+process_state_manager -[hidden]- dashboard_wrapper
+service_starter -[hidden]- dashboard_wrapper
+health_coordinator -[hidden]- dashboard_wrapper
+dashboard_wrapper --> psmregistration_lifecycle
+dashboard_wrapper --> signal_forwarder
+
+@enduml

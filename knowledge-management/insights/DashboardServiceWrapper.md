@@ -2,124 +2,83 @@
 
 **Type:** SubComponent
 
-DashboardServiceWrapper likely utilizes the retry-with-backoff pattern in the Service Starter (lib/service-starter.js) to handle dashboard service failures.
+The symmetry between scripts/api-service.js and scripts/dashboard-service.js indicates both services share an implicit wrapper contract: spawn first, coordinate second
 
-## What It Is  
+# DashboardServiceWrapper — Technical Insight Document
 
-The **DashboardServiceWrapper** is a sub‑component that lives inside the **DockerizedServices** container (the exact file path is not listed in the current observations, but it is grouped with the other service‑wrapper modules). Its primary responsibility is to expose a single, cohesive API for all dashboard‑related services that run as independent Docker containers. By doing so, it abstracts the details of starting, stopping, and communicating with each dashboard micro‑service, allowing higher‑level code to treat the entire dashboard layer as a unified façade.  
+## What It Is
 
-The observations suggest that the wrapper is built on the same foundations as its siblings – **LLMServiceManager**, **APIServiceWrapper**, and **ServiceStarter** – and therefore inherits many of the same resilience and orchestration mechanisms (e.g., the retry‑with‑backoff logic found in `lib/service-starter.js`). It also appears to sit alongside the **ProviderRegistry**, which supplies mock services for testing, indicating that the DashboardServiceWrapper can be exercised in both production and test environments.
+`DashboardServiceWrapper` is implemented in `scripts/dashboard-service.js` and serves as the lifecycle wrapper script for the dashboard service within the `DockerizedServices` component group. It is responsible for spawning the dashboard child process and coordinating its identity with the central `ProcessStateManager` (PSM) registry. The wrapper does not embed the dashboard application logic itself; rather, it acts as a thin orchestration layer that brings the service up, registers it for coordination, and ensures it is unregistered on shutdown.
 
----
+Structurally, the wrapper decomposes into two child responsibilities: `ChildProcessSpawner`, which forks the dashboard process, and `PostSpawnPsmRegistration`, which handles the after-the-fact handshake with `ProcessStateManager`. This decomposition mirrors the structure of its sibling, `ApiServiceWrapper` (implemented in `scripts/api-service.js`), and both share an implicit wrapper contract enforced by convention rather than by a shared base class: **spawn first, coordinate second**.
 
-## Architecture and Design  
+![DashboardServiceWrapper — Architecture](images/dashboard-service-wrapper-architecture.png)
 
-### Architectural Approach  
-The surrounding system is organized as a **microservices architecture** (explicitly mentioned in the hierarchy description). Each functional area—LLM handling, generic API calls, provider registration, and dashboard operations—is encapsulated in its own Docker container. The **DashboardServiceWrapper** follows this pattern by acting as the orchestration point for the dashboard services, allowing them to be updated, scaled, or replaced without touching the rest of the platform.
+## Architecture and Design
 
-### Design Patterns  
-1. **Retry‑with‑Backoff** – The wrapper is expected to reuse the retry logic implemented in `lib/service-starter.js`. This pattern protects the dashboard services from transient failures (e.g., network hiccups or temporary unavailability of a downstream dashboard component) and prevents endless restart loops.  
-2. **Facade (Unified Interface)** – By providing a single entry point for all dashboard interactions, the wrapper implements a façade that hides the complexity of dealing with multiple individual services.  
-3. **Dependency Injection / Service Locator** – While not directly observed, the fact that the wrapper “may interact with the LLMServiceManager” and “could leverage the APIServiceWrapper” implies that it receives references to these sibling components rather than hard‑coding them, a common practice in the surrounding codebase.  
+The architectural stance taken by `DashboardServiceWrapper` is one of **decoupled coordination**. The wrapper treats PSM as a non-blocking coordination sink — a place to deposit service identity information for the benefit of orchestration tooling, but never as a gating dependency that could prevent the dashboard from running. This is evident in the sequence: the child process is spawned first via `ChildProcessSpawner`, and only then does `PostSpawnPsmRegistration` invoke `ProcessStateManager.registerService()`. The dashboard is considered live and authoritative the moment the fork completes; PSM acknowledgment is never awaited as a readiness signal.
 
-### Component Interaction  
-- **ServiceStarter** (`lib/service-starter.js`) is the common entry point for launching any optional service. The DashboardServiceWrapper likely registers its dashboard services with ServiceStarter, thereby inheriting the back‑off retry behavior.  
-- **LLMServiceManager** and **APIServiceWrapper** are sibling wrappers that manage their respective domains. The DashboardServiceWrapper may call into these when a dashboard operation requires language‑model inference or external API data, creating a thin, request‑forwarding relationship.  
-- **ProviderRegistry** supplies mock implementations (e.g., the LLM mock service at `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`). During test runs, the DashboardServiceWrapper can be pointed at these mocks to verify UI logic without invoking real dashboard back‑ends.  
+A defining design choice is the explicit swallowing of PSM registration failures. If `ProcessStateManager.registerService()` throws — for instance, because PSM's backing store or IPC channel is unavailable — the wrapper continues execution silently. This deliberately decouples dashboard availability from PSM health, ensuring that orchestration-layer faults cannot cascade into service-layer outages. The same philosophy applies on shutdown: an exit handler invokes `PSM.unregisterService()` to clean up the dashboard's PID/port record, but this too is best-effort. In crash scenarios where the exit handler does not fire, PSM's view of the dashboard will become stale, representing last-known state rather than guaranteed live state.
 
----
+This pattern is not unique to the dashboard. The symmetry between `scripts/dashboard-service.js` and `scripts/api-service.js` indicates a shared architectural convention across `DockerizedServices`: both wrappers implement the same spawn-then-register-best-effort flow, and both register an exit hook for `PSM.unregisterService()`. The convention is reinforced by the fact that the only entry into the registry from either wrapper is `ProcessStateManager.registerService()`, the sibling component that serves as the registration target for both.
 
-## Implementation Details  
+## Implementation Details
 
-Even though the source code for the wrapper itself is not listed, the observations let us infer several concrete implementation aspects:
+The execution flow inside `scripts/dashboard-service.js` proceeds in three logical phases. First, the `ChildProcessSpawner` responsibility creates the dashboard child process. The fork is treated as the point of liveness — there is no separate health probe, no waiting on stdout for a "ready" signal, and no synchronous handshake before proceeding. Second, the `PostSpawnPsmRegistration` responsibility calls `ProcessStateManager.registerService()` with the spawned process's identity (PID, port, and any associated metadata captured by the registry). This call is wrapped in error handling that catches and discards any thrown exception — registration failure does not propagate.
 
-1. **Service Registration & Lifecycle**  
-   The wrapper likely calls a function such as `ServiceStarter.startService(name, options)` for each dashboard micro‑service. The `options` object would include the Docker image name, health‑check endpoint, and the retry‑with‑backoff configuration imported from `lib/service-starter.js`.  
+Third, the wrapper installs an exit handler that calls `PSM.unregisterService()` upon normal process termination. This handler mirrors the cleanup contract established in `ApiServiceWrapper` and is the only mechanism by which the dashboard's entry is removed from PSM under normal conditions. Like the registration call, the unregistration is best-effort: any error during cleanup is tolerated, since by the time it runs the dashboard is already exiting and there is no actionable recovery path.
 
-2. **Unified API Surface**  
-   A class (e.g., `DashboardServiceWrapper`) probably exposes methods like `getDashboard(dashboardId)`, `updateWidget(dashboardId, widgetPayload)`, and `listDashboards()`. Internally each method resolves the appropriate micro‑service endpoint (perhaps via a lookup table) and forwards the request using an HTTP client that is also used by **APIServiceWrapper**.  
+![DashboardServiceWrapper — Relationship](images/dashboard-service-wrapper-relationship.png)
 
-3. **Authentication & Authorization**  
-   The wrapper “could handle authentication and authorization” – this suggests that before delegating a request it validates a JWT or API key, possibly reusing a shared auth middleware present in the sibling wrappers.  
+Notably, the code structure analysis reports zero code symbols in this entity, which is consistent with the wrapper being a small, script-style file composed of top-level imperative statements rather than exported classes or functions. The logic lives in the sequence of calls itself, not in reusable abstractions.
 
-4. **Logging & Monitoring**  
-   Consistent with the system’s emphasis on observability, the wrapper likely emits structured logs (service name, operation, outcome) and pushes metrics (request latency, error rates) to a central monitoring stack. The retry‑with‑backoff loop in `lib/service-starter.js` already logs each retry attempt, and the wrapper would augment those logs with dashboard‑specific context.  
+## Integration Points
 
-5. **Error Propagation**  
-   When a dashboard service fails after exhausting its back‑off retries, the wrapper probably returns a graceful degradation response (e.g., a default empty dashboard) rather than bubbling up a raw exception, mirroring the “graceful degradation” behavior noted for the Service Starter.
+The primary integration point is with `ProcessStateManager`, a sibling component within `DockerizedServices`. `DashboardServiceWrapper` depends on PSM's public surface — specifically `ProcessStateManager.registerService()` and `PSM.unregisterService()` — but only in a unidirectional, fire-and-forget manner. PSM is not consulted for any decision made by the wrapper; it is purely a sink for identity information. This makes the dependency a soft one: the dashboard service would continue to function correctly even if PSM were completely removed, with the only loss being the registry record.
 
----
+The wrapper also has a strong structural relationship with its sibling, `ApiServiceWrapper`. While there is no shared module between them, they implement the same wrapper contract, and changes to one are likely to require mirroring in the other to preserve the convention. The shared convention is documented at the parent level (`DockerizedServices`) and is realized concretely through the two child responsibilities `PostSpawnPsmRegistration` and `ChildProcessSpawner`, both of which are explicitly named to reflect their role in the spawn-then-coordinate sequence.
 
-## Integration Points  
+Within the dashboard process tree, `ChildProcessSpawner` is the integration point with the actual dashboard runtime. The wrapper does not impose any specific contract on the dashboard binary beyond standard Node.js child process semantics — it forks, observes the lifetime, and unregisters on exit.
 
-| Integration | How the Wrapper Connects | Observed Path / Component |
-|-------------|--------------------------|---------------------------|
-| **ServiceStarter** (`lib/service-starter.js`) | Registers dashboard services for start‑up, leverages retry‑with‑backoff for resilience | `lib/service-starter.js` |
-| **LLMServiceManager** | May forward language‑model requests originating from dashboard widgets (e.g., autocomplete, insights) | Sibling component |
-| **APIServiceWrapper** | Uses shared HTTP client utilities and possibly common error handling logic | Sibling component |
-| **ProviderRegistry** | During testing, swaps real dashboard services with mock providers supplied by the registry | `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` (example mock) |
-| **DockerizedServices** (parent) | The wrapper is packaged as part of the Docker compose / orchestration definition that spins up each dashboard micro‑service container | Parent component |
+## Usage Guidelines
 
-These connections indicate that the DashboardServiceWrapper is both a consumer (of ServiceStarter, LLMServiceManager, APIServiceWrapper) and a provider (exposing dashboard APIs to the rest of the application).
+Developers extending or modifying `DashboardServiceWrapper` should preserve the spawn-first, register-second ordering. Reversing this order — for example, attempting to register with PSM before forking — would couple dashboard availability to PSM health, violating the explicit design intent and the convention shared with `ApiServiceWrapper`. Similarly, the error-swallowing behavior around `ProcessStateManager.registerService()` should not be tightened into a hard failure; doing so would defeat the decoupling that makes PSM safe to take offline independently.
+
+When inspecting PSM to diagnose dashboard state, developers should remember that the registry reflects **last-known state, not guaranteed live state**. A dashboard entry may persist in PSM after a crash because the exit handler did not run, and conversely a running dashboard may be absent from PSM if the initial registration call silently failed. Cross-referencing PSM entries with actual process state (e.g., via `ps` or port checks) is advisable when correctness matters.
+
+When adding a new service wrapper to `DockerizedServices` alongside `DashboardServiceWrapper` and `ApiServiceWrapper`, follow the same pattern: spawn the child via a `ChildProcessSpawner`-equivalent step, call `ProcessStateManager.registerService()` post-spawn with errors swallowed, and install an exit handler invoking `PSM.unregisterService()`. This preserves the implicit wrapper contract and ensures consistent behavior across the component group.
 
 ---
 
-## Usage Guidelines  
+## Summary Findings
 
-1. **Prefer the Facade Methods** – Call the high‑level methods on `DashboardServiceWrapper` rather than reaching directly into individual dashboard containers. This ensures that retry‑with‑backoff and authentication are applied uniformly.  
+**1. Architectural patterns identified:** Thin wrapper script pattern; decoupled best-effort coordination with a central registry; convention-based contract sharing between sibling wrappers (rather than inheritance or a shared base module); fire-and-forget integration with `ProcessStateManager`.
 
-2. **Handle Degraded Responses** – Because the wrapper may return default data when a dashboard service is unavailable, callers should be prepared for empty or placeholder payloads and display appropriate UI cues (e.g., “Dashboard data currently unavailable”).  
+**2. Design decisions and trade-offs:** Service availability is prioritized over registry correctness — PSM failures cannot block dashboard startup, and registry state may become stale on crashes. The trade-off favors local development ergonomics (no startup deadlocks) at the cost of orchestration accuracy (potential zombie entries in PSM).
 
-3. **Configure Timeouts Consistently** – When extending the wrapper or adding new dashboard services, reuse the timeout and back‑off settings defined in `lib/service-starter.js` to keep failure handling consistent across the system.  
+**3. System structure insights:** `DashboardServiceWrapper` decomposes into `ChildProcessSpawner` and `PostSpawnPsmRegistration`, structurally identical to `ApiServiceWrapper`. Both sit under `DockerizedServices` and both write into the sibling `ProcessStateManager`. The wrapper carries no exported symbols; its logic is script-level imperative code.
 
-4. **Leverage ProviderRegistry for Tests** – In unit or integration tests, bind the wrapper to mock dashboard providers supplied by `ProviderRegistry`. This avoids spinning up real containers and speeds up the test cycle.  
+**4. Scalability considerations:** The pattern scales linearly with the number of wrapped services — each new service adds another best-effort writer to PSM. Because registration is non-blocking and failures are tolerated, PSM contention or unavailability does not create a scaling bottleneck for service startup. The model is explicitly tuned for a local development container, not high-availability orchestration.
 
-5. **Log Contextual Information** – When adding custom dashboard operations, include the wrapper’s request ID and dashboard identifier in log statements to aid traceability across the micro‑service boundary.  
+**5. Maintainability assessment:** Maintainability is high for the wrapper itself due to its small surface area, but the convention-based contract with `ApiServiceWrapper` is fragile — there is no compile-time or test-time enforcement that the two wrappers stay in sync. Future maintainers must manually mirror changes across both files. Extracting the shared spawn-then-register-best-effort logic into a common module would harden the contract but is not currently done.
 
----
-
-### Architectural Patterns Identified  
-
-1. **Microservices Architecture** – Independent Dockerized dashboard services managed collectively.  
-2. **Retry‑with‑Backoff** – Centralized resilience logic in `lib/service-starter.js`.  
-3. **Facade / Unified Interface** – Single wrapper exposing a cohesive API.  
-4. **Dependency Injection / Service Locator** – Implicit through interaction with sibling wrappers.  
-
-### Design Decisions & Trade‑offs  
-
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| Use a dedicated wrapper per domain (Dashboard, API, LLM) | Encapsulates domain‑specific concerns, simplifies testing | Slight duplication of orchestration code across wrappers |
-| Centralize retry logic in ServiceStarter | Guarantees uniform failure handling and prevents endless loops | Wrapper must conform to ServiceStarter’s contract, limiting custom back‑off strategies |
-| Expose a façade instead of raw service endpoints | Shields callers from service churn, eases future refactoring | Adds an extra abstraction layer, potentially increasing latency for very simple calls |
-
-### System Structure Insights  
-
-- **DockerizedServices** acts as the top‑level orchestrator, housing multiple service wrappers that each manage a specific micro‑service family.  
-- **Sibling wrappers** share common infrastructure (retry, logging, auth) which promotes consistency but also creates a tight coupling to the ServiceStarter implementation.  
-- **ProviderRegistry** provides a plug‑in point for mock services, illustrating a clear separation between production and test environments.  
-
-### Scalability Considerations  
-
-- Because each dashboard runs in its own container, horizontal scaling (adding more instances) can be performed independently of the LLM or API layers.  
-- The retry‑with‑backoff mechanism prevents cascading failures when a particular dashboard instance becomes unhealthy, protecting the rest of the system.  
-- The unified façade can become a bottleneck if all UI traffic funnels through a single wrapper instance; deploying the wrapper itself as a stateless, load‑balanced service would mitigate this.  
-
-### Maintainability Assessment  
-
-The design leans heavily on shared patterns (retry, logging, auth) that are already codified in `lib/service-starter.js` and sibling wrappers, which reduces duplication and eases maintenance. The clear separation of concerns—each wrapper handling its own domain—means changes to dashboard internals rarely affect the LLM or API layers. However, the reliance on implicit interactions (e.g., “may interact with LLMServiceManager”) suggests that documentation and explicit interface contracts are crucial to avoid hidden coupling as the codebase evolves. Regularly updating the façade methods to reflect the underlying micro‑service APIs, and keeping the ServiceStarter configuration in sync, will be key to long‑term maintainability.
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes a microservices architecture, with each service responsible for a specific task, such as the LLM Mock Service (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) providing mock LLM responses for testing frontend logic without actual API calls. This approach allows for greater flexibility and scalability, as individual services can be updated or replaced without affecting the overall system. For example, the LLM Service (lib/llm/llm-service.ts) acts as a high-level facade for all LLM operations, handling mode routing, caching, circuit breaking, and budget/sensitivity checks. The use of a retry-with-backoff pattern in the Service Starter (lib/service-starter.js) also helps to prevent endless loops and provide graceful degradation when optional services fail.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] **Process State Manager (PSM) as a Non-Critical Registration Sink**
+
+The service wrapper scripts (`scripts/api-service.js` and `scripts/dashboard-service.js`) treat registration with the `ProcessStateManager` singleton as a best-effort, non-critical side effect rather than a prerequisite for service startup. Concretely, `ProcessStateManager.registerService()` is called after the child process is spawned, but any error thrown during registration is explicitly swallowed — the wrapper continues regardless. This design decision reflects a deliberate architectural stance: PSM is a coordination facility for coordinated startup/shutdown introspection, not a gating mechanism. If PSM fails (e.g., because its backing store or IPC channel is unavailable), the individual service still runs. Conversely, on process exit, the wrapper calls `PSM.unregisterService()` to clean up the PID/port records, again in a best-effort fashion. This means PSM's state can become stale in crash scenarios — a developer inspecting PSM for health should be aware that the registry reflects last-known state, not guaranteed live state. The tradeoff favors availability of individual services over centralized orchestration correctness, which is appropriate for a local development container where zombie processes are more easily tolerated than startup deadlocks.
+
+### Children
+- [PostSpawnPsmRegistration](./PostSpawnPsmRegistration.md) -- scripts/dashboard-service.js explicitly follows the same post-spawn PSM registration pattern as scripts/api-service.js, confirming this is a shared architectural convention across the DockerizedServices component, not an incidental implementation choice.
+- [ChildProcessSpawner](./ChildProcessSpawner.md) -- scripts/dashboard-service.js treats the child process as live and authoritative the moment it is forked — PSM acknowledgment is never awaited as a readiness signal, consistent with the non-blocking coordination model described in the parent component.
 
 ### Siblings
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager utilizes the retry-with-backoff pattern in the Service Starter (lib/service-starter.js) to prevent endless loops and provide graceful degradation when optional services fail.
-- [APIServiceWrapper](./APIServiceWrapper.md) -- APIServiceWrapper likely utilizes the retry-with-backoff pattern in the Service Starter (lib/service-starter.js) to handle API service failures.
-- [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry utilizes the LLM Mock Service (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) to provide mock LLM responses for testing frontend logic without actual API calls.
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes the retry-with-backoff pattern to handle service failures.
+- [ApiServiceWrapper](./ApiServiceWrapper.md) -- scripts/api-service.js calls ProcessStateManager.registerService() after the child process is spawned, meaning the service is live before PSM acknowledgment occurs
+- [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager.registerService() is the entry point called by both scripts/api-service.js and scripts/dashboard-service.js after child process spawn, recording service identity in the registry
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 4 observations*

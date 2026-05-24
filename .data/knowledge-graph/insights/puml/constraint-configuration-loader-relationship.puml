@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintConfigurationLoader
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ConstraintConfigurationLoader] as constraint_configuration_loader #LightBlue
+[SemanticConstraintDetector] as semantic_constraint_detector #F0F0F0
+[McpConstraintMonitor] as mcp_constraint_monitor #F0F0F0
+
+constraint_system --> constraint_configuration_loader
+semantic_constraint_detector -[hidden]- constraint_configuration_loader
+mcp_constraint_monitor -[hidden]- constraint_configuration_loader
+
+@enduml

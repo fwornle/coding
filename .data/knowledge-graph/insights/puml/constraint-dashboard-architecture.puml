@@ -1,0 +1,33 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Claude Code Integration" {
+  component "Claude Code Hook Payloads" as hookPayloads <<external>>
+}
+
+package "MCP Constraint Monitor" {
+  component "McpConstraintMonitor" as mcpMonitor <<core>>
+  component "Pattern Detection Layer" as patternDetect <<core>>
+  component "Semantic Detection Layer" as semanticDetect <<core>>
+  database "Violation History JSON Store" as violationStore <<storage>>
+}
+
+package "Constraint Dashboard" {
+  component "ConstraintDashboard" as dashboard <<core>>
+  component "Severity Breakdown Display" as severityDisplay <<cli>>
+  component "Session Statistics Tracker" as sessionStats <<cli>>
+}
+
+hookPayloads --> mcpMonitor : "delivers hook events"
+mcpMonitor --> patternDetect : "routes for analysis"
+mcpMonitor --> semanticDetect : "routes for analysis"
+patternDetect --> violationStore : "writes violations\n(with severity)"
+semanticDetect --> violationStore : "writes violations\n(with severity)"
+
+violationStore --> dashboard : "read-only consumption"
+dashboard --> severityDisplay : "renders severity breakdown"
+dashboard --> sessionStats : "groups by session ID"
+
+@enduml

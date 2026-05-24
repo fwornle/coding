@@ -2,118 +2,82 @@
 
 **Type:** SubComponent
 
-ManualLearning relies on the migrateGraphDatabase script in scripts/migrate-graph-db-entity-types.js to update entity types in the live LevelDB/Graphology database.
+ManualLearning entities are typed nodes in the GraphDatabaseService (Graphology+LevelDB) with entity types including System, Project, Component, SubComponent, Pattern, and Detail, each carrying rich metadata fields set at authoring time.
 
-## What It Is  
+# ManualLearning
 
-ManualLearning is a **sub‑component** of the larger **KnowledgeManagement** system. Its implementation lives primarily in two concrete artifacts:  
+## What It Is
 
-* the migration script **`scripts/migrate-graph-db-entity-types.js`** – the “GraphDatabaseUpdater” child that rewrites entity type definitions directly in the live **LevelDB/Graphology** store, and  
-* the **`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`** file – the **GraphDatabaseAdapter** that mediates all read/write operations against the same LevelDB/Graphology knowledge graph.  
+ManualLearning is a SubComponent of the KnowledgeManagement system that represents the pathway for human-authored knowledge to enter the graph database. It is implemented as a set of conventions and write paths over the `GraphDatabaseService` (Graphology+LevelDB), where hand-crafted entities are persisted as typed nodes alongside automatically extracted knowledge. The entities created through this pathway carry the same rich metadata fields as machine-generated ones, including entity type classifications (System, Project, Component, SubComponent, Pattern, Detail), `metadata.ontologyClass`, bi-temporal staleness tracking fields, and hierarchical edges.
 
-Together these pieces enable a workflow where human curators manually enrich and correct entities, while the surrounding infrastructure guarantees that the curated data is persisted, version‑tracked, and kept in sync with downstream JSON exports. ManualLearning therefore represents the “human‑in‑the‑loop” segment of KnowledgeManagement, sitting alongside sibling components such as **OnlineLearning**, **OntologyClassificationModule**, and **UtilitiesModule**.
+Unlike its sibling OnlineLearning—which routes extracted entities through the `PersistenceAgent` and `mapEntityToSharedMemory()` for ontology pre-population—ManualLearning bypasses extraction entirely. The entity author directly specifies `entityType` and `metadata.ontologyClass` at authoring time, which prevents redundant LLM re-classification when the `PersistenceAgent` routes the write through the VKB HTTP API. This makes ManualLearning the canonical path for curated, authoritative knowledge that does not need to be inferred from source material.
 
 ![ManualLearning — Architecture](images/manual-learning-architecture.png)
 
-## Architecture and Design  
+## Architecture and Design
 
-The design of ManualLearning follows a **layered adapter‑centric architecture**. The **GraphDatabaseAdapter** acts as an abstraction layer (the classic *Adapter* pattern) that hides the specifics of the underlying **Graphology + LevelDB** persistence engine from the rest of the system. All manual curation actions – adding, editing, or deleting entities – are funneled through this adapter, ensuring a single point of control for data consistency, transaction handling, and automatic JSON export synchronization.
+The architectural approach centers on a **dual-write strategy** mediated by the `GraphDatabaseAdapter`. Manual edits can be written along two routes: (1) the VKB HTTP API path, used when the MCP semantic analysis server is running, or (2) direct LevelDB access, used as a fallback when the server is not running. The adapter selects the route based on server availability, which is a deliberate design choice to **avoid LevelDB lock conflicts** that would otherwise occur if two processes attempted to open the same database simultaneously.
 
-The **migration script** (`migrate-graph-db-entity-types.js`) is a **stand‑alone procedural utility** that directly manipulates the graph store to evolve entity type schemas. Its placement as a child component (**GraphDatabaseUpdater**) reflects a **script‑driven migration pattern**: rather than embedding migration logic in the runtime service, a dedicated, version‑controlled script is executed when a schema change is required. This keeps the core adapter code clean and focused on CRUD operations while still providing a reliable path for bulk updates.
+This adapter pattern provides a uniform interface to authors and tools while abstracting away the underlying transport. The design treats hand-curated and automatically extracted entities as **first-class peers** in the graph: they share the same schema, the same persistence routes, and the same lifecycle. Parent/child hierarchical relationships—such as Component → SubComponent → Detail—are stored as typed edges in the Graphology graph, making manually authored hierarchies traversable via either the direct-access or VKB API paths without any special-casing.
 
-ManualLearning also leverages the **checkpoint system** from **UtilitiesModule**. Checkpoints act as lightweight progress markers stored alongside the graph data, enabling the system to resume long‑running curation batches without reprocessing already‑handled entities. This pattern resembles a **saga‑style checkpointing** approach, albeit implemented as simple state snapshots rather than a full distributed transaction manager.
+A second key design decision is **pre-classified metadata**. By requiring authors to fill in `entityType` and `metadata.ontologyClass` up front, the system avoids the cost and non-determinism of LLM re-classification when the `PersistenceAgent` processes the write. This is in deliberate contrast to OnlineLearning, where `mapEntityToSharedMemory()` must populate these fields from raw extraction output.
 
-Finally, the **OntologyClassificationModule** is consulted during curation to assign or validate entity types based on their properties. This tight coupling ensures that manual edits remain semantically aligned with the ontology, reinforcing data integrity across the KnowledgeManagement suite.
+## Implementation Details
 
-## Implementation Details  
+The implementation hinges on three concrete mechanisms found across the KnowledgeManagement component. First, the `GraphDatabaseService` stores entities as typed nodes in a Graphology graph backed by LevelDB. Each node carries metadata such as `entityType`, `metadata.ontologyClass`, embedding vectors, and bi-temporal staleness fields. For ManualLearning entries, these fields are populated explicitly by the human author rather than derived computationally.
 
-### GraphDatabaseAdapter (`graph-database-adapter.ts`)  
-The adapter exposes a clear API (e.g., `getEntity(id)`, `upsertEntity(entity)`, `deleteEntity(id)`) that internally translates calls into Graphology graph mutations and LevelDB key/value writes. Two notable responsibilities are:  
+Second, the `GraphDatabaseAdapter` performs runtime detection of MCP server availability and routes accordingly. When the MCP server is live, writes flow over HTTP to the VKB API, which in turn invokes `GraphDatabaseService` operations inside the server process. When the server is offline, the adapter opens LevelDB directly. This two-path implementation ensures that ad-hoc tooling, scripts, and editor integrations can persist manual entries regardless of whether the long-running semantic analysis service is active.
 
-1. **Consistency enforcement** – before persisting an entity, the adapter validates the payload against the current ontology (via OntologyClassificationModule) and checks for conflicts with existing nodes.  
-2. **Automatic JSON export sync** – every successful mutation triggers an asynchronous routine that writes a JSON representation of the affected sub‑graph to a designated export directory. This export is consumed by downstream services (e.g., InsightGenerationModule) that require a flat data view.
-
-### Migration Script (`migrate-graph-db-entity-types.js`)  
-The script follows a three‑step process:  
-
-1. **Discovery** – it scans the LevelDB store for nodes whose `type` field does not match the target schema version.  
-2. **Transformation** – using a mapping table (hard‑coded or supplied via CLI arguments), each outdated node is re‑typed, and any required property migrations are applied.  
-3. **Commit** – changes are written back atomically where possible; otherwise, the script logs a checkpoint (via UtilitiesModule) so that a partial run can be resumed safely.
-
-Because the script runs outside the normal request path, it can afford to lock the database briefly, guaranteeing that no concurrent writes corrupt the migration.
-
-### Checkpoint System (UtilitiesModule)  
-Checkpoints are simple JSON blobs stored in a dedicated LevelDB namespace (e.g., `checkpoints/manual-learning`). They record the last processed entity ID, timestamp, and migration version. ManualLearning’s long‑running curation jobs read this checkpoint at start‑up, skip already‑processed entities, and update the checkpoint after each batch, thereby providing **idempotent** and **fault‑tolerant** execution.
-
-### Ontology Classification Integration  
-When a curator adds a new entity, the ManualLearning flow invokes the **OntologyClassificationModule** to infer the most appropriate type based on supplied properties. The module, in turn, consults the **OntologySystem** (shared across the KnowledgeManagement domain) to ensure the classification aligns with the global taxonomy. This bidirectional validation prevents drift between manually curated data and the automated classification logic used by other components such as OnlineLearning.
+Third, hierarchical relationships are encoded as **typed edges** in the Graphology layer. A manually authored Component can link to its SubComponent children, which in turn link to Detail nodes, all using the same edge schema as any other knowledge. This means traversal <USER_ID_REDACTED>—whether for visualization, query expansion, or staleness propagation—work identically on manual and extracted content.
 
 ![ManualLearning — Relationship](images/manual-learning-relationship.png)
 
-## Integration Points  
+## Integration Points
 
-* **Parent – KnowledgeManagement** – ManualLearning inherits the overarching persistence contract defined by KnowledgeManagement’s GraphDatabaseAdapter. Any changes to the adapter’s contract (e.g., method signatures, export format) ripple through ManualLearning, requiring coordinated updates.  
-* **Sibling – GraphDatabaseModule** – Both components rely on the same adapter; GraphDatabaseModule typically performs automated ingestion, while ManualLearning focuses on human‑driven edits. They share the same export sync mechanism, ensuring that updates from either side are reflected in the JSON exports consumed by InsightGenerationModule.  
-* **Sibling – OntologyClassificationModule** – Provides the classification logic that ManualLearning calls during curation. The two modules must stay in sync regarding ontology version; a mismatch would cause validation failures.  
-* **Sibling – UtilitiesModule** – Supplies the checkpoint infrastructure. ManualLearning’s long‑running jobs depend on UtilitiesModule’s `createCheckpoint`, `readCheckpoint`, and `updateCheckpoint` utilities.  
-* **Child – GraphDatabaseUpdater** – The migration script is invoked when entity‑type schema changes are introduced. ManualLearning may schedule this script as part of a release pipeline to ensure that manually curated data conforms to the new schema before further curation proceeds.
+ManualLearning integrates most directly with its parent, KnowledgeManagement, by writing into the same `GraphDatabaseService` graph store. It shares the `PersistenceAgent` and `GraphDatabaseAdapter` with its sibling OnlineLearning, which means both human-curated and automatically extracted entries land in the same physical LevelDB store and become indistinguishable to downstream consumers (except by inspection of their provenance metadata).
 
-All interactions are mediated through **well‑defined TypeScript interfaces** (as seen in the adapter file), avoiding direct file‑system or LevelDB manipulation outside the adapter’s scope. This encapsulation simplifies testing and future refactoring.
+The bi-temporal staleness tracking integration is particularly notable: by populating staleness fields on manually authored entities, ManualLearning ensures that **human-curated knowledge participates in the same lifecycle management** as machine-extracted knowledge. Curated entities are not exempt from staleness review; instead, they age and require revalidation through the same mechanisms.
 
-## Usage Guidelines  
+ManualLearning also intersects with EntityMigrationScripts, the other sibling SubComponent. Scripts such as `migrate-graph-db-entity-types.js` operate over the same Graphology+LevelDB store and can rename or merge entity type labels for both manual and extracted entries. This means manually authored type classifications must remain compatible with the canonical type vocabulary or be updated by migration runs.
 
-1. **Always route entity modifications through `GraphDatabaseAdapter`** – Direct LevelDB writes bypass validation and export sync, risking data inconsistency.  
-2. **Run the migration script (`migrate-graph-db-entity-types.js`) before starting a new curation cycle** whenever the ontology version is bumped. Record the script’s exit status and checkpoint to confirm successful completion.  
-3. **Leverage the checkpoint API** from UtilitiesModule for any batch‑oriented manual curation job. Initialize the job by reading the latest checkpoint, process entities in deterministic order, and update the checkpoint after each successful batch.  
-4. **Validate entity types via OntologyClassificationModule** before committing changes. Use the module’s `classify(entity)` method to obtain a recommended type and compare it against the curator’s intended classification.  
-5. **Monitor the JSON export directory** – downstream components (e.g., InsightGenerationModule) depend on up‑to‑date exports. If the export sync appears stalled, check the adapter’s background worker logs for errors.  
-6. **Version control the migration script** – treat each schema change as a separate script version (e.g., `migrate-graph-db-entity-types.v2.js`). This practice enables safe roll‑backs and clear audit trails.
+## Usage Guidelines
 
-## Architectural Patterns Identified  
+When authoring manual entries, populate `entityType` and `metadata.ontologyClass` explicitly using values from the canonical vocabulary (System, Project, Component, SubComponent, Pattern, Detail). Skipping these fields defeats the optimization that prevents redundant LLM re-classification in the `PersistenceAgent` and may cause inconsistent downstream behavior.
 
-* **Adapter Pattern** – `GraphDatabaseAdapter` abstracts Graphology + LevelDB.  
-* **Script‑Driven Migration** – `migrate-graph-db-entity-types.js` provides a controlled, versioned schema evolution path.  
-* **Checkpoint / Saga‑Style Progress Tracking** – UtilitiesModule’s checkpoint mechanism enables resumable, idempotent batch processing.  
-* **Facade for Ontology Classification** – ManualLearning uses OntologyClassificationModule as a façade to enforce semantic consistency.
+Prefer the VKB HTTP API path when the MCP server is running. Direct LevelDB writes should be reserved for cases where the server is genuinely offline, such as bootstrapping, offline editing, or recovery scenarios. The `GraphDatabaseAdapter` handles selection automatically, but tools that bypass the adapter risk **LevelDB lock conflicts** if they open the database while the MCP server holds it.
 
-## Design Decisions and Trade‑offs  
+Construct hierarchies using typed parent/child edges rather than embedding child data inside parent nodes. The Component → SubComponent → Detail pattern is the convention, and conforming to it ensures that traversal <USER_ID_REDACTED>, visualization tooling, and migration scripts all behave correctly. Finally, remember that manually authored entities are subject to the same bi-temporal staleness lifecycle as extracted ones—plan to revisit and refresh them, and treat manual authorship as a contribution to a living graph rather than a one-time write.
 
-* **Centralized Adapter vs. Direct DB Access** – Centralizing all graph interactions through an adapter improves consistency and testability but adds a thin performance overhead for each call.  
-* **Standalone Migration Script** – Isolating schema changes into a script reduces runtime complexity but requires disciplined operational procedures to ensure the script is executed at the right time.  
-* **Checkpoint Granularity** – Storing checkpoints per curation job yields fine‑grained resumability but increases the number of small LevelDB entries, which may marginally affect read performance.  
-* **Automatic JSON Export** – Guarantees downstream freshness but couples the adapter’s write path to I/O‑bound export work; the system mitigates this via asynchronous workers.
+### Architectural Patterns Identified
+- **Adapter pattern** (`GraphDatabaseAdapter`) selecting between HTTP and direct-access transports
+- **Dual-write fallback** to handle process-level lock contention on LevelDB
+- **Uniform schema across provenance** so manual and extracted entries are peers
+- **Typed-edge hierarchy** for parent/child relationships in Graphology
 
-## System Structure Insights  
+### Design Decisions and Trade-offs
+- Requiring authors to pre-classify entities trades a small authoring burden for avoidance of LLM re-classification cost and nondeterminism.
+- Allowing direct LevelDB writes increases flexibility but requires careful coordination to avoid lock conflicts—mitigated by the adapter's availability check.
+- Treating manual entries as full lifecycle citizens (including staleness) increases maintenance overhead but prevents drift between curated and extracted knowledge.
 
-ManualLearning sits at the intersection of **human curation** and **automated knowledge pipelines**. Its reliance on the same adapter and export mechanisms as GraphDatabaseModule ensures a unified view of the knowledge graph across both manual and automated processes. The child **GraphDatabaseUpdater** script acts as a bridge when the underlying ontology evolves, preserving the integrity of previously curated data.
+### System Structure Insights
+ManualLearning is structurally thin: it is less a separate module and more a **set of conventions and write routes** layered over shared KnowledgeManagement infrastructure. Its identity comes from how entities are authored (by humans, with pre-filled metadata) rather than from a distinct code path.
 
-## Scalability Considerations  
+### Scalability Considerations
+Scalability is bounded by the underlying Graphology+LevelDB store, which is a single-writer embedded database. The adapter's HTTP route effectively serializes writes through the MCP server, which is the appropriate scaling boundary. High-volume manual ingestion should batch writes and prefer the VKB API path to centralize lock ownership.
 
-* **Graphology + LevelDB** – Both are designed for high‑read, moderate‑write workloads. ManualLearning’s write pattern (human‑driven, bursty) is well‑matched, but large‑scale batch imports should be throttled or staged to avoid overwhelming LevelDB’s write amplification.  
-* **Export Sync** – As the graph grows, JSON export size may become a bottleneck. Consider partitioning exports by sub‑graph or introducing incremental diff generation.  
-* **Checkpoint Storage** – Since checkpoints are tiny, scaling the number of concurrent curation jobs does not strain LevelDB, but the checkpoint read/write path should be kept lock‑free to avoid contention.
+### Maintainability Assessment
+Maintainability is strong because manual and automatic paths share schema, persistence, and lifecycle. The same migration scripts (e.g., `migrate-graph-db-entity-types.js`) maintain both. The main maintenance hazard is **schema drift**: if authors hand-craft entries with stale or non-canonical `entityType` values, migration scripts must absorb the cleanup. Encouraging adapter-mediated writes and canonical vocabulary use keeps the system coherent over time.
 
-## Maintainability Assessment  
-
-The architecture’s **single‑point adapter** simplifies maintenance: changes to the persistence layer (e.g., swapping LevelDB for RocksDB) require updates only in `graph-database-adapter.ts`. The **script‑based migration** isolates schema evolution logic, making it straightforward to audit and test migrations independently. However, the tight coupling between ManualLearning and OntologyClassificationModule means that ontology version changes must be coordinated across both modules, necessitating clear release governance. Overall, the component exhibits high **modularity** (clear boundaries between adapter, migration, checkpoint, and classification) and **testability** (each piece can be unit‑tested in isolation), supporting long‑term maintainability.
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
-
-### Children
-- [GraphDatabaseUpdater](./GraphDatabaseUpdater.md) -- The migrateGraphDatabase script is located in scripts/migrate-graph-db-entity-types.js, which is a key artifact in the ManualLearning sub-component.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides knowledge graph storage, query, and lifecycle management for the Coding project. It centers on a Graphology+LevelDB graph database (GraphDatabaseService) that stores entities as typed nodes with rich metadata, exposed through both a direct-access path and a VKB HTTP API. The component supports multiple entity types (System, Project, Component, SubComponent, Pattern, Detail) with ontology classification, bi-temporal staleness tracking, embedding vectors, and hierarchical parent/child relationships. It integrates with the MCP semantic analysis server via PersistenceAgent and GraphDatabaseAdapter, which route writes through the VKB API when the server is running or fall back to direct LevelDB access to avoid lock conflicts.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the Code Graph RAG system in integrations/code-graph-rag to extract knowledge from codebases.
-- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter to interact with the Graphology + LevelDB knowledge graph.
-- [OntologyClassificationModule](./OntologyClassificationModule.md) -- OntologyClassificationModule uses the OntologySystem to classify entities based on their types and properties.
-- [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the UKB trace report from the UtilitiesModule to generate insights.
-- [AgentFrameworkModule](./AgentFrameworkModule.md) -- AgentFrameworkModule uses the agent development guide in integrations/copi/docs/hooks.md to provide a framework for agent development.
-- [UtilitiesModule](./UtilitiesModule.md) -- UtilitiesModule uses the checkpoint system to track progress and ensure data consistency.
-- [BrowserAccess](./BrowserAccess.md) -- BrowserAccess uses the browser access guide in integrations/browser-access/README.md to provide browser access to the MCP server.
-- [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG uses the code-graph-rag guide in integrations/code-graph-rag/README.md to provide a graph-based RAG system.
+- [OnlineLearning](./OnlineLearning.md) -- The batch analysis pipeline routes extracted entities through the PersistenceAgent, which calls mapEntityToSharedMemory() to pre-populate ontology metadata fields before persisting via the VKB HTTP API or direct LevelDB fallback.
+- [EntityMigrationScripts](./EntityMigrationScripts.md) -- migrate-graph-db-entity-types.js handles type consolidation—renaming or merging entity type labels in the Graphology+LevelDB store without full data reconstruction.
+
 
 ---
 

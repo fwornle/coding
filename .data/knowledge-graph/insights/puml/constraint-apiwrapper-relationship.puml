@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintAPIWrapper
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ConstraintAPIWrapper] as constraint_apiwrapper #LightBlue
+[ServiceProbe] as service_probe #F0F0F0
+[DashboardWrapper] as dashboard_wrapper #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[ServiceStarter] as service_starter #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[ChildProcessSpawner] as child_process_spawner #E8F5E8
+[PSMRegistrationLifecycle] as psmregistration_lifecycle #E8F5E8
+
+dockerized_services --> constraint_apiwrapper
+service_probe -[hidden]- constraint_apiwrapper
+dashboard_wrapper -[hidden]- constraint_apiwrapper
+llmmock_service -[hidden]- constraint_apiwrapper
+process_state_manager -[hidden]- constraint_apiwrapper
+service_starter -[hidden]- constraint_apiwrapper
+health_coordinator -[hidden]- constraint_apiwrapper
+constraint_apiwrapper --> child_process_spawner
+constraint_apiwrapper --> psmregistration_lifecycle
+
+@enduml

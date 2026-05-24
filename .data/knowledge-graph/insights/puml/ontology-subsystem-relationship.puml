@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologySubsystem
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[OntologySubsystem] as ontology_subsystem #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyConfigManager] as ontology_config_manager #E8F5E8
+
+semantic_analysis --> ontology_subsystem
+pipeline -[hidden]- ontology_subsystem
+ontology -[hidden]- ontology_subsystem
+insights -[hidden]- ontology_subsystem
+ontology_subsystem --> ontology_config_manager
+
+@enduml

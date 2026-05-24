@@ -1,91 +1,76 @@
 # ServiceRegistry
 
-**Type:** SubComponent
+**Type:** Detail
 
-The ServiceRegistry uses a service registry data structure to store service information, including service name, status, and configuration.
+api-service.js and dashboard-service.js each call psm.registerService() immediately after spawning their child processes, inserting a service-name-to-process-handle entry into this shared map so downstream consumers have an up-to-date view.
 
-## What It Is  
+# ServiceRegistry
 
-The **ServiceRegistry** is a sub‑component that lives inside the **DockerizedServices** parent.  It provides a centralized data structure that records each service’s *name*, *status*, and *configuration* (Observation 1) together with richer *metadata* such as description and version (Observation 4).  The registry is the authoritative source for service discovery – clients query it to locate and access services (Observation 3).  To keep the registry responsive, a dedicated cache layer is employed (Observation 7), and the component actively monitors its own registry‑related metrics to spot anomalies (Observation 5).  The registry is protocol‑agnostic: it can speak both **HTTP** and **DNS**‑based service‑registry protocols (Observation 6).  Its lifecycle is coordinated by the sibling **ServiceManager**, which ensures that services are started, initialized, and kept healthy before they are entered into the registry (Observation 2).
+## What It Is
+
+ServiceRegistry is an in-memory map data structure contained within `ProcessStateManager` (PSM) that maintains the canonical mapping of service names to their corresponding child process handles. Based on the observations, it is accessed and mutated through PSM's public surface—specifically `psm.registerService()` for insertion and `psm.unregisterService()` for removal—and is consumed by at least three scripts in the system: `api-service.js`, `dashboard-service.js`, and `health-coordinator.js`.
+
+Functionally, the registry serves as the single source of truth for "which services are currently alive and reachable." When a wrapper script spawns its child process, it registers a name-to-handle entry; when that child exits, the entry is removed via the wrapper's exit handler. Any other component that needs to enumerate or act on live services—most notably `health-coordinator.js`—reads this same map rather than maintaining its own bookkeeping.
+
+## Architecture and Design
+
+The architectural approach is a **shared mutable registry** layered on top of a **singleton module**. The registry itself is a simple map, but its system-wide coherence depends entirely on the fact that its parent `ProcessStateManager` is exposed through the `SingletonModulePattern` (its sibling concept at the same level). Because Node.js caches the result of the first `require()` call for a given module, every importer—`api-service.js`, `dashboard-service.js`, and `health-coordinator.js`—obtains the exact same PSM instance and therefore the exact same registry object. No explicit reference passing, dependency injection, or service-locator boilerplate is required.
+
+This design produces an **implicit inter-script communication channel**. Rather than introducing message-passing, IPC sockets, or an event bus between the wrapper scripts and the health coordinator, the registry functions as shared state that all participants read and write. Producers (the wrappers) mutate the map at well-defined lifecycle moments—immediately after spawning a child, and inside the exit handler—and the consumer (`health-coordinator.js`) treats the map as an authoritative snapshot at probe time.
+
+The pattern trades the indirection of formal IPC for the simplicity of in-process shared memory. It is only viable because all consumers run in the same Node.js process and load PSM through the same module resolution path. The registry is therefore tightly coupled to PSM's singleton guarantee; any change that breaks that guarantee (e.g., loading PSM under two different paths, or running consumers in separate processes) would silently fragment the registry into disjoint views.
+
+## Implementation Details
+
+The registry exposes two primary mutation entry points through its parent `ProcessStateManager`:
+
+- **`psm.registerService(name, handle)`** — Called by `api-service.js` and `dashboard-service.js` immediately after each spawns its child process. This insertion happens synchronously with spawn so that downstream consumers never observe a window in which the process exists but the registry does not reflect it.
+- **`psm.unregisterService(name)`** — Invoked inside the wrapper scripts' exit handlers. When the child process terminates, the wrapper removes the corresponding entry, preventing `health-coordinator.js` from later probing a dead handle.
+
+On the read side, `health-coordinator.js` iterates the registry to determine which services are currently active and eligible for health probing. Critically, the coordinator keeps **no separate bookkeeping** of its own; it treats the registry as the definitive list. This means correctness of health probing depends entirely on the wrappers maintaining their register/unregister discipline at the correct lifecycle boundaries.
+
+The map itself is a plain in-memory structure with no persistence layer. Because all access occurs within a single Node.js process under cooperative single-threaded execution, no locking or synchronization primitives are needed—the JavaScript event loop serializes all reads and writes automatically.
+
+## Integration Points
+
+ServiceRegistry sits at the convergence of three caller surfaces:
+
+1. **Producer wrappers** — `api-service.js` and `dashboard-service.js` are the registry's writers. They depend on PSM solely for the `registerService` / `unregisterService` lifecycle hooks. Each maintains a 1:1 relationship between its spawned child and a single registry entry.
+2. **Consumer coordinator** — `health-coordinator.js` is the registry's primary reader. Its health-probing loop is driven entirely by registry contents, making it transitively dependent on the wrappers' correct usage of the registration API.
+3. **Containing module** — `ProcessStateManager` owns the registry's lifetime, and the `SingletonModulePattern` (its sibling) guarantees that all three consumers share one instance. This containment relationship is what allows the registry to function as a coordination point without explicit wiring.
+
+There are no observed external integrations—no database, no IPC, no network protocol. All coupling is in-process and via Node's module cache.
+
+## Usage Guidelines
+
+When working with ServiceRegistry, developers should observe the following conventions:
+
+- **Register synchronously with spawn.** Always call `psm.registerService()` immediately after spawning a child process, as `api-service.js` and `dashboard-service.js` do. Delaying registration opens a window in which `health-coordinator.js` cannot see the new service.
+- **Unregister from the exit handler.** Stale entries cause `health-coordinator.js` to probe dead process handles. The established pattern is to invoke `psm.unregisterService()` inside the wrapper's child-exit handler, ensuring the map stays consistent with actual process state.
+- **Do not duplicate registry state.** `health-coordinator.js` deliberately avoids maintaining its own list of services; new consumers should follow the same convention. Parallel bookkeeping would drift out of sync and reintroduce the bugs the singleton registry is designed to eliminate.
+- **Preserve the singleton invariant.** Because the registry's correctness depends on every consumer importing the same `ProcessStateManager` instance (via the `SingletonModulePattern`), avoid any change that could cause PSM to be loaded under two module paths, bundled into separate process boundaries, or instantiated explicitly. Such a change would silently split the registry into disjoint views and break health probing.
+- **Treat reads as point-in-time snapshots.** The map can change between iteration steps as wrappers register or unregister. Consumers should not assume registry stability across asynchronous boundaries.
 
 ---
 
-## Architecture and Design  
+### Summary of Insights
 
-The architecture follows a **registry‑centric** style where the ServiceRegistry is the hub for all service‑related information.  The design leans on **separation of concerns**: the ServiceRegistry focuses on storage, discovery, and metadata, while the ServiceManager handles lifecycle concerns, and the HealthChecker (sibling) validates health status before entries become visible.  This division mirrors a **Facade** pattern – the ServiceRegistry presents a simple discovery API while delegating lifecycle and health responsibilities to its peers.  
+1. **Architectural patterns identified:** Shared mutable in-memory registry built atop a singleton module; implicit inter-process-script coordination via shared state in lieu of IPC.
+2. **Design decisions and trade-offs:** Chooses simplicity (plain map + module-cache singleton) over formal IPC or dependency injection. Trade-off: zero ceremony and zero latency, at the cost of being tightly coupled to single-process execution and the singleton guarantee.
+3. **System structure insights:** Three scripts (`api-service.js`, `dashboard-service.js`, `health-coordinator.js`) coordinate through a single object inside `ProcessStateManager`. Producers mutate at spawn/exit boundaries; the sole consumer treats the registry as authoritative with no shadow state.
+4. **Scalability considerations:** Bounded to a single Node.js process. Cannot scale to multiple host processes, multiple nodes, or restart-survivable state without replacing the in-memory map with an external store or IPC mechanism. For the current set of a handful of services, the design is more than sufficient.
+5. **Maintainability assessment:** High locally—the API surface is just two methods and the semantics are obvious. Fragility lies at the edges: any new wrapper script must follow the register-on-spawn / unregister-on-exit discipline, and any change to PSM's loading model risks silently fragmenting the registry. Adding new consumers is trivial as long as they read through the same PSM singleton.
 
-Multiple **protocol adapters** are built into the registry to support both HTTP and DNS registration flows (Observation 6).  This indicates an **Adapter**‑like approach where protocol‑specific logic is encapsulated behind a common interface, allowing the rest of the system to remain oblivious to the underlying transport.  The presence of a **service‑registry cache** (Observation 7) shows a classic **Cache‑Aside** strategy: callers read from the cache for speed, and the registry updates the cache when the authoritative store changes.  
-
-Metrics monitoring (Observation 5) is woven into the registry loop, suggesting an **Observer**‑style feedback channel where metric collectors can trigger remediation or alerting pathways.  The overall composition is a loosely‑coupled graph: DockerizedServices → ServiceRegistry ↔ ServiceManager ↔ HealthChecker ↔ RetryMechanism, with DockerOrchestrator providing the container‑level isolation underneath.
-
----
-
-## Implementation Details  
-
-Even though the source tree does not expose concrete symbols, the observations outline the logical building blocks.  At its core the ServiceRegistry maintains a **service‑registry data structure** (likely a map or database table) that holds entries composed of *service name*, *status*, *configuration*, and *metadata* (Observations 1 & 4).  When a new service is started, the **ServiceManager** invokes the registry’s “register” operation after the **HealthChecker** confirms the service is healthy (Observation 2).  
-
-Discovery logic (Observation 3) is implemented as a query interface that can be called by clients; the interface abstracts the underlying protocol, delegating to either an HTTP‑based registrar or a DNS‑based registrar depending on the service’s registration request (Observation 6).  The **service‑registry cache** (Observation 7) is refreshed either on write‑through events from the registry or via periodic syncs, reducing lookup latency for high‑frequency discovery calls.  
-
-Metrics collection (Observation 5) likely hooks into key events—registration, deregistration, health state changes, cache hits/misses—and publishes them to a monitoring subsystem.  This enables automated detection of issues such as stale entries or sudden status flips, which can be acted upon by the **RetryMechanism** or external orchestration tools.
-
----
-
-## Integration Points  
-
-The ServiceRegistry sits directly under **DockerizedServices**, which uses `lib/service‑starter.js` to spin up containers.  The **ServiceManager** sibling consumes the registry’s API to add or remove services as containers are started or stopped.  The **HealthChecker** validates each service’s `/health` endpoint (as described in the parent component) before the ServiceManager calls the registry, ensuring only healthy services appear in discovery results.  
-
-When a service needs to be discovered, client code reaches into the ServiceRegistry, which may forward the request to the appropriate protocol adapter (HTTP or DNS) based on the service’s registration metadata.  The **DockerOrchestrator** provides the runtime isolation but does not directly interact with the registry; instead it relies on the ServiceManager to keep the registry in sync with container state.  In failure scenarios, the **RetryMechanism** can be triggered by metric alerts emitted from the registry’s monitoring hooks, allowing exponential back‑off retries for problematic services.
-
----
-
-## Usage Guidelines  
-
-1. **Register Only After Health Confirmation** – Follow the established flow: start a service via `lib/service‑starter.js`, let the **HealthChecker** confirm health, then let **ServiceManager** invoke the ServiceRegistry registration.  Skipping health verification can pollute the registry with unhealthy entries.  
-
-2. **Prefer the Cache for Discovery** – Client code should query the ServiceRegistry’s cache layer first; this reduces latency and off‑loads the underlying storage.  Ensure that any write‑through updates (e.g., service version bump) also invalidate or refresh the cache to avoid stale data.  
-
-3. **Choose the Correct Protocol Adapter** – When registering a service, specify the intended protocol (HTTP or DNS) in the service configuration.  The registry will route the registration to the matching adapter; mixing protocols inadvertently can lead to discovery failures.  
-
-4. **Monitor Registry Metrics** – Keep an eye on the metrics emitted by the registry (registration latency, cache hit ratio, error rates).  Use these signals to tune the **RetryMechanism** back‑off parameters or to trigger automated remediation scripts.  
-
-5. **Keep Metadata Up‑to‑Date** – Service description and version are part of the registry entry (Observation 4).  Updating these fields promptly when a service is upgraded helps downstream consumers make compatibility decisions.
-
----
-
-### Architectural patterns identified  
-* Facade – ServiceRegistry presents a simple discovery API.  
-* Adapter – Protocol‑specific registration (HTTP, DNS) behind a common interface.  
-* Cache‑Aside – Service‑registry cache improves read performance.  
-* Observer – Metrics monitoring feeds back into system health loops.  
-
-### Design decisions and trade‑offs  
-* **Lifecycle delegation** to ServiceManager isolates startup concerns but adds a dependency chain.  
-* **Multi‑protocol support** adds flexibility at the cost of added adapter complexity.  
-* **Caching** boosts latency performance but introduces potential staleness; cache invalidation must be carefully managed.  
-* **Metric‑driven monitoring** enables proactive issue detection but requires a reliable telemetry pipeline.  
-
-### System structure insights  
-The ServiceRegistry is a central node in a loosely coupled graph of sibling components (ServiceManager, HealthChecker, RetryMechanism) under the DockerizedServices parent.  Its responsibilities are narrowly scoped to storage, discovery, and observability, while orchestration and container management are handled elsewhere (DockerOrchestrator).  
-
-### Scalability considerations  
-* Supporting both HTTP and DNS protocols allows the registry to scale across different networking environments.  
-* The cache layer reduces read load on the primary store, enabling the registry to handle high‑frequency discovery traffic.  
-* Metric collection must be lightweight to avoid becoming a bottleneck as the number of services grows.  
-
-### Maintainability assessment  
-The clear separation between lifecycle (ServiceManager), health verification (HealthChecker), and discovery (ServiceRegistry) promotes maintainability; changes to one area are unlikely to ripple across others.  However, the reliance on multiple adapters and cache synchronization introduces additional moving parts that require disciplined testing and documentation to keep the system coherent.
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes lib/service-starter.js to manage the startup of various services, including the LLMService, with retry logic and health verification. This is evident in the use of the startService function in lib/service-starter.js, which takes a service configuration object as an argument and attempts to start the service with a specified number of retries. The health verification is performed using the isServiceHealthy function, which checks the service's health by making a request to its health endpoint. For example, in the scripts/api-service.js file, the startAPIService function uses the startService function from lib/service-starter.js to start the API service. The use of this library ensures that services are properly initialized and ready for use, which is crucial for the operational integrity of the project. Furthermore, the integration of this library with the semantic analysis pipeline, as seen in the mcp-server-semantic-analysis component, highlights the component's role in supporting key project functionalities.
+- [ProcessStateManager](./ProcessStateManager.md) -- PSM is a singleton, meaning all wrapper scripts (api-service.js, dashboard-service.js) and health-coordinator.js share a single registry instance without passing references explicitly
 
 ### Siblings
-- [ServiceManager](./ServiceManager.md) -- The ServiceManager uses the startService function in lib/service-starter.js to start services with retry logic and health verification.
-- [DockerOrchestrator](./DockerOrchestrator.md) -- The DockerOrchestrator uses Docker containerization to manage services, ensuring isolation and scalability.
-- [HealthChecker](./HealthChecker.md) -- The HealthChecker uses the isServiceHealthy function to check the health of services by making requests to their health endpoints.
-- [RetryMechanism](./RetryMechanism.md) -- The RetryMechanism uses a exponential backoff strategy to retry service startup, preventing cascading failures.
+- [SingletonModulePattern](./SingletonModulePattern.md) -- The singleton guarantee means that when api-service.js calls psm.registerService() and health-coordinator.js later iterates the registry, they are operating on the exact same object—a direct consequence of Node.js caching the first require() result for all subsequent importers.
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 4 observations*

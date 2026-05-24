@@ -1,30 +1,31 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Data Extraction" {
-  component "Code Graph RAG" as cgr <<external>>
-  component "Git History" as gh <<external>>
+package "Ingestion Sources" {
+  component "Git History" as git <<external>>
   component "LSL Sessions" as lsl <<external>>
+  component "Code Analysis" as codeanalysis <<external>>
 }
 
-package "Data Processing" {
-  component "Batch Analysis Pipeline" as bap <<core>>
-  component "InsightGenerationModule" as ig <<core>>
-  component "UKB Trace Report" as utr <<cli>>
+package "Orchestration Layer" {
+  component "MCP Semantic Analysis Server" as mcpserver <<core>>
+  component "PersistenceAgent" as persistagent <<agent>>
 }
 
-package "Data Storage and Query" {
-  database "GraphDatabase" as gd <<storage>>
-  component "GraphDatabaseAdapter" as gda <<api>>
+package "Storage Layer" {
+  component "GraphDatabaseAdapter" as dbadapter <<core>>
+  cloud "VKB HTTP API" as vkbapi <<api>>
+  database "LevelDB + Graphology" as leveldb <<storage>>
 }
 
-cgr --> bap : provides code analysis
-gh --> bap : provides git history
-lsl --> bap : provides LSL sessions
-bap --> ig : generates insights
-bap --> utr : uses UKB trace report
-ig --> gd : stores insights
-gda --> gd : queries database
-bap --> gda : uses adapter
+git --> mcpserver : "ingests"
+lsl --> mcpserver : "ingests"
+codeanalysis --> mcpserver : "ingests"
+
+mcpserver --> persistagent : "orchestrates extraction"
+persistagent --> dbadapter : "mapEntityToSharedMemory()\n+ bi-temporal fields"
+dbadapter --> vkbapi : "primary write\n(typed nodes + embeddings)"
+dbadapter ..> leveldb : "fallback write\n(lock-safe)"
+vkbapi --> leveldb : "semantic similarity queries"
 
 @enduml

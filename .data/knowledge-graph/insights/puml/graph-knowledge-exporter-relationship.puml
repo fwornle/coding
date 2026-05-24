@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphKnowledgeExporter
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphKnowledgeExporter] as graph_knowledge_exporter #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[VkbApiClient] as vkb_api_client #F0F0F0
+[EntityTypeMigration] as entity_type_migration #F0F0F0
+[KnowledgeDecayTracker] as knowledge_decay_tracker #F0F0F0
+[EventDrivenExportSubscription] as event_driven_export_subscription #E8F5E8
+
+knowledge_management --> graph_knowledge_exporter
+manual_learning -[hidden]- graph_knowledge_exporter
+online_learning -[hidden]- graph_knowledge_exporter
+vkb_api_client -[hidden]- graph_knowledge_exporter
+entity_type_migration -[hidden]- graph_knowledge_exporter
+knowledge_decay_tracker -[hidden]- graph_knowledge_exporter
+graph_knowledge_exporter --> event_driven_export_subscription
+
+@enduml

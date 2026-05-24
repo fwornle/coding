@@ -1,0 +1,41 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Migration Scripts" {
+    component "migrate-graph-db-entity-types.js" as migrateTypes <<cli>>
+    component "migrate-leveldb-to-kmcore.mjs" as migrateKmcore <<cli>>
+    component "Error Budget Handler" as errorBudget <<core>>
+}
+
+package "Storage Layer" {
+    database "LevelDB" as leveldb <<storage>>
+    component "Graphology Graph" as graphology <<core>>
+}
+
+package "km-core Target Schema" {
+    component "km-core Schema" as kmcore <<core>>
+    component "GraphDatabaseService" as gds <<core>>
+}
+
+component "VKB HTTP API" as vkbApi <<api>>
+component "GraphDatabaseAdapter" as gdAdapter <<core>>
+
+migrateTypes --> errorBudget : "configurable failure budget"
+migrateKmcore --> errorBudget : "configurable failure budget"
+
+migrateTypes --> leveldb : "direct batch access"
+migrateTypes --> graphology : "type label consolidation"
+
+migrateKmcore --> leveldb : "direct batch access"
+migrateKmcore --> kmcore : "field normalization\n& bi-temporal mapping"
+
+gds --> kmcore : "defines canonical\nontology hierarchy"
+kmcore --> gds : "enforces 6 entity types"
+
+gdAdapter ..> leveldb : "fallback pattern (reference)"
+migrateTypes ..> vkbApi : "bypasses (lock avoidance)"
+migrateKmcore ..> vkbApi : "bypasses (lock avoidance)"
+
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TranscriptAdapterBase
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TranscriptAdapterBase] as transcript_adapter_base #LightBlue
+[SessionWindowManager] as session_window_manager #F0F0F0
+[RedactionEngine] as redaction_engine #F0F0F0
+[AbstractAdapterContract] as abstract_adapter_contract #E8F5E8
+
+live_logging_system --> transcript_adapter_base
+session_window_manager -[hidden]- transcript_adapter_base
+redaction_engine -[hidden]- transcript_adapter_base
+transcript_adapter_base --> abstract_adapter_contract
+
+@enduml

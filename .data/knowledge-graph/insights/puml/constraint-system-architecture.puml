@@ -1,33 +1,37 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Constraint System" {
-  component "ConstraintSystem" as cs <<core>>
-  component "GraphDatabaseAdapter" as gda <<storage>>
-  component "ContentValidationAgent" as cva <<agent>>
-  component "UnifiedHookManager" as uhm <<core>>
-  component "ViolationCaptureService" as vcs <<core>>
+package "Configuration Layer" {
+  database "User Config\n~/.coding-tools/hooks.json" as userConfig <<storage>>
+  database "Project Config\n.coding/hooks.json" as projectConfig <<storage>>
+  component "HookConfigLoader" as configLoader <<core>>
 }
 
-package "Storage" {
-  database "GraphDatabase" as gd <<storage>>
-  database "LevelDB" as ld <<storage>>
+package "Hook Execution Layer" {
+  component "UnifiedHookManager" as hookManager <<core>>
 }
 
-package "Integrations" {
-  component "MCP Server" as mcp <<external>>
-  component "System Health Dashboard" as shd <<external>>
+package "Violation Persistence" {
+  component "ViolationCaptureService" as violationSvc <<core>>
+  database "JSONL Log\nsession-violations.jsonl" as jsonlLog <<storage>>
+  database "JSON History\nviolation-history.json" as jsonHistory <<storage>>
 }
 
-cs --> gda : uses
-gda --> gd : stores in
-gda --> ld : uses
-cs --> cva : uses
-cva --> cs : validates
-uhm --> cs : manages hooks for
-vcs --> cs : captures violations for
-vcs --> gd : stores violations in
-cs --> mcp : integrates with
-cs --> shd : integrates with
+package "Monitoring & Integration" {
+  component "MCP Constraint Monitor" as mcpMonitor <<external>>
+  component "Dashboard" as dashboard <<external>>
+  component "MCP Semantic Analysis" as semanticAnalysis <<external>>
+}
+
+userConfig --> configLoader : "global defaults"
+projectConfig --> configLoader : "project overrides"
+configLoader --> hookManager : "mergeConfigs()"
+hookManager --> violationSvc : "emit violations"
+violationSvc --> jsonlLog : "append-only audit"
+violationSvc --> jsonHistory : "capped 1000 entries"
+jsonlLog --> mcpMonitor : "stream events"
+jsonHistory --> mcpMonitor : "recent violations"
+mcpMonitor --> dashboard : "status & stats"
+semanticAnalysis ..> hookManager : "semantic detection"
 
 @enduml

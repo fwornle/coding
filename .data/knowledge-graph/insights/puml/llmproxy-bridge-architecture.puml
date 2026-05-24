@@ -1,0 +1,37 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Upstream Callers" {
+  component "OKB System" as okb <<agent>>
+  component "Coding System" as coding <<agent>>
+  component "MCP Server" as mcp <<api>>
+}
+
+package "@rapid/llm-proxy  (Shared Infrastructure)" {
+  component "HTTP Ingress" as httpIngress <<api>>
+  component "Provider Dispatch" as dispatch <<core>>
+}
+
+package "Provider Backends" {
+  cloud "Anthropic API" as anthropic <<external>>
+  cloud "OpenAI API" as openai <<external>>
+  cloud "Groq API" as groq <<external>>
+  component "Local / DMR" as dmr <<external>>
+  component "Mock Provider" as mock <<core>>
+}
+
+okb --> httpIngress : "HTTP request"
+coding --> httpIngress : "HTTP request"
+mcp --> httpIngress : "HTTP request"
+
+httpIngress --> dispatch : "routes"
+
+dispatch --> anthropic : "provider call"
+dispatch --> openai : "provider call"
+dispatch --> groq : "provider call"
+dispatch --> dmr : "provider call"
+dispatch --> mock : "deterministic response"
+
+@enduml

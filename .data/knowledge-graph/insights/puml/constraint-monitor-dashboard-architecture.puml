@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Live Session Layer" {
+  component "Claude Code Sessions" as sessions <<external>>
+  component "Hook Manager" as hookMgr <<core>>
+}
+
+package "Persistence Layer" {
+  database "Violation Data Store" as violationStore <<storage>>
+}
+
+package "Dashboard UI (dashboard/)" {
+  component "Constraint Monitor Dashboard" as dashboard <<core>>
+  component "Violation History View" as historyView <<cli>>
+  component "Session Statistics View" as statsView <<cli>>
+}
+
+package "Editor Integration" {
+  component "Status Line Display" as statusLine <<cli>>
+}
+
+sessions --> hookMgr : "triggers constraint hooks"
+hookMgr --> violationStore : "persists violations"
+violationStore --> dashboard : "reads async"
+dashboard --> historyView : "renders history"
+dashboard --> statsView : "aggregates rule hits & counts"
+dashboard ..> statusLine : "lightweight companion mode"
+
+@enduml

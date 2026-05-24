@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Integration Layer" {
+  component "MCP Server\nSemantic Analysis" as mcpSemantic <<external>>
+}
+
+package "Core Monitoring" {
+  component "MCPConstraintMonitor" as mcpMonitor <<core>>
+  component "Constraint Configuration" as constraintConfig <<core>>
+}
+
+package "Event & Pattern Support" {
+  component "StructuredEventEnvelopePattern" as eventEnvelope <<api>>
+  component "ClosedVocabularyPattern" as closedVocab <<api>>
+  component "ServiceStartupPattern" as serviceStartup <<api>>
+}
+
+mcpSemantic --> mcpMonitor : "uses"
+mcpMonitor --> constraintConfig : "loads"
+mcpMonitor --> eventEnvelope : "processes events"
+mcpMonitor --> closedVocab : "enforces vocabulary"
+serviceStartup --> mcpMonitor : "initializes"
+eventEnvelope ..> closedVocab : "validates via"
+
+@enduml

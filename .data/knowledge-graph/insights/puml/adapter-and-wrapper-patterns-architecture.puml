@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+' Adapter and Wrapper Patterns — AdapterAndWrapperPatterns SubComponent
+
+package "Application Layer" {
+  component "MCP Server" as mcp <<api>>
+  component "Domain Logic" as domain <<core>>
+}
+
+package "Adapter / Wrapper Layer" {
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  component "OntologyClassificationEngine" as oce <<core>>
+}
+
+package "External Dependencies" {
+  component "Graphology" as graphology <<external>>
+  database "LevelDB" as leveldb <<storage>>
+  component "@fwornle/km-core" as kmcore <<external>>
+}
+
+' Application to Adapters
+mcp --> domain : "invokes"
+domain --> gda : "uses domain API"
+domain --> oce : "uses domain API"
+
+' Adapters to External Libraries
+gda --> graphology : "wraps"
+gda --> leveldb : "persists via"
+oce --> kmcore : "wraps"
+
+@enduml

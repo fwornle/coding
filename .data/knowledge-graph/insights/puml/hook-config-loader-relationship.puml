@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HookConfigLoader
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[HookConfigLoader] as hook_config_loader #LightBlue
+[DualScopeConfigResolution] as dual_scope_config_resolution #E8F5E8
+
+constraint_system --> hook_config_loader
+hook_config_loader --> dual_scope_config_resolution
+
+@enduml

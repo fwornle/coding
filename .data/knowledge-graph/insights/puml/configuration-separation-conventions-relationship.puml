@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConfigurationSeparationConventions
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ConfigurationSeparationConventions] as configuration_separation_conventions #LightBlue
+[AgentLifecyclePatterns] as agent_lifecycle_patterns #F0F0F0
+[ServiceRegistrationPatterns] as service_registration_patterns #F0F0F0
+[AdapterAndWrapperPatterns] as adapter_and_wrapper_patterns #F0F0F0
+[DocumentationConventions] as documentation_conventions #F0F0F0
+[AvailabilityGuardPatterns] as availability_guard_patterns #F0F0F0
+[AgentProfileRuntimeConfig] as agent_profile_runtime_config #E8F5E8
+[TieredModelSelectionPolicy] as tiered_model_selection_policy #E8F5E8
+
+coding_patterns --> configuration_separation_conventions
+agent_lifecycle_patterns -[hidden]- configuration_separation_conventions
+service_registration_patterns -[hidden]- configuration_separation_conventions
+adapter_and_wrapper_patterns -[hidden]- configuration_separation_conventions
+documentation_conventions -[hidden]- configuration_separation_conventions
+availability_guard_patterns -[hidden]- configuration_separation_conventions
+configuration_separation_conventions --> agent_profile_runtime_config
+configuration_separation_conventions --> tiered_model_selection_policy
+
+@enduml

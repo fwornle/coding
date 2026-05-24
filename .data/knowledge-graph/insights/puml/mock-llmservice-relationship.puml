@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MockLLMService
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[MockLLMService] as mock_llmservice #LightBlue
+[PublicCloudProviders] as public_cloud_providers #F0F0F0
+[LLMProviderConfig] as llmprovider_config #F0F0F0
+[TierRouter] as tier_router #F0F0F0
+[LLMModeResolver] as llmmode_resolver #E8F5E8
+[LLMStateStore] as llmstate_store #E8F5E8
+
+llmabstraction --> mock_llmservice
+public_cloud_providers -[hidden]- mock_llmservice
+llmprovider_config -[hidden]- mock_llmservice
+tier_router -[hidden]- mock_llmservice
+mock_llmservice --> llmmode_resolver
+mock_llmservice --> llmstate_store
+
+@enduml

@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMModeController
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMModeController] as llmmode_controller #LightBlue
+[ModeResolutionChain] as mode_resolution_chain #E8F5E8
+[AgentOverrideRegistry] as agent_override_registry #E8F5E8
+
+llmabstraction --> llmmode_controller
+llmmode_controller --> mode_resolution_chain
+llmmode_controller --> agent_override_registry
+
+@enduml

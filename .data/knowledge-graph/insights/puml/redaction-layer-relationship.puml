@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: RedactionLayer
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[RedactionLayer] as redaction_layer #LightBlue
+[SessionWindowing] as session_windowing #F0F0F0
+[RedactionConfigLoader] as redaction_config_loader #E8F5E8
+
+live_logging_system --> redaction_layer
+session_windowing -[hidden]- redaction_layer
+redaction_layer --> redaction_config_loader
+
+@enduml

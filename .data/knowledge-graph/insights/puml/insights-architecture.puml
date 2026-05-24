@@ -1,29 +1,34 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Insights Sub-Component" {
-  component "InsightGenerator" as ig <<agent>>
-  component "Pattern Catalog" as pc <<storage>>
-  component "Insight Ranker" as ir <<agent>>
-  component "Insight Cache" as ic <<storage>>
-  component "Insight API" as ia <<api>>
+package "Post-Persistence Input" {
+  database "Knowledge Graph" as kg <<storage>>
 }
 
-package "Knowledge Reporting" {
-  component "KnowledgeReportAuthor" as kra <<agent>>
-  component "Knowledge Report Template" as krt <<core>>
+package "Insights SubComponent" {
+  component "Pattern Catalog Extractor" as patternExtractor <<agent>>
+  component "Pattern Catalog" as patternCatalog <<storage>>
+  component "Knowledge Report Authoring" as reportAuthoring <<agent>>
 }
 
-package "Code Analysis" {
-  component "CodeAnalyzer" as ca <<agent>>
+package "BaseAgent Contract" {
+  component "calculateConfidence()" as calcConfidence <<core>>
+  component "generateRouting()" as genRouting <<core>>
 }
 
-ig --> ca : uses
-ig --> pc : stores
-ir --> ig : ranks
-ic --> ig : caches
-ia --> ig : exposes
-kra --> ig : uses
-kra --> krt : uses
+package "Output" {
+  component "Knowledge Report" as knowledgeReport <<core>>
+  cloud "Delivery Channels" as deliveryChannels
+}
+
+kg --> patternExtractor : "consumes"
+kg --> reportAuthoring : "consumes"
+patternExtractor --> patternCatalog : "produces"
+patternCatalog --> reportAuthoring : "input"
+reportAuthoring --> knowledgeReport : "produces"
+patternExtractor ..> calcConfidence : "scores"
+reportAuthoring ..> calcConfidence : "scores"
+reportAuthoring ..> genRouting : "routes"
+genRouting --> deliveryChannels : "directs by confidence"
 
 @enduml

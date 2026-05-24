@@ -1,0 +1,29 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management Core" {
+  component "KnowledgeManagement" as km <<core>>
+  component "VkbApiClient\n//lib/ukb-unified/core/VkbApiClient.js//" as vkb <<api>>
+}
+
+package "CRUD Interface" {
+  component "Entity Types\nProject · Component · SubComponent\nPattern · Detail · System" as entities <<core>>
+}
+
+package "HTTP API Server" {
+  component "API Server\n//fronts Graph + Storage//" as server <<api>>
+}
+
+package "Graph + Storage Stack" {
+  component "Graphology\n//in-memory graph//" as graphology <<storage>>
+  database "LevelDB\n//persistent storage//" as leveldb <<storage>>
+}
+
+km ..> vkb : "dynamic import (runtime)\nno static dependency"
+km --> leveldb : "fallback: direct access\n(offline / server not running)"
+entities --> vkb : "type encoded in payload"
+vkb --> server : "lock-free HTTP CRUD\n(concurrent read/write safe)"
+server --> graphology : "atomic write propagation\n(in-memory)"
+server --> leveldb : "atomic write propagation\n(persistent)"
+
+@enduml

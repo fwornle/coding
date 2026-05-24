@@ -1,0 +1,38 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Lifecycle Policy" {
+  component "service-starter.js" as starter <<core>>
+}
+
+package "ConstraintAPI Wrapper" {
+  component "api-service.js" as apiService <<core>>
+  component "SIGTERM / SIGINT Handlers" as sigHandlers <<core>>
+}
+
+package "Child Process Runtime" {
+  component "Node child_process" as childProc <<external>>
+  component "Constraint Monitor Express API" as constraintAPI <<api>>
+}
+
+package "Service Registry (PSM)" {
+  component "PSM Registry" as psm <<core>>
+  component "health-coordinator.js" as healthCoord <<core>>
+}
+
+starter --> apiService : "owns restart\n& retry policy"
+
+apiService --> childProc : "spawns"
+childProc --> constraintAPI : "runs as child PID"
+
+apiService --> sigHandlers : "registers"
+sigHandlers --> constraintAPI : "forwards signals"
+
+apiService --> psm : "registerService()\non spawn"
+apiService --> psm : "unregisterService()\non exit"
+
+healthCoord --> psm : "lookups by\nservice name"
+
+@enduml

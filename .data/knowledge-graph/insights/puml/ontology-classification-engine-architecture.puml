@@ -1,0 +1,37 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "External Callers" {
+  component "OnlineLearning" as ol <<external>>
+  component "KmCoreMigrationPipeline" as kmp <<external>>
+}
+
+package "PersistenceAgent" {
+  component "mapEntityToSharedMemory()" as mapEntity <<api>>
+  component "OntologyClassificationEngine" as oce <<core>>
+  database "Classification Cache\n(TTL: 5 min)" as cache
+  component "Heuristic Classifier" as heuristic <<core>>
+  component "LLM Classifier" as llm <<core>>
+  component "Hybrid Classifier" as hybrid <<core>>
+}
+
+package "@fwornle/km-core" {
+  component "OntologyRegistry" as registry <<external>>
+}
+
+ol      --> oce      : "high-throughput\nbatch ingestion"
+kmp     --> oce      : "confidence-gated\nclassification"
+mapEntity --> oce    : "pre-populates\nontology metadata"
+
+oce --> cache     : "TTL lookup / store"
+oce --> heuristic : "dispatch (low latency)"
+oce --> llm       : "dispatch (high accuracy)"
+oce --> hybrid    : "dispatch (balanced)"
+
+heuristic --> registry : "wraps / queries"
+llm       --> registry : "wraps / queries"
+hybrid    --> registry : "wraps / queries"
+
+@enduml

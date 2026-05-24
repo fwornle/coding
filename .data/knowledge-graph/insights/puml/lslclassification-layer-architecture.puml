@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Agent Backends" {
+    component "Agent-Native Formats" as agentNative <<external>>
+}
+
+package "Transcript API  (transcript-api.js)" {
+    component "TranscriptAdapter" as transcriptAdapter <<core>>
+    component "convertToLSL()" as convertToLSL <<api>>
+}
+
+package "LSL Classification Pipeline" {
+    component "LSL Entry Taxonomy\nuser | assistant | tool_use\ntool_result | system | error" as lslTaxonomy <<core>>
+    component "SessionWindowManager\n(hourly buckets)" as sessionWindowMgr <<core>>
+    component "LSLClassificationLayer\n(5-Layer Model)" as lslClassLayer <<core>>
+    component "Metadata Annotations\n(original entry preserved)" as metaAnnotations <<storage>>
+}
+
+package "Architecture Specification" {
+    component "lsl-5-layer-classification.puml\n(Authoritative Design)" as classSpec <<external>>
+}
+
+agentNative --> transcriptAdapter : "raw payloads"
+transcriptAdapter --> convertToLSL : "enforces LSL contract"
+convertToLSL --> lslTaxonomy : "produces typed entries"
+lslTaxonomy --> lslClassLayer : "typed LSL entries"
+sessionWindowMgr --> lslClassLayer : "hourly session buckets"
+classSpec ..> lslClassLayer : "defines 5-layer model"
+lslClassLayer --> metaAnnotations : "sequential annotation\n(no content transform)"
+
+@enduml

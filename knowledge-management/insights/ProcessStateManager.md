@@ -2,108 +2,87 @@
 
 **Type:** SubComponent
 
-It provides a standardized approach to service management, enabling developers to easily configure the services for different environments and use cases.
+psm.unregisterService() is called in each wrapper's exit handler, so the registry reflects live processes only — health-coordinator.js sees removals immediately without requiring its own process polling
 
-## What It Is  
+# ProcessStateManager — Technical Insight Document
 
-**ProcessStateManager** is a **SubComponent** that lives inside the **DockerizedServices** component.  Its implementation is driven by the configuration files found under `config/teams/*.json` and by environment‑variable settings that are read at runtime.  The class `ProcessStateManager` is responsible for **registering, unregistering, and monitoring** LLM‑related services through the higher‑level **LLMServiceManager**.  By acting as the coordination layer for service lifecycles, it gives developers a single, standardized entry point for configuring which LLM services are active in a given Docker container or deployment environment.
+## What It Is
 
----
+The ProcessStateManager (PSM) is a SubComponent within the DockerizedServices parent, implemented as a singleton module that maintains a centralized registry mapping stable service names to live OS-level process handles. It is consumed primarily by the wrapper scripts `scripts/api-service.js` and `scripts/dashboard-service.js`, and <USER_ID_REDACTED> by `scripts/health-coordinator.js`. The PSM itself contains two conceptual children: the **ServiceRegistry** (the underlying map data structure) and the **SingletonModulePattern** (the module-loading mechanism that guarantees a single shared instance across all importers).
 
-## Architecture and Design  
+The defining purpose of the PSM is to decouple **service identity** from **process identity**. Where raw PIDs change every time a child process is spawned or restarted, the PSM exposes a stable, name-based view of which services are currently live. This allows the rest of the system to reason about services symbolically rather than by transient OS resources.
 
-The design that emerges from the observations is a **manager‑orchestrator** style architecture.  `ProcessStateManager` plays the *manager* role for service registration while its sibling **DockerOrchestrator** handles container‑level orchestration, and **LLMServiceManager** provides the concrete LLM‑service handling.  This separation of concerns follows a **layered** approach:
+![ProcessStateManager — Architecture](images/process-state-manager-architecture.png)
 
-1. **Configuration Layer** – JSON files in `config/teams/*.json` and environment variables supply the declarative description of which services should be instantiated.  
-2. **Management Layer** – `ProcessStateManager` reads that configuration, invokes `LLMServiceManager` to create or tear down service instances, and keeps a watch‑list for health/availability monitoring.  
-3. **Execution Layer** – The parent **DockerizedServices** component runs the actual Docker containers, relying on the state information maintained by `ProcessStateManager`.
+## Architecture and Design
 
-No explicit “micro‑service” or “event‑driven” patterns are mentioned, so the architecture is best described as **configuration‑driven service coordination** using a **manager** pattern.  Interaction flows are straightforward: `ProcessStateManager` → `LLMServiceManager` → `LLMService` (implemented in `lib/llm/llm-service.ts`).  Sibling components such as **GraphDatabaseManager** follow the same pattern of delegating work to an adapter (the graph database adapter), reinforcing a consistent design language across the codebase.
+The PSM follows the **Singleton Module Pattern**, leveraging Node.js's `require()` caching: the first import of the module instantiates the registry, and every subsequent importer (whether `api-service.js`, `dashboard-service.js`, or `health-coordinator.js`) receives the same object reference. No explicit reference passing or dependency injection is required. This is the technical foundation that makes the registry "shared" across otherwise independent scripts.
 
----
+Architecturally, the PSM sits at the intersection of three concerns that have been deliberately separated:
 
-## Implementation Details  
+1. **Process lifecycle and signal forwarding** — owned by the wrapper scripts (`scripts/api-service.js`, `scripts/dashboard-service.js`), which spawn child processes via Node's `child_process` module, register them with the PSM, and wire `SIGTERM`/`SIGINT` propagation.
+2. **Retry and restart policy** — owned by `lib/service-starter.js`, which is explicitly isolated from signal handling. The starter updates state indirectly through the wrappers rather than mutating the registry directly.
+3. **Health observation** — owned by `scripts/health-coordinator.js`, which <USER_ID_REDACTED> PSM state and delegates probing to **ServiceProbe** (`lib/utils/service-probe.js`).
 
-Although the source contains no explicit symbols, the observations give a clear picture of the internal mechanics:
+The PSM is the connective tissue between these three concerns, and the indirection it provides is what allows each concern to evolve independently.
 
-* **Registration / Unregistration** – The class exposes methods that accept a service identifier (e.g., a team name derived from the JSON files).  When a registration request arrives, `ProcessStateManager` reads the corresponding JSON entry, extracts required parameters (API keys, endpoint URLs, mode flags), and forwards them to `LLMServiceManager`.  `LLMServiceManager` then constructs an instance of `LLMService` (found in `lib/llm/llm-service.ts`) and stores it in an internal registry.
+![ProcessStateManager — Relationship](images/process-state-manager-relationship.png)
 
-* **Monitoring** – After a service is registered, `ProcessStateManager` starts a lightweight monitoring loop (likely a periodic health‑check) that queries the `LLMService` instances for status.  If a service becomes unhealthy, the manager can trigger an automatic **unregistration** and optionally a re‑registration with refreshed credentials, ensuring the overall environment remains coordinated.
+## Implementation Details
 
-* **Configuration Handling** – The manager loads all `config/teams/*.json` files at startup (or on‑demand when a new team is added).  Each file defines a service profile, allowing developers to plug in new LLM providers without code changes.  Environment variables supplement the JSON files for secrets or environment‑specific overrides, providing a secure and flexible way to tailor deployments.
+The PSM exposes two principal operations: `psm.registerService()` and `psm.unregisterService()`. Both `api-service.js` and `dashboard-service.js` follow an identical structural pattern that exercises these methods:
 
-* **Dependency on LLMServiceManager** – All concrete service lifecycle actions are delegated to the sibling **LLMServiceManager**.  This keeps `ProcessStateManager` thin and focused on *state* rather than *implementation* details, adhering to the **single‑responsibility principle**.
+1. Spawn a child process via Node's `child_process` module (the constraint monitor Express API in the case of **ConstraintAPIWrapper**; the dashboard process in the case of **DashboardWrapper**).
+2. Call `psm.registerService()` immediately after spawn, binding a stable service name to the returned process handle. This inserts a service-name-to-process-handle entry into the **ServiceRegistry** shared map.
+3. Wire up `SIGTERM` and `SIGINT` handlers so that signals delivered to the wrapper propagate to the child.
+4. Call `psm.unregisterService()` from the exit handler, so the registry reflects only currently-live processes.
 
----
+The crucial property of this design is that the registry is **eagerly maintained**: removals happen the moment a child exits, so consumers like `health-coordinator.js` never see stale entries and do not need to perform their own process polling or liveness verification at the OS level. Because PSM lives in module scope and is cached by Node, when `api-service.js` calls `psm.registerService()` and `health-coordinator.js` later iterates the registry, both are operating on the exact same in-memory object — the **SingletonModulePattern** child entity is what guarantees this invariant.
 
-## Integration Points  
+The PSM does not itself perform spawning, signal handling, restart logic, or probing. It is intentionally minimal: a registry with register/unregister semantics. Everything else is a collaborator.
 
-`ProcessStateManager` sits at the intersection of several system pieces:
+## Integration Points
 
-* **Parent – DockerizedServices** – The parent component uses the state information maintained by `ProcessStateManager` to decide which containers to spin up or keep alive.  Because DockerizedServices already consumes `LLMService` (via `lib/llm/llm-service.ts`), the manager’s registry directly influences the Docker orchestration layer.
+The PSM integrates with several sibling components within DockerizedServices, each touching it through a narrow, well-defined interface:
 
-* **Sibling – LLMServiceManager** – This is the primary dependency.  All service creation, destruction, and low‑level API interaction are performed by LLMServiceManager, which in turn relies on the unified interface defined in `LLMService`.
+- **ConstraintAPIWrapper** (`scripts/api-service.js`) and **DashboardWrapper** (`scripts/dashboard-service.js`) are the *writers* — they call `psm.registerService()` after spawning and `psm.unregisterService()` on exit. The two wrappers mirror each other's structural pattern exactly, suggesting the integration contract is well-established but currently duplicated rather than abstracted.
+- **HealthCoordinator** (`scripts/health-coordinator.js`) is the *primary reader* — it iterates the registry to discover which services are live, then dispatches **ServiceProbe** (`lib/utils/service-probe.js`) calls against those service names. Because the PSM removes entries promptly on exit, the coordinator never probes against dead PIDs.
+- **ServiceStarter** (`lib/service-starter.js`) is deliberately *not* an integration point for signals — it owns retry policy but does not touch the registry directly. Its updates flow through the wrappers, preserving separation of concerns.
+- **LLMMockService**, while a sibling under DockerizedServices, follows a different persistence philosophy (state in `workflow-progress.json`) and does not interact with the PSM.
 
-* **Sibling – DockerOrchestrator** – While DockerOrchestrator handles the Docker‑Compose files and container lifecycle, it may query `ProcessStateManager` to know which services should be represented as containers, ensuring the orchestration reflects the current registration state.
+The dependency direction is unambiguous: wrappers and the coordinator depend on the PSM; the PSM depends on nothing in the application layer. This makes it a foundational utility within the DockerizedServices subsystem.
 
-* **Sibling – GraphDatabaseManager** – Although unrelated to LLM services, GraphDatabaseManager follows a similar manager‑adapter pattern, indicating a shared architectural convention across the codebase.  This similarity can simplify onboarding, as developers can expect comparable APIs for state handling.
+## Usage Guidelines
 
-* **Configuration Files** – The JSON files under `config/teams/` act as the external contract for service definitions.  Any change to these files is automatically reflected in the manager’s behavior, making the integration point between code and operational configuration explicit and version‑controllable.
+When adding a new containerized service, developers should create a new wrapper script that replicates the established pattern: spawn via `child_process`, call `psm.registerService()` with a stable service name, wire `SIGTERM`/`SIGINT` forwarding to the child, and call `psm.unregisterService()` in the exit handler. The parent component documentation explicitly notes that this boilerplate is currently duplicated across wrappers rather than centralized — a known maintenance concern as service count grows. Until that abstraction is introduced, fidelity to the existing pattern in `api-service.js` and `dashboard-service.js` is the safest path.
 
----
+Developers should treat the PSM as the **single source of truth for service liveness**. Code that needs to know whether a service is running, or what process handle backs it, must query the PSM rather than tracking PIDs independently. This is precisely how `health-coordinator.js` operates, and it is why probe results remain correlated to service names that are stable across restarts.
 
-## Usage Guidelines  
+Restart and retry logic must remain in `lib/service-starter.js` and must not be embedded into the PSM or the wrappers. The current architecture relies on the starter being signal-agnostic and the wrappers being retry-agnostic; collapsing these responsibilities would erode the clean separation between lifecycle, policy, and observation.
 
-1. **Define Services via JSON** – Add or modify a `config/teams/<team>.json` file to declare a new LLM service.  Include all required fields (provider, credentials, mode).  Keep secret values out of the JSON and reference them through environment variables to avoid committing credentials.
+**Scalability considerations:** The PSM's in-memory, single-process registry assumes that all wrapper scripts and the health coordinator run inside the same Node process or within a shared Docker container where module caching applies. The pattern does not natively span multiple Node processes — extending it to a distributed setting would require an external store. The current scope (a handful of Dockerized services) is well-served by the in-process singleton.
 
-2. **Register Only Once** – Call the registration API of `ProcessStateManager` a single time per service lifecycle.  The manager will forward the request to `LLMServiceManager`; duplicate registrations will be ignored or will raise a clear warning.
+**Maintainability assessment:** The PSM itself is small, focused, and easy to reason about. The principal maintenance risk is not in the PSM but in the duplicated wrapper boilerplate around it; each new service requires copy-paste replication of the spawn/register/signal/unregister pattern. Refactoring this into a shared wrapper factory would reduce drift between `api-service.js` and `dashboard-service.js` and lower the cost of adding services, without altering the PSM's contract.
 
-3. **Graceful Unregistration** – When a service is no longer needed (e.g., a team is decommissioned), invoke the unregistration method.  This ensures the underlying `LLMService` instance is disposed of and the monitoring loop is stopped, preventing resource leaks.
-
-4. **Monitor Health via Logs** – The manager emits health‑check logs for each registered service.  Watch these logs to detect flapping services early.  If a service repeatedly fails health checks, consider updating its configuration or credentials.
-
-5. **Do Not Bypass the Manager** – Directly constructing `LLMService` instances outside of `ProcessStateManager` defeats the coordinated environment guarantee.  All interactions should flow through the manager to maintain a single source of truth for service state.
-
----
-
-### 1. Architectural patterns identified  
-* **Manager pattern** – `ProcessStateManager` centralizes registration, unregistration, and monitoring.  
-* **Configuration‑driven design** – Service definitions are externalized in `config/teams/*.json` and environment variables.  
-* **Layered architecture** – Separation between configuration, management, and execution layers.
-
-### 2. Design decisions and trade‑offs  
-* **Centralized state vs. distributed control** – Centralizing service state simplifies coordination but introduces a single point of failure; the health‑monitoring loop mitigates this by allowing automatic recovery.  
-* **File‑based configuration** – Easy to version and edit, but large numbers of teams may increase file‑system overhead; however, the JSON approach keeps runtime parsing lightweight.  
-* **Delegation to LLMServiceManager** – Keeps `ProcessStateManager` focused on state, but adds an extra indirection layer that could affect latency for very high‑frequency registration changes (unlikely in typical use cases).
-
-### 3. System structure insights  
-* `ProcessStateManager` is a child of **DockerizedServices**, inheriting the Docker orchestration context.  
-* It shares the “manager” responsibility with siblings **LLMServiceManager**, **DockerOrchestrator**, and **GraphDatabaseManager**, indicating a consistent internal design language.  
-* The only concrete service implementation it touches is `LLMService` (via `lib/llm/llm-service.ts`), reinforcing a clear dependency chain.
-
-### 4. Scalability considerations  
-* Because service definitions are read from JSON and kept in an in‑memory registry, the manager can handle a large number of services as long as memory permits.  
-* Health‑monitoring loops are lightweight; they can be scaled horizontally if the DockerizedServices component is replicated across nodes, each instance managing its own subset of services.  
-* Adding new providers requires only a new JSON entry and, if needed, a small extension in `LLMServiceManager`, preserving scalability without code churn.
-
-### 5. Maintainability assessment  
-* **High maintainability** – The clear separation of concerns (configuration, management, execution) makes the codebase easy to understand.  
-* Adding or removing services is a matter of editing JSON and environment variables, avoiding code changes.  
-* The manager’s thin wrapper around `LLMServiceManager` reduces duplication and encourages reuse.  
-* Potential risk: if the JSON schema evolves, all existing team files must be updated; a schema‑validation step could be added to mitigate this.  
-
-Overall, **ProcessStateManager** provides a well‑encapsulated, configuration‑driven coordination layer that fits cleanly within the DockerizedServices ecosystem while sharing design conventions with its sibling managers.
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes the LLMService (lib/llm/llm-service.ts) for unified LLM operations across different modes and providers, allowing for a standardized approach to language model interactions. This is evident in the lib/llm/llm-service.ts file, where the LLMService class provides a unified interface for LLM operations. The use of this service enables the DockerizedServices component to seamlessly integrate with various LLM providers, facilitating a flexible and scalable architecture. Furthermore, the incorporation of environment variables and configuration files (config/teams/*.json) enables flexible service setup and customization, allowing developers to easily configure the services for different environments and use cases.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The ProcessStateManager (PSM) singleton implements a deliberate decoupling between service identity and process identity across both `scripts/api-service.js` and `scripts/dashboard-service.js`. Each script follows an identical structural pattern: spawn a child process via Node's `child_process` module, register the resulting process handle with the PSM via `psm.registerService()`, wire up `SIGTERM`/`SIGINT` forwarding so that signals delivered to the wrapper propagate to the child, and call `psm.unregisterService()` in the exit handler. This indirection means that the rest of the system (including `scripts/health-coordinator.js`) can query the PSM registry without holding direct references to OS-level process IDs. The practical consequence for developers is that a service restart — where a new child process replaces the old one — does not require the health coordinator or any consumer of PSM state to be aware of the PID change; only the wrapper scripts update the registry. This pattern also cleanly isolates the restart/retry logic in `lib/service-starter.js` from signal-handling responsibilities, since the wrapper owns the process lifecycle signals while the starter owns the retry policy. A new developer should note that adding a new containerized service almost certainly means creating a new wrapper script that replicates this boilerplate rather than centralizing it, which is a potential maintenance concern as the number of services grows.
+
+### Children
+- [ServiceRegistry](./ServiceRegistry.md) -- api-service.js and dashboard-service.js each call psm.registerService() immediately after spawning their child processes, inserting a service-name-to-process-handle entry into this shared map so downstream consumers have an up-to-date view.
+- [SingletonModulePattern](./SingletonModulePattern.md) -- The singleton guarantee means that when api-service.js calls psm.registerService() and health-coordinator.js later iterates the registry, they are operating on the exact same object—a direct consequence of Node.js caching the first require() result for all subsequent importers.
 
 ### Siblings
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses the LLMService class in lib/llm/llm-service.ts to manage LLM services across different modes and providers.
-- [DockerOrchestrator](./DockerOrchestrator.md) -- DockerOrchestrator uses Docker Compose configurations to manage container deployments.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter to interact with the graph database.
+- [ServiceProbe](./ServiceProbe.md) -- ServiceProbe lives at lib/utils/service-probe.js and is consumed by scripts/health-coordinator.js, establishing a clear utility-to-orchestrator dependency direction
+- [ConstraintAPIWrapper](./ConstraintAPIWrapper.md) -- scripts/api-service.js uses Node's child_process module to spawn the constraint monitor Express API, decoupling the OS-level PID from the service identity tracked by PSM
+- [DashboardWrapper](./DashboardWrapper.md) -- scripts/dashboard-service.js mirrors the structural pattern of api-service.js exactly: spawn via child_process, registerService, wire signals, unregisterService on exit
+- [LLMMockService](./LLMMockService.md) -- llm-mock-service.ts persists LLM mode state to workflow-progress.json rather than keeping it in memory, making mode selection survive process restarts within the Docker environment
+- [ServiceStarter](./ServiceStarter.md) -- lib/service-starter.js is explicitly isolated from SIGTERM/SIGINT handling — signal propagation is owned by the wrapper scripts (api-service.js, dashboard-service.js), not by the starter
+- [HealthCoordinator](./HealthCoordinator.md) -- health-coordinator.js consumes PSM state by name rather than PID, so service restarts are transparent — it never needs to be notified of PID changes in api-service.js or dashboard-service.js
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMStateManager
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMStateManager] as llmstate_manager #LightBlue
+[PublicProviderAdapter] as public_provider_adapter #F0F0F0
+[TierRouter] as tier_router #F0F0F0
+[ModeResolutionChain] as mode_resolution_chain #E8F5E8
+[AgentModeOverrideStore] as agent_mode_override_store #E8F5E8
+
+llmabstraction --> llmstate_manager
+public_provider_adapter -[hidden]- llmstate_manager
+tier_router -[hidden]- llmstate_manager
+llmstate_manager --> mode_resolution_chain
+llmstate_manager --> agent_mode_override_store
+
+@enduml

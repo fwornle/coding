@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Startup & Lifecycle" {
+    component "ServiceStartupPattern" as ssp <<core>>
+}
+
+package "MCPServerSemanticAnalysis" {
+    component "Semantic Analysis\nModule" as sam <<core>>
+}
+
+package "Event & Vocabulary Patterns" {
+    component "StructuredEventEnvelopePattern" as seep <<api>>
+    component "ClosedVocabularyPattern" as cvp <<api>>
+}
+
+package "Integrations" {
+    component "MCPConstraintMonitor" as mcm <<external>>
+}
+
+ssp --> sam : "initializes"
+sam --> seep : "handles events via"
+sam --> cvp : "constrains vocabulary with"
+mcm --> sam : "uses for\nconstraint detection"
+
+@enduml

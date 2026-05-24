@@ -1,0 +1,31 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Orchestration Layer" {
+  component "Orchestrator" as orchestrator <<core>>
+  component "Test Harness" as harness <<core>>
+}
+
+package "BaseAgent Lifecycle Contract" {
+  component "constructor(repoPath, team)" as ctor <<core>>
+  component "ensureLLMInitialized()" as ensureLLM <<core>>
+  component "execute(input)" as execute <<api>>
+}
+
+package "External Resources" {
+  cloud "LLM Client" as llmClient <<external>>
+}
+
+orchestrator --> ctor : "bulk instantiates"
+orchestrator --> execute : "selectively invokes"
+
+harness --> ensureLLM : "pre-initializes explicitly"
+harness --> execute : "drives invocation"
+
+ctor ..> ensureLLM : "must NOT call"
+
+execute --> ensureLLM : "calls if not pre-initialized"
+ensureLLM --> llmClient : "lazily allocates (first call only)"
+ensureLLM ..> ensureLLM : "idempotent guard"
+
+@enduml

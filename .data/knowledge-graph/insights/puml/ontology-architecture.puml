@@ -1,23 +1,32 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Ontology Sub-Component" {
-  component "OntologyManager" as om <<core>>
-  component "OntologyClassificationAgent" as oca <<agent>>
-  component "EntityValidator" as ev <<agent>>
-  component "OntologyCache" as oc <<storage>>
-  component "OntologyVersioning" as ov <<core>>
+package "Ontology Definitions" {
+    component "Upper Ontology" as upperOnt <<core>>
+    component "Lower Ontology" as lowerOnt <<core>>
+    upperOnt --> lowerOnt : "refinement"
 }
 
-package "External Dependencies" {
-  component "Machine Learning Model" as mlm <<external>>
+package "Classification Pipeline" {
+    component "OntologyClassificationBatch" as batch <<core>>
+    component "OntologyClassificationAgent" as classAgent <<agent>>
+    component "Entity Type Resolution" as typeRes <<core>>
 }
 
-om --> oc : uses
-om --> ov : uses
-oca --> om : uses
-oca --> mlm : uses
-ev --> om : uses
-om --> oca : provides API
+package "Validation & Output" {
+    component "Validation Rules" as valRules <<core>>
+}
+
+package "MCP Tool Integration" {
+    component "Tool Extensions" as toolExt <<external>>
+}
+
+batch --> classAgent : "pre-batched entities"
+classAgent --> typeRes : "resolve entity types"
+upperOnt --> typeRes : "broad abstract categories"
+lowerOnt --> typeRes : "concrete type refinement"
+typeRes --> valRules : "classified entities"
+valRules --> toolExt : "validated entity types"
+toolExt ..> typeRes : "shared classification path"
 
 @enduml

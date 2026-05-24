@@ -1,0 +1,36 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Agent Layer" {
+  component "Claude Code" as claudeCode <<agent>>
+  component "AI Agents" as agents <<agent>>
+}
+
+package "MCP Interface Layer" {
+  component "MCP Tool Registry" as mcpRegistry <<api>>
+}
+
+package "MCP Servers" {
+  component "code-graph-rag\nMCP Server" as codeGraphMcp <<core>>
+  component "mcp-server-semantic-analysis" as semanticMcp <<core>>
+  component "mcp-constraint-monitor" as constraintMcp <<core>>
+}
+
+package "Backing Capabilities" {
+  database "Knowledge Graph\n(Graph Query Engine)" as graphDb <<storage>>
+  component "Semantic Analysis\nEngine" as semanticEngine <<core>>
+  component "Constraint\nChecker" as constraintEngine <<core>>
+}
+
+claudeCode --> mcpRegistry : "discovers & calls tools"
+agents --> mcpRegistry : "discovers & calls tools"
+
+mcpRegistry --> codeGraphMcp : "routes tool calls"
+mcpRegistry --> semanticMcp : "routes tool calls"
+mcpRegistry --> constraintMcp : "routes tool calls"
+
+codeGraphMcp --> graphDb : "queries"
+semanticMcp --> semanticEngine : "invokes"
+constraintMcp --> constraintEngine : "invokes"
+
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: McpConstraintMonitor
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[McpConstraintMonitor] as mcp_constraint_monitor #LightBlue
+[SemanticConstraintDetector] as semantic_constraint_detector #F0F0F0
+[ConstraintConfigurationLoader] as constraint_configuration_loader #F0F0F0
+[ClaudeCodeHookIntegration] as claude_code_hook_integration #E8F5E8
+[SemanticConstraintDetection] as semantic_constraint_detection #E8F5E8
+
+constraint_system --> mcp_constraint_monitor
+semantic_constraint_detector -[hidden]- mcp_constraint_monitor
+constraint_configuration_loader -[hidden]- mcp_constraint_monitor
+mcp_constraint_monitor --> claude_code_hook_integration
+mcp_constraint_monitor --> semantic_constraint_detection
+
+@enduml

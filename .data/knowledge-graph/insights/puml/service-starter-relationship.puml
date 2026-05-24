@@ -5,11 +5,23 @@ title Hierarchy Context: ServiceStarter
 
 [DockerizedServices] as dockerized_services #FFFFDD
 [ServiceStarter] as service_starter #LightBlue
-[GraphDatabaseManager] as graph_database_manager #F0F0F0
-[RetryMechanism] as retry_mechanism #E8F5E8
+[ServiceProbe] as service_probe #F0F0F0
+[ConstraintAPIWrapper] as constraint_apiwrapper #F0F0F0
+[DashboardWrapper] as dashboard_wrapper #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[ServiceLaunchInvoker] as service_launch_invoker #E8F5E8
+[RetryPolicy] as retry_policy #E8F5E8
 
 dockerized_services --> service_starter
-graph_database_manager -[hidden]- service_starter
-service_starter --> retry_mechanism
+service_probe -[hidden]- service_starter
+constraint_apiwrapper -[hidden]- service_starter
+dashboard_wrapper -[hidden]- service_starter
+llmmock_service -[hidden]- service_starter
+process_state_manager -[hidden]- service_starter
+health_coordinator -[hidden]- service_starter
+service_starter --> service_launch_invoker
+service_starter --> retry_policy
 
 @enduml

@@ -1,27 +1,36 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "LLM Abstraction" {
-  component "LLMAbstraction" as llm <<core>>
-  component "ProviderRegistry" as pr <<api>>
-  component "LLMService" as lls <<api>>
-  component "CircuitBreaker" as cb <<api>>
+package "LLM Abstraction Core (llm-mock-service.ts)" as core {
+  component "getLLMMode()" as getMode <<core>>
+  component "setGlobalLLMMode()\n/ setAgentLLMMode()" as setters <<core>>
+  component "LLM State\n(globalMode · perAgentOverrides · mockLLM)" as llmState <<storage>>
 }
 
-package "Providers" {
-  component "AnthropicProvider" as ap <<external>>
-  component "DMRProvider" as dmr <<external>>
-  component "MockProvider" as mp <<external>>
+package "Provider Backends" as backends {
+  component "Mock Provider\n(offline harness)" as mockProv <<core>>
+  component "DMR Provider\n(dmr-provider.ts)" as dmrProv <<core>>
+  component "Docker Model Runner\n(localhost:DMR_PORT)" as dmr <<external>>
+  cloud "Anthropic / OpenAI / Groq\n(public cloud APIs)" as cloudAPIs <<external>>
 }
 
-llm --> pr : uses
-pr --> ap : manages
-pr --> dmr : manages
-pr --> mp : manages
-lls --> pr : uses
-lls --> cb : uses
-cb --> ap : monitors
-cb --> dmr : monitors
-cb --> mp : monitors
+package "Persistence & Configuration" as persistence {
+  database "workflow-progress.json\n(.data/)" as stateFile <<storage>>
+  database "dmr-config.yaml\n(config/)" as dmrConfig <<storage>>
+}
+
+' Core state management
+getMode --> llmState : "reads 3-tier priority\n(perAgent > global > mockLLM)"
+setters --> llmState : "writes + syncs legacy mockLLM"
+setters --> stateFile : "atomic write\n(effectivePath / CODING_ROOT)"
+
+' Mode routing from resolution
+getMode --> mockProv : "mode = 'mock'"
+getMode --> dmrProv : "mode = 'local'"
+getMode --> cloudAPIs : "mode = 'public'"
+
+' DMR provider internals
+dmrProv --> dmrConfig : "loads modelOverrides\nper agentId via getModelForAgent()"
+dmrProv --> dmr : "OpenAI-compatible\nsingleton client"
 
 @enduml

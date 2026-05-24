@@ -1,29 +1,34 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Data Storage" {
-  component "Graphology" as graph <<storage>>
-  component "LevelDB" as leveldb <<storage>>
-  database "GraphDatabase" as graphdb
+package "Knowledge Authoring" {
+    component "ManualLearning Entities\n(System, Project, Component,\nSubComponent, Pattern, Detail)" as ml <<core>>
 }
 
-package "Manual Learning" {
-  component "ManualLearning" as manual <<core>>
-  component "GraphDatabaseAdapter" as gda <<api>>
+package "Routing Layer" {
+    component "PersistenceAgent" as pa <<agent>>
+    component "GraphDatabaseAdapter" as gda <<agent>>
 }
 
-package "Utilities" {
-  component "UtilitiesModule" as utils <<core>>
-  component "Checkpoint System" as checkpoint <<core>>
-  component "OntologyClassificationModule" as oc <<core>>
+package "API Layer" {
+    component "VKB HTTP API" as vkb <<api>>
+    component "MCP Server" as mcp <<api>>
 }
 
-manual --> gda : uses
-gda --> graphdb : updates
-graphdb --> graph : relies on
-graphdb --> leveldb : relies on
-manual --> checkpoint : uses
-manual --> oc : uses
-gda --> utils : uses
+package "Storage Layer" {
+    component "GraphDatabaseService\n(Graphology + LevelDB)" as gds <<core>>
+    component "Graphology Graph" as gg <<storage>>
+    database "LevelDB" as ldb <<storage>>
+}
+
+ml --> pa : "routes writes\n(ontology metadata)"
+ml --> gda : "direct authoring path"
+pa --> vkb : "writes via API\n(skips LLM re-classification)"
+gda --> mcp : "checks availability"
+gda --> vkb : "API path\n(MCP online)"
+gda --> ldb : "direct write\n(MCP offline, avoids lock)"
+vkb --> gds : "manages"
+gds --> gg : "typed nodes & edges\n(hierarchical relationships)"
+gds --> ldb : "bi-temporal\nstaleness tracking"
 
 @enduml

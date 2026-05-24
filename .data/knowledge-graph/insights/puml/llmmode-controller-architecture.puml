@@ -1,0 +1,45 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+component "Agents" as agents <<agent>>
+
+package "llm-mock-service.ts" {
+  component "getLLMMode()" as getLLMMode <<core>>
+  component "setAgentLLMMode()" as setAgentLLM <<api>>
+  component "setGlobalLLMMode()" as setGlobalLLM <<api>>
+}
+
+package "llmState (Priority Resolution)" {
+  component "perAgentOverrides [Tier 1 — Highest]" as tier1 <<storage>>
+  component "globalMode [Tier 2 — Fallback]" as tier2 <<storage>>
+  component "mockLLM legacy [Tier 3 — Lowest]" as tier3 <<storage>>
+}
+
+package "LLM Backends" {
+  cloud "Docker Model Runner" as dockerRunner
+  cloud "Anthropic / OpenAI" as anthropic
+}
+
+database "workflow-progress.json" as progressFile <<storage>>
+
+agents --> setAgentLLM : "per-agent override"
+agents --> setGlobalLLM : "global config"
+agents --> getLLMMode : "resolve backend"
+
+setAgentLLM --> tier1 : "writes"
+setGlobalLLM --> tier2 : "writes"
+
+getLLMMode --> tier1 : "check first"
+getLLMMode --> tier2 : "fallback if no override"
+getLLMMode --> tier3 : "last resort (legacy)"
+
+getLLMMode --> dockerRunner : "routes to"
+getLLMMode --> anthropic : "routes to"
+
+tier1 --> progressFile : "persisted"
+tier2 --> progressFile : "persisted"
+tier3 --> progressFile : "persisted"
+
+@enduml

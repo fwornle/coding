@@ -2,85 +2,83 @@
 
 **Type:** Detail
 
-The OntologyConfigManager's role in loading the ontology configuration is crucial for the SemanticAnalysis component, as it enables the analysis of semantic data based on the defined ontology.
+Based on parent context, OntologyConfigManager acts as the sole entry point for ontology configuration under src/ontology/, preventing scattered entity hierarchy definitions across multiple agent files.
 
-## What It Is  
+# OntologyConfigManager: Technical Insight Document
 
-**OntologyConfigManager** is the concrete class that materialises the ontology configuration for the **SemanticAnalysis** subsystem of the MCP server. It lives inside the `integrations/mcp-server-semantic-analysis/src/config` folder and is responsible for reading the `ontology-config.yaml` file that resides in the same directory. By translating this human‑readable YAML definition into in‑memory structures, the manager supplies the rest of the **Ontology** component (its parent) with the precise vocabulary, relationships, and rules required for semantic data processing. In practice, every time the **SemanticAnalysis** component starts up, it asks the **OntologyConfigManager** to load the configuration, ensuring that the analysis logic works against the latest, centrally‑maintained ontology definition.
+## What It Is
 
----
+`OntologyConfigManager` is the centralized configuration management component implemented under `src/ontology/`, serving as the sole entry point for ontology configuration within the broader OntologySubsystem. It is responsible for loading, managing, and exposing entity type hierarchy definitions that govern how semantic analysis agents interpret and classify domain concepts.
 
-## Architecture and Design  
+Rather than allowing entity hierarchy definitions to be scattered across multiple agent files, `OntologyConfigManager` consolidates this concern into a single managed location. This architectural choice directly supports the coordination model documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, where shared configuration and agent coordination are treated as first-class architectural concerns.
 
-The design of **OntologyConfigManager** follows a **configuration‑driven** architectural approach. The manager isolates *configuration concerns* from *analysis logic* by delegating the reading and parsing of the YAML file to a dedicated class. This separation of concerns is evident from the observation that the manager “loads the configuration from the `integrations/mcp-server-semantic-analysis/src/config` directory,” indicating that the configuration files are treated as first‑class artefacts that can be swapped without touching the analysis code.
+As a child component of OntologySubsystem, it specifically owns the configuration lifecycle for ontology data — its parent subsystem delegates this responsibility entirely to `OntologyConfigManager`, ensuring a clear separation between ontology configuration management and ontology consumption.
 
-Because the configuration is stored in **YAML**, the system benefits from a *human‑readable* and *editable* format, which aligns with the “easy‑to‑modify” characteristic highlighted in the observations. The manager likely uses a standard YAML parsing library (e.g., SnakeYAML for Java or PyYAML for Python) to deserialize the file into domain objects that the **SemanticAnalysis** component can consume. This choice encourages **declarative configuration** rather than hard‑coded values, making the system more adaptable to evolving ontology definitions.
+## Architecture and Design
 
-From an architectural perspective, **OntologyConfigManager** acts as a *gateway* between the **Ontology** parent component and the **SemanticAnalysis** child component. The parent (Ontology) owns the conceptual model, while the child (SemanticAnalysis) performs runtime processing. The manager’s sole responsibility is to bridge these layers, which reflects a **Facade**‑style pattern: it presents a simple, well‑defined API (e.g., `loadOntologyConfig()`) while hiding the complexities of file I/O, parsing, and validation.
+The architectural approach embodied by `OntologyConfigManager` follows the **Single Source of Truth** pattern applied to ontology configuration. By centralizing all entity type hierarchy definitions under `src/ontology/`, the design eliminates the risk of definitional drift that would otherwise occur if multiple semantic analysis agents maintained their own local copies of ontology rules.
 
----
+This is reinforced by a **Facade pattern** characteristic: agents within the system interact with ontology configuration through `OntologyConfigManager` rather than reaching directly into configuration files or duplicating loading logic. The facade insulates consumers from the underlying configuration storage format and loading mechanics, allowing those internals to evolve independently.
 
-## Implementation Details  
+The component's placement within OntologySubsystem reflects a clear **layered responsibility model**. OntologySubsystem provides the broader ontology capability surface, while `OntologyConfigManager` handles the narrow but critical concern of configuration management. This separation ensures that changes to entity type hierarchies flow through one managed entry point, directly aligning with the agent coordination concerns described in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.
 
-Although the source code is not directly visible, the observations give us enough concrete anchors to describe the implementation flow:
+## Implementation Details
 
-1. **Location & Entry Point** – The manager resides in the `integrations/mcp-server-semantic-analysis/src/config` directory. The primary entry point is likely a method such as `load()` or `initialize()` that is invoked during the bootstrap of the **SemanticAnalysis** component.
+The implementation is localized to `src/ontology/`, providing a stable, predictable location for all ontology configuration logic. While the current code structure inventory does not surface specific symbols, the design intent is clear from the observations: `OntologyConfigManager` exposes ontology configuration loading as its primary responsibility, and entity type hierarchy definitions are managed through this single component.
 
-2. **YAML Loading** – The manager reads `ontology-config.yaml`. The file format suggests a straightforward key‑value hierarchy that maps directly to ontology constructs (e.g., classes, properties, constraints). The manager probably opens the file using a relative path (`src/config/ontology-config.yaml`) to guarantee that the configuration is bundled with the integration module.
+Technically, this means any modification to entity type hierarchies — adding new entity types, restructuring parent-child relationships between types, or adjusting classification rules — is performed in one location. This eliminates the need to synchronize changes across multiple semantic analysis agents, each of which would otherwise need to interpret the same ontological constructs independently.
 
-3. **Deserialization & Validation** – After loading the raw YAML text, the manager deserialises it into an internal representation—perhaps a set of POJOs/DTOs that model the ontology entities. Validation steps (schema checks, mandatory field enforcement) are implied by the “crucial for the SemanticAnalysis component” role; any malformed configuration would break downstream analysis, so the manager must surface clear errors.
+The component operates as part of the broader OntologySubsystem, which acts as its containing context. This containment relationship establishes clear ownership: `OntologyConfigManager` is not a free-floating utility but rather a deliberately scoped subsystem component with a well-defined responsibility boundary.
 
-4. **Provisioning to Consumers** – Once parsed, the manager exposes the configuration through accessor methods (e.g., `getClasses()`, `getRelationships()`). The **SemanticAnalysis** component queries these methods to understand how to interpret incoming semantic data. Because the manager is part of the **Ontology** parent, it may also be used by other sibling components that need ontology awareness (e.g., data ingestion pipelines).
+## Integration Points
 
-5. **Lifecycle Management** – The manager is likely a singleton or scoped to the lifetime of the **SemanticAnalysis** service, ensuring that the configuration is loaded once and reused, reducing I/O overhead.
+`OntologyConfigManager` integrates primarily with the semantic analysis agents referenced in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. These agents depend on consistent ontology definitions to perform their classification and analysis tasks, and `OntologyConfigManager` is the point through which they obtain that shared configuration.
 
----
+The integration with its parent OntologySubsystem is hierarchical: OntologySubsystem composes `OntologyConfigManager` to fulfill its configuration management responsibilities. Other components within OntologySubsystem can rely on `OntologyConfigManager` for authoritative entity hierarchy information without needing to know how that information is sourced or loaded.
 
-## Integration Points  
+By centralizing configuration access, `OntologyConfigManager` becomes an integration choke point in the positive sense — a deliberate convergence that simplifies dependency graphs across the agent ecosystem. Agents no longer need direct knowledge of configuration files, formats, or locations; they need only a reference to this manager.
 
-The **OntologyConfigManager** sits at the intersection of three logical layers:
+## Usage Guidelines
 
-* **Parent – Ontology** – As a child of the **Ontology** component, the manager inherits the responsibility of representing the domain’s conceptual model. Any changes to the ontology definition (e.g., adding a new concept) are reflected only in the `ontology-config.yaml` file, and the manager automatically propagates those changes to its consumers.
+Developers extending or modifying the system should treat `OntologyConfigManager` as the **exclusive entry point** for entity type hierarchy definitions. Avoid the temptation to embed ontology definitions directly into individual agent files; this directly contradicts the architectural intent and reintroduces the consistency risks that this centralization is designed to prevent.
 
-* **Sibling – Other Config Managers** – Within the `integrations/mcp-server-semantic-analysis/src/config` folder, there may be other configuration managers (e.g., for data source connections or analysis parameters). While the observations do not name them, the shared directory suggests a *cohesive configuration package* where each manager follows a similar loading pattern, promoting consistency across the integration.
+When making changes to entity type hierarchies, perform all modifications through the configuration path managed by `OntologyConfigManager` under `src/ontology/`. This ensures that all downstream semantic analysis agents observe the same updated definitions and that the architectural guarantees provided by OntologySubsystem remain intact.
 
-* **Child – SemanticAnalysis** – The **SemanticAnalysis** component consumes the ontology configuration supplied by the manager. It likely injects the manager (or the parsed configuration object) during its own initialization, using the data to drive rule‑based processing, graph traversals, or similarity calculations.
-
-External dependencies are limited to the YAML parsing library and the file system. No network or inter‑process communication is indicated, which keeps the integration surface small and deterministic.
+New semantic analysis agents should consume ontology configuration via `OntologyConfigManager` rather than implementing custom loading logic. This convention preserves the architectural coordination model documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` and ensures that the agent ecosystem remains cohesive as it grows.
 
 ---
 
-## Usage Guidelines  
+## Architectural Analysis Summary
 
-1. **Keep the YAML Canonical** – Since the manager reads `ontology-config.yaml` directly, developers should avoid manual edits that break YAML syntax (e.g., inconsistent indentation). Use a linting tool or IDE support for YAML to catch errors early.
+### 1. Architectural Patterns Identified
+- **Single Source of Truth**: All entity type hierarchy definitions converge in one managed location under `src/ontology/`.
+- **Facade Pattern**: `OntologyConfigManager` presents a unified interface for ontology configuration access, hiding loading mechanics.
+- **Composition within Subsystem**: OntologySubsystem composes `OntologyConfigManager` as a scoped, responsibility-bounded component.
+- **Centralized Configuration Management**: Aligns with the shared configuration concerns explicitly documented in the agent architecture.
 
-2. **Version the Configuration** – Treat the YAML file as part of the codebase’s version control. Any change to the ontology definition must be reviewed alongside the corresponding updates in the **SemanticAnalysis** logic, because mismatches can cause runtime failures.
+### 2. Design Decisions and Trade-offs
+- **Decision**: Centralize ontology configuration in a single manager rather than allowing per-agent definitions.
+  - *Benefit*: Eliminates definitional drift and inconsistency between semantic analysis agents.
+  - *Trade-off*: Introduces a single point that all agents depend on; changes here have system-wide impact.
+- **Decision**: Place `OntologyConfigManager` as a child of OntologySubsystem rather than as a top-level utility.
+  - *Benefit*: Clear ownership and architectural placement; reinforces subsystem boundaries.
+  - *Trade-off*: Consumers must navigate the subsystem hierarchy to locate configuration management.
 
-3. **Do Not Bypass the Manager** – All components that need ontology information should obtain it through the **OntologyConfigManager** API. Direct file reads or duplicate parsing logic would duplicate responsibilities and increase maintenance overhead.
+### 3. System Structure Insights
+The structure reflects a **deliberate hierarchical decomposition**: OntologySubsystem owns the broader ontology capability, while `OntologyConfigManager` owns the narrower configuration concern. This nesting mirrors the architectural separation between "what ontology means" (subsystem-level) and "how ontology configuration is loaded and managed" (manager-level). The location under `src/ontology/` makes the structure discoverable and consistent with the documented architecture in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.
 
-4. **Reload on Deployments** – If the system supports hot‑reloading, ensure that the manager’s `load()` method is invoked after a configuration change. Otherwise, restart the **SemanticAnalysis** service to guarantee the latest ontology is in effect.
+### 4. Scalability Considerations
+As the number of semantic analysis agents grows, the centralized design scales favorably from a *coordination* perspective: each new agent depends on one well-known manager rather than introducing new configuration sources. However, `OntologyConfigManager` itself becomes a critical path component — its loading performance and the size of the entity hierarchy it manages will directly influence agent initialization and behavior. Future scaling may benefit from caching strategies or lazy loading patterns if the ontology grows substantially in size or complexity.
 
-5. **Validate Early** – Incorporate unit tests that load a sample `ontology-config.yaml` and assert that required sections (e.g., top‑level `entities` list) are present. This guards against accidental omission of critical ontology parts.
+### 5. Maintainability Assessment
+The maintainability profile is strong by design. Centralizing entity type hierarchy definitions means that changes are made in one location, tested in one location, and reasoned about in one location. This dramatically reduces the cognitive load of evolving the ontology compared to a distributed approach where each agent maintained its own definitions. The clear parent-child relationship with OntologySubsystem also makes the component easy to locate and understand within the broader codebase. The primary maintainability risk is that the manager must remain disciplined about scope — accumulating unrelated responsibilities would erode the clarity that makes this design effective.
 
----
-
-### Summary of Architectural Insights  
-
-| Aspect | Observation‑Based Insight |
-|--------|----------------------------|
-| **Architectural patterns** | Configuration‑driven design, Facade‑style gateway, Separation of concerns |
-| **Design decisions** | Use of human‑readable YAML for easy maintenance; dedicated manager isolates I/O and parsing; placement under `integrations/.../config` promotes modularity |
-| **Trade‑offs** | Simplicity and readability vs. runtime validation overhead; reliance on file‑system access may limit distributed deployment without shared storage |
-| **System structure** | **Ontology** (parent) → **OntologyConfigManager** (configuration gateway) → **SemanticAnalysis** (child consumer); co‑located sibling config managers in same directory |
-| **Scalability** | Loading is a one‑time operation per service instance; the manager’s singleton nature scales horizontally as each node loads its own copy of the YAML; large ontologies could increase memory footprint, but the design keeps the loading cost bounded |
-| **Maintainability** | High, thanks to declarative YAML and clear responsibility boundaries; changes to the ontology are localized to a single file, and the manager’s API shields downstream code from format changes |
-
-By anchoring the analysis strictly to the provided observations, this document captures the essential architectural and design characteristics of **OntologyConfigManager**, clarifying how it fits within the broader **Ontology** and **SemanticAnalysis** ecosystem while offering concrete guidance for developers who will maintain or extend it.
 
 ## Hierarchy Context
 
 ### Parent
-- [Ontology](./Ontology.md) -- OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/mcp-server-semantic-analysis/src/config directory
+- [OntologySubsystem](./OntologySubsystem.md) -- OntologyConfigManager centralizes all ontology configuration loading under src/ontology/, meaning changes to entity type hierarchies flow through a single managed entry point rather than being scattered across agents
+
 
 ---
 

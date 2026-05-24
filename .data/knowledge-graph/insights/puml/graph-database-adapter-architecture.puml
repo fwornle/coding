@@ -1,32 +1,32 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Data Storage" {
-  component "GraphDatabase" as graphdb <<storage>>
-  component "LevelDB" as leveldb <<storage>>
+package "Consumer Layer" {
+  component "Consumer Process" as consumer <<cli>>
 }
 
-package "Adapters and Agents" {
-  component "GraphDatabaseAdapter" as gda <<core>>
-  component "CodeGraphAgent" as cga <<agent>>
+package "Adapter Layer" {
+  component "GraphDatabaseAdapter" as adapter <<core>>
+  component "isServerAvailable() Probe" as probe <<core>>
 }
 
-package "Learning Components" {
-  component "ManualLearning" as ml <<core>>
-  component "OnlineLearning" as ol <<core>>
+package "Backend Implementations" {
+  component "VkbApiClient" as vkbApi <<api>>
+  component "GraphDatabaseService" as dbService <<core>>
 }
 
-package "External Integrations" {
-  component "MCP Constraint Monitor" as mcp <<external>>
-  component "JSON Export" as json <<cli>>
+package "External Process" {
+  component "VKB Server Process" as vkbServer <<external>>
 }
 
-graphdb --> leveldb : uses
-gda --> graphdb : uses
-cga --> gda : uses
-gda --> json : exports
-ml --> gda : uses
-ol --> gda : uses
-gda --> mcp : configures
+database "LevelDB Files" as leveldb <<storage>>
+
+consumer --> adapter : "unified interface"
+adapter --> probe : "once on initialize()"
+probe ..> vkbApi : "routes (API mode)"
+probe ..> dbService : "routes (Direct mode)"
+vkbApi --> vkbServer : "HTTP calls"
+vkbServer --> leveldb : "holds file lock"
+dbService --> leveldb : "direct LevelDB ops"
 
 @enduml

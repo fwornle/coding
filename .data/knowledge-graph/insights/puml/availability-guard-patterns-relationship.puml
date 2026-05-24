@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AvailabilityGuardPatterns
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AvailabilityGuardPatterns] as availability_guard_patterns #LightBlue
+[AgentLifecyclePatterns] as agent_lifecycle_patterns #F0F0F0
+[ServiceRegistrationPatterns] as service_registration_patterns #F0F0F0
+[AdapterAndWrapperPatterns] as adapter_and_wrapper_patterns #F0F0F0
+[DocumentationConventions] as documentation_conventions #F0F0F0
+[ConfigurationSeparationConventions] as configuration_separation_conventions #F0F0F0
+[ServerAvailabilityPrecheck] as server_availability_precheck #E8F5E8
+[VkbApiClientDeferredImport] as vkb_api_client_deferred_import #E8F5E8
+
+coding_patterns --> availability_guard_patterns
+agent_lifecycle_patterns -[hidden]- availability_guard_patterns
+service_registration_patterns -[hidden]- availability_guard_patterns
+adapter_and_wrapper_patterns -[hidden]- availability_guard_patterns
+documentation_conventions -[hidden]- availability_guard_patterns
+configuration_separation_conventions -[hidden]- availability_guard_patterns
+availability_guard_patterns --> server_availability_precheck
+availability_guard_patterns --> vkb_api_client_deferred_import
+
+@enduml

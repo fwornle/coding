@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SessionWindowManager
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[SessionWindowManager] as session_window_manager #LightBlue
+[RedactionEngine] as redaction_engine #F0F0F0
+[TranscriptAdapterBase] as transcript_adapter_base #F0F0F0
+[WindowLabelFileIdentityEmbedder] as window_label_file_identity_embedder #E8F5E8
+
+live_logging_system --> session_window_manager
+redaction_engine -[hidden]- session_window_manager
+transcript_adapter_base -[hidden]- session_window_manager
+session_window_manager --> window_label_file_identity_embedder
+
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MCPToolExposurePattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[MCPToolExposurePattern] as mcptool_exposure_pattern #LightBlue
+[AgentConstructionPattern] as agent_construction_pattern #F0F0F0
+[ConfigDrivenBehavior] as config_driven_behavior #F0F0F0
+[HookExtensionSystem] as hook_extension_system #F0F0F0
+[DiagramFirstDocumentation] as diagram_first_documentation #F0F0F0
+[TieredLLMRouting] as tiered_llmrouting #F0F0F0
+[SseTransportMCPBinding] as sse_transport_mcpbinding #E8F5E8
+
+coding_patterns --> mcptool_exposure_pattern
+agent_construction_pattern -[hidden]- mcptool_exposure_pattern
+config_driven_behavior -[hidden]- mcptool_exposure_pattern
+hook_extension_system -[hidden]- mcptool_exposure_pattern
+diagram_first_documentation -[hidden]- mcptool_exposure_pattern
+tiered_llmrouting -[hidden]- mcptool_exposure_pattern
+mcptool_exposure_pattern --> sse_transport_mcpbinding
+
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMMockService
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[LLMMockService] as llmmock_service #LightBlue
+[ServiceProbe] as service_probe #F0F0F0
+[ConstraintAPIWrapper] as constraint_apiwrapper #F0F0F0
+[DashboardWrapper] as dashboard_wrapper #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[ServiceStarter] as service_starter #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[PersistedModeStore] as persisted_mode_store #E8F5E8
+[AgentOverrideResolver] as agent_override_resolver #E8F5E8
+
+dockerized_services --> llmmock_service
+service_probe -[hidden]- llmmock_service
+constraint_apiwrapper -[hidden]- llmmock_service
+dashboard_wrapper -[hidden]- llmmock_service
+process_state_manager -[hidden]- llmmock_service
+service_starter -[hidden]- llmmock_service
+health_coordinator -[hidden]- llmmock_service
+llmmock_service --> persisted_mode_store
+llmmock_service --> agent_override_resolver
+
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: PublicCloudProviders
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[PublicCloudProviders] as public_cloud_providers #LightBlue
+[LLMProviderConfig] as llmprovider_config #F0F0F0
+[TierRouter] as tier_router #F0F0F0
+[MockLLMService] as mock_llmservice #F0F0F0
+[AnthropicAdapter] as anthropic_adapter #E8F5E8
+
+llmabstraction --> public_cloud_providers
+llmprovider_config -[hidden]- public_cloud_providers
+tier_router -[hidden]- public_cloud_providers
+mock_llmservice -[hidden]- public_cloud_providers
+public_cloud_providers --> anthropic_adapter
+
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Adapter Layer (transcript-api.js)" as adapterPkg {
+  component "TranscriptAdapter" as adapter <<api>>
+  component "getCurrentSession()" as getSession <<core>>
+}
+
+package "Windowing Contract" as windowingPkg {
+  component "SessionWindowing" as sessionWindowing <<core>>
+  component "LSLMetadata.timeWindow" as timeWindow <<core>>
+}
+
+package "Serialization Layer (lsl-converter.js)" as serializationPkg {
+  component "convertToLSL()" as convertLSL <<core>>
+  component "LSL Typed Entry" as lslEntry <<storage>>
+}
+
+adapter --> getSession : "invokes"
+getSession --> sessionWindowing : "filters live vs historical"
+sessionWindowing --> timeWindow : "encodes as\nhour-range strings"
+adapter --> timeWindow : "reads window boundaries"
+convertLSL --> timeWindow : "stamps at\nnormalization"
+convertLSL --> lslEntry : "produces"
+adapterPkg ..> windowingPkg : "shared contract"
+serializationPkg ..> windowingPkg : "shared contract"
+
+@enduml

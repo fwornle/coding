@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DashboardServiceWrapper
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[DashboardServiceWrapper] as dashboard_service_wrapper #LightBlue
+[ApiServiceWrapper] as api_service_wrapper #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[PostSpawnPsmRegistration] as post_spawn_psm_registration #E8F5E8
+[ChildProcessSpawner] as child_process_spawner #E8F5E8
+
+dockerized_services --> dashboard_service_wrapper
+api_service_wrapper -[hidden]- dashboard_service_wrapper
+process_state_manager -[hidden]- dashboard_service_wrapper
+dashboard_service_wrapper --> post_spawn_psm_registration
+dashboard_service_wrapper --> child_process_spawner
+
+@enduml

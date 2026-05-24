@@ -2,103 +2,72 @@
 
 **Type:** Detail
 
-The CLAUDE-CODE-HOOK-FORMAT.md documentation in integrations/mcp-constraint-monitor/docs provides insight into the data format used by the UKBTraceReporting sub-component.
+The coexistence of `CLAUDE-CODE-HOOK-FORMAT.md` (event ingestion) and `integrations/mcp-constraint-monitor/docs/status-line-integration.md` (UI feedback) reveals a two-stage pipeline: raw hook payloads are received, constraint evaluation occurs, and results are surfaced to developers via status line output.
 
-## What It Is  
+# ClaudeCodeHookDataFormat
 
-`ClaudeCodeHookDataFormat` is a data‑exchange contract that lives inside the **MCP Constraint Monitor** integration. The definitive description of the format is found in the markdown file  
+## What It Is
 
-```
-integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-```  
+The `ClaudeCodeHookDataFormat` is a specification document located at `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` that defines the payload schema emitted by Claude Code when invoking the constraint monitor as a downstream hook consumer. It establishes the contract for the primary ingestion boundary of the `MCPConstraintMonitor` system, codifying exactly what data structure flows across the integration seam between Claude Code and the constraint enforcement pipeline.
 
-This document is referenced by the **UKBTraceReporting** sub‑component, which is the parent of the data format (see the hierarchy note that *UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format*). In the broader model, the format is also listed as a member of the **OntologyClassification** entity, indicating that it is part of the system’s shared ontology for classifying trace data.  
+As a Detail-type artifact under the `MCPConstraintMonitor` parent component, this format specification is foundational rather than operational — it does not execute logic itself but rather governs the shape of every interaction that downstream constraint-evaluation logic must handle. Without this schema being honored, no constraint can be evaluated, because the monitor would have no reliable way to parse what Claude Code has sent.
 
-In practice, `ClaudeCodeHookDataFormat` defines the JSON (or equivalent) payload that the Claude code‑hook emits and that the MCP Constraint Monitor (and downstream consumers such as UKBTraceReporting) expects to receive. The format is therefore a **boundary artifact** – a schema that enables loose coupling between the code‑hook producer and the monitoring/reporting pipelines.
+The document sits alongside other integration documentation in the `integrations/mcp-constraint-monitor/docs/` directory, where it forms one half of a coherent integration story: defining what comes in, while companion documents like `status-line-integration.md` define what goes out.
 
----
+## Architecture and Design
 
-## Architecture and Design  
+The presence of `ClaudeCodeHookDataFormat` reveals a fundamentally **reactive, event-driven architectural model**. The constraint monitor does not poll Claude Code or proactively inspect its state; instead, Claude Code pushes structured payloads to the monitor when relevant events occur. This hook-based integration pattern, which aligns with the component-level event-driven design described in `integrations/mcp-constraint-monitor/README.md`, decouples the monitor's execution lifecycle from Claude Code's internal operation while ensuring the monitor sees every event of interest in real time.
 
-The only concrete artifact we have is the markdown specification, which suggests a **contract‑first** design. By publishing the format in a human‑readable document, the team establishes a **shared contract** that multiple components can implement independently. This is a classic **interface‑based** architectural approach, where the contract lives outside of any particular code base, allowing the producer (the Claude code‑hook) and the consumer (UKBTraceReporting) to evolve separately as long as they adhere to the documented schema.
+The coexistence of `CLAUDE-CODE-HOOK-FORMAT.md` (ingestion) and `integrations/mcp-constraint-monitor/docs/status-line-integration.md` (UI feedback) reveals a clear **two-stage pipeline architecture**:
 
-The placement of the file under `integrations/mcp-constraint-monitor/docs/` indicates that the **MCP Constraint Monitor** integration is the primary owner of the format. The **UKBTraceReporting** component is a consumer that “may utilize a similar approach,” implying that it either parses the same payload directly or transforms it into its own internal representation. No explicit design patterns (e.g., strategy, observer) are mentioned in the observations, so we limit the analysis to the contract‑first, **schema‑driven** style that the documentation enforces.
+1. **Ingestion stage**: Raw hook payloads conforming to `ClaudeCodeHookDataFormat` are received from Claude Code.
+2. **Evaluation and surfacing stage**: Constraint evaluation occurs on the parsed payload, and results are surfaced to developers via status line output.
 
-Because the format is defined in a static markdown file rather than generated code, the architecture leans on **documentation‑driven development**. Consumers are expected to read the spec and implement parsers manually, which encourages clear ownership but can introduce duplication if multiple languages need to consume the same schema.
+This pipeline separation reflects a classic **boundary-isolation pattern**: by formalizing the input contract in a dedicated document, the system localizes the impact of any upstream changes from Claude Code to a single, well-defined translation point. Internal constraint-evaluation logic — including any work performed by the sibling `SemanticConstraintDetection` component — can operate on a stable internal representation derived from the hook payload, insulated from upstream churn.
 
----
+## Implementation Details
 
-## Implementation Details  
+The `ClaudeCodeHookDataFormat` itself is a specification rather than executable code, so its implementation is the schema definition contained in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This document establishes the field-level structure that Claude Code commits to emitting and that the constraint monitor commits to accepting.
 
-The observations do not expose any concrete classes, functions, or source files that implement the format. Consequently, the implementation details we can infer are limited to the **structure of the specification itself**. The `CLAUDE-CODE-HOOK-FORMAT.md` file presumably enumerates required fields, data types, and possibly validation rules (e.g., required vs optional keys, enumerated values).  
+Mechanically, this schema serves as the deserialization target for hook invocations. When Claude Code triggers the monitor as a downstream hook consumer, the payload arrives in the format prescribed here, and the monitor's ingestion layer parses it into in-memory structures suitable for constraint evaluation. Because the format is documented separately from the consuming code, it functions as a stable interface artifact: changes to the schema require explicit document updates, providing a deliberate friction point that helps prevent silent contract drift.
 
-Given the relationship to **UKBTraceReporting**, it is reasonable to assume that somewhere in that sub‑component there exists a parser that reads the incoming payload, validates it against the documented schema, and maps the data onto internal models used for trace reporting. The fact that **OntologyClassification** contains the format suggests that the parsed data may be classified according to a shared ontology, enabling downstream analytics or constraint‑checking logic.
+The format specification is intentionally narrow in scope — it covers only the inbound hook payload. Downstream concerns such as how constraints are detected (the domain of `SemanticConstraintDetection`, documented across `semantic-constraint-detection.md` and `semantic-detection-design.md`) and how results are presented (covered by `status-line-integration.md`) are handled by separate artifacts. This separation keeps the schema document focused and authoritative.
 
-Because no source symbols are present, we cannot name specific parsers, validators, or data‑transfer objects. Developers looking to implement support should therefore:
+## Integration Points
 
-1. Consult `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` for the exact field list.  
-2. Build a data‑structure (e.g., a POJO, a TypeScript interface, or a Python dataclass) that mirrors the documented fields.  
-3. Implement validation logic that respects any constraints described in the markdown (e.g., value ranges, required fields).  
+The most significant integration point is the boundary with **Claude Code itself**, which acts as the producer of payloads conforming to `ClaudeCodeHookDataFormat`. Claude Code invokes the constraint monitor as a downstream hook consumer, and this format defines what Claude Code must send and what the monitor will accept.
 
----
+Within the `MCPConstraintMonitor` parent module, the format feeds directly into the constraint-evaluation pipeline. The sibling component `SemanticConstraintDetection` — which has both an operational guide (`semantic-constraint-detection.md`) and a separate design rationale (`semantic-detection-design.md`) — consumes the parsed representation of these payloads when performing its semantic analysis work. The format therefore acts as the upstream contract that semantic detection depends upon.
 
-## Integration Points  
+On the output side, the pipeline terminates in the status line integration described in `integrations/mcp-constraint-monitor/docs/status-line-integration.md`. Although `ClaudeCodeHookDataFormat` does not directly interact with the status line, it is the originating data source whose evaluation outcomes ultimately drive that feedback channel. Any field present in the hook payload may influence what developers see in their status line.
 
-The primary integration surface for `ClaudeCodeHookDataFormat` is the **MCP Constraint Monitor** integration, as indicated by the location of the spec file. The **UKBTraceReporting** component consumes the format, meaning that any data produced by the Claude code‑hook will flow through the MCP Constraint Monitor and be handed off to UKBTraceReporting for further processing, classification (via **OntologyClassification**), and reporting.
+## Usage Guidelines
 
-From a dependency perspective:
+Developers extending or maintaining the `MCPConstraintMonitor` should treat `ClaudeCodeHookDataFormat` as the **canonical reference** for what hook data looks like. Any new constraint-evaluation logic, including additions to `SemanticConstraintDetection`, should consult this document first to confirm which fields are available and how they are structured, rather than relying on ad-hoc inspection of runtime payloads.
 
-* **Producer side** – The Claude code‑hook (outside the repository) must serialize its output to match the documented schema.  
-* **Consumer side** – UKBTraceReporting likely imports or reads the payload from a message queue, HTTP endpoint, or file system location that the MCP Constraint Monitor writes to. The exact transport mechanism is not described in the observations, so developers should follow the integration documentation for the MCP Constraint Monitor to discover the concrete I/O details.  
+When changes to the hook payload are required — either because Claude Code has evolved its emission format or because the monitor needs new information — the schema document must be updated alongside the code. Because the format defines the ingestion boundary of the entire system, undocumented changes carry the risk of breaking constraint evaluation system-wide. Treat schema updates as breaking-change candidates and verify that all downstream consumers (semantic detection, status line surfacing) handle the new shape correctly.
 
-No additional libraries, external services, or APIs are mentioned, so the integration appears to be **in‑process or simple message‑based** rather than relying on complex middleware.
+Finally, given the reactive, push-based nature of the integration, developers should not introduce polling or pull-based mechanisms that bypass the hook channel. The architectural choice to operate reactively on Claude Code-pushed events is intentional and consistent throughout the `MCPConstraintMonitor`; alternative ingestion paths would fragment the data model and undermine the value of having a single, well-defined hook format.
 
 ---
 
-## Usage Guidelines  
+### Summary Insights
 
-1. **Adhere Strictly to the Spec** – Since the format is defined in `CLAUDE-CODE-HOOK-FORMAT.md`, any deviation (extra fields, missing required fields, type mismatches) will likely cause parsing failures in UKBTraceReporting. Validate payloads against the spec before transmission.  
+1. **Architectural patterns identified**: Reactive, event-driven hook consumption; two-stage ingestion-then-surfacing pipeline; boundary-isolation via a dedicated schema document.
+2. **Design decisions and trade-offs**: Choosing push-based hooks over polling trades some control over invocation timing for guaranteed event coverage and reduced overhead; documenting the format separately from code trades minor duplication for a stable, auditable contract.
+3. **System structure insights**: The format sits at the upstream edge of `MCPConstraintMonitor`, feeding a pipeline that includes `SemanticConstraintDetection` and terminates at status-line output, giving the module a clear input-process-output shape.
+4. **Scalability considerations**: Because the monitor reacts to events rather than polling, its workload scales naturally with Claude Code activity; the well-defined schema also enables future batching or asynchronous processing without changing the contract.
+5. **Maintainability assessment**: Strong — the dedicated specification document makes the ingestion contract explicit, the separation between format, detection, and surfacing concerns keeps each artifact focused, and the parallel documentation of sibling components (operational vs. design rationale) suggests a mature documentation culture that should ease long-term maintenance.
 
-2. **Versioning Discipline** – The markdown file is the single source of truth. If the format evolves, update the document first and communicate the change to all consumers (e.g., UKBTraceReporting) before rolling out producer changes.  
-
-3. **Leverage OntologyClassification** – When mapping the payload into internal models, use the ontology definitions that already include `ClaudeCodeHookDataFormat`. This ensures consistent classification across the system.  
-
-4. **Testing** – Implement unit tests that deserialize a sample payload matching the markdown schema and verify that the resulting internal representation satisfies downstream constraints.  
-
-5. **Documentation First** – Because no code symbols are provided, treat the markdown as the contract and keep it synchronized with any implementation code. Any new fields should be added to the markdown before they appear in code.
-
----
-
-### Architectural Patterns Identified  
-
-* **Contract‑First / Schema‑Driven Design** – The format is defined in a markdown contract that both producer and consumer reference.  
-* **Documentation‑Driven Development** – The primary artifact is a human‑readable spec rather than generated code.  
-
-### Design Decisions and Trade‑offs  
-
-* **Decision**: Keep the data contract external to code (markdown).  
-  * *Trade‑off*: Improves readability and cross‑language compatibility but requires manual synchronization between spec and code, increasing risk of drift.  
-
-* **Decision**: Centralize ownership of the format within the MCP Constraint Monitor integration.  
-  * *Trade‑off*: Clear responsibility, but other components (e.g., UKBTraceReporting) must depend on the integration’s documentation, potentially creating a tight coupling to the integration’s release cycle.  
-
-### System Structure Insights  
-
-* `ClaudeCodeHookDataFormat` sits at the intersection of **MCP Constraint Monitor** (producer side) and **UKBTraceReporting** (consumer side).  
-* It is also part of the **OntologyClassification** entity, indicating that the payload contributes to a broader classification taxonomy used throughout the system.  
-
-### Scalability Considerations  
-
-Because the format is a lightweight JSON‑like contract, scaling the data flow depends more on the transport layer (message queue, HTTP service) than on the schema itself. The contract‑first approach does not impose inherent scalability limits, but any future increase in payload size or frequency will require the underlying integration (MCP Constraint Monitor) to handle higher throughput, possibly necessitating batching or streaming mechanisms.  
-
-### Maintainability Assessment  
-
-The maintainability hinges on disciplined documentation practices. With a single source of truth (`CLAUDE-CODE-HOOK-FORMAT.md`), updates are straightforward if the team enforces a process where spec changes precede code changes. However, the lack of generated schema code means developers must manually keep parsers in sync, which can be error‑prone. Introducing schema generation tools (e.g., JSON Schema → code) could improve maintainability, but such a step would be a future design enhancement beyond the current observations.
 
 ## Hierarchy Context
 
 ### Parent
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/mcp-constraint-monitor/README.md monitors and enforces constraints
+
+### Siblings
+- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- Documented across two distinct files — `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` and `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md` — indicating this feature is complex enough to require both an operational guide and a separate design rationale document.
+
 
 ---
 

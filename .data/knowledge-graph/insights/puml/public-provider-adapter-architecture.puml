@@ -1,0 +1,35 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Configuration" {
+  component "llm-providers.yaml" as llmConfig <<storage>>
+}
+
+package "Core" {
+  component "LLMStateManager" as stateMgr <<core>>
+  component "PublicProviderAdapter" as adapterIface <<core>>
+}
+
+package "Provider Adapters (src/providers/)" {
+  component "AnthropicAdapter" as anthropicAdpt <<api>>
+  component "OpenAIAdapter" as openaiAdpt <<api>>
+  component "GroqAdapter" as groqAdpt <<api>>
+}
+
+package "External Cloud Services" {
+  cloud "Anthropic API" as anthropicSvc
+  cloud "OpenAI API" as openaiSvc
+  cloud "Groq API" as groqSvc
+}
+
+llmConfig --> stateMgr : "declares supported providers"
+llmConfig --> adapterIface : "supplies init config keys"
+stateMgr --> adapterIface : "invokes when mode='public'"
+adapterIface --> anthropicAdpt : "delegates"
+adapterIface --> openaiAdpt : "delegates"
+adapterIface --> groqAdpt : "delegates"
+anthropicAdpt --> anthropicSvc : "calls"
+openaiAdpt --> openaiSvc : "calls"
+groqAdpt --> groqSvc : "calls"
+
+@enduml

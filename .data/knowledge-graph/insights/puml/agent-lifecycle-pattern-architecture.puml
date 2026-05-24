@@ -1,0 +1,46 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+title AgentLifecyclePattern — SubComponent Architecture
+
+package "Base Framework" {
+    component "BaseAgent" as baseAgent <<core>>
+    component "ensureLLMInitialized()" as lazyInit <<core>>
+}
+
+package "Lifecycle Methods" {
+    component "init()" as init <<api>>
+    component "start()" as start <<api>>
+    component "stop()" as stop <<api>>
+    component "pause()" as pause <<api>>
+    component "resume()" as resume <<api>>
+}
+
+package "Concrete Implementations" {
+    component "MyAgent" as myAgent <<agent>>
+}
+
+package "Integration Patterns" {
+    component "StructuredEventEnvelopePattern" as eventEnvelope <<external>>
+}
+
+baseAgent --> init : "defines"
+baseAgent --> start : "defines"
+baseAgent --> stop : "defines"
+baseAgent --> pause : "defines"
+baseAgent --> resume : "defines"
+baseAgent --> lazyInit : "guards LLM via"
+
+myAgent --> baseAgent : "extends"
+myAgent --> init : "implements"
+myAgent --> start : "implements"
+myAgent --> stop : "implements"
+myAgent --> pause : "implements"
+myAgent --> resume : "implements"
+
+lazyInit ..> myAgent : "prevents redundant\nre-classification"
+
+start --> eventEnvelope : "works with"
+stop --> eventEnvelope : "works with"
+
+@enduml

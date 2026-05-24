@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Learning Paths" {
+  component "ManualLearning" as ml <<core>>
+  component "OnlineLearning" as ol <<core>>
+}
+
+package "Persistence Layer" {
+  component "PersistenceAgent" as pa <<agent>>
+  database "EntityMetadata" as em <<storage>>
+}
+
+package "Decay Tracking" {
+  component "KnowledgeDecayTracker" as kdt <<core>>
+  component "StalenessScorer" as ss <<core>>
+}
+
+cloud "Git Repository" as git <<external>>
+
+ml --> pa : "delegates write"
+ol --> pa : "delegates write"
+pa --> em : "reads/writes staleness fields"
+git --> em : "invalidating_commits"
+kdt --> em : "reads embedded decay signal"
+kdt --> ss : "triggers evaluation"
+ss --> em : "updates staleness_score\n& staleness_method"
+ss --> em : "schedules staleness_check_at"
+
+@enduml

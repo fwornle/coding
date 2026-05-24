@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMProxyBridge
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMProxyBridge] as llmproxy_bridge #LightBlue
+[LLMModeController] as llmmode_controller #F0F0F0
+[TierRouter] as tier_router #F0F0F0
+[LocalLLMFallback] as local_llmfallback #F0F0F0
+
+llmabstraction --> llmproxy_bridge
+llmmode_controller -[hidden]- llmproxy_bridge
+tier_router -[hidden]- llmproxy_bridge
+local_llmfallback -[hidden]- llmproxy_bridge
+
+@enduml

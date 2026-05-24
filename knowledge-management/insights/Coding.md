@@ -2,213 +2,84 @@
 
 **Type:** Project
 
-Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration ; LLMAbstraction: [LLM] The LLMAbstraction component uses a provider-agnostic approach, allowing for easy switching between different LLM providers. This is achieved th; DockerizedServices: [LLM] The DockerizedServices component utilizes dependency injection to manage complex workflows and handle multiple requests efficiently. This is evi; Trajectory: [LLM] The Trajectory component utilizes the SpecstoryAdapter class, defined in lib/integrations/specstory-adapter.js, for logging conversations and ev; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-sema; CodingPatterns: [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts fi; SemanticAnalysis: [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAge.
+Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 7 major components: LiveLoggingSystem: [LLM] The TranscriptAdapter class in lib/agent-api/transcript-api.js establishes a strict plugin contract for integrating new agent conversation sourc; LLMAbstraction: [LLM] The LLMAbstraction layer implements a three-tier mode resolution hierarchy in `getLLMMode()` within `llm-mock-service.ts` that prioritizes speci; DockerizedServices: [LLM] The ProcessStateManager (PSM) singleton implements a deliberate decoupling between service identity and process identity across both `scripts/ap; KnowledgeManagement: The KnowledgeManagement component provides knowledge graph storage, query, and lifecycle management for the Coding project. It centers on a Graphology; CodingPatterns: [LLM] The project-wide singleton guard pattern is formally codified in `docs/puml/psm-singleton-pattern.puml` and manifests consistently wherever stat; ConstraintSystem: [LLM] The ConstraintSystem implements a two-level configuration hierarchy through `HookConfigLoader` (lib/agent-api/hooks/hook-config.js) that disting; SemanticAnalysis: [LLM] The `BaseAgent<TInput, TOutput>` abstract class defined in `src/agents/base-agent.ts` establishes a rigid, five-method execution contract that e.
 
-## What It Is  
+# Coding Project — Technical Insight Document
 
-The **Coding** project is a large‑scale LLM‑centric system whose top‑level knowledge hierarchy lives at the repository root.  It is composed of eight first‑level (L1) components – **LiveLoggingSystem**, **LLMAbstraction**, **DockerizedServices**, **Trajectory**, **KnowledgeManagement**, **CodingPatterns**, **ConstraintSystem**, and **SemanticAnalysis** – each of which lives in its own sub‑tree under the root.  
+## What It Is
 
-Key implementation locations that illustrate the breadth of the code base include:  
+The **Coding** project is the root node of a development infrastructure knowledge hierarchy that encompasses seven major architectural components working in concert: `LiveLoggingSystem`, `LLMAbstraction`, `DockerizedServices`, `KnowledgeManagement`, `CodingPatterns`, `ConstraintSystem`, and `SemanticAnalysis`. It is not a single deployable artifact but rather an umbrella project that organizes infrastructure spanning agent transcript ingestion (`lib/agent-api/transcript-api.js`), LLM mode resolution (`llm-mock-service.ts`), process lifecycle management (`scripts/api-service.js`, `scripts/dashboard-service.js`), and a Graphology+LevelDB-backed knowledge graph.
 
-* `integrations/mcp-server-semantic-analysis/src/logging.ts` – the unified logging interface used by **LiveLoggingSystem**.  
-* `lib/llm/provider-registry.js` together with provider implementations such as `lib/llm/providers/anthropic-provider.ts` and `lib/llm/providers/dmr-provider.ts` – the heart of **LLMAbstraction**.  
-* `lib/llm/llm-service.ts` and `lib/service-starter.js` – the dependency‑injection‑driven service layer that powers **DockerizedServices**.  
-* `lib/integrations/specstory-adapter.js` – the concrete adapter used by **Trajectory** for Specstory‑based conversation logging.  
-* `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` and the migration script `scripts/migrate-graph-db-entity-types.js` – the persistence mechanism shared by **KnowledgeManagement** and **ConstraintSystem**.  
-* The `integrations/code-graph-rag/README.md` file shows the graph‑based code‑analysis approach employed by **CodingPatterns**.  
-* Multi‑agent classes such as `OntologyClassificationAgent` and `SemanticAnalysisAgent` (referenced under **SemanticAnalysis**) reveal a coordinated agent architecture.  
+The project's purpose is to provide a unified development substrate where multiple agent runtimes (Claude Code, Copilot CLI, and future integrations like Cursor or Aider) can co-exist, share state through a persistent knowledge graph, and be governed by a consistent set of architectural conventions. The seven child components collectively implement a system where every layer — from raw transcript polling to semantic analysis via `BaseAgent<TInput, TOutput>` in `src/agents/base-agent.ts` — adheres to shared patterns codified in artifacts like `docs/puml/psm-singleton-pattern.puml`.
 
-Together these modules form a cohesive “Coding” platform that orchestrates LLM inference, logging, knowledge‑graph persistence, and multi‑agent reasoning across a Docker‑friendly runtime.
+## Architecture and Design
 
----
+The architecture is **layered and pluggable**, with each L1 component owning a distinct concern but sharing a common discipline around singletons, plugin contracts, and decoupling of identity from implementation. At the ingestion layer, `LiveLoggingSystem` defines the `TranscriptAdapter` base class that establishes a five-method plugin contract (`getAgentType()`, `getTranscriptDirectory()`, `readTranscripts()`, `convertToLSL()`, `getCurrentSession()`) — a textbook **Template Method pattern** where the base owns lifecycle and dispatch while subclasses own format-specific parsing. This same plugin sensibility is mirrored in `SemanticAnalysis`, where `BaseAgent<TInput, TOutput>` enforces a rigid five-method execution contract across all agents.
 
-## Architecture and Design  
+Cross-cutting through these layers is the **singleton guard pattern**, formally codified in `docs/puml/psm-singleton-pattern.puml` under `CodingPatterns`. This pattern is not an incidental convention but a project-wide architectural rule: any class described as a "manager" or "session" object — the `ProcessStateManager` (PSM) being the canonical exemplar — must follow a strict guard-and-return idiom with a module-level instance variable. This is significant for the Node.js runtime context where event-driven concurrency without explicit locking primitives makes race conditions during manager initialization a real concern.
 
-### Modular, Component‑Based Architecture  
-The project follows a **modular architecture** in which each L1 component encapsulates a distinct concern.  The directory layout mirrors this separation: each component’s source lives under a dedicated folder (e.g., `integrations/…`, `lib/…`, `scripts/`).  This modularity enables independent development, testing, and replacement of parts without destabilising the whole system.  
+The `LLMAbstraction` layer introduces a **three-tier resolution hierarchy** in `getLLMMode()` (per-agent override → global mode → legacy `mockLLM` boolean) that demonstrates the project's preference for **specificity-over-generality** prioritization with explicit backward-compatibility paths. This trade-off — accepting additional code complexity to preserve older configuration files — recurs throughout the project and is a deliberate design stance rather than accumulated debt. `DockerizedServices` exhibits a parallel design philosophy through PSM's **decoupling of service identity from OS-level process identity**, allowing health coordination (`scripts/health-coordinator.js`) to operate on logical service references rather than PIDs.
 
-### Provider‑Agnostic LLM Layer  
-**LLMAbstraction** implements a **provider‑registry pattern**.  The `ProviderRegistry` class (`lib/llm/provider-registry.js`) maintains a map of provider identifiers to concrete provider objects (e.g., `AnthropicProvider`, `DMRProvider`).  By exposing a uniform interface to the rest of the system, the registry decouples higher‑level services from the specifics of any single LLM API, allowing seamless switching or addition of new providers.  
+## Implementation Details
 
-### Dependency Injection (DI) in Dockerized Services  
-`DockerizedServices` leverages **dependency injection** as evidenced by the `LLMService` class (`lib/llm/llm-service.ts`) which receives its provider registry, caching layer, and fallback strategy via constructor injection.  The `ServiceStarter` (`lib/service-starter.js`) further abstracts service boot‑strapping, handling retries, timeouts, and graceful degradation.  This DI approach yields loose coupling, easier unit testing, and the ability to spin up multiple isolated service instances inside Docker containers.  
+The seven L1 components are implemented across distinct directory trees but share structural conventions. `LiveLoggingSystem`'s `TranscriptAdapter` (`lib/agent-api/transcript-api.js`) normalizes Claude Code's `~/.claude/projects/<project>/conversation.jsonl` append-only JSONL stream and Copilot CLI's differently-structured transcript directory into the unified **LSL typed-entry format** with six entry types: `user`, `assistant`, `tool_use`, `tool_result`, `system`, and `error`. The `convertToLSL()` method serves as the normalization seam, while `getCurrentSession()` requires each adapter to implement agent-specific session-boundary detection so the polling loop can distinguish live entries from historical ones.
 
-### Graph‑Based Persistence & Knowledge Graph  
-Both **KnowledgeManagement** and **ConstraintSystem** rely on a **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`).  The adapter wraps a **Graphology + LevelDB** store, exposing CRUD operations to agents and other components.  Automatic JSON export sync and the migration script (`scripts/migrate-graph-db-entity-types.js`) demonstrate a commitment to data consistency and schema evolution.  
+`LLMAbstraction`'s mode resolution is implemented in `llm-mock-service.ts`, where `llmState.perAgentOverrides` is a map consulted first, `llmState.globalMode` is the project-wide default, and the legacy `mockLLM` boolean serves as the lowest-priority fallback. This enables **mixed-mode workflows** — a lightweight code-indexing agent can run against the local Docker Model Runner while a complex reasoning agent routes to Anthropic or OpenAI APIs within the same workflow execution.
 
-### Multi‑Agent Coordination  
-**SemanticAnalysis** adopts a **multi‑agent architecture**.  Agents such as `OntologyClassificationAgent` and `SemanticAnalysisAgent` collaborate to perform higher‑order reasoning over the knowledge graph.  The agents communicate through shared adapters (e.g., the graph database) and likely use a publish/subscribe or direct method‑call pattern, although the exact messaging mechanism is not detailed in the observations.  
+`DockerizedServices` is realized through `scripts/api-service.js` and `scripts/dashboard-service.js`, both following an identical structural pattern: spawn a child via Node's `child_process`, register with `psm.registerService()`, wire `SIGTERM`/`SIGINT` forwarding to the child, and call `psm.unregisterService()` in the exit handler. Restart and retry policy is intentionally isolated in `lib/service-starter.js`, separate from signal handling owned by the wrappers.
 
-### Specstory‑Based Event Logging (Trajectory)  
-The **Trajectory** component introduces a **work‑stealing concurrency pattern** inside `SpecstoryAdapter.logConversation()`.  A shared atomic index counter distributes logging tasks across threads, enabling high‑throughput, ordered event recording without lock contention.  The adapter follows a clear lifecycle (`constructor → initialize → logConversation`) that aligns with the modular logging strategy of **LiveLoggingSystem**.  
+`KnowledgeManagement` centers on `GraphDatabaseService`, a Graphology+LevelDB store that persists entities as typed nodes (`System`, `Project`, `Component`, `SubComponent`, `Pattern`, `Detail`) with ontology classification, **bi-temporal staleness tracking**, embedding vectors, and hierarchical parent/child edges (the very edges that link `Coding` to its seven children). Two access paths exist: a direct LevelDB path and a VKB HTTP API. `PersistenceAgent` and `GraphDatabaseAdapter` mediate this choice — routing writes through the VKB API when the MCP semantic analysis server is running to avoid LevelDB lock conflicts, and falling back to direct access otherwise.
 
-### Shared Logging Infrastructure  
-`integrations/mcp-server-semantic-analysis/src/logging.ts` provides a **centralized logging API** used by **LiveLoggingSystem** and likely by other components as well.  This shared module ensures consistent log formatting, severity handling, and output destinations across the entire code base.  
+`SemanticAnalysis` is anchored by `BaseAgent<TInput, TOutput>` in `src/agents/base-agent.ts`, a generic abstract class establishing a five-method execution contract for all semantic agents. `ConstraintSystem` operates via `HookConfigLoader` (`lib/agent-api/hooks/hook-config.js`), implementing a two-level configuration hierarchy. `CodingPatterns` is documentation-bearing rather than executable, with `docs/puml/psm-singleton-pattern.puml` serving as the authoritative reference for singleton implementations elsewhere.
 
----
+## Integration Points
 
-## Implementation Details  
+The components integrate primarily through the `KnowledgeManagement` substrate. `SemanticAnalysis` agents (subclasses of `BaseAgent`) write their results into the graph via `PersistenceAgent` and `GraphDatabaseAdapter`, which negotiate between the VKB HTTP API and direct LevelDB access based on whether the MCP server is active — a runtime negotiation explicitly designed to **avoid LevelDB lock conflicts**.
 
-### LiveLoggingSystem  
-* **Structure** – The `integrations` folder contains sub‑folders `browser-access`, `code-graph-rag`, and `copi`.  The `copi` sub‑folder holds documentation (`INSTALL.md`, `USAGE.md`).  
-* **Core Classes** – `TranscriptAdapter` (abstract base in `lib/agent-api`) defines the contract for reading transcripts from varied agent formats.  `LSLConfigValidator` (in `scripts`) validates LSL configuration files, ensuring they meet performance and correctness criteria before runtime.  
-* **Logging** – The `logging.ts` module offers methods such as `logInfo`, `logError`, and `logDebug`.  All components import this module, guaranteeing a single source of truth for log handling.  
+`LiveLoggingSystem` integrates with the rest of the system through the **LSL normalized format**: any downstream consumer (including `SemanticAnalysis` agents that need conversation context) reads typed entries without needing to know which agent runtime produced them. Adding a new agent integration (Cursor, Aider) requires only subclassing `TranscriptAdapter` and implementing its five abstract methods — no changes to core LSL infrastructure are required.
 
-### LLMAbstraction  
-* **ProviderRegistry** (`lib/llm/provider-registry.js`) maintains an internal map: `{ providerId: providerInstance }`.  It exposes methods `registerProvider(id, instance)`, `getProvider(id)`, and `listProviders()`.  
-* **Providers** – `AnthropicProvider` (`lib/llm/providers/anthropic-provider.ts`) implements the Anthropic API contract, handling request signing, throttling, and response parsing.  `DMRProvider` (`lib/llm/providers/dmr-provider.ts`) runs local inference, exposing a compatible `generate` method.  
-* **Flexibility** – Adding a new provider only requires implementing the provider interface and registering it via `ProviderRegistry`.  No other component needs to be altered, which is a deliberate design decision to future‑proof the LLM layer.  
+`DockerizedServices` integrates with health monitoring via `scripts/health-coordinator.js`, which <USER_ID_REDACTED> the PSM registry rather than holding direct OS process references. This means service restarts (a new child replacing an old one) propagate transparently through the registry update performed by the wrapper script, without any other consumer needing PID-change awareness.
 
-### DockerizedServices  
-* **LLMService** (`lib/llm/llm-service.ts`) orchestrates high‑level operations:  
-  * **Mode Routing** – Determines whether a request should go to Anthropic, DMR, or a fallback based on configuration or runtime health.  
-  * **Caching** – Stores recent completions in an in‑memory cache to reduce duplicate LLM calls.  
-  * **Provider Fallback** – If the primary provider fails, the service transparently retries with an alternative, leveraging the provider‑registry.  
-* **ServiceStarter** (`lib/service-starter.js`) wraps service initialization with retry loops, exponential back‑off, and graceful shutdown hooks.  This is critical when the services run inside Docker containers that may experience transient network or resource issues.  
+`LLMAbstraction` is a horizontal integration layer consumed implicitly by any component invoking an LLM — its mode resolution determines whether calls are mocked, routed to Docker Model Runner, or sent to cloud APIs. `ConstraintSystem`'s `HookConfigLoader` provides hook configuration to the agent API surface in `lib/agent-api/hooks/`, integrating with the broader agent invocation pipeline.
 
-### Trajectory  
-* **SpecstoryAdapter** (`lib/integrations/specstory-adapter.js`) follows a three‑step pattern:  
-  1. **constructor()** – Stores configuration (e.g., endpoint URL, auth token).  
-  2. **initialize()** – Performs any async setup such as establishing a WebSocket or HTTP client.  
-  3. **logConversation(conversationObj)** – Uses an atomic counter (`AtomicInteger`) to claim a slot, then pushes the payload to Specstory.  The work‑stealing scheduler pulls unclaimed slots from a shared queue, allowing multiple producer threads to log concurrently without contention.  
+## Usage Guidelines
 
-### KnowledgeManagement & ConstraintSystem  
-* **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) abstracts the underlying **Graphology** graph library combined with **LevelDB** for persistence.  It implements methods like `upsertNode`, `addEdge`, `query`, and `exportToJSON`.  
-* **Automatic JSON Export Sync** – After each mutation, the adapter triggers a background job that writes a JSON snapshot to a configurable location, enabling downstream tools to consume a static view of the knowledge graph.  
-* **Migration Script** (`scripts/migrate-graph-db-entity-types.js`) scans existing LevelDB entries, transforms entity type identifiers, and rewrites them, ensuring schema evolution does not corrupt live data.  
+Developers working in the `Coding` project must internalize several non-negotiable conventions. **Never call `new` directly on any class described as a "manager" or "session" object** — always go through the designated factory or accessor function that enforces the singleton guard pattern documented in `docs/puml/psm-singleton-pattern.puml`. This applies most prominently to `ProcessStateManager` but extends to any stateful manager added in the future; consult the PlantUML diagram before introducing a new singleton-style class.
 
-### CodingPatterns  
-* The `integrations/code-graph-rag/README.md` describes a **graph‑based code‑analysis pipeline** that constructs a code graph (functions, classes, imports) and runs Retrieval‑Augmented Generation (RAG) queries against it.  While the concrete implementation files are not listed, the presence of this README signals that the component treats code as a graph and leverages the same GraphDatabaseAdapter for storage.  
+When adding a new agent runtime integration, **subclass `TranscriptAdapter`** in `lib/agent-api/transcript-api.js` and implement all five abstract methods. Pay particular attention to `getCurrentSession()`, which must return the "live" session object so the polling loop can correctly distinguish current-conversation entries from historical ones — this requires implementing agent-specific session-boundary detection logic. Do not modify the core LSL infrastructure; the design intent is that all agent-specific logic lives in the adapter subclass.
 
-### SemanticAnalysis  
-* Agents such as `OntologyClassificationAgent` and `SemanticAnalysisAgent` are instantiated by the **SemanticAnalysis** component.  They likely consume the knowledge graph via the GraphDatabaseAdapter, perform classification or inference, and push results back into the graph, completing a feedback loop.  
+When adding a new containerized service, **create a new wrapper script** that replicates the pattern in `scripts/api-service.js` and `scripts/dashboard-service.js`: spawn the child, register with PSM, forward signals, unregister on exit. Be aware this is acknowledged as a **potential maintenance concern** as the service count grows — the boilerplate is intentionally not centralized to keep wrapper scripts self-contained and inspectable, but consider whether a shared helper makes sense beyond a certain scale.
+
+For `LLMAbstraction`, remember that **`mockLLM` is the lowest-priority fallback**. If you observe unexpected behavior when `globalMode` is set but `mockLLM` is also present in a persisted state file, the global mode wins; `mockLLM` only activates when neither `perAgentOverrides` nor `globalMode` is populated. Older configuration files predating the `llmState` structure continue to function without migration — this is deliberate and should not be "cleaned up" without a coordinated deprecation plan.
+
+For `KnowledgeManagement` writes, **prefer the VKB HTTP API when the MCP server is running** and rely on `GraphDatabaseAdapter` to route correctly. Direct LevelDB access while the server holds the lock will fail; the adapter's fallback logic handles this transparently when used as intended.
 
 ---
 
-## Integration Points  
+### Summary of Key Insights
 
-1. **Provider Registry ↔ LLMService** – `LLMService` resolves the concrete provider through `ProviderRegistry`, allowing the Dockerized services to remain agnostic of provider specifics.  
-2. **Logging ↔ All Components** – The central `logging.ts` module is imported by LiveLoggingSystem, DockerizedServices, and any other component that needs structured logs.  
-3. **GraphDatabaseAdapter ↔ KnowledgeManagement / ConstraintSystem / CodingPatterns / SemanticAnalysis** – These four components share the same persistence layer, enabling consistent data representation and cross‑component queries.  
-4. **SpecstoryAdapter ↔ Trajectory ↔ LiveLoggingSystem** – While Trajectory logs conversation events via Specstory, LiveLoggingSystem may forward higher‑level transcript data to the same adapter for unified event tracking.  
-5. **DockerizedServices ↔ Docker Runtime** – The `ServiceStarter` class expects to run inside Docker containers, handling container‑level concerns (restart policies, health checks).  
-6. **Agent API ↔ TranscriptAdapter** – Agents in SemanticAnalysis consume transcripts via the abstract `TranscriptAdapter`, allowing them to operate on a uniform transcript format regardless of the originating LLM.  
+1. **Architectural patterns identified**: Template Method (TranscriptAdapter, BaseAgent), Singleton with guard idiom (PSM and all manager classes), Plugin/Adapter (agent integrations), Adapter/Facade (GraphDatabaseAdapter routing between VKB API and LevelDB), Layered configuration resolution (three-tier LLM mode), and decoupling of logical identity from physical identity (PSM service-vs-process).
 
-These integration points illustrate a **layered dependency graph** where low‑level utilities (logging, adapters, DI) sit at the base, LLM‑centric services occupy the middle tier, and domain‑specific agents and knowledge‑graph logic sit on top.
+2. **Design decisions and trade-offs**: Explicit backward compatibility via lowest-priority fallbacks (legacy `mockLLM`); duplication of wrapper boilerplate accepted in exchange for self-contained service scripts; dual-path knowledge graph access (HTTP and direct) to balance MCP server collaboration against lock conflicts; documentation-as-authority via PlantUML diagrams for cross-cutting patterns.
 
----
+3. **System structure insights**: Seven L1 components organized as a flat hierarchy under `Coding`, with `KnowledgeManagement` serving as the persistence substrate, `CodingPatterns` serving as the convention authority, and the remaining five components implementing functional domains that share these conventions.
 
-## Usage Guidelines  
+4. **Scalability considerations**: The plugin-contract design at both `TranscriptAdapter` and `BaseAgent` scales horizontally — new agents and new semantic analyzers can be added without core changes. The wrapper-script-per-service pattern in `DockerizedServices` does not scale as cleanly and is flagged as a future concern.
 
-* **Register New LLM Providers Properly** – Add the provider class under `lib/llm/providers/`, implement the standard `generate(prompt, options)` method, and register it in `ProviderRegistry` during application bootstrap.  Do not modify `LLMService` directly; rely on the registry for routing.  
-* **Leverage Dependency Injection** – When extending Dockerized services, inject dependencies via the constructor of `LLMService` or any custom service class.  This preserves testability and keeps the DI container (often instantiated in `ServiceStarter`) as the single source of truth.  
-* **Persist Knowledge Consistently** – All graph mutations must go through `GraphDatabaseAdapter`.  Direct manipulation of Graphology or LevelDB files bypasses the automatic JSON export and may corrupt the shared view.  
-* **Follow the SpecstoryAdapter Lifecycle** – Always call `initialize()` before attempting to log conversations, and avoid re‑initializing the adapter multiple times within the same process to prevent duplicate connections.  
-* **Validate Configurations Early** – Run `LSLConfigValidator` (found in `scripts`) as part of CI pipelines to catch mis‑configurations before containers start.  This reduces runtime failures in the LiveLoggingSystem.  
-* **Use Central Logging** – Prefer `logging.info()`, `logging.error()`, etc., from `integrations/mcp-server-semantic-analysis/src/logging.ts` instead of `console.log`.  This ensures logs are captured uniformly across Docker containers and can be routed to external observability platforms.  
-* **Respect Migration Scripts** – When upgrading entity types in the knowledge graph, always execute `scripts/migrate-graph-db-entity-types.js` in a controlled maintenance window.  Skipping migration can lead to schema mismatches for agents that rely on new type definitions.  
+5. **Maintainability assessment**: Strong — the singleton pattern is formally documented, plugin contracts are explicit five-method interfaces, and decoupling between identity layers (service/process, conversation source/LSL format, write path/storage) means most subsystems can evolve independently. The primary maintainability risk is wrapper-script duplication in `DockerizedServices` as service count grows.
 
----
-
-## Architectural Patterns Identified  
-
-| Pattern | Where Observed | Rationale |
-|---------|----------------|-----------|
-| **Modular Component Architecture** | Directory hierarchy, eight L1 components | Enables independent evolution and clear separation of concerns. |
-| **Provider Registry (Strategy)** | `lib/llm/provider-registry.js` | Allows runtime selection among multiple LLM back‑ends. |
-| **Dependency Injection** | `lib/llm/llm-service.ts`, `lib/service-starter.js` | Decouples service implementations from concrete dependencies, improving testability. |
-| **Work‑Stealing Concurrency** | `SpecstoryAdapter.logConversation()` | Maximizes throughput for high‑frequency logging without lock contention. |
-| **Graph‑Based Persistence** | `GraphDatabaseAdapter` (Graphology + LevelDB) | Supports rich relationship queries needed by agents and code‑analysis pipelines. |
-| **Multi‑Agent Coordination** | `OntologyClassificationAgent`, `SemanticAnalysisAgent` | Enables specialized reasoning tasks while sharing a common knowledge base. |
-| **Centralized Logging Facade** | `integrations/mcp-server-semantic-analysis/src/logging.ts` | Guarantees consistent log format and routing across all modules. |
-
----
-
-## Design Decisions and Trade‑offs  
-
-* **Provider‑agnostic LLM layer** – *Decision*: abstract LLM APIs behind a registry. *Trade‑off*: adds an indirection layer and slight runtime overhead, but gains extensibility and reduces vendor lock‑in.  
-* **Dependency injection for services** – *Decision*: inject collaborators into `LLMService`. *Trade‑off*: initial bootstrapping complexity, but improves modularity and enables mock injection for unit tests.  
-* **Graphology + LevelDB for knowledge storage** – *Decision*: combine an in‑memory graph library with a persistent key‑value store. *Trade‑off*: higher memory usage for large graphs, but provides fast traversals and durable storage without a full-fledged graph DB server.  
-* **Work‑stealing logger** – *Decision*: use atomic counters for concurrent logging. *Trade‑off*: complexity in concurrency handling, yet yields low‑latency, high‑throughput event capture.  
-* **Docker‑centric deployment** – *Decision*: wrap services in Docker containers with `ServiceStarter` handling retries. *Trade‑off*: reliance on container orchestration for scaling; however, it simplifies environment replication and isolation.  
-
----
-
-## System Structure Insights  
-
-The system can be visualised as a **layered graph**:
-
-```
-+-------------------+       +-------------------+
-|   LiveLoggingSys |<----->|   SpecstoryAdapter|
-+-------------------+       +-------------------+
-          |                         |
-          v                         v
-+-------------------+       +-------------------+
-|   LLMAbstraction  |<----->|   ProviderRegistry|
-+-------------------+       +-------------------+
-          |                         |
-          v                         v
-+-------------------+       +-------------------+
-| DockerizedServices|<----->|   LLMService      |
-+-------------------+       +-------------------+
-          |                         |
-          v                         v
-+-------------------+       +-------------------+
-| KnowledgeManagement/ConstraintSystem |
-|   (GraphDatabaseAdapter)             |
-+-------------------+-------------------+
-          |                         |
-          v                         v
-+-------------------+       +-------------------+
-|   CodingPatterns  |<----->|   Code‑Graph RAG  |
-+-------------------+       +-------------------+
-          |
-          v
-+-------------------+
-| SemanticAnalysis  |
-| (Multi‑Agent)     |
-+-------------------+
-```
-
-* The **LiveLoggingSystem** feeds raw transcript data to the **LLMAbstraction** and **Trajectory** via shared adapters.  
-* **DockerizedServices** orchestrates request flow, invoking the appropriate LLM provider through the registry and caching results.  
-* All higher‑level reasoning (CodingPatterns, SemanticAnalysis) reads and writes to the **GraphDatabaseAdapter**, ensuring a single source of truth for knowledge.  
-
----
-
-## Scalability Considerations  
-
-* **Horizontal Scaling of LLM Services** – Because `LLMService` is stateless aside from its injected cache, multiple Docker containers can be run behind a load balancer.  Provider fallback logic remains consistent across instances.  
-* **Concurrent Logging** – The work‑stealing pattern in `SpecstoryAdapter` allows the logging subsystem to scale with CPU cores, handling thousands of conversation events per second without bottlenecking on a single lock.  
-* **Graph Database Sharding** – While the current implementation uses a single LevelDB file, the adapter abstraction could be extended to partition the graph across multiple stores if the knowledge graph grows beyond a single node’s memory capacity.  
-* **Cache Warm‑up** – The in‑memory cache inside `LLMService` can be pre‑populated during service startup to reduce latency spikes during traffic bursts.  
-* **Provider Pooling** – For remote providers (e.g., Anthropic), connection pooling can be introduced within each provider implementation to reuse HTTP/TCP connections, improving throughput under high request volumes.  
-
----
-
-## Maintainability Assessment  
-
-* **Clear Separation of Concerns** – Each component lives in its own namespace and interacts via well‑defined adapters (e.g., `GraphDatabaseAdapter`, `ProviderRegistry`).  This reduces the cognitive load when modifying a single area.  
-* **Extensible Provider Model** – Adding or deprecating LLM providers requires only changes in the `providers/` directory and a registration call, keeping the core service stable.  
-* **Centralized Logging & Validation** – A single logging module and configuration validator mean that updates to logging format or config rules propagate automatically.  
-* **Potential Technical Debt** – The reliance on a custom GraphDatabaseAdapter built atop Graphology + LevelDB may become a maintenance burden as graph size grows; future migration to a dedicated graph DB could be costly.  
-* **Testing Friendly** – Dependency injection and provider abstraction make unit testing straightforward; mocks can replace real LLM calls or graph storage.  
-* **Documentation Gaps** – The observations list several README files but no explicit API documentation for the adapters.  Adding TypeScript typings and generated docs would further improve onboarding.  
-
-Overall
 
 ## Hierarchy Context
 
 ### Children
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/mcp-server-semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component uses a provider-agnostic approach, allowing for easy switching between different LLM providers. This is achieved through the ProviderRegistry class (lib/llm/provider-registry.js), which manages the different LLM providers and their configurations. For instance, the AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) is used to interact with the Anthropic API, while the DMRProvider class (lib/llm/providers/dmr-provider.ts) is used for local LLM inference. The use of a provider registry enables the component to be highly flexible and scalable, as new providers can be easily added or removed without affecting the overall architecture.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes dependency injection to manage complex workflows and handle multiple requests efficiently. This is evident in the lib/llm/llm-service.ts file, where the LLMService class is used for high-level LLM operations, including mode routing, caching, and provider fallback. The use of dependency injection allows for loose coupling between components, making it easier to test and maintain the codebase. Furthermore, the ServiceStarter class in lib/service-starter.js provides robust service startup with retry, timeout, and graceful degradation, ensuring that the component can recover from failures and provide a responsive user experience.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component utilizes the SpecstoryAdapter class, defined in lib/integrations/specstory-adapter.js, for logging conversations and events via Specstory. This class follows a specific pattern of constructor() + initialize() + logConversation() for its initialization and logging functionality. The logConversation() method employs a work-stealing concurrency pattern via a shared atomic index counter, allowing for efficient and concurrent logging of conversations and events.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The TranscriptAdapter class in lib/agent-api/transcript-api.js establishes a strict plugin contract for integrating new agent conversation sources into the LSL pipeline. It requires five abstract methods: getAgentType(), getTranscriptDirectory(), readTranscripts(), convertToLSL(), and getCurrentSession(). This design cleanly separates concerns — the base class owns the lifecycle and dispatch logic, while subclasses own the format-specific parsing. Claude Code transcripts live at ~/.claude/projects/<project>/conversation.jsonl, a JSONL file that grows append-only during a session; the Copilot CLI adapter targets a different directory structure. The convertToLSL() method is the normalization seam, responsible for mapping each agent's native message structure into the unified LSL typed-entry format with types: user, assistant, tool_use, tool_result, system, and error. A new developer adding a third agent integration (e.g., Cursor, Aider) only needs to subclass TranscriptAdapter and implement these five methods — no changes to the core LSL infrastructure are required. The getCurrentSession() method is particularly important: it must return the 'live' session object so the polling loop knows which entries are part of the current conversation versus a historical one, which implies adapters must implement their own session-boundary detection logic appropriate to their agent's format.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction layer implements a three-tier mode resolution hierarchy in `getLLMMode()` within `llm-mock-service.ts` that prioritizes specificity over generality: a per-agent override stored in `llmState.perAgentOverrides` takes precedence over the `llmState.globalMode`, which in turn takes precedence over a legacy `mockLLM` boolean field. This design is significant because it allows the system to run mixed-mode configurations in production — for example, running a lightweight code-indexing agent against the local Docker Model Runner while routing a more complex reasoning agent to a cloud API like Anthropic or OpenAI, all within a single workflow execution. The legacy `mockLLM` boolean is retained explicitly for backward compatibility, meaning older configuration files or callers that predate the `llmState` structure continue to function without migration. New developers should be aware that if they observe unexpected behavior when `globalMode` is set but `mockLLM` is also present in a persisted state file, the `mockLLM` boolean is the lowest-priority fallback and will only activate when neither of the higher-priority fields are populated.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The ProcessStateManager (PSM) singleton implements a deliberate decoupling between service identity and process identity across both `scripts/api-service.js` and `scripts/dashboard-service.js`. Each script follows an identical structural pattern: spawn a child process via Node's `child_process` module, register the resulting process handle with the PSM via `psm.registerService()`, wire up `SIGTERM`/`SIGINT` forwarding so that signals delivered to the wrapper propagate to the child, and call `psm.unregisterService()` in the exit handler. This indirection means that the rest of the system (including `scripts/health-coordinator.js`) can query the PSM registry without holding direct references to OS-level process IDs. The practical consequence for developers is that a service restart — where a new child process replaces the old one — does not require the health coordinator or any consumer of PSM state to be aware of the PID change; only the wrapper scripts update the registry. This pattern also cleanly isolates the restart/retry logic in `lib/service-starter.js` from signal-handling responsibilities, since the wrapper owns the process lifecycle signals while the starter owns the retry policy. A new developer should note that adding a new containerized service almost certainly means creating a new wrapper script that replicates this boilerplate rather than centralizing it, which is a potential maintenance concern as the number of services grows.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides knowledge graph storage, query, and lifecycle management for the Coding project. It centers on a Graphology+LevelDB graph database (GraphDatabaseService) that stores entities as typed nodes with rich metadata, exposed through both a direct-access path and a VKB HTTP API. The component supports multiple entity types (System, Project, Component, SubComponent, Pattern, Detail) with ontology classification, bi-temporal staleness tracking, embedding vectors, and hierarchical parent/child relationships. It integrates with the MCP semantic analysis server via PersistenceAgent and GraphDatabaseAdapter, which route writes through the VKB API when the server is running or fall back to direct LevelDB access to avoid lock conflicts.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The project-wide singleton guard pattern is formally codified in `docs/puml/psm-singleton-pattern.puml` and manifests consistently wherever stateful managers are instantiated. The pattern follows a strict guard-and-return idiom: a module-level variable holds the single instance (initialized to null or undefined), and every access point checks that variable before constructing a new object. If an instance already exists, the existing reference is returned immediately without re-running any constructor or initialization logic. This prevents race conditions in async service environments where multiple subsystems might attempt to spin up the same stateful manager concurrently — a real concern in Node.js applications that use event-driven concurrency without explicit locking primitives. For new developers, the implication is that any class described as a 'manager' or 'session' object in this codebase should be assumed to follow this pattern: do not call `new` directly on these classes from arbitrary call sites; instead, always go through the designated factory or accessor function that enforces the singleton contract. The PlantUML diagram in `docs/puml/psm-singleton-pattern.puml` is authoritative and should be consulted before introducing any new singleton-style manager to ensure the guard logic is structurally consistent with the rest of the project.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem implements a two-level configuration hierarchy through `HookConfigLoader` (lib/agent-api/hooks/hook-config.js) that distinguishes between user-wide defaults and project-specific overrides. User-level configuration lives at `~/.coding-tools/hooks.json`, making it available across all Claude Code sessions on the machine, while project-level configuration resides at `{project}/.coding/hooks.json`, enabling per-repository constraint customization. The `mergeConfigs()` method is the critical integration point: it applies project configuration on top of user configuration, meaning any handler, constraint rule, or hook binding defined at the project level supersedes or augments what the user has set globally. This design has a meaningful implication for teams: a repository can enforce stricter or more specific constraints than a developer's personal defaults without requiring them to change their global setup. However, because the merge strategy gives project config full precedence, there is no mechanism for user config to 'lock' a setting that cannot be overridden by a project — a security boundary that new developers should be aware of when assessing whether globally-defined compliance constraints can be bypassed by a malicious or misconfigured `.coding/hooks.json`.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The `BaseAgent<TInput, TOutput>` abstract class defined in `src/agents/base-agent.ts` establishes a rigid, five-method execution contract that every agent in the pipeline must implement: `process()`, `calculateConfidence()`, `detectIssues()`, `generateRouting()`, and `applyCorrections()`. This is not a loose interface — each method is called sequentially within a standardized envelope, meaning an agent cannot skip confidence calculation or issue detection even if it has nothing meaningful to report for those phases. The resulting `AgentResponse` envelope carries not just the domain output but also metadata (timestamps, model usage), routing suggestions for downstream agents, and a corrections list for self-healing. For a new developer, this means that implementing a new agent is less about writing a single processing function and more about correctly filling all five lifecycle slots; an agent that returns empty stubs for `detectIssues()` or `generateRouting()` will still compile and run, but the orchestrating pipeline likely depends on those fields being populated to make branching decisions. The generic type parameters `<TInput, TOutput>` allow the base class to be reused across wildly different domains — from raw git commit arrays (SemanticAnalysisAgent) to ontology classification batches (OntologyClassificationAgent) — without sacrificing static type safety on the input/output contracts.
+
 
 ---
 

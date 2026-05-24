@@ -1,0 +1,33 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Hook Interception Layer" {
+  component "Pre-Tool Hook" as preHook <<api>>
+  component "Post-Tool Hook" as postHook <<api>>
+}
+
+package "Violation Detection Pipeline" {
+  component "Violation Checking Pipeline" as pipeline <<core>>
+  component "SemanticConstraintDetector" as scd <<core>>
+  component "PatternBasedDetector" as pbd <<core>>
+}
+
+package "Semantic Analysis Engine" {
+  component "LLM / AST Analyzer" as analyzer <<core>>
+}
+
+package "Constraint Configuration" {
+  component "Constraint Config" as config <<storage>>
+  component "Semantic Rule Definitions" as rules <<storage>>
+}
+
+preHook --> pipeline : intercepts tool call
+postHook --> pipeline : intercepts tool response
+pipeline --> scd : delegates semantic checks
+pipeline --> pbd : delegates pattern checks
+scd --> analyzer : invokes deep analysis
+scd --> rules : reads semantic rules
+pbd --> config : reads pattern rules
+rules --> config : co-located with
+
+@enduml

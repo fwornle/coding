@@ -1,30 +1,41 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Pipeline Components" {
-  component "Pipeline Coordinator" as coordinator <<agent>>
-  component "Code Analyzer" as codeAnalyzer <<agent>>
-  component "Knowledge Graph Constructor" as kgConstructor <<agent>>
-  component "EntityValidator" as entity Validator <<agent>>
-  component "Ontology Manager" as ontologyManager <<agent>>
-  component "Observation Generation Agent" as observationAgent <<agent>>
-  component "Deduplication Agent" as deduplicationAgent <<agent>>
-  component "Persistence Agent" as persistenceAgent <<agent>>
+cloud "Git Commits" as gitcommits <<external>>
+
+package "Configuration" {
+  component "batch-analysis.yaml" as yaml <<core>>
 }
 
-package "Data Storage" {
-  database "Memgraph" as memgraph <<storage>>
-  database "Tree-sitter AST" as treeSitter <<storage>>
+package "Pipeline Coordination" {
+  component "Pipeline Coordinator" as coordinator <<core>>
 }
 
-coordinator --> codeAnalyzer : uses
-codeAnalyzer --> kgConstructor : uses
-kgConstructor --> memgraph : uses
-kgConstructor --> treeSitter : uses
-observationAgent --> codeAnalyzer : uses
-deduplicationAgent --> entity Validator : uses
-persistenceAgent --> ontologyManager : uses
-ontologyManager --> memgraph : uses
-observationAgent --> ontologyManager : uses
+package "Agent Pipeline" {
+  component "SemanticAnalysisAgent" as semantic <<agent>>
+  component "DeduplicationAgent" as dedup <<agent>>
+  component "PersistenceAgent" as persistence <<agent>>
+  component "KG Operator Agent" as kgop <<agent>>
+}
+
+package "Storage Layer" {
+  component "Shared Memory" as sharedmem <<storage>>
+  database "Memgraph" as memgraph
+}
+
+yaml --> coordinator : "defines DAG\n& depends_on edges"
+
+gitcommits --> semantic : "raw commit arrays\n(TInput)"
+
+coordinator --> semantic : "sequences"
+coordinator --> dedup : "sequences"
+coordinator --> persistence : "sequences"
+coordinator --> kgop : "sequences via\nrouting output"
+
+semantic --> dedup : "structured observations"
+dedup --> persistence : "deduplicated\nclassified entities"
+persistence --> sharedmem : "mapEntityToSharedMemory()\nontology metadata cache"
+persistence --> kgop : "resolved entities"
+kgop --> memgraph : "batch writes\n(MEMGRAPH_BATCH_SIZE)"
 
 @enduml

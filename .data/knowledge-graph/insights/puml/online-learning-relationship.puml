@@ -6,24 +6,14 @@ title Hierarchy Context: OnlineLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [OnlineLearning] as online_learning #LightBlue
 [ManualLearning] as manual_learning #F0F0F0
-[GraphDatabaseModule] as graph_database_module #F0F0F0
-[OntologyClassificationModule] as ontology_classification_module #F0F0F0
-[InsightGenerationModule] as insight_generation_module #F0F0F0
-[AgentFrameworkModule] as agent_framework_module #F0F0F0
-[UtilitiesModule] as utilities_module #F0F0F0
-[BrowserAccess] as browser_access #F0F0F0
-[CodeGraphRAG] as code_graph_rag #F0F0F0
-[CodeGraphRAGIntegration] as code_graph_ragintegration #E8F5E8
+[EntityMigrationScripts] as entity_migration_scripts #F0F0F0
+[OntologyMetadataMapper] as ontology_metadata_mapper #E8F5E8
+[VkbLevelDbPersistenceFallback] as vkb_level_db_persistence_fallback #E8F5E8
 
 knowledge_management --> online_learning
 manual_learning -[hidden]- online_learning
-graph_database_module -[hidden]- online_learning
-ontology_classification_module -[hidden]- online_learning
-insight_generation_module -[hidden]- online_learning
-agent_framework_module -[hidden]- online_learning
-utilities_module -[hidden]- online_learning
-browser_access -[hidden]- online_learning
-code_graph_rag -[hidden]- online_learning
-online_learning --> code_graph_ragintegration
+entity_migration_scripts -[hidden]- online_learning
+online_learning --> ontology_metadata_mapper
+online_learning --> vkb_level_db_persistence_fallback
 
 @enduml

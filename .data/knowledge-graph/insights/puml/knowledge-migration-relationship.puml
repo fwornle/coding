@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KnowledgeMigration
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[KnowledgeMigration] as knowledge_migration #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #F0F0F0
+[EntityTypeConsolidation] as entity_type_consolidation #E8F5E8
+[LevelDbToKmCoreTransfer] as level_db_to_km_core_transfer #E8F5E8
+
+knowledge_management --> knowledge_migration
+manual_learning -[hidden]- knowledge_migration
+online_learning -[hidden]- knowledge_migration
+graph_database_adapter -[hidden]- knowledge_migration
+knowledge_migration --> entity_type_consolidation
+knowledge_migration --> level_db_to_km_core_transfer
+
+@enduml

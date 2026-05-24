@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Mode Resolution" {
+  component "LLM Mock Service" as llmMockService <<core>>
+  component "getLLMMode()" as getLLMMode <<core>>
+}
+
+package "Configuration" {
+  component "llm-providers.yaml" as llmConfig <<storage>>
+}
+
+package "src/providers" {
+  component "Public Cloud Adapters" as cloudAdapters <<external>>
+  component "DMR Provider" as dmrProvider <<external>>
+}
+
+package "Routing & Integration" {
+  component "TierRouter" as tierRouter <<core>>
+  component "MCP Server Semantic Analysis" as mcpServer <<api>>
+}
+
+llmMockService --> getLLMMode : "defines 'public' LLMMode"
+getLLMMode --> cloudAdapters : "delegates when mode='public'"
+llmConfig --> cloudAdapters : "endpoints, models & credentials"
+llmConfig --> dmrProvider : "endpoint config"
+tierRouter --> cloudAdapters : "routes by task complexity"
+cloudAdapters --> tierRouter : "exposes model-tier metadata"
+mcpServer --> tierRouter : "references multi-tier models"
+dmrProvider ..> cloudAdapters : "shared adapter interface"
+
+@enduml

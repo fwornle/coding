@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LocalLLMFallback
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LocalLLMFallback] as local_llmfallback #LightBlue
+[LLMModeController] as llmmode_controller #F0F0F0
+[LLMProxyBridge] as llmproxy_bridge #F0F0F0
+[TierRouter] as tier_router #F0F0F0
+[FallbackTriggerLogic] as fallback_trigger_logic #E8F5E8
+[DMREndpointConnector] as dmrendpoint_connector #E8F5E8
+
+llmabstraction --> local_llmfallback
+llmmode_controller -[hidden]- local_llmfallback
+llmproxy_bridge -[hidden]- local_llmfallback
+tier_router -[hidden]- local_llmfallback
+local_llmfallback --> fallback_trigger_logic
+local_llmfallback --> dmrendpoint_connector
+
+@enduml

@@ -1,78 +1,82 @@
 # GraphDatabaseAdapter
 
-**Type:** Detail
+**Type:** SubComponent
 
-The absence of source files limits the ability to provide specific code references, but the parent context suggests a strong connection between the GraphDatabaseModule and the GraphDatabaseAdapter.
+The probe-once design is an explicit architectural choice to avoid LevelDB file-lock conflicts: if both a VKB server process and a direct-access client attempted to open the same LevelDB files concurrently, write failures or data corruption would result
 
-## What It Is  
+# GraphDatabaseAdapter — Technical Insight Document
 
-The **GraphDatabaseAdapter** is the concrete bridge that enables the **GraphDatabaseModule** to read from and write to the underlying knowledge‑graph store built on **Graphology** (the in‑memory graph library) backed by **LevelDB** for persistence. Although the source repository does not expose a concrete file path for the adapter, the surrounding documentation makes it clear that the adapter lives inside the *GraphDatabaseModule* package and is the only component that knows the details of the Graphology + LevelDB stack. In practice, any higher‑level feature—such as the browser‑access UI or the code‑graph‑RAG (retrieval‑augmented generation) service—relies on the module’s public API, which in turn delegates all graph‑specific operations to the GraphDatabaseAdapter.
+## What It Is
 
-## Architecture and Design  
+The `GraphDatabaseAdapter` is implemented in `storage/graph-database-adapter.ts` and serves as a unified abstraction layer over two fundamentally different graph storage backends: the `VkbApiClient` (HTTP-based access to a running VKB server) and the `GraphDatabaseService` (direct, in-process LevelDB operations). It is a SubComponent within the broader `KnowledgeManagement` parent component, sitting alongside siblings `ManualLearning`, `OnlineLearning`, and `KnowledgeMigration`—all of which ultimately funnel their graph reads and writes through this adapter.
 
-From the observations we can infer a classic **Adapter pattern** implementation. The GraphDatabaseModule defines a generic interface for graph operations (e.g., `addNode`, `addEdge`, `query`, `persist`). The GraphDatabaseAdapter implements that interface while encapsulating the idiosyncrasies of Graphology (its event‑driven API, mutation semantics) and LevelDB (key‑value storage, batch writes). This separation gives the rest of the system a stable contract, shielding callers from the volatility of the underlying graph engine.
+The defining characteristic of the adapter is its **probe-once, route-always** lifecycle. On its first `initialize()` invocation, the adapter dynamically imports `VkbApiClient` and calls `isServerAvailable()` exactly once. The boolean outcome of that single probe permanently determines, for the entire lifetime of the adapter instance, whether subsequent operations are dispatched over HTTP to the VKB server or executed directly against the underlying LevelDB store. This routing decision is immutable; there is no re-evaluation, no hot-swap, and no per-operation detection.
 
-The architecture is **modular**: the GraphDatabaseModule is a distinct component that aggregates the adapter and any auxiliary helpers (caching, transaction handling). The module is then consumed by several sibling components—browser‑access, code‑graph‑RAG, etc.—which treat it as a black‑box service. Interaction flows are therefore **unidirectional**: higher‑level services call the module’s public façade, the façade forwards to the adapter, and the adapter talks to Graphology/LevelDB. No circular dependencies are indicated, which keeps the dependency graph shallow and eases testing.
+![GraphDatabaseAdapter — Architecture](images/graph-database-adapter-architecture.png)
 
-Because the adapter is the sole point of contact with LevelDB, any change to persistence strategy (e.g., swapping LevelDB for RocksDB) would be isolated to this class, preserving the rest of the codebase. This design decision reflects a **separation‑of‑concerns** mindset and supports future extensibility without widespread refactoring.
+## Architecture and Design
 
-## Implementation Details  
+The architecture follows a classic **Adapter pattern** layered over a **runtime backend selector**, with two child sub-concepts cleanly carved out: `SingleProbeRoutingDecision` (encapsulating the one-shot `isServerAvailable()` call inside `initialize()`) and `LazyVkbClientImport` (encapsulating the dynamic `import()` of `VkbApiClient` so the module is never loaded when the VKB server is absent at startup). Together, these two children express the entire personality of the adapter: a deferred, minimal-cost probe that decides everything thereafter.
 
-While the repository does not list concrete symbols, the naming convention suggests a small, focused class—`GraphDatabaseAdapter`—that likely holds:
+The most important architectural property is that the adapter is **lock-free by design**. LevelDB enforces a single-writer file-lock constraint: if both a VKB server process and an in-process direct-access client were to open the same LevelDB files concurrently, the result would be write failures or data corruption. The probe-once decision is the deliberate mechanism that prevents this race—by committing to exactly one backend before any operation runs, the adapter eliminates the possibility of contending file-lock holders without requiring any mutex, semaphore, or coordination primitive. This is a conscious trade: runtime adaptability is sacrificed in exchange for simplicity and correctness under LevelDB's hard constraints.
 
-1. **Graphology Instance** – an in‑memory graph object created at module initialization. The adapter probably wraps Graphology’s mutation methods (`graph.addNode`, `graph.addEdge`, etc.) with additional validation or transformation logic required by the domain.
-2. **LevelDB Connection** – a persistent store opened via the LevelDB Node.js bindings. The adapter would batch graph updates into LevelDB writes, perhaps using LevelDB’s atomic `batch` API to guarantee consistency between the in‑memory graph and its persisted representation.
-3. **Serialization Layer** – because Graphology stores rich node/edge objects while LevelDB stores byte buffers, the adapter must serialize/deserialize graph elements (JSON, MessagePack, or a custom binary format). This logic is central to ensuring that a restart of the process can reconstruct the exact graph state.
-4. **Error‑Handling & Recovery** – the adapter is the logical place for retry policies, corruption detection, and fallback mechanisms. For example, if LevelDB reports a write error, the adapter can roll back the in‑memory mutation to keep the two stores in sync.
+Because the adapter presents a unified interface over the two completely different backends, all callers are decoupled from which backend is active. This decoupling is what allows the sibling components to remain backend-agnostic: `ManualLearning` writes hand-crafted entries without knowing whether they travel over HTTP or land directly on disk, and `OnlineLearning`'s convergent batch pipeline (which fans in git history, LSL sessions, and code analysis into a single graph write path) does so through the adapter without branching on transport. The `KnowledgeMigration` sibling—exemplified by `scripts/migrate-graph-db-entity-types.js`, which consolidates entity types to the canonical `System`/`Project`/`Pattern` set—similarly relies on the adapter to abstract away the storage layer during retroactive schema migrations.
 
-The adapter’s public API is probably a thin wrapper exposing methods such as `initialize()`, `loadGraph()`, `saveGraph()`, `executeQuery(criteria)`, and `close()`. Internally, it may maintain a **write‑through cache**: every mutation updates Graphology immediately and is queued for asynchronous persistence, balancing latency for read‑heavy workloads (e.g., code‑graph‑RAG queries) against durability guarantees.
+## Implementation Details
 
-## Integration Points  
+The implementation is concentrated in `storage/graph-database-adapter.ts`. The `initialize()` method is the only place where backend selection occurs. Inside it:
 
-- **Parent Component – GraphDatabaseModule**: The module imports the adapter and re‑exports its façade. All module‑level configuration (e.g., LevelDB file path, Graphology plugins) is funneled through the adapter’s constructor or initialization routine.
-- **Sibling Components – Browser‑Access, Code‑Graph‑RAG**: These services request graph data via the module’s API. For instance, the browser‑access UI may call `module.getSubgraph(nodeId, depth)` which the module forwards to `adapter.querySubgraph`. The code‑graph‑RAG pipeline likely invokes `adapter.search(queryVector)` to retrieve relevant code entities before feeding them to an LLM.
-- **External Dependencies**: The adapter depends on the `graphology` npm package and the `level` (or `levelup`) package for LevelDB interaction. No other third‑party libraries are mentioned, keeping the dependency surface narrow.
-- **Potential Extension Points**: Because the adapter isolates persistence, any future component that needs direct graph access (e.g., a batch analytics job) could instantiate its own adapter instance, reusing the same configuration logic without duplicating low‑level code.
+1. A dynamic `import()` statement loads the `VkbApiClient` module on demand. Because this is a lazy import rather than a static top-level `import`, environments without a VKB server pay zero load cost for the API client code path—this is the `LazyVkbClientImport` child entity made concrete.
+2. The freshly imported client's `isServerAvailable()` is invoked exactly once. The boolean result is captured as the adapter instance's permanent routing flag—this is the `SingleProbeRoutingDecision` child entity made concrete.
+3. From that moment forward, every read and write method on the adapter dispatches to either the `VkbApiClient` (HTTP) or directly to `GraphDatabaseService` (LevelDB) based on the captured flag, with no further probing.
 
-## Usage Guidelines  
+![GraphDatabaseAdapter — Relationship](images/graph-database-adapter-relationship.png)
 
-1. **Instantiate Through the Module** – Developers should never construct `GraphDatabaseAdapter` directly. Instead, obtain a reference via `GraphDatabaseModule.getAdapter()` (or the module’s exported façade). This guarantees that the adapter is configured with the correct LevelDB path and Graphology plugins.
-2. **Prefer Asynchronous APIs** – Graphology operations are synchronous, but LevelDB I/O is asynchronous. The adapter’s public methods therefore return Promises; callers must `await` them to ensure durability before proceeding.
-3. **Batch Mutations When Possible** – For bulk imports (e.g., loading a new codebase), use the adapter’s batch interface (`adapter.batchWrite(operations)`) to minimize LevelDB write overhead and keep the in‑memory graph consistent.
-4. **Handle Errors Gracefully** – The adapter propagates LevelDB errors as custom `GraphDatabaseError` objects. Consumers should catch these and decide whether to retry, fallback to a read‑only mode, or abort the operation.
-5. **Close Gracefully on Shutdown** – On application termination, invoke `adapter.close()` to flush any pending writes and close the LevelDB handle, preventing corruption.
+The absence of any synchronization primitive is itself an implementation detail worth noting: there is no mutex around the routing flag, no atomic compare-and-swap, no coordination layer. The flag is written exactly once during `initialize()` and only read thereafter, so it is safe by construction. This minimalism is only sound because the design *forbids* mid-lifecycle changes; any attempt to add re-probing logic would require re-introducing the very locking complexity the architecture exists to avoid.
 
----
+## Integration Points
 
-### 1. Architectural patterns identified  
-- **Adapter pattern** – isolates Graphology + LevelDB specifics behind a stable interface.  
-- **Modular decomposition** – GraphDatabaseModule encapsulates the adapter, exposing a clean façade to siblings.  
-- **Separation of concerns** – persistence, in‑memory representation, and public API are distinct responsibilities.
+The adapter integrates with two backends and one parent context:
 
-### 2. Design decisions and trade‑offs  
-- **Single‑point persistence** (adapter) simplifies future storage swaps but concentrates error‑handling complexity in one class.  
-- **Write‑through cache** (Graphology in memory, LevelDB on disk) offers fast read latency at the cost of additional memory usage and the need for robust sync logic.  
-- **Synchronous Graphology vs. asynchronous LevelDB** required an async façade, adding slight overhead but preserving non‑blocking behavior for callers.
+- **Upstream (parent):** It is contained within `KnowledgeManagement`, which is the architectural surface through which all knowledge graph operations flow.
+- **Downstream backend A:** `VkbApiClient`, accessed via the dynamic import in `initialize()`. Used when `isServerAvailable()` returns true.
+- **Downstream backend B:** `GraphDatabaseService`, the direct LevelDB operations layer. Used when the probe returns false.
+- **Sibling consumers:** `ManualLearning` routes all hand-crafted writes through the adapter; `OnlineLearning`'s batch analysis pipeline converges its three source channels (git history, LSL sessions, code analysis) into a single graph write path via the adapter; `KnowledgeMigration` (e.g., `scripts/migrate-graph-db-entity-types.js`) likewise depends on the adapter for its retroactive data work.
 
-### 3. System structure insights  
-- The graph stack sits at the core of the system, with the adapter acting as the gateway.  
-- All higher‑level features (browser UI, RAG pipelines) are leaf nodes that depend on the module’s API, resulting in a clear top‑down dependency hierarchy.
+The contract with consumers is simple but strict: callers see a single uniform API regardless of backend, but they must accept that backend selection is fixed once `initialize()` has run.
 
-### 4. Scalability considerations  
-- **Horizontal scaling** is limited by LevelDB’s single‑process design; scaling out would require sharding the graph or moving to a distributed KV store.  
-- **Vertical scaling** (more RAM) directly benefits the in‑memory Graphology instance, allowing larger code graphs to be held entirely in memory for low‑latency queries.  
-- The adapter’s batch API mitigates write amplification, supporting bulk ingestion workloads.
+## Usage Guidelines
 
-### 5. Maintainability assessment  
-- The adapter’s isolation makes the codebase **highly maintainable**: changes to the storage engine or Graphology version are confined to a single file.  
-- Lack of explicit symbols in the repository hampers immediate code navigation, but the documented contract (module → adapter → storage) provides a clear mental model for future contributors.  
-- Because the adapter centralizes error handling and serialization, **bug surface area is small**, easing testing and debugging.
+Developers integrating with `GraphDatabaseAdapter` must internalize a small number of non-negotiable rules:
+
+1. **The routing decision is immutable per adapter instance.** If the VKB server starts or stops after `initialize()` has been called, the adapter will not adapt. To switch from API-mode to direct-mode (or vice versa), the entire consumer process must be restarted. There is no hot-swap, no re-initialization path, and no API to force re-probing.
+
+2. **Never open LevelDB directly while the VKB server is running.** The probe-once design exists precisely to prevent this. Bypassing the adapter to open the same LevelDB files that a running VKB server already holds will produce write failures or data corruption. Always go through the adapter.
+
+3. **Expect the first `initialize()` call to incur the dynamic import cost.** `VkbApiClient` is loaded lazily; the first initialization will pay for both the module load and the `isServerAvailable()` network probe. Subsequent calls (if the adapter exposes idempotent initialization) should not repeat the work.
+
+4. **Design consumers to be backend-agnostic.** Since the adapter unifies two completely different backends behind one interface, consumer code should never branch on transport. If a consumer finds itself needing to know whether HTTP or direct LevelDB is in use, that is usually a signal the abstraction is being violated.
+
+5. **Plan deployment topology around the probe.** Because the probe runs once at startup, the operational decision of whether to run a VKB server must be made—and stable—before any adapter-using process initializes. Starting a server after consumers are already running will not cause them to migrate to API mode.
+
+These guidelines, taken together, describe a component that deliberately trades flexibility for safety and simplicity, leaning hard on LevelDB's single-writer reality to justify a lock-free architecture that is correct precisely because it refuses to change its mind.
+
 
 ## Hierarchy Context
 
 ### Parent
-- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter to interact with the Graphology + LevelDB knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The GraphDatabaseAdapter (storage/graph-database-adapter.ts) implements a lock-free dual-routing architecture that permanently commits to one of two execution paths at initialization time, never re-evaluating afterward. During its first `initialize()` call, the adapter dynamically imports VkbApiClient and invokes `isServerAvailable()`—a single probe that determines forever whether all subsequent reads and writes are routed to the VKB HTTP API or directly to the underlying GraphDatabaseService. This 'probe-once, route-always' design is deliberately lock-free: because LevelDB does not support multiple concurrent file-lock holders, having both the VKB server process and a direct-access client attempt to open the same LevelDB files simultaneously would cause write failures or corruption. By detecting server presence at startup and never switching paths mid-session, the adapter avoids the race conditions that would arise from per-operation detection. A developer integrating with this component must understand that the routing decision is immutable per adapter instance: if the VKB server starts or stops after initialization, the adapter will not adapt, and a restart of the consumer process is required to pick up the new routing path.
+
+### Children
+- [SingleProbeRoutingDecision](./SingleProbeRoutingDecision.md) -- storage/graph-database-adapter.ts calls isServerAvailable() exactly once during initialize(), making this the sole input to the routing decision for the adapter instance's lifetime — a deliberate design that trades adaptability for simplicity and predictability.
+- [LazyVkbClientImport](./LazyVkbClientImport.md) -- storage/graph-database-adapter.ts uses a dynamic import (import()) for VkbApiClient inside initialize() rather than a static top-level import, so the VKB client module is never loaded in environments where the VKB server is absent at startup.
+
+### Siblings
+- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are routed through GraphDatabaseAdapter, meaning all hand-crafted writes go either to the VKB HTTP API or directly to GraphDatabaseService depending on the probe-once initialization decision in storage/graph-database-adapter.ts
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning extraction runs as a batch analysis pipeline referencing git history, LSL sessions, and code analysis—three distinct source channels whose outputs converge into a single graph write path via GraphDatabaseAdapter in storage/graph-database-adapter.ts
+- [KnowledgeMigration](./KnowledgeMigration.md) -- scripts/migrate-graph-db-entity-types.js consolidates entity types to a canonical three-value set (System/Project/Pattern), indicating the graph schema has undergone at least one breaking taxonomy change that required a retroactive data migration
+
 
 ---
 
-*Generated from 3 observations*
+*Generated from 5 observations*

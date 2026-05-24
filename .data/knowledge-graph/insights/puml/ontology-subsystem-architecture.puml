@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+package "Pipeline Layer" {
+  component "OntologyClassificationAgent" as oca <<agent>>
+}
+
+package "Ontology Subsystem (src/ontology/)" {
+  component "OntologyConfigManager" as ocm <<core>>
+  component "OntologyClassifier" as oc <<core>>
+  component "OntologyValidator" as ov <<core>>
+  component "LegacyOntologyAdapter" as loa <<api>>
+  component "HeuristicClassifiers" as hc <<core>>
+}
+
+package "External Services" {
+  cloud "LLM Service" as llm <<external>>
+}
+
+ocm --> oc : configures
+ocm --> loa : loads legacy schema
+loa --> oc : bridges schema
+
+oca --> oc : delegates classification
+oca --> ov : detectIssues()
+
+oc --> hc : fast path (structural types)
+oc --> llm : complex classification
+
+@enduml

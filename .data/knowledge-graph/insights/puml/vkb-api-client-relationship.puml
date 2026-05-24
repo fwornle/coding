@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: VkbApiClient
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[VkbApiClient] as vkb_api_client #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphKnowledgeExporter] as graph_knowledge_exporter #F0F0F0
+[EntityTypeMigration] as entity_type_migration #F0F0F0
+[KnowledgeDecayTracker] as knowledge_decay_tracker #F0F0F0
+[DynamicImportFallback] as dynamic_import_fallback #E8F5E8
+[EntityCrudEndpoints] as entity_crud_endpoints #E8F5E8
+
+knowledge_management --> vkb_api_client
+manual_learning -[hidden]- vkb_api_client
+online_learning -[hidden]- vkb_api_client
+graph_knowledge_exporter -[hidden]- vkb_api_client
+entity_type_migration -[hidden]- vkb_api_client
+knowledge_decay_tracker -[hidden]- vkb_api_client
+vkb_api_client --> dynamic_import_fallback
+vkb_api_client --> entity_crud_endpoints
+
+@enduml

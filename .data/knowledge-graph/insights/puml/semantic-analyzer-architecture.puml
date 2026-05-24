@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Semantic Analysis Agents" {
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "SemanticAnalysisAgent" as saa <<agent>>
+  component "ContentValidationAgent" as cva <<agent>>
+  component "CodeGraphAgent" as cga <<agent>>
+}
+
+package "Core Utilities" {
+  component "SemanticAnalyzer" as sa <<core>>
+}
+
+package "Storage" {
+  database "Memgraph" as mg <<storage>>
+}
+
+package "Integrations" {
+  component "MCP Constraint Monitor" as mcm <<external>>
+}
+
+oca --> sa : "entity type resolution → calculateConfidence()"
+saa --> sa : "pattern primitives"
+cva --> sa : "text analysis → detectIssues()"
+cga --> sa : "DEFINES / DEFINES_METHOD candidates"
+
+cga --> mg : "writes graph edges"
+
+sa ..> mcm : "informs constraint patterns"
+
+@enduml

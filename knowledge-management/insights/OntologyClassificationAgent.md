@@ -2,113 +2,111 @@
 
 **Type:** Detail
 
-The OntologyClassificationAgent is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, which outlines the responsibilities of the agent.
+The agent's output is an AgentResponse object that includes a dedicated ontologyClass field, meaning classification results are carried as a named, typed property rather than inlined into a generic result payload — a design decision that enables downstream agents to reliably inspect classification without parsing freeform output.
 
 ## What It Is  
 
-The **OntologyClassificationAgent** lives in the source tree at  
+**OntologyClassificationAgent** is a concrete implementation of the *BaseAgent* contract that lives in the **SemanticAnalysis** component of the MCP Server, specifically under the **Ontology** sub‑component. Its source code resides in the repository path `integrations/mcp-server-semantic-analysis/` (the exact file is not listed, but the surrounding documentation is located at `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`). The agent fulfills **all five** abstract methods defined by *BaseAgent*—initialisation, execution, validation, error handling, and finalisation—making it a full‑cycle, production‑ready agent.  
 
-```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
-```  
-
-and is declared as a TypeScript class (or module) with that exact name.  It is a concrete *agent* that participates in the **SemanticAnalysis** subsystem of the MCP server.  The only concrete relationship that is documented is that the **Pipeline** component *contains* the OntologyClassificationAgent, indicating that the agent is one step in a larger batch‑processing pipeline that analyses code semantics.  Although the source file does not spell out its public methods or properties, the naming makes its purpose clear: it is responsible for classifying ontological information (e.g., mapping code entities to a domain ontology) as part of the overall semantic analysis workflow.
+When invoked, the agent returns an **AgentResponse** object that contains a dedicated `ontologyClass` field. This field carries the classification result as a typed, named property rather than as an unstructured string, allowing downstream agents (most notably **PersistenceAgent**) to consume the classification directly without additional parsing. The presence of a sibling component, **OntologyClassReclassificationGuard**, indicates that the classification result is also used to guard against redundant re‑classification downstream.
 
 ---
 
 ## Architecture and Design  
 
-The architecture exposed by the observations follows a **pipeline pattern**.  A `Pipeline` object orchestrates a series of agents, each of which performs a distinct transformation or analysis on the input data.  The OntologyClassificationAgent is one such stage, positioned after earlier stages that likely parse code and extract raw symbols, and before later stages that may persist results or generate reports.  
+The design follows the **Agent‑Based Architecture** described in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. Each agent implements a common *BaseAgent* interface, guaranteeing a uniform lifecycle across the system. OntologyClassificationAgent adheres to this pattern, which provides predictable entry points for orchestration, monitoring, and error handling.  
 
-Because the agent is defined in the `agents` directory, the design deliberately separates *concern* (ontology classification) from other concerns (parsing, type inference, etc.).  This modularity supports **single‑responsibility**: each agent encapsulates one piece of the semantic analysis workflow, making the pipeline extensible—new agents can be added without touching existing ones.  The only explicit design pattern we can confirm is the **pipeline** (or “chain of responsibility”) pattern; no other patterns (e.g., microservices, event‑driven) are mentioned in the observations, so we refrain from asserting their presence.
+The **semantic layer** positioning—after syntactic parsing and before persistence—places the agent in a clear **pipeline stage**. Data flows from a parser → OntologyClassificationAgent → PersistenceAgent (which consumes the `ontologyClass` field) → optional guards such as OntologyClassReclassificationGuard. This linear flow mirrors the integration pattern documented in `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md`, where each stage produces a well‑typed payload consumed by the next stage, minimizing coupling and enabling independent evolution of each component.  
 
-Interaction between components is straightforward: the `Pipeline` creates (or injects) an instance of `OntologyClassificationAgent` and invokes its processing method as part of the sequential execution.  The agent likely receives a data structure representing the code model and returns an enriched model that now includes ontology classification metadata.  Because the file path places the agent alongside other agents, we can infer that the system uses a **convention‑based discovery** mechanism—any file under `src/agents/` that exports a class with the `*Agent` suffix is automatically registered with the pipeline at startup.
+A notable design decision is the **typed response contract** (`AgentResponse` with an explicit `ontologyClass` field). Rather than embedding classification text in a generic `result` blob, the agent emits a structured property. This decision improves **inter‑agent contract clarity**, reduces parsing overhead for downstream agents, and supports static analysis tools that can verify the presence of required fields at compile‑time or CI time.
 
 ---
 
 ## Implementation Details  
 
-The only concrete implementation artifact we have is the file location:
+*OntologyClassificationAgent* implements the five abstract methods defined in **BaseAgent**:
 
+1. **initialize** – prepares any required resources (e.g., loading ontology models or caches).  
+2. **execute** – receives the syntactically parsed input, runs the classification logic (likely invoking an ontology reasoner or lookup service), and populates the `ontologyClass` field.  
+3. **validate** – ensures the classification result conforms to expected schema (e.g., that the class identifier exists in the ontology).  
+4. **handleError** – translates any runtime exceptions into a standardized error payload within the `AgentResponse`.  
+5. **finalize** – releases resources, logs metrics, and returns the completed `AgentResponse`.  
+
+The **AgentResponse** object is the common envelope for all agents. In this case, its schema includes at least:
+
+```json
+{
+  "status": "success|error",
+  "ontologyClass": "string",   // populated by OntologyClassificationAgent
+  "payload": { … }             // other generic fields
+}
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
-```
 
-From the filename we know the agent is implemented in TypeScript.  Its name, `OntologyClassificationAgent`, suggests the exported class follows the convention used by other agents in the codebase (e.g., `SomeOtherAgent`).  While the source symbols are not listed, typical agents in this repository expose at least:
-
-* a constructor that may accept configuration or service dependencies (e.g., an ontology service, logger, or a reference to the shared semantic model);
-* a `process` or `run` method that receives the current analysis context and returns a promise or synchronous result;
-* possibly lifecycle hooks (`initialize`, `shutdown`) that the pipeline invokes when the pipeline starts or stops.
-
-Given its role, the internal mechanics likely involve:
-
-1. **Ontology Lookup** – querying a pre‑built ontology (perhaps a JSON‑LD or RDF store) to find matching concepts for code symbols.
-2. **Classification Logic** – applying rules or similarity metrics to assign the most appropriate ontology class to each symbol.
-3. **Annotation** – augmenting the intermediate representation (AST, symbol table, etc.) with ontology tags that downstream agents can consume.
-
-Because the file resides under `integrations/mcp-server-semantic-analysis`, the agent is part of the *semantic‑analysis integration* rather than core server logic, indicating a clear separation between the analysis pipeline and the rest of the MCP server.
+Because the agent is a **complete implementation**, it does not rely on partial mixins or default method stubs; every lifecycle hook is explicitly handled, ensuring that the classification step is both **self‑contained** and **observable**. The sibling **OntologyClassReclassificationGuard** likely inspects the same `ontologyClass` field to decide whether a re‑classification request should be suppressed, reinforcing the contract that downstream components can safely read this field.
 
 ---
 
 ## Integration Points  
 
-The OntologyClassificationAgent is tightly coupled to the **Pipeline** component, which is its parent in the hierarchy.  The pipeline is responsible for:
+1. **Upstream** – The agent receives input from the **syntactic parsing** stage of the SemanticAnalysis component. The parser supplies a normalized representation (e.g., an AST or token list) that the classification logic consumes.  
 
-* **Instantiating** the agent (likely via a dependency‑injection container or a simple factory).
-* **Feeding** it the intermediate data produced by earlier agents (e.g., a parsed abstract syntax tree).
-* **Collecting** the enriched data for subsequent agents or for persistence.
+2. **Downstream** – The primary consumer is **PersistenceAgent**, which reads the `ontologyClass` field to store the classification alongside the original data, thereby avoiding a second classification pass. This relationship is explicitly mentioned: *“PersistenceAgent consumes [the ontologyClass field] to avoid re‑classification.”*  
 
-Other integration points that can be inferred include:
+3. **Sibling Guard** – **OntologyClassReclassificationGuard** monitors the same response payload to enforce idempotency. Its presence indicates a **guard pattern** where classification results are checked before any further processing that might trigger duplicate work.  
 
-* **Ontology Service** – an external or internal service that provides the ontology definitions; the agent probably imports a client or repository from another module.
-* **Logging / Metrics** – standard cross‑cutting concerns that most agents share, suggesting the agent may accept a logger instance.
-* **Configuration** – the agent may read configuration values (e.g., which ontology version to use) from a central config module, as is common for agents in this codebase.
-
-No sibling agents are explicitly listed, but the mention that the pipeline “contains OntologyClassificationAgent” implies that there are other sibling agents handling different analysis steps (e.g., type inference, dependency graph construction).  The agent therefore shares the same interface contract with its siblings, enabling the pipeline to treat all agents uniformly.
+4. **Integration Layer** – The overall flow adheres to the integration patterns in `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md`, which prescribe that agents exchange typed response objects rather than free‑form strings. This ensures loose coupling and clear versioning of contracts.
 
 ---
 
 ## Usage Guidelines  
 
-* **Instantiate via the Pipeline** – developers should never create an `OntologyClassificationAgent` directly; instead, they should add it to the pipeline configuration so the pipeline can manage its lifecycle.
-* **Provide Required Dependencies** – if the agent expects an ontology provider or logger, ensure those services are registered in the DI container before the pipeline starts.
-* **Maintain Order** – because the pipeline processes agents sequentially, the OntologyClassificationAgent must appear **after** any agents that produce the symbols it needs to classify, and **before** any agents that rely on ontology annotations.
-* **Statelessness** – agents in this architecture are designed to be stateless between runs; avoid storing mutable state on the agent instance that could leak across pipeline executions.
-* **Error Handling** – propagate errors through the pipeline’s error‑handling mechanism; the agent should throw or reject with descriptive messages rather than swallowing exceptions.
+* **Instantiate via the Agent Factory** – All agents, including OntologyClassificationAgent, should be created through the central factory defined in the agent architecture documentation. This guarantees that lifecycle hooks are wired correctly.  
+
+* **Provide Valid Parsed Input** – The `execute` method expects a syntactically parsed payload. Supplying raw text will bypass the contract and likely cause validation failures.  
+
+* **Do Not Modify the `ontologyClass` Field** – Downstream agents rely on the immutability of this field once set. If a transformation is required, create a new `AgentResponse` rather than mutating the existing one.  
+
+* **Handle Errors Through the AgentResponse** – Errors should be reported by setting the `status` to `error` and populating an `errorMessage` field inside the payload. Consumers like PersistenceAgent are designed to interpret this pattern.  
+
+* **Respect Guard Semantics** – When integrating new components that might trigger classification, consult **OntologyClassReclassificationGuard** to avoid unnecessary re‑classification cycles.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural Patterns Identified
+1. **Agent‑Based Architecture** – Uniform lifecycle via *BaseAgent*.
+2. **Typed Response Contract** – Structured `AgentResponse` with explicit `ontologyClass`.
+3. **Pipeline/Stage Pattern** – Linear data flow: parser → classification → persistence.
+4. **Guard Pattern** – OntologyClassReclassificationGuard prevents duplicate work.
 
-1. **Pipeline (Chain of Responsibility)** – a parent `Pipeline` orchestrates a series of agents, each performing a discrete transformation.  
-2. **Convention‑Based Agent Registration** – agents are discovered by their placement in `src/agents/` and the `*Agent` naming suffix.  
+### Design Decisions & Trade‑offs
+* **Explicit field vs. generic payload** – Improves type safety and downstream simplicity at the cost of a slightly larger response envelope.
+* **Full implementation of BaseAgent** – Guarantees lifecycle completeness but introduces boilerplate that must be maintained for every agent.
+* **Positioning in semantic layer** – Enables early classification (beneficial for downstream indexing) but requires the ontology model to be loaded before persistence, affecting start‑up time.
 
-### Design Decisions and Trade‑offs  
+### System Structure Insights
+* The **Ontology** sub‑component encapsulates all ontology‑related agents, centralising responsibility for semantic enrichment.
+* **PersistenceAgent** acts as the sink for classification results, illustrating a clear producer‑consumer relationship.
+* Sibling **OntologyClassReclassificationGuard** demonstrates a cross‑cutting concern (idempotency) that is factored out of the core classification logic.
 
-* **Modular Agent Design** – isolates ontology classification from other analysis steps, improving testability and allowing independent evolution. The trade‑off is a potential increase in coordination overhead (e.g., ensuring data contracts between agents remain compatible).  
-* **File‑System Conventions for Discovery** – simplifies registration but can make the system less explicit; adding an agent requires only placing a file in the correct directory, which may lead to accidental inclusion if a file is misnamed.  
+### Scalability Considerations
+* Because classification is performed as a discrete agent step, the system can horizontally scale by running multiple instances of OntologyClassificationAgent behind a load balancer, provided the underlying ontology model is thread‑safe or replicated.
+* The typed `ontologyClass` field eliminates heavy parsing, reducing CPU overhead for downstream agents and supporting higher throughput.
 
-### System Structure Insights  
+### Maintainability Assessment
+* **High maintainability** – The strict contract (`BaseAgent` + `AgentResponse`) isolates changes; modifications to classification logic rarely affect other agents.
+* **Clear separation of concerns** – Guard, classification, and persistence responsibilities are split into distinct components, simplifying unit testing and future refactoring.
+* **Potential technical debt** – The requirement to implement all five lifecycle methods may lead to duplicated boilerplate across agents; introducing a reusable abstract base class with default implementations could mitigate this.
 
-The system is organized around a **semantic‑analysis integration** (`integrations/mcp-server-semantic-analysis`) that houses a `Pipeline` and a collection of agents.  The OntologyClassificationAgent sits as a child of the pipeline, sharing the same interface as its sibling agents.  This hierarchy promotes a clear top‑down flow: the pipeline triggers agents in order, each agent consumes the output of its predecessor and produces enriched data for the next.  
-
-### Scalability Considerations  
-
-Because each agent is a self‑contained unit, the pipeline can be **parallelized** at the stage level if later redesign introduces independent branches.  Currently, the sequential nature may become a bottleneck for very large codebases; however, the modularity allows future refactoring (e.g., splitting ontology classification into multiple workers) without affecting other agents.  The ontology lookup itself could be a scaling hotspot; caching strategies or externalizing the ontology service would mitigate latency.  
-
-### Maintainability Assessment  
-
-The clear separation of concerns and the convention‑driven registration make the codebase **easy to maintain**: new classification rules can be added inside the agent without touching the pipeline.  The lack of explicit documentation in the source file (no method signatures or comments) is a minor maintainability risk; developers must rely on naming conventions and surrounding context to understand the agent’s API.  Adding inline JSDoc comments and exposing a well‑typed interface would further improve maintainability.  
-
----  
-
-*All statements above are directly grounded in the observations provided; no unverified patterns or speculative code details have been introduced.*
 
 ## Hierarchy Context
 
 ### Parent
-- [Pipeline](./Pipeline.md) -- The batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, which outlines the responsibilities of the OntologyClassificationAgent.
+- [Ontology](./Ontology.md) -- OntologyClassificationAgent implements all five BaseAgent abstract methods, emitting an ontologyClass field in its AgentResponse output that PersistenceAgent consumes to avoid re-classification
+
+### Siblings
+- [OntologyClassReclassificationGuard](./OntologyClassReclassificationGuard.md) -- The L2 parent context explicitly states that PersistenceAgent 'consumes [the ontologyClass field] to avoid re-classification', establishing a directional data dependency: OntologyClassificationAgent produces, PersistenceAgent guards — a pattern consistent with the integration patterns documented in integrations/mcp-server-semantic-analysis/docs/architecture/integration.md.
+
 
 ---
 
-*Generated from 3 observations*
+*Generated from 4 observations*

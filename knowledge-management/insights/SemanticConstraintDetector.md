@@ -1,119 +1,79 @@
 # SemanticConstraintDetector
 
-**Type:** Detail
+**Type:** SubComponent
 
-The integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documentation outlines the process for detecting semantic constraints.
+Documented in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and semantic-detection-design.md, indicating the detection logic is substantial enough to warrant both a user-facing doc and an internal design doc
 
-## What It Is  
+# SemanticConstraintDetector — Technical Insight Document
 
-**SemanticConstraintDetector** is a logical component that lives inside the **SemanticAnalysisModule** and is also referenced by the **ConstraintMonitor** package.  The only concrete artefacts that mention it are the Markdown files under the *integrations/mcp‑constraint‑monitor* folder:
+## What It Is
 
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – a guide that describes the *process* for detecting semantic constraints.  
-* `integrations/mcp-constraint-monitor/README.md` – the top‑level README for the MCP Constraint Monitor, which lists **SemanticConstraintDetector** as one of the capabilities of the monitor.
+The `SemanticConstraintDetector` is a SubComponent of the broader `ConstraintSystem`, implemented within the `integrations/mcp-constraint-monitor/` integration. Its documentation lives in two complementary files: `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` (the user-facing reference) and `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md` (the internal design document). The presence of both documents signals that this detector is not a thin wrapper over regex matching — it represents a deliberate architectural investment in meaning-aware constraint evaluation that warrants both consumer documentation and maintainer-oriented design rationale.
 
-No source code files are currently enumerated for the detector, but the documentation makes it clear that the detector’s purpose is to **interpret the semantic‑constraint‑detection guide** and turn that guidance into actionable checks within the broader **SemanticAnalysisModule** workflow.
+Functionally, the detector is responsible for evaluating code actions and file operations against semantic rules — constraints that depend on the *meaning* of code rather than its surface text. It complements the simpler pattern-matching path inside `ConstraintSystem` by handling cases where regex or string-equality checks would produce too many false positives (or miss too many violations). The component is co-located with `constraint-configuration.md` under `integrations/mcp-constraint-monitor/docs/`, indicating that its semantic rules are authored and configured alongside the standard constraint definitions consumed by the rest of the monitor.
 
-In the system hierarchy, **SemanticConstraintDetector** is a child of **SemanticAnalysisModule** (the module that “utilizes the … documentation to provide a guide for semantic constraint detection”).  It is also a child of **ConstraintMonitor**, indicating that the monitor aggregates the detector’s output as part of its overall constraint‑watching responsibilities.
+![SemanticConstraintDetector — Architecture](images/semantic-constraint-detector-architecture.png)
 
----
+Within the entity hierarchy, the detector owns two child SubComponents: `SemanticRuleEvaluator`, which executes the actual rule logic against incoming events, and `ViolationClassifier`, which categorizes and shapes detected violations into a structured form suitable for downstream consumers such as the `ConstraintMonitorDashboard`.
 
-## Architecture and Design  
+## Architecture and Design
 
-The observations point to a **documentation‑driven, modular architecture**.  Rather than hard‑coding constraint rules, the system relies on a human‑maintained Markdown specification (`semantic-constraint-detection.md`).  The detector’s role is to **parse** that specification and expose the resulting rules to the rest of the platform.  This approach yields a clear separation of concerns:
+The architectural pivot evident from `semantic-detection-design.md` is the separation of **semantic detection** from **pattern-based detection**. This implies a *layered violation-checking pipeline* inside `ConstraintSystem`: cheaper, deterministic pattern checks run first, with semantic evaluation reserved for rules that genuinely require interpretation. This is a classic layered-filter pattern — fast pre-filters reduce the load on the expensive semantic stage, which likely involves LLM-based or AST-based analysis given that a dedicated design document was warranted rather than inline implementation notes.
 
-1. **Specification Layer** – the Markdown file lives under `integrations/mcp-constraint-monitor/docs/`.  It is the single source of truth for what constitutes a semantic constraint.  
-2. **Detection Layer** – **SemanticConstraintDetector** consumes the specification, turning textual rules into runtime checks.  Because the detector is housed inside **SemanticAnalysisModule**, it can be invoked wherever semantic analysis is performed.  
-3. **Monitoring Layer** – **ConstraintMonitor** aggregates the detector’s findings, presenting them to operators or downstream tooling.
+The detector is integrated into the same hook-based architecture documented in `integrations/mcp-constraint-monitor/README.md`. That means semantic checks are not invoked through a separate API surface; instead, they are triggered as part of the unified pre-tool/post-tool hook interception flow that the parent `ConstraintSystem` manages. Hook events arrive via `HookEventRouter` (whose envelope format is captured in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`), are matched against configurations resolved by `HookConfigurationLoader` (which merges user-level `~/.coding-tools/hooks.json` with project-level `.coding/hooks.json`), and — when semantic rules apply — are dispatched into `SemanticConstraintDetector`.
 
-No explicit design pattern (e.g., Strategy, Observer) is named in the observations, but the **modular decomposition** (Specification → Detector → Monitor) mirrors a classic *pipeline* or *adapter* style: the detector adapts a static document into an executable component that feeds a monitoring pipeline.
+Internally, the detector decomposes responsibility across its two children. `SemanticRuleEvaluator` carries the heavy logic of interpreting a rule and an action together; the fact that it deserves its own user-facing and design-level documentation suggests its evaluation strategy is non-trivial and likely pluggable across analysis backends. `ViolationClassifier` operates as a downstream stage that converts raw evaluator output into a typed violation structure — one that the `ConstraintMonitorDashboard` (a self-contained UI sub-project at `integrations/mcp-constraint-monitor/dashboard/`) can render by severity or category.
 
-Interaction flow (as inferred from the hierarchy):
+## Implementation Details
 
-* **SemanticAnalysisModule** loads `semantic-constraint-detection.md` → hands it to **SemanticConstraintDetector** → detector produces a set of constraint objects → **ConstraintMonitor** consumes those objects to raise alerts or log violations.
+The detector is structured as a small internal pipeline: incoming hook event → `SemanticRuleEvaluator` → `ViolationClassifier` → emitted violation record. `SemanticRuleEvaluator` is the analytical core. Because the design document treats semantic detection as architecturally distinct from pattern matching, the evaluator is the natural home for any AST traversal, semantic embedding lookup, or LLM-mediated reasoning that the system performs. Its dual documentation (`semantic-constraint-detection.md` for consumers, `semantic-detection-design.md` for maintainers) reinforces that the evaluator's contract — what it accepts, what semantic primitives it supports, what guarantees it makes — is stable enough to publish externally while the internals remain free to evolve.
 
-Because the detector is defined as a *child* of two parent components, it is likely a **re‑usable library** that can be invoked from multiple contexts without duplication.
+`ViolationClassifier` complements the evaluator by transforming raw detection outputs into a structured, displayable form. The `integrations/mcp-constraint-monitor/dashboard/README.md` confirms that a dashboard exists as a downstream consumer, which constrains the classifier's output: violations must be typed and carry enough metadata (severity, category, originating rule) for the dashboard to group and present them. This separation of "did we detect a problem?" from "how should the problem be categorized?" keeps the evaluator focused on truth-finding and the classifier focused on presentation semantics.
 
----
+![SemanticConstraintDetector — Relationship](images/semantic-constraint-detector-relationship.png)
 
-## Implementation Details  
+Configuration is unified with the rest of the constraint system: semantic rules are authored alongside conventional constraints in the same configuration surface described by `constraint-configuration.md`. This means developers do not invoke a separate API to enable semantic checks — they declare rules, and the detector picks up the ones whose evaluation mode requires semantic analysis. Concrete code-symbol enumeration is not available in the current observation set, so implementation specifics below the documentation layer (exact class signatures, file names) should be confirmed against the source under `integrations/mcp-constraint-monitor/`.
 
-The only concrete implementation artefacts we have are file paths; no class or function names are listed.  Consequently, the technical description must stay at a high level:
+## Integration Points
 
-* **Location** – The detector’s documentation lives at `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`.  The surrounding package (`integrations/mcp-constraint-monitor`) is described in its `README.md`.  The detector itself is a logical entity within the **SemanticAnalysisModule** codebase, though the exact source files are not enumerated.
+The detector's primary upstream integration is with the hook interception flow of `ConstraintSystem`. As described in `integrations/mcp-constraint-monitor/README.md`, Claude Code's native hook events (pre-tool, post-tool, startup, shutdown) are routed through a unified hook manager; `SemanticConstraintDetector` is invoked as one of the validators in that flow. This makes its input contract effectively the Claude Code hook event envelope defined in `CLAUDE-CODE-HOOK-FORMAT.md` and parsed by the sibling `HookEventRouter`.
 
-* **Mechanics** – Based on the documentation‑driven premise, the detector most likely performs the following steps:
-  1. **File Ingestion** – Reads the Markdown file at the path above.
-  2. **Parsing** – Uses a Markdown parser (e.g., `remark`, `commonmark`) to locate sections that define constraint rules (tables, bullet lists, code blocks).
-  3. **Rule Materialization** – Translates each textual rule into an in‑memory representation (objects or data structures) that can be evaluated against a model or data payload.
-  4. **Evaluation API** – Exposes a function such as `detectConstraints(model)` that returns a list of violated constraints, which the **ConstraintMonitor** can then act upon.
+On the configuration side, the detector depends on rules loaded by `HookConfigurationLoader`, which establishes a clear precedence between user-level (`~/.coding-tools/hooks.json`) and project-level (`.coding/hooks.json`) sources. Semantic rules participate in this same two-level merge, so a project can extend or override globally configured semantic constraints without bypassing the detector.
 
-* **Dependencies** – The detector depends on the **SemanticAnalysisModule** runtime environment (e.g., the model representation it analyses) and on any generic Markdown parsing library the repository already uses.  It also implicitly depends on the **ConstraintMonitor** for downstream handling of its output.
+Downstream, the detector feeds violation records into the persistence layer that the parent `ConstraintSystem` exposes for dashboard display. The `ConstraintMonitorDashboard` consumes this stream — its existence as a self-contained UI under `integrations/mcp-constraint-monitor/dashboard/` is what makes `ViolationClassifier`'s typed-output contract necessary in the first place. Internally, the detector composes its two children: `SemanticRuleEvaluator` provides the analytical capability, and `ViolationClassifier` provides the output normalization, with the detector itself orchestrating their interaction.
 
-Because the observations do not list concrete symbols, the above steps are inferred from the documented process rather than from code.
+## Usage Guidelines
 
----
+When authoring new constraints, developers should first ask whether a rule can be expressed as a pattern; if so, it belongs in the pattern-based path of `ConstraintSystem` rather than as a semantic rule. Semantic rules are more expressive but also more expensive to evaluate, and the layered design implied by `semantic-detection-design.md` is built on the assumption that semantic detection is the exception rather than the default. Use it for rules whose intent cannot be captured by literal text matching — for example, constraints that depend on code structure, type relationships, or contextual meaning.
 
-## Integration Points  
+Rules should be declared in the same configuration surface documented by `constraint-configuration.md`, taking advantage of the two-level loading model: cross-project defaults belong in `~/.coding-tools/hooks.json`, while project-specific semantic rules belong in `.coding/hooks.json`. When adding a new semantic rule type, consult `semantic-detection-design.md` for the evaluator's extension contract before modifying `SemanticRuleEvaluator`, and ensure any new violation shape is reflected in `ViolationClassifier` so the dashboard can render it correctly.
 
-1. **Parent – SemanticAnalysisModule**  
-   * The module calls the detector as part of its analysis pipeline.  The detector supplies the semantic‑constraint rules that the module applies to the data it processes.  
+Finally, because the detector runs inside the hook interception flow, its evaluation latency is on the critical path for Claude Code tool invocations. Rule authors should be mindful that expensive semantic checks affect interactive responsiveness; if the evaluator supports caching or precomputation, prefer rules that exploit those facilities. Treat `semantic-constraint-detection.md` as the authoritative user-facing reference for what the detector can express, and `semantic-detection-design.md` as the source of truth for how it expresses it internally.
 
-2. **Sibling – Other Detectors (if any)**  
-   * While not explicitly mentioned, the architecture suggests that other constraint detectors could exist alongside **SemanticConstraintDetector**, each consuming its own documentation file.  They would share the same integration contract with **SemanticAnalysisModule**.  
+## Summary of Key Insights
 
-3. **Child – ConstraintMonitor**  
-   * **ConstraintMonitor** aggregates the results of the detector.  The monitor’s README (`integrations/mcp-constraint-monitor/README.md`) lists the detector as a capability, implying that the monitor imports the detector’s API and registers its output for alerting or logging.  
+1. **Architectural patterns**: Layered violation-checking pipeline (pattern-based pre-filter → semantic evaluator → violation classifier), hook-based interception inherited from `ConstraintSystem`, and a clear evaluator/classifier separation among child components.
+2. **Design decisions and trade-offs**: Explicit split between semantic and pattern detection trades implementation complexity for expressive power; dual documentation (consumer + design) trades doc maintenance overhead for clearer API stability; unified configuration with standard constraints trades a narrower semantic-only surface for authoring consistency.
+3. **System structure**: The detector is a mid-tier SubComponent — child of `ConstraintSystem`, parent of `SemanticRuleEvaluator` and `ViolationClassifier` — and a peer-in-flow to `HookEventRouter` and `HookConfigurationLoader`.
+4. **Scalability considerations**: Semantic evaluation is inherently more expensive than pattern matching, and because it executes inside the pre/post-tool hook path, the layered design (cheap checks first) is essential to keep tool-invocation latency acceptable as the rule set grows.
+5. **Maintainability assessment**: Strong — the separation into `SemanticRuleEvaluator` and `ViolationClassifier`, the existence of a dedicated design document, and the co-located configuration documentation all indicate the component was designed for ongoing evolution rather than as a one-off feature.
 
-4. **External Interfaces**  
-   * The detector’s only external file dependency is the Markdown specification (`semantic-constraint-detection.md`).  Any change to that file propagates automatically to the detector on the next run, making the integration point a *configuration‑as‑code* style interface.
-
----
-
-## Usage Guidelines  
-
-* **Keep the Specification Source of Truth** – All semantic constraints should be defined **only** in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`.  Adding or modifying rules directly in code would bypass the detector’s intended workflow and create divergence.
-
-* **Version the Documentation** – Because the detector reads the Markdown at runtime, any change to the file should be version‑controlled (Git) and, if possible, accompanied by a change‑log entry.  This ensures that downstream monitors can trace which rule set produced a given alert.
-
-* **Invoke Through the Analysis Module** – Developers should not call the detector in isolation.  The recommended entry point is the public API exposed by **SemanticAnalysisModule** (e.g., `SemanticAnalysisModule.runAnalysis(...)`), which internally triggers the detector.  This guarantees that any preprocessing or context required by the detector is correctly supplied.
-
-* **Monitor Output Consistently** – When handling detector results, use the interfaces provided by **ConstraintMonitor**.  The monitor likely normalizes the output (e.g., severity levels, timestamps) before persisting or forwarding it, so bypassing the monitor could lead to inconsistent alert handling.
-
-* **Testing** – Since the detector’s behavior is driven by a Markdown file, unit tests should focus on **fixture versions of the specification**.  Tests can load a static copy of `semantic-constraint-detection.md` and assert that the detector produces the expected constraint objects.  This isolates the detector from external changes and validates the parsing logic.
-
----
-
-### Architectural Patterns Identified  
-
-* **Documentation‑Driven Configuration** – The system treats a Markdown file as a declarative source of constraint rules.  
-* **Modular Pipeline** – A clear three‑tier pipeline (Specification → Detector → Monitor) separates concerns and enables reuse.
-
-### Design Decisions and Trade‑offs  
-
-* **Pros** – Easy to update constraints without code changes; non‑developers can edit the Markdown; single source of truth reduces duplication.  
-* **Cons** – Runtime parsing of Markdown can add overhead; correctness of the specification depends on proper formatting; lack of compile‑time validation may allow malformed rules to slip through.
-
-### System Structure Insights  
-
-* The detector sits at the intersection of **SemanticAnalysisModule** (analysis engine) and **ConstraintMonitor** (observability layer).  
-* The file hierarchy (`integrations/mcp-constraint-monitor/...`) suggests that the detector is part of an *integration* package rather than core business logic, indicating a plug‑in‑style extension point.
-
-### Scalability Considerations  
-
-* **Horizontal Scaling** – Because the detector’s work is stateless (read‑only parsing of a file and rule evaluation), multiple analysis workers can run in parallel without contention.  
-* **Specification Size** – Very large Markdown files could increase parsing time; if the rule set grows substantially, consider pre‑compiling the specification into a binary format or caching the parsed representation.
-
-### Maintainability Assessment  
-
-* **High Maintainability** – The declarative approach centralizes constraint definitions, making updates straightforward.  
-* **Potential Technical Debt** – Absence of explicit code symbols means developers must rely on documentation to understand the detector’s contract; adding strong type definitions or an interface file would improve discoverability.  
-* **Documentation Dependency** – The health of the detector is directly tied to the accuracy and consistency of the Markdown file; investing in linting or validation tooling for the specification would further boost maintainability.
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysisModule](./SemanticAnalysisModule.md) -- The SemanticAnalysisModule utilizes the integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documentation to provide a guide for semantic constraint detection.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a constraint monitoring and enforcement subsystem that validates code actions and file operations against configured rules during Claude Code sessions. It operates through a hook-based architecture where Claude Code's native hook events (pre-tool, post-tool, startup, shutdown, etc.) are intercepted and routed through a unified hook manager that loads configuration from both user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) sources. The system captures violations in real time, persists them for dashboard display, and supports semantic constraint detection beyond simple pattern matching.
+
+### Children
+- [SemanticRuleEvaluator](./SemanticRuleEvaluator.md) -- The existence of both a user-facing doc (integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md, titled 'Semantic Constraint Detection') and a separate internal design doc (integrations/mcp-constraint-monitor/docs/semantic-detection-design.md, titled 'Semantic Constraint Detection - Design Document') strongly implies that rule evaluation logic is architecturally complex enough to require distinct documentation for consumers and maintainers.
+- [ViolationClassifier](./ViolationClassifier.md) -- The integrations/mcp-constraint-monitor/dashboard/README.md confirms a dashboard component exists as a downstream consumer of violation data, implying ViolationClassifier must produce a typed, displayable violation structure that the dashboard can render by severity or category.
+
+### Siblings
+- [ConstraintMonitorDashboard](./ConstraintMonitorDashboard.md) -- Lives in integrations/mcp-constraint-monitor/dashboard/ with its own README.md, indicating it is a self-contained UI sub-project within the broader mcp-constraint-monitor integration
+- [HookConfigurationLoader](./HookConfigurationLoader.md) -- The two-level configuration model (user-level and project-level hooks.json) is documented in integrations/mcp-constraint-monitor/README.md, establishing a clear precedence/merge strategy between global and per-project rules
+- [HookEventRouter](./HookEventRouter.md) -- Claude Code hook data format is documented in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, defining the event envelope the router must parse for each hook type
+
 
 ---
 
-*Generated from 3 observations*
+*Generated from 5 observations*

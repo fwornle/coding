@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DynamicImportGuardPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[DynamicImportGuardPattern] as dynamic_import_guard_pattern #LightBlue
+[LazyLLMInitializationPattern] as lazy_llminitialization_pattern #F0F0F0
+[AvailabilityProbeFunction] as availability_probe_function #E8F5E8
+[GracefulDegradationResponse] as graceful_degradation_response #E8F5E8
+
+coding_patterns --> dynamic_import_guard_pattern
+lazy_llminitialization_pattern -[hidden]- dynamic_import_guard_pattern
+dynamic_import_guard_pattern --> availability_probe_function
+dynamic_import_guard_pattern --> graceful_degradation_response
+
+@enduml

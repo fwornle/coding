@@ -1,26 +1,30 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Service Management" {
-  component "ServiceStarter" as ss <<core>>
-  component "DockerizedServices" as ds <<external>>
-  ss --> ds : manages
+cloud "OS Signals (SIGTERM/SIGINT)" as signals <<external>>
+
+package "Service Starter" {
+  component "service-starter.js" as starter <<core>>
+  component "Retry Policy" as retry <<core>>
 }
 
-package "Service Startup" {
-  component "Health Verification" as hv <<api>>
-  component "Exponential Backoff" as eb <<core>>
-  ss --> hv : uses
-  ss --> eb : uses
+package "Wrapper Scripts" {
+  component "api-service.js" as apiSvc <<api>>
+  component "dashboard-service.js" as dashSvc <<api>>
 }
 
-package "Integrations" {
-  component "COPi" as copi <<external>>
-  component "Browser Access" as ba <<cli>>
-  ss --> copi : integrates
-  ss --> ba : integrates
+package "Process Management" {
+  component "PSM" as psm <<storage>>
 }
 
-ss --> ds : starts
+signals --> apiSvc : "handled by"
+signals --> dashSvc : "handled by"
+
+starter --> retry : "centralizes"
+starter --> apiSvc : "triggers spawn"
+starter --> dashSvc : "triggers spawn"
+
+apiSvc --> psm : "registers new PID"
+dashSvc --> psm : "registers new PID"
 
 @enduml

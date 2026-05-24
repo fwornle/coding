@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Inputs" {
+  component "Routing Request" as routingReq <<api>>
+  component "Agent Identity" as agentId <<agent>>
+}
+
+package "Routing Layer" {
+  component "LLMStateManager" as llmState <<core>>
+  component "TierRouter" as tierRouter <<core>>
+}
+
+package "Configuration" {
+  database "llm-providers.yaml" as providersYaml <<storage>>
+}
+
+package "Provider Layer" {
+  component "Provider Adapters" as providerAdapters <<external>>
+}
+
+routingReq --> llmState : "resolves operational mode"
+llmState --> tierRouter : "local / public mode only"
+agentId --> tierRouter : "agent tier pin"
+providersYaml --> tierRouter : "available models per tier"
+tierRouter --> providerAdapters : "emits (provider, model)"
+
+@enduml

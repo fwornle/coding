@@ -1,0 +1,27 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Configuration Layer" {
+    database "redaction-config.yaml" as config <<storage>>
+    component "LSLConfigValidator" as validator <<core>>
+}
+
+package "Ingestion Layer" {
+    component "Raw In-Memory Entries" as rawEntries <<storage>>
+}
+
+package "Processing Layer" {
+    component "ClassificationPipeline" as classifier <<core>>
+    component "LSLConverter" as converter <<core>>
+}
+
+component "Serialized Output" as output <<external>>
+
+config --> validator : validates schema at startup
+validator ..> converter : enforces valid config on load
+config --> converter : supplies redaction rules by category
+rawEntries --> classifier : unredacted content preserved
+rawEntries --> converter : input to serialization step
+converter --> output : redacted bytes written
+
+@enduml

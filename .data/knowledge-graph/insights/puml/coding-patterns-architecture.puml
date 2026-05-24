@@ -1,24 +1,30 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "CodingPatterns" {
-  component "GraphDatabase" as graph <<storage>>
-  component "GraphPersistenceModule" as gpm <<core>>
-  component "EntityValidator" as ev <<agent>>
-  component "BatchProcessingPipeline" as bpp <<core>>
-  component "BrowserAccess" as ba <<external>>
-  component "LlmServiceManager" as lsm <<api>>
-  component "WaveAgentController" as wac <<agent>>
-  component "CopiWrapper" as cw <<cli>>
+component "PlantUML Diagrams\ndocs/puml/ (~150 files)" as puml <<core>>
+
+package "Initialization & Lifecycle" {
+  component "Singleton Guard\npsm-singleton-pattern.puml" as sg <<core>>
+  component "BaseAgent\nensureLLMInitialized()" as ba <<agent>>
 }
 
-graph --> gpm : uses
-gpm --> graph : stores
-ev --> graph : validates
-bpp --> ev : processes
-ba --> bpp : integrates
-lsm --> wac : manages
-wac --> lsm : uses
-cw --> ba : extends
+package "Service Orchestration" {
+  component "ServiceStarter\nstartServiceWithRetry()" as ss <<core>>
+  component "Process Registry\nregisterService()" as pr <<core>>
+}
+
+package "Integration & Schema" {
+  component "Structured Envelope\nCLAUDE-CODE-HOOK-FORMAT.md" as se <<api>>
+  component "Closed Vocabulary Enum\nmigrate-graph-db-entity-types.js" as cv <<storage>>
+  component "VkbApiClient\nlib/ukb-unified/core" as vkb <<external>>
+}
+
+puml --> sg : "specifies guard idiom"
+puml ..> ba : "documents agent lifecycle"
+ba ..> sg : "lazy-init gate\non first use"
+ss --> pr : "registerService()\nbinds on spawn"
+ss ..> sg : "singleton process\nownership"
+vkb ..> se : "dynamic import()\nemits wrapped events"
+se --> cv : "validates against\nclosed vocabulary"
 
 @enduml

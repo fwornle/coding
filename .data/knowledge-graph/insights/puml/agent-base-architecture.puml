@@ -1,0 +1,44 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Template Foundation" {
+  component "BaseAgent<TInput, TOutput>" as baseAgent <<core>>
+  component "AgentResponse<TOutput>" as agentResponse <<core>>
+}
+
+package "Abstract Method Contract" {
+  component "process()" as proc <<api>>
+  component "calculateConfidence()" as conf <<api>>
+  component "detectIssues()" as issues <<api>>
+  component "generateRouting()" as routing <<api>>
+  component "applyCorrections()" as corrections <<api>>
+}
+
+package "Pipeline Agents (7 implementations)" {
+  component "SemanticAnalysisAgent\n[Orchestrator]" as semAgent <<agent>>
+  component "GitHistoryAgent" as gitAgent <<agent>>
+  component "PersistenceAgent" as persistAgent <<agent>>
+}
+
+' execute() [sealed] unconditionally calls all five abstract methods
+baseAgent --> proc : "sealed execute()"
+baseAgent --> conf : "sealed execute()"
+baseAgent --> issues : "sealed execute()"
+baseAgent --> routing : "sealed execute()"
+baseAgent --> corrections : "sealed execute()"
+
+' Uniform observability envelope produced by all agents
+baseAgent --> agentResponse : "produces envelope\n(payload + metadata)"
+
+' Concrete agents extend the template
+gitAgent ..> baseAgent : "extends"
+semAgent ..> baseAgent : "extends"
+persistAgent ..> baseAgent : "extends"
+
+' Orchestration and pipeline gating
+semAgent --> agentResponse : "reads confidence score\n& routing hints"
+semAgent --> persistAgent : "conditionally invokes\n(pipeline gate)"
+
+@enduml

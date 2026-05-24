@@ -1,117 +1,82 @@
 # ServiceStarter
 
-**Type:** Detail
+**Type:** SubComponent
 
-Given the parent context, the ServiceStarter likely implements key aspects of service startup, including retry logic and timeout handling, although specific code details are not available for direct observation.
+lib/service-starter.js is explicitly isolated from SIGTERM/SIGINT handling — signal propagation is owned by the wrapper scripts (api-service.js, dashboard-service.js), not by the starter
 
-## What It Is  
+# ServiceStarter — Technical Insight Document
 
-**ServiceStarter** is a concrete class that lives in the file **`lib/service-starter.js`**. It is invoked by the **ServiceOrchestrator** component, which is the parent in the service‑management hierarchy. The primary purpose of ServiceStarter is to encapsulate the logic required to bring an individual service to an operational state. Observations highlight three core responsibilities:  
+## What It Is
 
-1. **Retry logic** – repeatedly attempting to start a service when the first attempt fails.  
-2. **Timeout handling** – aborting a start‑up attempt that exceeds a configured time budget.  
-3. **Graceful degradation** – falling back to a safe state or reporting a controlled failure when a service cannot be started after all retries.  
+ServiceStarter is a SubComponent implemented in `lib/service-starter.js` that serves as the centralized orchestration layer for launching and restarting containerized services within the DockerizedServices parent system. Rather than directly hosting or spawning processes itself, ServiceStarter operates as a coordinator that delegates actual process creation to wrapper scripts (`scripts/api-service.js` and `scripts/dashboard-service.js`), while owning the retry and restart logic that governs when those wrappers should be re-invoked.
 
-Because ServiceOrchestrator delegates the start‑up sequence to ServiceStarter, the system adopts a modular design where the orchestration layer coordinates *what* to start, while ServiceStarter concentrates on *how* to start it reliably.
+Architecturally, ServiceStarter is composed of two tightly coupled internal child components: `ServiceLaunchInvoker` and `RetryPolicy`. Both reside within `lib/service-starter.js` and collaborate in a restart loop where RetryPolicy gates whether another launch attempt is permitted, and ServiceLaunchInvoker performs the delegated spawn through the appropriate wrapper script. This structural split keeps the orchestration concern (when to retry) cleanly separated from the invocation concern (how to launch).
 
----
+![ServiceStarter — Architecture](images/service-starter-architecture.png)
 
-## Architecture and Design  
+A defining characteristic of ServiceStarter is what it explicitly does *not* do: it is isolated from `SIGTERM`/`SIGINT` handling. Signal propagation is owned entirely by the wrapper scripts, leaving the starter free to focus on retry semantics without entangling itself in process lifecycle signaling.
 
-The observations reveal a **layered, responsibility‑segregated architecture**. The **ServiceOrchestrator** sits at a higher orchestration layer, orchestrating multiple services, while **ServiceStarter** resides one layer below, handling the nitty‑gritty of start‑up. This separation follows the **Single‑Responsibility Principle**: orchestration logic (ordering, dependency resolution) is kept distinct from the mechanics of initiating a service (retries, timeouts, degradation).
+## Architecture and Design
 
-The only explicit design pattern we can confirm is **encapsulation of start‑up concerns** within a dedicated class (`ServiceStarter`). By centralising retry, timeout, and degradation logic, the system avoids scattering these concerns across the orchestration code, which improves readability and testability.  
+The architectural pattern at play is a **delegated orchestration** model with clear separation of concerns. ServiceStarter sits above the wrapper scripts but below any higher-level consumer logic. When a restart cycle is triggered, the flow proceeds as follows: the starter triggers a spawn via `ServiceLaunchInvoker`, the wrapper script (such as `scripts/api-service.js` or `scripts/dashboard-service.js`) creates the child process via Node's `child_process` module and registers the new PID with the `ProcessStateManager` (PSM) singleton, and PSM then reflects the updated state to any consumer such as `scripts/health-coordinator.js`. This three-tier indirection — starter → wrapper → PSM — is a deliberate design decision inherited from the parent DockerizedServices pattern, which decouples service identity from OS-level process identity.
 
-Interaction flow (as inferred from the parent‑child relationship):
+The decision to centralize retry policy in `lib/service-starter.js` rather than duplicating it across wrapper scripts is a classic application of the Don't Repeat Yourself principle applied to operational policy. Because `RetryPolicy` lives in one place, every service governed by ServiceStarter — currently the constraint monitor API spawned by `scripts/api-service.js` and the dashboard spawned by `scripts/dashboard-service.js` — automatically shares the same restart backoff, attempt-limit, and gating semantics. Adjustments such as introducing exponential backoff or capping maximum retries require editing only `lib/service-starter.js`, never the wrapper scripts.
 
-```
-ServiceOrchestrator
-   └─> lib/service-starter.js (ServiceStarter)
-            ├─ retry loop
-            ├─ timeout watchdog
-            └─ graceful‑degradation handler
-```
+The internal coupling between `ServiceLaunchInvoker` and `RetryPolicy` is intentional and tight: after each failed launch attempt, `RetryPolicy` is consulted before `ServiceLaunchInvoker` is invoked again. They form a cohesive restart loop within the starter, and neither is meaningful without the other. This contrasts sharply with the starter's loose coupling to the wrapper scripts, which it treats as opaque process hosts.
 
-The diagram above illustrates the direct dependency: ServiceOrchestrator creates or invokes an instance of ServiceStarter, passing any service‑specific configuration (e.g., max retries, timeout duration). ServiceStarter then executes its internal start‑up sequence and returns a success/failure signal to the orchestrator.
+## Implementation Details
 
----
+`ServiceLaunchInvoker` is responsible for triggering the wrapper scripts but does not itself perform `child_process.spawn` calls — that responsibility belongs to the wrappers. This means the invoker acts more like a router or dispatcher: given a target service, it knows which wrapper script to invoke, but it does not embed knowledge of the underlying child process mechanics, executable paths, or signal wiring. This keeps the starter agnostic to the specifics of any individual service's launch requirements.
 
-## Implementation Details  
+`RetryPolicy` is the gating component that determines whether a failed launch warrants another attempt. Because it is consulted *after* each failed launch attempt and *before* the next `ServiceLaunchInvoker` invocation, it functions as a guard at the top of the restart loop. The policy encapsulates whatever logic governs restart attempts — attempt counts, backoff intervals, or threshold conditions — and exposes that as a single decision point.
 
-Although the source code is not directly visible, the observations give us enough to infer the internal structure of **`lib/service-starter.js`**:
+![ServiceStarter — Relationship](images/service-starter-relationship.png)
 
-1. **Class Definition** – `class ServiceStarter` is the exported entry point. Its constructor likely accepts a configuration object that defines retry count, back‑off strategy, timeout thresholds, and possibly a callback for degradation handling.  
+A critical implementation boundary is the explicit exclusion of signal handling from `lib/service-starter.js`. The wrapper scripts (`scripts/api-service.js`, `scripts/dashboard-service.js`) each install `SIGTERM`/`SIGINT` handlers that forward signals to their respective child processes and call `psm.unregisterService()` on exit. By keeping signal handling out of the starter, the codebase avoids the common pitfall of two layers competing to interpret the same signals, which can lead to double-unregistration, race conditions, or zombie processes.
 
-2. **Retry Mechanism** – Internally, ServiceStarter probably wraps the actual service start call in a loop or recursive function. After each failed attempt, it may wait a configurable delay before retrying, up to a maximum number of attempts. The presence of “retry logic” suggests that the implementation tracks attempt count and may log each failure for observability.  
+## Integration Points
 
-3. **Timeout Handling** – A timer (e.g., `setTimeout` in a Node.js environment) is expected to guard the overall start operation. If the service does not signal readiness within the allotted window, the timer triggers a cancellation path, aborting the current attempt and potentially moving to the next retry cycle.  
+ServiceStarter integrates with the system through three primary surfaces. First, it consumes the wrapper scripts `scripts/api-service.js` (which spawns the constraint monitor Express API, also tracked as ConstraintAPIWrapper) and `scripts/dashboard-service.js` (DashboardWrapper, which mirrors the api-service structural pattern exactly). The starter never imports `child_process` directly; instead, it invokes these wrappers, which themselves perform the spawn and PSM registration.
 
-4. **Graceful Degradation** – When all retries are exhausted or a timeout persists, ServiceStarter likely invokes a degradation routine. This could involve marking the service as “degraded”, emitting an event, or invoking a fallback component. The goal is to keep the broader system functional even when an individual service cannot be fully started.  
+Second, ServiceStarter integrates indirectly with the `ProcessStateManager` (PSM) singleton. The starter does not call `psm.registerService()` or `psm.unregisterService()` itself — those calls live in the wrappers. However, the starter's restart cycle depends on PSM behavior in the sense that a restart cycle produces a new PID, and PSM is the registry that consumers like `scripts/health-coordinator.js` query to discover that change. This indirect coupling is what allows `HealthCoordinator` and other PSM consumers to remain unaware of PID transitions during restarts.
 
-5. **Public API** – The class probably exposes at least one method such as `start()` that returns a Promise (or uses a callback) indicating success or failure. This asynchronous contract aligns with the need for timeout and retry handling.  
+Third, ServiceStarter sits as a sibling-level peer to other components such as `ServiceProbe` (at `lib/utils/service-probe.js`), `LLMMockService`, `ProcessStateManager`, and `HealthCoordinator`. While these siblings each play distinct roles in the DockerizedServices ecosystem, ServiceStarter's role is uniquely focused on the launch/relaunch concern. It does not perform health checks (that is ServiceProbe and HealthCoordinator's domain), it does not maintain process state (PSM's domain), and it does not persist mode state (LLMMockService's domain).
 
-Because **ServiceOrchestrator** directly consumes ServiceStarter, the orchestrator can remain agnostic to the exact retry/timeout algorithms; it simply reacts to the final outcome.
+## Usage Guidelines
 
----
+Developers adding a new containerized service to the DockerizedServices system should create a new wrapper script that mirrors the structural pattern established by `scripts/api-service.js` and `scripts/dashboard-service.js`: spawn the child process via `child_process`, register with PSM, wire up `SIGTERM`/`SIGINT` forwarding, and unregister on exit. ServiceStarter can then be extended to recognize and dispatch to the new wrapper, but the wrapper itself must remain responsible for the OS-level concerns. This replication of wrapper boilerplate is a known maintenance concern that grows with service count, but it is the established convention.
 
-## Integration Points  
+When modifying retry behavior — for example, introducing exponential backoff, tuning maximum retry counts, or adding circuit-breaker logic — the change should be made exclusively in `lib/service-starter.js`, specifically within the `RetryPolicy` component. Do not duplicate retry logic into the wrapper scripts; doing so undermines the centralization that makes the current design maintainable. Conversely, never move signal handling into `lib/service-starter.js`, as this would violate the deliberate isolation between retry orchestration and process-lifecycle signaling.
 
-**ServiceStarter** is tightly coupled to its parent **ServiceOrchestrator**. The orchestrator supplies the configuration and invokes the `start` method, receiving a boolean or error object that informs subsequent orchestration decisions (e.g., whether to continue launching other services or to halt the deployment).  
+When reasoning about a service restart, remember the chain: ServiceStarter triggers `ServiceLaunchInvoker` → wrapper script spawns and calls `psm.registerService()` → PSM reflects the new PID → consumers like `scripts/health-coordinator.js` observe the updated registry. Consumers of PSM never need to be notified of PID changes directly because the indirection through PSM handles that transparently. If you find yourself needing to thread PID information through ServiceStarter to a consumer, that is a strong signal that the design is being bypassed and the work should likely flow through PSM instead.
 
-Other integration points that can be deduced:
+### Architectural Summary
 
-* **Configuration Source** – ServiceStarter likely reads its parameters from a configuration file or environment variables supplied by the orchestrator. This enables per‑service tuning without modifying the starter code.  
+- **Architectural patterns identified:** Delegated orchestration; separation of policy (RetryPolicy) from mechanism (ServiceLaunchInvoker and wrapper scripts); indirection via PSM to decouple service identity from PID.
+- **Design decisions and trade-offs:** Centralizing retry policy in one file improves consistency at the cost of making the starter a single point of change; isolating signal handling in wrappers keeps the starter clean but requires each new service to replicate wrapper boilerplate.
+- **System structure insights:** ServiceStarter is purely an orchestration layer — it neither spawns processes nor handles signals nor maintains state, making it a thin but pivotal coordinator.
+- **Scalability considerations:** Adding services scales linearly with new wrapper scripts; the starter itself does not need to grow proportionally, but the wrapper-script duplication is a friction point at higher service counts.
+- **Maintainability assessment:** High maintainability for retry logic (single file to edit); moderate maintainability concern for wrapper proliferation as services multiply, since the established pattern favors replication over abstraction.
 
-* **Logging/Telemetry** – Retry attempts, timeout events, and degradation actions are prime candidates for logging. While not explicitly mentioned, robust start‑up typically integrates with the system’s logging framework, allowing operators to trace start‑up failures.  
-
-* **Event Bus or Callback Hooks** – To signal graceful degradation, ServiceStarter may emit an event (e.g., `service:degraded`) that other components can listen to, or it may invoke a callback supplied by the orchestrator. This creates a loose coupling for downstream handling.  
-
-* **Dependency Injection** – If the system uses a DI container, ServiceStarter could be registered as a singleton or transient service, allowing the orchestrator to request an instance without manual `new` construction. The observation does not confirm this, but the modular nature suggests such a pattern is feasible.
-
----
-
-## Usage Guidelines  
-
-1. **Configure Thoughtfully** – When instantiating ServiceStarter from ServiceOrchestrator, provide realistic retry counts and timeout values based on the service’s start‑up characteristics. Overly aggressive retries can waste resources; too‑short timeouts may cause premature degradation.  
-
-2. **Handle the Promise (or Callback) Result** – Always await or attach `.then/.catch` to the `start()` call. The orchestrator must react to both success and failure paths; ignoring the result can leave the system in an inconsistent state.  
-
-3. **Leverage Degradation Hooks** – If ServiceStarter offers a callback for graceful degradation, register a handler that updates health checks, notifies monitoring dashboards, or triggers fallback logic. This ensures the broader system remains aware of the degraded component.  
-
-4. **Avoid Direct Service Manipulation** – Keep all start‑up logic inside ServiceStarter. ServiceOrchestrator should not duplicate retry or timeout code; doing so would break the single‑responsibility contract and increase maintenance overhead.  
-
-5. **Test with Fault Injection** – To verify robustness, write integration tests that simulate start‑up failures (e.g., by throwing errors or delaying responses). Confirm that ServiceStarter respects the configured retry limit, times out appropriately, and invokes the degradation path as expected.  
-
----
-
-### Architectural Patterns Identified  
-
-* **Encapsulation of Start‑up Concerns** – ServiceStarter isolates retry, timeout, and degradation logic.  
-* **Layered Responsibility Separation** – Orchestrator (coordination) vs. Starter (execution).  
-
-### Design Decisions and Trade‑offs  
-
-* **Centralising Retry/Timeout** improves consistency but introduces a single point of failure if the starter itself has bugs.  
-* **Graceful Degradation** preserves overall system availability at the cost of operating with a reduced feature set.  
-
-### System Structure Insights  
-
-* The hierarchy is **ServiceOrchestrator → ServiceStarter** (parent → child). No siblings are mentioned, but any additional service‑starter instances would follow the same contract, promoting uniform start‑up behavior across the system.  
-
-### Scalability Considerations  
-
-* Because ServiceStarter is a lightweight, per‑service class, scaling to many services simply means creating more instances. The retry and timeout mechanisms are bounded by configuration, preventing runaway resource consumption.  
-
-### Maintainability Assessment  
-
-* The clear separation of concerns makes the codebase easier to maintain: changes to start‑up policies affect only `lib/service-starter.js`.  
-* However, the lack of visible unit tests or explicit interfaces in the observations suggests a potential risk: without contract documentation, downstream developers may misuse the API. Adding TypeScript typings or JSDoc comments would further improve maintainability.
 
 ## Hierarchy Context
 
 ### Parent
-- [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the ServiceStarter class in lib/service-starter.js to provide robust service startup with retry, timeout, and graceful degradation.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The ProcessStateManager (PSM) singleton implements a deliberate decoupling between service identity and process identity across both `scripts/api-service.js` and `scripts/dashboard-service.js`. Each script follows an identical structural pattern: spawn a child process via Node's `child_process` module, register the resulting process handle with the PSM via `psm.registerService()`, wire up `SIGTERM`/`SIGINT` forwarding so that signals delivered to the wrapper propagate to the child, and call `psm.unregisterService()` in the exit handler. This indirection means that the rest of the system (including `scripts/health-coordinator.js`) can query the PSM registry without holding direct references to OS-level process IDs. The practical consequence for developers is that a service restart — where a new child process replaces the old one — does not require the health coordinator or any consumer of PSM state to be aware of the PID change; only the wrapper scripts update the registry. This pattern also cleanly isolates the restart/retry logic in `lib/service-starter.js` from signal-handling responsibilities, since the wrapper owns the process lifecycle signals while the starter owns the retry policy. A new developer should note that adding a new containerized service almost certainly means creating a new wrapper script that replicates this boilerplate rather than centralizing it, which is a potential maintenance concern as the number of services grows.
+
+### Children
+- [ServiceLaunchInvoker](./ServiceLaunchInvoker.md) -- ServiceLaunchInvoker resides in lib/service-starter.js and delegates actual process creation to the wrapper scripts api-service.js and dashboard-service.js, keeping the starter itself as an orchestration layer rather than a direct process host.
+- [RetryPolicy](./RetryPolicy.md) -- RetryPolicy lives in lib/service-starter.js and is the gating logic consulted after each failed launch attempt before ServiceLaunchInvoker is invoked again, making the two tightly coupled within the restart loop.
+
+### Siblings
+- [ServiceProbe](./ServiceProbe.md) -- ServiceProbe lives at lib/utils/service-probe.js and is consumed by scripts/health-coordinator.js, establishing a clear utility-to-orchestrator dependency direction
+- [ConstraintAPIWrapper](./ConstraintAPIWrapper.md) -- scripts/api-service.js uses Node's child_process module to spawn the constraint monitor Express API, decoupling the OS-level PID from the service identity tracked by PSM
+- [DashboardWrapper](./DashboardWrapper.md) -- scripts/dashboard-service.js mirrors the structural pattern of api-service.js exactly: spawn via child_process, registerService, wire signals, unregisterService on exit
+- [LLMMockService](./LLMMockService.md) -- llm-mock-service.ts persists LLM mode state to workflow-progress.json rather than keeping it in memory, making mode selection survive process restarts within the Docker environment
+- [ProcessStateManager](./ProcessStateManager.md) -- PSM is a singleton, meaning all wrapper scripts (api-service.js, dashboard-service.js) and health-coordinator.js share a single registry instance without passing references explicitly
+- [HealthCoordinator](./HealthCoordinator.md) -- health-coordinator.js consumes PSM state by name rather than PID, so service restarts are transparent — it never needs to be notified of PID changes in api-service.js or dashboard-service.js
+
 
 ---
 
-*Generated from 3 observations*
+*Generated from 4 observations*

@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EntityTypeMigration
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[EntityTypeMigration] as entity_type_migration #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[VkbApiClient] as vkb_api_client #F0F0F0
+[GraphKnowledgeExporter] as graph_knowledge_exporter #F0F0F0
+[KnowledgeDecayTracker] as knowledge_decay_tracker #F0F0F0
+[EntityTypeConsolidation] as entity_type_consolidation #E8F5E8
+
+knowledge_management --> entity_type_migration
+manual_learning -[hidden]- entity_type_migration
+online_learning -[hidden]- entity_type_migration
+vkb_api_client -[hidden]- entity_type_migration
+graph_knowledge_exporter -[hidden]- entity_type_migration
+knowledge_decay_tracker -[hidden]- entity_type_migration
+entity_type_migration --> entity_type_consolidation
+
+@enduml

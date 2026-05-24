@@ -7,21 +7,13 @@ title Hierarchy Context: Pipeline
 [Pipeline] as pipeline #LightBlue
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
-[OntologyManager] as ontology_manager #F0F0F0
-[CodeAnalyzer] as code_analyzer #F0F0F0
-[InsightGenerator] as insight_generator #F0F0F0
-[KnowledgeGraphConstructor] as knowledge_graph_constructor #F0F0F0
-[EntityValidator] as entity_validator #F0F0F0
-[CodeGraphRAG] as code_graph_rag #F0F0F0
+[OntologySubsystem] as ontology_subsystem #F0F0F0
+[BatchAnalysisYamlConfig] as batch_analysis_yaml_config #E8F5E8
 
 semantic_analysis --> pipeline
 ontology -[hidden]- pipeline
 insights -[hidden]- pipeline
-ontology_manager -[hidden]- pipeline
-code_analyzer -[hidden]- pipeline
-insight_generator -[hidden]- pipeline
-knowledge_graph_constructor -[hidden]- pipeline
-entity_validator -[hidden]- pipeline
-code_graph_rag -[hidden]- pipeline
+ontology_subsystem -[hidden]- pipeline
+pipeline --> batch_analysis_yaml_config
 
 @enduml

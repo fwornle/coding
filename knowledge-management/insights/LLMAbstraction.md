@@ -2,176 +2,113 @@
 
 **Type:** Component
 
-[LLM] The LLMAbstraction component handles mode routing, caching, and circuit breaking through the LLMService class (lib/llm/llm-service.ts). This class serves as the main entry point for all LLM operations, providing a unified interface for interacting with the different LLM providers. The LLMService class uses the provider registry to determine the appropriate provider to use for a given request, and then routes the request to the selected provider. The class also implements caching and circuit breaking mechanisms to optimize performance and reliability. The use of a single entry point for all LLM operations simplifies the component's architecture and makes it easier to manage and maintain.
+[LLM] The LLMAbstraction component's provider enumeration — Anthropic, OpenAI, Groq, and DMR — reflects a deliberate separation between compute location and API contract. Anthropic and OpenAI are cloud providers with their own proprietary endpoints; Groq is a cloud provider that also uses an OpenAI-compatible API but offers significantly lower latency on supported models; and DMR is a local provider that is OpenAI-compatible but requires no authentication and runs entirely on the developer's machine via Docker Desktop. The architectural decision to represent all four under a single abstraction with a mode string ('mock', 'local', 'public') rather than four separate modes means the abstraction does not expose which specific provider is active within the 'public' mode — per-agent routing to Anthropic vs. OpenAI vs. Groq within the 'public' mode must be handled by a separate layer, likely configuration-driven per-agent settings similar to the `modelOverrides` map in `dmr-provider.ts`. New developers extending the system to add a fifth provider (e.g., a self-hosted vLLM endpoint) should evaluate whether it belongs in the 'local' mode alongside DMR or whether it warrants a new mode string, since conflating it with 'local' would prevent `getLLMMode()` from distinguishing between Docker Desktop's runner and an arbitrary self-hosted endpoint.
 
-## What It Is  
+# LLMAbstraction — Technical Insight Document
 
-The **LLMAbstraction** component lives under the `lib/llm/` directory of the codebase. Its core files are:
+## What It Is
 
-* `lib/llm/provider-registry.js` – the central registry that discovers, configures and selects LLM providers.  
-* `lib/llm/llm-service.ts` – the public façade that callers use for every LLM operation (routing, caching, circuit‑breaking).  
-* `lib/llm/circuit-breaker.js` – a reusable circuit‑breaker implementation that protects the system from provider‑side failures.  
-* `lib/llm/config.js` – a YAML‑based configuration loader that feeds the registry with provider settings.  
-* Provider implementations such as `lib/llm/providers/anthropic-provider.ts`, `lib/llm/providers/dmr-provider.ts` and the test‑only `lib/llm/providers/mock-provider.js`.
+LLMAbstraction is a provider-agnostic LLM dispatch layer implemented primarily in `llm-mock-service.ts` (mode resolution, state persistence, and Docker path handling) and `dmr-provider.ts` (Docker Model Runner integration). It sits as a sibling to LiveLoggingSystem, DockerizedServices, KnowledgeManagement, CodingPatterns, ConstraintSystem, and SemanticAnalysis under the Coding parent component, and contains the LLMModeController child which encapsulates the per-agent mode resolution logic.
 
-Together these files give the **LLMAbstraction** component a *provider‑agnostic* surface: any LLM service that conforms to the `LLMProvider` contract can be swapped in or out without touching the rest of the system. The component is a child of the top‑level **Coding** node, sharing the same modular philosophy found in sibling components like **LiveLoggingSystem** and **DockerizedServices**. Its own children—**ProviderRegistry** and concrete **LLMProvider** subclasses—encapsulate the extensibility points.
+The component unifies four LLM provider backends — Anthropic, OpenAI, Groq, and DMR (Docker Model Runner) — behind a single abstraction parameterized by a three-value mode string: `'mock'`, `'local'`, and `'public'`. Provider selection within a mode is driven by configuration rather than caller-side conditionals, allowing agent code to remain backend-neutral. State for which mode applies (globally, per-agent, or via the legacy boolean) is persisted to `.data/workflow-progress.json`, making the runtime configuration both inspectable and durable across process restarts.
+
+In practical terms, LLMAbstraction is the layer that decides — for any given agent call — whether to return a deterministic mock response, dispatch to a local Docker-hosted model, or call out to a cloud API; and it does so without requiring agents to know which path was taken.
+
+## Architecture and Design
+
+The defining architectural pattern is a **three-tier mode resolution hierarchy** implemented in `getLLMMode()` inside `llm-mock-service.ts`. The hierarchy prioritizes specificity over generality: `llmState.perAgentOverrides` (highest priority, evaluated by the LLMModeController child) beats `llmState.globalMode`, which in turn beats the legacy `mockLLM` boolean field. This stratified resolution enables mixed-mode workflows in a single execution — for instance, a lightweight code-indexing agent can target the local DMR endpoint while a complex reasoning agent simultaneously routes to Anthropic, all within one orchestration. The legacy `mockLLM` boolean is intentionally retained as the lowest-priority fallback for backward compatibility with pre-`llmState` configuration files.
 
 ![LLMAbstraction — Architecture](images/llmabstraction-architecture.png)
 
----
+A second key pattern is the **OpenAI-compatible client as drop-in interface**. The DMR backend in `dmr-provider.ts` is instantiated as a singleton `dmrClient` pointing at `localhost:${DMR_PORT}/engines/v1` with `apiKey: 'not-required'`. Because Groq also speaks the OpenAI API, three of the four backends share a single client contract; only Anthropic requires a distinct proprietary endpoint. This reduces the surface area of backend-specific code and makes adding new OpenAI-compatible providers (e.g., self-hosted vLLM) a configuration concern rather than an integration project.
 
-## Architecture and Design  
+Third, the component embeds a **transparent path substitution pattern** for Docker awareness. Every file-system operation in `llm-mock-service.ts` resolves through an `effectivePath` variable that swaps the caller-supplied `repositoryPath` for `process.env.CODING_ROOT` (typically `/coding`) when running inside a container. Callers remain container-unaware, and the same agent code executes correctly in both local development and Dockerized deployments. This mirrors the path-discipline patterns codified in the sibling CodingPatterns component.
 
-### Provider‑Agnostic Registry  
+Fourth, **health-check caching with tri-state availability** governs DMR liveness probing. `dmr-provider.ts` maintains an `isAvailable` sentinel that begins as `null` (never checked), transitions to `true` or `false` after a probe, and is re-validated at most once per `healthCheckInterval` (default 30,000 ms). The semantic distinction between `null` and `false` is intentional: the first call must force a real probe rather than assume availability, but subsequent calls within the window reuse the cached verdict to avoid hammering the local endpoint.
 
-The architecture hinges on the **ProviderRegistry** (`lib/llm/provider-registry.js`). It reads a YAML configuration (via `loadConfig` in `lib/llm/config.js`) that enumerates available providers, their credentials and any provider‑specific options. By decoupling registration from usage, the system follows the *registry* pattern: the registry holds a map of provider names → provider instances, and the `LLMService` queries it at request time to resolve the correct implementation.
+## Implementation Details
 
-### Single Entry Point – LLMService  
+**Mode Resolution (`getLLMMode()`):** The function is the contract surface of the LLMModeController child. It accepts an agent identifier, then consults `llmState.perAgentOverrides[agentId]`, falling through to `llmState.globalMode`, and finally to the `mockLLM` boolean (which, if true, yields `'mock'`). The three-tier evaluation is short-circuit — once a tier produces a value, lower tiers are not consulted.
 
-All external callers interact with a single façade, the **LLMService** class (`lib/llm/llm-service.ts`). This class orchestrates three cross‑cutting concerns:
+**State Persistence (`setGlobalLLMMode()` and `setAgentLLMMode()`):** Both setters live in `llm-mock-service.ts` and write atomically to `.data/workflow-progress.json`, protecting against partial-write corruption on interruption. A critical invariant enforced by `setGlobalLLMMode()` is the **dual-write to keep `mockLLM` synchronized with `globalMode`**: when `globalMode` becomes `'mock'`, `mockLLM` is flipped to `true`; otherwise it is cleared. This guarantees the legacy backward-compatibility tier can never produce a contradictory state relative to the structured fields. Any future modification of the persistence layer must preserve this dual-write or risk silent drift between the legacy boolean and the structured state.
 
-1. **Mode routing** – selecting the appropriate provider based on request metadata (e.g., “mock”, “production”, “local”).  
-2. **Caching** – storing recent LLM responses to avoid duplicate calls (the cache implementation is not detailed in the observations but is mentioned as a responsibility of `LLMService`).  
-3. **Circuit breaking** – delegating to the **CircuitBreaker** (`lib/llm/circuit-breaker.js`) before invoking a provider, thereby preventing repeated calls to a failing endpoint.
+**DMR Client and Model Selection:** The `dmrClient` singleton in `dmr-provider.ts` is constructed once at module load. Per-agent model selection is handled by `getModelForAgent()`, which performs a keyed lookup in `dmrConfig.modelOverrides[agentId]` and falls back to `dmrConfig.defaultModel`. This permits operator-driven assignment of different model quantizations or families to different agent roles — for example, a large parameter model for semantic-analysis and a smaller, faster one for code-indexing — entirely through configuration, with no agent source changes required.
 
-The combination of these responsibilities makes `LLMService` a classic *Facade* pattern that hides the complexity of provider selection, resiliency and performance optimisation behind a clean API.
+**Configuration Loading (`loadDMRConfig()`):** DMR configuration is read from `config/dmr-config.yaml` at startup using a **three-path fallback search**: `cwd`-relative, integration-relative, and `__dirname`-relative. This makes the configuration portable whether the server runs from the project root or from a symlinked installation path. The YAML loader also applies environment variable interpolation to the `baseUrl` field via `expandEnvVars()`, supporting the `${VAR:-default}` syntax so that the DMR endpoint URL can be overridden per-environment without touching the config file.
 
-### Resilience – Circuit Breaker  
+**Mock Mode Semantics:** When `getLLMMode()` resolves to `'mock'`, calls that would otherwise dispatch to Anthropic, OpenAI, Groq, or DMR are fulfilled by deterministic mock responses. Crucially, the mock layer sits behind the same provider-agnostic interface, so agent code under test exercises identical execution paths — including state serialization, mode resolution, and path substitution — as it would in production. This reduces the risk of test-only behavioral divergence.
 
-The **CircuitBreaker** class implements the classic circuit‑breaker pattern: it tracks failure counts and latency, trips to an open state when a threshold is breached, and later attempts a half‑open probe. By wrapping each provider call inside the breaker, the component can *fail fast* and avoid cascading failures across the system—a design decision echoed in the sibling **DockerizedServices** component, which also relies on robust service‑startup logic.
-
-### Mock Provider for Testing  
-
-A dedicated **MockProvider** (`lib/llm/providers/mock-provider.js`) implements the same `LLMProvider` interface but returns fabricated, plausible data. This enables unit‑ and integration‑tests to run without external API keys or network latency, reinforcing the *testability* aspect of the architecture. The mock is selected through mode routing in `LLMService`, keeping production code untouched.
-
-### Configuration‑Driven Extensibility  
-
-YAML configuration (`loadConfig` in `lib/llm/config.js`) lets operators enable, disable or reorder providers without code changes. Adding a new provider only requires:
-
-1. Implementing a subclass of `LLMProvider` (as done for `AnthropicProvider` and `DMRProvider`).  
-2. Registering the class in the YAML file.  
-
-This mirrors the plug‑in style used in other parts of the **Coding** hierarchy (e.g., the **LiveLoggingSystem** integrations folder).
+## Integration Points
 
 ![LLMAbstraction — Relationship](images/llmabstraction-relationship.png)
 
----
+LLMAbstraction is consumed by every agent in the system that issues LLM calls, most notably those in the sibling SemanticAnalysis component, whose `BaseAgent<TInput, TOutput>` execution contract relies on the abstraction to route calls without knowing the active provider. The mode resolution logic specifically — exposed by the LLMModeController child — is the contract that agents implicitly depend on when they pass an `agentId` through to LLM dispatch.
 
-## Implementation Details  
+The persistence file `.data/workflow-progress.json` is the integration seam between LLMAbstraction and the broader workflow execution layer. Because it is plain JSON, the file can be inspected or manually edited for debugging — a meaningful operational advantage over environment-variable or in-memory state, which are opaque and ephemeral. Other components reading workflow progress will observe LLM-mode state alongside other workflow fields, so changes to the schema must be made carefully.
 
-### Provider Registry (`lib/llm/provider-registry.js`)  
+The DMR integration depends on Docker Desktop being available on the developer's machine, aligning it conceptually with the sibling DockerizedServices component, though DMR is managed independently rather than through the `ProcessStateManager` singleton pattern that governs the API and dashboard services. The `CODING_ROOT` environment variable is the cross-cutting integration signal: when present, it indicates the process is running inside a container mount and triggers the `effectivePath` substitution across all file I/O in `llm-mock-service.ts`.
 
-* Exposes `register(name, providerInstance)` and `get(name)` methods.  
-* During startup, it calls `loadConfig` to read a YAML file (path supplied by the caller or default location).  
-* The config object contains entries like `{ name: "anthropic", class: "./providers/anthropic-provider", options: { apiKey: "..."} }`. The registry dynamically `require`s the class file, constructs the provider with its options, and stores it in an internal map.
+Configuration files form a third integration surface: `config/dmr-config.yaml` for DMR-specific settings (default model, per-agent overrides, base URL) and `.data/workflow-progress.json` for runtime mode state. These two are independent — DMR config is read once at startup, while workflow progress is read and written throughout execution.
 
-### LLMProvider Base (`lib/llm/providers/…`)  
+## Usage Guidelines
 
-All concrete providers extend a common abstract base (implicitly referenced as **LLMProvider**). The base defines at minimum:
+**Respect the mode resolution hierarchy.** When debugging unexpected LLM behavior, check `llmState.perAgentOverrides` first, then `llmState.globalMode`, then `mockLLM`. If `globalMode` is set but you observe mock behavior anyway, look for a per-agent override that takes precedence. Conversely, if `mockLLM` is present in a persisted state file but is not activating, remember it is the lowest-priority fallback and will only take effect when both higher-priority fields are absent.
 
-```ts
-abstract class LLMProvider {
-  abstract async generate(prompt: string, options?: any): Promise<string>;
-}
-```
+**Preserve the `globalMode`/`mockLLM` dual-write invariant.** Any code modifying LLM state persistence must keep `mockLLM` synchronized with `globalMode === 'mock'`. Failure to do so creates subtle bugs where the legacy compatibility tier reports contradictory values relative to the structured state. Always go through `setGlobalLLMMode()` rather than mutating `llmState` directly.
 
-* **AnthropicProvider** (`anthropic-provider.ts`) implements the Anthropic HTTP API, handling authentication, request shaping and response parsing.  
-* **DMRProvider** (`dmr-provider.ts`) runs a local inference engine, likely invoking a binary or a library call.  
-* **MockProvider** (`mock-provider.js`) returns deterministic or random strings that mimic real responses.
+**Apply the `effectivePath` substitution to all new file I/O.** When extending `llm-mock-service.ts` with new persistence or read operations, route the path through the same `CODING_ROOT`-aware substitution rather than using `repositoryPath` directly. Skipping this step will cause the Docker container path to diverge from the local-development path, producing environment-specific bugs that are difficult to reproduce.
 
-### Circuit Breaker (`lib/llm/circuit-breaker.js`)  
+**Use per-agent overrides for progressive validation.** A powerful pattern enabled by the three-tier hierarchy is running most agents in `'mock'` mode (via `globalMode`) while routing one specific agent to a real API endpoint (via `perAgentOverrides`) to validate prompt structure or response parsing in isolation. This is preferable to standing up a full live environment for targeted validation work.
 
-* Maintains state: `closed`, `open`, `halfOpen`.  
-* Tracks `failureCount`, `successCount`, and a `timeout` after which the breaker attempts a half‑open transition.  
-* Provides an `execute(fn)` method that runs the supplied async function only if the breaker is not open, otherwise throws a `CircuitOpenError`.  
-* Integrated into `LLMService` such that each provider call is wrapped:
+**Treat `isAvailable === null` as semantically distinct from `false`.** When working with the DMR availability cache in `dmr-provider.ts`, do not conflate "never checked" with "known unavailable." The first call within any `healthCheckInterval` window must trigger a real probe; subsequent calls reuse the cached verdict. Be aware that requests may continue routing to DMR for up to 30 seconds after the local runner becomes unavailable — a deliberate trade-off to prevent probe flooding.
 
-```ts
-await circuitBreaker.execute(() => provider.generate(prompt, opts));
-```
-
-### LLMService (`lib/llm/llm-service.ts`)  
-
-* Constructor receives a `ProviderRegistry` instance and optional `Cache` and `CircuitBreaker` instances (dependency injection is hinted at in the sibling **DockerizedServices** description).  
-* `async invoke(request)` performs:  
-  1. Resolve mode (`mock`, `primary`, `fallback`) → pick provider name.  
-  2. Check cache; if hit, return cached response.  
-  3. Retrieve provider from registry.  
-  4. Run provider call through the circuit breaker.  
-  5. Store successful response in cache before returning.  
-
-* Exposes high‑level methods like `generateText`, `chat`, or any domain‑specific LLM operation needed by the rest of the **Coding** system.
-
-### Configuration Loader (`lib/llm/config.js`)  
-
-* Uses a YAML parser (e.g., `js-yaml`) to read a file such as `config/llm-providers.yaml`.  
-* Returns a plain JavaScript object that the `ProviderRegistry` consumes.  
-* Because the loader is isolated, environments can swap configuration files (dev vs prod) without code changes.
+**Consider mode boundaries when adding new providers.** The current abstraction collapses Anthropic, OpenAI, and Groq under the `'public'` mode, and treats DMR as `'local'`. Per-provider routing within `'public'` is handled by a separate configuration layer, analogous to the `modelOverrides` map in `dmr-provider.ts`. When adding a fifth provider (e.g., self-hosted vLLM), explicitly evaluate whether it belongs in `'local'` alongside DMR or warrants a new mode string — conflating it with `'local'` would prevent `getLLMMode()` from distinguishing between Docker Desktop's runner and an arbitrary self-hosted endpoint.
 
 ---
 
-## Integration Points  
+### Architectural Patterns Identified
+- **Tiered resolution with backward-compatibility fallback** (`getLLMMode()` three-tier hierarchy)
+- **Singleton client with interface unification** (`dmrClient` reusing the OpenAI schema)
+- **Tri-state cached health check** (`null`/`true`/`false` `isAvailable` sentinel with windowed re-validation)
+- **Transparent environment-aware path substitution** (`effectivePath` driven by `CODING_ROOT`)
+- **Atomic dual-write persistence with invariant maintenance** (`mockLLM` kept in sync with `globalMode`)
+- **Multi-path configuration discovery** (`loadDMRConfig()` cwd → integration → `__dirname`)
+- **Provider-agnostic mock harness behind the production interface**
 
-* **Parent – Coding**: The **LLMAbstraction** component is one of eight major components under the root **Coding** node. Its public API (`LLMService`) is consumed by higher‑level agents (e.g., the **Trajectory** component’s conversation logging) that need LLM‑generated text.  
-* **Siblings**:  
-  * **LiveLoggingSystem** also uses a modular “integrations” folder; both components share the philosophy of abstracting external services behind a registry.  
-  * **DockerizedServices** demonstrates dependency injection, a pattern mirrored in `LLMService`’s constructor arguments (registry, cache, circuit breaker).  
-* **Children**:  
-  * **ProviderRegistry** is the glue that binds concrete **LLMProvider** implementations (`AnthropicProvider`, `DMRProvider`, `MockProvider`) to the service façade.  
-  * Adding a new provider only requires extending `LLMProvider` and updating the YAML config, no changes to `LLMService` or other siblings.  
-* **External Dependencies**:  
-  * Network libraries for HTTP calls (used by `AnthropicProvider`).  
-  * Local inference binaries or libraries (used by `DMRProvider`).  
-  * The cache layer (not detailed, but likely a simple in‑memory map or Redis client).  
-* **Configuration**: The component reads its own YAML file via `loadConfig`, but the same mechanism is used elsewhere in the project (e.g., LiveLoggingSystem’s config validator), promoting a consistent configuration strategy across the codebase.
+### Design Decisions and Trade-offs
+- **Retaining the legacy `mockLLM` boolean** trades a small amount of resolution complexity for zero-friction backward compatibility with pre-`llmState` configurations.
+- **Collapsing three cloud providers into a single `'public'` mode** simplifies the top-level API but pushes per-provider routing to a secondary configuration layer, hiding which specific cloud is active at the mode level.
+- **Caching DMR availability for up to 30 seconds** trades probe efficiency against detection latency — the system may dispatch to an unavailable runner for almost half a minute.
+- **Atomic JSON persistence** trades raw write throughput for crash safety, an appropriate choice given the low write frequency of mode changes.
+- **Per-script wrapper boilerplate avoided here** — unlike DockerizedServices, LLMAbstraction does not duplicate lifecycle code across providers; configuration drives provider selection instead.
 
----
+### System Structure Insights
+The component cleanly separates **mode resolution** (LLMModeController child, `getLLMMode()`), **state persistence** (`setGlobalLLMMode()`, `setAgentLLMMode()`, `.data/workflow-progress.json`), **environment adaptation** (`effectivePath` substitution), and **backend integration** (`dmr-provider.ts` and its OpenAI-compatible singleton). These concerns are addressable independently, which keeps the surface area each new developer must understand to extend any single dimension reasonably small.
 
-## Usage Guidelines  
+### Scalability Considerations
+The 30-second DMR health-check window bounds local-endpoint probe load even under high-throughput workflows. Atomic JSON persistence to `.data/workflow-progress.json` is not designed for high-frequency writes — appropriate, since mode changes are administrative events rather than per-call operations. The per-agent override map is an in-memory keyed lookup, so resolution cost is constant per call regardless of how many agents are configured. The principal scalability concern is the single-file persistence model: if many concurrent mode mutations occur, atomic-write contention could become a bottleneck, though current usage patterns make this unlikely.
 
-1. **Prefer the Facade** – All callers should import and use `LLMService` rather than interacting directly with a provider. This guarantees that caching, circuit breaking and mode routing are uniformly applied.  
-2. **Select Modes Explicitly** – When invoking `LLMService`, pass a `mode` flag (`"mock"`, `"primary"`, `"fallback"`). The mock mode is intended for unit tests and CI pipelines; production code should default to the primary provider unless a fallback is required.  
-3. **Configure via YAML** – Provider credentials, time‑outs and fallback ordering belong in the YAML file read by `loadConfig`. Do not hard‑code API keys; keep them in environment‑specific config files and reference them via placeholders.  
-4. **Handle CircuitBreaker Errors** – Calls wrapped by the circuit breaker may throw a `CircuitOpenError`. Consumers should catch this exception and decide whether to retry with a different provider or surface a user‑friendly error.  
-5. **Extend Carefully** – To add a new LLM vendor:  
-   * Implement a class that extends the abstract `LLMProvider` and implements `generate`.  
-   * Add the class path and any required options to the YAML configuration.  
-   * Register the new provider name in the `ProviderRegistry` (this happens automatically at startup).  
-   * Write unit tests that exercise the provider through `MockProvider` or a dedicated test harness.  
-6. **Cache Invalidation** – If the underlying LLM model changes (e.g., a new version is deployed), invalidate the cache to avoid serving stale responses. The cache interface should expose an `invalidateAll` method that can be called during deployment scripts.  
+### Maintainability Assessment
+Maintainability is strong in the areas covered by the observations: file paths are explicit, invariants (the dual-write of `mockLLM`/`globalMode`, the `effectivePath` substitution discipline) are documented and enforceable, and the configuration layer is portable across deployment topologies via the three-path fallback. The principal maintainability risks are (1) silent drift between `mockLLM` and `globalMode` if future code bypasses the dedicated setters, (2) divergence between local and Docker paths if a new file operation forgets the `effectivePath` pattern, and (3) the implicit per-agent provider routing within `'public'` mode, which is not directly visible at the mode-resolution layer and could surprise developers expecting `getLLMMode()` to reveal the actual backend. Each risk has a corresponding usage guideline above, and adherence to those guidelines should keep the component maintainable as it grows.
 
----
-
-### Summary of Architectural Insights  
-
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Pattern(s) Identified** | Registry (ProviderRegistry), Facade (LLMService), Circuit Breaker (CircuitBreaker), Strategy/Plug‑in (individual LLMProvider subclasses), Configuration‑Driven (YAML loader) |
-| **Key Design Decisions** | Provider‑agnostic abstraction; single entry point for all LLM ops; resiliency via circuit breaker; testability via MockProvider; extensibility through YAML‑driven registration |
-| **Trade‑offs** | Added indirection (registry + service) introduces slight latency but gains flexibility; circuit breaker adds complexity but prevents cascading failures; mock provider sacrifices realism for speed in tests |
-| **Scalability** | New providers can be added without code changes; circuit breaker protects against provider overload; caching reduces external calls, enabling higher request throughput |
-| **Maintainability** | Clear separation of concerns (registry, providers, service, resilience) simplifies unit testing; YAML config centralises provider settings; mock implementation encourages robust test suites |
-
-The **LLMAbstraction** component therefore embodies a clean, modular, and resilient design that aligns with the broader architectural goals of the **Coding** project—namely, easy extensibility, consistent configuration, and robust operation across a heterogeneous set of external LLM services.
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration ; LLMAbstraction: [LLM] The LLMAbstraction component uses a provider-agnostic approach, allowing for easy switching between different LLM providers. This is achieved th; DockerizedServices: [LLM] The DockerizedServices component utilizes dependency injection to manage complex workflows and handle multiple requests efficiently. This is evi; Trajectory: [LLM] The Trajectory component utilizes the SpecstoryAdapter class, defined in lib/integrations/specstory-adapter.js, for logging conversations and ev; KnowledgeManagement: [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-sema; CodingPatterns: [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which; ConstraintSystem: [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts fi; SemanticAnalysis: [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAge.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 7 major components: LiveLoggingSystem: [LLM] The TranscriptAdapter class in lib/agent-api/transcript-api.js establishes a strict plugin contract for integrating new agent conversation sourc; LLMAbstraction: [LLM] The LLMAbstraction layer implements a three-tier mode resolution hierarchy in `getLLMMode()` within `llm-mock-service.ts` that prioritizes speci; DockerizedServices: [LLM] The ProcessStateManager (PSM) singleton implements a deliberate decoupling between service identity and process identity across both `scripts/ap; KnowledgeManagement: The KnowledgeManagement component provides knowledge graph storage, query, and lifecycle management for the Coding project. It centers on a Graphology; CodingPatterns: [LLM] The project-wide singleton guard pattern is formally codified in `docs/puml/psm-singleton-pattern.puml` and manifests consistently wherever stat; ConstraintSystem: [LLM] The ConstraintSystem implements a two-level configuration hierarchy through `HookConfigLoader` (lib/agent-api/hooks/hook-config.js) that disting; SemanticAnalysis: [LLM] The `BaseAgent<TInput, TOutput>` abstract class defined in `src/agents/base-agent.ts` establishes a rigid, five-method execution contract that e.
 
 ### Children
-- [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry class (lib/llm/provider-registry.js) uses a provider-agnostic approach to manage LLM providers.
-- [LLMProvider](./LLMProvider.md) -- The AnthropicProvider class (lib/llm/providers/anthropic-provider.ts) extends the LLMProvider class.
+- [LLMModeController](./LLMModeController.md) -- `getLLMMode()` in `llm-mock-service.ts` evaluates `llmState.perAgentOverrides` first, making per-agent configuration the highest-priority tier; only if no override exists for the requesting agent does it fall through to the lower tiers
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/mcp-server-semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component utilizes dependency injection to manage complex workflows and handle multiple requests efficiently. This is evident in the lib/llm/llm-service.ts file, where the LLMService class is used for high-level LLM operations, including mode routing, caching, and provider fallback. The use of dependency injection allows for loose coupling between components, making it easier to test and maintain the codebase. Furthermore, the ServiceStarter class in lib/service-starter.js provides robust service startup with retry, timeout, and graceful degradation, ensuring that the component can recover from failures and provide a responsive user experience.
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component utilizes the SpecstoryAdapter class, defined in lib/integrations/specstory-adapter.js, for logging conversations and events via Specstory. This class follows a specific pattern of constructor() + initialize() + logConversation() for its initialization and logging functionality. The logConversation() method employs a work-stealing concurrency pattern via a shared atomic index counter, allowing for efficient and concurrent logging of conversations and events.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The TranscriptAdapter class in lib/agent-api/transcript-api.js establishes a strict plugin contract for integrating new agent conversation sources into the LSL pipeline. It requires five abstract methods: getAgentType(), getTranscriptDirectory(), readTranscripts(), convertToLSL(), and getCurrentSession(). This design cleanly separates concerns — the base class owns the lifecycle and dispatch logic, while subclasses own the format-specific parsing. Claude Code transcripts live at ~/.claude/projects/<project>/conversation.jsonl, a JSONL file that grows append-only during a session; the Copilot CLI adapter targets a different directory structure. The convertToLSL() method is the normalization seam, responsible for mapping each agent's native message structure into the unified LSL typed-entry format with types: user, assistant, tool_use, tool_result, system, and error. A new developer adding a third agent integration (e.g., Cursor, Aider) only needs to subclass TranscriptAdapter and implement these five methods — no changes to the core LSL infrastructure are required. The getCurrentSession() method is particularly important: it must return the 'live' session object so the polling loop knows which entries are part of the current conversation versus a historical one, which implies adapters must implement their own session-boundary detection logic appropriate to their agent's format.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The ProcessStateManager (PSM) singleton implements a deliberate decoupling between service identity and process identity across both `scripts/api-service.js` and `scripts/dashboard-service.js`. Each script follows an identical structural pattern: spawn a child process via Node's `child_process` module, register the resulting process handle with the PSM via `psm.registerService()`, wire up `SIGTERM`/`SIGINT` forwarding so that signals delivered to the wrapper propagate to the child, and call `psm.unregisterService()` in the exit handler. This indirection means that the rest of the system (including `scripts/health-coordinator.js`) can query the PSM registry without holding direct references to OS-level process IDs. The practical consequence for developers is that a service restart — where a new child process replaces the old one — does not require the health coordinator or any consumer of PSM state to be aware of the PID change; only the wrapper scripts update the registry. This pattern also cleanly isolates the restart/retry logic in `lib/service-starter.js` from signal-handling responsibilities, since the wrapper owns the process lifecycle signals while the starter owns the retry policy. A new developer should note that adding a new containerized service almost certainly means creating a new wrapper script that replicates this boilerplate rather than centralizing it, which is a potential maintenance concern as the number of services grows.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides knowledge graph storage, query, and lifecycle management for the Coding project. It centers on a Graphology+LevelDB graph database (GraphDatabaseService) that stores entities as typed nodes with rich metadata, exposed through both a direct-access path and a VKB HTTP API. The component supports multiple entity types (System, Project, Component, SubComponent, Pattern, Detail) with ontology classification, bi-temporal staleness tracking, embedding vectors, and hierarchical parent/child relationships. It integrates with the MCP semantic analysis server via PersistenceAgent and GraphDatabaseAdapter, which route writes through the VKB API when the server is running or fall back to direct LevelDB access to avoid lock conflicts.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The project-wide singleton guard pattern is formally codified in `docs/puml/psm-singleton-pattern.puml` and manifests consistently wherever stateful managers are instantiated. The pattern follows a strict guard-and-return idiom: a module-level variable holds the single instance (initialized to null or undefined), and every access point checks that variable before constructing a new object. If an instance already exists, the existing reference is returned immediately without re-running any constructor or initialization logic. This prevents race conditions in async service environments where multiple subsystems might attempt to spin up the same stateful manager concurrently — a real concern in Node.js applications that use event-driven concurrency without explicit locking primitives. For new developers, the implication is that any class described as a 'manager' or 'session' object in this codebase should be assumed to follow this pattern: do not call `new` directly on these classes from arbitrary call sites; instead, always go through the designated factory or accessor function that enforces the singleton contract. The PlantUML diagram in `docs/puml/psm-singleton-pattern.puml` is authoritative and should be consulted before introducing any new singleton-style manager to ensure the guard logic is structurally consistent with the rest of the project.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem implements a two-level configuration hierarchy through `HookConfigLoader` (lib/agent-api/hooks/hook-config.js) that distinguishes between user-wide defaults and project-specific overrides. User-level configuration lives at `~/.coding-tools/hooks.json`, making it available across all Claude Code sessions on the machine, while project-level configuration resides at `{project}/.coding/hooks.json`, enabling per-repository constraint customization. The `mergeConfigs()` method is the critical integration point: it applies project configuration on top of user configuration, meaning any handler, constraint rule, or hook binding defined at the project level supersedes or augments what the user has set globally. This design has a meaningful implication for teams: a repository can enforce stricter or more specific constraints than a developer's personal defaults without requiring them to change their global setup. However, because the merge strategy gives project config full precedence, there is no mechanism for user config to 'lock' a setting that cannot be overridden by a project — a security boundary that new developers should be aware of when assessing whether globally-defined compliance constraints can be bypassed by a malicious or misconfigured `.coding/hooks.json`.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The `BaseAgent<TInput, TOutput>` abstract class defined in `src/agents/base-agent.ts` establishes a rigid, five-method execution contract that every agent in the pipeline must implement: `process()`, `calculateConfidence()`, `detectIssues()`, `generateRouting()`, and `applyCorrections()`. This is not a loose interface — each method is called sequentially within a standardized envelope, meaning an agent cannot skip confidence calculation or issue detection even if it has nothing meaningful to report for those phases. The resulting `AgentResponse` envelope carries not just the domain output but also metadata (timestamps, model usage), routing suggestions for downstream agents, and a corrections list for self-healing. For a new developer, this means that implementing a new agent is less about writing a single processing function and more about correctly filling all five lifecycle slots; an agent that returns empty stubs for `detectIssues()` or `generateRouting()` will still compile and run, but the orchestrating pipeline likely depends on those fields being populated to make branching decisions. The generic type parameters `<TInput, TOutput>` allow the base class to be reused across wildly different domains — from raw git commit arrays (SemanticAnalysisAgent) to ontology classification batches (OntologyClassificationAgent) — without sacrificing static type safety on the input/output contracts.
+
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

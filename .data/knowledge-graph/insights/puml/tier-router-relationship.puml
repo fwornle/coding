@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TierRouter
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[TierRouter] as tier_router #LightBlue
+[LLMStateManager] as llmstate_manager #F0F0F0
+[PublicProviderAdapter] as public_provider_adapter #F0F0F0
+[ComplexityClassifier] as complexity_classifier #E8F5E8
+[AgentTierPinMap] as agent_tier_pin_map #E8F5E8
+
+llmabstraction --> tier_router
+llmstate_manager -[hidden]- tier_router
+public_provider_adapter -[hidden]- tier_router
+tier_router --> complexity_classifier
+tier_router --> agent_tier_pin_map
+
+@enduml

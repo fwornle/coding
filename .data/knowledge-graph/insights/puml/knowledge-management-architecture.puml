@@ -1,31 +1,30 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-  component "Knowledge Graph" as kg <<storage>>
-  component "GraphDatabaseAdapter" as gda <<core>>
-  component "CheckpointManager" as cm <<core>>
-  component "CodeGraphAgent" as cga <<agent>>
+package "MCP Semantic Analysis" {
   component "PersistenceAgent" as pa <<agent>>
+  component "GraphDatabaseAdapter" as gda <<core>>
 }
 
-package "Ontology System" {
-  component "OntologySystem" as os <<core>>
-  database "LevelDB" as ldb
+package "VKB Unified" {
+  component "VkbApiClient" as vkbc <<api>>
+  component "VKB HTTP API Server" as vkbapi <<api>>
 }
 
-package "External Services" {
-  cloud "VKB API" as vkb <<external>>
+package "Knowledge Management Core" {
+  component "GraphDatabaseService\n(Graphology)" as gds <<storage>>
+  database "LevelDB" as ldb <<storage>>
+  component "GraphKnowledgeExporter" as gke <<core>>
+  database ".data/knowledge-export/\n(JSON files)" as jef <<storage>>
 }
 
-kg --> gda : uses
-gda --> ldb : stores
-cga --> gda : uses
-pa --> gda : uses
-cm --> gda : tracks
-os --> kg : classifies
-vkb --> gda : interacts
-cga --> cm : updates
-pa --> cm : updates
+pa --> gda : storeEntity()\n[enforces ontology type]
+gda --> vkbc : "API mode\n(server available)"
+gda --> gds : "direct mode\n(fallback, no lock)"
+vkbc --> vkbapi : HTTP requests
+vkbapi --> gds : routes writes
+gds --> ldb : _persistGraphToLevel()\n[nodes/edges/metadata blob]
+gds ..> gke : entity:stored event
+gke --> jef : sync export\n(2s debounce)
 
 @enduml

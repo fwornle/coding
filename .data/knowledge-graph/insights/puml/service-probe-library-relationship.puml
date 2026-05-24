@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ServiceProbeLibrary
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ServiceProbeLibrary] as service_probe_library #LightBlue
+[ServiceStarterLibrary] as service_starter_library #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+[UnifiedProbeInterface] as unified_probe_interface #E8F5E8
+
+dockerized_services --> service_probe_library
+service_starter_library -[hidden]- service_probe_library
+llmmock_service -[hidden]- service_probe_library
+service_probe_library --> unified_probe_interface
+
+@enduml
