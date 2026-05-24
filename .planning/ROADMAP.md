@@ -516,6 +516,13 @@ Plans:
 Plans:
 - [x] 42.1.1-01-PLAN.md — Implement ontologyPathResolver helper + unit tests; wire OntologyConfigManager.validatePaths() + injectOntology() through resolver + add integration test against real `.data/ontologies/` flat layout; public re-export + regression sweep. **COMPLETE 2026-05-24** (commits 6bde70ba0 + 6933264ed + ef9a4e9bd + e341152a8 + 00c6ca154; 18/18 node:test cases pass; layer-1 of SC#6 root cause unblocked; NEW known residual — Project class not on disk, layer-2 follow-up tracked separately. See 42.1.1-01-SUMMARY.md.)
 
+### Phase 42.1.2: Register Project ontology class — surfaced by 42.1.1 Test C; ensureProjectAnchor('Coding') still throws "Unknown ontology class: Project" because Project is not declared in any on-disk JSON. Closes layer-2 of SC#6 root cause. (INSERTED)
+
+**Goal:** Add a `Project` class definition to the on-disk ontology so that `km-core` `OntologyRegistry.isValidClass('Project')` returns `true` after `OntologyConfigManager.initialize()`. This unblocks `ensureProjectAnchor('Coding')` at runtime and closes the layer-2 follow-up identified by Phase 42.1.1 Test C (see 42.1.1-01-SUMMARY.md § Known Residuals + 42.1.1-VERIFICATION.md). Scope is strictly the ontology JSON change + a smoke test that proves `ensureProjectAnchor('Coding')` no longer throws; Phase 42.1 SC#6 wave-analysis re-run remains owned by Phase 42.1's verifier.
+**Requirements**: none (decision-coverage gate against CONTEXT.md `<decisions>`)
+**Depends on:** Phase 42.1.1
+**Plans:** TBD
+
 #### Phase 43: OKM Cross-Repo Migration (C)
 
 **Goal:** Execute the cross-repo refactor that migrates C (`~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) onto KM-Core; this is a **separate repository** with its own CI, release cycle, and packaging story, so success means landing KM-Core in OKM via the agreed packaging strategy without breaking rapid-automations' green build.
