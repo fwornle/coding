@@ -50,6 +50,7 @@ const PROCESS_COLORS: Record<string, string> = {
   'entity-refresh': '#f87171',         // lighter red
   'backfill-raw': '#10b981',           // emerald
   'general': '#6b7280',               // gray
+  'unknown': '#94a3b8',               // slate — distinct from PROCESS gray and from EVOLUTION_PALETTE[0] blue
 }
 
 const PROVIDER_COLORS: Record<string, string> = {
