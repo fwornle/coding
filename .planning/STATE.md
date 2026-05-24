@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: ready_to_plan
-stopped_at: Phase 42.1.1 complete (1/1) — ready to discuss Phase 47
-last_updated: 2026-05-24T17:58:50.731Z
-last_activity: 2026-05-24 -- Phase 42.1.1 plan 01 complete (layer-1 of SC#6 root cause)
+status: planning
+stopped_at: Phase 42.1.2 context gathered
+last_updated: "2026-05-24T19:31:47.489Z"
+last_activity: 2026-05-24
 progress:
-  total_phases: 19
-  completed_phases: 7
-  total_plans: 44
+  total_phases: 20
+  completed_phases: 8
+  total_plans: 43
   completed_plans: 43
-  percent: 37
+  percent: 40
 ---
 
 # Project State
@@ -210,8 +210,8 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-05-24T17:30:00Z
-Stopped at: Phase 42.1.1-01 complete (ontologyPathResolver + OntologyConfigManager loader-path wiring + Test C softened per Option A; 18/18 node:test pass; layer-1 SC#6 unblocked; NEW known residual — Project class not on disk, layer-2 follow-up tracked separately)
+Last session: 2026-05-24T19:31:47.480Z
+Stopped at: Phase 42.1.2 context gathered
 Resume with: Either open a new bug-fix phase (proposed 42.1.2) to register `Project` on disk and re-run `/gsd-verify-phase 42.1`, OR continue with Phase 42 (Offline UKB Migration) and address the Project-class follow-up in parallel.
 
 Plan 02 follow-up for Plan 7:
