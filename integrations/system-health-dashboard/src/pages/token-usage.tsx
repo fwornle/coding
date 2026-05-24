@@ -236,7 +236,7 @@ export function TokenUsagePage() {
   // counts; 'all' is a backend sentinel that picks every retained row.
   const [hoursWindow, setHoursWindow] = useState<string>('24')
   // Evolution chart can stack tokens by process (purpose) or by model.
-  const [evoGroupBy, setEvoGroupBy] = useState<'process' | 'model'>('process')
+  const [evoGroupBy, setEvoGroupBy] = useState<'process' | 'model' | 'tokens'>('process')
   const [evoStackMode, setEvoStackMode] = useState<'stacked' | 'overlapping'>('stacked')
   const [evoHidden, setEvoHidden] = useState<Set<string>>(new Set())
   const toggleEvoSeries = (key: string) => {
@@ -308,16 +308,6 @@ export function TokenUsagePage() {
       output: p.output_tokens,
     }))
 
-  // Prepare timeline data (2-minute buckets, zero-filled by the backend).
-  // The `hour` field arrives as full UTC ISO (e.g. 2026-05-15T12:06:00.000Z);
-  // convert to the viewer's local time zone before stripping to HH:MM.
-  const hourlyData = (summary.by_hour || []).map(h => ({
-    hour: new Date(h.hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-    input: h.input_tokens,
-    output: h.output_tokens,
-    calls: h.calls,
-  }))
-
   // Sort process table
   const sortedProcesses = [...summary.by_process].sort((a, b) =>
     sortField === 'total_tokens' ? b.total_tokens - a.total_tokens : b.calls - a.calls
@@ -328,12 +318,14 @@ export function TokenUsagePage() {
   // in the window (incl. test/reap-* / fake-* outliers); restrict to the
   // "main consumers" — series contributing at least 0.5% of the window's
   // total tokens — so the legend and stacked area stay focused.
-  const evoKeysRaw = (evoGroupBy === 'process'
-    ? summary.process_keys
-    : summary.model_keys) || []
-  const evoSeriesRaw = (evoGroupBy === 'process'
-    ? summary.by_process_hour
-    : summary.by_model_hour) || []
+  const evoKeysRaw: string[] =
+    evoGroupBy === 'process' ? (summary.process_keys || [])
+    : evoGroupBy === 'model' ? (summary.model_keys || [])
+    : ['input', 'output']
+  const evoSeriesRaw: Array<Record<string, any>> =
+    evoGroupBy === 'process' ? (summary.by_process_hour || [])
+    : evoGroupBy === 'model' ? (summary.by_model_hour || [])
+    : (summary.by_hour || []).map(h => ({ hour: h.hour, input: h.input_tokens, output: h.output_tokens }))
   const MAIN_CONSUMER_THRESHOLD = 0.005   // 0.5% of window total
   const evoGrandTotal = summary.total_tokens || 1
   const evoKeyTotals = new Map<string, number>()
@@ -366,6 +358,10 @@ export function TokenUsagePage() {
     // 'unknown' from EVOLUTION_PALETTE[4] to [0] and made it collide with
     // observation-writer. Models share the same logic so model series also
     // keep stable colors.
+    if (evoGroupBy === 'tokens') {
+      if (key === 'input')  return '#3b82f6'   // blue (matches former Timeline tab)
+      if (key === 'output') return '#10b981'   // emerald
+    }
     if (evoGroupBy === 'process') {
       const canonical = PROCESS_COLORS[key]
       if (canonical) return canonical
@@ -487,7 +483,6 @@ export function TokenUsagePage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="evolution">Evolution</TabsTrigger>
           <TabsTrigger value="processes">By Process</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="recent">Recent Calls</TabsTrigger>
         </TabsList>
 
@@ -584,7 +579,11 @@ export function TokenUsagePage() {
                   </CardTitle>
                   <CardDescription>
                     {windowLabel} · {summary.bucket_minutes ?? '?'}-minute buckets ·
-                    {' '}{evoStackMode === 'stacked' ? 'stacked by' : 'overlapping by'} {evoGroupBy === 'process' ? 'purpose' : 'model'} ·
+                    {' '}{evoStackMode === 'stacked' ? 'stacked by' : 'overlapping by'} {
+                      evoGroupBy === 'process' ? 'purpose'
+                      : evoGroupBy === 'model' ? 'model'
+                      : 'token type'
+                    } ·
                     {' '}click legend to toggle · drag brush to zoom
                   </CardDescription>
                 </div>
@@ -600,7 +599,7 @@ export function TokenUsagePage() {
                   </Button>
                   <Select
                     value={evoGroupBy}
-                    onValueChange={(v) => setEvoGroupBy(v as 'process' | 'model')}
+                    onValueChange={(v) => setEvoGroupBy(v as 'process' | 'model' | 'tokens')}
                   >
                     <SelectTrigger className="w-[160px] h-9">
                       <SelectValue />
@@ -608,6 +607,7 @@ export function TokenUsagePage() {
                     <SelectContent>
                       <SelectItem value="process">By Process</SelectItem>
                       <SelectItem value="model">By Model</SelectItem>
+                      <SelectItem value="tokens">Input/Output</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -798,39 +798,6 @@ export function TokenUsagePage() {
                   })}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Timeline Tab - hourly area chart */}
-        <TabsContent value="timeline" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Token Usage Over Time</CardTitle>
-              <CardDescription>2-minute input/output token consumption (gaps render as zero)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {hourlyData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={350}>
-                  <AreaChart data={hourlyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                    <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
-                    <YAxis tickFormatter={formatTokens} tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      formatter={(val: number, name: string) => [formatTokens(val), name]}
-                      labelStyle={{ color: '#999' }}
-                      contentStyle={{ backgroundColor: '#1e1e2e', border: '1px solid #333' }}
-                    />
-                    <Legend />
-                    <Area type="monotone" dataKey="input" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} name="Input Tokens" />
-                    <Area type="monotone" dataKey="output" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.6} name="Output Tokens" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center text-muted-foreground py-12">
-                  No timeline data available yet. Token usage will appear here as LLM calls are made.
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
