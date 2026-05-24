@@ -10,6 +10,24 @@
 > **claude code / opencode / copilot / mastra** alike. The Claude-Code-specific observation backfill is now
 > just the immediate stopgap (Path B-claude) within a larger architecture; see the expanded scope below.
 
+> **Statusline-bubble consequence (callout, 2026-05-24):** the tmux per-project bubble (`C🟢` / `KC⚫` etc.)
+> and the `[📚]` badge both key off the *pinned parent transcript's* mtime via
+> `combined-status-line-projects.json`. When a sub-agent is doing the work, the parent file's mtime sits
+> frozen and both signals fade to ⚫ even though the user is actively confirming prompts inside the
+> sub-agent (confirmed live this morning: parent age 32 227 s → ⚫, while a sub-agent transcript
+> `<parent>/subagents/agent-a8ec1c2d9fabb5e25.jsonl` was just 56 s old → should be 🟢).
+>
+> An **interim mitigation shipped 2026-05-24** (commit follows this CONTEXT.md edit) folds sub-agent
+> mtimes into the per-project freshness signal in three places — `_freshestProjectActivityAgeMs()`,
+> `transcriptAgeMs()`, and the projects-mapping write (extended with a new `subMt` field consumed by
+> `status-line-fast.cjs`). This unblocks the bubble symptom without waiting for the full registry.
+>
+> **The proper fix lives in this phase**: once the sub-agent registry (Must #2) exists, the mapping
+> should source `subMt` from the registry instead of re-walking `<parent>/subagents/` on every tick,
+> and Must #3 (LSL parity) makes sub-agent activity visible via the same parent signal that drives
+> every other dashboard surface. Treat the 2026-05-24 mitigation as scaffolding — replace it during
+> plan-phase, don't extend it.
+
 ---
 
 ## Bug

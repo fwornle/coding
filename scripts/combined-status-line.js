@@ -445,6 +445,38 @@ class CombinedStatusLine {
   }
 
   /**
+   * Effective activity mtime for a transcript: max of the parent transcript's
+   * own mtime and the freshest mtime among its sub-agent transcripts under
+   * `<parent_without_ext>/subagents/*.jsonl`.
+   *
+   * Claude Code spawns sub-agents (e.g. GSD wave-execute, Task tool) into
+   * a `subagents/` sibling-dir of the parent transcript. The parent file's
+   * own mtime sits frozen during sub-agent work, so every signal that
+   * keys off "parent transcript mtime" goes stale even when the user is
+   * actively confirming prompts inside a sub-agent. This helper folds
+   * sub-agent freshness back into the parent's representative mtime so
+   * the lifecycle bubble and [📚] badge reflect actual user activity.
+   *
+   * Interim mitigation pending Phase 51's full sub-agent registry.
+   * Returns 0 if the parent can't be stat'd and no sub-agents exist.
+   */
+  static _effectiveActivityMtime(parentTranscriptPath) {
+    let mt = 0;
+    try { mt = fs.statSync(parentTranscriptPath).mtimeMs; } catch { /* ignore */ }
+    const subagentsDir = parentTranscriptPath.replace(/\.jsonl$/, '') + '/subagents';
+    try {
+      for (const f of fs.readdirSync(subagentsDir)) {
+        if (!f.endsWith('.jsonl')) continue;
+        try {
+          const m = fs.statSync(join(subagentsDir, f)).mtimeMs;
+          if (m > mt) mt = m;
+        } catch { /* skip unreadable */ }
+      }
+    } catch { /* no subagents dir — common, fine */ }
+    return mt;
+  }
+
+  /**
    * Freshest project-activity age (ms) across all tracked projects, derived
    * from the coordinator's `lsl[*].transcriptPath` mtime — the same signal
    * that drives the per-project activity bubbles. Used to map coordinator
@@ -483,7 +515,8 @@ class CombinedStatusLine {
       for (const entry of lslEntries) {
         if (!entry?.transcriptPath) continue;
         try {
-          let age = now - fs.statSync(entry.transcriptPath).mtimeMs;
+          const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath);
+          let age = effMt > 0 ? now - effMt : now - fs.statSync(entry.transcriptPath).mtimeMs;
           if (age >= 5 * 60_000 && age < 45 * 60_000 && entry.projectName) {
             const lb = heartbeatByProject.get(entry.projectName);
             if (lb) {
@@ -947,7 +980,9 @@ class CombinedStatusLine {
         for (const entry of lslEntries) {
           if (entry?.projectName !== projectName || !entry?.transcriptPath) continue;
           try {
-            const age = Date.now() - fs.statSync(entry.transcriptPath).mtimeMs;
+            const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath);
+            const mtime = effMt > 0 ? effMt : fs.statSync(entry.transcriptPath).mtimeMs;
+            const age = Date.now() - mtime;
             if (freshestAge === null || age < freshestAge) freshestAge = age;
           } catch { /* skip unreadable paths */ }
         }
@@ -1092,19 +1127,26 @@ class CombinedStatusLine {
         // active session drives the project icon in the fast-path patcher.
         for (const entry of lslEntries) {
           if (!entry?.projectName || !entry?.transcriptPath) continue;
-          let mt = 0;
-          try { mt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { continue; }
+          let parentMt = 0;
+          try { parentMt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { continue; }
+          // Sub-agent freshness: folded in so the fast-path can promote
+          // the bubble when work is happening inside a sub-agent and the
+          // parent transcript file is frozen. Phase 51 interim mitigation.
+          const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath);
+          const subMt = effMt > parentMt ? effMt : 0;
+          const mt = effMt > parentMt ? effMt : parentMt;
           const prev = mapping[entry.projectName];
           if (!prev || mt > prev._mt) {
             mapping[entry.projectName] = {
               tp: entry.transcriptPath,
               hbTs: freshestBeat.get(entry.projectName) || 0,
-              _mt: mt,  // internal; stripped before write
+              subMt,            // fast-path uses max(stat(tp).mtimeMs, subMt)
+              _mt: mt,          // internal; stripped before write
             };
           }
           seen.add(entry.projectName);
         }
-        // Strip internal _mt before persisting
+        // Strip internal _mt before persisting (subMt is part of the on-disk shape)
         for (const v of Object.values(mapping)) delete v._mt;
         // Fallback: for projects in rollup but with no transcriptPath,
         // look up via the same forward-encoded dir scan as transcriptAgeMs.

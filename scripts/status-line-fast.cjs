@@ -100,12 +100,16 @@ function readProjectMapping() {
   } catch { return {}; }
 }
 
-// Normalize either shape to {tp, hbTs}. Legacy string entry has no
+// Normalize either shape to {tp, hbTs, subMt}. Legacy string entry has no
 // heartbeat data — hbTs=0 disables the promotion path, falling back to
 // pure transcript-mtime behaviour for that tick.
+// `subMt` (sub-agent freshest mtime, ms) is folded into the effective
+// activity age below so the bubble doesn't stay frozen when the user is
+// actively confirming prompts inside a sub-agent and the parent transcript
+// file isn't being written. Phase 51 interim mitigation.
 function normalizeMappingEntry(v) {
-  if (typeof v === 'string') return { tp: v, hbTs: 0 };
-  return { tp: v?.tp, hbTs: v?.hbTs || 0 };
+  if (typeof v === 'string') return { tp: v, hbTs: 0, subMt: 0 };
+  return { tp: v?.tp, hbTs: v?.hbTs || 0, subMt: v?.subMt || 0 };
 }
 
 // Patch each project's lifecycle icon in `text` based on its current
@@ -126,9 +130,15 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     .sort((a, b) => b[2].length - a[2].length);
 
   const now = Date.now();
-  for (const [, { tp, hbTs }, abbrev] of entries) {
-    let mt;
-    try { mt = fs.statSync(tp).mtimeMs; } catch { continue; }
+  for (const [, { tp, hbTs, subMt }, abbrev] of entries) {
+    let parentMt;
+    try { parentMt = fs.statSync(tp).mtimeMs; } catch { continue; }
+    // Effective mtime folds in the freshest sub-agent transcript so the
+    // bubble reflects activity happening inside Task-tool / wave-execute
+    // sub-agents (whose writes don't touch the parent .jsonl). Phase 51
+    // interim mitigation; the on-disk subMt is published by CSL on each
+    // refresh tick.
+    const mt = subMt > parentMt ? subMt : parentMt;
     if (mt > cacheMtimeMs) anyNewer = true;
     let newIcon = ageToActivityIcon(now - mt);
     // Mirror combined-status-line.js's heartbeat promotion: a fresh ETM
@@ -141,6 +151,9 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     if (newIcon !== '🟢' && hbTs > 0 && (now - hbTs) < 5 * 60_000 && transcriptAge < 45 * 60_000) {
       newIcon = '🟢';
     }
+    // anyNewer also fires if a sub-agent file is fresher than the cache —
+    // so the next tick triggers a CSL refresh that re-walks subagents/
+    // and re-publishes subMt.
     // Match: <ABBREV>(?![A-Z]) optionally followed by a #[nounderscore]
     // closing tag (when the abbrev is the underlined "current project"),
     // immediately followed by exactly one lifecycle icon. The (?![A-Z])
