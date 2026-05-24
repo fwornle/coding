@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: blocked
-stopped_at: Phase 42-07 PARTIAL — Phase A + B1 + SC#4 + Surprise#5 fix landed; Phase C deferred. Forensic .planning/forensics/report-20260524-073300.md identifies root causes for Plan 42-06 gaps. Load-bearing: Phase 42-07 Phase B1 replaced persistence-agent.persistEntities with persistWithKmCore, dropping findBestParent + post-sweep contains-edge pass — wave entities are now orphaned from the Coding Project anchor (+64 entities, 0 new edges to Coding). Parallel: canonical-mapper has no team/domain param + km-core-adapter underscore-discards team; LLM attribution unknown because proxy-provider doesn't forward agentId. Next step: /gsd-plan-phase 42.1 with Blocks 0-5 from the forensic report; Block 0 (anchor parity) is the urgent fix.
-last_updated: "2026-05-24T05:40:00.000Z"
-last_activity: 2026-05-24
+status: executing
+stopped_at: Phase 42-06 complete (canonical emit + flag-gated km-core persistWithKmCore + mergeEntityGroup → km-core mergeEntities; 12 unit tests pass, container-side AC verified)
+last_updated: "2026-05-24T06:22:06.578Z"
+last_activity: 2026-05-24 -- Phase 42.1 execution started
 progress:
-  total_phases: 15
-  completed_phases: 5
-  total_plans: 41
-  completed_plans: 40
-  percent: 33
+  total_phases: 17
+  completed_phases: 6
+  total_plans: 42
+  completed_plans: 41
+  percent: 35
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 42 — offline-ukb-migration-b
+**Current focus:** Phase 42.1 — ukb-project-anchor-parity
 
 **v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
 
@@ -49,11 +49,11 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 42 (offline-ukb-migration-b) — PARTIAL (Plan 7 incomplete; Phase C deferred)
-Plan: 7 of 7 (PARTIAL — Phase A + B1 + SC#4 + Surprise#5 landed; Phase C blocked on Plan 42-06 emit-shape gaps)
-Status: blocked — operator observations expose Plan 42-06 canonical emit gaps (no project linkage; LLM proxy attribution=unknown)
+Phase: 42.1 (ukb-project-anchor-parity) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 42.1
 Next step: /gsd-forensics on integrations/mcp-server-semantic-analysis/src/agents/canonical-mapper.ts (and wave-controller LLM dispatch path) → plan Phase 42.1 to fix gaps + retire legacy persistence trio + atomic dir-swap + re-run SC#1-5 verifier
-Last activity: 2026-05-24
+Last activity: 2026-05-24 -- Phase 42.1 execution started
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Last activity: 2026-05-24
 - Phase 41 directory scaffolded 2026-05-22: roadmap entry has existed since v7.1 was created (Online Learning Adapter & Post-Hoc Resolution — INT-01 + PIPE-02), but the `.planning/phases/41-online-learning-adapter-post-hoc-resolution/` directory was created only now after Phase 40 closure. STATE Current Position re-pointed from Phase 47 back to Phase 41 to reflect the milestone (v7.1) phase order. Phases 42–46 still need directories.
 - Phase 50 added 2026-05-23: LSL-grounded async observation resolver — backfills observation rows that are unrecoverably vague on their own (ambiguous-reference summaries like "some previously discussed feature" + Phase 47's image-only rows) by walking the verbatim Live Session Logs. Critical design decision: window is measured in user→assistant **prompt count** (default N=3), NOT wall-clock minutes — a naive 15-min window misses the antecedent of "do the same again" after a 6-hour autonomous task. Subsumes Phase 47's `Could` recovery item; `_buildPriorContext` (shipped today as `2f4cbf7d7`) should be migrated to the same N-prompt window in Phase 50's Should-scope. See `.planning/phases/50-…/50-CONTEXT.md`.
 - Phase 51 added 2026-05-23 (scope broadened same day): agent-agnostic sub-agent capture across LSL **and** observations. Original framing was Claude-Code-only observation backfill; real requirement is sub-agents must appear in both LSL (`.specstory/history/`) and observations panel, in real time, for claude/opencode/copilot/mastra alike. Live (spawn-time hook) + sweep (periodic backfill) tiers both needed. LSL naming convention proposed: `{YYYY-MM-DD}_{HHHH-HHHH}_S{slot}-{idx}-{hash}[-part{N}].md`. First plan-phase step is per-agent research into how each spawns sub-agents. See `.planning/phases/51-…/51-CONTEXT.md`. (Concrete trigger: 25 sub-agent transcripts under `<parent>/subagents/agent-*.jsonl` confirmed today during the Phase 42 wave — backfill running via `scripts/backfill-subagent-transcripts.mjs` proof-of-concept.)
+- Phase 52 added 2026-05-24: Dashboard LLM routing label + process tag observability fix. Two issues surfaced during the phase 42.1 production ukb run. (1) Wave-analysis HTTP calls don't set `body.process`, so all UKB sub-step calls land in `.data/llm-proxy/token-usage.db` with `process='unknown'` — operators can't pin per-sub-step provider/model via `processOverrides` in `llm-settings.json`. (2) Dashboard sub-step badges hardcode `'Groq: llama-3.3-70b-versatile'` (constants.ts:603 + 18 literals) although the proxy's auto-route preference order is `claude-code → copilot → groq → openai → anthropic`. Token-usage telemetry for the 2026-05-24 11:34Z run confirmed ZERO groq calls — all wave-analysis traffic went to copilot (6) + claude-code (4). Routing is correct; the dashboard label is misleading. Bug-fix style phase, outside v7.1 milestone scope. See `.planning/phases/52-…/NOTES.md` for evidence base.
 
 ### Decisions
 
