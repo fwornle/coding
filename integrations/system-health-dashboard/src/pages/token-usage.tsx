@@ -22,6 +22,7 @@ const REFRESH_INTERVAL = 30_000
 // Window options for the time-range selector. `value` is what we send as
 // ?hours= (the literal string 'all' is a backend sentinel for "everything").
 const WINDOW_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '1',   label: 'Last 1h' },
   { value: '24',  label: 'Last 24h' },
   { value: '48',  label: 'Last 48h' },
   { value: '168', label: 'Last 7 days' },
