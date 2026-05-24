@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: blocked
-stopped_at: Phase 42-07 Phase B1 + SC#4 fix COMPLETE; Phase C HALTED at Architectural Surprise #5 (require() not defined in semantic-analyzer.ts when loaded as ESM — pre-existing regression masked by empty Error log payload)
-last_updated: "2026-05-23T15:57:00.000Z"
-last_activity: 2026-05-23
+stopped_at: Phase 42-07 PARTIAL — Phase A + B1 + SC#4 + Surprise#5 fix landed; Phase C deferred. Operator-observed Plan 42-06 gaps (no project linkage, LLM proxy attribution=unknown) block SC verification. Route to /gsd-forensics on canonical-mapper.ts before planning Phase 42.1.
+last_updated: "2026-05-24T20:25:00.000Z"
+last_activity: 2026-05-24
 progress:
   total_phases: 15
   completed_phases: 5
@@ -49,10 +49,11 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 42 (offline-ukb-migration-b) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
-Last activity: 2026-05-23
+Phase: 42 (offline-ukb-migration-b) — PARTIAL (Plan 7 incomplete; Phase C deferred)
+Plan: 7 of 7 (PARTIAL — Phase A + B1 + SC#4 + Surprise#5 landed; Phase C blocked on Plan 42-06 emit-shape gaps)
+Status: blocked — operator observations expose Plan 42-06 canonical emit gaps (no project linkage; LLM proxy attribution=unknown)
+Next step: /gsd-forensics on integrations/mcp-server-semantic-analysis/src/agents/canonical-mapper.ts (and wave-controller LLM dispatch path) → plan Phase 42.1 to fix gaps + retire legacy persistence trio + atomic dir-swap + re-run SC#1-5 verifier
+Last activity: 2026-05-24
 
 ## Performance Metrics
 
