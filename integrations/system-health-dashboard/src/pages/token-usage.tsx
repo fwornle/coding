@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, Treemap, AreaChart, Area
+  PieChart, Pie, Cell, Legend, Treemap, AreaChart, Area, Brush
 } from 'recharts'
 
 const PROXY_PORT = '12435'
@@ -237,6 +237,15 @@ export function TokenUsagePage() {
   const [hoursWindow, setHoursWindow] = useState<string>('24')
   // Evolution chart can stack tokens by process (purpose) or by model.
   const [evoGroupBy, setEvoGroupBy] = useState<'process' | 'model'>('process')
+  const [evoStackMode, setEvoStackMode] = useState<'stacked' | 'overlapping'>('stacked')
+  const [evoHidden, setEvoHidden] = useState<Set<string>>(new Set())
+  const toggleEvoSeries = (key: string) => {
+    setEvoHidden(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
+  }
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchData = useCallback(async (isAuto = false) => {
@@ -575,21 +584,33 @@ export function TokenUsagePage() {
                   </CardTitle>
                   <CardDescription>
                     {windowLabel} · {summary.bucket_minutes ?? '?'}-minute buckets ·
-                    {' '}stacked by {evoGroupBy === 'process' ? 'purpose' : 'model'}
+                    {' '}{evoStackMode === 'stacked' ? 'stacked by' : 'overlapping by'} {evoGroupBy === 'process' ? 'purpose' : 'model'} ·
+                    {' '}click legend to toggle · drag brush to zoom
                   </CardDescription>
                 </div>
-                <Select
-                  value={evoGroupBy}
-                  onValueChange={(v) => setEvoGroupBy(v as 'process' | 'model')}
-                >
-                  <SelectTrigger className="w-[160px] h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="process">By Process</SelectItem>
-                    <SelectItem value="model">By Model</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEvoStackMode(m => m === 'stacked' ? 'overlapping' : 'stacked')}
+                    title={evoStackMode === 'stacked' ? 'Switch to overlapping (translucent)' : 'Switch to stacked'}
+                    className="h-9"
+                  >
+                    {evoStackMode === 'stacked' ? 'Stacked' : 'Overlap'}
+                  </Button>
+                  <Select
+                    value={evoGroupBy}
+                    onValueChange={(v) => setEvoGroupBy(v as 'process' | 'model')}
+                  >
+                    <SelectTrigger className="w-[160px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="process">By Process</SelectItem>
+                      <SelectItem value="model">By Model</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -604,19 +625,37 @@ export function TokenUsagePage() {
                       labelStyle={{ color: '#999' }}
                       contentStyle={{ backgroundColor: '#1e1e2e', border: '1px solid #333' }}
                     />
-                    <Legend />
+                    <Legend
+                      onClick={(e: any) => {
+                        const key = e?.dataKey || e?.value
+                        if (typeof key === 'string') toggleEvoSeries(key)
+                      }}
+                      formatter={(value: string) => (
+                        <span
+                          style={{
+                            cursor: 'pointer',
+                            opacity: evoHidden.has(value) ? 0.4 : 1,
+                            textDecoration: evoHidden.has(value) ? 'line-through' : 'none',
+                          }}
+                        >
+                          {value}
+                        </span>
+                      )}
+                    />
                     {evoKeys.map((k, i) => (
                       <Area
                         key={k}
                         type="monotone"
                         dataKey={k}
-                        stackId="evo"
+                        stackId={evoStackMode === 'stacked' ? 'evo' : undefined}
                         stroke={evoColorFor(k, i)}
                         fill={evoColorFor(k, i)}
-                        fillOpacity={0.7}
+                        fillOpacity={evoStackMode === 'stacked' ? 0.7 : 0.35}
                         name={k}
+                        hide={evoHidden.has(k)}
                       />
                     ))}
+                    <Brush dataKey="label" height={24} stroke="#888" travellerWidth={8} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
