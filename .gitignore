@@ -191,10 +191,12 @@ integrations/browser-access/logs/
 .data/knowledge-graph/insights/*
 !.data/knowledge-graph/insights/puml/
 !.data/knowledge-graph/insights/images/
+.data/knowledge-graph-migrated/
 .data/knowledge.db
 .data/knowledge.db-shm
 .data/knowledge.db-wal
 .data/backups/
+.data/exports/*.pre-*-backup
 
 # Track knowledge exports (git-reviewable JSON)
 !.data/
