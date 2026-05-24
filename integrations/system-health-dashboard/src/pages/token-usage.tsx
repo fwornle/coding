@@ -51,6 +51,14 @@ const PROCESS_COLORS: Record<string, string> = {
   'backfill-raw': '#10b981',           // emerald
   'general': '#6b7280',               // gray
   'unknown': '#94a3b8',               // slate — distinct from PROCESS gray and from EVOLUTION_PALETTE[0] blue
+  // Process names actually emitted by the live pipeline (the *-consolidator
+  // / *-synthesizer entries above are older naming we keep for back-compat
+  // with any historical rows still surfacing). Stable colors here so the
+  // hash-fallback can't collide on the small SAFE_EVOLUTION_PALETTE.
+  'consolidator-digest':  '#8b5cf6',   // purple
+  'consolidator-insight': '#ec4899',   // pink
+  'health-coordinator':   '#f43f5e',   // rose — distinct from consolidator-digest purple
+  'reproject-online':     '#06b6d4',   // cyan
 }
 
 // Palette slots that don't collide with any canonical PROCESS_COLORS value.
@@ -108,6 +116,7 @@ interface TokenSummary {
     model: string
     calls: number
     total_tokens: number
+    avg_latency?: number
   }>
   by_subscription: Array<{
     subscription: string
@@ -686,7 +695,7 @@ export function TokenUsagePage() {
                     }
                   } else if (evoGroupBy === 'model') {
                     for (const m of (summary.by_model || [])) {
-                      meta.set(m.model, { calls: m.calls })
+                      meta.set(m.model, { calls: m.calls, avg_latency: m.avg_latency })
                     }
                   }
                   return (
