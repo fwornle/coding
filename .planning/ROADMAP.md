@@ -511,7 +511,7 @@ Plans:
 **Goal:** Resolve the empty-ontology-registry blocker (Phase 42.1 SC#6 root cause) by adding a loader-side path-resolution layer (`src/ontology/ontologyPathResolver.ts`) that lets `OntologyConfigManager` find ontology JSONs under BOTH the legacy two-tier layout (`.data/ontologies/{upper,lower}/<file>.json`) AND the current flat layout (`.data/ontologies/<file>.json` + `.data/ontologies/upper.json` alias). No file moves; no caller path-construction changes. Path (a) per the forensic report.
 **Requirements**: none (decision-coverage gate against CONTEXT.md `<decisions>`)
 **Depends on:** Phase 42.1
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 42.1.1-01-PLAN.md — Implement ontologyPathResolver helper + unit tests; wire OntologyConfigManager.validatePaths() + injectOntology() through resolver + add integration test against real `.data/ontologies/` flat layout; public re-export + regression sweep. **COMPLETE 2026-05-24** (commits 6bde70ba0 + 6933264ed + ef9a4e9bd + e341152a8 + 00c6ca154; 18/18 node:test cases pass; layer-1 of SC#6 root cause unblocked; NEW known residual — Project class not on disk, layer-2 follow-up tracked separately. See 42.1.1-01-SUMMARY.md.)

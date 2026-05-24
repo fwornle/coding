@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: Phase 42.1.1-01 complete (ontologyPathResolver + OntologyConfigManager loader-path wiring + Test C softened per Option A; 18/18 node:test pass; layer-1 SC#6 unblocked; NEW known residual — Project class not on disk, layer-2 follow-up tracked separately)
-last_updated: "2026-05-24T17:30:00.000Z"
+status: ready_to_plan
+stopped_at: Phase 42.1.1 complete (1/1) — ready to discuss Phase 47
+last_updated: 2026-05-24T17:58:50.731Z
 last_activity: 2026-05-24 -- Phase 42.1.1 plan 01 complete (layer-1 of SC#6 root cause)
 progress:
   total_phases: 19
   completed_phases: 7
   total_plans: 44
   completed_plans: 43
-  percent: 38
+  percent: 37
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 42.1.1 — ontology-layout-resolution-registry-empty-because-loader-exp
+**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
 
 **v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
 
@@ -49,17 +49,17 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 42.1.1 (ontology-layout-resolution-registry-empty-because-loader-exp) — COMPLETE (loader fix, layer 1 of SC#6)
-Plan: 1 of 1 complete
-Status: Phase 42.1.1 closed. Awaiting layer-2 follow-up (add `Project` class to `.data/ontologies/upper.json`) before `/gsd-verify-phase 42.1` will pass.
+Phase: 47
+Plan: Not started
+Status: Ready to plan
 Next step: Either (a) open a new bug-fix phase to register `Project` on disk, then `/gsd-verify-phase 42.1`; OR (b) continue with Phase 42 (Offline UKB Migration) and address the Project-class follow-up in parallel.
-Last activity: 2026-05-24 -- Phase 42.1.1 plan 01 complete (layer-1 SC#6 unblocked; 18/18 node:test pass; commits 6bde70ba0..00c6ca154; SUMMARY 42803f2b6)
+Last activity: 2026-05-24
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 50 (v6.0)
+- Total plans completed: 51 (v6.0)
 - Average duration: 3 min
 - Total execution time: 0.05 hours
 
