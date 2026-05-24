@@ -34,6 +34,38 @@ render time, or (b) relabel the static badge to reflect the tier
 ("standard / auto" or "preferred: claude-sonnet, fallback: llama-70b") rather
 than a specific provider/model.
 
+## Issue 3 — Wave-step progress counters jump from 0 to total at end of wave
+
+Captured 2026-05-24 from the Workflow Trace modal at the end of the 42.1
+production ukb run (screenshot in session).
+
+The Insight Generation step in Wave 4 shows the final number ("74 docs
+generated") *only after the wave completes*. While the wave is running the
+counter sits at 0, then snaps to 74 at the end. Same shape for the inline
+arrows on the wave rows (`8 → 8 → 8`, `26 → 26 → 26`, `40 → 40 → 40`,
+`107 → 107 → 107` — start = in-progress = end because the in-progress
+sample never gets emitted while the wave is still in flight).
+
+For a 68m 42s wave this is essentially zero feedback. Operators can't tell
+whether the wave is stuck at doc #3 or making steady progress through #47.
+
+**Fix direction:**
+
+- Emit per-item progress updates inside the wave loop (not only at
+  step boundaries). Likely site: the insight-generation iteration in
+  `integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts` (or
+  wherever the doc-generation loop lives — confirm with grep on
+  `docsGenerated` / `insightDocsGenerated`).
+- Pipe per-item progress through `workflow-runner.ts:469-530`-style
+  `writeProgressPreservingDetails` calls so the dashboard SSE stream picks
+  them up — note Phase 10 race-condition guidance in MEMORY.md before
+  layering more progress writes.
+- Dashboard side: ensure the `stepsDetail.{wave}.itemsCompleted` / `itemsTotal`
+  fields are read and rendered as `{n}/{N}` next to the wave row.
+
+**Suggested split** if this grows: keep it bundled with Issue 1 (dashboard
+label correctness) since both touch the same display surfaces.
+
 ## Issue 2 — wave-analysis HTTP calls don't set `body.process`
 
 Confirmed via `.data/llm-proxy/token-usage.db` for the 2026-05-24 run:
