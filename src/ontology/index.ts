@@ -43,6 +43,7 @@ export * from './LegacyOntologyAdapter.js';
 export * from './OntologyValidator.js';
 export * from './OntologyClassifier.js';
 export * from './OntologyConfigManager.js';
+export * from './ontologyPathResolver.js';
 export * from './heuristics/index.js';
 export * from './metrics.js';
 
