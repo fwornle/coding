@@ -508,13 +508,13 @@ Plans:
 
 ### Phase 42.1.1: Ontology layout resolution — registry empty because loader expects .data/ontologies/{upper,lower}/ subdirs but files live flat at .data/ontologies/. Blocks 42.1 SC#6 + Phase 40 dedup. Forensic: .planning/forensics/report-20260524-130355.md (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
+**Goal:** Resolve the empty-ontology-registry blocker (Phase 42.1 SC#6 root cause) by adding a loader-side path-resolution layer (`src/ontology/ontologyPathResolver.ts`) that lets `OntologyConfigManager` find ontology JSONs under BOTH the legacy two-tier layout (`.data/ontologies/{upper,lower}/<file>.json`) AND the current flat layout (`.data/ontologies/<file>.json` + `.data/ontologies/upper.json` alias). No file moves; no caller path-construction changes. Path (a) per the forensic report.
+**Requirements**: none (decision-coverage gate against CONTEXT.md `<decisions>`)
 **Depends on:** Phase 42.1
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 42.1.1 to break down)
+- [ ] 42.1.1-01-PLAN.md — Implement ontologyPathResolver helper + unit tests; wire OntologyConfigManager.validatePaths() + injectOntology() through resolver + add integration test against real `.data/ontologies/` flat layout; public re-export + regression sweep.
 
 #### Phase 43: OKM Cross-Repo Migration (C)
 

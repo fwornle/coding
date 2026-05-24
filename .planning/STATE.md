@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: 42.1 PARTIAL — blocked on ontology layout (Phase 42.1.1)
+status: executing
 stopped_at: Phase 42-06 complete (canonical emit + flag-gated km-core persistWithKmCore + mergeEntityGroup → km-core mergeEntities; 12 unit tests pass, container-side AC verified)
-last_updated: "2026-05-24T13:11:50.044Z"
-last_activity: 2026-05-24 -- Phase 42.1 execution started
+last_updated: "2026-05-24T13:57:41.847Z"
+last_activity: 2026-05-24 -- Phase 42.1.1 planning complete
 progress:
   total_phases: 19
-  completed_phases: 6
-  total_plans: 42
-  completed_plans: 41
-  percent: 32
+  completed_phases: 7
+  total_plans: 43
+  completed_plans: 42
+  percent: 37
 ---
 
 # Project State
@@ -51,9 +51,9 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 Phase: 42.1 (ukb-project-anchor-parity) — EXECUTING
 Plan: 1 of 1
-Status: 42.1 PARTIAL — blocked on ontology layout (Phase 42.1.1)
+Status: Ready to execute
 Next step: /gsd-plan-phase 42.1.1
-Last activity: 2026-05-24 -- Phase 42.1 execution started
+Last activity: 2026-05-24 -- Phase 42.1.1 planning complete
 
 ## Performance Metrics
 
