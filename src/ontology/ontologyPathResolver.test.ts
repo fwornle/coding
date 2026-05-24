@@ -37,6 +37,7 @@ import {
   OntologyPathNotFoundError,
   __resetProbeCounter,
   __getProbeCount,
+  __clearCache,
 } from './ontologyPathResolver.js';
 
 // ---------------------------------------------------------------------------
@@ -247,6 +248,11 @@ describe('Phase 42.1.1 Plan 01 Task 1 — ontologyPathResolver', () => {
     writeOntology(fixture, 'upper.json');
     const basePath = resolve(fixture, '..', '..');
 
+    // WR-07: explicitly flush the module-level cache so this test does not
+    // depend on cross-test ordering. Previously each test used a unique tmpdir
+    // (cache keys do not collide), but any future fixed-path test added before
+    // Test 9 would prime the cache and silently break the `n1 >= 1` assertion.
+    __clearCache();
     __resetProbeCounter();
     const first = resolveOntologyPath({ kind: 'upper', basePath });
     assert.ok(first.resolvedPath.endsWith('/upper.json'), 'first call must resolve to upper.json');
