@@ -230,7 +230,6 @@ export function TokenUsagePage() {
   const [recent, setRecent] = useState<RecentCall[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sortField, setSortField] = useState<'total_tokens' | 'calls'>('total_tokens')
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Time window for the summary endpoint. '24'/'48'/'168'/'720' are hour
   // counts; 'all' is a backend sentinel that picks every retained row.
@@ -309,10 +308,6 @@ export function TokenUsagePage() {
     }))
 
   // Sort process table
-  const sortedProcesses = [...summary.by_process].sort((a, b) =>
-    sortField === 'total_tokens' ? b.total_tokens - a.total_tokens : b.calls - a.calls
-  )
-
   // Evolution chart data. Picks process-stacked vs model-stacked from the
   // toggle. The backend's process_keys/model_keys include every value seen
   // in the window (incl. test/reap-* / fake-* outliers); restrict to the
@@ -482,7 +477,6 @@ export function TokenUsagePage() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="evolution">Evolution</TabsTrigger>
-          <TabsTrigger value="processes">By Process</TabsTrigger>
           <TabsTrigger value="recent">Recent Calls</TabsTrigger>
         </TabsList>
 
@@ -723,83 +717,6 @@ export function TokenUsagePage() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        {/* Processes Tab - detailed table */}
-        <TabsContent value="processes" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Process Breakdown
-              </CardTitle>
-              <CardDescription>
-                Cognitive processes ranked by token consumption
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Process</TableHead>
-                    <TableHead className="text-right cursor-pointer" onClick={() => setSortField('calls')}>
-                      <span className="flex items-center justify-end gap-1">
-                        Calls <ArrowUpDown className="h-3 w-3" />
-                      </span>
-                    </TableHead>
-                    <TableHead className="text-right">Input</TableHead>
-                    <TableHead className="text-right">Output</TableHead>
-                    <TableHead className="text-right cursor-pointer" onClick={() => setSortField('total_tokens')}>
-                      <span className="flex items-center justify-end gap-1">
-                        Total <ArrowUpDown className="h-3 w-3" />
-                      </span>
-                    </TableHead>
-                    <TableHead className="text-right">Avg Latency</TableHead>
-                    <TableHead className="w-[200px]">Share</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedProcesses.map(p => {
-                    const pct = summary.total_tokens > 0
-                      ? (p.total_tokens / summary.total_tokens * 100)
-                      : 0
-                    return (
-                      <TableRow key={p.process}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-3 h-3 rounded-sm shrink-0"
-                              style={{ backgroundColor: getProcessColor(p.process) }}
-                            />
-                            <span className="font-medium">{p.process}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{p.calls}</TableCell>
-                        <TableCell className="text-right font-mono text-blue-400">{formatTokens(p.input_tokens)}</TableCell>
-                        <TableCell className="text-right font-mono text-emerald-400">{formatTokens(p.output_tokens)}</TableCell>
-                        <TableCell className="text-right font-mono font-semibold">{formatTokens(p.total_tokens)}</TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">{formatLatency(p.avg_latency)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                  width: `${pct}%`,
-                                  backgroundColor: getProcessColor(p.process)
-                                }}
-                              />
-                            </div>
-                            <span className="text-xs text-muted-foreground w-10 text-right">{pct.toFixed(1)}%</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Recent Calls Tab */}
