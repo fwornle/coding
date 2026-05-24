@@ -12,6 +12,11 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 import { OntologyConfig, ValidationMode, TeamOntologyConfig } from './types.js';
+import {
+  resolveOntologyPath,
+  OntologyPathNotFoundError,
+} from './ontologyPathResolver.js';
+import type { OntologyLayoutDetected } from './ontologyPathResolver.js';
 
 // Re-export for convenience
 export type { TeamOntologyConfig };
@@ -121,22 +126,64 @@ export class OntologyConfigManager extends EventEmitter {
   }
 
   /**
-   * Validate that ontology paths exist
+   * Validate that ontology paths exist.
+   *
+   * Routes through resolveOntologyPath so callers that pass two-tier paths
+   * (the historical convention) still resolve correctly against the flat
+   * on-disk layout (Phase 42.1.1). On successful resolve, the config is
+   * rewritten IN PLACE to the absolute resolved path so downstream watchers
+   * and getters see the real on-disk location.
+   *
+   * On miss, the OntologyPathNotFoundError message (which already lists every
+   * probed alias) is preserved verbatim in the aggregate validation error.
+   *
+   * Uses process.stderr.write for the structured-log line (project constraint
+   * disallows the stdout logger API in this module).
    */
   private async validatePaths(): Promise<void> {
     const errors: string[] = [];
 
     if (this.config.upperOntologyPath) {
-      const upperPath = this.resolvePath(this.config.upperOntologyPath);
-      if (!fs.existsSync(upperPath)) {
-        errors.push(`Upper ontology not found: ${upperPath}`);
+      try {
+        const layout: OntologyLayoutDetected = resolveOntologyPath({
+          kind: 'upper',
+          team: this.config.team,
+          configHint: this.config.upperOntologyPath,
+        });
+        // Rewrite the config in place so downstream watchers and getters see
+        // the resolved absolute path (Test B in OntologyConfigManager.layout.test.ts).
+        this.config.upperOntologyPath = layout.resolvedPath;
+        // One-shot structured stderr line so post-incident forensics can
+        // confirm which layout served the registry (T-42.1.1-03).
+        process.stderr.write(
+          `[OntologyConfigManager] upper ontology resolved: layout=${layout.layout} alias=${layout.alias} path=${layout.resolvedPath}\n`,
+        );
+      } catch (err) {
+        if (err instanceof OntologyPathNotFoundError) {
+          errors.push(err.message);
+        } else {
+          throw err;
+        }
       }
     }
 
     if (this.config.lowerOntologyPath) {
-      const lowerPath = this.resolvePath(this.config.lowerOntologyPath);
-      if (!fs.existsSync(lowerPath)) {
-        errors.push(`Lower ontology not found: ${lowerPath}`);
+      try {
+        const layout: OntologyLayoutDetected = resolveOntologyPath({
+          kind: 'lower',
+          team: this.config.team,
+          configHint: this.config.lowerOntologyPath,
+        });
+        this.config.lowerOntologyPath = layout.resolvedPath;
+        process.stderr.write(
+          `[OntologyConfigManager] lower ontology resolved: layout=${layout.layout} alias=${layout.alias} path=${layout.resolvedPath}\n`,
+        );
+      } catch (err) {
+        if (err instanceof OntologyPathNotFoundError) {
+          errors.push(err.message);
+        } else {
+          throw err;
+        }
       }
     }
 
@@ -291,19 +338,44 @@ export class OntologyConfigManager extends EventEmitter {
     const previousConfig = { ...this.config };
 
     if (options.upperOntologyPath) {
-      const resolvedPath = this.resolvePath(options.upperOntologyPath);
-      if (!fs.existsSync(resolvedPath)) {
-        throw new Error(`Upper ontology not found: ${resolvedPath}`);
+      try {
+        const layout: OntologyLayoutDetected = resolveOntologyPath({
+          kind: 'upper',
+          team: options.team ?? this.config.team,
+          configHint: options.upperOntologyPath,
+        });
+        // Preserve the existing "Upper ontology not found:" prefix that
+        // callers may grep on, but include the full probed-path list as the
+        // suffix so layout drift surfaces immediately.
+        this.config.upperOntologyPath = layout.resolvedPath;
+        process.stderr.write(
+          `[OntologyConfigManager] upper ontology injected: layout=${layout.layout} alias=${layout.alias} path=${layout.resolvedPath}\n`,
+        );
+      } catch (err) {
+        if (err instanceof OntologyPathNotFoundError) {
+          throw new Error(`Upper ontology not found: ${err.message}`);
+        }
+        throw err;
       }
-      this.config.upperOntologyPath = options.upperOntologyPath;
     }
 
     if (options.lowerOntologyPath) {
-      const resolvedPath = this.resolvePath(options.lowerOntologyPath);
-      if (!fs.existsSync(resolvedPath)) {
-        throw new Error(`Lower ontology not found: ${resolvedPath}`);
+      try {
+        const layout: OntologyLayoutDetected = resolveOntologyPath({
+          kind: 'lower',
+          team: options.team ?? this.config.team,
+          configHint: options.lowerOntologyPath,
+        });
+        this.config.lowerOntologyPath = layout.resolvedPath;
+        process.stderr.write(
+          `[OntologyConfigManager] lower ontology injected: layout=${layout.layout} alias=${layout.alias} path=${layout.resolvedPath}\n`,
+        );
+      } catch (err) {
+        if (err instanceof OntologyPathNotFoundError) {
+          throw new Error(`Lower ontology not found: ${err.message}`);
+        }
+        throw err;
       }
-      this.config.lowerOntologyPath = options.lowerOntologyPath;
     }
 
     if (options.team) {
