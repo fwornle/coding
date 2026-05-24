@@ -130,6 +130,21 @@ export function __clearCache(): void {
   _cache.clear();
 }
 
+/**
+ * Public, name-stable cache-invalidation hook for callers that need to flush
+ * the resolver's cache when the on-disk layout changes (e.g. an operator
+ * moves `development-knowledge-ontology.json` from flat to two-tier at runtime,
+ * or `OntologyConfigManager.resetInstance()` is invoked during testing).
+ *
+ * This is a thin alias around `__clearCache()` exposed without the
+ * double-underscore "private" marker so production callers
+ * (OntologyConfigManager.resetInstance, hot-reload watchers) can flush the
+ * cache without depending on a test-only symbol. Phase 42.1.1 WR-04.
+ */
+export function clearOntologyPathResolverCache(): void {
+  _cache.clear();
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -260,7 +275,14 @@ export function resolveOntologyPath(
 
   // Sanitise team value for the cache key so the cache mirrors the
   // sanitisation applied in buildProbeList (`path.basename(team)`).
-  const cacheTeam = opts.team ? path.basename(opts.team) : '';
+  //
+  // Phase 42.1.1 WR-05: omit team for kind='upper' because buildProbeList
+  // does NOT consult team for upper probes (lines 201-221) — including team
+  // in the upper cache key creates N redundant entries that all resolve to
+  // the same path. Lower-kind probes DO depend on team (`<team>-ontology.json`)
+  // so the team segment is preserved there.
+  const cacheTeam =
+    opts.kind === 'lower' && opts.team ? path.basename(opts.team) : '';
   const cacheKey = `${opts.kind}::${cacheTeam}::${ontologyDir}`;
   const cached = _cache.get(cacheKey);
   if (cached) {

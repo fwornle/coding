@@ -15,6 +15,7 @@ import { OntologyConfig, ValidationMode, TeamOntologyConfig } from './types.js';
 import {
   resolveOntologyPath,
   OntologyPathNotFoundError,
+  clearOntologyPathResolverCache,
 } from './ontologyPathResolver.js';
 import type { OntologyLayoutDetected } from './ontologyPathResolver.js';
 
@@ -96,13 +97,21 @@ export class OntologyConfigManager extends EventEmitter {
   }
 
   /**
-   * Reset the singleton (for testing)
+   * Reset the singleton (for testing).
+   *
+   * Phase 42.1.1 WR-04: also flush the resolver's module-level path cache so
+   * test-time fixture changes do not bleed across `resetInstance()` calls.
+   * The resolver cache is keyed by `(kind, team?, ontologyDir)` and persists
+   * across singleton lifetimes, so a test that swaps the on-disk layout
+   * between two `getInstance(...)` calls would otherwise see stale resolved
+   * paths.
    */
   static resetInstance(): void {
     if (OntologyConfigManager.instance) {
       OntologyConfigManager.instance.stopWatching();
       OntologyConfigManager.instance = null;
     }
+    clearOntologyPathResolverCache();
   }
 
   /**
