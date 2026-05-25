@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: ready_to_plan
-stopped_at: Phase 42.1.2 complete (3/3) — ready to discuss Phase 47
-last_updated: 2026-05-25T05:10:42.685Z
-last_activity: 2026-05-25 -- Phase 42.1.2 Plan 03 complete (ensureProjectAnchor integration smoke landed)
+status: planning
+stopped_at: Phase 42.1.2 Plan 03 complete (ensureProjectAnchor integration smoke; layer-2 closed at integration level; phase verifier-ready)
+last_updated: "2026-05-25T05:31:32.016Z"
+last_activity: 2026-05-25
 progress:
-  total_phases: 20
-  completed_phases: 8
+  total_phases: 21
+  completed_phases: 9
   total_plans: 46
   completed_plans: 46
-  percent: 40
+  percent: 43
 ---
 
 # Project State
@@ -81,6 +81,7 @@ Last activity: 2026-05-25
 - Phase 52 added 2026-05-24: Dashboard LLM routing label + process tag observability fix. Two issues surfaced during the phase 42.1 production ukb run. (1) Wave-analysis HTTP calls don't set `body.process`, so all UKB sub-step calls land in `.data/llm-proxy/token-usage.db` with `process='unknown'` — operators can't pin per-sub-step provider/model via `processOverrides` in `llm-settings.json`. (2) Dashboard sub-step badges hardcode `'Groq: llama-3.3-70b-versatile'` (constants.ts:603 + 18 literals) although the proxy's auto-route preference order is `claude-code → copilot → groq → openai → anthropic`. Token-usage telemetry for the 2026-05-24 11:34Z run confirmed ZERO groq calls — all wave-analysis traffic went to copilot (6) + claude-code (4). Routing is correct; the dashboard label is misleading. Bug-fix style phase, outside v7.1 milestone scope. See `.planning/phases/52-…/NOTES.md` for evidence base.
 - Phase 42.1.1 inserted after Phase 42.1: Ontology layout resolution — registry empty because loader expects .data/ontologies/{upper,lower}/ subdirs but files live flat at .data/ontologies/. Blocks 42.1 SC#6 + Phase 40 dedup type signal. See .planning/forensics/report-20260524-130355.md (URGENT)
 - Phase 42.1.1 plan 01 complete 2026-05-24: layer-1 of SC#6 root cause unblocked (ontologyPathResolver helper + OntologyConfigManager.{validatePaths,injectOntology} wired through resolver). 18/18 node:test pass against real `.data/ontologies/` flat layout for all 7 teams. Path-a invariant preserved (zero caller modifications, zero `.data/ontologies/*` modifications). NEW known residual surfaced during execution: the `Project` class — which `ensureProjectAnchor('Coding')` mints at runtime — is NOT declared in any on-disk ontology JSON (upper.json exposes File/Service/Feature/Contract/RuntimeDiagnostics; team ontologies declare L2 team-specific classes). Test C was softened per user Option A (drop `isValidClass('Project')`, add `domains.length === 8` + keep `isValidClass('Component')`). A follow-up ticket is required to add `Project` to `.data/ontologies/upper.json` before `/gsd-verify-phase 42.1` will pass — this is layer 2 of the SC#6 cascade and is separate from both 42.1 and 42.1.1. See `.planning/phases/42.1.1-…/42.1.1-01-SUMMARY.md` § Known Residuals.
+- Phase 42.2 inserted after Phase 42: Retire deferred 42-07 work: legacy persistence trio + atomic LevelDB dir-swap + canonical-emit gaps (URGENT)
 
 ### Decisions
 

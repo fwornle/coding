@@ -479,6 +479,16 @@ Plans:
 
 - [ ] 42-07-PLAN.md — Final cleanup + goal-backward verification gate. Atomic dir-swap of migrated LevelDB; DELETE GraphDatabaseService.js + KnowledgeStorageService.js + QdrantSyncService.js + persistence-agent.ts + graph-database-adapter.ts + persistence-flag.ts; remove KM_CORE_PERSISTENCE flag; rewire content-validation-agent.ts. Production wave-analysis workflow run + `syncQdrantFromStore` rebuild + SC#1-5 verification script + human-verify operator gate.
 
+### Phase 42.2: Retire deferred 42-07 work: legacy persistence trio + atomic LevelDB dir-swap + canonical-emit gaps (LLM process attribution + team/project linkage in canonical-mapper) (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 42
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 42.2 to break down)
+
 #### Phase 42.1: UKB Project-Anchor Parity
 
 **Goal:** Restore the project-anchor `contains`-edge pass that Phase 42-07 Phase B1 inadvertently removed from B's wave-analysis persist path so newly-emitted wave entities are no longer orphaned from the `Coding` Project anchor. Forensic 2026-05-24 root cause: Phase 42-07 Phase B1 replaced `persistence-agent.persistEntities()` with `persistWithKmCore` in `wave-controller.ts`, dropping the legacy `findBestParent` lookup + post-sweep `contains`-relation insertion that ran after every batch. Online (`ObservationConsolidator._ensureProjectAnchor`) and legacy (`persistence-agent.findBestParent` at L1043-1110) persist paths both still attach new entities to the project root; only the km-core wave path doesn't. Empirical evidence from the 2026-05-24 overnight `ukb full`: +64 entities, +1 relation, **0 new edges to the Coding project anchor**.
