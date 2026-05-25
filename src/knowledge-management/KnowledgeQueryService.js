@@ -12,6 +12,9 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createLogger } from '../../lib/logging/Logger.js';
+
+const logger = createLogger('KnowledgeQueryService');
 
 export class KnowledgeQueryService {
   constructor(databaseManager, graphDatabase = null, options = {}) {
@@ -656,107 +659,210 @@ export class KnowledgeQueryService {
   // nodes, edges}). Cached by mtime so repeated polling is cheap.
   // ------------------------------------------------------------------
 
-  _getExportDir() {
+  _getExportDirs() {
+    // TWO source dirs since Phase 42.2 (the migration is partial):
+    //   - .data/exports/        — legacy/canonical UKBDatabaseWriter +
+    //                              ObservationConsolidator HTTP-API output;
+    //                              entities/relations shape; team named after
+    //                              filename (coding.json, resi.json, ui.json).
+    //                              Frozen post-Phase-42.2 (last writer was the
+    //                              retired graphDB) but tracked in git so it
+    //                              still carries the rich KM-Core baseline:
+    //                              full CK -> Project -> Component hierarchy,
+    //                              manual + online sources, ~928 entities and
+    //                              ~1124 relations as of the freeze.
+    //   - .data/knowledge-graph/exports/ — wave-controller's km-core output;
+    //                              nodes/edges shape (Graphology); writes go
+    //                              to general.json by default because the
+    //                              team field never reaches km-core (Phase 49
+    //                              Gap 1). Sparse — typically <50 edges.
+    //
+    // Reading from BOTH gives the user the rich legacy hierarchy AND any new
+    // wave-controller updates. Merging by entity name (with legacy as the
+    // base) so a later wave-controller update can overlay attributes without
+    // losing legacy relations.
     const graphRoot = this.databaseManager?.graphDbConfig?.path
       || path.join(process.cwd(), '.data', 'knowledge-graph');
-    return path.join(graphRoot, 'exports');
+    const dataRoot = path.dirname(graphRoot);
+    return [
+      { dir: path.join(dataRoot, 'exports'),           shape: 'legacy'  },
+      { dir: path.join(graphRoot, 'exports'),          shape: 'km-core' },
+    ];
   }
 
-  _loadExports() {
-    const dir = this._getExportDir();
-    if (!fs.existsSync(dir)) return null;
-    let files;
-    try {
-      files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-    } catch {
-      return null;
-    }
-    if (files.length === 0) return null;
+  // Back-compat: some callers (or future ones) may still ask for a single dir.
+  _getExportDir() {
+    return this._getExportDirs()[0].dir;
+  }
 
+  // Load all KB exports from BOTH source dirs, normalising each into a uniform
+  // legacy-style envelope: { team, entities: [...legacy-entity...], relations:
+  // [...legacy-relation...] }. Returns null if neither dir has anything.
+  _loadExports() {
+    const dirs = this._getExportDirs();
     const result = [];
-    for (const f of files) {
-      const abs = path.join(dir, f);
-      const team = path.basename(f, '.json');
+    for (const { dir, shape } of dirs) {
+      if (!fs.existsSync(dir)) continue;
+      let files;
       try {
-        const stat = fs.statSync(abs);
-        const cached = this._exportCache.get(abs);
-        let parsed;
-        if (cached && cached.mtimeMs === stat.mtimeMs) {
-          parsed = cached.parsed;
-        } else {
-          parsed = JSON.parse(fs.readFileSync(abs, 'utf-8'));
-          this._exportCache.set(abs, { mtimeMs: stat.mtimeMs, parsed });
+        files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+      } catch {
+        continue;
+      }
+      for (const f of files) {
+        const abs = path.join(dir, f);
+        const fallbackTeam = path.basename(f, '.json');
+        try {
+          const stat = fs.statSync(abs);
+          const cached = this._exportCache.get(abs);
+          let parsed;
+          if (cached && cached.mtimeMs === stat.mtimeMs) {
+            parsed = cached.parsed;
+          } else {
+            parsed = JSON.parse(fs.readFileSync(abs, 'utf-8'));
+            this._exportCache.set(abs, { mtimeMs: stat.mtimeMs, parsed });
+          }
+          const team = parsed?.metadata?.team || fallbackTeam;
+          result.push({
+            team,
+            shape,
+            entities: this._normaliseEntities(parsed, shape, team),
+            relations: this._normaliseRelations(parsed, shape, team),
+          });
+        } catch (err) {
+          logger.warn(`Failed to read export ${f}`, { error: err?.message || String(err) });
         }
-        result.push({
-          team,
-          nodes: Array.isArray(parsed?.nodes) ? parsed.nodes : [],
-          edges: Array.isArray(parsed?.edges) ? parsed.edges : [],
-        });
-      } catch (err) {
-        process.stderr.write(`[KnowledgeQueryService] Failed to read export ${f}: ${err?.message || err}\n`);
       }
     }
+    if (result.length === 0) return null;
+    // Special case: a file ALWAYS named "general.json" written by the km-core
+    // path doesn't represent a team — it's the unattributed-domain bucket
+    // (wave-controller writes that never had a team threaded). Surface them
+    // under their actual team if known; otherwise label them "general" so
+    // the existing legend doesn't break.
     return result;
   }
 
-  _mapNodeToEntity(node, team) {
-    const a = (node && node.attributes) || {};
-    const subsystem = a.metadata && a.metadata.subsystem;
-    // VKB legend categories:
-    //   - 'manual'           = Batch / UKB / wave-analysis (manually-triggered
-    //                          or scheduled full-graph reanalysis)
-    //   - 'auto' or 'online' = Continuous online-pipeline learning from
-    //                          ObservationConsolidator
-    // wave-analysis is the UKB pipeline (Batch), NOT the online pipeline —
-    // earlier mapping treated both as 'online' which made every node render
-    // in the pink Online/Auto colour even though they were batch-learned.
-    let source = a.source;
-    if (!source) {
-      if (subsystem === 'wave-analysis') source = 'manual';
-      else if (subsystem === 'online-pipeline') source = 'online';
-      else source = 'manual';
+  // Convert a parsed export into legacy { name, entityType, observations,
+  // source, team, metadata, ... } entity records regardless of shape.
+  _normaliseEntities(parsed, shape, team) {
+    if (shape === 'legacy') {
+      return Array.isArray(parsed?.entities) ? parsed.entities.map(e => ({
+        ...e,
+        team: e.team || team,
+      })) : [];
     }
+    // km-core: nodes are { key, attributes: { name, entityType, metadata, ... } }
+    if (!Array.isArray(parsed?.nodes)) return [];
+    return parsed.nodes.map(n => {
+      const a = n.attributes || {};
+      const subsystem = (a.metadata && a.metadata.subsystem) || null;
+      let source = a.source;
+      if (!source) {
+        if (subsystem === 'wave-analysis')         source = 'manual';
+        else if (subsystem === 'online-pipeline')  source = 'online';
+        else                                       source = 'manual';
+      }
+      return {
+        id: n.key || a.id || null,
+        name: a.name || null,
+        entityType: a.entityType || a.ontologyClass || 'Unknown',
+        observations: Array.isArray(a.observations) ? a.observations
+          : (a.description ? [a.description] : []),
+        significance: a.significance || null,
+        source,
+        team: a.team || team,
+        metadata: {
+          ...(a.metadata || {}),
+          ...(a.createdAt ? { created_at: a.createdAt } : {}),
+          ...(a.updatedAt ? { last_updated: a.updatedAt } : {}),
+        },
+        ...(a.parentEntityName !== undefined ? { parentEntityName: a.parentEntityName } : {}),
+        ...(a.hierarchyLevel != null ? { hierarchyLevel: a.hierarchyLevel } : {}),
+        ...(a.isScaffoldNode ? { isScaffoldNode: a.isScaffoldNode } : {}),
+        ...(Array.isArray(a.childEntityNames) ? { childEntityNames: a.childEntityNames } : {}),
+        ...(a.embedding ? { embedding: a.embedding } : {}),
+        ...(a.role ? { role: a.role } : {}),
+        ...(a.layer ? { layer: a.layer } : {}),
+      };
+    });
+  }
+
+  // Convert a parsed export's relations into a uniform { from, to,
+  // relationType, metadata } shape with names (not ids).
+  _normaliseRelations(parsed, shape, team) {
+    if (shape === 'legacy') {
+      return Array.isArray(parsed?.relations) ? parsed.relations.map(r => ({
+        ...r,
+        team: r.team || team,
+      })) : [];
+    }
+    // km-core edges reference UUIDs in source/target → resolve via nodes list.
+    const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
+    const idToName = new Map();
+    for (const n of nodes) {
+      const id = n.key || n.attributes?.id;
+      const name = n.attributes?.name;
+      if (id && name) idToName.set(id, name);
+    }
+    if (!Array.isArray(parsed?.edges)) return [];
+    return parsed.edges.map(e => {
+      const a = e.attributes || {};
+      const fromName = idToName.get(e.source || a.from) || null;
+      const toName = idToName.get(e.target || a.to) || null;
+      return {
+        from: fromName,
+        to: toName,
+        relationType: a.type || a.relation_type || 'unknown',
+        metadata: a.metadata || {},
+        team: a.team || team,
+      };
+    });
+  }
+
+  // Convert a normalised legacy-shape entity record into the public API
+  // shape the VKB frontend expects (snake_case-ish, entity_name / entity_type
+  // / observations / source / team / metadata / hierarchy fields).
+  _mapNodeToEntity(entity, team) {
+    const m = entity.metadata || {};
     return {
-      id: node?.key || a.id || null,
-      entity_name: a.name || a.entity_name || null,
-      entity_type: a.entityType || a.ontologyClass || a.entity_type || 'Unknown',
-      observations: Array.isArray(a.observations) ? a.observations
-        : (a.description ? [a.description] : []),
-      extraction_type: a.extraction_type || null,
-      classification: a.ontologyClass || a.classification || null,
-      confidence: a.confidence != null ? a.confidence : 1.0,
-      source,
-      team: a.team || team,
-      extracted_at: a.createdAt || a.extracted_at || null,
-      last_modified: a.updatedAt || a.last_modified || a.createdAt || null,
-      session_id: a.session_id || null,
-      embedding_id: a.embedding_id || null,
-      metadata: a.metadata || {},
-      parentEntityName: a.parentEntityName || null,
-      hierarchyLevel: a.hierarchyLevel != null ? a.hierarchyLevel : null,
-      isScaffoldNode: a.isScaffoldNode || false,
-      childEntityNames: Array.isArray(a.childEntityNames) ? a.childEntityNames : [],
-      ...(a.embedding ? { embedding: a.embedding } : {}),
-      ...(a.role ? { role: a.role } : {}),
-      ...(a.layer ? { layer: a.layer } : {}),
+      id: entity.id || null,
+      entity_name: entity.name || null,
+      entity_type: entity.entityType || 'Unknown',
+      observations: Array.isArray(entity.observations) ? entity.observations : [],
+      extraction_type: entity.extraction_type || entity.extractionType || null,
+      classification: entity.classification || entity.entityType || null,
+      confidence: entity.confidence != null ? entity.confidence
+        : (entity.significance != null ? entity.significance : 1.0),
+      source: entity.source || 'manual',
+      team: entity.team || team,
+      extracted_at: m.created_at || m.createdAt || entity.extracted_at || null,
+      last_modified: m.last_updated || m.updatedAt || entity.last_modified || m.created_at || null,
+      session_id: entity.session_id || null,
+      embedding_id: entity.embedding_id || null,
+      metadata: m,
+      parentEntityName: entity.parentEntityName || null,
+      hierarchyLevel: entity.hierarchyLevel != null ? entity.hierarchyLevel : null,
+      isScaffoldNode: entity.isScaffoldNode || false,
+      childEntityNames: Array.isArray(entity.childEntityNames) ? entity.childEntityNames : [],
+      ...(entity.embedding ? { embedding: entity.embedding } : {}),
+      ...(entity.role ? { role: entity.role } : {}),
+      ...(entity.layer ? { layer: entity.layer } : {}),
     };
   }
 
-  _mapEdgeToRelation(edge, team, idToName) {
-    const a = (edge && edge.attributes) || {};
-    const from = edge?.source || a.from || null;
-    const to = edge?.target || a.to || null;
+  _mapEdgeToRelation(relation, team) {
     return {
-      id: edge?.key || null,
-      from_entity_id: from,
-      to_entity_id: to,
-      relation_type: a.type || a.relation_type || 'unknown',
-      confidence: a.confidence != null ? a.confidence : 1.0,
-      team: a.team || team,
-      created_at: (a.metadata && a.metadata.createdAt) || null,
-      metadata: a.metadata || {},
-      from_name: idToName.get(from) || null,
-      to_name: idToName.get(to) || null,
+      id: relation.id || null,
+      from_entity_id: relation.from || null,
+      to_entity_id: relation.to || null,
+      relation_type: relation.relationType || relation.relation_type || 'unknown',
+      confidence: relation.confidence != null ? relation.confidence : 1.0,
+      team: relation.team || team,
+      created_at: (relation.metadata && relation.metadata.createdAt) || null,
+      metadata: relation.metadata || {},
+      from_name: relation.from || null,
+      to_name: relation.to || null,
     };
   }
 
@@ -785,11 +891,20 @@ export class KnowledgeQueryService {
       sortOrder = 'DESC',
     } = options;
 
-    let entities = [];
-    for (const ex of exports) {
+    // Merge across BOTH source dirs by (team, entity_name). Legacy entries
+    // are processed FIRST so any same-named km-core entry overlays them — the
+    // km-core version is fresher when it exists, but the legacy version
+    // carries the rich hierarchy + 'online' source distinction the km-core
+    // path has lost.
+    const ordered = [
+      ...exports.filter(ex => ex.shape === 'legacy'),
+      ...exports.filter(ex => ex.shape !== 'legacy'),
+    ];
+    const merged = new Map(); // key: `${team}:${name}` → mapped entity
+    for (const ex of ordered) {
       if (team && ex.team !== team) continue;
-      for (const node of ex.nodes) {
-        const e = this._mapNodeToEntity(node, ex.team);
+      for (const ent of ex.entities) {
+        const e = this._mapNodeToEntity(ent, ex.team);
         if (!e.entity_name) continue;
         if (!this._sourceMatches(source, e.source)) continue;
         if (types && types.length > 0 && !types.includes(e.entity_type)) continue;
@@ -800,9 +915,11 @@ export class KnowledgeQueryService {
           const term = String(searchTerm).toLowerCase();
           if (!String(e.entity_name).toLowerCase().includes(term)) continue;
         }
-        entities.push(e);
+        const key = `${e.team}:${e.entity_name}`;
+        merged.set(key, e); // later writes overlay earlier — km-core overlays legacy
       }
     }
+    let entities = [...merged.values()];
 
     const safeSortBy = ['last_modified', 'extracted_at', 'confidence', 'entity_name'].includes(sortBy)
       ? sortBy : 'last_modified';
@@ -831,22 +948,25 @@ export class KnowledgeQueryService {
       limit = 1000,
     } = options;
 
-    let relations = [];
-    for (const ex of exports) {
+    // Merge across both source dirs by (team, from, to, relationType).
+    // Same precedence as entities: legacy first, km-core overlays.
+    const ordered = [
+      ...exports.filter(ex => ex.shape === 'legacy'),
+      ...exports.filter(ex => ex.shape !== 'legacy'),
+    ];
+    const merged = new Map();
+    for (const ex of ordered) {
       if (team && ex.team !== team) continue;
-      const idToName = new Map();
-      for (const node of ex.nodes) {
-        const a = (node && node.attributes) || {};
-        const id = node?.key || a.id;
-        if (id && a.name) idToName.set(id, a.name);
-      }
-      for (const edge of ex.edges) {
-        const r = this._mapEdgeToRelation(edge, ex.team, idToName);
-        if (entityId && r.from_entity_id !== entityId && r.to_entity_id !== entityId) continue;
+      for (const rel of ex.relations) {
+        const r = this._mapEdgeToRelation(rel, ex.team);
+        if (!r.from_name || !r.to_name) continue; // skip orphaned edges (km-core nodes pruned)
+        if (entityId && r.from_name !== entityId && r.to_name !== entityId) continue;
         if (relationType && r.relation_type !== relationType) continue;
-        relations.push(r);
+        const key = `${r.team}:${r.from_name}:${r.relation_type}:${r.to_name}`;
+        merged.set(key, r);
       }
     }
+    const relations = [...merged.values()];
 
     return relations.slice(0, Math.max(0, parseInt(limit, 10) || 0));
   }
@@ -854,18 +974,34 @@ export class KnowledgeQueryService {
   _getTeamsFromExports() {
     const exports = this._loadExports();
     if (!exports) return null;
-    return exports.map(ex => {
-      const lastModified = ex.nodes.reduce((max, n) => {
-        const v = n?.attributes?.updatedAt || n?.attributes?.createdAt;
-        return v && (!max || v > max) ? v : max;
-      }, null);
-      return {
-        name: ex.team,
-        displayName: ex.team.charAt(0).toUpperCase() + ex.team.slice(1),
-        entityCount: ex.nodes.length,
-        lastActivity: lastModified,
-      };
-    });
+    // Aggregate by team across BOTH dirs (legacy + km-core) so we don't
+    // double-count 'coding' when both `.data/exports/coding.json` and
+    // `.data/knowledge-graph/exports/coding.json` exist.
+    const byTeam = new Map(); // team → { entityCount, lastActivity }
+    for (const ex of exports) {
+      let lastActivity = null;
+      for (const e of ex.entities) {
+        const v = e.metadata?.last_updated || e.metadata?.updatedAt
+              || e.metadata?.created_at || e.metadata?.createdAt;
+        if (v && (!lastActivity || v > lastActivity)) lastActivity = v;
+      }
+      const existing = byTeam.get(ex.team);
+      if (!existing) {
+        byTeam.set(ex.team, { entityCount: ex.entities.length, lastActivity });
+      } else {
+        // Prefer the entry with more entities (rich legacy file vs sparse km-core).
+        if (ex.entities.length > existing.entityCount) existing.entityCount = ex.entities.length;
+        if (lastActivity && (!existing.lastActivity || lastActivity > existing.lastActivity)) {
+          existing.lastActivity = lastActivity;
+        }
+      }
+    }
+    return [...byTeam.entries()].map(([name, info]) => ({
+      name,
+      displayName: name.charAt(0).toUpperCase() + name.slice(1),
+      entityCount: info.entityCount,
+      lastActivity: info.lastActivity,
+    }));
   }
 }
 
