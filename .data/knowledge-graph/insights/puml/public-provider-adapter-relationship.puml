@@ -5,15 +5,13 @@ title Hierarchy Context: PublicProviderAdapter
 
 [LLMAbstraction] as llmabstraction #FFFFDD
 [PublicProviderAdapter] as public_provider_adapter #LightBlue
-[LLMStateManager] as llmstate_manager #F0F0F0
+[LLMProviderConfig] as llmprovider_config #F0F0F0
 [TierRouter] as tier_router #F0F0F0
-[ProviderConfig] as provider_config #E8F5E8
-[TieredModelSelection] as tiered_model_selection #E8F5E8
+[TieredModelSelector] as tiered_model_selector #E8F5E8
 
 llmabstraction --> public_provider_adapter
-llmstate_manager -[hidden]- public_provider_adapter
+llmprovider_config -[hidden]- public_provider_adapter
 tier_router -[hidden]- public_provider_adapter
-public_provider_adapter --> provider_config
-public_provider_adapter --> tiered_model_selection
+public_provider_adapter --> tiered_model_selector
 
 @enduml

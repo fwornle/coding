@@ -1,0 +1,40 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+' ─── Runtime Mode Resolution ───
+package "Runtime Mode Resolution" {
+    component "Mode Selector" as modeSelector <<core>>
+    component "Runtime Mode Resolver" as modeResolver <<core>>
+}
+
+' ─── DMR Configuration Loading ───
+package "DMR Configuration" {
+    component "DMRConfigLoader" as dmrLoader <<core>>
+    component "DMR YAML Config File" as dmrYaml <<storage>>
+    component "Environment Variables" as envVars <<external>>
+}
+
+' ─── Deployment Contexts ───
+package "Deployment Contexts" {
+    component "Developer Workstation" as devEnv <<external>>
+    component "CI / Docker Environment" as ciEnv <<external>>
+}
+
+' ─── State Management ───
+package "State Management" {
+    database "workflow-progress.json" as workflowState <<storage>>
+}
+
+' ─── Relationships ───
+modeSelector --> modeResolver : "per-agent > global > legacy > default"
+modeSelector --> workflowState : "reads mode state"
+
+modeResolver --> dmrLoader : "invokes when mode = 'dmr'"
+
+dmrLoader --> dmrYaml : "reads via multi-path search"
+dmrLoader --> envVars : "expands endpoint URLs\n& model names"
+
+devEnv ..> dmrYaml : "candidate path"
+ciEnv ..> dmrYaml : "candidate path"
+
+@enduml

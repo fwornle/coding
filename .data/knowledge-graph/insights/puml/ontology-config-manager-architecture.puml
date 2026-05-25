@@ -1,0 +1,31 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Pipeline Runtime" {
+    component "Pipeline Agents" as agents <<agent>>
+    component "Entity Classifier" as classifier <<core>>
+}
+
+package "Config Management (Singleton)" {
+    component "OntologyConfigManager" as ocm <<core>>
+    component "In-Memory Cache" as cache <<storage>>
+    component "Hot-Reload Watcher" as hotreload <<core>>
+}
+
+package "Ontology File Storage" {
+    database "Upper Ontology Files\n(YAML / JSON)" as upper
+    database "Lower Ontology Files\n(YAML / JSON)" as lower
+}
+
+agents     --> ocm       : "reads shared config"
+classifier --> ocm       : "classification thresholds"
+ocm        --> cache     : "stores parsed definitions"
+ocm        --> upper     : "loads on startup / reload"
+ocm        --> lower     : "loads custom taxonomy"
+hotreload  ..> upper     : "watches for changes"
+hotreload  ..> lower     : "watches for changes"
+hotreload  ..> ocm       : "triggers cache invalidation"
+
+@enduml

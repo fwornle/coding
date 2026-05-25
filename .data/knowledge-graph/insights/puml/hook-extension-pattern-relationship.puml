@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HookExtensionPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[HookExtensionPattern] as hook_extension_pattern #LightBlue
+[AgentAbstractionPatterns] as agent_abstraction_patterns #F0F0F0
+[MCPIntegrationConventions] as mcpintegration_conventions #F0F0F0
+[LLMTierRoutingPattern] as llmtier_routing_pattern #F0F0F0
+[HookDataFormatContract] as hook_data_format_contract #E8F5E8
+[SemanticConstraintHook] as semantic_constraint_hook #E8F5E8
+
+coding_patterns --> hook_extension_pattern
+agent_abstraction_patterns -[hidden]- hook_extension_pattern
+mcpintegration_conventions -[hidden]- hook_extension_pattern
+llmtier_routing_pattern -[hidden]- hook_extension_pattern
+hook_extension_pattern --> hook_data_format_contract
+hook_extension_pattern --> semantic_constraint_hook
+
+@enduml

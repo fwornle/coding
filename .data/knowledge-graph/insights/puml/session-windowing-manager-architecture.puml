@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Input Layer" {
+  component "Incoming Session"      as inSession     <<external>>
+  component "LSLMetadata\n(timeWindow)" as lslMeta  <<api>>
+}
+
+package "LiveLoggingSystem" {
+  package "SessionWindowingManager" {
+    component "Time Bucket Assigner" as timeBucket      <<core>>
+    component "Boundary Detector"    as boundary Detect  <<core>>
+  }
+}
+
+package "Log Storage" {
+  component "Active File Slot"    as activeSlot  <<storage>>
+  database  "Hourly File Archive" as hourlySlots <<storage>>
+}
+
+inSession       --> lslMeta         : carries
+lslMeta         --> timeBucket      : timeWindow field
+timeBucket      --> activeSlot      : assigns session to slot
+timeBucket      --> boundary Detect  : delegates threshold check
+boundary Detect  --> activeSlot      : closes on hourly boundary
+boundary Detect  --> hourlySlots     : rotates / archives
+
+@enduml

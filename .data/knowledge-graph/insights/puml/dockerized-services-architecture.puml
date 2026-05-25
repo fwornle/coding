@@ -1,46 +1,47 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Script Wrappers" {
-  component "api-service.js" as apiScript <<cli>>
-  component "dashboard-service.js" as dashScript <<cli>>
-}
+top to bottom direction
 
-package "Service Management" {
+package "Service Orchestration" {
+  component "service-starter.js" as serviceStarter <<core>>
   component "ProcessStateManager" as psm <<core>>
-  component "service-starter.js" as starter <<core>>
+  component "api-service.js" as apiWrapper <<cli>>
+  component "dashboard-service.js" as dashWrapper <<cli>>
 }
 
-package "Health Monitoring" {
-  component "health-coordinator.js" as healthCoord <<core>>
-  component "service-probe.js" as probe <<core>>
+package "Microservices" {
+  component "MCP Semantic Analysis" as mcpServer <<api>>
+  component "Constraint Monitor API :3031" as constraintAPI <<api>>
+  component "Constraint Monitor Dashboard :3030" as constraintDash <<api>>
+  component "llm-mock-service" as llmMock <<core>>
 }
 
-package "Running Services" {
-  component "API Service (3031)" as apiSvc <<api>>
-  component "Next.js Dashboard (dev)" as dashboard <<api>>
-  database "Memgraph (Bolt)" as memgraph <<storage>>
+package "Data Stores" {
+  database "Memgraph" as memgraph <<storage>>
+  database "Redis" as redis <<storage>>
 }
 
-component "llm-mock-service\n(Semantic Analysis MCP)" as llmMock <<external>>
+' Startup orchestration with retry-with-backoff
+serviceStarter --> apiWrapper : "starts (required)"
+serviceStarter --> dashWrapper : "starts (optional)"
+serviceStarter --> mcpServer : "starts (required)"
 
-starter --> apiScript : "startWithRetry()\nexponential backoff"
-starter --> dashScript : "startWithRetry()\nexponential backoff"
+' Process identity management
+apiWrapper --> psm : "register PID / unregister on exit"
+dashWrapper --> psm : "register PID / unregister on exit"
 
-apiScript --> psm : "register / unregister"
-dashScript --> psm : "register / unregister"
-apiScript --> apiSvc : "spawns child process"
-dashScript --> dashboard : "spawns (NODE_ENV=dev)"
+' Child process spawning
+apiWrapper --> constraintAPI : "spawns child process"
+dashWrapper --> constraintDash : "spawns w/ NEXT_PUBLIC_API_BASE_URL"
 
-healthCoord --> psm : "dynamic service discovery"
-healthCoord --> probe : "5-second tick cycle"
+' Fixed coupling between dashboard and API backend
+constraintDash --> constraintAPI : "hardcoded :3031"
 
-probe --> apiSvc : "probeHttpHealth()\n{status, latency_ms, error}"
-probe --> memgraph : "probeTcpPort()\nBolt protocol"
-
-dashboard --> apiSvc : "NEXT_PUBLIC_API_BASE_URL\nlocalhost:3031"
-
-llmMock --> memgraph : "staged startup dependency"
-llmMock ..> psm : "registered at runtime"
+' MCP Semantic Analysis dependencies
+mcpServer --> llmMock : "LLM mode (mock/local/public)"
+mcpServer --> memgraph : "Bolt protocol"
+mcpServer --> redis : "cache"
+constraintAPI --> memgraph : "queries"
 
 @enduml

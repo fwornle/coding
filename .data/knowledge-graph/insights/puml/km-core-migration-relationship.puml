@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KmCoreMigration
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[KmCoreMigration] as km_core_migration #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[OntologyClassificationSystem] as ontology_classification_system #F0F0F0
+
+knowledge_management --> km_core_migration
+manual_learning -[hidden]- km_core_migration
+online_learning -[hidden]- km_core_migration
+ontology_classification_system -[hidden]- km_core_migration
+
+@enduml

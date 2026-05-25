@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Pipeline Layer" {
+  component "OnlineLearning Pipeline" as olPipeline <<core>>
+  component "Batch Pipeline Executor" as batchPipeline <<core>>
+}
+
+package "src/utils/" {
+  component "CheckpointManager" as checkpointMgr <<core>>
+}
+
+package "Data Sources" {
+  component "Git History" as gitHistory <<external>>
+  component "LSL Sessions" as lslSessions <<external>>
+}
+
+package "Storage & Infrastructure" {
+  database "Checkpoint Store" as checkpointStore <<storage>>
+  component "Knowledge Graph" as kg <<storage>>
+  component "GraphDatabaseAdapter" as graphDb <<core>>
+}
+
+olPipeline --> checkpointMgr : "pre-run lookup"
+batchPipeline --> checkpointMgr : "prerequisite check"
+gitHistory --> checkpointMgr : "commit hashes"
+lslSessions --> checkpointMgr : "session counts"
+checkpointMgr --> checkpointStore : "persists commit hashes,\nscores & session counts"
+checkpointStore ..> kg : "completeness scores\nguide coverage"
+checkpointMgr ..> graphDb : "decoupled from\nlive/direct routing"
+
+@enduml

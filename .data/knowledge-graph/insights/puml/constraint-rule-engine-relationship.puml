@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintRuleEngine
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ConstraintRuleEngine] as constraint_rule_engine #LightBlue
+[HookInterceptor] as hook_interceptor #F0F0F0
+[MCPConstraintMonitorIntegration] as mcpconstraint_monitor_integration #F0F0F0
+[SemanticConstraintDetector] as semantic_constraint_detector #E8F5E8
+[RuleConfigLoader] as rule_config_loader #E8F5E8
+
+constraint_system --> constraint_rule_engine
+hook_interceptor -[hidden]- constraint_rule_engine
+mcpconstraint_monitor_integration -[hidden]- constraint_rule_engine
+constraint_rule_engine --> semantic_constraint_detector
+constraint_rule_engine --> rule_config_loader
+
+@enduml

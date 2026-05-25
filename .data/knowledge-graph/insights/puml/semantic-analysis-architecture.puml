@@ -1,48 +1,43 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Pipeline Foundation" {
-  component "BaseAgent<TInput,TOutput>" as base <<core>>
+package "Pipeline Orchestration" {
+  component "Batch Analysis Workflow" as baw <<core>>
+  component "BaseAgent<TInput, TOutput>" as base <<core>>
 }
 
-package "Extraction Stage" {
-  component "SemanticAnalysisAgent" as semantic <<agent>>
-  component "CodeGraphAgent" as codegraph <<agent>>
+package "Specialized Agents" {
+  component "SemanticAnalysisAgent" as saa <<agent>>
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "CodeGraphAgent" as cga <<agent>>
+  component "ContentValidationAgent" as cva <<agent>>
 }
 
-package "Qualification Stage" {
-  component "ContentValidationAgent" as validation <<agent>>
-  component "GitStalenessDetector" as stale <<core>>
+package "Ontology Layer" {
+  component "OntologyRegistry" as reg <<core>>
 }
 
-package "Classification Stage" {
-  component "OntologyClassificationAgent" as onto <<agent>>
-  component "LegacyOntologyAdapter" as adapter <<core>>
-  component "OntologyRegistry" as registry <<external>>
+package "Infrastructure" {
+  database "Memgraph" as memgraph <<storage>>
+  component "GitStalenessDetector" as gsd <<core>>
+  cloud "code-graph-rag MCP" as cgrag <<external>>
 }
 
-database "Memgraph" as memgraph <<storage>>
-database "Trace Log (JSON)" as trace <<storage>>
+baw --> saa : "orchestrates"
+baw --> oca : "orchestrates"
+baw --> cga : "orchestrates"
+baw --> cva : "orchestrates"
 
-' All agents implement the five-method BaseAgent lifecycle contract
-semantic ..> base : implements
-codegraph ..> base : implements
-validation ..> base : implements
-onto ..> base : implements
+saa ..> base : "extends"
+oca ..> base : "extends"
+cga ..> base : "extends"
+cva ..> base : "extends"
 
-' Pipeline data flow via generateRouting()
-semantic --> codegraph : routes output
-semantic --> validation : routes output
-codegraph --> validation : routes output
-validation --> onto : routes output
+oca --> reg : "constructs via\nLegacyOntologyAdapter"
 
-' Internal component dependencies
-validation --> stale : deduplicates git lookups
-onto --> adapter : uses
-adapter --> registry : wraps API (node moduleResolution)
+cga --> cgrag : "TCP socket check"
+cgrag --> memgraph : "queries graph"
 
-' Infrastructure connections
-codegraph --> memgraph : TCP socket probe\n+ Bolt queries
-semantic --> trace : writes JSON trace\n(suppressed on I/O error)
+cva --> gsd : "staleness detection\n(60s cache)"
 
 @enduml

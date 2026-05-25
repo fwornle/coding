@@ -1,30 +1,40 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-component "PlantUML Diagrams\ndocs/puml/ (~150 files)" as puml <<core>>
-
-package "Initialization & Lifecycle" {
-  component "Singleton Guard\npsm-singleton-pattern.puml" as sg <<core>>
-  component "BaseAgent\nensureLLMInitialized()" as ba <<agent>>
+package "Execution Layer" {
+  component "Agent\n(Lazy-Init)" as agent <<agent>>
+  component "Hook System" as hookSystem <<core>>
+  component "LLM Tier Router" as llmRouter <<core>>
 }
 
-package "Service Orchestration" {
-  component "ServiceStarter\nstartServiceWithRetry()" as ss <<core>>
-  component "Process Registry\nregisterService()" as pr <<core>>
+package "Configuration" {
+  component "llm-providers.yaml" as llmConfig <<external>>
+  component "hooks-config.json" as hooksConfig <<external>>
+  component "health-verification-rules.json" as healthRules <<external>>
 }
 
-package "Integration & Schema" {
-  component "Structured Envelope\nCLAUDE-CODE-HOOK-FORMAT.md" as se <<api>>
-  component "Closed Vocabulary Enum\nmigrate-graph-db-entity-types.js" as cv <<storage>>
-  component "VkbApiClient\nlib/ukb-unified/core" as vkb <<external>>
+package "MCP Integrations" {
+  component "MCP Constraint Monitor" as constraintMonitor <<api>>
+  component "MCP Semantic Analysis" as semanticAnalysis <<api>>
+  component "Code Graph RAG" as codeGraphRag <<core>>
 }
 
-puml --> sg : "specifies guard idiom"
-puml ..> ba : "documents agent lifecycle"
-ba ..> sg : "lazy-init gate\non first use"
-ss --> pr : "registerService()\nbinds on spawn"
-ss ..> sg : "singleton process\nownership"
-vkb ..> se : "dynamic import()\nemits wrapped events"
-se --> cv : "validates against\nclosed vocabulary"
+database "Graph Database\n(Memgraph)" as graphDB <<storage>>
+
+llmConfig --> llmRouter : tier policy\n(primary / secondary / local)
+hooksConfig --> hookSystem : hook registry
+healthRules --> agent : health criteria
+
+agent --> llmRouter : routes LLM calls via
+agent --> hookSystem : triggers on execution
+
+hookSystem --> constraintMonitor : constraint callbacks
+hookSystem --> semanticAnalysis : analysis triggers
+
+codeGraphRag --> graphDB : ingests\n(CONTAINS, DEFINES,\nDEPENDS_ON)
+semanticAnalysis --> graphDB : queries structure
+constraintMonitor --> graphDB : reads relationships
+
+semanticAnalysis --> codeGraphRag : shared graph traversal
 
 @enduml

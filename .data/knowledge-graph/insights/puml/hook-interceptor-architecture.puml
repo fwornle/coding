@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Claude Code Session" {
+    component "Claude Code UI" as claudeUI <<external>>
+    component "Live Tool Calls" as toolCalls <<core>>
+}
+
+package "Hook Layer" {
+    component "HookInterceptor" as hookInterceptor <<core>>
+    component "Pre-Tool Event" as preToolEvent <<api>>
+    component "Post-Tool Event" as postToolEvent <<api>>
+    component "Hook Payload Format" as hookFormat <<api>>
+}
+
+package "Constraint Evaluation Pipeline" {
+    component "Constraint Monitor (MCP)" as constraintMonitor <<core>>
+    component "Status Line Integration" as statusLine <<api>>
+}
+
+toolCalls --> hookInterceptor : "triggers"
+hookInterceptor --> preToolEvent : "emits"
+hookInterceptor --> postToolEvent : "emits"
+preToolEvent --> hookFormat : "conforms to"
+postToolEvent --> hookFormat : "conforms to"
+hookFormat --> constraintMonitor : "feeds"
+constraintMonitor --> statusLine : "reports state"
+statusLine --> claudeUI : "real-time feedback"
+
+@enduml

@@ -1,32 +1,28 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Consumer Layer" {
-  component "Consumer Process" as consumer <<cli>>
-}
+top to bottom direction
 
 package "Adapter Layer" {
-  component "GraphDatabaseAdapter" as adapter <<core>>
-  component "isServerAvailable() Probe" as probe <<core>>
+    component "GraphDatabaseAdapter" as gda <<core>>
 }
 
-package "Backend Implementations" {
-  component "VkbApiClient" as vkbApi <<api>>
-  component "GraphDatabaseService" as dbService <<core>>
+package "Live Mode (HTTP)" {
+    component "VkbApiClient" as vkb <<api>>
+    cloud "VKB HTTP Server" as server <<external>>
 }
 
-package "External Process" {
-  component "VKB Server Process" as vkbServer <<external>>
+package "Direct Mode (Local)" {
+    component "GraphDatabaseService" as gds <<core>>
+    database "LevelDB" as ldb <<storage>>
 }
 
-database "LevelDB Files" as leveldb <<storage>>
+gda --> vkb : "isServerAvailable()\n[once at init]"
+gda --> vkb : "delegates all ops\n[live mode]"
+gda --> gds : "calls directly\n[direct mode,\nsingle-process only]"
 
-consumer --> adapter : "unified interface"
-adapter --> probe : "once on initialize()"
-probe ..> vkbApi : "routes (API mode)"
-probe ..> dbService : "routes (Direct mode)"
-vkbApi --> vkbServer : "HTTP calls"
-vkbServer --> leveldb : "holds file lock"
-dbService --> leveldb : "direct LevelDB ops"
+vkb --> server : "HTTP requests"
+
+gds --> ldb : "file handle\n(single-writer lock)"
 
 @enduml

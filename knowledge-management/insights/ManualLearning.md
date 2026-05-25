@@ -2,81 +2,78 @@
 
 **Type:** SubComponent
 
-ManualLearning entities are typed nodes in the GraphDatabaseService (Graphology+LevelDB) with entity types including System, Project, Component, SubComponent, Pattern, and Detail, each carrying rich metadata fields set at authoring time.
+Because GraphDatabaseAdapter's routing mode is fixed at initialization, ManualLearning operations issued after a server state change continue using the mode selected at startup, requiring operational awareness when deploying
 
 # ManualLearning
 
 ## What It Is
 
-ManualLearning is a SubComponent of the KnowledgeManagement system that represents the pathway for human-authored knowledge to enter the graph database. It is implemented as a set of conventions and write paths over the `GraphDatabaseService` (Graphology+LevelDB), where hand-crafted entities are persisted as typed nodes alongside automatically extracted knowledge. The entities created through this pathway carry the same rich metadata fields as machine-generated ones, including entity type classifications (System, Project, Component, SubComponent, Pattern, Detail), `metadata.ontologyClass`, bi-temporal staleness tracking fields, and hierarchical edges.
-
-Unlike its sibling OnlineLearning—which routes extracted entities through the `PersistenceAgent` and `mapEntityToSharedMemory()` for ontology pre-population—ManualLearning bypasses extraction entirely. The entity author directly specifies `entityType` and `metadata.ontologyClass` at authoring time, which prevents redundant LLM re-classification when the `PersistenceAgent` routes the write through the VKB HTTP API. This makes ManualLearning the canonical path for curated, authoritative knowledge that does not need to be inferred from source material.
+ManualLearning is a SubComponent within the KnowledgeManagement domain that represents the human-curated write path into the knowledge graph. Unlike its sibling OnlineLearning, which feeds automated commit-hash tracked analysis into the system, ManualLearning provides a direct authoring channel where humans explicitly create and modify entities and observations. Its writes flow through GraphDatabaseAdapter (defined in `storage/graph-database-adapter.ts`), which routes operations either through the VKB HTTP API or directly against the LevelDB-backed GraphDatabaseService depending on the mode selected at initialization.
 
 ![ManualLearning — Architecture](images/manual-learning-architecture.png)
 
+As the highest-trust write path in the KnowledgeManagement system, ManualLearning carries a privileged status: manually authored entities and observations are not overwritten by automated analysis without explicit conflict resolution. This makes it the authoritative source when the curated intent of a human disagrees with what automated pipelines might infer.
+
 ## Architecture and Design
 
-The architectural approach centers on a **dual-write strategy** mediated by the `GraphDatabaseAdapter`. Manual edits can be written along two routes: (1) the VKB HTTP API path, used when the MCP semantic analysis server is running, or (2) direct LevelDB access, used as a fallback when the server is not running. The adapter selects the route based on server availability, which is a deliberate design choice to **avoid LevelDB lock conflicts** that would otherwise occur if two processes attempted to open the same database simultaneously.
+ManualLearning's architecture is shaped by the dual-mode routing strategy of its underlying adapter. Because GraphDatabaseAdapter resolves its routing mode exactly once at startup via `VkbApiClient.isServerAvailable()` and caches that decision permanently, ManualLearning operations inherit a fixed transport: either every write goes over HTTP to the VKB server (live mode), or every write goes directly against the LevelDB handle held by GraphDatabaseService (direct mode). There is no per-operation re-evaluation, which means ManualLearning's behavior is deterministic for the lifetime of the process but cannot adapt to mid-flight server availability changes.
 
-This adapter pattern provides a uniform interface to authors and tools while abstracting away the underlying transport. The design treats hand-curated and automatically extracted entities as **first-class peers** in the graph: they share the same schema, the same persistence routes, and the same lifecycle. Parent/child hierarchical relationships—such as Component → SubComponent → Detail—are stored as typed edges in the Graphology graph, making manually authored hierarchies traversable via either the direct-access or VKB API paths without any special-casing.
+This design embodies a deliberate trade-off between simplicity and dynamism. The single-writer constraint of LevelDB makes concurrent direct-mode writers unsafe, so the dual-mode design exists specifically to serialize writes through the HTTP server when it is available. ManualLearning, being one such writer, must therefore be aware of this serialization contract — if the VKB HTTP server is up at adapter initialization, ManualLearning's writes are safely multiplexed alongside other writers; if it is not, ManualLearning holds the LevelDB lock directly and any other direct-mode process will collide.
 
-A second key design decision is **pre-classified metadata**. By requiring authors to fill in `entityType` and `metadata.ontologyClass` up front, the system avoids the cost and non-determinism of LLM re-classification when the `PersistenceAgent` processes the write. This is in deliberate contrast to OnlineLearning, where `mapEntityToSharedMemory()` must populate these fields from raw extraction output.
+A second architectural pattern visible here is event-based decoupling for downstream consumers. After a successful graph write, an `entity:stored` event is emitted, which GraphKnowledgeExporter subscribes to in order to regenerate debounced JSON export files for the affected domain. ManualLearning does not need to know about export concerns — it simply writes through the adapter and the event bus carries the side effects to GraphKnowledgeExporter without coupling the write path to the export path.
 
 ## Implementation Details
 
-The implementation hinges on three concrete mechanisms found across the KnowledgeManagement component. First, the `GraphDatabaseService` stores entities as typed nodes in a Graphology graph backed by LevelDB. Each node carries metadata such as `entityType`, `metadata.ontologyClass`, embedding vectors, and bi-temporal staleness fields. For ManualLearning entries, these fields are populated explicitly by the human author rather than derived computationally.
+ManualLearning writes flow through `GraphDatabaseAdapter` in `storage/graph-database-adapter.ts`. When a manual edit is issued, the adapter consults its cached routing mode and either forwards the operation to VkbApiClient over HTTP or invokes GraphDatabaseService methods directly. Once the write succeeds at the storage layer, the system emits an `entity:stored` event. GraphKnowledgeExporter, listening for this event, schedules a debounced JSON re-export for the domain that owns the affected entity, ensuring filesystem artifacts stay consistent with graph state.
 
-Second, the `GraphDatabaseAdapter` performs runtime detection of MCP server availability and routes accordingly. When the MCP server is live, writes flow over HTTP to the VKB API, which in turn invokes `GraphDatabaseService` operations inside the server process. When the server is offline, the adapter opens LevelDB directly. This two-path implementation ensures that ad-hoc tooling, scripts, and editor integrations can persist manual entries regardless of whether the long-running semantic analysis service is active.
-
-Third, hierarchical relationships are encoded as **typed edges** in the Graphology layer. A manually authored Component can link to its SubComponent children, which in turn link to Detail nodes, all using the same edge schema as any other knowledge. This means traversal <USER_ID_REDACTED>—whether for visualization, query expansion, or staleness propagation—work identically on manual and extracted content.
+A critical implementation detail is what ManualLearning does *not* do: it does not participate in the batch analysis pipeline used by OnlineLearning, and consequently it is not tracked by CheckpointManager (located at `src/utils/checkpoint-manager.ts`). CheckpointManager exists to record commit hashes and session counts so that incremental analysis runs of OnlineLearning skip already-processed git history. Because manual edits have no commit hash or git provenance, they fall outside that tracking model entirely — they are simply applied directly to the graph as authoritative human input.
 
 ![ManualLearning — Relationship](images/manual-learning-relationship.png)
 
+The trust hierarchy is enforced by convention rather than by a separate code path: automated pipelines that produce competing observations must perform conflict resolution before overwriting manually authored content. This positions ManualLearning as a kind of "pinned" layer in the data model — durable against the churn of repeated automated re-analysis.
+
 ## Integration Points
 
-ManualLearning integrates most directly with its parent, KnowledgeManagement, by writing into the same `GraphDatabaseService` graph store. It shares the `PersistenceAgent` and `GraphDatabaseAdapter` with its sibling OnlineLearning, which means both human-curated and automatically extracted entries land in the same physical LevelDB store and become indistinguishable to downstream consumers (except by inspection of their provenance metadata).
+ManualLearning integrates with three principal collaborators in the KnowledgeManagement domain. First, it depends on GraphDatabaseAdapter as its sole write conduit; the adapter abstracts away whether the write travels over HTTP or directly against LevelDB. Second, through the adapter, ManualLearning indirectly depends on VkbApiClient — specifically on `VkbApiClient.isServerAvailable()`, whose return value at startup determines the routing mode for the entire process lifetime. Third, ManualLearning produces `entity:stored` events that GraphKnowledgeExporter consumes to keep exported JSON in sync with graph state.
 
-The bi-temporal staleness tracking integration is particularly notable: by populating staleness fields on manually authored entities, ManualLearning ensures that **human-curated knowledge participates in the same lifecycle management** as machine-extracted knowledge. Curated entities are not exempt from staleness review; instead, they age and require revalidation through the same mechanisms.
+ManualLearning is deliberately decoupled from OnlineLearning and CheckpointManager. While OnlineLearning feeds CheckpointManager with commit hashes and session counts so incremental runs can skip already-analyzed history, ManualLearning has no such bookkeeping requirement. This separation cleanly distinguishes the two write paths: OnlineLearning is incremental, git-aware, and batch-oriented; ManualLearning is immediate, ad-hoc, and authoritative.
 
-ManualLearning also intersects with EntityMigrationScripts, the other sibling SubComponent. Scripts such as `migrate-graph-db-entity-types.js` operate over the same Graphology+LevelDB store and can rename or merge entity type labels for both manual and extracted entries. This means manually authored type classifications must remain compatible with the canonical type vocabulary or be updated by migration runs.
+Within the broader KnowledgeManagement parent component, ManualLearning sits alongside its siblings as one of several writers that must all respect the LevelDB single-writer constraint mediated by GraphDatabaseAdapter. Any future write path added to KnowledgeManagement must follow the same rule: either route through the VKB HTTP API or guarantee exclusive direct-mode access.
 
 ## Usage Guidelines
 
-When authoring manual entries, populate `entityType` and `metadata.ontologyClass` explicitly using values from the canonical vocabulary (System, Project, Component, SubComponent, Pattern, Detail). Skipping these fields defeats the optimization that prevents redundant LLM re-classification in the `PersistenceAgent` and may cause inconsistent downstream behavior.
+Developers using or extending ManualLearning should treat the adapter's routing mode as an operational concern that must be settled before the process starts. Because GraphDatabaseAdapter calls `VkbApiClient.isServerAvailable()` exactly once at initialization and never re-evaluates, ManualLearning operations issued after a server state change continue using the mode selected at startup. If the VKB HTTP server is started or stopped while the process is running, ManualLearning will not detect or react to the change — restart is required to pick up the new routing.
 
-Prefer the VKB HTTP API path when the MCP server is running. Direct LevelDB writes should be reserved for cases where the server is genuinely offline, such as bootstrapping, offline editing, or recovery scenarios. The `GraphDatabaseAdapter` handles selection automatically, but tools that bypass the adapter risk **LevelDB lock conflicts** if they open the database while the MCP server holds it.
+When deploying environments where multiple writers may be active (for example, an OnlineLearning batch job and an interactive ManualLearning session), ensure the VKB HTTP server is running and available at the moment ManualLearning's process initializes. This guarantees the adapter selects live mode and serializes writes through the HTTP API, avoiding LevelDB lock collisions. Running two direct-mode processes concurrently — even briefly — risks corrupt state and write failures.
 
-Construct hierarchies using typed parent/child edges rather than embedding child data inside parent nodes. The Component → SubComponent → Detail pattern is the convention, and conforming to it ensures that traversal <USER_ID_REDACTED>, visualization tooling, and migration scripts all behave correctly. Finally, remember that manually authored entities are subject to the same bi-temporal staleness lifecycle as extracted ones—plan to revisit and refresh them, and treat manual authorship as a contribution to a living graph rather than a one-time write.
+Because manually authored content represents the highest-trust path, treat it as the source of truth when reconciling with automated analysis. Automated pipelines that would otherwise update an entity should check for human-curated provenance and either skip the write or invoke an explicit conflict resolution step rather than silently overwriting.
 
-### Architectural Patterns Identified
-- **Adapter pattern** (`GraphDatabaseAdapter`) selecting between HTTP and direct-access transports
-- **Dual-write fallback** to handle process-level lock contention on LevelDB
-- **Uniform schema across provenance** so manual and extracted entries are peers
-- **Typed-edge hierarchy** for parent/child relationships in Graphology
+Finally, remember that every successful ManualLearning write triggers a debounced JSON export through GraphKnowledgeExporter. This means rapid sequences of manual edits will be batched into a single export pass per domain, which is efficient for normal authoring but should be considered when scripting bulk imports — large bulk operations may be better served by the OnlineLearning batch pipeline, which integrates with CheckpointManager for incremental tracking.
 
-### Design Decisions and Trade-offs
-- Requiring authors to pre-classify entities trades a small authoring burden for avoidance of LLM re-classification cost and nondeterminism.
-- Allowing direct LevelDB writes increases flexibility but requires careful coordination to avoid lock conflicts—mitigated by the adapter's availability check.
-- Treating manual entries as full lifecycle citizens (including staleness) increases maintenance overhead but prevents drift between curated and extracted knowledge.
+---
 
-### System Structure Insights
-ManualLearning is structurally thin: it is less a separate module and more a **set of conventions and write routes** layered over shared KnowledgeManagement infrastructure. Its identity comes from how entities are authored (by humans, with pre-filled metadata) rather than from a distinct code path.
+**Architectural patterns identified:** dual-mode routing through GraphDatabaseAdapter (live HTTP vs direct LevelDB); event-driven decoupling via `entity:stored` events consumed by GraphKnowledgeExporter; trust-tiered write paths with ManualLearning as the highest-priority authoring channel.
 
-### Scalability Considerations
-Scalability is bounded by the underlying Graphology+LevelDB store, which is a single-writer embedded database. The adapter's HTTP route effectively serializes writes through the MCP server, which is the appropriate scaling boundary. High-volume manual ingestion should batch writes and prefer the VKB API path to centralize lock ownership.
+**Design decisions and trade-offs:** startup-time routing resolution sacrifices runtime adaptability for deterministic behavior and simpler concurrency reasoning; bypassing the batch analysis pipeline and CheckpointManager simplifies the manual write path but requires explicit conflict resolution to protect human input from automated overwrites.
 
-### Maintainability Assessment
-Maintainability is strong because manual and automatic paths share schema, persistence, and lifecycle. The same migration scripts (e.g., `migrate-graph-db-entity-types.js`) maintain both. The main maintenance hazard is **schema drift**: if authors hand-craft entries with stale or non-canonical `entityType` values, migration scripts must absorb the cleanup. Encouraging adapter-mediated writes and canonical vocabulary use keeps the system coherent over time.
+**System structure insights:** ManualLearning is one of several sibling writers (OnlineLearning, others) within KnowledgeManagement, all funneling through GraphDatabaseAdapter; the HTTP server's availability at startup is a critical, process-wide dependency that affects every write originating from this component.
+
+**Scalability considerations:** concurrent writer scalability is mediated by the VKB HTTP API serving as a serialization point; direct mode does not scale beyond one process because of the LevelDB single-writer lock; debounced exports prevent write-amplification on the filesystem under rapid editing.
+
+**Maintainability assessment:** the clear separation between manual and automated write paths keeps responsibilities legible; however, the once-only routing-mode evaluation is an operational footgun that requires documentation and deployment discipline — new developers adding write paths must explicitly choose between the HTTP API and single-process direct access to remain safe.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides knowledge graph storage, query, and lifecycle management for the Coding project. It centers on a Graphology+LevelDB graph database (GraphDatabaseService) that stores entities as typed nodes with rich metadata, exposed through both a direct-access path and a VKB HTTP API. The component supports multiple entity types (System, Project, Component, SubComponent, Pattern, Detail) with ontology classification, bi-temporal staleness tracking, embedding vectors, and hierarchical parent/child relationships. It integrates with the MCP semantic analysis server via PersistenceAgent and GraphDatabaseAdapter, which route writes through the VKB API when the server is running or fall back to direct LevelDB access to avoid lock conflicts.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] GraphDatabaseAdapter (storage/graph-database-adapter.ts) implements a dual-mode routing strategy that is determined once at initialization time via VkbApiClient.isServerAvailable(), not re-evaluated on each operation. This means if the VKB HTTP server starts or stops after the adapter is initialized, the adapter continues using the mode it selected at startup. In 'live' mode it routes all reads and writes through the HTTP API, avoiding LevelDB's single-writer lock. In 'direct' mode it accesses GraphDatabaseService (which holds the LevelDB handle) directly. The consequence is that two processes attempting direct mode simultaneously will collide on the LevelDB lock — the dual-mode design exists specifically to serialize writers through the HTTP server when it is available. New developers integrating additional write paths must either go through the VKB HTTP API or ensure only one process operates in direct mode at a time.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- The batch analysis pipeline routes extracted entities through the PersistenceAgent, which calls mapEntityToSharedMemory() to pre-populate ontology metadata fields before persisting via the VKB HTTP API or direct LevelDB fallback.
-- [EntityMigrationScripts](./EntityMigrationScripts.md) -- migrate-graph-db-entity-types.js handles type consolidation—renaming or merging entity type labels in the Graphology+LevelDB store without full data reconstruction.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning feeds CheckpointManager with commit hashes and session counts so incremental runs skip already-analyzed history, as tracked in src/utils/checkpoint-manager.ts
+- [VkbApiClient](./VkbApiClient.md) -- VkbApiClient.isServerAvailable() is called once at GraphDatabaseAdapter initialization to determine routing mode — live vs direct — and the result is never re-evaluated, making server availability at startup a critical operational dependency
+- [GraphKnowledgeExporter](./GraphKnowledgeExporter.md) -- GraphKnowledgeExporter subscribes to entity:stored events emitted after each successful graph write, decoupling export from the write path itself
+- [CheckpointManager](./CheckpointManager.md) -- CheckpointManager at src/utils/checkpoint-manager.ts stores commit hashes as markers so the OnlineLearning pipeline can skip already-processed git history on subsequent runs
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter calls VkbApiClient.isServerAvailable() exactly once at initialization and caches the result as the permanent routing mode — no per-operation re-evaluation occurs
 
 
 ---

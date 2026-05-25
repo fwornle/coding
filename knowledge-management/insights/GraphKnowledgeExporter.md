@@ -2,90 +2,76 @@
 
 **Type:** SubComponent
 
-The exporter's event-driven design means it is decoupled from both ManualLearning and OnlineLearning write paths — any write that triggers entity:stored will be reflected in exports regardless of origin
+Because GraphKnowledgeExporter reacts to entity:stored events regardless of whether the write came from ManualLearning or OnlineLearning, it provides a unified export view of the entire knowledge graph
 
 # GraphKnowledgeExporter — Technical Insight Document
 
 ## What It Is
 
-GraphKnowledgeExporter is a SubComponent within the broader `KnowledgeManagement` component that materializes the in-memory Graphology knowledge graph as portable JSON snapshots on disk. It operates as an event-driven subscriber to `entity:stored` events emitted by `GraphDatabaseService`, writing partitioned per-domain JSON files into the `.data/knowledge-export` directory. Rather than acting as a synchronous step in the write path, it sits alongside it — observing storage events and projecting their effects into a file-based representation that external tools can consume.
+GraphKnowledgeExporter is a SubComponent within the `KnowledgeManagement` parent module responsible for projecting the live knowledge graph into file-based JSON artifacts on disk. Rather than sitting on the critical write path, it operates as an asynchronous observer: it subscribes to `entity:stored` events that are emitted after each successful graph write, and it materializes the resulting state into per-domain export files. This positions it as the system's bridge between the internal graph storage (LevelDB, accessed via the routing layer described in `GraphDatabaseAdapter`) and external consumers that lack the ability to query the database directly.
 
-Its purpose is twofold: (1) to provide an eventually consistent, portable snapshot of the knowledge graph that does not require a running VKB server to read, and (2) to decouple the costs of serialization and file I/O from the latency-sensitive write operations performed by callers like `ManualLearning` and `OnlineLearning`. Because it observes `entity:stored` rather than being called inline, any pathway that legitimately writes through `GraphDatabaseService` is automatically reflected in exports.
+The exporter exists specifically to serve downstream integrations — most notably RAG (Retrieval-Augmented Generation) pipelines — that need a stable, file-based representation of the knowledge graph. These consumers cannot speak to LevelDB or even the VKB HTTP API, so a flattened JSON projection on disk becomes the canonical hand-off format.
 
 ![GraphKnowledgeExporter — Architecture](images/graph-knowledge-exporter-architecture.png)
 
 ## Architecture and Design
 
-The exporter follows an **event-driven, observer pattern** architecture. Its sole child entity, `EventDrivenExportSubscription`, encapsulates the subscription mechanism: GraphKnowledgeExporter registers as a listener on `entity:stored` events emitted by `GraphDatabaseService`, ensuring that exports happen asynchronously and never block the originating write. This is a deliberate **eventually-consistent** design choice — exports are guaranteed to converge with the underlying graph state, but they are not transactionally aligned with each individual write.
+The architectural cornerstone of GraphKnowledgeExporter is **event-driven decoupling from the write path**. By subscribing to `entity:stored` events rather than being invoked inline during writes, the exporter introduces no latency or failure risk into the storage operation itself. A graph write succeeds or fails on its own merits; the export is a downstream consequence handled asynchronously. This is a deliberate separation-of-concerns choice: persistence and projection are independent concerns with independent failure modes.
 
-A second core pattern is **debouncing**. Rather than reacting to every `entity:stored` event with an immediate file write, the exporter batches rapid successive events into a single coalesced write. This protects the file system from write storms during bulk operations such as the batch analysis pipeline runs performed by `OnlineLearning`, where hundreds or thousands of entities may be stored in quick succession. The debouncing strategy trades fine-grained recency for I/O efficiency — a worthwhile trade since consumers of the export files are themselves typically batch processes (RAG indexers, graph analysis tools).
+A second key design decision is **per-domain file partitioning**. The exporter maintains an internal mapping from entity domain to output file path, so each event only triggers an update to the specific file that owns the affected entity. This avoids the cost of rewriting the entire knowledge graph on every change and keeps export files reasonably scoped — domain consumers can subscribe to (or watch) only the files they care about.
 
-The third architectural choice is **partitioning by domain**. Instead of serializing the entire knowledge graph into a single monolithic JSON file, exports are split into multiple per-domain JSON files under `.data/knowledge-export`. This allows consumers to load only the slice of the graph that is relevant to their task, reducing memory pressure and parse time for tools that only care about, for example, one project's worth of entities.
+The third architectural pattern is **debouncing for write coalescing**. Because sibling component `OnlineLearning` can produce bursts of entity updates during batch operations (e.g., processing a span of git history coordinated via `CheckpointManager`), naive event handling would generate excessive file I/O. The debouncing mechanism collapses many rapid events targeting the same domain into a single write per export cycle, trading a small delay for substantial I/O efficiency.
+
+Finally, because GraphKnowledgeExporter listens for `entity:stored` events regardless of their origin, it provides a **unified export view**. Writes from `ManualLearning` and `OnlineLearning` are indistinguishable from the exporter's perspective — both flow through `GraphDatabaseAdapter`, both emit the same event, and both land in the same export files. This gives downstream consumers a single source of truth.
 
 ## Implementation Details
 
-The exporter's runtime behavior is anchored in its subscription to `entity:stored` events from `GraphDatabaseService`. When such an event arrives, the exporter does not immediately serialize the graph; instead, it schedules a debounced flush. Successive events arriving within the debounce window collapse into a single flush, at which point the affected per-domain JSON files are written to `.data/knowledge-export`. This means that during a heavy ingest cycle — for example, when the batch analysis pipeline described in `OnlineLearning` is ingesting git history, LSL sessions, and code analysis outputs — the exporter produces a small number of well-batched writes rather than one write per entity.
+The exporter's runtime behavior is structured around three concrete mechanics. First, an event subscription is established against the `entity:stored` event channel; this is the sole input trigger for the component. Second, an in-memory mapping from domain identifier to output file path is consulted on each event to determine the target file. Third, a debouncer per domain accumulates pending updates and flushes them to disk after a quiescence interval, producing one JSON write per domain per burst.
 
-The per-domain partitioning logic implies the exporter must classify each entity by its domain (likely derived from the entity's ontology classification metadata, which is one of the rich metadata fields tracked by the parent `KnowledgeManagement` component). The canonical entity types used across the system — Project, Component, SubComponent, Pattern, Detail, System — are the same set used by siblings like `ManualLearning` and `OnlineLearning`, and consolidated by `EntityTypeMigration` via `scripts/migrate-graph-db-entity-types.js`. The exporter therefore relies on the same typed-node ontology that the rest of `KnowledgeManagement` enforces.
+When an `entity:stored` event arrives, the exporter inspects the entity's domain, locates the corresponding file path in its mapping, and schedules a write. If subsequent events arrive for the same domain within the debounce window, they coalesce into the same pending write. When the window expires, a single serialization pass produces the JSON output for that domain.
 
-Because exports are plain JSON on disk, no special runtime is required to read them. External tools — RAG integrations, code-graph-rag, MCP servers — can open the files directly, without going through the VKB HTTP API exposed by `VkbApiClient` (located at `lib/ukb-unified/core/VkbApiClient.js`). This bypass is important: `VkbApiClient` is dynamically imported and may not be available if the server is not running, so the exported files act as a fallback knowledge surface that is always readable.
-
-## Integration Points
+Because the exporter does not perform graph writes itself, it inherits none of the LevelDB locking concerns that constrain its siblings. It is purely a reader and projector of state — though crucially, since the `entity:stored` event presumably carries enough payload (or triggers a read through the live infrastructure), the exporter remains insulated from the dual-mode routing tension between live and direct access that `GraphDatabaseAdapter` mediates.
 
 ![GraphKnowledgeExporter — Relationship](images/graph-knowledge-exporter-relationship.png)
 
-The exporter's primary integration point is its event subscription to `GraphDatabaseService`, the LevelDB-backed graph store at the heart of `KnowledgeManagement`. Every write through that service — regardless of whether it originated in `ManualLearning` (human-authored entity additions) or `OnlineLearning` (automated batch analysis pipeline outputs) — emits an `entity:stored` event that the exporter consumes. This single subscription point is what gives the exporter its uniform coverage: it does not need to know about or be invoked by the various write paths.
+## Integration Points
 
-On the consumer side, the exporter's integration surface is the file system itself. Anything that can read JSON from `.data/knowledge-export` is a valid downstream consumer. This includes RAG integrations that index the knowledge graph for retrieval, the external code-graph-rag tool, and MCP servers that expose the graph to LLM-driven workflows. Crucially, none of these consumers need a running VKB server — the exported files are entirely self-contained, complementing the direct LevelDB fallback pattern that `VkbApiClient` already supports.
+GraphKnowledgeExporter sits inside `KnowledgeManagement` alongside `ManualLearning`, `OnlineLearning`, `VkbApiClient`, `CheckpointManager`, and `GraphDatabaseAdapter`. Its upstream dependency is the `entity:stored` event stream, which is emitted by the graph storage layer downstream of `GraphDatabaseAdapter`. This means the exporter benefits from the adapter's routing decisions transparently — whether a write originated in `live` mode (through the VKB HTTP API) or `direct` mode (against the LevelDB handle held by `GraphDatabaseService`), the resulting `entity:stored` event reaches the exporter identically.
 
-The exporter is conceptually adjacent to siblings like `KnowledgeDecayTracker`, which also reads from entity state but embeds its information (staleness) directly in `EntityMetadata` rather than producing a side artifact. The contrast highlights the exporter's distinct role: it is the only sibling whose output is an external, portable file representation rather than an in-graph annotation.
+The two principal write producers in the system are siblings of the exporter. `ManualLearning` writes directly through `GraphDatabaseAdapter` and thus generates events that the exporter consumes. `OnlineLearning`, which is coordinated against git history via `CheckpointManager` (located at `src/utils/checkpoint-manager.ts`), produces the high-frequency batch writes that justify the debouncing design — without debouncing, an incremental run over many commits would translate into a storm of file rewrites.
+
+Downstream, GraphKnowledgeExporter integrates with consumers that cannot reach into LevelDB or the HTTP API. RAG integrations are the explicitly cited example: they ingest the partitioned JSON files as their knowledge source. This file-based interface gives external systems a stable, version-controllable contract that does not require runtime coupling to the VKB infrastructure.
 
 ## Usage Guidelines
 
-Developers extending or relying on GraphKnowledgeExporter should respect its **eventual consistency** contract. The export files in `.data/knowledge-export` are not guaranteed to reflect the very latest write at the instant it completes; there is a debounce window during which a write has occurred in `GraphDatabaseService` but has not yet been flushed to disk. Code that requires strict read-your-write semantics must query `GraphDatabaseService` (or the VKB API) directly rather than reading from the exported files.
+Developers introducing new write paths into the knowledge graph should ensure their writes flow through `GraphDatabaseAdapter` so that `entity:stored` events are emitted; bypassing the adapter would also bypass the exporter and create silently stale JSON files on disk. The same operational dependency that constrains the rest of `KnowledgeManagement` applies here: writes should route through the VKB HTTP API (live mode) when available, since the adapter's mode is fixed at initialization based on a one-time `VkbApiClient.isServerAvailable()` check.
 
-When adding new write paths into `GraphDatabaseService`, no special wiring to GraphKnowledgeExporter is needed — as long as the new path emits `entity:stored` events through the standard mechanism, exports will reflect the changes automatically. This is the central virtue of the event-driven design and the reason the exporter remains decoupled from `ManualLearning` and `OnlineLearning`. Conversely, any write path that bypasses the event emission will silently break export coverage, so emission discipline at the `GraphDatabaseService` layer is critical.
+When adding a new domain, the domain-to-file-path mapping inside GraphKnowledgeExporter must be updated; otherwise writes for that domain will lack a destination and the unified export view will be incomplete. Consumers reading the exported JSON should be aware that updates are debounced — there is a small but non-zero window between a successful graph write and its appearance in the file. For RAG pipelines and similar consumers, this is generally acceptable, but anything requiring strict read-after-write consistency should query the graph through the HTTP API instead.
 
-Consumers of the export should load only the per-domain JSON files they need, taking advantage of the partitioning rather than reassembling the full graph in memory. The partitioning is the exporter's primary scalability lever — as the graph grows, per-domain file sizes grow at the rate of their domain only, keeping consumer load times bounded for narrowly scoped use cases.
+Finally, because the exporter coalesces events per domain, batch operations from `OnlineLearning` will not generate proportional I/O — but operations spanning many domains in parallel will still produce one write per affected domain. Developers planning very large multi-domain ingestion runs should anticipate that the export step, while debounced, still scales with the number of distinct domains touched.
 
 ---
 
-### Architectural Patterns Identified
-- **Observer / event-driven subscription** via `entity:stored` on `GraphDatabaseService`
-- **Debounce / write coalescing** to absorb bulk-write bursts
-- **Domain partitioning** of serialized output across multiple JSON files
-- **Side-artifact projection** — the graph is the source of truth; the export is a derived view
+**Summary of analysis dimensions:**
 
-### Design Decisions and Trade-offs
-- **Asynchronous, eventually consistent exports** trade strict recency for write-path latency isolation
-- **Debouncing** trades fine-grained event-to-file alignment for I/O efficiency under burst load
-- **Plain JSON on disk** trades richer query capability for portability and zero-runtime consumer access
-- **Subscription to a single event stream** trades explicit per-caller wiring for uniform but emission-dependent coverage
-
-### System Structure Insights
-GraphKnowledgeExporter sits as a passive consumer at the edge of `KnowledgeManagement`'s write path. It owns one child concept — `EventDrivenExportSubscription` — which exists primarily to document and encapsulate the subscription mechanism. It is structurally peer to `ManualLearning`, `OnlineLearning`, `VkbApiClient`, `EntityTypeMigration`, and `KnowledgeDecayTracker`, but unlike them it neither writes to nor annotates the graph; it only observes and projects.
-
-### Scalability Considerations
-The combination of debouncing and per-domain partitioning gives the exporter graceful behavior under load. Write storms from the batch analysis pipeline collapse into single flushes, and consumers pay only for the domain slice they read. The main scalability risk is the size of a single domain partition — if one domain dominates the graph, its JSON file becomes a hot spot for both serialization cost and consumer parse cost. Future evolution might introduce sub-domain partitioning or incremental delta exports.
-
-### Maintainability Assessment
-The exporter's decoupling from write origins is its strongest maintainability property: new ingestion sources require no changes here. The maintenance burden is concentrated at two boundaries — (1) the `entity:stored` event contract on `GraphDatabaseService`, which must be honored by every write path, and (2) the per-domain JSON schema in `.data/knowledge-export`, which constitutes an implicit public interface to external consumers like RAG integrations, code-graph-rag, and MCP servers. Schema changes there are effectively API changes and should be versioned accordingly.
+1. **Architectural patterns identified:** event-driven observer subscribing to `entity:stored`, write-path decoupling, per-domain partitioning, debounced write coalescing, unified projection across heterogeneous write sources.
+2. **Design decisions and trade-offs:** asynchronous export trades read-after-write consistency for write-path isolation; debouncing trades latency for I/O efficiency; per-domain files trade global atomicity for incremental update cost.
+3. **System structure insights:** the exporter is a pure consumer of events emitted by `GraphDatabaseAdapter`-mediated writes, making it agnostic to whether `ManualLearning` or `OnlineLearning` produced the change, and insulated from the live/direct routing concerns of its siblings.
+4. **Scalability considerations:** debouncing absorbs `OnlineLearning` burst load; per-domain partitioning bounds the size of any single export write; scaling is linear in the number of distinct domains touched per burst rather than in the number of entities written.
+5. **Maintainability assessment:** clear single responsibility (event-to-file projection), minimal coupling (one event subscription, one file-mapping table), and stable downstream contract (JSON files) make this component low-risk to extend, with the main maintenance hotspot being the domain-to-path mapping that must be kept in sync with the broader domain taxonomy.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides graph-based knowledge storage, entity lifecycle management, and query capabilities for the Coding project. At its core it combines a Graphology in-memory graph with LevelDB persistent storage (via GraphDatabaseService), accessed either through a lock-free VKB HTTP API when the server is running or through direct file access as a fallback. The component manages typed entities (Project, Component, SubComponent, Pattern, Detail, System) with rich metadata including ontology classification, bi-temporal staleness tracking, embedding vectors, and hierarchy relationships.
-
-### Children
-- [EventDrivenExportSubscription](./EventDrivenExportSubscription.md) -- GraphKnowledgeExporter subscribes to entity:stored events emitted by GraphDatabaseService rather than being called inline, meaning file export is asynchronous and does not block the original write operation — a deliberate eventually-consistent design decision stated in the parent component description.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] GraphDatabaseAdapter (storage/graph-database-adapter.ts) implements a dual-mode routing strategy that is determined once at initialization time via VkbApiClient.isServerAvailable(), not re-evaluated on each operation. This means if the VKB HTTP server starts or stops after the adapter is initialized, the adapter continues using the mode it selected at startup. In 'live' mode it routes all reads and writes through the HTTP API, avoiding LevelDB's single-writer lock. In 'direct' mode it accesses GraphDatabaseService (which holds the LevelDB handle) directly. The consequence is that two processes attempting direct mode simultaneously will collide on the LevelDB lock — the dual-mode design exists specifically to serialize writers through the HTTP server when it is available. New developers integrating additional write paths must either go through the VKB HTTP API or ensure only one process operates in direct mode at a time.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are stored as typed nodes (Project, Component, SubComponent, Pattern, Detail, System) in the GraphDatabaseService-backed graph, using the same ontology classification fields as automated entities
-- [OnlineLearning](./OnlineLearning.md) -- The batch analysis pipeline ingests git history, LSL sessions, and code analysis outputs, mapping findings to the canonical typed entity set (Project, Component, SubComponent, Pattern, Detail, System) before writing to GraphDatabaseService
-- [VkbApiClient](./VkbApiClient.md) -- VkbApiClient is located at lib/ukb-unified/core/VkbApiClient.js and is dynamically imported at runtime, so callers must handle the case where the import fails (server not running) and fall back to direct LevelDB access
-- [EntityTypeMigration](./EntityTypeMigration.md) -- scripts/migrate-graph-db-entity-types.js consolidates legacy entity type names into the canonical six-type set (Project, Component, SubComponent, Pattern, Detail, System), rewriting node attributes in the Graphology graph
-- [KnowledgeDecayTracker](./KnowledgeDecayTracker.md) -- KnowledgeDecayTracker embeds staleness state directly in EntityMetadata rather than a separate store, so every entity read returns its own decay signal without additional <USER_ID_REDACTED>
+- [ManualLearning](./ManualLearning.md) -- ManualLearning writes directly through GraphDatabaseAdapter, which means it must route through the VKB HTTP API (live mode) or risk LevelDB lock collisions in direct mode when other writers are active
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning feeds CheckpointManager with commit hashes and session counts so incremental runs skip already-analyzed history, as tracked in src/utils/checkpoint-manager.ts
+- [VkbApiClient](./VkbApiClient.md) -- VkbApiClient.isServerAvailable() is called once at GraphDatabaseAdapter initialization to determine routing mode — live vs direct — and the result is never re-evaluated, making server availability at startup a critical operational dependency
+- [CheckpointManager](./CheckpointManager.md) -- CheckpointManager at src/utils/checkpoint-manager.ts stores commit hashes as markers so the OnlineLearning pipeline can skip already-processed git history on subsequent runs
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter calls VkbApiClient.isServerAvailable() exactly once at initialization and caches the result as the permanent routing mode — no per-operation re-evaluation occurs
 
 
 ---

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentAbstractionPatterns
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentAbstractionPatterns] as agent_abstraction_patterns #LightBlue
+[MCPIntegrationConventions] as mcpintegration_conventions #F0F0F0
+[HookExtensionPattern] as hook_extension_pattern #F0F0F0
+[LLMTierRoutingPattern] as llmtier_routing_pattern #F0F0F0
+[AgentLifecycleContract] as agent_lifecycle_contract #E8F5E8
+
+coding_patterns --> agent_abstraction_patterns
+mcpintegration_conventions -[hidden]- agent_abstraction_patterns
+hook_extension_pattern -[hidden]- agent_abstraction_patterns
+llmtier_routing_pattern -[hidden]- agent_abstraction_patterns
+agent_abstraction_patterns --> agent_lifecycle_contract
+
+@enduml

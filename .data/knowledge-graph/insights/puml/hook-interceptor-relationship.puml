@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HookInterceptor
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[HookInterceptor] as hook_interceptor #LightBlue
+[ConstraintRuleEngine] as constraint_rule_engine #F0F0F0
+[MCPConstraintMonitorIntegration] as mcpconstraint_monitor_integration #F0F0F0
+[HookPayloadParser] as hook_payload_parser #E8F5E8
+
+constraint_system --> hook_interceptor
+constraint_rule_engine -[hidden]- hook_interceptor
+mcpconstraint_monitor_integration -[hidden]- hook_interceptor
+hook_interceptor --> hook_payload_parser
+
+@enduml

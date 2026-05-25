@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MCPIntegrationConventions
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[MCPIntegrationConventions] as mcpintegration_conventions #LightBlue
+[AgentAbstractionPatterns] as agent_abstraction_patterns #F0F0F0
+[HookExtensionPattern] as hook_extension_pattern #F0F0F0
+[LLMTierRoutingPattern] as llmtier_routing_pattern #F0F0F0
+[MCPDirectoryLayout] as mcpdirectory_layout #E8F5E8
+[MCPToolExtensionModel] as mcptool_extension_model #E8F5E8
+
+coding_patterns --> mcpintegration_conventions
+agent_abstraction_patterns -[hidden]- mcpintegration_conventions
+hook_extension_pattern -[hidden]- mcpintegration_conventions
+llmtier_routing_pattern -[hidden]- mcpintegration_conventions
+mcpintegration_conventions --> mcpdirectory_layout
+mcpintegration_conventions --> mcptool_extension_model
+
+@enduml

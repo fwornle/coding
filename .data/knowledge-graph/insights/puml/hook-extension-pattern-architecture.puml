@@ -1,0 +1,35 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Claude Code Core" {
+  component "Claude Code Agent" as agent <<agent>>
+  component "Hook Data Format\n(CLAUDE-CODE-HOOK-FORMAT)" as hookFormat <<core>>
+}
+
+package "Hook Infrastructure" {
+  component "Hook Event Pipeline" as pipeline <<core>>
+  component "hooks-config.json\n(Event-to-Handler Registry)" as hooksConfig <<storage>>
+}
+
+package "MCP Constraint Monitor" {
+  component "Constraint Monitor Consumer" as constraintMonitor <<api>>
+  component "Semantic Constraint Detection" as semanticDetect <<core>>
+  component "Constraint Configuration" as constraintConfig <<storage>>
+}
+
+package "Cross-Cutting Concerns" {
+  component "Status Line Integration" as statusLine <<cli>>
+}
+
+agent --> hookFormat : "emits at hook points"
+hookFormat --> pipeline : "structured events"
+hooksConfig --> pipeline : "registers handler mappings"
+pipeline --> constraintMonitor : "routes hook events"
+pipeline --> statusLine : "attaches UI concern"
+constraintMonitor --> semanticDetect : "wires semantic analysis"
+constraintConfig --> semanticDetect : "configures constraint rules"
+constraintConfig --> pipeline : "drives which constraints fire"
+
+@enduml

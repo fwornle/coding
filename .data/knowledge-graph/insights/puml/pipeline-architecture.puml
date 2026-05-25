@@ -1,41 +1,41 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-cloud "Git Commits" as gitcommits <<external>>
-
-package "Configuration" {
-  component "batch-analysis.yaml" as yaml <<core>>
+package "Pipeline Configuration" {
+  component "batch-analysis.yaml\n(DAG Definition)" as dagConfig <<core>>
 }
 
-package "Pipeline Coordination" {
-  component "Pipeline Coordinator" as coordinator <<core>>
+package "Orchestration" {
+  component "Coordinator Agent" as coordinator <<agent>>
 }
 
-package "Agent Pipeline" {
-  component "SemanticAnalysisAgent" as semantic <<agent>>
-  component "DeduplicationAgent" as dedup <<agent>>
-  component "PersistenceAgent" as persistence <<agent>>
-  component "KG Operator Agent" as kgop <<agent>>
+package "Processing Pipeline" {
+  component "BaseAgent<TInput, TOutput>" as baseAgent <<core>>
+  component "Observation Agent" as obsAgent <<agent>>
+  component "KG Operator Agent" as kgAgent <<agent>>
+  component "Dedup Agent" as dedupAgent <<agent>>
+  component "Persistence Agent" as persistAgent <<agent>>
 }
 
 package "Storage Layer" {
-  component "Shared Memory" as sharedmem <<storage>>
-  database "Memgraph" as memgraph
+  database "Memgraph" as memgraph <<storage>>
+  component "Shared Memory" as sharedMem <<storage>>
 }
 
-yaml --> coordinator : "defines DAG\n& depends_on edges"
+dagConfig --> coordinator : "defines DAG\nexecution order"
 
-gitcommits --> semantic : "raw commit arrays\n(TInput)"
+coordinator --> obsAgent : "routes typed input"
+obsAgent --> kgAgent : "response envelope\n(confidence scored)"
+kgAgent --> dedupAgent : "structured entity sets"
+dedupAgent --> persistAgent : "deduplicated entities"
 
-coordinator --> semantic : "sequences"
-coordinator --> dedup : "sequences"
-coordinator --> persistence : "sequences"
-coordinator --> kgop : "sequences via\nrouting output"
+baseAgent ..> coordinator : "extends"
+baseAgent ..> obsAgent : "extends"
+baseAgent ..> kgAgent : "extends"
+baseAgent ..> dedupAgent : "extends"
+baseAgent ..> persistAgent : "extends"
 
-semantic --> dedup : "structured observations"
-dedup --> persistence : "deduplicated\nclassified entities"
-persistence --> sharedmem : "mapEntityToSharedMemory()\nontology metadata cache"
-persistence --> kgop : "resolved entities"
-kgop --> memgraph : "batch writes\n(MEMGRAPH_BATCH_SIZE)"
+persistAgent --> sharedMem : "mapEntityToSharedMemory()\nontology metadata pre-population"
+persistAgent --> memgraph : "MEMGRAPH_BATCH_SIZE\nbatched flush"
 
 @enduml

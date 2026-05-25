@@ -1,36 +1,36 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "LLM Abstraction Core (llm-mock-service.ts)" as core {
-  component "getLLMMode()" as getMode <<core>>
-  component "setGlobalLLMMode()\n/ setAgentLLMMode()" as setters <<core>>
-  component "LLM State\n(globalMode · perAgentOverrides · mockLLM)" as llmState <<storage>>
+package "LLM Abstraction Layer" {
+  component "LLMAbstraction" as llmabs <<core>>
+  component "LLMMockService\n(llm-mock-service.ts)" as mockSvc <<core>>
 }
 
-package "Provider Backends" as backends {
-  component "Mock Provider\n(offline harness)" as mockProv <<core>>
-  component "DMR Provider\n(dmr-provider.ts)" as dmrProv <<core>>
-  component "Docker Model Runner\n(localhost:DMR_PORT)" as dmr <<external>>
-  cloud "Anthropic / OpenAI / Groq\n(public cloud APIs)" as cloudAPIs <<external>>
+package "Inference Providers" {
+  component "DMR Provider\n(dmr-provider.ts)" as dmrProv <<api>>
+  component "Mock Provider" as mockProv <<api>>
+  component "Public Providers" as pubProv <<api>>
 }
 
-package "Persistence & Configuration" as persistence {
-  database "workflow-progress.json\n(.data/)" as stateFile <<storage>>
-  database "dmr-config.yaml\n(config/)" as dmrConfig <<storage>>
+package "Persistence" {
+  database "workflow-progress.json\n(.data/)" as wpJson <<storage>>
+  database "dmr-config.yaml" as dmrCfg <<storage>>
 }
 
-' Core state management
-getMode --> llmState : "reads 3-tier priority\n(perAgent > global > mockLLM)"
-setters --> llmState : "writes + syncs legacy mockLLM"
-setters --> stateFile : "atomic write\n(effectivePath / CODING_ROOT)"
+cloud "Public Cloud APIs" as cloudGroup {
+  component "Anthropic / OpenAI / Groq" as cloudApis <<external>>
+}
 
-' Mode routing from resolution
-getMode --> mockProv : "mode = 'mock'"
-getMode --> dmrProv : "mode = 'local'"
-getMode --> cloudAPIs : "mode = 'public'"
+component "Docker Model Runner\n(DMR)" as dmr <<external>>
 
-' DMR provider internals
-dmrProv --> dmrConfig : "loads modelOverrides\nper agentId via getModelForAgent()"
-dmrProv --> dmr : "OpenAI-compatible\nsingleton client"
+llmabs --> mockSvc : "resolves mode\n(per-agent > global > legacy > default)"
+llmabs --> dmrProv : "local mode"
+llmabs --> mockProv : "mock mode"
+llmabs --> pubProv : "public mode"
+
+mockSvc --> wpJson : "reads / writes\nllmState + mockLLM flag"
+dmrProv --> dmrCfg : "loadDMRConfig()\n+ expandEnvVars()"
+dmrProv --> dmr : "OpenAI-compatible\nAPI (engines/v1)"
+pubProv --> cloudApis : "provider API calls"
 
 @enduml

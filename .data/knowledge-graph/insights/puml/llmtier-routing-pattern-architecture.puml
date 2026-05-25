@@ -1,0 +1,29 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Design Documentation" {
+  component "TIERED-MODEL-PROPOSAL.md" as proposal <<external>>
+  component "configuration.md" as configDoc <<external>>
+}
+
+package "Configuration Registry" {
+  component "llm-providers.yaml" as yamlReg <<storage>>
+}
+
+package "Routing Abstraction" {
+  component "LLMTierRoutingPattern" as tierRouting <<core>>
+}
+
+package "Agent Runtime" {
+  component "AgentAbstractionPatterns\n(Lazy-Init)" as lazyInit <<agent>>
+  component "Agents" as agents <<agent>>
+}
+
+proposal ..> yamlReg : "establishes rationale\nimplemented by"
+configDoc ..> tierRouting : "surfaces tier params\nas first-class config"
+yamlReg --> tierRouting : "provider tiers,\nfallback order,\nrouting rules"
+lazyInit --> yamlReg : "consults at\ninitialize()"
+lazyInit --> tierRouting : "resolves provider tier\nvia lazy initialization"
+agents --> tierRouting : "consumes abstraction,\nnot direct providers"
+
+@enduml

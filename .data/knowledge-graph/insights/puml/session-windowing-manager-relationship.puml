@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SessionWindowingManager
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[SessionWindowingManager] as session_windowing_manager #LightBlue
+[RedactionEngine] as redaction_engine #F0F0F0
+
+live_logging_system --> session_windowing_manager
+redaction_engine -[hidden]- session_windowing_manager
+
+@enduml

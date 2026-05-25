@@ -3,30 +3,27 @@
 
 top to bottom direction
 
-package "Managed Services" {
-  component "Wrapper Scripts" as wrappers <<cli>>
-  component "api-service.js" as apiService <<external>>
-  component "dashboard-service.js" as dashService <<external>>
+package "Configuration" {
+  component "health-verification-rules.json" as rules <<storage>>
 }
 
-package "Process State" {
-  component "PSM\n(Process State Manager)" as psm <<storage>>
+package "DockerizedServices" {
+  component "health-coordinator.js" as hc <<core>>
 }
 
-package "Health Monitoring" {
-  component "HealthCoordinator\n(health-coordinator.js)" as hc <<core>>
-  component "ServiceProbe\n(lib/utils/service-probe.js)" as probe <<api>>
+package "Service Probing" {
+  component "ServiceProbeLibrary" as spl <<api>>
+  component "Registered Services" as rs <<external>>
 }
 
-wrappers --> apiService : "spawns & owns handle"
-wrappers --> dashService : "spawns & owns handle"
-wrappers --> psm : "registers by name"
+package "Runtime State" {
+  database "currentState.services" as css <<storage>>
+}
 
-hc --> psm : "reads state by name"
-hc --> probe : "delegates liveness checks"
-
-probe --> apiService : "probes endpoint"
-probe --> dashService : "probes endpoint"
-probe --> hc : "normalized status envelopes"
+rules --> hc : "reads evaluation criteria\n(per poll cycle)"
+hc --> spl : "drives polling\n(5s fixed interval)"
+spl --> rs : "probes"
+rs ..> spl : "probe responses"
+hc --> css : "writes aggregated results"
 
 @enduml

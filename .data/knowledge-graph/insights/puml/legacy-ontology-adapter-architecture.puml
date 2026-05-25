@@ -1,0 +1,24 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "mcp-server-semantic-analysis" {
+  component "BaseAgent Subclasses" as agents <<agent>>
+}
+
+package "Integration Layer" {
+  component "OntologyClassifier" as classifier <<api>>
+  component "OntologyValidator" as validator <<api>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+}
+
+package "km-core" {
+  component "OntologyRegistry" as registry <<external>>
+}
+
+agents --> classifier : "uses"
+agents --> validator : "uses"
+adapter ..> classifier : "implements"
+adapter ..> validator : "implements"
+adapter --> registry : "delegates to"
+
+@enduml

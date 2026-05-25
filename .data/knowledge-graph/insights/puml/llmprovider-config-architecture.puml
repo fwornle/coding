@@ -1,34 +1,27 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Config Registry" {
-  component "llm-providers.yaml" as llmYaml <<storage>>
-  component "dmr-config.yaml" as dmrYaml <<storage>>
+package "Configuration" {
+  component "llm-providers.yaml" as yamlFile <<storage>>
+  component "Premium Tier Models\n(tier: premium)" as premiumTier <<core>>
+  component "Standard Tier Models\n(tier: standard)" as standardTier <<core>>
 }
 
-package "Config Loading Layer" {
-  component "Config Loader" as configLoader <<core>>
-  component "Multi-Path Discovery" as multiPath <<core>>
-  component "Env Var Expander" as envExpander <<core>>
+package "LLMAbstraction Layer" {
+  component "LLMProviderConfig\nLoader" as configLoader <<core>>
+  component "Token Limit\nValidator" as tokenValidator <<core>>
+  component "LLMAbstraction\nRouter" as llmAbstraction <<api>>
 }
 
-cloud "Environment Variables" as envVars
+cloud "Provider Client" as providerClient <<external>>
 
-package "Runtime Layer" {
-  component "LLM Mock Service" as mockService <<core>>
-  component "LLMState / LLMMode" as llmStateMode <<api>>
-}
-
-component "MCP Server Semantic Analysis" as mcpServer <<external>>
-
-llmYaml --> configLoader : "provider definitions"
-dmrYaml --> configLoader : "DMR overrides"
-multiPath --> configLoader : "filesystem resolution"
-envVars ..> envExpander : "${ENV_VAR} tokens"
-envExpander --> configLoader : "resolved secrets"
-configLoader --> llmStateMode : "declared providers"
-mockService --> llmStateMode : "mode resolution"
-configLoader --> mcpServer : "provider config"
-llmStateMode --> mcpServer : "runtime state"
+yamlFile --> premiumTier : "organizes"
+yamlFile --> standardTier : "organizes"
+yamlFile --> configLoader : "loaded by"
+configLoader --> tokenValidator : "enforces context_window\n& max_tokens"
+configLoader --> llmAbstraction : "supplies tier\nrouting config"
+llmAbstraction --> tokenValidator : "pre-dispatch\nvalidation"
+llmAbstraction --> providerClient : "routes by tier\n(cost / capability)"
+tokenValidator --> providerClient : "dispatches\nvalidated calls"
 
 @enduml

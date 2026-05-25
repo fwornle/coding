@@ -1,0 +1,26 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Claude Code Layer" {
+    component "Claude Code Hooks" as hooks <<external>>
+}
+
+package "MCP Constraint Monitor Integration" {
+    component "MCP-Compatible Server" as mcpServer <<api>>
+    component "Protocol Translation Layer" as protocolLayer <<core>>
+    component "Constraint Violation Processor" as violationProcessor <<core>>
+    database "Violation History Store" as violationStore <<storage>>
+}
+
+package "Dashboard Layer" {
+    component "Dashboard UI" as dashboard <<external>>
+}
+
+hooks --> protocolLayer : "raw hook events"
+protocolLayer --> mcpServer : "MCP protocol"
+protocolLayer --> violationProcessor : "constraint events"
+violationProcessor --> violationStore : "persists"
+violationStore --> dashboard : "violation history"
+mcpServer --> violationProcessor : "routes"
+
+@enduml

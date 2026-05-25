@@ -5,23 +5,9 @@ title Hierarchy Context: ProcessStateManager
 
 [DockerizedServices] as dockerized_services #FFFFDD
 [ProcessStateManager] as process_state_manager #LightBlue
-[ServiceProbe] as service_probe #F0F0F0
-[ConstraintAPIWrapper] as constraint_apiwrapper #F0F0F0
-[DashboardWrapper] as dashboard_wrapper #F0F0F0
-[LLMMockService] as llmmock_service #F0F0F0
-[ServiceStarter] as service_starter #F0F0F0
 [HealthCoordinator] as health_coordinator #F0F0F0
-[ServiceRegistry] as service_registry #E8F5E8
-[SingletonModulePattern] as singleton_module_pattern #E8F5E8
 
 dockerized_services --> process_state_manager
-service_probe -[hidden]- process_state_manager
-constraint_apiwrapper -[hidden]- process_state_manager
-dashboard_wrapper -[hidden]- process_state_manager
-llmmock_service -[hidden]- process_state_manager
-service_starter -[hidden]- process_state_manager
 health_coordinator -[hidden]- process_state_manager
-process_state_manager --> service_registry
-process_state_manager --> singleton_module_pattern
 
 @enduml

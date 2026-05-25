@@ -7,15 +7,17 @@ title Hierarchy Context: GraphDatabaseAdapter
 [GraphDatabaseAdapter] as graph_database_adapter #LightBlue
 [ManualLearning] as manual_learning #F0F0F0
 [OnlineLearning] as online_learning #F0F0F0
-[KnowledgeMigration] as knowledge_migration #F0F0F0
-[SingleProbeRoutingDecision] as single_probe_routing_decision #E8F5E8
-[LazyVkbClientImport] as lazy_vkb_client_import #E8F5E8
+[VkbApiClient] as vkb_api_client #F0F0F0
+[GraphKnowledgeExporter] as graph_knowledge_exporter #F0F0F0
+[CheckpointManager] as checkpoint_manager #F0F0F0
+[RoutingModeInitializer] as routing_mode_initializer #E8F5E8
 
 knowledge_management --> graph_database_adapter
 manual_learning -[hidden]- graph_database_adapter
 online_learning -[hidden]- graph_database_adapter
-knowledge_migration -[hidden]- graph_database_adapter
-graph_database_adapter --> single_probe_routing_decision
-graph_database_adapter --> lazy_vkb_client_import
+vkb_api_client -[hidden]- graph_database_adapter
+graph_knowledge_exporter -[hidden]- graph_database_adapter
+checkpoint_manager -[hidden]- graph_database_adapter
+graph_database_adapter --> routing_mode_initializer
 
 @enduml

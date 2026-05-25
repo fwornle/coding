@@ -2,105 +2,81 @@
 
 **Type:** SubComponent
 
-The CodeGraphAgent's classifyEntity function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to retrieve information from the graph database.
+The classification cache within OntologyClassificationSystem applies a 5-minute TTL policy, meaning repeated calls to classifyNode() with identical input will return cached confidence scores rather than re-invoking the LLM or heuristic pipeline.
 
-## What It Is  
+# OntologyClassificationSystem — Technical Insight Document
 
-**OntologyClassificationSystem** is a sub‑component that lives inside the **KnowledgeManagement** domain. Its primary responsibility is to classify a given entity against the system’s ontology. All of the classification work is delegated to the **CodeGraphAgent** – specifically the `classifyEntity` method found in `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`. The sub‑component does not contain its own classification logic; instead it orchestrates the call to the agent, supplies the required entity metadata, and receives the ontology‑based classification result.  
+## What It Is
 
-The implementation is tightly coupled to the semantic‑analysis package (`integrations/mcp-server-semantic-analysis`) and, through the agent, to the graph‑persistence layer (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). This makes the classification pathway traceable from the top‑level KnowledgeManagement component down through the CodeGraphAgent and into the underlying graph database.
+OntologyClassificationSystem is a SubComponent of KnowledgeManagement responsible for classifying graph nodes against both upper and lower ontologies sourced via the `OntologyRegistry` import from `@fwornle/km-core`. It serves as the dispatch layer that takes a classification request, resolves the appropriate ontology context, and routes the work to one of three configured classification methods: **heuristic**, **llm**, or **hybrid**. The component exposes a `classifyNode()` entry point whose results are memoized through an internal cache with a 5-minute TTL.
 
----
+Within the broader KnowledgeManagement hierarchy, OntologyClassificationSystem sits alongside siblings ManualLearning, OnlineLearning, and KmCoreMigration, and it contains one child component, CodeGraphRelationshipTaxonomy, which supplies the two-tier ontological model (structural containment versus semantic definition) over which classification decisions are made.
 
-## Architecture and Design  
+![OntologyClassificationSystem — Architecture](images/ontology-classification-system-architecture.png)
 
-The observed structure follows a **delegation‑centric** architecture. The OntologyClassificationSystem does not implement classification itself; it delegates to **CodeGraphAgent** (`classifyEntity`). This delegation is a classic *Facade*‑like pattern, where the sub‑component provides a simplified entry point for callers while hiding the complexity of the underlying agent and storage interactions.  
+## Architecture and Design
 
-The **CodeGraphAgent** itself acts as a *service* that bridges the domain logic with persistence. Inside `classifyEntity`, the agent reaches out to the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). The adapter supplies a **type‑safe** interface to the graph database, which is an explicit use of the *Adapter* pattern to isolate the rest of the code from database‑specific APIs.  
+The architecture follows a **strategy dispatch pattern** layered behind a caching facade. At the front, `classifyNode()` acts as the single public surface; behind it, a registry resolution step (via the imported `OntologyRegistry` from `@fwornle/km-core`) fetches both upper and lower ontology sources before the request is dispatched to the configured strategy. The three strategies — heuristic, llm, and hybrid — are interchangeable at configuration time, which keeps lighter heuristic paths viable for cheap or offline classification while preserving LLM-driven precision when needed. The hybrid mode implies a composition of the two, though the observations do not specify its internal weighting policy.
 
-All of these pieces sit under the **KnowledgeManagement** parent component, which also houses sibling sub‑components such as **ManualLearning**, **OnlineLearning**, **CodeGraphConstructor**, **EntityPersistenceManager**, **GraphDatabaseService**, and **UKBTraceReportGenerator**. The siblings share the same foundational agents (e.g., `constructCodeGraph` from CodeGraphAgent, `storeEntity` from PersistenceAgent) and the same GraphDatabaseAdapter, indicating a **shared‑service** architecture where common capabilities are factored into reusable agents and adapters.
+A second architectural concern is the **time-bounded memoization layer**. The 5-minute TTL cache wraps `classifyNode()`, so identical inputs short-circuit to a stored confidence score rather than re-invoking the underlying heuristic or LLM pipeline. This is a deliberate trade-off: the design favors throughput and cost containment (especially valuable when the LLM strategy is active) over freshness guarantees within the 5-minute window. Because the cache key is the classification input itself, callers who require freshly computed scores must either wait out the TTL or vary their input.
 
----
+The child component CodeGraphRelationshipTaxonomy contributes the canonical relationship vocabulary against which classification occurs — the seven documented types (CONTAINS_PACKAGE, CONTAINS_FOLDER, CONTAINS_FILE, CONTAINS_MODULE, DEFINES, DEFINES_METHOD, DEPENDS_ON_EXTERNAL) form the discrete output space that the strategies must map nodes into. This tight pairing between OntologyClassificationSystem (the runtime classifier) and CodeGraphRelationshipTaxonomy (the schema being classified against) is the core internal contract of the component.
 
-## Implementation Details  
+## Implementation Details
 
-1. **Classification Entry Point** – The only public method used by OntologyClassificationSystem is `classifyEntity` defined in `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`. The method signature expects an *entity* object that includes the necessary metadata (as observed in point 5).  
+The central runtime concern is the resolution flow inside `classifyNode()`. On invocation, the function consults the TTL cache first; on a miss, it uses `OntologyRegistry` (imported from `@fwornle/km-core`) to resolve both the upper ontology and the lower ontology relevant to the input. Once both ontology sources are in hand, the request is dispatched to the configured method:
 
-2. **Metadata Handling** – While the exact shape of the metadata is not enumerated, the observation that “providing metadata about the entity” is part of the classification flow tells us that the agent likely extracts or validates fields such as type, name, relationships, and possibly AST‑derived attributes before invoking the ontology lookup.  
+- **heuristic** — deterministic rule-based classification, presumably cheap and offline.
+- **llm** — model-driven classification, more expensive but more flexible.
+- **hybrid** — combined application of both signals.
 
-3. **Graph Database Interaction** – Inside `classifyEntity`, the agent calls into the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). This adapter abstracts CRUD operations on the underlying graph store, ensuring that the classification logic can query ontology nodes, relationships, or inference rules without dealing with low‑level query syntax.  
+Each path returns a confidence score, which is what the cache ultimately stores. The 5-minute TTL is a uniform policy applied across all three strategies; there is no observed differentiation in cache lifetime by method, meaning even cheap heuristic results are cached as aggressively as expensive LLM results.
 
-4. **Agent Collaboration** – The broader KnowledgeManagement context reveals that the **PersistenceAgent** (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`) works alongside the CodeGraphAgent for storage concerns. Although OntologyClassificationSystem does not directly invoke PersistenceAgent, the classification result may be persisted later by sibling components like **EntityPersistenceManager**, which uses `storeEntity`.  
+The classification target — the relationship taxonomy — is owned by the child CodeGraphRelationshipTaxonomy, which divides relationship types into two tiers: **structural containment** (the CONTAINS_* family plus DEPENDS_ON_EXTERNAL) and **semantic definition** (DEFINES, DEFINES_METHOD). Classifiers therefore implicitly operate over this bi-modal label space when assigning a node to a relationship type.
 
-5. **Reuse Across Siblings** – The same `classifyEntity` method is potentially reusable by other siblings that need ontology‑aware decisions (e.g., **OnlineLearning** could classify automatically extracted entities). This reuse is facilitated by the shared location of the agent file and the uniform interface it exposes.
+![OntologyClassificationSystem — Relationship](images/ontology-classification-system-relationship.png)
 
----
+## Integration Points
 
-## Integration Points  
+The most important integration is the dependency on `@fwornle/km-core`, specifically its `OntologyRegistry` export. This coupling means OntologyClassificationSystem does not own its ontology sources — it consumes them — and any change in the km-core registry API directly affects how upper/lower ontologies are resolved here. This integration is consistent with the broader migration narrative implied by the sibling KmCoreMigration component, which suggests an ongoing consolidation of shared infrastructure into the km-core package.
 
-- **CodeGraphAgent** – The sole integration for classification. All calls to `classifyEntity` are routed through `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`.  
-- **GraphDatabaseAdapter** – Provides the persistence back‑end for ontology lookups. The adapter is used inside the agent and is also directly referenced by **GraphDatabaseService**, which offers a type‑safe façade for other components needing graph access.  
-- **PersistenceAgent** – While not part of the classification path, it is part of the same agent family and is used by sibling components (e.g., **EntityPersistenceManager**) for storing classification outcomes.  
-- **KnowledgeManagement** – The parent component orchestrates the overall workflow. It may invoke OntologyClassificationSystem as part of a larger pipeline that includes code graph construction (`constructCodeGraph`) and entity persistence.  
-- **Sibling Components** – ManualLearning, OnlineLearning, and CodeGraphConstructor all rely on the same CodeGraphAgent for graph construction, suggesting that any change to the agent’s API (including `classifyEntity`) will ripple across these siblings.  
+Internally, OntologyClassificationSystem integrates downward with CodeGraphRelationshipTaxonomy, which defines the seven-type relationship vocabulary that classification outputs conform to. Upward, it lives under KnowledgeManagement, whose `GraphDatabaseAdapter` (at `src/storage/graph-database-adapter.ts`) governs how knowledge-management writes are routed — either through the VKB HTTP API or directly into LevelDB. While the observations do not explicitly state that OntologyClassificationSystem writes through this adapter, any persisted classification results within the KnowledgeManagement subsystem would inherit that adapter's dual-routing behavior.
 
-All integration points are file‑level explicit: the paths are fixed, and the class/function names are the contracts that other modules import.
+The siblings serve complementary roles: ManualLearning and OnlineLearning likely produce the very nodes and edges that OntologyClassificationSystem then classifies, while KmCoreMigration tracks the broader transition that exposes shared types (like `OntologyRegistry`) through km-core.
 
----
+## Usage Guidelines
 
-## Usage Guidelines  
+When invoking `classifyNode()`, developers should be aware that **identical inputs within a 5-minute window will return cached confidence scores** rather than fresh classifications. This is the correct default for most pipelines — it eliminates redundant LLM calls and stabilizes scores across rapid re-<USER_ID_REDACTED> — but it means that any test or workflow that mutates an upstream ontology and immediately reclassifies must either wait out the TTL, invalidate the cache, or vary the input to bypass memoization.
 
-1. **Pass Complete Metadata** – When invoking `OntologyClassificationSystem` (i.e., calling `CodeGraphAgent.classifyEntity`), ensure the entity object includes all required metadata fields expected by the agent. Missing fields may cause classification to fail or produce inaccurate ontology matches.  
+The choice of classification method should be deliberate. The heuristic mode is appropriate when classification rules are well-understood and cost matters; the llm mode is appropriate when the input space is too varied for rules to cover; the hybrid mode is the natural choice when neither alone suffices. Because all three modes share the same cache and the same TTL, switching methods does not flush stored results — the cache is method-agnostic with respect to keying.
 
-2. **Treat the Agent as a Black Box** – The sub‑component is designed to be a thin façade. Developers should avoid embedding classification logic in calling code; instead, rely on the agent’s method to encapsulate ontology rules.  
-
-3. **Respect the Adapter Contract** – If you need to query the graph database directly (e.g., for custom analytics), use the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) rather than raw database drivers. This preserves type safety and future compatibility.  
-
-4. **Coordinate with Persistence** – After classification, if the result must be stored, route it through **EntityPersistenceManager** (which uses `PersistenceAgent.storeEntity`). Directly persisting classification objects without the manager may bypass validation or indexing steps baked into the persistence pipeline.  
-
-5. **Version Compatibility** – Because OntologyClassificationSystem, its siblings, and the underlying agents share the same source files, any change to the signature of `classifyEntity` or to the GraphDatabaseAdapter interface must be coordinated across all dependent components to avoid breaking the shared contract.
+Because OntologyClassificationSystem relies on `OntologyRegistry` from `@fwornle/km-core`, developers extending or modifying this component should treat km-core as the source of truth for ontology shape. New ontology sources should be registered there, not added ad hoc inside OntologyClassificationSystem. Similarly, when the relationship vocabulary needs to evolve, changes should flow through the child CodeGraphRelationshipTaxonomy so that the two-tier structural/semantic distinction remains the canonical schema.
 
 ---
 
-### Architectural patterns identified  
+### Summary Findings
 
-1. **Facade / Delegation** – OntologyClassificationSystem provides a simple façade that delegates classification to CodeGraphAgent.  
-2. **Adapter** – GraphDatabaseAdapter abstracts the concrete graph‑DB API, delivering a type‑safe interface.  
-3. **Shared Service** – CodeGraphAgent and PersistenceAgent act as shared services used by multiple sibling components.
+1. **Architectural patterns identified**: strategy dispatch (heuristic/llm/hybrid), TTL-based memoization facade, registry-driven resource resolution, and a two-tier taxonomy (structural vs. semantic) supplied by the child component.
+2. **Design decisions and trade-offs**: the 5-minute TTL trades freshness for cost and throughput; method selection is configuration-driven rather than per-call, simplifying call sites but limiting fine-grained control; ontology ownership is externalized to `@fwornle/km-core`, reducing local responsibility but creating an upstream dependency.
+3. **System structure insights**: classification is cleanly separated from taxonomy definition (CodeGraphRelationshipTaxonomy) and from ontology sourcing (`OntologyRegistry`), giving a three-layer composition — schema, sources, dispatch.
+4. **Scalability considerations**: the TTL cache is the primary scalability lever, particularly under the llm strategy where per-call cost is non-trivial; uniform TTL across methods may overcache heuristic results unnecessarily but is unlikely to be a hotspot.
+5. **Maintainability assessment**: maintainability is supported by the externalization of ontology definitions to km-core and the encapsulation of the relationship vocabulary in CodeGraphRelationshipTaxonomy; the chief risk is implicit coupling to the km-core `OntologyRegistry` API surface, which the sibling KmCoreMigration component appears to be actively shaping.
 
-### Design decisions and trade‑offs  
-
-- **Centralising classification in CodeGraphAgent** reduces duplication but creates a single point of failure; any performance bottleneck or bug in `classifyEntity` impacts all consumers.  
-- **Using an adapter for the graph DB** isolates the rest of the system from vendor‑specific query languages, improving maintainability, at the cost of an extra indirection layer that may add slight latency.  
-- **Explicit file‑level coupling** (all components import from the same `integrations/mcp-server-semantic-analysis` directory) simplifies discovery but makes refactoring more delicate because many siblings share the same source files.
-
-### System structure insights  
-
-The system is organized as a hierarchy: **KnowledgeManagement** (parent) → **OntologyClassificationSystem** (sub‑component) plus several sibling sub‑components. All share a common agent layer (`code-graph-agent.ts`, `persistence-agent.ts`) and a persistence adapter (`graph-database-adapter.ts`). This indicates a modular but tightly‑coupled architecture where functional domains (learning, graph construction, persistence) are separated into sibling modules but rely on a common service layer.
-
-### Scalability considerations  
-
-- **Horizontal scaling** of classification can be achieved by deploying multiple instances of the CodeGraphAgent behind a load balancer, provided the underlying graph database can handle concurrent read queries.  
-- The **GraphDatabaseAdapter** abstracts the DB, so swapping to a more scalable graph store (e.g., a clustered Neo4j) would require only changes inside the adapter, not in the classification logic.  
-- Because classification is a read‑heavy operation (ontology lookup) rather than write‑heavy, scaling read replicas of the graph store would improve throughput without altering the OntologyClassificationSystem code.
-
-### Maintainability assessment  
-
-Maintainability is strong where the adapter pattern is used: changes to the graph DB API are localized to `graph-database-adapter.ts`. The façade approach of OntologyClassificationSystem also isolates callers from internal changes. However, the heavy reliance on a single agent file means that any modification to `classifyEntity` must be carefully coordinated with all sibling components, increasing the coordination overhead. Adding comprehensive unit tests around `classifyEntity` and the adapter will mitigate regression risk and preserve the system’s maintainability as it evolves.
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to construct a code knowledge graph based on Abstract Syntax Trees (ASTs). This allows for efficient semantic code search capabilities. The CodeGraphAgent is designed to work in conjunction with the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to store and retrieve entities from the graph database. The GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) provides a type-safe interface for interacting with the graph database, ensuring seamless data persistence and retrieval. For instance, the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) takes an AST as input and returns a constructed code graph, which is then stored in the graph database via the PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts).
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The GraphDatabaseAdapter (src/storage/graph-database-adapter.ts) implements a lock-free dual-routing pattern that is central to the component's ability to run multiple concurrent processes without LevelDB file-lock collisions. At runtime, the adapter dynamically imports VkbApiClient and calls isServerAvailable() to probe whether a live VKB HTTP server is reachable. If the probe succeeds, all write and read operations are routed through the REST API, meaning the LevelDB file is exclusively owned by the VKB server process and agent workers never open it directly. If the probe fails—because the server is stopped or not yet started—the adapter falls back to direct GraphDatabaseService+LevelDB access. This design deliberately avoids any static configuration toggle, instead making the routing decision dynamically at call time, which means a developer starting the VKB server mid-session will transparently shift all subsequent operations to the API path without restarting agent workers. The practical consequence is that teams can run the VKB server in a long-lived terminal while agent workflows execute in parallel, and the system self-coordinates. The debounce-based GraphKnowledgeExporter (dynamically imported from src/knowledge-management/GraphKnowledgeExporter.js, 2000ms debounce) is only attached and triggered on the direct LevelDB path, ensuring JSON export files under .data/knowledge-export stay synchronized only when the adapter is writing directly, and are not double-written when the VKB server is managing its own export lifecycle.
+
+### Children
+- [CodeGraphRelationshipTaxonomy](./CodeGraphRelationshipTaxonomy.md) -- The project documentation explicitly enumerates seven core relationship types as key documented components — CONTAINS_PACKAGE, CONTAINS_FOLDER, CONTAINS_FILE, CONTAINS_MODULE, DEFINES, DEFINES_METHOD, and DEPENDS_ON_EXTERNAL — establishing a two-tier ontological classification of structural containment versus semantic definition.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from manually authored entities.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from automatically extracted entities.
-- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from an AST.
-- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to store entities in the graph database.
-- [GraphDatabaseService](./GraphDatabaseService.md) -- GraphDatabaseService uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to provide a type-safe interface for interacting with the graph database.
-- [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator uses the CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to generate reports.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning is a sub-component of KnowledgeManagement
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning is a sub-component of KnowledgeManagement
+- [KmCoreMigration](./KmCoreMigration.md) -- KmCoreMigration is a sub-component of KnowledgeManagement
+
 
 ---
 
-*Generated from 6 observations*
+*Generated from 3 observations*

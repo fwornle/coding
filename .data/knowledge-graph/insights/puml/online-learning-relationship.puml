@@ -6,14 +6,16 @@ title Hierarchy Context: OnlineLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [OnlineLearning] as online_learning #LightBlue
 [ManualLearning] as manual_learning #F0F0F0
-[EntityMigrationScripts] as entity_migration_scripts #F0F0F0
-[OntologyMetadataMapper] as ontology_metadata_mapper #E8F5E8
-[VkbLevelDbPersistenceFallback] as vkb_level_db_persistence_fallback #E8F5E8
+[VkbApiClient] as vkb_api_client #F0F0F0
+[GraphKnowledgeExporter] as graph_knowledge_exporter #F0F0F0
+[CheckpointManager] as checkpoint_manager #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #F0F0F0
 
 knowledge_management --> online_learning
 manual_learning -[hidden]- online_learning
-entity_migration_scripts -[hidden]- online_learning
-online_learning --> ontology_metadata_mapper
-online_learning --> vkb_level_db_persistence_fallback
+vkb_api_client -[hidden]- online_learning
+graph_knowledge_exporter -[hidden]- online_learning
+checkpoint_manager -[hidden]- online_learning
+graph_database_adapter -[hidden]- online_learning
 
 @enduml

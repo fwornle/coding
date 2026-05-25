@@ -1,0 +1,48 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+title "KM Core Migration Architecture\nv1.0 — 2026-05-25"
+
+' Author: fradou7@gmail.com
+' Purpose: Illustrates LevelDB + GraphDB → km-core migration pipeline
+```
+
+---
+
+## ✅ Corrected PlantUML (Complete)
+
+```plantuml
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Source Stores" {
+    database "LevelDB" as leveldb <<storage>>
+    database "Graph DB" as graphdb <<storage>>
+}
+
+package "KmCoreMigration" {
+    component "migrate-leveldb-to-kmcore.mjs" as migrateLeveldb <<core>>
+    component "migrate-graph-db-entity-types.js" as migrateGraph <<core>>
+    component "UUIDv7 Key Assigner" as uuidAssigner <<core>>
+    component "Error Budget Enforcer" as errorBudget <<core>>
+    component "Dry-Run Preview" as dryRun <<cli>>
+}
+
+package "KnowledgeManagement / km-core" {
+    database "km-core Canonical Store" as kmcore <<storage>>
+    component "Entity Type Registry" as entity Registry <<core>>
+}
+
+leveldb --> migrateLeveldb : "source records"
+graphdb --> migrateGraph : "entity types"
+
+migrateLeveldb --> uuidAssigner : "assigns UUIDv7 keys\n+ provenance stamps"
+uuidAssigner --> kmcore : "transformed records"
+
+migrateGraph --> errorBudget : "tracks failures\nvs. threshold"
+migrateGraph --> dryRun : "preview remappings\n(no writes)"
+errorBudget --> migrateGraph : "halt / skip signal"
+migrateGraph --> entity Registry : "remapped entity types"
+
+@enduml

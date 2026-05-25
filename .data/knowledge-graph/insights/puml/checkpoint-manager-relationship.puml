@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CheckpointManager
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[CheckpointManager] as checkpoint_manager #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[VkbApiClient] as vkb_api_client #F0F0F0
+[GraphKnowledgeExporter] as graph_knowledge_exporter #F0F0F0
+[GraphDatabaseAdapter] as graph_database_adapter #F0F0F0
+[CommitHashRegistry] as commit_hash_registry #E8F5E8
+
+knowledge_management --> checkpoint_manager
+manual_learning -[hidden]- checkpoint_manager
+online_learning -[hidden]- checkpoint_manager
+vkb_api_client -[hidden]- checkpoint_manager
+graph_knowledge_exporter -[hidden]- checkpoint_manager
+graph_database_adapter -[hidden]- checkpoint_manager
+checkpoint_manager --> commit_hash_registry
+
+@enduml

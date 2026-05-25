@@ -7,13 +7,17 @@ title Hierarchy Context: Pipeline
 [Pipeline] as pipeline #LightBlue
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
-[OntologySubsystem] as ontology_subsystem #F0F0F0
-[BatchAnalysisYamlConfig] as batch_analysis_yaml_config #E8F5E8
+[OntologyConfigManager] as ontology_config_manager #F0F0F0
+[LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
+[BaseAgent] as base_agent #F0F0F0
+[DAGTopologicalExecutor] as dagtopological_executor #E8F5E8
 
 semantic_analysis --> pipeline
 ontology -[hidden]- pipeline
 insights -[hidden]- pipeline
-ontology_subsystem -[hidden]- pipeline
-pipeline --> batch_analysis_yaml_config
+ontology_config_manager -[hidden]- pipeline
+legacy_ontology_adapter -[hidden]- pipeline
+base_agent -[hidden]- pipeline
+pipeline --> dagtopological_executor
 
 @enduml

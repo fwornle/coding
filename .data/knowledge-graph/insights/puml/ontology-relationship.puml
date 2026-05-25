@@ -7,13 +7,17 @@ title Hierarchy Context: Ontology
 [Ontology] as ontology #LightBlue
 [Pipeline] as pipeline #F0F0F0
 [Insights] as insights #F0F0F0
-[OntologySubsystem] as ontology_subsystem #F0F0F0
-[TwoTierClassificationHierarchy] as two_tier_classification_hierarchy #E8F5E8
+[OntologyConfigManager] as ontology_config_manager #F0F0F0
+[LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
+[BaseAgent] as base_agent #F0F0F0
+[LegacyOntologyAdapter] as legacy_ontology_adapter #E8F5E8
 
 semantic_analysis --> ontology
 pipeline -[hidden]- ontology
 insights -[hidden]- ontology
-ontology_subsystem -[hidden]- ontology
-ontology --> two_tier_classification_hierarchy
+ontology_config_manager -[hidden]- ontology
+legacy_ontology_adapter -[hidden]- ontology
+base_agent -[hidden]- ontology
+ontology --> legacy_ontology_adapter
 
 @enduml

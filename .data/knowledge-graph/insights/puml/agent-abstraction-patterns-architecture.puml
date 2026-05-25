@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Agent Abstraction Layer" {
+  component "Base Agent Interface" as bai <<core>>
+  component "__init__()\nCheap Construction" as ctor <<core>>
+  component "initialize()\nLazy Setup" as init <<core>>
+}
+
+package "Agent Registration" {
+  component "Concrete Agent Types" as cat <<agent>>
+  component "Agent Registry" as reg <<core>>
+}
+
+package "Runtime & External Resources" {
+  component "Workflow Invocation" as wf <<api>>
+  component "LLM Model Setup" as llm <<external>>
+  component "Network / Credentials" as net <<external>>
+}
+
+bai --> ctor : "enforces cheap phase"
+bai --> init : "enforces deferred phase"
+cat --> bai : "adheres to lifecycle"
+ctor --> reg : "low-cost startup\nregistration"
+wf --> reg : "resolves agent"
+wf --> init : "triggers on\nfirst invocation"
+init --> llm : "deferred model load"
+init --> net : "deferred credential load"
+
+@enduml

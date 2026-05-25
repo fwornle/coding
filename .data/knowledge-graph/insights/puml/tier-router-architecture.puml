@@ -3,28 +3,30 @@
 
 top to bottom direction
 
-package "Inputs" {
-  component "Routing Request" as routingReq <<api>>
+package "Request Inputs" {
   component "Agent Identity" as agentId <<agent>>
+  component "Request Context" as reqCtx <<api>>
+  component "Env / Config Flags" as envFlags <<cli>>
 }
 
-package "Routing Layer" {
-  component "LLMStateManager" as llmState <<core>>
-  component "TierRouter" as tierRouter <<core>>
+package "LLMAbstraction" {
+  component "TierRouter" as tr <<core>>
+  component "Mode Control" as mc <<core>>
 }
 
-package "Configuration" {
-  database "llm-providers.yaml" as providersYaml <<storage>>
+package "LLM Provider Tiers" {
+  component "Mock Provider" as mockProv <<external>>
+  component "Local Provider" as localProv <<external>>
+  cloud "Public Provider" as pubProv
 }
 
-package "Provider Layer" {
-  component "Provider Adapters" as providerAdapters <<external>>
-}
+agentId --> tr : "resolves identity"
+reqCtx  --> tr : "provides context"
+envFlags --> mc : "configures gates"
+mc --> tr : "controls tier transitions"
 
-routingReq --> llmState : "resolves operational mode"
-llmState --> tierRouter : "local / public mode only"
-agentId --> tierRouter : "agent tier pin"
-providersYaml --> tierRouter : "available models per tier"
-tierRouter --> providerAdapters : "emits (provider, model)"
+tr --> mockProv : "tier 1 · test"
+tr --> localProv : "tier 2 · local"
+tr --> pubProv   : "tier 3 · public"
 
 @enduml

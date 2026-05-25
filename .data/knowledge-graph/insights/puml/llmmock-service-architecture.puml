@@ -1,34 +1,36 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Docker Environment" {
-
-  package "Configuration Layer" {
-    component "LLMMockService" as llmMock <<core>>
-    database "workflow-progress.json" as wpJson <<storage>>
-  }
-
-  package "LLM Mode Targets" {
-    component "Mock Mode" as mockMode <<core>>
-    component "Local Model" as localModel <<core>>
-    cloud "Public LLM" as publicLLM <<external>>
-  }
-
-  package "mcp-server-semantic-analysis" {
-    component "Semantic Agent A" as agentA <<agent>>
-    component "Semantic Agent B" as agentB <<agent>>
-  }
-
+package "MCP Semantic Analysis Server" {
+    component "Agent Factory\n/ Dispatcher" as agentFactory <<core>>
+    component "Agent (Global Mode)" as agentGlobal <<agent>>
+    component "Agent (Per-Agent Override)" as agentOverride <<agent>>
 }
 
-llmMock --> wpJson : "persists mode state"
-wpJson ..> llmMock : "restores on restart"
+package "mock/ Subdirectory" {
+    component "LLMMockService\n(Singleton)" as llmMock <<core>>
+    component "Mock Mode\n(Deterministic / Offline)" as modeMock <<api>>
+    component "Local Mode\n(Local LLM Backend)" as modeLocal <<api>>
+    component "Public Mode\n(External LLM API)" as modePublic <<api>>
+}
 
-llmMock --> mockMode : "activates"
-llmMock --> localModel : "activates"
-llmMock --> publicLLM : "activates"
+package "Infrastructure" {
+    component "Docker Container\n/ CI Pipeline" as docker <<external>>
+    cloud "External LLM API" as externalLLM <<external>>
+}
 
-agentA --> wpJson : "reads per-agent override"
-agentB --> wpJson : "reads per-agent override"
+agentFactory --> llmMock : "get/set global mode"
+agentGlobal --> llmMock : "reads global default"
+agentOverride --> llmMock : "applies per-agent override"
+
+llmMock --> modeMock : "routes to"
+llmMock --> modeLocal : "routes to"
+llmMock --> modePublic : "routes to"
+
+docker --> modeMock : "offline / API-blocked CI"
+modePublic --> externalLLM : "calls"
+
+agentFactory --> agentGlobal : "instantiates"
+agentFactory --> agentOverride : "instantiates"
 
 @enduml

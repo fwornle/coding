@@ -1,0 +1,11 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DMRConfigLoader
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[DMRConfigLoader] as dmrconfig_loader #LightBlue
+
+llmabstraction --> dmrconfig_loader
+
+@enduml

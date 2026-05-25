@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LegacyOntologyAdapter
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[LegacyOntologyAdapter] as legacy_ontology_adapter #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyConfigManager] as ontology_config_manager #F0F0F0
+[BaseAgent] as base_agent #F0F0F0
+[RegistryDecouplingAdapter] as registry_decoupling_adapter #E8F5E8
+
+semantic_analysis --> legacy_ontology_adapter
+pipeline -[hidden]- legacy_ontology_adapter
+ontology -[hidden]- legacy_ontology_adapter
+insights -[hidden]- legacy_ontology_adapter
+ontology_config_manager -[hidden]- legacy_ontology_adapter
+base_agent -[hidden]- legacy_ontology_adapter
+legacy_ontology_adapter --> registry_decoupling_adapter
+
+@enduml

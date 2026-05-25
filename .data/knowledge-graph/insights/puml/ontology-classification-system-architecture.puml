@@ -1,0 +1,35 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "KnowledgeManagement" {
+
+  package "OntologyClassificationSystem" {
+    component "classifyNode() API" as classifyApi <<api>>
+    component "Classification Cache\n[TTL: 5 min]" as cache <<storage>>
+    component "Classification Router" as router <<core>>
+    component "Heuristic Pipeline" as heuristic <<core>>
+    component "LLM Pipeline" as llm <<core>>
+    component "Hybrid Pipeline" as hybrid <<core>>
+  }
+
+}
+
+package "@fwornle/km-core" {
+  component "OntologyRegistry" as registry <<external>>
+  database "Upper Ontology Source" as upperOntology
+  database "Lower Ontology Source" as lowerOntology
+}
+
+classifyApi --> cache : "lookup"
+classifyApi --> router : "on cache miss"
+router --> registry : "import & resolve"
+registry --> upperOntology : "resolves"
+registry --> lowerOntology : "resolves"
+router --> heuristic : "heuristic mode"
+router --> llm : "llm mode"
+router --> hybrid : "hybrid mode"
+heuristic --> cache : "store confidence scores"
+llm --> cache : "store confidence scores"
+hybrid --> cache : "store confidence scores"
+
+@enduml

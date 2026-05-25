@@ -1,29 +1,32 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management Core" {
-  component "KnowledgeManagement" as km <<core>>
-  component "VkbApiClient\n//lib/ukb-unified/core/VkbApiClient.js//" as vkb <<api>>
+top to bottom direction
+
+package "Application Layer" {
+  component "Application Processes\n(Concurrent Writers)" as procs <<agent>>
 }
 
-package "CRUD Interface" {
-  component "Entity Types\nProject · Component · SubComponent\nPattern · Detail · System" as entities <<core>>
+package "Adapter Layer" {
+  component "GraphDatabaseAdapter" as gda <<core>>
 }
 
-package "HTTP API Server" {
-  component "API Server\n//fronts Graph + Storage//" as server <<api>>
+package "Unified Library Layer\n(lib/ukb-unified/core/)" {
+  component "VkbApiClient" as vkb <<api>>
 }
 
-package "Graph + Storage Stack" {
-  component "Graphology\n//in-memory graph//" as graphology <<storage>>
-  database "LevelDB\n//persistent storage//" as leveldb <<storage>>
+package "Infrastructure Layer" {
+  component "HTTP API Server" as httpapi <<external>>
+  database "LevelDB" as leveldb <<storage>>
 }
 
-km ..> vkb : "dynamic import (runtime)\nno static dependency"
-km --> leveldb : "fallback: direct access\n(offline / server not running)"
-entities --> vkb : "type encoded in payload"
-vkb --> server : "lock-free HTTP CRUD\n(concurrent read/write safe)"
-server --> graphology : "atomic write propagation\n(in-memory)"
-server --> leveldb : "atomic write propagation\n(persistent)"
+procs --> gda : "read / write requests"
+
+gda --> vkb : "isServerAvailable()\n[startup — determines routing mode]"
+gda --> vkb : "all reads & writes\n[live mode]"
+gda ..> leveldb : "direct access\n[direct mode — risk: lock collision]"
+
+vkb --> httpapi : "HTTP requests\n[implicit write queue / serialization]"
+httpapi --> leveldb : "serialized single-writer\naccess"
 
 @enduml

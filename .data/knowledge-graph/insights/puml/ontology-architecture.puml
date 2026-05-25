@@ -1,32 +1,39 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Ontology Definitions" {
-    component "Upper Ontology" as upperOnt <<core>>
-    component "Lower Ontology" as lowerOnt <<core>>
-    upperOnt --> lowerOnt : "refinement"
+top to bottom direction
+
+package "Ontology Interfaces" {
+  component "OntologyClassifier" as classifier <<api>>
+  component "OntologyValidator" as validator <<api>>
 }
 
-package "Classification Pipeline" {
-    component "OntologyClassificationBatch" as batch <<core>>
-    component "OntologyClassificationAgent" as classAgent <<agent>>
-    component "Entity Type Resolution" as typeRes <<core>>
+package "Adapter & Core" {
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  component "OntologyRegistry\n(km-core)" as registry <<external>>
+  component "OntologyConfigManager" as configMgr <<core>>
 }
 
-package "Validation & Output" {
-    component "Validation Rules" as valRules <<core>>
+package "Taxonomy Storage" {
+  database "Upper Ontology\n(Module, Package, Concept)" as upperOnt
+  database "Lower Ontology\n(Domain Subtypes)" as lowerOnt
 }
 
-package "MCP Tool Integration" {
-    component "Tool Extensions" as toolExt <<external>>
+package "Pipeline" {
+  component "Insight Agents" as insightAgents <<agent>>
+  component "Entity Type Resolver" as resolver <<core>>
+  component "Persistence Step" as persistence <<core>>
 }
 
-batch --> classAgent : "pre-batched entities"
-classAgent --> typeRes : "resolve entity types"
-upperOnt --> typeRes : "broad abstract categories"
-lowerOnt --> typeRes : "concrete type refinement"
-typeRes --> valRules : "classified entities"
-valRules --> toolExt : "validated entity types"
-toolExt ..> typeRes : "shared classification path"
+classifier --> adapter : "backed by"
+validator --> adapter : "backed by"
+adapter --> registry : "wraps"
+configMgr --> upperOnt : "manages"
+configMgr --> lowerOnt : "manages"
+configMgr --> registry : "triggers hot-reload"
+insightAgents --> resolver : "semantic signals"
+resolver --> classifier : "resolve ontologyClass"
+resolver --> persistence : "entity + ontologyClass"
+validator --> persistence : "schema gate"
 
 @enduml

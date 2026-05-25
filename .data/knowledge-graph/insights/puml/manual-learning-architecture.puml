@@ -1,34 +1,38 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Knowledge Authoring" {
-    component "ManualLearning Entities\n(System, Project, Component,\nSubComponent, Pattern, Detail)" as ml <<core>>
-}
-
-package "Routing Layer" {
-    component "PersistenceAgent" as pa <<agent>>
-    component "GraphDatabaseAdapter" as gda <<agent>>
-}
-
-package "API Layer" {
-    component "VKB HTTP API" as vkb <<api>>
-    component "MCP Server" as mcp <<api>>
+package "Human-Curated Write Path" {
+  component "ManualLearning" as ml <<core>>
+  component "GraphDatabaseAdapter" as gda <<api>>
 }
 
 package "Storage Layer" {
-    component "GraphDatabaseService\n(Graphology + LevelDB)" as gds <<core>>
-    component "Graphology Graph" as gg <<storage>>
-    database "LevelDB" as ldb <<storage>>
+  cloud "VKB HTTP API" as vkb <<api>>
+  database "LevelDB" as ldb <<storage>>
 }
 
-ml --> pa : "routes writes\n(ontology metadata)"
-ml --> gda : "direct authoring path"
-pa --> vkb : "writes via API\n(skips LLM re-classification)"
-gda --> mcp : "checks availability"
-gda --> vkb : "API path\n(MCP online)"
-gda --> ldb : "direct write\n(MCP offline, avoids lock)"
-vkb --> gds : "manages"
-gds --> gg : "typed nodes & edges\n(hierarchical relationships)"
-gds --> ldb : "bi-temporal\nstaleness tracking"
+package "Event & Export Pipeline" {
+  component "entity:stored Event" as evt <<core>>
+  component "GraphKnowledgeExporter" as gke <<core>>
+  database "Domain JSON Exports" as djson <<storage>>
+}
+
+package "Automated Pipeline" {
+  component "OnlineLearning" as ol <<agent>>
+  component "CheckpointManager" as cm <<core>>
+}
+
+ml --> gda : "writes (highest trust)"
+gda --> vkb : "live mode routing"
+gda ..> ldb : "direct mode (lock collision risk)"
+vkb --> ldb : "persists to"
+
+ml --> evt : "triggers entity:stored"
+evt --> gke : "notifies (per domain)"
+gke --> djson : "regenerates (debounced)"
+
+ol --> cm : "commit-hash incremental tracking"
+ol --> gda : "batch writes"
+ml ..> ol : "bypasses batch pipeline"
 
 @enduml

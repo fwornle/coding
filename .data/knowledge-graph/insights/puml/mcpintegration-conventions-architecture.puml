@@ -1,0 +1,33 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "MCP Integrations (Reference Implementations)" {
+  component "mcp-server-semantic-analysis" as semanalysis <<core>>
+  component "code-graph-rag" as coderag <<core>>
+  component "mcp-constraint-monitor" as constraintmon <<core>>
+}
+
+package "Documentation Standards" {
+  component "API Reference\n(docs/api/README.md)" as apiref <<api>>
+  component "Architecture Docs\n(docs/architecture/)" as archdocs <<core>>
+  component "Installation Docs\n(docs/installation/)" as installdocs <<core>>
+  component "Claude Code Setup\n(docs/claude-code-setup.md)" as ccsetup <<cli>>
+  component "README Pattern\n(overview / setup / usage)" as readmepat <<core>>
+}
+
+package "Tool Abstraction & Governance" {
+  component "Tool Extensions\n(architecture/tools.md)" as toolext <<api>>
+  component "Deviation Tracker\n(CRITICAL-ARCHITECTURE-ISSUES.md)" as devtracker <<core>>
+}
+
+semanalysis --> apiref : "publishes"
+semanalysis --> archdocs : "includes"
+semanalysis --> installdocs : "includes"
+semanalysis --> readmepat : "follows"
+semanalysis --> devtracker : "records violations in"
+coderag --> ccsetup : "provides"
+coderag --> readmepat : "follows"
+constraintmon --> readmepat : "follows"
+archdocs --> toolext : "documents"
+
+@enduml

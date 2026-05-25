@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Configuration Layer" {
+  component "Constraint Configuration Schema" as configSchema <<storage>>
+  component "Rule Types & Scopes" as ruleDefs <<core>>
+  component "Enforcement Modes" as enforceModes <<core>>
+}
+
+package "Rule Engine Core" {
+  component "ConstraintRuleEngine" as engine <<core>>
+  component "Syntactic Rule Matcher" as syntacticMatcher <<core>>
+  component "Semantic Constraint Detector" as semanticDetector <<core>>
+}
+
+package "AI Classification" {
+  component "LLM-Assisted Classifier" as llmClassifier <<external>>
+}
+
+configSchema --> ruleDefs : "defines"
+configSchema --> enforceModes : "defines"
+ruleDefs --> engine : "configures"
+enforceModes --> engine : "configures"
+engine --> syntacticMatcher : "pattern evaluation"
+engine --> semanticDetector : "meaning-based evaluation"
+semanticDetector --> llmClassifier : "classification request"
+
+@enduml

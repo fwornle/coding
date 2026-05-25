@@ -1,35 +1,35 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Config & Validation" {
-  component "LSLConfigValidator" as validator <<cli>>
+package "Adapter Layer" {
+  component "TranscriptAdapter\n[Abstract Base Class]" as ta <<core>>
+  component "AgentImpl\n(Claude Code / other agents)" as ai <<agent>>
+  component "LSLConverter" as lslc <<core>>
+}
+
+package "Configuration & Validation" {
+  component "LSLConfigValidator" as lcv <<cli>>
   database "lsl-config.json" as lslcfg <<storage>>
-  database "redaction-config.yaml" as redactcfg <<storage>>
+  database "redaction-config.yaml" as redcfg <<storage>>
 }
 
-package "Agent Integration Layer" {
-  component "TranscriptAdapter" as ta <<api>>
-  component "ClaudeCode Adapter" as cca <<agent>>
-  component "CopilotCLI Adapter" as copa <<agent>>
+package "Runtime Backend" {
+  component "AsyncLogBuffer\n(100ms / 50-entry flush)" as alb <<core>>
+  component "FileManager\n(Routing & Rotation)" as fm <<storage>>
 }
 
-package "Core LSL Pipeline" {
-  component "watchTranscripts\n(Poll Engine)" as wt <<core>>
-  component "LSLConverter" as conv <<core>>
-  component "LSLSession" as sess <<core>>
+package "5-Layer Classification" {
+  component "Ontology\nClassification Pipeline" as clp <<api>>
 }
 
-database "JSONL Session Files" as jsonlfiles <<storage>>
-
-validator --> lslcfg : "validates schema"
-validator --> redactcfg : "validates schema"
-validator ..> sess : "injects userHash\n(SHA-256 prefix)"
-
-cca --> ta : "implements contract"
-copa --> ta : "implements contract"
-wt --> ta : "polls readTranscripts()\ngetCurrentSession()"
-wt --> conv : "dispatches entry delta\n(1000ms interval)"
-conv --> sess : "serializes / deserializes"
-sess --> jsonlfiles : "toJSONL()\nmetadata-first layout"
+ai --> ta : extends contract\n(5-method interface)
+ta --> lslc : delegates\nformat conversion
+lslc --> redcfg : applies\nredaction rules
+lcv --> lslcfg : validates schema\n(size & batch bounds)
+lcv --> redcfg : validates schema\n(enabled & categories)
+lslcfg --> ta : configures session\nwindowing & multiUser
+ta --> fm : routes LSL output\n(timeWindow / userHash)
+ta --> clp : classifies\nlog entries
+alb --> fm : buffered\nappendFile write
 
 @enduml

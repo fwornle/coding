@@ -1,35 +1,33 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Configuration" {
-  component "llm-providers.yaml" as llmConfig <<storage>>
+top to bottom direction
+
+package "LLMAbstraction" {
+
+  component "PublicProviderAdapter" as ppa <<core>>
+
+  package "src/providers/" as provPkg {
+    component "anthropic-provider.ts" as anthProv <<api>>
+    component "openai-provider.ts" as oaiProv <<api>>
+    component "groq-provider.ts" as groqProv <<api>>
+    component "dmr-provider.ts" as dmrProv <<core>>
+  }
 }
 
-package "Core" {
-  component "LLMStateManager" as stateMgr <<core>>
-  component "PublicProviderAdapter" as adapterIface <<core>>
-}
+cloud "Anthropic Cloud API" as anthAPI
+cloud "OpenAI Cloud API" as oaiAPI
+cloud "Groq Cloud API" as groqAPI
+component "Internal DMR Proxy" as dmrProxy <<external>>
 
-package "Provider Adapters (src/providers/)" {
-  component "AnthropicAdapter" as anthropicAdpt <<api>>
-  component "OpenAIAdapter" as openaiAdpt <<api>>
-  component "GroqAdapter" as groqAdpt <<api>>
-}
+anthProv --> ppa : "implements"
+oaiProv --> ppa : "implements"
+groqProv --> ppa : "implements"
 
-package "External Cloud Services" {
-  cloud "Anthropic API" as anthropicSvc
-  cloud "OpenAI API" as openaiSvc
-  cloud "Groq API" as groqSvc
-}
+anthProv --> anthAPI : "direct auth & routing"
+oaiProv --> oaiAPI : "direct auth & routing"
+groqProv --> groqAPI : "direct auth & routing"
 
-llmConfig --> stateMgr : "declares supported providers"
-llmConfig --> adapterIface : "supplies init config keys"
-stateMgr --> adapterIface : "invokes when mode='public'"
-adapterIface --> anthropicAdpt : "delegates"
-adapterIface --> openaiAdpt : "delegates"
-adapterIface --> groqAdpt : "delegates"
-anthropicAdpt --> anthropicSvc : "calls"
-openaiAdpt --> openaiSvc : "calls"
-groqAdpt --> groqSvc : "calls"
+dmrProv --> dmrProxy : "proxy routing"
 
 @enduml

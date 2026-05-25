@@ -1,32 +1,35 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Write Sources" {
-  component "Manual Learning" as ml <<agent>>
-  component "Online Learning" as ol <<agent>>
+package "Learning Sources" {
+  component "ManualLearning" as ml <<agent>>
+  component "OnlineLearning" as ol <<agent>>
 }
 
-package "Knowledge Base Core" {
-  component "GraphDatabaseService" as gds <<core>>
+package "Knowledge Graph" {
+  database "LevelDB" as ldb <<storage>>
+  component "entity:stored Event Bus" as evtbus <<core>>
+  component "HTTP API" as httpapi <<api>>
+}
+
+package "Export Pipeline" {
   component "GraphKnowledgeExporter" as gke <<core>>
+  component "Debounce Layer" as dbl <<core>>
+  component "Domain-Partitioned JSON Files" as json <<storage>>
 }
 
-package "Export Storage (.data/knowledge-export)" {
-  database "Domain JSON Files" as domainFiles <<storage>>
-}
-
-package "External Consumers" {
+package "Downstream Consumers" {
   component "RAG Integrations" as rag <<external>>
-  component "code-graph-rag" as cgr <<external>>
-  component "MCP Servers" as mcp <<external>>
 }
 
-ml --> gds : "writes entity"
-ol --> gds : "writes entity"
-gds --> gke : "entity:stored event"
-gke --> domainFiles : "debounced\nbatch write (per-domain)"
-domainFiles --> rag : "reads snapshot"
-domainFiles --> cgr : "reads snapshot"
-domainFiles --> mcp : "reads snapshot"
+ml --> ldb : "writes entity"
+ol --> ldb : "batch writes"
+ldb --> evtbus : "emits on\nsuccessful write"
+ldb --> httpapi : "serves"
+evtbus --> gke : "subscribes\n(all sources)"
+gke --> dbl : "coalesces rapid\nupdates per domain"
+dbl --> json : "exports\nper domain"
+json --> rag : "file-based\nconsumption"
+httpapi ..> rag : "not accessible\nto downstream"
 
 @enduml

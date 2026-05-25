@@ -1,37 +1,42 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Configuration Layer" {
-  database "User Config\n~/.coding-tools/hooks.json" as userConfig <<storage>>
-  database "Project Config\n.coding/hooks.json" as projectConfig <<storage>>
-  component "HookConfigLoader" as configLoader <<core>>
+component "Claude Code Agent" as agent <<agent>>
+
+package "Configuration" {
+  component "User Hooks Config\n~/.coding-tools/hooks.json" as userCfg <<external>>
+  component "Project Hooks Config\n.coding/hooks.json" as projCfg <<external>>
 }
 
-package "Hook Execution Layer" {
-  component "UnifiedHookManager" as hookManager <<core>>
+package "Hook Infrastructure" {
+  component "HookConfigLoader" as hookCfg <<core>>
+  component "UnifiedHookManager" as hookMgr <<core>>
 }
 
 package "Violation Persistence" {
-  component "ViolationCaptureService" as violationSvc <<core>>
-  database "JSONL Log\nsession-violations.jsonl" as jsonlLog <<storage>>
-  database "JSON History\nviolation-history.json" as jsonHistory <<storage>>
+  component "ViolationCaptureService" as vcs <<core>>
+  database "session-violations.jsonl\n(.mcp-sync/)" as sessionLog <<storage>>
+  database "violation-history.json\n(.mcp-sync/)" as historyJson <<storage>>
 }
 
-package "Monitoring & Integration" {
-  component "MCP Constraint Monitor" as mcpMonitor <<external>>
-  component "Dashboard" as dashboard <<external>>
-  component "MCP Semantic Analysis" as semanticAnalysis <<external>>
+package "MCP Integration" {
+  component "mcp-constraint-monitor" as mcpMon <<api>>
+  component "Violation Dashboard" as dashboard <<cli>>
 }
 
-userConfig --> configLoader : "global defaults"
-projectConfig --> configLoader : "project overrides"
-configLoader --> hookManager : "mergeConfigs()"
-hookManager --> violationSvc : "emit violations"
-violationSvc --> jsonlLog : "append-only audit"
-violationSvc --> jsonHistory : "capped 1000 entries"
-jsonlLog --> mcpMonitor : "stream events"
-jsonHistory --> mcpMonitor : "recent violations"
-mcpMonitor --> dashboard : "status & stats"
-semanticAnalysis ..> hookManager : "semantic detection"
+agent --> hookMgr : "pre/post-tool events"
+
+userCfg --> hookCfg : "base config"
+projCfg --> hookCfg : "project overrides"
+hookCfg --> hookMgr : "merged handlers\n(priority-sorted)"
+
+hookMgr --> vcs : "constraint violations\n(sanitized params)"
+vcs --> sessionLog : "appends JSONL"
+vcs --> historyJson : "capped at 1000 entries"
+
+historyJson --> dashboard : "violation history"
+vcs --> dashboard : "calculateStatistics()"
+mcpMon ..> hookMgr : "MCP bridge"
+mcpMon --> dashboard : "semantic detection\n+ hook format docs"
 
 @enduml

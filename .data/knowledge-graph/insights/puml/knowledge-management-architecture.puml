@@ -1,30 +1,47 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "MCP Semantic Analysis" {
+top to bottom direction
+
+package "Agent Layer" {
   component "PersistenceAgent" as pa <<agent>>
+}
+
+package "Classification (km-core)" {
+  component "OntologyRegistry" as oreg <<external>>
+}
+
+package "Storage Layer" {
   component "GraphDatabaseAdapter" as gda <<core>>
-}
-
-package "VKB Unified" {
-  component "VkbApiClient" as vkbc <<api>>
-  component "VKB HTTP API Server" as vkbapi <<api>>
-}
-
-package "Knowledge Management Core" {
-  component "GraphDatabaseService\n(Graphology)" as gds <<storage>>
-  database "LevelDB" as ldb <<storage>>
+  component "GraphDatabaseService" as gds <<storage>>
   component "GraphKnowledgeExporter" as gke <<core>>
-  database ".data/knowledge-export/\n(JSON files)" as jef <<storage>>
+  database "LevelDB" as ldb <<storage>>
 }
 
-pa --> gda : storeEntity()\n[enforces ontology type]
-gda --> vkbc : "API mode\n(server available)"
-gda --> gds : "direct mode\n(fallback, no lock)"
-vkbc --> vkbapi : HTTP requests
-vkbapi --> gds : routes writes
-gds --> ldb : _persistGraphToLevel()\n[nodes/edges/metadata blob]
-gds ..> gke : entity:stored event
-gke --> jef : sync export\n(2s debounce)
+cloud "VKB HTTP Server" as vkb <<external>>
+
+package "Code Graph RAG Integration" {
+  component "CodeGraphRAG Service" as cgr <<api>>
+  database "Memgraph" as mg <<storage>>
+}
+
+' Agent to classification and storage
+pa --> oreg : "classify entity\n(5-min cache)"
+pa --> gda : "storeEntity()\n[throws if Unclassified]"
+
+' Adapter dual-mode routing
+gda --> vkb : "live mode:\nHTTP API routes"
+gda --> gds : "direct mode:\nLevelDB access"
+gda --> gke : "attach exporter\n(direct mode only)"
+
+' Service layer
+gds --> ldb : "persist graph"
+gds ..> gke : "entity:stored events"
+gke ..> ldb : "write JSON exports"
+
+' Parallel RAG layer
+cgr --> mg : "structural graph\n(CONTAINS, DEFINES,\nDEPENDS_ON)"
+
+pa ..> cgr : "parallel RAG layer\n(structural queries)"
 
 @enduml

@@ -1,25 +1,18 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Configuration Layer" {
-  component "redaction-config.yaml" as rcfg <<external>>
-  component "LSLConfigValidator" as validator <<core>>
+package "LiveLoggingSystem" {
+    component "LSLConverter" as lslconv <<core>>
+    component "LSLConfigValidator" as lslval <<core>>
+    component "RedactionEngine" as redact <<core>>
 }
 
-package "Processing Pipeline" {
-  component "TranscriptAdapter" as adapter <<api>>
-  component "RedactionEngine" as engine <<core>>
+package "Configuration" {
+    database "redaction-config.yaml" as redactcfg <<storage>>
 }
 
-package "Persistence Layer" {
-  component "SessionWindowManager" as swm <<core>>
-  database "File Store" as filestore <<storage>>
-}
-
-rcfg --> validator : "declarative rule definitions"
-validator --> engine : "validated config (gates flow)"
-adapter --> engine : "LSL-format content\n(post convertToLSL())"
-engine --> swm : "redacted LSL content"
-engine --> filestore : "persisted redacted output"
+redactcfg --> redact : "provides category-based\npattern rules"
+lslval --> redact : "validates options"
+lslconv --> redact : "applies redaction\ntransformation"
 
 @enduml

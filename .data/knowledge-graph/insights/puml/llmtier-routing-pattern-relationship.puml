@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMTierRoutingPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[LLMTierRoutingPattern] as llmtier_routing_pattern #LightBlue
+[AgentAbstractionPatterns] as agent_abstraction_patterns #F0F0F0
+[MCPIntegrationConventions] as mcpintegration_conventions #F0F0F0
+[HookExtensionPattern] as hook_extension_pattern #F0F0F0
+[TieredModelProposal] as tiered_model_proposal #E8F5E8
+
+coding_patterns --> llmtier_routing_pattern
+agent_abstraction_patterns -[hidden]- llmtier_routing_pattern
+mcpintegration_conventions -[hidden]- llmtier_routing_pattern
+hook_extension_pattern -[hidden]- llmtier_routing_pattern
+llmtier_routing_pattern --> tiered_model_proposal
+
+@enduml

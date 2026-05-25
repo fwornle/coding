@@ -2,83 +2,70 @@
 
 **Type:** SubComponent
 
-integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md defines the tiered model selection strategy, distinguishing tiers by task complexity so that lightweight tasks avoid expensive frontier models
+The mode control flow documented in docs/puml/llm-mode-control.puml shows that TierRouter evaluates environment or configuration flags to gate transitions between tiers, preventing unintended escalation to public LLM providers during local or test execution.
 
 # TierRouter — Technical Insight Document
 
 ## What It Is
 
-TierRouter is a SubComponent of the LLMAbstraction layer responsible for selecting an appropriate model tier (and thus a concrete provider/model pair) for any given LLM invocation. Its conceptual design is captured in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` ("Tiered Model Selection Proposal"), and its architectural placement is visualized in `docs/puml/llm-tier-routing.puml`, a PlantUML sequence diagram that shows TierRouter sitting above the individual provider adapters and emitting a `(provider, model)` pair in response to a routing request.
-
-The fundamental purpose of TierRouter is cost and capability matching: lightweight tasks should not consume expensive frontier models, while sufficiently complex tasks should escalate to higher-tier models. Tier definitions themselves are data-driven, sourced from `config/llm-providers.yaml`, which keeps the mapping between tiers and concrete models out of code.
+`TierRouter` is a sub-component of `LLMAbstraction` whose responsibility is to resolve which LLM backend handles a given request at routing time. It operates against the three-tier provider hierarchy (`mock` / `local` / `public`) formalized in `docs/puml/llm-tier-routing.puml`, and it enforces the mode transition rules captured in `docs/puml/llm-mode-control.puml`. In other words, TierRouter is the decision point that maps an incoming agent request — together with its surrounding context (agent identity, environment flags, configuration) — onto a concrete provider tier inside the broader `LLMAbstraction` layer.
 
 ![TierRouter — Architecture](images/tier-router-architecture.png)
 
-TierRouter is only activated when the operational mode resolved by its sibling LLMStateManager is either `local` or `public` — that is, modes in which multiple model sizes meaningfully exist. In `mock` mode, tier selection is bypassed entirely because no real models are being dispatched.
+Because the parent `LLMAbstraction` exposes a `LLMMode` type (`'mock' | 'local' | 'public'`) defined in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` and treats mode as a first-class runtime concept rather than a deploy-time switch, TierRouter is the runtime mechanism that makes that switchability real. It is the component that takes a `getLLMMode()` result (or a per-request override) and converts it into a binding to the appropriate adapter — most notably the sibling `PublicProviderAdapter` when the resolved tier is `public`, and the corresponding mock or local execution paths for the other two tiers.
 
 ## Architecture and Design
 
-Architecturally, TierRouter implements a **Strategy + Lookup pipeline** pattern. Routing requests flow through two cooperating child components: ComplexityClassifier, which assesses the task at hand, and AgentTierPinMap, which can override the classifier's decision based on the calling agent's identity. The classifier acts as the entry point for every routing decision, as established by the foundational principle laid out in `TIERED-MODEL-PROPOSAL.md`, while the pin map provides a deterministic escape hatch documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` ("Agent Architecture").
+TierRouter implements a **tiered router / strategy-selection pattern** layered on top of the explicit provider hierarchy documented in `docs/puml/llm-tier-routing.puml`. Three tiers — `mock`, `local`, and `public` — are arranged from cheapest/safest to most expensive/most-capable, and TierRouter is responsible for selecting among them rather than for executing the call itself. Execution is delegated downstream to the appropriate adapter (e.g., `PublicProviderAdapter` for cloud calls), keeping TierRouter focused on policy and dispatch.
 
-The sequence captured in `docs/puml/llm-tier-routing.puml` clarifies that TierRouter is a *router*, not a *provider*: it does not invoke models itself. Instead, it returns a `(provider, model)` tuple to the caller, who then dispatches the request through the corresponding provider adapter — for example, the sibling PublicProviderAdapter under `integrations/mcp-server-semantic-analysis/src/providers/`. This separation of routing from execution is the key architectural decision and aligns TierRouter with classical front-controller / dispatcher patterns.
+The design separates two concerns that are easy to conflate in LLM systems: **selection** (which tier should serve this request?) and **gating** (is the system currently allowed to use that tier?). The `docs/puml/llm-mode-control.puml` diagram documents the latter explicitly: TierRouter inspects environment or configuration flags to gate transitions between tiers, with a particular emphasis on preventing unintended escalation to `public` providers during local development or test execution. This guard-rail design encodes a safety-by-default posture in which higher-cost or externally-visible tiers must be affirmatively unlocked rather than passively reachable.
 
-A second important design decision is the **ordering with respect to mode resolution**. Because the tier routing decision is made *after* LLMStateManager resolves the operational mode, TierRouter never needs to reason about `mock` mode. This stratification means TierRouter has a narrower contract than its parent LLMAbstraction: LLMAbstraction handles the three-mode dispatch (`mock`, `local`, `public`), and TierRouter handles only the within-mode model selection.
+TierRouter also collaborates with its child component, `TieredModelSelectionPolicy`, which encapsulates the *criteria* used to choose among tiers and models. The selection criteria for that policy are formally proposed in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. This composition — a router that consults a pluggable policy — is a deliberate separation of mechanism (TierRouter's dispatch and gating) from policy (the tier/model selection rules), allowing the rules to evolve without re-architecting the routing surface.
 
 ## Implementation Details
 
-TierRouter's implementation revolves around two contained constructs. **ComplexityClassifier** is invoked first for every routing decision and produces a complexity signal that maps to a tier (e.g., low/medium/high). Per `TIERED-MODEL-PROPOSAL.md`, this complexity-based discrimination is the foundational routing principle inside TierRouter.
+The routing flow can be understood as a small pipeline: (1) the request arrives with an agent identity and request context; (2) TierRouter consults `TieredModelSelectionPolicy` to determine the preferred tier and model for that combination; (3) TierRouter applies the mode-control gating rules from `docs/puml/llm-mode-control.puml` to validate that the preferred tier is permitted under current environment/configuration flags; and (4) it binds the request to the corresponding provider path — falling through to a downgraded tier (or rejecting) when gating denies the preferred selection.
 
-**AgentTierPinMap** runs in parallel or as an override path: if the calling agent's identity matches an entry in the map, that agent is pinned to a specific tier regardless of what ComplexityClassifier reports. This makes agent identity a first-class input to tier selection, as described in `docs/architecture/agents.md`. The combination yields a precedence rule: agent pin overrides complexity-based selection.
+The `LLMMode` type lives alongside the mock implementation in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`, which means the mock path is co-located with the canonical mode definition. For TierRouter this implies that resolving to `mock` is the closest-to-default behavior: deterministic, network-free, and zero-cost. Resolving to `local` engages the local Docker Model Runner inference path described by the parent component, while resolving to `public` hands off to the sibling `PublicProviderAdapter`, which encapsulates Anthropic/OpenAI/Groq API calls.
 
 ![TierRouter — Relationship](images/tier-router-relationship.png)
 
-Once a tier has been chosen, TierRouter consults the available models for that tier from `config/llm-providers.yaml` and emits the resulting `(provider, model)` pair. Because tier-to-model mappings live in YAML rather than code, operators can add new models, retire old ones, or rebalance tiers without code changes. This data-driven posture is one of the explicit design intents stated in the tiered model proposal.
-
-No specific code symbols were enumerated for TierRouter in the current code structure observations, indicating the component is currently in a proposal/design-formalized state with its primary documentation in the markdown and PlantUML artifacts cited above.
+Although no concrete code symbols were indexed for TierRouter directly, the structural contract is constrained by the surrounding components: it must consume the `LLMMode` enumeration, it must produce a normalized handle that the abstraction layer's response-shaping code can use uniformly, and it must defer model-level decisions to `TieredModelSelectionPolicy`. The PlantUML artifacts (`llm-tier-routing.puml` and `llm-mode-control.puml`) and the proposal document (`TIERED-MODEL-PROPOSAL.md`) together constitute the authoritative implementation specification.
 
 ## Integration Points
 
-TierRouter's primary upstream integration is with its parent LLMAbstraction. LLMAbstraction is a multi-modal provider abstraction layer that routes LLM calls across `mock`, `local`, and `public` modes; TierRouter is invoked by LLMAbstraction only after mode resolution. The mode itself comes from sibling LLMStateManager, whose `getLLMState()` function in `llm-mock-service.ts` reads `.data/workflow-progress.json` at invocation time. This means TierRouter implicitly inherits LLMStateManager's runtime-switchable behavior — operators can change modes without restart, and TierRouter will simply begin or cease participating accordingly.
+Upstream, TierRouter is invoked by `LLMAbstraction`, which owns the public surface that agents call. Because the parent enforces that "every agent must be mode-agnostic — none may directly instantiate an LLM client," TierRouter is effectively the only path through which mode resolution occurs. Agents never see it directly; they see the normalized response returned by the abstraction layer after TierRouter has chosen and dispatched to a backend.
 
-Downstream, TierRouter integrates with provider adapters such as the sibling PublicProviderAdapter located under `integrations/mcp-server-semantic-analysis/src/providers/`. The integration contract is intentionally minimal: TierRouter emits `(provider, model)`, and the caller resolves the appropriate adapter. This loose coupling means new provider adapters can be added without modifying TierRouter, provided they are registered in `config/llm-providers.yaml`.
+Laterally, TierRouter coordinates with its siblings inside `LLMAbstraction`. `LLMProviderConfig` supplies the configuration surface — credentials, endpoints, feature flags — that TierRouter reads when applying mode-control gating. `PublicProviderAdapter` is the downstream consumer when the router resolves to the `public` tier, encapsulating the actual cloud provider integrations so that TierRouter does not need provider-specific knowledge.
 
-Internally, TierRouter integrates with its children ComplexityClassifier and AgentTierPinMap. The classifier consumes task content/metadata; the pin map consumes the agent identity. Both are driven by external inputs — task payload and caller identity respectively — making TierRouter a pure function from `(task, agent, mode, config)` to `(provider, model)`.
+Downstream, TierRouter delegates the *what-to-pick* question to its child, `TieredModelSelectionPolicy`. This is the integration point that determines, for a given agent identity and request context, which model within a tier is appropriate, and how the policy proposal in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` is realized at runtime. The two components together form a router-plus-policy pair, with TierRouter responsible for dispatch and gating and `TieredModelSelectionPolicy` responsible for the selection rules themselves.
 
 ## Usage Guidelines
 
-Developers integrating with TierRouter should observe several conventions. First, **do not bypass mode resolution** — TierRouter must be invoked downstream of LLMStateManager so that it only runs in `local` or `public` modes. Calling it in `mock` mode is meaningless and may indicate a layering violation.
+Developers extending or invoking this subsystem should treat TierRouter as the single resolution point for tier selection — do not bypass it by reading `LLMMode` directly and instantiating providers inline. The parent `LLMAbstraction` contract requires agents to be mode-agnostic, and TierRouter's gating logic (per `docs/puml/llm-mode-control.puml`) is what enforces the "no unintended escalation to public" safety property. Skipping it forfeits that guarantee and risks accidental cloud API calls during CI or local iteration.
 
-Second, **prefer adjusting `config/llm-providers.yaml` over code changes** when retuning the tier system. Because tier definitions are data-driven, model additions, retirements, and tier rebalancing should happen in configuration. Adding a new model in code would defeat the design intent stated in `TIERED-MODEL-PROPOSAL.md`.
+When changing tier selection behavior, modify `TieredModelSelectionPolicy` and update `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` to keep the documented design in sync with the implementation. TierRouter itself should remain focused on dispatch and gating; introducing selection heuristics into the router would blur the mechanism/policy boundary that the current design deliberately maintains.
 
-Third, **use AgentTierPinMap sparingly**. Agent pinning overrides complexity-based selection, and excessive pinning will erode the cost-efficiency benefit that motivated the tiered approach. Reserve pins for agents with verified hard requirements — for example, an agent that demonstrably fails at lower tiers or one whose latency budget rules out frontier models.
-
-Finally, treat the `(provider, model)` return value as opaque routing metadata; the actual invocation belongs to the appropriate provider adapter (e.g., PublicProviderAdapter). Conflating routing and execution would re-introduce the coupling that the TierRouter / adapter split is explicitly designed to prevent.
-
----
-
-### Summary of Key Insights
-
-1. **Architectural patterns identified**: Strategy + Lookup pipeline, Front-controller/Dispatcher (routing decoupled from execution), Data-driven configuration via YAML, Override-precedence pattern (agent pin over complexity classification).
-2. **Design decisions and trade-offs**: Routing is separated from execution (loose coupling at cost of an extra indirection); tier mappings live in `config/llm-providers.yaml` (operability vs. compile-time safety); TierRouter is layered below LLMStateManager (narrower contract, no `mock` handling); agent pinning is supported but should be the exception.
-3. **System structure insights**: TierRouter is a pure routing function bracketed by LLMStateManager upstream and provider adapters downstream; its children ComplexityClassifier and AgentTierPinMap implement the two complementary selection inputs.
-4. **Scalability considerations**: New providers/models scale via YAML edits rather than code; the routing function is stateless aside from configuration, making it horizontally trivial; the cost-tiering itself is a scalability lever, preserving frontier-model capacity for genuinely complex work.
-5. **Maintainability assessment**: High — design is documented in `TIERED-MODEL-PROPOSAL.md` and `docs/puml/llm-tier-routing.puml`, configuration is externalized, and responsibilities are sharply partitioned between TierRouter, its children, and sibling adapters. The clear precedence rule (pin → complexity) and the narrow `(provider, model)` output contract reduce the surface area developers must reason about.
+When adding new providers, prefer extending an existing tier (typically `public` via `PublicProviderAdapter`) and surfacing any new configuration through `LLMProviderConfig`, rather than introducing a fourth tier. The three-tier model (`mock` / `local` / `public`) is intentionally coarse — it represents three fundamentally different execution regimes (deterministic, offline-capable, cloud) — and broadening it would dilute the safety semantics that the mode-control flow depends on. Finally, when working in CI or local development, leave mode resolution to default to `mock` so that workflows are exercised end-to-end without consuming tokens or requiring network access; `local` and `public` should be opted into explicitly via the configuration flags that TierRouter evaluates at routing time.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a multi-modal provider abstraction layer that routes LLM calls across three operational modes—mock, local, and public—without requiring callers to be aware of the underlying provider. The mode selection follows a strict priority hierarchy: per-agent overrides take precedence over a global mode, which itself overrides a fallback default of 'public'. This state is persisted in `.data/workflow-progress.json` and read at invocation time, enabling runtime mode switching without service restarts. The component also maintains backward compatibility with a legacy boolean `mockLLM` flag in the same file, ensuring older clients continue to function correctly.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] **Three-Tier Mode System and Runtime Switchability**
+
+The `LLMAbstraction` component defines a `LLMMode` type (`'mock' | 'local' | 'public'`) in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` that maps to three fundamentally different execution paths: deterministic mock responses (zero-cost, no network), local Docker Model Runner inference (offline-capable, GPU-optional), and cloud API calls to Anthropic/OpenAI/Groq. These are not environment-level flags but a first-class runtime concept — the mode can be changed mid-session without restarting any process.
+
+This design directly solves a pain point common in LLM-integrated systems: the inability to cheaply validate agent orchestration logic without burning API tokens or requiring network access. By making 'mock' a first-class mode rather than a test-only stub, developers can run full multi-agent workflows during CI, iterate on prompt logic locally, and only graduate to 'public' when cloud validation is needed. The architectural implication is that every agent must be mode-agnostic — none may directly instantiate an LLM client; all must go through the abstraction layer's `getLLMMode()` query and receive a normalized response structure regardless of provider.
 
 ### Children
-- [ComplexityClassifier](./ComplexityClassifier.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered Model Selection Proposal') establishes complexity-based tier discrimination as the foundational routing principle, making the classifier the entry point for every routing decision inside TierRouter.
-- [AgentTierPinMap](./AgentTierPinMap.md) -- integrations/mcp-server-semantic-analysis/docs/architecture/agents.md ('Agent Architecture') is the primary reference for this construct, documenting how individual agent identities are associated with fixed tiers within the routing pipeline.
+- [TieredModelSelectionPolicy](./TieredModelSelectionPolicy.md) -- The document 'integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md' (titled 'Tiered Model Selection Proposal') is the primary design artifact for this policy, indicating that tier boundaries and selection criteria were formally proposed and documented rather than emerged organically.
 
 ### Siblings
-- [LLMStateManager](./LLMStateManager.md) -- getLLMState() in llm-mock-service.ts reads .data/workflow-progress.json at invocation time, enabling runtime mode switching without service restarts
-- [PublicProviderAdapter](./PublicProviderAdapter.md) -- Provider implementations are located under integrations/mcp-server-semantic-analysis/src/providers/, one adapter per cloud provider as implied by the three-mode architecture
+- [LLMProviderConfig](./LLMProviderConfig.md) -- LLMProviderConfig is a sub-component of LLMAbstraction
+- [PublicProviderAdapter](./PublicProviderAdapter.md) -- PublicProviderAdapter is a sub-component of LLMAbstraction
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 3 observations*

@@ -5,15 +5,13 @@ title Hierarchy Context: LLMProviderConfig
 
 [LLMAbstraction] as llmabstraction #FFFFDD
 [LLMProviderConfig] as llmprovider_config #LightBlue
-[PublicCloudProviders] as public_cloud_providers #F0F0F0
 [TierRouter] as tier_router #F0F0F0
-[MockLLMService] as mock_llmservice #F0F0F0
-[ProviderYamlSchema] as provider_yaml_schema #E8F5E8
+[PublicProviderAdapter] as public_provider_adapter #F0F0F0
+[TieredModelSelection] as tiered_model_selection #E8F5E8
 
 llmabstraction --> llmprovider_config
-public_cloud_providers -[hidden]- llmprovider_config
 tier_router -[hidden]- llmprovider_config
-mock_llmservice -[hidden]- llmprovider_config
-llmprovider_config --> provider_yaml_schema
+public_provider_adapter -[hidden]- llmprovider_config
+llmprovider_config --> tiered_model_selection
 
 @enduml

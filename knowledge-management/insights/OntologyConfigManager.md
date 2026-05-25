@@ -1,85 +1,82 @@
 # OntologyConfigManager
 
-**Type:** Detail
+**Type:** SubComponent
 
-Based on parent context, OntologyConfigManager acts as the sole entry point for ontology configuration under src/ontology/, preventing scattered entity hierarchy definitions across multiple agent files.
+Hot-reload support allows updated ontology YAML/JSON files to be picked up at runtime, enabling taxonomy iteration without MCP server restarts—critical for iterative ontology development workflows
 
-# OntologyConfigManager: Technical Insight Document
+# OntologyConfigManager — Deep Technical Insight
 
 ## What It Is
 
-`OntologyConfigManager` is the centralized configuration management component implemented under `src/ontology/`, serving as the sole entry point for ontology configuration within the broader OntologySubsystem. It is responsible for loading, managing, and exposing entity type hierarchy definitions that govern how semantic analysis agents interpret and classify domain concepts.
+`OntologyConfigManager` is a SubComponent within the `SemanticAnalysis` multi-agent pipeline housed in `integrations/mcp-server-semantic-analysis/`. As documented in `integrations/mcp-server-semantic-analysis/docs/configuration.md`, it is implemented as a singleton — materialized through its child entity `SingletonOntologyConfig` — and serves as the single authoritative source for ontology path resolution and classification threshold values used by every agent in the pipeline.
 
-Rather than allowing entity hierarchy definitions to be scattered across multiple agent files, `OntologyConfigManager` consolidates this concern into a single managed location. This architectural choice directly supports the coordination model documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, where shared configuration and agent coordination are treated as first-class architectural concerns.
+Functionally, the manager owns two distinct configurable file paths: one for the upper-ontology definition and one for the lower-ontology definition. This separation allows downstream projects to supply their own lower-ontology taxonomies (project-specific entity categories, custom classifiers, domain-specific vocabularies) without forcing modifications to the shared upper-ontology schema that all consumers depend on. Beyond path management, it caches parsed ontology definitions in memory and supports runtime hot-reloading so that taxonomy revisions become visible to running agents without an MCP server restart.
 
-As a child component of OntologySubsystem, it specifically owns the configuration lifecycle for ontology data — its parent subsystem delegates this responsibility entirely to `OntologyConfigManager`, ensuring a clear separation between ontology configuration management and ontology consumption.
+![OntologyConfigManager — Architecture](images/ontology-config-manager-architecture.png)
+
+The component exists, in part, as the documented remediation for a problem captured in `CRITICAL-ARCHITECTURE-ISSUES.md`: prior to this centralization, ontology path references were scattered across multiple agents, producing inconsistent ontology loading and divergent classification behavior. `OntologyConfigManager` resolves that by making itself the only place where these settings are read, parsed, and cached.
 
 ## Architecture and Design
 
-The architectural approach embodied by `OntologyConfigManager` follows the **Single Source of Truth** pattern applied to ontology configuration. By centralizing all entity type hierarchy definitions under `src/ontology/`, the design eliminates the risk of definitional drift that would otherwise occur if multiple semantic analysis agents maintained their own local copies of ontology rules.
+The dominant architectural pattern is the **Singleton pattern**, applied at the configuration layer. Within the broader `SemanticAnalysis` pipeline — which orchestrates specialized agents for git history ingestion, code graph construction, semantic insight generation, ontology classification, content validation, and persistence — every agent that needs to know "where is the ontology?" or "what is the classification threshold?" obtains those values from this one instance. The child component `SingletonOntologyConfig` is the concrete realization of that singleton contract, as described in `docs/configuration.md`.
 
-This is reinforced by a **Facade pattern** characteristic: agents within the system interact with ontology configuration through `OntologyConfigManager` rather than reaching directly into configuration files or duplicating loading logic. The facade insulates consumers from the underlying configuration storage format and loading mechanics, allowing those internals to evolve independently.
+A second pattern in evidence is **in-memory caching with event-driven invalidation**. Parsed ontology definitions (loaded from YAML or JSON files) are held in memory to eliminate redundant file I/O on the hot path of entity classification, which is called frequently by the ontology-classification agent. The cache is not stale-forever: hot-reload events trigger invalidation, after which the next access re-parses from disk. This trade-off — staleness windows bounded by reload events versus the cost of per-call file reads — is deliberately chosen to support iterative ontology development.
 
-The component's placement within OntologySubsystem reflects a clear **layered responsibility model**. OntologySubsystem provides the broader ontology capability surface, while `OntologyConfigManager` handles the narrow but critical concern of configuration management. This separation ensures that changes to entity type hierarchies flow through one managed entry point, directly aligning with the agent coordination concerns described in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.
+A third pattern is the **separation of upper and lower ontology configuration**. By exposing two independent paths rather than one monolithic ontology file, the design enforces a layered taxonomy model: a stable, shared upper ontology and a swappable, project-specific lower ontology. This is a classic configuration-by-composition decision that keeps the shared schema immutable from a consumer's perspective while still permitting taxonomy extension.
 
 ## Implementation Details
 
-The implementation is localized to `src/ontology/`, providing a stable, predictable location for all ontology configuration logic. While the current code structure inventory does not surface specific symbols, the design intent is clear from the observations: `OntologyConfigManager` exposes ontology configuration loading as its primary responsibility, and entity type hierarchy definitions are managed through this single component.
+The implementation centers on the singleton instance materialized as `SingletonOntologyConfig`, the only child component of `OntologyConfigManager`. According to `docs/configuration.md`, this singleton is what guarantees that ontology paths and classification thresholds remain consistent across all pipeline agents without re-initialization — i.e., there is no per-agent bootstrap of configuration state that could drift between agents.
 
-Technically, this means any modification to entity type hierarchies — adding new entity types, restructuring parent-child relationships between types, or adjusting classification rules — is performed in one location. This eliminates the need to synchronize changes across multiple semantic analysis agents, each of which would otherwise need to interpret the same ontological constructs independently.
+Internally, the manager exposes (a) the resolved upper-ontology path, (b) the resolved lower-ontology path, (c) configurable classification thresholds, and (d) accessors for parsed ontology definitions. The parsed-definition accessors are backed by the in-memory cache; on first call the underlying YAML/JSON is read and parsed, and on subsequent calls the parsed structure is returned directly. When a hot-reload signal fires (e.g., a watched file is updated), the cache entry is invalidated so the next access reloads fresh content. This is the mechanism that makes taxonomy iteration possible without restarting the MCP server.
 
-The component operates as part of the broader OntologySubsystem, which acts as its containing context. This containment relationship establishes clear ownership: `OntologyConfigManager` is not a free-floating utility but rather a deliberately scoped subsystem component with a well-defined responsibility boundary.
+![OntologyConfigManager — Relationship](images/ontology-config-manager-relationship.png)
+
+Notably, the observations report 0 code symbols indexed for this entity, which suggests the implementation surface area is intentionally small — concentrated on path resolution, threshold storage, cache management, and reload signaling — and exists primarily as a configuration facade rather than as a logic-heavy module. The behavioral complexity it removes from elsewhere in the pipeline is its principal contribution.
 
 ## Integration Points
 
-`OntologyConfigManager` integrates primarily with the semantic analysis agents referenced in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. These agents depend on consistent ontology definitions to perform their classification and analysis tasks, and `OntologyConfigManager` is the point through which they obtain that shared configuration.
+`OntologyConfigManager` sits directly under its parent component `SemanticAnalysis` (the multi-agent pipeline described in `integrations/mcp-server-semantic-analysis/`) and is consumed by sibling components that need ontology metadata. Most directly, the `Ontology` sibling — which `docs/architecture/agents.md` describes as exposing `OntologyClassifier` and `OntologyValidator` interfaces backed by `LegacyOntologyAdapter` wrapping `km-core`'s `OntologyRegistry` — reads its paths and thresholds from this manager. The `LegacyOntologyAdapter` sibling is itself a response to a related coupling issue from `CRITICAL-ARCHITECTURE-ISSUES.md`: where `LegacyOntologyAdapter` decouples agents from the concrete `km-core` registry API, `OntologyConfigManager` decouples them from the concrete file locations and threshold values.
 
-The integration with its parent OntologySubsystem is hierarchical: OntologySubsystem composes `OntologyConfigManager` to fulfill its configuration management responsibilities. Other components within OntologySubsystem can rely on `OntologyConfigManager` for authoritative entity hierarchy information without needing to know how that information is sourced or loaded.
+Other siblings interact more loosely. The `Pipeline` sibling, defined by `batch-analysis.yaml` as a DAG of steps with explicit `depends_on` edges, can rely on the manager's singleton semantics because configuration is resolved once and shared across topologically ordered steps. The `Insights` sibling — the dedicated insight-generation agent — and any other agent extending the `BaseAgent<TInput, TOutput>` abstract class can pull threshold values from the manager without each having to reimplement configuration parsing. This is what allows the heterogeneous agent pipeline to remain type-safe (via `BaseAgent`'s generics) while still sharing runtime configuration state.
 
-By centralizing configuration access, `OntologyConfigManager` becomes an integration choke point in the positive sense — a deliberate convergence that simplifies dependency graphs across the agent ecosystem. Agents no longer need direct knowledge of configuration files, formats, or locations; they need only a reference to this manager.
+The child `SingletonOntologyConfig` is the concrete singleton object that consumers obtain; from the caller's perspective, interacting with `OntologyConfigManager` and obtaining `SingletonOntologyConfig` are effectively the same operation. External dependencies are the ontology files themselves (YAML/JSON on disk) and the filesystem watch / reload mechanism that drives cache invalidation.
 
 ## Usage Guidelines
 
-Developers extending or modifying the system should treat `OntologyConfigManager` as the **exclusive entry point** for entity type hierarchy definitions. Avoid the temptation to embed ontology definitions directly into individual agent files; this directly contradicts the architectural intent and reintroduces the consistency risks that this centralization is designed to prevent.
+Developers working in the `SemanticAnalysis` pipeline should **never read ontology paths or thresholds directly from environment variables, hard-coded constants, or local configuration parsing**. The entire reason `OntologyConfigManager` exists — per `CRITICAL-ARCHITECTURE-ISSUES.md` — is to eliminate the scattered, inconsistent path references that previously plagued the pipeline. Any new agent that needs ontology metadata should resolve it through the singleton accessor.
 
-When making changes to entity type hierarchies, perform all modifications through the configuration path managed by `OntologyConfigManager` under `src/ontology/`. This ensures that all downstream semantic analysis agents observe the same updated definitions and that the architectural guarantees provided by OntologySubsystem remain intact.
+When introducing project-specific taxonomies, override the **lower-ontology path** only; do not modify the upper-ontology schema, since it is shared across consumers. This boundary is the contract that lets `OntologyClassifier` and `OntologyValidator` (in the `Ontology` sibling) behave predictably across deployments.
 
-New semantic analysis agents should consume ontology configuration via `OntologyConfigManager` rather than implementing custom loading logic. This convention preserves the architectural coordination model documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` and ensures that the agent ecosystem remains cohesive as it grows.
+Treat hot-reload as a **development and iteration affordance**, not a transactional configuration mechanism. Because the cache invalidates on reload events, a change to an ontology file mid-pipeline can cause two agents in the same DAG run to see different ontology versions if a reload occurs between their executions. For production-grade reproducibility within a single batch run, ontology files should be stable for the duration of that run; for iterative development the hot-reload behavior is exactly what enables fast feedback.
 
----
+Finally, because parsed ontology definitions are cached in memory, callers should not mutate the returned parsed structures. Any mutation would corrupt the cached state observed by every other agent in the pipeline, defeating the singleton's whole purpose. Treat all returned ontology data as immutable, and if transformation is needed, copy first.
 
-## Architectural Analysis Summary
+## Summary of Key Insights
 
-### 1. Architectural Patterns Identified
-- **Single Source of Truth**: All entity type hierarchy definitions converge in one managed location under `src/ontology/`.
-- **Facade Pattern**: `OntologyConfigManager` presents a unified interface for ontology configuration access, hiding loading mechanics.
-- **Composition within Subsystem**: OntologySubsystem composes `OntologyConfigManager` as a scoped, responsibility-bounded component.
-- **Centralized Configuration Management**: Aligns with the shared configuration concerns explicitly documented in the agent architecture.
-
-### 2. Design Decisions and Trade-offs
-- **Decision**: Centralize ontology configuration in a single manager rather than allowing per-agent definitions.
-  - *Benefit*: Eliminates definitional drift and inconsistency between semantic analysis agents.
-  - *Trade-off*: Introduces a single point that all agents depend on; changes here have system-wide impact.
-- **Decision**: Place `OntologyConfigManager` as a child of OntologySubsystem rather than as a top-level utility.
-  - *Benefit*: Clear ownership and architectural placement; reinforces subsystem boundaries.
-  - *Trade-off*: Consumers must navigate the subsystem hierarchy to locate configuration management.
-
-### 3. System Structure Insights
-The structure reflects a **deliberate hierarchical decomposition**: OntologySubsystem owns the broader ontology capability, while `OntologyConfigManager` owns the narrower configuration concern. This nesting mirrors the architectural separation between "what ontology means" (subsystem-level) and "how ontology configuration is loaded and managed" (manager-level). The location under `src/ontology/` makes the structure discoverable and consistent with the documented architecture in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.
-
-### 4. Scalability Considerations
-As the number of semantic analysis agents grows, the centralized design scales favorably from a *coordination* perspective: each new agent depends on one well-known manager rather than introducing new configuration sources. However, `OntologyConfigManager` itself becomes a critical path component — its loading performance and the size of the entity hierarchy it manages will directly influence agent initialization and behavior. Future scaling may benefit from caching strategies or lazy loading patterns if the ontology grows substantially in size or complexity.
-
-### 5. Maintainability Assessment
-The maintainability profile is strong by design. Centralizing entity type hierarchy definitions means that changes are made in one location, tested in one location, and reasoned about in one location. This dramatically reduces the cognitive load of evolving the ontology compared to a distributed approach where each agent maintained its own definitions. The clear parent-child relationship with OntologySubsystem also makes the component easy to locate and understand within the broader codebase. The primary maintainability risk is that the manager must remain disciplined about scope — accumulating unrelated responsibilities would erode the clarity that makes this design effective.
+1. **Architectural patterns identified**: Singleton (via `SingletonOntologyConfig`), in-memory caching with event-driven invalidation, configuration facade, and layered taxonomy composition (upper + lower ontology).
+2. **Design decisions and trade-offs**: Centralization over distribution (eliminates scattered config at the cost of a global instance); cached parsing over fresh reads (performance at the cost of staleness windows bounded by reload events); hot-reload over restart (iteration speed at the cost of intra-run consistency guarantees); split upper/lower ontology paths (extensibility at the cost of two configuration surfaces instead of one).
+3. **System structure insights**: A small, focused configuration facade that sits at the boundary between filesystem-resident ontology definitions and the agent pipeline; complements `LegacyOntologyAdapter` (which decouples API surface) by decoupling location and threshold values.
+4. **Scalability considerations**: The in-memory cache keeps classification calls O(1) with respect to file I/O, which matters because every entity processed by the pipeline triggers ontology lookups; singleton semantics mean memory cost is constant regardless of how many agents are active.
+5. **Maintainability assessment**: High. The manager directly resolves a maintenance pain point recorded in `CRITICAL-ARCHITECTURE-ISSUES.md`, replaces N scattered configuration sites with one, and exposes a narrow surface area (paths, thresholds, parsed definitions, reload signal) that is easy to reason about and evolve.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [OntologySubsystem](./OntologySubsystem.md) -- OntologyConfigManager centralizes all ontology configuration loading under src/ontology/, meaning changes to entity type hierarchies flow through a single managed entry point rather than being scattered across agents
+- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a multi-agent pipeline in `integrations/mcp-server-semantic-analysis/` that processes git history, LSL/vibe sessions, and AST-parsed code graphs to extract and persist structured knowledge entities. The system orchestrates several specialized agents—covering git history ingestion, code graph construction, semantic insight generation, ontology classification, content validation, and persistence—coordinated through a batch-analysis workflow. Each agent extends a common `BaseAgent<TInput, TOutput>` abstract class that enforces a standard response envelope with confidence scoring, issue detection, routing suggestions, and corrections, enabling robust retry and <USER_ID_REDACTED>-gating across pipeline steps.
+
+### Children
+- [SingletonOntologyConfig](./SingletonOntologyConfig.md) -- Per integrations/mcp-server-semantic-analysis/docs/configuration.md, the OntologyConfigManager is implemented as a singleton so that ontology paths and classification thresholds remain consistent across all pipeline agents without re-initialization.
+
+### Siblings
+- [Pipeline](./Pipeline.md) -- batch-analysis.yaml defines the pipeline as a DAG of steps with explicit depends_on edges, enabling topological execution order across coordinator, observation, KG, dedup, and persistence agents
+- [Ontology](./Ontology.md) -- docs/architecture/agents.md describes OntologyClassifier and OntologyValidator as distinct interfaces, both now backed by LegacyOntologyAdapter wrapping km-core OntologyRegistry
+- [Insights](./Insights.md) -- docs/architecture/agents.md identifies a dedicated insight-generation agent responsible for authoring structured knowledge reports from aggregated code and history signals
+- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- Resolves the architectural issue documented in CRITICAL-ARCHITECTURE-ISSUES.md where OntologyClassifier was tightly coupled to an internal registry; the adapter decouples pipeline agents from the km-core registry's concrete API
+- [BaseAgent](./BaseAgent.md) -- BaseAgent<TInput, TOutput> is a generic abstract class (documented in docs/architecture/agents.md) parameterized on input and output types, enforcing type safety across the heterogeneous agent pipeline
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 5 observations*

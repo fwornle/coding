@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologyClassificationSystem
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[OntologyClassificationSystem] as ontology_classification_system #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[KmCoreMigration] as km_core_migration #F0F0F0
+[CodeGraphRelationshipTaxonomy] as code_graph_relationship_taxonomy #E8F5E8
+
+knowledge_management --> ontology_classification_system
+manual_learning -[hidden]- ontology_classification_system
+online_learning -[hidden]- ontology_classification_system
+km_core_migration -[hidden]- ontology_classification_system
+ontology_classification_system --> code_graph_relationship_taxonomy
+
+@enduml

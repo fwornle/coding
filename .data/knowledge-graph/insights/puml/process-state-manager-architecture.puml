@@ -1,28 +1,35 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Orchestration" {
-  component "service-starter.js" as servicStarter <<cli>>
-  component "health-coordinator.js" as healthCoord <<core>>
-  component "ServiceProbe" as serviceProbe <<external>>
+package "DockerizedServices" {
+
+    package "ProcessStateManager" {
+        component "process-state-manager.js" as psm <<core>>
+        component "In-Memory PID Registry" as registry <<storage>>
+    }
+
+    package "Wrapper Scripts" {
+        component "Wrapper Script A" as wrapperA <<cli>>
+        component "Wrapper Script B" as wrapperB <<cli>>
+        component "Wrapper Script C" as wrapperC <<cli>>
+    }
+
+    package "Child Processes" {
+        component "Child Process" as childProc <<external>>
+    }
+
 }
 
-package "Service Wrappers" {
-  component "api-service.js" as apiWrapper <<api>>
-  component "dashboard-service.js" as dashWrapper <<api>>
-}
+psm --> registry : "maintains"
 
-package "Core Registry" {
-  component "ProcessStateManager" as psm <<core>>
-}
+wrapperA --> psm : "registerService / unregisterService"
+wrapperB --> psm : "registerService / unregisterService"
+wrapperC --> psm : "registerService / unregisterService"
 
-servicStarter --> apiWrapper : "spawns & retries"
-servicStarter --> dashWrapper : "spawns & retries"
+wrapperA --> childProc : "spawns"
+wrapperB --> childProc : "spawns"
+wrapperC --> childProc : "spawns"
 
-apiWrapper --> psm : "registerService /\nunregisterService"
-dashWrapper --> psm : "registerService /\nunregisterService"
-
-healthCoord --> psm : "queries live state"
-healthCoord --> serviceProbe : "correlates results\nby stable name"
+childProc --> psm : "PID mapped to\n{port, type, script}"
 
 @enduml

@@ -1,34 +1,29 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Post-Persistence Input" {
-  database "Knowledge Graph" as kg <<storage>>
+package "Input Sources" {
+  component "AST Code Graph" as astGraph <<storage>>
 }
 
-package "Insights SubComponent" {
-  component "Pattern Catalog Extractor" as patternExtractor <<agent>>
-  component "Pattern Catalog" as patternCatalog <<storage>>
-  component "Knowledge Report Authoring" as reportAuthoring <<agent>>
+package "Insight Generation" {
+  component "LLM Tier Router" as llmRouter <<core>>
+  component "Pattern Catalog Extractor" as patternExtractor <<core>>
+  component "Insight Generation Agent" as insightAgent <<agent>>
+  component "BaseAgent Response Envelope" as responseEnvelope <<api>>
 }
 
-package "BaseAgent Contract" {
-  component "calculateConfidence()" as calcConfidence <<core>>
-  component "generateRouting()" as genRouting <<core>>
+package "Output Pipeline" {
+  component "Quality Gate" as qualityGate <<core>>
+  component "Knowledge Report" as knowledgeReport <<storage>>
+  component "KG Operator Agent" as kgOperator <<agent>>
 }
 
-package "Output" {
-  component "Knowledge Report" as knowledgeReport <<core>>
-  cloud "Delivery Channels" as deliveryChannels
-}
-
-kg --> patternExtractor : "consumes"
-kg --> reportAuthoring : "consumes"
-patternExtractor --> patternCatalog : "produces"
-patternCatalog --> reportAuthoring : "input"
-reportAuthoring --> knowledgeReport : "produces"
-patternExtractor ..> calcConfidence : "scores"
-reportAuthoring ..> calcConfidence : "scores"
-reportAuthoring ..> genRouting : "routes"
-genRouting --> deliveryChannels : "directs by confidence"
+astGraph --> patternExtractor : "parses structural motifs"
+patternExtractor --> insightAgent : "surfaces named patterns"
+llmRouter --> insightAgent : "routes to LLM tier"
+insightAgent --> responseEnvelope : "emits structured output"
+responseEnvelope --> qualityGate : "carries confidence score"
+qualityGate --> knowledgeReport : "accepted insights"
+knowledgeReport --> kgOperator : "consumed by"
 
 @enduml

@@ -1,31 +1,31 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Ingestion Sources" {
-  component "Git History" as git <<external>>
-  component "LSL Sessions" as lsl <<external>>
-  component "Code Analysis" as codeanalysis <<external>>
+top to bottom direction
+
+package "Batch Pipeline" {
+  component "OnlineLearning" as ol <<core>>
 }
 
-package "Orchestration Layer" {
-  component "MCP Semantic Analysis Server" as mcpserver <<core>>
-  component "PersistenceAgent" as persistagent <<agent>>
+package "State Management" {
+  component "CheckpointManager" as cm <<core>>
 }
 
 package "Storage Layer" {
-  component "GraphDatabaseAdapter" as dbadapter <<core>>
-  cloud "VKB HTTP API" as vkbapi <<api>>
-  database "LevelDB + Graphology" as leveldb <<storage>>
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  cloud "VKB HTTP Server" as vkb <<external>>
 }
 
-git --> mcpserver : "ingests"
-lsl --> mcpserver : "ingests"
-codeanalysis --> mcpserver : "ingests"
+package "Export Layer" {
+  component "GraphKnowledgeExporter" as gke <<core>>
+  database "Per-Domain JSON Files" as json <<storage>>
+}
 
-mcpserver --> persistagent : "orchestrates extraction"
-persistagent --> dbadapter : "mapEntityToSharedMemory()\n+ bi-temporal fields"
-dbadapter --> vkbapi : "primary write\n(typed nodes + embeddings)"
-dbadapter ..> leveldb : "fallback write\n(lock-safe)"
-vkbapi --> leveldb : "semantic similarity queries"
+ol --> cm : "commit hashes / session counts"
+cm --> ol : "completeness scores / skip state"
+ol --> gda : "entities (batch write)"
+gda ..> vkb : "direct mode (must be live at startup)"
+ol --> gke : "entity:stored events"
+gke --> json : "debounced writes"
 
 @enduml
