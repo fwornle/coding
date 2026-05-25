@@ -4,8 +4,8 @@ milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
 stopped_at: Phase 42.1.2 context gathered
-last_updated: "2026-05-24T20:06:23.477Z"
-last_activity: 2026-05-24 -- Phase 42.1.2 planning complete
+last_updated: "2026-05-25T04:35:29.917Z"
+last_activity: 2026-05-25 -- Phase 42.1.2 execution started
 progress:
   total_phases: 20
   completed_phases: 8
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
+**Current focus:** Phase 42.1.2 — register-project-ontology-class
 
 **v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
 
@@ -49,11 +49,11 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 47
-Plan: Not started
-Status: Ready to execute
+Phase: 42.1.2 (register-project-ontology-class) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 42.1.2
 Next step: Either (a) open a new bug-fix phase to register `Project` on disk, then `/gsd-verify-phase 42.1`; OR (b) continue with Phase 42 (Offline UKB Migration) and address the Project-class follow-up in parallel.
-Last activity: 2026-05-24 -- Phase 42.1.2 planning complete
+Last activity: 2026-05-25 -- Phase 42.1.2 execution started
 
 ## Performance Metrics
 
