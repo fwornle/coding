@@ -742,8 +742,16 @@ export class KnowledgeQueryService {
           this._exportCache.set(f.abs, { mtimeMs: stat.mtimeMs, parsed: doc });
         }
         const explicitTeam = doc?.metadata?.team;
+        // Critical: an entity may only join a team if some explicit team file
+        // claims it. Wave-controller's general.json is the unattributed
+        // domain (Phase 49 root cause — team field dropped). Default tag
+        // for its content is 'general', NOT 'coding'; the 727 name-matches
+        // against legacy coding.json get re-attributed to 'coding' in
+        // PASS 4 via nameToExplicitTeam. The ~73 that have no match stay
+        // in 'general' so the user can see the Phase-49 bug surface
+        // directly in the Teams panel instead of contaminating 'coding'.
         const team = explicitTeam
-          || (f.shape === 'km-core' && f.fname === 'general.json' ? 'coding' : f.fallbackTeam);
+          || (f.shape === 'km-core' && f.fname === 'general.json' ? 'general' : f.fallbackTeam);
         parsed.push({ fname: f.fname, shape: f.shape, team, isUnattributed: !explicitTeam && f.fname === 'general.json', doc });
       } catch (err) {
         logger.warn(`Failed to read export ${f.fname}`, { error: err?.message || String(err) });
