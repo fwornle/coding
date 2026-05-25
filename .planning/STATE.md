@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 42.2 Plan 02 complete (canonical-emit gap closed; team + process attribution restored; 802 entities backfilled with metadata.team='coding')
-last_updated: "2026-05-25T10:19:39.460Z"
+stopped_at: Phase 42.2 Plan 04 complete (legacy persistence trio retired; ~30 consumer call sites rewired across coordinator.ts + tools.ts + content-validation-agent.ts + wave-controller.ts; full submodule test suite 80/80 GREEN)
+last_updated: "2026-05-25T10:50:39.000Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 52
-  completed_plans: 49
-  percent: 43
+  completed_plans: 50
+  percent: 44
 ---
 
 # Project State
@@ -50,9 +50,9 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 ## Current Position
 
 Phase: 42.2 (retire-deferred-42-07-work-legacy-persistence-trio-atomic-le) — EXECUTING
-Plan: 3 of 6
+Plan: 5 of 6
 Status: Ready to execute
-Next step: Run `/gsd-verify-phase 42.1.2` — both Verification-Boundary bullets locked in CONTEXT.md are now green: Plan 02 closed the unit-level smoke (`registry.isValidClass('Project')` per team, 7 teams logged Project=valid); Plan 03 closes the integration-level smoke (`ensureProjectAnchor` cold/warm/idempotency contract, OK: 3/3 integration smoke tests pass). The Phase 42.1 SC#6 promotion gate (`/gsd-verify-phase 42.1`) remains separately owned per CONTEXT.md line 93-94.
+Next step: Execute Phase 42.2 Plan 05 (atomic LevelDB dir-swap per D-DirSwap recipe). Plan 04 just closed — the legacy persistence trio is fully retired, no code references `.data/knowledge-graph/` any longer, so Plan 05's dir-swap (collapse `.data/knowledge-graph/` + `.data/knowledge-graph-migrated/` into the single canonical `.data/knowledge-graph/` location) can proceed safely. Container stop required during the swap window per D-DirSwap step 1.
 Last activity: 2026-05-25
 
 ## Performance Metrics
@@ -170,6 +170,7 @@ Last activity: 2026-05-25
 - [Phase 42.1.2-03]: Integration smoke for `WaveController.ensureProjectAnchor(runId)` lands at `integrations/mcp-server-semantic-analysis/src/agents/wave-controller-ensure-project-anchor.test.ts` (310 lines, 3 `it(...)` blocks in 1 `describe(...)`). Cold path asserts the full locked spy contract (`name='Coding'`, `entityType='Project'`, `ontologyClass='Project'`, `opts.team='coding'`) on the single storeEntity call, plus a defence-in-depth `persistedEntityNames.has('Coding')` regression guard for the wave-controller.ts:2291 set-add ordering. Warm path proves no storeEntity call when queryEntities returns existing Coding/Project. Idempotency drives a mutable closure `codingMinted` flag flipped after the first storeEntity lands so the second invocation takes the warm path — final tally: 1 storeEntity, 2 queryEntities across two ensureProjectAnchor calls. Production source `wave-controller.ts` byte-identical (private method reached via `as unknown as { ... }` compile-time visibility hatch — no production-side accessor introduced). Built-in `node:test` + `node:assert/strict` only, zero console.* (process.stderr.write for forensic lines). **Topology decision:** plan opposite to Plan 02 — `src/agents/` is a REAL directory (`drwxr-xr-x`), not a symlink, so two-commit topology required: submodule commit `7f71c8f` (branch `main`) + outer-repo pointer-bump `1577f1367`. The submodule mixes both topologies (`src/agents/` real, `src/ontology/` symlink) — future plans touching `integrations/mcp-server-semantic-analysis/src/<subdir>/` MUST probe `ls -la` per subdir. Phase 42.1.2 layer-2 of SC#6 closed at the integration level; both Verification-Boundary bullets locked in CONTEXT.md are now green. Phase ready for `/gsd-verify-phase 42.1.2`. Phase 42.1 SC#6 wave-analysis re-run remains separately owned per CONTEXT.md line 93-94.
 - [Phase ?]: [Phase 42.2-03]: QdrantSyncService retired in full — outer-repo scripts/sync-graph-to-qdrant.js rewritten to construct GraphKMStore (with mandatory ontologyDir per CLAUDE.md) + wrap @qdrant/js-client-rest and call km-core syncQdrantFromStore (Phase 42-04 D-52a). DatabaseManager.qdrantSync field DELETED OUTRIGHT (planner discretion per D-Qdrant step 2 — bidirectional sync was vestigial). Single outer-repo commit (NOT submodule+pointer-bump pair) because src/knowledge-management/ is the symlink target of integrations/mcp-server-semantic-analysis/src/knowledge-management/ — matches Phase 42.1.2-02 precedent. Legacy --teams CLI flag honored as deprecated no-op for operator CLI surface compat. Monorepo grep gate clean (0 live-code QdrantSyncService hits).
 - [Phase ?]: [Phase 42.2-02]: Canonical-emit gap closed (4 gaps from forensics §4). Gap 1: canonical-mapper.ts CanonicalMapperOptions.team?: string + length>0 guard; metadata.team stamped from options.team. Gap 2: new llm-with-process.ts direct-fetch wrapper sets body.process on /api/complete (SDK has no process field per forensics §2.2); records into SDK MetricsTracker via duck-typed interface so wave-controller tracer instrumentation is unaffected. 7 wave-agent call sites re-routed (wave1×3, wave2×2, wave3×2). Gap 3: scripts/augment-team-field-42.2.mjs EXECUTED inline — 802 entities backfilled with metadata.team='coding' in .data/knowledge-graph-migrated/; idempotent re-run confirmed skipped=802. Gap 4: km-core-adapter storeEntity _options → options + explicit team merge. Rule 1 deviation: augment script passes includeSuperseded:true to iterate() because 42-05 migration set validUntil:null on every entity and km-core's isActive filter drops them by default (Plan 05 dir-swap is natural cleanup point). Single submodule commit c8c6cc7 + outer-repo pointer-bump 229f7b338 per CLAUDE.md dual-commit dance (src/agents/ is REAL dir, NOT symlink). 37/37 tests pass across 8 suites.
+- [Phase ?]: [Phase 42.2-04]: Legacy persistence trio retired — persistence-agent.ts + graph-database-adapter.ts (real-subdir submodule deletions) + GraphDatabaseService.js + GraphDatabaseService.d.ts (symlinked-subdir outer-repo deletions). All ~30 consumer call sites in coordinator.ts + tools.ts + content-validation-agent.ts rewired to the km-core adapter. Rule 1 deviation: wave-controller.ts was NOT in the plan's <interfaces> block but also imported the trio (GraphDatabaseAdapter + type-only SharedMemoryEntity/EntityRelationship/GraphEntity) — full rewire required; type defs extracted to a new dependency-free src/types/shared-memory-types.ts module. Rule 3 deviations: (a) DatabaseManager.js initializeGraphDB() reduced to a no-op stub (the dynamic import would have failed at runtime; no src/ consumer reads .graphDB); (b) GraphKnowledgeExporter.js JSDoc comment "Reads from GraphDatabaseService" was matching the grep gate's `from.*GraphDatabaseService` regex — rephrased; (c) orphan integration tests at submodule root (test-ontology-integration.ts + test-validation-integration.ts) deleted because they imported the trio and were not part of npm test. New helpers in src/storage/legacy-consumer-helpers.ts (saveSuccessfulWorkflowCompletion, linkInsightDocuments, cleanupEntityFiles, exportKnowledgeToJSON — file-system-only ports of the non-graph methods). km-core-adapter.ts extended with initialize/close/renameEntity/updateEntityObservations + file-rename helper. ContentValidationAgent.setKmCoreAdapter collapses the legacy setGraphDB + setPersistenceAgent setter pair. DeduplicationAgent.registerAgent('knowledge_graph'/'persistence') retired without replacement (legacy contract is incompatible with km-core; wave-controller path is canonical). Cross-repo commit pair: submodule a27aac6 + outer-repo 8bfee7faf. Full submodule test suite 80/80 GREEN both before and after deletion. Known residual (out of scope): 8 orphan operator test scripts under scripts/ + 5 sibling files in src/knowledge-management/ still reference the retired trio — slated for a follow-up housekeeping phase.
 
 ### Blockers/Concerns
 
@@ -216,12 +217,13 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 42.1.2 P03 | ~15m | 1 task | 1 file |
 | Phase 42.2 P03 | ~7m | 3 tasks | 4 files |
 | Phase 42.2 P02 | 19min | 4 tasks | 8 files |
+| Phase 42.2 P04 | ~80m | 4 tasks (+3 Rule 1/3 deviations) | 18 files (2 created, 10 modified, 6 deleted) |
 
 ## Session Continuity
 
-Last session: 2026-05-25T10:19:39.448Z
-Stopped at: Phase 42.2 Plan 02 complete (canonical-emit gap closed; team + process attribution restored; 802 entities backfilled with metadata.team='coding')
-Resume with: Run `/gsd-verify-phase 42.1.2` — both Verification-Boundary bullets are now green (unit: 7/7 teams logged Project=valid via Plan 02; integration: OK: 3/3 cold/warm/idempotency tests pass via Plan 03). The Phase 42.1 SC#6 verifier remains separately owned per CONTEXT.md line 93-94 (operator does the Docker rebuild + production `ukb full` invocation as Phase 42.1's verifier step, NOT as Phase 42.1.2's acceptance gate).
+Last session: 2026-05-25T10:50:39.000Z
+Stopped at: Phase 42.2 Plan 04 complete (legacy persistence trio retired; ~30 consumer call sites rewired; full submodule test suite 80/80 GREEN; cross-repo commit pair landed)
+Resume with: Phase 42.2 Plan 05 (atomic LevelDB dir-swap) — D-DirSwap recipe is unblocked because no code references `.data/knowledge-graph/` any longer. Plan 05 collapses `.data/knowledge-graph/` (legacy) and `.data/knowledge-graph-migrated/` (km-core canonical, 802 entities) into the single canonical location + reverts wave-controller.ts:507 dbPath back to `.data/knowledge-graph/`.
 
 Plan 02 follow-up for Plan 7:
 
