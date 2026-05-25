@@ -12,9 +12,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import { createLogger } from '../../lib/logging/Logger.js';
-
-const logger = createLogger('KnowledgeQueryService');
 
 export class KnowledgeQueryService {
   constructor(databaseManager, graphDatabase = null, options = {}) {
@@ -366,7 +363,7 @@ export class KnowledgeQueryService {
     // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
     const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
     if (graphDB) {
-      logger.debug('Using GraphDB for teams');
+      process.stderr.write('[KnowledgeQueryService] Using GraphDB for teams\n');
       return await graphDB.getTeams();
     }
 
@@ -375,7 +372,7 @@ export class KnowledgeQueryService {
     const fromExports = this._getTeamsFromExports();
     if (fromExports !== null) return fromExports;
 
-    logger.warn('GraphDB unavailable and km-core exports missing; using SQLite fallback');
+    process.stderr.write('[KnowledgeQueryService] GraphDB not available, using SQLite fallback\n');
     // Fallback to SQLite
     if (!this.databaseManager.health.sqlite.available) {
       throw new Error('SQLite database unavailable');
@@ -446,13 +443,6 @@ export class KnowledgeQueryService {
   async storeEntity(entity) {
     // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
     const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
-    if (!graphDB) {
-      // Phase 42.2 Plan 04: graphDB retired. Write directly to km-core
-      // GraphKMStore. Open/write/close per call so we don't hold the
-      // LevelDB lock between writes (wave-controller may want it).
-      const fromKmCore = await this._writeEntityToKmCore(entity);
-      if (fromKmCore !== null) return fromKmCore;
-    }
     if (graphDB) {
       const {
         entityName,
@@ -495,7 +485,7 @@ export class KnowledgeQueryService {
       const nodeId = await graphDB.storeEntity(graphEntity, { team });
 
       if (this.debug) {
-        logger.debug('Stored entity in graph', { name: entityName, nodeId });
+        console.log(`[KnowledgeQueryService] Stored entity in graph: ${entityName} (${nodeId})`);
       }
 
       return nodeId;
@@ -546,12 +536,12 @@ export class KnowledgeQueryService {
       );
 
       if (this.debug) {
-        logger.debug('Stored entity (sqlite)', { name: entityName, id });
+        console.log(`[KnowledgeQueryService] Stored entity: ${entityName} (${id})`);
       }
 
       return id;
     } catch (error) {
-      logger.error('Failed to store entity', { name: entityName, error: error?.message || String(error) });
+      console.error('[KnowledgeQueryService] Failed to store entity:', error);
       throw error;
     }
   }
@@ -567,10 +557,6 @@ export class KnowledgeQueryService {
   async storeRelation(relation) {
     // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
     const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
-    if (!graphDB) {
-      const fromKmCore = await this._writeRelationToKmCore(relation);
-      if (fromKmCore !== null) return fromKmCore;
-    }
     if (graphDB) {
       const {
         fromEntityName,
@@ -605,7 +591,7 @@ export class KnowledgeQueryService {
       });
 
       if (this.debug) {
-        logger.debug('Stored relation in graph', { from: fromName, to: toName });
+        console.log(`[KnowledgeQueryService] Stored relation in graph: ${fromName} -> ${toName}`);
       }
 
       // Return a consistent ID format for graph relations
@@ -646,12 +632,12 @@ export class KnowledgeQueryService {
       );
 
       if (this.debug) {
-        logger.debug('Stored relation (sqlite)', { from: fromEntityId, to: toEntityId });
+        console.log(`[KnowledgeQueryService] Stored relation: ${fromEntityId} -> ${toEntityId}`);
       }
 
       return id;
     } catch (error) {
-      logger.error('Failed to store relation', { error: error?.message || String(error) });
+      process.stderr.write(`[KnowledgeQueryService] Failed to store relation: ${error?.message || error}\n`);
       throw error;
     }
   }
@@ -707,7 +693,7 @@ export class KnowledgeQueryService {
           edges: Array.isArray(parsed?.edges) ? parsed.edges : [],
         });
       } catch (err) {
-        logger.warn(`Failed to read export ${f}`, { error: err?.message || String(err) });
+        process.stderr.write(`[KnowledgeQueryService] Failed to read export ${f}: ${err?.message || err}\n`);
       }
     }
     return result;
@@ -863,168 +849,6 @@ export class KnowledgeQueryService {
     }
 
     return relations.slice(0, Math.max(0, parseInt(limit, 10) || 0));
-  }
-
-  // ------------------------------------------------------------------
-  // km-core write path (Phase 42.2 Plan 04 — companion to read fallback)
-  //
-  // ObservationConsolidator (and any other writer that POSTs to
-  // /api/entities or /api/relations) used to land in the in-process
-  // graphDB. That field is now null and the SQLite fallback writes
-  // into a non-existent knowledge_extractions table — writes either
-  // 500 or silently disappear (ObservationConsolidator swallows the
-  // 500). Until the VKB writer surface is migrated to construct a
-  // long-lived km-core store of its own, fall back to open/write/close
-  // against the same .data/knowledge-graph/leveldb the wave-controller
-  // uses. Per-call open avoids holding the LevelDB lock between
-  // unrelated writes; lock contention against a running wave-controller
-  // gets a short backoff retry before bubbling.
-  // ------------------------------------------------------------------
-
-  _getKmCorePaths() {
-    // Derive everything from the configured graphDb root so we work
-    // regardless of cwd. VKB-server runs in /coding/lib/vkb-server,
-    // so process.cwd() does NOT point at the project root.
-    const graphRoot = this.databaseManager?.graphDbConfig?.path
-      || path.join(process.cwd(), '.data', 'knowledge-graph');
-    const dataDir = path.dirname(graphRoot);
-    return {
-      dbPath: path.join(graphRoot, 'leveldb'),
-      exportDir: path.join(graphRoot, 'exports'),
-      ontologyDir: path.join(dataDir, 'ontologies'),
-    };
-  }
-
-  async _withKmCoreStore(callback) {
-    const { dbPath, exportDir, ontologyDir } = this._getKmCorePaths();
-    if (!fs.existsSync(dbPath) || !fs.existsSync(ontologyDir)) {
-      // Not initialised yet — let caller fall through to SQLite.
-      return null;
-    }
-    const { GraphKMStore } = await import('@fwornle/km-core');
-    const delays = [0, 250, 500, 1000];
-    let lastErr;
-    for (const delay of delays) {
-      if (delay > 0) await new Promise(r => setTimeout(r, delay));
-      const store = new GraphKMStore({
-        dbPath, exportDir, ontologyDir,
-        ontologyStrict: false,
-        debounceMs: 0,
-        domains: ['coding'],
-      });
-      try {
-        await store.open();
-        try {
-          return await callback(store);
-        } finally {
-          await store.close().catch(() => {});
-        }
-      } catch (err) {
-        lastErr = err;
-        const msg = String(err?.message || err).toLowerCase();
-        // Retry only on LevelDB lock contention; bubble everything else.
-        if (!msg.includes('lock') && !msg.includes('resource') && !msg.includes('busy')) {
-          throw err;
-        }
-      }
-    }
-    throw lastErr;
-  }
-
-  async _writeEntityToKmCore(entity) {
-    try {
-      const name = entity.entityName || entity.name;
-      const entityType = entity.entityType || entity.entity_type;
-      if (!name || !entityType) return null;
-      const observations = Array.isArray(entity.observations) ? entity.observations : [];
-      const source = entity.source || 'manual';
-      const team = entity.team || 'coding';
-      const mergedMetadata = {
-        ...(entity.metadata || {}),
-        source,
-        team,
-        ...(entity.sessionId ? { sessionId: entity.sessionId } : {}),
-        ...(entity.classification ? { classification: entity.classification } : {}),
-        ...(entity.confidence != null ? { confidence: entity.confidence } : {}),
-      };
-      const payload = {
-        name,
-        entityType,
-        observations,
-        metadata: mergedMetadata,
-      };
-      // Pass-through optional hierarchy / operator fields.
-      for (const k of ['parentEntityName', 'hierarchyLevel', 'isScaffoldNode', 'childEntityNames', 'embedding', 'role', 'enrichedContext']) {
-        if (entity[k] !== undefined) payload[k] = entity[k];
-      }
-      const provenance = {
-        source: 'vkb-api',
-        runId: `vkb-api-${Date.now()}`,
-      };
-      const id = await this._withKmCoreStore(async (store) => {
-        return await store.putEntity(payload, { provenance });
-      });
-      return id;
-    } catch (err) {
-      logger.warn('km-core entity write failed', {
-        name: entity?.entityName || entity?.name,
-        error: err?.message || String(err),
-      });
-      return null;
-    }
-  }
-
-  async _writeRelationToKmCore(relation) {
-    try {
-      // Accept all shapes callers use: name-based (API: from/to), legacy
-      // SQL-shape (from_entity_id/to_entity_id), and the variant the
-      // graphDB code-path uses (fromEntityName/toEntityName).
-      const fromHint = relation.fromEntityName || relation.from_entity_id
-        || relation.fromEntityId || relation.fromName || relation.from;
-      const toHint = relation.toEntityName || relation.to_entity_id
-        || relation.toEntityId || relation.toName || relation.to;
-      const type = relation.relationType || relation.relation_type || relation.type;
-      if (!fromHint || !toHint || !type) return null;
-
-      const provenance = {
-        source: 'vkb-api',
-        runId: `vkb-api-${Date.now()}`,
-      };
-
-      const id = await this._withKmCoreStore(async (store) => {
-        // km-core addRelation expects UUIDs, not names. getEntity takes
-        // an id, not a name, so to resolve a name we have to scan via
-        // iterate (km-core has no name index). Build a tiny one-pass
-        // index of just the names we need so we don't iterate twice.
-        const isUuid = (s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-        const needed = new Set();
-        if (!isUuid(fromHint)) needed.add(fromHint);
-        if (!isUuid(toHint)) needed.add(toHint);
-        const nameToId = new Map();
-        if (needed.size > 0) {
-          for await (const ent of store.iterate()) {
-            if (needed.has(ent.name)) {
-              nameToId.set(ent.name, ent.id);
-              if (nameToId.size === needed.size) break;
-            }
-          }
-        }
-        const fromId = isUuid(fromHint) ? fromHint : nameToId.get(fromHint) || null;
-        const toId = isUuid(toHint) ? toHint : nameToId.get(toHint) || null;
-        if (!fromId || !toId) {
-          logger.warn('km-core relation skipped — endpoint not found', { from: fromHint, to: toHint });
-          return null;
-        }
-        return await store.addRelation(
-          { from: fromId, to: toId, type, metadata: relation.metadata || {} },
-          { provenance },
-        );
-      });
-      return id;
-    } catch (err) {
-      logger.warn('km-core relation write failed', { error: err?.message || String(err) });
-      return null;
-    }
   }
 
   _getTeamsFromExports() {
