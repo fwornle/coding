@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: planning
-stopped_at: Phase 42.1.2 Plan 03 complete (ensureProjectAnchor integration smoke; layer-2 closed at integration level; phase verifier-ready)
-last_updated: "2026-05-25T05:31:32.016Z"
+status: executing
+stopped_at: Phase 42.2 Plan 03 complete (QdrantSyncService retired; outer-repo CLI routes through km-core syncQdrantFromStore; Wave 1 of phase complete pending Plan 02)
+last_updated: "2026-05-25T07:32:50.563Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 21
   completed_phases: 9
-  total_plans: 46
-  completed_plans: 46
+  total_plans: 52
+  completed_plans: 47
   percent: 43
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
+**Current focus:** Phase 42.2 — retire-deferred-42-07-work-legacy-persistence-trio-atomic-le
 
 **v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
 
@@ -49,9 +49,9 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 47
-Plan: Not started
-Status: Ready to plan
+Phase: 42.2 (retire-deferred-42-07-work-legacy-persistence-trio-atomic-le) — EXECUTING
+Plan: 2 of 6
+Status: Ready to execute
 Next step: Run `/gsd-verify-phase 42.1.2` — both Verification-Boundary bullets locked in CONTEXT.md are now green: Plan 02 closed the unit-level smoke (`registry.isValidClass('Project')` per team, 7 teams logged Project=valid); Plan 03 closes the integration-level smoke (`ensureProjectAnchor` cold/warm/idempotency contract, OK: 3/3 integration smoke tests pass). The Phase 42.1 SC#6 promotion gate (`/gsd-verify-phase 42.1`) remains separately owned per CONTEXT.md line 93-94.
 Last activity: 2026-05-25
 
@@ -168,6 +168,7 @@ Last activity: 2026-05-25
 - [Phase 42.1.1-01]: Test C softened per user Option A — dropped `isValidClass('Project') === true`, kept Component canary + added `domains.length === 8`. Rationale: Project class is not declared in any on-disk ontology JSON; asserting on it would require either editing `.data/ontologies/upper.json` (path-b explicitly rejected by CONTEXT.md) or registering Project at runtime (out of scope for a loader fix). Per CONTEXT.md line 93-94, SC#6 promotion is owned by Phase 42.1's verifier, not 42.1.1. The new known residual (add Project to on-disk JSON) is layer-2 of the SC#6 cascade and tracked as a separate follow-up.
 - [Phase 42.1.2-02]: Test C upgrade lands per-team positive assertion (`registry.isValidClass('Project') === true` for every team in TEAMS) — the 42.1.1 Option-A carve-out is RESTORED, not DROPPED, after Plan 01 registered Project in upper.json. Component canary gated to `team === 'coding'` (only coding-ontology.json declares Component); negative-case sanity (NonExistentClassXyz123) kept per-team. New positive forensic-trail stderr line `[Test C] team=<team> Project=valid (Phase 42.1.2 layer-2 closed)` emitted 7× per run (one per team in TEAMS); verify grep gate count-asserts == 7. Layer-2 of SC#6 closed at the unit level. **Plan-staleness deviation:** the prompt's "submodule commit protocol" was a no-op for this plan because `integrations/mcp-server-semantic-analysis/src/ontology` is a `120000` symlink (target `../../../src/ontology`); the file is tracked by the OUTER repo. Single outer-repo commit `3fee3a5f3` instead of submodule + pointer-bump pair. Future plans touching `src/ontology/` should inherit this — Plan 03 must re-evaluate the symlink check before assuming the submodule tracks any new file under that path.
 - [Phase 42.1.2-03]: Integration smoke for `WaveController.ensureProjectAnchor(runId)` lands at `integrations/mcp-server-semantic-analysis/src/agents/wave-controller-ensure-project-anchor.test.ts` (310 lines, 3 `it(...)` blocks in 1 `describe(...)`). Cold path asserts the full locked spy contract (`name='Coding'`, `entityType='Project'`, `ontologyClass='Project'`, `opts.team='coding'`) on the single storeEntity call, plus a defence-in-depth `persistedEntityNames.has('Coding')` regression guard for the wave-controller.ts:2291 set-add ordering. Warm path proves no storeEntity call when queryEntities returns existing Coding/Project. Idempotency drives a mutable closure `codingMinted` flag flipped after the first storeEntity lands so the second invocation takes the warm path — final tally: 1 storeEntity, 2 queryEntities across two ensureProjectAnchor calls. Production source `wave-controller.ts` byte-identical (private method reached via `as unknown as { ... }` compile-time visibility hatch — no production-side accessor introduced). Built-in `node:test` + `node:assert/strict` only, zero console.* (process.stderr.write for forensic lines). **Topology decision:** plan opposite to Plan 02 — `src/agents/` is a REAL directory (`drwxr-xr-x`), not a symlink, so two-commit topology required: submodule commit `7f71c8f` (branch `main`) + outer-repo pointer-bump `1577f1367`. The submodule mixes both topologies (`src/agents/` real, `src/ontology/` symlink) — future plans touching `integrations/mcp-server-semantic-analysis/src/<subdir>/` MUST probe `ls -la` per subdir. Phase 42.1.2 layer-2 of SC#6 closed at the integration level; both Verification-Boundary bullets locked in CONTEXT.md are now green. Phase ready for `/gsd-verify-phase 42.1.2`. Phase 42.1 SC#6 wave-analysis re-run remains separately owned per CONTEXT.md line 93-94.
+- [Phase ?]: [Phase 42.2-03]: QdrantSyncService retired in full — outer-repo scripts/sync-graph-to-qdrant.js rewritten to construct GraphKMStore (with mandatory ontologyDir per CLAUDE.md) + wrap @qdrant/js-client-rest and call km-core syncQdrantFromStore (Phase 42-04 D-52a). DatabaseManager.qdrantSync field DELETED OUTRIGHT (planner discretion per D-Qdrant step 2 — bidirectional sync was vestigial). Single outer-repo commit (NOT submodule+pointer-bump pair) because src/knowledge-management/ is the symlink target of integrations/mcp-server-semantic-analysis/src/knowledge-management/ — matches Phase 42.1.2-02 precedent. Legacy --teams CLI flag honored as deprecated no-op for operator CLI surface compat. Monorepo grep gate clean (0 live-code QdrantSyncService hits).
 
 ### Blockers/Concerns
 
@@ -212,11 +213,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 42.1.1 P01 | ~50m (cross-session) | 3 tasks | 5 files |
 | Phase 42.1.2 P02 | ~10m | 1 task | 1 file |
 | Phase 42.1.2 P03 | ~15m | 1 task | 1 file |
+| Phase 42.2 P03 | ~7m | 3 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-05-25T04:58:00Z
-Stopped at: Phase 42.1.2 Plan 03 complete (ensureProjectAnchor integration smoke; layer-2 closed at integration level; phase verifier-ready)
+Last session: 2026-05-25T07:32:50.554Z
+Stopped at: Phase 42.2 Plan 03 complete (QdrantSyncService retired; outer-repo CLI routes through km-core syncQdrantFromStore; Wave 1 of phase complete pending Plan 02)
 Resume with: Run `/gsd-verify-phase 42.1.2` — both Verification-Boundary bullets are now green (unit: 7/7 teams logged Project=valid via Plan 02; integration: OK: 3/3 cold/warm/idempotency tests pass via Plan 03). The Phase 42.1 SC#6 verifier remains separately owned per CONTEXT.md line 93-94 (operator does the Docker rebuild + production `ukb full` invocation as Phase 42.1's verifier step, NOT as Phase 42.1.2's acceptance gate).
 
 Plan 02 follow-up for Plan 7:

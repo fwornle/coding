@@ -484,7 +484,7 @@ Plans:
 **Goal:** Land the four explicit deferred-work blocks recorded in 42-07-SUMMARY so Phase 42 can finally be marked COMPLETE — (1) canonical-emit gap fix (team + process attribution per D-Emit forensics), (2) full QdrantSync retirement routing through km-core syncQdrantFromStore, (3) legacy persistence trio retirement (persistence-agent.ts + graph-database-adapter.ts + GraphDatabaseService.js) with ~30 consumer rewires in coordinator.ts/tools.ts/content-validation-agent.ts, (4) atomic LevelDB dir-swap collapsing the two-store era, capped by the SC#1-6 verification gate (5 from Phase 42 ROADMAP + SC#6 orphan-count from Phase 42.1).
 **Requirements**: none (decision-coverage gate against CONTEXT.md `<decisions>` — D-Wave, D-Qdrant, D-DirSwap, D-Emit)
 **Depends on:** Phase 42
-**Plans:** 6 plans across 4 waves
+**Plans:** 1/6 plans executed
 
 Plans:
 
@@ -495,7 +495,7 @@ Plans:
 **Wave 1 (parallel — disjoint files)**
 
 - [ ] 42.2-02-PLAN.md — Canonical-emit gap fix (depends on 42.2-01): extend CanonicalMapperOptions with team?; thread metadata.team in toCanonicalEntity; thread process:'wave-analysis-{wave-N}' into LLMService calls in wave1/wave2/wave3 agents; submodule + outer-repo pointer-bump commit pair. Optional one-shot 802-entity augmentation script if forensics demands.
-- [ ] 42.2-03-PLAN.md — QdrantSync retirement (no dependency — fully parallel): rewrite scripts/sync-graph-to-qdrant.js to call km-core syncQdrantFromStore; delete QdrantSyncService field+init+shutdown from src/databases/DatabaseManager.js; delete src/knowledge-management/QdrantSyncService.js; monorepo grep-gate clean.
+- [x] 42.2-03-PLAN.md — QdrantSync retirement (no dependency — fully parallel): rewrite scripts/sync-graph-to-qdrant.js to call km-core syncQdrantFromStore; delete QdrantSyncService field+init+shutdown from src/databases/DatabaseManager.js; delete src/knowledge-management/QdrantSyncService.js; monorepo grep-gate clean.
 
 **Wave 2 (parallel — depends on Wave 1)**
 
