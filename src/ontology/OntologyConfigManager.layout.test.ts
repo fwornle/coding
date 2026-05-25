@@ -148,84 +148,98 @@ describe('Phase 42.1.1 Plan 01 Task 2 — OntologyConfigManager layout integrati
 
   // -------------------------------------------------------------------------
   // Test C: verification-boundary smoke — fresh OntologyRegistry constructed
-  // over the post-initialize ontologyDir loads all 8 on-disk domain JSONs
-  // and the canary 'Component' class resolves. In-process equivalent of
-  // CONTEXT.md `<decisions>` § "Verification Boundary" bullets 2 AND 3.
+  // over the post-initialize ontologyDir reports `isValidClass('Project')
+  // === true` for every team in TEAMS. In-process equivalent of Phase 42.1.2
+  // CONTEXT.md `<decisions>` § "Verification Boundary (LOCKED)" bullet 1.
   //
-  // NOTE (Phase 42.1.1 Option A — locked 2026-05-24):
-  //   The original plan asked for `isValidClass('Project') === true` here, but
-  //   the on-disk ontology JSONs do NOT declare a `Project` class — `upper.json`
-  //   exposes File/Service/Feature/Contract/RuntimeDiagnostics and each
-  //   `<team>-ontology.json` declares team-specific L2 classes. Asserting on
-  //   `Project` would be impossible without also editing the on-disk JSONs,
-  //   which is explicitly out of scope for 42.1.1 (path-b rejected). Per
-  //   CONTEXT.md line 93-94, SC#6 pass for Phase 42.1 is the PROMOTION GATE,
-  //   not a 42.1.1 acceptance gate — 42.1.1 proves the loader works (layer 1
-  //   of the SC#6 root cause); registering a `Project` class on disk (layer 2)
-  //   is tracked as a NEW known residual in the SUMMARY and owned separately.
+  // NOTE (Phase 42.1.2 — Option-A carve-out RESTORED, 2026-05-25):
+  //   Phase 42.1.1 softened this test (per user Option A) because the
+  //   `Project` class was not declared in any on-disk ontology JSON at the
+  //   time — the original `isValidClass('Project') === true` assertion was
+  //   impossible without also editing `.data/ontologies/upper.json`, which
+  //   was out of scope for 42.1.1's path-a (loader-side only) contract.
   //
-  //   Softened assertions (this test):
-  //     - registry.getLoadedDomains().length > 0   (loader works at all)
-  //     - registry.getLoadedDomains().length === 8 (all on-disk JSONs loaded)
-  //     - registry.isValidClass('Component') === true   (canary that IS in
-  //       coding-ontology.json — matches registry-adoption.test.ts:88)
-  //     - registry.isValidClass('NonExistentClassXyz123') === false   (negative)
+  //   Phase 42.1.2 Plan 01 LANDED that on-disk change: the `Project` class
+  //   is now declared in `.data/ontologies/upper.json` with `name` +
+  //   `repoRoot` properties and `relationships: {}`. Because every team's
+  //   `<team>-ontology.json` declares `meta.extends: "upper"`, the
+  //   `Project` class is visible to all 7 teams' km-core registries on the
+  //   next registry load — zero per-team duplication.
   //
-  //   DROPPED: registry.isValidClass('Project') === true   (would require
-  //   adding Project to .data/ontologies/upper.json — separate follow-up)
+  //   This plan (42.1.2 Plan 02) RESTORES the positive assertion the
+  //   original 42.1.1 plan asked for, parameterised across every team in
+  //   the existing `TEAMS` literal. The Phase 42.1.1 "layer-2 follow-up —
+  //   Project class not on disk" known-residual closes when this test
+  //   goes green. Cross-reference: Phase 42.1.1 Plan 01 SUMMARY § Known
+  //   Residuals (NEW); Phase 42.1.2 CONTEXT.md § Verification Boundary
+  //   bullet 1.
+  //
+  //   Per-team assertions (this test):
+  //     - registry.isValidClass('Project') === true       (the new positive
+  //       gate — Project resolves from upper.json for every team)
+  //     - registry.isValidClass('Component') === true     (canary that IS
+  //       in coding-ontology.json — matches registry-adoption.test.ts:88;
+  //       gated to team='coding' because non-coding teams' lower
+  //       ontologies do not declare Component)
+  //     - registry.isValidClass('NonExistentClassXyz123') === false
+  //       (negative-case sanity — registry actually discriminates)
+  //
+  //   Forensic-trail stderr line per team: `[Test C] team=<team>
+  //   Project=valid (Phase 42.1.2 layer-2 closed)`.
   // -------------------------------------------------------------------------
-  it('Test C: fresh OntologyRegistry over post-initialize ontologyDir loads all 8 domains AND canary Component resolves', async () => {
-    OntologyConfigManager.resetInstance();
-    const manager = OntologyConfigManager.getInstance({
-      enabled: true,
-      upperOntologyPath: upperTwoTier(),
-      team: 'coding',
-      lowerOntologyPath: lowerTwoTier('coding'),
-      hotReload: false,
-    });
-    await manager.initialize();
-
-    const ontologyDir = dirname(manager.getConfig().lowerOntologyPath!);
-    process.stderr.write(`[Test C] ontologyDir resolved to: ${ontologyDir}\n`);
-
+  it("Test C: fresh OntologyRegistry over post-initialize ontologyDir reports isValidClass('Project') === true for every team (Phase 42.1.2 layer-2 of SC#6)", async () => {
     const m = await import('@fwornle/km-core');
-    const registry = new m.OntologyRegistry({ ontologyDir });
 
-    const domains = registry.getLoadedDomains();
-    process.stderr.write(`[Test C] getLoadedDomains().length = ${domains.length}\n`);
-    process.stderr.write(`[Test C] domains = ${domains.join(', ')}\n`);
+    for (const team of TEAMS) {
+      OntologyConfigManager.resetInstance();
+      const manager = OntologyConfigManager.getInstance({
+        enabled: true,
+        upperOntologyPath: upperTwoTier(),
+        team,
+        lowerOntologyPath: lowerTwoTier(team),
+        hotReload: false,
+      });
+      await manager.initialize();
 
-    // (1) Loader works at all
-    assert.ok(domains.length > 0, `expected >0 loaded domains, got ${domains.length}`);
+      const ontologyDir = dirname(manager.getConfig().lowerOntologyPath!);
+      const registry = new m.OntologyRegistry({ ontologyDir });
 
-    // (2) All 8 on-disk JSONs loaded — proves resolver-then-registry chain reads
-    // every flat-layout file under .data/ontologies/ (upper.json + 7 team JSONs)
-    assert.equal(
-      domains.length,
-      8,
-      `expected exactly 8 loaded domains (upper + 7 team JSONs), got ${domains.length}: ${domains.join(', ')}`,
-    );
+      // (1) PRIMARY ASSERTION — the new positive gate. Project resolves from
+      // upper.json (declared in Phase 42.1.2 Plan 01) for every team because
+      // every <team>-ontology.json declares meta.extends: "upper".
+      assert.equal(
+        registry.isValidClass('Project'),
+        true,
+        `team=${team}: registry.isValidClass('Project') must return true (Phase 42.1.2 — Project registered in upper.json)`,
+      );
 
-    // (3) Component — canary class, sourced from coding-ontology.json
-    // (matches registry-adoption.test.ts:88)
-    assert.equal(
-      registry.isValidClass('Component'),
-      true,
-      'Component must resolve via the loaded registry (canary class)',
-    );
+      // (2) Component — canary class, sourced from coding-ontology.json
+      // (matches registry-adoption.test.ts:88). Only the 'coding' team's
+      // lower ontology declares Component; other teams' lower ontologies
+      // declare their own L2 classes (e.g. AgentFramework for agentic,
+      // EmbeddedFunction for resi). Gate this assertion to team='coding'
+      // so it stays a true canary, not a false positive.
+      if (team === 'coding') {
+        assert.equal(
+          registry.isValidClass('Component'),
+          true,
+          `team=${team}: Component must resolve via the loaded registry (canary class from coding-ontology.json)`,
+        );
+      }
 
-    // (4) Negative-case sanity — registry actually discriminates
-    assert.equal(
-      registry.isValidClass('NonExistentClassXyz123'),
-      false,
-      'NonExistentClassXyz123 must NOT resolve (registry is not trivially returning true)',
-    );
+      // (3) Negative-case sanity — registry actually discriminates
+      assert.equal(
+        registry.isValidClass('NonExistentClassXyz123'),
+        false,
+        `team=${team}: NonExistentClassXyz123 must NOT resolve (registry is not trivially returning true)`,
+      );
 
-    // Forensic-trail log line — records that Project is NOT in the loaded set,
-    // referencing the SUMMARY known-residuals for the follow-up ticket.
-    process.stderr.write(
-      `[Test C] domains.length=${domains.length}, sample classes: Component=valid, Project=NOT loaded (see SUMMARY known-residuals)\n`,
-    );
+      // Forensic-trail log line — the visible signal in test output that
+      // the Phase 42.1.1 Option-A carve-out is closed for this team.
+      process.stderr.write(
+        `[Test C] team=${team} Project=valid (Phase 42.1.2 layer-2 closed)\n`,
+      );
+    }
 
     OntologyConfigManager.resetInstance();
   });
