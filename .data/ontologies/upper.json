@@ -146,6 +146,23 @@
         }
       }
     },
+    "Project": {
+      "description": "Top-level anchor for a team's wave-analysis emissions — every entity ultimately roots back to a Project. Minted by ensureProjectAnchor when the registry first sees a team's wave-analysis run.",
+      "relationships": {},
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Project name (PascalCase or single-word — e.g. 'Coding', 'RaaS', 'Agentic')",
+          "required": true,
+          "facet": "structure"
+        },
+        "repoRoot": {
+          "type": "string",
+          "description": "Absolute filesystem path to the project's root directory (matches scout-codebase + findBestParent heuristics)",
+          "facet": "structure"
+        }
+      }
+    },
     "Contract": {
       "description": "A specification of what a component promises to do — the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",
       "relationships": {},
