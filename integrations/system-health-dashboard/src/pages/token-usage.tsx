@@ -176,8 +176,14 @@ function formatLatency(ms: number): string {
   return `${Math.round(ms)}ms`
 }
 
+// Canonical map first, then hash-based fallback into SAFE_EVOLUTION_PALETTE.
+// Keeps Overview Treemap + Recent Calls border colors in sync with the
+// Evolution chart legend (evoColorFor uses the same scheme inline).
 function getProcessColor(process: string): string {
-  return PROCESS_COLORS[process] || '#6b7280'
+  const canonical = PROCESS_COLORS[process]
+  if (canonical) return canonical
+  const palette = SAFE_EVOLUTION_PALETTE.length > 0 ? SAFE_EVOLUTION_PALETTE : EVOLUTION_PALETTE
+  return palette[hashKey(process) % palette.length]
 }
 
 function getProviderColor(provider: string): string {
