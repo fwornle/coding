@@ -446,31 +446,34 @@ export function TraceModal({
     const groups: WaveGroup[] = []
     for (const [waveNumber, waveSteps] of waveMap) {
       const parent = parentMetrics.get(waveNumber)
-      let totalDuration = 0
-      let totalLLMCalls = 0
-      let totalTokens = 0
-      const entityFlow: TraceEntityFlow = { produced: 0, passedQA: 0, persisted: 0 }
 
-      if (parent) {
-        // Use parent step's aggregate metrics (more accurate when sub-steps lack duration)
-        totalDuration = parent.duration
-        totalLLMCalls = parent.llmCalls
-        totalTokens = parent.tokens
-        entityFlow.produced = parent.entityFlow.produced
-        entityFlow.passedQA = parent.entityFlow.passedQA
-        entityFlow.persisted = parent.entityFlow.persisted
-      } else {
-        // No parent — compute from individual steps
-        for (const step of waveSteps) {
-          totalDuration += step.duration ?? 0
-          totalLLMCalls += step.llmCalls ?? 0
-          totalTokens += step.tokensUsed ?? 0
-          if (step.entityFlow) {
-            entityFlow.produced += step.entityFlow.produced
-            entityFlow.passedQA += step.entityFlow.passedQA
-            entityFlow.persisted += step.entityFlow.persisted
-          }
+      // Always sum sub-step metrics — covers in-progress waves whose parent
+      // step hasn't emitted final aggregates yet (would otherwise render as
+      // "0 calls, -" until the wave completes).
+      let subDuration = 0
+      let subLLMCalls = 0
+      let subTokens = 0
+      const subFlow: TraceEntityFlow = { produced: 0, passedQA: 0, persisted: 0 }
+      for (const step of waveSteps) {
+        subDuration += step.duration ?? 0
+        subLLMCalls += step.llmCalls ?? 0
+        subTokens += step.tokensUsed ?? 0
+        if (step.entityFlow) {
+          subFlow.produced += step.entityFlow.produced
+          subFlow.passedQA += step.entityFlow.passedQA
+          subFlow.persisted += step.entityFlow.persisted
         }
+      }
+
+      // Take max(parent, sub-step sum). Parent is authoritative once the
+      // wave completes; sub-step sums make running-wave progress visible.
+      const totalDuration = Math.max(parent?.duration ?? 0, subDuration)
+      const totalLLMCalls = Math.max(parent?.llmCalls ?? 0, subLLMCalls)
+      const totalTokens = Math.max(parent?.tokens ?? 0, subTokens)
+      const entityFlow: TraceEntityFlow = {
+        produced: Math.max(parent?.entityFlow.produced ?? 0, subFlow.produced),
+        passedQA: Math.max(parent?.entityFlow.passedQA ?? 0, subFlow.passedQA),
+        persisted: Math.max(parent?.entityFlow.persisted ?? 0, subFlow.persisted),
       }
 
       groups.push({ waveNumber, steps: waveSteps, totalDuration, totalLLMCalls, totalTokens, entityFlow })
