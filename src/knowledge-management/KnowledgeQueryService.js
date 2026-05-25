@@ -10,11 +10,16 @@
  * - Analytics and reporting tools
  */
 
+import fs from 'fs';
+import path from 'path';
+
 export class KnowledgeQueryService {
   constructor(databaseManager, graphDatabase = null, options = {}) {
     this.databaseManager = databaseManager;
     this.graphDatabase = graphDatabase;
     this.debug = options.debug || false;
+    // Cache for km-core JSON exports — keyed by absolute file path, value: { mtimeMs, parsed }
+    this._exportCache = new Map();
   }
 
   /**
@@ -42,6 +47,13 @@ export class KnowledgeQueryService {
     if (graphDB) {
       return await graphDB.queryEntities(options);
     }
+
+    // Phase 42.2 Plan 04 retired GraphDatabaseService; VKB reads the km-core
+    // JSON exports written by the wave-controller into
+    // .data/knowledge-graph/exports/{team}.json. Falls through to SQLite
+    // only if the export dir is missing/empty.
+    const fromExports = this._queryEntitiesFromExports(options);
+    if (fromExports !== null) return fromExports;
 
     // Fallback to SQLite
     if (!this.databaseManager.health.sqlite.available) {
@@ -174,6 +186,11 @@ export class KnowledgeQueryService {
     if (graphDB) {
       return await graphDB.queryRelations(options);
     }
+
+    // Phase 42.2 Plan 04 retired GraphDatabaseService; read from km-core
+    // JSON exports before falling through to the legacy SQLite path.
+    const fromExports = this._queryRelationsFromExports(options);
+    if (fromExports !== null) return fromExports;
 
     // Fallback to SQLite
     if (!this.databaseManager.health.sqlite.available) {
@@ -346,11 +363,16 @@ export class KnowledgeQueryService {
     // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
     const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
     if (graphDB) {
-      console.log('[KnowledgeQueryService] Using GraphDB for teams');
+      process.stderr.write('[KnowledgeQueryService] Using GraphDB for teams\n');
       return await graphDB.getTeams();
     }
 
-    console.log('[KnowledgeQueryService] GraphDB not available, using SQLite fallback');
+    // Phase 42.2 Plan 04 retired GraphDatabaseService; derive teams from
+    // the km-core JSON export filenames (one file per team).
+    const fromExports = this._getTeamsFromExports();
+    if (fromExports !== null) return fromExports;
+
+    process.stderr.write('[KnowledgeQueryService] GraphDB not available, using SQLite fallback\n');
     // Fallback to SQLite
     if (!this.databaseManager.health.sqlite.available) {
       throw new Error('SQLite database unavailable');
@@ -615,9 +637,223 @@ export class KnowledgeQueryService {
 
       return id;
     } catch (error) {
-      console.error('[KnowledgeQueryService] Failed to store relation:', error);
+      process.stderr.write(`[KnowledgeQueryService] Failed to store relation: ${error?.message || error}\n`);
       throw error;
     }
+  }
+
+  // ------------------------------------------------------------------
+  // km-core JSON-export fallback (Phase 42.2 Plan 04)
+  //
+  // GraphDatabaseService is retired and DatabaseManager.initializeGraphDB()
+  // is a no-op. The VKB server (and any other consumer of this class)
+  // would otherwise fall through to the SQLite `knowledge_extractions`
+  // table — which was never created in the post-retirement DB schema —
+  // and 500. To unblock the viewer without rebuilding the whole VKB
+  // around km-core's GraphKMStore, we read the canonical JSON exports
+  // written by the wave-controller into .data/knowledge-graph/exports/.
+  // Each file is one team's full graph snapshot ({attributes, options,
+  // nodes, edges}). Cached by mtime so repeated polling is cheap.
+  // ------------------------------------------------------------------
+
+  _getExportDir() {
+    const graphRoot = this.databaseManager?.graphDbConfig?.path
+      || path.join(process.cwd(), '.data', 'knowledge-graph');
+    return path.join(graphRoot, 'exports');
+  }
+
+  _loadExports() {
+    const dir = this._getExportDir();
+    if (!fs.existsSync(dir)) return null;
+    let files;
+    try {
+      files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+    } catch {
+      return null;
+    }
+    if (files.length === 0) return null;
+
+    const result = [];
+    for (const f of files) {
+      const abs = path.join(dir, f);
+      const team = path.basename(f, '.json');
+      try {
+        const stat = fs.statSync(abs);
+        const cached = this._exportCache.get(abs);
+        let parsed;
+        if (cached && cached.mtimeMs === stat.mtimeMs) {
+          parsed = cached.parsed;
+        } else {
+          parsed = JSON.parse(fs.readFileSync(abs, 'utf-8'));
+          this._exportCache.set(abs, { mtimeMs: stat.mtimeMs, parsed });
+        }
+        result.push({
+          team,
+          nodes: Array.isArray(parsed?.nodes) ? parsed.nodes : [],
+          edges: Array.isArray(parsed?.edges) ? parsed.edges : [],
+        });
+      } catch (err) {
+        process.stderr.write(`[KnowledgeQueryService] Failed to read export ${f}: ${err?.message || err}\n`);
+      }
+    }
+    return result;
+  }
+
+  _mapNodeToEntity(node, team) {
+    const a = (node && node.attributes) || {};
+    const subsystem = a.metadata && a.metadata.subsystem;
+    const source = a.source
+      || (subsystem === 'wave-analysis' || subsystem === 'online-pipeline' ? 'online' : 'manual');
+    return {
+      id: node?.key || a.id || null,
+      entity_name: a.name || a.entity_name || null,
+      entity_type: a.entityType || a.ontologyClass || a.entity_type || 'Unknown',
+      observations: Array.isArray(a.observations) ? a.observations
+        : (a.description ? [a.description] : []),
+      extraction_type: a.extraction_type || null,
+      classification: a.ontologyClass || a.classification || null,
+      confidence: a.confidence != null ? a.confidence : 1.0,
+      source,
+      team: a.team || team,
+      extracted_at: a.createdAt || a.extracted_at || null,
+      last_modified: a.updatedAt || a.last_modified || a.createdAt || null,
+      session_id: a.session_id || null,
+      embedding_id: a.embedding_id || null,
+      metadata: a.metadata || {},
+      parentEntityName: a.parentEntityName || null,
+      hierarchyLevel: a.hierarchyLevel != null ? a.hierarchyLevel : null,
+      isScaffoldNode: a.isScaffoldNode || false,
+      childEntityNames: Array.isArray(a.childEntityNames) ? a.childEntityNames : [],
+      ...(a.embedding ? { embedding: a.embedding } : {}),
+      ...(a.role ? { role: a.role } : {}),
+      ...(a.layer ? { layer: a.layer } : {}),
+    };
+  }
+
+  _mapEdgeToRelation(edge, team, idToName) {
+    const a = (edge && edge.attributes) || {};
+    const from = edge?.source || a.from || null;
+    const to = edge?.target || a.to || null;
+    return {
+      id: edge?.key || null,
+      from_entity_id: from,
+      to_entity_id: to,
+      relation_type: a.type || a.relation_type || 'unknown',
+      confidence: a.confidence != null ? a.confidence : 1.0,
+      team: a.team || team,
+      created_at: (a.metadata && a.metadata.createdAt) || null,
+      metadata: a.metadata || {},
+      from_name: idToName.get(from) || null,
+      to_name: idToName.get(to) || null,
+    };
+  }
+
+  // Source 'auto' and 'online' are synonyms (see retired graphDB comment).
+  _sourceMatches(filter, actual) {
+    if (!filter) return true;
+    const syn = (s) => (s === 'auto' || s === 'online') ? new Set(['auto', 'online']) : new Set([s]);
+    return syn(filter).has(actual);
+  }
+
+  _queryEntitiesFromExports(options) {
+    const exports = this._loadExports();
+    if (!exports) return null;
+
+    const {
+      team = null,
+      source = null,
+      types = null,
+      startDate = null,
+      endDate = null,
+      minConfidence = 0,
+      limit = 1000,
+      offset = 0,
+      searchTerm = null,
+      sortBy = 'last_modified',
+      sortOrder = 'DESC',
+    } = options;
+
+    let entities = [];
+    for (const ex of exports) {
+      if (team && ex.team !== team) continue;
+      for (const node of ex.nodes) {
+        const e = this._mapNodeToEntity(node, ex.team);
+        if (!e.entity_name) continue;
+        if (!this._sourceMatches(source, e.source)) continue;
+        if (types && types.length > 0 && !types.includes(e.entity_type)) continue;
+        if (startDate && e.last_modified && e.last_modified < startDate) continue;
+        if (endDate && e.last_modified && e.last_modified > endDate) continue;
+        if (e.confidence < minConfidence) continue;
+        if (searchTerm) {
+          const term = String(searchTerm).toLowerCase();
+          if (!String(e.entity_name).toLowerCase().includes(term)) continue;
+        }
+        entities.push(e);
+      }
+    }
+
+    const safeSortBy = ['last_modified', 'extracted_at', 'confidence', 'entity_name'].includes(sortBy)
+      ? sortBy : 'last_modified';
+    const dir = String(sortOrder).toUpperCase() === 'ASC' ? 1 : -1;
+    entities.sort((a, b) => {
+      const av = a[safeSortBy] ?? '';
+      const bv = b[safeSortBy] ?? '';
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+
+    const start = Math.max(0, parseInt(offset, 10) || 0);
+    const end = start + (Math.max(0, parseInt(limit, 10) || 0));
+    return entities.slice(start, end);
+  }
+
+  _queryRelationsFromExports(options) {
+    const exports = this._loadExports();
+    if (!exports) return null;
+
+    const {
+      entityId = null,
+      team = null,
+      relationType = null,
+      limit = 1000,
+    } = options;
+
+    let relations = [];
+    for (const ex of exports) {
+      if (team && ex.team !== team) continue;
+      const idToName = new Map();
+      for (const node of ex.nodes) {
+        const a = (node && node.attributes) || {};
+        const id = node?.key || a.id;
+        if (id && a.name) idToName.set(id, a.name);
+      }
+      for (const edge of ex.edges) {
+        const r = this._mapEdgeToRelation(edge, ex.team, idToName);
+        if (entityId && r.from_entity_id !== entityId && r.to_entity_id !== entityId) continue;
+        if (relationType && r.relation_type !== relationType) continue;
+        relations.push(r);
+      }
+    }
+
+    return relations.slice(0, Math.max(0, parseInt(limit, 10) || 0));
+  }
+
+  _getTeamsFromExports() {
+    const exports = this._loadExports();
+    if (!exports) return null;
+    return exports.map(ex => {
+      const lastModified = ex.nodes.reduce((max, n) => {
+        const v = n?.attributes?.updatedAt || n?.attributes?.createdAt;
+        return v && (!max || v > max) ? v : max;
+      }, null);
+      return {
+        name: ex.team,
+        displayName: ex.team.charAt(0).toUpperCase() + ex.team.slice(1),
+        entityCount: ex.nodes.length,
+        lastActivity: lastModified,
+      };
+    });
   }
 }
 
