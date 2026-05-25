@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: Phase 42.2 Plan 04 complete (legacy persistence trio retired; ~30 consumer call sites rewired across coordinator.ts + tools.ts + content-validation-agent.ts + wave-controller.ts; full submodule test suite 80/80 GREEN)
-last_updated: "2026-05-25T10:50:39.000Z"
+status: ready_to_plan
+stopped_at: Phase 42.2 complete (6/6) — ready to discuss Phase 47
+last_updated: 2026-05-25T12:25:17.167Z
 last_activity: 2026-05-25
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 52
-  completed_plans: 50
-  percent: 44
+  completed_plans: 52
+  percent: 43
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 42.2 — retire-deferred-42-07-work-legacy-persistence-trio-atomic-le
+**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
 
 **v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
 
@@ -49,9 +49,9 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 42.2 (retire-deferred-42-07-work-legacy-persistence-trio-atomic-le) — EXECUTING
-Plan: 5 of 6
-Status: Ready to execute
+Phase: 47
+Plan: Not started
+Status: Ready to plan
 Next step: Execute Phase 42.2 Plan 05 (atomic LevelDB dir-swap per D-DirSwap recipe). Plan 04 just closed — the legacy persistence trio is fully retired, no code references `.data/knowledge-graph/` any longer, so Plan 05's dir-swap (collapse `.data/knowledge-graph/` + `.data/knowledge-graph-migrated/` into the single canonical `.data/knowledge-graph/` location) can proceed safely. Container stop required during the swap window per D-DirSwap step 1.
 Last activity: 2026-05-25
 
@@ -59,7 +59,7 @@ Last activity: 2026-05-25
 
 **Velocity:**
 
-- Total plans completed: 54 (v6.0)
+- Total plans completed: 60 (v6.0)
 - Average duration: 3 min
 - Total execution time: 0.05 hours
 

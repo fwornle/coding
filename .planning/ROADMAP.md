@@ -484,7 +484,7 @@ Plans:
 **Goal:** Land the four explicit deferred-work blocks recorded in 42-07-SUMMARY so Phase 42 can finally be marked COMPLETE — (1) canonical-emit gap fix (team + process attribution per D-Emit forensics), (2) full QdrantSync retirement routing through km-core syncQdrantFromStore, (3) legacy persistence trio retirement (persistence-agent.ts + graph-database-adapter.ts + GraphDatabaseService.js) with ~30 consumer rewires in coordinator.ts/tools.ts/content-validation-agent.ts, (4) atomic LevelDB dir-swap collapsing the two-store era, capped by the SC#1-6 verification gate (5 from Phase 42 ROADMAP + SC#6 orphan-count from Phase 42.1).
 **Requirements**: none (decision-coverage gate against CONTEXT.md `<decisions>` — D-Wave, D-Qdrant, D-DirSwap, D-Emit)
 **Depends on:** Phase 42
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -504,7 +504,7 @@ Plans:
 
 **Wave 3 (autonomous: false — depends on all prior)**
 
-- [ ] 42.2-06-PLAN.md — SC#1-6 end-to-end verification gate (depends on 42.2-02 + 42.2-03 + 42.2-04 + 42.2-05): production `ukb full` against the post-everything state + Qdrant rebuild via the Plan 03 CLI + run verify-knowledge-graph-store.mjs (renamed from 42-07-end-to-end-verify.mjs in this plan) + OPERATOR GATE for dashboard eyeballing (token-usage process column non-unknown; metadata.team present on new entities; dedup/merge fired). Closes Phase 42 + Phase 42.2 in STATE.md + ROADMAP.md.
+- [x] 42.2-06-PLAN.md — SC#1-6 end-to-end verification gate (depends on 42.2-02 + 42.2-03 + 42.2-04 + 42.2-05): production `ukb full` against the post-everything state + Qdrant rebuild via the Plan 03 CLI + run verify-knowledge-graph-store.mjs (renamed from 42-07-end-to-end-verify.mjs in this plan) + OPERATOR GATE for dashboard eyeballing (token-usage process column non-unknown; metadata.team present on new entities; dedup/merge fired). Closes Phase 42 + Phase 42.2 in STATE.md + ROADMAP.md. (completed 2026-05-25)
 
 
 #### Phase 42.1: UKB Project-Anchor Parity
