@@ -702,8 +702,20 @@ export class KnowledgeQueryService {
   _mapNodeToEntity(node, team) {
     const a = (node && node.attributes) || {};
     const subsystem = a.metadata && a.metadata.subsystem;
-    const source = a.source
-      || (subsystem === 'wave-analysis' || subsystem === 'online-pipeline' ? 'online' : 'manual');
+    // VKB legend categories:
+    //   - 'manual'           = Batch / UKB / wave-analysis (manually-triggered
+    //                          or scheduled full-graph reanalysis)
+    //   - 'auto' or 'online' = Continuous online-pipeline learning from
+    //                          ObservationConsolidator
+    // wave-analysis is the UKB pipeline (Batch), NOT the online pipeline —
+    // earlier mapping treated both as 'online' which made every node render
+    // in the pink Online/Auto colour even though they were batch-learned.
+    let source = a.source;
+    if (!source) {
+      if (subsystem === 'wave-analysis') source = 'manual';
+      else if (subsystem === 'online-pipeline') source = 'online';
+      else source = 'manual';
+    }
     return {
       id: node?.key || a.id || null,
       entity_name: a.name || a.entity_name || null,
