@@ -72,7 +72,7 @@ export class DatabaseManager extends EventEmitter {
     this.qdrant = null;
     this.sqlite = null;
     this.graphDB = null;
-    this.qdrantSync = null;  // Sync service for Qdrant ↔ Graph bidirectional sync
+    // QdrantSync removed in Phase 42.2 Plan 03 — Qdrant rebuild now via scripts/sync-graph-to-qdrant.js -> km-core syncQdrantFromStore (D-Qdrant).
 
     // Health status
     this.health = {
@@ -265,7 +265,6 @@ export class DatabaseManager extends EventEmitter {
       const { GraphDatabaseService } = await import('../knowledge-management/GraphDatabaseService.js');
       const { GraphKnowledgeImporter } = await import('../knowledge-management/GraphKnowledgeImporter.js');
       const { GraphKnowledgeExporter } = await import('../knowledge-management/GraphKnowledgeExporter.js');
-      const { QdrantSyncService } = await import('../knowledge-management/QdrantSyncService.js');
 
       // Create graph database instance
       this.graphDB = new GraphDatabaseService({
@@ -294,26 +293,7 @@ export class DatabaseManager extends EventEmitter {
       });
       await this.graphExporter.initialize();
 
-      // Initialize QdrantSyncService for bidirectional Graph ↔ Qdrant synchronization
-      // This ensures Qdrant vector database stays in sync with graph changes
-      if (this.qdrantConfig.enabled && this.health.qdrant.available) {
-        try {
-          this.qdrantSync = new QdrantSyncService({
-            graphService: this.graphDB,
-            databaseManager: this,
-            enabled: true,
-            syncOnStart: false  // Manual population via sync script
-          });
-          await this.qdrantSync.initialize();
-          console.log('[DatabaseManager] QdrantSyncService initialized - bidirectional sync active');
-        } catch (error) {
-          console.warn('[DatabaseManager] QdrantSyncService initialization failed:', error.message);
-          console.warn('[DatabaseManager] Graph→Qdrant sync disabled, but graph operations continue normally');
-          // Non-fatal: Graph DB works without Qdrant sync
-        }
-      } else {
-        console.log('[DatabaseManager] QdrantSyncService skipped (Qdrant not available)');
-      }
+      // QdrantSync removed in Phase 42.2 Plan 03 — Qdrant rebuild now via scripts/sync-graph-to-qdrant.js -> km-core syncQdrantFromStore (D-Qdrant).
 
       this.health.graph = {
         available: true,
@@ -819,11 +799,6 @@ export class DatabaseManager extends EventEmitter {
     // This prevents the race condition where debounced exports fire after graph is cleared
     if (this.graphExporter) {
       await this.graphExporter.shutdown();
-    }
-
-    // Shutdown QdrantSyncService before closing graph
-    if (this.qdrantSync) {
-      await this.qdrantSync.shutdown();
     }
 
     // Close graph database

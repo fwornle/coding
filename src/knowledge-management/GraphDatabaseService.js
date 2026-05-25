@@ -569,7 +569,7 @@ export class GraphDatabaseService extends EventEmitter {
       // NOTE: JSON export is handled by GraphKnowledgeExporter via events
     }
 
-    // Emit deletion event (GraphKnowledgeExporter and QdrantSyncService listen to this)
+    // Emit deletion event (GraphKnowledgeExporter listens to this; QdrantSync retired Phase 42.2 Plan 03)
     this.emit('entity:deleted', { team, name, nodeId, entity });
 
     console.error(`✓ Deleted entity: ${name} (team: ${team})`);
