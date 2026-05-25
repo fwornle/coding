@@ -484,7 +484,7 @@ Plans:
 **Goal:** Land the four explicit deferred-work blocks recorded in 42-07-SUMMARY so Phase 42 can finally be marked COMPLETE — (1) canonical-emit gap fix (team + process attribution per D-Emit forensics), (2) full QdrantSync retirement routing through km-core syncQdrantFromStore, (3) legacy persistence trio retirement (persistence-agent.ts + graph-database-adapter.ts + GraphDatabaseService.js) with ~30 consumer rewires in coordinator.ts/tools.ts/content-validation-agent.ts, (4) atomic LevelDB dir-swap collapsing the two-store era, capped by the SC#1-6 verification gate (5 from Phase 42 ROADMAP + SC#6 orphan-count from Phase 42.1).
 **Requirements**: none (decision-coverage gate against CONTEXT.md `<decisions>` — D-Wave, D-Qdrant, D-DirSwap, D-Emit)
 **Depends on:** Phase 42
-**Plans:** 3/6 plans executed
+**Plans:** 5/6 plans executed
 
 Plans:
 
@@ -500,11 +500,11 @@ Plans:
 **Wave 2 (parallel — depends on Wave 1)**
 
 - [x] 42.2-04-PLAN.md — Legacy persistence trio retirement (depends on 42.2-02 + 42.2-03). DONE 2026-05-25. Deleted persistence-agent.ts + graph-database-adapter.ts (real-subdir submodule deletions in commit a27aac6) + GraphDatabaseService.js + GraphDatabaseService.d.ts (symlinked-subdir outer-repo deletions in commit 8bfee7faf). Rewired ~30 consumer call sites in coordinator.ts + tools.ts + content-validation-agent.ts to km-core-adapter. Rule 1 scope expansion: also rewired wave-controller.ts (legacy GraphDatabaseAdapter import + 3 graphDB.* call sites — not in plan's <interfaces> block but caught by grep gate); type-only imports moved to new src/types/shared-memory-types.ts. Rule 3 scope expansions: DatabaseManager.initializeGraphDB() reduced to no-op stub; GraphKnowledgeExporter.js JSDoc rephrased; 2 orphan integration tests at submodule root deleted. New helpers in src/storage/legacy-consumer-helpers.ts (saveSuccessfulWorkflowCompletion / linkInsightDocuments / cleanupEntityFiles / exportKnowledgeToJSON). km-core-adapter extended with initialize/close/renameEntity/updateEntityObservations. ContentValidationAgent.setKmCoreAdapter collapses legacy setter pair. DeduplicationAgent.registerAgent retired without replacement. Full submodule test suite 80/80 GREEN before AND after deletion. Live-code grep gate clean. Known residual (out of scope; follow-up housekeeping): 8 orphan operator test scripts under scripts/ + 5 sibling files in src/knowledge-management/.
-- [ ] 42.2-05-PLAN.md — Atomic LevelDB dir-swap (depends on 42.2-04; autonomous: false): D-DirSwap recipe — stop container → cp -R .data/knowledge-graph .bak → verify migrated dir health (>=802 entities + 5 spot-checks) → OPERATOR GATE → mv pair (knowledge-graph → .bak.old; knowledge-graph-migrated → knowledge-graph) → revert wave-controller.ts:507 dbPath → restart → sanity probe. Both backups retained pending Wave 3 PASS.
+- [x] 42.2-05-PLAN.md — Atomic LevelDB dir-swap (depends on 42.2-04; autonomous: false): D-DirSwap recipe — stop container → cp -R .data/knowledge-graph .bak → verify migrated dir health (>=802 entities + 5 spot-checks) → OPERATOR GATE → mv pair (knowledge-graph → .bak.old; knowledge-graph-migrated → knowledge-graph) → revert wave-controller.ts:507 dbPath → restart → sanity probe. Both backups retained pending Wave 3 PASS.
 
 **Wave 3 (autonomous: false — depends on all prior)**
 
-- [ ] 42.2-06-PLAN.md — SC#1-6 end-to-end verification gate (depends on 42.2-02 + 42.2-03 + 42.2-04 + 42.2-05): production `ukb full` against the post-everything state + Qdrant rebuild via the Plan 03 CLI + run 42-07-end-to-end-verify.mjs + OPERATOR GATE for dashboard eyeballing (token-usage process column non-unknown; metadata.team present on new entities; dedup/merge fired). Closes Phase 42 + Phase 42.2 in STATE.md + ROADMAP.md.
+- [ ] 42.2-06-PLAN.md — SC#1-6 end-to-end verification gate (depends on 42.2-02 + 42.2-03 + 42.2-04 + 42.2-05): production `ukb full` against the post-everything state + Qdrant rebuild via the Plan 03 CLI + run verify-knowledge-graph-store.mjs (renamed from 42-07-end-to-end-verify.mjs in this plan) + OPERATOR GATE for dashboard eyeballing (token-usage process column non-unknown; metadata.team present on new entities; dedup/merge fired). Closes Phase 42 + Phase 42.2 in STATE.md + ROADMAP.md.
 
 
 #### Phase 42.1: UKB Project-Anchor Parity
