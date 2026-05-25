@@ -722,7 +722,15 @@ export class KnowledgeQueryService {
             parsed = JSON.parse(fs.readFileSync(abs, 'utf-8'));
             this._exportCache.set(abs, { mtimeMs: stat.mtimeMs, parsed });
           }
-          const team = parsed?.metadata?.team || fallbackTeam;
+          // km-core's general.json is the unattributed-team default bucket;
+          // post-Phase-49 every entity should land in its real team's file.
+          // Until that fix, treat km-core general as 'coding' so name-matches
+          // against the rich legacy coding.json collapse the ~727 duplicates
+          // (the wave-controller re-discovered entities that already exist)
+          // and the duplicated entities pick up the legacy file's relations.
+          const explicitTeam = parsed?.metadata?.team;
+          const team = explicitTeam
+            || (shape === 'km-core' && fallbackTeam === 'general' ? 'coding' : fallbackTeam);
           result.push({
             team,
             shape,
@@ -891,14 +899,16 @@ export class KnowledgeQueryService {
       sortOrder = 'DESC',
     } = options;
 
-    // Merge across BOTH source dirs by (team, entity_name). Legacy entries
-    // are processed FIRST so any same-named km-core entry overlays them — the
-    // km-core version is fresher when it exists, but the legacy version
-    // carries the rich hierarchy + 'online' source distinction the km-core
-    // path has lost.
+    // Merge across BOTH source dirs by (team, entity_name). Process
+    // km-core FIRST so legacy can OVERLAY same-named duplicates — the
+    // legacy file carries the authoritative source distinction
+    // ('online' vs 'manual') that the km-core path lost when it stamped
+    // every wave-analysis re-discovery as 'manual'. For names that only
+    // exist in km-core (the ~73 truly-new wave-analysis entities), the
+    // km-core value remains.
     const ordered = [
-      ...exports.filter(ex => ex.shape === 'legacy'),
       ...exports.filter(ex => ex.shape !== 'legacy'),
+      ...exports.filter(ex => ex.shape === 'legacy'),
     ];
     const merged = new Map(); // key: `${team}:${name}` → mapped entity
     for (const ex of ordered) {
@@ -974,32 +984,32 @@ export class KnowledgeQueryService {
   _getTeamsFromExports() {
     const exports = this._loadExports();
     if (!exports) return null;
-    // Aggregate by team across BOTH dirs (legacy + km-core) so we don't
-    // double-count 'coding' when both `.data/exports/coding.json` and
-    // `.data/knowledge-graph/exports/coding.json` exist.
-    const byTeam = new Map(); // team → { entityCount, lastActivity }
+    // Aggregate by team across BOTH dirs. Count is the UNION (de-duplicated
+    // by entity name) so it matches what /api/entities returns rather than
+    // showing a per-file max (legacy 928) that contradicts the deduped union
+    // (1001 = 928 + 73 unique km-core additions).
+    const byTeam = new Map(); // team → { names: Set, lastActivity }
     for (const ex of exports) {
       let lastActivity = null;
+      let entry = byTeam.get(ex.team);
+      if (!entry) {
+        entry = { names: new Set(), lastActivity: null };
+        byTeam.set(ex.team, entry);
+      }
       for (const e of ex.entities) {
+        if (e.name) entry.names.add(e.name);
         const v = e.metadata?.last_updated || e.metadata?.updatedAt
               || e.metadata?.created_at || e.metadata?.createdAt;
         if (v && (!lastActivity || v > lastActivity)) lastActivity = v;
       }
-      const existing = byTeam.get(ex.team);
-      if (!existing) {
-        byTeam.set(ex.team, { entityCount: ex.entities.length, lastActivity });
-      } else {
-        // Prefer the entry with more entities (rich legacy file vs sparse km-core).
-        if (ex.entities.length > existing.entityCount) existing.entityCount = ex.entities.length;
-        if (lastActivity && (!existing.lastActivity || lastActivity > existing.lastActivity)) {
-          existing.lastActivity = lastActivity;
-        }
+      if (lastActivity && (!entry.lastActivity || lastActivity > entry.lastActivity)) {
+        entry.lastActivity = lastActivity;
       }
     }
     return [...byTeam.entries()].map(([name, info]) => ({
       name,
       displayName: name.charAt(0).toUpperCase() + name.slice(1),
-      entityCount: info.entityCount,
+      entityCount: info.names.size,
       lastActivity: info.lastActivity,
     }));
   }
