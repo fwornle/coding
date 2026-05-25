@@ -521,7 +521,7 @@ Plans:
 **Goal:** Add a `Project` class definition to the on-disk ontology so that `km-core` `OntologyRegistry.isValidClass('Project')` returns `true` after `OntologyConfigManager.initialize()`. This unblocks `ensureProjectAnchor('Coding')` at runtime and closes the layer-2 follow-up identified by Phase 42.1.1 Test C (see 42.1.1-01-SUMMARY.md § Known Residuals + 42.1.1-VERIFICATION.md). Scope is strictly the ontology JSON change + a smoke test that proves `ensureProjectAnchor('Coding')` no longer throws; Phase 42.1 SC#6 wave-analysis re-run remains owned by Phase 42.1's verifier.
 **Requirements**: none (decision-coverage gate against CONTEXT.md `<decisions>`)
 **Depends on:** Phase 42.1.1
-**Plans:** 3/3 plans executed — phase verifier-ready
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 42.1.2-01-PLAN.md — Insert `Project` class block into `.data/ontologies/upper.json` (anchor-only, `name` required + `repoRoot` optional, `relationships: {}` — locked shape per CONTEXT.md).

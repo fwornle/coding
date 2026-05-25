@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: Phase 42.1.2 plan 03 complete -- phase ready for /gsd-verify-phase 42.1.2
-last_updated: "2026-05-25T04:58:00Z"
+status: ready_to_plan
+stopped_at: Phase 42.1.2 complete (3/3) — ready to discuss Phase 47
+last_updated: 2026-05-25T05:10:42.685Z
 last_activity: 2026-05-25 -- Phase 42.1.2 Plan 03 complete (ensureProjectAnchor integration smoke landed)
 progress:
   total_phases: 20
   completed_phases: 8
   total_plans: 46
-  completed_plans: 45
-  percent: 42
+  completed_plans: 46
+  percent: 40
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 42.1.2 — register-project-ontology-class
+**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
 
 **v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
 
@@ -49,17 +49,17 @@ These are real bugs; address them after v7.1 closes, or as side-tracks between m
 
 ## Current Position
 
-Phase: 42.1.2 (register-project-ontology-class) — READY FOR VERIFICATION
-Plan: 3 of 3 complete; phase is verifier-ready
-Status: Phase 42.1.2 implementation complete; awaiting `/gsd-verify-phase 42.1.2`
+Phase: 47
+Plan: Not started
+Status: Ready to plan
 Next step: Run `/gsd-verify-phase 42.1.2` — both Verification-Boundary bullets locked in CONTEXT.md are now green: Plan 02 closed the unit-level smoke (`registry.isValidClass('Project')` per team, 7 teams logged Project=valid); Plan 03 closes the integration-level smoke (`ensureProjectAnchor` cold/warm/idempotency contract, OK: 3/3 integration smoke tests pass). The Phase 42.1 SC#6 promotion gate (`/gsd-verify-phase 42.1`) remains separately owned per CONTEXT.md line 93-94.
-Last activity: 2026-05-25 -- Phase 42.1.2 Plan 03 complete (submodule commit 7f71c8f + outer-repo pointer-bump 1577f1367; ensureProjectAnchor integration smoke landed)
+Last activity: 2026-05-25
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 51 (v6.0)
+- Total plans completed: 54 (v6.0)
 - Average duration: 3 min
 - Total execution time: 0.05 hours
 
