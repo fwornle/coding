@@ -15,6 +15,7 @@
 - **Dashboard**: http://localhost:3032 | **Health API**: http://localhost:3033
 - **Semantic Analysis SSE**: http://localhost:3848 (workflow execution)
 - **VKB**: `vkb` command opens http://localhost:8080
+- **rapid-llm-proxy routing** (REQUIRED on first start / after `.data/` wipe): run `scripts/configure-wave-analysis-routing.sh` to install `processOverrides` that route `wave-analysis-*` LLM calls through `copilot` (fast HTTP+OAuth) instead of the default `claude-code` (slow CLI subprocess). Without this, wave-analysis is ~30x slower AND silently degrades to mock-mode on truncated CLI responses (Phase 42.2 Plan 06 follow-up lesson). `--show` lists current state; `--reset` removes only the wave-analysis-* entries (preserves health-coordinator / observation-writer overrides which intentionally use claude-code).
 
 ## UKB Workflow Control
 
