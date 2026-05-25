@@ -12,11 +12,11 @@ The Token Usage page provides real-time visibility into LLM token consumption ac
 
 ## Page layout
 
-The page is organized into five tabs sharing a single header bar:
+The page is organized into three tabs sharing a single header bar:
 
 - **Summary cards** (always visible): Total Tokens, Total Calls, Avg Latency per LLM call, and a Subscription summary (Claude Max + GitHub Copilot quotas). Every card respects the active **time window** (see header actions below).
-- **Tabs:** Overview · Evolution · By Process · Timeline · Recent Calls.
-- **Header actions:** **Time window** dropdown (`Last 24h · 48h · 7 days · 30 days · All time`) · ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh (re-fetches summary + recent; shows a busy spinner while the request is in flight).
+- **Tabs:** Overview · Evolution · Recent Calls. (The earlier dedicated *By Process* and *Timeline* tabs were folded into Overview's Treemap and Evolution's *By Tokens (in/out)* toggle respectively — see below.)
+- **Header actions:** **Time window** dropdown (`Last 1h · 24h · 48h · 7 days · 30 days · All time`) · ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh (re-fetches summary + recent; shows a busy spinner while the request is in flight).
 
 ### Time window selector
 
@@ -34,31 +34,31 @@ The header cards plus two side-by-side panels:
 
 ### Evolution tab
 
-![Evolution tab — 30-day window, stacked by purpose](../images/health-mon-tokens-evolution.png)
+![Evolution tab — stacked by process](../images/health-mon-tokens-evolution.png)
 
-The Evolution tab is the answer to "**how does my consumption evolve over time, and who are the main consumers?**" It renders a **stacked area chart** across the selected window, with one band per cognitive process (or per model, via the chart's own *By Process / By Model* toggle).
+The Evolution tab answers "**how does my consumption evolve over time, and who are the main consumers?**" It renders a **stacked area chart** across the selected window with three independently-toggled axes — *By Process*, *By Model*, and *By Tokens (in/out)* — plus a *Stacked / Overlapping* render mode.
 
-Three design rules keep the visual focused:
+#### Stack axis toggle
 
-- **Main-consumer threshold.** The chart only renders series contributing **≥ 0.5 %** of the window's total tokens. Test/diagnostic processes (`reap-test`, `reap-final`, `fake-process`, `export-test`, …) routinely satisfy `> 0` but contribute fractions of a percent — they're dropped here to keep the legend readable. The full unfiltered breakdown is still available via the `summary.process_keys` API field for callers that want it.
-- **Stable colors per process.** Canonical processes (`observation-writer`, `consolidator-digest`, etc.) keep the same color across every chart on the page via `PROCESS_COLORS`. Unmapped processes fall through to a rotating palette — never the all-gray fallback that used to make competing stacks indistinguishable.
-- **Adaptive bucket size.** Driven by the header time window (see above). The bucket-minutes value is echoed in the card subtitle so the reader can sanity-check the granularity.
+The dropdown at top-right of the chart card switches what each band represents. Same window, same data, three lenses:
+
+| Mode | One band per | Use when |
+|---|---|---|
+| **By Process** *(default)* | Cognitive process (`observation-writer`, `wave-analysis-wave1`, `health-coordinator`, …) | Identifying which subsystem is driving consumption |
+| **By Model** | Canonical model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`) | Assessing the model mix and per-model spend |
+| **By Tokens (in/out)** | `input_tokens` vs `output_tokens` only | Tracking prompt-bloat vs generation share — this is what the retired *Timeline* tab used to show |
+
+![Evolution tab — By Model](../images/health-mon-tokens-evolution-by-model.png)
+
+![Evolution tab — By Tokens (in/out)](../images/health-mon-tokens-evolution-by-in_out.png)
+
+#### Design rules
+
+- **Main-consumer threshold.** The chart only renders series contributing **≥ 0.5 %** of the window's total tokens. Test/diagnostic processes (`reap-test`, `reap-final`, `fake-process`, `export-test`, …) routinely satisfy `> 0` but contribute fractions of a percent — they're dropped here to keep the legend readable. The full unfiltered breakdown is still available via the `summary.process_keys` / `summary.model_keys` API fields for callers that want it.
+- **Stable colors per process / model.** Canonical processes (`observation-writer`, `consolidator-digest`, etc.) keep the same color across every chart on the page via `PROCESS_COLORS`. Unmapped processes (e.g. `wave-analysis-wave1/wave2/wave3`) fall through to a deterministic **hash → SAFE_EVOLUTION_PALETTE** mapping — every key gets a stable slot across re-renders, never the all-gray fallback that used to make competing stacks indistinguishable. The same hash logic now drives the Overview Treemap and Recent Calls left-border, so the legend you learn here matches across every panel.
+- **Adaptive bucket size.** Driven by the header time window. The bucket-minutes value is echoed in the card subtitle so the reader can sanity-check the granularity.
 
 Below the chart, **Top Consumers** is a compact table showing each visible series's total tokens in the window plus its share bar — same data the chart stacks, but in tabular form so you can read exact totals without hovering through the chart.
-
-### By Process tab
-
-![By Process tab](../images/health-mon-tokens-by-process.png)
-
-Sortable table — one row per cognitive process — with columns Calls · Input · Output · Total · Avg Latency · Share %. Share is computed against the window total. `observation-writer` typically holds 75–85 %; `health-coordinator` accounts for hundreds of calls but only a fraction of a percent of tokens (its calls are 14-token health-check probes).
-
-### Timeline tab
-
-![Timeline tab](../images/health-mon-tokens-timeline.png)
-
-`Token Usage Over Time` plotted as **input + output token consumption per bucket** (gaps render as zero). The bucket width is **adaptive** to the active time window (2 min ≤ 24 h, 10 min ≤ 72 h, 30 min ≤ 7 d, 2 h ≤ 30 d, 6 h for All time) so a multi-day window stays a single chart rather than re-rendering at multiple zoom levels. Empty buckets are zero-filled in the backend response so the chart never invents missing data on the client.
-
-X-axis timestamps render in the **viewer's local timezone**, not UTC — the underlying timestamps in the export are ISO-with-Z but the chart converts to the browser locale for readability. The chart was fixed to do this conversion correctly during Phase 35 (prior versions occasionally wedged the navbar when timezone math threw).
 
 ### Recent Calls tab
 
