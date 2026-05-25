@@ -5,7 +5,11 @@
  * Supports team-specific exports with pretty formatting for PR reviews.
  *
  * Architecture:
- * - Reads from GraphDatabaseService (in-memory graph + LevelDB)
+ * - Reads from the legacy in-memory graph + LevelDB service (retired in
+ *   Phase 42.2 Plan 04 — this exporter is now orphaned and slated for
+ *   deletion in a follow-up housekeeping phase; the canonical export path
+ *   is km-core's own debounced JSON export under
+ *   .data/knowledge-graph-migrated/exports/).
  * - Writes to .data/knowledge-export/<team>.json
  * - Format: Pretty JSON matching knowledge-export structure
  * - Auto-export on entity/relationship changes (debounced)
@@ -24,7 +28,7 @@ export class GraphKnowledgeExporter {
   /**
    * Create a GraphKnowledgeExporter instance
    *
-   * @param {GraphDatabaseService} graphService - Graph database instance
+   * @param {object} graphService - Legacy graph database instance (orphaned post Phase 42.2 Plan 04)
    * @param {Object} options - Configuration options
    * @param {string} [options.exportDir] - Export directory path
    * @param {string} [options.configPath] - Knowledge config path

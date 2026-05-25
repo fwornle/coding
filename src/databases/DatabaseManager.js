@@ -257,63 +257,35 @@ export class DatabaseManager extends EventEmitter {
   }
 
   /**
-   * Initialize Graph Database (Graphology + Level)
+   * Initialize Graph Database — Phase 42.2 Plan 04 RETIRED.
+   *
+   * The legacy GraphDatabaseService (Graphology + LevelDB) was deleted along
+   * with the rest of the persistence trio in Phase 42.2 Plan 04. km-core's
+   * GraphKMStore is now the canonical graph backend, and it is constructed
+   * by the consumers that actually need it (wave-controller.ts, coordinator.ts,
+   * tools.ts). DatabaseManager has no remaining src/ consumers that depend
+   * on `.graphDB`; the field is left in place for operator-script back-compat
+   * but is never populated.
+   *
+   * Operator scripts that call `dbManager.initializeGraphDB()` see a warning
+   * + a graph: { available: false } health entry. They should be migrated
+   * to construct a km-core GraphKMStore directly (see
+   * scripts/sync-graph-to-qdrant.js for the canonical pattern from Phase 42.2 Plan 03).
    */
   async initializeGraphDB() {
-    try {
-      // Dynamic import to avoid loading if not needed
-      const { GraphDatabaseService } = await import('../knowledge-management/GraphDatabaseService.js');
-      const { GraphKnowledgeImporter } = await import('../knowledge-management/GraphKnowledgeImporter.js');
-      const { GraphKnowledgeExporter } = await import('../knowledge-management/GraphKnowledgeExporter.js');
+    this.health.graph = {
+      available: false,
+      lastCheck: Date.now(),
+      error: 'GraphDatabaseService retired in Phase 42.2 Plan 04 — use @fwornle/km-core GraphKMStore directly'
+    };
 
-      // Create graph database instance
-      this.graphDB = new GraphDatabaseService({
-        dbPath: this.graphDbConfig.path,
-        config: {
-          autoPersist: true,
-          persistIntervalMs: 1000
-        }
-      });
+    // QdrantSync removed in Phase 42.2 Plan 03 — Qdrant rebuild now via scripts/sync-graph-to-qdrant.js -> km-core syncQdrantFromStore (D-Qdrant).
 
-      // Initialize the graph database
-      await this.graphDB.initialize();
-
-      // Import knowledge from JSON exports on startup (Phase 4 bidirectional sync)
-      const importer = new GraphKnowledgeImporter(this.graphDB, {
-        autoImportOnStartup: true,
-        conflictResolution: 'newest-wins'
-      });
-      await importer.initialize();
-
-      // CRITICAL: Initialize exporter to keep JSON, LevelDB, and Graphology in sync
-      // This is NOT optional - all three storage layers must remain synchronized
-      this.graphExporter = new GraphKnowledgeExporter(this.graphDB, {
-        autoExport: true,
-        debounceMs: 5000
-      });
-      await this.graphExporter.initialize();
-
-      // QdrantSync removed in Phase 42.2 Plan 03 — Qdrant rebuild now via scripts/sync-graph-to-qdrant.js -> km-core syncQdrantFromStore (D-Qdrant).
-
-      this.health.graph = {
-        available: true,
-        lastCheck: Date.now(),
-        error: null
-      };
-
-      console.log(`[DatabaseManager] Graph database initialized at: ${this.graphDbConfig.path}`);
-    } catch (error) {
-      this.health.graph = {
-        available: false,
-        lastCheck: Date.now(),
-        error: error.message
-      };
-
-      console.warn('[DatabaseManager] Graph database not available:', error.message);
-      console.warn('[DatabaseManager] Knowledge operations (entities/relations) are unavailable');
-      console.warn('[DatabaseManager] Note: SQLite is only used for analytics (budget tracking, session metrics)');
-      // Continue with degraded functionality - graph DB is optional for analytics-only operations
-    }
+    process.stderr.write(
+      '[DatabaseManager] initializeGraphDB() is a no-op (Phase 42.2 Plan 04 — GraphDatabaseService retired). ' +
+      'Consumers should construct @fwornle/km-core GraphKMStore directly. ' +
+      'See scripts/sync-graph-to-qdrant.js (Phase 42.2 Plan 03) for the canonical pattern.\n'
+    );
   }
 
   /**
