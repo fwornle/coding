@@ -1049,38 +1049,64 @@ export function TraceModal({
                   {(() => {
                     // Check if this wave has insight outputs instead of entity flow
                     const insightStep = selectedWave.steps.find(s => s.name.includes('insight'))
-                    const insightOutputs = (insightStep as any)?.outputs as { generated?: number; failed?: number; skippedDiagrams?: number } | undefined
+                    const insightOutputs = (insightStep as any)?.outputs as {
+                      planned?: number; generated?: number; failed?: number; skippedDiagrams?: number
+                    } | undefined
                     const hasEntityFlow = selectedWave.entityFlow.produced > 0 || selectedWave.entityFlow.persisted > 0
-                    const hasInsights = insightOutputs?.generated != null && insightOutputs.generated > 0
+                    const planned = insightOutputs?.planned ?? 0
+                    const generated = insightOutputs?.generated ?? 0
+                    const failedCount = insightOutputs?.failed ?? 0
+                    const skipped = insightOutputs?.skippedDiagrams ?? 0
+                    // Show the insight panel whenever the wave-controller has emitted
+                    // any insight metric — planned (upfront), generated (in-flight),
+                    // or final. Previously it only rendered if generated > 0, hiding
+                    // the in-progress state and the zero-generated final outcome.
+                    const hasInsights = planned > 0 || generated > 0 || failedCount > 0 || skipped > 0
 
                     if (hasInsights && !hasEntityFlow) {
+                      const pct = planned > 0 ? Math.min(100, Math.round(((generated + failedCount) / planned) * 100)) : 0
                       return (
                         <div className="space-y-2">
                           <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Insight Generation</h4>
                           <div className="flex items-center gap-2 text-sm">
                             <div className="flex flex-col items-center px-3 py-2 bg-blue-500/10 rounded">
-                              <span className="text-lg font-bold text-blue-400">{insightOutputs!.generated}</span>
-                              <span className="text-[10px] text-zinc-500">docs generated</span>
+                              <span className="text-lg font-bold text-blue-400 tabular-nums">
+                                {generated}{planned > 0 && <span className="text-zinc-500 font-normal">{` / ${planned}`}</span>}
+                              </span>
+                              <span className="text-[10px] text-zinc-500">{planned > 0 ? 'docs generated' : 'docs generated'}</span>
                             </div>
-                            {(insightOutputs!.failed ?? 0) > 0 && (
+                            {failedCount > 0 && (
                               <>
                                 <ArrowRight className="h-4 w-4 text-zinc-600" />
                                 <div className="flex flex-col items-center px-3 py-2 bg-red-500/10 rounded">
-                                  <span className="text-lg font-bold text-red-400">{insightOutputs!.failed}</span>
+                                  <span className="text-lg font-bold text-red-400">{failedCount}</span>
                                   <span className="text-[10px] text-zinc-500">failed</span>
                                 </div>
                               </>
                             )}
-                            {(insightOutputs!.skippedDiagrams ?? 0) > 0 && (
+                            {skipped > 0 && (
                               <>
                                 <ArrowRight className="h-4 w-4 text-zinc-600" />
                                 <div className="flex flex-col items-center px-3 py-2 bg-amber-500/10 rounded">
-                                  <span className="text-lg font-bold text-amber-400">{insightOutputs!.skippedDiagrams}</span>
+                                  <span className="text-lg font-bold text-amber-400">{skipped}</span>
                                   <span className="text-[10px] text-zinc-500">diagrams skipped</span>
                                 </div>
                               </>
                             )}
                           </div>
+                          {planned > 0 && (
+                            <div className="space-y-1 pt-1">
+                              <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-500 transition-all duration-300"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <div className="text-[10px] text-zinc-500 tabular-nums">
+                                {pct}% — {generated + failedCount} of {planned} processed
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     }
