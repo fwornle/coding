@@ -660,32 +660,35 @@ export class KnowledgeQueryService {
   // ------------------------------------------------------------------
 
   _getExportDirs() {
-    // TWO source dirs since Phase 42.2 (the migration is partial):
-    //   - .data/exports/        — legacy/canonical UKBDatabaseWriter +
-    //                              ObservationConsolidator HTTP-API output;
-    //                              entities/relations shape; team named after
-    //                              filename (coding.json, resi.json, ui.json).
-    //                              Frozen post-Phase-42.2 (last writer was the
-    //                              retired graphDB) but tracked in git so it
-    //                              still carries the rich KM-Core baseline:
-    //                              full CK -> Project -> Component hierarchy,
-    //                              manual + online sources, ~928 entities and
-    //                              ~1124 relations as of the freeze.
-    //   - .data/knowledge-graph/exports/ — wave-controller's km-core output;
-    //                              nodes/edges shape (Graphology); writes go
-    //                              to general.json by default because the
-    //                              team field never reaches km-core (Phase 49
-    //                              Gap 1). Sparse — typically <50 edges.
+    // THREE source dirs since Phase 42.2 (the migration is partial):
+    //   - .data/exports/                  — canonical legacy path; rich coding.json
+    //                                       (entities/relations shape) populated by
+    //                                       UKBDatabaseWriter + ObservationConsolidator
+    //                                       HTTP-API. Frozen since 2026-05-24 but
+    //                                       carries the full CK→Project→Component
+    //                                       hierarchy, 60 online-learned entities,
+    //                                       and ~928/1124 of the KM-Core baseline.
+    //   - .data/knowledge-export/         — older legacy dir kept for the per-team
+    //                                       JSON files (resi.json, ui.json). The
+    //                                       coding.json here is a symlink to
+    //                                       ../exports/coding.json so it would be
+    //                                       a duplicate read — deduped via realpath
+    //                                       in _loadExports().
+    //   - .data/knowledge-graph/exports/  — wave-controller's km-core output
+    //                                       (nodes/edges Graphology shape). Writes
+    //                                       fall into general.json regardless of
+    //                                       team because canonical-mapper drops
+    //                                       the team field (Phase 49 Gap 1). Sparse.
     //
-    // Reading from BOTH gives the user the rich legacy hierarchy AND any new
-    // wave-controller updates. Merging by entity name (with legacy as the
-    // base) so a later wave-controller update can overlay attributes without
-    // losing legacy relations.
+    // Reading from all three gives the user every team file ever populated PLUS
+    // any new wave-controller updates. _loadExports() builds a name→explicit-team
+    // map from the resi/ui files and uses it to re-attribute general.json entries.
     const graphRoot = this.databaseManager?.graphDbConfig?.path
       || path.join(process.cwd(), '.data', 'knowledge-graph');
     const dataRoot = path.dirname(graphRoot);
     return [
       { dir: path.join(dataRoot, 'exports'),           shape: 'legacy'  },
+      { dir: path.join(dataRoot, 'knowledge-export'),  shape: 'legacy'  },
       { dir: path.join(graphRoot, 'exports'),          shape: 'km-core' },
     ];
   }
@@ -700,54 +703,114 @@ export class KnowledgeQueryService {
   // [...legacy-relation...] }. Returns null if neither dir has anything.
   _loadExports() {
     const dirs = this._getExportDirs();
-    const result = [];
+    // PASS 1: enumerate all files across all dirs, dedupe by realpath so
+    // `.data/knowledge-export/coding.json` (symlink to ../exports/coding.json)
+    // is not loaded twice.
+    const seenReal = new Set();
+    const filesToLoad = [];
     for (const { dir, shape } of dirs) {
       if (!fs.existsSync(dir)) continue;
-      let files;
+      let names;
       try {
-        files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+        names = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
       } catch {
         continue;
       }
-      for (const f of files) {
+      for (const f of names) {
         const abs = path.join(dir, f);
-        const fallbackTeam = path.basename(f, '.json');
-        try {
-          const stat = fs.statSync(abs);
-          const cached = this._exportCache.get(abs);
-          let parsed;
-          if (cached && cached.mtimeMs === stat.mtimeMs) {
-            parsed = cached.parsed;
-          } else {
-            parsed = JSON.parse(fs.readFileSync(abs, 'utf-8'));
-            this._exportCache.set(abs, { mtimeMs: stat.mtimeMs, parsed });
-          }
-          // km-core's general.json is the unattributed-team default bucket;
-          // post-Phase-49 every entity should land in its real team's file.
-          // Until that fix, treat km-core general as 'coding' so name-matches
-          // against the rich legacy coding.json collapse the ~727 duplicates
-          // (the wave-controller re-discovered entities that already exist)
-          // and the duplicated entities pick up the legacy file's relations.
-          const explicitTeam = parsed?.metadata?.team;
-          const team = explicitTeam
-            || (shape === 'km-core' && fallbackTeam === 'general' ? 'coding' : fallbackTeam);
-          result.push({
-            team,
-            shape,
-            entities: this._normaliseEntities(parsed, shape, team),
-            relations: this._normaliseRelations(parsed, shape, team),
-          });
-        } catch (err) {
-          logger.warn(`Failed to read export ${f}`, { error: err?.message || String(err) });
+        let real;
+        try { real = fs.realpathSync(abs); } catch { real = abs; }
+        if (seenReal.has(real)) continue;
+        seenReal.add(real);
+        filesToLoad.push({ abs, shape, fname: f, fallbackTeam: path.basename(f, '.json') });
+      }
+    }
+
+    // PASS 2: parse + collect with placeholder team='coding' for any km-core
+    // general.json. We'll re-attribute per-entity in pass 3 using the
+    // name→team map built from explicitly-team-tagged files.
+    const parsed = []; // { fname, shape, team (initial), parsedDoc }
+    for (const f of filesToLoad) {
+      try {
+        const stat = fs.statSync(f.abs);
+        const cached = this._exportCache.get(f.abs);
+        let doc;
+        if (cached && cached.mtimeMs === stat.mtimeMs) {
+          doc = cached.parsed;
+        } else {
+          doc = JSON.parse(fs.readFileSync(f.abs, 'utf-8'));
+          this._exportCache.set(f.abs, { mtimeMs: stat.mtimeMs, parsed: doc });
+        }
+        const explicitTeam = doc?.metadata?.team;
+        const team = explicitTeam
+          || (f.shape === 'km-core' && f.fname === 'general.json' ? 'coding' : f.fallbackTeam);
+        parsed.push({ fname: f.fname, shape: f.shape, team, isUnattributed: !explicitTeam && f.fname === 'general.json', doc });
+      } catch (err) {
+        logger.warn(`Failed to read export ${f.fname}`, { error: err?.message || String(err) });
+      }
+    }
+
+    if (parsed.length === 0) return null;
+
+    // PASS 3: build name → explicit-team map from EXPLICITLY-team-tagged files
+    // only (resi.json, ui.json, and any other file with metadata.team set).
+    // Skip the unattributed general.json (its 'coding' assignment is the
+    // default, not authoritative). We later use this map to re-attribute
+    // names appearing in general.json so e.g. Normalisa lands in 'resi'
+    // (because resi.json explicitly claims it) instead of in 'coding'.
+    const nameToExplicitTeam = new Map();
+    for (const p of parsed) {
+      if (p.isUnattributed) continue;
+      const ents = this._normaliseEntities(p.doc, p.shape, p.team);
+      for (const e of ents) {
+        if (e.name && !nameToExplicitTeam.has(e.name)) {
+          nameToExplicitTeam.set(e.name, p.team);
         }
       }
     }
-    if (result.length === 0) return null;
-    // Special case: a file ALWAYS named "general.json" written by the km-core
-    // path doesn't represent a team — it's the unattributed-domain bucket
-    // (wave-controller writes that never had a team threaded). Surface them
-    // under their actual team if known; otherwise label them "general" so
-    // the existing legend doesn't break.
+
+    // PASS 4: build the final envelopes. For unattributed general.json,
+    // split entities into per-team buckets based on the explicit map.
+    const result = [];
+    for (const p of parsed) {
+      if (!p.isUnattributed) {
+        result.push({
+          team: p.team,
+          shape: p.shape,
+          entities: this._normaliseEntities(p.doc, p.shape, p.team),
+          relations: this._normaliseRelations(p.doc, p.shape, p.team),
+        });
+        continue;
+      }
+      // Unattributed (km-core general.json): per-entity team override.
+      const entsAll = this._normaliseEntities(p.doc, p.shape, p.team);
+      const relsAll = this._normaliseRelations(p.doc, p.shape, p.team);
+      const byTeam = new Map(); // team → { entities, relations }
+      const nameToTeamForFile = new Map();
+      for (const e of entsAll) {
+        const finalTeam = (e.name && nameToExplicitTeam.get(e.name)) || p.team;
+        e.team = finalTeam;
+        if (e.name) nameToTeamForFile.set(e.name, finalTeam);
+        let bucket = byTeam.get(finalTeam);
+        if (!bucket) { bucket = { entities: [], relations: [] }; byTeam.set(finalTeam, bucket); }
+        bucket.entities.push(e);
+      }
+      // For relations in the unattributed bucket: attribute based on the
+      // 'from' endpoint's resolved team (a relation typically tells a story
+      // about the from-side). Falls back to the file-level team.
+      for (const r of relsAll) {
+        const finalTeam = nameToTeamForFile.get(r.from) || p.team;
+        r.team = finalTeam;
+        const bucket = byTeam.get(finalTeam) || (() => {
+          const b = { entities: [], relations: [] }; byTeam.set(finalTeam, b); return b;
+        })();
+        bucket.relations.push(r);
+      }
+      for (const [t, bucket] of byTeam) {
+        result.push({ team: t, shape: p.shape, entities: bucket.entities, relations: bucket.relations });
+      }
+    }
+
     return result;
   }
 
