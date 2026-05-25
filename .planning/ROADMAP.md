@@ -521,12 +521,12 @@ Plans:
 **Goal:** Add a `Project` class definition to the on-disk ontology so that `km-core` `OntologyRegistry.isValidClass('Project')` returns `true` after `OntologyConfigManager.initialize()`. This unblocks `ensureProjectAnchor('Coding')` at runtime and closes the layer-2 follow-up identified by Phase 42.1.1 Test C (see 42.1.1-01-SUMMARY.md § Known Residuals + 42.1.1-VERIFICATION.md). Scope is strictly the ontology JSON change + a smoke test that proves `ensureProjectAnchor('Coding')` no longer throws; Phase 42.1 SC#6 wave-analysis re-run remains owned by Phase 42.1's verifier.
 **Requirements**: none (decision-coverage gate against CONTEXT.md `<decisions>`)
 **Depends on:** Phase 42.1.1
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed — phase verifier-ready
 
 Plans:
 - [x] 42.1.2-01-PLAN.md — Insert `Project` class block into `.data/ontologies/upper.json` (anchor-only, `name` required + `repoRoot` optional, `relationships: {}` — locked shape per CONTEXT.md).
 - [x] 42.1.2-02-PLAN.md — Upgrade Test C in `OntologyConfigManager.layout.test.ts` to assert `registry.isValidClass('Project') === true` per team across the existing `TEAMS` literal (closes the Phase 42.1.1 Option-A residual). **COMPLETE 2026-05-25** (commit 3fee3a5f3; 5/5 layout tests pass, 14/14 sibling regression tests pass, grep gate emits "OK: 7 teams logged Project=valid". See 42.1.2-02-SUMMARY.md.)
-- [ ] 42.1.2-03-PLAN.md — Add integration smoke `wave-controller-ensure-project-anchor.test.ts` covering cold path (one storeEntity call with `{ name: 'Coding', entityType: 'Project', ontologyClass: 'Project', team: 'coding' }`), warm path (no storeEntity), and idempotency (two calls = one mint).
+- [x] 42.1.2-03-PLAN.md — Add integration smoke `wave-controller-ensure-project-anchor.test.ts` covering cold path (one storeEntity call with `{ name: 'Coding', entityType: 'Project', ontologyClass: 'Project', team: 'coding' }`), warm path (no storeEntity), and idempotency (two calls = one mint). **COMPLETE 2026-05-25** (submodule commit 7f71c8f + outer-repo pointer-bump 1577f1367; 3/3 integration smoke tests pass, 19/19 sibling regression tests pass; production `wave-controller.ts` byte-identical. Phase ready for `/gsd-verify-phase 42.1.2`. See 42.1.2-03-SUMMARY.md.)
 
 #### Phase 43: OKM Cross-Repo Migration (C)
 
