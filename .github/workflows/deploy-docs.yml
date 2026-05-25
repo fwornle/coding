@@ -1,13 +1,17 @@
 name: Deploy Documentation
 
+# Trigger on every push to main and on manual dispatch. The first job (`gate`)
+# inspects the actual git diff and decides whether `build` + `deploy` should
+# run. The old top-level `paths:` filter was unreliable because GitHub
+# truncates the PushEvent commits array at 20 commits — when more than that
+# arrives in a single push (a multi-day local backlog, for example), the
+# filter cannot find the matching path and silently skips the workflow,
+# so docs-content changes never deployed (see the 2026-05-25 incident:
+# 84-commit push containing 8685ef2e2 went un-built).
 on:
   push:
     branches:
       - main
-    paths:
-      - 'docs-content/**'
-      - 'mkdocs.yml'
-      - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,7 +24,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ---------------------------------------------------------------------
+  # gate — decide whether the push actually touched docs paths.
+  # Uses `git diff` against `github.event.before` (the pre-push tip) so
+  # it works for any push size, unlike the top-level `paths:` filter.
+  # workflow_dispatch always builds.
+  # ---------------------------------------------------------------------
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      docs-changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether docs paths changed
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "workflow_dispatch — building unconditionally"
+            exit 0
+          fi
+          BASE="${{ github.event.before }}"
+          # Initial push / force-push / unrelated history → compare to HEAD~1.
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE="HEAD~1"
+          fi
+          # If BASE isn't reachable (e.g. force-push), fall back too.
+          if ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
+            echo "BASE $BASE not reachable; falling back to HEAD~1"
+            BASE="HEAD~1"
+          fi
+          echo "Comparing $BASE..HEAD"
+          CHANGED_PATHS=$(git diff --name-only "$BASE" HEAD || true)
+          echo "Files changed in push:"
+          echo "$CHANGED_PATHS" | sed 's/^/  /'
+          if echo "$CHANGED_PATHS" | grep -qE '^(docs-content/|mkdocs\.yml$|\.github/workflows/deploy-docs\.yml$)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Docs-relevant paths detected — will build"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No docs-relevant paths in this push — skipping build"
+          fi
+
   build:
+    needs: gate
+    if: needs.gate.outputs.docs-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,13 +106,13 @@ jobs:
           path: ./site
 
   deploy:
+    needs: [gate, build]
+    if: needs.gate.outputs.docs-changed == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
