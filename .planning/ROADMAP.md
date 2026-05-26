@@ -239,8 +239,8 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 - [x] **Phase 39: Entity Data Model** - Provenance fields and `validFrom`/`validUntil`/`supersedes` temporal validity on the canonical entity (locked before migrations). (completed 2026-05-20)
 - [x] **Phase 40: Ingest Pipeline & Layered Dedup** - 4-stage `extract → dedup → store → synthesize` framework with the layered dedup pipeline B and C will implement against. (completed 2026-05-22)
 - [x] **Phase 41: Online Learning Adapter & Post-Hoc Resolution** - INT-01 (A's SQLite hot path exposed as KM-Core entities) + PIPE-02 (post-hoc cross-class entity resolution as a shared maintenance op). (completed 2026-05-23)
-- [ ] **Phase 42: Offline UKB Migration (B)** - Full migration of `mcp-server-semantic-analysis` to KM-Core; folds in Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition.
-- [ ] **Phase 42.1: UKB Project-Anchor Parity** - Restore the `findBestParent` + post-sweep `contains`-edge pass that Phase 42-07 Phase B1 removed when replacing `persistence-agent.persistEntities` with `persistWithKmCore`. Without this, every `ukb full` orphans new entities from the `Coding` Project anchor (forensic 2026-05-24 evidence: +64 entities, 0 new edges to Coding).
+- [x] **Phase 42: Offline UKB Migration (B)** - Full migration of `mcp-server-semantic-analysis` to KM-Core; folds in Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition. (completed 2026-05-25 via the 42.1/42.1.1/42.1.2/42.2 sub-phase chain; SC#1-6 verification gate cleared by 42.2-06-PLAN — 5/6 PASS, 1 FAIL-WITH-FIX-LANDED on the project-anchor parity SC.)
+- [x] **Phase 42.1: UKB Project-Anchor Parity** - Restore the `findBestParent` + post-sweep `contains`-edge pass that Phase 42-07 Phase B1 removed when replacing `persistence-agent.persistEntities` with `persistWithKmCore`. Without this, every `ukb full` orphans new entities from the `Coding` Project anchor (forensic 2026-05-24 evidence: +64 entities, 0 new edges to Coding). (closed via 42.1.1 + 42.1.2 + structural fix in 42.2-06; remaining residual = 18 ghost orphans in stale general.json which next clean wave-analysis will overwrite.)
 - [ ] **Phase 43: OKM Cross-Repo Migration (C)** - Cross-repo refactor of `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` onto KM-Core; rapid-automations CI stays green.
 - [ ] **Phase 44: REST API & Git Snapshots** - Common entity/search/clusters/snapshots/ontology REST contract + git-snapshot/restore identical across A/B/C.
 - [ ] **Phase 45: Unified Web Viewer** - Single viewer parameterized by ontology config; VKB (B) and VOKB (C) users migrate without functional regression.
@@ -664,13 +664,15 @@ Plans:
 
 ### Phase 50: LSL-grounded async observation resolver — backfill ambiguous-reference and image-only rows from verbatim session logs
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Stop carrying observation rows whose Intent line resolves to "some previously discussed feature" or stores only `[Image: source: …]` placeholders. Build an LSL-grounded async resolver that walks the verbatim Live Session Logs (3-user-prompt window, not 30-min wall-clock) and rewrites ambiguous summaries with a full audit trail, plus migrate the inline `_buildPriorContext` to use the same window primitive so both tiers agree on what "recent" means.
+**Requirements**: None registered (out-of-milestone bug-fix phase; acceptance criteria in 50-CONTEXT.md)
 **Depends on:** Phase 49
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 50 to break down)
+- [ ] 50-01-PLAN.md — Build `lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs` primitives + `scripts/resolve-observations-from-lsl.mjs` CLI (detectors A regex + C image-only). CLI alone satisfies all 4 CONTEXT.md acceptance criteria.
+- [ ] 50-02-PLAN.md — Migrate `ObservationWriter._buildPriorContext` from 30-min observation-DB window to `getLSLWindow` + add capture-time `needs_lsl_resolution` stamp (detector B).
+- [ ] 50-03-PLAN.md — launchd job + idempotent installer + wrapper script for periodic background runs; optional `/health/state` `summary_integrity` counter add-on (D-Confidence Could #10).
 
 ### Phase 51: GSD wave-execution sub-agent transcripts are not captured as observations
 
