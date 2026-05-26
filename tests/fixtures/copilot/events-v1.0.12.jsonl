@@ -1,0 +1,4 @@
+{"type":"session.start","data":{"sessionId":"394aba6f-2868-4782-b836-3238a8a3970b","version":1,"producer":"copilot-agent","copilotVersion":"1.0.12","startTime":"2026-03-29T14:52:50.612Z","selectedModel":"claude-sonnet-4.6","context":{"cwd":"/Users/Q284340/Agentic/coding"}},"id":"4d633d60-7936-452b-966a-21980510c7be","timestamp":"2026-03-29T14:52:50.733Z","parentId":null}
+{"type":"user.message","data":{"content":"older question","role":"user"},"id":"u-old","timestamp":"2026-03-29T14:52:51.000Z","parentId":"4d633d60-7936-452b-966a-21980510c7be"}
+{"type":"assistant.message","data":{"messageId":"a-old","content":"older reply","role":"assistant"},"id":"a-old","timestamp":"2026-03-29T14:52:52.000Z","parentId":"u-old"}
+{"event":"conversation.message","data":{"content":"legacy shape user","role":"user","timestamp":"2026-03-29T14:53:00.000Z"}}

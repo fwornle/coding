@@ -1,0 +1,10 @@
+{"type":"session.start","data":{"sessionId":"00b9c9f4-15dd-443f-842e-cd7fd188be6a","version":1,"producer":"copilot-agent","copilotVersion":"1.0.48","startTime":"2026-03-05T12:30:00.000Z","context":{"cwd":"/Users/Q284340/Agentic/coding"}},"id":"9f8b168d-8dc1-4323-b3c6-4ca432182388","timestamp":"2026-03-05T12:30:00.000Z","parentId":null}
+{"type":"user.message","data":{"content":"hello","role":"user"},"id":"u1","timestamp":"2026-03-05T12:30:01.000Z","parentId":"9f8b168d-8dc1-4323-b3c6-4ca432182388"}
+{"type":"assistant.turn_start","data":{"turnId":"0"},"id":"ts1","timestamp":"2026-03-05T12:30:02.000Z","parentId":"u1"}
+{"type":"assistant.message","data":{"messageId":"a1","content":"hi back","role":"assistant"},"id":"a1","timestamp":"2026-03-05T12:30:03.000Z","parentId":"ts1"}
+{"type":"subagent.started","data":{"toolCallId":"toolu_vrtx_01GPwHxdgsdNJskjjNbN6wqa","agentName":"general-purpose","agentDisplayName":"General Purpose Agent","agentDescription":"Full-capability agent running in a subprocess."},"id":"sa1","timestamp":"2026-03-05T12:30:53.149Z","parentId":"a1"}
+{"type":"subagent.completed","data":{"toolCallId":"toolu_vrtx_01GPwHxdgsdNJskjjNbN6wqa","agentName":"general-purpose","agentDisplayName":"General Purpose Agent"},"id":"sa2","timestamp":"2026-03-05T12:33:39.686Z","parentId":"sa1"}
+{"type":"assistant.turn_end","data":{"turnId":"0"},"id":"te1","timestamp":"2026-03-05T12:33:40.000Z","parentId":"sa2"}
+{"type":"session.compaction_start","data":{"reason":"context-window"},"id":"sc1","timestamp":"2026-03-05T12:33:41.000Z","parentId":"te1"}
+{"type":"skill.invoked","data":{"name":"documentation-style"},"id":"sk1","timestamp":"2026-03-05T12:33:42.000Z","parentId":"sc1"}
+not a json line at all
