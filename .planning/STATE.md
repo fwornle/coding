@@ -43,19 +43,19 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 - Phase 47: ObservationWriter drops user-prompt text when image attachment present (subsumed by Phase 50 `Could` recovery item)
 - Phase 48: VKB graph strips `entity_type='System'` nodes when their team is unchecked
 - Phase 49: 187 orphan VKB entities (~24%) lack project-anchor relations
-- **Phase 50: LSL-grounded async observation resolver** — ACTIVE (user-directed 2026-05-26)
-- **Phase 51: Agent-agnostic sub-agent capture across LSL + observations** — ACTIVE (user-directed 2026-05-26; shares primitives with Phase 50)
+- **Phase 50: LSL-grounded async observation resolver** — ✓ EXECUTED 2026-05-26 (3/3 plans merged; 181 tests passing; Plan 03 Task 4 human-verify checkpoint awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`)
+- **Phase 51: Agent-agnostic sub-agent capture** — PLANNED 2026-05-26 (11 plans / 6 waves committed; 4 RESEARCH-*.md artifacts shipped; ready for `/gsd-execute-phase 51` in a fresh session)
 - Phase 52: Dashboard LLM routing label + `process` tag observability fix
 
-Phases 50 + 51 are being worked now per user directive; the rest remain real bugs to address after v7.1 closes, or as side-tracks between milestone phases if they become blocking.
+Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs`) that Phase 51 imports unchanged per D-Reuse. The rest of the backlog phases (47/48/49/52) remain unaddressed; pick up when blocking.
 
 ## Current Position
 
-Phase: 50
-Plan: Not started (CONTEXT.md exists; needs discuss → plan → execute)
-Status: Ready to discuss
-Next step: Begin Phase 50 via `/gsd-discuss-phase 50` (LSL-grounded async observation resolver). Per 50-CONTEXT.md, the Must scope is: LSL-window primitive with N-prompt counter (not wall-clock), detectors A+B+C (regex on summary, capture-time `needs_lsl_resolution` stamp, image-only structural), resolver pass with audit-trail metadata, and CLI entry `scripts/resolve-observations-from-lsl.mjs`. Phase 50 must land before (or co-design with) Phase 51 — they share two primitives per 51 Should #10: "scan-and-convert" and "read transcript window by user-prompt count". Phase 51 follows immediately on 50's close. After both, STATE Current Position re-points at Phase 43 (v7.1 OKM Cross-Repo Migration).
-Last activity: 2026-05-26
+Phase: 51
+Plan: 11 plans landed, 0 of 11 executed (ready to dispatch `/gsd-execute-phase 51`)
+Status: Ready to execute
+Next step: Run `/gsd-execute-phase 51` in a fresh session. Phase 51 has 11 plans in 6 waves: W1=registry+dispatcher, W2=four parallel per-agent sweep adapters (claude/opencode/copilot/mastra), W3=D-LSL-Filename writer + 2026-05-23 backfill, W4=three parallel per-agent live hooks (mastra excluded — Path A not viable per RESEARCH-mastra.md), W5=statusline mitigation replacement (1 human-verify checkpoint — live tmux render), W6=launchd × 4 + health-coordinator + final 6-AC verification (2 human-verify checkpoints). All 4 RESEARCH-{claude,opencode,copilot,mastra}.md shipped 2026-05-26; D-Reuse cumulative gate enforced across all 11 plans (Phase 50 primitives unchanged). After Phase 51 closes, STATE re-points to Phase 43 (v7.1 OKM Cross-Repo Migration) — task #4 in the session task list captures this future transition.
+Last activity: 2026-05-26 (Phase 50 plans + code shipped, 181 tests; Phase 51 plans shipped)
 
 ## Performance Metrics
 
