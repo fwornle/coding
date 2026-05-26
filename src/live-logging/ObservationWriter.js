@@ -313,6 +313,58 @@ export class ObservationWriter {
   }
 
   /**
+   * Heuristic: does the last user message in `messages` contain an
+   * unresolved pronoun reference? Used in tandem with
+   * `_buildPriorContext` to set `metadata.needs_lsl_resolution = true`
+   * at capture time, so the Plan 01 async resolver can pre-filter rows
+   * worth re-summarizing without re-scanning all of `.observations/`.
+   *
+   * The heuristic is intentionally lenient — false positives just mean
+   * an extra LLM call by the resolver on its next sweep (bounded by
+   * Plan 01's --limit and idempotency). False negatives are the failure
+   * mode (the row is never re-resolved), so err toward over-flagging.
+   *
+   * Phase 50 Plan 02 detector B (CONTEXT.md § "B. Capture-time hint").
+   *
+   * @param {Array<{role: string, content: string}>} messages
+   * @returns {boolean}
+   */
+  _hasUnresolvedPronoun(messages) {
+    try {
+      if (!Array.isArray(messages) || messages.length === 0) return false;
+      const userMsgs = messages.filter(m => m && m.role === 'user' && typeof m.content === 'string');
+      if (userMsgs.length === 0) return false;
+      const lastUser = userMsgs[userMsgs.length - 1].content || '';
+      const trimmed = lastUser.trim();
+      // Standalone affirmation patterns: single-word/phrase user reply.
+      if (/^(yes|yep|sure|proceed|continue|do it|go ahead|same again|do the same)$/i.test(trimmed)) {
+        return true;
+      }
+      // Canonical verb + pronoun trigger: "implement it now", "do that", etc.
+      if (/\b(implement|do|fix|continue|resume|apply)\s+(it|that|this|the same|again)\b/i.test(lastUser)) {
+        return true;
+      }
+      // Bare "the same|change|previous|earlier|prior|first|second|other"
+      // without a clarifying noun within ~5 tokens. "Apply the change please"
+      // → triggers. "Apply the change to file user-profile.tsx" → does not
+      // (clarifying noun 'file' within window).
+      const bareRefRe = /\bthe\s+(same|change|previous|earlier|prior|first|second|other)\b/i;
+      const bareRefMatch = lastUser.match(bareRefRe);
+      if (bareRefMatch) {
+        const tailStart = bareRefMatch.index + bareRefMatch[0].length;
+        const after = lastUser.slice(tailStart, tailStart + 40);
+        const clarifyingNounRe = /\b(file|feature|function|plan|change|fix|button|page|api|component|test|migration|script|module|class|method|hook|workflow|task|step|wave|phase|exchange)s?\b/i;
+        if (!clarifyingNounRe.test(after)) {
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Extract a one-line representation from a single LSL-window exchange
    * content string. The content combines <user>...</user> and optional
    * <assistant>...</assistant> blocks (per lib/lsl/window.mjs).
@@ -347,6 +399,17 @@ export class ObservationWriter {
   async summarize(messages, metadata = {}) {
     const projectName = metadata.project || 'unknown';
     const priorContext = this._buildPriorContext(metadata);
+    // Phase 50 Plan 02 detector B: when prior context is empty AND the
+    // current user message has an unresolved pronoun, stamp the row so
+    // the Plan 01 resolver picks it up first on its next sweep.
+    const needsLslResolution = priorContext === '' && this._hasUnresolvedPronoun(messages);
+    if (needsLslResolution) {
+      process.stderr.write(
+        `[ObservationWriter] needs_lsl_resolution flagged: ` +
+        `agent=${metadata.agent || 'unknown'} project=${metadata.project || 'unknown'} ` +
+        `created_at=${metadata.created_at || 'now'}\n`
+      );
+    }
 
     // Wrap the exchange in XML tags so the LLM treats it as data to analyze, not content to relay
     const exchangeBlock = messages
@@ -435,7 +498,7 @@ export class ObservationWriter {
               await new Promise(r => setTimeout(r, RETRY_BACKOFF_MS[attempt - 1]));
               continue;
             }
-            return { summary: this._fallbackSummary(messages) };
+            return { summary: this._fallbackSummary(messages), needs_lsl_resolution: needsLslResolution || undefined };
           }
 
           const result = await response.json();
@@ -444,7 +507,7 @@ export class ObservationWriter {
             ? { model: result.model, provider: result.provider, tokens: result.tokens || null, latencyMs: result.latencyMs || null }
             : undefined;
           process.stderr.write(`[ObservationWriter] Summary ${result.content ? 'received' : 'MISSING'} (${summary.length} chars) via ${llm ? `${llm.model}@${llm.provider}` : 'fallback'}\n`);
-          return { summary, llm };
+          return { summary, llm, needs_lsl_resolution: needsLslResolution || undefined };
         } catch (err) {
           lastError = err.message;
           process.stderr.write(`[ObservationWriter] Attempt ${attempt} failed: ${err.message}\n`);
@@ -455,10 +518,10 @@ export class ObservationWriter {
       }
 
       process.stderr.write(`[ObservationWriter] All ${MAX_RETRIES} attempts failed. Last error: ${lastError}. Storing raw summary.\n`);
-      return { summary: this._fallbackSummary(messages) };
+      return { summary: this._fallbackSummary(messages), needs_lsl_resolution: needsLslResolution || undefined };
     } catch (err) {
       process.stderr.write(`[ObservationWriter] Unexpected error: ${err.message}. Storing raw summary.\n`);
-      return { summary: this._fallbackSummary(messages) };
+      return { summary: this._fallbackSummary(messages), needs_lsl_resolution: needsLslResolution || undefined };
     }
   }
 
@@ -881,10 +944,16 @@ export class ObservationWriter {
     for (const chunk of chunks) {
       try {
         // LLM summarization runs outside the lock (slow, ~5-15s)
-        const { summary, llm } = await this.summarize(chunk, metadata);
-        const enrichedMeta = llm
+        const { summary, llm, needs_lsl_resolution } = await this.summarize(chunk, metadata);
+        let enrichedMeta = llm
           ? { ...metadata, llmModel: llm.model, llmProvider: llm.provider, llmTokens: llm.tokens, llmLatencyMs: llm.latencyMs }
-          : metadata;
+          : { ...metadata };
+        // Phase 50 Plan 02 detector B: persist the capture-time stamp into
+        // metadata JSON so the Plan 01 resolver can SELECT on
+        // json_extract(metadata, '$.needs_lsl_resolution') = 1.
+        if (needs_lsl_resolution) {
+          enrichedMeta = { ...enrichedMeta, needs_lsl_resolution: true };
+        }
 
         // DB write runs inside the lock to prevent TOCTOU races:
         // two concurrent fire-and-forget calls could both pass the semantic
