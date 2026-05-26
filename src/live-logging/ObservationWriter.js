@@ -16,6 +16,7 @@ import Redis from 'ioredis';
 import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { openDatabase, closeDatabase } from './SafeDatabase.js';
+import { getLSLWindow } from '../../lib/lsl/window.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -249,50 +250,98 @@ export class ObservationWriter {
    * @returns {Promise<{summary: string, llm?: {model: string, provider: string}}>}
    */
   /**
-   * Fetch the last few observation Intents for the same agent+project so the
-   * summarizer can resolve context-dependent references ("it", "that", "the
-   * change", "implement it now") that otherwise produce content-free
-   * summaries like "Developer requested implementation of some previously
-   * discussed feature". Returns a small XML block ready to drop into the
-   * prompt, or an empty string when no recent prior observations exist.
+   * Fetch a short window of prior user→assistant exchanges from the Live
+   * Session Log (LSL) so the summarizer can resolve context-dependent
+   * references ("it", "that", "the change", "implement it now") that
+   * otherwise produce content-free summaries like "Developer requested
+   * implementation of some previously discussed feature". Returns a small
+   * XML block ready to drop into the prompt, or an empty string when no
+   * prior exchanges are available.
    *
-   * Scoped to the last 30 min — anything older is rarely the antecedent of
-   * a "temporal/local" pronoun and only adds noise. Returns at most 2 rows
-   * to keep the prompt small.
+   * Phase 50 Plan 02: scoped to the most recent 3 user-prompt exchanges in
+   * the LSL (project-scoped) via `lib/lsl/window.mjs::getLSLWindow`. The
+   * 30-min observation-DB lookup that lived here previously is retired —
+   * both inline and async tiers now agree on what "recent context" means
+   * (CONTEXT.md "Implication for tier-1" lines 82-90, Should #7). The
+   * window walker is interaction-time, not wall-clock, so a 6-hour
+   * autonomous task with no user activity still surfaces the most recent
+   * user prompt as antecedent.
    */
   _buildPriorContext(metadata) {
     try {
       const agent = metadata.agent;
       const project = metadata.project;
       if (!agent || !project) return '';
-      const rows = this.db.prepare(
-        `SELECT summary, created_at FROM observations
-         WHERE agent = ?
-           AND json_extract(metadata, '$.project') = ?
-           AND created_at > datetime('now', '-30 minutes')
-         ORDER BY created_at DESC LIMIT 2`
-      ).all(agent, project);
-      if (!rows || rows.length === 0) return '';
-      const intents = rows
-        .map(r => this._extractIntent(r.summary))
-        .filter(Boolean);
-      if (intents.length === 0) return '';
-      // Oldest first so the LLM reads them chronologically. Truncate each
-      // intent at 200 chars to bound prompt growth.
-      intents.reverse();
-      const lines = intents
-        .map(s => '  - ' + (s.length > 200 ? s.slice(0, 200) + '…' : s))
-        .join('\n');
+
+      const observation = {
+        created_at: metadata.created_at || new Date().toISOString(),
+        project,
+      };
+      let window;
+      try {
+        window = getLSLWindow(observation, { maxPrompts: 3, project });
+      } catch {
+        return '';
+      }
+      if (!window || !window.exchanges || window.exchanges.length === 0) return '';
+
+      // Build the line list. The LSL window's exchange.content is a single
+      // string combining <user> and <assistant> turns (see lib/lsl/window.mjs
+      // renderExchangeContent). For each exchange, prefer the assistant turn's
+      // Intent line when it follows the 4-line template; otherwise fall back
+      // to the user's first non-blank line. Cap at 3 lines (mirrors maxPrompts).
+      const lines = [];
+      for (const ex of window.exchanges) {
+        if (lines.length >= 3) break;
+        const repr = this._extractPriorLine(ex.content);
+        if (!repr) continue;
+        const truncated = repr.length > 200 ? repr.slice(0, 200) + '…' : repr;
+        lines.push('  - ' + truncated);
+      }
+      if (lines.length === 0) return '';
+
       return `\n<prior_observations>\n` +
         `The most recent observations for this agent+project (oldest first). ` +
         `Use ONLY to resolve pronominal or implicit references in the exchange below ` +
         `(e.g. "it", "that", "the change", "implement it now"). ` +
         `Do NOT copy these into Intent unless the current exchange explicitly references them.\n` +
-        lines +
+        lines.join('\n') +
         `\n</prior_observations>`;
     } catch {
       return ''; // never let context-fetch break summarization
     }
+  }
+
+  /**
+   * Extract a one-line representation from a single LSL-window exchange
+   * content string. The content combines <user>...</user> and optional
+   * <assistant>...</assistant> blocks (per lib/lsl/window.mjs).
+   *
+   * Strategy:
+   *   1. If the assistant turn follows the 4-line template, return its
+   *      Intent line value.
+   *   2. Otherwise, return the first non-blank line of the user turn.
+   *
+   * Returns null when neither yields a usable line.
+   */
+  _extractPriorLine(content) {
+    if (!content || typeof content !== 'string') return null;
+    // Try assistant Intent line first.
+    const asstMatch = content.match(/<assistant>([\s\S]*?)<\/assistant>/);
+    if (asstMatch) {
+      const intent = this._extractIntent(asstMatch[1]);
+      if (intent) return intent;
+    }
+    // Fall back to first non-blank line of user turn.
+    const userMatch = content.match(/<user>([\s\S]*?)<\/user>/);
+    if (userMatch) {
+      const userText = userMatch[1].trim();
+      if (userText) {
+        const firstLine = userText.split(/\r?\n/).map(s => s.trim()).find(s => s.length > 0);
+        if (firstLine) return firstLine;
+      }
+    }
+    return null;
   }
 
   async summarize(messages, metadata = {}) {
