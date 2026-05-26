@@ -256,31 +256,31 @@ describe('opencode-sqlite adapter — discover()', () => {
 
   test('Test 10: directory allowlist regex rejects path-injection violators', async () => {
     const dbPath = dbAt();
-    // Seed with two valid sub-sessions, then patch one to have an evil directory.
+    // Seed with two valid sub-sessions, then patch one to have an evil
+    // directory whose path is INSIDE the project root prefix (so the SQL
+    // LIKE filter admits it) but whose basename fails the allowlist regex.
+    // This is the defense-in-depth surface: SQL prefix-match narrows the
+    // candidates, and path.basename + allowlist regex is a second guard.
     seedOpencodeFixture(dbPath, { numSubSessions: 2 });
     const db = new Database(dbPath);
     const sids = db.prepare(
       'SELECT id FROM session WHERE parent_id IS NOT NULL ORDER BY id',
     ).all();
-    // Patch the second to /tmp/../etc — basename is "etc" which IS alphanumeric;
-    // but the path itself contains '..' which the allowlist regex must catch
-    // BEFORE basename. Use directory='/tmp/bad/../danger' so basename = 'danger',
-    // path.basename collapses '..' segments → in practice basename of
-    // '/tmp/bad/../danger' on POSIX is 'danger'. Test the explicit case:
-    // a directory whose path.basename contains a forbidden char ('.. ').
-    // Force the violation by patching directory to a value whose basename
-    // contains a space + dot:  '/Users/Q284340/Agentic/.. evil'.
+    // basename('/Users/Q284340/Agentic/coding/.. evil') === '.. evil' on POSIX,
+    // which contains '.', ' ', and starts with '..' — all rejected by /^[a-z0-9-]+$/i.
     db.prepare('UPDATE session SET directory = ? WHERE id = ?')
-      .run('/Users/Q284340/Agentic/.. evil', sids[1].id);
+      .run('/Users/Q284340/Agentic/coding/.. evil', sids[1].id);
     db.close();
 
+    process.env.LSL_PROJECT_ROOT_CODING = '/Users/Q284340/Agentic/coding';
     const rows = await adapter.discover({
       searchPaths: [{ type: 'sqlite', dbPath: dbPath }],
       project: 'coding',
     });
-    // The original 2 sub-sessions are in `/Users/Q284340/Agentic/coding`.
-    // First row should pass; second row has malformed basename and should be
-    // filtered OUT with a stderr log line.
+    // First sub-session passes (directory = '/Users/Q284340/Agentic/coding',
+    // basename = 'coding', allowlist-clean).
+    // Second sub-session matched by SQL prefix `dir/%` but rejected by the
+    // basename allowlist guard with a stderr log line.
     expect(rows).toHaveLength(1);
     expect(stderrBuf).toMatch(/opencode-adapter.*basename/i);
   });
