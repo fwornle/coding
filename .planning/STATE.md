@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: ready_to_plan
-stopped_at: Phase 42.2 complete (6/6) — ready to discuss Phase 47
-last_updated: 2026-05-25T12:25:17.167Z
-last_activity: 2026-05-25
+status: Ready to discuss
+stopped_at: Phase 50 context gathered (D-Cadence, D-Confidence, D-47-Boundary, D-Primitives, D-Reuse locked)
+last_updated: "2026-05-26T12:03:21.616Z"
+last_activity: 2026-05-26
 progress:
   total_phases: 21
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 52
   completed_plans: 52
-  percent: 43
+  percent: 48
 ---
 
 # Project State
@@ -21,9 +21,9 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
+**Current focus:** Phase 50 (LSL-grounded async observation resolver) + Phase 51 (agent-agnostic sub-agent capture) — out-of-milestone backlog. After both close, resume v7.1 at Phase 43.
 
-**v7.1 milestone status (KM-Core unification — 5 of 10 phases done):**
+**v7.1 milestone status (KM-Core unification — 6 of 10 phases done):**
 
 | # | Title | System | Status |
 |---|-------|--------|--------|
@@ -32,28 +32,30 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 | 39 | Entity Data Model | shared | ✓ |
 | 40 | Ingest Pipeline & Layered Dedup | shared | ✓ |
 | 41 | Online Learning Adapter & Post-Hoc Resolution | A (ODI) | ✓ |
-| **42** | **Offline UKB Migration** | **B (mcp-server-semantic-analysis)** | **NEXT** |
-| 43 | OKM Cross-Repo Migration | C (rapid-automations/OKM) | pending |
+| 42 | Offline UKB Migration | B (mcp-server-semantic-analysis) | ✓ (closed via 42.1/42.1.1/42.1.2/42.2 chain; SC#1-6 gate cleared 2026-05-25 per 42.2-06-SUMMARY) |
+| **43** | **OKM Cross-Repo Migration** | **C (rapid-automations/OKM)** | **NEXT (after 50+51 backlog)** |
 | 44 | REST API & Git Snapshots | shared (requires A+B+C) | pending |
 | 45 | Unified Web Viewer | shared (requires API) | pending |
 | 46 | Per-System Docs & Onboarding | shared | pending |
 
 **Out-of-milestone backlog (NOT v7.1 work — bug-fix phases that got slotted by number):**
 
-- Phase 47: ObservationWriter drops user-prompt text when image attachment present
+- Phase 47: ObservationWriter drops user-prompt text when image attachment present (subsumed by Phase 50 `Could` recovery item)
 - Phase 48: VKB graph strips `entity_type='System'` nodes when their team is unchecked
 - Phase 49: 187 orphan VKB entities (~24%) lack project-anchor relations
-- Phase 50: LSL-grounded async observation resolver
+- **Phase 50: LSL-grounded async observation resolver** — ACTIVE (user-directed 2026-05-26)
+- **Phase 51: Agent-agnostic sub-agent capture across LSL + observations** — ACTIVE (user-directed 2026-05-26; shares primitives with Phase 50)
+- Phase 52: Dashboard LLM routing label + `process` tag observability fix
 
-These are real bugs; address them after v7.1 closes, or as side-tracks between milestone phases if they become blocking.
+Phases 50 + 51 are being worked now per user directive; the rest remain real bugs to address after v7.1 closes, or as side-tracks between milestone phases if they become blocking.
 
 ## Current Position
 
-Phase: 47
-Plan: Not started
-Status: Ready to plan
-Next step: Execute Phase 42.2 Plan 05 (atomic LevelDB dir-swap per D-DirSwap recipe). Plan 04 just closed — the legacy persistence trio is fully retired, no code references `.data/knowledge-graph/` any longer, so Plan 05's dir-swap (collapse `.data/knowledge-graph/` + `.data/knowledge-graph-migrated/` into the single canonical `.data/knowledge-graph/` location) can proceed safely. Container stop required during the swap window per D-DirSwap step 1.
-Last activity: 2026-05-25
+Phase: 50
+Plan: Not started (CONTEXT.md exists; needs discuss → plan → execute)
+Status: Ready to discuss
+Next step: Begin Phase 50 via `/gsd-discuss-phase 50` (LSL-grounded async observation resolver). Per 50-CONTEXT.md, the Must scope is: LSL-window primitive with N-prompt counter (not wall-clock), detectors A+B+C (regex on summary, capture-time `needs_lsl_resolution` stamp, image-only structural), resolver pass with audit-trail metadata, and CLI entry `scripts/resolve-observations-from-lsl.mjs`. Phase 50 must land before (or co-design with) Phase 51 — they share two primitives per 51 Should #10: "scan-and-convert" and "read transcript window by user-prompt count". Phase 51 follows immediately on 50's close. After both, STATE Current Position re-points at Phase 43 (v7.1 OKM Cross-Repo Migration).
+Last activity: 2026-05-26
 
 ## Performance Metrics
 
@@ -221,9 +223,15 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-05-25T10:50:39.000Z
-Stopped at: Phase 42.2 Plan 04 complete (legacy persistence trio retired; ~30 consumer call sites rewired; full submodule test suite 80/80 GREEN; cross-repo commit pair landed)
-Resume with: Phase 42.2 Plan 05 (atomic LevelDB dir-swap) — D-DirSwap recipe is unblocked because no code references `.data/knowledge-graph/` any longer. Plan 05 collapses `.data/knowledge-graph/` (legacy) and `.data/knowledge-graph-migrated/` (km-core canonical, 802 entities) into the single canonical location + reverts wave-controller.ts:507 dbPath back to `.data/knowledge-graph/`.
+Last session: 2026-05-26T12:03:21.595Z
+Stopped at: Phase 50 context gathered (D-Cadence, D-Confidence, D-47-Boundary, D-Primitives, D-Reuse locked)
+Resume with: Phase 50 — `/gsd-discuss-phase 50` to begin discuss→plan→execute pipeline for LSL-grounded async observation resolver (see 50-CONTEXT.md). Phase 51 (agent-agnostic sub-agent capture) follows immediately on 50's close; share primitives per 51 Should #10. After both backlog phases complete, STATE Current Position re-points at Phase 43 (v7.1 OKM Cross-Repo Migration / INT-03, blocking the v7.1 close-out chain at 44/45/46).
+
+Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
+
+- Wave-4 InsightGenerationAgent hang (SDK direct path, no `process` tag) — surfaced during Plan 06 production run; out of scope for 42.2.
+- 18 ghost orphans in stale general.json (`legacyId: null, validUntil: null`) — km-core iterate() doesn't surface them; will be overwritten by next clean wave-analysis OR needs deeper JSON/leveldb-sync forensics.
+- 264/312 migrated entities lack embeddings (Phase 42-05 deferral). Embedding backfill helper exists; deferred until ranking/retrieval consumer pressure demands it.
 
 Plan 02 follow-up for Plan 7:
 
