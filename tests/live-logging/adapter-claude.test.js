@@ -66,8 +66,17 @@ afterEach(() => {
 });
 
 /**
+ * Path under tmpDir that mirrors the real `~/.claude/projects/` layout so the
+ * adapter's SUBAGENT_PATH_RE anchors match. Everything below this prefix is
+ * the test's fake claude-projects root.
+ */
+function claudeRoot() {
+  return path.join(tmpDir, '.claude', 'projects');
+}
+
+/**
  * Write a fake sub-agent JSONL fixture under
- *   <tmpDir>/<encoded-cwd>/<parent-uuid>/subagents/agent-<hex>.jsonl
+ *   <tmpDir>/.claude/projects/<encoded-cwd>/<parent-uuid>/subagents/agent-<hex>.jsonl
  * and return the absolute path.
  *
  * @param {object} opts
@@ -77,7 +86,7 @@ afterEach(() => {
  * @param {Array<object>} opts.records   Records to write (one per line)
  */
 function writeSubAgent({ encodedCwd, parentUuid, agentId, records }) {
-  const dir = path.join(tmpDir, encodedCwd, parentUuid, 'subagents');
+  const dir = path.join(claudeRoot(), encodedCwd, parentUuid, 'subagents');
   fs.mkdirSync(dir, { recursive: true });
   const abs = path.join(dir, `agent-${agentId}.jsonl`);
   fs.writeFileSync(abs, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf-8');
@@ -183,16 +192,21 @@ describe('discover()', () => {
     const encodedCwd = '-Users-Q284340-Agentic-coding';
     const uuid = '33333333-3333-3333-3333-333333333333';
 
-    // Lexicographically, 'aaa...' < 'zzz...' but make 'zzz...' have an EARLIER first message
-    // → first-msg-ts order should win: aaa=2 (later), zzz=1 (earlier).
-    // Actually plan Test 6 spec: "agent-zzz" (T+10) and "agent-aaa" (T+5) → zzz=2, aaa=1.
+    // Both ids must be lowercase hex per Claude's filename schema. The
+    // hex-lex order is fff... > aaa... but make fff... have a LATER first
+    // message and aaa... have an EARLIER one → first-msg-ts ordering should
+    // give aaa=1 and fff=2 — matching what lex would also give. To prove
+    // ordering is by TIMESTAMP NOT LEX we therefore use two ids where lex
+    // ordering disagrees with desired sub_index assignment: 'fffffffffffffffff'
+    // (lex-greater, ts-earlier) and 'aaaaaaaaaaaaaaaaa' (lex-lesser, ts-later).
+    // sub_index should give fff=1 and aaa=2 — the OPPOSITE of lex order.
     writeSubAgent({
-      encodedCwd, parentUuid: uuid, agentId: 'zzzzzzzzzzzzzzzzz',
-      records: [userMsg('2026-05-23T10:00:10Z'), assistantMsg('2026-05-23T10:00:15Z')],
+      encodedCwd, parentUuid: uuid, agentId: 'fffffffffffffffff',
+      records: [userMsg('2026-05-23T10:00:05Z'), assistantMsg('2026-05-23T10:00:10Z')],
     });
     writeSubAgent({
       encodedCwd, parentUuid: uuid, agentId: 'aaaaaaaaaaaaaaaaa',
-      records: [userMsg('2026-05-23T10:00:05Z'), assistantMsg('2026-05-23T10:00:10Z')],
+      records: [userMsg('2026-05-23T10:00:10Z'), assistantMsg('2026-05-23T10:00:15Z')],
     });
 
     const rows = await adapter.discover({
@@ -200,12 +214,12 @@ describe('discover()', () => {
       project: 'coding',
     });
     expect(rows).toHaveLength(2);
-    const zzz = rows.find((r) => r.agent_metadata?.agent_id === 'zzzzzzzzzzzzzzzzz');
+    const fff = rows.find((r) => r.agent_metadata?.agent_id === 'fffffffffffffffff');
     const aaa = rows.find((r) => r.agent_metadata?.agent_id === 'aaaaaaaaaaaaaaaaa');
     expect(aaa).toBeDefined();
-    expect(zzz).toBeDefined();
-    expect(aaa.sub_index).toBe(1); // earlier first-msg timestamp
-    expect(zzz.sub_index).toBe(2); // later first-msg timestamp
+    expect(fff).toBeDefined();
+    expect(fff.sub_index).toBe(1); // earlier first-msg timestamp (lex-greater)
+    expect(aaa.sub_index).toBe(2); // later first-msg timestamp (lex-lesser)
   });
 
   test('Test 7: uid-check gate — non-owned file is skipped with stderr', async () => {
@@ -246,7 +260,7 @@ describe('discover()', () => {
   test('Test 8: isSidechain:false filter — file skipped with stderr', async () => {
     const encodedCwd = '-Users-Q284340-Agentic-coding';
     const uuid = '55555555-5555-5555-5555-555555555555';
-    const dir = path.join(tmpDir, encodedCwd, uuid, 'subagents');
+    const dir = path.join(claudeRoot(), encodedCwd, uuid, 'subagents');
     fs.mkdirSync(dir, { recursive: true });
     const abs = path.join(dir, 'agent-eeeeeeeeeeeeeeeee.jsonl');
     // First line has isSidechain:false — should be rejected.
@@ -272,7 +286,7 @@ describe('discover()', () => {
   test('Test 9: truncated last lines do not throw — row still produced', async () => {
     const encodedCwd = '-Users-Q284340-Agentic-coding';
     const uuid = '66666666-6666-6666-6666-666666666666';
-    const dir = path.join(tmpDir, encodedCwd, uuid, 'subagents');
+    const dir = path.join(claudeRoot(), encodedCwd, uuid, 'subagents');
     fs.mkdirSync(dir, { recursive: true });
     const abs = path.join(dir, 'agent-fffffffffffffffff.jsonl');
     // Valid first line + malformed second line (truncated JSON).
