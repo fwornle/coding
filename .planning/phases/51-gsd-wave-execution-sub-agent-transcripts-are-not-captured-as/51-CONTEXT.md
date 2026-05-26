@@ -364,3 +364,344 @@ is well understood from the sweep data.
   `2129be37b` (idle-aware probe cadence) — preserved here only
   because this gap was discovered while diagnosing the panel
   alongside those fixes; not causally related.
+
+---
+
+## Implementation Decisions Locked During Discuss (2026-05-26)
+
+<decisions>
+
+The body above (filed 2026-05-23) captures scope. The decisions below
+resolve residual gray areas downstream agents (researcher, planner)
+need locked before they can act. Phase 50 closed earlier today
+(2026-05-26) — the `lib/lsl/window.mjs` and `lib/lsl/scan-and-convert.mjs`
+primitives are now landed and imported here unchanged per D-Reuse.
+
+### D-Order: Path B (sweep) ships first, Path A (live hook) follows
+
+Plan order:
+
+1. **Plans for Path B (sweep tier):** agent-agnostic registry + sweep
+   primitives (extending `lib/lsl/scan-and-convert.mjs` with the
+   sub-agent-paths search list) + backfill of the 2026-05-23 ~25
+   transcripts + LSL parity (sub-agent `.specstory` files written
+   from the sweep using D-LSL-Filename). Ships the immediate value
+   AND closes the data-loss gap for any future wave that the live
+   tier misses.
+2. **Plans for Path A (live tier), per agent:** claude/opencode/copilot/mastra
+   each get their own plan based on the research mechanism from
+   D-Research. Some agents may end up "sweep-only" if research
+   shows no spawn hook is available (CONTEXT.md flagged Copilot
+   as the likely sweep-only agent).
+3. **Statusline replacement plan:** replace the 2026-05-24
+   `_freshestProjectActivityAgeMs()` + `transcriptAgeMs()` +
+   projects-mapping subMt-write mitigation with registry-sourced
+   reads (see D-Statusline).
+4. **Closure plan:** health-coordinator integration + final
+   verification (the dashboard knowledge-pipeline badge stays
+   "healthy" during an active wave + the AC table from this file).
+
+**Rationale:** Path B unblocks the immediate symptom (sub-agent work
+invisible in observations panel) WITHOUT needing per-agent
+spawn-hook research to land. Path A is the "do it right" tier and
+benefits from learning patterns from operating Path B in production
+for a few wave runs first.
+
+**Rejected alternative — Path A first:** would have meant 4 separate
+hook plans before anything ships value. CONTEXT.md's own
+recommendation matches D-Order.
+
+### D-Research: Full mechanism research for all 4 agents upfront (4 parallel research subagents)
+
+Plan-phase MUST spawn **4 parallel `gsd-phase-researcher` subagents**
+during the research wave — one per agent (claude / opencode /
+copilot / mastra). Each researcher produces a section in the phase
+RESEARCH.md (or per-agent RESEARCH-{agent}.md if the planner
+prefers granularity) covering:
+
+- **Process model.** How does the agent spawn sub-agents? (subprocess
+  spawn, in-process worker, async task, MCP server, etc.) Document
+  the exact mechanism + invocation surface.
+- **Transcript location.** Where on disk does each sub-agent's
+  transcript / event-stream live? Include the directory pattern,
+  any encoding of project cwd in path, file extension, and
+  rotation/cleanup behavior.
+- **Lifecycle events.** What signals are available at spawn /
+  progress / complete? Process exit codes? Files closing? IPC
+  events? MCP `notifications/initialized`?
+- **Sub-agent-of-sub-agent recursion.** Does the agent allow
+  recursive sub-agent spawning? If yes, how is the parent chain
+  recoverable from the transcript?
+- **Detection plan.** Concrete steps for Path A (spawn hook) AND
+  Path B (sweep). For Path B specifically: the directory paths to
+  add to the registry's `searchPaths` list and the cwd-parsing
+  rule to map transcript → originating project.
+
+**Why parallel:** the 4 researchers operate on different doc sets
+and filesystem evidence. Parallel saves wall-clock time and
+prevents one slow research thread from blocking the others. Each
+research agent gets the same `<files_to_read>` template + an
+agent-specific `<agent>` field.
+
+**Recommendation for researcher prompts:** include a hard cap of 30
+min per agent and 4 web fetches per agent. Output: a SHORT
+"detection_plan" block per agent that the planner uses directly
+to write the corresponding Path A / Path B plan.
+
+**Out of scope for research:** how the agent encodes sub-agent
+state (we don't care about the agent's internal data model, only
+the externally-observable transcript / event surface).
+
+### D-Backfill: Scope = the 2026-05-23 ~25 transcripts only
+
+Backfill plan handles the documented incident (the 25 sub-agent
+transcripts under `<parent>/subagents/agent-*.jsonl` from the
+2026-05-23 afternoon Phase 42 wave). Does NOT sweep every historical
+`/private/tmp/` transcript ever produced — that's a different scope
+question (and most older transcripts have already been cleaned up
+by GSD worktree removal anyway).
+
+**Concrete inputs:** the existing `scripts/backfill-subagent-transcripts.mjs`
+PoC seed (now factored into `lib/lsl/scan-and-convert.mjs` per Phase 50
+D-Primitives) + the directory of the live `~/.claude/projects/-Users-Q284340-Agentic-coding/<parent>/subagents/`
+sub-agent transcripts confirmed during the 2026-05-23 incident.
+
+**Acceptance:** all 25 confirmed transcripts produce observation
+rows tagged `metadata.source = "sub-agent-backfill"`,
+`metadata.parent_session_id = <parent>`, `metadata.sub_index = <N>`,
+`metadata.project = "coding"`. Idempotent — re-running the backfill
+is a no-op (uniqueness key = sub-agent session UUID + message UUID
+per CONTEXT.md AC #5).
+
+**Out of scope** (filed deferred for follow-up):
+- Sweeping pre-2026-05-23 sub-agent transcripts that may exist in stale `/private/tmp/` paths
+- Cross-project backfill (only the `coding` project's sub-agent transcripts in scope here; other projects use their own GSD instances)
+
+### D-LSL-Filename: Lock the proposed filename convention verbatim
+
+The naming pattern in CONTEXT.md body is locked as the canonical
+LSL filename for ALL agents (claude/opencode/copilot/mastra):
+
+```
+{YYYY-MM-DD}_{HHHH-HHHH}_S{parent-slot}-{sub-index}-{sub-hash}[-part{N}].md
+```
+
+Where:
+- `S{parent-slot}` — slot number per active parent session per local LSL day (1-indexed)
+- `{sub-index}` — 1-based index of sub-agent within parent's fan-out
+- `{sub-hash}` — first 7 chars of the sub-agent's session id (NOT pid, NOT timestamp)
+- `[-part{N}]` — existing hourly-chunk suffix (unchanged from parent LSL pattern)
+
+**Agent-agnostic:** the source agent goes in the LSL frontmatter as
+`agent: claude|opencode|copilot|mastra`, NOT in the filename. The
+sweep path-walker treats all four identically once the registry
+knows where each agent's transcripts live.
+
+**Backward-compatible:** existing parent-session LSL files
+(`{YYYY-MM-DD}_{HHHH-HHHH}_{userHash}.md` without `S{n}-` segment)
+keep their current names. Only NEW sub-agent files use the
+extended shape.
+
+**Stable across agent restarts:** because `{sub-hash}` is derived
+from the sub-agent's SESSION id (not pid, not spawn timestamp), a
+sub-agent that survives a parent restart can be re-associated by
+matching its session id. Also serves as the uniqueness gate
+against same-slot collisions.
+
+**Recursive sub-agent (Could #11) extension reserved but not
+implemented:** if a sub-agent spawns its own sub-sub-agents, the
+naming would extend to `S{slot}-{idx}-{sub-idx}`. The registry's
+schema reserves a `parent_sub_hash` field for this; population
+deferred until the failure mode is observed in the wild (per
+CONTEXT.md Could #11 disposition).
+
+### D-Statusline: Replace 2026-05-24 mitigation inside Phase 51
+
+The 2026-05-24 statusline-bubble mitigation (sub-agent mtime folded
+into `_freshestProjectActivityAgeMs()`, `transcriptAgeMs()`, and
+the projects-mapping `subMt` write) is **scaffolding**. Phase 51
+includes a dedicated cleanup plan (one of the final plans in the
+phase) that:
+
+- Sources `subMt` for each project from the new registry instead of
+  re-walking `<parent>/subagents/` on every tick
+- Removes the three mitigation hooks (`_freshestProjectActivityAgeMs`
+  treats sub-agent mtimes the same as parent mtimes natively;
+  `transcriptAgeMs` returns whichever is freshest from the
+  registry; mapping writes `subMt` only when registry surfaces a
+  current sub-agent)
+- Verification: the per-project bubble (`C🟢 / KC⚫`) and the `[📚]`
+  badge BOTH go green during an active sub-agent run (no mtime
+  fade), AND the dashboard does not regress on the 2026-05-12
+  tmux emoji-width fix (see `reference_tmux_emoji_width_fix.md`)
+
+**Why inside this phase:** the registry IS the source of truth for
+sub-agent state once Phase 51 ships. Leaving the 2026-05-24
+mitigation in tree means two divergent code paths for sub-agent
+freshness signal — future maintainer will not know which is
+canonical. Cleanup in the same phase prevents drift.
+
+### D-Reuse: Phase 50 primitives are imported unchanged
+
+Phase 50 closed earlier today (2026-05-26) shipping
+`lib/lsl/window.mjs` (getLSLWindow) and `lib/lsl/scan-and-convert.mjs`
+(scanTranscriptsForUnconverted + convertTranscriptsToObservations).
+Phase 51's plans MUST import these exactly — no signature changes,
+no wrapper layers, no in-place rewrites. The Path B sweep extends
+the primitives' `searchPaths` list config to include each agent's
+sub-agent transcript directory; nothing in the primitives'
+behavior changes.
+
+**Phase 50 contract verification gates that Phase 51 must respect:**
+- The exact exported function signatures (per `lib/lsl/window.mjs`
+  and `lib/lsl/scan-and-convert.mjs` grep gates from Phase 50
+  Plan 01 `<done>` blocks)
+- The Phase 50 test suite (181 tests across 20 suites) must still
+  pass after every Phase 51 plan. CI gate.
+
+### D-Live-Sweep-Tags: Distinct metadata.source for the two tiers
+
+Observations produced by:
+
+- **Live tier (Path A spawn hook):** `metadata.source = "sub-agent"`
+  (no suffix, indicates real-time capture)
+- **Sweep tier (Path B post-hoc):** `metadata.source = "sub-agent-backfill"`
+- **Both tiers:** `metadata.parent_session_id = <parent's claude
+  session id>`, `metadata.sub_index = <N>` (1-based), `metadata.sub_hash =
+  <7-char session id prefix>`, `metadata.agent = <claude|opencode|copilot|mastra>`,
+  `metadata.project = <project name>`
+
+**Why distinct:** lets the dashboard distinguish "real-time
+captured, expected to be in panel within seconds" from
+"sweep-recovered, expected within 15-30 min after sub-agent exit".
+Operators can spot when the live tier is silently broken (sweep
+should be the exception, not the norm).
+
+### Claude's Discretion
+
+The following are NOT locked and downstream agents have flexibility:
+
+- The exact JSON schema for the agent-agnostic registry table
+  (`Map<sub_hash, {parent_session_id, sub_index, agent, status,
+  transcript_path, lsl_path, project}>` or a SQLite table — planner
+  decides based on whether it needs persistence across coordinator
+  restarts)
+- launchd cadence for the periodic sweep (15 vs 20 vs 30 min —
+  planner picks based on the wave-execution cadence patterns
+  observed in 2026-05-23's afternoon)
+- Whether the LSL writer for sub-agents is a separate Node script
+  or a method on an existing class (planner discretion based on
+  the existing LSL writer's architecture)
+- Whether to use one researcher subagent per agent (4 parallel) or
+  to colocate research into one researcher with 4 dispatch passes —
+  D-Research mandates the parallel approach but planner can switch
+  if context-budget constraints force serialization
+
+</decisions>
+
+---
+
+## Canonical References
+
+<canonical_refs>
+
+**Downstream agents MUST read these before planning or implementing.**
+
+### Phase 51 spec + this phase
+
+- `.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md` (this file) — full spec including the decisions block above
+- `.planning/ROADMAP.md` § Phase 51 — one-line summary
+
+### Phase 50 (shared primitives — imported unchanged)
+
+- `lib/lsl/window.mjs` — getLSLWindow primitive (don't modify; Phase 50 contract)
+- `lib/lsl/scan-and-convert.mjs` — scanTranscriptsForUnconverted + convertTranscriptsToObservations (extend `searchPaths` config in Phase 51 plans, don't modify function bodies)
+- `scripts/resolve-observations-from-lsl.mjs` — Phase 50 CLI (reference for CLI flag conventions, error handling, etc.)
+- `.planning/phases/50-lsl-grounded-async-observation-resolver-backfill-ambiguous-r/50-01-SUMMARY.md` — implementation notes for the primitives, including the Format-B LSL labels + filename/anchor time skew fixes (Rule 1 deviations documented; may be relevant when parsing sub-agent transcripts)
+
+### 2026-05-23 incident artifacts (Path B's first job)
+
+- `~/.claude/projects/-Users-Q284340-Agentic-coding/<parent-session>/subagents/agent-*.jsonl` — the 25 confirmed sub-agent transcripts from the afternoon Phase 42 wave
+- `scripts/backfill-subagent-transcripts.mjs` — the PoC seed (now factored into `lib/lsl/scan-and-convert.mjs`)
+- `.planning/phases/42-offline-ukb-migration-b/42-06-SUMMARY.md` — the wave that surfaced the bug
+
+### 2026-05-24 statusline mitigation (to be replaced)
+
+- `scripts/combined-status-line-projects.json` — projects-mapping file with the `subMt` field
+- `status-line-fast.cjs` — consumer of `subMt`
+- `_freshestProjectActivityAgeMs()` + `transcriptAgeMs()` — sub-agent-mtime-folding helpers; locations TBD by researcher
+- `[checkpoint]` heartbeats spec from `execute-phase.md:#2410` (heartbeats reference the parent transcript mtime — sub-agent activity must influence the parent signal once registry exists)
+
+### Project conventions (from CLAUDE.md)
+
+- `CLAUDE.md` § "Rebuilding After Code Changes" — `scripts/`, `lib/`, and host-side Node code don't need Docker rebuild; only `integrations/mcp-*` submodules do (sub-agent capture is host-side, so no submodule rebuild needed for most Phase 51 plans)
+- `CLAUDE.md` § statusline rules — don't touch global statusline config; project-level `.claude/settings.local.json` only
+- Memory `feedback_test_statusline_in_tmux.md` — statusline cleanup plan MUST verify in live tmux before staging, not just offline output
+- Memory `reference_tmux_emoji_width_fix.md` — do NOT regress the 2026-05-12 codepoint-widths fix when modifying statusline rendering
+- Memory `feedback_e2e_verify.md` — verify dashboard badge + bubble visually in browser, not just via DB query
+
+### Phase 50 closure context
+
+- `.planning/phases/50-lsl-grounded-async-observation-resolver-backfill-ambiguous-r/50-01-SUMMARY.md`
+- `.planning/phases/50-lsl-grounded-async-observation-resolver-backfill-ambiguous-r/50-02-SUMMARY.md`
+- `.planning/phases/50-lsl-grounded-async-observation-resolver-backfill-ambiguous-r/50-03-SUMMARY.md`
+- `181 tests across 20 suites` — Phase 50 CI baseline; Phase 51 plans MUST keep this green
+
+</canonical_refs>
+
+---
+
+## Code Context
+
+<code_context>
+
+### Reusable assets (from Phase 50)
+
+- **`lib/lsl/window.mjs`** (Phase 50 Plan 01, 13468 B) — `getLSLWindow(observation, opts)`. Phase 51's sweep tier doesn't need this (transcripts have their own format), but the statusline-cleanup plan may use it to compute "freshness" from the LSL files
+- **`lib/lsl/scan-and-convert.mjs`** (Phase 50 Plan 01, 11569 B) — `scanTranscriptsForUnconverted(searchPaths, opts)` + `convertTranscriptsToObservations(transcripts, opts)`. Phase 51 extends `searchPaths` to include sub-agent transcript directories per agent. NOT modified, only its caller's config changes
+- **`scripts/resolve-observations-from-lsl.mjs`** (Phase 50 Plan 01) — CLI shape template (flag set, dry-run, idempotency, project filter pattern)
+- **`scripts/lsl-resolver-job.sh`** + **launchd plist** (Phase 50 Plan 03) — pattern for the periodic background job that Path B's sweep will mirror (different command, same plist + installer shape)
+
+### Existing seed scripts (still in tree, refactored into primitives by Phase 50)
+
+- **`scripts/backfill-subagent-transcripts.mjs`** (5KB, 2026-05-23) — original PoC; remains as thin wrapper around `lib/lsl/scan-and-convert.mjs` for backward compat. Reference for the cwd-parsing rule that maps `/private/tmp/<uuid>/agent-<hash>/` → originating project
+- **`scripts/convert-transcripts.js`** (10KB, 2026-04-19) — same pattern, parent transcripts
+
+### Established patterns (from CONTEXT.md body + Phase 50 closure)
+
+- **`lib/<category>/` plain ESM modules** — established (Phase 50 D-Primitives validated this is the right shape)
+- **launchd plist + idempotent installer + wrapper script** — Phase 50 Plan 03 demonstrates the pattern (`launchd/com.coding.lsl-resolver.plist` + `scripts/install-lsl-resolver-launchd.sh` + `scripts/lsl-resolver-job.sh`). Path B's sweep job follows the same pattern
+- **`.data/observations/observations.db` SQLite + WAL JSON metadata column** — Phase 50 wrote 7 new metadata keys (`lsl_*`). Phase 51 writes new keys (`source`, `parent_session_id`, `sub_index`, `sub_hash`, `agent`, `project`) — same idiom, no schema migration
+- **`POST /api/complete` on `host.docker.internal:12435`** — LLM proxy. Phase 51 plans MAY need this if observation summarization is part of the sweep pipeline; reuse Phase 50's invocation shape
+
+### Integration points
+
+- **Health coordinator** (Phase 51 final closure plan) — surface `sub_agent_capture` block in `/health/state`: `live_registrations` count, `last_sweep_at`, `captured_vs_skipped`, plus the registry size. Read-only from coordinator's perspective; the registry writes itself
+- **ETM (EnhancedTranscriptMonitor)** (Plan 1 — registry) — the registry's source-of-truth for sub-agent transcripts that ARE under ETM's watch path. Sub-agent transcripts OUTSIDE ETM (`/private/tmp/`, OpenCode/Copilot dirs) populate the registry via the periodic sweep
+- **GSD wave-execute** (Path A claude-code plan) — the spawn-time hook injects into `Skill(skill="gsd-execute-phase")`'s worktree-creation step. Specific location TBD by research
+
+</code_context>
+
+---
+
+## Deferred Ideas
+
+<deferred>
+
+- **Recursive sub-agent capture (Could #11)** — registry reserves a `parent_sub_hash` field per D-LSL-Filename but population is deferred until the failure mode is observed
+- **Cross-project sweep** — D-Backfill scopes the sweep to the `coding` project only. Other projects use their own GSD instances and will need their own Phase 51-style rollouts when adopted
+- **Provenance richness (Could #12)** — auto-set `metadata.phase = N`, `metadata.plan = NN` when a sub-agent transcript references a `.planning/phases/<N>-<slug>/<N>-<NN>-PLAN.md` path. Out of scope for Phase 51 closure; nice follow-up
+- **Sub-agent lifecycle events (Could #13)** — emit `sub-agent.spawned` / `sub-agent.completed` to the coordinator for live wave progress without polling. Useful but not blocking
+- **Pre-2026-05-23 historical backfill** — most stale `/private/tmp/` transcripts have been cleaned up. Out of scope per D-Backfill
+- **Health-coordinator integration depth** — Phase 50 hit the same surface (Plan 03 Task 3 skipped because health-coordinator.js is a pure HTTP aggregator). Phase 51's health-coordinator closure plan must either (a) work via the aggregator's existing surface (counter pulled from observation API), or (b) accept the same architectural-drift caveat and skip. Planner decides
+
+### Reviewed Todos (not folded)
+
+- `2026-05-23-orphan-digest-observation-refs.md` (score 0.6, area "observability / data-integrity") — same as Phase 50: reviewed, not folded. Different failure mode (digest→observation FK integrity, not sub-agent capture). Belongs in its own phase
+
+</deferred>
+
+---
+
+*Phase: 51 — gsd-wave-execution-sub-agent-transcripts-are-not-captured-as*
+*Decisions augmented: 2026-05-26*
