@@ -1,0 +1,17 @@
+{"type":"session_start","sessionId":"ses_parent_A","cwd":"/tmp/coding","timestamp":"2026-05-26T17:00:00Z"}
+{"type":"message","role":"user","content":"Hello mastracode","sessionId":"ses_parent_A","cwd":"/tmp/coding","timestamp":"2026-05-26T17:00:01Z"}
+{"type":"message","role":"assistant","content":"Hi! How can I help?","reason":"end_turn","sessionId":"ses_parent_A","cwd":"/tmp/coding","timestamp":"2026-05-26T17:00:02Z"}
+{"type":"onToolCall","tool":"read_file","input":"src/index.ts","sessionId":"ses_parent_A","cwd":"/tmp/coding","timestamp":"2026-05-26T17:00:03Z"}
+{"type":"onToolResult","tool":"read_file","output":"file contents","sessionId":"ses_parent_A","cwd":"/tmp/coding","timestamp":"2026-05-26T17:00:04Z"}
+{"type":"message","role":"user","content":"Now please review","sessionId":"ses_parent_A","cwd":"/tmp/coding","timestamp":"2026-05-26T17:00:05Z"}
+{"type":"session_end","sessionId":"ses_parent_A","cwd":"/tmp/coding","timestamp":"2026-05-26T17:00:06Z"}
+{"type":"session_start","sessionId":"ses_parent_B","cwd":"/tmp/coding","timestamp":"2026-05-26T17:10:00Z"}
+{"type":"subagent_start","sessionId":"ses_parent_B","subAgentSessionId":"ses_sub1","subIndex":1,"subName":"reviewer","timestamp":"2026-05-26T17:10:01Z"}
+{"type":"message","role":"user","content":"Please review the code","sessionId":"ses_sub1","subAgentSessionId":"ses_sub1","timestamp":"2026-05-26T17:10:02Z"}
+{"type":"message","role":"assistant","content":"Looks good overall","reason":"end_turn","sessionId":"ses_sub1","subAgentSessionId":"ses_sub1","timestamp":"2026-05-26T17:10:03Z"}
+{"type":"subagent_end","sessionId":"ses_parent_B","subAgentSessionId":"ses_sub1","timestamp":"2026-05-26T17:10:04Z"}
+{"type":"subagent_start","sessionId":"ses_parent_B","subAgentSessionId":"ses_sub2","subIndex":2,"subName":"tester","timestamp":"2026-05-26T17:10:05Z"}
+{"type":"message","role":"user","content":"Run the tests","sessionId":"ses_sub2","subAgentSessionId":"ses_sub2","timestamp":"2026-05-26T17:10:06Z"}
+{"type":"message","role":"assistant","content":"Tests passed","reason":"end_turn","sessionId":"ses_sub2","subAgentSessionId":"ses_sub2","timestamp":"2026-05-26T17:10:07Z"}
+{"type":"subagent_end","sessionId":"ses_parent_B","subAgentSessionId":"ses_sub2","timestamp":"2026-05-26T17:10:08Z"}
+{"type":"session_end","sessionId":"ses_parent_B","cwd":"/tmp/coding","timestamp":"2026-05-26T17:10:09Z"}
