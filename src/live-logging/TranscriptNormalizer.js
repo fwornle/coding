@@ -187,12 +187,41 @@ export function parseClaude(jsonlLine) {
  */
 /**
  * Set of Copilot event types that contain conversation content.
+ *
+ * Phase 51 Plan 04 Task 1 extended for Copilot CLI v1.0.48 dotted event names
+ * (user.message, assistant.message, assistant.turn_start/end). Legacy entries
+ * (conversation.message, conversation.turn, completion.response) preserved for
+ * backward compat against older sessions on disk.
+ *
  * @type {Set<string>}
  */
 const COPILOT_CONVERSATION_EVENTS = new Set([
+  // v1.0.48+ dotted names
+  'user.message',
+  'assistant.message',
+  'assistant.turn_start',
+  'assistant.turn_end',
+  // Legacy / older versions
   'conversation.message',
   'conversation.turn',
   'completion.response',
+]);
+
+/**
+ * Set of Copilot sub-agent lifecycle events.
+ *
+ * Phase 51 Plan 04 Task 1: first-class sub-agent boundary events emitted by
+ * Copilot CLI v1.0.48+. These do NOT carry conversation content — parseCopilot
+ * returns a structured sub-agent record (type:'subagent' discriminator) rather
+ * than a chat MastraDBMessage so the Path B adapter can register them in the
+ * sub-agent registry.
+ *
+ * @type {Set<string>}
+ */
+const COPILOT_SUBAGENT_EVENTS = new Set([
+  'subagent.started',
+  'subagent.completed',
+  'subagent.failed',
 ]);
 
 export function parseCopilot(eventLine) {
@@ -205,28 +234,59 @@ export function parseCopilot(eventLine) {
     return null;
   }
 
-  const eventType = parsed.event || parsed.type;
+  // v1.0.48 uses top-level `type` field; legacy v1.0.12 used `event` field.
+  const eventType = parsed.type || parsed.event;
+  if (!eventType) return null;
+
+  // Sub-agent branch — return structured record for the Path B adapter.
+  if (COPILOT_SUBAGENT_EVENTS.has(eventType)) {
+    const data = parsed.data || {};
+    return {
+      type: 'subagent', // discriminator — adapter checks this
+      subEventType: eventType.split('.')[1], // 'started' | 'completed' | 'failed'
+      toolCallId: data.toolCallId,
+      agentName: data.agentName,
+      agentDisplayName: data.agentDisplayName,
+      agentDescription: data.agentDescription,
+      timestamp: parsed.timestamp,
+      errorMessage: data.error || null,
+    };
+  }
 
   // Only process conversation-related events; skip status events, heartbeats, etc.
-  if (!eventType || !COPILOT_CONVERSATION_EVENTS.has(eventType)) return null;
+  if (!COPILOT_CONVERSATION_EVENTS.has(eventType)) return null;
+
+  // assistant.turn_start / assistant.turn_end are boundary events; they carry
+  // no content. Adapter / writer keys exchange boundaries on role='assistant'
+  // messages, not turn markers — return null.
+  if (eventType === 'assistant.turn_start' || eventType === 'assistant.turn_end') {
+    return null;
+  }
 
   const data = parsed.data;
   if (!data) return null;
 
   // Extract content from multiple possible shapes:
-  // 1. data.content (string) -- most common for conversation.message
+  // 1. data.content (string) -- most common for user.message / assistant.message
+  //    in v1.0.48 AND for legacy conversation.message
   // 2. data.message.content (nested) -- some event formats
   // 3. data.choices[0].message.content -- completion.response format
   // 4. data.choices[0].delta.content -- incremental delta events
   let content = null;
   let role = null;
 
+  // Derive role from event-type prefix for v1.0.48 dotted names, else
+  // fall back to data.role.
+  let prefixRole = null;
+  if (eventType.startsWith('user.')) prefixRole = 'user';
+  else if (eventType.startsWith('assistant.')) prefixRole = 'assistant';
+
   if (typeof data.content === 'string' && data.content.trim()) {
     content = data.content;
-    role = data.role || 'assistant';
+    role = prefixRole || data.role || 'assistant';
   } else if (data.message && typeof data.message.content === 'string' && data.message.content.trim()) {
     content = data.message.content;
-    role = data.message.role || data.role || 'assistant';
+    role = prefixRole || data.message.role || data.role || 'assistant';
   } else if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
     const choice = data.choices[0];
     // Full message (completion.response)
@@ -244,7 +304,7 @@ export function parseCopilot(eventLine) {
   // Skip events with no meaningful content
   if (!content) return null;
 
-  const timestamp = data.timestamp || parsed.timestamp || new Date().toISOString();
+  const timestamp = parsed.timestamp || data.timestamp || new Date().toISOString();
 
   return {
     id: deterministicId(content, timestamp),
