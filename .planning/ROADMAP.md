@@ -679,7 +679,7 @@ Plans:
 **Goal:** Agent-agnostic sub-agent capture across LSL and observations for claude / opencode / copilot / mastra. Path B (sweep) ships first, Path A (live hooks) second per D-Order; D-LSL-Filename convention applied across all four agents; the 2026-05-24 statusline mitigation is replaced with registry-sourced reads; final closure surfaces sub_agent_capture in /health/state.
 **Requirements**: TBD (out-of-milestone bug-fix; no requirement IDs registered)
 **Depends on:** Phase 50
-**Plans:** 5/11 plans executed
+**Plans:** 6/11 plans executed
 
 Plans:
 - [x] 51-01-PLAN.md — Agent-agnostic sub-agent registry + sweep dispatcher (Wave 1; shared infrastructure)
@@ -687,7 +687,7 @@ Plans:
 - [x] 51-03-PLAN.md — OpenCode Path B sweep adapter (SQLite reader; Wave 2)
 - [x] 51-04-PLAN.md — Copilot Path B sweep adapter + parseCopilot v1.0.48 fix (Wave 2)
 - [x] 51-05-PLAN.md — Mastra Path B sweep adapter (forward-compat; sweep-only — Path A NOT VIABLE; Wave 2)
-- [ ] 51-06-PLAN.md — D-LSL-Filename writer + LSL parity + 2026-05-23 historical LSL backfill (Wave 3; CONTEXT.md AC #2)
+- [x] 51-06-PLAN.md — D-LSL-Filename writer + LSL parity + 2026-05-23 historical LSL backfill (Wave 3; CONTEXT.md AC #2)
 - [ ] 51-07-PLAN.md — Claude Code Path A live hook (FSEvents watcher + tail-reader; Wave 4)
 - [ ] 51-08-PLAN.md — OpenCode Path A live hook (5s SQLite polling; Wave 4)
 - [ ] 51-09-PLAN.md — Copilot Path A live hook (file-tail; degraded LSL parity acknowledged; Wave 4)
