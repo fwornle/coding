@@ -215,4 +215,41 @@ Trailing narrative.`;
     const result = getLSLWindow(obs, { maxPrompts: 3, project: tmpDir });
     expect(result).toEqual({ exchanges: [], sourceFile: null, byteCount: 0, windowSpanMs: 0 });
   });
+
+  test('Test 8: parses Format-B labels (**User Message:** / **Assistant Response:**)', () => {
+    // Live 2026 LSL files use inline label format, not `### User` headers.
+    // The walker must handle both. Hand-craft a file in the dominant format.
+    const baseTs = Date.parse('2026-05-23T07:00:00Z');
+    const dir = path.join(tmpDir, '2026', '05');
+    fs.mkdirSync(dir, { recursive: true });
+    const body = [
+      '# WORK SESSION (0700-0800)',
+      '',
+      '**Generated:** 2026-05-23T07:00:00Z',
+      '',
+      '---',
+      '',
+      `<a name="ps_${baseTs}"></a>`,
+      `## Prompt Set 1 (ps_${baseTs})`,
+      '',
+      '**User Message:** implement the dedup fix now',
+      '',
+      '**Assistant Response:** starting work...',
+      '',
+      `<a name="ps_${baseTs + 60_000}"></a>`,
+      `## Prompt Set 2 (ps_${baseTs + 60_000})`,
+      '',
+      '**User Request:** add tests too',
+      '',
+      '**Assistant Response:** added.',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(dir, '2026-05-23_0700-0800_format-b.md'), body, 'utf-8');
+
+    const obs = { created_at: new Date(baseTs + 5 * 60_000).toISOString() };
+    const result = getLSLWindow(obs, { maxPrompts: 3, project: tmpDir });
+    expect(result.exchanges).toHaveLength(2);
+    expect(result.exchanges[0].content).toContain('implement the dedup fix now');
+    expect(result.exchanges[1].content).toContain('add tests too');
+  });
 });
