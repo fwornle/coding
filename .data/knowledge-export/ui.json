@@ -50,11 +50,6 @@
           "type": "applicability",
           "content": "Essential for any 3D scene with many objects - Three.js, React Three Fiber, timeline visualizations",
           "date": "2025-06-19T12:34:22Z"
-        },
-        {
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/ViewportCullingPattern.md",
-          "date": "2025-06-19T12:34:22Z"
         }
       ],
       "significance": 5,
@@ -104,11 +99,6 @@
         {
           "type": "trigger_criteria",
           "content": "Basic: 15+ components, cross-component state. Advanced: 20+ components with state management chaos",
-          "date": "2025-06-19T12:34:40Z"
-        },
-        {
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/ReduxStateManagementPattern.md",
           "date": "2025-06-19T12:34:40Z"
         }
       ],
@@ -243,11 +233,6 @@
           "type": "applicability",
           "content": "Any system requiring coordinated animation management",
           "date": "2025-06-19T11:22:19Z"
-        },
-        {
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/StateDrivenAnimationPipelinePattern.md",
-          "date": "2025-06-19T11:22:19Z"
         }
       ],
       "significance": 5,
@@ -292,11 +277,6 @@
         {
           "type": "applicability",
           "content": "Network visualization, circuit design, game pathfinding",
-          "date": "2025-06-19T11:23:27Z"
-        },
-        {
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/StrategyBasedModularRoutingPattern.md",
           "date": "2025-06-19T11:23:27Z"
         }
       ],
@@ -350,14 +330,6 @@
           },
           "type": "benefit",
           "content": "Zero prop drilling, predictable state updates, time-travel debugging, and 100% TypeScript coverage"
-        },
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/MVIReduxArchitecturePattern.md"
         }
       ],
       "significance": 5,
@@ -410,14 +382,6 @@
           },
           "type": "benefit",
           "content": "Seamless integration of 3D graphics with React's declarative paradigm"
-        },
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/ReactThreeFiberIntegrationPattern.md"
         }
       ],
       "significance": 5,
@@ -470,14 +434,6 @@
           },
           "type": "metric",
           "content": "27 components organized in logical directories with zero circular dependencies"
-        },
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/ModularComponentArchitecturePattern.md"
         }
       ],
       "significance": 5,
@@ -530,14 +486,6 @@
           },
           "type": "benefit",
           "content": "DRY principle applied to React hooks with full TypeScript support"
-        },
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/CustomHookExtractionPattern.md"
         }
       ],
       "significance": 5,
@@ -582,11 +530,6 @@
         {
           "type": "applicability",
           "content": "Any application requiring sophisticated logging control and filtering",
-          "date": "2025-06-19T12:35:15Z"
-        },
-        {
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/ConditionalLoggingPattern.md",
           "date": "2025-06-19T12:35:15Z"
         }
       ],
@@ -751,7 +694,7 @@
       "agent-q284340",
       "q284340"
     ],
-    "total_entities": 10,
+    "total_entities": 12,
     "total_relations": 19,
     "source": "curated_high_value_patterns",
     "last_mode": "automatic",
