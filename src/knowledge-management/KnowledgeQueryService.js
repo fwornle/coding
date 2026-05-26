@@ -23,6 +23,10 @@ export class KnowledgeQueryService {
     this.debug = options.debug || false;
     // Cache for km-core JSON exports — keyed by absolute file path, value: { mtimeMs, parsed }
     this._exportCache = new Map();
+    // Cache of insight-document filename set (entity → .md presence on disk).
+    // Refreshed on TTL miss in _hasInsightDoc(). Frontend uses
+    // metadata.has_insight_document to draw the dark-blue 3px node border.
+    this._insightDocCache = { mtimeMs: 0, names: new Set(), checkedAt: 0 };
   }
 
   /**
@@ -899,11 +903,58 @@ export class KnowledgeQueryService {
     });
   }
 
+  // Resolve the on-disk insights directory (under the project root, sibling
+  // of .data/). We could derive this from graphDbConfig.path's parent, but
+  // VKB-server's cwd is /coding/lib/vkb-server; safer to walk up from the
+  // .data/ root we already resolve in _getKmCorePaths.
+  _getInsightsDir() {
+    const graphRoot = this.databaseManager?.graphDbConfig?.path
+      || path.join(process.cwd(), '.data', 'knowledge-graph');
+    const projectRoot = path.dirname(path.dirname(graphRoot)); // .data/knowledge-graph/.. = .data, ../ = project root
+    return path.join(projectRoot, 'knowledge-management', 'insights');
+  }
+
+  // Build (and TTL-cache) the set of entity names that have a matching
+  // `.md` file in `knowledge-management/insights/`. Used to derive the
+  // metadata.has_insight_document flag at READ TIME so the visualizer's
+  // dark-blue 3px "Has Insight Doc" border lights up without us needing
+  // to mutate the source JSON files.
+  _hasInsightDoc(entityName) {
+    if (!entityName) return false;
+    const now = Date.now();
+    const TTL_MS = 30_000;
+    if (now - this._insightDocCache.checkedAt > TTL_MS) {
+      const dir = this._getInsightsDir();
+      const names = new Set();
+      try {
+        for (const f of fs.readdirSync(dir)) {
+          if (f.endsWith('.md')) names.add(f.slice(0, -3));
+        }
+      } catch {
+        // dir missing — leave the set empty, fall through to false.
+      }
+      this._insightDocCache = { names, checkedAt: now };
+    }
+    return this._insightDocCache.names.has(entityName);
+  }
+
   // Convert a normalised legacy-shape entity record into the public API
   // shape the VKB frontend expects (snake_case-ish, entity_name / entity_type
   // / observations / source / team / metadata / hierarchy fields).
   _mapNodeToEntity(entity, team) {
     const m = entity.metadata || {};
+    // Derive the has_insight_document flag from disk presence so the
+    // visualizer can render the dark-blue 3px node border (GraphVisualization.tsx:525)
+    // for entities that have an associated knowledge-management/insights/<name>.md
+    // — historically NONE of the legacy team JSON files carried this flag,
+    // so the indicator has been broken since the field was introduced
+    // post-export. Auto-deriving keeps the source files immutable.
+    const hasInsightDoc = m.has_insight_document === true
+      || m.originalMetadata?.has_insight_document === true
+      || (typeof entity.name === 'string' && this._hasInsightDoc(entity.name));
+    const enrichedMetadata = hasInsightDoc && !m.has_insight_document
+      ? { ...m, has_insight_document: true }
+      : m;
     return {
       id: entity.id || null,
       entity_name: entity.name || null,
@@ -919,7 +970,7 @@ export class KnowledgeQueryService {
       last_modified: m.last_updated || m.updatedAt || entity.last_modified || m.created_at || null,
       session_id: entity.session_id || null,
       embedding_id: entity.embedding_id || null,
-      metadata: m,
+      metadata: enrichedMetadata,
       parentEntityName: entity.parentEntityName || null,
       hierarchyLevel: entity.hierarchyLevel != null ? entity.hierarchyLevel : null,
       isScaffoldNode: entity.isScaffoldNode || false,
