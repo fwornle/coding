@@ -262,9 +262,15 @@ export function seedOpencodeFixture(dbPath, opts = {}) {
   );
 
   // ---- Sub-sessions (parent_id = parentId, directory = directory) ----
+  // sub_hash = sid.slice(0, 7), so prefix the index character within the
+  // first 7 chars to keep sub_hashes distinct across siblings. Earlier the
+  // pattern `ses_sub${i}c4f...` collapsed `i=0` and `i=1` to the same
+  // 7-char prefix `ses_sub`, which broke the (agent, sub_hash)-keyed
+  // registry dedup. Use 4-letter prefix per index so `ses_s0c`, `ses_s1c`,
+  // ... stay 7-char distinct.
   const subSessionIds = [];
   for (let i = 0; i < numSubSessions; i++) {
-    const sid = `ses_sub${i}c4f0ffe2hVGls09bIagj${i}`;
+    const sid = `ses_s${i}c4f0ffe2hVGls09bIagj${i}`;
     subSessionIds.push(sid);
     insertSession.run(
       sid, 'prj_1', parentId, `sub-slug-${i}`, directory,
