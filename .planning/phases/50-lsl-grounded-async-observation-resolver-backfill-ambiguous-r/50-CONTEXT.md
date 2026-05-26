@@ -209,3 +209,275 @@ USER:   <ambiguous_summary>
 - Phase 47 — image-attachment text loss. This phase's resolver handles Phase 47's `Could` (recovery from transcripts) so Phase 47's scope narrows to the writer-path fix.
 - Inline pronoun-resolution fix `2f4cbf7d7` (2026-05-23) — same problem, different tier. This phase additionally addresses the case where the prior context was never observed.
 - Phase 48 / 49 — VKB graph viewer & data integrity. Unrelated tier.
+
+---
+
+## Implementation Decisions Locked During Discuss (2026-05-26)
+
+<decisions>
+
+The body above (filed 2026-05-23) captures the design. The decisions
+below resolve residual gray areas that downstream agents (researcher,
+planner) need locked before they can act.
+
+### D-Cadence: CLI → capture-time stamp → cron (three sequential plans)
+
+Ship the resolver in three independently-verifiable plans, in this order:
+
+- **Plan 1 — CLI + primitive.** Build the LSL-window primitive
+  (`lib/lsl/window.mjs`) + resolver core + CLI entry
+  `scripts/resolve-observations-from-lsl.mjs` with all flags
+  (`--dry-run`, `--limit`, `--id`, `--since`, `--force`, `--mode`).
+  This plan alone satisfies the four acceptance criteria — the CLI
+  can backfill all historical rows on demand. Detector A (regex) +
+  detector C (image-only structural) ship here.
+
+- **Plan 2 — Capture-time stamp.** Modify
+  `src/live-logging/ObservationWriter.js` to stamp
+  `metadata.needs_lsl_resolution = true` when `_buildPriorContext`
+  returned empty AND the user message contains an unresolved
+  pronoun (detector B). Migrate `_buildPriorContext` itself to use
+  the same N-prompt window logic (Should #7) — both consumers
+  share `lib/lsl/window.mjs`.
+
+- **Plan 3 — Cron / launchd.** Wire a periodic job that runs the
+  Plan 1 CLI with `--since <last-run> --limit 100` every 15-30 min.
+  launchd preferred (mirrors existing project conventions per
+  CLAUDE.md statusline plist pattern + `reference_llm_proxy_corp_wrapper.md`).
+
+**Why this order:** Plan 1 ships ALL the recovery capability — humans
+can run it whenever they want. Plan 2 reduces the regex-scan cost on
+each cron run. Plan 3 is pure ergonomics. Each plan has its own
+verification gate. The intermediate state after Plan 1 is fully
+functional, not a half-built feature.
+
+**Rejected alternative:** CLI + writer change in one plan was tempting
+but compounds risk (writer-path change touches a hot code path —
+ObservationWriter runs on every prompt-set close).
+
+### D-Confidence: Three-state policy (commit / commit+flag / skip+stamp)
+
+Resolver prompt is amended (`resolver_prompt_shape` above) to require
+the LLM emit `{summary, confidence: 0.0-1.0}`. Behavior by threshold:
+
+| Confidence | Action | Metadata stamped |
+|---|---|---|
+| ≥ 0.7 | Commit rewrite silently | `lsl_resolved_at`, `lsl_resolution_source`, `lsl_resolution_window`, `lsl_resolution_confidence`, `pre_resolution_summary` |
+| 0.4 – 0.7 | Commit rewrite + flag for review | All of above + `lsl_resolution_needs_review = true` |
+| < 0.4 OR no antecedent | **Do not rewrite.** Stamp skip marker | `lsl_resolution_skipped = "low_confidence"` or `"no_antecedent"`, `lsl_resolution_attempted_at` (idempotency: same row not retried on next run unless `--force`) |
+
+**Dashboard surfaces** (folds in Could #10): `/health/state` exposes
+`observations.summary_integrity` with three counts —
+`resolved_high_confidence`, `flagged_for_review`, `skipped`. Dashboard
+renders a badge from this. (Out of scope for Phase 50 execute; goes
+into Plan 3 as an optional add-on or deferred to a follow-up plan.)
+
+**Rejected alternative:** "Always commit + stamp confidence" is simpler
+but the user's standing preference (per project memory:
+`feedback_e2e_verify.md`, `feedback_test_statusline_in_tmux.md`) is
+high-evidence quality bars over speed. A silent low-confidence commit
+that gets surfaced later is harder to audit than a deliberate skip.
+
+### D-47-Boundary: Phase 47 stays separate (writer-path fix only)
+
+Phase 47 (ObservationWriter drops user-prompt text when image
+attachments present) remains in the backlog as its own phase. Its
+scope is **only** the writer-path fix — preserve prompt text on
+image-only messages so future rows are not stripped.
+
+Phase 50 handles the **recovery** tier for historical rows via
+detector C. The two phases are NOT merged. Two distinct ROADMAP
+entries, two distinct closures.
+
+**Practical consequence for Phase 50 planning:** Don't include the
+writer-path change in Plan 2. Plan 2's writer-side change is ONLY
+the capture-time `needs_lsl_resolution` stamp + the
+`_buildPriorContext` migration — neither of which is the
+image-attachment fix.
+
+**Rejected alternative:** Folding 47 into 50 was tempting (one PR,
+one closure) but breaks the audit trail and conflates writer-side
+fixes with reader-side recovery — different blast radii, different
+verification approaches.
+
+### D-Primitives: `lib/lsl/` top-level, plain ESM
+
+Two new files at the repo root:
+
+- `lib/lsl/window.mjs` — exports `getLSLWindow(observation, opts)`
+  per scope Must #1.
+- `lib/lsl/scan-and-convert.mjs` — exports
+  `scanTranscriptsForUnconverted(searchPaths, opts)` and
+  `convertTranscriptsToObservations(transcripts, opts)`. Factored
+  from `scripts/convert-transcripts.js` (10KB, already converts
+  one transcript) + `scripts/backfill-subagent-transcripts.mjs`
+  (5KB PoC seed).
+
+Both modules are **plain ESM** (`.mjs`), no build step, no
+TypeScript. Mirrors the existing `lib/<category>/` convention
+established by `lib/adapters/`, `lib/agent-api/`, `lib/fallbacks/`,
+`lib/integrations/`, `lib/agent-detector.js`, `lib/agent-registry.js`.
+
+**Consumers:**
+
+- `scripts/resolve-observations-from-lsl.mjs` (Plan 1) — imports both.
+- `src/live-logging/ObservationWriter.js` (Plan 2) — imports
+  `window.mjs` for the migrated `_buildPriorContext`.
+- Phase 51 — imports both modules unchanged. This is the entire
+  point of "land in 50, reuse in 51" (decided 2026-05-26
+  pre-discuss). The sub-agent transcript paths
+  (`~/.claude/projects/<encoded>/subagents/agent-*.jsonl`,
+  `/private/tmp/`) are scanner config, not a code change.
+
+**Module shape (rough):**
+
+```javascript
+// lib/lsl/window.mjs
+export function getLSLWindow(observation, {
+  maxPrompts = 3,        // primary stop condition
+  maxWallClockMs = 24*60*60*1000,  // safety net
+  maxBytes = 30 * 1024,  // prompt-size cap
+  project,               // scope to same project's LSL dir
+} = {}) { /* returns { exchanges, sourceFile, byteCount, windowSpanMs } */ }
+
+// lib/lsl/scan-and-convert.mjs
+export function scanTranscriptsForUnconverted(searchPaths, { since, project } = {}) {
+  /* returns [{ path, mtime, projectHint, parentSession }] */
+}
+export function convertTranscriptsToObservations(transcripts, { dryRun, tag } = {}) {
+  /* returns [{ transcriptPath, observationsWritten, skipped }] */
+}
+```
+
+**Rejected alternative:** A new `@coding/lsl-tools` package was the
+"most reusable" option but adds package boilerplate (package.json,
+tsconfig if TS) for code that's used by exactly two callers. Defer
+extraction to Phase 999.1-style submodule work if it grows.
+
+### D-Reuse: Primitives land in Phase 50, Phase 51 imports them (pre-discuss decision)
+
+Decided 2026-05-26 before the discuss-phase began, in response to
+the "Phase 50 and 51 share two primitives" framing. Phase 51 does
+NOT re-implement `getLSLWindow` or `scan-and-convert`; it imports
+them from `lib/lsl/`. This is the dependency that makes Phase 50
+block Phase 51.
+
+**Consequence:** Phase 50 plan-checker MUST verify that
+`lib/lsl/window.mjs` and `lib/lsl/scan-and-convert.mjs` are
+exported with stable signatures, because Phase 51 will lock against
+them. No breaking changes to either module after Phase 50 closes
+without coordinated Phase 51 follow-up.
+
+### Claude's Discretion
+
+The following are NOT locked in this CONTEXT and downstream agents
+have flexibility:
+
+- The exact prompt template wording sent to the LLM (the
+  `resolver_prompt_shape` body above is a sketch; the planner may
+  tune phrasing for the specific LLM provider).
+- Whether the LSL window walker reads files lazily or pre-loads
+  hourly chunks into memory — depends on observed performance.
+- Whether to use Claude Code via the proxy or Copilot for the
+  resolver LLM calls. CLAUDE.md routing convention defaults to
+  proxy; the planner may pick a per-task `processOverrides` config.
+- Database schema migration — the new `metadata.*` fields are
+  observation-level JSON, not new columns. No schema migration
+  needed; the planner may add a doc-only schema comment.
+
+</decisions>
+
+---
+
+## Canonical References
+
+<canonical_refs>
+
+**Downstream agents MUST read these before planning or implementing.**
+
+### Phase 50 spec + this phase
+
+- `.planning/phases/50-lsl-grounded-async-observation-resolver-backfill-ambiguous-r/50-CONTEXT.md` (this file) — full spec including the decisions block above
+- `.planning/ROADMAP.md` § Phase 50 — one-line summary
+
+### Related phases (must respect their boundaries)
+
+- `.planning/phases/47-observationwriter-preserve-prompt-text-when-image-attachment/47-CONTEXT.md` — Phase 47 stays as the writer-path fix; Phase 50 handles recovery only (D-47-Boundary)
+- `.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md` — Phase 51 imports `lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs` unchanged (D-Reuse)
+
+### Source files Phase 50 will modify or create
+
+- `lib/lsl/window.mjs` — NEW (D-Primitives)
+- `lib/lsl/scan-and-convert.mjs` — NEW (D-Primitives)
+- `scripts/resolve-observations-from-lsl.mjs` — NEW (Plan 1)
+- `src/live-logging/ObservationWriter.js` § `_buildPriorContext` at line 263 — Plan 2 migrates this to N-prompt window logic (Should #7); Plan 2 also adds the `needs_lsl_resolution` capture-time stamp around the existing call site at line 300
+- launchd plist (location TBD by planner) — Plan 3
+
+### Seed scripts to factor from (during Plan 1)
+
+- `scripts/convert-transcripts.js` (10KB, 2026-04-19) — already batch-converts one transcript to observations. The scan-and-convert primitive's `convertTranscriptsToObservations` is a generalization of this script's core loop
+- `scripts/backfill-subagent-transcripts.mjs` (5KB, 2026-05-23) — proof-of-concept written during Phase 42 wave; the scan-and-convert primitive's `scanTranscriptsForUnconverted` generalizes its directory-walker
+- `scripts/backfill-raw-observations.mjs` (9KB, 2026-05-19) — different bug class (stuck `[Raw]` rows) but same shape: a CLI that runs against `.data/observations/observations.db` with `--dry-run`/`--limit` flags. Use as the CLI shape template for `resolve-observations-from-lsl.mjs`
+
+### LSL format reference
+
+- `.specstory/history/{YYYY}/{MM}/{YYYY-MM-DD}_HHMM-HHMM_*.md` — verbatim session logs. Format is markdown with prompt-set sections (`## Prompt Set (ps_*)`) and tool-call blocks. The window walker must parse these to extract user→assistant exchanges
+- Inline pronoun-resolution fix commit `2f4cbf7d7` (2026-05-23) — `src/live-logging/ObservationWriter.js _buildPriorContext` source — the existing 30-min wall-clock window logic that Plan 2 replaces
+
+### Project conventions (from CLAUDE.md)
+
+- `CLAUDE.md` § "Rebuilding After Code Changes" — `src/live-logging/` runs outside Docker, so Plan 2 needs no Docker rebuild
+- `CLAUDE.md` § "km-core LLM proxy endpoint" — Plan 1 + Plan 3 LLM calls MUST hit `POST /api/complete` on host port 12435 (NOT port 3033). Pass `taskType: 'observation-resolution'` to route through the cheaper claude-haiku tier
+- Memory `feedback_e2e_verify.md` — verify rewrites visually in the dashboard, not just via DB queries
+
+</canonical_refs>
+
+---
+
+## Code Context
+
+<code_context>
+
+### Reusable assets
+
+- **`src/live-logging/ObservationWriter.js`** (existing) — `_buildPriorContext` at line 263, called at line 300. Currently uses a 30-min wall-clock window on observations DB. Plan 2 migrates to `getLSLWindow` from `lib/lsl/window.mjs`
+- **`scripts/convert-transcripts.js`** (existing, 10KB) — batch transcript→observations converter. Refactored in Plan 1 to expose its core loop via `convertTranscriptsToObservations` in `lib/lsl/scan-and-convert.mjs`. The CLI itself stays as a thin wrapper
+- **`scripts/backfill-subagent-transcripts.mjs`** (existing, 5KB PoC) — directory walker for sub-agent transcripts. Refactored in Plan 1 to expose `scanTranscriptsForUnconverted`. Phase 51 imports it unchanged
+- **`scripts/backfill-raw-observations.mjs`** (existing, 9KB) — CLI shape template (flag set, dry-run handling, idempotent commit pattern) for the new resolver CLI
+
+### Established patterns
+
+- **`lib/<category>/` flat ESM modules** — established by `lib/adapters/`, `lib/agent-api/`, `lib/fallbacks/`, `lib/integrations/`. No build step. New `lib/lsl/` directory fits this pattern
+- **`.data/observations/observations.db` SQLite + WAL** — read/write with `better-sqlite3` or `sqlite3`. Schema: observations table with JSON `metadata` column. New fields (`lsl_resolved_at`, `lsl_resolution_*`, `needs_lsl_resolution`) are JSON keys, no schema migration
+- **`POST /api/complete` on `host.docker.internal:12435`** — LLM proxy endpoint. NOT OpenAI-compatible. Body: `{process, messages, taskType?}`. Routing: `taskType` selects cheaper provider (haiku). Per-CLI process tag enables `processOverrides` in `llm-settings.json` to pin provider/model
+- **Idempotent backfill scripts under `scripts/`** — existing pattern: `--dry-run`, `--limit`, `--since`, `--id`, `--force`, fail-loud error budget. Stamp completion via metadata field that prevents re-processing
+
+### Integration points
+
+- **ObservationWriter writer path** (Plan 2) — single function modified; existing tests in `tests/live-logging/ObservationWriter.retention-floor.test.js` provide the regression suite shape. New test file follows that pattern
+- **Health coordinator `/health/state`** (Plan 3, optional add-on per D-Confidence) — coordinator already exposes computed counts. Add `observations.summary_integrity` block with three counters. Read path only; no writer-side changes
+- **launchd plist** (Plan 3) — pattern already used by the rapid-llm-proxy wrapper (`_work/rapid-llm-proxy/bin/start-llm-proxy.sh`). Per `reference_llm_proxy_corp_wrapper.md`, plist lives in `~/Library/LaunchAgents/`. Cron alternative: `crontab -e` entry. Planner picks one
+
+</code_context>
+
+---
+
+## Deferred Ideas
+
+<deferred>
+
+- **Confidence dashboard badge** (Could #10) — `/health/state` integration is fully decided in D-Confidence but ships as an optional Plan 3 add-on or a follow-up phase. Not blocking for Phase 50 closure
+- **Recursive sub-agent handling** — out of scope; lives in Phase 51's Could-tier work
+- **Embedding-based detector D** — possible follow-up: detect "vague summary" not by regex but by low semantic-similarity to surrounding observations. Defer; current detectors A+B+C cover the documented failure cases
+- **Mid-phase Phase 47 retirement** — if Plan 2's writer-path migration touches enough of `ObservationWriter.js` to make the Phase 47 image-attachment fix trivially small, the planner MAY surface that as a deviation. Default per D-47-Boundary: keep them separate
+
+### Reviewed Todos (not folded)
+
+- `2026-05-23-orphan-digest-observation-refs.md` — 8 digests reference observations missing from both live SQLite and cold-store export. **Reviewed, not folded.** Same broad area (observation data quality) but a different failure mode (digest→observation FK integrity, not vague-summary recovery). Belongs in a separate phase
+
+</deferred>
+
+---
+
+*Phase: 50 — lsl-grounded-async-observation-resolver*
+*Decisions augmented: 2026-05-26*
