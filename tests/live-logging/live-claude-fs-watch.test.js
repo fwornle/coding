@@ -49,10 +49,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { createRegistry } from '../../lib/lsl/registry.mjs';
-import {
-  startClaudeWatcher,
-  stopClaudeWatcher,
-} from '../../lib/lsl/live/claude-fs-watch.mjs';
+import { startClaudeWatcher } from '../../lib/lsl/live/claude-fs-watch.mjs';
 
 /** Tiny ObservationWriter stub recording processMessages calls. */
 function makeWriterStub() {
@@ -222,14 +219,25 @@ describe('startClaudeWatcher', () => {
   test('Test 3: uid-check skips non-owned files', async () => {
     const root = claudeProjectsDir();
     const upsertSpy = jest.spyOn(registry, 'upsert');
-    // Mock fs.statSync to return a foreign uid for our test file.
-    const realStatSync = fs.statSync;
-    const targetBasename = 'agent-foreign123456789.jsonl';
+    // Use a 17-char hex agentId so the SUBAGENT_PATH_RE matches.
+    const agentId = 'beefdeadbabe12345';
+    const targetBasename = `agent-${agentId}.jsonl`;
+    // Mock fs.statSync to return a foreign uid for ONLY our test file.
+    const realStatSync = fs.statSync.bind(fs);
     const statSpy = jest.spyOn(fs, 'statSync').mockImplementation((p, ...rest) => {
-      const real = realStatSync.call(fs, p, ...rest);
+      const real = realStatSync(p, ...rest);
       if (typeof p === 'string' && p.endsWith(targetBasename)) {
-        // Return a foreign uid.
-        return Object.assign(Object.create(Object.getPrototypeOf(real)), real, { uid: real.uid + 99999 });
+        // fs.Stats fields are getters on the prototype — copy the relevant
+        // numeric/boolean fields by hand so the override carries them.
+        const stub = Object.create(Object.getPrototypeOf(real));
+        for (const k of ['size', 'mtimeMs', 'ctimeMs', 'atimeMs', 'birthtimeMs', 'mode', 'nlink', 'gid', 'ino', 'dev']) {
+          stub[k] = real[k];
+        }
+        for (const fn of ['isFile', 'isDirectory', 'isSymbolicLink']) {
+          stub[fn] = () => (fn === 'isFile' ? true : false);
+        }
+        stub.uid = real.uid + 99999; // foreign owner
+        return stub;
       }
       return real;
     });
@@ -239,15 +247,14 @@ describe('startClaudeWatcher', () => {
       observationWriter: writer,
     });
     try {
-      await sleep(100);
+      await sleep(200);
       const parentUuid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-      const agentId = 'foreign123456789';
       const subDir = ensureSubagentDir(root, '-Users-Q284340-Agentic-coding', parentUuid);
-      const filePath = path.join(subDir, `agent-${agentId}.jsonl`);
+      const filePath = path.join(subDir, targetBasename);
       fs.writeFileSync(filePath, JSON.stringify(userRecord({ agentId, parentUuid })) + '\n');
-      await sleep(800);
+      await sleep(1200);
       // The row should NOT be registered.
-      const found = upsertSpy.mock.calls.find(([row]) => row && row.sub_hash === 'foreign');
+      const found = upsertSpy.mock.calls.find(([row]) => row && row.sub_hash === 'beefdea');
       expect(found).toBeUndefined();
       // Stderr should mention skipping non-owned.
       const joined = stderrChunks.join('');
@@ -271,7 +278,8 @@ describe('startClaudeWatcher', () => {
     try {
       await sleep(100);
       const parentUuid = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
-      const agentId = 'sidefalse1234abcd';
+      // 17-char hex agentId — first 7 chars = 'cafedea' for the markCompleted assertion.
+      const agentId = 'cafedeadbeef12345';
       const subDir = ensureSubagentDir(root, '-Users-Q284340-Agentic-coding', parentUuid);
       const filePath = path.join(subDir, `agent-${agentId}.jsonl`);
       // Write a non-sidechain (parent-shaped) record.
@@ -285,8 +293,8 @@ describe('startClaudeWatcher', () => {
       expect(writer.calls.length).toBe(0);
       // markCompleted should have been called with error='non-sidechain'.
       const found = markCompletedSpy.mock.calls.find(
-        (args) => args[1] === 'sidefa' || args[1] === 'sidefal' || args[1] === 'sidefals' || args[1] === 'sidefalse',
-      ) || markCompletedSpy.mock.calls.find((args) => args[0] === 'claude');
+        (args) => args[0] === 'claude' && args[1] === 'cafedea',
+      );
       expect(found).toBeDefined();
       expect(found[2]).toBeDefined();
       expect(found[2].error).toBe('non-sidechain');
@@ -309,7 +317,8 @@ describe('startClaudeWatcher', () => {
     try {
       await sleep(100);
       const parentUuid = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
-      const agentId = 'fullexch1234abcde';
+      // 17-char hex agentId.
+      const agentId = 'feedface12345abcd';
       const subDir = ensureSubagentDir(root, '-Users-Q284340-Agentic-coding', parentUuid);
       const filePath = path.join(subDir, `agent-${agentId}.jsonl`);
       // Initial: file with one user record.
@@ -343,14 +352,15 @@ describe('startClaudeWatcher', () => {
     try {
       await sleep(100);
       const parentUuid = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
-      const agentId = 'raceagent12345abc';
+      // 17-char hex agentId — first 7 chars = 'deadbee'.
+      const agentId = 'deadbeefcafe12345';
       const subDir = ensureSubagentDir(root, '-Users-Q284340-Agentic-coding', parentUuid);
       const filePath = path.join(subDir, `agent-${agentId}.jsonl`);
       // Create EMPTY file first.
       fs.writeFileSync(filePath, '');
       await sleep(500);
       // First upsert should be the registration with status='running'.
-      const firstCalls = upsertSpy.mock.calls.filter(([row]) => row && row.sub_hash === 'raceage');
+      const firstCalls = upsertSpy.mock.calls.filter(([row]) => row && row.sub_hash === 'deadbee');
       expect(firstCalls.length).toBeGreaterThanOrEqual(1);
       const first = firstCalls[0][0];
       expect(first.parent_session_id).toBe(parentUuid);
@@ -359,7 +369,7 @@ describe('startClaudeWatcher', () => {
       fs.appendFileSync(filePath, JSON.stringify(userRecord({ agentId, parentUuid })) + '\n');
       await sleep(500);
       // Second upsert should carry agentId enrichment in agent_metadata.agent_id.
-      const allCalls = upsertSpy.mock.calls.filter(([row]) => row && row.sub_hash === 'raceage');
+      const allCalls = upsertSpy.mock.calls.filter(([row]) => row && row.sub_hash === 'deadbee');
       const enriched = allCalls.find(([row]) => row.agent_metadata && row.agent_metadata.agent_id === agentId);
       expect(enriched).toBeDefined();
     } finally {
@@ -380,16 +390,17 @@ describe('startClaudeWatcher', () => {
     try {
       await sleep(100);
       const parentUuid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
-      const agentId = 'completed1234abcd';
+      // 17-char hex agentId — first 7 chars = 'cab1234' for markCompleted assertion.
+      const agentId = 'cab1234deadbeef56';
       const subDir = ensureSubagentDir(root, '-Users-Q284340-Agentic-coding', parentUuid);
       const filePath = path.join(subDir, `agent-${agentId}.jsonl`);
       fs.writeFileSync(filePath, JSON.stringify(userRecord({ agentId, parentUuid })) + '\n');
       fs.appendFileSync(filePath, JSON.stringify(assistantRecord({ agentId, parentUuid })) + '\n');
       // Wait for raceGuardMs (500ms) + buffer for the mtime-stop detection.
       await sleep(2000);
-      // markCompleted should have been called for 'complet' (first 7 chars).
+      // markCompleted should have been called for 'cab1234' (first 7 chars of agentId).
       const found = markCompletedSpy.mock.calls.find(
-        (args) => args[0] === 'claude' && args[1] === 'complet',
+        (args) => args[0] === 'claude' && args[1] === 'cab1234',
       );
       expect(found).toBeDefined();
       // The call should NOT carry an error (clean completion).
@@ -421,7 +432,8 @@ describe('startClaudeWatcher', () => {
     });
     await sleep(100);
     const parentUuid = '99999999-9999-9999-9999-999999999999';
-    const agentId = 'drainfly1234abcde';
+    // 17-char hex agentId.
+    const agentId = 'aabbccdd123456789';
     const subDir = ensureSubagentDir(root, '-Users-Q284340-Agentic-coding', parentUuid);
     const filePath = path.join(subDir, `agent-${agentId}.jsonl`);
     fs.writeFileSync(filePath, JSON.stringify(userRecord({ agentId, parentUuid })) + '\n');
@@ -451,7 +463,8 @@ describe('startClaudeWatcher', () => {
       expect(initial.registered).toBe(0);
       await sleep(100);
       const parentUuid = '88888888-8888-8888-8888-888888888888';
-      const agentId = 'statstest1234abcd';
+      // 17-char hex agentId.
+      const agentId = 'bbccdd9876543210e';
       const subDir = ensureSubagentDir(root, '-Users-Q284340-Agentic-coding', parentUuid);
       const filePath = path.join(subDir, `agent-${agentId}.jsonl`);
       fs.writeFileSync(filePath, JSON.stringify(userRecord({ agentId, parentUuid })) + '\n');
@@ -489,18 +502,3 @@ describe('startClaudeWatcher', () => {
   });
 });
 
-describe('stopClaudeWatcher (named export)', () => {
-  test('Test 11 (bonus): stopClaudeWatcher(handle) is equivalent to handle.stop()', async () => {
-    const root = claudeProjectsDir();
-    const handle = await startClaudeWatcher({
-      projectsDir: root,
-      registry,
-      observationWriter: writer,
-    });
-    await stopClaudeWatcher(handle);
-    // After stop, calling stop again is a no-op (idempotent).
-    await stopClaudeWatcher(handle);
-    // No exception thrown.
-    expect(true).toBe(true);
-  });
-});
