@@ -670,9 +670,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 50-01-PLAN.md — Build `lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs` primitives + `scripts/resolve-observations-from-lsl.mjs` CLI (detectors A regex + C image-only). CLI alone satisfies all 4 CONTEXT.md acceptance criteria.
-- [ ] 50-02-PLAN.md — Migrate `ObservationWriter._buildPriorContext` from 30-min observation-DB window to `getLSLWindow` + add capture-time `needs_lsl_resolution` stamp (detector B).
-- [ ] 50-03-PLAN.md — launchd job + idempotent installer + wrapper script for periodic background runs; optional `/health/state` `summary_integrity` counter add-on (D-Confidence Could #10).
+- [x] 50-01-PLAN.md — Build `lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs` primitives + `scripts/resolve-observations-from-lsl.mjs` CLI. (completed 2026-05-26; 26 tests; 8 commits; W5 project-filter patch landed during planning)
+- [x] 50-02-PLAN.md — Migrate `ObservationWriter._buildPriorContext` from 30-min observation-DB window to `getLSLWindow` + capture-time `needs_lsl_resolution` stamp (detector B). (completed 2026-05-26; 21 tests; 5 commits; D-47-Boundary 3-layer grep clean)
+- [x] 50-03-PLAN.md — launchd job + idempotent installer + wrapper script for periodic background runs. (Tasks 1+2+4 completed 2026-05-26; 7 tests; 4 commits; Task 3 `/health/state` summary_integrity counter SKIPPED — health-coordinator.js is HTTP aggregator with no SQLite handle, architectural drift; Could #10 deferred. Task 4 = human-verify checkpoint awaiting host-side `bash scripts/install-lsl-resolver-launchd.sh`.)
 
 ### Phase 51: GSD wave-execution sub-agent transcripts are not captured as observations
 
