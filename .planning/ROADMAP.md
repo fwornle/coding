@@ -685,7 +685,7 @@ Plans:
 **Goal:** Agent-agnostic sub-agent capture across LSL and observations for claude / opencode / copilot / mastra. Path B (sweep) ships first, Path A (live hooks) second per D-Order; D-LSL-Filename convention applied across all four agents; the 2026-05-24 statusline mitigation is replaced with registry-sourced reads; final closure surfaces sub_agent_capture in /health/state.
 **Requirements**: TBD (out-of-milestone bug-fix; no requirement IDs registered)
 **Depends on:** Phase 50
-**Plans:** 14/16 plans executed
+**Plans:** 15/16 plans executed
 
 Plans:
 **Wave 1**
@@ -725,7 +725,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 51-15-PLAN.md — Gap-closure AC #2: production LSL backfill execution + WR-05 --historical flag fix (Wave 8)
+- [x] 51-15-PLAN.md — Gap-closure AC #2: production LSL backfill execution + WR-05 --historical flag fix (Wave 8)
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
