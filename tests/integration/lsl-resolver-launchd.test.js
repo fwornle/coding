@@ -208,6 +208,18 @@ describe('scripts/lsl-resolver-job.sh — launchd wrapper integration', () => {
     expect(wrapperBody).toMatch(/mv\s+"?\$\{?TMP_FILE\}?"?\s+"?\$\{?STATE_FILE\}?"?/);
   });
 
+  test('Test 5a: proxy reachability probe targets GET /health (mirrors sweep wrapper post sweep-llm-proxy-probe-fix)', () => {
+    // Companion to sub-agent-launchd-install.test.js Test 7a. Both Phase 50
+    // and Phase 51 wrappers shared the same broken probe pattern. The fix
+    // switches both to GET /health. See:
+    //   - .planning/todos/pending/sweep-llm-proxy-probe-fix.md
+    const wrapperBody = fs.readFileSync(WRAPPER_PATH, 'utf8');
+    // GET /health (canonical reachability endpoint) — multi-line tolerant.
+    expect(wrapperBody).toMatch(/\$\{?PROXY_URL\}?\/health/);
+    expect(wrapperBody).not.toMatch(/-X\s+POST[\s\S]{0,200}\/api\/complete/);
+    expect(wrapperBody).not.toMatch(/-d\s+'\{\}'[\s\S]{0,200}\/api\/complete/);
+  });
+
   test('Test 6: bash strict mode — script starts with set -euo pipefail', async () => {
     const wrapperBody = fs.readFileSync(WRAPPER_PATH, 'utf8');
     const firstNonShebang = wrapperBody.split('\n').slice(1, 10).join('\n');

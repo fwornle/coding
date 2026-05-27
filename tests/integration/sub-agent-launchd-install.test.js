@@ -230,6 +230,24 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
     expect(wrapperBody).toMatch(/\[sub-agent-sweep\]/);
   });
 
+  test('Test 7a: proxy reachability probe targets GET /health (post sweep-llm-proxy-probe-fix)', () => {
+    // Regression guard for the silent-no-op bug surfaced during Phase 51-16 UAT
+    // (todo: .planning/todos/pending/sweep-llm-proxy-probe-fix.md). The original
+    // probe POST'd {} to /api/complete and expected 4xx, but the proxy returns
+    // 500 (not 400) for "no messages or prompt" validation errors. That made
+    // every sweep run a silent no-op for 24+ hours. The fix switches to GET
+    // /health which the proxy returns 200 for. This test locks the new shape:
+    //   - probe must target /health
+    //   - probe must NOT POST an empty body to /api/complete
+    const wrapperBody = fs.readFileSync(WRAPPER_PATH, 'utf8');
+    // GET /health (the canonical reachability endpoint) — must appear with $PROXY_URL.
+    // Multi-line tolerant: bash uses `\` for line-continuation between curl and the URL.
+    expect(wrapperBody).toMatch(/\$\{?PROXY_URL\}?\/health/);
+    // Must not be doing the broken empty-POST validation pattern.
+    expect(wrapperBody).not.toMatch(/-X\s+POST[\s\S]{0,200}\/api\/complete/);
+    expect(wrapperBody).not.toMatch(/-d\s+'\{\}'[\s\S]{0,200}\/api\/complete/);
+  });
+
   test('Test 8a: ProgramArguments[0] of every plist resolves to an executable file on the host (closes CR-04 test gap — REVIEW Addendum)', () => {
     // Per Phase 51 Plan 12: the original plists hardcoded /usr/local/bin/node
     // in ProgramArguments[0] which does NOT exist on Apple Silicon. Plan 12

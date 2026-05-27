@@ -40,12 +40,15 @@ log() { printf '[sub-agent-sweep][%s] %s\n' "$(date -u +%H:%M:%SZ)" "$*" >&2; }
 cd "${REPO_ROOT}"
 
 # ---- 1. Probe the LLM proxy. -------------------------------------------------
-# Empty-body POST to /api/complete; expect a 4xx response (validation
-# rejection) on a reachable proxy. 5xx and network errors both look like
-# "unreachable" and gate us out without running the sweep.
+# GET /health is the canonical reachability endpoint. We previously POST'd
+# an empty body to /api/complete and expected 4xx, but the current
+# rapid-llm-proxy returns 500 (not 400) for "no messages or prompt"
+# validation errors, which made the probe fail-closed even on a healthy
+# proxy and silently no-op'd the sweep for hours. /health returns 200
+# when the proxy is up; anything else (5xx, 404, 000 network error) gates
+# us out. Mirrors the probe used in scripts/test-coding.sh.
 PROXY_HTTP_CODE="$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' \
-  -X POST -H 'Content-Type: application/json' -d '{}' \
-  "${PROXY_URL}/api/complete" 2>/dev/null || echo '000')"
+  "${PROXY_URL}/health" 2>/dev/null || echo '000')"
 
 case "${PROXY_HTTP_CODE}" in
   2*|4*)
