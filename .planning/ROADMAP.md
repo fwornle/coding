@@ -685,7 +685,7 @@ Plans:
 **Goal:** Agent-agnostic sub-agent capture across LSL and observations for claude / opencode / copilot / mastra. Path B (sweep) ships first, Path A (live hooks) second per D-Order; D-LSL-Filename convention applied across all four agents; the 2026-05-24 statusline mitigation is replaced with registry-sourced reads; final closure surfaces sub_agent_capture in /health/state.
 **Requirements**: TBD (out-of-milestone bug-fix; no requirement IDs registered)
 **Depends on:** Phase 50
-**Plans:** 15/16 plans executed
+**Plans:** 16/16 plans complete
 
 Plans:
 **Wave 1**
@@ -729,7 +729,7 @@ Plans:
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 51-16-PLAN.md — Gap-closure AC #3 + HUMAN-UAT re-attempt: kill stale daemons, restart launchd, restart health-coordinator, run small /gsd-execute-phase, verify 6 ACs (Wave 9; checkpoint:human-verify)
+- [x] 51-16-PLAN.md — Gap-closure AC #3 + HUMAN-UAT re-attempt: kill stale daemons, restart launchd, restart health-coordinator, run small /gsd-execute-phase, verify 6 ACs (Wave 9; checkpoint:human-verify)
 
 **Cross-cutting constraints:**
 
@@ -753,11 +753,11 @@ Plans:
 **Goal:** Trigger ONE executor sub-agent via `/gsd-execute-phase 53` to exercise the live-claude FSEvents watcher and close Phase 51 AC #3. Throwaway phase — entire directory + marker file may be removed after Phase 51 closes.
 **Requirements:** none (operational verification only)
 **Depends on:** Phase 51 plans 51-12, 51-13, 51-14 (CR fixes) on main
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 
-- [ ] 53-01-PLAN.md — Write throwaway marker file `.planning/uat-probes/2026-05-27-sub-agent-capture-probe.md`; sole purpose is to spawn one executor sub-agent for live-claude observation evidence.
+- [x] 53-01-PLAN.md — Write throwaway marker file `.planning/uat-probes/2026-05-27-sub-agent-capture-probe.md`; sole purpose is to spawn one executor sub-agent for live-claude observation evidence.
 
 ---
 
