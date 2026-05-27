@@ -1,11 +1,32 @@
 ---
 id: sweep-llm-proxy-probe-fix
 created: 2026-05-27
-status: pending
+status: completed
+completed: 2026-05-27T19:42:00Z
 priority: high
 tags: [phase-51, sub-agent-sweep, llm-proxy, ac-5, runtime-bug]
 discovered_in: phase-51, plan-51-16 HUMAN-UAT
+resolved_by: commit 0aaf749e0 — "fix(sweep): use GET /health for LLM proxy reachability probe"
 ---
+
+## Resolution (2026-05-27)
+
+Root cause confirmed: the rapid-llm-proxy returns HTTP 500 (not 400) for
+"no messages or prompt provided" validation errors. The probe assumed
+4xx for validation rejection — wrong assumption — so a healthy proxy
+got classified as unreachable.
+
+Fix landed in commit `0aaf749e0`: switched probe to `GET /health` (returns
+200 on a healthy proxy) in both `scripts/sub-agent-sweep-job.sh` and
+`scripts/lsl-resolver-job.sh` (same broken pattern in Phase 50 mirror).
+Added regression tests (`Test 7a` in sub-agent-launchd-install.test.js,
+`Test 5a` in lsl-resolver-launchd.test.js) that lock the new probe shape
+and refuse the broken empty-POST pattern. 18/18 tests pass.
+
+End-to-end verified: sub-agent-backfill count moved 117 → 125 (8 new
+rows written by the post-fix sweep run). AC #5 idempotency from Phase 51
+is now substantive instead of vacuous; AC #2 fresh-LSL-file emission via
+sweep cycle is unblocked.
 
 # Fix sub-agent sweep — LLM proxy probe returning HTTP 500 on every run
 
