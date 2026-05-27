@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.sub-agent-sweep</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/Q284340/Agentic/coding/scripts/sub-agent-sweep-job.sh</string>
+    </array>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StartInterval</key>
+    <integer>1800</integer>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>WorkingDirectory</key>
+    <string>/Users/Q284340/Agentic/coding</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/Q284340/Agentic/coding/.data/live-sub-agent-sweep.log</string>
+    <key>StandardOutPath</key>
+    <string>/Users/Q284340/Agentic/coding/.data/live-sub-agent-sweep.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin</string>
+    </dict>
+</dict>
+</plist>

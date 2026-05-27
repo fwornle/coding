@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.sub-agent-live-opencode</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/Users/Q284340/Agentic/coding/scripts/sub-agent-live-opencode.mjs</string>
+        <string>--state-file</string>
+        <string>/Users/Q284340/Agentic/coding/.data/sub-agent-live-state-opencode.json</string>
+    </array>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>NetworkState</key>
+        <true/>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+    <key>WorkingDirectory</key>
+    <string>/Users/Q284340/Agentic/coding</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/Q284340/Agentic/coding/.data/live-opencode.log</string>
+    <key>StandardOutPath</key>
+    <string>/Users/Q284340/Agentic/coding/.data/live-opencode.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin</string>
+    </dict>
+</dict>
+</plist>
