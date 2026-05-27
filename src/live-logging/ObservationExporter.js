@@ -179,6 +179,7 @@ export class ObservationExporter {
       SELECT id, summary, agent, session_id, source_file, created_at,
              quality, content_hash, digested_at,
              json_extract(metadata, '$.project') as project,
+             json_extract(metadata, '$.source') as source,
              json_extract(metadata, '$.llmModel') as llmModel,
              json_extract(metadata, '$.llmProvider') as llmProvider,
              json_extract(metadata, '$.modifiedFiles') as modifiedFiles
@@ -192,6 +193,14 @@ export class ObservationExporter {
       summary: r.summary,
       agent: r.agent,
       project: r.project || null,
+      // metadata.source distinguishes the producer pipeline ('sub-agent',
+      // 'sub-agent-backfill', etc). Plan 51-14 (CR-03) stamps this for
+      // sub-agent live writes; backfill stamps 'sub-agent-backfill'.
+      // Without this column in the export, consumers reading the JSON
+      // couldn't filter by tier (the DB tagging was always correct; only
+      // the export projection was incomplete). See:
+      //   .planning/todos/completed/json-export-missing-source-field.md
+      source: r.source || null,
       quality: r.quality,
       createdAt: r.created_at,
       digestedAt: r.digested_at || null,
