@@ -17,6 +17,16 @@ import { UKBProcessManager } from './ukb-process-manager.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = process.env.CODING_REPO || join(__dirname, '..');
 
+// Phase 51 Plan 10: Sub-agent freshness sourced from heartbeat files written
+// by lib/lsl/live/* daemons, NOT a re-walk of <parent>/subagents/. Cached
+// after first dynamic import so per-tick overhead is one property lookup.
+let _registryReader = null;
+async function getRegistryReader() {
+  if (_registryReader) return _registryReader;
+  _registryReader = await import('../lib/lsl/registry-reader.mjs');
+  return _registryReader;
+}
+
 // Identity passthrough. tmux right-aligns status-right against the pane's
 // actual right edge on its own; any trailing characters we add (spaces,
 // NBSP, anything) become the right-most cells and push our content left.
@@ -446,33 +456,35 @@ class CombinedStatusLine {
 
   /**
    * Effective activity mtime for a transcript: max of the parent transcript's
-   * own mtime and the freshest mtime among its sub-agent transcripts under
-   * `<parent_without_ext>/subagents/*.jsonl`.
+   * own mtime and the freshest sub-agent heartbeat mtime for the project,
+   * sourced from the Phase 51 sub-agent registry (heartbeat files written
+   * by lib/lsl/live/* daemons).
    *
-   * Claude Code spawns sub-agents (e.g. GSD wave-execute, Task tool) into
-   * a `subagents/` sibling-dir of the parent transcript. The parent file's
-   * own mtime sits frozen during sub-agent work, so every signal that
-   * keys off "parent transcript mtime" goes stale even when the user is
-   * actively confirming prompts inside a sub-agent. This helper folds
-   * sub-agent freshness back into the parent's representative mtime so
-   * the lifecycle bubble and [📚] badge reflect actual user activity.
+   * Claude Code spawns sub-agents (e.g. GSD wave-execute, Task tool) and
+   * the parent transcript's mtime sits frozen during sub-agent work, so
+   * every signal that keys off "parent transcript mtime" goes stale even
+   * when the user is actively confirming prompts inside a sub-agent. This
+   * helper folds sub-agent freshness back into the parent's representative
+   * mtime so the lifecycle bubble and [📚] badge reflect actual activity.
    *
-   * Interim mitigation pending Phase 51's full sub-agent registry.
-   * Returns 0 if the parent can't be stat'd and no sub-agents exist.
+   * The 2026-05-24 interim mitigation (re-walking <parent>/subagents/ on
+   * each tick) was replaced by Phase 51 Plan 10: the live daemons write
+   * heartbeat files with deterministic schema, and getProjectSubMt() reads
+   * those instead — bounded I/O and no Claude-specific path assumptions.
+   *
+   * Returns 0 when the parent can't be stat'd and no sub-agent heartbeat
+   * is available. `registry` is the cached registry-reader module loaded
+   * by getRegistryReader().
    */
-  static _effectiveActivityMtime(parentTranscriptPath) {
+  static _effectiveActivityMtime(parentTranscriptPath, projectName, registry) {
     let mt = 0;
     try { mt = fs.statSync(parentTranscriptPath).mtimeMs; } catch { /* ignore */ }
-    const subagentsDir = parentTranscriptPath.replace(/\.jsonl$/, '') + '/subagents';
-    try {
-      for (const f of fs.readdirSync(subagentsDir)) {
-        if (!f.endsWith('.jsonl')) continue;
-        try {
-          const m = fs.statSync(join(subagentsDir, f)).mtimeMs;
-          if (m > mt) mt = m;
-        } catch { /* skip unreadable */ }
-      }
-    } catch { /* no subagents dir — common, fine */ }
+    if (registry && projectName) {
+      try {
+        const subMt = registry.getProjectSubMt(projectName, { stateDir: join(rootDir, '.data') });
+        if (subMt > mt) mt = subMt;
+      } catch { /* defensive: never let the statusline crash on registry errors */ }
+    }
     return mt;
   }
 
@@ -511,11 +523,12 @@ class CombinedStatusLine {
           heartbeatByProject.set(e.projectName, lb);
         }
       }
+      const registry = await getRegistryReader();
       let freshest = null;
       for (const entry of lslEntries) {
         if (!entry?.transcriptPath) continue;
         try {
-          const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath);
+          const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath, entry.projectName, registry);
           let age = effMt > 0 ? now - effMt : now - fs.statSync(entry.transcriptPath).mtimeMs;
           if (age >= 5 * 60_000 && age < 45 * 60_000 && entry.projectName) {
             const lb = heartbeatByProject.get(entry.projectName);
@@ -971,7 +984,11 @@ class CombinedStatusLine {
       const lslEntries = Object.values(state.lsl || {});
       const agenticDir = dirname(process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir);
       const claudeProjectsDir = process.env.HOME ? join(process.env.HOME, '.claude', 'projects') : null;
-       const transcriptAgeMs = (projectName) => {
+      // Phase 51 Plan 10: pre-load the sub-agent registry-reader so the
+      // sync transcriptAgeMs closure below can call getProjectSubMt() at
+      // each per-project tick without re-awaiting an import.
+      const registry = await getRegistryReader();
+      const transcriptAgeMs = (projectName) => {
         // Preferred: state.lsl carries explicit transcriptPaths from ETM
         // heartbeats. When multiple sessions target the same project
         // (e.g. Claude + OpenCode), pick the FRESHEST transcript — the
@@ -980,7 +997,7 @@ class CombinedStatusLine {
         for (const entry of lslEntries) {
           if (entry?.projectName !== projectName || !entry?.transcriptPath) continue;
           try {
-            const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath);
+            const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath, projectName, registry);
             const mtime = effMt > 0 ? effMt : fs.statSync(entry.transcriptPath).mtimeMs;
             const age = Date.now() - mtime;
             if (freshestAge === null || age < freshestAge) freshestAge = age;
@@ -1131,8 +1148,10 @@ class CombinedStatusLine {
           try { parentMt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { continue; }
           // Sub-agent freshness: folded in so the fast-path can promote
           // the bubble when work is happening inside a sub-agent and the
-          // parent transcript file is frozen. Phase 51 interim mitigation.
-          const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath);
+          // parent transcript file is frozen. Phase 51 sourced from the
+          // sub-agent registry-reader (heartbeat files from live daemons)
+          // — replaces the 2026-05-24 mitigation that walked subagents/.
+          const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath, entry.projectName, registry);
           const subMt = effMt > parentMt ? effMt : 0;
           const mt = effMt > parentMt ? effMt : parentMt;
           const prev = mapping[entry.projectName];
