@@ -685,7 +685,7 @@ Plans:
 **Goal:** Agent-agnostic sub-agent capture across LSL and observations for claude / opencode / copilot / mastra. Path B (sweep) ships first, Path A (live hooks) second per D-Order; D-LSL-Filename convention applied across all four agents; the 2026-05-24 statusline mitigation is replaced with registry-sourced reads; final closure surfaces sub_agent_capture in /health/state.
 **Requirements**: TBD (out-of-milestone bug-fix; no requirement IDs registered)
 **Depends on:** Phase 50
-**Plans:** 16 plans (11 base + 5 gap-closure)
+**Plans:** 14/16 plans executed
 
 Plans:
 **Wave 1**
@@ -719,9 +719,9 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 51-12-PLAN.md — Gap-closure CR-04: resolve node binary path at install time so launchd plists work on Apple Silicon (Wave 7)
-- [ ] 51-13-PLAN.md — Gap-closure CR-01 + CR-02: OpenCode --limit plumb-through + heartbeat registry_rows emit (Wave 7)
-- [ ] 51-14-PLAN.md — Gap-closure CR-03: atomic upsert for observations_written increment in claude-fs-watch (Wave 7)
+- [x] 51-12-PLAN.md — Gap-closure CR-04: resolve node binary path at install time so launchd plists work on Apple Silicon (Wave 7)
+- [x] 51-13-PLAN.md — Gap-closure CR-01 + CR-02: OpenCode --limit plumb-through + heartbeat registry_rows emit (Wave 7)
+- [x] 51-14-PLAN.md — Gap-closure CR-03: atomic upsert for observations_written increment in claude-fs-watch (Wave 7)
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
