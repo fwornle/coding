@@ -1,11 +1,33 @@
 ---
 id: json-export-missing-source-field
 created: 2026-05-27
-status: pending
+status: completed
+completed: 2026-05-27T22:10:00Z
 priority: medium
 tags: [phase-51, observation-export, source-tagging, ac-3]
 discovered_in: phase-51, plan-51-16 HUMAN-UAT
+resolved_by: commit c972bf09f — "fix(observation-exporter): include metadata.source in JSON export projection"
 ---
+
+## Resolution (2026-05-27)
+
+Root cause confirmed: `ObservationExporter._exportObservations` SELECT
+projection extracted `project / llmModel / llmProvider / modifiedFiles`
+from metadata but NOT `source`. DB-side tagging was correct (Plan 51-14
+CR-03 verified); only the export pipeline was incomplete.
+
+Fix landed in commit `c972bf09f`: added `json_extract(metadata, '$.source')
+as source` to the SQL and `source: r.source || null` to the row mapper.
+Regression test added (`ObservationExporter.source-field.test.js`, 2/2
+pass) — covers happy path round-trip + source-grep gate to defend
+against silent removal.
+
+End-to-end verified: before the fix, 0/2364 rows in
+`.data/observation-export/observations.json` had a `source` key; after
+triggering a fresh export, 394/2365 rows include it, with 11
+`source='sub-agent'` (matches DB) and 99 `source='sub-agent-backfill'`
+(remaining historic rows refresh on the next consolidator cycle via
+the existing `_mergeWithExisting` safety-merge path).
 
 # `.data/observation-export/observations.json` strips `metadata.source` field
 
