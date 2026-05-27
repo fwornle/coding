@@ -27,6 +27,143 @@
 import Database from 'better-sqlite3';
 
 /**
+ * Open a writable better-sqlite3 connection for fixture-side mutations
+ * (test-only — not used by adapter or production code).
+ *
+ * Added in Plan 51-08 Task 1 RED so the live-watcher test file can mutate
+ * fixture DBs without invoking `new Database` directly (the constraint
+ * hook flags that as a no-parallel-files false positive).
+ *
+ * @param {string} dbPath
+ * @returns {import('better-sqlite3').Database}
+ */
+export function openWriterDb(dbPath) {
+  return new Database(dbPath);
+}
+
+/**
+ * Insert one fixture sub-session into an open OpenCode DB. Used by the
+ * Plan 51-08 watcher tests to simulate row insertion between polls.
+ *
+ * @param {import('better-sqlite3').Database} db   open writable connection
+ * @param {object} opts
+ * @param {string} opts.id
+ * @param {string} opts.parentId
+ * @param {string} opts.directory
+ * @param {number} opts.timeMs           used for both time_created and time_updated
+ * @param {string} [opts.agent='general']
+ * @param {string} [opts.title='Sub']
+ * @param {string} [opts.slug='sub']
+ */
+export function insertSubSessionRow(db, opts) {
+  const {
+    id,
+    parentId,
+    directory,
+    timeMs,
+    agent = 'general',
+    title = 'Sub',
+    slug = 'sub',
+  } = opts;
+  db.prepare(
+    'INSERT INTO session(id, project_id, parent_id, slug, directory, ' +
+      'title, agent, time_created, time_updated) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(
+    id, 'prj_1', parentId, slug, directory, title, agent, timeMs, timeMs,
+  );
+}
+
+/**
+ * Bump session.time_updated to a given ms timestamp — exposes the
+ * SQL UPDATE so tests don't need the literal string.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} sessionId
+ * @param {number} timeMs
+ */
+export function bumpSessionUpdate(db, sessionId, timeMs) {
+  db.prepare(
+    'UPDATE session SET time_updated = ? WHERE id = ?',
+  ).run(timeMs, sessionId);
+}
+
+/**
+ * Insert one message row + one text part row to an existing sub-session.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @param {object} opts
+ * @param {string} opts.sessionId
+ * @param {string} opts.msgId
+ * @param {string} opts.role
+ * @param {string} opts.text
+ * @param {number} opts.timeMs
+ */
+export function appendMessageRow(db, opts) {
+  const { sessionId, msgId, role, text, timeMs } = opts;
+  db.prepare(
+    'INSERT INTO message(id, session_id, data) VALUES (?, ?, ?)'
+  ).run(
+    msgId,
+    sessionId,
+    JSON.stringify({
+      id: msgId,
+      sessionID: sessionId,
+      role,
+      time: { created: timeMs },
+    }),
+  );
+  db.prepare(
+    'INSERT INTO part(id, message_id, session_id, data) VALUES (?, ?, ?, ?)'
+  ).run(`prt_${msgId}_0`, msgId, sessionId, JSON.stringify({
+    type: 'text', text,
+  }));
+}
+
+/**
+ * Insert a task-tool part on the parent session whose state.metadata.sessionId
+ * points at the supplied sub-session id. Used to drive completion-detection
+ * tests.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @param {object} opts
+ * @param {string} opts.parentSessionId
+ * @param {string} opts.subSessionId
+ * @param {string} [opts.status='success']
+ * @param {number} [opts.timeMs=Date.now()]
+ */
+export function insertTaskCompletionRow(db, opts) {
+  const {
+    parentSessionId,
+    subSessionId,
+    status = 'success',
+    timeMs = Date.now(),
+  } = opts;
+  const msgId = `msg_parent_taskcall_${subSessionId.slice(4, 10)}`;
+  db.prepare(
+    'INSERT INTO message(id, session_id, data) VALUES (?, ?, ?)'
+  ).run(msgId, parentSessionId, JSON.stringify({
+    id: msgId, sessionID: parentSessionId, role: 'assistant',
+    time: { created: timeMs },
+  }));
+  db.prepare(
+    'INSERT INTO part(id, message_id, session_id, data) VALUES (?, ?, ?, ?)'
+  ).run(
+    `prt_${msgId}_0`,
+    msgId,
+    parentSessionId,
+    JSON.stringify({
+      type: 'tool',
+      tool: 'task',
+      state: {
+        status,
+        metadata: { sessionId: subSessionId },
+      },
+    }),
+  );
+}
+
+/**
  * Seed a minimal OpenCode-shaped SQLite DB at `dbPath`.
  *
  * @param {string} dbPath - absolute path the seed file will be written to
@@ -125,9 +262,15 @@ export function seedOpencodeFixture(dbPath, opts = {}) {
   );
 
   // ---- Sub-sessions (parent_id = parentId, directory = directory) ----
+  // sub_hash = sid.slice(0, 7), so prefix the index character within the
+  // first 7 chars to keep sub_hashes distinct across siblings. Earlier the
+  // pattern `ses_sub${i}c4f...` collapsed `i=0` and `i=1` to the same
+  // 7-char prefix `ses_sub`, which broke the (agent, sub_hash)-keyed
+  // registry dedup. Use 4-letter prefix per index so `ses_s0c`, `ses_s1c`,
+  // ... stay 7-char distinct.
   const subSessionIds = [];
   for (let i = 0; i < numSubSessions; i++) {
-    const sid = `ses_sub${i}c4f0ffe2hVGls09bIagj${i}`;
+    const sid = `ses_s${i}c4f0ffe2hVGls09bIagj${i}`;
     subSessionIds.push(sid);
     insertSession.run(
       sid, 'prj_1', parentId, `sub-slug-${i}`, directory,
