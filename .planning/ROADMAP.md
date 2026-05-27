@@ -316,7 +316,6 @@ Plans:
 - [x] 38-05-PLAN.md — Wire registry into `GraphKMStore` constructor: add `ontologyDir?` + `ontologyStrict?` options, instantiate registry internally, expose `store.ontology` getter, validator resolution chain (explicit > auto-wired > noop). Pure additive — Phase 37 BC-2 + T-37-04-06 + PersistenceManager/Exporter ordering all preserved. depends_on: 38-03, 38-04. [DONE 2026-05-20: km-core commit 1094046; 1 file modified (src/store/GraphKMStore.ts 519→575); all 4 Phase 37 NO-CHANGE invariants verified by grep+awk gates; all 33 Phase 37 vitest tests still pass — zero regression; Plan 38-06 unblocked]
 - [x] 38-06-PLAN.md — Registry unit tests (`tests/unit/ontology-registry.test.ts`, 6 describe-blocks covering all 4 SCs) + 2 append-only tests in `tests/unit/graph-store.test.ts` (ontologyDir auto-wiring + skipOntologyCheck BC-2 preservation). depends_on: 38-02, 38-03, 38-05. [DONE 2026-05-20: km-core commits d624212 + b343a3b; 1 file created (581 lines, 21 tests) + 1 file modified (217→269 lines, 11→13 tests); final suite 7 files / 56 tests / 56 passed (33 Phase 37 baseline + 23 new); all 4 SCs verified by test-name mapping; D-27 collision warning text grep-asserted VERBATIM; all 11 Phase 37 protected graph-store names preserved; FLAG-2 OR-precedence neutralized; Phase 38 COMPLETE — ready for /gsd:verify-phase 38]
 
-
 #### Phase 39: Entity Data Model
 
 **Goal:** Lock the canonical KM-Core entity shape with first-class temporal validity (`validFrom`, `validUntil`, `supersedes`) and structured provenance (`createdBy`, `lastConfirmedBy`, `confirmationCount`, per-segment provenance) before B and C migrate, so neither has to backfill twice.
@@ -506,7 +505,6 @@ Plans:
 
 - [x] 42.2-06-PLAN.md — SC#1-6 end-to-end verification gate (depends on 42.2-02 + 42.2-03 + 42.2-04 + 42.2-05): production `ukb full` against the post-everything state + Qdrant rebuild via the Plan 03 CLI + run verify-knowledge-graph-store.mjs (renamed from 42-07-end-to-end-verify.mjs in this plan) + OPERATOR GATE for dashboard eyeballing (token-usage process column non-unknown; metadata.team present on new entities; dedup/merge fired). Closes Phase 42 + Phase 42.2 in STATE.md + ROADMAP.md. (completed 2026-05-25)
 
-
 #### Phase 42.1: UKB Project-Anchor Parity
 
 **Goal:** Restore the project-anchor `contains`-edge pass that Phase 42-07 Phase B1 inadvertently removed from B's wave-analysis persist path so newly-emitted wave entities are no longer orphaned from the `Coding` Project anchor. Forensic 2026-05-24 root cause: Phase 42-07 Phase B1 replaced `persistence-agent.persistEntities()` with `persistWithKmCore` in `wave-controller.ts`, dropping the legacy `findBestParent` lookup + post-sweep `contains`-relation insertion that ran after every batch. Online (`ObservationConsolidator._ensureProjectAnchor`) and legacy (`persistence-agent.findBestParent` at L1043-1110) persist paths both still attach new entities to the project root; only the km-core wave path doesn't. Empirical evidence from the 2026-05-24 overnight `ukb full`: +64 entities, +1 relation, **0 new edges to the Coding project anchor**.
@@ -523,6 +521,7 @@ Plans:
   6. The `42-07-end-to-end-verify.mjs` verifier (already in tree from Phase 42-07) reports `0 orphan entities` after a fresh `ukb full`, where "orphan" is defined as an entity with `entityType ∉ {Project, System}` that has no incoming `contains` edge.
 
 **Out of scope for this phase** (deferred to follow-up phases):
+
   - Field-name reconciliation (`metadata.team` vs `metadata.domain` — the Exporter bucketing issue). Tracked separately.
   - LLM proxy attribution fix (`proxy-provider.ts` doesn't forward `agentId` → process column shows `'unknown'`). Touches the `_work/rapid-llm-proxy` repo; deferred to its own phase.
   - Legacy persistence trio retirement (Phase 42-07 deferral).
@@ -532,6 +531,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
+
 - [ ] 42.1-01-PLAN.md — Restore findBestParent + ensureProjectAnchor + post-sweep contains-edge pass in wave-controller.persistWithKmCore; extend SC verifier with SC#6 orphan check; rebuild Docker + validate via production wave-analysis workflow.
 
 ### Phase 42.1.1: Ontology layout resolution — registry empty because loader expects .data/ontologies/{upper,lower}/ subdirs but files live flat at .data/ontologies/. Blocks 42.1 SC#6 + Phase 40 dedup. Forensic: .planning/forensics/report-20260524-130355.md (INSERTED)
@@ -542,6 +542,7 @@ Plans:
 **Plans:** 1/1 plans complete
 
 Plans:
+
 - [x] 42.1.1-01-PLAN.md — Implement ontologyPathResolver helper + unit tests; wire OntologyConfigManager.validatePaths() + injectOntology() through resolver + add integration test against real `.data/ontologies/` flat layout; public re-export + regression sweep. **COMPLETE 2026-05-24** (commits 6bde70ba0 + 6933264ed + ef9a4e9bd + e341152a8 + 00c6ca154; 18/18 node:test cases pass; layer-1 of SC#6 root cause unblocked; NEW known residual — Project class not on disk, layer-2 follow-up tracked separately. See 42.1.1-01-SUMMARY.md.)
 
 ### Phase 42.1.2: Register Project ontology class — surfaced by 42.1.1 Test C; ensureProjectAnchor('Coding') still throws "Unknown ontology class: Project" because Project is not declared in any on-disk JSON. Closes layer-2 of SC#6 root cause. (INSERTED)
@@ -552,6 +553,7 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
+
 - [x] 42.1.2-01-PLAN.md — Insert `Project` class block into `.data/ontologies/upper.json` (anchor-only, `name` required + `repoRoot` optional, `relationships: {}` — locked shape per CONTEXT.md).
 - [x] 42.1.2-02-PLAN.md — Upgrade Test C in `OntologyConfigManager.layout.test.ts` to assert `registry.isValidClass('Project') === true` per team across the existing `TEAMS` literal (closes the Phase 42.1.1 Option-A residual). **COMPLETE 2026-05-25** (commit 3fee3a5f3; 5/5 layout tests pass, 14/14 sibling regression tests pass, grep gate emits "OK: 7 teams logged Project=valid". See 42.1.2-02-SUMMARY.md.)
 - [x] 42.1.2-03-PLAN.md — Add integration smoke `wave-controller-ensure-project-anchor.test.ts` covering cold path (one storeEntity call with `{ name: 'Coding', entityType: 'Project', ontologyClass: 'Project', team: 'coding' }`), warm path (no storeEntity), and idempotency (two calls = one mint). **COMPLETE 2026-05-25** (submodule commit 7f71c8f + outer-repo pointer-bump 1577f1367; 3/3 integration smoke tests pass, 19/19 sibling regression tests pass; production `wave-controller.ts` byte-identical. Phase ready for `/gsd-verify-phase 42.1.2`. See 42.1.2-03-SUMMARY.md.)
@@ -640,6 +642,7 @@ Plans:
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (run /gsd-plan-phase 47 to break down)
 
 ### Phase 48: VKB graph viewer: System-type nodes vanish when their owning team is unchecked
@@ -650,6 +653,7 @@ Plans:
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (run /gsd-plan-phase 48 to break down)
 
 ### Phase 49: VKB graph data: 187 orphan nodes lack project-anchor relations (online + manual)
@@ -660,6 +664,7 @@ Plans:
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (run /gsd-plan-phase 49 to break down)
 
 ### Phase 50: LSL-grounded async observation resolver — backfill ambiguous-reference and image-only rows from verbatim session logs
@@ -670,6 +675,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
+
 - [x] 50-01-PLAN.md — Build `lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs` primitives + `scripts/resolve-observations-from-lsl.mjs` CLI. (completed 2026-05-26; 26 tests; 8 commits; W5 project-filter patch landed during planning)
 - [x] 50-02-PLAN.md — Migrate `ObservationWriter._buildPriorContext` from 30-min observation-DB window to `getLSLWindow` + capture-time `needs_lsl_resolution` stamp (detector B). (completed 2026-05-26; 21 tests; 5 commits; D-47-Boundary 3-layer grep clean)
 - [x] 50-03-PLAN.md — launchd job + idempotent installer + wrapper script for periodic background runs. (Tasks 1+2+4 completed 2026-05-26; 7 tests; 4 commits; Task 3 `/health/state` summary_integrity counter SKIPPED — health-coordinator.js is HTTP aggregator with no SQLite handle, architectural drift; Could #10 deferred. Task 4 = human-verify checkpoint awaiting host-side `bash scripts/install-lsl-resolver-launchd.sh`.)
@@ -679,20 +685,55 @@ Plans:
 **Goal:** Agent-agnostic sub-agent capture across LSL and observations for claude / opencode / copilot / mastra. Path B (sweep) ships first, Path A (live hooks) second per D-Order; D-LSL-Filename convention applied across all four agents; the 2026-05-24 statusline mitigation is replaced with registry-sourced reads; final closure surfaces sub_agent_capture in /health/state.
 **Requirements**: TBD (out-of-milestone bug-fix; no requirement IDs registered)
 **Depends on:** Phase 50
-**Plans:** 11/11 plans complete
+**Plans:** 16 plans (11 base + 5 gap-closure)
 
 Plans:
+**Wave 1**
+
 - [x] 51-01-PLAN.md — Agent-agnostic sub-agent registry + sweep dispatcher (Wave 1; shared infrastructure)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [x] 51-02-PLAN.md — Claude Code Path B sweep adapter + historical backfill of 2026-05-23 transcripts (Wave 2; CONTEXT.md AC #1)
 - [x] 51-03-PLAN.md — OpenCode Path B sweep adapter (SQLite reader; Wave 2)
 - [x] 51-04-PLAN.md — Copilot Path B sweep adapter + parseCopilot v1.0.48 fix (Wave 2)
 - [x] 51-05-PLAN.md — Mastra Path B sweep adapter (forward-compat; sweep-only — Path A NOT VIABLE; Wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [x] 51-06-PLAN.md — D-LSL-Filename writer + LSL parity + 2026-05-23 historical LSL backfill (Wave 3; CONTEXT.md AC #2)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [x] 51-07-PLAN.md — Claude Code Path A live hook (FSEvents watcher + tail-reader; Wave 4)
 - [x] 51-08-PLAN.md — OpenCode Path A live hook (5s SQLite polling; Wave 4)
 - [x] 51-09-PLAN.md — Copilot Path A live hook (file-tail; degraded LSL parity acknowledged; Wave 4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [x] 51-10-PLAN.md — Replace 2026-05-24 statusline mitigation with registry-sourced reads (Wave 5; D-Statusline)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [x] 51-11-PLAN.md — launchd integration (4 plists) + health-coordinator sub_agent_capture block + final 6-AC verification (Wave 6; closure)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 51-12-PLAN.md — Gap-closure CR-04: resolve node binary path at install time so launchd plists work on Apple Silicon (Wave 7)
+- [ ] 51-13-PLAN.md — Gap-closure CR-01 + CR-02: OpenCode --limit plumb-through + heartbeat registry_rows emit (Wave 7)
+- [ ] 51-14-PLAN.md — Gap-closure CR-03: atomic upsert for observations_written increment in claude-fs-watch (Wave 7)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 51-15-PLAN.md — Gap-closure AC #2: production LSL backfill execution + WR-05 --historical flag fix (Wave 8)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 51-16-PLAN.md — Gap-closure AC #3 + HUMAN-UAT re-attempt: kill stale daemons, restart launchd, restart health-coordinator, run small /gsd-execute-phase, verify 6 ACs (Wave 9; checkpoint:human-verify)
+
+**Cross-cutting constraints:**
+
+- Phase 50 primitives unchanged; D-Reuse cumulative gate clean
 
 ### Phase 52: Dashboard LLM routing label + process tag observability fix
 
@@ -702,6 +743,7 @@ Plans:
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (run /gsd-plan-phase 52 to break down)
 
 ---
