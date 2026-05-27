@@ -230,6 +230,32 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
     expect(wrapperBody).toMatch(/\[sub-agent-sweep\]/);
   });
 
+  test('Test 8a: ProgramArguments[0] of every plist resolves to an executable file on the host (closes CR-04 test gap — REVIEW Addendum)', () => {
+    // Per Phase 51 Plan 12: the original plists hardcoded /usr/local/bin/node
+    // in ProgramArguments[0] which does NOT exist on Apple Silicon. Plan 12
+    // fixed this via Strategy A (wrapper pattern) — ProgramArguments[0] is
+    // now /bin/sh (live daemons) or /bin/bash (sweep), both always
+    // executable on macOS. This test gates future regressions: any plist
+    // that hardcodes a missing absolute path (e.g. /usr/local/bin/node on
+    // Apple Silicon) will now fail CI BEFORE the operator runs the installer.
+    //
+    // REVIEW Addendum CR-04 "Why this isn't caught":
+    //   tests/integration/sub-agent-launchd-install.test.js only checks
+    //   plist structure, NEVER asserts ProgramArguments[0] is an executable
+    //   file on the host. This test closes that gap.
+    for (const label of PLISTS) {
+      const plistPath = path.join(LAUNCHD_DIR, `${label}.plist`);
+      const r = spawnSync('/usr/bin/plutil', ['-extract', 'ProgramArguments.0', 'raw', plistPath], { encoding: 'utf8' });
+      expect(r.status).toBe(0);
+      const programArg0 = (r.stdout || '').trim();
+      // Must be an absolute path — launchd does NOT apply EnvironmentVariables.PATH to arg0.
+      expect(programArg0).toMatch(/^\//);
+      // Must exist and be executable on the install host. fs.constants.X_OK
+      // is the POSIX check used by the kernel when execve()-ing the path.
+      expect(() => fs.accessSync(programArg0, fs.constants.X_OK)).not.toThrow();
+    }
+  });
+
   test('Test 8: install script iterates all 4 plist labels + KeepAlive policy differs by job class', () => {
     const installerBody = fs.readFileSync(INSTALLER_PATH, 'utf8');
     // Every label must appear in the installer (the PLISTS=( ... ) array).

@@ -6,7 +6,10 @@
     <string>com.coding.sub-agent-live-opencode</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/node</string>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec node "$@"</string>
+        <string>node</string>
         <string>/Users/Q284340/Agentic/coding/scripts/sub-agent-live-opencode.mjs</string>
         <string>--state-file</string>
         <string>/Users/Q284340/Agentic/coding/.data/sub-agent-live-state-opencode.json</string>
