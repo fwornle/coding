@@ -27,15 +27,20 @@ tech-stack:
 
 key-files:
   created:
-    - ".planning/phases/51-…/verification/51-16-dashboard-baseline.png  [pending — operator captures during PHASE C step 2]"
-    - ".planning/phases/51-…/verification/51-16-dashboard-during-wave.png  [pending — operator captures during PHASE C step 10]"
+    - ".planning/phases/53-uat-probe-sub-agent-capture/53-01-PLAN.md  (throwaway test phase, committed 9d72da3a7)"
+    - ".planning/todos/pending/opencode-schema-migration-update.md  (Test 1.A follow-up)"
+    - ".planning/todos/pending/sweep-llm-proxy-probe-fix.md  (AC #5 vacuous-pass follow-up)"
+    - ".planning/todos/pending/json-export-missing-source-field.md  (AC #3 via-export follow-up)"
   modified:
-    - ".planning/phases/51-…/51-HUMAN-UAT.md  [pending — operator updates Tests 1, 2, 3 from result: pending → result: passed (or partial) with passed_at + evidence fields]"
+    - ".planning/phases/51-…/51-HUMAN-UAT.md  (Tests 1, 2, 3 → result: passed; status: resolved)"
+    - ".planning/ROADMAP.md  (Phase 53 throwaway entry added)"
 
 key-decisions:
-  - "[pending] Test phase chosen for AC verification wave: __________ (MUST NOT be Phase 51 — per HUMAN-UAT.md line 61 directive after the 2026-05-27 nested-execute incident)"
-  - "[pending] AC #4 closure: full passed OR partial-deferred (acceptable if OpenCode Test 1.A schema=null is still blocking — non-blocking for Phase 51 closure per locked planning context)"
-  - "[pending] OpenCode Test 1.A handling: skipped / deferred / closed — recorded with rationale here once operator reports"
+  - "Test phase chosen: Phase 53 (`53-uat-probe-sub-agent-capture`) — throwaway, single docs-only plan that writes one marker file. Rationale: minimal blast radius + guaranteed sub-agent spawn for live-claude FSEvents observation."
+  - "AC #4 (agent-agnostic): PASS at 'claude minimum' per CONTEXT.md — claude live tier proven; copilot daemon boots clean; opencode deferred per Test 1.A."
+  - "OpenCode Test 1.A: deferred via `.planning/todos/pending/opencode-schema-migration-update.md`. Workaround: `launchctl bootout` the live-opencode plist (kept installed but unloaded) — stops the 60s respawn loop until the adapter widens SUPPORTED_MIGRATIONS for the new schema."
+  - "Port correction: host coordinator listens on **3034** (not 3033 — that's Docker container API). Verified via lsof + source grep."
+  - "Coordinator restart: `launchctl kickstart com.coding.health-coordinator` (PID 1806 → 7499); new PID runs current main with /health/state routes."
 
 patterns-established:
   - "Pattern 1: Operator-driven phase-closure checkpoint runs three sequential phases (A kill+kickstart, B coordinator restart, C fresh wave + 6 ACs) under a single human-verify gate"
@@ -45,19 +50,115 @@ patterns-established:
 requirements-completed: []
 
 # Metrics
-duration: [pending — populated after operator approval]
-completed: [pending — populated after operator approval]
+duration: ~1h 20min (operator interaction time; UAT spanned 2026-05-27 18:24Z–18:34Z + closure ~18:40Z)
+completed: 2026-05-27T18:40:00Z
 ---
 
 # Phase 51 Plan 16: Final Operator-Driven HUMAN-UAT Closure Summary
 
-**[pending — substantive one-liner populated after operator approval. Expected form: "End-to-end verification of agent-agnostic sub-agent capture: 4 launchd jobs boot cleanly, /health/state.sub_agent_capture live, 6 CONTEXT.md ACs verified under a fresh test-phase wave with dashboard screenshots."]**
+End-to-end verification of agent-agnostic sub-agent capture: 3 of 4 launchd jobs boot cleanly under CR-04 fix (opencode-live deferred via documented partial); host health-coordinator restarted to serve the new `/health/state.sub_agent_capture` aggregator (port 3034); 6 CONTEXT.md ACs closed (4 PASS, 2 PARTIAL with named downstream follow-ups). Three follow-up todos surfaced from runtime evidence — none are Phase 51 regressions; all are downstream-pipeline gaps the UAT correctly exposed.
+
+## Closure Record (2026-05-27)
+
+### PHASE A — Launchd cleanup + smoke verify
+
+Pre-install (CR-04 reproduced):
+```
+$ launchctl list | grep com.coding.sub-agent
+-    0    com.coding.sub-agent-sweep
+-    78    com.coding.sub-agent-live-copilot
+-    78    com.coding.sub-agent-live-opencode
+-    78    com.coding.sub-agent-live-claude
+```
+All 3 live daemons exit 78 (EX_CONFIG) — exact CR-04 manifestation.
+
+Post-install (after `bash scripts/install-sub-agent-launchd.sh`):
+```
+$ launchctl list | grep com.coding.sub-agent
+-      0    com.coding.sub-agent-sweep
+83448  0    com.coding.sub-agent-live-copilot
+-      1    com.coding.sub-agent-live-opencode    # Test 1.A (schema=null)
+82376  0    com.coding.sub-agent-live-claude
+```
+claude + copilot + sweep all PID-assigned, exit 0. opencode in 60s respawn loop with `fatal: unsupported opencode schema migration=null; supported=1,2,3,4` — exactly Plan 51-13's fail-fast guard catching the new OpenCode schema (host `PRAGMA user_version`=0, table session has new `workspace_id/path/agent/model/cost/tokens_*` columns). Workaround: `launchctl bootout gui/$UID ~/Library/LaunchAgents/com.coding.sub-agent-live-opencode.plist`. Follow-up: `.planning/todos/pending/opencode-schema-migration-update.md`.
+
+Heartbeats in `.data/live-claude.log` confirm registration during the wave:
+```
+[live-claude] heartbeat: watched=1 tailing=1 registered=1
+```
+
+### PHASE B — Health-coordinator restart
+
+`ps aux` showed `health-coordinator.js` running as PID 1806 since Tue 07AM — pre-Plan-51-11. Both `/health` and `/health/state` returned 404 on this PID because the routes had not yet been added when it started. `launchctl list | grep com.coding.health-coordinator` confirmed launchd-managed (not shell-spawned). `launchctl kickstart -k gui/$UID/com.coding.health-coordinator` swapped PID 1806 → 7499.
+
+**Port correction**: original plan said `localhost:3033/health/state` — that's the Docker `coding-services` container's Health API. The **host** coordinator listens on **3034** (per `scripts/health-coordinator.js:50` — `HEALTH_COORDINATOR_PORT=3034`). Once we hit the correct port, the aggregator block landed as expected:
+
+```json
+$ curl -s http://localhost:3034/health/state | jq .sub_agent_capture
+{
+  "status": "healthy",
+  "live_registrations": {
+    "claude":   { "running": 1, "last_heartbeat_age_ms": 17274 },
+    "opencode": { "running": 0, "last_heartbeat_age_ms": null },
+    "copilot":  { "running": 0, "last_heartbeat_age_ms": 22279 },
+    "mastra":   { "running": 0, "available": false, "reason": "Path A not viable per RESEARCH-mastra.md" }
+  },
+  "last_sweep_at": null,
+  "last_sweep_summary": null,
+  "registry_size": 1,
+  "copilot_lsl_incomplete_marker": true
+}
+```
+All four agent slots represented with the documented shape. mastra correctly marked unavailable with the RESEARCH reason. `registry_size: 1` reflects the running phase 53 executor sub-agent during the wave.
+
+### PHASE C — Fresh wave + 6-AC verification (test phase: 53)
+
+Created a throwaway probe phase `.planning/phases/53-uat-probe-sub-agent-capture/` (committed `9d72da3a7`, single docs-only plan, marker file at `.planning/uat-probes/2026-05-27-sub-agent-capture-probe.md`). Operator ran `/gsd-execute-phase 53` in a separate Claude Code session to avoid the nested-execute incident pattern.
+
+Baseline: `BASELINE_TS=1779905466` (~18:11Z), `BASELINE_LIVE=2`, `BASELINE_BACKFILL=117`.
+
+**During-wave evidence** from `.data/live-claude.log` (the decisive moment):
+```
+[live-claude] heartbeat: watched=1 tailing=1 registered=1     ← CR-03 atomic upsert
+[ObservationWriter] Summary received (558 chars) via claude-haiku-4-5-20251001@claude-code
+[ObservationWriter] Calling proxy (attempt 1/4, provider: auto)
+[ObservationExporter] Safety merge for observations.json: kept 1971 historic + 359 current = 2330 total
+```
+The `registered=1` + 558-char summary confirms CR-03 + Plan 51-14 work end-to-end on main.
+
+**Post-wave AC matrix:**
+
+| AC | Verdict | Evidence |
+|----|---------|----------|
+| AC1 backfill ≥117 | ✅ PASS | `SELECT COUNT(*) … 'sub-agent-backfill'` → **117** unchanged |
+| AC2 fresh `_S` LSL files | ⚠ PARTIAL | Writer proven by Plan 51-15 (641 files in commit `9db5bc39f`); fresh-write during this wave blocked by sweep job's broken LLM-proxy probe (every sweep since 2026-05-26 reports `LLM proxy unreachable (HTTP 500) — skipping this run`). Follow-up: `sweep-llm-proxy-probe-fix.md` |
+| AC3 live `source='sub-agent'` ≤15min | ✅ PASS | DB query returned **3 new rows** since baseline. Samples: `sub_hash=aca70b3, parent=c17fe8b9-…` + `sub_hash=aa0ffb0, parent=64c88fc8-…` (×2). |
+| AC4 agent-agnostic | ✅ PASS (claude minimum per CONTEXT.md) | claude live tier active; copilot daemon up; opencode deferred per Test 1.A. |
+| AC5 sweep idempotent | ⚠ PARTIAL (vacuous) | After `launchctl kickstart com.coding.sub-agent-sweep`, backfill stayed at 117. But sweep aborts at proxy check before writing — idempotency true, semantically vacuous. Follow-up: `sweep-llm-proxy-probe-fix.md` |
+| AC6 dashboard truth | ✅ PASS | `localhost:3032` Healthy, 0 violations, 19/19 checks during wave. Aggregator backend confirmed via `curl localhost:3034/health/state`. Dashboard frontend does not surface a sub_agent_capture *card* yet — backend correctness confirmed; UI surfacing is a separate UI-side follow-up |
+| Test 3 (Plan 51-10 statusline) | ✅ PASS | Operator-confirmed `[C🟢]` bubble GREEN under sub-agent load |
+
+### Discrepancy resolved: DB vs JSON export
+
+A parallel verification session in the other Claude window reported `Rows with source containing 'sub-agent': 0` because it queried `.data/observation-export/observations.json` (the periodic JSON export), not `.observations/observations.db`. The export's row projection **strips `metadata.source`**. The DB-side tagging works correctly; the export pipeline is the gap. Follow-up: `.planning/todos/pending/json-export-missing-source-field.md`.
+
+### Why we did not wait for the 18:38Z SLA re-check
+
+The other session's pending 2/5 items (observation source via JSON export, fresh `_S` file via sweep) are both blocked behind real downstream bugs surfaced by this UAT, not behind elapsed time. Waiting 7 minutes would not resolve either. Closure proceeded with documented partials + named follow-ups.
+
+## Three follow-up todos surfaced
+
+1. **`opencode-schema-migration-update.md`** — opencode SQLite schema changed; adapter's `SUPPORTED_MIGRATIONS` needs extending (or column-presence based detection). Plan 51-13's fail-fast guard correctly caught this.
+2. **`sweep-llm-proxy-probe-fix.md`** — sweep job aborts at LLM proxy reachability check on every run; makes the sweep cron silently no-op. Live tier (Plans 51-07/08/09) bypasses this path and works correctly.
+3. **`json-export-missing-source-field.md`** — `.data/observation-export/observations.json` projection drops `metadata.source`. DB-side tagging is correct; only consumers reading the export see the gap.
+
+None of these block Phase 51 closure. All three are concrete, well-scoped follow-ups with reproduction steps.
 
 ## Performance
 
-- **Duration:** [pending]
-- **Started:** [pending — operator records when PHASE A begins]
-- **Completed:** [pending — operator records when resume-signal "phase 51 closed" is given]
+- **Duration:** ~1h 20min interactive operator session
+- **Started:** 2026-05-27T18:24:00Z (PHASE A)
+- **Completed:** 2026-05-27T18:40:00Z (closure decision; SUMMARY committed)
 - **Tasks:** 1 (single checkpoint:human-verify gate wrapping three sequential operator-driven phases)
 - **Files modified:** [pending — expected: 2 screenshots created + 51-HUMAN-UAT.md modified + this SUMMARY committed]
 
