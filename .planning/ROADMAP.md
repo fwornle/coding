@@ -679,7 +679,7 @@ Plans:
 **Goal:** Agent-agnostic sub-agent capture across LSL and observations for claude / opencode / copilot / mastra. Path B (sweep) ships first, Path A (live hooks) second per D-Order; D-LSL-Filename convention applied across all four agents; the 2026-05-24 statusline mitigation is replaced with registry-sourced reads; final closure surfaces sub_agent_capture in /health/state.
 **Requirements**: TBD (out-of-milestone bug-fix; no requirement IDs registered)
 **Depends on:** Phase 50
-**Plans:** 10/11 plans executed
+**Plans:** 11/11 plans complete
 
 Plans:
 - [x] 51-01-PLAN.md — Agent-agnostic sub-agent registry + sweep dispatcher (Wave 1; shared infrastructure)
@@ -692,7 +692,7 @@ Plans:
 - [x] 51-08-PLAN.md — OpenCode Path A live hook (5s SQLite polling; Wave 4)
 - [x] 51-09-PLAN.md — Copilot Path A live hook (file-tail; degraded LSL parity acknowledged; Wave 4)
 - [x] 51-10-PLAN.md — Replace 2026-05-24 statusline mitigation with registry-sourced reads (Wave 5; D-Statusline)
-- [ ] 51-11-PLAN.md — launchd integration (4 plists) + health-coordinator sub_agent_capture block + final 6-AC verification (Wave 6; closure)
+- [x] 51-11-PLAN.md — launchd integration (4 plists) + health-coordinator sub_agent_capture block + final 6-AC verification (Wave 6; closure)
 
 ### Phase 52: Dashboard LLM routing label + process tag observability fix
 
