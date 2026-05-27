@@ -748,6 +748,19 @@ Plans:
 
 ---
 
+### Phase 53: UAT Probe — Sub-Agent Capture (THROWAWAY)
+
+**Goal:** Trigger ONE executor sub-agent via `/gsd-execute-phase 53` to exercise the live-claude FSEvents watcher and close Phase 51 AC #3. Throwaway phase — entire directory + marker file may be removed after Phase 51 closes.
+**Requirements:** none (operational verification only)
+**Depends on:** Phase 51 plans 51-12, 51-13, 51-14 (CR fixes) on main
+**Plans:** 1 plan
+
+Plans:
+
+- [ ] 53-01-PLAN.md — Write throwaway marker file `.planning/uat-probes/2026-05-27-sub-agent-capture-probe.md`; sole purpose is to spawn one executor sub-agent for live-claude observation evidence.
+
+---
+
 ## Backlog
 
 ### Phase 999.1: Extract Shared LLM Adapter Library (BACKLOG)
