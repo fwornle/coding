@@ -2770,30 +2770,61 @@ ORDER BY m.time_created ASC;`;
 
   /**
    * Get the active (current) session file path, splitting into a new part file
-   * if the current one exceeds the configured max size.
-   * Returns the path to the file that should be appended to.
+   * if the current one — or the current one PLUS the intended write — would
+   * exceed the configured max size.
+   *
+   * Rotation fix 2026-05-27: the original picker only consulted current file
+   * size, so a single fat slice append could grow a file from 50KB → 800KB
+   * in one shot (4× the 200KB limit). The next slice would correctly pick
+   * `-1`, but the bloated base file stayed bloated forever, and the
+   * partNumber>99 safety branch appended without bound to `-99` (observed:
+   * 9.8MB `..._1600-1700-99_c197ef.md`).
+   *
+   * The fix takes the intended write size into account: a part qualifies
+   * only if `currentSize + intendedWriteSize` stays under the limit. Callers
+   * that know the upcoming `appendFileSync` payload should pass its length
+   * via `intendedWriteSize` so the picker advances to the next part **before**
+   * the overflow happens, not after. If `intendedWriteSize > maxSizeBytes`
+   * by itself (single mega-slice), the picker still returns a fresh empty
+   * part — we accept that one part will exceed the limit rather than split
+   * markdown content mid-anchor, but at least we don't bloat an existing
+   * partially-full part.
+   *
+   * @param {string} targetProject
+   * @param {object} tranche
+   * @param {number} [intendedWriteSize=0]  bytes the caller is about to append
+   * @returns {string} absolute path to the file the caller should write to
    */
-  getActiveSessionFilePath(targetProject, tranche) {
+  getActiveSessionFilePath(targetProject, tranche, intendedWriteSize = 0) {
     const baseFile = this.getSessionFilePath(targetProject, tranche);
-    
+
     // Read max file size from config (default 200KB)
     const maxSizeKB = this.config?.liveLogging?.max_lsl_file_size_kb
       || this.liveLoggingConfig?.max_lsl_file_size_kb
       || 200;
     const maxSizeBytes = maxSizeKB * 1024;
 
-    // If base file doesn't exist or is under the limit, use it
-    if (!fs.existsSync(baseFile)) return baseFile;
-    const baseStats = fs.statSync(baseFile);
-    if (baseStats.size < maxSizeBytes) return baseFile;
+    // Helper: does this part have room for `intendedWriteSize` more bytes?
+    // An empty / non-existent file always qualifies (we have to write somewhere
+    // even if intendedWriteSize alone exceeds the limit — splitting markdown
+    // content mid-anchor would corrupt prompt-set discovery via `grep -l`).
+    const partHasRoom = (filePath) => {
+      if (!fs.existsSync(filePath)) return true;
+      const size = fs.statSync(filePath).size;
+      if (size === 0) return true;
+      return (size + intendedWriteSize) < maxSizeBytes;
+    };
 
-    // Base file is too large — find the highest existing part number
+    // If base file qualifies, use it.
+    if (partHasRoom(baseFile)) return baseFile;
+
+    // Base file is too large — find the next part with room.
     const dir = path.dirname(baseFile);
     const baseName = path.basename(baseFile, '.md'); // e.g. 2026-04-17_1100-1200_c197ef
     // baseName may contain _from-<project> suffix; the part number sits between
     // the time window and the user hash: YYYY-MM-DD_HHMM-HHMM-N_hash[_from-proj]
     // We need to list existing part files and find the max N.
-    
+
     const currentProjectName = path.basename(this.config.projectPath);
     const resolvedTarget = path.resolve(targetProject);
     const resolvedProject = path.resolve(this.config.projectPath);
@@ -2801,7 +2832,10 @@ ORDER BY m.time_created ASC;`;
     const timestamp = tranche.originalTimestamp ||
       new Date(`${tranche.date}T${tranche.timeString.split('-')[0].slice(0,2)}:${tranche.timeString.split('-')[0].slice(2)}:00.000Z`).getTime();
 
-    // Try increasing part numbers until we find one that doesn't exist or is under limit
+    // Try increasing part numbers until we find one that has room (or one
+    // that doesn't exist — first-write wins regardless of intendedWriteSize
+    // so a single oversized slice still lands somewhere, just not on top of
+    // an already-partial part).
     let partNumber = 1;
     while (true) {
       const partFilename = generateLSLFilename(
@@ -2810,23 +2844,27 @@ ORDER BY m.time_created ASC;`;
         { partNumber }
       );
       const partFile = path.join(dir, partFilename);
-      
+
       if (!fs.existsSync(partFile)) {
-        this.debug(`📂 Splitting LSL file: starting part ${partNumber} (${path.basename(baseFile)} exceeded ${maxSizeKB}KB)`);
+        this.debug(`📂 Splitting LSL file: starting part ${partNumber} (${path.basename(baseFile)} would exceed ${maxSizeKB}KB${intendedWriteSize ? ` after +${Math.round(intendedWriteSize/1024)}KB` : ''})`);
         return partFile;
       }
-      
-      const partStats = fs.statSync(partFile);
-      if (partStats.size < maxSizeBytes) {
-        return partFile; // This part still has room
+
+      if (partHasRoom(partFile)) {
+        return partFile; // This part still has room for intendedWriteSize.
       }
-      
+
       partNumber++;
-      
-      // Safety: don't create more than 99 parts per hour window
+
+      // Safety: don't create more than 99 parts per hour window. Pre-fix
+      // behavior was to append forever to `-99`, which created the 9.8MB
+      // observed bloat. Now we create a fresh empty part for partNumber=100,
+      // 101, ... to preserve the size-bound invariant even past the soft cap.
+      // (Mathematically there could be 100, 101, ..., but in practice an
+      // hour rarely exceeds 20 parts — the historical max we've seen is
+      // 53 parts in 2026-05-01_1100-1200_*.)
       if (partNumber > 99) {
-        this.debug(`⚠️ LSL split limit reached (99 parts), appending to last part`);
-        return partFile;
+        this.debug(`⚠️ LSL split exceeded 99 parts in one hour window — continuing with part ${partNumber} to preserve size bound`);
       }
     }
   }
@@ -3213,10 +3251,12 @@ ORDER BY m.time_created ASC;`;
       // Phase 2: write one slice per tranche
       for (let sliceIdx = 0; sliceIdx < totalSlices; sliceIdx++) {
         const { tranche: sliceTranche, exchanges: sliceExchanges } = sortedSlices[sliceIdx];
-        const sessionFile = this.getActiveSessionFilePath(targetProject, sliceTranche);
 
         // Build the slice block. Use the SAME ps_id anchor across slices so they're
         // discoverable as parts of the same prompt set (grep -l).
+        // NOTE: sessionFile is picked AFTER sessionContent is built so the
+        // picker can advance to the next part if appending this slice would
+        // push the current file over the size limit (rotation fix 2026-05-27).
         let sessionContent = '';
         sessionContent += `<a name="${promptSetId}"></a>\n`;
         if (totalSlices > 1) {
@@ -3247,6 +3287,13 @@ ORDER BY m.time_created ASC;`;
 
         sessionContent += `---\n\n`;
 
+        // Pick the part-file now that we know the full slice payload size.
+        // This is the rotation-fix point: the picker advances to the next
+        // part if (currentFileSize + sessionContent.length) > maxSizeBytes
+        // — preventing single-slice bloats like the 9.8MB -99 file observed
+        // before the fix.
+        const sessionFile = this.getActiveSessionFilePath(targetProject, sliceTranche, sessionContent.length);
+
         if (!fs.existsSync(sessionFile)) {
           await this.createSessionFileWithContent(targetProject, sliceTranche, sessionContent, sessionFile);
         } else {
@@ -3257,7 +3304,7 @@ ORDER BY m.time_created ASC;`;
           } else {
             try {
               fs.appendFileSync(sessionFile, sessionContent);
-              this.debug(`📝 Appended slice ${sliceIdx + 1}/${totalSlices} (${sliceExchanges.length} exch) to ${path.basename(sessionFile)}`);
+              this.debug(`📝 Appended slice ${sliceIdx + 1}/${totalSlices} (${sliceExchanges.length} exch, ${Math.round(sessionContent.length/1024)}KB) to ${path.basename(sessionFile)}`);
             } catch (error) {
               this.logHealthError(`Failed to append to session file: ${error.message}`);
             }
