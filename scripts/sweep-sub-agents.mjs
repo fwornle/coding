@@ -134,7 +134,13 @@ async function main(argv) {
 
     let discovered = [];
     try {
-      discovered = await adapter.discover({ searchPaths, project, since });
+      // Phase 51 Plan 51-13 (CR-01): forward `limit` to the adapter so it
+      // can bind the SQL LIMIT at query time. Without this, the OpenCode
+      // adapter silently caps at 100 (the dispatcher's post-process
+      // .slice(0, limit) below only narrows a result the DB already
+      // truncated). Other adapters that destructure their own fields
+      // ignore the extra parameter per JS object-destructure semantics.
+      discovered = await adapter.discover({ searchPaths, project, since, limit });
       if (!Array.isArray(discovered)) discovered = [];
     } catch (err) {
       process.stderr.write(`[sweep] agent=${agentId} ERROR discover: ${err.message}\n`);
