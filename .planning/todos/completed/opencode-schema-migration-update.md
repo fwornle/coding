@@ -1,11 +1,37 @@
 ---
 id: opencode-schema-migration-update
 created: 2026-05-27
-status: pending
+status: completed
+completed: 2026-05-27T22:00:00Z
 priority: medium
 tags: [opencode, sub-agent-live, schema-drift]
 discovered_in: phase-51, plan-51-16 HUMAN-UAT
+resolved_by: commit c52930a6b — "fix(opencode-adapter): switch schema-version guard from MAX(id) to column-presence contract"
 ---
+
+## Resolution (2026-05-27)
+
+Root cause confirmed: OpenCode upgraded the host schema such that the
+`__drizzle_migrations.id` column (SERIAL) is no longer populated — every
+row has empty `id`; `hash` is the new primary key. The adapter's
+`MAX(id) AS m FROM __drizzle_migrations` returned NULL, failing the
+SUPPORTED_MIGRATIONS=[1,2,3,4] allowlist on every host with the upgrade.
+
+Fix landed in commit `c52930a6b`: replaced the migration-id allowlist
+with a column-presence contract check on the tables the adapter actually
+reads (session/message/part). Robust to all future __drizzle_migrations
+schema drift; fails only when the real read contract is broken.
+SUPPORTED_MIGRATIONS kept exported as a historical breadcrumb.
+
+Tests rewritten/added across 2 suites (27/27 pass). End-to-end verified
+on host: `checkSchemaVersion` passes against
+`~/.local/share/opencode/opencode.db`; live-opencode daemon (PID 15561)
+boots clean, writes observations ("Summary received (843 chars) via
+claude-haiku-4-5"). Sub-agent observation count moved 5 → 11.
+
+Phase 51 AC #4 (agent-agnostic) now satisfied for claude + opencode +
+copilot — previously opencode was permanently deferred per Test 1.A on
+this host.
 
 # Update opencode-sqlite adapter for new schema migration
 
