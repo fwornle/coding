@@ -238,6 +238,25 @@ async function main() {
       registered: stats.registered,
       last_poll_at: stats.last_poll_at,
       errors: stats.errors,
+      // Phase 51 Plan 51-13 (CR-02): mirror Plan 51-07/51-09 daemons by
+      // emitting registry_rows so lib/lsl/registry-reader.mjs:145 can
+      // enumerate live OpenCode sub-agents. Without this, the registry
+      // reader's `Array.isArray(hb.registry_rows)` guard returns [] for
+      // OpenCode and `live_registrations.opencode.running` on /health/state
+      // is permanently 0 regardless of real activity.
+      //
+      // ASYMMETRY (REVIEW.md line 132): Plans 51-07/51-09 OMIT `project`
+      // from their row objects → registry-reader's project filter is
+      // "permissive" (missing project = match). We INCLUDE `project` for
+      // OpenCode so the filter is strict-correct rather than defensively-lax.
+      // Cleanup of claude/copilot daemons to also stamp `project` is
+      // deferred — out of scope for this gap-closure plan.
+      registry_rows: registry.listByAgent('opencode').map((r) => ({
+        sub_hash: r.sub_hash,
+        parent_session_id: r.parent_session_id,
+        status: r.status,
+        project: r.project,
+      })),
       ...extra,
     };
     try {
