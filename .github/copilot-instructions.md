@@ -17,7 +17,7 @@ Paths shown as `~` refer to the user's home directory.
 - **TypeScript**: Mandatory with strict type checking
 - **API design**: Never modify working APIs for TypeScript compliance; fix types instead
 - **km-core scripts**: Any CLI or service that imports `resolveEntities` from `@fwornle/km-core` MUST construct `GraphKMStore` with an `ontologyDir` option — otherwise default-class resolution throws `opts.classes omitted but store has no ontology registry`. Resolve via `import.meta.resolve('@fwornle/km-core')` + walk up to package root. Integration tests pass this explicitly, so absent CLI greps will mask the gap (Phase 41 lesson, commits `87bc2f567` / `fd35c5350`). When authoring a new CLI plan, include an acceptance grep for `ontologyDir` in the script.
-- **km-core LLM proxy endpoint**: The local rapid-llm-proxy serves `POST /api/complete` (NOT OpenAI `/v1/chat/completions`). Request body: `{ process, messages, taskType? }`; response: `{ content, provider, model, tokens, latencyMs }` — not OpenAI-wrapped. See `scripts/backfill-raw-observations.mjs:95` for the canonical client. Passing `taskType` routes dedup calls to claude-haiku (cheaper).
+- **km-core LLM proxy endpoint**: The local rapid-llm-proxy serves `POST /api/complete` (NOT OpenAI `/v1/chat/completions`) on **port 12435** (host) / **`host.docker.internal:12435`** from inside the coding-services container. The container has `LLM_CLI_PROXY_URL=http://host.docker.internal:12435` pre-set in `docker/docker-compose.yml`. **DO NOT confuse with port 3033** — that's the *Health API*, not the LLM proxy (the Health API will silently return `Cannot POST /api/complete` HTML, masking the wrong-port bug — Phase 42.2 Plan 06 follow-up lesson; submodule commit `7df8773`). Request body: `{ process, messages, taskType? }`; response: `{ content, provider, model, tokens, latencyMs }` — not OpenAI-wrapped. URL resolution precedence (matches `@rapid/llm-proxy` SDK convention): `RAPID_LLM_PROXY_URL` → `LLM_CLI_PROXY_URL` → `LLM_PROXY_URL` → `http://localhost:${LLM_CLI_PROXY_PORT ?? '12435'}`; append `/api/complete` exactly once. See `scripts/backfill-raw-observations.mjs:40,95` for the canonical host-side client and `integrations/mcp-server-semantic-analysis/src/agents/llm-with-process.ts` for the container-side wrapper. Passing `taskType` routes dedup calls to claude-haiku (cheaper).
 
 ## Startup & Services
 
@@ -25,6 +25,7 @@ Paths shown as `~` refer to the user's home directory.
 - **Dashboard**: http://localhost:3032 | **Health API**: http://localhost:3033
 - **Semantic Analysis SSE**: http://localhost:3848 (workflow execution)
 - **VKB**: `vkb` command opens http://localhost:8080
+- **rapid-llm-proxy routing** (REQUIRED on first start / after `.data/` wipe): run `scripts/configure-wave-analysis-routing.sh` to install `processOverrides` that route `wave-analysis-*` LLM calls through `copilot` (fast HTTP+OAuth) instead of the default `claude-code` (slow CLI subprocess). Without this, wave-analysis is ~30x slower AND silently degrades to mock-mode on truncated CLI responses (Phase 42.2 Plan 06 follow-up lesson). `--show` lists current state; `--reset` removes only the wave-analysis-* entries (preserves health-coordinator / observation-writer overrides which intentionally use claude-code).
 
 ## UKB Workflow Control
 

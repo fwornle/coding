@@ -15772,56 +15772,6 @@
     "project": "coding"
   },
   {
-    "id": "1daf4ef4-f196-42d2-84ef-512aaf6f99de",
-    "date": "2026-05-15",
-    "theme": "Fix Statusline Freshness: OpenCode Specstory Transcript Support",
-    "summary": "Diagnosed and fixed a bug where the tmux status bar displayed 💤 instead of 🟢 for an actively running OpenCode session in the \"coding\" project.\n\n- **Root cause:** `transcriptAgeMs()` in `combined-status-line.js` only scanned Claude `.jsonl` files, completely ignoring OpenCode's `.specstory/history/` files, causing it to read a stale 24h+ Claude transcript instead of the fresh OpenCode one.\n- **Fix:** Extended both `transcriptAgeMs()` and the sidecar writer in `combined-status-line.js` to scan `.specstory/history/` in addition to Claude `.jsonl` files, accumulating the freshest age across **all** sources before returning (no early exit on Claude-only hits).\n- Result: The sidecar now correctly selects the most recently modified transcript regardless of agent format; the statusline icon flipped to 🟢 on the next refresh cycle.",
-    "observationIds": [
-      "ab05766a-7f1b-4894-b134-7c5d8f1ee33b"
-    ],
-    "agents": [
-      "opencode"
-    ],
-    "filesTouched": [
-      "combined-status-line.js (transcriptAgeMs function and sidecar writer to include .specstory/history/ scanning)"
-    ],
-    "quality": "normal",
-    "createdAt": "2026-05-19T10:04:20.151Z",
-    "metadata": {
-      "sourceCount": 1
-    },
-    "project": "coding"
-  },
-  {
-    "id": "68700dc0-5f15-4027-99cd-e5de009b1cd3",
-    "date": "2026-05-15",
-    "theme": "LLM Proxy Token Usage Logging and Dashboard Implementation",
-    "summary": "Across three closely related observation captures (all at 04:49), added end-to-end token usage telemetry to the LLM proxy and built a new health monitor dashboard tab to visualize consumption.\n\n**Backend instrumentation (`integrations/llm-proxy/server.ts` / `integrations/llm-cli-proxy/src/server.ts`):**\n- Added `initTokenDb` and `logTokenUsage` functions backed by `better-sqlite3` (already a dependency) to persist every LLM call with: model, provider, subscription type, logical `process` label, and input/output token counts.\n- Exposed new REST endpoints: `/api/token-usage/summary`, `/api/token-usage/recent`, `/api/tokens/timeline`, `/api/tokens/summary` for frontend aggregation.\n- Added `process` and `subscription` fields to the `CompletionRequest` type.\n- Updated multiple LLM caller files throughout the codebase to pass a `process` identifier on each request.\n\n**Frontend (`dashboard/src/pages/token-usage.tsx`, `dashboard/src/App.tsx`):**\n- Created a new \"Token Usage\" tab in the health monitor dashboard using Recharts (already installed).\n- Wired into the existing router and nav bar via edits to `dashboard/src/App.tsx`.\n- Visualizes totals, breakdowns by process/model/provider, and a recent-calls table.\n\n**Result:** 15 live calls were captured and confirmed in SQLite during implementation. Earlier attempts saw the dashboard page write fail; the final state (observation [4]) has the full page successfully scaffolded and the proxy instrumentation fully functional.",
-    "observationIds": [
-      "b08ebb28-5189-4102-92a8-d604e7cfd6eb",
-      "da5a0b47-0a8c-4f65-bfdd-4239aa16767c",
-      "6db7b48b-297d-42d0-82e3-dc4674872594"
-    ],
-    "agents": [
-      "opencode"
-    ],
-    "filesTouched": [
-      "integrations/llm-cli-proxy/src/server.ts (SQLite init",
-      "integrations/llm-proxy/server.ts (added logTokenUsage",
-      "dashboard/src/pages/token-usage.tsx",
-      "dashboard router and nav to register new route",
-      "integrations/llm-proxy/server.ts",
-      "dashboard/src/App.tsx (router + nav)",
-      "multiple LLM caller files to pass process identifiers"
-    ],
-    "quality": "normal",
-    "createdAt": "2026-05-19T10:04:20.151Z",
-    "metadata": {
-      "sourceCount": 3
-    },
-    "project": "coding"
-  },
-  {
     "id": "f88f69e4-4d92-4c1d-afe7-3dacd7caf0e1",
     "date": "2026-05-16",
     "theme": "LLM Health Probe Prompt Optimized to Minimize Token Usage",
@@ -16853,6 +16803,56 @@
     "createdAt": "2026-05-18T15:00:29.335Z",
     "metadata": {
       "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1daf4ef4-f196-42d2-84ef-512aaf6f99de",
+    "date": "2026-05-15",
+    "theme": "Fix Statusline Freshness: OpenCode Specstory Transcript Support",
+    "summary": "Diagnosed and fixed a bug where the tmux status bar displayed 💤 instead of 🟢 for an actively running OpenCode session in the \"coding\" project.\n\n- **Root cause:** `transcriptAgeMs()` in `combined-status-line.js` only scanned Claude `.jsonl` files, completely ignoring OpenCode's `.specstory/history/` files, causing it to read a stale 24h+ Claude transcript instead of the fresh OpenCode one.\n- **Fix:** Extended both `transcriptAgeMs()` and the sidecar writer in `combined-status-line.js` to scan `.specstory/history/` in addition to Claude `.jsonl` files, accumulating the freshest age across **all** sources before returning (no early exit on Claude-only hits).\n- Result: The sidecar now correctly selects the most recently modified transcript regardless of agent format; the statusline icon flipped to 🟢 on the next refresh cycle.",
+    "observationIds": [
+      "ab05766a-7f1b-4894-b134-7c5d8f1ee33b"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "combined-status-line.js (transcriptAgeMs function and sidecar writer to include .specstory/history/ scanning)"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-19T10:04:20.151Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "68700dc0-5f15-4027-99cd-e5de009b1cd3",
+    "date": "2026-05-15",
+    "theme": "LLM Proxy Token Usage Logging and Dashboard Implementation",
+    "summary": "Across three closely related observation captures (all at 04:49), added end-to-end token usage telemetry to the LLM proxy and built a new health monitor dashboard tab to visualize consumption.\n\n**Backend instrumentation (`integrations/llm-proxy/server.ts` / `integrations/llm-cli-proxy/src/server.ts`):**\n- Added `initTokenDb` and `logTokenUsage` functions backed by `better-sqlite3` (already a dependency) to persist every LLM call with: model, provider, subscription type, logical `process` label, and input/output token counts.\n- Exposed new REST endpoints: `/api/token-usage/summary`, `/api/token-usage/recent`, `/api/tokens/timeline`, `/api/tokens/summary` for frontend aggregation.\n- Added `process` and `subscription` fields to the `CompletionRequest` type.\n- Updated multiple LLM caller files throughout the codebase to pass a `process` identifier on each request.\n\n**Frontend (`dashboard/src/pages/token-usage.tsx`, `dashboard/src/App.tsx`):**\n- Created a new \"Token Usage\" tab in the health monitor dashboard using Recharts (already installed).\n- Wired into the existing router and nav bar via edits to `dashboard/src/App.tsx`.\n- Visualizes totals, breakdowns by process/model/provider, and a recent-calls table.\n\n**Result:** 15 live calls were captured and confirmed in SQLite during implementation. Earlier attempts saw the dashboard page write fail; the final state (observation [4]) has the full page successfully scaffolded and the proxy instrumentation fully functional.",
+    "observationIds": [
+      "b08ebb28-5189-4102-92a8-d604e7cfd6eb",
+      "da5a0b47-0a8c-4f65-bfdd-4239aa16767c",
+      "6db7b48b-297d-42d0-82e3-dc4674872594"
+    ],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "integrations/llm-cli-proxy/src/server.ts (SQLite init",
+      "integrations/llm-proxy/server.ts (added logTokenUsage",
+      "dashboard/src/pages/token-usage.tsx",
+      "dashboard router and nav to register new route",
+      "integrations/llm-proxy/server.ts",
+      "dashboard/src/App.tsx (router + nav)",
+      "multiple LLM caller files to pass process identifiers"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-19T10:04:20.151Z",
+    "metadata": {
+      "sourceCount": 3
     },
     "project": "coding"
   },
@@ -19171,5 +19171,1180 @@
       "sourceCount": 3
     },
     "project": "km-core"
+  },
+  {
+    "id": "f0101102-e3f5-4401-81a9-22adad743d51",
+    "date": "2026-05-23",
+    "theme": "Resume Session After Quota Hit, Plan Phase C",
+    "summary": "After hitting Claude's usage limit, the session was resumed to assess progress and plan continuation.\n\n- **Agent:** claude\n- Checked current git state to determine what work landed before the quota interruption\n- Confirmed three commits were successfully recorded prior to the pause:\n  - Surprise #5 ESM fix\n  - SC#4 belt-and-braces\n  - Submodule pointer bump\n- **Pending work identified:**\n  - Phase C pipeline: preflight → ukb full → `syncQdrantFromStore` → SC#1–5 verifier\n  - Final human-verify gate\n- No artifacts were modified in this observation; work was purely diagnostic/planning\n- A fresh continuation agent was dispatched to carry forward the remaining Phase C tasks",
+    "observationIds": [
+      "18f7f343-9af3-4de7-b8f9-3a8ce69146e1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-24T19:58:39.507Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "670983a7-d2f2-4e17-90a3-3263255a0c67",
+    "date": "2026-05-24",
+    "theme": "Fix Stale Transcript Age Logic in Status Line Scripts",
+    "summary": "Investigation of a ⚫ (stale/black) coding bubble status confirmed it was correct: the pinned transcript had not been written for ~8h48m, placing it in the 6h–24h black band, and the 45-minute heartbeat-promotion gate intentionally blocked status promotion without recent transcript writes. The hypothesis was raised that the user may be active in a different session than the pinned one.\n\nAs a fix, a shared helper was introduced to consolidate transcript-age and sub-agent mtime lookup logic that had been scattered across multiple call sites:\n- `combined-status-line.js` — three call sites unified under the shared helper, including the fast-path\n- `status-line-fast.cjs` — updated to use `fs.statSync` with the same sub-agent mtime logic\n\nBoth scripts now correctly account for sub-agent mtime when computing transcript age, eliminating duplicated logic.",
+    "observationIds": [
+      "f94aea7d-6e42-4bdc-877c-9f94bec6323b",
+      "60662ce2-4ffd-44e1-b43f-73bf8c23d811",
+      "a9acdf46-2b1a-4c4e-a276-d4b4d6f3077a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/status-line-fast.cjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "71281eb4-73d1-4f2a-a46e-b2fab745910a",
+    "date": "2026-05-24",
+    "theme": "Knowledge Graph Orphaned Entities Diagnosed, UKB Work Deferred",
+    "summary": "Orphaned entities visible in the knowledge graph viewer were traced to a four-site bug in the UKB batch pipeline:\n- Missing `team` param in `canonical-mapper.ts`\n- Discarded `team` field in `km-core-adapter.ts`\n- Absent `_ensureProjectAnchor` step in the UKB batch path\n- A missing anchor-edge step causing double-orphaning\n\nAs immediate repo hygiene, `.gitignore` was updated to cover `.data/knowledge-graph-migrated/` LevelDB files (SST tables, WAL, CURRENT, LOCK, LOG, MANIFEST) that had been untracked since Phase 42-07. Further investigation into `wave-analysis.yaml` and `ukb-workflow-modal.tsx` was performed to understand edge schemas and viewer ID-to-label mappings, but no surgical fixes were finalized. All UKB-edge and LLM-routing work was subsequently deferred pending completion of Phase 42.1, with the history-view edge bug and LLM routing switch queued for post-42.1 resumption.",
+    "observationIds": [
+      "e4426a43-90b9-4d99-9ff2-f9b8e6db3d2f",
+      "3d9131f1-ad18-4b45-bf40-fd3fb5c457c4",
+      "3054107d-2c58-4bd0-a295-ef656cb1af90"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "d233a3ac-c13c-4235-8701-524912f7622f",
+    "date": "2026-05-24",
+    "theme": "Token-Usage Dashboard \"Last 1h\" Option and Stale Bundle Fix",
+    "summary": "A **\"Last 1h\"** option was prepended to the `hoursWindow` selector in `token-usage.tsx`, requiring only a frontend change since the backend proxy passes the `hours=` value directly. No backend changes were needed.\n\nAfter the commit landed, the new option was not visible in the browser. Investigation revealed:\n- The dashboard SPA is served as static files from a `dist/` folder mounted into Docker\n- `dist/index.html` was **5 days stale** (last built May 19), meaning committed changes never reached the running bundle\n- Fix: run `npm run build` in `integrations/system-health-dashboard` on the host, which updates the live-mounted `dist/` volume instantly — no Docker rebuild required\n\nThis also retroactively deployed an earlier modal flex-wrap fix that had similarly been stuck behind the stale bundle.",
+    "observationIds": [
+      "e7780b1a-fd26-4b11-933d-e99e27818359",
+      "3c66099f-1a73-423d-9fde-d3c6a84147e0",
+      "e92c8fca-2b78-4321-a754-05cc1e5793ce",
+      "36b77d61-0438-4ff9-a62b-bafa630e4c58"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "84a36193-28b3-4f21-8d14-937e0a647218",
+    "date": "2026-05-24",
+    "theme": "Token-Usage Chart Series Color Collision Diagnosed and Fixed",
+    "summary": "After the rebuilt bundle went live, a color collision was identified in the token-usage chart: `observation-writer` was hardcoded to `#3b82f6` (blue) in `PROCESS_COLORS`, which coincided with `EVOLUTION_PALETTE[0]` — the fallback color assigned to the `unknown` series, causing them to render identically.\n\n- **Immediate fix**: `unknown` was explicitly added to `PROCESS_COLORS` with a distinct color, eliminating the blue collision and stabilizing its color across all time windows — applied to `token-usage.tsx`\n- **Follow-on strategy identified (not yet implemented)**: derive non-canonical series colors by hashing the key name rather than using render-order index, and skip any palette entries already reserved in the canonical color map — ensuring stable, collision-free color assignment regardless of which series are visible",
+    "observationIds": [
+      "df570b01-86d9-4b83-a44f-8ae983cf2435",
+      "440cfaeb-502a-4fb7-8851-040d25891d2a",
+      "b27b0181-b365-46f3-b804-f2ba95d7fb9e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "eaae4dc2-b282-4ce7-b66b-ba27ac932a0d",
+    "date": "2026-05-24",
+    "theme": "Token-Usage Chart Enhancements Planned, Cleanup Initiated",
+    "summary": "A later session (11:20–12:47) focused on planning and scoping multiple improvements to `token-usage.tsx`, with work remaining in investigation/planning phase across all exchanges:\n\n- **Chart enhancements planned** (no existing recharts packages needed):\n  - Legend-driven series visibility toggle (click to hide/show)\n  - Stacked vs. overlapping chart mode toggle\n  - `Brush` component for sub-range time selection\n- **Tab cleanup**: the \"By Process\" tab on the Evolution page was identified as redundant and queued for removal; grep-based file search was in progress to locate the tab trigger and content block\n- **Top Consumers table**: calls, latency, and share columns were scoped for addition; the existing table structure in `token-usage.tsx` was inspected but not yet modified\n\nNo files were committed in this session; all changes were in pre-implementation investigation. `NOTES.md` was also read as part of the scoping work.",
+    "observationIds": [
+      "f0820980-c2a7-4733-89c4-b04e4676f65f",
+      "0d3c8232-4c16-42ab-95f2-189b04b14622",
+      "284d87b7-4f09-4e5b-af40-fee5aa35b384",
+      "a766ecb8-b7d6-47a6-8b76-ab0d69a5b3b1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/52-dashboard-llm-routing-label-process-tag-observability-fix/NOTES.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "8228ea81-6e32-42a0-9587-12d9f77f6327",
+    "date": "2026-05-24",
+    "theme": "Overnight UKB Run Forensics: Unknown Process and Orphaned Nodes",
+    "summary": "Two anomalies were surfaced after an overnight UKB run and investigated via a GSD forensics workflow in read-only mode across git history, source files, and runtime data.\n\n**Root causes identified:**\n- `canonical-mapper.ts` emitting entity shapes without team/project fields, and `km-core-adapter.ts` silently discarding the team parameter downstream\n- The UKB batch path lacking an `_ensureProjectAnchor` equivalent present in the standard path — producing **64 double-orphaned entities** with zero project linkage edges\n- `LLMService` instantiated without a process identifier, causing `process='unknown'` in `token-usage.db` rows\n\nKey files inspected: `canonical-mapper.ts`, `token-usage-logger.ts`, `km-core-adapter.ts`, exported entity JSON, and `token-usage.db` schema. A parallel session independently confirmed the same canonical-mapper chain of omissions. No source files were modified; findings were written to `.planning/forensics/report-20260524-073300.md`.",
+    "observationIds": [
+      "784fb21f-21d7-45bc-b96d-ecf84be23d2c",
+      "0c278b0d-ed12-4834-aa9a-8ffad6cb613b",
+      "e7a11da9-b5fa-4bff-b750-b2c327c3c544",
+      "5f2f9a58-ea8e-42bf-b7e4-43208bc7c379"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42-offline-ukb-migration-b/42-07-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/forensics/report-20260524-073300.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "20cda9cc-4027-48f1-bd9e-a711da194d4e",
+    "date": "2026-05-24",
+    "theme": "Phase 42.1 UKB Project-Anchor Parity Scoped and Bootstrapped",
+    "summary": "Running `gsd-plan-phase` for phase 42.1 initially stalled at a validation gate because the phase did not yet exist in `ROADMAP.md`. After scoping questions were answered, the phase was registered as **ukb-project-anchor-parity** with a minimal Block 0 entry.\n\n- Inserted phase 42.1 into `.planning/ROADMAP.md`\n- Created phase directory `.planning/phases/42.1-ukb-project-anchor-parity/`\n- Wrote `42.1-CONTEXT.md` synthesizing forensic findings and prior plan summaries to bootstrap the planner\n\nResearch was not yet required as the forensic report already provided a full evidence base.",
+    "observationIds": [
+      "3807b4f9-469c-4c39-88fb-c79a36258e15",
+      "3dde8ba9-6e29-4242-82cd-8283daa04642"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42.1-ukb-project-anchor-parity/42.1-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e56578bd-2512-493b-9cd9-ea2dcb4b469a",
+    "date": "2026-05-24",
+    "theme": "Phase 42.1 Execution Triggered via gsd-execute-phase",
+    "summary": "The `gsd-execute-phase` skill was invoked for phase 42.1 (ukb-project-anchor-parity). The orchestrator determined sequential inline execution on the main worktree was appropriate. `ukb-workflow-modal.tsx` was noted as an edited artifact during this session, though detailed execution findings were not surfaced in this exchange.",
+    "observationIds": [
+      "35d7b969-78a6-4a2d-9c38-8666a9eca305"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d9699337-c75d-43be-8e3c-cac975b6db4a",
+    "date": "2026-05-24",
+    "theme": "Dashboard \"llama-70b\" Label Investigated, Phase 52 Filed",
+    "summary": "A screenshot showing a \"llama-70b\" badge in the system health dashboard triggered an investigation into whether it reflected actual runtime routing or was a static cosmetic label.\n\n**Finding:** `token-usage.tsx` hardcodes `\"Groq: llama-3.3-70b-versatile\"` as the display name for the \"standard\" tier in dashboard constants — it is not the actual runtime route. Querying the live `token-usage.db` confirmed zero Groq/llama calls; all real traffic went to `claude-code` and `copilot` providers, matching the proxy preference order (claude-code → copilot → groq as fallback).\n\nAs a follow-up, **phase 52** was filed covering two observability fixes:\n1. Wave-analysis HTTP calls omitting `body.process`, causing `process='unknown'` in token-usage rows\n2. Dashboard workflow constants misrepresenting the auto-routing order with a hardcoded Groq label\n\n- Created: `.planning/phases/52-dashboard-llm-routing-label-process-tag-observability-fix/NOTES.md`\n- Edited: `token-usage.tsx`, `token-usage.ts`",
+    "observationIds": [
+      "b786a842-e0bc-4be5-9b83-be2aff393a8d",
+      "d8ac7c79-ab3f-45ba-8592-20eeb81f3f13",
+      "349dab1e-bbed-43ad-8239-a566073c3f52"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/52-dashboard-llm-routing-label-process-tag-observability-fix/NOTES.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7bfeba1d-50ae-41be-8ce8-13a11d62fbc8",
+    "date": "2026-05-24",
+    "theme": "SC#6 Orphan Failure Traced to Ontology Loader Bug",
+    "summary": "After the wave-analysis run completed, the SC#6 end-to-end verifier returned **FAIL: 68 orphans out of 106 in-scope entities**, with zero `[WaveController] Project-anchor pass:` log lines found in Docker logs since 11:30Z. A forensic investigation using git history, Docker logs, and source inspection identified the root cause.\n\n**Root cause:** `OntologyConfigManager.ts:126-146` expects subdirectory-structured ontology files, but they exist flat (e.g., `.data/ontologies/upper.json`), leaving the registry empty and causing `ensureProjectAnchor('Coding')` to throw silently.\n\n**Resolution path:**\n- An early attempt (obs 10) to file a roadmap phase via `/gsd-phase` produced no file edits; obs 18 successfully inserted phase 42.1 (\"Ontology layout resolution\") into `ROADMAP.md` with PARTIAL/blocked status\n- Phase **42.1.1** (`42.1.1-ontology-layout-resolution-registry-empty-because-loader-exp`) was created with chosen fix: option (a) — fix the loader to resolve flat paths\n- `CONTEXT.md` committed at `94ef1f188`; forensic report written to `.planning/forensics/report-20260524-130355.md`\n- Edited: `.planning/ROADMAP.md`, `42.1.1-CONTEXT.md`",
+    "observationIds": [
+      "bb1fac03-bf00-47d2-aac9-a94d05ffcb4d",
+      "ff3eb9f8-c176-4d2d-aeb2-8d291d789002",
+      "04558894-4bea-4ed1-a425-d774269e26f5",
+      "839bbfba-af33-4c21-bb1b-5fb82c944041",
+      "e2aa12a8-c4c6-49aa-8f78-9fcd0ca9347c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/src/token-usage.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/52-dashboard-llm-routing-label-process-tag-observability-fix/NOTES.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/forensics/report-20260524-130355.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42.1.1-ontology-layout-resolution-registry-empty-because-loader-exp/42.1.1-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d376f796-d38e-41e4-978a-7409f07549df",
+    "date": "2026-05-24",
+    "theme": "Live Wave-Analysis Workflow Monitored to Completion",
+    "summary": "A running wave-analysis workflow was monitored via `workflow-progress.json` heartbeat/step data and `token-usage.db` call deltas (preferred over the unreliable `elapsedSeconds` field).\n\n**Status checkpoints:**\n- **12:15** — Step 3/4 (wave4 — Insight Docs), waves 1–3 complete, heartbeat 2 s old, ~20 min remaining\n- **12:41** — 131 new `haiku-4.5` wave-analysis calls and 51 new health-coordinator calls confirmed liveness; estimated 10–20 min more\n- **12:43** — Background monitor task exited with code 0; output file read to confirm final state before triggering SC#6 verification\n\nNo source files were modified during monitoring.",
+    "observationIds": [
+      "455a6255-286b-4dd9-91b3-f835f165e06d",
+      "1dd963a3-b88b-422a-a505-28dbcfe4ef46",
+      "e5a36bc9-b54e-433a-b5ec-23e10a2be914",
+      "5160c655-8e66-498f-a7a9-f0c927fe5425"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/52-dashboard-llm-routing-label-process-tag-observability-fix/NOTES.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8da04d48-e89d-40bf-a4f8-8a5504ae4f40",
+    "date": "2026-05-24",
+    "theme": "Phase 42.1.1 Ontology Loader Fix Executed and Reviewed",
+    "summary": "Planning for phase 42.1.1 was confirmed complete with one plan in one wave (`42.1.1-01-PLAN.md`), covering a loader-side flat-path resolver, wiring into `OntologyConfigManager`, unit/integration tests, and a barrel re-export.\n\n**Execution:** `gsd-execute-phase` was invoked; the orchestrator chose sequential inline execution on the main worktree rather than subagents due to the single-plan structure and submodule path requirements under `integrations/mcp-server-semantic-analysis`.\n\n**Review:** `gsd-code-review` was run at standard depth, spawning the `gsd-code-reviewer` agent to produce a `REVIEW.md` in the phase directory.\n\n- `ROADMAP.md` updated across all three exchanges",
+    "observationIds": [
+      "e2a0f0ae-5a49-470f-8e28-bb9011010316",
+      "6789615d-c482-4cfd-b486-cbc8e577f98a",
+      "872c617b-6126-4e10-bc4d-5c42968a49c8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ae6f190e-cc65-4bed-9a06-7f0957aec128",
+    "date": "2026-05-24",
+    "theme": "Phase 42.1.2 Project Ontology Class Registration Planned",
+    "summary": "Two unresolved work items surfaced during phase 42.1.1 execution drove creation of **phase 42.1.2** (`register-project-ontology-class`):\n1. Add a `Project` class to `.data/ontologies/upper.json` so `ensureProjectAnchor('Coding')` no longer throws\n2. Fix `getStatus()` to return `upperOntologyPath: string | undefined` with guarded callers in `tools.ts`\n\n`gsd-plan-phase` auto-detected the missing phase, inserted it into `ROADMAP.md` after phase 42.1.1, committed the change, and created the phase directory. Two parallel agents (obs 23, 24) both independently triggered the same insert-phase workflow with consistent scope. With an existing `CONTEXT.md` and research disabled in project config, the planner was spawned directly to produce `PLAN.md`.\n\n- Edited: `.planning/ROADMAP.md`\n- Created: `.planning/phases/42.1.2-.../` directory and `CONTEXT.md`",
+    "observationIds": [
+      "3f69c1f2-6d78-449c-b176-b9b9164e7a4c",
+      "9e231add-6e7a-4227-a5a7-59158dfab80e",
+      "edc16e0e-d138-4175-b90f-4406dc55e635"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-24T20:03:13.308Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "bfe46e90-cd98-4d01-992b-6c35b8099579",
+    "date": "2026-05-24",
+    "theme": "Proxy Restart to Surface avg_latency in Summary Endpoint",
+    "summary": "Resumed in-progress work to expose `avg_latency` in the token usage summary API response.\n\n- **Goal:** Restart the proxy with updated SQL so that `avg_latency` appears on every `by_model` entry in `/api/token-usage/summary`, enabling the dashboard's Avg Latency column to populate when grouped By Model.\n- **Approach:** Verified no launchd supervisor conflicts before terminating the old process (to avoid interrupting in-flight LLM calls), confirmed the updated SQL was present in the built `dist`, then performed a clean `launchctl kickstart` restart.\n- **Result:** Proxy restarted cleanly (PID `83696` → `8188`, build `ed19dac`); the live `/api/token-usage/summary` endpoint now returns `avg_latency` on every `by_model` entry as expected.\n- No source files were directly modified in this session — changes had been made prior; this session was purely verification and restart.",
+    "observationIds": [
+      "c563de42-807e-4a50-b115-9f5b4ea02354"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:43:49.950Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "2e71bb56-5906-4bae-9a16-15af8b857806",
+    "date": "2026-05-25",
+    "theme": "Phase 42.1.2 Execution, Code Review, and Security Gate",
+    "summary": "Phase 42.1.2 was fully executed via wave-based parallel orchestration, then reviewed and secured.\n\n- **Execution**: Plans discovered, dependency-analyzed, grouped into waves, and dispatched with subagents each given a fresh context budget; `42.1.2-SECURITY.md` updated.\n- **Code review**: `gsd-code-review` skill invoked; `gsd-code-reviewer` agent scoped files via `SUMMARY.md`, ran regression/schema-drift/verification gates. Result: 0 Critical, 3 Warning, 4 Info findings (all advisory/non-blocking); 11/11 must-haves passed, 19/19 regression tests passed; `REVIEW.md` committed.\n- **Security gate**: `gsd-secure-phase` detected State B (no prior `SECURITY.md`, but `PLAN.md` files with STRIDE threat blocks present). All 3 threats had `disposition: accept` with zero open threats — short-circuited directly to writing `42.1.2-SECURITY.md`.\n- Phase 42.1.2 marked complete; security gate reminder issued to run `/gsd-secure-phase 42.1.2` before milestone close.",
+    "observationIds": [
+      "461e6e88-5841-441a-8f47-4dad4daeb3bf",
+      "caca1884-b35c-44a1-8559-06ae6142da56",
+      "d89b1c0b-a348-4e99-bd0e-70008da561a5",
+      "8cb6efde-5ed9-4f10-b4ac-2df982c31e80"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42.1.2-register-project-ontology-class/42.1.2-SECURITY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/forensics/report-42.2-00-canonical-emit.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "04ff0f99-564c-4943-a845-f39e34e6ffd2",
+    "date": "2026-05-25",
+    "theme": "Phase 42.2 Roadmap Discovery and Initialization",
+    "summary": "After closing 42.1.2, the next eligible work was assessed and phase 42.2 was bootstrapped.\n\n- Roadmap inspection revealed phase 47 is six dependency hops away; truly unblocked phases are: finishing 42's last plan, phase 38 (Ontology Registry, 1/6 in progress), and phase 43 (OKM Cross-Repo Migration).\n- `gsd-discuss-phase` was invoked for 42.2, but the phase did not yet exist — the `insert-phase` workflow created it after 42.1 with scope covering the deferred 42-07 work (legacy persistence trio, atomic LevelDB dir-swap, canonical items).\n- `42.2-CONTEXT.md` was created; `STATE.md` updated to point to 42.2 as current phase with `/gsd-plan-phase 42.2` as next recommended action.",
+    "observationIds": [
+      "0ad7e4a0-4eca-4e1d-989d-3c884a64adc8",
+      "9c72eb1a-dcfa-4b66-a4ca-4b0226f99c35"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42.2-retire-deferred-42-07-work-legacy-persistence-trio-atomic-le/42.2-CONTEXT.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6f2591ce-5bd9-4372-b383-58e9cffb7b6b",
+    "date": "2026-05-25",
+    "theme": "Phase 42.2 Full Wave Execution: Legacy Persistence Retirement and LevelDB Dir-Swap",
+    "summary": "Phase 42.2 was executed across four sequential waves, retiring the legacy persistence stack and promoting the km-core canonical store.\n\n- **Wave 0 — Plans 42.2-01 & 42.2-03 (parallel)**:\n  - Plan 42.2-01 (forensics audit): subagent completed all discovery but was blocked by harness rules from writing the report; orchestrator materialized `report-42.2-00-canonical-emit.md` directly, capturing 4 gap sections: missing `team` propagation in canonical-mapper, missing `process` attribution at 15 LLM call sites, 0/10 entities carrying team field, and `km-core-adapter` silent `_options` drop.\n  - Plan 42.2-03: `QdrantSyncService.js` (390 lines) deleted; `scripts/sync-graph-to-qdrant.js` rewritten to route through `km-core/maintenance.syncQdrantFromStore`; `DatabaseManager.js` stripped of qdrantSync init/shutdown logic. Two commits landed.\n- **Wave 1 — Plan 42.2-02**: Closed all 4 forensic gaps — team field threading in canonical-mapper, `llm-with-process.ts` wrapper for LLM process passthrough, 802-entity team backfill script, `km-core-adapter` options rename. 37/37 tests pass; 3 commits landed.\n- **Wave 2 — Plan 42.2-04**: Retired `persistence-agent.ts`, `graph-database-adapter.ts`, and `GraphDatabaseService.js` (~232 kB deleted); ~30+ consumer sites rewired through `km-core-adapter.ts`. 80/80 tests green.\n- **Wave 3 — Plan 42.2-05 (atomic LevelDB dir-swap)**: Subagent's sandbox blocked `cp -R` backup snapshot; orchestrator created the cold-copy `.data/knowledge-graph.legacy-pre-42.2.bak/` (9.5 MB) from its own sandbox. After operator approval, the two `mv` renames executed cleanly — `.data/knowledge-graph/` now hosts 802-entity km-core canonical store (14 MB). `wave-controller.ts:507` `dbPath` reverted to canonical path.",
+    "observationIds": [
+      "cadbeef2-d432-457f-90c2-7f83443de87d",
+      "a59cf454-1c1d-45e3-a280-5c08c8f44784",
+      "a8469267-f7fa-4f87-a41a-3b36eaa29e9e",
+      "8fa1f528-95b9-4f8a-9749-b847539a5b54",
+      "fb09bb0a-2a57-43a8-9f9a-93e796cfbc9a",
+      "e53c7f6f-c732-4b52-b1d1-36f8a4145486",
+      "08e43be7-1afe-497e-a0a5-a941911bb96a",
+      "ec03f008-c6a9-4b94-8675-262d4c6707d5",
+      "c5116194-7a96-4315-af15-bb35d30c9458",
+      "cc3eb6bb-31d5-417b-9f08-93a379bc9e24"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/sync-graph-to-qdrant.js",
+      "src/databases/DatabaseManager.js",
+      "src/knowledge-management/QdrantSyncService.js",
+      "src/knowledge-management/GraphDatabaseService.js",
+      ".planning/phases/42.2-retire-deferred-42-07-work-legacy-persistence-trio-atomic-le/42.2-03-SUMMARY.md",
+      ".planning/STATE.md",
+      ".planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/forensics/report-42.2-00-canonical-emit.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/src/agents/wave-controller.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 10
+    },
+    "project": "coding"
+  },
+  {
+    "id": "113e0295-48a4-4181-9a3f-e9539126d8a8",
+    "date": "2026-05-25",
+    "theme": "Verifier Script Rename and Zero-Entity Workflow Run Diagnosis",
+    "summary": "A question about the oddly-named `42-07-end-to-end-verify.mjs` triggered a rename and surfaced a workflow no-op bug.\n\n- `42-07-end-to-end-verify.mjs` was a 398-line permanent SC#1–6 verifier for the km-core store — not a temp file. The phase-tagged name was a GSD artifact leftover. It was renamed to `verify-knowledge-graph-store.mjs` via `git mv`; header docstring and `ROADMAP.md` references updated.\n- Concurrent diagnosis of workflow runs returning 0 LLM calls in ~80ms identified two contributing issues: a git-staleness cache early exit, and `wave-controller.ts:515` using `domains: [this.team]` (value: `['coding']`) which excluded the `general` domain containing the 802/829 entities.\n- Two full Docker container rebuilds were performed (down + up) to invalidate VirtioFS bind-mount cache after the rename and ensure the container picked up the updated script path.\n- Verifier script patching was initiated to align it with the actual `GraphKMStore`/`OntologyRegistry` API surface, but edits were not yet committed in this session window.",
+    "observationIds": [
+      "4a7db90b-3622-40c8-be14-be7b0fc7f691",
+      "20679d85-56c6-4ede-88f4-0856f4f6e4c4",
+      "fce221cf-a8d6-47a2-8393-92a82147f425",
+      "4a70d552-82ad-4490-af52-423ee78e63ef",
+      "f414e42a-455a-42c1-94e7-9187032fd165",
+      "4614c9ee-3753-4578-ae85-6bfef3e13340",
+      "5a6c315f-2405-4442-a252-066502b46675"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/scripts/verify-knowledge-graph-store.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/configure-wave-analysis-routing.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/CLAUDE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 7
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f2cc10ae-2d8a-4cca-b6a7-03e31d4318e1",
+    "date": "2026-05-25",
+    "theme": "LLM Proxy Port Fix and Wave-Analysis Performance Root Cause",
+    "summary": "All prior UKB wave-analysis runs were producing zero real LLM calls due to a hardcoded wrong port; after the fix a secondary performance bottleneck was identified.\n\n- **Root cause found**: `llm-with-process.ts` had the LLM proxy port hardcoded as `3033` (the health-API port) instead of reading `LLM_CLI_PROXY_URL` (port `12435`). Fixed to honor the env var; 99 tests pass; container rebuilt and redeployed.\n- **Fix validated**: `token-usage.db` confirmed 5 `wave-analysis-wave1` LLM calls with correct `process` attribution; 13,012 total LLM calls in a 10-minute window, confirming real execution.\n- **Performance bottleneck**: Wave 1 is using `claude-haiku-4.5` via the `claude-code` CLI provider, adding 5–10s constant startup overhead per call vs. sub-second copilot provider. The 12-component loop runs serially (~20 min estimated total). 16–18 token outputs in several calls suggest parse failures falling back to `generateMockAnalysis`, meaning partial mock-mode may persist.\n- `configure-wave-analysis-routing.sh` and `CLAUDE.md` were edited as part of provider routing investigation.\n- A trace view showing flat/empty progress was explained as expected: sub-step detail only populates after each subStep fully completes, and the wave was cancelled mid-execution.",
+    "observationIds": [
+      "1006024c-ae40-464a-ba20-a10e778a76e9",
+      "3526b90b-a2d7-4a10-9c92-153d4a729eff",
+      "c37727af-a22f-4d4e-bab1-94adbfa254f6",
+      "58d6e034-e553-4925-87e9-518b8620ab8a",
+      "9ef07b23-19d7-42e6-9775-2817cf2721b7",
+      "e4436914-63ea-440e-b07c-54fd36e89ad5",
+      "5aa2bc59-9349-4b38-bae2-1df8fce6b0e8",
+      "d0cc201f-1341-4721-b511-d398139f2633",
+      "85d26ddc-4f5a-4910-ba2d-ccd7efb12ac3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/src/agents/llm-with-process.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/CLAUDE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/configure-wave-analysis-routing.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 9
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fc3f024f-2da6-4e84-83f2-f2cdc18c55d5",
+    "date": "2026-05-25",
+    "theme": "Production Wave-Analysis Launch with Copilot Routing Restored",
+    "summary": "After a session break, full context was restored and a corrected production wave-analysis run was launched with copilot routing active.\n\n- Sticky/mock state cleared via `POST /api/ukb/mock-ll`; all 7 `wave-analysis-*` routing overrides confirmed active (copilot/sonnet for heavy calls, copilot/haiku for cheap calls), replacing the slow `claude-code` CLI path.\n- Baseline confirmed at 866 `general` nodes; workflow `wf_1779715884831_m5t3h9` launched in production mode with a 90s background polling check to verify copilot endpoints are being hit.\n- A screenshot of the system health dashboard was shared; the assistant began investigating color-mapping consistency between the Overview and Evolution tabs in `token-usage.tsx` but no code changes were made.",
+    "observationIds": [
+      "bc4889d7-d4f4-4ab9-8864-d5068ed2938b",
+      "c183716d-f0f5-4fbd-9de3-a054ba404a35",
+      "fc055286-b637-453e-ae7d-c475fc882972"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b9669aff-7cb3-4070-b244-6bacaa4ef69d",
+    "date": "2026-05-25",
+    "theme": "Fix Process Color Inconsistency Across Dashboard Tabs",
+    "summary": "**Goal:** Eliminate the uniform fallback gray color applied to unrecognized process names (e.g., `wave-analysis-wave1/2/3`) in the Overview tab's Treemap and Recent Calls borders, making them match the distinct colors already shown on the Evolution tab.\n\n**Approach & Result:**\n- Unified `getProcessColor` in `token-usage.tsx` to use the same canonical-map-first, then stable-hash-into-`SAFE_EVOLUTION_PALETTE` fallback logic already employed by `evoColorFor`\n- `wave-analysis-wave1/2/3` now renders with consistent green/purple/branded colors on the Overview tab instead of a uniform gray\n- Single file changed: `system-health-dashboard/src/pages/token-usage.tsx`",
+    "observationIds": [
+      "69f24ba1-489b-4b30-8552-ffff1ca6eb75"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/pages/token-usage.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "98e44b5b-ff1c-4cc9-8e45-b31f97b6a48d",
+    "date": "2026-05-25",
+    "theme": "Trace Modal Zero Metrics and Missing Wave 4 Diagnosis",
+    "summary": "**Goal:** Investigate why the workflow trace modal showed zero values for LLM calls, tokens, and duration for in-progress waves, and why Wave 4 appeared entirely absent.\n\n**Two root causes identified:**\n- **Zero metrics ([37]):** The right panel reads exclusively from parent step aggregate fields (`llmCalls`, `tokensUsed`, `duration`) in `parentMetrics`, which remain zero while a wave is still running — fix needed to fall back to sub-step values when parent aggregates are empty. `trace-modal.tsx` edited.\n- **Missing Wave 4 ([38]):** `stepsDetail` in `workflow-progress.json` only contains entries for waves 1–3; the backend (`KnowledgeQueryService.js`) had not yet emitted Wave 4 sub-step metrics, so the frontend had no data to display regardless of aggregation logic.\n\nBoth issues confirmed as backend data availability problems, not frontend rendering bugs.",
+    "observationIds": [
+      "a1abf371-6e60-4a5d-abab-a3a0645e7089",
+      "6477f83c-2164-4998-ab76-575a0ef87d38"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/workflow/trace-modal.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/KnowledgeQueryService.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1344def0-b7a0-4e9b-ae29-e0a763d4b847",
+    "date": "2026-05-25",
+    "theme": "Session Resume, UI Commits, and VKB Service Outage",
+    "summary": "**Goal:** Resume the prior session, validate workflow state, and commit pending UI fixes before continuing feature work.\n\n**What happened:**\n- Verified workflow ran to full completion (4/4 steps, 51 insight docs, knowledge graph grew from 866 → 896 nodes) via saved JSON and `git diff`\n- Committed two pending UI fixes as separate git commits: `token-usage.tsx` (color fix) and `trace-modal.tsx` (zero-metrics fix)\n- Planned to implement a wave-4 insight counter feature in `wave-controller.ts`, but work was **deferred** when the VKB/knowledge-graph service on port 8080 began returning HTTP 500 errors for all `/api/entities` and `/api/relations` endpoints\n- `KnowledgeQueryService.js` was examined during both the workflow state verification and the outage diagnosis",
+    "observationIds": [
+      "c0f75aaf-15dd-4e74-a975-9e84b1b233ff",
+      "292722b6-6712-4f79-a5b8-37c01445ed02"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/KnowledgeQueryService.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c4515f80-fbdc-465b-aaa3-31400dde4404",
+    "date": "2026-05-25",
+    "theme": "Wave Controller Planned Emission and Frontend Progress Bar",
+    "summary": "**Goal:** Add planned-vs-generated insight tracking to the wave processing pipeline — emitting upfront planned counts and per-entity progress ticks on the backend, then surfacing them as a labeled progress bar in the frontend trace modal.\n\n**Changes across two observations (both at 17:25):**\n- **Backend** (`mcp-server-semantic-analysis/src/agents/wave-controller.ts`):\n  - Emits a `planned` count event upfront before entity processing begins in `generateInsightsForWaveEntities`\n  - Fires a per-entity tick event after each entity's insights are generated\n- **Frontend** (`system-health-dashboard/src/components/workflow/trace-modal.tsx`):\n  - Insight Generation panel now displays a `\"{generated}/{planned}\"` label\n  - A progress bar fills proportionally as entities are processed\n\nBoth observations worked the same topic; [41] focused on backend wiring and [42] completed the full backend + frontend pass together.",
+    "observationIds": [
+      "fc58e1ec-e3f4-4d39-949c-79765e8ab567",
+      "56eba827-4021-419c-b2eb-4f429ff1042f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/src/agents/wave-controller.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/workflow/trace-modal.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4ef1dd34-92cd-4005-9528-3a900419f93c",
+    "date": "2026-05-25",
+    "theme": "Knowledge Graph Hierarchy Regression Investigation Initiated",
+    "summary": "**Goal:** Investigate a structural regression in the knowledge graph — lost hierarchy (`CK→proj→comp→sub-comp`), missing \"online learned\" nodes, disconnected project nodes, and projects no longer linked to the central `CollectiveKnowledge` node.\n\n**Status:** Investigation initiated but not completed.\n- Treated as a graph integrity regression requiring a clean baseline before diagnosis\n- Began with a housekeeping `git commit` of `knowledge-management/insights` and `.data/knowledge-graph/insights` to isolate pending changes\n- Root cause analysis not yet reached; structural diagnosis was the next planned step",
+    "observationIds": [
+      "318030e7-2697-4e6c-9e6f-aa357c2cc2c8"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b8954b62-937f-4bc6-80d6-8ecc150ec5a2",
+    "date": "2026-05-25",
+    "theme": "Cross-Project Vite Frontend Survey and Rolldown-Vite Evaluation",
+    "summary": "The goal was to map all Vite-based frontends across the `coding` repo and `rapid-automation` (OKB integration), then assess whether adopting Rolldown-Vite could accelerate builds in km-core.\n\n**Vite frontend inventory (3 apps total):**\n- `integrations/system-health-dashboard/` — Vite v5.3.1, port 3032 (coding repo)\n- `integrations/memory-visualizer/` — Vite v6.0.0, port 8080 (coding repo)\n- `viewer/` (OKB integration, rapid-automation) — Vite v6.0.0, React/sigma.js graph UI\n\n**Rolldown-Vite investigation:** Initiated but inconclusive — the agent was mid-research (fetching the voidzero.dev announcement and auditing existing Vite versions) to evaluate feasibility, breaking changes, and required config adjustments before the session ended.\n\n- Shared artifacts modified throughout: `wave-controller.ts`, `42.2-05-SUMMARY.md`\n- The version mismatch between the v5.3.1 and v6.0.0 apps may be a relevant factor in migration planning.",
+    "observationIds": [
+      "e7758cf8-36bf-4a68-b067-16d34c6f6684",
+      "49501384-505c-4ff5-a311-82aed80a3f51",
+      "9063fa1e-0d2b-4768-9313-05af08ba78f1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/mcp-server-semantic-analysis/src/agents/wave-controller.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/42.2-retire-deferred-42-07-work-legacy-persistence-trio-atomic-le/42.2-05-SUMMARY.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "721d2b2e-ddc7-44f0-9326-57d2da46e897",
+    "date": "2026-05-25",
+    "theme": "km-core Phase 42-04 Session Context Restoration",
+    "summary": "At 17:13, after a significant gap, the agent resumed work on km-core by re-reading the two most recent SpecStory history files to reconstruct session state.\n\n**Context restored:**\n- km-core is mid-Phase 42-04; the last landed sub-task was **D-52c**: `FastembedEmbeddingClient` promoted as the default embedding client\n- Working tree is clean with no uncommitted changes\n- Suggested next action: consult `.planning/` to identify the next D-52 sub-task\n\n- Artifact modified: `KnowledgeQueryService.js`\n- This observation is isolated from the morning's Vite survey work and represents a distinct afternoon development thread.",
+    "observationIds": [
+      "9be24245-be2e-4686-98c2-95f090ebd70a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/KnowledgeQueryService.js"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-05-25T17:46:28.479Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "km-core"
+  },
+  {
+    "id": "b0b395a4-b59a-4f74-979c-ff6b7a9428df",
+    "date": "2026-05-25",
+    "theme": "Deploy-Docs Workflow Updated to Gate Pattern",
+    "summary": "The GitHub Actions `deploy-docs` workflow was refactored to use the **gate pattern**, introducing a dedicated gating job or condition to prevent premature or failed deployments from proceeding downstream.\n\n- File edited: `.github/workflows/deploy-docs.yml`\n- YAML validity was confirmed via a Python parse check after the change.",
+    "observationIds": [
+      "be813fb8-5a05-4954-93ba-2b2600d552fb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.github/workflows/deploy-docs.yml"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-26T05:31:14.386Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "340531a6-4bef-4fe1-8384-f8c853ccedcd",
+    "date": "2026-05-25",
+    "theme": "Knowledge Base Edge Regression Root Cause Identified and Fixed",
+    "summary": "An investigation was triggered by a visible regression where `general.json` showed 0 edges (down from 50 wave-analysis edges) and `km-core` reported 0 entities/relations despite LevelDB holding 9 MB of valid data.\n\n- **Root cause (obs 2 & 3):** A smoke-cleanup cycle opened `km-core` with a `domains:['coding']` filter (loading entities but not relations into the in-memory model), then called `close()`, which re-exported the empty in-memory state over the existing `general.json`, destructively zeroing all edges.\n- **Secondary root cause (obs 4 & 5):** A Phase 42.2 path migration had pointed VKB's read path at `.data/knowledge-graph/exports/` (sparse wave-controller outputs) instead of the legacy `.data/exports/` directory containing the full 928-entity / 1124-relation graph.\n- **Fix:** `_loadExports` in `KnowledgeQueryService.js` was refactored to read from **both** `.data/exports/` and `.data/knowledge-graph/exports/`, merging results by entity name and preferring richer legacy entries, restoring visibility of all 928 nodes and 1124 edges.\n- LevelDB was confirmed as the authoritative source throughout; recovery from raw LevelDB key prefixes was identified as the longer-term path.",
+    "observationIds": [
+      "ef78a541-1bb5-4fd5-99cc-ca9065dadd15",
+      "1856993f-6880-49bf-bbcc-ab8143adaa29",
+      "5d4edfb8-4677-4a22-a725-5570308807cd",
+      "fead51c2-dfa2-461f-b1bc-8c079135a7d3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/KnowledgeQueryService.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-26T05:31:14.386Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6031e0b0-8c01-455f-85af-fc476be6e2af",
+    "date": "2026-05-25",
+    "theme": "Knowledge Graph Teams Panel Multi-Directory Read and Team Attribution Overhaul",
+    "summary": "Following the read-union fix, attention shifted to the graph visualization showing a disconnected outer ring of ~802 `general.json` entities with 0 edges, and the Teams panel only displaying \"Coding.\"\n\n- **Disconnected entities (obs 6 & 7):** 727 of the 802 outer-ring entities were name-duplicates of existing coding entities, created by a Phase 49 bug that stripped team tags; only 73 were genuinely new. Hierarchy metadata (`parentEntityName`, `hierarchyLevel`, `childEntityNames`) was absent across all 802, ruling out metadata-based edge derivation.\n- **Third directory discovery (obs 8):** `.data/knowledge-export/` was found to contain real (non-symlink) `resi.json` and `ui.json` files, entirely missed by the existing two-directory read-union logic.\n- **Teams panel fix (obs 9, 10, 11):** `_loadExports` in `KnowledgeQueryService.js` was extended to read from **three** source directories with symlink deduplication and name-based team overrides (Normalisa → `resi`, Timeline/DynArch → `ui`, remainder → `coding`), surfacing all three teams: coding (998), resi (1), ui (2).\n- **Team attribution tightening (obs 12 & 13):** The default-to-\"coding\" fallback was removed; entities are now only attributed to a team if explicitly claimed by a team-specific file. Unmatched `general.json` entities (70 wave-analysis nodes) surface under a visible `\"general\"` bucket instead of silently polluting team counts. Final counts: coding=928, resi=1, ui=2, general=70.\n- This multi-dir/shim approach was noted as explicitly transitional, to be replaced by a single km-core LevelDB source of truth after Phase 49.\n- Primary file changed throughout: `KnowledgeQueryService.js`",
+    "observationIds": [
+      "1fdb0f2a-4b8c-4d4c-af04-7d6dff960f3b",
+      "af98e4ff-fd7a-4401-98c3-4f0fb5fab347",
+      "69970412-772d-4073-9982-b7eaff16e12e",
+      "d3a6ba53-0e0c-4769-ad9b-7c7c654105cb",
+      "94c2318b-ff25-4987-a84c-3d7f50f62648",
+      "f5933c04-b2a2-4087-ada3-d75ffd6069b3",
+      "127c475f-128e-48f8-9b18-3db000b8db57",
+      "b3de51ec-1e51-4a55-83dc-c43f5b3042d0"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/KnowledgeQueryService.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-26T05:31:14.386Z",
+    "metadata": {
+      "sourceCount": 8
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ee8ab3ac-b87b-433a-a56e-131b9ed07cf2",
+    "date": "2026-05-25",
+    "theme": "Restoring Lost ui.json and resi.json Entities from Git History",
+    "summary": "With the Teams panel showing only 2 `ui` entities and 1 `resi` entity, a git history investigation was launched to determine whether richer data existed previously.\n\n- `git log` + `git show` were used to trace all commits touching `ui.json` and `resi.json`.\n- **Confirmed loss:** `ui.json` historically contained **12 entities and 20 relations**; two commits reduced it to 2 entities and 0 relations.\n- **Culprit commit:** `60680e9e8` (\"fix: orphaned nodes and visu improvements\") was identified as the point where 9 `TransferablePattern` entities and all 20 relations were dropped.\n- The assistant located the richest historical snapshots and began planning restoration of both `ui.json` and `resi.json` from git history; no files were edited yet in this session.",
+    "observationIds": [
+      "5c9e6072-43aa-40c5-99f7-0d56f203e3a0",
+      "3286501c-81b7-4de0-99d0-e0459b99dd28",
+      "da788aac-cdab-4620-a554-ef9aa8e4fb79"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-05-26T05:31:14.386Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d7262835-42fe-42ae-a56e-803584bbab1b",
+    "date": "2026-05-26",
+    "theme": "Knowledge-Management Visualizer \"Has Insight Doc\" Badge Recovery",
+    "summary": "The goal was to restore the \"Has Insight Doc\" badge for pattern entities in the knowledge-management visualizer after companion `.md` files were lost.\n\n- **Observation 1** performed git history bisection to find commit `638a66bac`, restored 9 UI pattern `.md` files, generated 2 stub `.md` files for resi patterns, recovered 3 PNGs and `knowledge-management/insights/puml/redux-mvi-architecture.puml`, and stripped 9 legacy duplicate `type:\"link\"` observations from `.data/knowledge-export/ui.json`.\n- **Observations 2 & 3** then diagnosed why badges were still missing after the file recovery: the `has_insight_document` flag was never present in the legacy schema, making the badge broken *globally* — not just for the restored patterns.\n- Root cause identified in `KnowledgeQueryService.js`: the flag must be derived dynamically at read time by checking disk presence of companion `.md` files rather than relying on stored entity data.\n- No data migration required; the fix is a read-time derivation added to `KnowledgeQueryService.js`.\n- Four recovery commits (`d1fc40703` through `f3397964b`) captured the file restoration work.",
+    "observationIds": [
+      "c7c596e9-a4a2-494c-95ca-cc1a11cb0aeb",
+      "13f6ad29-0383-4433-b468-cee72f78fe58",
+      "423d2737-981b-46f4-b751-66ceb7070dd4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "knowledge-management/insights/ConditionalLoggingPattern.md",
+      "knowledge-management/insights/ (9 ui pattern .md files total)",
+      "knowledge-management/insights/ (2 resi stub .md files)",
+      "knowledge-management/insights/puml/redux-mvi-architecture.puml",
+      ".data/knowledge-export/ui.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/knowledge-management/KnowledgeQueryService.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T00:09:42.325Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "0b227a3d-d73e-4ed7-90b9-f201cc38dcad",
+    "date": "2026-05-26",
+    "theme": "Session Continuity Restore and Planning State Repair",
+    "summary": "The goal was to re-establish session context and repair a corrupted GSD planning state before resuming active development work.\n\n- **Observation 4** followed the `/sl` protocol, reading the two most recent LSL files (`2026-05-26_0700-0800` and `2026-05-25_2100-2200`) to reconstruct prior session context, updating `STATE.md`.\n- **Observation 5** inspected `.planning/` directory structure, cross-referencing `STATE.md` and phase files against `ROADMAP.md` to identify corrupted/inconsistent planning state; investigation ended mid-diagnosis.\n- **Observation 6** completed the repair: fixed frontmatter consistency in `/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md`, marked phases 50 and 51 as done in `ROADMAP.md`, updated the active-phase pointer to phase 43, and flagged sub-phase checkboxes `42.1`, `42.1.1`, `42.1.2` as needing correction.",
+    "observationIds": [
+      "a557c972-9aff-438f-bd67-90affb910e9f",
+      "5a3f8777-71a8-475f-b1e4-a5ea3262882e",
+      "af6aaccb-385c-42ec-b7c6-3720668516da"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T00:09:42.325Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a8195593-471b-4f25-be2b-61601283b038",
+    "date": "2026-05-26",
+    "theme": "GSD Phase 50 Planning and Wave-Based Execution",
+    "summary": "The goal was to plan and fully execute GSD phase 50, which covered LSL primitives, an ObservationWriter migration, and a launchd cron job.\n\n- **Observation 7** parsed the `plan-phase.md` workflow, read GSD SDK context, and spawned the planner for phase 50 — research was skipped because `CONTEXT.md` was already comprehensive; produced `50-01-PLAN.md`.\n- **Observation 8** ran wave-based parallel execution across 3 sequentially-dependent plans:\n  - **Plan 50-01** (Wave 1): LSL window primitive, scan-and-convert primitive, resolver CLI — merged successfully.\n  - **Plan 50-02** (Wave 2): `ObservationWriter` capture-time stamp and `_buildPriorContext` migration — merged with 77 tests passing.\n  - **Plan 50-03** (Wave 3): launchd cron job — spawned but outcome not confirmed before exchange ended.\n- `ROADMAP.md` was updated to reflect wave progress; worktree isolation was used per plan with FF-merge to main between waves.",
+    "observationIds": [
+      "a6cd4222-2a8c-45d8-b627-b9daf3b2939e",
+      "9a321f0a-18c9-41d2-b288-9d5fba1cd3c4"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/50-lsl-grounded-async-observation-resolver-backfill-ambiguous-r/50-01-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T00:09:42.325Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "4f854e5d-7cf7-4e91-8f30-321d6cc15085",
+    "date": "2026-05-26",
+    "theme": "GSD Phase 51 Discussion, Research, and Planning",
+    "summary": "The goal was to discuss, research, and plan GSD phase 51, which covers end-to-end capture of sub-agent transcripts in the live-logging system.\n\n- **Observation 9** ran the `discuss-phase` skill: loaded the existing `51-CONTEXT.md` (366 lines, dated 2026-05-23), identified 4 remaining gray areas and 3 auto-resolved residuals (backfill scope, recursive sub-agents, filename convention); no files were written.\n- **Observations 10 & 11** both represent the `plan-phase` skill for phase 51 with research enabled; 4 parallel research subagents (claude, opencode, copilot, mastra) were spawned, producing key reversals from `CONTEXT.md`:\n  - Claude Code transcripts confirmed under `~/.claude/projects/` (804 files).\n  - OpenCode sub-agents accessible via SQLite (Path B adapter).\n  - Copilot's real path is `~/.copilot/session-state/<uuid>/events.jsonl`; `parseCopilot` parser identified as broken and needing a fix.\n  - Mastra is sweep-only and currently empty.\n- `STATE.md` was updated; the planner subagent was subsequently spawned to produce the phase 51 plan set.",
+    "observationIds": [
+      "359e5705-dcd4-46e1-a69b-65366682e4c1",
+      "0889f5c3-f044-4648-8715-19487b680ecf",
+      "ce2f2a0c-68c8-4425-bab7-8d57e4c4780b"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-CONTEXT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/STATE.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T00:09:42.325Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5688fde2-10e0-4e7d-ade5-bb4f7e073d4b",
+    "date": "2026-05-26",
+    "theme": "GSD Phase 51 Wave 2 Execution: Mastra Adapter and Branch Merges",
+    "summary": "The goal was to complete Wave 2 of phase 51's execution, which included the Mastra NDJSON Path B adapter (plan 51-05) alongside plans 51-02 through 51-04.\n\n- **Observation 12** reported sub-agent `a35b48db79000aec2` completing plan 51-05: a 455-line forward-compatible Mastra adapter (`agentId='mastra'`, `storageType='ndjson'`) that handles both current parent-only and future sub-agent NDJSON shapes with multi-session partitioning by `sessionId`.\n  - New files: `lib/lsl/adapters/mastra-ndjson.mjs`, `tests/live-logging/adapter-mastra.test.js` (13 tests), `tests/fixtures/mastra/mastra-transcript-sample.jsonl`, and `51-05-SUMMARY.md`.\n  - Cumulative suite: 79/79 tests passing.\n- **Observation 13** covered orchestrator recovery from a `cwd-drift` incident where the 51-05 worktree agent committed to `main` instead of its branch; all four Wave 2 branches (51-02, 51-03, 51-04, 51-05) were recovered via reflog and FF-merged into `main` at commit `dbdfa8d43` with **80/80 tests passing**.\n- Wave 3 (plan 51-06: LSL parity writer + slot allocator) subsequently kicked off.",
+    "observationIds": [
+      "a9ac00b0-aec6-400b-b276-accc9f2f86f1",
+      "03a1df7b-1072-4d4f-a637-55eecc7a68e2"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "lib/lsl/adapters/mastra-ndjson.mjs",
+      "tests/live-logging/adapter-mastra.test.js",
+      "tests/fixtures/mastra/mastra-transcript-sample.jsonl",
+      ".planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-05-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T00:09:42.325Z",
+    "metadata": {
+      "sourceCount": 2
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6a08f637-19aa-476a-8dcb-7965cb9e946a",
+    "date": "2026-05-26",
+    "theme": "Phase 51 Plan 51-09: Copilot Live Events Tail Watcher",
+    "summary": "**Goal:** Implement a live tail watcher and daemon CLI for Copilot `events.jsonl` as part of the Phase 51 GSD wave execution (plan 51-09, Path A).\n\n**Approach:** A parallel executor sub-agent ran a full TDD RED→GREEN cycle with zero new dependencies and no `console` calls.\n\n**Files created:**\n- `lib/lsl/live/copilot-events-tail.mjs` — tail watcher library module\n- `scripts/sub-agent-live-copilot.mjs` — daemon CLI script\n- `tests/live-logging/live-copilot-events-tail.test.js` — 13 watcher tests\n- `.planning/phases/51-.../51-09-SUMMARY.md` — plan summary\n\n**Result:** All 13 watcher tests pass; cumulative 86-test Phase 51 subset remains green; all acceptance grep gates pass. Delivered in 4 commits. Wave 4 progress advanced to 7/11 plans complete, with orchestrator awaiting plans 51-07 and 51-08.",
+    "observationIds": [
+      "fce40dac-6fd1-45fc-b7e9-7c371d233e90"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "lib/lsl/live/copilot-events-tail.mjs",
+      "scripts/sub-agent-live-copilot.mjs",
+      "tests/live-logging/live-copilot-events-tail.test.js",
+      ".planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-09-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:11:13.005Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6e5c44fa-8646-4b86-a10c-5d5fe81e478c",
+    "date": "2026-05-26",
+    "theme": "Phase 51 Plan 51-07: Claude Live FS-Watch Hook Daemon",
+    "summary": "**Goal:** Implement a live Claude hook (Path A) using `claude-fs-watch`, including a daemon CLI with heartbeat and graceful SIGTERM shutdown, as part of Phase 51 wave 4.\n\n**Approach:** Passive acknowledgment of a sub-agent completion notification; the sub-agent handled the full implementation and test cycle independently.\n\n**Result:** 65/65 regression tests pass. Wave 4 advanced to 8/11 plans complete, leaving only plan 51-08 outstanding before merges.",
+    "observationIds": [
+      "5de8b254-4316-4c4e-ad23-b3fc7a714ade"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:11:13.005Z",
+    "metadata": {
+      "sourceCount": 1
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9124d066-247f-42ef-917c-bc034d0505b8",
+    "date": "2026-05-26",
+    "theme": "Phase 51 Plan 51-08: Opencode SQLite Poll Watcher and Wave 4 Merge",
+    "summary": "**Goal:** Complete plan 51-08 — a polling-based live watcher and daemon CLI for the opencode SQLite source — then sequentially merge all three Wave 4 worktrees back into `main`.\n\n**Approach:** Sub-agent ran a TDD RED→GREEN/refactor cycle (5 commits across 6 files); orchestrator verified base commit integrity and absence of branch drift before merging worktrees in sequence per the established Phase 51 GSD protocol.\n\n**Files created/edited:**\n- `lib/lsl/live/opencode-sqlite-poll.mjs` — `startOpencodeWatcher`/`stopOpencodeWatcher` polling watcher\n- `scripts/sub-agent-live-opencode.mjs` — daemon CLI\n- `tests/live-logging/live-opencode-sqlite-poll.test.js` — 13 new tests\n- `lib/lsl/adapters/opencode-sqlite.mjs` — additive edits to existing adapter\n- `tests/fixtures/opencode/seed-opencode-fixture.mjs` — fixture seeder updates\n- `.planning/phases/51-.../51-08-SUMMARY.md` — plan summary\n- `statusline-registry-sourced.test.js` — edited during merge\n\n**Result:** 26/26 watcher + adapter tests pass; 139 Phase 50+51 regression tests remain green. All three Wave 4 agents completed (9/11 total plans done); worktrees merged cleanly into `main`. Multiple overlapping notifications from the orchestrator and sub-agents were consolidated into a single merge action.",
+    "observationIds": [
+      "a9bae637-25a9-4873-8d38-93a935ed65f6",
+      "64da4ce8-2a00-4d10-b65b-0a437f40ac46",
+      "14fa5bd6-e82f-4342-82d0-3fa7b77db773",
+      "9c70a3d8-db82-43ae-b67d-6662550aa428"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "lib/lsl/live/opencode-sqlite-poll.mjs",
+      "scripts/sub-agent-live-opencode.mjs",
+      "tests/live-logging/live-opencode-sqlite-poll.test.js",
+      "lib/lsl/adapters/opencode-sqlite.mjs",
+      "tests/fixtures/opencode/seed-opencode-fixture.mjs",
+      ".planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-08-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/live-logging/statusline-registry-sourced.test.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:11:13.005Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "920e20bc-ee9d-40ee-b56f-c94f652544a9",
+    "date": "2026-05-27",
+    "theme": "Phase 51 Wave Execution Orchestration and Plan Completions",
+    "summary": "The orchestrator drove Phase 51 through a 3-wave parallel execution model, reading `STATE.md`, plan files, and workflow definitions to manage 16 sub-agent plans. Key milestones:\n- **Wave 1** closed 14/16 plans: Plan 51-12 (CR-04 `/bin/sh` wrapper for launchd live daemons, 9 tests green), 51-13 (CR-01/CR-02 OpenCode adapter — `limit` plumbed, `registry_rows` in heartbeat, 7 new tests), and 51-14 (atomic upsert fix in `claude-fs-watch.mjs` replacing broken get/upsert sequence, 5-test regression suite added).\n- **Wave 2** (51-15): 641 D-LSL-Filename sidecar files backfilled into `.specstory/history/2026/01–05/`, both incident parent UUIDs verified with 21 files each, idempotency confirmed.\n- **Wave 3** (51-16): `checkpoint:human-verify` plan requiring operator UAT; SUMMARY skeleton was committed (`86250eddc`), worktree merged into main, and operator was presented with three sequential verification phases (A: launchd restart, B: health-coordinator probe, C: AC #1–#6 wave verification).\n- A CWD-drift incident during 51-13 worktree merge created a stray commit that was remediated by resetting and re-running the merge from the primary worktree.\n- Code review (observation 3) identified 44 changed files via git diff and spawned a `gsd-code-reviewer` agent to produce a `REVIEW.md` artifact.\n- Artifacts touched: `statusline-registry-sourced.test.js`, `combined-status-line.js`, `51-10-SUMMARY.md`, `51-HUMAN-UAT.md`, `opencode-schema-migration-update.md`, `lib/lsl/live/claude-fs-watch.mjs`, `tests/integration/claude-fs-watch-observations-written.test.js`.",
+    "observationIds": [
+      "40b5ddb6-584c-4156-b587-6c4070f910f3",
+      "b3fbbb4c-51a5-406d-90eb-6d245820e100",
+      "0dce3f79-9177-499c-821d-43d320e5068e",
+      "2a5e0e75-7ae7-4b3c-bf44-2be57abebc32",
+      "489131de-89d3-459e-926b-704d53e771fa",
+      "5c5ce48e-554b-464b-8c81-f49651147a6c",
+      "2b98699d-c49a-48c7-b8b3-afa3f03f4463",
+      "520baab3-4f2b-4bc1-bfdf-46debb1b2e08",
+      "83bb85ed-1c8b-446d-a5b3-4c7a84146101",
+      "a6f5f4e9-78ca-4b5d-82c9-729004863995",
+      "b2a97e0c-719e-4dd0-8c56-ae6d12ae6b09"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/live-logging/statusline-registry-sourced.test.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/combined-status-line.js",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-10-SUMMARY.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-HUMAN-UAT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/opencode-schema-migration-update.md",
+      "lib/lsl/live/claude-fs-watch.mjs",
+      "tests/integration/claude-fs-watch-observations-written.test.js",
+      ".planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-14-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:12:51.915Z",
+    "metadata": {
+      "sourceCount": 11
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9e6ca731-e6c5-49a9-9299-f37de24c073e",
+    "date": "2026-05-27",
+    "theme": "Phase 51 UAT Phase A: Daemons, OpenCode Crash, Schema Discovery",
+    "summary": "Manual UAT Phase A was executed to verify the CR-04 launchd daemon fix. Results and follow-on investigation:\n- `claude` (PID 82376) and `copilot` (PID 83448) daemons started cleanly with exit 0 and heartbeats flowing — CR-04 confirmed successful.\n- `opencode` showed exit 1 in a crash loop; root cause identified as a fail-fast guard in the OpenCode SQLite adapter rejecting an unknown schema version (`migration=null`, not in the supported list 1–4) after an OpenCode upgrade.\n- The opencode LaunchAgent plist was unloaded to stop the respawn loop.\n- Live DB was inspected: `PRAGMA user_version` returns `0`; the `session` table already contains newer columns (`workspace_id`, `path`, `agent`, `model`, `cost`, token fields) appended via `ALTER TABLE`.\n- Findings written to `/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/opencode-schema-migration-update.md` as a structured pending todo for a follow-up adapter migration fix.",
+    "observationIds": [
+      "c224a3da-433c-4389-a9e0-bb847693428b",
+      "b503c611-280e-4df5-bee6-f1f8e135501f",
+      "948fc0fb-82a3-4df1-a4ca-8362a7d2e825",
+      "98d25562-2da5-4696-bbbf-9e1c255ee8ef"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/opencode-schema-migration-update.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:12:51.915Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f014d774-4bae-4710-8543-ebf937839bc7",
+    "date": "2026-05-27",
+    "theme": "Health Coordinator 404 Diagnosis: Stale Process and Docker Port Conflict",
+    "summary": "Investigated why `/health` and `/health/state` routes on `scripts/health-coordinator.js` returned 404, across multiple diagnostic rounds:\n- PID 1806 was confirmed to be a launchd-managed process (`com.coding.health-coordinator`) started before recent Phase 51 merges, predating the new route additions — a `launchctl kickstart -k` was prescribed to load the updated on-disk binary.\n- Routes `/health` and `/health/state` were confirmed present in the current source via grep, ruling out a code omission.\n- Further investigation (observation 19) revealed that port 3033 is actually owned by a **Docker container** (`coding-services`) acting as a port-forward; the host Node.js process (PID 7499) is only a *client* connecting to that port, not the listener — meaning prior `/api/health` 200 responses came from the container's Health API, not the coordinator.\n- Artifact `53-01-PLAN.md` was edited during diagnosis.",
+    "observationIds": [
+      "a28cd31f-7554-4a2e-a390-92aef3e53686",
+      "4fff43de-29ab-47bc-85ba-73853e8c6f70",
+      "508d09d5-b185-4cec-98d5-f9995e7a607a",
+      "0a9a976a-af3b-4ff3-9b55-ccbde65bccb1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/53-uat-probe-sub-agent-capture/53-01-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:12:51.915Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1d3f889b-95c3-4c31-ba25-9244be77684f",
+    "date": "2026-05-27",
+    "theme": "Phase 53 UAT Probe: Sub-Agent Capture FSEvents Scaffold",
+    "summary": "Scaffolded and initiated a throwaway UAT probe phase (53) to satisfy Phase 51 AC #3 (sub-agent capture verification):\n- Baseline locked: `BASELINE_TS=1779905466`, `BASELINE_LIVE=2`, `BASELINE_BACKFILL=117`.\n- Created `.planning/phases/53-uat-probe-sub-agent-capture/` directory structure and authored `53-01-PLAN.md` defining a single-executor sub-agent task scoped to exercising `live-claude`'s FSEvents watch.\n- A ROADMAP entry was added for phase 53.\n- Orchestrator completed discovery (1 plan, no prior state, live-claude watcher active) and prepared to dispatch the executor sub-agent.\n- `live-claude.log` was tailed to confirm the watcher was heartbeating (`watched=1`, `tailing=0`, `registered=0`) before the probe sub-agent was triggered by opening a separate Claude Code session running `/gsd-execute-phase 53`.",
+    "observationIds": [
+      "227d7931-a1c3-4463-881d-17f0a7808066",
+      "2c8ab57c-4bee-4223-bcaf-03bbf5973b72",
+      "c5213f43-b93e-45b0-81af-6ba5118b0a61",
+      "9c9527df-3c48-4fb0-94f5-61e24a189aca"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/53-uat-probe-sub-agent-capture/53-01-PLAN.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/ROADMAP.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/sweep-llm-proxy-probe-fix.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:12:51.915Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fb9c4c89-bb7a-4b5e-bd7f-41837b9ca9dd",
+    "date": "2026-05-27",
+    "theme": "AC Verification: SQLite <USER_ID_REDACTED> and Sweep Status Checks",
+    "summary": "A series of verification <USER_ID_REDACTED> and sweep checks were run to confirm Phase 51 acceptance criteria, primarily in a new terminal session where `$BASELINE_TS` was not exported:\n- Fixed `$BASELINE_TS` not being set by substituting the hardcoded literal `1779905466` directly into SQLite <USER_ID_REDACTED>.\n- AC #3 confirmed: 3 new `source='sub-agent'` rows written since baseline (total 5, up from 2); both rows had valid `sub_hash` and `parent_session_id` fields; empty `ts` display column attributed to milliseconds-vs-seconds datetime conversion, not a data integrity issue.\n- AC #1 (idempotency): backfill observation count held at 117.\n- AC #2 (fresh LSL files): `find` returned empty — attributed to the phase 53 sub-agent still being active; LSL flush is expected only on sub-agent *completion*.\n- AC #6 (aggregator health): confirmed healthy with registry tracking one active sub-agent.\n- Sweep was kickstarted via launchctl; sweep confirmed running at 20:29 with 117 backfill observations, no new `_S<slot>` LSL files due to timing gap.\n- Artifacts edited: `sweep-llm-proxy-probe-fix.md`, `53-01-PLAN.md`.",
+    "observationIds": [
+      "7ee5b9c6-1fcf-460a-b0f0-33ca81337b04",
+      "2d9d57ec-146e-43d7-97f0-5d77f6e29d8b",
+      "930af8a8-27dc-44ab-8c77-d41a1321535b",
+      "5c11628b-f214-4951-8b8b-5c9913119f26",
+      "50efd77b-0429-4275-a3e9-5801900d7280"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/sweep-llm-proxy-probe-fix.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:12:51.915Z",
+    "metadata": {
+      "sourceCount": 5
+    },
+    "project": "coding"
+  },
+  {
+    "id": "73184509-38d9-4caa-ade7-051503d0f41c",
+    "date": "2026-05-27",
+    "theme": "Sweep Daemon LLM Proxy Probe Bug and JSON Export Source Field Gap",
+    "summary": "Two downstream pipeline bugs were surfaced from a sweep agent diagnostic screenshot and captured as structured pending todos:\n- **Bug 1 (sweep no-ops):** The sweep daemon short-circuits on every run because its LLM proxy probe returns HTTP 500 — likely hitting the wrong port (3033 Docker container vs. the actual host proxy port 12435). This made all prior AC sweep checks vacuous.\n- **Bug 2 (JSON export missing `source`):** The JSON export at `.data/observation-export/observations.json` does not include the `source` field that is correctly stored in the SQLite DB, causing cross-session verification to incorrectly conclude AC #3 was unmet.\n- Phase 51's core DB-writer tagging was confirmed working correctly; both bugs are documented as UAT-surfaced follow-up findings rather than plan failures.\n- Todos written:\n  - `/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/sweep-llm-proxy-probe-fix.md`\n  - `/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/json-export-missing-source-field.md`",
+    "observationIds": [
+      "70e9f3c8-9c18-454f-a633-734ef24d4c2f",
+      "de3770e2-ce7c-41cb-95a4-63723c7a4153",
+      "662c2811-5072-4055-9d5a-90324e2042fc"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/sweep-llm-proxy-probe-fix.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/json-export-missing-source-field.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:12:51.915Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
+  },
+  {
+    "id": "904dfaa7-eebf-4de3-a2a3-29f907af81e4",
+    "date": "2026-05-27",
+    "theme": "Phase 51 UAT Closure and Final Outcome Recording",
+    "summary": "Phase 51 was formally closed following user selection of option 2 from the UAT decision prompt:\n- `/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-HUMAN-UAT.md` was updated multiple times (observations 32–34 represent parallel/redundant agent executions of the same close action) to record final UAT outcomes and mark the phase complete.\n- A background task (\"Wait until SLA deadline, then re-check all five must-have signals\") completed with exit code 0; its output was reviewed and a clarifying question was raised about whether 69 rows referencing sub-agents are tagged with `source='sub-agent'` or merely mention sub-agents in text content.\n- `51-16-SUMMARY.md` was also updated to reflect final phase outcomes.",
+    "observationIds": [
+      "ee0da5b4-c477-461c-94b0-cb9c7392cabd",
+      "59e18bcc-91dc-4029-902d-141d29da93b1",
+      "a412920c-d579-42ac-95f8-38fbe0f570c0",
+      "73ba334f-099a-46bc-8800-7054683ada93"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-HUMAN-UAT.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-16-SUMMARY.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:12:51.915Z",
+    "metadata": {
+      "sourceCount": 4
+    },
+    "project": "coding"
+  },
+  {
+    "id": "10e5c465-baf5-4b17-9138-5dcd41c073eb",
+    "date": "2026-05-27",
+    "theme": "Phase 51 Gap-Closure Code Review and REVIEW.md Refresh",
+    "summary": "The goal was to run a fresh code review for Phase 51 (`51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as`) after a series of gap-closure plans (51-12 through 51-16) rendered the existing `REVIEW.md` stale.\n\n- Observations 36 and 37 both describe the same initiation step: the `gsd-code-review` skill was invoked, the workflow validated the phase, and the agent discovered the pre-existing `REVIEW.md` predated the gap-closure commits — making a scoped re-review necessary.\n- Observation 38 executed the substantive review: all 12 relevant source files were read in parallel and cross-referenced against fix commits `414a030f0..eae204af4`.\n- All four previously recorded critical findings were confirmed resolved:\n  - **CR-01**: OpenCode limit now plumbed correctly\n  - **CR-02**: Heartbeat logic present\n  - **CR-03**: Upsert made atomic\n  - **CR-04**: `<COMPANY_NAME_REDACTED>` Silicon node path corrected\n- New observations from the updated test files and fix commits were documented as well.\n- The artifact `.planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-REVIEW.md` was overwritten in place (not committed).",
+    "observationIds": [
+      "cc85b7af-1e88-4a84-b1dc-316f33a2a1ac",
+      "c7053f01-8543-4c1e-af23-294f80e9f308",
+      "86604d01-12bb-4136-b53f-888c476aeaea"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      ".planning/phases/51-gsd-wave-execution-sub-agent-transcripts-are-not-captured-as/51-REVIEW.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-05-27T19:12:51.915Z",
+    "metadata": {
+      "sourceCount": 3
+    },
+    "project": "coding"
   }
 ]

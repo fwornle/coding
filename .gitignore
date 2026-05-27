@@ -148,6 +148,15 @@ integrations/mcp-server-browserbase/
 .data/ukb-trace-reports/
 .data/step-timing-statistics.json
 
+# Phase 51 sub-agent live-tier runtime state (heartbeats rewritten every 30s
+# by the live-{claude,copilot,opencode} daemons; slot-state is the slot
+# allocator's persistent mapping but is regenerable from .specstory/history/
+# listings via scripts/write-sub-agent-lsl.mjs --historical).
+.data/sub-agent-live-state.json
+.data/sub-agent-live-state-*.json
+.data/sub-agent-slot-state.json
+.data/sub-agent-sweep-state.json
+
 # Ontology suggestions (runtime-generated, not needed in git)
 .data/ontologies/suggestions/
 
