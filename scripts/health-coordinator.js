@@ -209,6 +209,28 @@ const currentState = {
     totals: null,
     last_probe_end: null
   },
+  // Phase 51 Plan 11 — sub-agent capture freshness across all four agents.
+  // Reads the per-agent heartbeat files in .data/sub-agent-live-state-*.json
+  // via lib/lsl/registry-reader.mjs (the same helper Plan 51-10's statusline
+  // uses). status: 'unknown' before first probe · 'healthy' if at least one
+  // live daemon has a fresh heartbeat · 'degraded' if all heartbeats are
+  // stale (>90s) or missing. Mastra is forward-compat (no Path A daemon yet
+  // per CONTEXT.md / RESEARCH-mastra.md), so it always reports available:
+  // false with the documented rationale.
+  sub_agent_capture: {
+    status: 'unknown',
+    live_registrations: {
+      claude: { running: 0, last_heartbeat_age_ms: null },
+      opencode: { running: 0, last_heartbeat_age_ms: null },
+      copilot: { running: 0, last_heartbeat_age_ms: null },
+      mastra: { running: 0, available: false, reason: 'Path A not viable per RESEARCH-mastra.md' }
+    },
+    last_sweep_at: null,
+    last_sweep_summary: null,
+    registry_size: 0,
+    copilot_lsl_incomplete_marker: true,
+    last_probe_end: null
+  },
   // Proxy semantic-readiness — drives the [🧠] statusline badge (Plan 34-05)
   // and the dashboard proxy-health card (Plan 34-05). semantic_ok=true only
   // after a successful POST /api/complete round-trip with content containing
@@ -585,6 +607,137 @@ async function pollKnowledgePipeline() {
     last_probe_end: probeEndedAt()
   };
   evaluateObsApiAutoHeal();
+}
+
+/**
+ * Phase 51 Plan 11 — surface sub-agent capture state in /health/state.
+ *
+ * Reads the per-agent heartbeat files via lib/lsl/registry-reader.mjs
+ * (Plan 51-10's defensive aggregator — same uid-check + try/catch guarantees
+ * the statusline relies on). Also reads the sweep job's state file
+ * (.data/sub-agent-sweep-state.json) for `last_sweep_at`.
+ *
+ * The aggregator is purely additive — it stamps `currentState.sub_agent_capture`
+ * and never throws (per registry-reader.mjs's defensive contract). On any
+ * unexpected error, the block transitions to status:'unknown' with the error
+ * captured in `reason`.
+ *
+ * status transitions:
+ *   - 'healthy'  — at least one live daemon has a fresh (non-stale) heartbeat
+ *   - 'degraded' — daemons are running but all heartbeats are stale (>90s)
+ *                  OR the live tier is silent while sweep evidence exists
+ *   - 'unknown'  — no heartbeat files exist yet (cold boot / pre-install)
+ *
+ * Mastra is forward-compat: RESEARCH-mastra.md found no Path A spawn hook,
+ * so the agent's `available:false` slot is permanent per CONTEXT.md.
+ *
+ * Dynamic-imports registry-reader.mjs so a stale/missing module doesn't
+ * crash the coordinator at startup (defensive — coordinator MUST keep
+ * running even if Phase 51's lib/lsl is in flux during a deploy).
+ */
+async function pollSubAgentCapture() {
+  const probeEndedAt = () => new Date().toISOString();
+  const stateDir = path.join(REPO_ROOT, '.data');
+  const sweepStatePath = path.join(stateDir, 'sub-agent-sweep-state.json');
+
+  let heartbeats = null;
+  try {
+    const mod = await import('../lib/lsl/registry-reader.mjs');
+    heartbeats = mod.loadAllHeartbeats({ stateDir });
+  } catch (err) {
+    log(`sub_agent_capture: registry-reader import failed: ${err.message}`, 'WARN');
+    currentState.sub_agent_capture = {
+      status: 'unknown',
+      reason: `registry_reader_unavailable: ${err.message}`,
+      live_registrations: {
+        claude: { running: 0, last_heartbeat_age_ms: null },
+        opencode: { running: 0, last_heartbeat_age_ms: null },
+        copilot: { running: 0, last_heartbeat_age_ms: null },
+        mastra: { running: 0, available: false, reason: 'Path A not viable per RESEARCH-mastra.md' }
+      },
+      last_sweep_at: null,
+      last_sweep_summary: null,
+      registry_size: 0,
+      copilot_lsl_incomplete_marker: true,
+      last_probe_end: probeEndedAt()
+    };
+    return;
+  }
+
+  // Aggregate per-agent block. heartbeats[agent] is either:
+  //   - {} (file missing/unreadable/foreign-uid)
+  //   - {...parsed, stale: false, mtime_ms} (fresh)
+  //   - {...parsed, stale: true, age_ms} (stale heartbeat)
+  const now = Date.now();
+  const liveRegistrations = {
+    claude: { running: 0, last_heartbeat_age_ms: null },
+    opencode: { running: 0, last_heartbeat_age_ms: null },
+    copilot: { running: 0, last_heartbeat_age_ms: null },
+    mastra: { running: 0, available: false, reason: 'Path A not viable per RESEARCH-mastra.md' }
+  };
+
+  let anyFresh = false;
+  let anyHeartbeatFile = false;
+  let registrySize = 0;
+
+  for (const agent of ['claude', 'opencode', 'copilot']) {
+    const hb = heartbeats[agent] || {};
+    if (Object.keys(hb).length === 0) continue; // file missing
+    anyHeartbeatFile = true;
+
+    const rows = Array.isArray(hb.registry_rows) ? hb.registry_rows : [];
+    const runningRows = rows.filter((r) => r && r.status === 'running');
+    liveRegistrations[agent].running = runningRows.length;
+    registrySize += runningRows.length;
+
+    if (hb.stale) {
+      liveRegistrations[agent].last_heartbeat_age_ms = hb.age_ms ?? null;
+    } else if (typeof hb.mtime_ms === 'number') {
+      liveRegistrations[agent].last_heartbeat_age_ms = now - hb.mtime_ms;
+      anyFresh = true;
+    }
+  }
+
+  // Read sweep state file. Pure additive — failure here doesn't change status.
+  let lastSweepAt = null;
+  try {
+    if (fs.existsSync(sweepStatePath)) {
+      const stat = fs.statSync(sweepStatePath);
+      const myUid = typeof process.getuid === 'function' ? process.getuid() : null;
+      if (myUid === null || stat.uid === myUid) {
+        const parsed = JSON.parse(fs.readFileSync(sweepStatePath, 'utf-8'));
+        if (parsed && typeof parsed.last_run_at === 'string') {
+          lastSweepAt = parsed.last_run_at;
+        }
+      }
+    }
+  } catch (err) {
+    log(`sub_agent_capture: sweep state read failed: ${err.message}`, 'WARN');
+  }
+
+  // Status decision:
+  //   - 'healthy' if at least one live daemon has a fresh heartbeat
+  //   - 'degraded' if heartbeat files exist but all are stale OR no fresh
+  //     daemon but sweep state shows the sweep tier has run recently
+  //   - 'unknown' otherwise (no heartbeats AND no sweep evidence)
+  let status;
+  if (anyFresh) {
+    status = 'healthy';
+  } else if (anyHeartbeatFile || lastSweepAt) {
+    status = 'degraded';
+  } else {
+    status = 'unknown';
+  }
+
+  currentState.sub_agent_capture = {
+    status,
+    live_registrations: liveRegistrations,
+    last_sweep_at: lastSweepAt,
+    last_sweep_summary: null,  // sweep wrapper doesn't persist a per-run summary yet (forward-compat slot)
+    registry_size: registrySize,
+    copilot_lsl_incomplete_marker: true,  // per CONTEXT.md — copilot tier is degraded-parity by design
+    last_probe_end: probeEndedAt()
+  };
 }
 
 /**
@@ -1557,6 +1710,32 @@ async function runAllChecks() {
       lastDigestAt: null,
       lastInsightAt: null,
       totals: null,
+      last_probe_end: new Date().toISOString()
+    };
+  }
+
+  // ----- Sub-agent capture aggregation (Phase 51 Plan 11) -----
+  // Reads heartbeat files via lib/lsl/registry-reader.mjs + sweep state file
+  // and stamps currentState.sub_agent_capture. Defensive — never throws even
+  // when registry-reader / files are missing (status falls through to
+  // 'unknown' / 'degraded' instead).
+  try {
+    await pollSubAgentCapture();
+  } catch (err) {
+    log(`sub_agent_capture probe threw: ${err.message}`, 'ERROR');
+    currentState.sub_agent_capture = {
+      status: 'unknown',
+      reason: err.message,
+      live_registrations: {
+        claude: { running: 0, last_heartbeat_age_ms: null },
+        opencode: { running: 0, last_heartbeat_age_ms: null },
+        copilot: { running: 0, last_heartbeat_age_ms: null },
+        mastra: { running: 0, available: false, reason: 'Path A not viable per RESEARCH-mastra.md' }
+      },
+      last_sweep_at: null,
+      last_sweep_summary: null,
+      registry_size: 0,
+      copilot_lsl_incomplete_marker: true,
       last_probe_end: new Date().toISOString()
     };
   }
