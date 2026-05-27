@@ -27,6 +27,20 @@
 # .data/live-<agent>.log so they NEVER bleed into the operator's terminal
 # (which would corrupt opencode/copilot's TUI). Matches the user's
 # `nohup ... >> .data/live-<agent>.log 2>&1 &` recipe.
+#
+# Per Phase 51 Plan 12 (CR-04 closure): the three live-daemon plists used
+# to hardcode `/usr/local/bin/node` in ProgramArguments[0], which does NOT
+# exist on Apple Silicon hosts (node lives at /opt/homebrew/bin/node).
+# launchd resolves ProgramArguments[0] BEFORE applying
+# EnvironmentVariables.PATH, so the PATH-based fix has to go via a wrapper.
+# We picked Strategy A (wrapper pattern, mirrors scripts/sub-agent-sweep-job.sh):
+# the plists now invoke `/bin/sh -c 'exec node "$@"' node <script> <args>`
+# so the shell does PATH-driven node resolution at exec time.
+# This installer therefore needs NO node-resolution logic — but we still
+# probe `command -v node` and log the resolved binary so operators can
+# diagnose "wrong node version" issues without spelunking through
+# Console.app. Hard-failing on absent node is NOT necessary: the wrapper
+# will surface a clear ENOENT in .data/live-*.log on first spawn.
 
 set -euo pipefail
 
@@ -49,6 +63,19 @@ log() { printf '[install-sub-agent] %s\n' "$*" >&2; }
 #    to .data/live-<agent>.log to keep the user's terminal clean).
 mkdir -p "${DEST_DIR}"
 mkdir -p "${LOG_DIR}"
+
+# 1a. Plan 51-12 diagnostic: resolve `node` and log the absolute path so an
+#     operator running this on Apple Silicon can confirm the wrapper will
+#     pick up /opt/homebrew/bin/node (Intel: /usr/local/bin/node). Not a
+#     hard gate — the wrapper surfaces a clear ENOENT in .data/live-*.log
+#     if node is genuinely missing. See plist header comment for Strategy
+#     A rationale.
+RESOLVED_NODE="$(command -v node 2>/dev/null || true)"
+if [[ -z "${RESOLVED_NODE}" ]]; then
+  log "WARN: node not on PATH for installer process — live daemons will fail until node is installed (brew install node or equivalent)"
+else
+  log "resolved node binary: ${RESOLVED_NODE} (live daemons use /bin/sh -c wrapper + EnvironmentVariables.PATH)"
+fi
 
 # 2. Iterate every label.
 for LABEL in "${PLISTS[@]}"; do
