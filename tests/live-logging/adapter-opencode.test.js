@@ -134,27 +134,44 @@ describe('opencode-sqlite adapter — discover()', () => {
     probe.close();
   });
 
-  test('Test 3: schema-version guard hard-fails for MAX(id)=9999', async () => {
-    const dbPath = seed({ migrationIds: [9999] });
+  test('Test 3: schema-contract guard hard-fails when a required session column is missing', async () => {
+    // Schema-detection fix (2026-05-27): replaced MAX(id)-vs-SUPPORTED_MIGRATIONS
+    // gate with a column-presence contract check. The original gate broke
+    // when OpenCode upgraded the host schema such that __drizzle_migrations.id
+    // returned NULL (the SERIAL column exists but rows are empty; `hash` is
+    // the new primary key). This test exercises the new failure trigger.
+    const dbPath = path.join(tmpDir, `opencode-missing-agent-${Date.now()}.db`);
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE session (
+        id TEXT PRIMARY KEY,
+        parent_id TEXT,
+        directory TEXT,
+        title TEXT,
+        slug TEXT,
+        time_created INTEGER,
+        time_updated INTEGER
+      );
+      CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, data TEXT);
+      CREATE TABLE part    (id TEXT PRIMARY KEY, message_id TEXT, data TEXT);
+    `);
+    db.close();
+
     await expect(
       adapter.discover({
         searchPaths: [{ type: 'sqlite', dbPath }],
         project: 'coding',
       }),
-    ).rejects.toThrow(/unsupported opencode schema/);
-    // Also assert the migration id is in the message.
-    try {
-      await adapter.discover({
-        searchPaths: [{ type: 'sqlite', dbPath }],
-        project: 'coding',
-      });
-    } catch (err) {
-      expect(err.message).toContain('9999');
-    }
+    ).rejects.toThrow(/unsupported opencode schema.*session.*missing.*agent/i);
   });
 
-  test('Test 4: schema-version guard PASSES for supported migration list', async () => {
-    const dbPath = seed({ migrationIds: [1, 2, 3, 4] });
+  test('Test 4: schema-contract guard PASSES regardless of __drizzle_migrations MAX(id)', async () => {
+    // Companion to Test 3: the original 2026-05 failure trigger (a migration
+    // id not in [1,2,3,4]) is NO LONGER a guard failure — the new check only
+    // cares about column presence on session/message/part. seed() builds a
+    // fully-compatible schema; passing migrationIds=[9999] used to fail, now
+    // discovers successfully.
+    const dbPath = seed({ migrationIds: [9999] });
     await expect(
       adapter.discover({
         searchPaths: [{ type: 'sqlite', dbPath }],

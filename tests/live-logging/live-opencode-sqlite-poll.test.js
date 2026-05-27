@@ -176,8 +176,31 @@ describe('opencode poll watcher - discover (initial tick)', () => {
 });
 
 describe('opencode poll watcher - schema-version guard', () => {
-  test('Test 4: unsupported migration id causes startOpencodeWatcher to throw', async () => {
-    const dbPath = seed({ migrationIds: [9999] });
+  test('Test 4: missing required session column triggers unsupported schema error', async () => {
+    // Schema-detection fix (2026-05-27): the guard moved from
+    // `MAX(id) FROM __drizzle_migrations` (which broke when OpenCode emptied
+    // the id column on host upgrade) to column-presence validation on the
+    // tables the adapter actually reads. This test exercises the new
+    // contract — a session table missing a required column (`agent`)
+    // must trigger the guard.
+    const { default: Database } = await import('better-sqlite3');
+    const dbPath = path.join(tmpDir, `opencode-missing-agent-${Date.now()}.db`);
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE session (
+        id TEXT PRIMARY KEY,
+        parent_id TEXT,
+        directory TEXT,
+        title TEXT,
+        slug TEXT,
+        time_created INTEGER,
+        time_updated INTEGER
+      );
+      CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, data TEXT);
+      CREATE TABLE part    (id TEXT PRIMARY KEY, message_id TEXT, data TEXT);
+    `);
+    db.close();
+
     const registry = createRegistry();
     const writer = makeObservationWriterStub();
     await expect(
@@ -188,7 +211,31 @@ describe('opencode poll watcher - schema-version guard', () => {
         projectRoot: '/Users/Q284340/Agentic/coding',
         pollIntervalMs: 100,
       }),
-    ).rejects.toThrow(/unsupported opencode schema/i);
+    ).rejects.toThrow(/unsupported opencode schema.*session.*missing.*agent/i);
+  });
+
+  test('Test 4a: legacy migration id outside historical SUPPORTED_MIGRATIONS no longer fails (column-contract check only)', async () => {
+    // Companion to Test 4: confirms that an unfamiliar `MAX(id)` value
+    // (the original 2026-05 failure trigger) is NO LONGER a schema-guard
+    // failure under the post-2026-05-27 check. The host's OpenCode upgrade
+    // emptied the migration id column entirely; we must NOT fail-closed on
+    // anything other than the real read-contract invariant.
+    const dbPath = seed({ migrationIds: [9999] });
+    const registry = createRegistry();
+    const writer = makeObservationWriterStub();
+    const handle = await startOpencodeWatcher({
+      dbPath,
+      registry,
+      observationWriter: writer,
+      projectRoot: '/Users/Q284340/Agentic/coding',
+      pollIntervalMs: 200,
+    });
+    try {
+      // Watcher started cleanly — the legacy migration id did NOT block it.
+      expect(typeof handle.stop).toBe('function');
+    } finally {
+      await handle.stop();
+    }
   });
 });
 
