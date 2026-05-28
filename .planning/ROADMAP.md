@@ -740,11 +740,11 @@ Plans:
 **Goal:** Make the dashboard's claim of "what model handled this sub-step" verifiable from live telemetry, drive process tags to per-sub-step granularity (zero `unknown` from semantic-analysis container), and give operators live `{n}/{N}` progress feedback during multi-minute wave-analysis runs.
 **Requirements**: D-01..D-15 (out-of-milestone bug-fix; decision IDs from 52-CONTEXT.md serve as requirement anchors)
 **Depends on:** Phase 51
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 
-- [ ] 52-01-PLAN.md — Process-tags registry + per-call-site override factory + wave1/2/3/4 tagging + semantic-analyzer strangler swap + zero-unknown gate (D-05, D-06, D-07, D-09, D-10, D-11)
+- [x] 52-01-PLAN.md — Process-tags registry + per-call-site override factory + wave1/2/3/4 tagging + semantic-analyzer strangler swap + zero-unknown gate (D-05, D-06, D-07, D-09, D-10, D-11)
 - [ ] 52-02-PLAN.md — Dashboard live LLM badges from /api/token-usage/recent + processTag wiring on WORKFLOW_AGENTS (D-01, D-02, D-03, D-04, D-08)
 - [ ] 52-03-PLAN.md — Throttled per-item progress emission (wave1/2/3/4) + dashboard {n}/{N} ItemProgressBadge (D-12, D-13, D-14, D-15)
 

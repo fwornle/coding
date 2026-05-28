@@ -196,9 +196,17 @@ None new. The plan's `<threat_model>` covers everything Phase 52 introduced. Spe
 - T-52-01-04 (registry tampering via prototype pollution): `PROCESS_TAGS` is exported as `as const`; compile-time literal narrowing makes the registry shape immutable from consumer code without TS-defeating casts.
 - T-52-01-SC (supply-chain): zero new package installs. `better-sqlite3` was already a project dep (`package.json: "better-sqlite3": "^11.7.0"`).
 
-## Self-Check: PENDING
+## Self-Check: PASSED
 
-Self-check verification will be appended after STATE.md updates. Tasks 1-4 commits have been verified by `git rev-parse --short HEAD` capture at each task completion (recorded in the Task Commits section above).
+Verified 2026-05-28T06:01Z:
+
+- File `integrations/mcp-server-semantic-analysis/src/agents/process-tags.ts` exists.
+- File `scripts/verify-zero-unknown.mjs` exists + executable.
+- File `.planning/phases/52-…/52-01-SUMMARY.md` exists.
+- Outer-repo commits exist on main: `af0d824`, `7f446b3`, `c5d6294` (this SUMMARY).
+- Submodule commits exist: `e28f816` (Task 1), `5b3be58` (Task 2) in `integrations/mcp-server-semantic-analysis`.
+- Container has the new compiled dist: `docker exec coding-services test -s /coding/integrations/mcp-server-semantic-analysis/dist/agents/process-tags.js` succeeds.
+- Routing installer applied: live proxy carries 13 wave-analysis-* override entries (`bash scripts/configure-wave-analysis-routing.sh --show | grep -cE "wave-analysis-wave[1-4]"` → 13, >=10 required).
 
 ---
 *Phase: 52-dashboard-llm-routing-label-process-tag-observability-fix*

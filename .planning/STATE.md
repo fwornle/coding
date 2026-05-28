@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: planning
-stopped_at: Phase 52 planned (3 plans, 3 waves) — ready to execute
-last_updated: "2026-05-28T05:25:40.981Z"
-last_activity: 2026-05-27
+status: executing
+stopped_at: Phase 52 plan 01 Tasks 1-4 executed; Task 5 awaiting human-verify checkpoint (production wave-analysis + D-10 zero-unknown gate)
+last_updated: "2026-05-28T06:07:42.738Z"
+last_activity: 2026-05-28 -- Phase 52 execution started
 progress:
   total_phases: 22
   completed_phases: 13
   total_plans: 75
-  completed_plans: 72
+  completed_plans: 73
   percent: 59
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 52 — dashboard llm routing label process tag observability fix
+**Current focus:** Phase 52 — dashboard-llm-routing-label-process-tag-observability-fix
 
 **v7.1 milestone status (KM-Core unification — 6 of 10 phases done):**
 
@@ -51,11 +51,11 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 52
-Plan: Not started
-Status: Ready to plan
+Phase: 52 (dashboard-llm-routing-label-process-tag-observability-fix) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 52
 Next step: Run `/gsd-execute-phase 51` in a fresh session. Phase 51 has 11 plans in 6 waves: W1=registry+dispatcher, W2=four parallel per-agent sweep adapters (claude/opencode/copilot/mastra), W3=D-LSL-Filename writer + 2026-05-23 backfill, W4=three parallel per-agent live hooks (mastra excluded — Path A not viable per RESEARCH-mastra.md), W5=statusline mitigation replacement (1 human-verify checkpoint — live tmux render), W6=launchd × 4 + health-coordinator + final 6-AC verification (2 human-verify checkpoints). All 4 RESEARCH-{claude,opencode,copilot,mastra}.md shipped 2026-05-26; D-Reuse cumulative gate enforced across all 11 plans (Phase 50 primitives unchanged). After Phase 51 closes, STATE re-points to Phase 43 (v7.1 OKM Cross-Repo Migration) — task #4 in the session task list captures this future transition.
-Last activity: 2026-05-27
+Last activity: 2026-05-28 -- Phase 52 execution started
 
 ## Performance Metrics
 
@@ -173,6 +173,10 @@ Last activity: 2026-05-27
 - [Phase ?]: [Phase 42.2-03]: QdrantSyncService retired in full — outer-repo scripts/sync-graph-to-qdrant.js rewritten to construct GraphKMStore (with mandatory ontologyDir per CLAUDE.md) + wrap @qdrant/js-client-rest and call km-core syncQdrantFromStore (Phase 42-04 D-52a). DatabaseManager.qdrantSync field DELETED OUTRIGHT (planner discretion per D-Qdrant step 2 — bidirectional sync was vestigial). Single outer-repo commit (NOT submodule+pointer-bump pair) because src/knowledge-management/ is the symlink target of integrations/mcp-server-semantic-analysis/src/knowledge-management/ — matches Phase 42.1.2-02 precedent. Legacy --teams CLI flag honored as deprecated no-op for operator CLI surface compat. Monorepo grep gate clean (0 live-code QdrantSyncService hits).
 - [Phase ?]: [Phase 42.2-02]: Canonical-emit gap closed (4 gaps from forensics §4). Gap 1: canonical-mapper.ts CanonicalMapperOptions.team?: string + length>0 guard; metadata.team stamped from options.team. Gap 2: new llm-with-process.ts direct-fetch wrapper sets body.process on /api/complete (SDK has no process field per forensics §2.2); records into SDK MetricsTracker via duck-typed interface so wave-controller tracer instrumentation is unaffected. 7 wave-agent call sites re-routed (wave1×3, wave2×2, wave3×2). Gap 3: scripts/augment-team-field-42.2.mjs EXECUTED inline — 802 entities backfilled with metadata.team='coding' in .data/knowledge-graph-migrated/; idempotent re-run confirmed skipped=802. Gap 4: km-core-adapter storeEntity _options → options + explicit team merge. Rule 1 deviation: augment script passes includeSuperseded:true to iterate() because 42-05 migration set validUntil:null on every entity and km-core's isActive filter drops them by default (Plan 05 dir-swap is natural cleanup point). Single submodule commit c8c6cc7 + outer-repo pointer-bump 229f7b338 per CLAUDE.md dual-commit dance (src/agents/ is REAL dir, NOT symlink). 37/37 tests pass across 8 suites.
 - [Phase ?]: [Phase 42.2-04]: Legacy persistence trio retired — persistence-agent.ts + graph-database-adapter.ts (real-subdir submodule deletions) + GraphDatabaseService.js + GraphDatabaseService.d.ts (symlinked-subdir outer-repo deletions). All ~30 consumer call sites in coordinator.ts + tools.ts + content-validation-agent.ts rewired to the km-core adapter. Rule 1 deviation: wave-controller.ts was NOT in the plan's <interfaces> block but also imported the trio (GraphDatabaseAdapter + type-only SharedMemoryEntity/EntityRelationship/GraphEntity) — full rewire required; type defs extracted to a new dependency-free src/types/shared-memory-types.ts module. Rule 3 deviations: (a) DatabaseManager.js initializeGraphDB() reduced to a no-op stub (the dynamic import would have failed at runtime; no src/ consumer reads .graphDB); (b) GraphKnowledgeExporter.js JSDoc comment "Reads from GraphDatabaseService" was matching the grep gate's `from.*GraphDatabaseService` regex — rephrased; (c) orphan integration tests at submodule root (test-ontology-integration.ts + test-validation-integration.ts) deleted because they imported the trio and were not part of npm test. New helpers in src/storage/legacy-consumer-helpers.ts (saveSuccessfulWorkflowCompletion, linkInsightDocuments, cleanupEntityFiles, exportKnowledgeToJSON — file-system-only ports of the non-graph methods). km-core-adapter.ts extended with initialize/close/renameEntity/updateEntityObservations + file-rename helper. ContentValidationAgent.setKmCoreAdapter collapses the legacy setGraphDB + setPersistenceAgent setter pair. DeduplicationAgent.registerAgent('knowledge_graph'/'persistence') retired without replacement (legacy contract is incompatible with km-core; wave-controller path is canonical). Cross-repo commit pair: submodule a27aac6 + outer-repo 8bfee7faf. Full submodule test suite 80/80 GREEN both before and after deletion. Known residual (out of scope): 8 orphan operator test scripts under scripts/ + 5 sibling files in src/knowledge-management/ still reference the retired trio — slated for a follow-up housekeeping phase.
+- [Phase 52-01]: D-06 createLLMWithProcess complete() accepts optional per-call process override; wave-level default preserved as safety-net. Backward-compatible with all 3 existing direct-construction callers (wave1/2/3).
+- [Phase 52-01]: PROCESS_TAGS registry ships with 9 keys NOT 10 — WAVE3_RELATION_DISCOVERY omitted because kg-operators.ts edgePrediction is pure score-based math (cos+AA+CA), zero LLM call to tag. Future phase that introduces LLM-driven relation discovery re-adds the constant. Documented as @remarks in process-tags.ts.
+- [Phase 52-01]: D-09 SemanticAnalyzer.analyzeContent strangler swap — when options.process is truthy non-empty string, route through llmWithProcessComplete with SDK MetricsTracker passed for getDetailedCalls() contract. SDK direct path preserved unchanged for orphan callers. Strangler gate is typeof check, not just truthy, to defend against empty-string slip-through that would store '' as the telemetry tag.
+- [Phase 52-01]: configure-wave-analysis-routing.sh extended in-phase with 9 per-sub-step entries. CHEAP (copilot/claude-haiku-4.5) for classify + diagram-repair recovery paths; HEAVY (copilot/claude-sonnet-4.6) for analyze/insight/generation/extract paths. Pre-Phase-52 wave-level entries preserved. Live proxy applied 9 new override changes; 13 total wave-analysis-* entries.
 
 ### Blockers/Concerns
 
@@ -220,11 +224,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 42.2 P03 | ~7m | 3 tasks | 4 files |
 | Phase 42.2 P02 | 19min | 4 tasks | 8 files |
 | Phase 42.2 P04 | ~80m | 4 tasks (+3 Rule 1/3 deviations) | 18 files (2 created, 10 modified, 6 deleted) |
+| Phase 52 P01 | 11min | 4 tasks | 10 files |
 
 ## Session Continuity
 
-Last session: 2026-05-28T05:25:40.967Z
-Stopped at: Phase 52 planned (3 plans, 3 waves) — ready to execute
+Last session: 2026-05-28T06:07:42.731Z
+Stopped at: Phase 52 plan 01 Tasks 1-4 executed; Task 5 awaiting human-verify checkpoint (production wave-analysis + D-10 zero-unknown gate)
 Resume with: Phase 50 — `/gsd-discuss-phase 50` to begin discuss→plan→execute pipeline for LSL-grounded async observation resolver (see 50-CONTEXT.md). Phase 51 (agent-agnostic sub-agent capture) follows immediately on 50's close; share primitives per 51 Should #10. After both backlog phases complete, STATE Current Position re-points at Phase 43 (v7.1 OKM Cross-Repo Migration / INT-03, blocking the v7.1 close-out chain at 44/45/46).
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
