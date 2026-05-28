@@ -1518,10 +1518,37 @@ async function pollNetworkStatus() {
     });
   }
 
+  // 2b. PAC-unreachable fallback: some corporate network segments don't carry
+  //     `muc.proxy-pac.bmwgroup.net` in DNS but still permit egress through a
+  //     locally-running proxydetox/px (Kerberos-authenticating against the
+  //     upstream corporate proxy). Mirrors the wrapper's `probe_local_px_proxy`
+  //     fallback at `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` so the
+  //     coordinator's location classification matches the rapid-llm-proxy's
+  //     HTTPS_PROXY decision. Without this, the dashboard reports
+  //     `location: open` and `Local proxy: Offline` while the bridge is happily
+  //     tunneling Copilot/Anthropic traffic through 127.0.0.1:3128.
+  let pxFunctional = false;
+  if (!pacResolved && portListening) {
+    pxFunctional = await new Promise(resolve => {
+      const req = http.get('http://127.0.0.1:3128/', {
+        timeout: 4000,
+        headers: { Host: 'api.github.com' }
+      }, res => {
+        res.resume();
+        resolve(res.statusCode < 502);  // any response (incl. 407) = functional
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+    });
+    if (pxFunctional) log('network: PAC unreachable but local px proxy functional — classifying as corporate', 'INFO');
+  }
+
   if (pacResolved && onPhysicalCN) {
     netState.location = 'corporate';  // physically on CN (proxy needed for internet)
   } else if (pacResolved) {
     netState.location = 'vpn';        // CN reachable but high latency = VPN tunnel
+  } else if (pxFunctional) {
+    netState.location = 'corporate';  // PAC-unreachable but px-proxydetox tunnels OK
   } else {
     netState.location = 'open';       // open internet, no corporate access
   }
