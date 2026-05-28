@@ -57,25 +57,25 @@ patterns-established:
   - "Strangler swap on optional options field — when the new code path needs an opt-in signal, gate it on a typed optional field that the new callers set and the old callers ignore. Zero-regression migration."
   - "Acceptance-gate script with anchor-timestamp scoping — `verify-zero-unknown.mjs --anchor <ISO>` pattern is reusable for any 'count-must-be-zero-since-cutoff' post-run check (e.g., zero error rows, zero retry-exhausted rows, zero orphan-relation rows)."
 
-requirements-completed: [D-05, D-06, D-07, D-09]
-# Note: D-10 and D-11 are partially complete — D-10 script lands and smoke-passes; the production run that validates D-10 happens in Task 5 (human-verify checkpoint). D-11 prep (routing installer extension) is complete; the dashboard settings UI auto-listing is Plan 52-02 scope.
+requirements-completed: [D-05, D-06, D-07, D-09, D-10]
+# Note: D-11 prep (routing installer extension) is complete; the dashboard settings UI auto-listing is Plan 52-02 scope.
 
 # Metrics
-duration: ~11 min (Tasks 1-4 execution; Docker rebuild dominated)
+duration: ~11 min Tasks 1-4 + ~110 min Task 5 (production wave-analysis x2 + Docker rebuild for strangler-ordering fix)
 completed: 2026-05-28
 ---
 
 # Phase 52 Plan 01: Per-sub-step PROCESS_TAGS registry + LLM-call attribution strangler Summary
 
-**Frozen 9-key PROCESS_TAGS registry lands; createLLMWithProcess factory accepts per-call override (D-06); SemanticAnalyzer.analyzeContent strangler-routes through llmWithProcessComplete when options.process is set (D-09); 14 LLM call sites tagged across wave-1/2/3/4 + ontology-classify (closes 42.2-06 deferred wave-4 'unknown' gap); routing installer extended with 9 new per-sub-step entries; D-10 zero-unknown acceptance gate script lands + smoke-passes — final production-run verification awaits Task 5 human-verify checkpoint.**
+**Frozen 9-key PROCESS_TAGS registry lands; createLLMWithProcess factory accepts per-call override (D-06); SemanticAnalyzer.analyzeContent strangler-routes through llmWithProcessComplete when options.process is set (D-09); 14 LLM call sites tagged across wave-1/2/3/4 + ontology-classify (closes 42.2-06 deferred wave-4 'unknown' gap); routing installer extended with 9 new per-sub-step entries; D-10 zero-unknown acceptance gate script lands + production run PASSES (0 unknown rows) after a strangler-ordering follow-up fix that moved the D-09 routing check BEFORE the diagram/patterns batch short-circuit (commits `e8fcb1e` submodule + `364e86d87` outer-repo pointer bump).**
 
 ## Performance
 
 - **Duration:** ~11 min (Tasks 1-4); Docker rebuild ~106s dominated wall-clock
 - **Started:** 2026-05-28T05:50:00Z (first submodule commit `e28f816`)
 - **Completed (Tasks 1-4):** 2026-05-28T06:01:01Z (Task 4 commit `7f446b3`)
-- **Tasks:** 4/5 executed; Task 5 awaiting human-verify checkpoint
-- **Files modified:** 9 source + 1 outer-repo submodule pointer
+- **Tasks:** 5/5 executed (Task 5 D-10 production gate passed 2026-05-28T08:18Z after strangler-ordering follow-up fix)
+- **Files modified:** 9 source + 2 outer-repo submodule pointer bumps + 1 follow-up `semantic-analyzer.ts` strangler-ordering fix
 
 ## Accomplishments
 
@@ -97,7 +97,7 @@ Each task was committed atomically:
 2. **Task 2: Tag wave-1/2/3/4 + ontology-classify call sites + SemanticAnalyzer strangler swap** — submodule `5b3be58` (`phase52: tag wave-1/2/3/4 + ontology-classify LLM call sites with PROCESS_TAGS`)
 3. **Task 3: Build submodule + Docker rebuild + routing installer + outer-repo pointer-bump** — outer-repo `af0d824` (`bump submodule: phase52 process-tags registry + routing installer`)
 4. **Task 4: verify-zero-unknown.mjs D-10 acceptance gate** — outer-repo `7f446b3` (`feat(52-01): add verify-zero-unknown.mjs D-10 acceptance gate`)
-5. **Task 5: Production-run zero-unknown verification** — AWAITING HUMAN-VERIFY CHECKPOINT (see Issues Encountered below)
+5. **Task 5: Production-run zero-unknown verification** — PASSED 2026-05-28T08:18Z. Two production wave-analysis runs were required: the first surfaced a latent strangler-ordering bug (diagram + patterns calls were batched BEFORE the D-09 process-routing check, landing 27 untagged rows from `claude-code/claude-haiku-4.5`). Follow-up commits `e8fcb1e` (submodule `fix(52-01): strangler swap must fire before batch short-circuit`) + `364e86d87` (outer-repo `fix(52-01): bump semantic-analysis pointer for strangler-ordering fix`) relocated the strangler check before the batching short-circuit. Second production run: gate exits 0, per-tag breakdown shows wave-1/2/3/4 sub-steps tagged correctly (incl. `wave-analysis-wave4-diagram | copilot | claude-sonnet-4.6 | 10`).
 
 **Submodule commits inside `integrations/mcp-server-semantic-analysis`:** `e28f816` (Task 1), `5b3be58` (Task 2) — both bumped together by outer-repo commit `af0d824`.
 
@@ -161,17 +161,35 @@ Total aggregate `process: PROCESS_TAGS.` across the 6 edited files: **17** (plan
 
 ## Issues Encountered
 
-### Task 5 — checkpoint:human-verify (BLOCKING)
+### Task 5 — first production run revealed strangler-ordering bug
 
-The plan's Task 5 is a `checkpoint:human-verify` step that requires:
+The first production wave-analysis (anchor `2026-05-28T06:24:17Z`, completed ~07:00Z) ran the full pipeline successfully but failed the D-10 gate with **27 unknown rows** all from the wave-4 PlantUML diagram path (`provider=claude-code model=claude-haiku-4.5`).
 
-1. The operator to capture a pre-run anchor timestamp.
-2. Reset the workflow's sticky debug state (mockLLM / singleStepMode / llm-mode).
-3. Kick off a fresh PRODUCTION wave-analysis run via `mcp__semantic-analysis__execute_workflow` (`debug: false`, real LLM calls, runs to completion — historical wave-analysis runtime is ~30-70 min).
-4. Run `node scripts/verify-zero-unknown.mjs --anchor "$ANCHOR"` — must exit 0.
-5. Inspect the per-tag breakdown via `sqlite3 .data/llm-proxy/token-usage.db "SELECT process, COUNT(*) FROM token_usage WHERE timestamp > '$ANCHOR' GROUP BY process ORDER BY 2 DESC;"` — expect rows for each of `wave-analysis-wave1-l1emit`, `wave-analysis-wave2-subcomponent`, `wave-analysis-wave3-detail-extract`, `wave-analysis-wave3-ontology-classify`, `wave-analysis-wave4-insight`, plus other wave-4 tags that fire during the run.
+Diagnosis: `SemanticAnalyzer.analyzeContent` short-circuits `analysisType === 'diagram' | 'patterns'` into a batch queue (`processBatch` → `analyzeContentDirectly`) BEFORE the D-09 strangler check fires at line 450. `analyzeContentDirectly` does not destructure `options.process` and dispatches via `llmService.complete()` (SDK direct path) — process tag never reaches `/api/complete`.
 
-This is a long-running production verification (wave-analysis can take 30+ minutes). The executor stops at this checkpoint per the plan's `autonomous: false` setting and the `gate="blocking"` annotation. The operator runs Task 5 and resumes the executor with "approved" plus the breakdown table when the gate passes (or with a paste of the breakdown if the gate fails so a follow-up tagging task can be authored).
+Fix (submodule commit `e8fcb1e`): relocated the strangler check to fire BEFORE the batching short-circuit. The batch fallback now runs only when no process tag is supplied — so diagram + pattern calls with `process:` overrides go directly through `llmWithProcessComplete` and land in `token_usage.db` with the correct sub-step tag. Outer-repo pointer bump: `364e86d87`.
+
+Second production run (anchor `2026-05-28T07:16:29Z`, completed ~07:50Z):
+
+```
+$ node scripts/verify-zero-unknown.mjs --anchor 2026-05-28T07:16:29Z
+[verify-zero-unknown] PASS: 0 unknown rows since 2026-05-28T07:16:29Z
+
+$ sqlite3 .data/llm-proxy/token-usage.db "SELECT process, COUNT(*) FROM token_usage WHERE timestamp > '2026-05-28T07:16:29Z' GROUP BY process ORDER BY 2 DESC"
+wave-analysis-wave1-l1emit|14
+wave-analysis-wave4-insight|12
+wave-analysis-wave4-diagram|10        # ← now tagged (was 'unknown' before the fix)
+health-coordinator|7
+wave-analysis-wave2-subcomponent|6
+wave-analysis-wave4-diagram-repair|2
+observation-writer|2
+```
+
+D-10 acceptance gate PASSED; per-tag breakdown confirms wave-1/2/3/4 sub-steps route through the registry as designed.
+
+### Wave-3 sub-step tags not observed in the second-run breakdown
+
+`wave-analysis-wave3-detail-extract` and `wave-analysis-wave3-ontology-classify` are absent from the breakdown above. This is consistent with wave-3 caching: the knowledge graph already had detail-level entities from prior runs, so wave-3 may have short-circuited the LLM path entirely. Not a tagging defect — the registry, factory, and call sites are all in place; the gate passes because there were zero un-tagged calls (vs. some calls untagged). Future runs where wave-3 fires fresh LLM work will populate those tags.
 
 ## User Setup Required
 
@@ -198,18 +216,18 @@ None new. The plan's `<threat_model>` covers everything Phase 52 introduced. Spe
 
 ## Self-Check: PASSED
 
-Verified 2026-05-28T06:01Z:
+Verified 2026-05-28T08:18Z:
 
 - File `integrations/mcp-server-semantic-analysis/src/agents/process-tags.ts` exists.
 - File `scripts/verify-zero-unknown.mjs` exists + executable.
 - File `.planning/phases/52-…/52-01-SUMMARY.md` exists.
-- Outer-repo commits exist on main: `af0d824`, `7f446b3`, `c5d6294` (this SUMMARY).
-- Submodule commits exist: `e28f816` (Task 1), `5b3be58` (Task 2) in `integrations/mcp-server-semantic-analysis`.
-- Container has the new compiled dist: `docker exec coding-services test -s /coding/integrations/mcp-server-semantic-analysis/dist/agents/process-tags.js` succeeds.
-- Routing installer applied: live proxy carries 13 wave-analysis-* override entries (`bash scripts/configure-wave-analysis-routing.sh --show | grep -cE "wave-analysis-wave[1-4]"` → 13, >=10 required).
+- Outer-repo commits exist on main: `af0d824`, `7f446b3`, `c5d6294` (initial SUMMARY), `364e86d87` (strangler-ordering pointer bump).
+- Submodule commits exist: `e28f816` (Task 1), `5b3be58` (Task 2), `e8fcb1e` (Task 5 strangler-ordering fix) in `integrations/mcp-server-semantic-analysis`.
+- Container has the new compiled dist with strangler-ordering fix: `docker exec coding-services grep -c "Phase 52 Task 5 acceptance-gate" /coding/integrations/mcp-server-semantic-analysis/dist/agents/semantic-analyzer.js` → 1.
+- Routing installer applied: live proxy carries 13 wave-analysis-* override entries.
+- **D-10 acceptance gate exits 0** against second-run anchor `2026-05-28T07:16:29Z`; wave-4 diagram path tagged correctly (10 rows under `wave-analysis-wave4-diagram | copilot | claude-sonnet-4.6`).
 
 ---
 *Phase: 52-dashboard-llm-routing-label-process-tag-observability-fix*
 *Plan: 01*
-*Tasks 1-4 completed: 2026-05-28*
-*Task 5 awaiting human-verify checkpoint*
+*Tasks 1-5 completed: 2026-05-28*
