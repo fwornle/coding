@@ -62,7 +62,17 @@ mode, url = sys.argv[1], sys.argv[2]
 HEAVY = {'provider': 'copilot', 'model': 'claude-sonnet-4.6'}
 CHEAP = {'provider': 'copilot', 'model': 'claude-haiku-4.5'}
 
+# Phase 52 D-05/D-11 — per-sub-step PROCESS_TAGS entries. Mirrors the 9 keys
+# in integrations/mcp-server-semantic-analysis/src/agents/process-tags.ts.
+# These default to HEAVY (copilot / claude-sonnet-4.6) for the analyze /
+# generation / extract paths, and CHEAP (copilot / claude-haiku-4.5) for
+# the classify / retry / repair recovery paths whose latency profile is
+# small-prompt-small-response. Operators can override per entry via the
+# dashboard settings UI (Plan 52-02) without changing this file.
 WAVE_OVERRIDES = {
+    # Pre-Phase-52 wave-level entries (preserved for any caller that does
+    # not opt-in to the per-sub-step override — wave-level constants are
+    # still bound at construction in wave{1,2,3}-*-agent.ts):
     'wave-analysis-wave1':        HEAVY,
     'wave-analysis-wave1-enrich': HEAVY,
     'wave-analysis-wave2':        HEAVY,
@@ -70,6 +80,16 @@ WAVE_OVERRIDES = {
     'wave-analysis-sem-analyze':  CHEAP,
     'wave-analysis-sem-analyzer': CHEAP,
     'wave-analysis-staleness':    CHEAP,
+    # Phase 52 D-05 per-sub-step tags (9 keys from PROCESS_TAGS registry):
+    'wave-analysis-wave1-l1emit':              HEAVY,
+    'wave-analysis-wave2-subcomponent':        HEAVY,
+    'wave-analysis-wave3-detail-extract':      HEAVY,
+    'wave-analysis-wave3-ontology-classify':   CHEAP,
+    'wave-analysis-wave4-insight':             HEAVY,
+    'wave-analysis-wave4-diagram':             HEAVY,
+    'wave-analysis-wave4-diagram-repair':      CHEAP,
+    'wave-analysis-wave4-pattern-extract':     HEAVY,
+    'wave-analysis-wave4-docs':                HEAVY,
 }
 
 def get_settings():
