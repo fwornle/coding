@@ -1,38 +1,35 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Human-Curated Write Path" {
-  component "ManualLearning" as ml <<core>>
-  component "GraphDatabaseAdapter" as gda <<api>>
+' ManualLearning SubComponent Architecture
+
+package "Manual Input" {
+  component "Human-Authored Entities" as humanInput <<external>>
 }
 
-package "Storage Layer" {
-  cloud "VKB HTTP API" as vkb <<api>>
-  database "LevelDB" as ldb <<storage>>
+package "Graph Service Layer" {
+  component "GraphDatabaseService.js" as gds <<core>>
+  component "Graphology In-Memory Graph" as graphology <<core>>
+  component "isDirty Deferred-Write Flag" as dirtyFlag <<core>>
+  component "_persistGraphToLevel()" as flushFn <<api>>
 }
 
-package "Event & Export Pipeline" {
-  component "entity:stored Event" as evt <<core>>
-  component "GraphKnowledgeExporter" as gke <<core>>
-  database "Domain JSON Exports" as djson <<storage>>
+package "Canonical Schema" {
+  component "KmCoreStore Format\n(UUIDv7 + Ontology)" as kmCore <<core>>
 }
 
-package "Automated Pipeline" {
-  component "OnlineLearning" as ol <<agent>>
-  component "CheckpointManager" as cm <<core>>
+package "Persistence Layer" {
+  database "LevelDB" as leveldb <<storage>>
+  component "Single 'graph' Blob Key" as graphBlob <<storage>>
 }
 
-ml --> gda : "writes (highest trust)"
-gda --> vkb : "live mode routing"
-gda ..> ldb : "direct mode (lock collision risk)"
-vkb --> ldb : "persists to"
-
-ml --> evt : "triggers entity:stored"
-evt --> gke : "notifies (per domain)"
-gke --> djson : "regenerates (debounced)"
-
-ol --> cm : "commit-hash incremental tracking"
-ol --> gda : "batch writes"
-ml ..> ol : "bypasses batch pipeline"
+humanInput --> gds : "write entities"
+gds --> graphology : "mutates in-memory graph"
+gds --> dirtyFlag : "sets isDirty=true"
+dirtyFlag ..> flushFn : "explicit flush required\n(no auto-trigger)"
+flushFn --> leveldb : "full deserialize/mutate/reserialize"
+leveldb --> graphBlob : "stores under key 'graph'\n(no manual/automated partition)"
+humanInput ..> kmCore : "must conform to"
+gds ..> kmCore : "no schema gate enforced"
 
 @enduml

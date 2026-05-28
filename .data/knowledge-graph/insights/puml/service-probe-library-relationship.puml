@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ServiceProbeLibrary
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ServiceProbeLibrary] as service_probe_library #LightBlue
+[DockerLLMModeControl] as docker_llmmode_control #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[HttpHealthProbe] as http_health_probe #E8F5E8
+[TcpPortProbe] as tcp_port_probe #E8F5E8
+
+dockerized_services --> service_probe_library
+docker_llmmode_control -[hidden]- service_probe_library
+health_coordinator -[hidden]- service_probe_library
+service_probe_library --> http_health_probe
+service_probe_library --> tcp_port_probe
+
+@enduml

@@ -1,0 +1,39 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+title HookConfigurationLayer — SubComponent Architecture
+
+package "Claude Code Runtime" {
+    component "Claude Code\nHook Emitter" as hookEmitter <<external>>
+    component "Hook JSON\nPayload" as hookPayload <<api>>
+}
+
+package "Hook Configuration Layer" {
+    component "Config\nResolver" as configResolver <<core>>
+    component "Schema\nParser" as schemaParser <<core>>
+    component "Rule-Lifecycle\nBinder" as ruleBinder <<core>>
+}
+
+package "Configuration Sources" {
+    component "Project Config\n.coding/hooks.json" as projectConfig <<storage>>
+    component "User Config\n~/.coding-tools/hooks.json" as userConfig <<storage>>
+    component "Constraint Rules\nconstraint-configuration.md" as constraintRules <<storage>>
+}
+
+package "MCP Constraint Monitor" {
+    component "Constraint\nMonitor" as constraintMonitor <<agent>>
+}
+
+hookEmitter --> hookPayload : "emits at\nlifecycle points"
+hookPayload --> schemaParser : "parses tool name,\nfile paths, session context"
+schemaParser --> configResolver : "structured\nhook context"
+
+projectConfig --> configResolver : "project-level\noverrides"
+userConfig --> configResolver : "user-level\ndefaults"
+configResolver --> configResolver : "project overrides\nuser precedence"
+
+constraintRules --> ruleBinder : "rule\ndefinitions"
+configResolver --> ruleBinder : "resolved\nconfig"
+ruleBinder --> constraintMonitor : "bound rules\nto lifecycle triggers"
+
+@enduml

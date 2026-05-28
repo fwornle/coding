@@ -1,35 +1,39 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Adapter Layer" {
-  component "TranscriptAdapter\n[Abstract Base Class]" as ta <<core>>
-  component "AgentImpl\n(Claude Code / other agents)" as ai <<agent>>
-  component "LSLConverter" as lslc <<core>>
+package "Agent Adapter Layer" {
+  component "TranscriptAdapter" as adapter <<api>>
+  component "Claude Code Adapter" as claude <<agent>>
+  component "Copilot CLI Adapter" as copilot <<agent>>
+}
+
+package "LSL Core" {
+  component "LSLConverter" as converter <<core>>
+  component "LSLMetadata" as metadata <<core>>
 }
 
 package "Configuration & Validation" {
-  component "LSLConfigValidator" as lcv <<cli>>
-  database "lsl-config.json" as lslcfg <<storage>>
-  database "redaction-config.yaml" as redcfg <<storage>>
+  component "LSLConfigValidator" as validator <<cli>>
+  database "lsl-config.json" as lslconfig <<storage>>
+  database "redaction-config.yaml" as redactconfig <<storage>>
 }
 
-package "Runtime Backend" {
-  component "AsyncLogBuffer\n(100ms / 50-entry flush)" as alb <<core>>
-  component "FileManager\n(Routing & Rotation)" as fm <<storage>>
+package "Output Storage" {
+  database "JSONL Log Files" as jsonllogs <<storage>>
+  database "Markdown Logs" as mdlogs <<storage>>
 }
 
-package "5-Layer Classification" {
-  component "Ontology\nClassification Pipeline" as clp <<api>>
-}
-
-ai --> ta : extends contract\n(5-method interface)
-ta --> lslc : delegates\nformat conversion
-lslc --> redcfg : applies\nredaction rules
-lcv --> lslcfg : validates schema\n(size & batch bounds)
-lcv --> redcfg : validates schema\n(enabled & categories)
-lslcfg --> ta : configures session\nwindowing & multiUser
-ta --> fm : routes LSL output\n(timeWindow / userHash)
-ta --> clp : classifies\nlog entries
-alb --> fm : buffered\nappendFile write
+claude --> adapter : "extends"
+copilot --> adapter : "extends"
+adapter --> converter : "converts transcripts"
+converter --> metadata : "annotates with userHash+timeWindow"
+metadata --> jsonllogs : "routes per-user file paths"
+converter --> redactconfig : "reads redaction patterns"
+converter --> jsonllogs : "toJSONL()"
+converter --> mdlogs : "toMarkdown()"
+validator --> lslconfig : "validates schema"
+validator --> redactconfig : "validates patterns"
+validator --> converter : "configures maxContentLength"
+validator --> metadata : "enforces userHashLength 6-12"
 
 @enduml

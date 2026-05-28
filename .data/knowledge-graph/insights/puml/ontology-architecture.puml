@@ -1,39 +1,37 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-top to bottom direction
+' Ontology SubComponent Architecture
 
-package "Ontology Interfaces" {
-  component "OntologyClassifier" as classifier <<api>>
-  component "OntologyValidator" as validator <<api>>
+package "Ontology Definition Layer" {
+  component "Ontology Definition Files" as ontoDefs <<core>>
+  component "LegacyOntologyAdapter" as legacyAdapter <<core>>
 }
 
-package "Adapter & Core" {
-  component "LegacyOntologyAdapter" as adapter <<core>>
-  component "OntologyRegistry\n(km-core)" as registry <<external>>
-  component "OntologyConfigManager" as configMgr <<core>>
+package "Classification" {
+  component "OntologyClassificationAgent" as classAgent <<agent>>
+  component "BaseAgent" as baseAgent <<core>>
 }
 
-package "Taxonomy Storage" {
-  database "Upper Ontology\n(Module, Package, Concept)" as upperOnt
-  database "Lower Ontology\n(Domain Subtypes)" as lowerOnt
+package "Validation & Persistence" {
+  component "ContentValidationAgent" as validAgent <<agent>>
+  component "PersistenceAgent" as persistAgent <<agent>>
 }
 
-package "Pipeline" {
-  component "Insight Agents" as insightAgents <<agent>>
-  component "Entity Type Resolver" as resolver <<core>>
-  component "Persistence Step" as persistence <<core>>
-}
+' Ontology layer relationships
+ontoDefs --> legacyAdapter : "loads class hierarchies"
 
-classifier --> adapter : "backed by"
-validator --> adapter : "backed by"
-adapter --> registry : "wraps"
-configMgr --> upperOnt : "manages"
-configMgr --> lowerOnt : "manages"
-configMgr --> registry : "triggers hot-reload"
-insightAgents --> resolver : "semantic signals"
-resolver --> classifier : "resolve ontologyClass"
-resolver --> persistence : "entity + ontologyClass"
-validator --> persistence : "schema gate"
+' Classification relationships
+classAgent --> baseAgent : "extends"
+classAgent --> ontoDefs : "resolves entity types"
+baseAgent --> classAgent : "confidence scoring\n& metadata construction"
+
+' Validation relationships
+validAgent --> ontoDefs : "uses as validation rules"
+baseAgent --> validAgent : "detectIssues() surfaces\nontology mismatches"
+
+' Persistence relationships
+classAgent --> persistAgent : "ontologyClass metadata"
+persistAgent --> classAgent : "mapEntityToSharedMemory()\nprevents redundant classification"
 
 @enduml

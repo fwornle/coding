@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Configuration Layer" {
+    component "redaction-config.yaml" as redactYaml <<storage>>
+    component "api_keys Category" as catApiKeys <<core>>
+    component "pii Category" as catPii <<core>>
+}
+
+package "Adapter Pipeline" {
+    component "TranscriptAdapter" as adapter <<core>>
+    component "convertToLSL()" as convertLSL <<core>>
+    component "watchTranscripts()" as watchTs <<api>>
+}
+
+package "Persistence & Output" {
+    component "LSL Entries" as lslEntries <<storage>>
+    component "Downstream Consumers" as consumers <<external>>
+}
+
+redactYaml --> catApiKeys : "defines"
+redactYaml --> catPii : "defines"
+redactYaml --> convertLSL : "configures patterns"
+
+adapter --> convertLSL : "pipeline stage"
+convertLSL --> lslEntries : "persists pre-redacted"
+convertLSL --> watchTs : "supplies redacted deltas"
+watchTs --> consumers : "emits pre-redacted callbacks"
+
+@enduml

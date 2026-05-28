@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MCPServerPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[MCPServerPattern] as mcpserver_pattern #LightBlue
+[ArchitectureDoc] as architecture_doc #E8F5E8
+[IntegrationOnboarding] as integration_onboarding #E8F5E8
+
+coding_patterns --> mcpserver_pattern
+mcpserver_pattern --> architecture_doc
+mcpserver_pattern --> integration_onboarding
+
+@enduml

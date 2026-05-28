@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Transcript Pipeline" {
+    component "TranscriptAdapter" as ta <<api>>
+    component "watchTranscripts()" as wt <<core>>
+}
+
+package "Session Windowing Layer" {
+    component "SessionWindowing" as sw <<core>>
+    component "LSLMetadata" as lslm <<core>>
+}
+
+package "File Storage" {
+    database "Windowed File\n(HHMM-HHMM)" as wf <<storage>>
+}
+
+cloud "System Wall-Clock" as clock <<external>>
+component "Log Consumer" as lc <<external>>
+
+ta --> wt : "lastEntryCount cursor"
+wt --> sw : "converted LSL entries"
+lslm --> sw : "timeWindow field routing"
+clock ..> sw : "hourly boundary signal"
+sw --> wf : "routes to time-bucketed file"
+lc --> wf : "joins windowed files\nto reconstruct session"
+
+@enduml

@@ -1,47 +1,30 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-top to bottom direction
-
-package "Agent Layer" {
-  component "PersistenceAgent" as pa <<agent>>
+package "Core Knowledge Store" {
+  component "GraphDatabaseService" as gds <<core>>
+  component "Graphology Graph" as graphology <<storage>>
+  database "LevelDB" as leveldb
 }
 
-package "Classification (km-core)" {
-  component "OntologyRegistry" as oreg <<external>>
+package "Migration Pipeline" {
+  component "Entity Type Migration" as etm <<cli>>
+  component "LevelDB to km-core Migration" as kmcmig <<cli>>
 }
 
-package "Storage Layer" {
-  component "GraphDatabaseAdapter" as gda <<core>>
-  component "GraphDatabaseService" as gds <<storage>>
-  component "GraphKnowledgeExporter" as gke <<core>>
-  database "LevelDB" as ldb <<storage>>
+package "Code Intelligence" {
+  component "CodeGraphAgent" as cga <<agent>>
+  database "Memgraph" as memgraph
 }
 
-cloud "VKB HTTP Server" as vkb <<external>>
+component "UKB Trace Report" as ukb <<core>>
 
-package "Code Graph RAG Integration" {
-  component "CodeGraphRAG Service" as cgr <<api>>
-  database "Memgraph" as mg <<storage>>
-}
-
-' Agent to classification and storage
-pa --> oreg : "classify entity\n(5-min cache)"
-pa --> gda : "storeEntity()\n[throws if Unclassified]"
-
-' Adapter dual-mode routing
-gda --> vkb : "live mode:\nHTTP API routes"
-gda --> gds : "direct mode:\nLevelDB access"
-gda --> gke : "attach exporter\n(direct mode only)"
-
-' Service layer
-gds --> ldb : "persist graph"
-gds ..> gke : "entity:stored events"
-gke ..> ldb : "write JSON exports"
-
-' Parallel RAG layer
-cgr --> mg : "structural graph\n(CONTAINS, DEFINES,\nDEPENDS_ON)"
-
-pa ..> cgr : "parallel RAG layer\n(structural queries)"
+gds --> graphology : "manages in-memory graph"
+gds --> leveldb : "batch-writes single-key JSON blob"
+etm --> gds : "canonicalizes entity types\n(System / Project / Pattern)"
+kmcmig --> leveldb : "reads B-shape blobs"
+kmcmig --> ukb : "emits provenance traces"
+cga --> memgraph : "indexes AST entities (Cypher/Bolt)"
+gds ..> ukb : "knowledge lifecycle events"
 
 @enduml

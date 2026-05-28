@@ -1,0 +1,30 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "LLM Call Sites" {
+  component "LLM Callers" as callers <<api>>
+}
+
+package "URL Resolution Core" {
+  component "ProxyURLResolver" as resolver <<core>>
+}
+
+package "Environment Variables (Priority Order)" {
+  component "RAPID_LLM_PROXY_URL" as rapid <<external>>
+  component "LLM_CLI_PROXY_URL" as clienv <<external>>
+  component "LLM_PROXY_URL" as proxyenv <<external>>
+  component "localhost:12435 (default)" as defaultAddr <<external>>
+}
+
+package "Proxy Backend" {
+  component "rapid-llm-proxy daemon" as daemon <<external>>
+}
+
+callers --> resolver : "resolves proxy URL"
+resolver --> rapid : "1st priority"
+resolver --> clienv : "2nd priority"
+resolver --> proxyenv : "3rd priority"
+resolver --> defaultAddr : "4th (final fallback)"
+daemon ..> defaultAddr : "binds to port 12435"
+
+@enduml

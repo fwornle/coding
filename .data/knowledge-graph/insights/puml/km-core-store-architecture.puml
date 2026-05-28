@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Entity Definition" {
+  component "Entity Model\n(UUIDv7, ontologyClass\nvalidFrom / validUntil)" as entity <<core>>
+}
+
+package "Core Store Layer" {
+  component "KmCoreStore" as kmcore <<core>>
+  component "Schema Validator" as schemaval <<core>>
+}
+
+package "Persistence" {
+  component "GraphDatabaseService.js\n(Single-Key Blob)" as graphdb <<storage>>
+  database "LevelDB" as leveldb
+}
+
+package "Read Interface" {
+  component "Domain JSON Export" as domainexport <<api>>
+  component "Downstream Consumers" as consumers <<external>>
+}
+
+entity --> kmcore : "ingested"
+kmcore --> schemaval : "validates pre-write"
+schemaval --> graphdb : "writes if valid"
+graphdb --> leveldb : "serialized blob"
+kmcore --> domainexport : "slices by domain"
+domainexport --> consumers : "domain-scoped export"
+
+@enduml

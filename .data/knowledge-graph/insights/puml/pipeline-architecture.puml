@@ -1,41 +1,44 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Pipeline Configuration" {
-  component "batch-analysis.yaml\n(DAG Definition)" as dagConfig <<core>>
+package "Coordinator Layer" {
+  component "Coordinator" as coordinator <<core>>
+  component "AgentResponse Envelope" as agentResponse <<api>>
 }
 
-package "Orchestration" {
-  component "Coordinator Agent" as coordinator <<agent>>
+package "Agent Pipeline" {
+  component "BaseAgent<TInput,TOutput>" as baseAgent <<core>>
+  component "CodeGraphAgent" as codeGraph <<agent>>
+  component "SemanticAnalysisAgent" as semanticAgent <<agent>>
+  component "OntologyClassificationAgent" as ontologyAgent <<agent>>
+  component "ContentValidationAgent" as contentAgent <<agent>>
 }
 
-package "Processing Pipeline" {
-  component "BaseAgent<TInput, TOutput>" as baseAgent <<core>>
-  component "Observation Agent" as obsAgent <<agent>>
-  component "KG Operator Agent" as kgAgent <<agent>>
-  component "Dedup Agent" as dedupAgent <<agent>>
-  component "Persistence Agent" as persistAgent <<agent>>
+package "Persistence Layer" {
+  component "Deduplication Stage" as dedup <<core>>
+  component "KG Operators" as kgOps <<core>>
+  database "Memgraph Graph Layer" as memgraph <<storage>>
 }
 
-package "Storage Layer" {
-  database "Memgraph" as memgraph <<storage>>
-  component "Shared Memory" as sharedMem <<storage>>
-}
+coordinator --> codeGraph : "dispatch [1]"
+coordinator --> semanticAgent : "dispatch [2]"
+coordinator --> ontologyAgent : "dispatch [3]"
+coordinator --> contentAgent : "dispatch [4]"
 
-dagConfig --> coordinator : "defines DAG\nexecution order"
+codeGraph ..> baseAgent : "extends"
+semanticAgent ..> baseAgent : "extends"
+ontologyAgent ..> baseAgent : "extends"
+contentAgent ..> baseAgent : "extends"
 
-coordinator --> obsAgent : "routes typed input"
-obsAgent --> kgAgent : "response envelope\n(confidence scored)"
-kgAgent --> dedupAgent : "structured entity sets"
-dedupAgent --> persistAgent : "deduplicated entities"
+codeGraph --> agentResponse : "returns"
+semanticAgent --> agentResponse : "returns"
+ontologyAgent --> agentResponse : "returns"
+contentAgent --> agentResponse : "returns"
 
-baseAgent ..> coordinator : "extends"
-baseAgent ..> obsAgent : "extends"
-baseAgent ..> kgAgent : "extends"
-baseAgent ..> dedupAgent : "extends"
-baseAgent ..> persistAgent : "extends"
+agentResponse --> coordinator : "routing decision"
+agentResponse --> dedup : "post-observation"
 
-persistAgent --> sharedMem : "mapEntityToSharedMemory()\nontology metadata pre-population"
-persistAgent --> memgraph : "MEMGRAPH_BATCH_SIZE\nbatched flush"
+dedup --> kgOps : "pre-persistence"
+kgOps --> memgraph : "batch ops (MEMGRAPH_BATCH_SIZE)"
 
 @enduml

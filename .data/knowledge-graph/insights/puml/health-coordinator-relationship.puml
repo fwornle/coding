@@ -5,9 +5,13 @@ title Hierarchy Context: HealthCoordinator
 
 [DockerizedServices] as dockerized_services #FFFFDD
 [HealthCoordinator] as health_coordinator #LightBlue
-[ProcessStateManager] as process_state_manager #F0F0F0
+[DockerLLMModeControl] as docker_llmmode_control #F0F0F0
+[ServiceProbeLibrary] as service_probe_library #F0F0F0
+[PollingScheduler] as polling_scheduler #E8F5E8
 
 dockerized_services --> health_coordinator
-process_state_manager -[hidden]- health_coordinator
+docker_llmmode_control -[hidden]- health_coordinator
+service_probe_library -[hidden]- health_coordinator
+health_coordinator --> polling_scheduler
 
 @enduml

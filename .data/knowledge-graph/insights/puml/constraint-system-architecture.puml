@@ -1,42 +1,40 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-component "Claude Code Agent" as agent <<agent>>
-
 package "Configuration" {
-  component "User Hooks Config\n~/.coding-tools/hooks.json" as userCfg <<external>>
-  component "Project Hooks Config\n.coding/hooks.json" as projCfg <<external>>
+  component "User Config\n~/.coding-tools/hooks.json" as userCfg <<storage>>
+  component "Project Config\n.coding/hooks.json" as projCfg <<storage>>
+  component "HookConfigLoader" as hcl <<core>>
 }
 
-package "Hook Infrastructure" {
-  component "HookConfigLoader" as hookCfg <<core>>
-  component "UnifiedHookManager" as hookMgr <<core>>
+package "Hook Engine" {
+  component "Claude Code\nHook Mechanism" as ccHook <<external>>
+  component "UnifiedHookManager" as uhm <<core>>
 }
 
-package "Violation Persistence" {
+package "Violation Management" {
   component "ViolationCaptureService" as vcs <<core>>
-  database "session-violations.jsonl\n(.mcp-sync/)" as sessionLog <<storage>>
-  database "violation-history.json\n(.mcp-sync/)" as historyJson <<storage>>
+  component "Statistics Engine\ncalculateStatistics()" as stats <<api>>
 }
 
-package "MCP Integration" {
-  component "mcp-constraint-monitor" as mcpMon <<api>>
-  component "Violation Dashboard" as dashboard <<cli>>
+package "Persistence & Reporting" {
+  database "Session Log\nsession-violations.jsonl" as sessionLog <<storage>>
+  database "Violation History\nviolation-history.json" as historyLog <<storage>>
+  component "Dashboard" as dashboard <<external>>
 }
 
-agent --> hookMgr : "pre/post-tool events"
+userCfg --> hcl : "provides defaults"
+projCfg --> hcl : "overrides"
+hcl --> uhm : "merged config\n(timeout, stopOnError)"
 
-userCfg --> hookCfg : "base config"
-projCfg --> hookCfg : "project overrides"
-hookCfg --> hookMgr : "merged handlers\n(priority-sorted)"
+ccHook --> uhm : "pre/post-tool\nlifecycle events"
+uhm --> vcs : "violation events\n(priority-sorted handlers)"
 
-hookMgr --> vcs : "constraint violations\n(sanitized params)"
-vcs --> sessionLog : "appends JSONL"
-vcs --> historyJson : "capped at 1000 entries"
+vcs --> sessionLog : "live stream (JSONL)"
+vcs --> historyLog : "persist (cap 1000)"
+vcs --> stats : "in-memory array"
 
-historyJson --> dashboard : "violation history"
-vcs --> dashboard : "calculateStatistics()"
-mcpMon ..> hookMgr : "MCP bridge"
-mcpMon --> dashboard : "semantic detection\n+ hook format docs"
+historyLog --> dashboard : "history display"
+stats --> dashboard : "real-time metrics\n(24h counts, severity)"
 
 @enduml

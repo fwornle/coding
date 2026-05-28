@@ -1,0 +1,25 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "MCP Constraint Monitor" {
+    component "Constraint Monitor" as constraintMonitor <<core>>
+    component "Hook Execution" as hookExec <<core>>
+}
+
+package "Persistence Layer" {
+    database "ViolationPersistenceStore" as vps <<storage>>
+}
+
+package "Consumers" {
+    component "Dashboard" as dashboard <<external>>
+    component "Status-Line Integration" as statusLine <<cli>>
+}
+
+hookExec --> constraintMonitor : "emits violations"
+constraintMonitor --> vps : "persists violations"
+vps --> dashboard : "query interface"
+vps --> statusLine : "low-latency reads"
+
+@enduml

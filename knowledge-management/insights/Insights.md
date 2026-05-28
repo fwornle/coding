@@ -2,83 +2,92 @@
 
 **Type:** SubComponent
 
-docs/TIERED-MODEL-PROPOSAL.md proposes routing insight generation to higher-capability LLM tiers for complex pattern synthesis while using cheaper models for straightforward extraction, reflecting cost-<USER_ID_REDACTED> tradeoffs
-
-# Insights — Technical Insight Document
+The integrations/mcp-server-semantic-analysis/docs/architecture/agents.md file distinguishes SemanticAnalysisAgent's role from classification, positioning it as the insight-producing agent in the coordinator chain
 
 ## What It Is
 
-`Insights` is a SubComponent of the `SemanticAnalysis` multi-agent pipeline (implemented in `integrations/mcp-server-semantic-analysis/`) that encapsulates the semantic insight generation stage of the knowledge extraction workflow. As documented in `docs/architecture/agents.md`, it centers on a dedicated insight-generation agent responsible for authoring structured knowledge reports from aggregated code and history signals. The component sits between upstream code-graph and git-history ingestion stages and downstream ontology classification, acting as the synthesis layer where raw signals are transformed into named, structured observations.
+Insights is a SubComponent of SemanticAnalysis responsible for deriving structured knowledge artifacts from classified graph data. It sits at the tail end of the agent pipeline — after OntologyClassificationAgent has resolved `entityType` and `ontologyClass` fields on every `AgentResponse` envelope — and transforms that enriched output into confidence-scored insight records, pattern catalog entries, and a final knowledge report. While no source files were directly resolved during analysis, the architectural documentation at `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` explicitly positions `SemanticAnalysisAgent.process()` as the entry point for this work, distinguishing it from the classification phase that precedes it.
 
-The primary purpose of `Insights` is pattern catalog extraction over AST-parsed code graphs. It identifies recurring structural motifs — for example, repeated `DEFINES_METHOD` clusters — and surfaces them as named patterns in the knowledge report. These reports are not free-form text but structured documents that conform to the `BaseAgent` response envelope shared by all agents in the pipeline. The single concrete child of this SubComponent is the `InsightGenerationAgent`, which performs the actual authoring work.
+The component owns three distinct sub-concerns: consuming classified `AgentResponse` envelopes (delegated to its child, AgentResponseInsightConsumer), accumulating recurring entity patterns into a pattern catalog, and authoring the structured knowledge report artifact. Together these concerns form a coherent output layer for the SemanticAnalysis pipeline.
 
 ![Insights — Architecture](images/insights-architecture.png)
 
+---
+
 ## Architecture and Design
 
-The architecture of `Insights` follows the same pattern that governs all stages of the parent `SemanticAnalysis` pipeline: a specialized agent extending the common `BaseAgent<TInput, TOutput>` abstract class. By emitting outputs conforming to the BaseAgent response envelope, each insight carries a confidence score that downstream <USER_ID_REDACTED>-gating uses to accept or discard the observation. This design decision unifies the heterogeneous agent pipeline behind a single contract — issue detection, routing suggestions, and corrections all flow through the same envelope structure used by sibling components such as `Pipeline`, `Ontology`, and `OntologyConfigManager`.
+Insights inherits the same foundational contract as every other agent in the system: the six-step template-method `execute()` sequence enforced by `BaseAgent<TInput,TOutput>` in `src/agents/base-agent.ts`. This means that even though `SemanticAnalysisAgent.process()` is where domain-specific insight logic lives, the steps `calculateConfidence()`, `detectIssues()`, `generateRouting()`, `applyCorrections()`, and `buildMetadata()` are guaranteed to execute afterward in fixed order. The practical consequence is that **every insight carries a confidence score before it is ever written into the knowledge report** — not as an optional field, but as a structural guarantee imposed by the base class. This uniform <USER_ID_REDACTED> signal is one of the more deliberate design decisions in the pipeline, as it allows downstream consumers to make trust-based routing decisions without needing to understand how any individual insight was produced.
 
-A key architectural decision documented in `docs/TIERED-MODEL-PROPOSAL.md` is the tiered routing of LLM workloads. Insight generation is proposed to be routed to higher-capability LLM tiers for complex pattern synthesis, while cheaper models handle straightforward extraction. This reflects an explicit cost-<USER_ID_REDACTED> tradeoff: pattern synthesis — recognizing that several `DEFINES_METHOD` relations cluster into a meaningful structural motif — demands richer reasoning, whereas mechanical extraction does not. The tiering mechanism is external to the agent itself; the agent declares its work type, and the routing layer chooses an appropriate model.
+The separation of pattern catalog extraction as a distinct sub-concern reflects a catalog accumulation model: patterns are not one-off derivations but recurring entity signatures that build up across pipeline runs. This suggests the pattern catalog is a stateful or persistent data structure, not a transient in-memory object, though its backing store is not directly evidenced in the current observations.
 
-The component participates in a producer-consumer relationship within the pipeline DAG defined by `batch-analysis.yaml` (managed by the sibling `Pipeline` component). Knowledge reports produced by insight agents are consumed by KG operator agents, which use them to generate ontology-typed entity triples in coordination with the sibling `Ontology` component. This makes `Insights` a synthesis node that depends on prior code-graph construction and feeds the classification/persistence stages with structured, confidence-scored payloads.
-
-## Implementation Details
-
-The concrete implementation work resides in the child entity `InsightGenerationAgent`, identified in `docs/architecture/agents.md` as the agent responsible for authoring structured knowledge reports. Its inputs are aggregated signals — AST-parsed code graphs and historical signals from git ingestion — and its outputs are structured knowledge reports containing named patterns discovered through the catalog extraction process. Because the agent extends `BaseAgent<TInput, TOutput>`, its output type is automatically wrapped in the standard response envelope, ensuring that consumers receive a uniform shape regardless of which agent produced it.
-
-Pattern catalog extraction is the central technical mechanic. The agent walks the AST-parsed graph looking for recurring structural motifs — clusters of repeated relationships (such as `DEFINES_METHOD`) that indicate a higher-order pattern worth naming. Each surfaced pattern becomes a named entry in the knowledge report. Because pattern significance is inherently probabilistic, every entry is associated with a confidence score so that downstream stages can apply <USER_ID_REDACTED> gates without re-deriving certainty themselves.
+The knowledge report is explicitly separated from its generation logic — the report schema is a first-class artifact, not just a serialized dump of intermediate state. This schema/generation separation is a meaningful design boundary: it means the report format can evolve independently of the rules that produce it, and it establishes the report as the canonical output contract for the Insights component.
 
 ![Insights — Relationship](images/insights-relationship.png)
 
-The confidence scoring mechanism is the contract that ties this component into the larger retry-and-validation machinery of the pipeline. Sibling components such as `BaseAgent` provide the abstract foundation that enforces this envelope; siblings like `Pipeline` enforce DAG ordering; and `OntologyConfigManager` (a singleton per `docs/configuration.md`) provides shared classification thresholds that downstream stages apply to insight outputs. The `LegacyOntologyAdapter` sibling further isolates the agent from concrete km-core registry APIs, so an insight's path to becoming an ontology-typed entity remains decoupled.
+---
 
-## Integration Points
+## Implementation Details
 
-`Insights` integrates with its parent `SemanticAnalysis` pipeline through the `BaseAgent<TInput, TOutput>` contract — the same contract that unifies all sibling agents covering git history ingestion, code graph construction, ontology classification, content validation, and persistence. Inputs arrive from upstream code-graph construction stages and git-history ingestion stages; outputs are picked up by KG operator agents responsible for triple generation. The depends_on edges declared in `batch-analysis.yaml` (administered by the `Pipeline` sibling) make this producer-consumer dependency explicit and enforceable through topological execution order.
+`SemanticAnalysisAgent.process()` is the primary entry point for insight derivation. It operates on graph data that has already been classified — meaning the expensive entity resolution work performed by `OntologyClassificationAgent` is a precondition, not a concurrent concern. The agent applies semantic rules on top of the classified graph, which implies a rule-evaluation model rather than a purely generative one: insights emerge from pattern-matching and semantic inference over structured input, not from freeform analysis.
 
-The connection to ontology infrastructure is indirect but critical. While `Insights` does not classify entities itself, the structured reports it produces are the raw material that the `Ontology` sibling (backed by `OntologyClassifier` and `OntologyValidator`, both wrapping km-core `OntologyRegistry` through `LegacyOntologyAdapter`) operates on. Classification thresholds are managed by the `OntologyConfigManager` singleton, ensuring all pipeline agents share a single authoritative view of ontology paths.
+The child component AgentResponseInsightConsumer handles the intake side of this pipeline step. Its role is scoped to consuming `AgentResponse` envelopes that carry populated `entityType` and `ontologyClass` fields — it does not re-classify or re-resolve entities. This strict sequencing dependency means AgentResponseInsightConsumer can be implemented with the assumption that classification is already complete and correct, simplifying its internal logic considerably.
 
-On the model-routing side, `Insights` integrates with the tiered model strategy proposed in `docs/TIERED-MODEL-PROPOSAL.md`. The agent signals the complexity of its current task — pattern synthesis vs. straightforward extraction — and the routing layer selects an appropriate LLM tier. This is an integration point that affects cost and latency characteristics of the whole pipeline rather than its functional outputs.
+Pattern catalog extraction accumulates recurring entity patterns, suggesting that `SemanticAnalysisAgent` (or a collaborator it delegates to) maintains a catalog data structure that is updated incrementally as entities flow through the pipeline. The fact that this is called out as a distinct sub-concern suggests it has its own logic path within the agent, separate from the per-entity insight derivation work.
 
-## Usage Guidelines
-
-When working with `Insights`, the foremost rule is to respect the `BaseAgent` response envelope. Any extension of `InsightGenerationAgent` must produce outputs that include a confidence score, issue list, routing suggestions, and corrections as appropriate — because downstream consumers (KG operator agents, ontology classifiers, persistence) all rely on this envelope to decide whether to accept, retry, or discard each observation. Bypassing the envelope breaks the pipeline's <USER_ID_REDACTED>-gating guarantees.
-
-Pattern catalog extraction should operate over AST-parsed code graphs rather than raw source text. The observed convention is to look for recurring structural motifs (such as repeated `DEFINES_METHOD` clusters) and to name them as discrete patterns in the report. New extraction logic should follow this same principle: identify a cluster, give it a name, attach a confidence score, and let downstream stages decide whether the named pattern is significant enough to materialize as an ontology entity.
-
-When tuning cost and <USER_ID_REDACTED>, route work according to the proposal in `docs/TIERED-MODEL-PROPOSAL.md`: use higher-capability LLM tiers for complex pattern synthesis and reserve cheaper models for straightforward extraction. Avoid hard-coding model choices inside the agent; instead, declare the nature of the task so the tiering layer can select appropriately. Finally, remember that `Insights` is a producer in the pipeline DAG — changes to the report schema have downstream impact on KG operator agents, so any structural modification must be coordinated with consumers and reflected in the depends_on edges declared in `batch-analysis.yaml`.
+The knowledge report authoring step produces the final structured artifact. The schema is separated from the generation logic, which implies at minimum two distinct objects: a report builder or authoring class, and a report schema or model class. This boundary would allow the report format to be validated, versioned, or consumed by external systems without coupling those consumers to the internal generation mechanics.
 
 ---
 
-### Summary of Key Findings
+## Integration Points
 
-1. **Architectural patterns identified**: Specialized-agent-over-common-abstract-base (`BaseAgent<TInput, TOutput>`); producer-consumer staging in a DAG-orchestrated pipeline; structured response envelope with confidence-based <USER_ID_REDACTED> gating; tiered LLM routing for cost-<USER_ID_REDACTED> balance.
+Insights sits in a strict upstream dependency on OntologyClassificationAgent. No insight generation begins until `entityType` and `ontologyClass` are populated on the `AgentResponse` envelope — this is the handoff contract between the Ontology sibling component and Insights. The coordinator chain documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` makes this sequencing explicit: `SemanticAnalysisAgent` is positioned after the classification agent, not alongside it.
 
-2. **Design decisions and trade-offs**: Uniform envelope across heterogeneous agents (simplicity vs. expressiveness); confidence-score-driven gating (probabilistic acceptance vs. deterministic rules); tiered model routing (cost vs. synthesis <USER_ID_REDACTED>); structured reports as the producer interface (schema rigidity vs. consumer reliability).
+The `BaseAgent` contract defined in `src/agents/base-agent.ts` is the shared structural dependency Insights shares with its siblings Pipeline, Ontology, OntologyRegistry, and KmCoreAdapter. All agents in the system return the same `AgentResponse` envelope format, which is what makes AgentResponseInsightConsumer's intake logic straightforward — the envelope shape is guaranteed regardless of which upstream agent produced it.
 
-3. **System structure insights**: `Insights` is a synthesis stage sandwiched between ingestion/graph-construction and ontology/persistence; its single child `InsightGenerationAgent` is the operational unit; integration is mediated entirely through the `BaseAgent` envelope and the DAG declared in `batch-analysis.yaml`.
+The knowledge report artifact is the primary output interface Insights exposes to the rest of the system. Its separated schema design means external consumers — such as KmCoreAdapter, which centralizes entity write paths via `storage/km-core-adapter.ts` — can depend on a stable report contract without being coupled to insight generation internals. Whether KmCoreAdapter actually consumes the knowledge report is not directly evidenced, but the write-path centralization pattern it implements makes it the natural candidate for persisting report output.
 
-4. **Scalability considerations**: Tiered model routing enables horizontal cost scaling by directing simple extraction to cheaper models. The DAG structure permits parallelism along independent edges. Confidence-score gating allows lossy fast paths where low-confidence insights are discarded without expensive downstream processing.
+---
 
-5. **Maintainability assessment**: Strong — the `BaseAgent` contract isolates `Insights` from sibling concerns, `LegacyOntologyAdapter` decouples it from the concrete km-core registry, and `OntologyConfigManager` centralizes configuration. The chief maintenance risk is schema drift in knowledge reports affecting downstream KG operator agents; this should be controlled through explicit versioning of the report structure.
+## Usage Guidelines
+
+Developers extending or modifying Insights should treat `SemanticAnalysisAgent.process()` as the single authoritative entry point for new insight logic. Adding insight types outside this method — for instance, by injecting logic into `calculateConfidence()` or `buildMetadata()` — would violate the template-method contract and produce inconsistently ordered side effects. The six-step sequence is not advisory; it cannot be short-circuited without throwing exceptions, as the parent context makes clear.
+
+Because `calculateConfidence()` always runs after `process()`, any insight produced by `SemanticAnalysisAgent` will have a confidence score attached before it reaches the report stage. Developers should rely on this guarantee rather than defensively checking for confidence scores downstream. Insights that cannot be meaningfully scored should surface that uncertainty through the confidence value itself (e.g., a low or sentinel score) rather than omitting the field.
+
+Pattern catalog additions should be treated as cumulative state mutations. If the catalog accumulates across pipeline runs, any logic that writes to it needs to handle concurrent or repeated runs gracefully — deduplication and idempotency are implicit requirements given the accumulation model described in the observations.
+
+The schema/generation separation on the knowledge report should be preserved. New report fields belong in the report schema definition; new derivation rules belong in the generation logic. Collapsing these two concerns — for instance, by building the schema dynamically inside the generator — would undermine the report's utility as a stable external contract and make the report harder to validate or version independently.
+
+---
+
+## Architectural Patterns Identified
+
+| Pattern | Where Applied |
+|---|---|
+| Template Method | `BaseAgent.execute()` enforces fixed six-step sequence across all agents |
+| Pipeline / Chain of Responsibility | Coordinator sequences OntologyClassificationAgent → SemanticAnalysisAgent |
+| Schema/Generator Separation | Knowledge report schema decoupled from authoring logic |
+| Catalog Accumulation | Pattern catalog builds incrementally across pipeline runs |
+| Uniform Envelope | `AgentResponse` provides consistent input contract for AgentResponseInsightConsumer |
+
+**Key trade-off:** The template-method design guarantees uniform <USER_ID_REDACTED> signals (confidence scores, metadata) at the cost of mandatory overhead on every agent invocation, even when insights are trivially simple. For Insights specifically, this overhead is acceptable because insight derivation is inherently a heavyweight semantic operation — the fixed steps add marginal cost relative to the core `process()` work.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a multi-agent pipeline in `integrations/mcp-server-semantic-analysis/` that processes git history, LSL/vibe sessions, and AST-parsed code graphs to extract and persist structured knowledge entities. The system orchestrates several specialized agents—covering git history ingestion, code graph construction, semantic insight generation, ontology classification, content validation, and persistence—coordinated through a batch-analysis workflow. Each agent extends a common `BaseAgent<TInput, TOutput>` abstract class that enforces a standard response envelope with confidence scoring, issue detection, routing suggestions, and corrections, enabling robust retry and <USER_ID_REDACTED>-gating across pipeline steps.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis pipeline is structured around a coordinator pattern where specialized agents each extend BaseAgent<TInput,TOutput> defined in src/agents/base-agent.ts. This base class implements a strict template-method execute() that sequences six steps in order: process(), calculateConfidence(), detectIssues(), generateRouting(), applyCorrections(), and buildMetadata(). Every agent—CodeGraphAgent, SemanticAnalysisAgent, OntologyClassificationAgent, ContentValidationAgent—inherits this contract and returns a uniform AgentResponse envelope. This design means a new developer adding an agent only needs to implement the domain-specific process() logic; confidence scoring, issue detection, and metadata construction are guaranteed to run in a consistent order regardless of which agent is invoked. The tradeoff is that the template method imposes overhead steps even when an agent's output is trivially simple, and agents cannot short-circuit the sequence without throwing exceptions.
 
 ### Children
-- [InsightGenerationAgent](./InsightGenerationAgent.md) -- docs/architecture/agents.md identifies a dedicated insight-generation agent responsible for authoring structured knowledge reports from aggregated code and history signals
+- [AgentResponseInsightConsumer](./AgentResponseInsightConsumer.md) -- Based on parent context, insight generation is explicitly sequenced after OntologyClassificationAgent, consuming envelopes with entityType and ontologyClass fields already populated — establishing a strict pipeline dependency
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- batch-analysis.yaml defines the pipeline as a DAG of steps with explicit depends_on edges, enabling topological execution order across coordinator, observation, KG, dedup, and persistence agents
-- [Ontology](./Ontology.md) -- docs/architecture/agents.md describes OntologyClassifier and OntologyValidator as distinct interfaces, both now backed by LegacyOntologyAdapter wrapping km-core OntologyRegistry
-- [OntologyConfigManager](./OntologyConfigManager.md) -- Implemented as a singleton (per docs/configuration.md patterns) to ensure all pipeline agents share a single authoritative view of ontology paths and classification thresholds
-- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- Resolves the architectural issue documented in CRITICAL-ARCHITECTURE-ISSUES.md where OntologyClassifier was tightly coupled to an internal registry; the adapter decouples pipeline agents from the km-core registry's concrete API
-- [BaseAgent](./BaseAgent.md) -- BaseAgent<TInput, TOutput> is a generic abstract class (documented in docs/architecture/agents.md) parameterized on input and output types, enforcing type safety across the heterogeneous agent pipeline
+- [Pipeline](./Pipeline.md) -- BaseAgent<TInput,TOutput> in src/agents/base-agent.ts enforces a six-step template-method execute() sequence (process, calculateConfidence, detectIssues, generateRouting, applyCorrections, buildMetadata) that all pipeline agents must follow without short-circuiting
+- [Ontology](./Ontology.md) -- OntologyClassificationAgent extends BaseAgent and implements domain-specific process() logic for entity type resolution while relying on the base class for confidence scoring and metadata construction
+- [OntologyRegistry](./OntologyRegistry.md) -- LegacyOntologyAdapter implements the strangler-facade pattern, exposing the old ontology-loading interface while delegating internally to km-core OntologyRegistry
+- [KmCoreAdapter](./KmCoreAdapter.md) -- storage/km-core-adapter.ts is the canonical file for this component, centralizing all entity write paths that were previously split across GraphDatabaseAdapter and PersistenceAgent
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

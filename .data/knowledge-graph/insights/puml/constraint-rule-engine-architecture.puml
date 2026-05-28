@@ -1,28 +1,37 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Configuration Layer" {
-  component "Constraint Configuration Schema" as configSchema <<storage>>
-  component "Rule Types & Scopes" as ruleDefs <<core>>
-  component "Enforcement Modes" as enforceModes <<core>>
+package "Constraint Configuration" {
+  database "Constraint Config" as cc <<storage>>
+  component "File Restriction Rules" as fr <<storage>>
+  component "Code Pattern Rules" as cp <<storage>>
+  component "Operation Policy Rules" as op <<storage>>
 }
 
 package "Rule Engine Core" {
-  component "ConstraintRuleEngine" as engine <<core>>
-  component "Syntactic Rule Matcher" as syntacticMatcher <<core>>
-  component "Semantic Constraint Detector" as semanticDetector <<core>>
+  component "Constraint Rule Engine" as cre <<core>>
 }
 
-package "AI Classification" {
-  component "LLM-Assisted Classifier" as llmClassifier <<external>>
+package "Evaluation Strategies" {
+  component "Exact / Pattern Matcher" as epm <<core>>
+  component "Semantic Constraint Detector" as scd <<core>>
 }
 
-configSchema --> ruleDefs : "defines"
-configSchema --> enforceModes : "defines"
-ruleDefs --> engine : "configures"
-enforceModes --> engine : "configures"
-engine --> syntacticMatcher : "pattern evaluation"
-engine --> semanticDetector : "meaning-based evaluation"
-semanticDetector --> llmClassifier : "classification request"
+package "Semantic Infrastructure" {
+  component "Embedding Model" as emb <<external>>
+}
+
+cc --> fr : "defines"
+cc --> cp : "defines"
+cc --> op : "defines"
+
+fr --> cre : "loaded by"
+cp --> cre : "loaded by"
+op --> cre : "loaded by"
+
+cre --> epm : "dispatches exact rules"
+cre --> scd : "dispatches semantic rules"
+
+scd --> emb : "computes embeddings"
 
 @enduml

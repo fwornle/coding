@@ -1,0 +1,29 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "scripts/" {
+  component "health-coordinator.js" as coordinator <<core>>
+}
+
+package "lib/utils/service-probe.js" {
+  component "probeHttpHealth()" as httpProbe <<api>>
+  component "probeTcpPort()" as tcpProbe <<api>>
+}
+
+package "Monitored Services" {
+  component "Next.js Dashboard" as nextjs <<external>>
+  component "Node.js API" as nodeapi <<external>>
+  component "Memgraph" as memgraph <<external>>
+  component "Redis" as redis <<external>>
+}
+
+coordinator --> httpProbe : "HTTP services\nreturns: running | stopped | unknown\n(SPEC R6: never 'healthy')"
+coordinator --> tcpProbe : "non-HTTP services\nreturns: running | stopped | unknown\n(SPEC R6: never 'healthy')"
+
+httpProbe --> nextjs : "HTTP/HTTPS\n2xx/3xx → running"
+httpProbe --> nodeapi : "HTTP/HTTPS\n2xx/3xx → running"
+
+tcpProbe --> memgraph : "net.Socket\nBolt protocol"
+tcpProbe --> redis : "net.Socket\nTCP port"
+
+@enduml

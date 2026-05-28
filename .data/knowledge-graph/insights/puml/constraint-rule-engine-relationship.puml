@@ -5,15 +5,17 @@ title Hierarchy Context: ConstraintRuleEngine
 
 [ConstraintSystem] as constraint_system #FFFFDD
 [ConstraintRuleEngine] as constraint_rule_engine #LightBlue
-[HookInterceptor] as hook_interceptor #F0F0F0
-[MCPConstraintMonitorIntegration] as mcpconstraint_monitor_integration #F0F0F0
-[SemanticConstraintDetector] as semantic_constraint_detector #E8F5E8
-[RuleConfigLoader] as rule_config_loader #E8F5E8
+[HookConfigurationLayer] as hook_configuration_layer #F0F0F0
+[ViolationPersistenceStore] as violation_persistence_store #F0F0F0
+[ConstraintDashboard] as constraint_dashboard #F0F0F0
+[SemanticConstraintEvaluator] as semantic_constraint_evaluator #E8F5E8
+[PatternConstraintEvaluator] as pattern_constraint_evaluator #E8F5E8
 
 constraint_system --> constraint_rule_engine
-hook_interceptor -[hidden]- constraint_rule_engine
-mcpconstraint_monitor_integration -[hidden]- constraint_rule_engine
-constraint_rule_engine --> semantic_constraint_detector
-constraint_rule_engine --> rule_config_loader
+hook_configuration_layer -[hidden]- constraint_rule_engine
+violation_persistence_store -[hidden]- constraint_rule_engine
+constraint_dashboard -[hidden]- constraint_rule_engine
+constraint_rule_engine --> semantic_constraint_evaluator
+constraint_rule_engine --> pattern_constraint_evaluator
 
 @enduml

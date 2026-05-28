@@ -1,0 +1,31 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Agents / Callers" {
+  component "Legacy Callers" as callers <<agent>>
+}
+
+package "Legacy Write Paths (Deprecated)" {
+  component "GraphDatabaseAdapter" as gda <<storage>>
+  component "PersistenceAgent" as pa <<agent>>
+}
+
+package "Adapter Layer" {
+  component "KmCoreAdapter" as kca <<core>>
+  component "MEMGRAPH_BATCH_SIZE" as batchenv <<external>>
+}
+
+package "Storage" {
+  database "km-core Storage Model" as kmcore <<storage>>
+}
+
+callers --> gda : "legacy write path"
+callers --> kca : "strangler-facade redirect"
+gda ..> kca : "superseded by"
+pa ..> kca : "superseded by\n(incl. ontologyClass mapping)"
+batchenv ..> kca : "configures throughput"
+kca --> kmcore : "entity writes"
+
+@enduml

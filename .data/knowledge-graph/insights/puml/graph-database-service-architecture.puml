@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Application Layer" {
+  component "Callers" as callers <<external>>
+}
+
+package "GraphDatabaseService" {
+  component "GraphDatabaseService" as gds <<core>>
+  component "isDirty Flag" as dirty <<core>>
+  component "Graphology Graph" as graphology <<storage>>
+  component "_persistGraphToLevel()" as persist <<core>>
+}
+
+package "LevelDB Storage" {
+  database "LevelDB" as leveldb <<storage>>
+}
+
+callers --> gds : "mutate / trigger flush"
+gds --> graphology : "in-memory mutations"
+gds --> dirty : "mark dirty on mutation"
+dirty ..> persist : "checked on flush"
+gds --> persist : "sole write path\n(explicit only)"
+persist --> graphology : "full serialize"
+persist --> leveldb : "write JSON blob\n(key: 'graph')"
+leveldb ..> graphology : "full deserialize on read"
+
+@enduml

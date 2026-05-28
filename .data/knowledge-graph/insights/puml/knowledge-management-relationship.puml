@@ -13,10 +13,8 @@ title Hierarchy Context: KnowledgeManagement
 [SemanticAnalysis] as semantic_analysis #F0F0F0
 [ManualLearning] as manual_learning #E8F5E8
 [OnlineLearning] as online_learning #E8F5E8
-[VkbApiClient] as vkb_api_client #E8F5E8
-[GraphKnowledgeExporter] as graph_knowledge_exporter #E8F5E8
-[CheckpointManager] as checkpoint_manager #E8F5E8
-[GraphDatabaseAdapter] as graph_database_adapter #E8F5E8
+[KmCoreStore] as km_core_store #E8F5E8
+[GraphDatabaseService] as graph_database_service #E8F5E8
 
 coding --> knowledge_management
 live_logging_system -[hidden]- knowledge_management
@@ -27,9 +25,7 @@ constraint_system -[hidden]- knowledge_management
 semantic_analysis -[hidden]- knowledge_management
 knowledge_management --> manual_learning
 knowledge_management --> online_learning
-knowledge_management --> vkb_api_client
-knowledge_management --> graph_knowledge_exporter
-knowledge_management --> checkpoint_manager
-knowledge_management --> graph_database_adapter
+knowledge_management --> km_core_store
+knowledge_management --> graph_database_service
 
 @enduml

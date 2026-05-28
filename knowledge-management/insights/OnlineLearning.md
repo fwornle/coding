@@ -2,79 +2,85 @@
 
 **Type:** SubComponent
 
-The batch analysis pipeline produces entities that are written through GraphDatabaseAdapter; because the adapter's live/direct mode is set once at startup, long-running pipeline jobs must account for server availability at launch time
+Git history ingestion, LSL session analysis, and code analysis are distinct extraction sources that all converge into the single 'graph' LevelDB blob via GraphDatabaseService.js, with no per-source isolation
 
 # OnlineLearning — Technical Insight Document
 
 ## What It Is
 
-OnlineLearning is a SubComponent within the `KnowledgeManagement` parent component, functioning as the batch analysis pipeline responsible for processing codebase history and producing graph entities at scale. While the observations do not pin down a single source file for OnlineLearning itself (no code symbols were enumerated), its operational footprint is defined by its interactions with three concrete artifacts: `src/utils/checkpoint-manager.ts` (CheckpointManager), `src/knowledge-management/GraphKnowledgeExporter.js` (GraphKnowledgeExporter), and the GraphDatabaseAdapter abstraction it writes through.
+OnlineLearning is a SubComponent of KnowledgeManagement responsible for automated, pipeline-driven knowledge extraction and ingestion into the shared graph store. Unlike its sibling ManualLearning — which accepts direct, human-authored graph mutations — OnlineLearning orchestrates structured extraction from multiple automated sources: Git history ingestion, LSL session analysis, and code analysis. All of these pipelines converge their output into the single Graphology in-memory graph managed by `GraphDatabaseService.js`, which persists the entire graph state as one JSON blob under the LevelDB key `'graph'`.
 
-Functionally, OnlineLearning is the only write path in `KnowledgeManagement` that operates at batch scale. It ingests git history, derives entities from incremental commit ranges, and persists them through the graph layer while emitting `entity:stored` events that downstream consumers react to. Its role is distinct from its sibling `ManualLearning`, which performs single-shot, developer-driven writes through the same adapter but does not generate sustained throughput.
+OnlineLearning contains CodeAnalysisPipeline as a child component, which represents one of the primary extraction sources within this automated learning domain. No dedicated source files or class symbols were directly identified within OnlineLearning's own boundary, suggesting it operates primarily as a coordinative layer whose logic is distributed across its pipeline children and the shared infrastructure of `GraphDatabaseService.js`.
 
 ![OnlineLearning — Architecture](images/online-learning-architecture.png)
 
+---
+
 ## Architecture and Design
 
-The architecture exhibits a clear **pipeline + event-emitter** composition layered over a **dual-mode storage adapter**. OnlineLearning sits at the top of the pipeline, feeding `CheckpointManager` with commit hashes and session counts so that subsequent runs can resume incrementally rather than re-analyze already-covered history. This checkpointing introduces a stateful resumability contract: progress is durable across runs, and partial coverage is observable via completeness scores that CheckpointManager tracks.
-
-Writes flow from OnlineLearning through `GraphDatabaseAdapter`, which inherits from its parent `KnowledgeManagement` a critical design constraint: the adapter calls `VkbApiClient.isServerAvailable()` exactly once at initialization and permanently caches the result as either `live` (HTTP-routed) or `direct` (LevelDB-handle) mode. Because OnlineLearning is a long-running batch process, its routing mode is fixed at launch and never re-evaluated. This is a deliberate trade-off: a single decision point keeps the hot write path branch-free, but it places the burden of correctness on launch-time environment validation.
-
-On the read-side of the write event, `GraphKnowledgeExporter` subscribes to `entity:stored` events and debounces writes to per-domain JSON export files. This **publish-subscribe with debouncing** pattern decouples export latency from write throughput — OnlineLearning can flood the graph at batch speed while the exporter coalesces bursts into manageable file-system operations.
-
-## Implementation Details
-
-The incremental analysis mechanism is anchored in `src/utils/checkpoint-manager.ts`. OnlineLearning passes commit hashes and session counts to CheckpointManager, which persists them as markers indicating which portions of git history have been processed. On subsequent runs, OnlineLearning <USER_ID_REDACTED> these markers to skip already-analyzed commit ranges, making the pipeline idempotent across restarts and efficient against large repositories.
-
-Completeness scoring lives alongside the checkpoint markers. CheckpointManager tracks coverage metrics that let the pipeline report what fraction of the codebase has been analyzed, enabling consumers to prioritize under-covered areas for focused re-runs. This turns the pipeline from a one-shot analyzer into a measurable, iteratively-improving knowledge source.
-
-Entity persistence is implemented as a pass-through to `GraphDatabaseAdapter`. Each successful write emits an `entity:stored` event, which `GraphKnowledgeExporter` at `src/knowledge-management/GraphKnowledgeExporter.js` consumes. The exporter applies per-domain debouncing — entities targeting the same domain export file are batched together — so high-throughput batches from OnlineLearning do not translate into proportional disk I/O. This is essential because batch runs can produce entities at a rate that would otherwise saturate filesystem syncs.
+The central architectural pattern in OnlineLearning is a **DAG-structured batch analysis pipeline**, as reflected in `batch-analysis.yaml` configuration patterns documented in the project. Each step in this DAG produces graph mutations — adding nodes, edges, or metadata — that accumulate in the Graphology in-memory graph. Rather than persisting after each individual write, mutations are deferred and batched until an explicit flush is triggered via `GraphDatabaseService.js`'s `isDirty`/`_persistGraphToLevel()` cycle. This is a deliberate write-deferral design optimized for high-throughput batch extraction where the cost of serializing the full graph blob on every edge write would be prohibitive.
 
 ![OnlineLearning — Relationship](images/online-learning-relationship.png)
 
-## Integration Points
+The multiple extraction sources — Git history, LSL sessions, and code analysis — are architecturally treated as peers. They all write into the same undifferentiated graph namespace with no per-source isolation. There is no partitioning, namespacing, or separate subgraph per extraction source. This keeps the integration model simple (all sources speak the same Graphology mutation API through `GraphDatabaseService.js`) but means that extraction artifacts from different sources are indistinguishable at the storage level once merged.
 
-OnlineLearning sits at the intersection of four collaborators in the `KnowledgeManagement` subsystem:
-
-- **CheckpointManager** (`src/utils/checkpoint-manager.ts`): The state <COMPANY_NAME_REDACTED>. OnlineLearning writes commit hashes and session counts here and reads them back on startup to decide what to skip. CheckpointManager also surfaces completeness scores upward.
-- **GraphDatabaseAdapter**: The write conduit. Whether the adapter is in `live` or `direct` mode was determined at adapter initialization by `VkbApiClient.isServerAvailable()`, and OnlineLearning inherits whichever mode was selected. In `live` mode writes go through the VKB HTTP API; in `direct` mode they hit `GraphDatabaseService` and the LevelDB handle directly.
-- **VkbApiClient**: Not called by OnlineLearning directly, but its availability at the moment of adapter initialization is the silent determinant of OnlineLearning's runtime characteristics. If the VKB HTTP server starts up after the adapter, OnlineLearning will not benefit — it remains in direct mode.
-- **GraphKnowledgeExporter** (`src/knowledge-management/GraphKnowledgeExporter.js`): The downstream listener. It is fully decoupled from OnlineLearning, communicating only through `entity:stored` events.
-
-The sibling `ManualLearning` shares the same `GraphDatabaseAdapter` write path, which means OnlineLearning and ManualLearning compete for the same routing-mode decision. If both run in `direct` mode concurrently, they will collide on the LevelDB single-writer lock — a constraint inherited from the parent `KnowledgeManagement` design.
-
-## Usage Guidelines
-
-**Always validate VKB HTTP server availability before launching OnlineLearning.** Because the routing mode is locked at `GraphDatabaseAdapter` initialization and never re-evaluated, starting a long-running batch job without the server up means the pipeline will run in `direct` mode for its entire duration. This is the most likely source of concurrent-writer collisions in the entire system: OnlineLearning is the only batch-scale writer, so any other process attempting direct LevelDB access during a batch run will be locked out.
-
-**Trust the checkpoint, but verify completeness.** CheckpointManager will faithfully skip already-processed commits, which is desirable for incrementality but can mask gaps if checkpoint state was corrupted or partially written in a previous failed run. Use the completeness scores it exposes to identify under-analyzed areas rather than assuming a successful run implies full coverage.
-
-**Do not assume `entity:stored` consumers see every write synchronously.** GraphKnowledgeExporter debounces per-domain writes, so JSON export files lag behind graph state during active batches. Tools that read export files immediately after a batch completes must either wait for the debounce window to flush or query the graph directly.
-
-**Treat OnlineLearning as the canonical batch writer.** When introducing new write paths into `KnowledgeManagement`, route them through the VKB HTTP API (live mode) rather than direct adapter access. The dual-mode design exists precisely to serialize writers through the HTTP server, and OnlineLearning's batch profile makes it the dominant consumer of that serialization guarantee.
+The child component CodeAnalysisPipeline contributes a well-typed edge vocabulary — `CONTAINS_PACKAGE`, `CONTAINS_FOLDER`, `CONTAINS_FILE`, `CONTAINS_MODULE`, `DEFINES`, `DEFINES_METHOD`, `DEPENDS_ON_EXTERNAL` — reflecting a hierarchical containment and dependency model that structures the graph's semantic layer. This typed edge schema represents the most explicitly documented aspect of OnlineLearning's output contract.
 
 ---
 
-### Summary of Key Findings
+## Implementation Details
 
-1. **Architectural patterns identified**: Incremental checkpoint-driven pipeline; dual-mode storage adapter (inherited from parent); publish-subscribe with debouncing for export decoupling.
-2. **Design decisions and trade-offs**: Routing mode locked at startup trades runtime adaptability for hot-path simplicity; debounced exports trade export freshness for write throughput; checkpoint-based resumability trades storage state complexity for restart efficiency.
-3. **System structure insights**: OnlineLearning is the sole batch-scale writer in `KnowledgeManagement`, making it the gravitational center of concurrency concerns; it shares the adapter with `ManualLearning` and emits to `GraphKnowledgeExporter` via events.
-4. **Scalability considerations**: The exporter's debouncing absorbs batch throughput; CheckpointManager's commit-hash skipping ensures runtime scales with new history rather than total history; the LevelDB single-writer lock is the primary scalability ceiling and is the reason live mode exists.
-5. **Maintainability assessment**: Event-driven decoupling from GraphKnowledgeExporter keeps the export path independently evolvable. The startup-once routing decision is a sharp edge — any future maintainer adding write paths must understand the live/direct distinction or risk introducing lock collisions.
+The mechanics of OnlineLearning's persistence flow are entirely mediated through `GraphDatabaseService.js`. Extraction pipelines write nodes and edges into the Graphology in-memory graph instance managed by that service. Each mutation sets the `isDirty` flag to `true`, signaling that the in-memory state has diverged from what is stored in LevelDB. The actual write to disk — serializing the full Graphology graph to JSON and storing it under the single key `'graph'` — occurs only when a flush is explicitly triggered by calling `_persistGraphToLevel()`.
+
+In the batch pipeline context, this means the typical execution model is: run all DAG steps, accumulate all graph mutations in memory, then flush once at the end. This is efficient but introduces a critical atomicity gap: if the process crashes between the first mutation and the eventual flush, all extracted knowledge from that run is silently lost. There is no incremental checkpointing mechanism — the single-key LevelDB design inherited from the parent KnowledgeManagement architecture does not support partial graph snapshots.
+
+All graph entities written by OnlineLearning's pipelines are expected to carry UUIDv7 identifiers, consistent with the convention enforced across the sibling KmCoreStore. UUIDv7's time-ordered structure means nodes extracted in sequence will have naturally ordered identifiers, which can be useful for debugging extraction runs, though there is no explicit ordering guarantee documented in the pipeline outputs.
+
+---
+
+## Integration Points
+
+OnlineLearning integrates directly with `GraphDatabaseService.js` as its sole persistence interface — all extraction sources funnel through this service rather than writing to LevelDB independently. This creates a clean single-writer model where `GraphDatabaseService.js` owns the canonical graph state, but it also means all pipelines share the same flush lifecycle and the same risk surface for data loss.
+
+The relationship to ManualLearning is architecturally symmetric at the persistence layer: both write to the same Graphology graph via `GraphDatabaseService.js` and both set `isDirty` without automatically triggering a flush. However, OnlineLearning's batch pipeline nature makes the flush gap more dangerous — a manual edit might represent seconds of work, while a failed batch run could represent hours of extraction. There is no documented coordination mechanism between OnlineLearning and ManualLearning to prevent concurrent mutation conflicts in the shared graph.
+
+The child CodeAnalysisPipeline's typed edge vocabulary (`DEFINES`, `DEPENDS_ON_EXTERNAL`, `CONTAINS_FILE`, etc.) represents OnlineLearning's most explicit output contract with downstream consumers. Any component that <USER_ID_REDACTED> the graph for structural code relationships depends on this pipeline having completed successfully and its mutations having been flushed.
+
+---
+
+## Usage Guidelines
+
+**Always ensure flush is triggered after pipeline completion.** Because `GraphDatabaseService.js` defers persistence via `isDirty`, any batch pipeline that exits without explicitly calling `_persistGraphToLevel()` will discard all extracted knowledge silently. This is the single most critical operational rule for OnlineLearning pipelines. There is no safety net — LevelDB will retain the last successfully flushed state with no indication that newer data was lost.
+
+**Treat the batch pipeline as an atomic unit.** Given the lack of incremental checkpointing, a partially completed DAG run that crashes mid-execution leaves the graph in its pre-run state (assuming no flush occurred). Operators should be aware that re-running a pipeline from scratch is the only recovery path, and they should design DAG steps to be idempotent where possible to make full reruns safe.
+
+**Be aware of no per-source isolation.** Because Git history ingestion, LSL session analysis, and code analysis all write into the same undifferentiated graph, there is no mechanism to roll back or reprocess a single extraction source without risk of affecting graph state contributed by others. When debugging extraction issues, developers should not assume that re-running one pipeline step is safe without understanding the full mutation surface of that step.
+
+**Follow the UUIDv7 identifier convention.** Consistent with KmCoreStore's identifier policy, all nodes and edges introduced by OnlineLearning pipelines should use UUIDv7. Deviating from this (e.g., using content-addressed hashes or sequential integers) would break the uniform identity model assumed across the KnowledgeManagement system.
+
+---
+
+### Scalability Considerations
+
+The single-key LevelDB blob design creates a hard scalability ceiling: as the graph grows (more Git history ingested, more code analyzed, more sessions processed), the serialization and deserialization cost of every flush and load grows linearly with graph size. There is no sharding or lazy-loading mechanism. For large codebases or long-running projects, this could become a significant bottleneck. Addressing this would require rearchitecting `GraphDatabaseService.js` at the parent KnowledgeManagement level, not within OnlineLearning itself.
+
+### Maintainability Assessment
+
+OnlineLearning's design is maintainable at small-to-medium scale due to its simplicity: one graph, one flush, one persistence service. However, the absence of checkpointing, source isolation, and crash recovery makes it brittle for long-running or high-stakes extraction workloads. The typed edge schema from CodeAnalysisPipeline is a positive maintainability signal — explicit relationship types make the graph's semantic structure legible and queryable — but this discipline needs to be consistently applied across all extraction sources to remain useful.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] GraphDatabaseAdapter (storage/graph-database-adapter.ts) implements a dual-mode routing strategy that is determined once at initialization time via VkbApiClient.isServerAvailable(), not re-evaluated on each operation. This means if the VKB HTTP server starts or stops after the adapter is initialized, the adapter continues using the mode it selected at startup. In 'live' mode it routes all reads and writes through the HTTP API, avoiding LevelDB's single-writer lock. In 'direct' mode it accesses GraphDatabaseService (which holds the LevelDB handle) directly. The consequence is that two processes attempting direct mode simultaneously will collide on the LevelDB lock — the dual-mode design exists specifically to serialize writers through the HTTP server when it is available. New developers integrating additional write paths must either go through the VKB HTTP API or ensure only one process operates in direct mode at a time.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The primary persistence mechanism in KnowledgeManagement is a single-key LevelDB strategy implemented in `src/knowledge-management/GraphDatabaseService.js`. Rather than storing each graph entity as a separate LevelDB key (which would enable partial reads and atomic per-entity updates), the entire Graphology in-memory graph is serialized as one JSON blob stored under the key `'graph'`. This blob contains all nodes, edges, and metadata. Writes are deferred using an `isDirty` flag — mutations to the graph set `isDirty = true`, and `_persistGraphToLevel()` is only called when a flush is explicitly triggered. This design optimizes for read-heavy, batch-write workloads but creates a risk of data loss if the process crashes between mutations and the next flush. New developers should be aware that any code path that modifies graph nodes or edges must ensure the flush cycle is triggered, or changes will silently remain only in memory.
+
+### Children
+- [CodeAnalysisPipeline](./CodeAnalysisPipeline.md) -- The pipeline produces typed edges documented in project references including CONTAINS_PACKAGE, CONTAINS_FOLDER, CONTAINS_FILE, CONTAINS_MODULE, DEFINES, DEFINES_METHOD, and DEPENDS_ON_EXTERNAL, indicating a hierarchical containment and dependency model.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning writes directly through GraphDatabaseAdapter, which means it must route through the VKB HTTP API (live mode) or risk LevelDB lock collisions in direct mode when other writers are active
-- [VkbApiClient](./VkbApiClient.md) -- VkbApiClient.isServerAvailable() is called once at GraphDatabaseAdapter initialization to determine routing mode — live vs direct — and the result is never re-evaluated, making server availability at startup a critical operational dependency
-- [GraphKnowledgeExporter](./GraphKnowledgeExporter.md) -- GraphKnowledgeExporter subscribes to entity:stored events emitted after each successful graph write, decoupling export from the write path itself
-- [CheckpointManager](./CheckpointManager.md) -- CheckpointManager at src/utils/checkpoint-manager.ts stores commit hashes as markers so the OnlineLearning pipeline can skip already-processed git history on subsequent runs
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter calls VkbApiClient.isServerAvailable() exactly once at initialization and caches the result as the permanent routing mode — no per-operation re-evaluation occurs
+- [ManualLearning](./ManualLearning.md) -- Manual edits write directly to the Graphology in-memory graph via GraphDatabaseService.js, setting the isDirty flag but not automatically triggering _persistGraphToLevel(), meaning unsaved manual edits are at risk of loss if flush is not explicitly called
+- [KmCoreStore](./KmCoreStore.md) -- All entities in the graph blob stored by GraphDatabaseService.js are expected to carry UUIDv7 identifiers, providing time-ordered, globally unique keys without a central ID authority
+- [GraphDatabaseService](./GraphDatabaseService.md) -- GraphDatabaseService.js implements a single-key LevelDB strategy storing the entire Graphology graph as one JSON blob under key 'graph', trading partial-read capability for simplicity
 
 
 ---

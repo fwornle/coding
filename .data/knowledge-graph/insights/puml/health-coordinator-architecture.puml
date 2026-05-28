@@ -3,27 +3,33 @@
 
 top to bottom direction
 
-package "Configuration" {
-  component "health-verification-rules.json" as rules <<storage>>
-}
-
-package "DockerizedServices" {
+package "Health Coordination" {
   component "health-coordinator.js" as hc <<core>>
+  component "State Machine\n(running | stopped | unknown)" as sm <<core>>
 }
 
-package "Service Probing" {
-  component "ServiceProbeLibrary" as spl <<api>>
-  component "Registered Services" as rs <<external>>
+package "Probe Layer" {
+  component "service-probe.js" as sp <<api>>
+  component "probeHttpHealth()" as httpProbe <<api>>
+  component "probeTcpPort()" as tcpProbe <<api>>
 }
 
-package "Runtime State" {
-  database "currentState.services" as css <<storage>>
+package "Monitored Services" {
+  component "Next.js Dashboard" as nextjs <<external>>
+  component "Node.js API" as nodeapi <<external>>
+  database "Memgraph" as memgraph <<storage>>
+  database "Redis" as redis <<storage>>
 }
 
-rules --> hc : "reads evaluation criteria\n(per poll cycle)"
-hc --> spl : "drives polling\n(5s fixed interval)"
-spl --> rs : "probes"
-rs ..> spl : "probe responses"
-hc --> css : "writes aggregated results"
+hc --> sm : "updates state"
+hc --> sp : "polls every 5s"
+
+sp --> httpProbe : "HTTP checks"
+sp --> tcpProbe : "TCP checks"
+
+httpProbe --> nextjs : "HTTP probe"
+httpProbe --> nodeapi : "HTTP probe"
+tcpProbe --> memgraph : "TCP probe"
+tcpProbe --> redis : "TCP probe"
 
 @enduml

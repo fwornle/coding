@@ -6,16 +6,14 @@ title Hierarchy Context: ManualLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [ManualLearning] as manual_learning #LightBlue
 [OnlineLearning] as online_learning #F0F0F0
-[VkbApiClient] as vkb_api_client #F0F0F0
-[GraphKnowledgeExporter] as graph_knowledge_exporter #F0F0F0
-[CheckpointManager] as checkpoint_manager #F0F0F0
-[GraphDatabaseAdapter] as graph_database_adapter #F0F0F0
+[KmCoreStore] as km_core_store #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
+[IsDirtyFlagMutation] as is_dirty_flag_mutation #E8F5E8
 
 knowledge_management --> manual_learning
 online_learning -[hidden]- manual_learning
-vkb_api_client -[hidden]- manual_learning
-graph_knowledge_exporter -[hidden]- manual_learning
-checkpoint_manager -[hidden]- manual_learning
-graph_database_adapter -[hidden]- manual_learning
+km_core_store -[hidden]- manual_learning
+graph_database_service -[hidden]- manual_learning
+manual_learning --> is_dirty_flag_mutation
 
 @enduml

@@ -1,40 +1,32 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Execution Layer" {
-  component "Agent\n(Lazy-Init)" as agent <<agent>>
-  component "Hook System" as hookSystem <<core>>
-  component "LLM Tier Router" as llmRouter <<core>>
-}
-
-package "Configuration" {
-  component "llm-providers.yaml" as llmConfig <<external>>
-  component "hooks-config.json" as hooksConfig <<external>>
-  component "health-verification-rules.json" as healthRules <<external>>
+package "Routing & Agent Layer" {
+  component "LLM Tier Router" as router <<core>>
+  component "Agent Backend" as agent <<agent>>
+  component "Hook System" as hooks <<core>>
 }
 
 package "MCP Integrations" {
-  component "MCP Constraint Monitor" as constraintMonitor <<api>>
-  component "MCP Semantic Analysis" as semanticAnalysis <<api>>
-  component "Code Graph RAG" as codeGraphRag <<core>>
+  component "mcp-constraint-monitor" as monitor <<api>>
+  component "mcp-server-semantic-analysis" as semantic <<api>>
+  component "code-graph-rag" as ragTool <<api>>
 }
 
-database "Graph Database\n(Memgraph)" as graphDB <<storage>>
+package "Knowledge & Graph Storage" {
+  database "Knowledge Graph\n(Memgraph)" as kg <<storage>>
+  component "Knowledge Pipeline" as pipeline <<core>>
+}
 
-llmConfig --> llmRouter : tier policy\n(primary / secondary / local)
-hooksConfig --> hookSystem : hook registry
-healthRules --> agent : health criteria
-
-agent --> llmRouter : routes LLM calls via
-agent --> hookSystem : triggers on execution
-
-hookSystem --> constraintMonitor : constraint callbacks
-hookSystem --> semanticAnalysis : analysis triggers
-
-codeGraphRag --> graphDB : ingests\n(CONTAINS, DEFINES,\nDEPENDS_ON)
-semanticAnalysis --> graphDB : queries structure
-constraintMonitor --> graphDB : reads relationships
-
-semanticAnalysis --> codeGraphRag : shared graph traversal
+router --> agent : "selects tier\n(fast / capable)"
+agent --> hooks : "emits lifecycle events"
+hooks --> monitor : "constraint callbacks"
+monitor --> hooks : "registers handlers"
+agent --> semantic : "semantic analysis queries"
+agent --> ragTool : "RAG context queries"
+ragTool --> kg : "graph traversal\n(CONTAINS_*, DEFINES, DEPENDS_ON)"
+pipeline --> kg : "observe → store → retrieve"
+pipeline --> agent : "injects context"
+ragTool --> pipeline : "operationalizes retrieval"
 
 @enduml

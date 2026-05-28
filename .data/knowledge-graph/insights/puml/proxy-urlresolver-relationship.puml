@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ProxyURLResolver
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ProxyURLResolver] as proxy_urlresolver #LightBlue
+[EnvironmentVariableFallbackChain] as environment_variable_fallback_chain #E8F5E8
+
+llmabstraction --> proxy_urlresolver
+proxy_urlresolver --> environment_variable_fallback_chain
+
+@enduml

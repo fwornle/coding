@@ -1,0 +1,32 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "MCP Integration Root" {
+  component "README.md\n(Tool Interface Entry Point)" as readme <<api>>
+  component "CONTRIBUTING.md\n(Onboarding)" as contributing <<core>>
+  component "CRITICAL-ARCHITECTURE-ISSUES.md\n(Decision Records)" as decisions <<core>>
+}
+
+package "MCP Server Semantic Analysis — Docs" {
+  component "API Reference\n(docs/api/README.md)" as api_ref <<api>>
+  component "Architecture Overview\n(docs/architecture/README.md)" as arch_docs <<core>>
+  component "agents.md" as agents <<agent>>
+  component "tools.md" as tools <<api>>
+}
+
+package "MCP Constraint Monitor — Docs" {
+  component "Constraint Configuration\n(constraint-configuration.md)" as constraint_cfg <<core>>
+  component "Semantic Constraint Detection\n(semantic-constraint-detection.md)" as sem_detect <<core>>
+  component "Status Line Integration\n(status-line-integration.md)" as status_line <<cli>>
+}
+
+readme --> api_ref : "exposes API surface"
+readme --> arch_docs : "describes internal design"
+readme --> contributing : "guides onboarding"
+decisions --> arch_docs : "informs"
+arch_docs --> agents : "decomposes by concern"
+arch_docs --> tools : "decomposes by concern"
+constraint_cfg --> sem_detect : "drives detection"
+sem_detect --> status_line : "reports via"
+
+@enduml

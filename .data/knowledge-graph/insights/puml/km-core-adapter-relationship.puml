@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KmCoreAdapter
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[KmCoreAdapter] as km_core_adapter #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyRegistry] as ontology_registry #F0F0F0
+[EntityWritePathConsolidation] as entity_write_path_consolidation #E8F5E8
+
+semantic_analysis --> km_core_adapter
+pipeline -[hidden]- km_core_adapter
+ontology -[hidden]- km_core_adapter
+insights -[hidden]- km_core_adapter
+ontology_registry -[hidden]- km_core_adapter
+km_core_adapter --> entity_write_path_consolidation
+
+@enduml

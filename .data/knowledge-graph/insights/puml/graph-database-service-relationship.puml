@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphDatabaseService
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphDatabaseService] as graph_database_service #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[KmCoreStore] as km_core_store #F0F0F0
+[SingleKeyPersistenceStrategy] as single_key_persistence_strategy #E8F5E8
+
+knowledge_management --> graph_database_service
+manual_learning -[hidden]- graph_database_service
+online_learning -[hidden]- graph_database_service
+km_core_store -[hidden]- graph_database_service
+graph_database_service --> single_key_persistence_strategy
+
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KmCoreStore
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[KmCoreStore] as km_core_store #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
+
+knowledge_management --> km_core_store
+manual_learning -[hidden]- km_core_store
+online_learning -[hidden]- km_core_store
+graph_database_service -[hidden]- km_core_store
+
+@enduml

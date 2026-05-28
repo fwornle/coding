@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HookConfigurationLayer
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[HookConfigurationLayer] as hook_configuration_layer #LightBlue
+[ConstraintRuleEngine] as constraint_rule_engine #F0F0F0
+[ViolationPersistenceStore] as violation_persistence_store #F0F0F0
+[ConstraintDashboard] as constraint_dashboard #F0F0F0
+[HookPayloadParser] as hook_payload_parser #E8F5E8
+
+constraint_system --> hook_configuration_layer
+constraint_rule_engine -[hidden]- hook_configuration_layer
+violation_persistence_store -[hidden]- hook_configuration_layer
+constraint_dashboard -[hidden]- hook_configuration_layer
+hook_configuration_layer --> hook_payload_parser
+
+@enduml

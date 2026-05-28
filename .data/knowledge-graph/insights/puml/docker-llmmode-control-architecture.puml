@@ -1,0 +1,40 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "mcp-server-semantic-analysis" {
+
+  package "src/mock/" {
+    component "LLM Mock Service\n(llm-mock-service.ts)" as lms <<core>>
+  }
+
+  component "Health Coordinator\n(health-coordinator.js)" as hc <<core>>
+}
+
+package "LLM Execution Modes" {
+  component "Mock Mode\n(fixture files)" as mockMode <<storage>>
+  component "Local Mode\n(local backend)" as localMode <<api>>
+  component "Public Mode\n(remote API)" as publicMode <<external>>
+}
+
+package "Docker Infrastructure" {
+  component "CODING_ROOT\nEnvironment Variable" as codingRoot <<cli>>
+  component "Docker Bind Mount\n(volume path)" as bindMount <<external>>
+}
+
+cloud "CI Environment" as ciEnv
+cloud "Production Environment" as prodEnv
+
+codingRoot --> lms : "resolves fixture paths"
+bindMount --> codingRoot : "mount point maps to"
+
+lms --> mockMode : "offline / CI"
+lms --> localMode : "local dev"
+lms --> publicMode : "production"
+
+hc ..> lms : "polls health status"
+lms ..> hc : "must not emit 'healthy'"
+
+ciEnv --> mockMode : "activates"
+prodEnv --> publicMode : "activates"
+
+@enduml

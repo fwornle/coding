@@ -2,66 +2,84 @@
 
 **Type:** SubComponent
 
-The health-coordinator.js script reads evaluation criteria exclusively from config/health-verification-rules.json at runtime, meaning rule changes take effect on the next polling cycle without requiring a process restart.
+The 5-second polling interval in health-coordinator.js represents a deliberate latency/overhead tradeoff, balancing timely failure detection against socket and HTTP connection overhead across multiple services
 
-# HealthCoordinator — Technical Insight Document
+# HealthCoordinator — Technical Reference
 
 ## What It Is
 
-HealthCoordinator is a sub-component of **DockerizedServices**, implemented primarily in `scripts/health-coordinator.js`. It serves as the periodic health-evaluation engine for the containerized service fleet, transforming raw probe signals into aggregated service-state verdicts. Where the parent DockerizedServices layer provides the low-level probing primitives (via `lib/utils/service-probe.js`), HealthCoordinator sits above that layer and is responsible for orchestrating *when* probes run, *how* their results are interpreted, and *where* the resulting verdicts are stored.
-
-The component operates on a fixed 5-second polling cadence. On every tick, it invokes the **ServiceProbeLibrary** to probe all registered services and writes the aggregated outcome into the `currentState.services` object. Its evaluation logic is not hardcoded — instead, it reads decision criteria from `config/health-verification-rules.json` at runtime, which means it acts as a configurable rules engine layered on top of the probe primitives.
+HealthCoordinator is a SubComponent implemented in `scripts/health-coordinator.js` that provides continuous liveness monitoring for the four core services in the DockerizedServices ecosystem: the Next.js dashboard, Node.js API, Memgraph, and Redis. It operates by polling results from `lib/utils/service-probe.js` (the ServiceProbeLibrary sibling component) on a fixed 5-second interval, aggregating probe outcomes into a unified health view consumed by the Next.js dashboard.
 
 ![HealthCoordinator — Architecture](images/health-coordinator-architecture.png)
 
+The component sits within DockerizedServices alongside DockerLLMModeControl and ServiceProbeLibrary. While ServiceProbeLibrary owns the mechanics of how individual services are tested (HTTP response codes, raw TCP socket connections), HealthCoordinator owns the *scheduling* and *state interpretation* of those tests. The actual scheduling behavior is delegated to its child component, PollingScheduler, which implements the fixed-interval pattern rather than any event-driven or callback-based approach.
+
+---
+
 ## Architecture and Design
 
-The architecture demonstrates a clean **layered separation of concerns** between probing (vocabulary: `'running'`, `'stopped'`, `'unknown'`) and verdict-rendering (vocabulary: health states determined by rules). This separation is enforced by the parent DockerizedServices' **SPEC R6** invariant, which forbids `lib/utils/service-probe.js` from ever returning `'healthy'`. HealthCoordinator is the direct architectural consumer of this invariant: it accepts the deliberately narrow probe vocabulary as input and is solely responsible for promoting raw liveness signals into application-layer readiness verdicts. This avoids conflating network-layer reachability with full service readiness.
-
-Two design patterns are clearly evident from the observations. First, a **polling/scheduler pattern** with a fixed interval (5 seconds) acts as the temporal heartbeat of the health subsystem — there is no event-driven push from services, only consistent pull-based polling. Second, an **externalized rules / configuration-driven evaluation pattern** is employed via `config/health-verification-rules.json`. Because rules are read at runtime on each polling cycle, operators can adjust health criteria without restarting the process — a hot-reload behavior achieved simply through re-read semantics rather than through a complex file-watcher mechanism.
+The central architectural decision in `health-coordinator.js` is **protocol-agnostic polling**: by consuming both `probeHttpHealth()` and `probeTcpPort()` through a single unified polling loop, the coordinator never special-cases individual service types. The Next.js dashboard and Node.js API (HTTP-based) and Memgraph's Bolt protocol and Redis (TCP-based) all flow through the same code path. This is a deliberate abstraction boundary — the probe selection logic lives in ServiceProbeLibrary, and HealthCoordinator simply trusts that any probe it calls will return one of the three valid status strings.
 
 ![HealthCoordinator — Relationship](images/health-coordinator-relationship.png)
 
-The interaction model places HealthCoordinator as the bridge between **ServiceProbeLibrary** (its dependency for raw signals) and the shared `currentState.services` object (its write target). Its sibling **ProcessStateManager** — also a sub-component of DockerizedServices — presumably consumes or coordinates with this same state object, though HealthCoordinator's specific contract is the production of aggregated probe results rather than process lifecycle management.
+The state machine embedded in `health-coordinator.js` is intentionally narrow: it recognizes exactly three status strings — `'running'`, `'stopped'`, and `'unknown'` — which directly mirrors the invariant enforced by ServiceProbeLibrary (documented as SPEC R6 in the parent DockerizedServices context). This tight coupling between the probe output contract and the coordinator's state machine is a **correctness-by-contract** design: the coordinator does not defensively handle unexpected values; instead, the system relies on probe implementations never producing a fourth string. Any violation of this contract produces undefined state transitions.
+
+The 5-second polling interval reflects a conscious **latency/overhead tradeoff**. Each polling cycle opens multiple HTTP connections and TCP sockets across all monitored services. A shorter interval would improve failure detection time but increase connection overhead proportionally; a longer interval reduces overhead but risks stale health state being surfaced to the dashboard. Five seconds represents the chosen equilibrium for this workload.
+
+---
 
 ## Implementation Details
 
-The core implementation lives in `scripts/health-coordinator.js`. On each 5-second tick, the script performs three logical steps: (1) enumerate all registered services, (2) call into the ServiceProbeLibrary to obtain probe results constrained to the SPEC R6 vocabulary of `'running'`, `'stopped'`, or `'unknown'`, and (3) evaluate those results against rules loaded from `config/health-verification-rules.json` before writing the aggregated outcome into `currentState.services`.
+The PollingScheduler child component drives the timing backbone of HealthCoordinator, implementing a fixed-interval schedule rather than an adaptive or event-triggered model. Every 5 seconds, `health-coordinator.js` invokes the probe functions sourced from `service-probe.js`. For HTTP-capable services, it calls `probeHttpHealth()`, which maps 2xx/3xx response codes to `'running'`. For non-HTTP services like Memgraph (Bolt protocol) and Redis, it calls `probeTcpPort()`, which uses a raw `net.Socket` connection to verify port reachability.
 
-The rules file is read **exclusively at runtime** on each cycle rather than being cached in memory at process startup. This is a deliberate implementation choice with significant operational implications: any change to `config/health-verification-rules.json` is automatically picked up on the next polling tick — typically within 5 seconds — with no process restart required. This makes rule iteration fast and safe in production-like environments.
+The results from all probes are fed into the internal state machine, which maps each service's current probe result to one of the three recognized states. Because the state machine has no handling for values outside `{'running', 'stopped', 'unknown'}`, the architecture places the enforcement burden entirely on ServiceProbeLibrary's probe implementations. This makes the coordinator's logic clean and minimal but means its correctness is contingent on the probe contract being honored system-wide.
 
-The probe-to-verdict mapping is the central piece of mechanical logic. Because probes return only `'running'`, `'stopped'`, or `'unknown'`, the rules file must translate combinations of these signals (potentially across services or across multiple consecutive ticks) into a richer health verdict. The probe vocabulary is intentionally minimal so that the *interpretation* responsibility lives entirely inside HealthCoordinator's rule evaluation, not inside the probe code.
+There are no code symbols currently indexed for this component (0 symbols found), which suggests `health-coordinator.js` may be a script-style module rather than a class-based implementation — consistent with its role as a runtime coordination script rather than an imported library.
+
+---
 
 ## Integration Points
 
-HealthCoordinator integrates with three principal external surfaces. First, it depends on **ServiceProbeLibrary** for all probe operations — including `probeHttpHealth()` and `probeTcpPort()` defined in `lib/utils/service-probe.js`. This dependency is bound by the SPEC R6 contract; modifications to `service-probe.js` that introduced a `'healthy'` return value would corrupt HealthCoordinator's decision logic. Second, it consumes `config/health-verification-rules.json` as its rules-of-record. Third, it writes its outputs into the shared `currentState.services` object, which serves as the integration channel to the rest of the system, likely including its sibling **ProcessStateManager**.
+HealthCoordinator's primary upstream dependency is ServiceProbeLibrary (`lib/utils/service-probe.js`), specifically the `probeHttpHealth()` and `probeTcpPort()` functions. The coordinator is a pure consumer of these functions — it does not modify probe behavior, only schedules and aggregates results.
 
-Within the broader hierarchy, HealthCoordinator's role inside DockerizedServices is complementary to ProcessStateManager: while ProcessStateManager (also a sub-component of DockerizedServices) is concerned with process state, HealthCoordinator focuses on the periodic re-evaluation of health from probe signals. They share the parent's architectural conventions and presumably converge through the same shared state object.
+The downstream consumer of HealthCoordinator's output is the Next.js dashboard, which receives the aggregated liveness heartbeat. This makes HealthCoordinator the single source of truth for service health state as presented in the UI.
 
-Downstream consumers of `currentState.services` — whatever alerting, restart-scheduling, or dependency-unblocking logic exists in the system — receive HealthCoordinator's verdicts indirectly through that shared state. This means HealthCoordinator does not need to know its consumers directly; it simply produces an authoritative health snapshot every 5 seconds.
+Within DockerizedServices, HealthCoordinator operates independently of DockerLLMModeControl, which handles LLM mock service path resolution via `llm-mock-service.ts` and the `CODING_ROOT` environment variable. There is no observed coupling between these two sibling components.
+
+---
 
 ## Usage Guidelines
 
-Developers working with or extending HealthCoordinator should observe several conventions grounded in its current design. First, **do not modify `lib/utils/service-probe.js` to return `'healthy'`** or any vocabulary outside `'running'`, `'stopped'`, or `'unknown'`. Doing so violates SPEC R6 enforced at the DockerizedServices parent level and will corrupt the rule-evaluation logic inside `scripts/health-coordinator.js`. The probe vocabulary and the verdict vocabulary are intentionally distinct.
+**Never introduce a fourth status string.** This is the most critical rule for developers extending the system. If a new service probe is added to ServiceProbeLibrary, it must return only `'running'`, `'stopped'`, or `'unknown'`. Introducing any other value — even something semantically reasonable like `'degraded'` or `'healthy'` — will cause the state machine in `health-coordinator.js` to encounter undefined transitions. The parent DockerizedServices documentation explicitly calls out that `'healthy'` is a forbidden return value (SPEC R6).
 
-Second, **express health policy changes through `config/health-verification-rules.json`**, not through code edits to the coordinator. Because the rules file is re-read on every polling cycle, configuration changes take effect on the next tick (within 5 seconds) without a process restart. This is the supported, low-risk path for tuning health criteria.
+**Non-HTTP services must use `probeTcpPort()`.** When adding a new service to the monitored set, the protocol determines which probe function to use. Any service not reachable via HTTP/HTTPS (such as a database using a binary protocol like Bolt) must be registered with `probeTcpPort()`. Using `probeHttpHealth()` for a TCP-only service will produce incorrect results that still satisfy the state machine's string contract, making the failure silent and harder to detect.
 
-Third, treat the 5-second polling interval as the system's effective resolution for health detection. Any verdict change cannot be observed faster than this cadence, so downstream consumers of `currentState.services` should not assume sub-5-second responsiveness. If finer granularity is ever required, the polling interval is the architectural lever — but changing it has fleet-wide implications for probe load on every registered service.
+**Understand the 5-second detection window.** Consumers of health state (e.g., the Next.js dashboard) should treat the displayed status as having up to a 5-second staleness window. Failure detection latency is bounded by the polling interval, not by real-time event propagation. Any alerting or automated response logic built on top of HealthCoordinator's output should account for this window. Changing the polling interval requires evaluating the cumulative connection overhead across all monitored services, not just the latency improvement in isolation.
 
-Finally, when reasoning about a service's reported state, always remember the layered semantics: a `'running'` probe result means the port responded, not that the service is fully initialized or production-ready. The promotion from "running" to "healthy" is performed by HealthCoordinator's rule evaluation, and that promotion is the meaningful event for orchestration concerns such as alerting, restart scheduling, or dependency unblocking.
+---
+
+### Scalability Considerations
+
+The fixed polling model scales linearly with the number of monitored services — each new service adds one additional probe call per 5-second cycle. For the current four-service scope this is negligible, but as the number of services grows, the per-cycle connection overhead (HTTP handshakes, TCP socket opens) will grow proportionally. The architecture does not currently include batching, connection pooling for probes, or adaptive interval scaling, so significant service count growth would warrant revisiting the PollingScheduler's fixed-interval approach.
+
+### Maintainability Assessment
+
+The strict three-value state contract is both a strength and a fragility. It keeps the coordinator logic simple and auditable, but it means the system has a hidden global invariant that is not enforced by types or runtime validation in `health-coordinator.js` itself — it is enforced by convention and documentation. A future improvement would be to add an explicit guard in the state machine that logs or throws on unrecognized status strings, converting silent undefined behavior into a visible failure.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component enforces a strict probe-result invariant called SPEC R6, implemented in `lib/utils/service-probe.js`, which mandates that both `probeHttpHealth()` and `probeTcpPort()` may only return the string values `'running'`, `'stopped'`, or `'unknown'` — never `'healthy'`. This design decision is architecturally significant because it prevents a class of silent-degradation bugs where a container that technically responds to a health endpoint (e.g., returning HTTP 200 with an incomplete initialization state) could be incorrectly classified as production-ready. The distinction between 'running' (process is alive and responding) and 'healthy' (fully initialized, all dependencies satisfied) is deliberately kept outside the probe layer and left to higher-level orchestration logic.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component uses a dual-probe health checking architecture implemented in lib/utils/service-probe.js that strictly separates HTTP-based and TCP-based service verification. probeHttpHealth() issues HTTP/HTTPS requests and maps 2xx/3xx response codes to the 'running' state, while probeTcpPort() opens a raw net.Socket connection to verify port reachability for non-HTTP protocols like Memgraph's Bolt protocol. A critical architectural invariant (documented as SPEC R6) enforces that neither probe ever returns the string 'healthy'—only 'running', 'stopped', or 'unknown' are valid return values. This distinction matters because health-coordinator.js in scripts/health-coordinator.js consumes these probes on a 5-second polling interval and must be able to uniformly handle all service types (Next.js dashboard, Node.js API, Memgraph, Redis) without special-casing the protocol. New developers adding services must use probeTcpPort() for any non-HTTP service and must not introduce a fourth status string, or the health-coordinator's state machine will behave incorrectly.
 
-This invariant is consumed by `scripts/health-coordinator.js`, which polls on 5-second ticks and evaluates probe results against rules defined in `config/health-verification-rules.json`. By separating the probe vocabulary from the health-verdict vocabulary, the system avoids conflating network-layer liveness (can I reach the port?) with application-layer readiness (is this service actually functioning correctly?). A new developer reading the codebase should understand that if they ever modify `service-probe.js` to return `'healthy'`, they risk corrupting the health-coordinator's decision logic, which presumably maps probe results to actions like alerting, restart scheduling, or dependency unblocking.
+### Children
+- [PollingScheduler](./PollingScheduler.md) -- Based on the SubComponent description, health-coordinator.js polls service-probe.js results every 5 seconds, establishing a fixed-interval scheduling pattern rather than event-driven probing.
 
 ### Siblings
-- [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager is a sub-component of DockerizedServices
+- [DockerLLMModeControl](./DockerLLMModeControl.md) -- llm-mock-service.ts uses CODING_ROOT environment variable for path resolution, enabling the service to locate mock fixtures regardless of Docker volume mount points
+- [ServiceProbeLibrary](./ServiceProbeLibrary.md) -- probeHttpHealth() in lib/utils/service-probe.js maps 2xx/3xx HTTP/HTTPS response codes to the 'running' state, covering services like the Next.js dashboard and Node.js API
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 4 observations*

@@ -1,0 +1,23 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "MCP Constraint Monitor" {
+
+    package "Core Engine" {
+        component "Rule Engine" as ruleEngine <<core>>
+        database "Persistence Store" as persistStore <<storage>>
+    }
+
+    package "Display Layer" {
+        component "Constraint Dashboard" as dashboard <<cli>>
+        component "Status Line" as statusLine <<cli>>
+    }
+
+}
+
+ruleEngine --> persistStore : "writes violations"
+ruleEngine ..> statusLine : "push events\n(real-time counts)"
+dashboard --> persistStore : "queries via\nquery interface"
+statusLine ..> dashboard : "ambient counts /\ndrills into"
+
+@enduml

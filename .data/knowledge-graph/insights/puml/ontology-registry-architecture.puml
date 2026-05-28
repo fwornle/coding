@@ -1,0 +1,26 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Legacy Agent Layer" {
+  component "ContentValidationAgent" as cva <<agent>>
+  component "OntologyClassificationAgent" as oca <<agent>>
+}
+
+package "Strangler-Facade Migration Layer" {
+  component "LegacyOntologyAdapter" as loa <<api>>
+  component "KmCoreAdapter" as kca <<api>>
+}
+
+package "km-core" {
+  component "OntologyRegistry" as oreg <<core>>
+}
+
+cva --> loa : "loads class hierarchy via\nlegacy interface"
+oca --> loa : "loads class hierarchy via\nlegacy interface"
+
+loa --> oreg : "delegates ontology\nloading + schema translation"
+kca --> oreg : "delegates storage\noperations"
+
+loa -[hidden]- kca
+
+@enduml

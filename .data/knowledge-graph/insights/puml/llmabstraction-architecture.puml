@@ -1,36 +1,35 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
+package "Agent Layer" {
+  component "wave-agent / wave-controller" as waveAgent <<agent>>
+}
+
 package "LLM Abstraction Layer" {
-  component "LLMAbstraction" as llmabs <<core>>
-  component "LLMMockService\n(llm-mock-service.ts)" as mockSvc <<core>>
+  component "llm-mock-service\n(getLLMMode)" as mockService <<core>>
+  component "llm-with-process\n(MetricsTrackerLike)" as llmProcess <<core>>
 }
 
-package "Inference Providers" {
-  component "DMR Provider\n(dmr-provider.ts)" as dmrProv <<api>>
-  component "Mock Provider" as mockProv <<api>>
-  component "Public Providers" as pubProv <<api>>
+package "Proxy Layer" {
+  component "rapid-llm-proxy\n(port 12435)" as proxy <<api>>
 }
 
-package "Persistence" {
-  database "workflow-progress.json\n(.data/)" as wpJson <<storage>>
-  database "dmr-config.yaml" as dmrCfg <<storage>>
+package "Provider Layer" {
+  component "dmr-provider" as dmrProvider <<core>>
+  cloud "Anthropic / OpenAI / Groq" as publicAPIs
+  component "Docker Model Runner (DMR)" as dmr <<external>>
 }
 
-cloud "Public Cloud APIs" as cloudGroup {
-  component "Anthropic / OpenAI / Groq" as cloudApis <<external>>
-}
+database "workflow-progress.json" as workflowConfig <<storage>>
+database "token-usage.db\n(.data/llm-proxy)" as tokenDb <<storage>>
 
-component "Docker Model Runner\n(DMR)" as dmr <<external>>
-
-llmabs --> mockSvc : "resolves mode\n(per-agent > global > legacy > default)"
-llmabs --> dmrProv : "local mode"
-llmabs --> mockProv : "mock mode"
-llmabs --> pubProv : "public mode"
-
-mockSvc --> wpJson : "reads / writes\nllmState + mockLLM flag"
-dmrProv --> dmrCfg : "loadDMRConfig()\n+ expandEnvVars()"
-dmrProv --> dmr : "OpenAI-compatible\nAPI (engines/v1)"
-pubProv --> cloudApis : "provider API calls"
+waveAgent --> mockService : "getLLMMode()\n(mock / local / public)"
+waveAgent --> llmProcess : "LLM completion calls"
+mockService --> workflowConfig : "reads llmState\n& per-agent overrides"
+llmProcess --> proxy : "POST /api/complete\n(+process field)"
+proxy --> dmrProvider : "local mode"
+proxy --> publicAPIs : "public mode"
+dmrProvider --> dmr : "localhost:DMR_PORT\n/engines/v1"
+proxy --> tokenDb : "per-step token\nattribution"
 
 @enduml

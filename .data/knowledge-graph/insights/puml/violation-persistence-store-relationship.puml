@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ViolationPersistenceStore
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ViolationPersistenceStore] as violation_persistence_store #LightBlue
+[HookConfigurationLayer] as hook_configuration_layer #F0F0F0
+[ConstraintRuleEngine] as constraint_rule_engine #F0F0F0
+[ConstraintDashboard] as constraint_dashboard #F0F0F0
+[ViolationPersistenceStore] as violation_persistence_store #E8F5E8
+
+constraint_system --> violation_persistence_store
+hook_configuration_layer -[hidden]- violation_persistence_store
+constraint_rule_engine -[hidden]- violation_persistence_store
+constraint_dashboard -[hidden]- violation_persistence_store
+violation_persistence_store --> violation_persistence_store
+
+@enduml

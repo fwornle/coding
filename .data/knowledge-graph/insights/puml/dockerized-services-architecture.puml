@@ -1,47 +1,43 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-top to bottom direction
-
-package "Service Orchestration" {
-  component "service-starter.js" as serviceStarter <<core>>
-  component "ProcessStateManager" as psm <<core>>
-  component "api-service.js" as apiWrapper <<cli>>
-  component "dashboard-service.js" as dashWrapper <<cli>>
+package "Supervision Layer" {
+  component "api-service.js\nSupervisor" as apiSupervisor <<core>>
+  component "dashboard-service.js\nSupervisor" as dashSupervisor <<core>>
 }
 
-package "Microservices" {
-  component "MCP Semantic Analysis" as mcpServer <<api>>
-  component "Constraint Monitor API :3031" as constraintAPI <<api>>
-  component "Constraint Monitor Dashboard :3030" as constraintDash <<api>>
-  component "llm-mock-service" as llmMock <<core>>
+package "Health & Lifecycle" {
+  component "health-coordinator.js" as healthCoord <<core>>
+  component "service-probe.js\n(HTTP + TCP dual-probe)" as serviceProbe <<core>>
+  component "service-starter.js\nstartServiceWithRetry()" as serviceStarter <<core>>
+  component "ProcessStateManager\n(PSM Singleton)" as psm <<core>>
 }
 
-package "Data Stores" {
-  database "Memgraph" as memgraph <<storage>>
-  database "Redis" as redis <<storage>>
+package "Dockerized Services" {
+  component "Next.js Dashboard\n:3030" as nextjs <<api>>
+  component "Constraint API\ndashboard-server.js :3031" as constraintApi <<api>>
+  database "Memgraph\n(Bolt Protocol)" as memgraph
+  database "Redis" as redis
 }
 
-' Startup orchestration with retry-with-backoff
-serviceStarter --> apiWrapper : "starts (required)"
-serviceStarter --> dashWrapper : "starts (optional)"
-serviceStarter --> mcpServer : "starts (required)"
+' Health coordinator polls service-probe
+healthCoord --> serviceProbe : "polls every 5s\n(running/stopped/unknown)"
 
-' Process identity management
-apiWrapper --> psm : "register PID / unregister on exit"
-dashWrapper --> psm : "register PID / unregister on exit"
+' Service probe targets
+serviceProbe --> nextjs : "probeHttpHealth()"
+serviceProbe --> constraintApi : "probeHttpHealth()"
+serviceProbe --> memgraph : "probeTcpPort()"
+serviceProbe --> redis : "probeTcpPort()"
 
-' Child process spawning
-apiWrapper --> constraintAPI : "spawns child process"
-dashWrapper --> constraintDash : "spawns w/ NEXT_PUBLIC_API_BASE_URL"
+' Supervision relationships
+apiSupervisor --> constraintApi : "spawns & forwards SIGTERM"
+dashSupervisor --> nextjs : "spawns & forwards SIGTERM"
+apiSupervisor --> serviceStarter : "retry + backoff\n(maxRetries=3, 30s timeout)"
+dashSupervisor --> serviceStarter : "retry + backoff\n(maxRetries=3, 30s timeout)"
+apiSupervisor ..> psm : "registers child\n(non-fatal)"
+dashSupervisor ..> psm : "registers child\n(non-fatal)"
 
-' Fixed coupling between dashboard and API backend
-constraintDash --> constraintAPI : "hardcoded :3031"
-
-' MCP Semantic Analysis dependencies
-mcpServer --> llmMock : "LLM mode (mock/local/public)"
-mcpServer --> memgraph : "Bolt protocol"
-mcpServer --> redis : "cache"
-constraintAPI --> memgraph : "queries"
+' Frontend-to-backend wiring
+nextjs --> constraintApi : "NEXT_PUBLIC_API_BASE_URL\nhttp://localhost:3031"
 
 @enduml

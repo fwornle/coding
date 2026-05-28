@@ -1,43 +1,44 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Pipeline Orchestration" {
-  component "Batch Analysis Workflow" as baw <<core>>
-  component "BaseAgent<TInput, TOutput>" as base <<core>>
+package "Pipeline Coordination" {
+  component "Pipeline Coordinator" as coordinator <<core>>
+  component "BaseAgent<TInput,TOutput>" as baseAgent <<core>>
 }
 
 package "Specialized Agents" {
-  component "SemanticAnalysisAgent" as saa <<agent>>
-  component "OntologyClassificationAgent" as oca <<agent>>
-  component "CodeGraphAgent" as cga <<agent>>
-  component "ContentValidationAgent" as cva <<agent>>
+  component "CodeGraphAgent" as codeGraphAgent <<agent>>
+  component "SemanticAnalysisAgent" as semanticAgent <<agent>>
+  component "OntologyClassificationAgent" as ontologyAgent <<agent>>
+  component "ContentValidationAgent" as contentAgent <<agent>>
 }
 
-package "Ontology Layer" {
-  component "OntologyRegistry" as reg <<core>>
+package "Adapters" {
+  component "LegacyOntologyAdapter" as legacyAdapter <<core>>
+  component "KmCoreAdapter" as kmAdapter <<core>>
 }
 
-package "Infrastructure" {
+package "External Infrastructure" {
   database "Memgraph" as memgraph <<storage>>
-  component "GitStalenessDetector" as gsd <<core>>
-  cloud "code-graph-rag MCP" as cgrag <<external>>
+  component "LLMService\n(@rapid/llm-proxy)" as llmService <<external>>
+  component "OntologyRegistry\n(km-core)" as ontologyReg <<external>>
 }
 
-baw --> saa : "orchestrates"
-baw --> oca : "orchestrates"
-baw --> cga : "orchestrates"
-baw --> cva : "orchestrates"
+coordinator --> baseAgent : "template-method execute()"
+coordinator --> codeGraphAgent : "invokes"
+coordinator --> semanticAgent : "invokes"
+coordinator --> ontologyAgent : "invokes"
+coordinator --> contentAgent : "invokes"
 
-saa ..> base : "extends"
-oca ..> base : "extends"
-cga ..> base : "extends"
-cva ..> base : "extends"
+baseAgent --> codeGraphAgent : "base contract"
+baseAgent --> semanticAgent : "base contract"
+baseAgent --> ontologyAgent : "base contract"
+baseAgent --> contentAgent : "base contract"
 
-oca --> reg : "constructs via\nLegacyOntologyAdapter"
-
-cga --> cgrag : "TCP socket check"
-cgrag --> memgraph : "queries graph"
-
-cva --> gsd : "staleness detection\n(60s cache)"
+codeGraphAgent --> memgraph : "TCP probe + queries"
+semanticAgent --> llmService : "LLM synthesis\n(attachTokenLogger)"
+ontologyAgent --> legacyAdapter : "legacy API surface"
+legacyAdapter --> ontologyReg : "wraps (migration shim)"
+contentAgent --> kmAdapter : "graphDB alias\n+ persistenceAgent alias"
 
 @enduml

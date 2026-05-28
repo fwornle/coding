@@ -1,31 +1,31 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-top to bottom direction
-
-package "Batch Pipeline" {
-  component "OnlineLearning" as ol <<core>>
+package "Extraction Sources" {
+  component "Git History Ingestion" as git <<external>>
+  component "LSL Session Analysis" as lsl <<external>>
+  component "Code Analysis" as code <<external>>
 }
 
-package "State Management" {
-  component "CheckpointManager" as cm <<core>>
+package "Batch Analysis Pipeline" {
+  component "batch-analysis.yaml\n(DAG Steps)" as dag <<core>>
+  component "GraphDatabaseService.js" as gds <<core>>
 }
 
-package "Storage Layer" {
-  component "GraphDatabaseAdapter" as gda <<storage>>
-  cloud "VKB HTTP Server" as vkb <<external>>
+package "Graph Layer" {
+  component "Graphology Graph\n(isDirty / flush cycle)" as graphology <<core>>
 }
 
-package "Export Layer" {
-  component "GraphKnowledgeExporter" as gke <<core>>
-  database "Per-Domain JSON Files" as json <<storage>>
+package "Persistence" {
+  database "LevelDB" as leveldb <<storage>>
 }
 
-ol --> cm : "commit hashes / session counts"
-cm --> ol : "completeness scores / skip state"
-ol --> gda : "entities (batch write)"
-gda ..> vkb : "direct mode (must be live at startup)"
-ol --> gke : "entity:stored events"
-gke --> json : "debounced writes"
+git --> dag : "graph mutations"
+lsl --> dag : "graph mutations"
+code --> dag : "DEFINES / DEPENDS_ON_EXTERNAL\nCONTAINS_FILE edges"
+
+dag --> gds : "accumulated step outputs"
+gds --> graphology : "write nodes & edges"
+graphology --> leveldb : "flush() → single 'graph' key\n(monolithic JSON blob)"
 
 @enduml

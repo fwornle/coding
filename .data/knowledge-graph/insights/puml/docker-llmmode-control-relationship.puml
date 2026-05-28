@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DockerLLMModeControl
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[DockerLLMModeControl] as docker_llmmode_control #LightBlue
+[ServiceProbeLibrary] as service_probe_library #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+
+dockerized_services --> docker_llmmode_control
+service_probe_library -[hidden]- docker_llmmode_control
+health_coordinator -[hidden]- docker_llmmode_control
+
+@enduml

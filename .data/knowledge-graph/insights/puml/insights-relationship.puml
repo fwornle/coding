@@ -7,17 +7,15 @@ title Hierarchy Context: Insights
 [Insights] as insights #LightBlue
 [Pipeline] as pipeline #F0F0F0
 [Ontology] as ontology #F0F0F0
-[OntologyConfigManager] as ontology_config_manager #F0F0F0
-[LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
-[BaseAgent] as base_agent #F0F0F0
-[InsightGenerationAgent] as insight_generation_agent #E8F5E8
+[OntologyRegistry] as ontology_registry #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[AgentResponseInsightConsumer] as agent_response_insight_consumer #E8F5E8
 
 semantic_analysis --> insights
 pipeline -[hidden]- insights
 ontology -[hidden]- insights
-ontology_config_manager -[hidden]- insights
-legacy_ontology_adapter -[hidden]- insights
-base_agent -[hidden]- insights
-insights --> insight_generation_agent
+ontology_registry -[hidden]- insights
+km_core_adapter -[hidden]- insights
+insights --> agent_response_insight_consumer
 
 @enduml

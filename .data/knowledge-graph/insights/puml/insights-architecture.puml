@@ -1,29 +1,26 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Input Sources" {
-  component "AST Code Graph" as astGraph <<storage>>
+package "Classification Layer" {
+    component "OntologyClassificationAgent" as oca <<agent>>
+    component "AgentResponse Envelope" as envelope <<core>>
 }
 
-package "Insight Generation" {
-  component "LLM Tier Router" as llmRouter <<core>>
-  component "Pattern Catalog Extractor" as patternExtractor <<core>>
-  component "Insight Generation Agent" as insightAgent <<agent>>
-  component "BaseAgent Response Envelope" as responseEnvelope <<api>>
+package "Insights" {
+    component "SemanticAnalysisAgent" as saa <<agent>>
+    component "Pattern Catalog" as catalog <<storage>>
+    component "Knowledge Report" as report <<core>>
 }
 
-package "Output Pipeline" {
-  component "Quality Gate" as qualityGate <<core>>
-  component "Knowledge Report" as knowledgeReport <<storage>>
-  component "KG Operator Agent" as kgOperator <<agent>>
+package "Base Infrastructure" {
+    component "BaseAgent" as base <<core>>
 }
 
-astGraph --> patternExtractor : "parses structural motifs"
-patternExtractor --> insightAgent : "surfaces named patterns"
-llmRouter --> insightAgent : "routes to LLM tier"
-insightAgent --> responseEnvelope : "emits structured output"
-responseEnvelope --> qualityGate : "carries confidence score"
-qualityGate --> knowledgeReport : "accepted insights"
-knowledgeReport --> kgOperator : "consumed by"
+oca --> envelope : "produces\n(entity Type + ontologyClass)"
+envelope --> saa : "consumes"
+base ..> saa : "enforces calculateConfidence()"
+saa --> catalog : "accumulates patterns"
+saa --> report : "authors"
+catalog ..> report : "feeds recurring patterns"
 
 @enduml

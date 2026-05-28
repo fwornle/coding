@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologyRegistry
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[OntologyRegistry] as ontology_registry #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[StranglerFacadeAdapter] as strangler_facade_adapter #E8F5E8
+
+semantic_analysis --> ontology_registry
+pipeline -[hidden]- ontology_registry
+ontology -[hidden]- ontology_registry
+insights -[hidden]- ontology_registry
+km_core_adapter -[hidden]- ontology_registry
+ontology_registry --> strangler_facade_adapter
+
+@enduml

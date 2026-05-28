@@ -11,9 +11,10 @@ title Hierarchy Context: ConstraintSystem
 [KnowledgeManagement] as knowledge_management #F0F0F0
 [CodingPatterns] as coding_patterns #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[HookInterceptor] as hook_interceptor #E8F5E8
+[HookConfigurationLayer] as hook_configuration_layer #E8F5E8
 [ConstraintRuleEngine] as constraint_rule_engine #E8F5E8
-[MCPConstraintMonitorIntegration] as mcpconstraint_monitor_integration #E8F5E8
+[ViolationPersistenceStore] as violation_persistence_store #E8F5E8
+[ConstraintDashboard] as constraint_dashboard #E8F5E8
 
 coding --> constraint_system
 live_logging_system -[hidden]- constraint_system
@@ -22,8 +23,9 @@ dockerized_services -[hidden]- constraint_system
 knowledge_management -[hidden]- constraint_system
 coding_patterns -[hidden]- constraint_system
 semantic_analysis -[hidden]- constraint_system
-constraint_system --> hook_interceptor
+constraint_system --> hook_configuration_layer
 constraint_system --> constraint_rule_engine
-constraint_system --> mcpconstraint_monitor_integration
+constraint_system --> violation_persistence_store
+constraint_system --> constraint_dashboard
 
 @enduml

@@ -7,17 +7,15 @@ title Hierarchy Context: Ontology
 [Ontology] as ontology #LightBlue
 [Pipeline] as pipeline #F0F0F0
 [Insights] as insights #F0F0F0
-[OntologyConfigManager] as ontology_config_manager #F0F0F0
-[LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
-[BaseAgent] as base_agent #F0F0F0
-[LegacyOntologyAdapter] as legacy_ontology_adapter #E8F5E8
+[OntologyRegistry] as ontology_registry #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[EntityTypeResolver] as entity_type_resolver #E8F5E8
 
 semantic_analysis --> ontology
 pipeline -[hidden]- ontology
 insights -[hidden]- ontology
-ontology_config_manager -[hidden]- ontology
-legacy_ontology_adapter -[hidden]- ontology
-base_agent -[hidden]- ontology
-ontology --> legacy_ontology_adapter
+ontology_registry -[hidden]- ontology
+km_core_adapter -[hidden]- ontology
+ontology --> entity_type_resolver
 
 @enduml
