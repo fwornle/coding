@@ -8,14 +8,12 @@ title Hierarchy Context: Pipeline
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
 [OntologyRegistry] as ontology_registry #F0F0F0
-[KmCoreAdapter] as km_core_adapter #F0F0F0
-[TemplatMethodExecuteSequence] as templat_method_execute_sequence #E8F5E8
+[GitStalenessDetector] as git_staleness_detector #F0F0F0
 
 semantic_analysis --> pipeline
 ontology -[hidden]- pipeline
 insights -[hidden]- pipeline
 ontology_registry -[hidden]- pipeline
-km_core_adapter -[hidden]- pipeline
-pipeline --> templat_method_execute_sequence
+git_staleness_detector -[hidden]- pipeline
 
 @enduml

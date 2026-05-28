@@ -13,8 +13,10 @@ title Hierarchy Context: KnowledgeManagement
 [SemanticAnalysis] as semantic_analysis #F0F0F0
 [ManualLearning] as manual_learning #E8F5E8
 [OnlineLearning] as online_learning #E8F5E8
-[KmCoreStore] as km_core_store #E8F5E8
-[GraphDatabaseService] as graph_database_service #E8F5E8
+[KMCoreStore] as kmcore_store #E8F5E8
+[EntityMigrationPipeline] as entity_migration_pipeline #E8F5E8
+[UKBTraceReporter] as ukbtrace_reporter #E8F5E8
+[OntologyClassifier] as ontology_classifier #E8F5E8
 
 coding --> knowledge_management
 live_logging_system -[hidden]- knowledge_management
@@ -25,7 +27,9 @@ constraint_system -[hidden]- knowledge_management
 semantic_analysis -[hidden]- knowledge_management
 knowledge_management --> manual_learning
 knowledge_management --> online_learning
-knowledge_management --> km_core_store
-knowledge_management --> graph_database_service
+knowledge_management --> kmcore_store
+knowledge_management --> entity_migration_pipeline
+knowledge_management --> ukbtrace_reporter
+knowledge_management --> ontology_classifier
 
 @enduml

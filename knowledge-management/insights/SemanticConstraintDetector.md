@@ -1,161 +1,58 @@
 # SemanticConstraintDetector
 
-**Type:** Detail
+**Type:** SubComponent
 
-The semantic approach is distinguished from pattern matching in the constraint-configuration.md schema, which defines rule types that can trigger semantic evaluation paths
+SemanticConstraintDetector is documented across two dedicated files—integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and docs/semantic-detection-design.md—indicating the detection strategy is complex enough to warrant both a user-facing guide and an internal design document
 
-## What It Is  
+# SemanticConstraintDetector — Technical Reference
 
-**SemanticConstraintDetector** is the runtime component that evaluates incoming tool‑call payloads against *semantic* constraint rules defined in the MCP‑Constraint‑Monitor configuration. The implementation lives under the **integrations/mcp-constraint-monitor** source tree and is documented in two markdown files:  
+## What It Is
 
-* `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md` – the architectural design that explains the LLM‑assisted matching algorithm.  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – the operational guide that describes how the detector is invoked during request processing.  
+SemanticConstraintDetector is a SubComponent of ConstraintSystem, housed within the `mcp-constraint-monitor` integration rather than `mcp-server-semantic-analysis`. Its documentation spans two dedicated files: `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` (user-facing guide) and `docs/semantic-detection-design.md` (internal design rationale). The existence of both a public guide and a design document signals that this component carries enough conceptual complexity to require separate treatment for operators configuring it and engineers maintaining it. Additional configuration guidance appears in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, confirming that detection behavior is driven by externalized parameters rather than hardcoded logic.
 
-The detector is a child of **ConstraintRuleEngine** (see `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` for the full rule schema) and works alongside its sibling **RuleConfigLoader**, which is responsible for parsing and validating the same configuration file. While **RuleConfigLoader** deals with static validation, **SemanticConstraintDetector** performs dynamic, AI‑driven evaluation of rules whose type is marked as *semantic* in the configuration schema.
+Its placement in `mcp-constraint-monitor` is a deliberate architectural statement: this component *consumes* semantic analysis capabilities provided elsewhere; it does not produce them. Constraint evaluation logic therefore travels with the monitoring integration, keeping domain concerns co-located and avoiding a dependency inversion where the monitoring layer would need to reach into `mcp-server-semantic-analysis` internals.
 
----
+## Architecture and Design
 
-## Architecture and Design  
+![SemanticConstraintDetector — Architecture](images/semantic-constraint-detector-architecture.png)
 
-The design of **SemanticConstraintDetector** follows a **pipeline‑oriented strategy** that separates concerns into three logical stages:
+The central architectural decision documented in `semantic-detection-design.md` is the explicit separation of meaning-based analysis from pure pattern-matching hook handlers. Within ConstraintSystem, this establishes two distinct detection layers: hook handlers that fire on structural or syntactic patterns, and SemanticConstraintDetector operating at a higher abstraction level, reasoning about the *meaning* of content rather than its surface form. This separation prevents semantic evaluation logic from bleeding into lower-level hook plumbing, and makes it possible to evolve each layer independently.
 
-1. **Rule‑type dispatch** – The detector first inspects the rule definition (provided by **ConstraintRuleEngine**) to determine whether a rule should be processed through the *semantic* path. This decision point is explicitly described in the *semantic‑detection‑design* document, where rule types are enumerated in `constraint-configuration.md`.  
+The externalization of configuration — thresholds, constraint definitions, or detection sensitivity — means SemanticConstraintDetector's behavior can be tuned without code changes. This is consistent with `constraint-configuration.md` describing configurable behavior, and it implies a clean boundary between the detection engine (stable code) and its policy parameters (operator-supplied data). The tradeoff is that configuration drift becomes a risk: misconfigured thresholds can silently alter detection behavior in ways that are harder to catch than a code change.
 
-2. **LLM‑assisted matching** – When a rule is flagged for semantic evaluation, the detector constructs a prompt that combines the tool‑call payload, the natural‑language description of the rule, and any contextual metadata. The prompt is sent to a large language model (LLM) service (the exact provider is abstracted behind an interface). The LLM returns a confidence score or a binary decision indicating whether the call satisfies the rule.  
+![SemanticConstraintDetector — Relationship](images/semantic-constraint-detector-relationship.png)
 
-3. **Result aggregation & enforcement** – The detector normalises the LLM response into the internal `ConstraintResult` model, merges it with any pattern‑matching results (if the rule also has a pattern component), and forwards the final decision back to **ConstraintRuleEngine** for enforcement (e.g., block, log, or allow).  
+## Implementation Details
 
-This flow is illustrated in the design diagram embedded in `semantic-detection-design.md` (see inline placeholder below). The detector does **not** implement any low‑level pattern matching itself; that responsibility remains with the existing pattern‑matching engine, preserving a clear separation between deterministic and probabilistic evaluation paths.
+No code symbols were resolved for this component, so implementation mechanics must be inferred from documentation and structural observations. SemanticConstraintDetector's role as a *producer* in the violation pipeline means its primary output is a structured violation object compatible with what ViolationCaptureService expects. Given that ViolationCaptureService (in `scripts/violation-capture-service.js`) writes violations to both `.mcp-sync/session-violations.jsonl` and `.mcp-sync/violation-history.json`, SemanticConstraintDetector must serialize violations in whatever schema those stores require — the same contract honored by the hook handlers that are its sibling producers.
 
-```
-[RuleConfigLoader] → loads → [ConstraintRuleEngine] → delegates → [SemanticConstraintDetector] → LLM → decision → back to ConstraintRuleEngine
-```
+The dual-documentation approach (`semantic-constraint-detection.md` for users, `semantic-detection-design.md` for engineers) suggests a non-trivial internal model. Semantic detection typically involves scoring, classification, or rule-matching against interpreted content rather than raw text, and the presence of configurable thresholds reinforces that detection outcomes exist on a spectrum rather than being binary. The design document likely captures the reasoning behind where threshold boundaries sit and how false-positive/false-negative tradeoffs were resolved.
 
-### Design Patterns Observed  
+## Integration Points
 
-| Pattern | Where It Appears | Rationale |
-|---------|------------------|-----------|
-| **Strategy / Policy** | The rule‑type dispatch in the detector selects between *pattern* and *semantic* evaluation based on the rule schema (`constraint-configuration.md`). | Allows new rule types (e.g., hybrid, contextual) to be added without touching the core detector logic. |
-| **Adapter** | The LLM client is wrapped by an adapter that presents a uniform `evaluateSemanticMatch(payload, ruleSpec)` method. | Decouples the detector from any particular LLM vendor, facilitating swapping or mocking in tests. |
-| **Pipeline** | The three‑stage processing (dispatch → LLM call → aggregation) is a classic processing pipeline. | Makes the flow easy to extend (e.g., adding a pre‑filter or post‑processing step). |
-| **Facade** | **ConstraintRuleEngine** acts as a façade exposing a single entry point (`applyRules(call)`) that internally routes to the semantic detector when needed. | Simplifies the public API for callers and isolates the detector from the rest of the engine. |
+SemanticConstraintDetector connects to the rest of ConstraintSystem at two boundaries. Upstream, it consumes semantic analysis capabilities from `mcp-server-semantic-analysis` — though it is not *part* of that package, it depends on what that package exposes, making that interface a key stability dependency. Any breaking change in the semantic analysis API would directly affect this component. Downstream, it feeds violations into ViolationCaptureService's dual-store pipeline, identical in contract to the hook handler producers. This means ConstraintMonitorDashboard, which reads `.mcp-sync/violation-history.json`, will surface SemanticConstraintDetector violations alongside hook-handler violations with no distinction in rendering — they are peers in the history store.
 
----
+The configuration surface described in `constraint-configuration.md` represents a third integration point: the operator or deployment environment that supplies detection parameters. This makes SemanticConstraintDetector sensitive to its runtime configuration in a way that pure hook handlers may not be, and it implies that deployment pipelines or setup documentation should treat constraint configuration as a first-class concern rather than an afterthought.
 
-## Implementation Details  
+## Usage Guidelines
 
-### Core Class  
+Because detection thresholds are externalized, developers modifying or deploying SemanticConstraintDetector should treat `constraint-configuration.md` as authoritative for what parameters exist and what their valid ranges are. Hardcoding thresholds in application code would undermine the configurability that was deliberately designed in, and would create a maintenance burden when policy needs to change.
 
-* **SemanticConstraintDetector** – resides in the code base (exact file not listed, but implied to be under `integrations/mcp-constraint-monitor/src/` or similar). The class implements the interface required by **ConstraintRuleEngine**:  
+When violations produced by SemanticConstraintDetector appear in the ViolationCaptureService stores, they share the 1000-entry cap on `.mcp-sync/violation-history.json`. Under high semantic violation rates, this cap will evict older entries through full-array rewrites — a write hotspot that ConstraintSystem's parent documentation explicitly flags. If semantic detection is expected to be high-frequency (e.g., firing on every LLM response), the cap behavior should be accounted for in operational planning, and consumers relying on historical completeness should prefer the unbounded `.mcp-sync/session-violations.jsonl` JSONL log instead of the history JSON.
 
-```go
-type SemanticConstraintDetector interface {
-    Evaluate(call ToolCall, rule ConstraintRule) (ConstraintResult, error)
-}
-```
-
-### Key Methods  
-
-* **`isSemanticRule(rule ConstraintRule) bool`** – reads the `type` field from the rule definition (as defined in `constraint-configuration.md`) and returns true for `"semantic"` rules.  
-* **`buildPrompt(call ToolCall, ruleSpec string) string`** – concatenates the tool‑call JSON, the human‑readable rule description, and optional context (e.g., user role) into a prompt template documented in `semantic-detection-design.md`.  
-* **`invokeLLM(prompt string) (LLMResponse, error)`** – uses the LLM adapter to send the prompt and receive a structured response. The response contains a `score` (0‑1) and a `decision` (`allow`/`deny`).  
-* **`normalizeResult(llmResp LLMResponse) ConstraintResult`** – maps the LLM confidence into the internal result model, applying any configured thresholds (e.g., a score ≥ 0.75 is considered a match).  
-
-### Supporting Components  
-
-* **LLMAdapter** – abstracted behind an interface, allowing the detector to remain agnostic of the underlying model (e.g., OpenAI, Anthropic). The adapter handles retries, rate‑limit back‑off, and response parsing.  
-* **ConstraintResult** – a shared data structure used across the rule engine; it records the rule identifier, the evaluation mode (`semantic`), the final decision, and any diagnostic metadata (LLM raw output, latency).  
-
-### Configuration Integration  
-
-The detector reads its operational parameters from the same configuration file that **RuleConfigLoader** validates (`constraint-configuration.md`). Relevant fields include:
-
-* `semanticEvaluation.threshold` – numeric confidence threshold.  
-* `semanticEvaluation.provider` – identifier of the LLM provider (used by the adapter).  
-* `semanticEvaluation.timeoutMs` – maximum time allowed for an LLM call before falling back to a safe default (e.g., deny).  
-
-These values are injected into the detector at construction time by **ConstraintRuleEngine**, ensuring a single source of truth for rule semantics.
-
----
-
-## Integration Points  
-
-1. **ConstraintRuleEngine (Parent)** – The engine owns an instance of **SemanticConstraintDetector**. When processing a tool call, the engine iterates over loaded rules; for each rule flagged as `semantic`, it forwards the call to the detector via `Evaluate`. The engine then merges the detector’s `ConstraintResult` with any pattern‑matching results before final enforcement.  
-
-2. **RuleConfigLoader (Sibling)** – This loader validates the configuration schema before the engine starts. Because the semantic detector relies on schema fields (`type: semantic`, `semanticEvaluation.*`), any change to the schema must be reflected in both the loader and the detector. The two components therefore share the same `ConstraintRule` data model.  
-
-3. **LLM Service (External Dependency)** – The detector’s adapter communicates with an external LLM endpoint. All network interactions are abstracted, allowing the detector to be unit‑tested with a mock adapter. The adapter also respects the timeout and retry policies defined in the configuration.  
-
-4. **Telemetry / Logging** – The detector records latency, token usage, and raw LLM responses in the `ConstraintResult` diagnostics. These are consumed by the system’s observability stack (e.g., Prometheus metrics, structured logs) to monitor the health and cost of semantic evaluation.  
-
-5. **Fail‑over Path** – If the LLM call fails or exceeds the configured timeout, the detector returns a deterministic fallback (`deny` by default, configurable via `semanticEvaluation.fallbackDecision`). This ensures the overall rule engine remains robust even when the AI service is unavailable.  
-
----
-
-## Usage Guidelines  
-
-* **Define Semantic Rules Explicitly** – When authoring a rule in the configuration file, set `type: semantic` and provide a clear, concise natural‑language description. The <USER_ID_REDACTED> of the LLM match is directly proportional to the clarity of this description.  
-
-* **Tune the Confidence Threshold** – Adjust `semanticEvaluation.threshold` based on the desired risk tolerance. A higher threshold reduces false‑positives but may increase false‑negatives; monitor the telemetry to find the sweet spot for your domain.  
-
-* **Keep LLM Prompt Size Reasonable** – The detector automatically truncates overly large tool‑call payloads to stay within the LLM’s token limits. If you frequently hit truncation, consider summarising the payload upstream or increasing the model’s context window.  
-
-* **Monitor Cost and Latency** – Semantic evaluation adds network latency and token cost. Use the built‑in metrics (latency histogram, token count) to set alerts if the average evaluation time exceeds the SLA defined in `semanticEvaluation.timeoutMs`.  
-
-* **Test with Mock Adapter** – For unit and integration tests, replace the real LLMAdapter with a mock that returns deterministic `LLMResponse` objects. This isolates the rule engine from external variability and speeds up CI pipelines.  
-
-* **Graceful Degradation** – Do not rely on semantic rules for critical safety checks unless you have a safe fallback. Configure `semanticEvaluation.fallbackDecision` to `deny` for high‑risk operations, ensuring the system remains secure even when the AI service is down.  
-
-* **Version the Configuration Schema** – Since the semantic detector reads its parameters from the same schema validated by **RuleConfigLoader**, any schema version bump must be coordinated across both components. Use the version field in `constraint-configuration.md` to signal breaking changes.  
-
----
-
-### Architectural Patterns Identified  
-
-1. **Strategy / Policy** – rule‑type dispatch enables pluggable evaluation strategies (semantic vs. pattern).  
-2. **Adapter** – LLM client is wrapped to hide provider‑specific details.  
-3. **Pipeline** – three‑stage processing (dispatch → LLM → aggregation).  
-4. **Facade** – **ConstraintRuleEngine** presents a unified rule‑application API.  
-
-### Design Decisions & Trade‑offs  
-
-* **LLM‑centric matching** provides flexibility for natural‑language rules but introduces external latency and cost. The fallback decision and timeout settings mitigate risk.  
-* **Separation of semantic and pattern logic** preserves deterministic behavior for simple regex‑based rules while allowing richer semantic checks where needed.  
-* **Configuration‑driven thresholds** give operators runtime control without code changes, at the expense of requiring careful observability to avoid mis‑tuning.  
-
-### System Structure Insights  
-
-* The detector lives as a leaf component under **ConstraintRuleEngine**, sharing the same `ConstraintRule` model with **RuleConfigLoader**.  
-* All semantic‑specific parameters are co‑located in the central constraint configuration file, ensuring a single source of truth.  
-* The LLM adapter acts as the only external boundary, making the detector’s core logic pure and easily testable.  
-
-### Scalability Considerations  
-
-* **Horizontal scaling** – Because each evaluation is stateless (aside from configuration), multiple detector instances can be run behind a load balancer to handle higher call volumes.  
-* **Rate‑limit awareness** – The adapter includes back‑off logic; however, large spikes in tool‑call traffic may still saturate the LLM provider’s quota. Monitoring token usage and configuring per‑instance rate limits is recommended.  
-* **Batching potential** – The current design processes calls individually. If throughput becomes a bottleneck, a future enhancement could batch multiple payloads into a single LLM request, provided the prompt template supports it.  
-
-### Maintainability Assessment  
-
-* **High cohesion, low coupling** – The detector’s responsibilities are narrowly focused on semantic evaluation, and it communicates with the rest of the system via well‑defined interfaces (`Evaluate`, `ConstraintResult`).  
-* **Extensible rule schema** – Adding new evaluation modes (e.g., hybrid semantic‑pattern) only requires extending the dispatch logic and possibly a new adapter, without touching the core detector.  
-* **Observability baked in** – Diagnostic fields in `ConstraintResult` and built‑in metrics simplify troubleshooting and performance tuning.  
-* **Potential technical debt** – The reliance on an external LLM introduces a moving target (model updates, pricing changes). Keeping the adapter abstracted and version‑controlled mitigates this risk.  
-
----  
-
-*All references to files, classes, and configuration fields are taken directly from the provided observations; no additional assumptions have been introduced.*
+Since SemanticConstraintDetector is architecturally a *consumer* of semantic analysis rather than a provider, engineers should resist the temptation to push constraint logic into `mcp-server-semantic-analysis` for reuse. The design intent captured in `semantic-detection-design.md` places constraint evaluation firmly in the monitoring integration layer. Crossing that boundary would erode the separation that makes each layer independently evolvable. New constraint types should be defined through the configuration mechanism and evaluated within this component, not by extending the upstream semantic analysis package.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/mcp-constraint-monitor/docs/constraint-configuration.md provides the full configuration schema for defining constraint rules, including rule types, scopes, and enforcement modes
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem employs a dual-store persistence strategy in ViolationCaptureService (scripts/violation-capture-service.js) that separates concerns between live streaming and historical querying. Violations are written to two distinct files: a JSONL append-log at .mcp-sync/session-violations.jsonl where each line is a JSON-serialized violation event suitable for tail-following and real-time consumption, and a capped JSON array at .mcp-sync/violation-history.json that never exceeds 1000 entries and is intended for dashboard reads. This design means producers (the hook handlers) never block on dashboard consumers, and the dashboard never needs to parse an unbounded stream. The tradeoff is that the history file requires a full rewrite on each append once the cap is active, since the oldest entry must be evicted and the array re-serialized, which can become a write hotspot under high violation rates.
 
 ### Siblings
-- [RuleConfigLoader](./RuleConfigLoader.md) -- integrations/mcp-constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide') defines the full configuration schema this loader must validate against, including rule types, scopes, and enforcement modes
+- [ConstraintMonitorDashboard](./ConstraintMonitorDashboard.md) -- ConstraintMonitorDashboard consumes .mcp-sync/violation-history.json (a capped 1000-entry JSON array) rather than the raw JSONL append-log, isolating the UI from unbounded stream parsing as described in the ViolationCaptureService dual-store design
+- [ViolationCaptureService](./ViolationCaptureService.md) -- scripts/violation-capture-service.js implements a dual-store write strategy: each violation is appended as a single JSON line to .mcp-sync/session-violations.jsonl and also inserted into .mcp-sync/violation-history.json
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 5 observations*

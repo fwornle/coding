@@ -1,26 +1,25 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Classification Layer" {
-    component "OntologyClassificationAgent" as oca <<agent>>
-    component "AgentResponse Envelope" as envelope <<core>>
+package "SemanticAnalysis" {
+    package "Insights" {
+        component "Insight Generation" as ig <<core>>
+        component "Pattern Catalog Extraction" as pce <<core>>
+        component "Knowledge Report Authoring" as kra <<core>>
+    }
 }
 
-package "Insights" {
-    component "SemanticAnalysisAgent" as saa <<agent>>
-    component "Pattern Catalog" as catalog <<storage>>
-    component "Knowledge Report" as report <<core>>
+package "Knowledge Hierarchy" {
+    component "Coding (L0)" as l0 <<external>>
+    component "SemanticAnalysis (L1)" as l1 <<api>>
+    component "Insights (L2)" as l2 <<core>>
 }
 
-package "Base Infrastructure" {
-    component "BaseAgent" as base <<core>>
-}
+l0 --> l1 : contains
+l1 --> l2 : contains
 
-oca --> envelope : "produces\n(entity Type + ontologyClass)"
-envelope --> saa : "consumes"
-base ..> saa : "enforces calculateConfidence()"
-saa --> catalog : "accumulates patterns"
-saa --> report : "authors"
-catalog ..> report : "feeds recurring patterns"
+ig --> pce : feeds
+pce --> kra : informs
+kra --> l2 : produces
 
 @enduml

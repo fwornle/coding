@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: UKBTraceReporter
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[UKBTraceReporter] as ukbtrace_reporter #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[KMCoreStore] as kmcore_store #F0F0F0
+[EntityMigrationPipeline] as entity_migration_pipeline #F0F0F0
+[OntologyClassifier] as ontology_classifier #F0F0F0
+
+knowledge_management --> ukbtrace_reporter
+manual_learning -[hidden]- ukbtrace_reporter
+online_learning -[hidden]- ukbtrace_reporter
+kmcore_store -[hidden]- ukbtrace_reporter
+entity_migration_pipeline -[hidden]- ukbtrace_reporter
+ontology_classifier -[hidden]- ukbtrace_reporter
+
+@enduml

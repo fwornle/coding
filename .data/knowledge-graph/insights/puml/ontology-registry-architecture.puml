@@ -1,26 +1,22 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Legacy Agent Layer" {
-  component "ContentValidationAgent" as cva <<agent>>
-  component "OntologyClassificationAgent" as oca <<agent>>
+package "SemanticAnalysis" {
+  component "OntologyRegistry" as registry <<core>>
+  component "LegacyOntologyAdapter" as adapter <<api>>
 }
 
-package "Strangler-Facade Migration Layer" {
-  component "LegacyOntologyAdapter" as loa <<api>>
-  component "KmCoreAdapter" as kca <<api>>
+package "km-core Module" {
+  component "@fwornle/km-core" as kmcore <<external>>
+  component "Directory Scanner" as scanner <<core>>
+  component "Atomic Reload" as reload <<core>>
 }
 
-package "km-core" {
-  component "OntologyRegistry" as oreg <<core>>
-}
-
-cva --> loa : "loads class hierarchy via\nlegacy interface"
-oca --> loa : "loads class hierarchy via\nlegacy interface"
-
-loa --> oreg : "delegates ontology\nloading + schema translation"
-kca --> oreg : "delegates storage\noperations"
-
-loa -[hidden]- kca
+kmcore --> scanner : provides
+kmcore --> reload : provides
+scanner --> registry : "single-level scan"
+reload --> registry : "atomic reload"
+registry --> adapter : wrapped by
+adapter --> registry : "backward compatibility"
 
 @enduml

@@ -1,0 +1,34 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "MCP Transport Layer (tools/)" {
+    component "MCP Tool Endpoints" as tools <<api>>
+    component "SSE Transport" as sse <<api>>
+    component "Standard Transport" as std <<api>>
+}
+
+package "Business Logic Layer (services/)" {
+    component "Core Services" as services <<core>>
+}
+
+package "Parser Layer (parsers/)" {
+    component "Language Parsers" as parsers <<core>>
+}
+
+package "Integration Instances" {
+    component "code-graph-rag" as cgr <<external>>
+    component "mcp-server-semantic-analysis" as msa <<external>>
+    component "mcp-constraint-monitor" as mcm <<external>>
+}
+
+tools --> services : "delegates to"
+tools --> std : "exposes via"
+tools --> sse : "exposes via"
+parsers --> services : "feeds"
+cgr ..> tools : "implements"
+msa ..> tools : "replicates"
+mcm ..> tools : "replicates"
+
+@enduml

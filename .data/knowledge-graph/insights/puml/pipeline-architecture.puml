@@ -1,44 +1,22 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-package "Coordinator Layer" {
-  component "Coordinator" as coordinator <<core>>
-  component "AgentResponse Envelope" as agentResponse <<api>>
+package "Pipeline (Batch Processing)" {
+    component "Coordinator" as coordinator <<core>>
+    component "Observation Generation" as obsgen <<agent>>
+    component "KG Operators" as kgops <<core>>
+    component "Deduplication" as dedup <<core>>
+    component "Persistence" as persist <<storage>>
 }
 
-package "Agent Pipeline" {
-  component "BaseAgent<TInput,TOutput>" as baseAgent <<core>>
-  component "CodeGraphAgent" as codeGraph <<agent>>
-  component "SemanticAnalysisAgent" as semanticAgent <<agent>>
-  component "OntologyClassificationAgent" as ontologyAgent <<agent>>
-  component "ContentValidationAgent" as contentAgent <<agent>>
+package "SemanticAnalysis" {
+    component "Semantic Analysis" as semanalysis <<core>>
 }
 
-package "Persistence Layer" {
-  component "Deduplication Stage" as dedup <<core>>
-  component "KG Operators" as kgOps <<core>>
-  database "Memgraph Graph Layer" as memgraph <<storage>>
-}
-
-coordinator --> codeGraph : "dispatch [1]"
-coordinator --> semanticAgent : "dispatch [2]"
-coordinator --> ontologyAgent : "dispatch [3]"
-coordinator --> contentAgent : "dispatch [4]"
-
-codeGraph ..> baseAgent : "extends"
-semanticAgent ..> baseAgent : "extends"
-ontologyAgent ..> baseAgent : "extends"
-contentAgent ..> baseAgent : "extends"
-
-codeGraph --> agentResponse : "returns"
-semanticAgent --> agentResponse : "returns"
-ontologyAgent --> agentResponse : "returns"
-contentAgent --> agentResponse : "returns"
-
-agentResponse --> coordinator : "routing decision"
-agentResponse --> dedup : "post-observation"
-
-dedup --> kgOps : "pre-persistence"
-kgOps --> memgraph : "batch ops (MEMGRAPH_BATCH_SIZE)"
+semanalysis --> coordinator : "orchestrates"
+coordinator --> obsgen : "triggers"
+obsgen --> kgops : "feeds"
+kgops --> dedup : "passes"
+dedup --> persist : "writes"
 
 @enduml

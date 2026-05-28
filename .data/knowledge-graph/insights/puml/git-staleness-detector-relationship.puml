@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GitStalenessDetector
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[GitStalenessDetector] as git_staleness_detector #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyRegistry] as ontology_registry #F0F0F0
+
+semantic_analysis --> git_staleness_detector
+pipeline -[hidden]- git_staleness_detector
+ontology -[hidden]- git_staleness_detector
+insights -[hidden]- git_staleness_detector
+ontology_registry -[hidden]- git_staleness_detector
+
+@enduml

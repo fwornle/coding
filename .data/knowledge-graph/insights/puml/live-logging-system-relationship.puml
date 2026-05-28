@@ -11,8 +11,9 @@ title Hierarchy Context: LiveLoggingSystem
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[SessionWindowing] as session_windowing #E8F5E8
-[RedactionSystem] as redaction_system #E8F5E8
+[SessionWindowManager] as session_window_manager #E8F5E8
+[UserHashService] as user_hash_service #E8F5E8
+[TranscriptAdapterRegistry] as transcript_adapter_registry #E8F5E8
 
 coding --> live_logging_system
 llmabstraction -[hidden]- live_logging_system
@@ -21,7 +22,8 @@ knowledge_management -[hidden]- live_logging_system
 coding_patterns -[hidden]- live_logging_system
 constraint_system -[hidden]- live_logging_system
 semantic_analysis -[hidden]- live_logging_system
-live_logging_system --> session_windowing
-live_logging_system --> redaction_system
+live_logging_system --> session_window_manager
+live_logging_system --> user_hash_service
+live_logging_system --> transcript_adapter_registry
 
 @enduml

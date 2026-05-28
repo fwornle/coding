@@ -5,9 +5,13 @@ title Hierarchy Context: LLMMockService
 
 [DockerizedServices] as dockerized_services #FFFFDD
 [LLMMockService] as llmmock_service #LightBlue
-[MockResponseProvider] as mock_response_provider #E8F5E8
+[ServiceProbe] as service_probe #F0F0F0
+[ServiceStarter] as service_starter #F0F0F0
+[ConstraintMonitorWrapper] as constraint_monitor_wrapper #F0F0F0
 
 dockerized_services --> llmmock_service
-llmmock_service --> mock_response_provider
+service_probe -[hidden]- llmmock_service
+service_starter -[hidden]- llmmock_service
+constraint_monitor_wrapper -[hidden]- llmmock_service
 
 @enduml

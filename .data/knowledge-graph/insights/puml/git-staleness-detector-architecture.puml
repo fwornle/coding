@@ -1,0 +1,19 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "SemanticAnalysis" {
+  component "GitStalenessDetector" as gsd <<core>>
+}
+
+package "Git Layer" {
+  component "Git Commits" as gc <<external>>
+}
+
+package "Consumers" {
+  component "ContentValidationAgent" as cva <<agent>>
+}
+
+gc --> gsd : "provides commit history"
+gsd --> cva : "staleness scores\n+ invalidating-commit lists"
+
+@enduml

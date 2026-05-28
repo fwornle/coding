@@ -2,84 +2,77 @@
 
 **Type:** SubComponent
 
-The adapter is the sole consumer-facing entry point for ontology loading, meaning both ContentValidationAgent and OntologyClassificationAgent load class hierarchies through this facade rather than directly from km-core
+Serves as km-core module (imported via @fwornle/km-core) providing single-level ontology directory scan and atomic reload, wrapped by LegacyOntologyAdapter for backward compatibility. within the SemanticAnalysis component at hierarchy path <AWS_SECRET_REDACTED>
+
+# OntologyRegistry — Technical Insight Document
 
 ## What It Is
 
-OntologyRegistry is a SubComponent within the SemanticAnalysis pipeline responsible for owning and serving canonical class hierarchy data used during ontology classification. It lives inside the `km-core` layer and serves as the authoritative source of entity type hierarchies consumed by the broader semantic pipeline. Its consumer-facing surface is not exposed directly; instead, access is mediated entirely through its child component, StranglerFacadeAdapter — implemented as `LegacyOntologyAdapter` — which wraps the registry's interface behind a compatibility facade. No specific source file paths were surfaced in the code structure scan, but the observations consistently point to `km-core` as the module boundary within which OntologyRegistry is defined.
+OntologyRegistry is an L2 SubComponent entity residing at the hierarchy path `<AWS_SECRET_REDACTED>`. It sits within the SemanticAnalysis component and is implemented as a **km-core module**, imported via the package identifier `@fwornle/km-core`. Its primary responsibilities are narrow and well-defined: performing a **single-level ontology directory scan** and supporting **atomic reload** of that directory's contents.
+
+Although OntologyRegistry itself is a focused, minimal module, it does not operate in isolation. Its raw interface is wrapped by a `LegacyOntologyAdapter`, which exists expressly to preserve backward compatibility for consumers that predate the current km-core packaging. This two-layer arrangement — a lean core registry plus an adapter shim — reflects a deliberate architectural boundary between the registry's canonical behavior and the legacy contracts it must still honor.
+
+Within the broader SemanticAnalysis hierarchy, OntologyRegistry sits alongside sibling sub-components Pipeline, Ontology, Insights, and GitStalenessDetector, each serving a distinct concern inside the multi-agent semantic pipeline.
 
 ## Architecture and Design
 
-The dominant architectural pattern here is the **strangler facade**, applied to isolate legacy consumer agents from the evolving `km-core` API. OntologyRegistry sits at the center of this arrangement as the canonical owner of class hierarchy data, while `LegacyOntologyAdapter` (StranglerFacadeAdapter) interposes between it and any upstream callers.
-
 ![OntologyRegistry — Architecture](images/ontology-registry-architecture.png)
 
-The design makes a deliberate trade-off: backward compatibility is treated as a hard constraint, not a convenience. `ContentValidationAgent` and `OntologyClassificationAgent` — both of which extend `BaseAgent<TInput,TOutput>` as defined in `src/agents/base-agent.ts` — load class hierarchies exclusively through the facade rather than through OntologyRegistry directly. This means the registry's internal representation and API can evolve freely as `km-core` matures, provided the adapter correctly translates between old and new schemas. The cost is an additional indirection layer and the ongoing maintenance burden of keeping the schema translation logic in `LegacyOntologyAdapter` current as both sides evolve.
+The dominant architectural pattern here is the **Adapter pattern**, explicitly instantiated through `LegacyOntologyAdapter`. The design decision is straightforward: the km-core module (`@fwornle/km-core`) evolves independently with a clean, modern API, while `LegacyOntologyAdapter` absorbs the backward-compatibility surface area. This separation means breaking changes to the core registry do not propagate to legacy consumers — they are intercepted and translated at the adapter boundary. The trade-off is an additional indirection layer, but this is justified when the alternative is either freezing the core API or forcing coordinated migrations across all consumers simultaneously.
 
-OntologyRegistry is a sibling to KmCoreAdapter (canonically implemented in `storage/km-core-adapter.ts`), and together these two components constitute the full strangler-facade migration layer. Where KmCoreAdapter centralizes all entity *write* paths previously scattered across `GraphDatabaseAdapter` and `PersistenceAgent`, OntologyRegistry centralizes all class hierarchy *read* paths. The symmetry is intentional: both components represent `km-core`'s ownership of a distinct concern, and both are shielded from legacy callers by their respective adapter facades.
+The **single-level scan** constraint is an intentional scoping decision, not a limitation. By restricting the directory scan to one level of depth, the registry keeps its operational surface predictable and its reload semantics simple. An atomic reload — where the entire ontology state is replaced in one operation rather than incrementally patched — is a design choice that eliminates partial-state inconsistency during updates. This is particularly valuable in a classification pipeline like SemanticAnalysis, where agents such as OntologyClassificationAgent depend on a coherent, fully-loaded ontology to classify observations correctly. A partially-loaded ontology mid-reload could produce misclassifications that would be difficult to trace.
 
 ![OntologyRegistry — Relationship](images/ontology-registry-relationship.png)
 
+The placement of OntologyRegistry as an `@fwornle/km-core` module rather than as inline code within SemanticAnalysis signals a deliberate **packaging boundary**. The km-core designation implies this is considered foundational or shared infrastructure, potentially consumed by components beyond SemanticAnalysis itself, even though current observations confirm it within this hierarchy.
+
 ## Implementation Details
 
-The registry itself owns the canonical representation of class hierarchy data in `km-core`'s native schema. `LegacyOntologyAdapter` — the sole StranglerFacadeAdapter child of this component — is responsible for any schema translation required when the legacy format expected by `ContentValidationAgent` and `OntologyClassificationAgent` diverges from `km-core`'s representation. This translation is a one-way concern: the adapter converts outbound data from registry format to legacy format; there is no implication that legacy data is written back through this path.
+Concrete code symbols are not currently indexed for OntologyRegistry (0 symbols found, no key files resolved). What can be grounded from observations is the following mechanical picture:
 
-The facade preserves old method signatures and call conventions exactly as the consuming agents expect them. Because `OntologyClassificationAgent` and `ContentValidationAgent` implement their domain-specific logic inside the `process()` step of `BaseAgent`'s template-method `execute()` sequence, they depend on class hierarchy data being available synchronously and in a predictable shape at process time. Any interface drift in the adapter would propagate directly into failures at the `process()` step, making the compatibility contract both critical and brittle.
+The registry performs a **single-level directory scan**, meaning it reads the immediate children of a designated ontology directory without recursing into subdirectories. This produces a flat listing of ontology artifacts — likely files defining classification terms, hierarchy nodes, or taxonomy entries used by OntologyClassificationAgent during its classification passes.
 
-No code symbols were surfaced in the structure scan, so the precise method names, class constructors, and internal data structures of OntologyRegistry itself remain opaque from this analysis. The observations confirm its existence within `km-core` and its role as the canonical data owner, but the implementation mechanics below the `LegacyOntologyAdapter` boundary are not directly documented here.
+The **atomic reload** mechanism replaces the in-memory ontology state as a unit. This is architecturally consistent with how the sibling Ontology sub-component would be expected to consume it — the consuming agent always sees either the old complete state or the new complete state, never a hybrid. Atomic reload also simplifies error handling: if a reload fails, the prior state remains intact and valid.
+
+`LegacyOntologyAdapter` wraps the km-core module and translates between its interface and the contract expected by older callers. Without resolved source files, the precise translation logic is not available for analysis, but its existence confirms that the registry's current API has diverged from what was originally exposed — a sign of deliberate evolution.
 
 ## Integration Points
 
-OntologyRegistry integrates upward into the SemanticAnalysis pipeline through a strict single-entry-point rule: `LegacyOntologyAdapter` is the **sole consumer-facing entry point** for ontology loading. This is not a convention but an enforced structural constraint — both `ContentValidationAgent` and `OntologyClassificationAgent` are prohibited (by design, if not by technical enforcement) from reaching into `km-core` OntologyRegistry directly.
+OntologyRegistry's primary integration is upward into SemanticAnalysis, which hosts it. Within the pipeline, the most directly dependent agent is **OntologyClassificationAgent**, which classifies observations against upper and lower ontology hierarchies — the exact classification vocabulary that OntologyRegistry loads and makes available. Any reload of the registry directly affects the classification results produced by that agent on subsequent pipeline runs.
 
-The downstream dependency chain is meaningful: `OntologyClassificationAgent` produces `AgentResponse` envelopes with populated `entityType` and `ontologyClass` fields, which the Insights component then consumes for insight generation. This means errors or inconsistencies in class hierarchy data served by OntologyRegistry propagate forward through classification and into the insight layer. The registry's data <USER_ID_REDACTED> is therefore a root dependency for at least two downstream pipeline stages.
+The sibling **Ontology** sub-component likely holds the ontology definitions themselves (the artifact files), while OntologyRegistry handles the runtime loading and indexing of those definitions — a plausible division of concerns between a storage/definition concern and a runtime-access concern, though this relationship should be confirmed when source files are indexed.
 
-The relationship to KmCoreAdapter as a sibling reinforces that `km-core` is being incrementally promoted as the single source of truth for both entity persistence and ontology classification support. OntologyRegistry's integration role is to make that promotion transparent to legacy consumers.
+The `@fwornle/km-core` import path means that other components in the broader `km` ecosystem could reference OntologyRegistry independently of SemanticAnalysis, giving it a wider potential integration surface than its current hierarchy position alone implies.
+
+Legacy consumers access OntologyRegistry exclusively through `LegacyOntologyAdapter`, meaning the adapter is the only integration seam that must maintain a stable interface contract. New consumers should integrate directly against the km-core module interface.
 
 ## Usage Guidelines
 
-Developers working with the SemanticAnalysis pipeline should never instantiate or call into `km-core` OntologyRegistry directly from agent code. All class hierarchy lookups must go through `LegacyOntologyAdapter`. This rule exists not as bureaucratic overhead but as the mechanism that makes zero-downtime migration of the `km-core` API possible — circumventing the adapter breaks the migration invariant for the entire strangler-facade layer.
+**Always reload atomically.** The registry is designed around atomic reload semantics. Consumers should not attempt to trigger partial or incremental updates; the reload mechanism is the canonical way to refresh ontology state, and partial-state workarounds would undermine the consistency guarantees the design provides.
 
-When modifying the `km-core` OntologyRegistry's internal schema or API, the corresponding schema translation logic inside `LegacyOntologyAdapter` must be updated atomically. Because the adapter is the only place where format conversion occurs, any gap between a registry change and an adapter update will manifest as malformed class hierarchy data reaching `OntologyClassificationAgent`'s `process()` step — a failure that will surface as a classification error rather than an obvious schema mismatch.
+**New integrations should bypass the adapter.** `LegacyOntologyAdapter` exists to avoid breaking existing consumers, not as the preferred integration path. Any new component or agent integrating with OntologyRegistry should consume `@fwornle/km-core` directly, keeping the legacy adapter's responsibility surface from growing.
 
-Additions to the set of agents that require ontology class data should route through `LegacyOntologyAdapter` following the same pattern established by `ContentValidationAgent` and `OntologyClassificationAgent`. If a new agent is introduced that requires `km-core`'s native schema directly (rather than the legacy format), the appropriate path is to extend the adapter's interface or introduce a parallel facade rather than bypassing the layer entirely. The sibling pattern established by KmCoreAdapter provides a reference model for how `km-core` concerns can be exposed cleanly without breaking the migration layer.
+**Respect the single-level scan constraint.** Ontology artifacts expected to be discovered by the registry must be placed at the top level of the configured ontology directory. Nesting artifacts in subdirectories will cause them to be silently excluded from the registry's loaded state. This constraint should be communicated clearly to anyone managing the ontology directory structure.
+
+**Coordinate reloads with pipeline execution.** Because OntologyClassificationAgent depends on the registry's loaded state, reloads should be timed to occur between pipeline runs or at a well-defined pipeline stage — not mid-execution. Reloading during active classification could cause a pipeline run's classifications to be based on an inconsistently timed ontology snapshot, even with atomic semantics at the registry level.
 
 ---
 
-### Architectural Patterns Identified
-- **Strangler Facade**: `LegacyOntologyAdapter` wraps OntologyRegistry to allow API evolution without breaking existing consumers.
-- **Single Entry Point**: All class hierarchy access is funneled through one adapter, reducing surface area for compatibility failures.
-- **Separation of Ownership**: OntologyRegistry owns data; the adapter owns translation — these concerns are deliberately isolated.
-
-### Design Decisions and Trade-offs
-| Decision | Rationale | Trade-off |
-|---|---|---|
-| Sole consumer access via adapter | Preserves backward compatibility during `km-core` migration | Extra indirection; translation logic can drift |
-| Registry owns canonical schema | Single source of truth for class hierarchies | Consumers cannot optimize by accessing raw data |
-| Sibling adapter pair (OntologyRegistry + KmCoreAdapter) | Symmetric migration layer for reads and writes | Both adapters must be maintained in parallel |
-
-### Scalability Considerations
-The observations do not surface caching, lazy-loading, or concurrency strategies within OntologyRegistry. Given that class hierarchies are read-heavy and relatively stable, a caching layer inside `LegacyOntologyAdapter` would be a natural extension point — but nothing in the current design mandates or precludes it.
-
-### Maintainability Assessment
-The strangler-facade pattern makes OntologyRegistry's internals independently maintainable, which is its primary strength. The main maintainability risk is schema translation drift: as `km-core` evolves, the translation layer in `LegacyOntologyAdapter` becomes increasingly complex. The absence of direct code symbol data limits the ability to assess test coverage or translation complexity at this time.
+*This document reflects the current known state of OntologyRegistry. Source file indexing is incomplete (0 symbols resolved); sections on Implementation Details will benefit from re-analysis once `@fwornle/km-core` source files are indexed.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis pipeline is structured around a coordinator pattern where specialized agents each extend BaseAgent<TInput,TOutput> defined in src/agents/base-agent.ts. This base class implements a strict template-method execute() that sequences six steps in order: process(), calculateConfidence(), detectIssues(), generateRouting(), applyCorrections(), and buildMetadata(). Every agent—CodeGraphAgent, SemanticAnalysisAgent, OntologyClassificationAgent, ContentValidationAgent—inherits this contract and returns a uniform AgentResponse envelope. This design means a new developer adding an agent only needs to implement the domain-specific process() logic; confidence scoring, issue detection, and metadata construction are guaranteed to run in a consistent order regardless of which agent is invoked. The tradeoff is that the template method imposes overhead steps even when an agent's output is trivially simple, and agents cannot short-circuit the sequence without throwing exceptions.
-
-### Children
-- [StranglerFacadeAdapter](./StranglerFacadeAdapter.md) -- Based on the parent context, LegacyOntologyAdapter exposes the legacy ontology-loading interface as a facade, meaning it preserves the old method signatures and call conventions expected by existing consumers.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a multi-agent pipeline within the mcp-server-semantic-analysis integration that processes git history, LSL (vibe) sessions, and AST-parsed code graphs to extract, classify, and persist structured knowledge entities. The system coordinates several specialized agents: CodeGraphAgent indexes repositories via Tree-sitter/Memgraph, SemanticAnalysisAgent performs LLM-driven cross-correlation of git/vibe/code data, OntologyClassificationAgent classifies observations against upper/lower ontology hierarchies, ContentValidationAgent detects stale entities via file-reference and git-commit correlation, and a BaseAgent abstract class provides the standard response envelope (confidence breakdown, issue detection, routing suggestions) used by all agents.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- BaseAgent<TInput,TOutput> in src/agents/base-agent.ts enforces a six-step template-method execute() sequence (process, calculateConfidence, detectIssues, generateRouting, applyCorrections, buildMetadata) that all pipeline agents must follow without short-circuiting
-- [Ontology](./Ontology.md) -- OntologyClassificationAgent extends BaseAgent and implements domain-specific process() logic for entity type resolution while relying on the base class for confidence scoring and metadata construction
-- [Insights](./Insights.md) -- Insight generation runs after ontology classification, consuming AgentResponse envelopes with populated entityType and ontologyClass fields produced by OntologyClassificationAgent
-- [KmCoreAdapter](./KmCoreAdapter.md) -- storage/km-core-adapter.ts is the canonical file for this component, centralizing all entity write paths that were previously split across GraphDatabaseAdapter and PersistenceAgent
+- [Pipeline](./Pipeline.md) -- Pipeline is a sub-component of SemanticAnalysis
+- [Ontology](./Ontology.md) -- Ontology is a sub-component of SemanticAnalysis
+- [Insights](./Insights.md) -- Insights is a sub-component of SemanticAnalysis
+- [GitStalenessDetector](./GitStalenessDetector.md) -- GitStalenessDetector is a sub-component of SemanticAnalysis
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 3 observations*

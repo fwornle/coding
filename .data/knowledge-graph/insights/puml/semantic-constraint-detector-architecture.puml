@@ -1,0 +1,27 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "mcp-constraint-monitor" {
+    component "SemanticConstraintDetector" as scd <<core>>
+    component "Constraint Configuration" as cfg <<external>>
+    component "Hook Handlers" as hh <<core>>
+}
+
+package "Semantic Analysis Layer" {
+    component "mcp-server-semantic-analysis" as msa <<api>>
+}
+
+package "Violation Pipeline" {
+    component "ViolationCaptureService" as vcs <<core>>
+    database "JSONL Store" as jsonl <<storage>>
+    database "Capped JSON Store" as cjson <<storage>>
+}
+
+cfg --> scd : "configures thresholds"
+msa --> scd : "provides semantic capabilities"
+scd --> vcs : "produces violations"
+hh --> vcs : "produces violations"
+vcs --> jsonl : "writes"
+vcs --> cjson : "writes"
+
+@enduml

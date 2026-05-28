@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologyClassifier
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[OntologyClassifier] as ontology_classifier #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[KMCoreStore] as kmcore_store #F0F0F0
+[EntityMigrationPipeline] as entity_migration_pipeline #F0F0F0
+[UKBTraceReporter] as ukbtrace_reporter #F0F0F0
+
+knowledge_management --> ontology_classifier
+manual_learning -[hidden]- ontology_classifier
+online_learning -[hidden]- ontology_classifier
+kmcore_store -[hidden]- ontology_classifier
+entity_migration_pipeline -[hidden]- ontology_classifier
+ukbtrace_reporter -[hidden]- ontology_classifier
+
+@enduml

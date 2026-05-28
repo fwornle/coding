@@ -1,0 +1,29 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Central Docs" {
+    component "docs/puml/" as puml_dir <<storage>>
+    component "docs/architecture/" as central_arch <<storage>>
+}
+
+package "Integration Docs" {
+    component "architecture/README.md" as arch_readme <<core>>
+    component "docs/architecture/agents.md" as agents_doc <<agent>>
+    component "docs/architecture/tools.md" as tools_doc <<core>>
+    component "docs/architecture/integration.md" as integration_doc <<api>>
+}
+
+package "Architectural Decision Records" {
+    component "CRITICAL-ARCHITECTURE-ISSUES.md" as critical_issues <<core>>
+    component "TIERED-MODEL-PROPOSAL.md" as tiered_proposal <<core>>
+}
+
+puml_dir --> arch_readme : "canonical diagrams"
+arch_readme --> agents_doc : "indexes"
+arch_readme --> tools_doc : "indexes"
+arch_readme --> integration_doc : "indexes"
+critical_issues --> tiered_proposal : "resolves via"
+arch_readme --> critical_issues : "tracks deviations"
+arch_readme --> tiered_proposal : "versioned proposals"
+
+@enduml

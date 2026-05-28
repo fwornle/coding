@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SemanticConstraintDetector
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[SemanticConstraintDetector] as semantic_constraint_detector #LightBlue
+[ConstraintMonitorDashboard] as constraint_monitor_dashboard #F0F0F0
+[ViolationCaptureService] as violation_capture_service #F0F0F0
+
+constraint_system --> semantic_constraint_detector
+constraint_monitor_dashboard -[hidden]- semantic_constraint_detector
+violation_capture_service -[hidden]- semantic_constraint_detector
+
+@enduml

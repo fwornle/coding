@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ServiceStarter
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ServiceStarter] as service_starter #LightBlue
+[ServiceProbe] as service_probe #F0F0F0
+[ConstraintMonitorWrapper] as constraint_monitor_wrapper #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+
+dockerized_services --> service_starter
+service_probe -[hidden]- service_starter
+constraint_monitor_wrapper -[hidden]- service_starter
+llmmock_service -[hidden]- service_starter
+
+@enduml

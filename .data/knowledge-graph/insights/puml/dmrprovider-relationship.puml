@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DMRProvider
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[DMRProvider] as dmrprovider #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[LLMWithProcess] as llmwith_process #F0F0F0
+[LLMStateManager] as llmstate_manager #F0F0F0
+
+llmabstraction --> dmrprovider
+llmmock_service -[hidden]- dmrprovider
+llmwith_process -[hidden]- dmrprovider
+llmstate_manager -[hidden]- dmrprovider
+
+@enduml

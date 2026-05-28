@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SessionWindowManager
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[SessionWindowManager] as session_window_manager #LightBlue
+[UserHashService] as user_hash_service #F0F0F0
+[TranscriptAdapterRegistry] as transcript_adapter_registry #F0F0F0
+
+live_logging_system --> session_window_manager
+user_hash_service -[hidden]- session_window_manager
+transcript_adapter_registry -[hidden]- session_window_manager
+
+@enduml

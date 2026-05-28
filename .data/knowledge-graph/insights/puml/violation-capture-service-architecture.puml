@@ -1,0 +1,28 @@
+@startuml
+!include /coding/docs/puml/_standard-style.puml
+
+package "Producers" {
+  component "Hook Handlers" as hooks <<external>>
+}
+
+package "ViolationCaptureService" {
+  component "violation-capture-service.js" as vcs <<core>>
+}
+
+package "Storage" {
+  database "session-violations.jsonl" as jsonl <<storage>>
+  database "violation-history.json" as vjson <<storage>>
+}
+
+package "Consumers" {
+  component "Stream / Tail Consumer" as stream <<external>>
+  component "Dashboard" as dashboard <<external>>
+}
+
+hooks --> vcs : "synchronous call"
+vcs --> jsonl : "append single JSON line"
+vcs --> vjson : "insert + evict oldest\n(cap: 1000 entries)"
+jsonl --> stream : "tail-follow / streaming read"
+vjson --> dashboard : "random-access read"
+
+@enduml

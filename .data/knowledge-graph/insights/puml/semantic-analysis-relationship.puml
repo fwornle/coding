@@ -15,7 +15,7 @@ title Hierarchy Context: SemanticAnalysis
 [Ontology] as ontology #E8F5E8
 [Insights] as insights #E8F5E8
 [OntologyRegistry] as ontology_registry #E8F5E8
-[KmCoreAdapter] as km_core_adapter #E8F5E8
+[GitStalenessDetector] as git_staleness_detector #E8F5E8
 
 coding --> semantic_analysis
 live_logging_system -[hidden]- semantic_analysis
@@ -28,6 +28,6 @@ semantic_analysis --> pipeline
 semantic_analysis --> ontology
 semantic_analysis --> insights
 semantic_analysis --> ontology_registry
-semantic_analysis --> km_core_adapter
+semantic_analysis --> git_staleness_detector
 
 @enduml

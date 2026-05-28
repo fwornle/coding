@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintMonitorDashboard
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ConstraintMonitorDashboard] as constraint_monitor_dashboard #LightBlue
+[SemanticConstraintDetector] as semantic_constraint_detector #F0F0F0
+[ViolationCaptureService] as violation_capture_service #F0F0F0
+
+constraint_system --> constraint_monitor_dashboard
+semantic_constraint_detector -[hidden]- constraint_monitor_dashboard
+violation_capture_service -[hidden]- constraint_monitor_dashboard
+
+@enduml

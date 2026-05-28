@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphOntologyPatterns
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[GraphOntologyPatterns] as graph_ontology_patterns #LightBlue
+[ArchitecturalDocumentationPatterns] as architectural_documentation_patterns #F0F0F0
+[LayeredIntegrationStructure] as layered_integration_structure #F0F0F0
+
+coding_patterns --> graph_ontology_patterns
+architectural_documentation_patterns -[hidden]- graph_ontology_patterns
+layered_integration_structure -[hidden]- graph_ontology_patterns
+
+@enduml

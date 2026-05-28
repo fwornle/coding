@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintMonitorWrapper
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ConstraintMonitorWrapper] as constraint_monitor_wrapper #LightBlue
+[ServiceProbe] as service_probe #F0F0F0
+[ServiceStarter] as service_starter #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+
+dockerized_services --> constraint_monitor_wrapper
+service_probe -[hidden]- constraint_monitor_wrapper
+service_starter -[hidden]- constraint_monitor_wrapper
+llmmock_service -[hidden]- constraint_monitor_wrapper
+
+@enduml

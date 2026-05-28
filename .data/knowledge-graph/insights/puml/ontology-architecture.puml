@@ -1,37 +1,18 @@
 @startuml
 !include /coding/docs/puml/_standard-style.puml
 
-' Ontology SubComponent Architecture
-
-package "Ontology Definition Layer" {
-  component "Ontology Definition Files" as ontoDefs <<core>>
-  component "LegacyOntologyAdapter" as legacyAdapter <<core>>
+package "SemanticAnalysis" {
+    package "Ontology" {
+        component "Upper Ontology\nDefinitions" as upperOntology <<core>>
+        component "Lower Ontology\nDefinitions" as lowerOntology <<core>>
+        component "Entity Type\nResolution" as entity Resolution <<core>>
+        component "Ontology\nValidation" as validation <<core>>
+    }
 }
 
-package "Classification" {
-  component "OntologyClassificationAgent" as classAgent <<agent>>
-  component "BaseAgent" as baseAgent <<core>>
-}
-
-package "Validation & Persistence" {
-  component "ContentValidationAgent" as validAgent <<agent>>
-  component "PersistenceAgent" as persistAgent <<agent>>
-}
-
-' Ontology layer relationships
-ontoDefs --> legacyAdapter : "loads class hierarchies"
-
-' Classification relationships
-classAgent --> baseAgent : "extends"
-classAgent --> ontoDefs : "resolves entity types"
-baseAgent --> classAgent : "confidence scoring\n& metadata construction"
-
-' Validation relationships
-validAgent --> ontoDefs : "uses as validation rules"
-baseAgent --> validAgent : "detectIssues() surfaces\nontology mismatches"
-
-' Persistence relationships
-classAgent --> persistAgent : "ontologyClass metadata"
-persistAgent --> classAgent : "mapEntityToSharedMemory()\nprevents redundant classification"
+upperOntology --> lowerOntology : "specializes"
+lowerOntology --> entity Resolution : "informs"
+entity Resolution --> validation : "validates against"
+upperOntology --> validation : "constrains"
 
 @enduml

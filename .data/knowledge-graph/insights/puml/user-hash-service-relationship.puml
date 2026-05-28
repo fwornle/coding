@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: UserHashService
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[UserHashService] as user_hash_service #LightBlue
+[SessionWindowManager] as session_window_manager #F0F0F0
+[TranscriptAdapterRegistry] as transcript_adapter_registry #F0F0F0
+
+live_logging_system --> user_hash_service
+session_window_manager -[hidden]- user_hash_service
+transcript_adapter_registry -[hidden]- user_hash_service
+
+@enduml
