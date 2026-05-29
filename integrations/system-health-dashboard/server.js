@@ -317,8 +317,19 @@ class SystemHealthAPIServer {
         this.app.get('/api/consolidation/status', this.handleGetConsolidationStatus.bind(this));
         this.app.post('/api/consolidation/run', this.handleRunConsolidation.bind(this));
 
-        // Retrieval API (Phase 29)
-        this.app.post('/api/retrieve', this.handleRetrieve.bind(this));
+         // km-core common REST proxy (Phase 44) — forward all /api/km/* to obs-api
+         this.app.use('/api/km', async (req, res) => {
+             const qs = new URLSearchParams(req.query).toString();
+             const pathAndQuery = `/api/km${req.path}${qs ? '?' + qs : ''}`;
+             if (req.method === 'GET') {
+                 await this._forwardObsApi(req, res, pathAndQuery);
+             } else {
+                 await this._forwardObsApiMutation(req, res, pathAndQuery, req.method);
+             }
+         });
+
+         // Retrieval API (Phase 29)
+         this.app.post('/api/retrieve', this.handleRetrieve.bind(this));
 
         // Error handling
         this.app.use(this.handleError.bind(this));

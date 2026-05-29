@@ -36,6 +36,10 @@ import { ColdStoreReader } from '../src/live-logging/ColdStoreReader.js';
 // and its TS dist deps.  Re-exported below for backwards-compatible discovery.
 import { _computeRetentionBoundary, _mergeObservations, _mergeDigests } from './observations-api-merge.mjs';
 
+// Phase 44 plan 04 — km-core common REST router mounted at /api/km/
+import { GraphKMStore } from '../lib/km-core/dist/store/GraphKMStore.js';
+import { createKMRouter } from '../lib/km-core/dist/api/router.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 const DB_PATH = process.env.OBSERVATIONS_DB_PATH || path.join(REPO_ROOT, '.observations', 'observations.db');
@@ -1133,6 +1137,129 @@ app.get('/api/consolidation/status', (_req, res) => {
   }
 });
 
+// ── Phase 44 plan 04: km-core GraphKMStore + common REST router ───────────
+//
+// Mount the km-core common REST router at /api/km/ so the observations API
+// server exposes the unified entity/relation/search surface alongside the
+// legacy SQLite-based endpoints.  The store opens asynchronously; requests
+// that arrive before hydration completes get a 503.
+
+const KG_DB_PATH = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'leveldb');
+const KG_EXPORT_DIR = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'exports');
+
+let _kmStore = null;
+let _kmStoreReady = false;
+
+async function ensureKMStore() {
+  if (_kmStore && _kmStoreReady) return _kmStore;
+  if (_kmStore) return null; // init in progress
+  try {
+    _kmStore = new GraphKMStore({
+      dbPath: KG_DB_PATH,
+      exportDir: KG_EXPORT_DIR,
+    });
+    await _kmStore.open();
+    _kmStoreReady = true;
+    process.stderr.write(`[obs-api] km-core GraphKMStore ready\n`);
+    return _kmStore;
+  } catch (err) {
+    process.stderr.write(`[obs-api] km-core store init failed: ${err.message}\n`);
+    _kmStore = null;
+    return null;
+  }
+}
+
+// Mount km-core router at /api/km/ — deferred until store is ready.
+// We use a gate middleware: if the store isn't hydrated yet, 503.
+import { Router } from 'express';
+const kmSubRouter = Router();
+
+// Gate: ensure store is hydrated before any km route runs
+kmSubRouter.use((_req, res, next) => {
+  if (!_kmStoreReady || !_kmStore) {
+    return res.status(503).json({ error: 'Knowledge graph store not ready' });
+  }
+  next();
+});
+
+app.use('/api/km', kmSubRouter);
+
+// After store opens, mount the actual km-core route handlers onto the sub-router
+function mountKMRoutes(store) {
+  createKMRouter(store, kmSubRouter, { readOnly: false });
+  process.stderr.write(`[obs-api] km-core REST routes mounted at /api/km/\n`);
+}
+
+// ── Phase 44 plan 04: backward-compatibility aliases ──────────────────────
+// These mount *additional* GET handlers that delegate to the km-core store
+// when it's available.  They sit on `/api/km/observations`, `/api/km/digests`,
+// and `/api/km/insights` so the legacy paths (`/api/observations` etc.) are
+// untouched — but callers can also hit the km-prefixed versions to get data
+// from the unified knowledge graph.
+//
+// We also install middleware on the *original* legacy GET routes so that,
+// when the km-core store is hydrated, the response is enriched with a
+// `_kmStoreAvailable: true` header — a signal to clients that the new
+// `/api/km/entities?ontologyClass=…` surface is ready.
+
+// Helper: query km-core store entities filtered by ontologyClass
+async function queryKMEntities(ontologyClass, { limit = 50, offset = 0, sort = 'updatedAt' } = {}) {
+  if (!_kmStore || !_kmStoreReady) return null;
+  try {
+    const all = [];
+    for await (const [, attrs] of _kmStore.graph.nodeEntries()) {
+      if (attrs.entityType === ontologyClass || attrs.ontologyClass === ontologyClass) {
+        all.push({ id: attrs.id ?? attrs.name, ...attrs });
+      }
+    }
+    // sort
+    if (sort === 'updatedAt') {
+      all.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+    } else {
+      all.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    }
+    return all.slice(offset, offset + limit);
+  } catch {
+    return null;
+  }
+}
+
+// Alias endpoints on the km sub-router
+kmSubRouter.get('/observations', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const offset = parseInt(req.query.offset) || 0;
+  const entities = await queryKMEntities('RawObservation', { limit, offset });
+  if (entities === null) return res.status(503).json({ error: 'km-core store not ready' });
+  res.json(entities);
+});
+
+kmSubRouter.get('/digests', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const offset = parseInt(req.query.offset) || 0;
+  const entities = await queryKMEntities('Digest', { limit, offset });
+  if (entities === null) return res.status(503).json({ error: 'km-core store not ready' });
+  res.json(entities);
+});
+
+kmSubRouter.get('/insights', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const offset = parseInt(req.query.offset) || 0;
+  const entities = await queryKMEntities('Insight', { limit, offset });
+  if (entities === null) return res.status(503).json({ error: 'km-core store not ready' });
+  res.json(entities);
+});
+
+// Enrich legacy GET handlers with a header when km-core is available.
+// This runs before the existing handlers (Express runs middleware in order).
+for (const legacyPath of ['/api/observations', '/api/digests', '/api/insights']) {
+  app.use(legacyPath, (_req, res, next) => {
+    if (_kmStoreReady && _kmStore) {
+      res.set('X-KM-Store-Available', 'true');
+    }
+    next();
+  });
+}
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   process.stderr.write(`[obs-api] listening on http://0.0.0.0:${PORT} (db: ${DB_PATH})\n`);
   // Warm the writer first (opens DB rw + FTS triggers + WAL), then warm
@@ -1142,6 +1269,12 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     .then(() => { ensureRetrieval(); ensurePruner(); })
     .catch((err) => {
       process.stderr.write(`[obs-api] startup init failed: ${err.message}\n`);
+    });
+  // Warm km-core store (independent of SQLite writer)
+  ensureKMStore()
+    .then((store) => { if (store) mountKMRoutes(store); })
+    .catch((err) => {
+      process.stderr.write(`[obs-api] km-core mount failed: ${err.message}\n`);
     });
 });
 
