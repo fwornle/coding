@@ -40,7 +40,7 @@ Two complementary approaches for capturing and visualizing development insights.
 ### Storage
 
 ```
-.data/knowledge-graph/     # Graphology + LevelDB
+.data/knowledge-graph/     # @fwornle/km-core (GraphKMStore backed by Graphology + LevelDB)
 .data/knowledge-export/    # Git-tracked JSON exports
   coding.json
   other-project.json
@@ -136,7 +136,9 @@ vkb
 
 **UKB**:
 
-- `lib/knowledge-api/` - Core implementation
+- `src/km-core-adapter.ts` — adapter wrapping km-core for the semantic-analysis service
+- `src/wave-controller.ts` — orchestrates wave-analysis, calls `persistWithKmCore()`
+- `@fwornle/km-core` — external package providing GraphKMStore, entity resolution, mergeEntities
 - `.data/knowledge-graph/` - GraphDB storage
 - `.data/knowledge-export/` - JSON exports
 
@@ -150,3 +152,7 @@ vkb
 
 - `bin/vkb` - Start server
 - `integrations/vkb-visualizer/` - Web UI
+
+## km-core Migration
+
+The `KM_CORE_PERSISTENCE` feature flag was removed in Phase 42-07 — km-core is now the unconditional persistence path. Legacy persistence modules (three separate Graphology/LevelDB wrappers in `lib/knowledge-api/`) were retired in Phase 42.2-04. Consumers now use `km-core-adapter` which wraps `@fwornle/km-core`.

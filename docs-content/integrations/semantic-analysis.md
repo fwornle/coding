@@ -48,7 +48,7 @@
 
 | Agent | Function |
 |-------|----------|
-| PersistenceAgent | Saves to Graphology + LevelDB |
+| PersistenceAgent | Saves via km-core adapter (GraphKMStore) |
 
 ## MCP Tools
 
@@ -89,8 +89,8 @@ Steps:
 8. CodeGraph.index()
 9. DocLinker.analyze()
 10. QA.validate()
-11. Persistence.save()
-12. Deduplication.merge()
+11. Persistence.save() — via `persistWithKmCore()`
+12. Deduplication.merge() — via km-core `mergeEntities()`
 13. ContentValidation.refresh()
 
 ### Incremental Analysis
@@ -159,7 +159,7 @@ extract_patterns {
 
 ## Storage
 
-- Entities: `.data/knowledge-graph/` (Graphology + LevelDB)
+- Entities: `.data/knowledge-graph/` (km-core: GraphKMStore backed by Graphology + LevelDB)
 - Auto-export: `shared-memory-coding.json` every 30 seconds
 - Insights: `knowledge-management/insights/`
 

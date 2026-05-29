@@ -3,6 +3,28 @@
 
 title Network-Aware Agent Selection & Connectivity Matrix
 
+rectangle "Network Detection" as detect #F0FFF0 {
+  component [Cisco VPN CLI\n/opt/cisco/secureclient] <<infra>> as vpncli
+  component [utun Interface\nCheck] <<infra>> as utun
+  component [BMW DNS\nmuc.proxy-pac.bmwgroup.net\n+ TCP latency] <<infra>> as dns
+  note bottom of vpncli
+    Priority 1: VPN CLI state
+    Priority 2: utun interface
+    Priority 3: DNS + latency
+    N decoupled from P
+  end note
+}
+
+rectangle "Proxy Detection" as pdetect #FFF0F0 {
+  component [~/.bash_profile\nhttp_proxy toggle\n(px alias)] <<infra>> as pxtoggle
+  component [CONNECT test\nvia 127.0.0.1:3128] <<infra>> as pxtest
+  note bottom of pxtoggle
+    P:ON  = enabled + works
+    P:ERR = enabled + broken
+    P:OFF = disabled by user
+  end note
+}
+
 rectangle "Network Environment" as env #F0F8FF {
   rectangle "Inside VPN / Corporate Network" as vpn #E8F5E8 {
     component [Proxydetox\n127.0.0.1:3128] <<infra>> as proxy
@@ -32,6 +54,17 @@ cloud "External APIs" as apis {
   component [GitHub API\napi.github.com] <<api>> as github
   component [GitHub Copilot\napi.githubcopilot.com] <<api>> as ghcopilot
 }
+
+' Detection flows
+vpncli --> vpn : "Connected"
+vpncli --> pub : "Disconnected"
+utun --> vpn : utun+inet
+dns --> vpn : resolves\n<30ms=CN\n≥30ms=VPN
+dns --> pub : no resolve
+
+' Proxy detection flows
+pxtoggle --> proxy : enabled
+pxtest --> proxy : CONNECT ok
 
 ' VPN connections (via proxy)
 proxy SYNC_LINE anthropic : via proxy

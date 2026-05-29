@@ -1,7 +1,7 @@
 @startuml ukb-architecture
 !include _standard-style.puml
 
-title UKB (Update Knowledge Base) - Current Architecture
+title UKB (Update Knowledge Base) - Current Architecture (km-core)
 
 top to bottom direction
 
@@ -38,15 +38,16 @@ package "Ontology Layer" {
 }
 
 ' Database layer
-package "Database Services" {
-  [GraphDatabaseService] as graph_db
-  [SQLite Service] as sqlite
-  [Qdrant Service] as qdrant
+package "Persistence (km-core)" {
+  [km-core-adapter] as km_adapter
+  [GraphKMStore\n(@fwornle/km-core)] as km_store
+  [persistWithKmCore()] as persist_fn
+  [mergeEntities()\n(deduplication)] as merge_fn
 }
 
 ' Storage layer
 package "Persistent Storage" {
-  database "Graphology\n(In-Memory)" as graphology
+  database "Graphology\n(via km-core)" as graphology
   database "LevelDB\n(.data/knowledge-graph/)" as leveldb
   database "SQLite\n(.data/knowledge.db)" as sqlite_db
   database "Qdrant\n(Vector DB)" as qdrant_db
@@ -83,20 +84,21 @@ extractor --> ontology
 ontology --> layers
 
 ' Database management
-db_mgr --> graph_db
-db_mgr --> sqlite
-db_mgr --> qdrant
+db_mgr --> km_adapter
+km_adapter --> km_store
+km_adapter --> persist_fn
+km_adapter --> merge_fn
 
 checkpoint --> gap
 
 ' Storage
-graph_db --> graphology
-graph_db --> leveldb
+km_store --> graphology
+km_store --> leveldb
 sqlite --> sqlite_db
 qdrant --> qdrant_db
 
 ' Automatic JSON export (REQUIRED - keeps all storage layers in sync)
-graph_db --> exporter : auto-export\n(5s debounce)
+km_store --> exporter : auto-export\n(5s debounce)
 exporter --> json_export : git-tracked\nsynchronization
 
 ' Visualization
@@ -112,12 +114,14 @@ note right of checkpoint
   • Tracks last commit & session
 end note
 
-note right of graph_db
-  **Primary Storage System**
-  • Graphology: In-memory graph
+note right of km_store
+  **km-core Persistence**
+  • GraphKMStore wraps Graphology
   • LevelDB: Persistent storage
-  • Auto-persist: 1000ms
-  • Fail-fast on errors
+  • Entity resolution via ontology
+  • mergeEntities() deduplication
+  • KM_CORE_PERSISTENCE flag retired
+  • Legacy persistence modules removed
 end note
 
 note right of extractor
@@ -149,7 +153,7 @@ end note
 
 note bottom of db_mgr
   **Multi-Database Orchestration**
-  • GraphDB (knowledge graph)
+  • km-core (knowledge graph)
   • SQLite (relational queries)
   • Qdrant (vector search - optional)
   • Health status monitoring

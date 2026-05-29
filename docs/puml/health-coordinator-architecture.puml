@@ -1,7 +1,7 @@
 @startuml health-coordinator-architecture
 !include _standard-style.puml
 
-title Health Monitoring Architecture (Phase 33 + auto-heal wiring)
+title Health Monitoring Architecture (Phase 33 + auto-heal + N/P decoupling)
 
 top to bottom direction
 
@@ -55,10 +55,20 @@ note right of COORD
   every tick and mapped to
   passed/failed.
 
-  Network detection every tick:
-  PAC resolves + proxy ON → vpn
-  PAC resolves + proxy OFF → corporate
-  PAC fails → home
+  Network detection (3-signal,
+  decoupled from proxy):
+  1. Cisco VPN CLI → vpn
+  2. utun interface → vpn
+  3. BMW DNS + latency:
+     <30ms → corporate
+     ≥30ms → vpn
+     no resolve → open
+
+  Proxy detection (user intent):
+  ~/.bash_profile toggle (px alias)
+  P:ON  = enabled + CONNECT ok
+  P:ERR = enabled + CONNECT fails
+  P:OFF = disabled by user
 
   Stale PID check: probes for
   orphaned consolidation
@@ -92,9 +102,20 @@ note bottom of DASHBOARD
 end note
 
 note bottom of STATUSLINE
-  Stats lsl[*].transcriptPath
-  for activity age, then maps
-  to graduated cooling icons.
+  Knowledge pipeline fading:
+  📚✅ fresh (<15min)
+  📚🟢 recent (15min-1h)
+  📚🟠 aging (1-3h)
+  📚🟤 stale (3-6h)
+  📚⚫ dormant (6-12h)
+  📚💤 deep dormant (>12h)
+  📚🔴 ONLY when obs_api
+       is unreachable (broken)
+
+  N: network = VPN CLI +
+     utun + DNS (never proxy)
+  P: proxy = ~/.bash_profile
+     toggle + CONNECT test
 end note
 
 @enduml

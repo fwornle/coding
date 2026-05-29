@@ -22,7 +22,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | Active Sessions | `[RA⚫C🟢]` | Per-project abbreviations with graduated activity icons |
 | Constraint | `[🔒77%]` | Code quality % (with optional `🟡N` violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
-| Network Location | `[N:VPN]` | Network environment: VPN / CN / HOME / ?? |
+| Network Location | `[N:VPN]` | Network environment: VPN / CN / OPEN / ?? |
 | Proxy Status | `[P:ON]` | Local proxy running & functional: ON / ERR / OFF |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
@@ -79,23 +79,30 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[N:VPN]` | Connected via corporate VPN (PAC resolves AND proxy running) | Normal remote-work state |
-| `[N:CN]` | On the physical corporate network (PAC resolves, proxy not running) | Normal on-site state |
-| `[N:HOME]` | Home / public network (PAC does not resolve) | Expected off-VPN |
+| `[N:VPN]` | Connected via corporate VPN (Cisco CLI or utun interface detected) | Normal remote-work state |
+| `[N:CN]` | On the physical corporate network (BMW DNS resolves, TCP latency <30 ms, no VPN interface) | Normal on-site state |
+| `[N:OPEN]` | Home / public network — no VPN, no corporate LAN | Expected off-VPN |
 | `[N:??]` | Network location unknown (coordinator just started or probe failed) | Transient — clears on next tick |
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[P:ON]` | Local proxy (px / proxydetox) running and functional | Normal |
-| `[P:ERR]` | Proxy process running but not functional (port open, requests fail) | Check proxy logs |
-| `[P:OFF]` | Proxy not running | Expected on CN or HOME; problem on VPN |
+| `[P:ON]` | User enabled proxy (via `px` alias) + proxy CONNECT test succeeds | Normal |
+| `[P:ERR]` | User enabled proxy but CONNECT fails (e.g. at home, proxydetox can't reach BMW PAC) | Check proxy logs / network |
+| `[P:OFF]` | User disabled proxy (via `px` alias) — regardless of proxydetox process running | Expected on CN or OPEN; problem on VPN |
 
-!!! note "VPN detection logic"
-    The coordinator determines `location` by probing the corporate PAC URL and checking proxy status:
-    **PAC resolves + proxy running → `vpn`** (tunneling in remotely requires the proxy).
-    **PAC resolves + proxy not running → `corporate`** (on-site, proxy unnecessary).
-    **PAC does not resolve → `home`**.
-    The statusline warns (yellow) when on VPN without a working proxy.
+!!! note "Proxy toggle detection"
+    P reads the persistent toggle in `~/.bash_profile` (commented `#http_proxy=` = OFF, uncommented = ON), which the `px` alias writes. This means P reflects **user intent**, not process liveness.
+
+!!! note "VPN / network detection logic (3-signal approach)"
+    The coordinator determines `location` using three independent signals. **N never depends on proxy state.**
+
+    **Signal 1 — Cisco VPN CLI:** runs `/opt/cisco/secureclient/bin/vpn state`. If the output contains "Connected" → `vpn`.
+
+    **Signal 2 — utun interface detection:** parses `ifconfig` for any `utun*` interface with an `inet` address. If found → `vpn`.
+
+    **Signal 3 — BMW internal DNS:** attempts to resolve `muc.proxy-pac.bmwgroup.net`. If resolution succeeds, measures TCP latency to the resolved address: latency <30 ms → `corporate` (on-site LAN); latency ≥30 ms → `vpn` (tunnelled). If resolution fails entirely → `open` (home / public network).
+
+    Signals are evaluated in order; the first match wins.
 
 ### Knowledge Pipeline Indicators
 
@@ -104,14 +111,19 @@ The badge reflects the freshness of the **observation → digest → insight** p
 | Status | Icon | Meaning |
 |--------|------|---------|
 | Healthy | `[📚✅]` | Last observation written within 15 minutes — pipeline is ingesting |
-| Stale | `[📚🟡]` | Last observation 15 min – 6 h ago AND a Claude session is actively heartbeating — anomalous |
-| Stalled | `[📚🔴]` | Last observation > 6 h ago AND a Claude session is actively heartbeating — pipeline appears dead |
-| **Idle** | **`[📚⚫]`** | **No Claude session heartbeating in the last 5 min — "no recent observations" is expected, not anomalous** |
+| Fresh | `[📚🟢]` | Last observation 15 min – 1 hour ago |
+| Aging | `[📚🟠]` | Last observation 1 – 3 hours ago |
+| Fading | `[📚🟤]` | Last observation 3 – 6 hours ago |
+| Dormant | `[📚⚫]` | Last observation 6 – 12 hours ago |
+| Sleeping | `[📚💤]` | Last observation > 12 hours ago |
 | Disabled | `[📚🔇]` | obs_api reachable but no rows in any pipeline table |
 | Unknown | `[📚❓]` | Coordinator just started, slice not yet populated |
-| Unreachable | `[📚❌]` | obs_api unreachable, returning non-OK, or returning unparseable JSON |
+| Unreachable | `[📚🔴]` | obs_api unreachable, returning non-OK, or returning unparseable JSON |
 
-**Idle suppression** is applied via `CombinedStatusLine.isUserActive()`, which checks `state.lsl` for any session whose `lastBeat` is within 5 min. When no session is heartbeating, the freshness-derived warnings (`stale`, `stalled`) collapse to a single `⚫` (idle) — the same rule applies to the proxy badge (`degraded`, `cooling` → `[🧠⚫]`). True error states (`disabled`, `unknown`, `unreachable`) are NOT suppressed.
+!!! note "Red is reserved for pipeline failure"
+    🔴 is shown **only** when `obs_api` is unreachable (confirmed pipeline failure). Time-based staleness uses a graduated fading scheme (🟢 → 🟠 → 🟤 → ⚫ → 💤) — red is never used for age alone.
+
+**Idle suppression** is applied via `CombinedStatusLine.isUserActive()`, which checks `state.lsl` for any session whose `lastBeat` is within 5 min. When no session is heartbeating, the freshness-derived icons collapse to a single `⚫` (idle). True error states (`disabled`, `unknown`, `unreachable`) are NOT suppressed.
 
 Tooltip details (visible in the verbose status output) include observation/digest/insight ages, totals, and any in-flight consolidation.
 

@@ -40,7 +40,8 @@ Coordinator-centric health architecture (Phase 33). One process — the **health
   "lsl_by_project": { "coding": "healthy", "rapid-automations": "healthy" },
   "processes": [],
   "databases": { "status": "healthy", "levelDB": {}, "qdrant": {}, "leveldb_lock_check": "passed", "qdrant_availability": "passed", "graph_integrity": "passed" },
-  "network": { "internet_reachable": true, "proxy_running": true, "location": "vpn" },
+  "network": { "internet_reachable": true, "location": "vpn", "vpn_cli": true, "utun_detected": true, "dns_internal_ok": true },
+  "proxy": { "state": "on", "user_enabled": true, "connect_ok": true },
   "files": [],
   "generated_at": "..."
 }
@@ -52,9 +53,9 @@ Coordinator-centric health architecture (Phase 33). One process — the **health
 - LSL entries are marked `status=stopped` automatically after **>15 s** without a fresh `lsl_heartbeat` from their reporter.
 - ETM service status is **derived** from `lsl_heartbeats` — there is no `service_status` signal kind for ETM. Other services are probed directly by the coordinator.
 - Database sub-checks (`leveldb_lock_check`, `qdrant_availability`, `graph_integrity`) are probed on every coordinator tick and mapped to `passed` / `failed`. The dashboard's `toUiStatus()` function maps these to UI-friendly states.
-- Network environment (`network.location`: `vpn` / `corporate` / `home`) is detected every tick by probing the corporate PAC URL and checking proxy status. VPN is detected as: PAC resolves AND proxy running.
+- Network environment (`network.location`: `vpn` / `corporate` / `home`) is detected every tick via a 3-signal approach: (1) Cisco VPN CLI — queries `vpn status` for tunnel state, (2) utun interface detection — checks for active `utun*` interfaces via `ifconfig`, (3) BMW internal DNS + latency — resolves an internal hostname and measures round-trip. Network location is fully decoupled from proxy state.
 - Process checks (`stale_pids`) actively probe for orphaned consolidation heartbeat files; placeholder rules without implementations (`process_uptime`, `high_cpu_usage`, `memory_usage`, `disk_usage`) are disabled.
-- `generated_at` is updated on every state refresh; consumers use it for staleness detection (`>180 s` is a `[🏥⏰]` stale badge).
+- `generated_at` is updated on every state refresh; consumers use it for staleness detection (`>180 s` is a `[🏥⏰]` stale badge). Knowledge pipeline staleness uses graduated fading (matching the session activity lifecycle icons) rather than red for stalled state; red is reserved exclusively for `obs_api` unreachable.
 
 ## Reporters
 
@@ -133,6 +134,20 @@ Statusline mapping (`combined-status-line.js`):
 
 The strong probe runs **fire-and-forget** with a 30s timeout — the CLI-fallback path through claude-code/sonnet currently takes ~14s end-to-end, and we don't want the strong probe serializing the coordinator's tick loop. Errors are caught and write to `semantic_strong_reason` for diagnostics.
 
+### Proxy detection (user-intent model)
+
+Proxy state (`proxy.state`) is determined by **user intent**, not process state. The toggle is the `px` alias in `~/.bash_profile` which sets/unsets `http_proxy`/`https_proxy` env vars. The proxydetox process state is irrelevant — only user intent matters.
+
+| State | Meaning |
+|-------|---------|
+| `P:ON` | User enabled proxy (`px on`) AND `CONNECT` probe succeeds |
+| `P:ERR` | User enabled proxy (`px on`) AND `CONNECT` probe fails |
+| `P:OFF` | User disabled proxy (`px off`) |
+
+### Violations
+
+The `/health/state` report endpoint includes `proxy` and `semantic_readiness` violations alongside other violation categories. This fixes a previous data inconsistency where the status endpoint counted violations that were not present in the report output.
+
 ## Consumers
 
 ### Statusline (`combined-status-line.js`)
@@ -198,7 +213,7 @@ When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Reme
 | Services (VKB / Constraint Monitor / Dashboard / Semantic Analysis SSE) | coordinator `services` |
 | Processes (Process Registry / Stale PIDs) | coordinator `processes.stale_pids` (probes for orphaned heartbeat files) |
 | UKB Workflows (status / capacity / history) | semantic-analysis SSE server (:3848) |
-| LLM Proxy Health (Internet / Proxy / Network location) | coordinator `network` (VPN detection, internet reachability, proxy status) |
+| LLM Proxy Health (Internet / Proxy / Network location) | coordinator `network` (3-signal VPN detection, internet reachability) + coordinator `proxy` (user-intent proxy state) |
 | Service Detail (Port Liveness / Supervisord Processes) | dashboard server probes ports + queries supervisorctl |
 
 ### Key API endpoints
