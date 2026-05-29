@@ -1154,7 +1154,7 @@ export function MultiAgentGraph({
               const badgeColors = {
                 mock: { bg: 'fill-orange-500', letter: 'M' },
                 local: { bg: 'fill-purple-500', letter: 'L' },
-                public: { bg: 'fill-green-500', letter: 'P' },
+                public: { bg: 'fill-green-500', letter: 'C' },
               }
               const badge = badgeColors[agentMode] || badgeColors.public
               return (

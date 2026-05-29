@@ -2109,10 +2109,10 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                             ? 'bg-green-500 text-white'
                             : 'bg-white text-gray-600 hover:bg-green-50'
                         }`}
-                        title="Public: Use Groq/Anthropic/OpenAI APIs"
+                        title="Cloud: Use Groq/Anthropic/OpenAI APIs"
                       >
                         <Cloud className="h-3 w-3" />
-                        Public
+                        Cloud
                       </button>
                     </div>
                   </div>

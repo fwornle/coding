@@ -24,6 +24,10 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import type { AgentDefinition, EdgeDefinition } from './types'
+import { PROCESS_TAGS } from '../../../../mcp-server-semantic-analysis/dist/agents/process-tags.js'
+
+// Phase 52: `llmModel` literals are now D-03 fallback hints (empty-bucket display).
+// Live model badges come from `useLLMBadgeForProcess(processTag)` in trace-modal.tsx.
 
 // Icon mapping for dynamic agent definitions from YAML
 export const ICON_MAP: Record<string, typeof GitBranch> = {
@@ -116,6 +120,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Analyzes commit history via git CLI with LLM-powered pattern extraction. Identifies code evolution patterns, development themes, and architectural decisions.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
+    processTag: PROCESS_TAGS.WAVE4_PATTERN_EXTRACT,
     techStack: 'Git CLI + SemanticAnalyzer',
     row: 2,
     col: 0,
@@ -128,6 +133,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Parses LSL session files to identify problem-solution pairs, extract development contexts, and discover workflow patterns.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
+    processTag: PROCESS_TAGS.WAVE2_SUBCOMPONENT,
     techStack: 'SemanticAnalyzer',
     row: 2,
     col: 1,
@@ -142,6 +148,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Deep code analysis to detect patterns (MVC, Factory, Observer, etc.), assess quality metrics, and generate LLM-powered insights.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
+    processTag: PROCESS_TAGS.WAVE1_L1_EMIT,
     techStack: 'Direct LLM clients',
     row: 3,
     col: 0,
@@ -154,6 +161,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Maps entities to ontology classes using LLM-powered semantic inference. Assigns categories, properties, and confidence scores.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
+    processTag: PROCESS_TAGS.WAVE3_ONTOLOGY_CLASSIFY,
     techStack: 'OntologyClassifier + SemanticAnalyzer',
     row: 3,
     col: 1,
@@ -253,6 +261,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Builds AST-based knowledge graph using Tree-sitter parsing. Indexes functions, classes, imports, and call relationships into Memgraph.',
     usesLLM: true,
     llmModel: 'External: code-graph-rag (OpenAI/Anthropic/Ollama)',
+    processTag: PROCESS_TAGS.WAVE4_DIAGRAM,
     techStack: 'Tree-sitter + Memgraph + pydantic_ai',
     row: 4,
     col: 1,
@@ -279,6 +288,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Links markdown docs and PlantUML diagrams to code entities using LLM-powered semantic matching.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
+    processTag: PROCESS_TAGS.WAVE4_DOCS,
     techStack: 'Regex + glob patterns + SemanticAnalyzer',
     row: 5,
     col: 1,
@@ -305,6 +315,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Generates comprehensive insights, PlantUML architecture diagrams, and design pattern documentation.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
+    processTag: PROCESS_TAGS.WAVE4_INSIGHT,
     techStack: 'SemanticAnalyzer',
     row: 6,
     col: 1,
@@ -317,6 +328,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Creates structured observations: pattern observations, problem-solution pairs, architectural decisions.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
+    processTag: PROCESS_TAGS.WAVE3_DETAIL_EXTRACT,
     techStack: 'SemanticAnalyzer',
     row: 7,
     col: 0,
@@ -355,6 +367,7 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
     description: 'Validates entity accuracy against current codebase. Detects git-based staleness and regenerates stale content.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
+    processTag: PROCESS_TAGS.WAVE4_DIAGRAM_REPAIR,
     techStack: 'SemanticAnalyzer',
     row: 8,
     col: 1,

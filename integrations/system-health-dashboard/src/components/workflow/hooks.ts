@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import type { AgentDefinition, EdgeDefinition } from './types'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
@@ -205,4 +205,107 @@ export function useWorkflowLayout(
     maxRow,
     maxCol: Math.max(maxCol, 2)
   }
+}
+
+// ─── Phase 52 D-04: Live LLM badge hooks ───────────────────────────────────
+
+interface RecentCall {
+  id: number
+  timestamp: string
+  provider: string
+  model: string
+  process: string
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  latency_ms: number
+  subscription: string
+  prompt_preview: string
+}
+
+const PROXY_PORT = '12435'
+const PROXY_BASE = `http://localhost:${PROXY_PORT}`
+const REFRESH_INTERVAL_MS = 30_000
+const RECENT_LIMIT = 50
+const N_PER_TAG = 10
+
+// Shared module-level store so all hook consumers share one fetch interval
+let _recentCalls: RecentCall[] = []
+let _loading = true
+let _error: string | null = null
+let _subscribers = new Set<() => void>()
+let _intervalId: ReturnType<typeof setInterval> | null = null
+
+function notifySubscribers() {
+  _subscribers.forEach(fn => fn())
+}
+
+async function fetchRecentCalls() {
+  try {
+    const res = await fetch(`${PROXY_BASE}/api/token-usage/recent?limit=${RECENT_LIMIT}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const json = await res.json()
+    _recentCalls = json.calls ?? json ?? []
+    _error = null
+  } catch (e: any) {
+    _error = `Failed to load LLM telemetry — check rapid-llm-proxy on port ${PROXY_PORT}`
+  } finally {
+    _loading = false
+    notifySubscribers()
+  }
+}
+
+function subscribe(cb: () => void) {
+  _subscribers.add(cb)
+  if (_subscribers.size === 1) {
+    // First subscriber — start polling
+    fetchRecentCalls()
+    _intervalId = setInterval(fetchRecentCalls, REFRESH_INTERVAL_MS)
+  }
+  return () => {
+    _subscribers.delete(cb)
+    if (_subscribers.size === 0 && _intervalId) {
+      clearInterval(_intervalId)
+      _intervalId = null
+    }
+  }
+}
+
+function getSnapshot() {
+  return { calls: _recentCalls, loading: _loading, error: _error }
+}
+
+/**
+ * Shared poller for /api/token-usage/recent. Single interval serves all consumers.
+ */
+export function useRecentCalls() {
+  const [state, setState] = useState(getSnapshot)
+
+  useEffect(() => {
+    const unsub = subscribe(() => setState(getSnapshot()))
+    // Sync immediately in case store already has data
+    setState(getSnapshot())
+    return unsub
+  }, [])
+
+  return state
+}
+
+/**
+ * Phase 52 D-04 — Returns the live provider/model for a process tag by
+ * examining the most-recent N=10 token_usage rows. Returns null when no
+ * rows match (caller falls back to static llmModel / tier label).
+ */
+export function useLLMBadgeForProcess(
+  processTag: string | undefined
+): { provider: string; model: string } | null {
+  const { calls } = useRecentCalls()
+
+  return useMemo(() => {
+    if (!processTag) return null
+    const matching = calls.filter(c => c.process === processTag).slice(0, N_PER_TAG)
+    if (matching.length === 0) return null
+    // Most-recent entry wins (calls are ordered newest-first)
+    return { provider: matching[0].provider, model: matching[0].model }
+  }, [calls, processTag])
 }
