@@ -137,8 +137,10 @@ interface TokenSummary {
   bucket_minutes?: number
   process_keys?: string[]
   model_keys?: string[]
+  provider_keys?: string[]
   by_process_hour?: Array<Record<string, number | string>>
   by_model_hour?: Array<Record<string, number | string>>
+  by_provider_hour?: Array<Record<string, number | string>>
 }
 
 interface RecentCall {
@@ -250,7 +252,7 @@ export function TokenUsagePage() {
   // counts; 'all' is a backend sentinel that picks every retained row.
   const [hoursWindow, setHoursWindow] = useState<string>('24')
   // Evolution chart can stack tokens by process (purpose) or by model.
-  const [evoGroupBy, setEvoGroupBy] = useState<'process' | 'model' | 'tokens'>('process')
+  const [evoGroupBy, setEvoGroupBy] = useState<'process' | 'model' | 'provider' | 'tokens'>('process')
   const [evoStackMode, setEvoStackMode] = useState<'stacked' | 'overlapping'>('stacked')
   const [evoHidden, setEvoHidden] = useState<Set<string>>(new Set())
   const toggleEvoSeries = (key: string) => {
@@ -331,10 +333,12 @@ export function TokenUsagePage() {
   const evoKeysRaw: string[] =
     evoGroupBy === 'process' ? (summary.process_keys || [])
     : evoGroupBy === 'model' ? (summary.model_keys || [])
+    : evoGroupBy === 'provider' ? (summary.provider_keys || [])
     : ['input', 'output']
   const evoSeriesRaw: Array<Record<string, any>> =
     evoGroupBy === 'process' ? (summary.by_process_hour || [])
     : evoGroupBy === 'model' ? (summary.by_model_hour || [])
+    : evoGroupBy === 'provider' ? (summary.by_provider_hour || [])
     : (summary.by_hour || []).map(h => ({ hour: h.hour, input: h.input_tokens, output: h.output_tokens }))
   const MAIN_CONSUMER_THRESHOLD = 0.005   // 0.5% of window total
   const evoGrandTotal = summary.total_tokens || 1
@@ -591,6 +595,7 @@ export function TokenUsagePage() {
                     {' '}{evoStackMode === 'stacked' ? 'stacked by' : 'overlapping by'} {
                       evoGroupBy === 'process' ? 'purpose'
                       : evoGroupBy === 'model' ? 'model'
+                      : evoGroupBy === 'provider' ? 'provider'
                       : 'token type'
                     } ·
                     {' '}click legend to toggle · drag brush to zoom
@@ -608,7 +613,7 @@ export function TokenUsagePage() {
                   </Button>
                   <Select
                     value={evoGroupBy}
-                    onValueChange={(v) => setEvoGroupBy(v as 'process' | 'model' | 'tokens')}
+                    onValueChange={(v) => setEvoGroupBy(v as 'process' | 'model' | 'provider' | 'tokens')}
                   >
                     <SelectTrigger className="w-[160px] h-9">
                       <SelectValue />
@@ -616,6 +621,7 @@ export function TokenUsagePage() {
                     <SelectContent>
                       <SelectItem value="process">By Process</SelectItem>
                       <SelectItem value="model">By Model</SelectItem>
+                      <SelectItem value="provider">By Provider</SelectItem>
                       <SelectItem value="tokens">Input/Output</SelectItem>
                     </SelectContent>
                   </Select>

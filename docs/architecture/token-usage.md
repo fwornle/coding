@@ -50,9 +50,12 @@ The dropdown at top-right of the chart card switches what each band represents. 
 |---|---|---|
 | **By Process** *(default)* | Cognitive process (`observation-writer`, `wave-analysis-wave1`, `health-coordinator`, …) | Identifying which subsystem is driving consumption |
 | **By Model** | Canonical model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`) | Assessing the model mix and per-model spend |
+| **By Provider** | Provider name (`copilot`, `claude-code`, `anthropic`, …) | Seeing which API provider is serving the bulk of traffic — useful after routing changes |
 | **By Tokens (in/out)** | `input_tokens` vs `output_tokens` only | Tracking prompt-bloat vs generation share — this is what the retired *Timeline* tab used to show |
 
 ![Evolution tab — By Model](../images/health-mon-tokens-evolution-by-model.png)
+
+![Evolution tab — By Provider](../images/health-mon-tokens-by-provider.png)
 
 ![Evolution tab — By Tokens (in/out)](../images/health-mon-tokens-evolution-by-in_out.png)
 

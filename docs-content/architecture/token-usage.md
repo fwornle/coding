@@ -50,9 +50,12 @@ The dropdown at top-right of the chart card switches what each band represents. 
 |---|---|---|
 | **By Process** *(default)* | Cognitive process (`observation-writer`, `wave-analysis-wave1`, `health-coordinator`, …) | Identifying which subsystem is driving consumption |
 | **By Model** | Canonical model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`) | Assessing the model mix and per-model spend |
+| **By Provider** | LLM provider backend (`copilot`, `claude-code`, `anthropic-direct`) | Seeing which provider handles the most traffic and comparing latency/cost profiles |
 | **By Tokens (in/out)** | `input_tokens` vs `output_tokens` only | Tracking prompt-bloat vs generation share — this is what the retired *Timeline* tab used to show |
 
 ![Evolution tab — By Model](../images/health-mon-tokens-evolution-by-model.png)
+
+![Evolution tab — By Provider](../images/health-mon-tokens-by-provider.png)
 
 ![Evolution tab — By Tokens (in/out)](../images/health-mon-tokens-evolution-by-in_out.png)
 

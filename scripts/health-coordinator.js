@@ -606,6 +606,25 @@ async function pollKnowledgePipeline() {
     last_probe_end: probeEndedAt()
   };
   evaluateObsApiAutoHeal();
+
+  // Auto-trigger consolidation when undigested observations accumulate
+  const CONSOLIDATION_THRESHOLD = 5;
+  const CONSOLIDATION_COOLDOWN_MS = 10 * 60_000; // 10 min between auto-triggers
+  if (
+    body.undigested >= CONSOLIDATION_THRESHOLD &&
+    !body.inflight &&
+    (!pollKnowledgePipeline._lastAutoConsolidate ||
+      now - pollKnowledgePipeline._lastAutoConsolidate > CONSOLIDATION_COOLDOWN_MS)
+  ) {
+    pollKnowledgePipeline._lastAutoConsolidate = now;
+    log(`[auto-consolidation] triggering: ${body.undigested} undigested observations`);
+    fetch(`${OBS_API_URL}/api/consolidation/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'health-coordinator-auto' }),
+      signal: AbortSignal.timeout(5_000)
+    }).catch(err => log(`[auto-consolidation] trigger failed: ${err.message}`));
+  }
 }
 
 /**
