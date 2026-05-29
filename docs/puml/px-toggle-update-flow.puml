@@ -1,0 +1,76 @@
+@startuml px-toggle-update-flow
+!include _standard-style.puml
+
+title px Toggle → Status Line Update Flow
+
+actor User as user
+participant "px alias\n(~/.bash_profile)" as px
+participant "proxydetox\n(launchd)" as proxydetox
+participant "Health Coordinator\n(:3034)" as coordinator
+participant "Status Line Cache\n(.logs/)" as cache
+participant "tmux\n(status-right)" as tmux
+participant "LLM Proxy\n(:12435)" as llm
+
+== px off (disable proxy) ==
+
+user -> px: px
+activate px
+
+px -> proxydetox: launchctl bootout\ngui/<uid>/cc.colorto.proxydetox
+note right: Fully unloads the plist;\nport 3128 goes down.\nNo socket activation respawn.
+deactivate proxydetox
+
+px -> cache: rm -f combined-status-line-cache-*.txt
+note right: Nuke ALL 47 per-pane\ncache files for instant\ninvalidation
+
+px -[#43A047,dashed]-> coordinator: POST /health/refresh
+activate coordinator
+coordinator -> coordinator: Reset network probe age\n→ immediate re-probe
+coordinator -> coordinator: Detect port 3128 down\n→ proxy_running=false
+deactivate coordinator
+
+deactivate px
+
+... ≤5s (tmux status-interval) ...
+
+tmux -> cache: Read cache file
+note right: Cache deleted → miss
+tmux -> tmux: Spawn combined-status-line.js\n(slow path, ~300ms)
+tmux -> coordinator: GET /health/state
+coordinator --> tmux: { proxy_running: false,\n  location: "corporate" }
+tmux -> cache: Write new cache\n[P:OFF] [N:CN]
+tmux --> user: **[P:OFF]** rendered\n(≤5s total latency)
+
+... Next LLM call ...
+
+llm -> llm: smartFetch()\n→ isProxyAlive()\n→ TCP connect 3128 fails
+llm -> llm: Use directFetch\n(no proxy agent)
+note right: 5s cache on probe;\nauto-switches without\nrestart or reload
+
+== px on (enable proxy) ==
+
+user -> px: px
+activate px
+
+px -> proxydetox: launchctl bootstrap\ngui/<uid> cc.colorto.proxydetox.plist
+activate proxydetox
+note right: Full plist load;\nport 3128 comes up\nvia socket activation
+
+px -> cache: rm -f combined-status-line-cache-*.txt
+px -[#43A047,dashed]-> coordinator: POST /health/refresh
+activate coordinator
+coordinator -> coordinator: Detect port 3128 up\n→ proxy_running=true
+deactivate coordinator
+
+deactivate px
+
+... ≤5s ...
+
+tmux -> coordinator: GET /health/state
+coordinator --> tmux: { proxy_running: true }
+tmux --> user: **[P:ON]** rendered
+
+llm -> llm: smartFetch()\n→ isProxyAlive()\n→ TCP connect 3128 OK
+llm -> llm: Use proxyFetch\n(via ProxyAgent)
+
+@enduml

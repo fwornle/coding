@@ -23,7 +23,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | Constraint | `[🔒77%]` | Code quality % (with optional `🟡N` violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
 | Network Location | `[N:VPN]` | Network environment: VPN / CN / OPEN / ?? |
-| Proxy Status | `[P:ON]` | Local proxy running & functional: ON / ERR / OFF |
+| Proxy Status | `[P:ON]` | Local proxy daemon (proxydetox): ON / OFF |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
 
@@ -75,23 +75,25 @@ The "time since last activity" signal is the project's Claude `.jsonl` transcrip
 
 ### Network & Proxy Indicators
 
-Two ASCII-only badges reflect the network environment detected by the coordinator every tick. They avoid emoji to prevent cell-width issues in tmux.
+Two ASCII-only badges reflect the network environment detected by the coordinator every 15 seconds. They avoid emoji to prevent cell-width issues in tmux.
 
 | Display | Meaning | Action |
 |---------|---------|--------|
 | `[N:VPN]` | Connected via corporate VPN (Cisco CLI or utun interface detected) | Normal remote-work state |
-| `[N:CN]` | On the physical corporate network (BMW DNS resolves, TCP latency <30 ms, no VPN interface) | Normal on-site state |
+| `[N:CN]` | On the physical corporate network (BMW DNS resolves via `dig`, TCP latency <100 ms, no VPN interface) | Normal on-site state |
 | `[N:OPEN]` | Home / public network — no VPN, no corporate LAN | Expected off-VPN |
-| `[N:??]` | Network location unknown (coordinator just started or probe failed) | Transient — clears on next tick |
+| `[N:??]` | Network location unknown (coordinator just started or probe failed) | Transient — clears within 15s |
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[P:ON]` | User enabled proxy (via `px` alias) + proxy CONNECT test succeeds | Normal |
-| `[P:ERR]` | User enabled proxy but CONNECT fails (e.g. at home, proxydetox can't reach BMW PAC) | Check proxy logs / network |
-| `[P:OFF]` | User disabled proxy (via `px` alias) — regardless of proxydetox process running | Expected on CN or OPEN; problem on VPN |
+| `[P:ON]` | Proxydetox daemon is running (port 3128 listening) | Normal on VPN/CN |
+| `[P:OFF]` | Proxydetox daemon is stopped (port 3128 closed) | Expected on OPEN; problem on VPN |
 
-!!! note "Proxy toggle detection"
-    P reads the persistent toggle in `~/.bash_profile` (commented `#http_proxy=` = OFF, uncommented = ON), which the `px` alias writes. This means P reflects **user intent**, not process liveness.
+!!! note "P: is binary — no ERR state"
+    Previous versions had a `P:ERR` state (proxy port listening but CONNECT tunnel fails). This was removed — the proxy is either ON (port up) or OFF (port down). If the proxy is up but non-functional, `internet_reachable` in the coordinator state will be `false`, and the system health badge `[🏥]` reflects the issue.
+
+!!! note "Proxy toggle via `px`"
+    The `px` alias toggles proxydetox via `launchctl unload`/`launchctl load` (not `stop`/`start`, which was ineffective due to launchd socket activation). After toggling, `px` invalidates all status line caches and triggers an immediate coordinator re-probe via `POST /health/refresh`. The P: badge updates within **≤5 seconds** (one tmux refresh cycle). See [Network Configuration → Proxy Management](network-configuration.md#proxy-management) for details.
 
 !!! note "VPN / network detection logic (3-signal approach)"
     The coordinator determines `location` using three independent signals. **N never depends on proxy state.**
@@ -100,7 +102,7 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 
     **Signal 2 — utun interface detection:** parses `ifconfig` for any `utun*` interface with an `inet` address. If found → `vpn`.
 
-    **Signal 3 — BMW internal DNS:** attempts to resolve `muc.proxy-pac.bmwgroup.net`. If resolution succeeds, measures TCP latency to the resolved address: latency <30 ms → `corporate` (on-site LAN); latency ≥30 ms → `vpn` (tunnelled). If resolution fails entirely → `open` (home / public network).
+    **Signal 3 — BMW internal DNS:** spawns `dig +short muc.proxy-pac.bmwgroup.net` (fresh subprocess — always uses current OS DNS servers, never stale). If resolution succeeds, measures TCP latency to the resolved address: latency <100 ms → `corporate` (on-site LAN); latency ≥100 ms → `vpn` (tunnelled). If resolution fails entirely → `open` (home / public network).
 
     Signals are evaluated in order; the first match wins.
 

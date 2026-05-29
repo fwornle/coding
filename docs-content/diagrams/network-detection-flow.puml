@@ -1,0 +1,92 @@
+@startuml network-detection-flow
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 8
+skinparam defaultFontName SF Mono
+skinparam defaultFontSize 11
+
+title Network Location Detection (Health Coordinator)
+
+participant "Health\nCoordinator" as HC
+participant "System\nDNS" as DNS
+participant "PAC Host\n(muc.proxy-pac)" as PAC
+participant "VPN CLI\n(scutil)" as VPN
+
+== Detection Flow (every 15s) ==
+
+activate HC
+
+HC -> DNS: dig +short\nmuc.proxy-pac.bmwgroup.net
+note right: Uses system dig\n(NOT Node dns.Resolver)\nto avoid stale DNS
+
+alt DNS resolves (e.g. 160.50.180.101)
+    DNS --> HC: IP address
+    HC -> HC: pac = true
+
+    HC -> PAC: TCP connect\n(measure RTT)
+    alt RTT < 100ms
+        PAC --> HC: connected (e.g. 13ms)
+        HC -> HC: physCN = true
+    else RTT >= 100ms or timeout
+        PAC --> HC: slow/timeout
+        HC -> HC: physCN = false
+    end
+
+else DNS fails
+    DNS --> HC: NXDOMAIN / timeout
+    HC -> HC: pac = false
+    HC -> HC: physCN = false
+end
+
+HC -> VPN: scutil --nc list\n+ scutil --nc status
+alt VPN shows "Connected"
+    VPN --> HC: Connected
+    HC -> HC: vpn = true
+else VPN disconnected or N/A
+    VPN --> HC: Disconnected
+    HC -> HC: vpn = false
+end
+
+== Location Decision ==
+
+alt pac AND physCN
+    HC -> HC: location = "corporate"\n(on office LAN)
+else pac AND vpn
+    HC -> HC: location = "corporate"\n(on VPN)
+else pac AND NOT physCN AND NOT vpn
+    HC -> HC: location = "corporate"\n(VPN, high latency)
+else NOT pac
+    HC -> HC: location = "open"\n(public network)
+end
+
+== Proxy Detection ==
+
+HC -> HC: TCP probe\nport 3128
+alt Port 3128 responds
+    HC -> HC: proxy_running = true
+    HC -> HC: Test CONNECT tunnel
+    alt CONNECT succeeds
+        HC -> HC: proxy_functional = true
+    else CONNECT fails
+        HC -> HC: proxy_functional = false
+    end
+else Port 3128 down
+    HC -> HC: proxy_running = false\nproxy_functional = false
+end
+
+deactivate HC
+
+note across
+  **Status Line Mapping:**
+  location=corporate → **N:CN**
+  location=corporate+vpn → **N:VPN**
+  location=open → **N:OPEN**
+  proxy_running=true → **P:ON**
+  proxy_running=false → **P:OFF**
+  (No P:ERR state — binary only)
+end note
+
+@enduml

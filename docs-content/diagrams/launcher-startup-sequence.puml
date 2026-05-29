@@ -1,0 +1,83 @@
+@startuml launcher-startup-sequence
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 8
+skinparam defaultFontName SF Mono
+skinparam defaultFontSize 11
+
+title Launcher Startup Sequence (coding/bin/coding)
+
+actor User
+participant "coding\n(bin/coding)" as L
+participant "detect-network.sh" as DN
+participant "System DNS\n(dig)" as DNS
+participant "Health\nCoordinator" as HC
+participant "Docker" as D
+participant "Agent\n(opencode/claude)" as A
+participant "tmux" as TM
+
+== Network Bootstrap ==
+
+User -> L: coding --opencode
+activate L
+
+L -> DN: source detect-network.sh
+activate DN
+
+DN -> DNS: dig +short\nmuc.proxy-pac.bmwgroup.net\n+timeout=2
+note right: DNS-based check\n(no proxy needed\n= no chicken-and-egg)
+
+alt Resolves to corporate IP
+    DNS --> DN: 160.50.180.101
+    DN -> DN: INSIDE_CN=true
+    DN -> DN: Configure proxy env vars\n(HTTP_PROXY=127.0.0.1:3128)
+else No resolution
+    DNS --> DN: (empty)
+    DN -> DN: INSIDE_CN=false
+    DN -> DN: Clear proxy env vars
+end
+
+DN --> L: INSIDE_CN, proxy vars
+deactivate DN
+
+== Coordinator Check ==
+
+L -> HC: GET /health/state
+alt Coordinator available
+    HC --> L: {location, proxy_running, ...}
+    L -> L: Validate against\nbootstrap detection
+else Coordinator unavailable
+    L -> L: Use bootstrap\nresult only
+end
+
+== Services ==
+
+L -> D: Check Docker status
+D --> L: Running / not running
+
+alt Docker not running
+    L -> D: docker-compose up -d
+end
+
+== Agent Launch ==
+
+L -> L: Select provider:\nCN → Copilot Enterprise\nOPEN → Anthropic direct
+
+L -> TM: Create tmux session\n(coding-{agent}-{PID})
+activate TM
+TM -> A: Launch agent
+activate A
+
+TM -> TM: status-right →\nstatus-line-fast.cjs\n(every 5s)
+
+note across
+  **Post-startup**: Status line reads from
+  Health Coordinator (N:/P: badges),
+  not from launcher's bootstrap result.
+  Coordinator probes every 15s.
+end note
+
+@enduml

@@ -9,10 +9,10 @@ How the Coding launcher handles corporate VPN, proxy detection, and agent-specif
 The Coding system operates in three network environments:
 
 - **VPN** — connected to corporate network via VPN tunnel; proxy (proxydetox on `127.0.0.1:3128`) is running and required for external API calls
-- **Corporate Network (CN)** — physically on the corporate network (e.g. office ethernet/Wi-Fi); PAC URL resolves but proxy is not needed
+- **Corporate Network (CN)** — physically on the corporate network (e.g. office ethernet/Wi-Fi); proxy is running and required for external API calls
 - **Home / Public Network** — direct internet access, no proxy needed
 
-The launcher automatically detects the environment and configures each agent accordingly. The health coordinator also tracks the network state and exposes it via `/health/state` → `network` slice.
+The **health coordinator** is the single source of truth for network state. It probes every **15 seconds** and exposes the result via `GET /health/state` → `network`. The launcher, status line, and LLM proxy all consume this endpoint — there is no independent detection elsewhere.
 
 ![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
 
@@ -36,28 +36,35 @@ The launcher automatically detects the environment and configures each agent acc
 
 ## Detection Flow
 
-### Launcher Detection (`detect-network.sh`)
+### Unified Detection (Health Coordinator)
 
-The detection runs early in the startup pipeline, before any agent-specific configuration:
+The coordinator (`scripts/health-coordinator.js`) is the **single authority** for network location. It probes every 15 seconds using three independent signals — evaluated in order, first match wins:
 
-1. **Corporate network probe** — `curl https://cc-github.bmwgroup.net` (2s timeout)
-2. **Proxy configuration**:
-    - Inside CN/VPN: verify/auto-configure proxydetox (`127.0.0.1:3128`)
-    - Outside CN: **clear** proxy env vars (`unset HTTP_PROXY HTTPS_PROXY`)
-3. **Connectivity test** — verify the chosen API endpoint is actually reachable
-4. **Agent model selection** — OpenCode picks GitHub Copilot or Anthropic
+| Priority | Signal | Method | Result |
+|----------|--------|--------|--------|
+| 1 | **Cisco VPN CLI** | `/opt/cisco/secureclient/bin/vpn state` → output contains "Connected" | `vpn` |
+| 2 | **utun interface** | `ifconfig` → any `utun*` with an `inet` address | `vpn` |
+| 3 | **BMW internal DNS** | `dig +short muc.proxy-pac.bmwgroup.net` (spawns a fresh process — never stale) + TCP latency to resolved IP | `corporate` (<100 ms) or `vpn` (≥100 ms) |
+| — | None match | DNS resolution fails entirely | `open` |
 
-### Coordinator Network Detection (`health-coordinator.js`)
+!!! warning "Why `dig` instead of Node.js `dns.Resolver`"
+    Node.js caches the system DNS servers at process start. If the coordinator starts on a hotspot (public DNS like `8.8.8.8`) and the user later connects to the office LAN (corporate DNS `160.50.x.x`), `dns.getServers()` returns the **stale startup servers** — BMW internal hostnames can't resolve, and the coordinator reports `open` indefinitely. Spawning `dig` as a subprocess reads the current OS DNS config on every probe, eliminating this class of bugs.
 
-The health coordinator independently detects the network environment on every tick and exposes it in the `/health/state` response under the `network` key. The detection logic distinguishes three states:
+### Launcher Bootstrap (`detect-network.sh`)
 
-| Condition | Location | Rationale |
-|-----------|----------|-----------|
-| PAC URL resolves **AND** proxy running | `vpn` | On VPN — the proxy is only needed when tunnelling in remotely |
-| PAC URL resolves **AND** proxy NOT running | `corporate` | Physically on the corporate network — proxy not required |
-| PAC URL does NOT resolve | `home` | Off-network — direct internet |
+The startup script runs a **one-time** DNS-based check before the coordinator is available:
 
-The `network` slice is consumed by the dashboard's **LLM Proxy Health** card and the statusline's `[N:xx]` / `[P:xx]` badges.
+```bash
+# DNS-based — works without proxy (no chicken-and-egg)
+dig +short muc.proxy-pac.bmwgroup.net +timeout=2
+dig +short cc-github.bmwgroup.net +timeout=2
+```
+
+If either resolves to a corporate IP → `INSIDE_CN=true`. This replaced the previous `curl https://cc-github.bmwgroup.net` approach, which required the proxy to already be configured (circular dependency on CN).
+
+Once the coordinator is running, the launcher defers to `GET http://localhost:3034/health/state` for all subsequent network state.
+
+![Network Detection Flow](../images/network-detection-flow.png)
 
 ### Startup Sequence
 
@@ -65,9 +72,44 @@ The `network` slice is consumed by the dashboard's **LLM Proxy Health** card and
 
 ---
 
-## Proxy Configuration
+## Proxy Management
 
-### Inside VPN (Corporate Network)
+### The `px` Toggle
+
+The `px` shell alias is the **only** way to toggle the proxy. It performs three actions atomically:
+
+1. **Toggles the proxydetox daemon** via `launchctl unload`/`launchctl load` of the plist — this truly stops/starts the daemon and closes/opens port 3128 (previous implementations used `launchctl stop` which was ineffective due to launchd socket activation respawning the process immediately)
+2. **Invalidates status line caches** — deletes all per-pane cache files so the next tmux render reflects the new state
+3. **Notifies the health coordinator** — `POST /health/refresh` triggers an immediate network re-probe (bypasses the 15s poll interval)
+
+```bash
+px          # Toggle: if proxy running → stop; if stopped → start
+```
+
+### Update Propagation After `px`
+
+![Proxy Toggle Flow](../images/proxy-toggle-flow.png)
+
+The status line reflects the new P: state within **≤5 seconds** (one tmux refresh cycle):
+
+| Step | Latency | Mechanism |
+|------|---------|-----------|
+| proxydetox stop/start | instant | `launchctl unload`/`load` |
+| Cache invalidation | instant | `rm .logs/combined-status-line-cache-*.txt` |
+| Coordinator re-probe | instant | `POST /health/refresh` resets rate-limiter + forces tick |
+| tmux renders | ≤5s | `status-interval 5` picks up fresh state |
+
+### LLM Proxy Dynamic Routing
+
+The LLM proxy (`rapid-llm-proxy`, port 12435) dynamically adapts to proxy availability without restart:
+
+- On each outbound request, `smartFetch()` TCP-probes port 3128 (with 5s cache)
+- If proxydetox is **up** → routes via `undici.ProxyAgent` (corporate proxy)
+- If proxydetox is **down** → routes via native `fetch` (direct internet)
+
+This means `px off` on a hotspot (direct internet) works immediately — the LLM proxy stops trying to route through the dead proxy within 5 seconds.
+
+### Inside VPN / Corporate Network
 
 The corporate proxy (proxydetox) runs on `127.0.0.1:3128`. The launcher:
 
@@ -80,7 +122,7 @@ export HTTPS_PROXY="http://127.0.0.1:3128"
 export NO_PROXY="localhost,127.0.0.1,.bmwgroup.net"
 ```
 
-All external API calls (Anthropic, GitHub, OpenAI) **require** this proxy when inside VPN. Direct connections time out.
+All external API calls (Anthropic, GitHub, OpenAI) **require** this proxy when inside VPN/CN. Direct connections time out.
 
 ### Outside VPN (Public Network)
 
@@ -146,10 +188,15 @@ CODING_FORCE_CN=true coding --opencode --dry-run
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| `N:OPEN` when on office LAN | Coordinator started on hotspot; stale DNS servers (pre-`dig` fix) or process running old code | Restart coordinator: `launchctl stop com.coding.health-coordinator && launchctl start com.coding.health-coordinator` |
+| `P:ON` after `px off` | Old `px` used `launchctl stop` which launchd respawns via socket activation | Update `proxy.sh` to use `launchctl unload`/`load` instead |
+| Status line takes >10s to show P: change | Cache files not invalidated; coordinator not notified | Ensure `px` does `rm .logs/combined-status-line-cache-*.txt` AND `curl -s -X POST http://localhost:3034/health/refresh` |
+| LLM proxy 500s after `px off` | Proxy dead but LLM proxy still routing through `ProxyAgent` | LLM proxy now has `smartFetch()` with 5s proxy-alive cache — recovers automatically |
 | 502 Bad Gateway in OpenCode | Proxy interfering with streaming API | Check proxydetox is running: `lsof -i :3128` |
-| All API calls timeout (000) | Inside VPN without proxy | Start proxydetox or set `HTTP_PROXY` |
+| All API calls timeout (000) | Inside VPN/CN without proxy | Run `px` to start proxydetox, or set `HTTP_PROXY` |
 | "Credit balance too low" | Using API key instead of OAuth | Log in via `claude auth login` for Max subscription |
 | OpenCode uses wrong model | Network detection mismatch | Use `--dry-run` to check, or `CODING_FORCE_CN=true/false` |
+| Semantic readiness yellow (brain badge) | `processOverrides` routing health-coordinator through `claude-code` (slow subprocess) | Set override to `copilot`: `curl -X POST http://localhost:12435/api/llm/settings -H 'Content-Type: application/json' -d '{"settings":{"processOverrides":{"health-coordinator":{"provider":"copilot"}}}}'` |
 
 ---
 
@@ -176,16 +223,24 @@ The coordinator exposes live network state at `GET http://localhost:3034/health/
   "network": {
     "internet_reachable": true,
     "proxy_running": true,
+    "proxy_functional": true,
+    "proxy_port_listening": true,
     "location": "vpn",
-    "last_check": "2026-05-14T10:48:52.982Z"
+    "last_check": "2026-05-29T07:48:52.982Z",
+    "last_probe_end": "2026-05-29T07:48:52.980Z"
   }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `internet_reachable` | boolean | Whether external endpoints (PAC URL) are reachable |
-| `proxy_running` | boolean | Whether proxydetox is listening on `:3128` |
-| `location` | string | `vpn`, `corporate`, `home`, or `unknown` |
+| `internet_reachable` | boolean | Whether external endpoints are reachable (via proxy or direct) |
+| `proxy_running` | boolean | Whether proxydetox process is alive |
+| `proxy_functional` | boolean | Whether CONNECT through proxy succeeds |
+| `proxy_port_listening` | boolean | Whether port 3128 accepts TCP connections |
+| `location` | string | `vpn`, `corporate`, `open`, or `unknown` |
+| `last_probe_end` | ISO string | Timestamp of last completed network probe |
 
-The dashboard's **LLM Proxy Health** card reads this state and displays Internet reachability, proxy status, and network location. The statusline renders `[N:VPN]` / `[N:CN]` / `[N:HM]` and `[P:ON]` / `[P:OFF]` from the same data.
+The `POST /health/refresh` endpoint triggers an immediate network re-probe (resets the rate-limiter so the probe runs on the next tick, regardless of the 15s interval).
+
+The dashboard's **LLM Proxy Health** card and the statusline's `[N:xx]` / `[P:xx]` badges both consume this state. **N** reflects `location`; **P** reflects `proxy_port_listening` (binary ON/OFF — there is no ERR state).

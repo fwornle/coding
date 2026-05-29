@@ -1,0 +1,97 @@
+@startuml proxy-toggle-flow
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 8
+skinparam defaultFontName SF Mono
+skinparam defaultFontSize 11
+
+title Proxy Toggle Flow (px command)
+
+actor User
+participant "px\n(proxy.sh)" as PX
+participant "launchd" as LD
+participant "proxydetox\n(port 3128)" as PD
+participant "Status Line\nCache" as SLC
+participant "Health\nCoordinator" as HC
+participant "LLM Proxy\n(port 12435)" as LLM
+participant "tmux" as TM
+
+== px off (disable proxy) ==
+
+User -> PX: px (toggle off)
+activate PX
+
+PX -> LD: launchctl unload\ncc.colorto.proxydetox
+activate LD
+LD -> PD: SIGTERM
+destroy PD
+LD --> PX: ok
+deactivate LD
+
+PX -> PX: unset HTTP_PROXY\nunset HTTPS_PROXY
+
+PX -> SLC: rm -f cache files\n(all pane widths)
+note right: Invalidates ALL\n47 cache files
+
+PX -> HC: POST /health/refresh
+activate HC
+HC -> HC: Reset probe age\n+ forceTick()
+HC -> HC: Probe network\n(dig, port 3128)
+HC --> PX: 200 OK
+deactivate HC
+
+deactivate PX
+
+... within 5 seconds ...
+
+TM -> SLC: read cache
+note right: Cache miss\n(files deleted)
+SLC -> HC: GET /health/state
+HC --> SLC: proxy_running: false
+SLC --> TM: P:OFF rendered
+
+... next LLM request ...
+
+LLM -> LLM: isProxyAlive()\nTCP 3128 fails
+note right: 5s TTL cache
+LLM -> LLM: Use directFetch\n(no proxy)
+
+== px on (enable proxy) ==
+
+User -> PX: px (toggle on)
+activate PX
+
+PX -> LD: launchctl load\ncc.colorto.proxydetox
+activate LD
+LD -> PD **: spawn + listen :3128
+LD --> PX: ok
+deactivate LD
+
+PX -> PX: export HTTP_PROXY\nexport HTTPS_PROXY
+
+PX -> SLC: rm -f cache files
+PX -> HC: POST /health/refresh
+activate HC
+HC -> HC: Probe network
+HC --> PX: 200 OK
+deactivate HC
+
+deactivate PX
+
+... within 5 seconds ...
+
+TM -> SLC: read cache (miss)
+SLC -> HC: GET /health/state
+HC --> SLC: proxy_running: true
+SLC --> TM: P:ON rendered
+
+... next LLM request ...
+
+LLM -> LLM: isProxyAlive()\nTCP 3128 ok
+note right: Switches to\nproxyFetch
+LLM -> PD: HTTPS via CONNECT
+
+@enduml

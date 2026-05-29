@@ -1,0 +1,47 @@
+@startuml network-detection-flow
+!include _standard-style.puml
+
+title Network Location Detection (Unified)
+
+participant "Coordinator\n(health-coordinator.js)" as coord
+participant "dig CLI\n(fresh DNS)" as dig
+participant "VPN CLI\n(/opt/cisco)" as vpn
+participant "TCP probe\n(PAC host)" as tcp
+
+== Every 15s tick ==
+
+coord -> dig: dig +short muc.proxy-pac.bmwgroup.net\n(fresh process = current OS DNS)
+alt DNS resolves (e.g. 160.50.180.101)
+  dig --> coord: IP address
+  coord -> vpn: /opt/cisco/secureclient/bin/vpn status
+  alt output contains "Connected"
+    vpn --> coord: Connected
+    coord -> coord: location = **vpn**
+  else Disconnected (office LAN, no VPN)
+    vpn --> coord: Disconnected
+    coord -> tcp: TCP connect to PAC IP, port 80
+    tcp --> coord: latency (e.g. 13ms)
+    alt latency < 100ms
+      coord -> coord: location = **corporate**\n(on-site LAN)
+    else latency ≥ 100ms
+      coord -> coord: location = **vpn**\n(tunnelled, high latency)
+    end
+  end
+else DNS fails (NXDOMAIN / timeout)
+  dig --> coord: (empty)
+  coord -> coord: location = **open**\n(home / public network)
+end
+
+note over coord
+  **Key fix**: Uses `dig` (spawns fresh process)
+  instead of Node.js `dns.Resolver` which
+  caches DNS servers from process startup.
+
+  On office LAN without VPN:
+  • VPN CLI = "Disconnected"
+  • PAC DNS resolves (corporate DNS)
+  • TCP latency < 100ms
+  → Correctly detects **corporate**
+end note
+
+@enduml
