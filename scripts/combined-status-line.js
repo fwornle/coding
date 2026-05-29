@@ -2022,55 +2022,51 @@ class CombinedStatusLine {
     // Source: state.knowledge_pipeline at /health/state.
     //
     // ObservationWriter fires on prompt-set completion, not continuously.
-    // During a long-running assistant turn, obs age past 15 min is normal —
-    // the next completion will write a fresh obs and the badge self-heals.
-    // Mirror the project-activity bubble lifecycle (🟢/🟠/🟤/⚫/💤) for any
-    // status within the natural async window (stale = 15 min–6 h, any
-    // activity level; stalled = >6 h on a cooling project). Reserve loud
-    // signals for truly broken cases:
-    //   stalled + Active (>6 h with no obs while transcript is fresh)  → 🔴
-    //   unreachable (obs_api itself down)                              → ❌ (yellow)
-    // Per spec: yellow only for "broken and won't recover on next prompt".
-    const freshestActivityAge = await this._freshestProjectActivityAgeMs();
-    const projectActive = freshestActivityAge !== null && freshestActivityAge < 5 * 60_000;
-    const lifecycleIcon = (() => {
-      if (freshestActivityAge === null) return '⚫';
-      if (freshestActivityAge < 5 * 60_000) return '🟢';
-      if (freshestActivityAge < 30 * 60_000) return '🟠';
-      if (freshestActivityAge < 6 * 60 * 60_000) return '🟤';
-      if (freshestActivityAge < 24 * 60 * 60_000) return '⚫';
-      return '💤';
-    })();
-    switch (knowledge.status) {
-      case 'healthy':
-        parts.push('[📚✅]');
-        break;
-      case 'stale':
-        // 15 min – 6 h gap — within natural latency window. No alarm.
-        parts.push(`[📚${lifecycleIcon}]`);
-        break;
-      case 'stalled':
-        // >6 h gap. If a project is Active right now, the obs pipe is
-        // broken (next prompt won't fix it after that long).
-        if (projectActive) {
-          parts.push('[📚🔴]');
-          overallColor = 'red';
-        } else {
-          parts.push(`[📚${lifecycleIcon}]`);
-        }
-        break;
-      case 'disabled':
-        parts.push('[📚🔇]');
-        break;
-      case 'unknown':
-        parts.push('[📚❓]');
-        break;
-      case 'unreachable':
-      default:
-        parts.push('[📚❌]');
-        if (overallColor === 'green') overallColor = 'yellow';
-        break;
-    }
+     // Observation age drives a smooth fading gradient:
+     //   < 15 min  → 📚✅  (healthy/fresh)
+     //   15m – 1h  → 📚🟢  (recent, normal async gap)
+     //   1h – 3h   → 📚🟠  (aging — long session or idle)
+     //   3h – 6h   → 📚🟤  (stale — cooling down)
+     //   6h – 24h  → 📚⚫  (dormant — user likely away)
+     //   > 24h     → 📚💤  (sleeping)
+     //
+     // 🔴 is NEVER triggered by time alone. Reserved for confirmed pipeline
+     // failure: obs_api unreachable while the user is actively typing.
+     // This avoids false alarms during long continuous sessions where
+     // prompt-sets complete infrequently.
+     const obsAgeMs = knowledge.obsAgeMs;
+     const obsIcon = (() => {
+       if (obsAgeMs == null) return '❓';
+       if (obsAgeMs < 15 * 60_000) return '✅';
+       if (obsAgeMs < 60 * 60_000) return '🟢';
+       if (obsAgeMs < 3 * 60 * 60_000) return '🟠';
+       if (obsAgeMs < 6 * 60 * 60_000) return '🟤';
+       if (obsAgeMs < 24 * 60 * 60_000) return '⚫';
+       return '💤';
+     })();
+     switch (knowledge.status) {
+       case 'healthy':
+         parts.push('[📚✅]');
+         break;
+       case 'stale':
+       case 'stalled':
+         // Pure fading — no red alarm. The pipeline isn't broken,
+         // it just hasn't had a prompt-set complete recently.
+         parts.push(`[📚${obsIcon}]`);
+         break;
+       case 'disabled':
+         parts.push('[📚🔇]');
+         break;
+       case 'unknown':
+         parts.push('[📚❓]');
+         break;
+       case 'unreachable':
+       default:
+         // obs_api service itself is down — this IS broken.
+         parts.push('[📚🔴]');
+         if (overallColor === 'green') overallColor = 'red';
+         break;
+     }
 
     // Network location badge: [N:CN] / [N:VPN] / [N:HOME] / [N:??]
     // Uses ASCII-only to avoid emoji-width issues.

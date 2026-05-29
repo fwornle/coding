@@ -32,7 +32,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
-import { spawnSync, spawn } from 'node:child_process';
+import { spawnSync, spawn, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
@@ -47,7 +47,7 @@ import { getTimeWindow, utcToLocalTime } from './timezone-utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-const PORT = parseInt(process.env.HEALTH_COORDINATOR_PORT || '3034', 10);
+const PORT = parseInt(process.env.HEALTH_COORDINATOR_PORT || '3033', 10);
 const TICK_MS = parseInt(process.env.HEALTH_COORDINATOR_TICK_MS || '5000', 10);
 const STARTED_AT = Date.now();
 const LOG_PATH = path.join(REPO_ROOT, '.logs', 'health-coordinator.log');
@@ -1464,33 +1464,71 @@ function refreshLslStaleness() {
 const NETWORK_PROBE_INTERVAL_MS = 30_000;
 
 /**
- * Detect network location and proxy status.
- * Logic ported from coding/scripts/detect-network.sh:
- *   1. Check if px/proxydetox is listening on 127.0.0.1:3128
- *   2. Check if BMW PAC host resolves (→ corporate/CN)
- *   3. Check VPN interfaces (utun*)
- *   4. Determine: corporate | vpn | home
+ * Detect network location and proxy status — INDEPENDENTLY.
+ *
+ * N (network location): Where am I physically?
+ *   - 'corporate' = on BMW corporate LAN (office Wi-Fi/Ethernet)
+ *   - 'vpn'       = connected to BMW VPN from outside
+ *   - 'open'      = home/public internet, no corporate access
+ *   Detection: Cisco Secure Client VPN CLI (definitive) + DNS probe (fallback).
+ *   NEVER depends on whether local proxy is running.
+ *
+ * P (proxy status): Is the local proxy active and functional?
+ *   - Running = port 3128 listening AND proxy env vars set (user intent)
+ *   - Functional = can actually proxy traffic (semantic probe elsewhere)
+ *   NEVER influences N.
  */
 async function pollNetworkStatus() {
   const netState = currentState.network;
 
-  // 1. Is the local proxy active?
-  //    px-toggle unsets proxy env vars when disabling, but may leave the
-  //    process listening on :3128. Treat proxy as inactive when none of the
-  //    standard env vars point to it — that's the user's intent signal.
-  const proxyEnvSet = !!(process.env.http_proxy || process.env.https_proxy ||
+  // ── P: Proxy status (independent of N) ──────────────────────────────────
+   const proxyEnvSet = !!(process.env.http_proxy || process.env.https_proxy ||
                          process.env.HTTP_PROXY || process.env.HTTPS_PROXY);
-  const portListening = await new Promise(resolve => {
-    const sock = net.connect({ host: '127.0.0.1', port: 3128, timeout: 2000 });
-    sock.once('connect', () => { sock.destroy(); resolve(true); });
-    sock.once('error', () => resolve(false));
-    sock.once('timeout', () => { sock.destroy(); resolve(false); });
-  });
-  netState.proxy_running = proxyEnvSet && portListening;
+   const portListening = await new Promise(resolve => {
+     const sock = net.connect({ host: '127.0.0.1', port: 3128, timeout: 2000 });
+     sock.once('connect', () => { sock.destroy(); resolve(true); });
+     sock.once('error', () => resolve(false));
+     sock.once('timeout', () => { sock.destroy(); resolve(false); });
+   });
 
-  // 2. Can we resolve BMW PAC host? (indicates CN)
-  //    Use a fresh DNS resolver to avoid stale libc resolver cache in long-running processes.
-  //    Guard: cancel resolver on timeout to prevent dangling callbacks that block the event loop.
+   // P: "Is proxy enabled?" — determined by user intent (the persistent toggle in ~/.bash_profile
+   // written by ~/proxy.sh aka `px`). proxydetox is a launchctl daemon that's always running,
+   // so port 3128 alone doesn't indicate intent. The bash_profile line is the ground truth:
+   //   "http_proxy=..."  → enabled (user ran `px` to enable)
+   //   "#http_proxy=..." → disabled (user ran `px` to disable)
+   let proxyEnabledByUser = false;
+   try {
+     const bashProfile = fs.readFileSync(path.join(os.homedir(), '.bash_profile'), 'utf8');
+     // If uncommented http_proxy= line exists, user enabled proxy
+     proxyEnabledByUser = /^http_proxy=/m.test(bashProfile);
+   } catch { /* file missing — treat as disabled */ }
+
+   // proxy_running = user enabled it AND proxydetox is actually listening
+   netState.proxy_running = proxyEnabledByUser && portListening;
+   netState.proxy_port_listening = portListening;  // raw: is proxydetox daemon alive?
+   netState.proxy_env_set = proxyEnvSet;           // track separately for debugging
+   netState.proxy_enabled_by_user = proxyEnabledByUser;  // the persistent toggle
+
+  // ── N: Network location (independent of P) ─────────────────────────────
+  // Strategy: 3 independent signals, evaluated in priority order.
+  //   1. Cisco Secure Client VPN CLI — definitive "vpn" signal
+  //   2. BMW PAC DNS resolution + latency — distinguishes corporate vs open
+  //   3. utun interface presence — fallback VPN indicator
+
+  // Signal 1: Cisco VPN state (most reliable)
+  // Note: the vpn CLI drops into an interactive VPN> prompt after output,
+  // so we must close stdin and use kill-on-timeout to avoid hanging.
+  const vpnConnected = await new Promise(resolve => {
+    const vpnBin = '/opt/cisco/secureclient/bin/vpn';
+    let stdout = '';
+    const child = spawn(vpnBin, ['state'], { stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 });
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.on('close', () => resolve(/state:\s*Connected/i.test(stdout)));
+    child.on('error', () => resolve(false));
+    setTimeout(() => { try { child.kill(); } catch {} }, 3000);
+  });
+
+  // Signal 2: BMW PAC DNS resolution (indicates corporate network reachability)
   const pacResolved = await new Promise(resolve => {
     let settled = false;
     const resolver = new dns.Resolver();
@@ -1503,12 +1541,10 @@ async function pollNetworkStatus() {
     });
   });
 
-  // 3. Determine location
-  //    PAC resolves = corporate network reachable (physically on CN or via VPN)
-  //    Distinguish CN vs VPN by latency to a CN-internal host:
-  //      < 30ms = physical CN (LAN/Wi-Fi), > 30ms = VPN tunnel (remote)
+  // Signal 3 (used only when PAC resolves): latency distinguishes physical CN vs VPN
   let onPhysicalCN = false;
-  if (pacResolved) {
+  if (pacResolved && !vpnConnected) {
+    // Only measure latency if VPN CLI didn't already tell us
     onPhysicalCN = await new Promise(resolve => {
       const start = Date.now();
       const sock = net.connect({ host: 'muc.proxy-pac.bmwgroup.net', port: 80, timeout: 2000 });
@@ -1518,76 +1554,43 @@ async function pollNetworkStatus() {
     });
   }
 
-  // 2b. PAC-unreachable fallback: some corporate network segments don't carry
-  //     `muc.proxy-pac.bmwgroup.net` in DNS but still permit egress through a
-  //     locally-running proxydetox/px (Kerberos-authenticating against the
-  //     upstream corporate proxy). Mirrors the wrapper's `probe_local_px_proxy`
-  //     fallback at `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` so the
-  //     coordinator's location classification matches the rapid-llm-proxy's
-  //     HTTPS_PROXY decision. Without this, the dashboard reports
-  //     `location: open` and `Local proxy: Offline` while the bridge is happily
-  //     tunneling Copilot/Anthropic traffic through 127.0.0.1:3128.
-  let pxFunctional = false;
-  if (!pacResolved && portListening) {
-    pxFunctional = await new Promise(resolve => {
-      const req = http.get('http://127.0.0.1:3128/', {
-        timeout: 4000,
-        headers: { Host: 'api.github.com' }
-      }, res => {
-        res.resume();
-        resolve(res.statusCode < 502);  // any response (incl. 407) = functional
-      });
-      req.on('error', () => resolve(false));
-      req.on('timeout', () => { req.destroy(); resolve(false); });
-    });
-    if (pxFunctional) log('network: PAC unreachable but local px proxy functional — classifying as corporate', 'INFO');
-  }
-
-  if (pacResolved && onPhysicalCN) {
-    netState.location = 'corporate';  // physically on CN (proxy needed for internet)
+  // Determine location from signals (N is NEVER influenced by proxy/port state)
+  if (vpnConnected) {
+    netState.location = 'vpn';          // Cisco says connected — definitive
+  } else if (pacResolved && onPhysicalCN) {
+    netState.location = 'corporate';    // PAC resolves + low latency = on-site
   } else if (pacResolved) {
-    netState.location = 'vpn';        // CN reachable but high latency = VPN tunnel
-  } else if (pxFunctional) {
-    netState.location = 'corporate';  // PAC-unreachable but px-proxydetox tunnels OK
+    netState.location = 'vpn';          // PAC resolves + high latency = VPN (CLI missed?)
   } else {
-    netState.location = 'open';       // open internet, no corporate access
+    netState.location = 'open';         // no corporate access whatsoever
   }
 
-  // 3b. Auto-enable proxy: on CN or VPN, if proxy port is listening but env vars
-  //     aren't set, auto-adopt it (the user likely forgot to re-enable after a toggle).
-  if ((netState.location === 'corporate' || netState.location === 'vpn') && portListening && !proxyEnvSet) {
-    const proxyUrl = 'http://127.0.0.1:3128';
-    process.env.http_proxy = proxyUrl;
-    process.env.https_proxy = proxyUrl;
-    process.env.HTTP_PROXY = proxyUrl;
-    process.env.HTTPS_PROXY = proxyUrl;
-    netState.proxy_running = true;
-    log(`network: auto-enabled proxy env vars (on ${netState.location} with port 3128 listening)`, 'INFO');
-  }
+  log(`network: location=${netState.location} (vpnCli=${vpnConnected}, pac=${pacResolved}, physCN=${onPhysicalCN}, px=${portListening}, envSet=${proxyEnvSet})`, 'DEBUG');
 
-  // 5. Check if proxy is functional (can reach external host via proxy)
-  if (netState.proxy_running) {
+   // Auto-manage proxy env vars in THIS process based on user intent (bash_profile toggle):
+   // - User enabled proxy (px) + port listening → set env vars so our probes use proxy
+   // - User disabled proxy → clear env vars so our probes go direct
+   const onCorporateNet = netState.location === 'corporate' || netState.location === 'vpn';
+   if (proxyEnabledByUser && portListening && !proxyEnvSet) {
+     const proxyUrl = 'http://127.0.0.1:3128';
+     process.env.http_proxy = proxyUrl;
+     process.env.https_proxy = proxyUrl;
+     process.env.HTTP_PROXY = proxyUrl;
+     process.env.HTTPS_PROXY = proxyUrl;
+     log(`network: auto-enabled proxy env vars (user enabled proxy, port 3128 listening)`, 'INFO');
+   } else if (!proxyEnabledByUser && proxyEnvSet) {
+     delete process.env.http_proxy;
+     delete process.env.https_proxy;
+     delete process.env.HTTP_PROXY;
+     delete process.env.HTTPS_PROXY;
+     log(`network: auto-disabled proxy env vars (user disabled proxy via px)`, 'INFO');
+   }
+
+   // 5. Check if proxy is functional (can actually CONNECT through to an external host)
+   // Only test when user has proxy enabled — otherwise P:OFF (not ERR)
+   if (proxyEnabledByUser && portListening) {
     netState.proxy_functional = await new Promise(resolve => {
-      const req = http.get('http://127.0.0.1:3128/', {
-        timeout: 5000,
-        headers: { Host: 'api.github.com' }
-      }, res => {
-        res.resume();
-        // Any response from the proxy (even 407) means it's functional
-        resolve(res.statusCode < 502);
-      });
-      req.on('error', () => resolve(false));
-      req.on('timeout', () => { req.destroy(); resolve(false); });
-    });
-  } else {
-    netState.proxy_functional = false;
-  }
-
-  // 6. Can we reach the internet? (either directly or via proxy)
-  netState.internet_reachable = await new Promise(resolve => {
-    const opts = { timeout: 5000, method: 'HEAD' };
-    if (netState.proxy_running) {
-      // Via proxy
+      // Use CONNECT (actual tunnel) not plain GET (just checks if px process responds)
       const proxyReq = http.request({
         host: '127.0.0.1', port: 3128,
         method: 'CONNECT', path: 'api.github.com:443',
@@ -1600,14 +1603,40 @@ async function pollNetworkStatus() {
       proxyReq.on('error', () => resolve(false));
       proxyReq.on('timeout', () => { proxyReq.destroy(); resolve(false); });
       proxyReq.end();
-    } else {
-      // Direct
-      const req = https.get('https://api.github.com/', opts, res => {
+    });
+  } else {
+    netState.proxy_functional = false;
+  }
+
+  // 6. Can we reach the internet?
+  // Strategy: on corporate/vpn, try via proxy; on open, try direct.
+  // Always try direct as fallback if proxy path fails.
+  netState.internet_reachable = await new Promise(resolve => {
+    const tryDirect = () => {
+      const req = https.get('https://api.github.com/', { timeout: 5000 }, res => {
         res.resume();
         resolve(res.statusCode < 500);
       });
       req.on('error', () => resolve(false));
       req.on('timeout', () => { req.destroy(); resolve(false); });
+    };
+
+     if (netState.proxy_functional && proxyEnabledByUser) {
+      // Try via proxy first, fall back to direct
+      const proxyReq = http.request({
+        host: '127.0.0.1', port: 3128,
+        method: 'CONNECT', path: 'api.github.com:443',
+        timeout: 5000
+      });
+      proxyReq.on('connect', (res) => {
+        resolve(res.statusCode === 200);
+        proxyReq.destroy();
+      });
+      proxyReq.on('error', () => tryDirect());
+      proxyReq.on('timeout', () => { proxyReq.destroy(); tryDirect(); });
+      proxyReq.end();
+    } else {
+      tryDirect();
     }
   });
 
@@ -1616,7 +1645,7 @@ async function pollNetworkStatus() {
   // Also update proxy.networkMode to match (backwards compat for dashboard)
   currentState.proxy.networkMode = netState.location === 'open' ? 'public' : netState.location;
 
-  log(`network: location=${netState.location} proxy_env=${proxyEnvSet} port_listening=${portListening} proxy_running=${netState.proxy_running} proxy_functional=${netState.proxy_functional} internet=${netState.internet_reachable}`);
+   log(`network: location=${netState.location} proxy_enabled=${proxyEnabledByUser} port_listening=${portListening} proxy_running=${netState.proxy_running} proxy_functional=${netState.proxy_functional} internet=${netState.internet_reachable}`);
 }
 
 async function runAllChecks() {

@@ -725,6 +725,24 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // Proxy / network violations — must mirror the status endpoint logic
+            // so violation count and violation list are always consistent.
+            if (state && state.proxy && state.proxy.semantic_ok === false && state.proxy.auto_heal_status !== 'disabled') {
+                checks.push({ check: 'proxy.semantic_readiness', name: 'proxy.semantic_readiness', category: 'proxy', status: 'failed', raw_status: 'error', timestamp: stamp, message: `LLM proxy semantic probe failed (${state.proxy.reason || 'unknown'})` });
+                violations.push({ check: 'proxy.semantic_readiness', kind: 'proxy.semantic_readiness', severity: 'high', detail: state.proxy.reason || 'semantic probe failed', message: `LLM proxy not responding — ${state.proxy.consecutive_failures || '?'} consecutive failures`, timestamp: stamp });
+            } else if (state && state.proxy && state.proxy.semantic_ok === true) {
+                checks.push({ check: 'proxy.semantic_readiness', name: 'proxy.semantic_readiness', category: 'proxy', status: 'passed', raw_status: 'ok', timestamp: stamp, message: `LLM proxy OK (${state.proxy.last_round_trip_ms || '?'}ms RTT)` });
+            }
+
+            if (state && state.network) {
+                const loc = state.network.location || 'unknown';
+                checks.push({ check: 'network.location', name: 'network.location', category: 'network', status: 'passed', raw_status: loc, timestamp: stamp, message: `Network: ${loc}` });
+                // Internet reachability on corporate/VPN without functional proxy is a violation
+                if ((loc === 'corporate' || loc === 'vpn') && state.network.proxy_running === false) {
+                    violations.push({ check: 'network.proxy_mismatch', kind: 'network.proxy_mismatch', severity: 'medium', detail: `On ${loc} but proxy not active`, message: `On ${loc} network but local proxy is inactive — internet access may fail`, timestamp: stamp });
+                }
+            }
+
             // SPEC R8 frontend-compat: bundle gates dispatch on `n.data && n.data.summary`.
             // Without `summary`, the entire payload is silently dropped (UI shows "no check data yet").
             // Frontend reads `summary.passed` and `summary.total_checks`.

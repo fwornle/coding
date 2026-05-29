@@ -109,9 +109,13 @@ function looksUnusable(content) {
   if (!content || typeof content !== 'string') return true;
   const trimmed = content.trim();
   if (!trimmed) return true;
-  if (/no actionable content/i.test(trimmed)) return true;
   if (trimmed.startsWith('[Raw]')) return true;
+  // "No actionable content" is a valid LLM verdict — store it as-is (quality='low')
   return false;
+}
+
+function isMinimalVerdict(content) {
+  return /no actionable content/i.test((content || '').trim());
 }
 
 function projectFromMetadata(metaJson) {
@@ -146,9 +150,9 @@ async function main() {
 
   const db = new Database(DB_PATH, { readonly: false });
 
-  let query = `SELECT id, summary, messages, agent, source_file, created_at, metadata
-               FROM observations
-               WHERE summary LIKE '[Raw]%' AND quality = 'low'`;
+   let query = `SELECT id, summary, messages, agent, source_file, created_at, metadata
+                FROM observations
+                WHERE (quality = 'raw' OR (quality = 'low' AND (summary LIKE '[Raw]%' OR summary LIKE 'Minimal exchange%')))`;
   const params = [];
   if (ONLY_ID) {
     query = `SELECT id, summary, messages, agent, source_file, created_at, metadata
@@ -205,7 +209,7 @@ async function main() {
         ? { model: result.model, provider: result.provider, tokens: result.tokens || null, latencyMs: result.latencyMs || null }
         : null;
       const newMeta = mergeMetadata(row.metadata, llm);
-      const newQuality = 'normal';
+      const newQuality = isMinimalVerdict(newSummary) ? 'low' : 'normal';
 
       process.stderr.write(`  → ${newSummary.length} chars via ${llm ? `${llm.model}@${llm.provider}` : 'proxy(unknown llm)'}\n`);
       process.stderr.write(`  → preview: ${newSummary.slice(0, 120).replace(/\n/g, ' ⏎ ')}\n`);

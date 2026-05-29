@@ -380,7 +380,7 @@ export default function SystemHealthDashboard() {
       {
         name: 'Network location',
         status: (net?.location === 'unknown' ? 'warning' : 'operational') as 'warning' | 'operational',
-        description: ({ corporate: 'Corporate (CN)', vpn: 'VPN', home: 'Home', unknown: 'Unknown' } as Record<string, string>)[net?.location ?? 'unknown'] ?? net?.location ?? 'unknown'
+        description: ({ corporate: 'Corporate (CN)', vpn: 'VPN', open: 'Open (Home)', home: 'Open (Home)', unknown: 'Unknown' } as Record<string, string>)[net?.location ?? 'unknown'] ?? net?.location ?? 'unknown'
       },
       {
         name: 'Local proxy (px)',
