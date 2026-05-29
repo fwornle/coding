@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
+import { useLLMBadgeForProcess } from './hooks'
+import { WORKFLOW_AGENTS } from './constants'
 import {
   Dialog,
   DialogContent,
@@ -316,6 +318,12 @@ const AgentInstanceRow = React.memo(function AgentInstanceRow({
   waveStart: number
   waveDuration: number
 }) {
+  const processTag = useMemo(() => {
+    const def = WORKFLOW_AGENTS.find(a => a.agentType === agent.agentType)
+    return def?.processTag
+  }, [agent.agentType])
+  const llmBadge = useLLMBadgeForProcess(processTag)
+
   const colors = AGENT_TYPE_COLORS[agent.agentType] || { bg: 'bg-zinc-500/10', text: 'text-zinc-400', border: 'border-zinc-500/30' }
   const agentStart = agent.startTime ? new Date(agent.startTime).getTime() : 0
   const agentEnd = agent.endTime ? new Date(agent.endTime).getTime() : agentStart
@@ -340,6 +348,9 @@ const AgentInstanceRow = React.memo(function AgentInstanceRow({
         <span className="text-zinc-500 tabular-nums text-[10px]">{formatDuration(duration)}</span>
         {agent.llmCalls.length > 0 && (
           <span className="text-zinc-500 text-[10px]">{agent.llmCalls.length} LLM</span>
+        )}
+        {llmBadge && (
+          <span className="text-[10px] text-blue-400/80 font-mono">{llmBadge.provider}/{llmBadge.model}</span>
         )}
         {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
       </div>
@@ -831,6 +842,11 @@ export function TraceModal({
                                     const cgrQ = (step as any).outputs?.cgrStats?.queriesMade
                                     return cgrQ > 0 ? <span className="text-[10px] text-emerald-500">{cgrQ} CGR</span> : null
                                   })()}
+                                  {(step as any).outputs?.itemsTotal > 0 && (
+                                    <span className="item-progress-badge" title={`${(step as any).outputs?.itemsCompleted ?? 0}/${(step as any).outputs.itemsTotal} items`}>
+                                      {(step as any).outputs?.itemsCompleted ?? 0}/{(step as any).outputs.itemsTotal}
+                                    </span>
+                                  )}
                                   <span className="text-xs text-zinc-500 tabular-nums w-16 text-right">
                                     {formatDuration(step.duration)}
                                   </span>

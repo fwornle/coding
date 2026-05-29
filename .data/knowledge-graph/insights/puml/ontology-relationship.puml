@@ -9,13 +9,15 @@ title Hierarchy Context: Ontology
 [Insights] as insights #F0F0F0
 [OntologyConfigManager] as ontology_config_manager #F0F0F0
 [LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
-[ThreePhaseOntologyLifecycle] as three_phase_ontology_lifecycle #E8F5E8
+[OntologyConfigManager] as ontology_config_manager #E8F5E8
+[TwoLevelOntologyHierarchy] as two_level_ontology_hierarchy #E8F5E8
 
 semantic_analysis --> ontology
 pipeline -[hidden]- ontology
 insights -[hidden]- ontology
 ontology_config_manager -[hidden]- ontology
 legacy_ontology_adapter -[hidden]- ontology
-ontology --> three_phase_ontology_lifecycle
+ontology --> ontology_config_manager
+ontology --> two_level_ontology_hierarchy
 
 @enduml

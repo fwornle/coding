@@ -1,40 +1,37 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title ConstraintSystem - Hook-Based Enforcement Architecture
-
-package "Hook Infrastructure" {
-    component "UnifiedHookManager" as uhm <<core>>
-    component "HookConfigLoader" as hcl <<core>>
+package "Hook Interception Layer" {
+  component "UnifiedHookManager" as hookMgr <<core>>
+  component "HookConfigLoader" as configLoader <<core>>
 }
 
 package "Configuration Sources" {
-    component "User Config\n~/.coding-tools/hooks.json" as ucfg <<external>>
-    component "Project Config\n.coding/hooks.json" as pcfg <<external>>
-    component "DEFAULT_CONFIG" as dcfg <<core>>
+  component "User Hooks Config\n~/.coding-tools/hooks.json" as userCfg <<external>>
+  component "Project Hooks Config\n.coding/hooks.json" as projCfg <<external>>
 }
 
-package "Violation Persistence" {
-    component "ViolationCaptureService" as vcs <<core>>
-    database "Session Log\nsession-violations.jsonl" as slog <<storage>>
-    database "Violation History\nviolation-history.json" as vhist <<storage>>
+package "Constraint Enforcement" {
+  component "Pre-Tool Hook Handler" as preHook <<api>>
+  component "Post-Tool Hook Handler" as postHook <<api>>
+  component "ContentValidationAgent" as cva <<agent>>
 }
 
-package "Validation Agents" {
-    component "ContentValidationAgent" as cva <<agent>>
+package "Persistence Layer" {
+  component "ViolationCaptureService" as vcs <<core>>
+  database "session-violations.jsonl\n.mcp-sync/" as jsonl <<storage>>
+  database "violation-history.json\n.mcp-sync/" as jsonHist <<storage>>
 }
 
-ucfg --> hcl : "loaded first"
-pcfg --> hcl : "overrides user config"
-dcfg --> hcl : "fallback structure"
-
-hcl --> uhm : "registers handlers\n(priority-sorted)"
-
-uhm --> vcs : "routes violations\non pre/post-tool events"
-
-vcs --> slog : "writes JSONL"
-vcs --> vhist : "persists (cap 1000)"
-
-cva --> uhm : "scoped via\nagents[] filter"
+userCfg --> configLoader : "user-level config"
+projCfg --> configLoader : "project-level override"
+configLoader --> hookMgr : "validated handler configs"
+hookMgr --> preHook : "dispatches pre-tool events"
+hookMgr --> postHook : "dispatches post-tool events"
+preHook --> vcs : "constraint violations"
+postHook --> vcs : "constraint violations"
+cva --> vcs : "EntityValidationReport scores"
+vcs --> jsonl : "append JSONL stream"
+vcs --> jsonHist : "capped 1000 entries"
 
 @enduml

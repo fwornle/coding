@@ -1,33 +1,32 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Agent Adapter Layer" {
-  component "TranscriptAdapter" as adapter <<api>>
-  component "convertToLSL()" as convert <<core>>
-  component "getCurrentSession()" as getCurrentSession <<core>>
-}
+top to bottom direction
 
-package "Session Window Management" {
+package "Session Capture Layer" {
+  component "TranscriptAdapter" as adapter <<core>>
   component "SessionWindowManager" as swm <<core>>
-  component "Hourly Bucket Logic" as bucket <<core>>
+  component "getCurrentSession()" as gcs <<api>>
 }
 
-package "LSL Data Model" {
-  component "LSLSession / LSLEntry" as lsl <<core>>
-  component "LSLMetadata (timeWindow)" as meta <<core>>
+package "Metadata & Routing" {
+  component "LSLMetadata" as lslmeta <<core>>
 }
 
-package "File System Output" {
-  database "Session Files\n(path per timeWindow)" as files <<storage>>
+package "Storage" {
+  database "Window-Keyed\nDirectory Hierarchy" as dirstore <<storage>>
 }
 
-adapter --> convert : delegates
-adapter --> getCurrentSession : mandates
-convert --> swm : computes timeWindow
-getCurrentSession --> swm : resolves active bucket
-swm --> bucket : applies hourly bucketing
-bucket --> meta : populates timeWindow\n(e.g. '0800-0900')
-meta --> lsl : attached to
-lsl --> files : routed by timeWindow
+package "Downstream Consumers" {
+  component "transcript-api.js" as transcriptapi <<api>>
+}
+
+adapter --> swm : "requests window label"
+swm --> lslmeta : "stamps window field\n(e.g. '0800-0900')"
+gcs --> swm : "assigns window\nat capture time"
+gcs --> lslmeta : "populates session metadata"
+lslmeta --> dirstore : "routes file by\nwindow label key"
+transcriptapi --> dirstore : "retrieves transcripts\nby hour window"
+transcriptapi --> gcs : "calls getCurrentSession()"
 
 @enduml

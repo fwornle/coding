@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EntityTypeRegistry
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[EntityTypeRegistry] as entity_type_registry #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[KMCoreMigration] as kmcore_migration #F0F0F0
+[ThreeTypeOntology] as three_type_ontology #E8F5E8
+[ConsolidationMapping] as consolidation_mapping #E8F5E8
+
+knowledge_management --> entity_type_registry
+manual_learning -[hidden]- entity_type_registry
+online_learning -[hidden]- entity_type_registry
+kmcore_migration -[hidden]- entity_type_registry
+entity_type_registry --> three_type_ontology
+entity_type_registry --> consolidation_mapping
+
+@enduml

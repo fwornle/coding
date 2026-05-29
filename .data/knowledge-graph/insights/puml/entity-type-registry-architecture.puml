@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+package "Learning Pipelines" {
+  component "ManualLearning" as ml <<api>>
+  component "OnlineLearning" as ol <<api>>
+}
+
+package "Registry Core" {
+  component "EntityTypeRegistry" as etr <<core>>
+  component "Consolidation Mapping\n(System / Project / Pattern)" as cm <<core>>
+  component "Unregistered Type Tracker" as utt <<core>>
+}
+
+package "Persistence & Graph" {
+  component "PersistenceAgent" as pa <<agent>>
+  database "Knowledge Graph" as kg <<storage>>
+}
+
+package "Validation" {
+  component "Constraint Monitors" as con <<api>>
+}
+
+ml --> etr : "normalize entity type"
+ol --> etr : "normalize entity type"
+etr --> cm : "resolves via"
+etr --> utt : "tracks unknown types"
+pa --> etr : "pre-populates ontologyClass"
+pa --> kg : "writes typed entity"
+con --> etr : "validates conformance"
+
+@enduml

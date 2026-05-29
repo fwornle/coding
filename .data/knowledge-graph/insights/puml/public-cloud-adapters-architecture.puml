@@ -1,0 +1,47 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+' Public Cloud Adapters Architecture
+
+package "Environment Configuration" {
+    component "ANTHROPIC_API_KEY" as anthKey <<core>>
+    component "OPENAI_API_KEY" as oaiKey <<core>>
+    component "RAPID_LLM_PROXY_URL" as proxyUrl <<core>>
+}
+
+package "Public Cloud Adapters" {
+    component "Anthropic Adapter" as anthAdapter <<api>>
+    component "OpenAI Adapter" as oaiAdapter <<api>>
+}
+
+package "Proxy / Intercept Layer" {
+    component "rapid-llm-proxy" as proxy <<external>>
+}
+
+package "Upstream Backends" {
+    cloud "Anthropic API" as anthCloud <<external>>
+    cloud "OpenAI API" as oaiCloud <<external>>
+}
+
+package "Normalized Output Contract" {
+    component "4-Field Response Shape" as normalizedResponse <<core>>
+}
+
+anthKey --> anthAdapter : "injects credentials"
+oaiKey --> oaiAdapter : "injects credentials"
+proxyUrl --> anthAdapter : "configures base URL"
+proxyUrl --> oaiAdapter : "configures base URL"
+
+anthAdapter ..> proxy : "optionally intercepted"
+oaiAdapter ..> proxy : "optionally intercepted"
+
+proxy --> anthCloud : "forwards to"
+proxy --> oaiCloud : "forwards to"
+
+anthAdapter --> anthCloud : "direct (no proxy)"
+oaiAdapter --> oaiCloud : "direct (no proxy)"
+
+anthAdapter --> normalizedResponse : "produces"
+oaiAdapter --> normalizedResponse : "produces"
+
+@enduml

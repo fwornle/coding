@@ -1,0 +1,31 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Orchestration Layer" {
+  component "Health Coordinator" as hc <<core>>
+}
+
+package "ServiceProbeLayer (lib/utils/service-probe.js)" {
+  component "HTTP Probe Strategy" as http <<api>>
+  component "TCP Probe Strategy" as tcp <<api>>
+}
+
+package "Container Startup" {
+  component "docker/entrypoint.sh" as entry <<external>>
+}
+
+package "Target Services" {
+  component "MCP Server (REST/SSE)" as mcp <<api>>
+  database "Memgraph (Bolt)" as memgraph <<storage>>
+  database "Redis (RESP)" as redis <<storage>>
+}
+
+hc --> http : "selects for HTTP targets"
+hc --> tcp : "selects for TCP targets"
+entry ..> hc : "delegates readiness"
+
+http --> mcp : "probes"
+tcp --> memgraph : "probes"
+tcp --> redis : "probes"
+
+@enduml

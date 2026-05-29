@@ -6,12 +6,14 @@ title Hierarchy Context: ServiceProbe
 [DockerizedServices] as dockerized_services #FFFFDD
 [ServiceProbe] as service_probe #LightBlue
 [ServiceStarter] as service_starter #F0F0F0
-[ConstraintMonitorWrapper] as constraint_monitor_wrapper #F0F0F0
 [LLMMockService] as llmmock_service #F0F0F0
+[HttpProbe] as http_probe #E8F5E8
+[TcpProbe] as tcp_probe #E8F5E8
 
 dockerized_services --> service_probe
 service_starter -[hidden]- service_probe
-constraint_monitor_wrapper -[hidden]- service_probe
 llmmock_service -[hidden]- service_probe
+service_probe --> http_probe
+service_probe --> tcp_probe
 
 @enduml

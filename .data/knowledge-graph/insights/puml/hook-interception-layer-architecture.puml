@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "MCP Tool Execution Lifecycle" {
+    component "MCP Tool Invocation" as mcp <<core>>
+}
+
+package "Hook Interception Layer" {
+    component "Pre-Tool Hook" as preHook <<core>>
+    component "Post-Tool Hook" as postHook <<core>>
+    component "Event Categorizer" as categorizer <<core>>
+}
+
+package "Event Categories" {
+    component "Code Actions" as codeActions <<api>>
+    component "File Operations" as fileOps <<api>>
+    component "Tool Interactions" as toolInteractions <<api>>
+}
+
+package "Enforcement & Audit" {
+    component "Blocking Enforcement" as blocking <<core>>
+    component "Audit Enforcement" as audit <<core>>
+    component "Rule Evaluator" as rules <<core>>
+}
+
+mcp --> preHook : "triggers"
+preHook --> categorizer : "classifies event"
+categorizer --> codeActions : "routes"
+categorizer --> fileOps : "routes"
+categorizer --> toolInteractions : "routes"
+codeActions --> rules : "evaluated by"
+fileOps --> rules : "evaluated by"
+toolInteractions --> rules : "evaluated by"
+rules --> blocking : "pre-tool enforcement"
+preHook --> blocking : "reject before execution"
+mcp --> postHook : "completes"
+postHook --> audit : "post-tool enforcement"
+rules --> audit : "audit logging"
+
+@enduml

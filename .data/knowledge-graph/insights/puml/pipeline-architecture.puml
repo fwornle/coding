@@ -3,57 +3,40 @@
 
 left to right direction
 
-package "Pipeline Agents" {
-    component "GitHistoryAgent" as git <<agent>>
-    component "VibeSessionAgent" as vibe <<agent>>
-    component "CodeGraphAgent" as codegraph <<agent>>
-    component "SemanticLLMAgent" as semantic <<agent>>
-    component "OntologyAgent" as ontology <<agent>>
-    component "ValidationAgent" as validation <<agent>>
-    component "InsightAgent" as insight <<agent>>
+package "MCP Server Layer" {
+  component "MCP Server\n(mcp-server-semantic-analysis)" as mcpServer <<api>>
 }
 
-package "Shared Infrastructure" {
-    component "BaseAgent<TInput,TOutput>" as base <<core>>
-    component "LLMService" as llm <<api>>
-    component "attachTokenLogger" as tokenlog <<core>>
+package "Orchestration" {
+  component "Coordinator Agent" as coordinator <<agent>>
+}
+
+package "Processing Pipeline" {
+  component "Observation Generation Agent" as obsAgent <<agent>>
+  component "KG Operator Agents" as kgOps <<agent>>
+  component "Deduplication Agent" as dedupAgent <<agent>>
+  component "Persistence Agent" as persistAgent <<agent>>
+}
+
+package "Input Sources" {
+  component "Git History" as gitHistory <<external>>
+  component "LSL Session Logs" as lslLogs <<external>>
 }
 
 package "Storage" {
-    component "KmCoreAdapter" as kmcore <<storage>>
-    database "Memgraph" as memgraph <<storage>>
+  database "GraphKMStore" as graphStore <<storage>>
 }
 
-package "Support" {
-    component "logs/" as logs <<external>>
-    component "Tree-sitter" as treesitter <<cli>>
-    component "uv CLI" as uv <<cli>>
-}
-
-git --> vibe : output
-vibe --> codegraph : output
-codegraph --> semantic : output
-semantic --> ontology : output
-ontology --> validation : output
-validation --> insight : output
-
-git ..> base : extends
-codegraph ..> base : extends
-semantic ..> base : extends
-insight ..> base : extends
-
-semantic --> llm : routes LLM calls
-llm --> tokenlog : attaches telemetry
-
-codegraph --> treesitter : AST parsing
-codegraph --> uv : graph build
-codegraph --> memgraph : stores graph
-
-insight --> kmcore : persists results
-kmcore ..> memgraph : adapter surface
-
-git ..> logs : trace (non-fatal)
-codegraph ..> logs : trace (non-fatal)
-insight ..> logs : trace (non-fatal)
+mcpServer --> coordinator : "triggers"
+gitHistory --> obsAgent : "commit diffs"
+lslLogs --> obsAgent : "session events"
+coordinator --> obsAgent : "1. generate observations"
+obsAgent --> kgOps : "candidate entities"
+coordinator --> kgOps : "2. construct/mutate graph"
+kgOps --> dedupAgent : "classified entities"
+coordinator --> dedupAgent : "3. merge duplicates"
+dedupAgent --> persistAgent : "deduplicated entities"
+coordinator --> persistAgent : "4. persist"
+persistAgent --> graphStore : "writes with ontology metadata"
 
 @enduml

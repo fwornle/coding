@@ -5,11 +5,11 @@ title Hierarchy Context: ViolationCaptureService
 
 [ConstraintSystem] as constraint_system #FFFFDD
 [ViolationCaptureService] as violation_capture_service #LightBlue
-[ConstraintMonitorDashboard] as constraint_monitor_dashboard #F0F0F0
-[SemanticConstraintDetector] as semantic_constraint_detector #F0F0F0
+[ConstraintDashboard] as constraint_dashboard #F0F0F0
+[HookInterceptionLayer] as hook_interception_layer #F0F0F0
 
 constraint_system --> violation_capture_service
-constraint_monitor_dashboard -[hidden]- violation_capture_service
-semantic_constraint_detector -[hidden]- violation_capture_service
+constraint_dashboard -[hidden]- violation_capture_service
+hook_interception_layer -[hidden]- violation_capture_service
 
 @enduml

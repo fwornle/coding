@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentAgnosticDesignPrinciple
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentAgnosticDesignPrinciple] as agent_agnostic_design_principle #LightBlue
+[AgentAdapterPattern] as agent_adapter_pattern #F0F0F0
+[CLIEntryPointPattern] as clientry_point_pattern #F0F0F0
+[DeclarativeTeamComposition] as declarative_team_composition #F0F0F0
+[ExternalizedConfiguration] as externalized_configuration #F0F0F0
+[AgentNameBackendSelector] as agent_name_backend_selector #E8F5E8
+[UnifiedAgentAbstractionAPI] as unified_agent_abstraction_api #E8F5E8
+
+coding_patterns --> agent_agnostic_design_principle
+agent_adapter_pattern -[hidden]- agent_agnostic_design_principle
+clientry_point_pattern -[hidden]- agent_agnostic_design_principle
+declarative_team_composition -[hidden]- agent_agnostic_design_principle
+externalized_configuration -[hidden]- agent_agnostic_design_principle
+agent_agnostic_design_principle --> agent_name_backend_selector
+agent_agnostic_design_principle --> unified_agent_abstraction_api
+
+@enduml

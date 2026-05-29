@@ -2,107 +2,90 @@
 
 **Type:** Detail
 
-docs/puml/agent-abstraction-architecture.puml documents the base agent interface that enforces the constructor/initialize() split as the canonical lifecycle contract for all agent types
+docs/agent-integration-guide.md provides integration guidance that references this lifecycle, orienting developers on how adapters plug into the broader system without modifying core code
 
-## What It Is  
-
-The **AgentLifecycleContract** is the canonical lifecycle definition for every concrete agent in the code‑base.  It lives under the *AgentAbstractionPatterns* documentation umbrella and is formally described in two places: the PlantUML diagram at  
-
-```
-docs/puml/agent-abstraction-architecture.puml
-```  
-
-and the narrative description in  
-
-```
-integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
-```  
-
-Both sources agree that an agent’s public surface is split into **two distinct phases** – a constructor that performs only in‑process, side‑effect‑free initialization, and an `initialize()` method that carries out any network‑bound or heavyweight setup (for example, creating an LLM client).  By enforcing this split, the contract guarantees that agents can be **registered** with the system without inadvertently triggering external calls, and that all required resources are provisioned only when the system explicitly invokes the second phase.
-
-The contract is not an implementation artifact but a design‑by‑contract rule that every concrete agent class must obey.  It is therefore documented rather than coded, which is why the current repository shows *zero* code symbols directly tied to the contract itself.  The contract’s presence in the *AgentAbstractionPatterns* parent component signals that it is a shared, cross‑cutting concern for all agents, and any sibling documentation (e.g., other pattern specifications) will reference the same two‑phase lifecycle.
+# AgentLifecycleContract — Technical Insight Document
 
 ---
 
-## Architecture and Design  
+## What It Is
 
-The architecture embodied by the **AgentLifecycleContract** follows a **two‑phase initialization pattern**.  The first phase—object construction—creates a plain‑old‑JavaScript (or TypeScript) instance that holds configuration data, static dependencies, and internal state that do not require I/O.  The second phase—`initialize()`—is responsible for any side‑effect‑prone work such as opening sockets, authenticating with external LLM services, or loading large language models.  This separation is deliberately captured in the PlantUML diagram (`docs/puml/agent-abstraction-architecture.puml`), which shows a base *Agent* interface with two abstract members: the constructor signature and an `initialize()` method.  
+`AgentLifecycleContract` is the formal behavioral specification that governs how AI backend adapters are initialized, operated, and torn down within the adapter layer. It is not a standalone file but a cross-cutting concern defined and reinforced across three documentation sources:
 
-Because the contract lives at the documentation level, the **design pattern** is effectively a **lifecycle contract** enforced by convention rather than by language‑level interfaces.  The pattern is reinforced by the *agents.md* file under the MCP‑Server Semantic Analysis integration, which describes a **register → invoke** flow: agents are first registered (construction only) and later invoked (after `initialize()` has completed).  This flow ensures that the system’s registration subsystem can safely enumerate and store agents without risking network latency or failure, which is critical for startup performance and for environments where network access may be intermittent.
+- **`docs/architecture/agent-abstraction-api.md`** — the authoritative interface specification that all backends must satisfy
+- **`docs/architecture/adding-new-agent.md`** — the procedural guide that maps lifecycle phases to concrete implementation steps for new adapters
+- **`docs/agent-integration-guide.md`** — the developer-facing orientation document that contextualizes lifecycle compliance within the broader integration model
 
-Interaction between components follows a **dependency‑injection‑friendly** model.  Constructors receive only pure data and lightweight utilities, while the `initialize()` method receives—or resolves—the heavyweight services (e.g., an LLM client).  This design encourages testability: unit tests can instantiate agents without needing a live LLM endpoint, and integration tests can focus on the `initialize()` phase in isolation.
-
----
-
-## Implementation Details  
-
-Although no concrete code symbols appear in the repository, the **AgentLifecycleContract** is concretized through the following documented elements:
-
-1. **Base Agent Interface (docs/puml/agent-abstraction-architecture.puml)** – The diagram defines an abstract *Agent* with a constructor that accepts configuration parameters and an `initialize()` method that returns a promise (or is otherwise asynchronous) to accommodate network calls.  The diagram also depicts the inheritance relationship to concrete agents, indicating that every concrete class must implement both members.
-
-2. **Lifecycle Narrative (integrations/mcp-server-semantic-analysis/docs/architecture/agents.md)** – This markdown file expands on the two‑phase contract, explicitly stating that **LLM client instantiation is prohibited inside constructors**.  Instead, agents are expected to defer any network‑dependent setup to `initialize()`.  The document also outlines the **register → invoke** sequence, where registration stores the constructed agent in a registry, and later invocation triggers `initialize()` before the agent can process any request.
-
-3. **Parent Context – AgentAbstractionPatterns** – The contract resides under this parent documentation component, meaning it is the shared contract that all pattern specifications within the *AgentAbstraction* family reference.  Sibling pattern documents (e.g., “AgentErrorHandling” or “AgentCaching”, if they exist) will implicitly inherit the same lifecycle expectations.
-
-Because the contract is expressed as documentation rather than a language construct, enforcement relies on **code reviews and static analysis**.  Developers must manually ensure that constructors contain no side effects, and that any LLM‑related code appears exclusively in `initialize()`.  The contract’s simplicity—just two required members—makes it easy to audit and to extend with additional lifecycle hooks if future requirements arise.
+Together, these documents define what it means for an adapter to be "conformant" — not merely that it exposes certain methods, but that it progresses through expected lifecycle phases in a predictable, system-compatible way. `AgentLifecycleContract` lives as a contained concept within its parent, `AgentAdapterPattern`, which itself is grounded in `docs/architecture/agent-abstraction-api.md` as the unified interface contract between adapters and consumers.
 
 ---
 
-## Integration Points  
+## Architecture and Design
 
-The **AgentLifecycleContract** connects to the broader system through two primary integration surfaces:
+The central architectural decision evident from the observations is **contract-based polymorphism**: the system enforces a shared lifecycle shape across all AI backends, allowing the core system to remain backend-agnostic. The unified Agent Abstraction API described in `docs/architecture/agent-abstraction-api.md` is the mechanism by which this is enforced — it defines the interface that all adapters must satisfy, and the lifecycle phases are a structural component of that interface.
 
-* **Registration Subsystem** – When the application boots, it discovers and **registers** agents by invoking their constructors.  The registration code (not shown in the observations) stores the raw instances in a central registry.  Because constructors are side‑effect‑free, this step can be performed synchronously and safely in any environment, including offline or sandboxed contexts.
+This design reflects a deliberate **inversion of dependency**: the core system depends on the abstraction (the lifecycle contract), not on any specific AI backend. New backends are added by conforming to the contract, not by modifying core logic. This is explicitly reinforced in `docs/agent-integration-guide.md`, which orients developers around plugging into the system without touching core code — a strong signal that the lifecycle contract is the primary extension boundary.
 
-* **Invocation Engine** – At runtime, when an agent is needed to handle a request, the engine retrieves the registered instance and calls its `initialize()` method.  Only after the promise resolves does the engine forward work to the agent’s business logic.  This engine is described in *agents.md* as the **invoke** phase of the register → invoke flow.  The engine therefore depends on the contract’s guarantee that `initialize()` will complete all external setup, such as establishing an LLM client connection.
+The relationship between `AgentLifecycleContract` and its parent `AgentAdapterPattern` is one of specification-within-pattern: `AgentAdapterPattern` establishes the structural adapter model (how backends are wrapped), while `AgentLifecycleContract` defines the temporal and behavioral rules those adapters must follow. The pattern provides the shape; the contract provides the rules of engagement.
 
-Because the contract explicitly forbids LLM client creation in constructors, **external dependencies** (LLM SDKs, HTTP clients, authentication tokens) are only required by the `initialize()` method.  This reduces the footprint of the registration phase and allows the system to defer loading heavy libraries until they are truly needed, which can improve startup time and memory usage.
-
----
-
-## Usage Guidelines  
-
-1. **Respect the Two‑Phase Boundary** – Always keep constructors pure.  Do not place any network calls, file I/O, or heavyweight object creation (e.g., LLM client instances) inside the constructor.  Reserve those operations for `initialize()`.  This rule is the core of the contract and is explicitly called out in both the PlantUML diagram and the agents.md narrative.
-
-2. **Implement Both Members** – Every concrete agent must provide a constructor that matches the signature described in the base diagram and an `initialize()` method that returns a promise (or otherwise signals completion).  Failure to implement either member will break the register → invoke flow and should be caught during code review.
-
-3. **Register Early, Initialize Lazily** – Follow the **register → invoke** pattern: construct agents as early as possible (e.g., at application start‑up) to populate the registry, but defer any costly initialization until the moment the agent is actually needed.  This maximizes startup performance and allows the system to run in environments without immediate network access.
-
-4. **Test Separately** – Write unit tests that instantiate agents and verify that constructors do not throw or perform side effects.  Write integration tests that invoke `initialize()` and confirm that external resources (e.g., an LLM client) are correctly provisioned.  Because the contract isolates side effects, these two test categories can be kept independent.
-
-5. **Document Any Extensions** – If a new lifecycle stage is required (e.g., a `shutdown()` hook), document it alongside the existing contract in the same PlantUML diagram and agents.md file, and ensure all concrete agents adopt the extension consistently.
+The decision to document lifecycle phases in *both* `agent-abstraction-api.md` (what phases exist) and `adding-new-agent.md` (how to implement them) is a notable design choice — it separates the normative specification from the procedural guidance, reducing the risk that implementation instructions drift into the authoritative API definition.
 
 ---
 
-### Architectural Patterns Identified  
-* Two‑phase (constructor / initialize) lifecycle pattern  
-* Register → invoke execution flow  
-* Dependency‑injection‑friendly separation of pure and side‑effect‑prone code  
+## Implementation Details
 
-### Design Decisions and Trade‑offs  
-* **Decision:** Enforce side‑effect‑free constructors to enable safe registration.  
-  *Trade‑off:* Developers must remember to move all external setup to `initialize()`, which can introduce boilerplate.  
-* **Decision:** Document the contract rather than encode it in language interfaces.  
-  *Trade‑off:* No compile‑time enforcement; reliance on manual review and static analysis.  
+Based on the observations, lifecycle phases are the core technical unit of `AgentLifecycleContract`. While the exact phase names are not enumerated in the available observations, the documentation structure across `docs/architecture/agent-abstraction-api.md` and `docs/architecture/adding-new-agent.md` confirms that phases exist as discrete, named stages that adapters must implement.
 
-### System Structure Insights  
-* The contract sits under the *AgentAbstractionPatterns* parent, serving as the shared foundation for all agent‑related documentation.  
-* Concrete agents are siblings that inherit the same two‑phase contract, ensuring uniform behavior across the ecosystem.  
+The `adding-new-agent.md` document is particularly revealing as an implementation reference: it describes a **registration procedure** that maps directly to lifecycle phase implementation. This implies that lifecycle conformance is not merely runtime behavior but also involves a registration step — adapters must declare themselves to the adapter layer in a way the system recognizes. This registration is presumably tied to the phases defined in the abstraction API.
 
-### Scalability Considerations  
-* Deferring heavy initialization to `initialize()` allows the system to **scale registration** across many agents without incurring network latency, supporting large‑scale deployments where agents may be discovered dynamically.  
-* Lazy initialization means that only the subset of agents actually needed at runtime will incur the cost of LLM client creation, conserving resources under load.  
+The `agent-integration-guide.md` serves as the developer entry point, suggesting that lifecycle compliance is framed as an integration concern rather than an internal implementation detail. This framing is significant: it means the lifecycle contract is an **outward-facing boundary** that third-party or team-external adapter authors are expected to understand and satisfy.
 
-### Maintainability Assessment  
-* The contract’s simplicity (only two required members) makes it **easy to understand and maintain**.  
-* Because enforcement is documentation‑driven, **maintenance overhead** lies in keeping the PlantUML diagram and markdown file synchronized with any future changes.  
-* The clear separation of concerns improves **testability** and reduces the risk of accidental side effects during refactoring, contributing positively to long‑term maintainability.
+The mechanics of how the core system invokes lifecycle phases — whether through direct interface calls, a registration registry, or a factory pattern — are not fully resolved from the available observations alone, but the documentation topology strongly suggests a structured handshake: adapters register, expose lifecycle-conformant methods as defined in the abstraction API, and the core system drives phase transitions.
+
+---
+
+## Integration Points
+
+`AgentLifecycleContract` integrates with the broader system at the adapter boundary. The contract is the handshake that makes `AgentAdapterPattern` functional: without lifecycle conformance, an adapter cannot safely be driven by the core system. This makes `AgentLifecycleContract` a **prerequisite for participation** in the adapter layer.
+
+The `docs/agent-integration-guide.md` explicitly references the lifecycle in the context of plugging adapters into the broader system, which indicates that the lifecycle contract is visible and relevant at the integration layer — not just internally within adapter implementations. Developers adding new backends are directed through `docs/architecture/adding-new-agent.md`, which means the lifecycle contract is the primary technical gate that new integrations must pass through.
+
+The absence of references to sibling entities in the current observations suggests `AgentLifecycleContract` may be the foundational concern within `AgentAdapterPattern`, with other sibling concepts (if any) likely building on top of lifecycle conformance rather than operating independently of it.
+
+---
+
+## Usage Guidelines
+
+Developers implementing a new AI backend adapter should treat `docs/architecture/agent-abstraction-api.md` as the normative source of truth for what the lifecycle contract requires. This document defines the interface, and conformance to it is non-negotiable for system compatibility. The `docs/architecture/adding-new-agent.md` guide should be followed as the step-by-step procedural companion — it translates the abstract lifecycle phases into concrete implementation tasks.
+
+A critical rule enforced by the overall design is **non-modification of core code**: `docs/agent-integration-guide.md` explicitly orients developers around plugging in without modifying core logic. Any implementation approach that requires touching core code to accommodate a new backend is a violation of the contract's intent and likely indicates a gap in lifecycle conformance rather than a gap in the core system.
+
+Developers should implement *all* lifecycle phases defined in the abstraction API, not a subset. Partial lifecycle implementations are likely to produce undefined behavior at phase transitions that the core system expects to drive. When in doubt, `adding-new-agent.md` provides the registration and implementation procedure that ensures all required phases are accounted for.
+
+---
+
+## Architectural Patterns Identified
+
+| Pattern | Evidence |
+|---|---|
+| **Contract-based polymorphism** | All backends conform to a unified interface defined in `agent-abstraction-api.md` |
+| **Adapter pattern** | Backends are wrapped as adapters; `AgentLifecycleContract` lives inside `AgentAdapterPattern` |
+| **Open/closed extension** | New backends added without modifying core code, per `agent-integration-guide.md` |
+| **Specification/procedure separation** | Normative API spec separated from procedural implementation guide |
+
+## Design Trade-offs
+
+The strict lifecycle contract reduces flexibility for backends with unconventional initialization models — adapters must map their native semantics onto the shared lifecycle phases, which may require shim logic. However, this trade-off is accepted in exchange for a fully backend-agnostic core and a predictable integration surface. The documentation-as-contract approach (rather than, say, a compiled interface) places the enforcement burden on developer discipline and documentation <USER_ID_REDACTED> rather than on the compiler or runtime, which is a maintainability risk as the system scales to more backends.
+
+## Maintainability Assessment
+
+The separation of concerns across the three documentation files is well-structured for maintainability: the abstraction API evolves independently of the procedural guide, and the integration guide can be updated for developer experience without touching the normative specification. The primary risk is **documentation drift** — if `adding-new-agent.md` falls out of sync with `agent-abstraction-api.md`, new adapters may implement stale lifecycle phases. A periodic review process or cross-referencing mechanism between these documents would mitigate this risk.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [AgentAbstractionPatterns](./AgentAbstractionPatterns.md) -- docs/puml/agent-abstraction-architecture.puml documents the base agent interface enforcing the constructor/initialize() split, ensuring all concrete agent types adhere to the same lifecycle contract
+- [AgentAdapterPattern](./AgentAdapterPattern.md) -- docs/architecture/agent-abstraction-api.md defines the unified Agent Abstraction API that all backends must conform to, serving as the contract between adapters and consumers
 
 
 ---

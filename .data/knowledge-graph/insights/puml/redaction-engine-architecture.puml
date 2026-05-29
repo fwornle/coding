@@ -2,29 +2,29 @@
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Configuration" {
-  component "redaction-config.yaml" as redactConfig <<storage>>
+  component "redaction-config.yaml" as config <<storage>>
 }
 
-package "Agent Adapter Layer" {
-  component "TranscriptAdapter" as adapter <<api>>
-  component "readTranscripts()" as readRaw <<core>>
-  component "convertToLSL()" as convertLSL <<core>>
+package "Transcript Pipeline" {
+  component "readTranscripts()" as reader <<api>>
+  component "convertToLSL()" as converter <<core>>
+  component "RedactionEngine" as engine <<core>>
+  component "LSL Output Files" as lsl <<storage>>
 }
 
-package "Unified LSL Format" {
-  component "LSLSession / LSLEntry" as lslOutput <<core>>
+package "Transcript Adapters" {
+  component "ClaudeCode Adapter" as claude <<agent>>
+  component "Other Agent Adapters" as others <<agent>>
 }
 
-package "Redaction Pipeline" {
-  component "RedactionEngine" as redact <<core>>
-  component "Redacted LSL Output" as redactedLSL <<storage>>
-}
+component "transcript-api.js" as transcriptApi <<api>>
 
-redactConfig --> redact : "configures patterns"
-readRaw --> adapter : "feeds raw agent files"
-adapter --> convertLSL : "transforms"
-convertLSL --> lslOutput : "produces"
-lslOutput --> redact : "post-process"
-redact --> redactedLSL : "sanitized output"
+config --> engine : "loads rules"
+reader --> converter : "raw transcripts"
+claude --> reader
+others --> reader
+converter --> engine : "LSL typed format"
+transcriptApi --> converter
+engine --> lsl : "sanitized output"
 
 @enduml

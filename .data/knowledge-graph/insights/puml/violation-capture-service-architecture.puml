@@ -1,28 +1,33 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Producers" {
-  component "Hook Handlers" as hooks <<external>>
+left to right direction
+
+package "Hook Layer" {
+    component "Pre-Tool Hook" as preHook <<external>>
+    component "Post-Tool Hook" as postHook <<external>>
 }
 
-package "ViolationCaptureService" {
-  component "violation-capture-service.js" as vcs <<core>>
+package "Capture Layer" {
+    component "ViolationCaptureService" as vcs <<core>>
 }
 
-package "Storage" {
-  database "session-violations.jsonl" as jsonl <<storage>>
-  database "violation-history.json" as vjson <<storage>>
+package "Output Layer" {
+    database "violations.jsonl\n(Streaming Log)" as jsonl <<storage>>
+    database "violations-history.json\n(Dashboard Snapshot)" as jsonHistory <<storage>>
 }
 
-package "Consumers" {
-  component "Stream / Tail Consumer" as stream <<external>>
-  component "Dashboard" as dashboard <<external>>
+package "Consumer Layer" {
+    component "ConstraintDashboard" as dashboard <<cli>>
+    component ".mcp-sync Directory" as mcpSync <<storage>>
 }
 
-hooks --> vcs : "synchronous call"
-vcs --> jsonl : "append single JSON line"
-vcs --> vjson : "insert + evict oldest\n(cap: 1000 entries)"
-jsonl --> stream : "tail-follow / streaming read"
-vjson --> dashboard : "random-access read"
+preHook --> vcs : "evaluated violations"
+postHook --> vcs : "evaluated violations"
+vcs --> jsonl : "append write"
+vcs --> jsonHistory : "snapshot write"
+jsonl --> mcpSync : "persisted to"
+jsonHistory --> mcpSync : "persisted to"
+mcpSync --> dashboard : "filesystem handoff"
 
 @enduml

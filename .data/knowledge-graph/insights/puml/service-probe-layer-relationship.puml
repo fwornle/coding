@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ServiceProbeLayer
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ServiceProbeLayer] as service_probe_layer #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[HttpProbe] as http_probe #E8F5E8
+[TcpProbe] as tcp_probe #E8F5E8
+
+dockerized_services --> service_probe_layer
+service_starter -[hidden]- service_probe_layer
+service_probe_layer --> http_probe
+service_probe_layer --> tcp_probe
+
+@enduml

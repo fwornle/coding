@@ -6,14 +6,14 @@ title Hierarchy Context: ManualLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [ManualLearning] as manual_learning #LightBlue
 [OnlineLearning] as online_learning #F0F0F0
-[GraphKMStore] as graph_kmstore #F0F0F0
-[KnowledgeDecayTracker] as knowledge_decay_tracker #F0F0F0
-[ProvenanceMetadataStamping] as provenance_metadata_stamping #E8F5E8
+[KMCoreMigration] as kmcore_migration #F0F0F0
+[EntityTypeRegistry] as entity_type_registry #F0F0F0
+[HumanProvenanceStamping] as human_provenance_stamping #E8F5E8
 
 knowledge_management --> manual_learning
 online_learning -[hidden]- manual_learning
-graph_kmstore -[hidden]- manual_learning
-knowledge_decay_tracker -[hidden]- manual_learning
-manual_learning --> provenance_metadata_stamping
+kmcore_migration -[hidden]- manual_learning
+entity_type_registry -[hidden]- manual_learning
+manual_learning --> human_provenance_stamping
 
 @enduml

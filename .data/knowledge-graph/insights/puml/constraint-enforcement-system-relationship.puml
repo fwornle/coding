@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintEnforcementSystem
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ConstraintEnforcementSystem] as constraint_enforcement_system #LightBlue
+[AgentAbstractionPattern] as agent_abstraction_pattern #F0F0F0
+[CrossProjectKnowledgePattern] as cross_project_knowledge_pattern #F0F0F0
+[HooksRegistry] as hooks_registry #E8F5E8
+[ConstraintMonitor] as constraint_monitor #E8F5E8
+
+coding_patterns --> constraint_enforcement_system
+agent_abstraction_pattern -[hidden]- constraint_enforcement_system
+cross_project_knowledge_pattern -[hidden]- constraint_enforcement_system
+constraint_enforcement_system --> hooks_registry
+constraint_enforcement_system --> constraint_monitor
+
+@enduml

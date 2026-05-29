@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SemanticLoggingBuffer
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[SemanticLoggingBuffer] as semantic_logging_buffer #LightBlue
+[OntologyClassificationAgent] as ontology_classification_agent #F0F0F0
+
+live_logging_system --> semantic_logging_buffer
+ontology_classification_agent -[hidden]- semantic_logging_buffer
+
+@enduml

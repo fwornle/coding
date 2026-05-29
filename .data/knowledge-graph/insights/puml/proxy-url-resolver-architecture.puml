@@ -4,30 +4,34 @@
 package "Environment Variables" {
   component "RAPID_LLM_PROXY_URL" as rapid <<external>>
   component "LLM_CLI_PROXY_URL" as cli <<external>>
-  component "LLM_PROXY_URL" as legacy <<external>>
+  component "LLM_PROXY_URL" as generic <<external>>
+  component "localhost:PORT (default)" as localport <<external>>
 }
 
-package "Resolution Logic" {
+package "URL Resolution Core" {
   component "ProxyUrlResolver" as resolver <<core>>
-  component "Default: localhost:12435" as fallback <<core>>
+  component "llm-with-process.ts" as lwp <<api>>
 }
 
-package "Proxy Infrastructure" {
-  component "rapid-llm-proxy daemon" as proxy <<api>>
-  component "/api/complete endpoint" as endpoint <<api>>
+package "Execution Modes" {
+  component "Mock Mode" as mock <<cli>>
+  component "Local Mode" as local <<cli>>
+  component "Public Mode" as public <<cli>>
 }
 
-package "Consumers" {
-  component "LLM Call Sites" as callsites <<cli>>
-}
+cloud "rapid-llm-proxy" as proxy <<external>>
 
-rapid --> resolver : "priority 1"
-cli --> resolver : "priority 2"
-legacy --> resolver : "priority 3"
-fallback --> resolver : "last resort"
+rapid --> resolver : "1st priority"
+cli --> resolver : "2nd priority"
+generic --> resolver : "3rd priority"
+localport --> resolver : "4th fallback"
 
-resolver --> endpoint : "routes to"
-endpoint --> proxy : "single ingress"
-callsites --> resolver : "resolves URL"
+resolver --> lwp : "resolved URL"
+
+lwp --> proxy : "direct fetch\n+ telemetry tags"
+
+mock --> lwp : "routes via"
+local --> lwp : "routes via"
+public --> lwp : "routes via"
 
 @enduml

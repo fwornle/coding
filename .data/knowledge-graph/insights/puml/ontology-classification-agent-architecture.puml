@@ -1,0 +1,29 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "MCP Server - Semantic Analysis" {
+    component "OntologyClassificationAgent" as oca <<agent>>
+    component "SemanticLoggingBuffer" as slb <<core>>
+}
+
+package "Storage" {
+    database ".data/logs/" as logfiles <<storage>>
+}
+
+package "LLM & Ontology" {
+    cloud "LLM Service" as llm <<external>>
+}
+
+package "Downstream Consumers" {
+    component "GraphKMStore" as gkm <<storage>>
+    component "Semantic Analysis Pipeline" as sap <<core>>
+}
+
+slb --> logfiles : "writes LSL entries"
+oca --> logfiles : "reads persisted entries"
+oca --> llm : "invokes for classification"
+oca --> logfiles : "writes enriched entries\n(ontologyClass, confidence)"
+logfiles --> gkm : "consumed by"
+logfiles --> sap : "consumed by"
+
+@enduml

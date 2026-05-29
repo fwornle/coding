@@ -2,82 +2,95 @@
 
 **Type:** SubComponent
 
-`LegacyOntologyAdapter` wraps `OntologyRegistry` from `@fwornle/km-core`, acting as an anti-corruption layer so that the legacy interface expected by `OntologyValidator` and `OntologyClassifier` is preserved even as the underlying registry implementation evolves
+The adapter's existence is explicitly scoped to the Phase 42-03 migration period, implying it carries a planned deprecation once OntologyValidator and OntologyClassifier are updated to consume OntologyRegistry directly
 
-# LegacyOntologyAdapter — Technical Reference
+# LegacyOntologyAdapter — Technical Insight Document
+
+---
 
 ## What It Is
 
-`LegacyOntologyAdapter` is a SubComponent of the SemanticAnalysis MCP server (`integrations/mcp-server-semantic-analysis`), housed within the broader Ontology component alongside `OntologyConfigManager` and the `OntologyClassificationAgent` lifecycle. Its singular responsibility is to wrap `OntologyRegistry` from `@fwornle/km-core` and re-expose it through the legacy interface that `OntologyValidator` and `OntologyClassifier` were originally written against — shielding those consumers from any evolution in the upstream `km-core` package.
+`LegacyOntologyAdapter` is a deliberately scoped migration component residing within the `SemanticAnalysis` system (`integrations/mcp-server-semantic-analysis`). It functions as a compatibility shim between the legacy ontology interface consumed by `OntologyValidator` and `OntologyClassifier` and the modern `OntologyRegistry` API exposed by `km-core`. Its existence is formally documented in `docs/RELEASE-2.0.md` as part of the ontology integration system rollout, underscoring that it is a purposeful architectural decision rather than an incidental abstraction that accumulated over time.
 
-The adapter itself contains one child component, AntiCorruptionLayerWrapper, which is where the actual translation mechanics live. Together, `LegacyOntologyAdapter` and its inner `AntiCorruptionLayerWrapper` form a two-layer containment boundary: the outer adapter establishes the contract boundary visible to call sites, while the inner wrapper performs the field-name and method-signature mapping work.
+The adapter sits inside the `SemanticAnalysis` parent component, which orchestrates a pipeline of specialized agents that extract, classify, validate, and persist structured knowledge from git history and LSL sessions. Within that broader pipeline, `LegacyOntologyAdapter` occupies a narrow but critical position: it guards the boundary between the new `km-core`-backed ontology registry and the downstream classification and validation agents that have not yet been migrated to consume `OntologyRegistry` directly. Its scope is explicitly tied to the Phase 42-03 migration period, after which it carries a planned deprecation.
 
 ---
 
 ## Architecture and Design
 
+The central architectural pattern is the **Anti-Corruption Layer (ACL)**, a well-established pattern in domain-driven design for protecting a bounded context from the churn of an upstream model. `LegacyOntologyAdapter` absorbs any API surface changes in `km-core`'s `OntologyRegistry`, preventing those changes from cascading into `OntologyValidator` and `OntologyClassifier`. Without this layer, every refactor of `OntologyRegistry` would require simultaneous updates to the classification and validation pipeline — a high-risk coupling inside a live, batch-processing system.
+
 ![LegacyOntologyAdapter — Architecture](images/legacy-ontology-adapter-architecture.png)
 
-The dominant pattern here is the **Adapter / Anti-Corruption Layer (ACL)**, a technique drawn from Domain-Driven Design. The intent is explicit: `OntologyValidator` and `OntologyClassifier` were written against a stable internal interface, and that interface is now preserved artificially by `LegacyOntologyAdapter` even as `OntologyRegistry` inside `@fwornle/km-core` continues to evolve independently. The ACL ensures that no upstream change to `km-core` can propagate as a breaking change into the classification and validation logic without an explicit, deliberate update to the adapter itself.
+A second key design decision is the **parallel operation model**. By presenting a stable legacy interface, the adapter allows the old and new registry implementations to coexist during the rollout window. This supports an incremental cutover strategy: teams can migrate `OntologyValidator` and `OntologyClassifier` independently, at their own pace, without requiring a hard flag-day replacement. This is particularly important given that `OntologyConfigManager` is implemented as a singleton ensuring all pipeline agents share identical ontology configuration throughout a batch run — any abrupt registry switch would risk mid-run config drift, which the adapter helps avoid.
 
-This mirrors a known precedent in the codebase: the Phase 42.x `KmCoreAdapter` storage migration, where the same shim strategy was used to preserve legacy field names and method signatures at the storage call sites while replacing `GraphDatabaseAdapter` and `PersistenceAgent` with the newer `KmCoreAdapter` surface. The repetition of this pattern across both the storage and ontology subsystems suggests it is an established architectural convention within this project — when a backing dependency must be modernized, a thin adapter shim absorbs the delta rather than cascading changes through all consumers.
-
-![LegacyOntologyAdapter — Relationship](images/legacy-ontology-adapter-relationship.png)
-
-A notable structural trade-off of this approach is the introduction of an indirection layer that must be actively maintained. Every future `OntologyRegistry` API change requires a corresponding update to `LegacyOntologyAdapter` before it can be used. This is intentional: the friction is the feature. The adapter makes upstream changes *visible* at a single point rather than silently diffusing them across every `OntologyValidator` and `OntologyClassifier` call site.
+The adapter is also architecturally honest about its own temporality. Its scope is explicitly bounded to Phase 42-03, and its documentation in `docs/RELEASE-2.0.md` confirms it was introduced as a deliberate seam, not a permanent fixture. This is a meaningful design discipline: acknowledging migration scaffolding as scaffolding, rather than allowing it to silently calcify into permanent infrastructure.
 
 ---
 
 ## Implementation Details
 
-The adapter delegates initialization to the `OntologyRegistry` side of `@fwornle/km-core` — most likely through a call equivalent to `OntologyRegistry.load()`. This is a lifecycle-critical detail: because `OntologyClassificationAgent` drives the initialize → classify → suggest-extensions sequence, `LegacyOntologyAdapter` must complete its initialization handshake before any entity reaches the classify phase. A failure at initialization would block the entire downstream classification pipeline, including the attachment of `OntologyMetadata` (class, confidence, method, version) that every entity requires before persistence.
+`LegacyOntologyAdapter` contains one documented child component: `LegacyInterfaceCompatibilityLayer`. This child component carries the translation mechanics — mapping legacy ontology lookup and classification call signatures to the equivalent operations on `km-core`'s `OntologyRegistry` — without touching any downstream consumer code. The separation of concerns here is deliberate: `LegacyOntologyAdapter` owns the boundary identity and lifecycle, while `LegacyInterfaceCompatibilityLayer` owns the low-level call translation.
 
-The AntiCorruptionLayerWrapper child component handles the mechanical translation — mapping legacy field names and method signatures to their modern `km-core` equivalents. This decomposition keeps the outer `LegacyOntologyAdapter` focused on lifecycle and interface contract, while the inner wrapper owns the mapping table. When `OntologyRegistry` changes a method name or restructures a return shape, the change is absorbed inside `AntiCorruptionLayerWrapper` without touching the adapter's public surface.
+![LegacyOntologyAdapter — Relationship](images/legacy-ontology-adapter-relationship.png)
 
-Because no code symbols or key files were resolvable from static analysis (0 symbols found), the exact method signatures and field mappings within `AntiCorruptionLayerWrapper` are not enumerable from this analysis. The behavioral contract, however, is well-established by the observations: the adapter's output must satisfy `OntologyValidator` and `OntologyClassifier` exactly as if they were calling a native legacy registry directly.
+No source file paths or code symbols were available at analysis time, which means the precise method signatures and internal dispatch logic cannot be confirmed from direct inspection. However, the functional contract is clear from the observations: the adapter must present whichever interface `OntologyValidator` and `OntologyClassifier` expect to call, and internally delegate those calls to `OntologyRegistry` in `km-core`. Any argument shape mismatches, return type differences, or error contract divergences between the two APIs are the responsibility of `LegacyInterfaceCompatibilityLayer` to reconcile.
+
+Given that the `Ontology` sibling component manages a two-level ontology hierarchy (upper/lower) through separate definition files, and that `OntologyConfigManager` controls the paths to those files as a singleton, the adapter must be careful not to introduce a second configuration pathway for ontology lookups. All registry access should remain routed through the configuration surface that `OntologyConfigManager` governs, so that classifier and validator instances remain consistent throughout a batch run.
 
 ---
 
 ## Integration Points
 
-`LegacyOntologyAdapter` sits at the intersection of two dependency chains. Upstream, it depends on `@fwornle/km-core`'s `OntologyRegistry` — an external package boundary that represents the only point of exposure to km-core's evolution. Downstream, it is consumed by `OntologyValidator` and `OntologyClassifier`, both of which are wholly ignorant of `OntologyRegistry`'s actual API; they program entirely against the legacy interface the adapter exposes.
+`LegacyOntologyAdapter` connects two distinct subsystems within `SemanticAnalysis`. On its upstream face, it depends on `km-core`'s `OntologyRegistry` — the authoritative, modern registry that the broader system is migrating toward. On its downstream face, it serves `OntologyValidator` and `OntologyClassifier`, which expect the legacy interface contract. These two consumers are the adapter's only justified clients; any new code introduced to `SemanticAnalysis` after Phase 42-03 should consume `OntologyRegistry` directly rather than routing through this adapter.
 
-Within the SemanticAnalysis pipeline, the adapter's lifecycle is governed by `OntologyClassificationAgent`, which is itself one of the sequenced agents in the batch-analysis pipeline managed by the parent SemanticAnalysis component. The Ontology sibling grouping — which includes `OntologyClassificationAgent` and the singleton `OntologyConfigManager` — collectively owns the classification concern. `LegacyOntologyAdapter` is the infrastructure underpinning of that group, providing the registry access that the agent and classifier logic require.
-
-The Insights sibling component, operating as the final pipeline stage on fully classified entities, is indirectly dependent on `LegacyOntologyAdapter` being healthy: if the adapter fails to initialize or returns malformed ontology data, the `OntologyMetadata` attached to entities will be incomplete or missing, corrupting the inputs that Insights generation consumes. This makes `LegacyOntologyAdapter` a silent upstream dependency of the entire post-classification pipeline.
+The relationship with the `Pipeline` sibling is indirect: the pipeline orchestrates the agents that invoke `OntologyValidator` and `OntologyClassifier`, meaning the adapter is implicitly in the critical path of every batch analysis run. If the adapter introduces latency, errors, or inconsistent ontology resolution, those effects propagate through the entire classification and validation stage. Similarly, the `Insights` sibling, which performs LLM-driven insight generation within token budget constraints configured via `OntologyConfigManager`, depends on correctly classified ontology metadata upstream — making the adapter's correctness a silent prerequisite for insight <USER_ID_REDACTED>.
 
 ---
 
 ## Usage Guidelines
 
-**Initialization must precede classification.** Any code path that triggers `OntologyClassificationAgent`'s classify phase must guarantee that `LegacyOntologyAdapter` has successfully completed initialization. Skipping or deferring this step will cause classification to operate against an unloaded registry, producing silent failures or incorrect ontology assignments that will only surface during Insights generation or persistence validation.
+**Do not extend the adapter's interface.** Any new ontology access patterns introduced during or after Phase 42-03 should be built against `OntologyRegistry` directly. Adding capabilities to `LegacyOntologyAdapter` would widen the migration surface and increase the cost of eventual deprecation.
 
-**Test isolation via mock substitution.** Because `OntologyValidator` and `OntologyClassifier` depend only on the legacy interface, unit tests for those components should substitute a mock adapter rather than instantiating a live `OntologyRegistry`. This is an explicitly supported pattern — it is one of the stated design goals of the ACL. Tests that instantiate a real `OntologyRegistry` are testing more than intended and introduce a hard `@fwornle/km-core` dependency into the unit test surface. The `OntologyConfigManager` singleton's `reset()` method (noted in the sibling context) provides a complementary mechanism for restoring configuration state between tests without process restarts.
+**Treat deprecation as a first-class deliverable.** The adapter's exit condition is well-defined: once `OntologyValidator` and `OntologyClassifier` are updated to consume `OntologyRegistry` directly, the adapter and its child `LegacyInterfaceCompatibilityLayer` should be removed in the same release cycle. Leaving the adapter in place after Phase 42-03 completes would convert migration scaffolding into permanent technical debt and obscure the true dependency structure of the pipeline.
 
-**Changes to `@fwornle/km-core` must be absorbed at the adapter boundary.** When `OntologyRegistry` changes — whether a method rename, a return-type restructure, or a new initialization contract — the correct point of intervention is `AntiCorruptionLayerWrapper`, not the consumers. Updating `OntologyValidator` or `OntologyClassifier` directly in response to upstream `km-core` changes would defeat the entire purpose of the ACL and re-expose those components to future churn.
+**Do not use the adapter as a model for new abstractions.** Its design is correct for a time-bounded migration context, but it is not a general pattern for ontology access within `SemanticAnalysis`. Future ontology integration work should reference the `Ontology` sibling and `OntologyConfigManager` as the stable configuration and definition layer, and `OntologyRegistry` as the runtime access layer.
 
-**Treat the adapter's legacy interface as a formal contract.** Because the field names and method signatures preserved by `LegacyOntologyAdapter` are the interface that downstream components were built against, any modification to that surface is a breaking change for `OntologyValidator` and `OntologyClassifier`. Such changes require coordinated updates across all consumers and should be treated with the same care as a public API version bump.
+**Monitor for config consistency.** Because `OntologyConfigManager` is a singleton governing all pipeline agents, any logic inside the adapter that independently resolves ontology paths or registry endpoints — outside the configuration surface `OntologyConfigManager` controls — risks introducing subtle inconsistencies between what the classifier and validator resolve at runtime. All registry delegation inside `LegacyInterfaceCompatibilityLayer` should respect the configuration state established by `OntologyConfigManager` at batch-run initialization.
+
+---
+
+### Architectural Patterns Identified
+- **Anti-Corruption Layer (ACL):** Core pattern; isolates legacy consumers from upstream API evolution.
+- **Adapter Pattern:** Structural translation between two incompatible interfaces with no behavioral addition.
+- **Seam-based incremental migration:** Enables parallel operation of old and new implementations without a hard cutover.
+
+### Key Design Trade-offs
+| Decision | Benefit | Cost |
+|---|---|---|
+| Explicit Phase 42-03 scope | Prevents adapter from becoming permanent | Requires disciplined deprecation execution |
+| Isolation in a child `LegacyInterfaceCompatibilityLayer` | Keeps translation logic separated from boundary identity | Adds one layer of indirection to trace |
+| No modification to `OntologyValidator`/`OntologyClassifier` | Zero risk to live classification pipeline during migration | Delays full modernization of those consumers |
+
+### Maintainability Assessment
+The component's maintainability risk is low in the short term and high if neglected past its intended lifespan. Its design is clean, its purpose is singular, and its deprecation path is explicit. The primary maintenance risk is organizational: if Phase 42-03 completion criteria are not enforced, the adapter will persist past its useful life and become an opaque indirection layer that obscures how ontology data actually flows through `SemanticAnalysis`.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a batch-analysis pipeline over git history and LSL (vibe) sessions to extract, classify, validate, and persist structured knowledge entities. It coordinates several specialized agents in sequence: git history ingestion, vibe/LSL session ingestion, AST-based code graph construction, semantic LLM analysis, ontology classification, content validation, and insight generation. Each agent is built on a shared `BaseAgent<TInput, TOutput>` abstract class that wraps execution in a standardized `AgentResponse` envelope with confidence scoring, issue detection, routing suggestions, and retry guidance.
-
-The pipeline uses an ontology system backed by `@fwornle/km-core`'s `OntologyRegistry` (accessed via a `LegacyOntologyAdapter` shim) to classify extracted observations into upper/lower ontology classes with configurable heuristic and LLM-assisted classification modes. The `OntologyClassificationAgent` manages lifecycle (initialize → classify → suggest extensions) and attaches `OntologyMetadata` (class, confidence, method, version) to every entity before persistence. Storage was migrated from a legacy `GraphDatabaseAdapter`+`PersistenceAgent` trio to a `KmCoreAdapter` surface in Phase 42.x, with field names preserved for minimal call-site disruption.
-
-Key cross-cutting concerns include: LLM calls routed through `@rapid/llm-proxy`'s `LLMService` with token usage telemetry via `attachTokenLogger`; optional code-graph-rag integration via `CodeGraphAgent` (Tree-sitter AST + Memgraph) that gracefully degrades when the `uv` CLI or Memgraph TCP connection is unavailable; content staleness detection combining reference-pattern regex scanning and git-commit correlation via `GitStalenessDetector`; and trace files written to `logs/` for debugging non-fatally.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
 
 ### Children
-- [AntiCorruptionLayerWrapper](./AntiCorruptionLayerWrapper.md) -- Based on the parent context, LegacyOntologyAdapter acts as an anti-corruption layer (a DDD pattern) ensuring OntologyValidator and OntologyClassifier never directly depend on @fwornle/km-core's OntologyRegistry, isolating them from upstream API changes.
+- [LegacyInterfaceCompatibilityLayer](./LegacyInterfaceCompatibilityLayer.md) -- Since no source files are available, the component's purpose as described in the parent context implies translation logic that maps legacy ontology lookup and classification calls to km-core OntologyRegistry equivalents without touching downstream consumers.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- All pipeline agents extend the shared `BaseAgent<TInput, TOutput>` abstract class, which wraps execution in a standardized `AgentResponse` envelope carrying confidence scores, detected issues, routing suggestions, and retry guidance
-- [Ontology](./Ontology.md) -- `OntologyClassificationAgent` manages a three-phase lifecycle — initialize → classify → suggest extensions — ensuring the ontology registry is ready before any entity is classified and can propose new classes when observed entities don't fit existing ones
-- [Insights](./Insights.md) -- Insight generation is the final sequential stage in the pipeline, operating on fully classified and validated entities produced by upstream agents, making it dependent on the complete ontology metadata attached by `OntologyClassificationAgent`
-- [OntologyConfigManager](./OntologyConfigManager.md) -- `OntologyConfigManager` is implemented as a singleton, meaning all agents and subsystems within a process share one configuration state; the explicit `reset()` method exists specifically to restore defaults between unit tests without restarting the process
+- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/mcp-server-semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
+- [Ontology](./Ontology.md) -- The system maintains a two-level ontology hierarchy (upper/lower) with separate definition files, paths to which are managed by OntologyConfigManager, allowing the classification tier to be reconfigured without code changes
+- [Insights](./Insights.md) -- Insight generation is LLM-driven, operating within the LLM budget constraints configured in OntologyConfigManager, meaning insight depth scales with available token budget per batch run
+- [OntologyConfigManager](./OntologyConfigManager.md) -- Implemented as a singleton to ensure all pipeline agents share identical ontology configuration throughout a batch run, preventing mid-run config drift between classifier and validator instances
 
 
 ---
 
-*Generated from 4 observations*
+*Generated from 5 observations*

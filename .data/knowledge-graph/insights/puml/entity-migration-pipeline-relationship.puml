@@ -7,15 +7,11 @@ title Hierarchy Context: EntityMigrationPipeline
 [EntityMigrationPipeline] as entity_migration_pipeline #LightBlue
 [ManualLearning] as manual_learning #F0F0F0
 [OnlineLearning] as online_learning #F0F0F0
-[KMCoreStore] as kmcore_store #F0F0F0
-[UKBTraceReporter] as ukbtrace_reporter #F0F0F0
-[OntologyClassifier] as ontology_classifier #F0F0F0
+[GraphologyBlobTransformer] as graphology_blob_transformer #E8F5E8
 
 knowledge_management --> entity_migration_pipeline
 manual_learning -[hidden]- entity_migration_pipeline
 online_learning -[hidden]- entity_migration_pipeline
-kmcore_store -[hidden]- entity_migration_pipeline
-ukbtrace_reporter -[hidden]- entity_migration_pipeline
-ontology_classifier -[hidden]- entity_migration_pipeline
+entity_migration_pipeline --> graphology_blob_transformer
 
 @enduml

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { PROCESS_TAGS } from '../../../mcp-server-semantic-analysis/dist/agents/process-tags.js'
 import {
   Dialog,
   DialogContent,
@@ -158,7 +159,8 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
                   </tr>
                 </thead>
                 <tbody>
-                  {data.processes.map(proc => {
+                  {/* Registry-driven rows (from PROCESS_TAGS) */}
+                  {Object.values(PROCESS_TAGS).map(proc => {
                     const override = draft[proc] || {}
                     const provider = override.provider || AUTO
                     const models = provider !== AUTO ? data.settings.providerModels[provider] || [] : []
@@ -217,6 +219,63 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
                       </tr>
                     )
                   })}
+                  {/* Legacy rows — processes seen in API but not in PROCESS_TAGS registry */}
+                  {data.processes
+                    .filter(p => !Object.values(PROCESS_TAGS).includes(p))
+                    .map(proc => {
+                      const override = draft[proc] || {}
+                      const provider = override.provider || AUTO
+                      const models = provider !== AUTO ? data.settings.providerModels[provider] || [] : []
+                      return (
+                        <tr key={proc} className="border-b last:border-b-0 bg-muted/20">
+                          <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{proc}</td>
+                          <td className="px-2 py-1">
+                            <Select
+                              value={provider}
+                              onValueChange={v => {
+                                if (v === AUTO) {
+                                  setOverride(proc, null)
+                                } else {
+                                  const firstModel = data.settings.providerModels[v]?.[0]
+                                  setOverride(proc, { provider: v, model: firstModel })
+                                }
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={AUTO}>(auto-route)</SelectItem>
+                                {data.allProviders.map(p => (
+                                  <SelectItem key={p} value={p} disabled={!data.availableProviders.includes(p)}>
+                                    {p}{!data.availableProviders.includes(p) ? ' (offline)' : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-2 py-1">
+                            {provider === AUTO ? (
+                              <span className="text-xs text-muted-foreground italic px-2">—</span>
+                            ) : (
+                              <Select
+                                value={override.model || ''}
+                                onValueChange={v => setOverride(proc, { provider: override.provider, model: v })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="(default)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {models.map(m => (
+                                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                 </tbody>
               </table>
             </div>

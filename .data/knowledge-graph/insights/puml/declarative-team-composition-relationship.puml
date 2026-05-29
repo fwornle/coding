@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DeclarativeTeamComposition
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[DeclarativeTeamComposition] as declarative_team_composition #LightBlue
+[AgentAdapterPattern] as agent_adapter_pattern #F0F0F0
+[CLIEntryPointPattern] as clientry_point_pattern #F0F0F0
+[ExternalizedConfiguration] as externalized_configuration #F0F0F0
+[AgentAgnosticDesignPrinciple] as agent_agnostic_design_principle #F0F0F0
+[TeamDefinitionSchema] as team_definition_schema #E8F5E8
+
+coding_patterns --> declarative_team_composition
+agent_adapter_pattern -[hidden]- declarative_team_composition
+clientry_point_pattern -[hidden]- declarative_team_composition
+externalized_configuration -[hidden]- declarative_team_composition
+agent_agnostic_design_principle -[hidden]- declarative_team_composition
+declarative_team_composition --> team_definition_schema
+
+@enduml

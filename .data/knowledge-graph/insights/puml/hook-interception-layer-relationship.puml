@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HookInterceptionLayer
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[HookInterceptionLayer] as hook_interception_layer #LightBlue
+[ConstraintDashboard] as constraint_dashboard #F0F0F0
+[ViolationCaptureService] as violation_capture_service #F0F0F0
+[PrePostToolHookModel] as pre_post_tool_hook_model #E8F5E8
+
+constraint_system --> hook_interception_layer
+constraint_dashboard -[hidden]- hook_interception_layer
+violation_capture_service -[hidden]- hook_interception_layer
+hook_interception_layer --> pre_post_tool_hook_model
+
+@enduml

@@ -9,13 +9,13 @@ title Hierarchy Context: LegacyOntologyAdapter
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
 [OntologyConfigManager] as ontology_config_manager #F0F0F0
-[AntiCorruptionLayerWrapper] as anti_corruption_layer_wrapper #E8F5E8
+[LegacyInterfaceCompatibilityLayer] as legacy_interface_compatibility_layer #E8F5E8
 
 semantic_analysis --> legacy_ontology_adapter
 pipeline -[hidden]- legacy_ontology_adapter
 ontology -[hidden]- legacy_ontology_adapter
 insights -[hidden]- legacy_ontology_adapter
 ontology_config_manager -[hidden]- legacy_ontology_adapter
-legacy_ontology_adapter --> anti_corruption_layer_wrapper
+legacy_ontology_adapter --> legacy_interface_compatibility_layer
 
 @enduml

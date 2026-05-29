@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Environment Variables" {
+  component "LLM_PROXY_URL" as llmurl <<external>>
+  component "OPENAI_API_KEY" as oaikey <<external>>
+  component "ANTHROPIC_API_KEY" as anthkey <<external>>
+  component "DOCKER_TIMEOUT" as dockertimeout <<external>>
+}
+
+package "config/ Files (YAML)" {
+  component "Constraint Rules" as constraints <<core>>
+  component "Health Rules" as healthrules <<core>>
+  component "Runtime Configuration" as runtime <<core>>
+}
+
+package "Deployment Layer" {
+  component "Docker Volume Mount" as dockermount <<cli>>
+  component "Environment Override" as envoverride <<cli>>
+}
+
+package "Application Runtime" {
+  component "LLM Integration" as llmint <<api>>
+  component "Health System" as healthsys <<core>>
+  component "Code Quality Engine" as codeq <<core>>
+}
+
+llmurl --> llmint : "resolves"
+oaikey --> llmint : "authenticates"
+anthkey --> llmint : "authenticates"
+dockertimeout --> dockermount : "configures"
+
+constraints --> codeq : "drives"
+healthrules --> healthsys : "drives"
+runtime --> llmint : "configures"
+
+dockermount --> runtime : "injects"
+envoverride --> runtime : "overrides"
+
+@enduml

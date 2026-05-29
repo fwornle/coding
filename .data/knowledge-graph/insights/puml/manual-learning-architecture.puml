@@ -1,27 +1,32 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Manual Input Channel" {
+package "Manual Authoring Layer" {
     component "ManualLearning" as ml <<core>>
+    component "Direct Observation API" as api <<api>>
+}
+
+package "Schema & Identity" {
+    component "EntityTypeRegistry" as etr <<core>>
+    component "UUIDv7 ID Generator" as uuid <<core>>
     component "Provenance Metadata" as prov <<core>>
 }
 
-package "Graph Layer" {
-    component "Graphology In-Memory Graph" as graphology <<storage>>
-    component "GraphDatabaseService" as gds <<api>>
-    database "Knowledge Graph" as kg <<storage>>
+package "Persistence Layer" {
+    component "GraphKMStore" as gkms <<storage>>
+    database "LevelDB" as ldb <<storage>>
 }
 
-package "Lifecycle Management" {
-    component "KnowledgeDecayTracker" as kdt <<core>>
-}
+component "Agent" as agent <<agent>>
+component "KMCoreMigration" as kmcm <<external>>
 
-ml --> prov : "stamps at creation"
-ml --> graphology : "direct write\n(bypasses batch pipeline)"
-ml --> gds : "persists via"
-graphology --> kg : "syncs to"
-gds --> kg : "stores entities\n(System/Project/Pattern)"
-kdt --> kg : "applies validFrom/\nvalidUntil lifecycle"
-prov --> kdt : "supplies timestamps"
+agent --> api : "injects observations"
+api --> ml : "asserts facts"
+ml --> etr : "validates typed attributes"
+ml --> uuid : "generates IDs"
+ml --> prov : "stamps human-authored origin"
+prov ..> kmcm : "contrasts with automated provenance"
+ml --> gkms : "persists entities & edges"
+gkms --> ldb : "writes to backend"
 
 @enduml

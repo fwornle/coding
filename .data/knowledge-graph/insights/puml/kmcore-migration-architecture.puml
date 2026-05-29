@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Legacy Source" {
+  database "LevelDB\n(B-shape records)" as leveldb <<storage>>
+}
+
+package "Migration Pipeline" {
+  component "migrate-leveldb-to-kmcore.mjs" as migscript <<core>>
+  component "UUIDv7 ID Rewriter" as uuidgen <<core>>
+  component "Provenance Stamper" as provenance <<core>>
+  component "Error Budget Enforcer" as errorbudget <<core>>
+}
+
+package "Schema & Registry" {
+  component "EntityTypeRegistry" as registry <<api>>
+  component "km-core Shape Normalizer\n(System/Project/Pattern)" as normalizer <<core>>
+}
+
+package "Write Target" {
+  component "GraphKMStore\n(Graphology/LevelDB)" as graphkmstore <<storage>>
+}
+
+leveldb --> migscript : "reads raw records"
+migscript --> uuidgen : "assigns stable IDs"
+migscript --> provenance : "stamps origin"
+migscript --> errorbudget : "enforces error ratio"
+uuidgen --> normalizer : "ID-stamped records"
+provenance --> normalizer : "provenance-tagged records"
+normalizer --> registry : "typed entities"
+normalizer --> graphkmstore : "writes canonical entities"
+errorbudget --> migscript : "halts on threshold breach"
+
+@enduml

@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ExternalizedConfiguration
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ExternalizedConfiguration] as externalized_configuration #LightBlue
+[AgentAdapterPattern] as agent_adapter_pattern #F0F0F0
+[CLIEntryPointPattern] as clientry_point_pattern #F0F0F0
+[DeclarativeTeamComposition] as declarative_team_composition #F0F0F0
+[AgentAgnosticDesignPrinciple] as agent_agnostic_design_principle #F0F0F0
+[LLMProviderEndpointConfiguration] as llmprovider_endpoint_configuration #E8F5E8
+
+coding_patterns --> externalized_configuration
+agent_adapter_pattern -[hidden]- externalized_configuration
+clientry_point_pattern -[hidden]- externalized_configuration
+declarative_team_composition -[hidden]- externalized_configuration
+agent_agnostic_design_principle -[hidden]- externalized_configuration
+externalized_configuration --> llmprovider_endpoint_configuration
+
+@enduml

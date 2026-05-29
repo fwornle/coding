@@ -1,0 +1,27 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Orchestration Layer" {
+  component "Agent Abstraction API" as api <<api>>
+  component "AGENT_NAME Env Var" as envvar <<core>>
+}
+
+package "Shared Infrastructure" {
+  component "Cross-Project Knowledge" as knowledge <<storage>>
+}
+
+package "Backend Implementations" {
+  component "Claude" as claude <<agent>>
+  component "Copilot" as copilot <<agent>>
+  component "Mastra" as mastra <<agent>>
+  component "OpenCode" as opencode <<agent>>
+}
+
+api --> envvar : "resolves active backend"
+api --> knowledge : "shared state"
+api --> claude : "delegates"
+api --> copilot : "delegates"
+api --> mastra : "delegates"
+api --> opencode : "delegates"
+
+@enduml

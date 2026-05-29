@@ -2,66 +2,55 @@
 
 **Type:** SubComponent
 
-As a singleton-style controller (implied by 'service' naming convention and the PSM singleton pattern described in the parent DockerizedServices), llm-mock-service.ts likely exposes a global mode-get/set interface consumed by agent factory or dispatcher code in the semantic analysis server.
+The local mode in llm-mock-service.ts targets a locally running LLM (possibly via LLM_CLI_PROXY_URL or RAPID_LLM_PROXY_URL environment variables documented in the project), while public mode routes to the external API via OPENAI_API_KEY or ANTHROPIC_API_KEY
 
-# LLMMockService — Technical Insight Document
+# LLMMockService — Technical Reference
 
 ## What It Is
 
-LLMMockService is implemented in `llm-mock-service.ts`, located in the `mock/` subdirectory of the semantic analysis server (under `integrations/mcp-server-semantic-analysis/`). It functions as a SubComponent within the broader DockerizedServices parent, serving as the controller that governs how LLM backends are selected and substituted across the MCP semantic analysis server's agent population. Rather than performing inference itself, it acts as a mode-routing facade that determines whether agents receive responses from a deterministic mock provider, a local model, or a public API endpoint.
-
-The service is governed by three distinct operational modes — `mock`, `local`, and `public` — formally documented in `integrations/mcp-server-semantic-analysis/docs/configuration.md`. These modes can be toggled at runtime without rebuilding the underlying Docker image, making the service a critical configuration surface for operators running the containerized stack. Its placement in the `mock/` subdirectory is deliberate: it isolates this substitution machinery from production LLM routing code, preventing accidental cross-contamination between test scaffolding and live inference paths.
-
-![LLMMockService — Architecture](images/llmmock-service-architecture.png)
+LLMMockService is implemented in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` as a three-mode LLM routing abstraction scoped specifically to the semantic analysis MCP integration. Its placement under the `mock/` subdirectory signals an intentional design boundary: this is not a shared infrastructure utility but a testing and environment-adaptation concern belonging exclusively to the semantic analysis MCP. Within the broader DockerizedServices deployment — which packages the semantic analysis MCP alongside services like code-graph-rag, Memgraph, and Redis under `docker/docker-compose.yml` — LLMMockService provides the seam that allows the semantic analysis component to operate across radically different runtime environments without code changes.
 
 ## Architecture and Design
 
-The architectural approach evident in `llm-mock-service.ts` follows a **singleton-style controller pattern**, consistent with the broader PSM (ProcessStateManager) singleton convention established by the parent DockerizedServices layer. The "service" suffix in its naming is intentional and signals that a single, globally-accessible mode-management instance is consumed by downstream callers — likely the agent factory or dispatcher code within the semantic analysis server. This design ensures that mode changes propagate atomically to all agents that consult the controller, rather than each agent maintaining its own divergent configuration.
+![LLMMockService — Architecture](images/llmmock-service-architecture.png)
 
-A key architectural decision is the **strategy pattern overlay** implied by the three-mode toggle. Each mode (`mock`/`local`/`public`) represents a distinct backend strategy, and the service abstracts the selection logic behind a uniform interface. The mock mode delegates to the child component `MockResponseProvider`, which supplies deterministic responses for offline operation. The local and public modes presumably hand off to real LLM clients, but the routing decision is centralized in `llm-mock-service.ts`.
+The central architectural decision is a **three-mode switcher**: `mock`, `local`, and `public`. This pattern decouples the semantic analysis MCP's core logic from any specific LLM backend, letting the same codebase serve CI pipelines (mock), developer workstations (local), and production deployments (public) through a single configuration boundary. The mode selection is driven by environment variables rather than compile-time branching, which is consistent with the rest of the DockerizedServices philosophy of environment-driven configuration visible across `docker/docker-compose.yml`.
 
-The service also implements a **per-agent override capability**, as documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. This means individual agents can be pinned to a specific LLM mode independent of the global default — a hierarchical configuration model where agent-level settings take precedence over the singleton's global state. This trade-off accepts increased configuration complexity in exchange for fine-grained experimental control, allowing operators to, for instance, run most agents on the public API while pinning a single agent to mock mode for debugging.
-
-## Implementation Details
-
-While the observations do not enumerate specific code symbols within `llm-mock-service.ts`, the design surface can be inferred from its responsibilities. The service almost certainly exposes a global **mode-get/set interface** — methods that read and mutate the current LLM mode — which is the primary contract consumed by agent construction code elsewhere in the MCP server. The singleton instance is the authoritative source of truth for "which backend should an agent use right now."
-
-The substitution mechanics in mock mode rely on the child entity `MockResponseProvider`, which is contained within LLMMockService. This containment relationship means `MockResponseProvider` is invoked by `llm-mock-service.ts` whenever the active mode resolves to `mock`, returning deterministic, reproducible responses suitable for CI environments. The deterministic nature of these responses is what makes fully offline operation viable inside Docker — there is no network egress, no API key, and no nondeterminism that would break snapshot-style test assertions.
+A second architectural concern embedded in LLMMockService is **Docker path resolution**: the service contains logic to adjust file or socket paths depending on whether the process is executing inside a container, bridging the gap between local development layouts and the containerized deployment managed by `docker/Dockerfile.coding-services` and `supervisord.conf`. This mirrors the dual-concern design seen in ServiceProbe, which similarly supports two distinct probe mechanisms (HTTP and TCP) so that different runtime contexts can be accommodated without forking code. The trade-off accepted here is that LLMMockService carries mild environmental awareness — knowledge of "am I in Docker?" — which is a form of infrastructure coupling, but one that is contained within a single file rather than spread across the integration.
 
 ![LLMMockService — Relationship](images/llmmock-service-relationship.png)
 
-Configuration ingestion likely occurs at service initialization, reading values that originate from the environment variables or config files described in `docs/configuration.md`. Because the service must support per-agent overrides, it likely accepts an optional agent identifier when <USER_ID_REDACTED>, returning the effective mode after applying override precedence rules over the global default.
+## Implementation Details
+
+In **mock mode**, LLMMockService returns static or templated responses, eliminating any network dependency on an LLM API. This makes it the correct backend for CI pipelines and integration test suites that need deterministic, credential-free execution of the semantic analysis MCP. The mock responses are presumably shaped to satisfy the same interface contract that the local and public modes return, meaning consuming code in the semantic analysis MCP does not need to branch on which mode is active.
+
+In **local mode**, the service routes requests to a locally running LLM process, most likely addressed via `LLM_CLI_PROXY_URL` or `RAPID_LLM_PROXY_URL` environment variables documented in the project. This mode serves developers who want real LLM inference during development without incurring external API costs or latency. The Docker path resolution logic is most relevant here, since socket or file paths to a local LLM process differ between a host machine and the containerized environment.
+
+In **public mode**, routing targets external APIs — OpenAI via `OPENAI_API_KEY` or Anthropic via `ANTHROPIC_API_KEY`. This is the production path and the only mode that requires external credentials. Separating this from the other modes means that credential requirements are never accidentally imposed on development or CI workflows.
 
 ## Integration Points
 
-The most significant integration is with the **agent layer** of the MCP semantic analysis server. Per `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, agents consult LLMMockService when they need to determine which LLM backend to invoke. This makes the service a foundational dependency for any agent-driven workflow — every inference request implicitly flows through the mode resolution logic before reaching an actual LLM provider.
+LLMMockService lives inside DockerizedServices as part of the semantic analysis MCP service boundary. It does not appear to be consumed by sibling components like ServiceProbe or ServiceStarter, which operate at the infrastructure health and lifecycle layer rather than the LLM routing layer. ServiceStarter's retry-with-backoff pattern handles bringing the semantic analysis MCP process up, and ServiceProbe monitors its health endpoint or TCP port — but neither interacts with LLMMockService's internal routing logic. The dependency boundary is clean: LLMMockService is an internal concern of the semantic analysis MCP, not an infrastructure primitive.
 
-LLMMockService is contained by **DockerizedServices**, which provides the broader containerization and lifecycle management context. The parent's wrapper scripts (`api-service.js`, `dashboard-service.js`) and `lib/service-starter.js` retry logic handle process orchestration, while LLMMockService operates within the running MCP server container as an in-process module. The PSM singleton pattern used elsewhere in DockerizedServices is mirrored here, providing architectural consistency across the suite.
-
-The service contains **MockResponseProvider** as a child component — this is the only direct dependency-down relationship in the current model. MockResponseProvider is invoked exclusively when mock mode is active, and it encapsulates the deterministic response generation that distinguishes mock operation from local or public modes. The remaining backends (local model runners, public API clients) are presumably referenced through other modules that LLMMockService dispatches to, though those are not enumerated in the current observations.
-
-Configuration consumers — including the documentation set under `integrations/mcp-server-semantic-analysis/docs/` — depend on the public mode contract remaining stable. Changes to mode names or override semantics would require coordinated updates across `configuration.md`, `agents.md`, and any agent factory code that constructs mode-aware clients.
+The environment variables `LLM_CLI_PROXY_URL`, `RAPID_LLM_PROXY_URL`, `OPENAI_API_KEY`, and `ANTHROPIC_API_KEY` are the primary external integration points. These are presumably injected via `docker/docker-compose.yml` for containerized runs or via local shell environment for development, consistent with how DockerizedServices manages configuration across its service portfolio.
 
 ## Usage Guidelines
 
-Developers working with LLMMockService should respect its placement in the `mock/` subdirectory: production LLM routing code should not import directly from this module unless it specifically needs to interact with the mode-toggle facade. The isolation is intentional, and bypassing it risks coupling production paths to test scaffolding.
+Developers working on the semantic analysis MCP should default to **mock mode** in CI and automated test environments. This ensures no API credentials are required in pipelines and that test results remain deterministic. The mock mode's static responses should be kept representative of real LLM output shapes so that integration tests catch interface regressions.
 
-When operating the containerized stack, prefer **mock mode for CI pipelines** where external API access may be blocked or where deterministic outputs are required for reproducible test runs. Switching modes does not require a Docker image rebuild — the toggle is a runtime configuration concern, so operators should update environment configuration rather than rebuilding artifacts when changing backends.
+When introducing changes that affect LLM path resolution or mode selection, the Docker path resolution logic inside `llm-mock-service.ts` must be tested both inside and outside the container environment. Because the same file handles both contexts, a change that fixes a local path issue can silently break the containerized deployment managed by `docker/docker-compose.yml` if not validated end-to-end.
 
-For agent authors, use the **per-agent override** capability sparingly. Global mode selection is the default and is easier to reason about; per-agent pinning should be reserved for cases where a specific agent genuinely requires a different backend (for example, a debugging agent that must remain on mock mode regardless of global configuration). Document any per-agent overrides clearly, because they create configuration state that is not visible from the global mode setting alone.
-
-When extending LLMMockService — for instance, adding a new backend mode — ensure that the new mode is documented in `integrations/mcp-server-semantic-analysis/docs/configuration.md` and that the singleton contract is preserved. New modes should follow the existing three-mode pattern (`mock`/`local`/`public`) in spirit: each mode should represent a distinct, well-defined backend strategy rather than a variation of an existing one. If the new mode requires deterministic test substitution, consider implementing a sibling to MockResponseProvider rather than overloading the existing one.
-
-Finally, treat the service as a **lifecycle-aware singleton** in line with the PSM pattern used by DockerizedServices. Mode state should be established during container startup and remain stable through normal operation; mid-flight mode changes are technically supported but should be regarded as an exceptional operation rather than a routine one, since in-flight inference requests may have already committed to a particular backend before the toggle takes effect.
+LLMMockService should not be promoted to a shared utility across other integrations without deliberate architectural review. Its current scoping to `integrations/mcp-server-semantic-analysis/src/mock/` is a correct boundary decision — other integrations may have different LLM routing needs, and centralizing this logic prematurely would create unwanted coupling across services that DockerizedServices currently keeps independent.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices provides the containerization and service lifecycle management layer for the coding project's suite of microservices. It encompasses the MCP semantic analysis server, constraint monitor (API on port 3031, dashboard on port 3030), code-graph-rag integration, and supporting databases (Memgraph, Redis). The architecture uses wrapper scripts (api-service.js, dashboard-service.js) that spawn child processes, register them with a ProcessStateManager (PSM) singleton, and forward OS signals for graceful shutdown. Services are classified as required or optional with retry-with-backoff startup logic handled by lib/service-starter.js.
+- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices provides the containerization layer for the coding infrastructure, packaging services like the semantic analysis MCP, constraint monitor, code-graph-rag, Memgraph, and Redis into a unified Docker Compose deployment. The architecture centers on docker/docker-compose.yml and docker/Dockerfile.coding-services with supervisord.conf managing multiple processes within a container. Service health is verified through two probe mechanisms: HTTP health endpoints and TCP port checks, used by the health coordinator to track service liveness with strict contracts (never returning 'healthy', only 'running'/'stopped'/'unknown').
 
-### Children
-- [MockResponseProvider](./MockResponseProvider.md) -- Based on parent context, llm-mock-service.ts resides in the mock/ subdirectory of the semantic analysis server, indicating intentional isolation from production LLM routing logic.
+### Siblings
+- [ServiceProbe](./ServiceProbe.md) -- ServiceProbe in lib/utils/service-probe.js implements two distinct probe mechanisms: HTTP endpoint checks and TCP port checks, allowing different services to be monitored via their most appropriate protocol
+- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter in lib/service-starter.js implements a retry-with-backoff pattern for service startup, meaning each failed health check attempt waits an increasing delay before retrying rather than polling at a fixed interval
 
 
 ---

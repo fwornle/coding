@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Backend Adapters" {
+    component "Mock Backend" as mock <<external>>
+    component "LLM Backend Adapters" as adapters <<external>>
+}
+
+package "ResponseNormalizer" {
+    component "ResponseNormalizer" as normalizer <<core>>
+    component "Token Usage Normalizer" as tokenNorm <<core>>
+}
+
+package "Normalized Response Schema" {
+    component "content" as content <<api>>
+    component "model" as model <<api>>
+    component "provider" as provider <<api>>
+    component "token_usage" as tokenUsage <<api>>
+}
+
+package "Downstream Consumers" {
+    component "Token Usage Dashboard" as dashboard <<agent>>
+    component "Downstream Agents" as agents <<agent>>
+}
+
+adapters --> normalizer : "native response"
+mock --> normalizer : "synthetic response"
+normalizer --> tokenNorm : "delegates"
+normalizer --> content : "populates"
+normalizer --> model : "populates"
+normalizer --> provider : "populates"
+normalizer --> tokenUsage : "populates"
+tokenNorm --> tokenUsage : "normalizes"
+tokenUsage --> dashboard : "drives"
+provider --> agents : "audit trail"
+model --> agents : "model identity"
+
+@enduml

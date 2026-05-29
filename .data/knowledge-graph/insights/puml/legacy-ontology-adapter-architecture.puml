@@ -1,24 +1,21 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "OntologyClassificationAgent Lifecycle" {
-  component "OntologyClassificationAgent" as agent <<agent>>
+package "Classification & Validation Pipeline" {
   component "OntologyValidator" as validator <<core>>
   component "OntologyClassifier" as classifier <<core>>
 }
 
-package "Anti-Corruption Layer" {
+package "Migration Boundary (Phase 42-03)" {
   component "LegacyOntologyAdapter" as adapter <<api>>
 }
 
-package "km-core (@fwornle/km-core)" {
-  component "OntologyRegistry" as registry <<external>>
+package "km-core" {
+  component "OntologyRegistry" as registry <<core>>
 }
 
-agent --> validator : "uses"
-agent --> classifier : "uses"
-validator --> adapter : "depends on legacy interface"
-classifier --> adapter : "depends on legacy interface"
-adapter --> registry : "delegates to OntologyRegistry.load()"
+validator --> adapter : "legacy interface"
+classifier --> adapter : "legacy interface"
+adapter --> registry : "wraps / translates"
 
 @enduml

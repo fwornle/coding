@@ -1,38 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Adapter Interface Contract" {
-  component "TranscriptAdapter\n(Abstract Base)" as base <<core>>
-  component "getAgentType()" as getType <<api>>
-  component "getTranscriptDirectory()" as getDir <<api>>
-  component "readTranscripts()" as readT <<api>>
-  component "convertToLSL()" as toLSL <<api>>
-  component "getCurrentSession()" as getSession <<api>>
+package "Agent API Layer" {
+  component "TranscriptAdapter\n(Base Class)" as base <<core>>
+  component "TranscriptAdapterRegistry" as registry <<core>>
 }
 
-package "Concrete Adapters" {
-  component "ClaudeAdapter" as claude <<agent>>
-  component "CopilotAdapter" as copilot <<agent>>
-  component "CursorAdapter\n(future)" as cursor <<external>>
-  component "GeminiCLIAdapter\n(future)" as gemini <<external>>
+package "Adapter Contract Methods" {
+  component "getAgentType()" as agentType <<api>>
+  component "getTranscriptDirectory()" as transcriptDir <<api>>
+  component "readTranscripts()" as readTranscripts <<api>>
+  component "convertToLSL()" as convertLSL <<api>>
+  component "getCurrentSession()" as currentSession <<api>>
 }
 
-package "Downstream Consumers" {
-  component "LSL Output Router" as router <<core>>
+package "Polling & Watch System" {
+  component "watchTranscripts()" as watcher <<core>>
+  component "Diff Engine\n(Stable ID Check)" as diff <<core>>
 }
 
-base --> getType : enforces
-base --> getDir : enforces
-base --> readT : enforces
-base --> toLSL : enforces
-base --> getSession : enforces
+component "ClaudeCode Adapter\n('claude-code')" as claudeAdapter <<agent>>
 
-claude --> base : implements
-copilot --> base : implements
-cursor ..> base : planned
-gemini ..> base : planned
+base --> agentType : defines
+base --> transcriptDir : defines
+base --> readTranscripts : defines
+base --> convertLSL : defines
+base --> currentSession : defines
 
-getType --> router : "agent tag\n('claude','copilot')"
-toLSL --> router : "LSL output"
+registry --> base : dispatches via\ngetAgentType()
+registry --> claudeAdapter : registers
+
+claudeAdapter --> base : implements
+
+watcher --> readTranscripts : polls via\nsetInterval
+watcher --> diff : compares results
+diff --> readTranscripts : requires stable\nentry IDs
 
 @enduml

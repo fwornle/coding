@@ -2,60 +2,86 @@
 
 **Type:** SubComponent
 
-The .mcp-sync/ directory path indicates the dashboard integrates with the broader MCP (Model Context Protocol) sync layer used across the Coding toolkit for cross-component state sharing
+docs/constraints/constraint-monitoring-system.md describes the dashboard as reading from a JSON history file maintained by ViolationCaptureService, meaning the dashboard is read-only with no direct write path to violation state
+
+# ConstraintDashboard — Technical Insight Document
 
 ## What It Is
 
-ConstraintDashboard is a SubComponent of the ConstraintSystem that serves as the primary consumer-facing interface for the enforcement pipeline's output. It reads violation data from `.mcp-sync/violation-history.json` — a shared persistence file maintained within the broader MCP (Model Context Protocol) sync layer — and surfaces that data as structured, queryable statistics for monitoring and analysis. The dashboard does not participate in violation detection or enforcement itself; it is a read-oriented reporting layer that transforms raw persisted violation records into meaningful operational views. Its architecture and monitoring responsibilities are documented in `docs/constraints/constraint-monitoring-system.md`.
+The ConstraintDashboard is a read-only visualization subcomponent within the ConstraintSystem, responsible for surfacing violation data accumulated during Claude Code sessions. It is documented across `docs/constraints/README.md` and `docs/constraints/constraint-monitoring-system.md`, with its integration boundary defined by the `.mcp-sync` directory — a shared filesystem location that serves as the handoff point between the live session runtime and the dashboard UI layer.
+
+Rather than participating in the active enforcement pipeline alongside its siblings HookInterceptionLayer and ViolationCaptureService, the ConstraintDashboard sits entirely downstream of that pipeline. It has no write path to violation state and does not receive push notifications from the session. Instead, it operates as a passive consumer of structured files: a JSONL log of individual violation events and a JSON history file maintained by ViolationCaptureService. This positions the dashboard as a pure visualization layer — its role is to parse, interpret, and display what the rest of the ConstraintSystem has already captured and persisted.
+
+Per `docs/architecture/system-overview.md`, the constraint monitoring system is part of the broader Coding infrastructure, meaning the ConstraintDashboard is accessible in the same operational context as other system dashboards, making it a peer UI concern within the wider tooling ecosystem.
+
+---
 
 ## Architecture and Design
 
+The defining architectural decision in the ConstraintDashboard is **file-based decoupling**, encapsulated by its child component FileBasedViolationDecoupling. Rather than coupling the dashboard to any live in-process state or event stream, the design interposes the `.mcp-sync` directory as a stable, filesystem-level integration boundary. This is not an incidental implementation detail — `docs/constraints/constraint-monitoring-system.md` explicitly frames `.mcp-sync` as *the* integration boundary between the dashboard and the rest of the ConstraintSystem.
+
 ![ConstraintDashboard — Architecture](images/constraint-dashboard-architecture.png)
 
-ConstraintDashboard sits at the output end of a pipeline that originates in UnifiedHookManager. The hook manager intercepts agent tool lifecycle events, routes them through registered handlers, and when violations are detected, writes structured records into `.mcp-sync/violation-history.json`. ConstraintDashboard's role is to consume that file. This is a clean separation of concerns: the enforcement pipeline (UnifiedHookManager and its handlers) owns the write path, and ConstraintDashboard owns the read and presentation path.
+This design reflects a deliberate separation-of-concerns trade-off: the dashboard cannot corrupt or interfere with violation state because it has no write access to it. The live session (driven by HookInterceptionLayer's pre-tool and post-tool hook events) produces violations; ViolationCaptureService persists those violations to `.mcp-sync`; the dashboard reads from `.mcp-sync`. The data flow is strictly unidirectional, and the dashboard is isolated from any failure modes in the capture pipeline. If the dashboard crashes or lags, no violations are lost, because the source of truth lives in files written by ViolationCaptureService independently.
 
-The `.mcp-sync/` directory placement is a deliberate architectural decision. By locating the shared state file here rather than in a component-specific path, the system participates in a cross-component state sharing convention used across the broader Coding toolkit. This means ConstraintDashboard is not coupled to a private data store — it reads from a shared sync layer that other components can also write to or read from. The trade-off is that the schema of `violation-history.json` becomes a shared contract that multiple components depend on.
-
-The dashboard contains ViolationHistoryStore as a child component, which encapsulates the mechanics of reading and interpreting the `.mcp-sync/violation-history.json` file. This separation suggests ConstraintDashboard is intentionally layered: ViolationHistoryStore handles data access and persistence concerns, while the dashboard itself handles aggregation, filtering, and presentation logic.
+The pull-based, file-polling model (reading JSONL logs and a JSON history file) rather than a push/event-driven model means the dashboard trades real-time immediacy for architectural simplicity and resilience. This is consistent with an offline-readable, audit-oriented dashboard rather than a live alerting system.
 
 ![ConstraintDashboard — Relationship](images/constraint-dashboard-relationship.png)
 
+---
+
 ## Implementation Details
 
-The violation records stored in `violation-history.json` carry at minimum two enriched metadata fields that make the dashboard's statistical views possible: a **session identifier** and a **severity tier**. Session tagging is applied at capture time by the hook pipeline, enabling ConstraintDashboard to compute per-session statistics — isolating which violations occurred in which Claude Code session. This is particularly valuable in a cross-session persistence model where the history file accumulates records across many independent runs.
+The ConstraintDashboard parses two structured file formats originating from ViolationCaptureService: a JSONL (JSON Lines) log, where each line represents a discrete violation event, and a JSON history file that likely represents an aggregated or indexed view of those violations. The distinction between these two formats suggests the dashboard may support different views — a chronological event stream from the JSONL log, and a summary or filtered view from the JSON history file.
 
-Severity classification is similarly applied upstream at capture time, not at display time. This means the dashboard does not re-evaluate or re-classify violations; it trusts the severity values written into each record by the enforcement pipeline. The presence of multiple severity tiers implies the ConstraintSystem uses a graduated enforcement model, though the specific tier definitions are owned by the capture layer rather than the dashboard.
+The FileBasedViolationDecoupling child component represents the abstraction responsible for mediating access to the `.mcp-sync` directory. Its existence as a named component implies it is more than a simple file read — it likely encapsulates the file path resolution, format parsing, and possibly polling or refresh logic that insulates the rest of the dashboard from direct filesystem concerns.
 
-ViolationHistoryStore manages the interface between ConstraintDashboard and the raw JSON file. Based on its placement as a child component, it likely handles file reads, deserialization, and any indexing or filtering operations needed to serve the dashboard's per-session and per-severity query patterns.
+No code symbols were located in the current analysis sweep, meaning the concrete class names, function signatures, and module paths that implement the parsing and rendering logic are not yet available. The architectural shape is clear from documentation, but the implementation mechanics at the code level remain to be mapped.
+
+---
 
 ## Integration Points
 
-ConstraintDashboard's primary integration is with `.mcp-sync/violation-history.json`, which is written by the UnifiedHookManager pipeline and read by ViolationHistoryStore on the dashboard's behalf. This file is the sole data interface between the enforcement side and the monitoring side of the ConstraintSystem. There is no observed direct coupling between ConstraintDashboard and UnifiedHookManager at the code level — they communicate exclusively through this shared file.
+The ConstraintDashboard's sole integration point with the rest of the ConstraintSystem is the `.mcp-sync` directory, written to by ViolationCaptureService. There is no direct API, function call, or in-memory interface between the dashboard and either ViolationCaptureService or HookInterceptionLayer. This means the dashboard's correctness is entirely dependent on the schema stability of the JSONL and JSON files that ViolationCaptureService produces — any change to those file formats constitutes a breaking change for the dashboard.
 
-The `.mcp-sync/` directory also places ConstraintDashboard in the orbit of any other Coding toolkit components that use the MCP sync layer for cross-component state. This could mean that other tools are capable of reading or contributing to violation history if they conform to the same file schema. The monitoring architecture documentation in `docs/constraints/constraint-monitoring-system.md` is the canonical reference for understanding these integration boundaries and should be consulted when extending either the write path or the dashboard's read logic.
+Within the parent ConstraintSystem, the dashboard is downstream of the entire enforcement pipeline. HookInterceptionLayer captures agent actions and feeds them to ViolationCaptureService, which writes to `.mcp-sync`; only after that write does any data become visible to the dashboard. This pipeline sequencing means the dashboard reflects a slightly lagged view of session activity, bounded by how frequently it reads from the filesystem.
 
-As a sibling to ContentValidationAgent within the ConstraintSystem, ConstraintDashboard operates in a complementary role: ContentValidationAgent uses git history as a staleness signal to flag outdated observations, while ConstraintDashboard uses session-tagged violation history to surface enforcement outcomes. Both are consumers of upstream pipeline outputs rather than active enforcers.
+Per `docs/architecture/system-overview.md`, the dashboard integrates into the broader Coding infrastructure as a peer to other system dashboards, suggesting it shares a display or navigation context with other monitoring UIs, though the specifics of that broader integration surface are outside the ConstraintSystem's own documentation scope.
+
+---
 
 ## Usage Guidelines
 
-Developers working with ConstraintDashboard should treat the schema of `.mcp-sync/violation-history.json` as a shared contract. Any changes to how violations are structured — particularly the session identifier field or severity classification — will directly affect the dashboard's ability to compute its statistics. Schema changes should be coordinated across the hook pipeline (write side) and ViolationHistoryStore (read side) simultaneously.
+Developers working with or extending the ConstraintDashboard should treat the `.mcp-sync` directory as the canonical, immutable interface contract. The dashboard must never write to `.mcp-sync` or any path within it — that write responsibility belongs exclusively to ViolationCaptureService. Any attempt to introduce a write path from the dashboard would violate the architectural isolation that FileBasedViolationDecoupling is designed to enforce.
 
-Because the dashboard relies on severity values assigned at capture time, the accuracy of severity breakdowns is entirely dependent on the classification logic in the enforcement pipeline. If severity tiers are misconfigured or inconsistently applied upstream, the dashboard will surface misleading statistics. Monitoring the dashboard's severity distribution over time is therefore also an indirect signal of enforcement pipeline health.
+When modifying the file formats written by ViolationCaptureService — whether the JSONL log schema or the JSON history file structure — the ConstraintDashboard's parsing logic must be updated in lockstep. Because there is no runtime schema negotiation between the two components (only filesystem files at a shared path), schema drift will produce silent parsing failures rather than explicit errors unless the dashboard implements robust format validation.
 
-The cross-session nature of `violation-history.json` means the file will grow over time. Developers extending ViolationHistoryStore or the dashboard's query logic should consider how large history files affect read performance, and whether pruning or archival conventions need to be established. The `.mcp-sync/` directory convention and the monitoring architecture document in `docs/constraints/constraint-monitoring-system.md` should be the starting points for any such decisions.
+The pull-based design means there is no built-in notification when new violations are written. Any dashboard refresh or live-update behavior must be implemented as explicit polling against the `.mcp-sync` files, with appropriate rate-limiting to avoid filesystem overhead during active sessions. Developers adding features to the dashboard should preserve the read-only, pull-based contract — introducing push channels or callbacks from the capture pipeline would undermine the decoupling that is the dashboard's primary architectural characteristic.
+
+---
+
+## Summary of Design Decisions and Trade-offs
+
+| Decision | Rationale | Trade-off |
+|---|---|---|
+| File-based decoupling via `.mcp-sync` | Isolates dashboard from live session failures | Dashboard reflects lagged, not real-time, state |
+| Read-only dashboard | Prevents corruption of violation state | No interactive remediation from the UI |
+| Pull-based file polling | Architectural simplicity, no event bus needed | Requires explicit refresh logic; no push latency guarantee |
+| Dual-format consumption (JSONL + JSON) | Supports both event-stream and summary views | Schema coupling between ViolationCaptureService and dashboard |
+| Filesystem as integration boundary | Decouples deployment and process lifecycles | Breaking changes are silent without schema versioning |
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a multi-layered enforcement framework that validates code actions and file operations during Claude Code sessions. It operates through a hook-based architecture where the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) intercepts agent tool events (pre-tool, post-tool, etc.) and routes them through registered handlers loaded from user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) configuration files. Violations detected during these checks are captured, persisted, and surfaced through a dashboard for monitoring.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a multi-layered constraint monitoring and enforcement framework that validates code actions, file operations, and tool interactions against configured rules during Claude Code sessions. It operates through a hook-based interception architecture where pre-tool and post-tool hook events capture agent actions, evaluate them against constraint rules, and record violations for persistence and dashboard display. The system bridges live session activity with persistent storage via the ViolationCaptureService, which writes violations to JSONL logs and maintains a JSON history file in the .mcp-sync directory for dashboard consumption.
 
 ### Children
-- [ViolationHistoryStore](./ViolationHistoryStore.md) -- Per parent context, .mcp-sync/violation-history.json serves as the cross-session persistence layer for violation data, placing it in the .mcp-sync directory which is referenced in docs/constraints/constraint-monitoring-system.md as part of the constraint monitoring infrastructure.
+- [FileBasedViolationDecoupling](./FileBasedViolationDecoupling.md) -- docs/constraints/README.md explicitly documents .mcp-sync as the intermediary directory where violation history files are written, establishing a file-based boundary between the live session and the dashboard UI
 
 ### Siblings
-- [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses git history as a staleness signal, comparing recorded entity observations against recent commits to flag observations that predate significant file changes
-- [UnifiedHookManager](./UnifiedHookManager.md) -- UnifiedHookManager lives at lib/agent-api/hooks/hook-manager.js and serves as the single interception point for all agent tool lifecycle events in the ConstraintSystem
+- [ViolationCaptureService](./ViolationCaptureService.md) -- docs/constraints/constraint-monitoring-system.md identifies ViolationCaptureService as the bridge between live session activity and persistent storage, writing to both a JSONL log and a JSON history file
+- [HookInterceptionLayer](./HookInterceptionLayer.md) -- docs/constraints/constraint-monitoring-system.md describes a hook-based interception architecture with distinct pre-tool and post-tool hook events, establishing a two-phase capture model around each tool invocation
 
 
 ---

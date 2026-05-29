@@ -1,52 +1,47 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Agent Layer" {
+package "CLI Entry Points" {
+  component "coding / coding.bat" as cli <<cli>>
+  component "llm / vkb" as llmcli <<cli>>
+}
+
+package "Agent Adapters" {
   component "claude.sh" as claude <<agent>>
   component "copilot.sh" as copilot <<agent>>
   component "mastra.sh" as mastra <<agent>>
   component "opencode.sh" as opencode <<agent>>
-  component "agent-profiles.json" as profiles <<core>>
 }
 
-package "CLI Entrypoints (bin/)" {
-  component "ckb" as ckb <<cli>>
-  component "vkb" as vkb <<cli>>
-  component "llm" as llm <<cli>>
-  component "log-session / graph-sync / status" as misc <<cli>>
-}
-
-package "Configuration & Routing" {
+package "Externalized Configuration" {
   component "llm-providers.yaml" as llmprov <<core>>
-  component "config/teams/" as teams <<core>>
-  component "knowledge-management.json" as kmmgmt <<storage>>
-  component "health-verification-rules.json" as healthrules <<storage>>
+  component "agent-profiles.json" as agentprof <<core>>
+  component "hooks-config.json" as hooks <<core>>
+  component "teams/coding.json\nteams/agentic.json" as teams <<core>>
 }
 
-package "Deployment & Observability" {
-  component "Dockerfile.coding-services" as dockerfile <<external>>
-  component "supervisord.conf + entrypoint.sh" as supervisor <<core>>
-  component "docs/health-system/" as healthdocs <<core>>
-  component "docs/constraints/" as constraints <<core>>
+package "Runtime & Storage" {
+  component "Supervisor Process Manager\n(supervisord.conf)" as supervisor <<core>>
+  component "GraphKMStore\n(graph-database-config.json)" as graphkm <<storage>>
 }
 
-claude --> profiles : registers
-copilot --> profiles : registers
-mastra --> profiles : registers
-opencode --> profiles : registers
+cli --> claude : delegates
+cli --> copilot : delegates
+cli --> mastra : delegates
+cli --> opencode : delegates
+llmcli --> llmprov : routes via
 
-profiles --> teams : resolves team topology
+llmprov --> claude : selects
+llmprov --> copilot : selects
+llmprov --> mastra : selects
+llmprov --> opencode : selects
 
-llm --> llmprov : routes via
-llmprov ..> profiles : selects agent
+agentprof --> claude : configures
+agentprof --> copilot : configures
+hooks --> cli : lifecycle hooks
+teams --> cli : assembles workflows
 
-ckb --> kmmgmt : configured by
-vkb --> kmmgmt : configured by
-
-healthrules --> healthdocs : governs
-healthrules --> constraints : enforces
-
-dockerfile --> supervisor : orchestrates
-supervisor --> profiles : loads agents
+supervisor --> graphkm : manages
+graphkm --> agentprof : persists agent state
 
 @enduml

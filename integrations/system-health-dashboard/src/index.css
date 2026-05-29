@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+.item-progress-badge {
+  font-size: 0.75rem;
+  background: var(--badge-bg, #2a2a3a);
+  color: var(--badge-fg, #8be9fd);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

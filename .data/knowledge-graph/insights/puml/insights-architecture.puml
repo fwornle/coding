@@ -1,31 +1,30 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Upstream Pipeline" {
-    component "OntologyClassificationAgent" as oca <<agent>>
+package "Upstream Configuration" {
+  component "OntologyConfigManager" as ocm <<core>>
+  component "Ontology Classification" as ontClass <<core>>
 }
 
 package "Insights SubComponent" {
-    component "InsightGeneratorAgent" as iga <<agent>>
-    component "PatternCatalogExtractor" as pce <<core>>
-    component "KnowledgeReportAuthor" as kra <<core>>
+  component "Insights Agents" as agents <<agent>>
+  component "Pattern Catalog Extractor" as patCat <<core>>
+  component "Knowledge Report Authoring" as kbReport <<core>>
 }
 
-package "LLM Infrastructure" {
-    component "LLMService" as llm <<external>>
-    component "attachTokenLogger" as atl <<core>>
+package "Observability & Output" {
+  component "Token Usage Dashboard" as tokenDash <<external>>
+  database "Pattern Catalog" as catalog <<storage>>
+  component "Knowledge Report" as report <<storage>>
 }
 
-component "BaseAgent<TInput, TOutput>" as base <<core>>
-component "AgentResponse" as ar <<api>>
-
-oca --> iga : "classified & validated entities"
-base --> iga : "extends"
-iga --> pce : "delegates pattern extraction"
-iga --> kra : "delegates report authoring"
-kra --> llm : "routes LLM calls"
-llm --> atl : "token tracking"
-iga --> ar : "wraps output"
-pce --> ar : "wraps output"
+ocm --> agents : "LLM budget constraints"
+ontClass --> agents : "ontologyClass metadata"
+agents --> patCat : "batch entities"
+agents --> kbReport : "batch findings"
+agents --> tokenDash : "token usage tracking"
+patCat --> catalog : "produces"
+kbReport --> report : "authors"
+catalog ..> ontClass : "informs future classification"
 
 @enduml

@@ -2,79 +2,77 @@
 
 **Type:** SubComponent
 
-The batch analysis pipeline is referenced in docs/architecture-report.md with step-level orchestration (batch-analysis.yaml), suggesting OnlineLearning steps declare explicit depends_on edges to sequence extraction before graph ingestion
+RELEASE-2.0.md (docs/RELEASE-2.0.md) documents the Ontology Integration System, indicating OnlineLearning was extended to emit ontology-classified entity types aligned with the EntityTypeRegistry normalization layer
 
 # OnlineLearning — Technical Insight Document
 
 ## What It Is
 
-OnlineLearning is a SubComponent of KnowledgeManagement responsible for the automated, continuous ingestion of knowledge into the system's graph infrastructure. Unlike its sibling ManualLearning — which manages human-curated facts with explicit provenance protections — OnlineLearning orchestrates the pipeline-driven side of knowledge acquisition, sourcing structured observations from three distinct extraction channels and writing them into GraphDatabaseService (and ultimately the canonical GraphKMStore) after ontology validation.
+OnlineLearning is a SubComponent of KnowledgeManagement responsible for automated, pipeline-driven knowledge extraction and graph population. Unlike its sibling ManualLearning — which sources entities from human-authored inputs marked with human-provenance metadata — OnlineLearning operates through a structured batch-analysis pipeline that ingests machine-readable signals: git history, LSL session data, and source code ASTs. The result is a continuously refreshed stream of entities and relationships written into GraphKMStore, the Graphology/LevelDB storage layer that OnlineLearning directly populates.
 
-The component is described in `docs/architecture/memory-systems.md` and referenced in `docs/architecture-report.md`, with its batch orchestration defined in `batch-analysis.yaml`. Its child component, AutomaticKnowledgeExtraction, implements the actual extraction logic across git history, LSL sessions, and code analysis — the three sources explicitly identified in `docs/architecture/memory-systems.md`.
+The pipeline is scoped to a single repository root, configured via the `CODING_REPO` environment variable, which defines the filesystem boundary for all AST indexing operations. There are no specific source file paths surfaced in code symbols at this time, but the pipeline's behavior is documented across `docs/architecture/memory-systems.md`, `docs/architecture/token-usage.md`, and `docs/RELEASE-2.0.md`.
 
-![OnlineLearning — Architecture](images/online-learning-architecture.png)
+---
 
 ## Architecture and Design
 
-The central architectural decision in OnlineLearning is the separation of **extraction** from **ingestion**, sequenced through explicit `depends_on` edges declared in `batch-analysis.yaml`. This step-level orchestration ensures that AutomaticKnowledgeExtraction completes its typed entity production before any graph write operations occur, avoiding partial or inconsistent states in the knowledge graph. The pipeline structure, as referenced in `docs/architecture-report.md`, positions OnlineLearning as a batch-oriented orchestrator rather than a real-time processor.
+![OnlineLearning — Architecture](images/online-learning-architecture.png)
 
-A second significant design decision is **ontology-gated writing**. Per `docs/RELEASE-2.0.md` (Ontology Integration System), automatically extracted entities must be classified against the ontology schema before they can be written to GraphDatabaseService. This means OnlineLearning includes — or depends on — a resolution step that maps raw extracted entities to known ontology types. This gate prevents schema drift: unrecognized or malformed entity types are rejected before they pollute the graph. This contrasts with how ManualLearning entities enter the system, where human authorship implies a higher trust level and likely a different (or lighter) validation path.
+OnlineLearning is structured as a **DAG-based batch pipeline**, where discrete, ordered stages process different signal sources before committing entities to the knowledge graph. The three primary stages — git history extraction, LSL session analysis, and code analysis — are not interchangeable or concurrent; they represent a deliberate sequencing that mirrors the dependency structure of the knowledge they produce. Code analysis, for instance, depends on a stable repository root, while git history extraction provides temporal provenance context that enriches the resulting entities.
+
+The code-analysis branch of the pipeline is anchored by the `CodeGraphAgent`, which uses **Tree-sitter AST parsing** to index repositories. Tree-sitter provides language-agnostic, incremental parsing, making this branch resilient to multi-language codebases while remaining deterministic in its output shape. This is a meaningful design choice: AST-derived entities carry structural certainty (symbol names, file locations, relationship types) that prose-derived or heuristic extraction cannot guarantee.
+
+A notable architectural extension, documented in `docs/RELEASE-2.0.md` as the **Ontology Integration System**, aligned OnlineLearning's output with the EntityTypeRegistry normalization layer. This means the pipeline does not emit raw or ad-hoc entity types — all extracted entities are classified through the three-type ontology (System / Project / Pattern) before graph insertion. This constraint binds OnlineLearning tightly to its sibling EntityTypeRegistry and ensures that automated extraction cannot introduce type drift that would corrupt downstream graph <USER_ID_REDACTED>.
 
 ![OnlineLearning — Relationship](images/online-learning-relationship.png)
 
-The third key design decision is **provenance stamping**. All entities produced by OnlineLearning carry `source: pipeline` metadata, distinguishing them from `source: human` entities contributed by ManualLearning. This distinction is not cosmetic — it feeds directly into KnowledgeDecayTracker's decay policies. Because KnowledgeDecayTracker uses `validFrom` and `validUntil` fields to manage knowledge expiry without physical deletion, the provenance stamp allows it to apply more aggressive decay schedules to pipeline-generated entities, which may be noisier or more volatile than human-curated facts.
+---
 
 ## Implementation Details
 
-AutomaticKnowledgeExtraction, as OnlineLearning's sole child component, implements the three extraction sources: git history, LSL sessions, and code analysis. Each source produces **typed graph entities** — the typing step is what enables downstream ontology classification. The `batch-analysis.yaml` pipeline sequences these extraction steps, with explicit `depends_on` edges ensuring graph ingestion only begins after extraction is complete.
+The pipeline's LLM-assisted extraction steps are metered through the Token Usage Dashboard (`docs/architecture/token-usage.md`), indicating that at least some extraction stages involve language model inference — likely for entity classification, relationship labeling, or semantic summarization of code constructs that Tree-sitter alone cannot resolve (e.g., inferring that a class represents a "Pattern" rather than merely a "Project" artifact). The token metering implies these steps are budget-aware, and the dashboard provides operational visibility into batch run costs.
 
-The ontology resolution step — described in the Ontology Integration System release notes in `docs/RELEASE-2.0.md` — must occur between extraction and write. Entity types produced by AutomaticKnowledgeExtraction are matched against the ontology schema; only entities that resolve successfully proceed to GraphDatabaseService. This acts as a schema enforcement layer within the pipeline, keeping the graph's type system coherent as new extraction sources or patterns are added.
+The `CODING_REPO` environment variable is the single configuration knob that scopes the entire AST indexer. This makes the pipeline explicitly **repo-scoped** — each invocation operates on one repository root, keeping extraction boundaries clean and avoiding cross-repository entity collisions. This is consistent with the parent KnowledgeManagement component's design, which treats the knowledge graph as a local-first, bounded structure rather than a federated one.
 
-Provenance metadata (`source: pipeline`) is attached at write time, before entities reach GraphDatabaseService. This stamp is what allows KnowledgeDecayTracker and merge operations to differentiate pipeline entities from ManualLearning entities. The sibling ManualLearning component's design explicitly protects human-curated facts from being overwritten by pipeline-generated observations during merges — a protection that relies entirely on this provenance distinction being present and reliable.
+Entity identity within the pipeline is stabilized by the sibling component KMCoreMigration's UUIDv7 scheme. Records extracted by OnlineLearning are assigned time-ordered, stable UUIDv7 identifiers, which means re-runs of the batch pipeline can produce deterministically comparable entity sets rather than accumulating duplicates. The migration script `migrate-leveldb-to-kmcore.mjs` is the mechanism through which raw pipeline output is canonicalized into this identifier space.
 
-Once validated and stamped, entities are written into GraphDatabaseService (the LevelDB/Graphology store managed by the parent KnowledgeManagement component). Migration tooling within KnowledgeManagement can subsequently promote these entities into GraphKMStore, where they receive UUIDv7 identifiers (as described in the GraphKMStore sibling documentation) rather than the legacy ID scheme used by the LevelDB store.
+---
 
 ## Integration Points
 
-**KnowledgeManagement (parent):** OnlineLearning writes into the Graphology/LevelDB graph managed by KnowledgeManagement via GraphDatabaseService. The parent provides the persistence layer; OnlineLearning is the automated write path into it.
+OnlineLearning's most direct downstream dependency is **GraphKMStore**, the child component that owns the Graphology in-memory graph backed by LevelDB. OnlineLearning is the primary writer to this store during batch runs; GraphKMStore exposes the graph surface that all consumers (query layers, the CodeGraphAgent's Memgraph integration) read from.
 
-**AutomaticKnowledgeExtraction (child):** The extraction pipeline — covering git history, LSL sessions, and code analysis — is entirely encapsulated in this child component. OnlineLearning's role is to orchestrate, validate, stamp, and commit what AutomaticKnowledgeExtraction produces.
+The relationship with **EntityTypeRegistry** is a hard constraint: OnlineLearning must route all emitted entity types through the three-type ontology (System / Project / Pattern) before insertion. This normalization gate prevents the automated pipeline from polluting the graph with uncategorized or inconsistently typed nodes, which would degrade the reliability of graph traversals used by the parent KnowledgeManagement infrastructure.
 
-**KnowledgeDecayTracker (sibling):** The `source: pipeline` provenance stamps written by OnlineLearning are consumed by KnowledgeDecayTracker to determine which decay policy applies to each entity. Pipeline-sourced entities may have shorter validity windows than human-sourced ones, reflecting their lower epistemic certainty.
+The CodeGraphAgent serves as both a consumer and a contributor to the pipeline — it uses Tree-sitter to index repositories (feeding OnlineLearning's code-analysis stage) and separately integrates with Memgraph for external graph database <USER_ID_REDACTED>, as described in the KnowledgeManagement parent context. This dual role means changes to the CodeGraphAgent's parsing behavior have direct consequences for the shape and completeness of OnlineLearning's output.
 
-**ManualLearning (sibling):** The merge-protection logic that prevents ManualLearning entities from being overwritten depends on the reliability of OnlineLearning's provenance stamps. These two components represent the two write paths into the knowledge graph, and their provenance metadata must remain mutually exclusive and consistently applied.
-
-**GraphKMStore (sibling):** OnlineLearning writes to GraphDatabaseService first; GraphKMStore receives entities through the migration tooling that KnowledgeManagement manages. UUIDv7 assignment happens at the GraphKMStore layer, not within OnlineLearning's pipeline.
-
-**Batch orchestration (`batch-analysis.yaml`):** The pipeline is scheduled or event-triggered independently of the interactive agent session, as noted in `docs/architecture/cross-project-knowledge.md`. This means OnlineLearning operates as a background process, decoupled from real-time user interactions.
+---
 
 ## Usage Guidelines
 
-**Provenance discipline is non-negotiable.** Any modification to OnlineLearning's write path must preserve the `source: pipeline` stamp on all entities it produces. The downstream behavior of KnowledgeDecayTracker and merge operations in ManualLearning both depend on this distinction being applied uniformly. Introducing a write path that omits or misclassifies provenance will silently corrupt decay scheduling and potentially allow pipeline data to overwrite human knowledge.
+**Repository scoping is mandatory.** The `CODING_REPO` environment variable must be set correctly before any batch run. Because the AST indexer and git history extractor both anchor to this root, an incorrect path will silently produce an empty or partial extraction rather than a visible error — developers should validate this variable as a pre-flight check.
 
-**Ontology classification is a hard gate, not a soft warning.** The Ontology Integration System requirement described in `docs/RELEASE-2.0.md` means that adding a new extraction source to AutomaticKnowledgeExtraction requires ensuring its output entity types are registered in the ontology schema. Entities that fail classification should be rejected or quarantined, not written with a fallback generic type, as this would undermine the type system enforced across the rest of KnowledgeManagement.
+**Stage ordering must be respected.** The DAG-based pipeline model means stages have implicit dependencies. Running code analysis before git history extraction, for example, may produce entities lacking the provenance context that makes them useful for downstream reasoning. The DAG structure should be treated as a contract, not a suggestion.
 
-**Pipeline sequencing via `depends_on` is the consistency mechanism.** The `batch-analysis.yaml` step dependencies are not merely organizational — they are the primary guard against partial graph states. Any extension or modification to the pipeline should maintain strict extraction-before-ingestion ordering. Parallelizing steps across this boundary would risk writing incomplete or unclassified entities into GraphDatabaseService.
+**LLM steps incur token costs.** Because batch runs are metered (per `docs/architecture/token-usage.md`), developers should avoid triggering full pipeline re-runs unnecessarily. Incremental or scoped runs — where only changed files or new commits are processed — are preferable to full re-indexing when the repository has not changed substantially.
 
-**Background scheduling must account for session isolation.** Because `docs/architecture/cross-project-knowledge.md` describes OnlineLearning as a continuous background process separate from the interactive agent session, care must be taken to avoid write contention with session-driven operations on GraphDatabaseService. The LevelDB backing store used by KnowledgeManagement may have locking constraints that need to be respected when scheduling pipeline runs relative to active agent sessions.
-
-**Scalability note:** The three current extraction sources (git history, LSL sessions, code analysis) represent distinct data volumes and update frequencies. Git history is largely append-only and grows slowly; code analysis may produce large volumes on significant refactors; LSL sessions are bounded by interaction frequency. Pipeline scheduling should account for these different cadences rather than treating all three as uniform batch jobs.
+**Ontology compliance is non-negotiable.** Any extension to OnlineLearning's extraction logic must emit entities that resolve cleanly through EntityTypeRegistry's three-type surface. Introducing new entity type strings without updating the registry will cause classification failures at the normalization layer, potentially blocking graph insertion entirely. Coordinate with the EntityTypeRegistry before adding new entity categories to the pipeline.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing entity storage, querying, and lifecycle management. It uses a Graphology in-memory graph backed by LevelDB for persistence, storing entities with typed attributes (System, Project, Pattern) and relationships. The system supports multiple knowledge stores: a local LevelDB/Graphology store (GraphDatabaseService) and a canonical km-core shape store (GraphKMStore), with migration tooling to move between them.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing persistent storage, entity lifecycle management, and graph query capabilities. It is built on a Graphology in-memory graph with LevelDB as the persistence backend, exposing entities with typed attributes (System, Project, Pattern) and relationships. The system supports both local graph operations and integration with external graph databases like Memgraph via the CodeGraphAgent, which uses Tree-sitter AST parsing to index repositories into a queryable knowledge graph.
 
 ### Children
-- [AutomaticKnowledgeExtraction](./AutomaticKnowledgeExtraction.md) -- docs/architecture/memory-systems.md explicitly identifies git history, LSL sessions, and code analysis as the three automatic extraction sources feeding OnlineLearning
+- [GraphKMStore](./GraphKMStore.md) -- docs/architecture/memory-systems.md describes the Graph-Based Knowledge Storage Architecture that OnlineLearning populates, with Graphology as the in-memory layer backed by LevelDB
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are distinguished from automatically extracted knowledge by provenance metadata, ensuring human-curated facts are not overwritten by pipeline-generated observations during merge operations
-- [GraphKMStore](./GraphKMStore.md) -- GraphKMStore uses UUIDv7 entity IDs (time-ordered UUIDs) rather than the legacy IDs used by GraphDatabaseService/LevelDB, enabling chronological ordering and distributed ID generation without coordination
-- [KnowledgeDecayTracker](./KnowledgeDecayTracker.md) -- KnowledgeDecayTracker attaches validFrom and validUntil fields to each entity, enabling time-range <USER_ID_REDACTED> that exclude expired knowledge without physically deleting records from the Graphology graph
+- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are distinguished by provenance metadata that marks their origin as human-authored, contrasting with the automated pipeline provenance stamps applied by KMCoreMigration
+- [KMCoreMigration](./KMCoreMigration.md) -- The migration script migrate-leveldb-to-kmcore.mjs reads raw LevelDB B-shape records and rewrites them with UUIDv7 identifiers, providing stable, time-ordered IDs for all canonical entities
+- [EntityTypeRegistry](./EntityTypeRegistry.md) -- EntityTypeRegistry enforces a three-type ontology (System/Project/Pattern) as the canonical classification surface, with all incoming entity types mapped through this consolidation layer before graph insertion
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

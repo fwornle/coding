@@ -1,38 +1,33 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Agent Adapters" {
-  component "TranscriptAdapter" as adapter <<api>>
-  component "ClaudeCodeAdapter" as claude <<agent>>
+left to right direction
+
+package "Ingestion Layer" {
+  component "TranscriptAdapter" as ta <<api>>
+  component "LSLConverter" as conv <<core>>
 }
 
-package "LSL Core" {
-  component "LSLConverter" as converter <<core>>
-  component "LSLConfigValidator" as validator <<core>>
-  component "watchTranscripts()" as watcher <<core>>
+package "Configuration & Validation" {
+  component "LSLConfigValidator" as val <<cli>>
+  component "lsl-config.json" as cfg <<storage>>
+  component "redaction-config.yaml" as red <<storage>>
 }
 
-package "Semantic Analysis" {
-  component "OntologyClassificationAgent" as ontology <<agent>>
-  component "AsyncLoggingSubsystem" as asynclog <<core>>
+package "Semantic Analysis Backend" {
+  component "SemanticLoggingBackend" as slb <<core>>
+  component "OntologyClassificationAgent" as oca <<agent>>
 }
 
-package "Storage" {
-  database "LSL Log Files\n(by userHash/project/timeWindow)" as logfiles <<storage>>
-  database "Semantic Analysis Logs\n(CODING_REPO/.data/logs)" as semlogs <<storage>>
-}
+database "LSL Session Files" as lsl <<storage>>
 
-component "LSLConfigValidator\n(lsl-config.json\nredaction-config.yaml)" as config <<external>>
-
-claude --> adapter : implements
-adapter --> watcher : readTranscripts()
-watcher --> converter : raw entries
-converter --> logfiles : toMarkdown()\ntoJSONL()
-validator --> converter : validates config\n& redaction rules
-config --> validator : reads
-
-converter --> ontology : LSL typed entries
-ontology --> asynclog : classification results
-asynclog --> semlogs : buffered writes\n(50 entries / 100ms)
+ta --> conv : "convertToLSL()"
+conv --> lsl : "toMarkdown() / toJSONL()"
+val --> cfg : "validates"
+val --> red : "validates"
+red ..> conv : "PII redaction gates"
+conv --> slb : "normalized LSL records"
+slb --> oca : "raw observations"
+oca --> lsl : "persists OntologyMetadata"
 
 @enduml

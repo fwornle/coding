@@ -1,55 +1,51 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Docker Compose Environment" {
+package "Docker Compose Deployment" {
   component "docker-compose.yml" as compose <<core>>
   component "Dockerfile.coding-services" as dockerfile <<core>>
   component "supervisord.conf" as supervisord <<core>>
-  component "entrypoint.sh" as entrypoint <<cli>>
 }
 
-package "Co-located Services (single container)" {
+package "Containerized Services" {
   component "Semantic Analysis MCP" as mcp <<api>>
-  component "Constraint Monitor API\n:3031" as constraintApi <<api>>
-  component "Next.js Dashboard\n:3030" as dashboard <<api>>
+  component "Constraint Monitor API\n(port 3031)" as constraint <<api>>
+  component "Next.js Dashboard\n(port 3030)" as dashboard <<api>>
   component "code-graph-rag" as rag <<core>>
+  database "Memgraph" as memgraph <<storage>>
+  database "Redis" as redis <<storage>>
 }
 
-package "Infrastructure" {
-  database "Memgraph\n(Bolt TCP)" as memgraph <<storage>>
-  database "Redis\n(TCP cache)" as redis <<storage>>
-}
-
-package "Service Lifecycle" {
-  component "service-starter.js\n(retry + backoff)" as starter <<core>>
-  component "service-probe.js\n(HTTP / TCP probes)" as probe <<core>>
+package "Process Management" {
   component "ProcessStateManager" as psm <<core>>
+  component "service-starter.js\n(retry + backoff)" as starter <<core>>
+  component "service-probe.js\n(running/stopped/unknown)" as probe <<core>>
+}
+
+package "LLM Mode Control" {
+  component "llm-mock-service.ts" as llmmock <<core>>
+  component "workflow-progress.json" as wpjson <<storage>>
 }
 
 compose --> dockerfile : builds
-compose --> memgraph : orchestrates
-compose --> redis : orchestrates
-dockerfile --> entrypoint : runs
-entrypoint --> supervisord : delegates supervision
+dockerfile --> supervisord : managed by
+supervisord --> mcp : spawns
+supervisord --> constraint : spawns
+supervisord --> dashboard : spawns
+supervisord --> rag : spawns
 
-supervisord --> mcp : manages
-supervisord --> constraintApi : manages
-supervisord --> dashboard : manages
-supervisord --> rag : manages
-
-starter --> probe : uses
-starter --> memgraph : waits for (TCP)
-starter --> redis : waits for (TCP)
-probe --> memgraph : probeTcpPort()
-probe --> redis : probeTcpPort()
-probe --> mcp : probeHttpHealth()
-
-constraintApi --> psm : registers
+constraint --> psm : registers
 dashboard --> psm : registers
-dashboard ..> constraintApi : "http://localhost:3031"
+psm --> starter : delegates lifecycle
+starter --> probe : health check
+probe ..> constraint : TCP/HTTP check
+probe ..> mcp : TCP/HTTP check
 
-mcp --> memgraph : graph queries
-rag --> memgraph : graph queries
-mcp --> redis : caching
+mcp --> memgraph : queries
+rag --> memgraph : queries
+mcp --> redis : caches
+
+llmmock --> wpjson : reads/writes llmState
+llmmock ..> mcp : path translation via CODING_ROOT
 
 @enduml

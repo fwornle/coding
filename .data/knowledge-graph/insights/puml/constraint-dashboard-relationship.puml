@@ -5,13 +5,13 @@ title Hierarchy Context: ConstraintDashboard
 
 [ConstraintSystem] as constraint_system #FFFFDD
 [ConstraintDashboard] as constraint_dashboard #LightBlue
-[ContentValidationAgent] as content_validation_agent #F0F0F0
-[UnifiedHookManager] as unified_hook_manager #F0F0F0
-[ViolationHistoryStore] as violation_history_store #E8F5E8
+[ViolationCaptureService] as violation_capture_service #F0F0F0
+[HookInterceptionLayer] as hook_interception_layer #F0F0F0
+[FileBasedViolationDecoupling] as file_based_violation_decoupling #E8F5E8
 
 constraint_system --> constraint_dashboard
-content_validation_agent -[hidden]- constraint_dashboard
-unified_hook_manager -[hidden]- constraint_dashboard
-constraint_dashboard --> violation_history_store
+violation_capture_service -[hidden]- constraint_dashboard
+hook_interception_layer -[hidden]- constraint_dashboard
+constraint_dashboard --> file_based_violation_decoupling
 
 @enduml

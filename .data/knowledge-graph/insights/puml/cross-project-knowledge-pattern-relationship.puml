@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CrossProjectKnowledgePattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[CrossProjectKnowledgePattern] as cross_project_knowledge_pattern #LightBlue
+[AgentAbstractionPattern] as agent_abstraction_pattern #F0F0F0
+[ConstraintEnforcementSystem] as constraint_enforcement_system #F0F0F0
+[GraphKMStore] as graph_kmstore #E8F5E8
+[CrossProjectTaggingConvention] as cross_project_tagging_convention #E8F5E8
+
+coding_patterns --> cross_project_knowledge_pattern
+agent_abstraction_pattern -[hidden]- cross_project_knowledge_pattern
+constraint_enforcement_system -[hidden]- cross_project_knowledge_pattern
+cross_project_knowledge_pattern --> graph_kmstore
+cross_project_knowledge_pattern --> cross_project_tagging_convention
+
+@enduml

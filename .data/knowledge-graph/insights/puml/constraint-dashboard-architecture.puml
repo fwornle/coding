@@ -1,30 +1,24 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Enforcement Pipeline" {
-  component "Hook Pipeline" as hooks <<core>>
-  component "Violation Classifier" as classifier <<core>>
+package "Constraint System" {
+  component "ViolationCaptureService" as vcs <<core>>
+  component "ConstraintMonitor" as cm <<core>>
 }
 
-package "MCP Sync Layer" {
-  database "violation-history.json" as violationDB <<storage>>
+package ".mcp-sync (Integration Boundary)" {
+  database "JSON History File" as jsonHistory <<storage>>
+  database "JSONL Logs" as jsonlLogs <<storage>>
 }
 
-package "ConstraintDashboard" {
+package "Visualization Layer" {
   component "ConstraintDashboard" as dashboard <<cli>>
-  component "Session Statistics" as sessionStats <<core>>
-  component "Severity Breakdown" as severityView <<core>>
 }
 
-package "Documentation" {
-  component "constraint-monitoring-system.md" as docs <<external>>
-}
-
-hooks --> classifier : classifies
-classifier --> violationDB : writes tagged violations
-violationDB --> dashboard : reads history
-dashboard --> sessionStats : surfaces
-dashboard --> severityView : surfaces
-docs ..> dashboard : documents
+cm --> vcs : "triggers"
+vcs --> jsonHistory : "writes violation history"
+vcs --> jsonlLogs : "writes log entries"
+jsonHistory --> dashboard : "read-only"
+jsonlLogs --> dashboard : "parses structured logs"
 
 @enduml

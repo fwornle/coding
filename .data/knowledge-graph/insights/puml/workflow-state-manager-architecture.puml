@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "State Management" {
+    database "workflow-progress.json" as stateFile <<storage>>
+    component "WorkflowStateManager" as wsm <<core>>
+}
+
+package "Mode Routing" {
+    component "Global Override" as globalOverride <<core>>
+    component "Per-Agent Override" as agentOverride <<core>>
+}
+
+package "LLM Providers" {
+    component "Mock Service" as mock <<external>>
+    component "DMR (Local)" as dmr <<external>>
+    cloud "Cloud APIs (Public)" as cloud <<external>>
+}
+
+package "Agent Runtime" {
+    component "Agent Instance" as agent <<agent>>
+    component "AGENT_NAME Env Var" as envVar <<cli>>
+}
+
+stateFile --> wsm : "read on each LLM call"
+wsm --> globalOverride : "resolves"
+wsm --> agentOverride : "resolves"
+envVar --> agentOverride : "keys override lookup"
+agent --> envVar : "identifies via"
+agentOverride --> agent : "routes"
+globalOverride --> mock : "mode=mock"
+globalOverride --> dmr : "mode=local"
+globalOverride --> cloud : "mode=public"
+agentOverride --> mock : "mode=mock"
+agentOverride --> dmr : "mode=local"
+agentOverride --> cloud : "mode=public"
+
+@enduml

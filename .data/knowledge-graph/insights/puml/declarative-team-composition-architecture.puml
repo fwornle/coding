@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Configuration Layer" {
+    component "config/teams/ JSON Files" as teamJson <<storage>>
+    component "LLM Provider Configs" as llmConfig <<storage>>
+    component "Health Rule Configs" as healthConfig <<storage>>
+}
+
+package "Declarative Team Composition" {
+    component "DeclarativeTeamComposition" as dtc <<core>>
+    component "Agent Role Definitions" as agentRoles <<core>>
+    component "Ontology Metadata" as ontology <<core>>
+}
+
+package "Runtime Orchestration" {
+    component "Multi-Agent Workflow Engine" as workflowEngine <<api>>
+    component "Agent-Agnostic Orchestrator" as orchestrator <<core>>
+}
+
+package "Agent Backends" {
+    component "Agent Instance A" as agentA <<agent>>
+    component "Agent Instance B" as agentB <<agent>>
+}
+
+teamJson --> dtc : defines
+ontology --> agentRoles : classifies
+agentRoles --> dtc : composes
+dtc --> orchestrator : configures
+llmConfig ..> orchestrator : provides
+healthConfig ..> orchestrator : governs
+orchestrator --> workflowEngine : drives
+workflowEngine --> agentA : dispatches
+workflowEngine --> agentB : dispatches
+
+@enduml

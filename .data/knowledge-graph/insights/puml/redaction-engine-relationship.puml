@@ -7,11 +7,11 @@ title Hierarchy Context: RedactionEngine
 [RedactionEngine] as redaction_engine #LightBlue
 [SessionWindowManager] as session_window_manager #F0F0F0
 [TranscriptAdapterRegistry] as transcript_adapter_registry #F0F0F0
-[RedactionConfigLoader] as redaction_config_loader #E8F5E8
+[PatternSanitizer] as pattern_sanitizer #E8F5E8
 
 live_logging_system --> redaction_engine
 session_window_manager -[hidden]- redaction_engine
 transcript_adapter_registry -[hidden]- redaction_engine
-redaction_engine --> redaction_config_loader
+redaction_engine --> pattern_sanitizer
 
 @enduml

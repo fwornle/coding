@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: WorkflowStateManager
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[WorkflowStateManager] as workflow_state_manager #LightBlue
+[ProviderRouter] as provider_router #F0F0F0
+[ResponseNormalizer] as response_normalizer #F0F0F0
+[PublicCloudAdapters] as public_cloud_adapters #F0F0F0
+
+llmabstraction --> workflow_state_manager
+provider_router -[hidden]- workflow_state_manager
+response_normalizer -[hidden]- workflow_state_manager
+public_cloud_adapters -[hidden]- workflow_state_manager
+
+@enduml

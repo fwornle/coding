@@ -6,14 +6,14 @@ title Hierarchy Context: OnlineLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [OnlineLearning] as online_learning #LightBlue
 [ManualLearning] as manual_learning #F0F0F0
-[GraphKMStore] as graph_kmstore #F0F0F0
-[KnowledgeDecayTracker] as knowledge_decay_tracker #F0F0F0
-[AutomaticKnowledgeExtraction] as automatic_knowledge_extraction #E8F5E8
+[KMCoreMigration] as kmcore_migration #F0F0F0
+[EntityTypeRegistry] as entity_type_registry #F0F0F0
+[GraphKMStore] as graph_kmstore #E8F5E8
 
 knowledge_management --> online_learning
 manual_learning -[hidden]- online_learning
-graph_kmstore -[hidden]- online_learning
-knowledge_decay_tracker -[hidden]- online_learning
-online_learning --> automatic_knowledge_extraction
+kmcore_migration -[hidden]- online_learning
+entity_type_registry -[hidden]- online_learning
+online_learning --> graph_kmstore
 
 @enduml

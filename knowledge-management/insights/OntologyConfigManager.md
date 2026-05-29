@@ -1,77 +1,92 @@
 # OntologyConfigManager
 
-**Type:** SubComponent
+**Type:** Detail
 
-`OntologyConfigManager` is implemented as a singleton, meaning all agents and subsystems within a process share one configuration state; the explicit `reset()` method exists specifically to restore defaults between unit tests without restarting the process
+Based on docs/RELEASE-2.0.md ('Release 2.0 - Ontology Integration System'), the ontology integration was introduced as a versioned release, suggesting OntologyConfigManager was a deliberate architectural addition to support swappable ontology files.
 
-# OntologyConfigManager — Technical Reference
+# OntologyConfigManager — Technical Insight Document
+
+---
 
 ## What It Is
 
-`OntologyConfigManager` is a singleton configuration hub living inside the `SemanticAnalysis` component (`integrations/mcp-server-semantic-analysis`). It serves as the single authoritative source for every tunable parameter that governs ontology loading and classification behavior: the file-system paths to upper and lower ontology definition files, classification confidence thresholds, and the LLM token-budget cap consulted by `OntologyClassificationAgent`. Because it is a singleton, every agent and subsystem sharing a process sees the same configuration state — a deliberate design choice that makes cross-agent behavior predictable without requiring each agent to independently read or negotiate configuration.
+`OntologyConfigManager` is a configuration management component residing within the `Ontology` sub-component of the broader `SemanticAnalysis` system. Its primary responsibility is to decouple ontology file paths from application code, enabling the two-tier ontology hierarchy — upper and lower — to be reconfigured at runtime without requiring code changes. This makes it the authoritative registry for resolving *where* ontology definitions live on disk, separating that concern entirely from the logic that consumes those definitions.
 
-![OntologyConfigManager — Architecture](images/ontology-config-manager-architecture.png)
+`OntologyConfigManager` directly owns a child component, `SingletonOntologyConfig`, which is the concrete runtime representation of the loaded configuration state. Together, these two components form the configuration layer that underpins the `TwoLevelOntologyHierarchy`, its sibling component within the `Ontology` sub-component.
+
+---
 
 ## Architecture and Design
 
-The dominant pattern is the **singleton with explicit test-reset**, captured in the child component `SingletonResetPattern`. The singleton ensures that runtime configuration changes — such as swapping ontology file paths or adjusting a confidence threshold — propagate immediately to all consumers without passing a config object through every call chain. The trade-off accepted here is that global mutable state requires discipline: any agent that modifies configuration affects every other agent in the same process. The `reset()` method exists precisely to contain this risk in testing contexts, restoring defaults between unit tests without a full process restart.
+### Decoupling via Configuration Indirection
 
-The design also embeds **hot-reload** semantics. Ontology definition files can be updated on disk and picked up by the running MCP server process, which is especially valuable during iterative ontology development sessions where an analyst is actively refining the upper/lower ontology hierarchy. This means `OntologyConfigManager` must hold not just the path strings but also the reload trigger mechanism — making it responsible for both path configuration and file-watching lifecycle.
+The central architectural insight of `OntologyConfigManager` is **path indirection**: rather than hardcoding references to ontology definition files within classifier or validator logic, all file path resolution flows through this manager. This mirrors a classic *configuration object* pattern, where a dedicated component owns all environment-sensitive values, and the rest of the system treats those values as injected dependencies. The practical consequence is that swapping ontology files — for instance, upgrading the lower ontology to a new domain-specific taxonomy — requires only a configuration change, not a code deployment.
 
-![OntologyConfigManager — Relationship](images/ontology-config-manager-relationship.png)
+This design was a deliberate architectural addition, introduced as part of the versioned Release 2.0 Ontology Integration System (documented in `docs/RELEASE-2.0.md`). The versioned release framing signals that the team consciously recognized the need for ontology *swappability* as a first-class requirement, and built `OntologyConfigManager` as the mechanism to fulfill it, rather than retrofitting ad-hoc path management later.
 
-The placement of `OntologyConfigManager` inside `SemanticAnalysis` — as a sibling to `Pipeline`, `Ontology`, `Insights`, and `LegacyOntologyAdapter` — reflects a deliberate separation: pipeline execution logic and classification logic are kept independent of configuration concerns. `OntologyClassificationAgent` (the core of the `Ontology` sibling component) consults `OntologyConfigManager` for its LLM budget cap and confidence thresholds but contains no hardcoded tuning values itself.
+### Two-Path Configuration Model
+
+Because the system maintains a `TwoLevelOntologyHierarchy` — with upper-level ontologies covering broad categorical classifications and lower-level ontologies covering domain-specific definitions — `OntologyConfigManager` necessarily holds at least two distinct path configurations. This mirrors the structural split in its sibling component: the upper and lower tiers are treated as independently configurable units. A developer can therefore update the lower ontology (e.g., swapping in a new domain vocabulary) without touching the upper ontology (e.g., broad entity type classifications), and vice versa.
+
+### Singleton Enforcement for Config Stability
+
+The most significant design decision embedded in this component is the use of the **Singleton pattern**, implemented through its child `SingletonOntologyConfig`. The motivation is explicitly tied to batch run lifecycle: preventing *mid-run config drift* between classifier and validator instances. In a system where multiple components (`SemanticAnalysis` classifiers, validators) may independently attempt to access ontology configuration, a non-singleton approach risks a scenario where one instance loads one version of the config while another loads a different state — a subtle but serious correctness hazard in batch processing. The singleton enforces that all consumers within a run share a single, consistent configuration snapshot.
+
+This is a deliberate trade-off: the singleton sacrifices some flexibility (e.g., running two parallel batch jobs with different ontology configs in the same process would be difficult) in exchange for strong consistency guarantees within a single run's lifecycle.
+
+---
 
 ## Implementation Details
 
-**Ontology file path ownership.** `OntologyConfigManager` holds the canonical paths to both the upper and lower ontology definition files. This indirection means that changing where ontology definitions live requires modifying only this manager, not the agents or the `LegacyOntologyAdapter` shim that wraps `@fwornle/km-core`'s `OntologyRegistry`. The `LegacyOntologyAdapter` benefits from this because it can load or reload registry content by querying `OntologyConfigManager` for the current paths rather than embedding them in adapter logic.
+### OntologyConfigManager
 
-**Classification thresholds.** The minimum confidence score required to accept a heuristic classification — as opposed to escalating to an LLM-assisted call — lives here. This is a significant design decision: by centralizing this threshold, the system allows <USER_ID_REDACTED> tuning to happen in one place rather than being scattered across individual agent implementations. The `OntologyClassificationAgent`'s three-phase lifecycle (initialize → classify → suggest extensions) depends on this threshold to decide, during the classify phase, whether heuristic confidence is sufficient or whether an LLM call is warranted.
+`OntologyConfigManager` acts as the public interface for retrieving ontology path configurations. Based on the two-tier hierarchy, it is expected to expose — at minimum — separate accessors or configuration slots for the upper ontology path and the lower ontology path. These paths point to the definition files consumed by the `TwoLevelOntologyHierarchy` at classification time.
 
-**LLM budget cap.** The token-spend ceiling stored in `OntologyConfigManager` acts as a guard consulted by `OntologyClassificationAgent` before each LLM-assisted classification call. This is particularly important during large batch runs over git history or vibe/LSL sessions, where the number of entities requiring classification can be large. Without this cap, LLM calls routed through `@rapid/llm-proxy`'s `LLMService` (with token usage telemetry via `attachTokenLogger`) could accumulate unbounded cost.
+> **Note:** No code symbols or specific file paths were surfaced in the available observations. The mechanics described here are grounded in the structural and behavioral descriptions provided. Developers should inspect the actual source files for precise method signatures and path resolution logic.
 
-**The `SingletonResetPattern`.** The explicit `reset()` method is a concession to testability. Because the singleton is process-wide, tests that modify thresholds, paths, or budget caps would otherwise pollute subsequent tests. `reset()` makes the singleton safe to use in unit test suites without forking processes.
+### SingletonOntologyConfig
+
+`SingletonOntologyConfig` is the child component owned by `OntologyConfigManager` and represents the singleton-enforced, loaded state of the configuration. Its singleton nature means it is instantiated once — at the start of a batch run — and that same instance is returned to all subsequent consumers. The explicit design goal, as documented in its description, is to prevent classifier and validator instances from operating with divergent configuration states during a run. This implies that `SingletonOntologyConfig` likely implements a standard singleton guard (e.g., a class-level instance check or a module-level cached instance, depending on the implementation language), and that `OntologyConfigManager` delegates to it for all actual config state storage and retrieval.
+
+The relationship between `OntologyConfigManager` and `SingletonOntologyConfig` follows a **Facade + Singleton** compound pattern: `OntologyConfigManager` provides the semantic interface (e.g., `get_upper_ontology_path()`, `get_lower_ontology_path()`), while `SingletonOntologyConfig` provides the underlying singleton state management. This separation means the singleton mechanics are encapsulated away from callers, who only interact with the manager's interface.
+
+---
 
 ## Integration Points
 
-`OntologyConfigManager` sits at the intersection of three active consumers within `SemanticAnalysis`:
+`OntologyConfigManager` sits at the intersection of two containing systems: `SemanticAnalysis` (the broader analysis pipeline) and `Ontology` (the ontology management sub-component). Within `Ontology`, it is the sibling of `TwoLevelOntologyHierarchy` — meaning the hierarchy component depends on paths that `OntologyConfigManager` resolves, but the two are architecturally separated: the hierarchy defines *structure and logic*, while the config manager defines *file locations*.
 
-1. **`OntologyClassificationAgent`** (via the `Ontology` component) — reads the confidence threshold to decide heuristic-vs-LLM routing, and reads the LLM budget cap before spending tokens.
-2. **`LegacyOntologyAdapter`** — depends on the file paths owned by `OntologyConfigManager` to load upper and lower ontology definitions into the `OntologyRegistry` from `@fwornle/km-core`.
-3. **The `Insights` component** — indirectly dependent, because insight generation operates on entities that carry `OntologyMetadata` (class, confidence, method, version) attached by `OntologyClassificationAgent`. If classification thresholds are misconfigured, the <USER_ID_REDACTED> of metadata flowing into insight generation degrades.
+Any component within `SemanticAnalysis` that needs to load or reference ontology definition files should route that request through `OntologyConfigManager` rather than constructing paths independently. This is the intended integration contract. Classifiers and validators within `SemanticAnalysis` are the primary consumers, and the singleton enforcement ensures they all operate on the same resolved paths.
 
-The hot-reload capability connects `OntologyConfigManager` to the MCP server process lifecycle: ontology file changes on disk can be absorbed without a server restart, making `OntologyConfigManager` a runtime configuration surface rather than a purely startup-time one.
+The introduction of `OntologyConfigManager` in Release 2.0 implies it may have replaced a prior pattern of hardcoded or locally managed paths in the classifier/validator components. New integrations should assume `OntologyConfigManager` is the *sole* authoritative source for ontology file paths.
+
+---
 
 ## Usage Guidelines
 
-**Treat threshold and budget values as operational levers, not code constants.** Because all classification <USER_ID_REDACTED> and cost control flows through `OntologyConfigManager`, tuning a batch run's LLM spend or adjusting classification confidence requires only changing values here — no agent code needs to change. This is the intended extension point for operational adjustments.
+**Always access ontology paths through `OntologyConfigManager`.** Direct path construction or hardcoded ontology file references in classifier or validator code undermine the decoupling this component provides and create fragility when ontology files are relocated or replaced.
 
-**Never modify singleton state in shared test fixtures without calling `reset()`.** The `SingletonResetPattern` exists for this reason. Any test that changes paths, thresholds, or budget caps must call `reset()` in teardown, or it risks silently affecting unrelated tests running in the same process.
+**Treat configuration as immutable within a batch run.** Because `SingletonOntologyConfig` is designed around batch run lifecycle stability, developers should not attempt to reload or mutate the configuration mid-run. Configuration should be resolved once at run initialization and remain stable for the duration. Any need for different ontology configurations should be expressed as separate batch runs.
 
-**Ontology file path changes take effect on hot-reload, not immediately.** Agents already mid-classification will use the paths active at the time their classify phase began. Hot-reload is designed for iterative development between runs, not for swapping ontology definitions mid-batch.
+**Understand the two-path model.** When configuring the system for a new environment or domain, both upper and lower ontology paths must be explicitly set. The upper path governs broad classifications; the lower path governs domain-specific definitions. Providing only one without the other will result in an incomplete configuration for the `TwoLevelOntologyHierarchy`.
 
-**The LLM budget cap is a hard guard, not a soft warning.** `OntologyClassificationAgent` consults it before making calls, meaning entities that would exceed the cap fall back to heuristic classification (or are skipped for LLM escalation). During large batch analyses, set this value deliberately rather than leaving it at a default — the token telemetry via `attachTokenLogger` in `LLMService` can inform appropriate values from prior runs.
+**Respect the singleton boundary.** Avoid instantiating `SingletonOntologyConfig` directly outside of `OntologyConfigManager`. The manager is the intended entry point; bypassing it risks creating a second configuration instance that escapes the singleton contract, reintroducing the config drift problem the architecture was designed to prevent.
+
+**Consider environment-specific configuration files.** Since `OntologyConfigManager` was designed to support runtime reconfiguration, the natural operational pattern is to maintain separate configuration files per environment (development, staging, production), each specifying the appropriate upper and lower ontology paths for that environment. This keeps ontology versioning and environment management clean and auditable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a batch-analysis pipeline over git history and LSL (vibe) sessions to extract, classify, validate, and persist structured knowledge entities. It coordinates several specialized agents in sequence: git history ingestion, vibe/LSL session ingestion, AST-based code graph construction, semantic LLM analysis, ontology classification, content validation, and insight generation. Each agent is built on a shared `BaseAgent<TInput, TOutput>` abstract class that wraps execution in a standardized `AgentResponse` envelope with confidence scoring, issue detection, routing suggestions, and retry guidance.
-
-The pipeline uses an ontology system backed by `@fwornle/km-core`'s `OntologyRegistry` (accessed via a `LegacyOntologyAdapter` shim) to classify extracted observations into upper/lower ontology classes with configurable heuristic and LLM-assisted classification modes. The `OntologyClassificationAgent` manages lifecycle (initialize → classify → suggest extensions) and attaches `OntologyMetadata` (class, confidence, method, version) to every entity before persistence. Storage was migrated from a legacy `GraphDatabaseAdapter`+`PersistenceAgent` trio to a `KmCoreAdapter` surface in Phase 42.x, with field names preserved for minimal call-site disruption.
-
-Key cross-cutting concerns include: LLM calls routed through `@rapid/llm-proxy`'s `LLMService` with token usage telemetry via `attachTokenLogger`; optional code-graph-rag integration via `CodeGraphAgent` (Tree-sitter AST + Memgraph) that gracefully degrades when the `uv` CLI or Memgraph TCP connection is unavailable; content staleness detection combining reference-pattern regex scanning and git-commit correlation via `GitStalenessDetector`; and trace files written to `logs/` for debugging non-fatally.
+- [Ontology](./Ontology.md) -- The system maintains a two-level ontology hierarchy (upper/lower) with separate definition files, paths to which are managed by OntologyConfigManager, allowing the classification tier to be reconfigured without code changes
 
 ### Children
-- [SingletonResetPattern](./SingletonResetPattern.md) -- Per parent context, all agents and subsystems within a process share one OntologyConfigManager instance, meaning configuration changes made by one agent are visible to all others in the same process.
+- [SingletonOntologyConfig](./SingletonOntologyConfig.md) -- Described in parent context as 'implemented as a singleton' specifically to prevent 'mid-run config drift between classifier and validator instances', indicating a deliberate architectural decision tied to batch run lifecycle.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- All pipeline agents extend the shared `BaseAgent<TInput, TOutput>` abstract class, which wraps execution in a standardized `AgentResponse` envelope carrying confidence scores, detected issues, routing suggestions, and retry guidance
-- [Ontology](./Ontology.md) -- `OntologyClassificationAgent` manages a three-phase lifecycle — initialize → classify → suggest extensions — ensuring the ontology registry is ready before any entity is classified and can propose new classes when observed entities don't fit existing ones
-- [Insights](./Insights.md) -- Insight generation is the final sequential stage in the pipeline, operating on fully classified and validated entities produced by upstream agents, making it dependent on the complete ontology metadata attached by `OntologyClassificationAgent`
-- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- `LegacyOntologyAdapter` wraps `OntologyRegistry` from `@fwornle/km-core`, acting as an anti-corruption layer so that the legacy interface expected by `OntologyValidator` and `OntologyClassifier` is preserved even as the underlying registry implementation evolves
+- [TwoLevelOntologyHierarchy](./TwoLevelOntologyHierarchy.md) -- The parent sub-component description explicitly states 'upper/lower' as the two tiers, with separate definition files for each, indicating a deliberate separation of broad categorical concepts from domain-specific ones.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 3 observations*

@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ViolationHistoryStore
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ViolationHistoryStore] as violation_history_store #LightBlue
+[ConstraintDashboard] as constraint_dashboard #F0F0F0
+
+constraint_system --> violation_history_store
+constraint_dashboard -[hidden]- violation_history_store
+
+@enduml

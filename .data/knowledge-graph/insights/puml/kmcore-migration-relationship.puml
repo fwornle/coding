@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KMCoreMigration
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[KMCoreMigration] as kmcore_migration #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[EntityTypeRegistry] as entity_type_registry #F0F0F0
+
+knowledge_management --> kmcore_migration
+manual_learning -[hidden]- kmcore_migration
+online_learning -[hidden]- kmcore_migration
+entity_type_registry -[hidden]- kmcore_migration
+
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ResponseNormalizer
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ResponseNormalizer] as response_normalizer #LightBlue
+[ProviderRouter] as provider_router #F0F0F0
+[WorkflowStateManager] as workflow_state_manager #F0F0F0
+[PublicCloudAdapters] as public_cloud_adapters #F0F0F0
+[NormalizedResponseSchema] as normalized_response_schema #E8F5E8
+
+llmabstraction --> response_normalizer
+provider_router -[hidden]- response_normalizer
+workflow_state_manager -[hidden]- response_normalizer
+public_cloud_adapters -[hidden]- response_normalizer
+response_normalizer --> normalized_response_schema
+
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentAbstractionPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentAbstractionPattern] as agent_abstraction_pattern #LightBlue
+[ConstraintEnforcementSystem] as constraint_enforcement_system #F0F0F0
+[CrossProjectKnowledgePattern] as cross_project_knowledge_pattern #F0F0F0
+[AgentCapabilityFlags] as agent_capability_flags #E8F5E8
+[AgentOnboardingProtocol] as agent_onboarding_protocol #E8F5E8
+
+coding_patterns --> agent_abstraction_pattern
+constraint_enforcement_system -[hidden]- agent_abstraction_pattern
+cross_project_knowledge_pattern -[hidden]- agent_abstraction_pattern
+agent_abstraction_pattern --> agent_capability_flags
+agent_abstraction_pattern --> agent_onboarding_protocol
+
+@enduml

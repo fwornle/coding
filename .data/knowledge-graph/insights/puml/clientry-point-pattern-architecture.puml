@@ -1,0 +1,35 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Entry Point Tier" {
+    component "bin/claude" as binClaude <<cli>>
+    component "bin/copilot" as binCopilot <<cli>>
+    component "bin/other" as binOther <<cli>>
+}
+
+package "Environment Configuration" {
+    component "LLM_CLI_PROXY_URL" as proxyUrl <<external>>
+}
+
+package "Service Layer" {
+    component "Claude Service" as claudeSvc <<core>>
+    component "Copilot Service" as copilotSvc <<core>>
+    component "Shared Service Implementation" as sharedSvc <<core>>
+}
+
+cloud "LLM Backend" as llmBackend <<external>>
+
+proxyUrl --> binClaude : "configures"
+proxyUrl --> binCopilot : "configures"
+
+binClaude --> sharedSvc : "delegates"
+binCopilot --> sharedSvc : "delegates"
+binOther --> sharedSvc : "delegates"
+
+sharedSvc --> claudeSvc : "routes"
+sharedSvc --> copilotSvc : "routes"
+
+claudeSvc --> llmBackend : "invokes"
+copilotSvc --> llmBackend : "invokes"
+
+@enduml

@@ -1,33 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Configuration Core" {
-  component "OntologyConfigManager" as ocm <<core>>
+package "Pipeline Agents" {
+    component "OntologyClassifier" as classifier <<agent>>
+    component "OntologyValidator" as validator <<agent>>
+    component "Insights Subsystem" as insights <<agent>>
 }
 
-package "Ontology Files" {
-  component "Upper Ontology Definition" as upper <<storage>>
-  component "Lower Ontology Definition" as lower <<storage>>
+package "OntologyConfigManager" {
+    component "OntologyConfigManager\n<<singleton>>" as ocm <<core>>
+    component "LLM Budget Parameters" as budget <<core>>
+    component "Caching Parameters" as cache <<core>>
+    component "Classification Thresholds" as threshold <<core>>
 }
 
-package "Consumers" {
-  component "OntologyClassificationAgent" as oca <<agent>>
-  component "MCP Server Process" as mcp <<api>>
+package "Ontology Resources" {
+    database "Upper Ontology\nDefinition File" as upper <<storage>>
+    database "Lower Ontology\nDefinition File" as lower <<storage>>
 }
 
-package "Test Support" {
-  component "Unit Test Harness" as tests <<cli>>
-}
+classifier --> ocm : "reads config"
+validator --> ocm : "reads config"
+insights --> budget : "consumes budget"
 
-upper --> ocm : "file path registered"
-lower --> ocm : "file path registered"
+ocm --> budget : "exposes"
+ocm --> cache : "controls"
+ocm --> threshold : "stores"
+ocm --> upper : "resolves path"
+ocm --> lower : "resolves path"
 
-ocm --> oca : "LLM budget cap\n& confidence thresholds"
-ocm --> mcp : "hot-reload config\non file change"
-
-tests --> ocm : "reset() restores defaults"
-
-ocm ..> upper : "reloads on disk change"
-ocm ..> lower : "reloads on disk change"
+classifier --> threshold : "applies decision boundary"
+classifier --> cache : "memoizes results"
+classifier --> upper : "loads definitions"
+classifier --> lower : "loads definitions"
+validator --> upper : "validates against"
+validator --> lower : "validates against"
 
 @enduml

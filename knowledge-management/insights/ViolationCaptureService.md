@@ -2,75 +2,90 @@
 
 **Type:** SubComponent
 
-The violation-history.json store enforces a hard cap of 1000 entries; once at capacity, the oldest entry is evicted and the entire array is re-serialized on each append, creating a write hotspot under high violation rates
+The dual-format output (JSONL for streaming append, JSON for dashboard snapshot) documented in docs/constraints/constraint-monitoring-system.md suggests ViolationCaptureService maintains two write paths with different update strategies
 
-# ViolationCaptureService — Technical Reference
+# ViolationCaptureService — Technical Insight Document
 
 ## What It Is
 
-`ViolationCaptureService` is implemented in `scripts/violation-capture-service.js` and serves as the persistence layer for constraint violations within the `ConstraintSystem`. Its sole responsibility is recording violations produced by hook handlers into durable storage in a form that satisfies two distinct consumer contracts simultaneously: real-time stream consumers that tail an append-log, and dashboard consumers that need random-access reads over a bounded history.
+ViolationCaptureService is a persistence-focused subcomponent of the ConstraintSystem, responsible for durably recording constraint violations that have already been evaluated upstream. Its designated output target is the `.mcp-sync` directory, as established in `docs/constraints/README.md`, which serves as the filesystem handoff point between the live session runtime and the ConstraintDashboard UI layer. The system's behavioral contract and output formats are specified in `docs/constraints/constraint-monitoring-system.md`.
+
+Critically, ViolationCaptureService does not perform rule evaluation. It operates as a downstream consumer of evaluated violation events, receiving structured violation records that have already been produced by the HookInterceptionLayer's pre-tool and post-tool hook phases. Its sole responsibility is receiving those records and writing them faithfully to persistent storage in the correct formats and at the correct locations.
+
+Within the broader ConstraintSystem, ViolationCaptureService occupies the persistence tier — sitting between the live interception machinery (HookInterceptionLayer) and the user-facing display layer (ConstraintDashboard). It is, in the precise language of `docs/constraints/constraint-monitoring-system.md`, "the bridge between live session activity and persistent storage."
 
 ![ViolationCaptureService — Relationship](images/violation-capture-service-relationship.png)
 
-The service writes every violation to two files: `.mcp-sync/session-violations.jsonl` and `.mcp-sync/violation-history.json`. These are not redundant copies — they encode fundamentally different access semantics, and each file is optimized for a different class of reader.
-
----
-
 ## Architecture and Design
 
-The central architectural decision in `ViolationCaptureService` is the **dual-store write strategy**: a single inbound violation event triggers two independent persistence operations, each targeting a file format chosen to match its downstream consumer's access pattern.
+The most architecturally significant decision in ViolationCaptureService is its **dual-format write strategy**. The service maintains two distinct output paths targeting the `.mcp-sync` directory:
+
+1. **A JSONL (JSON Lines) log** — an append-oriented stream where each violation record is written as a discrete newline-delimited JSON object. This format is optimized for sequential writes and supports streaming consumption without requiring the entire file to be parsed or rewritten on each new entry.
+
+2. **A JSON history file** — a snapshot-oriented document representing the accumulated violation history in a form suitable for dashboard consumption. Unlike the JSONL log, this file likely requires a read-modify-write cycle or full replacement on each update, reflecting its role as a complete state snapshot rather than an event stream.
 
 ![ViolationCaptureService — Architecture](images/violation-capture-service-architecture.png)
 
-The JSONL file at `.mcp-sync/session-violations.jsonl` is an unbounded append log. Each violation is serialized as a single JSON line and appended to the file. This format is explicitly designed for tail-following — a consumer can `tail -f` or stream-read from a known offset without ever needing to parse the entire file or hold it in memory. This makes it suitable for real-time pipelines, log shippers, or any consumer that processes violations as they arrive rather than querying historical ranges.
+This dual-format design encodes a deliberate trade-off: the JSONL path prioritizes write efficiency and durability (no data is lost if a write fails mid-session, since prior entries are already flushed), while the JSON snapshot path prioritizes read simplicity for the ConstraintDashboard, which can load a single structured file rather than parsing an unbounded log stream. The two formats serve different consumers with different access patterns, and ViolationCaptureService bears the cost of maintaining both in sync.
 
-The JSON array at `.mcp-sync/violation-history.json` takes the opposite approach: it is a bounded, fully-parsed structure capped at 1000 entries. This cap encodes an explicit contract with `ConstraintMonitorDashboard`, which reads this file directly. By keeping the file bounded, the dashboard never encounters an unbounded parse cost regardless of how long the system has been running. The tradeoff is a write penalty: once the cap is active, every append requires evicting the oldest entry and re-serializing the entire array to disk — a full rewrite on each violation event.
-
-The producer-consumer relationship is deliberately decoupled. Hook handlers call into `ViolationCaptureService` synchronously, but the dashboard reads `violation-history.json` independently. There is no shared queue, lock, or callback between producer and dashboard reader, meaning producer throughput is never gated by how fast the dashboard polls or renders. This is a clean separation that avoids backpressure propagating from UI reads into the hook execution path.
-
----
+The filesystem-based handoff to `.mcp-sync` is itself an architectural pattern worth noting. By writing to a shared directory rather than communicating with the ConstraintDashboard through a direct API or in-memory channel, ViolationCaptureService and ConstraintDashboard are **decoupled by the filesystem**. The dashboard can be started, stopped, or refreshed independently of the session runtime without any coordination protocol — it simply reads from `.mcp-sync` whenever it needs current state.
 
 ## Implementation Details
 
-On each violation event, `ViolationCaptureService` performs two writes in sequence. The JSONL append is a low-cost operation: serialize the violation object to a single JSON string, append it with a newline terminator to `.mcp-sync/session-violations.jsonl`. This is an O(1) append with no read-before-write required.
+No code symbols or source files were located during analysis, meaning the implementation details below are inferred entirely from the documentation observations in `docs/constraints/constraint-monitoring-system.md` and `docs/constraints/README.md`.
 
-The `violation-history.json` write is more expensive. The service must read the current array (or hold it in memory), check whether the entry count has reached the 1000-entry hard cap, conditionally evict the oldest entry (index 0), push the new violation, and then re-serialize the entire array back to disk. Once the cap is active, this is an O(n) write where n is capped at 1000 — bounded but non-trivial under high violation rates. At sustained high throughput, this file becomes a write hotspot, as every violation triggers a full rewrite of a potentially large JSON document.
+ViolationCaptureService receives violation records that originate from the HookInterceptionLayer's two-phase hook model. The HookInterceptionLayer wraps each tool invocation with a pre-tool hook (before execution) and a post-tool hook (after execution), evaluating constraint rules at both boundaries. Violations identified during either phase are passed downstream to ViolationCaptureService as already-evaluated records — the service does not re-evaluate rules or inspect raw tool inputs independently.
 
-The 1000-entry cap is a hard architectural constant, not a configurable parameter based on the available observations. It represents a design judgment about the useful horizon of dashboard-visible history — enough to show meaningful recent activity without allowing unbounded file growth.
+The write mechanics for the two output paths differ structurally. The JSONL log supports **append-only writes**: each incoming violation is serialized as a JSON object and written as a new line at the end of the file. This is an O(1) write operation regardless of how many prior violations exist. The JSON history file, by contrast, represents a **full-state snapshot** and must reflect all violations including the newly arrived one — this suggests either an in-memory accumulation strategy (where ViolationCaptureService holds the full violation list in memory and rewrites the JSON file on each update) or a read-append-write cycle (where the existing file is read, the new record is appended to the parsed structure, and the file is rewritten). The former is more efficient but risks data loss if the session crashes before a flush; the latter is more durable but incurs I/O overhead proportional to violation history size.
 
----
+Given that violations can originate from code actions, file operations, and tool interactions (as scoped in `docs/constraints/README.md`), ViolationCaptureService must handle a heterogeneous set of violation record structures, or the ConstraintSystem enforces a normalized violation schema upstream before records reach ViolationCaptureService.
 
 ## Integration Points
 
-Within `ConstraintSystem`, `ViolationCaptureService` sits between two groups of actors: upstream producers (hook handlers that detect and report violations) and downstream consumers (the dashboard and any stream readers).
+ViolationCaptureService integrates at two boundaries within the ConstraintSystem:
 
-`ConstraintMonitorDashboard` is the primary consumer of `violation-history.json`. The dashboard's isolation from the raw JSONL stream is a deliberate design choice — it trades access to the full unbounded history for a predictable, bounded parse cost on every read. The dashboard never needs to know about session duration or total violation volume; it always sees at most 1000 entries.
+**Upstream — HookInterceptionLayer**: ViolationCaptureService receives evaluated violations from the HookInterceptionLayer. The hook layer's pre-tool and post-tool events are the origination points; by the time a violation reaches ViolationCaptureService, rule evaluation is complete. This clean separation means ViolationCaptureService has no dependency on constraint rule definitions or tool inspection logic — it is a pure persistence consumer.
 
-`SemanticConstraintDetector` operates upstream in the detection pipeline. While the observations don't describe a direct API contract between `SemanticConstraintDetector` and `ViolationCaptureService`, both are siblings within `ConstraintSystem`, and it is reasonable to treat `SemanticConstraintDetector` as a producer that ultimately feeds violations into `ViolationCaptureService`'s write path via the hook handler layer.
+**Downstream — ConstraintDashboard**: The ConstraintDashboard reads from `.mcp-sync` to display violation history. ViolationCaptureService's JSON history file is the primary artifact the dashboard consumes. The filesystem boundary between them means the integration contract is entirely file-format-based: changes to how ViolationCaptureService structures its JSON output are breaking changes for the ConstraintDashboard, even though the two components never communicate directly.
 
-The `.mcp-sync/` directory is the shared integration surface. Both output files live here, and any external tooling (log forwarders, monitoring agents) that consumes violations should target the JSONL file rather than the JSON array, since the JSONL file is explicitly designed for that access pattern.
-
----
+**Filesystem — `.mcp-sync` directory**: This directory, designated in `docs/constraints/README.md`, is the concrete integration surface. Both output files (the JSONL log and the JSON snapshot) land here. Any tooling, monitoring, or external process that needs access to violation data can target this directory as a stable read location.
 
 ## Usage Guidelines
 
-**Choose the right file for your consumer type.** If you are building a real-time consumer, a stream processor, or anything that tails output, read from `.mcp-sync/session-violations.jsonl`. If you are building a UI or query interface that needs bounded, random-access reads over recent history, read from `.mcp-sync/violation-history.json`. Mixing these up — for example, parsing the full JSONL for a dashboard — will create unnecessary load and defeats the purpose of the dual-store design.
+**Do not route rule evaluation through ViolationCaptureService.** Its contract is to receive pre-evaluated violations. Introducing evaluation logic here would violate the separation of concerns between the HookInterceptionLayer (which owns rule assessment) and ViolationCaptureService (which owns persistence). New constraint rules belong in the interception layer, not here.
 
-**Be aware of the write hotspot under high violation rates.** The `violation-history.json` rewrite-on-append behavior is bounded by the 1000-entry cap, but it is still a full file rewrite on every event. Systems that generate violations at high frequency (e.g., during bulk operations or aggressive constraint checking) will exercise this path heavily. If write latency becomes a concern, the hotspot is localized to this file's update logic in `scripts/violation-capture-service.js`.
+**Treat the `.mcp-sync` directory as the canonical violation record.** Because ViolationCaptureService writes both formats there, `.mcp-sync` is the single source of truth for violation history. Developers should not maintain secondary caches or in-memory copies outside of ViolationCaptureService's own write buffer (if one exists) — doing so risks divergence between what the dashboard shows and what was actually recorded.
 
-**Do not bypass `ViolationCaptureService` to write violations directly.** Both files must remain consistent with each other; writing to one without the other breaks the consumer contracts. All violation persistence should flow through `ViolationCaptureService` as the single authoritative write path.
+**Understand the write-path asymmetry when extending output formats.** The JSONL log and JSON snapshot have fundamentally different update strategies. If a third output format is ever added (e.g., a database write, a metrics emission), its update strategy should be explicitly designed to match its consumer's access pattern, following the same reasoning that differentiated the existing two paths.
 
-**The 1000-entry cap is a design constant, not a bug.** Consumers of `violation-history.json` should not assume they can see the full session history — only the most recent 1000 violations are guaranteed to be present. For full session history, the JSONL file is the authoritative source.
+**Schema changes to violation records are a cross-component breaking change.** Because the integration between ViolationCaptureService and ConstraintDashboard is purely file-format-based, any modification to the JSON structure of violation records requires coordinated updates to both the serialization logic in ViolationCaptureService and the parsing logic in ConstraintDashboard. There is no runtime negotiation or versioning layer to absorb schema drift.
+
+---
+
+### Architectural Patterns Identified
+
+| Pattern | Evidence |
+|---|---|
+| **Dual-format persistence** | JSONL for append streaming, JSON for snapshot reads — two write paths serving different consumers |
+| **Filesystem-based decoupling** | `.mcp-sync` as handoff boundary between runtime and dashboard, eliminating direct component coupling |
+| **Pipeline stage separation** | ViolationCaptureService explicitly does not evaluate — it only persists, enforcing single responsibility |
+| **Append-optimized logging** | JSONL format chosen specifically for its sequential write characteristics |
+
+### Key Design Trade-offs
+
+- **JSONL durability vs. JSON readability**: The JSONL log is more resilient to mid-session failure; the JSON snapshot is simpler for dashboard consumers. Both are maintained at the cost of write overhead.
+- **Filesystem decoupling vs. consistency guarantees**: The file-based handoff eliminates coupling but introduces a window where the JSONL and JSON files may be transiently inconsistent if a write to one succeeds and the other fails.
+- **Downstream passivity vs. evaluation capability**: Keeping rule evaluation out of ViolationCaptureService simplifies it but means it has no ability to filter, deduplicate, or enrich violations — that responsibility must be handled upstream or the dashboard must tolerate raw, unprocessed records.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem employs a dual-store persistence strategy in ViolationCaptureService (scripts/violation-capture-service.js) that separates concerns between live streaming and historical querying. Violations are written to two distinct files: a JSONL append-log at .mcp-sync/session-violations.jsonl where each line is a JSON-serialized violation event suitable for tail-following and real-time consumption, and a capped JSON array at .mcp-sync/violation-history.json that never exceeds 1000 entries and is intended for dashboard reads. This design means producers (the hook handlers) never block on dashboard consumers, and the dashboard never needs to parse an unbounded stream. The tradeoff is that the history file requires a full rewrite on each append once the cap is active, since the oldest entry must be evicted and the array re-serialized, which can become a write hotspot under high violation rates.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a multi-layered constraint monitoring and enforcement framework that validates code actions, file operations, and tool interactions against configured rules during Claude Code sessions. It operates through a hook-based interception architecture where pre-tool and post-tool hook events capture agent actions, evaluate them against constraint rules, and record violations for persistence and dashboard display. The system bridges live session activity with persistent storage via the ViolationCaptureService, which writes violations to JSONL logs and maintains a JSON history file in the .mcp-sync directory for dashboard consumption.
 
 ### Siblings
-- [ConstraintMonitorDashboard](./ConstraintMonitorDashboard.md) -- ConstraintMonitorDashboard consumes .mcp-sync/violation-history.json (a capped 1000-entry JSON array) rather than the raw JSONL append-log, isolating the UI from unbounded stream parsing as described in the ViolationCaptureService dual-store design
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- SemanticConstraintDetector is documented across two dedicated files—integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and docs/semantic-detection-design.md—indicating the detection strategy is complex enough to warrant both a user-facing guide and an internal design document
+- [ConstraintDashboard](./ConstraintDashboard.md) -- docs/constraints/README.md documents the ConstraintDashboard as a consumer of violation history files written to .mcp-sync, establishing a file-based decoupling between the live session and the UI layer
+- [HookInterceptionLayer](./HookInterceptionLayer.md) -- docs/constraints/constraint-monitoring-system.md describes a hook-based interception architecture with distinct pre-tool and post-tool hook events, establishing a two-phase capture model around each tool invocation
 
 
 ---

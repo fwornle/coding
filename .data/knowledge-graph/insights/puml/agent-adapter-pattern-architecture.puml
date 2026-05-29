@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Consumers" {
+  component "Agent Consumers" as consumers <<cli>>
+}
+
+package "Adapter Contract" {
+  component "Agent Abstraction API" as api <<api>>
+  component "Constructor+Initialize+Execute\nLifecycle" as lifecycle <<core>>
+  component "AGENT_NAME / AGENT_REQUIRES_COMMANDS\nEnv Variables" as envvars <<core>>
+}
+
+package "Configuration" {
+  component "config/agents/" as agentconfig <<storage>>
+}
+
+package "Backend Adapters" {
+  component "Claude Adapter" as claude <<agent>>
+  component "Copilot Adapter" as copilot <<agent>>
+  component "Mastra Adapter" as mastra <<agent>>
+  component "OpenCode Adapter" as opencode <<agent>>
+}
+
+consumers --> api : "invokes"
+api --> lifecycle : "enforces"
+api --> envvars : "standardizes"
+agentconfig --> api : "configures"
+api --> claude : "normalizes"
+api --> copilot : "normalizes"
+api --> mastra : "normalizes"
+api --> opencode : "normalizes"
+
+@enduml

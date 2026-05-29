@@ -1,36 +1,33 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "MCP Semantic Analysis Server" {
-    component "Agent Factory\n/ Dispatcher" as agentFactory <<core>>
-    component "Agent (Global Mode)" as agentGlobal <<agent>>
-    component "Agent (Per-Agent Override)" as agentOverride <<agent>>
+package "Semantic Analysis MCP" {
+    component "LLMMockService" as lms <<core>>
+    component "Mode Switcher" as ms <<core>>
+    component "Docker Path Resolver" as dpr <<core>>
 }
 
-package "mock/ Subdirectory" {
-    component "LLMMockService\n(Singleton)" as llmMock <<core>>
-    component "Mock Mode\n(Deterministic / Offline)" as modeMock <<api>>
-    component "Local Mode\n(Local LLM Backend)" as modeLocal <<api>>
-    component "Public Mode\n(External LLM API)" as modePublic <<api>>
+package "Operation Modes" {
+    component "Mock Mode" as mock <<api>>
+    component "Local Mode" as local <<api>>
+    component "Public Mode" as pub <<api>>
 }
 
-package "Infrastructure" {
-    component "Docker Container\n/ CI Pipeline" as docker <<external>>
-    cloud "External LLM API" as externalLLM <<external>>
+package "External Dependencies" {
+    cloud "OpenAI / Anthropic API" as extapi <<external>>
+    component "Local LLM Proxy" as llmproxy <<external>>
+    component "CI Pipeline" as ci <<external>>
 }
 
-agentFactory --> llmMock : "get/set global mode"
-agentGlobal --> llmMock : "reads global default"
-agentOverride --> llmMock : "applies per-agent override"
+lms --> ms : "selects mode"
+lms --> dpr : "resolves paths"
 
-llmMock --> modeMock : "routes to"
-llmMock --> modeLocal : "routes to"
-llmMock --> modePublic : "routes to"
+ms --> mock : "mock"
+ms --> local : "local"
+ms --> pub : "public"
 
-docker --> modeMock : "offline / API-blocked CI"
-modePublic --> externalLLM : "calls"
-
-agentFactory --> agentGlobal : "instantiates"
-agentFactory --> agentOverride : "instantiates"
+mock --> ci : "static responses"
+local --> llmproxy : "LLM_CLI_PROXY_URL\nRAPID_LLM_PROXY_URL"
+pub --> extapi : "OPENAI_API_KEY\nANTHROPIC_API_KEY"
 
 @enduml

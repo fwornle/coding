@@ -2,79 +2,69 @@
 
 **Type:** SubComponent
 
-docs/architecture/cross-project-knowledge.md describes hand-crafted observations as a discrete input channel separate from git-history or LSL-session extraction, implying ManualLearning has its own write path into the GraphDatabaseService
+Agent Integration Guide (docs/agent-integration-guide.md) references direct observation injection, suggesting ManualLearning exposes an API for agents to assert facts without triggering the automated analysis pipeline
 
-# ManualLearning — Technical Insight Document
+# ManualLearning — Technical Reference
 
 ## What It Is
 
-ManualLearning is a SubComponent of KnowledgeManagement responsible for providing a dedicated write path through which human-curated knowledge enters the graph database. Unlike its sibling OnlineLearning — which ingests from automatic extraction sources such as git history, LSL sessions, and code analysis — ManualLearning represents a discrete, intentional input channel where a developer or operator directly authors entities and observations into the knowledge graph. The distinction is not merely procedural: it is enforced at the data level through ProvenanceMetadataStamping, the child component that attaches provenance metadata to every manually authored entity, marking its origin as human-curated and protecting it from being silently overwritten by automated pipeline output.
+ManualLearning is a SubComponent of KnowledgeManagement responsible for ingesting human-authored knowledge into the shared knowledge graph. Rather than receiving entities from automated analysis pipelines, it provides the pathway through which developers, agents, and curators directly assert facts, relationships, and cross-project edges into the same graph infrastructure that OnlineLearning and KMCoreMigration populate. Its behavior is documented across `docs/architecture/memory-systems.md`, `docs/architecture/cross-project-knowledge.md`, and `docs/agent-integration-guide.md`, though no dedicated source files have been identified in the current codebase scan.
 
-The component is documented across `docs/architecture/memory-systems.md`, `docs/architecture/cross-project-knowledge.md`, and `docs/architecture-report.md`. No dedicated source files were identified in the current code structure, suggesting ManualLearning's behavior is primarily defined through its interactions with the surrounding infrastructure — GraphDatabaseService, the Graphology in-memory graph, and KnowledgeDecayTracker — rather than through a standalone implementation module.
-
-## Architecture and Design
+The defining characteristic of ManualLearning is provenance: every entity it produces carries metadata explicitly marking it as human-authored, a concern delegated to its child component HumanProvenanceStamping. This provenance mark is a discriminating value on a shared provenance field — not a separate entity type — distinguishing manual records from the pipeline provenance stamps applied by KMCoreMigration during automated migration runs.
 
 ![ManualLearning — Architecture](images/manual-learning-architecture.png)
 
-The central architectural decision in ManualLearning is **provenance-driven write isolation**. The knowledge graph within KnowledgeManagement stores entities of typed categories — System, Project, Pattern — and both manual and automated entities inhabit these same typed slots. What separates them is provenance metadata applied at creation time by ProvenanceMetadataStamping. This metadata acts as a guard: during merge operations, the pipeline respects the human-provenance stamp and does not overwrite manually authored facts with automatically extracted observations. This design enables a heterogeneous graph where automated and human knowledge coexist without the latter being eroded over time by pipeline churn.
+## Architecture and Design
 
-A second key design decision is the **bypass of the batch analysis pipeline**. As described in `docs/architecture-report.md`, the standard OnlineLearning path routes through a scheduled batch analysis pipeline before entities reach the Graphology in-memory graph. ManualLearning skips this layer entirely, writing directly to the Graphology in-memory graph layer via GraphDatabaseService. This means manual edits achieve immediate consistency — a human correction or insight is available to graph <USER_ID_REDACTED> as soon as it is committed, without waiting for a batch cycle. The trade-off is that manual writes do not benefit from whatever normalization or enrichment the batch pipeline applies; the author bears responsibility for correctness and completeness at write time.
+ManualLearning sits within KnowledgeManagement alongside three siblings — OnlineLearning, KMCoreMigration, and EntityTypeRegistry — each contributing entities to the same underlying graph store. The architectural decision to unify all entry paths through a single write interface (GraphKMStore, backed by LevelDB) means ManualLearning does not own its own storage layer. Instead, it relies on GraphKMStore as the persistence gateway, ensuring that hand-crafted entities and pipeline-generated entities coexist in one addressable graph without structural divergence.
 
-The relationship between ManualLearning and its siblings reflects a deliberate separation of concerns in KnowledgeManagement. OnlineLearning handles volume and automation; ManualLearning handles authority and precision. GraphKMStore, which uses UUIDv7 time-ordered entity IDs, provides the shared persistence substrate that both paths write into, ensuring all entities — regardless of origin — are addressable and chronologically ordered.
+The design makes provenance a first-class attribute rather than an implicit assumption about which code path was invoked. This is a deliberate trade-off: it adds a metadata field to every entity but eliminates the need for separate storage partitions or query-time routing logic to distinguish human versus automated knowledge. The shared provenance field with distinct enum-like values (human-authored vs. pipeline-stamped) keeps the ontology flat and the query surface uniform.
 
 ![ManualLearning — Relationship](images/manual-learning-relationship.png)
 
+Type conformance is enforced externally by EntityTypeRegistry, which maps all incoming entity types to the three-type ontology (System, Project, Pattern) before graph insertion. ManualLearning does not bypass this constraint — hand-crafted nodes must conform to the same classification surface as automated ones. This prevents ontology drift where human authors might introduce ad-hoc types that fragment the shared schema.
+
 ## Implementation Details
 
-The primary mechanism ManualLearning relies on is **ProvenanceMetadataStamping**, its sole child component. At entity creation time, every manually authored entity must receive a provenance stamp that identifies it as human-curated. This stamp is the runtime signal used during merge conflict resolution to prevent automated pipeline writes from overwriting human edits. Without this stamp, a manually authored entity would be indistinguishable from an automatically extracted one and could be overwritten on the next pipeline run.
+The core mechanics of ManualLearning operate through two concerns: identifier assignment and provenance stamping.
 
-ManualLearning entities are also subject to the **KnowledgeDecayTracker** lifecycle model. KnowledgeDecayTracker attaches `validFrom` and `validUntil` fields to each entity in the graph, and this applies equally to manually authored entities. This means that when a developer authors a manual entity, they must either supply explicit validity timestamps or accept whatever defaults the system assigns. Practically, this implies that manual knowledge is not permanently immune to decay — a human-authored fact can expire if its `validUntil` boundary is reached, and time-range <USER_ID_REDACTED> issued by KnowledgeDecayTracker will exclude it from results without physically deleting it from the Graphology graph. Authors of manual entities should treat timestamp assignment as a first-class concern, not an afterthought.
+Identifier assignment follows the same UUIDv7 scheme established by KMCoreMigration. Manual entities receive time-ordered UUIDv7 IDs consistent with the canonical shape defined during migration, meaning legacy manual records and newly authored ones share the same identifier format. This is significant for graph traversal and temporal ordering — a UUIDv7 encodes creation time, so manual entities are naturally sortable alongside automated ones without a separate timestamp field.
 
-The direct write path into the Graphology in-memory graph layer means ManualLearning operates on the same graph object that all other KnowledgeManagement components read from. There is no separate manual-knowledge store; the distinction is carried entirely in metadata fields on the entities themselves. This keeps the graph unified but places correctness pressure on the provenance stamping logic.
+Provenance stamping is the responsibility of HumanProvenanceStamping, ManualLearning's only child component. Based on the observation that provenance is a shared field with distinct values rather than a type split, HumanProvenanceStamping likely applies a specific provenance marker at write time, before or during the GraphKMStore persistence call. The contrast with KMCoreMigration's automated pipeline stamps suggests this is a well-defined enum or constant value rather than free-form metadata.
+
+Cross-project edge authoring is an explicit capability of ManualLearning, as documented in `docs/architecture/cross-project-knowledge.md`. This means ManualLearning handles not just node creation but inter-project relationship assertion — a responsibility that requires awareness of entity identities across project boundaries. This positions ManualLearning as the primary mechanism for curating the relational structure of the knowledge graph where automation cannot infer connections.
 
 ## Integration Points
 
-ManualLearning's primary runtime dependency is **GraphDatabaseService**, the service that manages the Graphology in-memory graph backed by LevelDB. Manual writes go directly to this layer, making GraphDatabaseService the immediate integration boundary. The canonical shape store, GraphKMStore — which uses UUIDv7 entity IDs — is the broader persistence target that GraphDatabaseService writes through, and manual entities ultimately land there alongside automatically extracted ones.
+The `docs/agent-integration-guide.md` reference to direct observation injection indicates that ManualLearning exposes an API surface accessible to agents — allowing them to assert facts without triggering the automated analysis pipeline (OnlineLearning's path). This is a meaningful architectural boundary: it separates deliberate, curated assertions from continuous automated inference, giving consumers control over which pipeline semantics apply to a given fact.
 
-The relationship with **KnowledgeDecayTracker** is a lifecycle integration: every entity ManualLearning creates enters the `validFrom`/`validUntil` tracking system. This is non-optional; KnowledgeDecayTracker's time-range query model applies uniformly across all entity origins. Manual entity authors must be aware that their edits will age and may require explicit refresh or extension of validity windows.
-
-The sibling boundary with **OnlineLearning** is the clearest integration concern. Both components write typed entities (System, Project, Pattern) into the same graph. The separation is enforced only by provenance metadata during merge operations, as documented in `docs/architecture/cross-project-knowledge.md`. If provenance stamping is incomplete or inconsistent, the protection against pipeline overwrite breaks down. ProvenanceMetadataStamping as a child component is therefore a critical correctness dependency for the entire ManualLearning subsystem.
+GraphKMStore is the write dependency. All entities authored through ManualLearning are persisted via this interface to the LevelDB backend, placing ManualLearning downstream of GraphKMStore and upstream of the raw storage layer. EntityTypeRegistry acts as a schema gatekeeper that ManualLearning must satisfy before insertion succeeds. KMCoreMigration shares the UUIDv7 identifier contract, ensuring interoperability between migrated historical records and new manual entries.
 
 ## Usage Guidelines
 
-When authoring manual entities, developers must ensure ProvenanceMetadataStamping is invoked correctly at write time. The provenance stamp is not advisory — it is the mechanism that protects human-curated facts from being overwritten by OnlineLearning pipeline output during merge operations. Omitting or incorrectly applying provenance metadata renders a manual edit vulnerable to automated overwrite, defeating the purpose of manual curation.
+Developers and agents authoring knowledge through ManualLearning should treat EntityTypeRegistry conformance as a hard constraint — all entities must resolve to System, Project, or Pattern before they can be persisted. Attempting to introduce novel types will be rejected at the classification layer, not silently coerced.
 
-Timestamp hygiene is equally important. Because KnowledgeDecayTracker governs all entities through `validFrom`/`validUntil` fields, manually authored entities must carry meaningful validity windows. Authors should explicitly set `validUntil` to a duration appropriate for the fact being recorded — open-ended or overly short windows will cause either unbounded accumulation or premature expiry. When updating a manual entity, the validity window should be refreshed alongside the content change.
+When asserting cross-project relationships, authors should be aware that ManualLearning is the designated path for inter-project edge authoring per `docs/architecture/cross-project-knowledge.md`. These edges are curated rather than inferred, so they carry implicit authority within the graph — <USER_ID_REDACTED> that traverse cross-project relationships are relying on the correctness of manually authored data.
 
-Because ManualLearning writes bypass the batch analysis pipeline and commit directly to the Graphology in-memory graph, manual edits are immediately visible to all graph consumers. This is an advantage for urgency but a risk for <USER_ID_REDACTED>: there is no pipeline normalization pass to catch structural errors. Authors should validate entity type assignments (System, Project, Pattern) and relationship structure before committing, since corrections will require a subsequent manual write rather than a pipeline rerun.
+The direct observation injection API documented in `docs/agent-integration-guide.md` should be used when an agent has high-confidence, deliberate facts to record that should not be re-derived by the automated pipeline. This avoids duplication and prevents automated analysis from overwriting or conflicting with intentional assertions. The provenance field, set by HumanProvenanceStamping, serves as the durable signal for downstream consumers to distinguish these authoritative records from pipeline-generated ones.
 
-Finally, when migrating entities between GraphDatabaseService/LevelDB and GraphKMStore (using the migration tooling referenced in the KnowledgeManagement parent context), provenance metadata must be preserved across the migration boundary. UUIDv7 ID reissuance during migration should not strip the human-provenance stamp, as doing so would expose previously protected manual entities to pipeline overwrite in the post-migration graph.
-
----
-
-**Architectural Patterns Identified:** Provenance-driven write isolation; direct in-memory graph write bypass; uniform lifecycle metadata across heterogeneous entity origins.
-
-**Key Design Trade-offs:** Immediate consistency via pipeline bypass at the cost of no automated normalization for manual writes; shared graph namespace with automated entities with conflict protection delegated entirely to metadata rather than storage separation.
-
-**Scalability Consideration:** Because manual entities share the Graphology graph with all automated output, graph size growth is driven primarily by OnlineLearning volume; ManualLearning does not introduce a distinct scaling concern, but provenance-aware merge logic must remain efficient as graph cardinality grows.
-
-**Maintainability Assessment:** The design is maintainable so long as ProvenanceMetadataStamping remains consistently applied — it is a single point of correctness for a critical invariant. The absence of identified source files suggests the implementation may be distributed across infrastructure layers, which warrants explicit documentation of the write contract to prevent future contributors from introducing unguarded manual writes.
+Since no dedicated source files were identified in the code scan, implementors working in this area should treat `docs/architecture/memory-systems.md`, `docs/architecture/cross-project-knowledge.md`, and `docs/agent-integration-guide.md` as the primary normative references until code-level symbols are indexed.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing entity storage, querying, and lifecycle management. It uses a Graphology in-memory graph backed by LevelDB for persistence, storing entities with typed attributes (System, Project, Pattern) and relationships. The system supports multiple knowledge stores: a local LevelDB/Graphology store (GraphDatabaseService) and a canonical km-core shape store (GraphKMStore), with migration tooling to move between them.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing persistent storage, entity lifecycle management, and graph query capabilities. It is built on a Graphology in-memory graph with LevelDB as the persistence backend, exposing entities with typed attributes (System, Project, Pattern) and relationships. The system supports both local graph operations and integration with external graph databases like Memgraph via the CodeGraphAgent, which uses Tree-sitter AST parsing to index repositories into a queryable knowledge graph.
 
 ### Children
-- [ProvenanceMetadataStamping](./ProvenanceMetadataStamping.md) -- Referenced in the ManualLearning sub-component description: provenance metadata is the key distinguishing factor between human-curated facts and automatically extracted knowledge in the GraphKMStore (documented in docs/architecture/memory-systems.md as 'Graph-Based Knowledge Storage Architecture')
+- [HumanProvenanceStamping](./HumanProvenanceStamping.md) -- Per the ManualLearning sub-component description, entities carry provenance metadata explicitly marking them as human-authored, contrasting with pipeline provenance stamps applied by KMCoreMigration — indicating a shared provenance field with distinct enum-like values rather than separate entity types.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- docs/architecture/memory-systems.md identifies git history, LSL sessions, and code analysis as the three automatic extraction sources feeding OnlineLearning, each producing typed graph entities
-- [GraphKMStore](./GraphKMStore.md) -- GraphKMStore uses UUIDv7 entity IDs (time-ordered UUIDs) rather than the legacy IDs used by GraphDatabaseService/LevelDB, enabling chronological ordering and distributed ID generation without coordination
-- [KnowledgeDecayTracker](./KnowledgeDecayTracker.md) -- KnowledgeDecayTracker attaches validFrom and validUntil fields to each entity, enabling time-range <USER_ID_REDACTED> that exclude expired knowledge without physically deleting records from the Graphology graph
+- [OnlineLearning](./OnlineLearning.md) -- docs/architecture/memory-systems.md describes the Graph-Based Knowledge Storage Architecture that OnlineLearning populates, with Graphology as the in-memory layer backed by LevelDB
+- [KMCoreMigration](./KMCoreMigration.md) -- The migration script migrate-leveldb-to-kmcore.mjs reads raw LevelDB B-shape records and rewrites them with UUIDv7 identifiers, providing stable, time-ordered IDs for all canonical entities
+- [EntityTypeRegistry](./EntityTypeRegistry.md) -- EntityTypeRegistry enforces a three-type ontology (System/Project/Pattern) as the canonical classification surface, with all incoming entity types mapped through this consolidation layer before graph insertion
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

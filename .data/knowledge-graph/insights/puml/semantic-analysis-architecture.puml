@@ -1,53 +1,52 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title SemanticAnalysis MCP Server — Component Architecture
-
-package "Ingestion Layer" {
-  component "GitHistoryAgent" as gitAgent <<agent>>
-  component "VibeSessionAgent" as vibeAgent <<agent>>
+package "MCP Server" {
+  component "SemanticAnalysis\nMCP Server" as mcpServer <<api>>
 }
 
-package "Analysis & Classification" {
-  component "CodeGraphAgent\n(Tree-sitter + Memgraph)" as codeGraph <<agent>>
-  component "SemanticAnalysisAgent\n(LLM-based)" as semAgent <<agent>>
-  component "OntologyClassificationAgent" as ontoAgent <<agent>>
-}
-
-package "Validation & Persistence" {
-  component "ContentValidationAgent\n(GitStalenessDetector)" as validAgent <<agent>>
-  component "KmCoreAdapter" as kmCore <<core>>
-}
-
-package "Cross-Cutting Infrastructure" {
+package "Agent Pipeline" {
   component "BaseAgent<TInput,TOutput>" as baseAgent <<core>>
-  cloud "LLMService\n(@rapid/llm-proxy)" as llmSvc <<external>>
-  component "OntologyRegistry\n(@fwornle/km-core)" as ontoReg <<core>>
-  component "LegacyOntologyAdapter" as legacyAdapt <<core>>
-  database "Memgraph" as memgraph <<storage>>
+  component "SemanticAnalysisAgent" as semAgent <<agent>>
+  component "CodeGraphAgent" as cgAgent <<agent>>
+  component "OntologyClassificationAgent" as ontAgent <<agent>>
+  component "ContentValidationAgent" as cvAgent <<agent>>
 }
 
-gitAgent --> baseAgent : extends
-vibeAgent --> baseAgent : extends
-codeGraph --> baseAgent : extends
-semAgent --> baseAgent : extends
-ontoAgent --> baseAgent : extends
-validAgent --> baseAgent : extends
+package "Supporting Services" {
+  component "OntologyRegistry\n+ LegacyOntologyAdapter" as ontRegistry <<core>>
+  component "TokenUsageLogger" as tokenLogger <<core>>
+  component "GitStalenessDetector\n(60s cache)" as gitDetector <<core>>
+  component "KmCoreAdapter" as kmAdapter <<storage>>
+}
 
-gitAgent --> semAgent : git history
-vibeAgent --> semAgent : vibe/LSL sessions
+package "External Systems" {
+  database "Memgraph\nGraph DB" as memgraph <<storage>>
+  component "code-graph-rag\nMCP CLI (uv)" as codeGraphCli <<cli>>
+  cloud "LLM Service\ngenerateSemanticInsights()" as llm <<external>>
+}
 
-semAgent --> codeGraph : code graph context
-semAgent --> llmSvc : LLM calls\n(token telemetry)
-semAgent --> ontoAgent : classify entities
+mcpServer --> baseAgent : orchestrates
+baseAgent <-- semAgent : extends
+baseAgent <-- cgAgent : extends
+baseAgent <-- ontAgent : extends
+baseAgent <-- cvAgent : extends
 
-codeGraph --> memgraph : AST index
+mcpServer --> semAgent : depth:\nsurface/deep/comprehensive
+mcpServer --> cgAgent : AST parsing
+mcpServer --> ontAgent : classify
+mcpServer --> cvAgent : validate & persist
 
-ontoAgent --> legacyAdapt : classify
-legacyAdapt --> ontoReg : OntologyRegistry
+semAgent --> llm : enriches patterns
+semAgent --> tokenLogger : tracks token usage
 
-ontoAgent --> validAgent : classified entities
-validAgent --> kmCore : persist
-validAgent --> llmSvc : validation calls
+cgAgent --> memgraph : graph queries
+cgAgent --> codeGraphCli : Tree-sitter AST
+
+ontAgent --> ontRegistry : classifies entities
+
+cvAgent --> kmAdapter : persist entities
+cvAgent --> gitDetector : staleness check
+cvAgent --> kmAdapter : graphDB + persistenceAgent
 
 @enduml

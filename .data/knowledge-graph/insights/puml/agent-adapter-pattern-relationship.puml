@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentAdapterPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentAdapterPattern] as agent_adapter_pattern #LightBlue
+[CLIEntryPointPattern] as clientry_point_pattern #F0F0F0
+[DeclarativeTeamComposition] as declarative_team_composition #F0F0F0
+[ExternalizedConfiguration] as externalized_configuration #F0F0F0
+[AgentAgnosticDesignPrinciple] as agent_agnostic_design_principle #F0F0F0
+[AgentLifecycleContract] as agent_lifecycle_contract #E8F5E8
+
+coding_patterns --> agent_adapter_pattern
+clientry_point_pattern -[hidden]- agent_adapter_pattern
+declarative_team_composition -[hidden]- agent_adapter_pattern
+externalized_configuration -[hidden]- agent_adapter_pattern
+agent_agnostic_design_principle -[hidden]- agent_adapter_pattern
+agent_adapter_pattern --> agent_lifecycle_contract
+
+@enduml

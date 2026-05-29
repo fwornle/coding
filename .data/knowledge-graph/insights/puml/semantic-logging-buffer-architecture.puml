@@ -1,0 +1,31 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+' SemanticLoggingBuffer Architecture
+
+package "MCP Server" {
+  component "Claude Code Client" as claude <<external>>
+  component "MCP Server\nEvent Loop" as mcpLoop <<core>>
+  component "SemanticLoggingBuffer" as slb <<core>>
+}
+
+package "Processing" {
+  component "Async Batch\nAccumulator" as batcher <<core>>
+  component "SHA-256\nUser Hasher" as hasher <<api>>
+  component "File Rotation\nController" as rotator <<api>>
+}
+
+package "Storage (.data/logs/)" {
+  database "Dated Log Files\n(e.g. 0800-0900)" as logFiles <<storage>>
+}
+
+claude --> mcpLoop : "LSL entries"
+mcpLoop --> slb : "normalized log entries"
+slb --> batcher : "accumulates"
+slb --> hasher : "hash user identity"
+slb --> rotator : "check size threshold"
+batcher ..> logFiles : "non-blocking flush"
+rotator ..> logFiles : "rotate on threshold"
+hasher ..> logFiles : "segregate by hashed user"
+
+@enduml
