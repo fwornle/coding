@@ -857,7 +857,11 @@ async function pollProxySemantic() {
     // Success.
     currentState.proxy.semantic_ok = true;
     currentState.proxy.reason = null;
-    if (prevSemantic !== true) log(`proxy semantic_ok flip -> true (${elapsed}ms)`, 'INFO');
+    if (prevSemantic !== true) {
+      log(`proxy semantic_ok flip -> true (${elapsed}ms) — triggering immediate strong probe`, 'INFO');
+      // Don't wait for the 5-min strong probe cycle — verify full pipeline now.
+      setImmediate(() => pollProxySemanticStrong());
+    }
     log(`proxy semantic probe ok (${elapsed}ms)`, 'DEBUG');
   } finally {
     // Phase 34 D-06: every probe outcome flows through the FSM exactly once.
