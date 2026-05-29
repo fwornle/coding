@@ -2081,7 +2081,7 @@ class CombinedStatusLine {
     // Reflects whether the local proxy (px/proxydetox) is running and functional.
     {
       const pxOn = network?.proxy_running && network?.proxy_functional;
-      const pxLabel = network?.proxy_running ? (network?.proxy_functional ? 'ON' : 'ERR') : 'OFF';
+      const pxLabel = (network?.proxy_running && network?.proxy_functional) ? 'ON' : 'OFF';
       parts.push(`[P:${pxLabel}]`);
       if (network?.location === 'corporate' && !pxOn) {
         // On CN without working proxy — problem

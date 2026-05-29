@@ -32,7 +32,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
-import { spawnSync, spawn, execFile } from 'node:child_process';
+import { spawnSync, spawn, execFile, execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
@@ -40,7 +40,6 @@ import { probeHttpHealth, probeTcpPort } from '../lib/utils/service-probe.js';
 import net from 'node:net';
 import http from 'node:http';
 import https from 'node:https';
-import dns from 'node:dns';
 import os from 'node:os';
 import ProcessStateManager from './process-state-manager.js';
 import { getTimeWindow, utcToLocalTime } from './timezone-utils.js';
@@ -1465,7 +1464,7 @@ function refreshLslStaleness() {
 // ---------------------------------------------------------------------------
 // Network environment detection — single source of truth
 // ---------------------------------------------------------------------------
-const NETWORK_PROBE_INTERVAL_MS = 30_000;
+const NETWORK_PROBE_INTERVAL_MS = 15_000;
 
 /**
  * Detect network location and proxy status — INDEPENDENTLY.
@@ -1533,16 +1532,19 @@ async function pollNetworkStatus() {
   });
 
   // Signal 2: BMW PAC DNS resolution (indicates corporate network reachability)
+  // IMPORTANT: Use execSync('dig') instead of dns.Resolver — Node's dns module
+  // caches the system DNS servers from process startup and never re-reads them.
+  // If the coordinator starts on a hotspot (public DNS), it will NEVER resolve
+  // internal BMW hostnames even after switching to office LAN (corporate DNS).
+  // 'dig' spawns a fresh process that uses the OS's current DNS configuration.
   const pacResolved = await new Promise(resolve => {
-    let settled = false;
-    const resolver = new dns.Resolver();
-    resolver.setServers(dns.getServers());
-    const timer = setTimeout(() => {
-      if (!settled) { settled = true; resolver.cancel(); resolve(false); }
-    }, 3000);
-    resolver.resolve4('muc.proxy-pac.bmwgroup.net', (err, addrs) => {
-      if (!settled) { settled = true; clearTimeout(timer); resolve(!err && addrs && addrs.length > 0); }
-    });
+    try {
+      const result = execSync('dig +short +timeout=2 +tries=1 muc.proxy-pac.bmwgroup.net A 2>/dev/null', { timeout: 4000, encoding: 'utf8' });
+      const hasIP = /\d+\.\d+\.\d+\.\d+/.test(result.trim());
+      resolve(hasIP);
+    } catch {
+      resolve(false);
+    }
   });
 
   // Signal 3 (used only when PAC resolves): latency distinguishes physical CN vs VPN
@@ -1552,7 +1554,7 @@ async function pollNetworkStatus() {
     onPhysicalCN = await new Promise(resolve => {
       const start = Date.now();
       const sock = net.connect({ host: 'muc.proxy-pac.bmwgroup.net', port: 80, timeout: 2000 });
-      sock.once('connect', () => { const ms = Date.now() - start; log(`network: PAC TCP latency=${ms}ms (threshold=30ms)`, 'DEBUG'); sock.destroy(); resolve(ms < 30); });
+      sock.once('connect', () => { const ms = Date.now() - start; log(`network: PAC TCP latency=${ms}ms (threshold=100ms)`, 'DEBUG'); sock.destroy(); resolve(ms < 100); });
       sock.once('error', () => resolve(false));
       sock.once('timeout', () => { sock.destroy(); resolve(false); });
     });
@@ -2226,6 +2228,8 @@ app.post('/health/refresh', async (_req, res) => {
     // consecutive_failures when semantic_ok stayed false, and that flag is
     // unaffected by /health/refresh.
     evaluateAutoHealFSM();
+    // Reset network probe age so forceTick re-probes immediately (px toggle)
+    currentState.network.last_probe_end = null;
     await forceTick();
     res.json(currentState);
   } catch (err) {

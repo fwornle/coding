@@ -34,12 +34,24 @@ const cacheSuffix = paneProject
   : '';
 const cacheFile = join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 
-// Fast path: serve from cache if fresh (<30s)
+// Invalidation flag — `px` toggle writes this to force immediate re-render
+const invalidateFlag = join(codingRepo, '.logs', 'statusline-invalidate');
+let cacheInvalidated = false;
 try {
-  if (existsSync(cacheFile)) {
+  if (existsSync(invalidateFlag)) {
+    const flagAge = Date.now() - statSync(invalidateFlag).mtimeMs;
+    if (flagAge < 10000) cacheInvalidated = true;
+    // Remove flag after reading (one-shot)
+    try { (await import('fs')).unlinkSync(invalidateFlag); } catch {}
+  }
+} catch {}
+
+// Fast path: serve from cache if fresh (<10s) and not invalidated
+try {
+  if (!cacheInvalidated && existsSync(cacheFile)) {
     const stat = statSync(cacheFile);
     const ageMs = Date.now() - stat.mtimeMs;
-    if (ageMs < 30000) {
+    if (ageMs < 10000) {
       // CRITICAL: do NOT .trim() here — the producer LEFT-pads with spaces to
       // a stable cell count so tmux repaints the full status-right area every
       // render (tmux does not auto-clear cells when content shrinks). Trim

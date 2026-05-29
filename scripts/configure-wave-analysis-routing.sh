@@ -90,6 +90,9 @@ WAVE_OVERRIDES = {
     'wave-analysis-wave4-diagram-repair':      CHEAP,
     'wave-analysis-wave4-pattern-extract':     HEAVY,
     'wave-analysis-wave4-docs':                HEAVY,
+    # Health/monitoring probes — must use copilot (HTTP) not claude-code (subprocess)
+    'health-coordinator':                      CHEAP,
+    'observation-writer':                      HEAVY,
 }
 
 def get_settings():
