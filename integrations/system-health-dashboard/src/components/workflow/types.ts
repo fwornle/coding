@@ -10,6 +10,15 @@ export interface AgentDefinition {
   icon: LucideIcon
   description: string
   usesLLM: boolean
+  /**
+   * Phase 52 D-08 — Process tag for live LLM badge resolution.
+   * Imported from the frozen registry (process-tags.ts via the
+   * semantic-analysis submodule's compiled dist). When set, the trace-modal
+   * renders the live provider/model from the most-recent N=10 rows of
+   * token_usage.db where process = this tag. Falls back to the static
+   * `llmModel` string when no rows match (D-03 empty-bucket case).
+   */
+  processTag?: string
   llmModel: string | null
   techStack: string
   row: number
@@ -45,6 +54,17 @@ export interface StepInfo {
   // Trace extension fields for wave-analysis 3-level nested view
   wave?: number
   subSteps?: StepInfo[]
+  /**
+   * Phase 52 D-15 — per-item progress fields written by wave-controller's
+   * throttled emission inside wave1/2/3/4 loops. Optional + backward-compat:
+   * when itemsTotal is missing the dashboard falls back to the legacy
+   * arrow-style render. Field lives under `outputs.*` on the disk JSON; this
+   * declaration documents the public contract. Plan 52-03 wires the
+   * wave-controller emission; field is typed here for cohesion so the
+   * trace-modal in Plan 52-03 has the type immediately.
+   */
+  itemsCompleted?: number
+  itemsTotal?: number
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   agentInstances?: any[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,6 +117,13 @@ export interface AgentDefinitionAPI {
   icon: string
   description: string
   usesLLM: boolean
+  /**
+   * Phase 52 D-08 — Mirror of `AgentDefinition.processTag` on the API
+   * response shape. Optional + back-compat: older API responses without this
+   * field continue to work; the trace modal simply falls back to the static
+   * `llmModel` string (D-03 empty-bucket fallback).
+   */
+  processTag?: string
   llmModel: string | null
   techStack: string
   row: number
