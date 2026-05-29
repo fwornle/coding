@@ -2,57 +2,62 @@
 
 **Type:** SubComponent
 
-The RedactionEngine reads category-based pattern rules from `.specstory/config/redaction-config.yaml`, allowing secrets and PII patterns to be organized by category (e.g., API keys, email addresses) without modifying application code.
-
-# RedactionEngine — Technical Insight Document
+Because the TranscriptAdapter pipeline in `lib/agent-api/transcript-api.js` requires `convertToLSL()` to produce unified LSLSession/LSLEntry objects before persistence, redaction must occur either at the end of `convertToLSL()` or as a post-processing step on the LSL output, making it a cross-cutting concern over the unified format rather than agent-specific raw data
 
 ## What It Is
 
-RedactionEngine is a sub-component of LiveLoggingSystem responsible for stripping secrets and PII from log output before persistence. It is configured via `.specstory/config/redaction-config.yaml`, which defines category-based pattern rules (e.g., API keys, email addresses). This externalized configuration means redaction behavior can be modified without code changes.
+RedactionEngine is a SubComponent of LiveLoggingSystem responsible for sanitizing sensitive data from transcript content before persistence. Its configuration lives at `.specstory/config/redaction-config.yaml`, a project-local file that serves as the authoritative pattern registry defining what constitutes sensitive data. RedactionEngine owns a child component, RedactionConfigLoader, which is responsible for reading and surfacing those patterns to the engine at runtime. No source code symbols were directly observed, but the surrounding pipeline and configuration topology make its role and placement unambiguous.
 
 ## Architecture and Design
 
-RedactionEngine follows a **configuration-driven transformation** pattern. Rather than embedding redaction logic directly into format conversion, it exists as a separable, configurable step that LSLConverter references during log processing. LSLConfigValidator validates the redaction options, ensuring correctness before runtime.
+RedactionEngine is deliberately positioned as a **downstream, post-conversion pipeline stage** within LiveLoggingSystem rather than as logic embedded inside any individual agent adapter. This is its central architectural decision.
 
 ![RedactionEngine — Architecture](images/redaction-engine-architecture.png)
 
-This separation from LSLConverter is a key design decision: redaction is a cross-cutting concern applied as a pipeline stage, not a hardcoded behavior. This allows the same converter logic to operate with or without redaction, or with different redaction profiles.
-
-## Implementation Details
-
-The redaction configuration in `redaction-config.yaml` organizes patterns by category. Each category groups related sensitive data patterns (API keys, emails, etc.), enabling selective enable/disable of entire categories. LSLConverter consumes these as options during its format translation process (`lib/agent-api/transcripts/lsl-converter.js`), applying pattern matching and replacement as a transformation step.
-
-No code symbols were provided, so internal implementation details beyond this architectural relationship cannot be further specified.
-
-## Integration Points
-
-RedactionEngine integrates with two sibling-level concerns within LiveLoggingSystem:
-
-- **LSLConverter** references RedactionEngine options during conversion, making redaction an optional transformation layer in the logging pipeline.
-- **LSLConfigValidator** validates redaction configuration, ensuring pattern rules are well-formed before they reach the converter.
+The TranscriptAdapter contract defined in `lib/agent-api/transcript-api.js` requires all agent adapters to implement `convertToLSL()`, which transforms agent-native transcript formats into unified `LSLSession`/`LSLEntry` objects before anything downstream — including persistence — acts on the data. Because all agent types converge on this single, normalized format, RedactionEngine can apply one redaction pass over LSL-structured content and achieve uniform coverage regardless of which TranscriptAdapter subclass produced it. The alternative — redacting inside each adapter against raw, agent-native data — would require duplicating or specializing redaction logic across every adapter implementation, a maintenance burden that grows linearly with the number of supported agents. The current design avoids this entirely.
 
 ![RedactionEngine — Relationship](images/redaction-engine-relationship.png)
 
-It operates alongside SessionWindowingManager as a peer sub-component of LiveLoggingSystem, though the two appear to address orthogonal concerns (time-based session segmentation vs. content sanitization).
+This makes RedactionEngine a **cross-cutting concern over the unified LSL format**, not over any agent-specific representation. It sits after `convertToLSL()` in the pipeline and before persistence, functioning as a mandatory sanitization gate. Its sibling components — SessionWindowManager and TranscriptAdapterRegistry — operate at the adapter/ingestion layer and are unaffected by redaction logic. SessionWindowManager handles `timeWindow` bucketing (e.g., `'0800-0900'`) at ingestion time, while TranscriptAdapterRegistry manages adapter discovery and dispatch. Neither interacts with RedactionEngine directly; the separation of concerns is clean.
+
+## Implementation Details
+
+The configuration backbone is `.specstory/config/redaction-config.yaml`. Scoping this file under `.specstory/config/` rather than in shared pipeline code (`lib/`) is a deliberate design decision: it makes the pattern registry **project-local**, allowing each repository to define its own sensitive-data patterns — API keys, tokens, proprietary identifiers — without touching the shared `lib/agent-api/` pipeline code. This is the mechanism by which RedactionEngine achieves per-repository customization without coupling configuration to implementation.
+
+RedactionConfigLoader, as RedactionEngine's sole child component, is responsible for loading and parsing this YAML file, making the pattern definitions available to the engine. The separation of config loading into a discrete subcomponent follows a clean single-responsibility split: RedactionConfigLoader owns the I/O and parsing concern, while RedactionEngine owns the application of those patterns against LSL content.
+
+The redaction pass itself operates on the output of `convertToLSL()` — meaning it works against `LSLSession` and `LSLEntry` objects as defined by the unified format. The `readTranscripts()` method in `lib/agent-api/transcript-api.js` reads raw agent-native files, and `convertToLSL()` transforms them; RedactionEngine never touches the raw pre-conversion data. This ordering is significant: redaction benefits from the structured, normalized shape of LSL objects rather than having to parse heterogeneous raw formats.
+
+## Integration Points
+
+RedactionEngine's primary upstream dependency is the output of `convertToLSL()` in `lib/agent-api/transcript-api.js`. Any TranscriptAdapter subclass registered via TranscriptAdapterRegistry — whether for Claude, Copilot, or a future Cursor or Gemini CLI adapter — feeds into this same pipeline, and therefore all adapter output passes through RedactionEngine before reaching persistent storage. This is a strong integration guarantee: new agent adapters automatically inherit redaction coverage by virtue of satisfying the adapter interface contract documented in `docs/architecture/agent-abstraction-api.md`.
+
+RedactionConfigLoader is RedactionEngine's only child dependency, and `.specstory/config/redaction-config.yaml` is that loader's sole external input. The engine has no observed direct coupling to SessionWindowManager or TranscriptAdapterRegistry.
 
 ## Usage Guidelines
 
-Edit `.specstory/config/redaction-config.yaml` to add or modify redaction patterns by category. No application code changes are needed. Ensure configurations pass LSLConfigValidator before deployment. When adding new sensitive data categories, group patterns logically to allow category-level toggling.
+**Configuration is the primary extension point.** Developers adding new sensitive-data patterns should modify `.specstory/config/redaction-config.yaml` rather than touching any code in `lib/`. The project-local scoping of this file means changes are repository-contained and do not affect shared pipeline infrastructure.
+
+**Never introduce redaction logic inside a TranscriptAdapter subclass.** The architectural intent is that adapter implementations remain agent-specific and format-conversion-focused; they should not carry sanitization responsibilities. Redaction belongs in the downstream RedactionEngine stage, after `convertToLSL()` has produced normalized LSL output.
+
+**Redaction operates on LSL-structured data, not raw transcripts.** Any debugging or extension work should assume `LSLSession`/`LSLEntry` objects as the input domain — the engine never sees agent-native raw formats. When validating that a new pattern defined in `redaction-config.yaml` fires correctly, test it against LSL-structured content, not raw source files.
+
+**Adding a new agent type does not require redaction changes.** Because RedactionEngine operates downstream of the adapter layer and against the unified LSL format, onboarding a new agent (implementing the five-method adapter contract) automatically brings its output under the existing redaction regime. The architecture's cross-cutting design makes this a zero-touch concern for adapter authors.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem is the infrastructure responsible for capturing, converting, and routing Claude Code (and other agent) conversation sessions into a unified LSL (Live Session Logging) format. It handles session windowing with time-based identifiers (e.g., '0800-0900'), multi-user support via SHA-256 user hashing, file routing with size/rotation thresholds, and transcript format conversion between agent-native formats (JSONL conversation files) and LSL markdown or JSON-Lines output. The system is configured primarily through `.specstory/config/lsl-config.json` and a companion `redaction-config.yaml`, with validation tooling in `scripts/validate-lsl-config.js`.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The TranscriptAdapter abstract class in `lib/agent-api/transcript-api.js` enforces a strict interface contract that all agent-specific adapters must satisfy. Subclasses must implement five methods: `getAgentType()` (returns a string identifier like 'claude' or 'copilot'), `getTranscriptDirectory()` (returns the filesystem path where native transcripts are stored), `readTranscripts()` (reads raw agent-native files), `convertToLSL()` (transforms them into the unified LSLSession/LSLEntry format), and `getCurrentSession()` (returns the active session for live ingestion). This adapter pattern means that adding a new agent source — say, a Cursor or Gemini CLI — requires only implementing this interface without touching any downstream pipeline code. The LSLMetadata type includes a `timeWindow` field (formatted as e.g. '0800-0900') that the adapter is responsible for populating, meaning the adapter layer also owns the hourly-bucketing logic that drives file routing downstream.
 
-The architecture follows an adapter pattern: `TranscriptAdapter` (lib/agent-api/transcript-api.js) is an abstract base class that agent-specific implementations must extend, requiring `getAgentType()`, `getTranscriptDirectory()`, `readTranscripts()`, `convertToLSL()`, and `getCurrentSession()`. The `LSLConverter` class (lib/agent-api/transcripts/lsl-converter.js) handles the actual format translation — converting sessions to markdown, JSONL, or parsing JSONL back — with configurable content truncation, secret redaction, and tool result inclusion. The system also integrates a 5-layer ontology classification pipeline (referenced in `lsl-5-layer-classification.puml`) for categorizing captured log entries.
-
-Key operational concerns include async buffered file I/O (100ms flush interval, 50-entry max buffer in `integrations/mcp-server-semantic-analysis/src/logging.ts`), schema-constrained configuration validation (file size bounds of 1MB–100MB, rotation thresholds, batch sizes), and a watch/poll mechanism in `TranscriptAdapter.watchTranscripts()` that polls `getCurrentSession()` on a configurable interval to emit new entries to registered callbacks.
+### Children
+- [RedactionConfigLoader](./RedactionConfigLoader.md) -- The authoritative pattern registry lives at `.specstory/config/redaction-config.yaml`, as established by the RedactionEngine sub-component context; all agent adapters rely on this single config file for consistent sensitive-data definitions.
 
 ### Siblings
-- [SessionWindowingManager](./SessionWindowingManager.md) -- SessionWindowingManager is a sub-component of LiveLoggingSystem
+- [SessionWindowManager](./SessionWindowManager.md) -- The LSLMetadata type defined in the transcript pipeline includes a `timeWindow` field (formatted as e.g. '0800-0900'), and the TranscriptAdapter contract in `lib/agent-api/transcript-api.js` assigns responsibility for populating this field to the adapter layer, meaning window computation happens at ingestion time
+- [TranscriptAdapterRegistry](./TranscriptAdapterRegistry.md) -- The TranscriptAdapter abstract class in `lib/agent-api/transcript-api.js` enforces five mandatory methods — `getAgentType()`, `getTranscriptDirectory()`, `readTranscripts()`, `convertToLSL()`, `getCurrentSession()` — forming a strict interface contract all agent adapters must satisfy
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 5 observations*

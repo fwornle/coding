@@ -2,77 +2,71 @@
 
 **Type:** SubComponent
 
-ContentValidationAgent follows a specific pattern, executing a validation function with input and context as parameters, similar to the execute(input, context) pattern used in the ConstraintMonitor sub-component.
+As documented in docs/constraints/README.md, ContentValidationAgent is part of the constraint enforcement layer, meaning staleness violations it detects feed into the same violation-history.json pipeline as hook-based violations
 
-## What It Is  
+# ContentValidationAgent — Technical Insight Document
 
-The **ContentValidationAgent** is a sub‑component that lives in the file  
-`integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`.  
-Its sole responsibility is to validate the *content* of entities—such as code actions and file operations—against a set of rules that have been configured for the system. By doing so it provides a uniform enforcement point for the **ConstraintSystem**, ensuring that every modification performed during a Claude Code session respects the predefined constraints. The agent is therefore a key pillar in the overall constraint‑enforcement pipeline, sitting directly under the parent **ConstraintSystem** component and working alongside its sibling, **ConstraintMonitor**, which follows a very similar execution model.
+## What It Is
 
-## Architecture and Design  
+ContentValidationAgent is a SubComponent of the ConstraintSystem responsible for validating the semantic integrity of recorded knowledge against the live state of the repository. Rather than intercepting tool calls at runtime (the role of its sibling UnifiedHookManager), ContentValidationAgent operates as a retrospective auditor: it interrogates the graph-based memory store and checks whether what was previously observed and recorded still accurately reflects the current codebase.
 
-The design of the ContentValidationAgent is deliberately lightweight and follows the **execute‑input‑context** pattern that is also used by the sibling ConstraintMonitor. In practice the agent exposes a single entry point—conceptually `execute(input, context)`—that receives the data to be validated together with any contextual information required for rule evaluation. This pattern creates a **standardized validation contract** across the ConstraintSystem, allowing different agents to be swapped or extended without changing the surrounding orchestration logic.
+Its operational scope is defined in `docs/constraints/README.md`, which places it explicitly within the constraint enforcement layer. This means ContentValidationAgent is not an isolated utility — its findings are first-class violations that flow into the same `.mcp-sync/violation-history.json` pipeline that ConstraintDashboard reads for historical analysis and reporting.
 
-The agent is part of a **rule‑driven validation layer**. Rules are configured elsewhere in the system (the observations do not specify the exact location) and are applied by the agent’s internal validation function. The function iterates over these rules, checking the incoming entity content for compliance. Because the validation logic is encapsulated in a single function, the agent can be treated as a **pure function** from the perspective of the ConstraintSystem—no side effects other than reporting validation outcomes are introduced.  
+![ContentValidationAgent — Architecture](images/content-validation-agent-architecture.png)
 
-![ContentValidationAgent — Architecture](images/content-validation-agent-architecture.png)  
+The agent works against entity observations stored in the GraphKMStore architecture (documented in `docs/architecture/memory-systems.md`), meaning it validates *graph nodes* — structured records about files, components, and their relationships — rather than directly scanning raw source files. This design decision is significant: ContentValidationAgent is a second-order validator, checking the health of the knowledge layer itself.
 
-This architectural choice promotes **decoupling**: the ConstraintSystem does not need to know the internals of how validation is performed, only that the agent will return a pass/fail (or detailed error) result. The similarity to ConstraintMonitor also means that both agents can be orchestrated using the same dispatcher or pipeline, simplifying the overall system design.
+## Architecture and Design
 
-## Implementation Details  
+ContentValidationAgent embodies a two-pronged validation strategy. The first prong is temporal: through its child component GitHistoryStalenessSignal, it uses git commit history as a staleness <COMPANY_NAME_REDACTED>. The second prong is structural: it performs file reference extraction from diagrams and observations, resolving those references against the actual filesystem to detect broken links caused by file deletions or moves.
 
-The concrete implementation resides in `content-validation-agent.ts`. While the source snapshot does not list individual symbols, the observations make clear that the file defines **a validation function** that receives two parameters—`input` (the entity content to be checked) and `context` (metadata such as the current session, user permissions, or rule set version). Inside this function the following steps are performed:
+![ContentValidationAgent — Relationship](images/content-validation-agent-relationship.png)
 
-1. **Rule Retrieval** – The function accesses the configured validation rules, likely via a configuration service or a static definition bundled with the agent.  
-2. **Content Inspection** – The incoming `input` is examined; for code actions this might involve parsing AST nodes, while for file operations it could be a diff or file metadata.  
-3. **Rule Application** – Each rule is applied in turn. The rules are expressed as predicates that return true when the content complies, or produce a descriptive violation object when it does not.  
-4. **Result Aggregation** – All violations are collected and returned to the caller, enabling the ConstraintSystem to either block the operation or surface the issues to the user.
+The key architectural decision here is the separation of *when* something changed (git history, delegated to GitHistoryStalenessSignal) from *whether* something still exists (filesystem resolution, handled at the ContentValidationAgent level). This decomposition means staleness detection is version-control-aware, not merely timestamp-based — a file that was touched in a significant commit carries more weight as a staleness trigger than one that was incidentally modified.
 
-Because the agent follows the same **execute(input, context)** signature as ConstraintMonitor, the implementation likely reuses shared utility modules for logging, error handling, and rule loading, though those details are not enumerated in the observations.
+The choice to validate graph nodes rather than raw source files reflects a clean layering principle: ContentValidationAgent assumes the GraphKMStore is the authoritative record of what the agent "knows," and its job is to ensure that record remains trustworthy. This makes ContentValidationAgent a guardian of the knowledge graph's fidelity rather than a linter of source code.
 
-## Integration Points  
+The integration with the violation pipeline shared by the hook-based ConstraintSystem (UnifiedHookManager feeding into `violation-history.json`) is a deliberate unification of two otherwise separate validation modes — live interception and retrospective audit — under a single observability surface. ConstraintDashboard therefore presents a unified view of both real-time constraint violations and stale-knowledge violations without needing to distinguish their source.
 
-ContentValidationAgent is tightly integrated with the **ConstraintSystem**. The parent component invokes the agent whenever an entity that could affect system state is about to be persisted or executed. The agent’s output feeds directly into the ConstraintSystem’s decision‑making flow: a successful validation permits the operation to continue, while any violations cause the system to reject the action or request remediation.
+## Implementation Details
 
-The agent also shares an execution contract with its sibling **ConstraintMonitor**, meaning that both can be registered with a common dispatcher inside the ConstraintSystem. This dispatcher abstracts the concrete agent implementations, passing the same `input` and `context` structures to whichever validation routine is appropriate.  
+ContentValidationAgent contains GitHistoryStalenessSignal as a dedicated child responsible for the git-history comparison step. As described in `docs/constraints/constraint-monitoring-system.md`, GitHistoryStalenessSignal compares the timestamps or commit ancestry of recorded entity observations against recent commits affecting the corresponding files. Observations that predate significant file changes are flagged as potentially stale — the implication being that whatever was recorded about a file may no longer reflect its current structure or behavior.
 
-![ContentValidationAgent — Relationship](images/content-validation-agent-relationship.png)  
+The file reference extraction capability is the second major implementation concern. ContentValidationAgent can parse structured diagram formats — the observations point to Mermaid or similar syntaxes — to extract embedded file paths and entity references. These extracted references are then resolved against the live filesystem. A reference that no longer resolves (because the file was deleted, renamed, or moved) becomes a structural violation. This means ContentValidationAgent must maintain logic for both diagram parsing and path resolution, making it one of the more complex agents in the system despite having no direct code symbols currently indexed.
 
-Other integration points, inferred from the observations, include:
+The output of both validation paths — staleness flags from GitHistoryStalenessSignal and broken-reference flags from diagram/observation parsing — is formatted as violations compatible with `.mcp-sync/violation-history.json`. This shared schema is the integration contract that connects ContentValidationAgent to the rest of the ConstraintSystem.
 
-* **Code Actions** – The agent validates the content generated by Claude Code before it is applied to the repository.  
-* **File Operations** – When files are created, modified, or deleted, the agent checks the operation against the rule set.  
+## Integration Points
 
-No child components are mentioned; the agent appears to be a leaf node in the ConstraintSystem hierarchy.
+ContentValidationAgent sits within ConstraintSystem alongside UnifiedHookManager and ConstraintDashboard, but its integration mode is distinct from both siblings. UnifiedHookManager operates synchronously on tool events via `lib/agent-api/hooks/hook-manager.js`; ContentValidationAgent operates asynchronously or on-demand against the knowledge graph. ConstraintDashboard consumes the shared violation history that ContentValidationAgent populates, making ConstraintDashboard the downstream consumer of ContentValidationAgent's findings.
 
-## Usage Guidelines  
+The dependency on GraphKMStore (per `docs/architecture/memory-systems.md`) means ContentValidationAgent is tightly coupled to the memory system's node structure. Any changes to how entity observations are recorded in the graph — their schema, identifiers, or file reference format — will directly affect ContentValidationAgent's ability to extract and validate references. This is a meaningful architectural coupling to track.
 
-Developers should treat the ContentValidationAgent as a **black‑box validator** that must be invoked via its `execute(input, context)` interface. The `input` payload should be a fully‑formed representation of the entity (e.g., a code‑action object or a file‑operation descriptor), and the `context` should contain any metadata required for rule evaluation, such as the current user’s role or the active rule version.  
+The git history dependency introduces an external integration point: ContentValidationAgent (via GitHistoryStalenessSignal) must have access to the repository's git log, meaning it implicitly requires execution in an environment where the `.git` directory is accessible and git commands can be run or their output parsed.
 
-When adding new validation rules, place them in the configuration location consumed by the agent rather than modifying the agent’s code. This preserves the separation of concerns and allows rule changes to be hot‑reloaded without redeploying the agent.  
+## Usage Guidelines
 
-Because the agent follows the same pattern as ConstraintMonitor, any tooling or middleware that intercepts `execute` calls (e.g., logging, tracing, or performance monitoring) can be applied uniformly to both agents.  
+Developers working with or extending ContentValidationAgent should treat the `violation-history.json` schema as a strict contract. Violations emitted by ContentValidationAgent must be structurally identical to those produced by hook-based mechanisms, since ConstraintDashboard does not distinguish between sources. Any new validation check added to ContentValidationAgent must produce output conforming to this shared schema.
 
-Finally, ensure that any failure returned by the agent is handled gracefully by the ConstraintSystem—either by presenting a clear error to the user or by rolling back the pending operation. Ignoring validation results would defeat the purpose of the constraint enforcement layer.
+When interpreting staleness signals, it is important to understand that GitHistoryStalenessSignal flags observations that *predate significant file changes* — not all file changes. The definition of "significant" is a design parameter documented in `docs/constraints/README.md` and `docs/constraints/constraint-monitoring-system.md`. Developers tuning the system should revisit that definition before adjusting sensitivity thresholds, as overly aggressive staleness flagging will pollute the violation history with false positives visible in ConstraintDashboard.
 
----
+For diagram validation to function correctly, diagrams embedded in observations or documentation must use a format ContentValidationAgent can parse (currently indicated to be Mermaid or similar structured syntax). Ad-hoc or image-only diagrams will be invisible to the file reference extraction step, creating a blind spot in structural validation. Teams should standardize on parseable diagram formats for any documentation that includes file or entity references intended to be kept current.
 
-### Summary of Key Insights  
+Finally, because ContentValidationAgent validates graph nodes rather than source files directly, its accuracy is bounded by the <USER_ID_REDACTED> of the GraphKMStore's recorded observations. If observations are incomplete, coarsely granular, or recorded infrequently, ContentValidationAgent's staleness and reference checks will only be as reliable as that underlying data. Keeping the knowledge graph well-maintained is a prerequisite for ContentValidationAgent to provide meaningful signal.
 
-1. **Architectural patterns identified** – Execute‑input‑context contract, rule‑driven validation layer, pure‑function style agent, shared dispatcher pattern with sibling agents.  
-2. **Design decisions and trade‑offs** – Centralizing validation in a single function simplifies enforcement and testing but couples rule configuration tightly to the agent; using the same pattern as ConstraintMonitor reduces duplication but may limit flexibility if future agents need richer interfaces.  
-3. **System structure insights** – ContentValidationAgent is a leaf node under ConstraintSystem, sibling to ConstraintMonitor, and acts as the enforcement gate for code actions and file operations. The architecture promotes decoupling through a common execution contract.  
-4. **Scalability considerations** – Because validation is performed synchronously via a single function, the agent can become a bottleneck under high‑throughput workloads. Scaling can be achieved by parallelizing rule evaluation or by sharding rule sets across multiple agent instances, provided the dispatcher supports concurrent execution.  
-5. **Maintainability assessment** – The clear separation of rule configuration from validation logic, combined with the uniform execute pattern, yields high maintainability. Adding or updating rules does not require code changes, and the agent’s isolated location (`content-validation-agent.ts`) makes it easy to locate and test. The main risk is the lack of visible modularization within the file (no symbols reported), so future refactoring should introduce explicit classes or interfaces to improve readability.
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the ContentValidationAgent, which is implemented in the content-validation-agent.ts file, to validate entity content against configured rules. This agent is responsible for ensuring that the code actions and file operations performed during a Claude Code session comply with the predefined constraints. The ContentValidationAgent follows a specific pattern, where it executes a validation function with the input and context as parameters, similar to the execute(input, context) pattern used in the ConstraintMonitor sub-component. This pattern allows for a standardized way of validating constraints across different components of the system. The content-validation-agent.ts file is located in the integrations/mcp-server-semantic-analysis/src/agents directory.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a multi-layered enforcement framework that validates code actions and file operations during Claude Code sessions. It operates through a hook-based architecture where the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) intercepts agent tool events (pre-tool, post-tool, etc.) and routes them through registered handlers loaded from user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) configuration files. Violations detected during these checks are captured, persisted, and surfaced through a dashboard for monitoring.
+
+### Children
+- [GitHistoryStalenessSignal](./GitHistoryStalenessSignal.md) -- Described in the ContentValidationAgent sub-component context as comparing recorded entity observations against recent commits to flag observations that predate significant file changes, per docs/constraints/README.md and docs/constraints/constraint-monitoring-system.md documentation context.
 
 ### Siblings
-- [ConstraintMonitor](./ConstraintMonitor.md) -- The ConstraintMonitor uses an execute(input, context) pattern to validate constraints, similar to the pattern used by the ContentValidationAgent.
+- [ConstraintDashboard](./ConstraintDashboard.md) -- ConstraintDashboard reads violation data from .mcp-sync/violation-history.json, a shared sync file that persists violations across Claude Code sessions for historical analysis
+- [UnifiedHookManager](./UnifiedHookManager.md) -- UnifiedHookManager lives at lib/agent-api/hooks/hook-manager.js and serves as the single interception point for all agent tool lifecycle events in the ConstraintSystem
+
 
 ---
 

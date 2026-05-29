@@ -2,73 +2,55 @@
 
 **Type:** SubComponent
 
-The probe library's strict status vocabulary is a direct contract with health-coordinator.js in scripts/health-coordinator.js, which must handle all four service types (Next.js, Node.js API, Memgraph, Redis) uniformly without protocol-specific branching
-
-# ServiceProbeLibrary — Technical Insight Document
+lib/utils/service-probe.js exposes at least two probe strategies — HTTP (checking an endpoint for a success response) and TCP (checking port reachability) — allowing different services to declare the appropriate probe type
 
 ## What It Is
 
-ServiceProbeLibrary is a focused utility subcomponent implemented in `lib/utils/service-probe.js` that provides the foundational health-sensing primitives for the broader DockerizedServices system. It contains exactly two probes—HttpHealthProbe (`probeHttpHealth()`) and TcpPortProbe (`probeTcpPort()`)—each targeting a distinct transport-layer protocol. Rather than being a general-purpose monitoring framework, this library is a deliberately narrow contract: it exists to produce a strictly controlled vocabulary of service states consumed upstream by `scripts/health-coordinator.js`.
-
-![ServiceProbeLibrary — Architecture](images/service-probe-library-architecture.png)
-
-The library's scope is intentionally limited to the four concrete service types running in the Docker environment: the Next.js dashboard, the Node.js API, Memgraph, and Redis. Two of those services (Next.js and Node.js API) speak HTTP and are handled by HttpHealthProbe; the remaining two (Memgraph via Bolt, and Redis via its native TCP protocol) require raw socket verification and are handled by TcpPortProbe.
-
----
+ServiceProbeLibrary is implemented in `lib/utils/service-probe.js` and provides the canonical health-checking primitives for the DockerizedServices system. It exposes at minimum two probe strategies — HTTP and TCP — that other components consume to verify service reachability without each component implementing its own polling logic.
 
 ## Architecture and Design
 
-The central architectural decision in ServiceProbeLibrary is the **strict separation of protocol-specific detection logic from the state vocabulary it produces**. Both `probeHttpHealth()` and `probeTcpPort()` ultimately return one of exactly three strings: `'running'`, `'stopped'`, or `'unknown'`. This is not a convention—it is a documented architectural invariant recorded as **SPEC R6**, which explicitly prohibits either probe from ever returning `'healthy'`. The constraint exists because HealthCoordinator (`scripts/health-coordinator.js`) must process results from all four service types through a single, uniform state machine. If a fourth status string were introduced, or if `'healthy'` were returned instead of `'running'`, the coordinator's logic would break without any compile-time or runtime warning.
+The central design decision in ServiceProbeLibrary is the separation of *probe definition* from *probe invocation*. Rather than letting individual services check their own or each other's health ad hoc, probe logic lives in one place and is consumed by higher-level orchestrators. This means the library acts as a shared vocabulary of health semantics rather than a utility that services call for themselves.
 
-![ServiceProbeLibrary — Relationship](images/service-probe-library-relationship.png)
+![ServiceProbeLibrary — Architecture](images/service-probe-library-architecture.png)
 
-This design reflects a clear trade-off: protocol diversity is absorbed inside the library so that protocol-agnostic uniformity can be exposed outside it. The sibling component HealthCoordinator polls `service-probe.js` results on a 5-second interval and relies entirely on this uniformity to avoid branching on service type. DockerLLMModeControl, another sibling, takes a different approach to environment abstraction (using `CODING_ROOT` for path resolution), but ServiceProbeLibrary achieves its abstraction through vocabulary enforcement rather than environment variables.
+The two probe strategies reflect a deliberate mapping to service types. HTTP probes exist to check REST-endpoint-bearing services — the constraint monitor API and dashboard service are the identified consumers — while TcpLivenessProbe (a child component defined alongside `HttpLivenessProbe` in the same file) covers lower-level port availability for services that do not speak HTTP, such as databases or message brokers. This strategy pattern avoids forcing a uniform check mechanism on heterogeneous services.
 
-The two child components—HttpHealthProbe and TcpPortProbe—are not interchangeable; they represent a deliberate protocol fork at the point of observation, not at the point of reporting. This means the architecture cleanly separates *how you detect* a service's state from *what you call* that state.
-
----
+A notable consequence of centralization is that timeout thresholds, retry semantics, and error interpretation logic are defined once and inherited everywhere. Changes to `lib/utils/service-probe.js` propagate automatically to both consumers without requiring coordinated updates across files.
 
 ## Implementation Details
 
-**HttpHealthProbe** (`probeHttpHealth()`) issues HTTP or HTTPS requests to the target service and inspects the response status code. Any 2xx or 3xx code is mapped to `'running'`, which means redirects are treated as valid healthy states for web services—a practical decision given that Next.js dashboards and Node.js APIs may legitimately redirect on root paths. Failure to receive a response, or receiving a 4xx/5xx, maps to `'stopped'` or `'unknown'` depending on the failure mode.
+`lib/utils/service-probe.js` contains at least two probe implementations: an HTTP probe that issues a request to a configured endpoint and interprets a success response as liveness, and `TcpLivenessProbe` that checks raw port reachability without requiring an application-level response. The HTTP probe is appropriate for services where a 2xx response confirms not just port availability but application-layer readiness. The TCP probe is a lighter check — confirming a port is accepting connections without asserting anything about the application's internal state.
 
-**TcpPortProbe** (`probeTcpPort()`) takes a fundamentally different approach: it opens a raw `net.Socket` connection to the target host and port. A successful connection establishment indicates the port is reachable and the service is accepting connections, which is sufficient to declare `'running'`. This approach is specifically required for Memgraph's Bolt protocol, where issuing an HTTP request would be semantically wrong and would always fail regardless of service health. Redis similarly speaks a custom protocol over TCP, making `probeTcpPort()` the correct probe choice for both.
-
-The distinction between the two probes is not merely technical—it is an enforced architectural rule. New service onboarding explicitly requires selecting `probeTcpPort()` for any non-HTTP service, documented as a hard constraint to prevent state machine breakage in HealthCoordinator. There is no "auto-detect" mechanism; the probe selection is a deliberate, documented choice at integration time.
-
----
+Both probes are designed to be declarative from the caller's perspective: a service or coordinator declares *which* probe type applies and *what* target to check, rather than implementing the checking loop itself. This keeps probe consumers thin.
 
 ## Integration Points
 
-ServiceProbeLibrary's primary consumer is HealthCoordinator (`scripts/health-coordinator.js`), which calls both probes on a 5-second polling cycle and must handle all four service types—Next.js dashboard, Node.js API, Memgraph, and Redis—without any protocol-specific branching in its own logic. This upstream dependency is what gives SPEC R6 its teeth: the coordinator is architecturally incapable of handling a status string it doesn't know about, so the probe library bears full responsibility for vocabulary discipline.
+![ServiceProbeLibrary — Relationship](images/service-probe-library-relationship.png)
 
-ServiceProbeLibrary lives within DockerizedServices, which defines the broader dual-probe health checking architecture. The parent component's design choices flow directly into this library: the requirement to handle both HTTP and non-HTTP services in a Dockerized environment is what necessitates the two-probe split in the first place. There are no outbound dependencies from ServiceProbeLibrary to DockerLLMModeControl or other siblings—it is a leaf-level utility in the dependency graph, consumed but not consuming.
+ServiceProbeLibrary has two identified consumers, and the dual-consumer relationship is architecturally significant. First, `health-coordinator` uses the probes for **runtime liveness monitoring** — ongoing checks while the system is running. Second, the sibling component ServiceStarterFramework (`lib/service-starter.js`) reuses the same probes for **startup health gating** — verifying that services have become ready before proceeding with dependent startup steps. ServiceStarterFramework's retry-with-backoff logic wraps these probe calls, so the probe library itself remains stateless and purely functional while the retry state machine lives in the starter framework.
 
----
+This dual usage means the probe library sits at a junction between startup orchestration and runtime health paths. Both paths exist within the DockerizedServices container environment where supervisord manages process lifecycles — the probes are the mechanism by which the application layer reports health back up through the orchestration stack.
 
 ## Usage Guidelines
 
-**Probe selection is mandatory and non-negotiable.** Any service added to the DockerizedServices ecosystem must use `probeHttpHealth()` if it speaks HTTP/HTTPS, and `probeTcpPort()` for everything else. This is not a style preference—misapplying the probes will either produce false negatives (TCP probe against an HTTP service that isn't listening on raw sockets) or protocol errors (HTTP probe against Memgraph's Bolt port).
+Developers adding a new supervised service to the DockerizedServices architecture should declare the appropriate probe type in `lib/utils/service-probe.js`'s configuration surface: HTTP if the service exposes a REST endpoint, TCP if it only binds a port. Resist the temptation to implement inline health checks in new service code — the centralized pattern exists precisely to avoid that.
 
-**Never introduce a fourth status string.** SPEC R6 is the hardest constraint in this library. The valid return values are `'running'`, `'stopped'`, and `'unknown'`—no additions, no aliases, no `'healthy'`. Any modification to the vocabulary must be coordinated with a corresponding update to HealthCoordinator's state machine, which is a significantly larger change than it might appear.
+Because the same probe configuration affects both startup gating (via ServiceStarterFramework) and runtime monitoring (via health-coordinator), misconfiguring a probe — pointing it at the wrong port, using HTTP for a non-HTTP service — will cause failures in both contexts simultaneously. Validate probe targets carefully before deployment.
 
-**Redirect tolerance is intentional in HttpHealthProbe.** The decision to treat 3xx responses as `'running'` reflects the reality of web service behavior. Developers should not "fix" this by narrowing the accepted range to 2xx only, as this would cause false `'stopped'` reports for legitimately functioning services that redirect on their root paths.
-
-**The 5-second polling interval is owned by HealthCoordinator, not this library.** ServiceProbeLibrary is stateless and has no internal timer. Each probe call is an independent, synchronous-to-the-caller check. Rate limiting, retry logic, and polling cadence are the coordinator's responsibility, keeping this library focused and testable in isolation.
+Timeout and retry parameters should be modified only in `lib/utils/service-probe.js`, never in calling code. Any caller-side timeout layering would create confusing double-timeout behavior and undermine the single-source-of-truth guarantee that the centralized design provides. When tuning thresholds, consider that the values apply equally to fast startup checks and to steady-state liveness polling — values appropriate for one context may be too aggressive or too lenient for the other.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component uses a dual-probe health checking architecture implemented in lib/utils/service-probe.js that strictly separates HTTP-based and TCP-based service verification. probeHttpHealth() issues HTTP/HTTPS requests and maps 2xx/3xx response codes to the 'running' state, while probeTcpPort() opens a raw net.Socket connection to verify port reachability for non-HTTP protocols like Memgraph's Bolt protocol. A critical architectural invariant (documented as SPEC R6) enforces that neither probe ever returns the string 'healthy'—only 'running', 'stopped', or 'unknown' are valid return values. This distinction matters because health-coordinator.js in scripts/health-coordinator.js consumes these probes on a 5-second polling interval and must be able to uniformly handle all service types (Next.js dashboard, Node.js API, Memgraph, Redis) without special-casing the protocol. New developers adding services must use probeTcpPort() for any non-HTTP service and must not introduce a fourth status string, or the health-coordinator's state machine will behave incorrectly.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The multi-service container architecture uses supervisord (docker/supervisord.conf) to manage multiple long-running processes within a single Docker container defined in docker/Dockerfile.coding-services. This is an intentional design choice that trades container isolation purity for operational simplicity — rather than running separate containers for the semantic analysis MCP server, constraint monitor API, and dashboard service, all are co-located under supervisord's process supervision. The entrypoint script handles startup orchestration sequencing before handing off to supervisord. A new developer should be aware that this means a crash in one supervised service does not terminate the container, supervisord will attempt restarts, but it also means a single container failure takes down all co-located services simultaneously. The bind mount pattern `CODING_ROOT=/coding` connects the host repository filesystem into the container, making the container dependent on the host directory layout at runtime rather than baking code into the image.
 
 ### Children
-- [HttpHealthProbe](./HttpHealthProbe.md) -- probeHttpHealth() treats any 2xx or 3xx HTTP/HTTPS response code as a 'running' result, covering redirects as valid healthy states for web services
-- [TcpPortProbe](./TcpPortProbe.md) -- probeTcpPort() targets services that do not speak HTTP, most notably Memgraph's Bolt port, where an HTTP probe would be inappropriate
+- [TcpLivenessProbe](./TcpLivenessProbe.md) -- Defined alongside HttpLivenessProbe in lib/utils/service-probe.js, providing an alternative probe strategy for non-HTTP services such as databases or message brokers.
 
 ### Siblings
-- [DockerLLMModeControl](./DockerLLMModeControl.md) -- llm-mock-service.ts uses CODING_ROOT environment variable for path resolution, enabling the service to locate mock fixtures regardless of Docker volume mount points
-- [HealthCoordinator](./HealthCoordinator.md) -- health-coordinator.js polls service-probe.js results every 5 seconds, providing a consistent liveness heartbeat for Next.js dashboard, Node.js API, Memgraph, and Redis
+- [ServiceStarterFramework](./ServiceStarterFramework.md) -- lib/service-starter.js implements retry-with-backoff logic to handle transient startup failures, retrying service launches rather than failing immediately on first error
 
 
 ---

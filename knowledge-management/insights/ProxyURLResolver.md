@@ -1,67 +1,70 @@
-# ProxyURLResolver
+# ProxyUrlResolver
 
 **Type:** SubComponent
 
-ProxyURLResolver implements a prioritized fallback chain checking RAPID_LLM_PROXY_URL, then LLM_CLI_PROXY_URL, then LLM_PROXY_URL, and finally defaulting to a port-based localhost address (port 12435) when no environment variable is set
+Resolves proxy endpoint by checking environment variables RAPID_LLM_PROXY_URL, LLM_CLI_PROXY_URL, and LLM_PROXY_URL in priority order, falling back to localhost:12435 as the default, ensuring compatibility across Docker and host environments
 
-# ProxyURLResolver — Technical Reference
+# ProxyUrlResolver — Technical Insight Document
 
 ## What It Is
 
-ProxyURLResolver is a SubComponent housed within LLMAbstraction, responsible for one narrowly scoped but critical task: resolving the network address of the rapid-llm-proxy daemon at runtime. Rather than allowing individual LLM call sites to hardcode proxy URLs, the system delegates all address resolution to this single module. It contains one child component, EnvironmentVariableFallbackChain, which implements the ordered lookup logic across environment variables.
+ProxyUrlResolver is a SubComponent of LLMAbstraction responsible for a single, focused task: determining the correct base URL for the rapid-llm-proxy daemon at runtime. It is the entry point for all proxy-bound LLM calls before they reach the `/api/complete` endpoint, and it shields every call site in the system from needing any knowledge of deployment topology.
 
-![ProxyURLResolver — Relationship](images/proxy-urlresolver-relationship.png)
-
-The component's reason for existence is rooted in LLMAbstraction's multi-environment design. Because LLMAbstraction must route requests through the rapid-llm-proxy daemon across CI pipelines, local developer machines, Docker environments, and production deployments, no single hardcoded address can serve all contexts. ProxyURLResolver solves this by making the address a runtime decision, not a compile-time constant.
+The resolver operates by inspecting three environment variables in a defined priority order — `RAPID_LLM_PROXY_URL`, `LLM_CLI_PROXY_URL`, and `LLM_PROXY_URL` — before falling back to the hardcoded default of `localhost:12435`. This makes it the canonical authority on "where is the proxy right now?" within LLMAbstraction.
 
 ## Architecture and Design
 
-The core architectural pattern is a **prioritized fallback chain** — a ranked sequence of resolution strategies tried in order until one succeeds. EnvironmentVariableFallbackChain implements this as four discrete levels: `RAPID_LLM_PROXY_URL` (highest priority), then `LLM_CLI_PROXY_URL`, then `LLM_PROXY_URL`, and finally a hardcoded localhost default on port 12435.
+![ProxyUrlResolver — Architecture](images/proxy-url-resolver-architecture.png)
 
-![ProxyURLResolver — Architecture](images/proxy-urlresolver-architecture.png)
+The defining architectural decision in ProxyUrlResolver is the **priority-ordered environment variable chain**. Rather than accepting a single configuration variable, the resolver encodes a compatibility hierarchy directly into its lookup logic. `RAPID_LLM_PROXY_URL` is the primary override, designed explicitly for Docker deployments where the proxy is reachable via a container-internal hostname rather than `localhost`. `LLM_CLI_PROXY_URL` and `LLM_PROXY_URL` follow as legacy fallbacks, preserving backward compatibility with older deployment configurations without requiring those environments to be updated.
 
-The design decision to use four levels rather than one canonical variable reflects a deliberate accommodation of deployment heterogeneity. `RAPID_LLM_PROXY_URL` serves contexts where the proxy identity is explicit and unambiguous. `LLM_CLI_PROXY_URL` and `LLM_PROXY_URL` appear to serve legacy or tooling-specific naming conventions, allowing existing configurations to continue working without migration. The localhost default at port 12435 is not a generic fallback — it is tightly coupled to the rapid-llm-proxy daemon's expected default binding, meaning it is only valid when the daemon is running locally. This makes the default meaningful for local development while being intentionally unsuitable for production without explicit override.
+This design reflects a deliberate trade-off: the resolver absorbs configuration complexity so that no call site in the broader LLMAbstraction system needs to reason about deployment context. The ProxyMediatedLLMClient, which routes requests through this resolved URL to `/api/complete`, can remain agnostic about whether it's running inside Docker, on a developer's host machine, or in a CI environment. The AgentModeRouter similarly benefits — when it determines that a given agent should use the proxy path (rather than DMRLocalInferenceProvider or MockModeProvider), it can hand off to proxy-bound execution without any URL negotiation.
 
-The trade-off in this design is clarity versus flexibility. Four environment variable names that can influence the same behavior can create confusion about which one is "canonical." However, the strict priority ordering enforced by EnvironmentVariableFallbackChain means the behavior is deterministic once the environment is understood — higher-priority variables always win.
+The fallback default of `localhost:12435` is not arbitrary — it is the canonical local proxy port referenced throughout the parent LLMAbstraction description, making it a system-wide convention rather than a local constant. This port serves as the last-resort value and also acts as an implicit documentation anchor: any developer searching for the proxy port across the codebase will converge on this value.
+
+![ProxyUrlResolver — Relationship](images/proxy-url-resolver-relationship.png)
 
 ## Implementation Details
 
-The resolution logic is entirely encapsulated within EnvironmentVariableFallbackChain. The chain checks each variable in sequence and returns the first non-empty value found. If all three environment variables are absent or empty, the resolver emits the hardcoded default `http://localhost:12435` (or equivalent), which directly corresponds to the rapid-llm-proxy daemon's default binding port.
+The resolver's logic is straightforward by design: it evaluates `RAPID_LLM_PROXY_URL` first, then `LLM_CLI_PROXY_URL`, then `LLM_PROXY_URL`, returning the first defined value or defaulting to `localhost:12435`. The resolved URL is then used to construct the full proxy endpoint by appending `/api/complete`, which is the single ingress point into the rapid-llm-proxy daemon for centralized token tracking and tier-based routing.
 
-Port 12435 is a meaningful constant within this system — it is the specific port that LLMAbstraction's parent architecture designates for the proxy daemon. This tight coupling between the default and the daemon's actual binding means the default is not arbitrary; it works correctly in any standard local setup without any configuration. However, it also means that if the daemon's default port changes, ProxyURLResolver is the single file that requires updating — by design, as noted in the observations.
+The priority chain encodes an explicit deprecation gradient. `RAPID_LLM_PROXY_URL` is the documented primary variable — its name is specific to the rapid-llm-proxy service, signaling intentional, current-generation configuration. `LLM_PROXY_URL` and `LLM_CLI_PROXY_URL` carry no such specificity, marking them as legacy surfaces that the system continues to honor without promoting. This naming convention communicates to operators which variable they should be setting in new deployments.
 
-No code symbols were identified in the analysis, which suggests the component may be implemented as a small utility module or function rather than a class-heavy structure. The simplicity is intentional: the component's value is in its centralization, not its complexity.
+The resolver pattern also means that the `llm-with-process.ts` module (ProxyMediatedLLMClient) — which exists specifically to inject a `process` tag into proxy requests to fix telemetry attribution — does not need its own URL resolution logic. It consumes the resolved URL from ProxyUrlResolver, keeping the separation of concerns clean: one component resolves location, another handles request shaping.
 
 ## Integration Points
 
-ProxyURLResolver sits at the boundary between LLMAbstraction's internal routing logic and the external rapid-llm-proxy daemon. Every LLM call routed through the proxy — whether targeting Anthropic, OpenAI, Groq, or the local Docker Model Runner — depends on ProxyURLResolver to supply the correct daemon address. This makes it a universal dependency within LLMAbstraction's call path.
+ProxyUrlResolver sits at the base of the proxy execution path within LLMAbstraction. Its primary consumer is ProxyMediatedLLMClient, which uses the resolved URL to direct requests to `/api/complete` on the rapid-llm-proxy daemon. The AgentModeRouter determines *whether* the proxy path is taken at all — but once that routing decision is made, ProxyUrlResolver is the first thing invoked to establish *where* the proxy is.
 
-The relationship with LLMAbstraction is one of containment and delegation: LLMAbstraction owns the component and invokes it wherever a proxy URL is needed, but ProxyURLResolver itself has no knowledge of which provider or mode is being targeted. It answers only one question: *where is the proxy?* This separation keeps routing logic (LLMAbstraction's concern) cleanly decoupled from address resolution (ProxyURLResolver's concern).
+The resolver's output also implicitly affects telemetry. Because all proxy-routed LLM calls converge on the URL it produces, misconfiguration here would silently redirect traffic away from the rapid-llm-proxy's token-tracking and tier-based routing infrastructure — making ProxyUrlResolver a quiet but critical dependency for observability correctness. The `process` tag injection that ProxyMediatedLLMClient performs only has value if requests actually reach the rapid-llm-proxy, which depends on ProxyUrlResolver producing the correct address.
 
-The environment variables `RAPID_LLM_PROXY_URL`, `LLM_CLI_PROXY_URL`, and `LLM_PROXY_URL` represent the external interface through which deployment infrastructure communicates the proxy location to this component. CI pipelines, Docker Compose configurations, and developer dotfiles are all valid sources for these variables.
+DMRLocalInferenceProvider and MockModeProvider are unaffected by ProxyUrlResolver — DMR has its own URL construction logic targeting `localhost:${DMR_PORT}/engines/v1`, and mock mode bypasses network calls entirely. ProxyUrlResolver is exclusively in scope for the proxy-mediated path.
 
 ## Usage Guidelines
 
-**Setting the proxy address:** Prefer `RAPID_LLM_PROXY_URL` as the canonical variable in new configurations. The lower-priority variables (`LLM_CLI_PROXY_URL`, `LLM_PROXY_URL`) exist for compatibility and should be treated as legacy entry points rather than preferred configuration keys.
+**Environment variable discipline is the primary operational concern.** In Docker deployments, `RAPID_LLM_PROXY_URL` must be set to the container-internal hostname of the rapid-llm-proxy service. Relying on the `localhost:12435` default inside a container will cause requests to target the container's own loopback interface rather than the proxy service, silently failing or misdirecting traffic. `RAPID_LLM_PROXY_URL` is the correct and current variable to set; `LLM_PROXY_URL` and `LLM_CLI_PROXY_URL` should be treated as read-only legacy surfaces in new infrastructure.
 
-**Local development:** No configuration is required if the rapid-llm-proxy daemon is running on its default port (12435) on localhost. The fallback default handles this case automatically. Developers should be aware that any test or call that appears to succeed without configuration is implicitly using this localhost default.
+**No code changes are needed to reconfigure the proxy address.** The resolver pattern was designed specifically to make environment-level reconfiguration sufficient. If the proxy moves to a different host or port, updating the appropriate environment variable is the complete remediation — no call sites, no redeployment of logic, no configuration files need to change.
 
-**Changing the daemon port or host:** Because ProxyURLResolver is the single mutation point for proxy address logic, any change to the daemon's binding (port or hostname) should be made here and only here. Call sites throughout LLMAbstraction should never reference proxy addresses directly.
-
-**Environment isolation:** Each deployment context (CI, staging, production, Docker) should set exactly one of the supported environment variables to avoid ambiguity. While the priority order ensures determinism, having multiple variables set in the same environment can mask misconfiguration. Treat the fallback chain as a compatibility mechanism, not a multi-source merging tool.
-
-**Scalability and maintainability:** The component's design scales well for configuration-space growth — adding a new deployment context requires only setting the appropriate environment variable, with no code changes. Maintainability is high precisely because of centralization: there is no risk of URL drift across call sites. The primary maintenance risk is the undocumented relationship between port 12435 and the daemon's default, which should be kept explicitly noted wherever the default value appears in the source.
+**The default port `12435` should be treated as a system constant.** It appears in the LLMAbstraction parent description and in the resolver's fallback, making it the canonical local proxy port for the entire system. If you encounter this port referenced elsewhere in the codebase, it is referring to the same rapid-llm-proxy daemon. Avoid using this port for other services in the same environment to prevent silent conflicts with the fallback default.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a multi-layered abstraction over LLM providers that enables provider-agnostic model calls across public APIs (Anthropic, OpenAI, Groq), a local Docker Model Runner (DMR), and a mock mode for testing. The system routes requests through a rapid-llm-proxy daemon (port 12435) that handles provider selection, tier-based routing, and per-call telemetry attribution. Mode selection is dynamic and per-agent, stored in workflow-progress.json, supporting global and per-agent overrides across three modes: 'mock', 'local' (DMR), and 'public' (cloud APIs).
+- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a multi-layered abstraction over LLM providers that enables provider-agnostic model calls through three distinct execution paths: mock mode (for testing), local inference via Docker Model Runner (DMR), and public cloud providers (Anthropic, OpenAI, Groq) routed through a rapid-llm-proxy. The system supports per-agent and global mode switching stored in `.data/workflow-progress.json`, allowing runtime toggling between modes without code changes. Provider selection follows a priority chain from per-agent overrides to global mode to legacy flags.
 
-### Children
-- [EnvironmentVariableFallbackChain](./EnvironmentVariableFallbackChain.md) -- Based on the ProxyURLResolver sub-component description, the resolver checks three distinct environment variables in priority order before falling back to a hardcoded default, enabling deployment-specific overrides without code changes.
+The architecture centers on a proxy-mediated request pattern where most LLM calls route through a local rapid-llm-proxy daemon (default port 12435) via `/api/complete`, enabling centralized token tracking, tier-based routing, and telemetry attribution. The `llm-with-process.ts` module exists specifically to inject a `process` tag into proxy requests — a gap in the SDK's `LLMService.complete()` that caused all wave-analysis calls to appear as `process='unknown'` in token-usage telemetry. DMR provider uses an OpenAI-compatible API at `localhost:${DMR_PORT}/engines/v1` for fully local inference.
+
+Key patterns include: environment-variable-driven URL resolution with multiple fallback levels, singleton client instances with health-check caching, YAML-based provider configuration with env-var expansion, and SDK-shape response normalization ensuring downstream consumers work unchanged regardless of which provider path was taken.
+
+### Siblings
+- [ProxyMediatedLLMClient](./ProxyMediatedLLMClient.md) -- The llm-with-process.ts module exists specifically to inject a process tag into proxy requests, filling a gap in LLMService.complete() that caused wave-analysis calls to appear as process='unknown' in token-usage telemetry
+- [DMRLocalInferenceProvider](./DMRLocalInferenceProvider.md) -- DMR provider targets an OpenAI-compatible API at localhost:${DMR_PORT}/engines/v1, allowing reuse of OpenAI SDK request formatting without modification
+- [MockModeProvider](./MockModeProvider.md) -- Mock mode is one of three named execution paths in LLMAbstraction, activated via per-agent or global mode flags stored in .data/workflow-progress.json
+- [AgentModeRouter](./AgentModeRouter.md) -- Priority chain resolves in order: per-agent override → global mode → legacy flags, meaning a per-agent mock setting overrides a global DMR mode without affecting other agents
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

@@ -2,116 +2,66 @@
 
 **Type:** SubComponent
 
-UnifiedHookManager may utilize a configuration loading mechanism, such as a config loader module, to load hook configurations from files or databases.
+docs/constraints/README.md and docs/constraints/constraint-monitoring-system.md both document the hook pipeline, indicating UnifiedHookManager is the primary architectural entry point for the entire ConstraintSystem
 
-## What It Is  
+# UnifiedHookManager — Technical Reference
 
-UnifiedHookManager is the central hub for hook management inside the **ConstraintSystem** component. Its implementation lives in `lib/agent-api/hooks/hook-manager.js` and is driven by a configuration file named `hook‑manager.yaml`. The manager is responsible for loading hook configurations, caching validated definitions, registering handler functions for named hook events, and dispatching those events to the appropriate handlers. It is used by sibling sub‑components – **ConstraintMonitor**, **HookConfigurationManager**, and **ViolationCaptureModule** – all of which obtain a reference to the same manager instance to coordinate hook‑related work.
+## What It Is
 
----
+UnifiedHookManager is implemented at `lib/agent-api/hooks/hook-manager.js` and functions as the single interception point for all agent tool lifecycle events within the ConstraintSystem. Its role is not merely coordination — it is the architectural entry point through which every tool invocation during a Claude Code session passes before execution and after completion. This centralized position is deliberate: rather than distributing constraint logic across individual tools or handlers, the system funnels all lifecycle events through one manager, ensuring consistent policy enforcement regardless of which tool is active.
 
-## Architecture and Design  
+The component is documented across two dedicated references — `docs/constraints/README.md` and `docs/constraints/constraint-monitoring-system.md` — which reflects its significance as the primary structural seam of the entire ConstraintSystem. Understanding UnifiedHookManager is effectively understanding how constraints are applied at runtime.
 
-The observations point to a **modular design** where UnifiedHookManager encapsulates all hook‑related responsibilities behind a well‑defined API. The manager isolates three cross‑cutting concerns:
+## Architecture and Design
 
-1. **Configuration loading** – a dedicated loader (likely a “config loader module”) reads `hook‑manager.yaml` (or a similar source) and produces a structured representation of hook definitions.  
-2. **Caching** – a “cache module” stores the loaded and validated configuration, allowing subsequent look‑ups to avoid re‑reading the file or database.  
-3. **Handler registry** – a native JavaScript `Map` holds arrays of handler functions keyed by event name, enabling O(1) registration and retrieval.
+![UnifiedHookManager — Architecture](images/unified-hook-manager-architecture.png)
 
-These concerns are combined in a single class (or module) that offers methods such as `registerHandler(eventName, handlerFn)` and an internal dispatch routine that iterates the `Map` for a given event. The use of a `Map` is a concrete design decision that favors fast look‑ups and deterministic ordering of insertion, which is important when many hooks may be attached to a single event.
+The architectural approach centers on a **registration model**: handlers declare the event types they subscribe to, and the manager routes incoming lifecycle events to the appropriate registered handlers. This separates the routing concern (owned by UnifiedHookManager) from the enforcement concern (owned by individual handlers), allowing constraint policies to be added, removed, or modified without altering the core interception path.
 
-Although the term “event‑driven” is not explicitly used in the observations, the pattern of **dispatch → handler registration** is evident and aligns with a classic publish/subscribe (pub/sub) style: the manager publishes hook events and subscribers (the sibling components) register callbacks. The manager also integrates a **logging mechanism** (via a logger module) to record registration, dispatch, and error events, supporting observability without coupling the core logic to any particular logging framework.
+The manager distinguishes at minimum two event phases: **pre-tool** and **post-tool**. This phased design encodes a meaningful policy distinction. Pre-tool hooks carry blocking authority — a handler can prevent an operation from executing at all, which is the enforcement mechanism for hard constraints. Post-tool hooks serve an auditing function, capturing results and outcomes after the fact without the ability to reverse execution. This asymmetry is a deliberate design trade-off: pre-tool enforcement is synchronous and blocking by necessity, while post-tool auditing can be treated as a side effect pipeline.
 
----
+The child component ToolLifecycleInterceptor implements the centralized interceptor pattern described in the architecture, reinforcing that the design intentionally avoids per-tool hook registration. Instead of each tool managing its own lifecycle callbacks, a single interceptor captures all events and delegates upward to UnifiedHookManager for routing and handler dispatch.
 
-## Implementation Details  
+![UnifiedHookManager — Relationship](images/unified-hook-manager-relationship.png)
 
-### Core Data Structure  
-- **`handlers: Map<string, Function[]>`** – Each key is a hook event identifier; the value is an array of handler functions. The `registerHandler(event, fn)` method pushes `fn` onto the array, creating a new entry if the event does not yet exist.
+## Implementation Details
 
-### Configuration Loading  
-- The manager invokes a **config loader module** (exact name not given) to read `hook‑manager.yaml`. The loader parses the YAML into a JavaScript object describing which hooks are enabled, their priorities, and any static parameters.  
-- After parsing, the manager validates the configuration (e.g., ensuring required fields exist) and then stores the result in the **cache module**. Subsequent calls to load configuration first check the cache, returning the cached object if present, thereby avoiding repeated I/O.
+Hook configuration is loaded from two scopes. User-level configuration lives at `~/.coding-tools/hooks.json`, establishing global constraint policies that apply across all projects for a given user. Project-level configuration lives at `.coding/hooks.json`, allowing per-repository overrides or additions. The manager loads both, enabling a layered policy model where project constraints can extend or specialize the user-level baseline.
 
-### Caching  
-- The cache module provides simple `get(key)` / `set(key, value)` semantics. The manager uses a fixed cache key (e.g., `"hookConfig"`) to store the validated configuration object. This design reduces latency when many components request hook definitions during startup or runtime.
+The registration model means that `hook-manager.js` maintains a mapping from event types to handler collections. When a lifecycle event fires, the manager identifies the event phase (pre-tool, post-tool, or others potentially defined), looks up the registered handlers for that phase, and dispatches in sequence. The blocking semantics of pre-tool events imply that handler dispatch for that phase must be synchronous or at least await-capable — a handler returning a violation or rejection must halt the pipeline before tool execution proceeds.
 
-### Logging  
-- Throughout registration and dispatch, the manager calls a **logger module** (e.g., `logger.info`, `logger.error`). Typical log messages include “Handler registered for event X”, “Dispatching event Y to N handlers”, and error traces when a handler throws.
+ToolLifecycleInterceptor sits below the manager in the component hierarchy and is responsible for the actual interception mechanics — capturing tool invocations from the agent API layer and surfacing them as typed lifecycle events that UnifiedHookManager can route. This separation keeps the interception plumbing distinct from the routing and handler-dispatch logic.
 
-### Public API (as inferred)  
-```js
-// lib/agent-api/hooks/hook-manager.js
-class UnifiedHookManager {
-  constructor() { /* loads config, populates cache, creates empty Map */ }
-  registerHandler(eventName, handlerFn) { /* stores in handlers Map */ }
-  dispatch(eventName, payload) { /* iterates handlers[eventName] and invokes each */ }
-  getConfig() { /* returns cached configuration */ }
-}
-module.exports = new UnifiedHookManager(); // singleton used by siblings
-```
-While the exact method signatures are not listed in the observations, the presence of a `registerHandler` function is explicitly mentioned, and the surrounding description implies a complementary `dispatch` routine.
+## Integration Points
 
----
+Within the ConstraintSystem parent, UnifiedHookManager is the operational hub connecting the agent API layer (through ToolLifecycleInterceptor) to the constraint enforcement handlers and, downstream, to violation persistence. Violations detected during pre-tool or post-tool phases are persisted to `.mcp-sync/violation-history.json`, the shared sync file that ConstraintDashboard reads for historical analysis. UnifiedHookManager therefore sits upstream of the dashboard's data source — every violation surfaced in ConstraintDashboard has passed through this manager's pipeline first.
 
-## Integration Points  
+The sibling component ContentValidationAgent operates independently of the hook pipeline, using git history as a staleness signal rather than intercepting live tool events. However, both ContentValidationAgent and UnifiedHookManager feed into the same ConstraintSystem, meaning their respective violation signals converge at the persistence and dashboard layer.
 
-1. **Parent – ConstraintSystem** – UnifiedHookManager is a sub‑component of ConstraintSystem. The parent likely instantiates the manager (or imports the singleton) during its own initialization, ensuring the hook infrastructure is ready before any constraint logic runs.  
+The two configuration files (`~/.coding-tools/hooks.json`, `.coding/hooks.json`) represent the primary external interface for operators and developers. These files control which handlers are registered and what policies are active, making them the configuration surface through which the manager's behavior is customized without code changes.
 
-2. **Siblings** –  
-   - **ConstraintMonitor** registers handlers for constraint‑violation events via `UnifiedHookManager.registerHandler`.  
-   - **HookConfigurationManager** calls the manager’s configuration‑loading API to merge external hook definitions with the base `hook‑manager.yaml`.  
-   - **ViolationCaptureModule** also registers its own violation‑handling callbacks. Because all three share the same manager instance, they automatically see each other’s registrations, enabling coordinated responses to the same hook event.  
+## Usage Guidelines
 
-3. **External Modules** – The manager depends on three auxiliary modules:  
-   - **Config loader** (reads YAML or DB sources)  
-   - **Cache** (stores the parsed configuration)  
-   - **Logger** (records lifecycle events).  
+Developers extending the constraint pipeline should register handlers through the configuration files rather than modifying `hook-manager.js` directly. The registration model exists precisely to keep the core routing logic stable while allowing handler composition to vary per user or project. A handler must declare its target event phase explicitly — conflating pre-tool and post-tool semantics will produce incorrect behavior, since only pre-tool handlers have blocking authority.
 
-These dependencies are injected or required directly inside `hook-manager.js`, keeping the manager’s core logic thin and focused on hook orchestration.
+When writing pre-tool handlers, blocking must be treated as a definitive signal. The pipeline design implies that a rejection from any pre-tool handler should prevent execution; handlers should not assume other handlers will compensate for a permissive response. Post-tool handlers, by contrast, should be written defensively — they receive results after the fact and cannot undo execution, so they are best suited for logging, auditing, and feeding violation records downstream to the `.mcp-sync/violation-history.json` file consumed by ConstraintDashboard.
 
----
+Project-level configuration at `.coding/hooks.json` takes effect alongside user-level configuration at `~/.coding-tools/hooks.json`. Developers should be aware that both scopes are active simultaneously; project policies do not automatically supersede global ones unless the handler logic itself encodes that precedence. When diagnosing unexpected constraint behavior, both configuration files should be inspected as a first step, since the effective handler set is the union of both scopes as loaded by `hook-manager.js`.
 
-## Usage Guidelines  
-
-- **Always register before dispatch** – Handlers should be added during the application start‑up phase (e.g., in the initialization code of ConstraintMonitor, HookConfigurationManager, or ViolationCaptureModule). Registering after a hook has already been dispatched may lead to missed events.  
-- **Idempotent registration** – If a component may be re‑initialized, guard against duplicate registrations by checking whether the handler already exists in the `handlers` Map (or by using a unique identifier for each handler).  
-- **Keep handlers lightweight** – Since the manager will invoke every registered function synchronously during dispatch, long‑running or blocking operations should be delegated to asynchronous workers to avoid delaying other handlers.  
-- **Leverage the cache** – When accessing hook configuration, call the manager’s `getConfig()` method rather than reading the YAML file directly. This ensures the cached, validated version is used and prevents unnecessary I/O.  
-- **Respect logging conventions** – Use the provided logger module for any diagnostic output inside custom handlers; this maintains a consistent log format across the system.  
-
----
-
-### Architectural patterns identified  
-1. **Modular component design** – UnifiedHookManager isolates hook logic behind a clean API.  
-2. **Publish/Subscribe (pub/sub) style** – Handlers subscribe to named events; the manager publishes events to all subscribers.  
-3. **Cache‑aside pattern** – Configuration is loaded once, validated, then cached for fast subsequent reads.  
-
-### Design decisions and trade‑offs  
-- **Map for handler storage** gives O(1) registration/retrieval but stores handlers in memory, which is acceptable for the typical number of hooks but could become a memory concern if thousands of handlers are registered.  
-- **Centralized singleton** simplifies sharing across siblings but creates a single point of failure; any uncaught exception in a handler can affect the entire dispatch flow.  
-- **YAML configuration** offers human‑readable settings but introduces a parsing step; caching mitigates the performance impact.  
-
-### System structure insights  
-UnifiedHookManager sits at the heart of the ConstraintSystem’s extensibility layer. Its sibling components each focus on a specific domain (monitoring, configuration merging, violation capture) but converge on the same hook manager, ensuring consistent behavior and reducing duplication of hook‑handling code.
-
-### Scalability considerations  
-- **Horizontal scaling** – Because the manager holds state in memory (handlers Map, cached config), each process instance maintains its own copy. In a multi‑process deployment, configuration must be kept in sync (e.g., by re‑loading the YAML file on change).  
-- **Handler count** – The Map scales well up to tens of thousands of entries; beyond that, the cost of iterating all handlers during dispatch could become noticeable. Consider batching or prioritizing handlers if growth is anticipated.  
-
-### Maintainability assessment  
-The modular separation of concerns (configuration loading, caching, logging, handler registry) makes the codebase approachable. The explicit `registerHandler` API provides a clear contract for new components. However, the reliance on a singleton can make unit testing harder unless the manager is designed to allow injection of mock dependencies (config loader, cache, logger). Adding comprehensive unit tests around registration, dispatch ordering, and error handling will further improve maintainability.
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's architecture is designed with flexibility and customizability in mind, utilizing a modular design that allows for easy extension and modification. This is evident in the use of the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js), which provides a central hub for hook management, handling hook event dispatch, handler registration, and configuration loading. The UnifiedHookManager uses a Map to store handlers for each event, allowing for efficient registration and retrieval of handlers. For example, the registerHandler function in hook-manager.js takes in an event name and a handler function, and stores them in the handlers Map for later retrieval.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a multi-layered enforcement framework that validates code actions and file operations during Claude Code sessions. It operates through a hook-based architecture where the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) intercepts agent tool events (pre-tool, post-tool, etc.) and routes them through registered handlers loaded from user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) configuration files. Violations detected during these checks are captured, persisted, and surfaced through a dashboard for monitoring.
+
+### Children
+- [ToolLifecycleInterceptor](./ToolLifecycleInterceptor.md) -- Based on the SubComponent context, hook-manager.js at lib/agent-api/hooks/hook-manager.js is described as 'the single interception point for all agent tool lifecycle events', indicating a centralized interceptor pattern rather than per-tool hook registration.
 
 ### Siblings
-- [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to register handlers for constraint violation events.
-- [HookConfigurationManager](./HookConfigurationManager.md) -- HookConfigurationManager uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to load and merge hook configurations.
-- [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to register handlers for constraint violation events.
+- [ConstraintDashboard](./ConstraintDashboard.md) -- ConstraintDashboard reads violation data from .mcp-sync/violation-history.json, a shared sync file that persists violations across Claude Code sessions for historical analysis
+- [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses git history as a staleness signal, comparing recorded entity observations against recent commits to flag observations that predate significant file changes
+
 
 ---
 
-*Generated from 6 observations*
+*Generated from 5 observations*

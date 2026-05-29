@@ -2,76 +2,80 @@
 
 **Type:** SubComponent
 
-Serves as Insight generation, pattern catalog extraction, and knowledge report authoring. within the SemanticAnalysis component at hierarchy path Coding/SemanticAnalysis/Insights
+Insight generation is the final sequential stage in the pipeline, operating on fully classified and validated entities produced by upstream agents, making it dependent on the complete ontology metadata attached by `OntologyClassificationAgent`
+
+# Insights
 
 ## What It Is
 
-Insights is a SubComponent of SemanticAnalysis, residing at the hierarchy path `Coding/SemanticAnalysis/Insights`. It occupies an L2 position in the project knowledge hierarchy — one level below the SemanticAnalysis parent pipeline and at the same tier as sibling components Pipeline, Ontology, OntologyRegistry, and GitStalenessDetector. Its chartered responsibility within that hierarchy is threefold: **insight generation**, **pattern catalog extraction**, and **knowledge report authoring**. In other words, Insights is the synthesis and publication layer of the SemanticAnalysis system — the component responsible for turning processed signals into consumable, structured intelligence.
+Insights is a SubComponent of the SemanticAnalysis multi-agent MCP server (`integrations/mcp-server-semantic-analysis`), positioned as the **final sequential stage** of the batch-analysis pipeline. It operates exclusively on entities that have already been classified, validated, and annotated with `OntologyMetadata` by upstream agents — meaning it cannot begin execution until `OntologyClassificationAgent` has completed its full lifecycle (initialize → classify → suggest extensions) across all entities in scope.
 
-![Insights — Architecture](images/insights-architecture.png)
-
-No concrete code symbols or key files were surfaced in the current observations, which indicates that Insights is either in an early design/scaffolding phase, operates primarily through configuration or declarative specification rather than procedural code, or its implementation artifacts have not yet been indexed into the code graph. This document therefore focuses on architectural intent derived from position, role, and contextual relationships.
-
----
-
-## Architecture and Design
-
-Insights sits downstream in the SemanticAnalysis multi-agent pipeline. The parent component coordinates several specialized agents — CodeGraphAgent, SemanticAnalysisAgent, OntologyClassificationAgent, ContentValidationAgent, and BaseAgent — each of which produces structured intermediate outputs: indexed code graphs, cross-correlated observations, ontology classifications, and staleness flags. Insights is architecturally positioned to consume the *outputs* of these agents and synthesize them into higher-order artifacts: reports, pattern catalogs, and actionable insights.
+The component carries at least three distinct responsibilities as described in the pipeline manifest: **insight generation**, **pattern catalog extraction**, and **knowledge report authoring**. These concerns are distinct enough to suggest separate classes or agent steps internally, though no concrete file paths or class names are surfaced in the available observations. Its child component, OntologyDrivenInsightGeneration, represents the core mechanism by which ontology metadata attached upstream is consumed to derive structured insights.
 
 ![Insights — Relationship](images/insights-relationship.png)
 
-The design decision to separate Insights as its own SubComponent (rather than embedding report generation inside individual agents) reflects a **separation of concerns** principle. Each upstream agent handles a discrete analytical task; Insights handles the aggregation and narrative layer. This prevents any single agent from becoming responsible for both analysis and communication of results, keeping agent responsibilities narrow and testable.
+## Architecture and Design
 
-The sibling relationship with Pipeline is architecturally significant. Pipeline governs the orchestration and sequencing of agent execution within SemanticAnalysis. Insights likely depends on Pipeline completing its coordination pass before insight generation can begin — positioning Insights as a terminal or near-terminal stage in the pipeline's execution order. Similarly, the Ontology and OntologyRegistry siblings provide the classification vocabulary that Insights would need to label and categorize patterns coherently in its output catalogs. GitStalenessDetector provides the provenance and freshness signals that Insights would need to <USER_ID_REDACTED> the reliability of any generated report.
+Like every other agent in the SemanticAnalysis pipeline, Insights extends `BaseAgent<TInput, TOutput>` — the shared abstract base class that wraps execution in a standardized `AgentResponse` envelope. This means the insights it produces carry the same first-class metadata as observations produced by earlier stages: confidence scores, detected issues, routing suggestions, and retry guidance. Consumers of the pipeline can therefore treat generated insights with the same programmatic trust model applied to raw observations or classification results.
 
----
+![Insights — Architecture](images/insights-architecture.png)
+
+The three-responsibility structure (generation, pattern catalog extraction, report authoring) reflects a deliberate **separation of concerns** within what is already a late-stage, synthesis-focused component. Insight generation and pattern catalog extraction are likely structured or semi-structured outputs derived deterministically from ontology-annotated entities, while knowledge report authoring introduces a distinct LLM-assisted prose generation step. Routing these two modes of work through different execution paths — one potentially heuristic or rule-based, one LLM-driven — is consistent with how the broader pipeline distinguishes between classification modes (heuristic vs. LLM-assisted) in `OntologyClassificationAgent`.
+
+The sequential dependency on upstream ontology classification is an explicit architectural constraint, not incidental. Because OntologyDrivenInsightGeneration (the child component) is described as ontology-driven by name, the `OntologyMetadata` bundle — carrying class, confidence, method, and version fields attached by `OntologyClassificationAgent` — is effectively the primary input contract for this stage.
 
 ## Implementation Details
 
-Given that zero code symbols were found and no key files were identified in the current indexing pass, the implementation of Insights cannot be characterized at the code level from available observations. What can be inferred is the *functional contract* the component is expected to fulfill:
+The knowledge report authoring path routes LLM calls through `@rapid/llm-proxy`'s `LLMService`, with `attachTokenLogger` applied to instrument token consumption. This is the same LLM infrastructure used across the SemanticAnalysis pipeline, but the token logging attachment means insight narrative generation is **tracked as a distinct spend category** — separable in telemetry from classification token spend incurred by `OntologyClassificationAgent` or semantic analysis agents earlier in the pipeline. This separation supports cost attribution and budget analysis at a per-stage granularity.
 
-**Insight generation** implies the production of discrete, structured knowledge units from correlated agent outputs — likely consuming the BaseAgent response envelope (which standardizes confidence breakdowns, issue detection, and routing suggestions across all agents) as its primary input format.
+The child component OntologyDrivenInsightGeneration is the concrete realization of the ontology-to-insight translation. Given that all entities entering this stage carry `OntologyMetadata` (class, confidence, method, version), the generation logic can make decisions conditioned on ontology class membership, confidence thresholds, and the classification method used (heuristic vs. LLM) — enabling differential treatment of high-confidence vs. tentative classifications when surfacing insights or building the pattern catalog.
 
-**Pattern catalog extraction** implies an ability to recognize recurring structures across multiple observations or code entities — likely operating over the Memgraph-persisted knowledge graph that CodeGraphAgent populates via Tree-sitter AST parsing. The catalog would serve as a queryable, reusable record of architectural and behavioral patterns identified across the codebase.
-
-**Knowledge report authoring** suggests a document-generation responsibility — producing human-readable or structured outputs (potentially Markdown, JSON, or a defined report schema) that summarize findings across a SemanticAnalysis run. This output would be the primary artifact surfaced to developers or downstream consumers of the system.
-
----
+No concrete file paths or class symbol names are available in the current observations. The three-responsibility decomposition (generation, pattern catalog, report authoring) should guide future code navigation: look for distinct classes or agent step implementations corresponding to each concern rather than a monolithic agent body.
 
 ## Integration Points
 
-Insights integrates with the broader SemanticAnalysis ecosystem through several implied interfaces:
+Insights sits at the downstream terminus of the SemanticAnalysis pipeline, making its integration surface primarily **inbound** rather than bidirectional. Its direct upstream dependency is `OntologyClassificationAgent`, which must fully complete before Insights can execute. The `OntologyMetadata` attached to every entity — class, confidence, method, version — constitutes the structured contract this component consumes.
 
-- **SemanticAnalysisAgent** is the most direct upstream dependency, as it performs LLM-driven cross-correlation of git history, vibe session data, and AST-parsed code graphs — the raw material Insights transforms into reports and catalogs.
-- **OntologyClassificationAgent** provides the classification labels that Insights uses to structure and tag patterns in its catalogs. Without Ontology and OntologyRegistry siblings providing a stable vocabulary, pattern catalog entries would lack consistent categorization.
-- **ContentValidationAgent** and **GitStalenessDetector** supply the staleness and validity signals that Insights should incorporate into any report's confidence and freshness metadata — directly using or mirroring the confidence breakdown fields defined in BaseAgent's standard response envelope.
-- **Pipeline** governs when Insights executes, meaning any changes to pipeline sequencing directly affect the completeness of data available to Insights at runtime.
+On the output side, generated insights are returned in the standard `AgentResponse` envelope inherited from `BaseAgent<TInput, TOutput>`, making them consumable by any pipeline coordinator or downstream caller with the same interface used to consume outputs from Pipeline siblings. Storage of persisted knowledge entities uses the `KmCoreAdapter` surface (migrated from the legacy `GraphDatabaseAdapter`+`PersistenceAgent` trio in Phase 42.x), so persisted insights follow the same field-name conventions as other entity types to minimize call-site disruption.
 
----
+The LLM report authoring path depends on `@rapid/llm-proxy`'s `LLMService` with `attachTokenLogger`, shared with other LLM-assisted agents in the system. The `LegacyOntologyAdapter` (wrapping `@fwornle/km-core`'s `OntologyRegistry`) is the anti-corruption layer that keeps ontology class resolution stable across registry evolution — Insights inherits this stability indirectly through the metadata already attached by `OntologyClassificationAgent`.
 
 ## Usage Guidelines
 
-Because Insights is a synthesis component, developers working within SemanticAnalysis should treat it as a **read-only consumer** of upstream agent outputs rather than a processor that modifies shared state. Insight generation should be idempotent — running the same input through Insights multiple times should produce equivalent outputs, making it safe to re-run reports after pipeline corrections or ontology updates.
+Because Insights is the terminal pipeline stage, **it must not be invoked before `OntologyClassificationAgent` has completed its full lifecycle**. Premature invocation would result in entities lacking `OntologyMetadata`, which would undermine the ontology-driven insight generation that the child component OntologyDrivenInsightGeneration is built around. Pipeline orchestration must enforce this ordering.
 
-Pattern catalog entries produced by Insights should reference the ontology classification hierarchy maintained by Ontology and OntologyRegistry to ensure that catalog terms remain stable across pipeline versions. Ad hoc or locally defined pattern labels inside Insights risk diverging from the canonical classification vocabulary and should be avoided.
+Developers extending or modifying Insights should respect the three-responsibility decomposition. Report authoring (prose generation via `LLMService`) and structural insight/pattern extraction are meaningfully different operations with different cost profiles and reliability characteristics. Conflating them risks both inflated token spend and reduced debuggability when LLM-generated narrative <USER_ID_REDACTED> degrades independently of structured output <USER_ID_REDACTED>.
 
-Any knowledge report authored by Insights should carry explicit provenance metadata — ideally derived from the git commit correlation data that ContentValidationAgent and GitStalenessDetector process — so consumers can assess report freshness. This is especially important given that SemanticAnalysis operates over git history, where the relevance of any insight is inherently time-bounded by the commit range analyzed.
+Since `AgentResponse` carries confidence scores on generated insights, downstream consumers should treat low-confidence insights with the same caution applied to low-confidence classifications elsewhere in the pipeline. The `OntologyConfigManager` singleton governs classification configuration for the pipeline; if classification mode or thresholds are changed (e.g., in test scenarios using `reset()`), re-running the full pipeline including Insights is necessary to ensure insight output reflects the updated configuration rather than stale metadata.
 
-As the component's code implementation matures and symbols become indexable, this document should be updated to reference specific class names, function signatures, and file paths that ground these design intentions in concrete implementation detail.
+---
+
+**Architectural Patterns Identified:** Terminal-stage pipeline agent; separation of structured extraction from LLM-assisted prose generation; `AgentResponse` envelope for uniform consumer interface; token telemetry isolation via `attachTokenLogger`.
+
+**Key Design Trade-offs:** Sequential dependency on upstream ontology classification introduces pipeline latency but guarantees insight <USER_ID_REDACTED> is bounded below by classification completeness. Routing report authoring through `LLMService` adds LLM cost at the final stage but enables rich narrative output that purely heuristic extraction cannot produce.
+
+**Maintainability:** The three-responsibility structure, if implemented as distinct classes or steps, supports independent testing and replacement of each concern. The absence of concrete file paths in current observations is a gap — instrumentation or discovery work to surface actual class names would improve future navigability of this component.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a multi-agent pipeline within the mcp-server-semantic-analysis integration that processes git history, LSL (vibe) sessions, and AST-parsed code graphs to extract, classify, and persist structured knowledge entities. The system coordinates several specialized agents: CodeGraphAgent indexes repositories via Tree-sitter/Memgraph, SemanticAnalysisAgent performs LLM-driven cross-correlation of git/vibe/code data, OntologyClassificationAgent classifies observations against upper/lower ontology hierarchies, ContentValidationAgent detects stale entities via file-reference and git-commit correlation, and a BaseAgent abstract class provides the standard response envelope (confidence breakdown, issue detection, routing suggestions) used by all agents.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a batch-analysis pipeline over git history and LSL (vibe) sessions to extract, classify, validate, and persist structured knowledge entities. It coordinates several specialized agents in sequence: git history ingestion, vibe/LSL session ingestion, AST-based code graph construction, semantic LLM analysis, ontology classification, content validation, and insight generation. Each agent is built on a shared `BaseAgent<TInput, TOutput>` abstract class that wraps execution in a standardized `AgentResponse` envelope with confidence scoring, issue detection, routing suggestions, and retry guidance.
+
+The pipeline uses an ontology system backed by `@fwornle/km-core`'s `OntologyRegistry` (accessed via a `LegacyOntologyAdapter` shim) to classify extracted observations into upper/lower ontology classes with configurable heuristic and LLM-assisted classification modes. The `OntologyClassificationAgent` manages lifecycle (initialize → classify → suggest extensions) and attaches `OntologyMetadata` (class, confidence, method, version) to every entity before persistence. Storage was migrated from a legacy `GraphDatabaseAdapter`+`PersistenceAgent` trio to a `KmCoreAdapter` surface in Phase 42.x, with field names preserved for minimal call-site disruption.
+
+Key cross-cutting concerns include: LLM calls routed through `@rapid/llm-proxy`'s `LLMService` with token usage telemetry via `attachTokenLogger`; optional code-graph-rag integration via `CodeGraphAgent` (Tree-sitter AST + Memgraph) that gracefully degrades when the `uv` CLI or Memgraph TCP connection is unavailable; content staleness detection combining reference-pattern regex scanning and git-commit correlation via `GitStalenessDetector`; and trace files written to `logs/` for debugging non-fatally.
+
+### Children
+- [OntologyDrivenInsightGeneration](./OntologyDrivenInsightGeneration.md) -- Based on the parent context, Insights operates as the final sequential stage in the SemanticAnalysis pipeline, meaning it cannot execute until OntologyClassificationAgent has completed attaching ontology metadata to all entities.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline is a sub-component of SemanticAnalysis
-- [Ontology](./Ontology.md) -- Ontology is a sub-component of SemanticAnalysis
-- [OntologyRegistry](./OntologyRegistry.md) -- OntologyRegistry is a sub-component of SemanticAnalysis
-- [GitStalenessDetector](./GitStalenessDetector.md) -- GitStalenessDetector is a sub-component of SemanticAnalysis
+- [Pipeline](./Pipeline.md) -- All pipeline agents extend the shared `BaseAgent<TInput, TOutput>` abstract class, which wraps execution in a standardized `AgentResponse` envelope carrying confidence scores, detected issues, routing suggestions, and retry guidance
+- [Ontology](./Ontology.md) -- `OntologyClassificationAgent` manages a three-phase lifecycle — initialize → classify → suggest extensions — ensuring the ontology registry is ready before any entity is classified and can propose new classes when observed entities don't fit existing ones
+- [OntologyConfigManager](./OntologyConfigManager.md) -- `OntologyConfigManager` is implemented as a singleton, meaning all agents and subsystems within a process share one configuration state; the explicit `reset()` method exists specifically to restore defaults between unit tests without restarting the process
+- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- `LegacyOntologyAdapter` wraps `OntologyRegistry` from `@fwornle/km-core`, acting as an anti-corruption layer so that the legacy interface expected by `OntologyValidator` and `OntologyClassifier` is preserved even as the underlying registry implementation evolves
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 4 observations*

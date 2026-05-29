@@ -2,69 +2,79 @@
 
 **Type:** SubComponent
 
-PersistenceAgent manages reads and writes of staleness fields, centralizing the logic for updating decay state so that neither ManualLearning nor OnlineLearning write paths need to implement staleness logic directly
+The migration tooling referenced in the parent description implies KnowledgeDecayTracker performs bulk provenance re-stamping when moving legacy LevelDB entities to GraphKMStore, normalizing timestamps that may have been absent in the source store
 
 # KnowledgeDecayTracker — Technical Insight Document
 
 ## What It Is
 
-KnowledgeDecayTracker is a SubComponent of the broader KnowledgeManagement system that tracks the validity and freshness of stored knowledge entities over time. Rather than existing as a standalone service with its own data store, it is implemented as a set of fields embedded directly within `EntityMetadata` — the metadata structure attached to every typed entity (Project, Component, SubComponent, Pattern, Detail, System) in the Graphology in-memory graph backed by GraphDatabaseService and LevelDB. The tracker's responsibility is to quantify how "stale" any given piece of recorded knowledge has become as the underlying code evolves, and to record the evidence and methodology behind that judgment.
+KnowledgeDecayTracker is a SubComponent of KnowledgeManagement responsible for the temporal lifecycle of knowledge entities within the Graphology-backed graph store. It operates as the system's primary mechanism for expressing that knowledge has an expiration — not by destroying records, but by stamping each entity with `validFrom` and `validUntil` fields that define a validity window. This soft-expiry model allows the graph to retain a historical record of what was known and when, while ensuring that stale knowledge is invisible to live <USER_ID_REDACTED>.
 
-The core fields managed by KnowledgeDecayTracker include `staleness_score` (a numeric value supporting range <USER_ID_REDACTED> and threshold-based policies), `staleness_check_at` (a timestamp recording when the last evaluation occurred), `staleness_method` (an identifier for the algorithm or heuristic that produced the current score), and `invalidating_commits` (a list linking specific git commits to the entity they may have invalidated). Together these fields turn every entity into a self-describing record of its own decay state, allowing downstream consumers to reason about knowledge freshness without performing additional lookups.
-
-![KnowledgeDecayTracker — Architecture](images/knowledge-decay-tracker-architecture.png)
-
-## Architecture and Design
-
-The architectural approach is best described as **co-located metadata** rather than a separate decay tracking store. By embedding staleness state directly in `EntityMetadata`, KnowledgeDecayTracker ensures that every entity read returns its own decay signal as part of the same query. This eliminates the need for join-like operations across separate stores and aligns with the broader KnowledgeManagement design of returning rich, self-contained entity records from either the lock-free VKB HTTP API or the direct LevelDB fallback path.
-
-A second key design decision is the separation of measurement from evidence. The numeric `staleness_score` exists alongside the structured `invalidating_commits` list, meaning the system records *both* a summary signal usable for fast range <USER_ID_REDACTED> and the underlying observations that justify it. The `staleness_method` field complements this by recording which algorithm produced a given score, supporting auditability and allowing different scoring methods to be compared or rolled out incrementally without losing historical context. This is a deliberate trade-off favoring transparency and methodological evolvability over schema simplicity.
-
-The tracker also delegates population of `invalidating_commits` to its child component, InvalidatingCommitLinker. Without that commit linkage, staleness scores would be purely time-based and blind to actual code change history — so the parent/child split cleanly separates "what the score is" (KnowledgeDecayTracker) from "what evidence supports it" (InvalidatingCommitLinker).
-
-## Implementation Details
-
-The mechanics of staleness tracking are centralized in PersistenceAgent, which manages all reads and writes of the staleness fields. By funneling staleness mutations through a single agent, the codebase avoids duplicating decay logic across multiple write paths. Specifically, the sibling components ManualLearning and OnlineLearning — both of which create or update entities in the GraphDatabaseService-backed graph — do not need to implement staleness logic themselves. ManualLearning writes typed nodes using the same ontology classification as automated entities, and OnlineLearning's batch analysis pipeline (which ingests git history, LSL sessions, and code analysis outputs) produces entities through the same write surface. In both cases, the decay-related metadata is handled by PersistenceAgent.
-
-The `staleness_score` field is numeric specifically to enable range <USER_ID_REDACTED> and threshold-based decay policies — for example, retrieving all entities above a given staleness threshold, or filtering by decay bands. The `staleness_check_at` timestamp supports scheduling: future decay evaluations can prioritize entities that have not been re-scored recently, enabling work-shedding and incremental re-evaluation rather than full graph passes.
+The component sits at a cross-cutting position within KnowledgeManagement: it is invoked on both the write path (when entities are created or migrated) and the read path (where expired nodes must be excluded from query results). Its child component, ValidityWindowEnforcer, carries the read-path responsibility, checking `validFrom`/`validUntil` at query time rather than eagerly pruning the graph. The broader architectural mandate for this lifecycle-first approach is documented in `docs/architecture/memory-systems.md`, which identifies lifecycle management as a first-class concern of the knowledge graph.
 
 ![KnowledgeDecayTracker — Relationship](images/knowledge-decay-tracker-relationship.png)
 
-The `invalidating_commits` field, populated via InvalidatingCommitLinker, ties knowledge validity directly to the git history of the underlying codebase. When a commit modifies files or symbols associated with an entity, the linker records that commit ID against the entity's metadata. This converts what would otherwise be an abstract "time has passed" signal into a concrete causal link: *this knowledge may be invalid because this specific commit changed the code it describes*.
+## Architecture and Design
+
+The central design decision behind KnowledgeDecayTracker is **soft deletion via temporal bounding** rather than physical removal. Every entity in the graph carries a `validFrom`/`validUntil` pair, turning the graph into a bitemporal store where the question "is this knowledge current?" is answered by a range check, not by the presence or absence of a node. This eliminates the risk of cascading deletes breaking graph topology and preserves an audit trail of knowledge provenance over time.
+
+A second significant design decision is the separation of **write-time stamping** from **read-time enforcement**. KnowledgeDecayTracker handles stamping (setting `validFrom`, and potentially `validUntil` based on decay policy) at entity creation, while ValidityWindowEnforcer handles filtering at query time. This separation keeps each concern isolated: decay policy logic does not need to be embedded in query infrastructure, and query infrastructure does not need to understand policy rules.
+
+![KnowledgeDecayTracker — Architecture](images/knowledge-decay-tracker-architecture.png)
+
+The architecture also expresses a deliberate **provenance-aware decay model**. Because both ManualLearning and OnlineLearning entities pass through KnowledgeDecayTracker, the component can apply different decay rates depending on how an entity entered the graph. Human-curated ManualLearning facts — which carry provenance metadata distinguishing them from pipeline-generated knowledge — can be assigned longer validity windows, reflecting the higher confidence and deliberate intent behind them. Automatically extracted OnlineLearning entities (sourced from git history, LSL sessions, and code analysis per `docs/architecture/memory-systems.md`) may decay faster, acknowledging that automatically inferred knowledge is more likely to become stale. This policy differentiation is a direct consequence of ManualLearning's design guarantee that hand-curated facts are not overwritten by pipeline observations.
+
+## Implementation Details
+
+At the entity level, KnowledgeDecayTracker stamps two metadata fields onto each graph node: `validFrom`, representing the moment the entity's knowledge claim became authoritative, and `validUntil`, representing when that claim should be considered expired. These fields are attached within the Graphology in-memory graph, meaning they are stored as node attributes alongside the entity's typed data (System, Project, Pattern, and similar types used by KnowledgeManagement).
+
+The child component ValidityWindowEnforcer operationalizes the `validUntil` field at query time. Rather than eagerly removing expired nodes from the graph, it intercepts read operations and excludes any node whose validity window does not cover the current timestamp. This lazy enforcement strategy is well-suited to the Graphology in-memory model: the graph remains structurally intact, relationships are never orphaned by expiry, and historical <USER_ID_REDACTED> (asking what was known at a past point in time) remain possible by adjusting the reference timestamp passed to ValidityWindowEnforcer.
+
+The **provenance re-stamping** behavior during migration deserves specific attention. When legacy entities are moved from the LevelDB-backed GraphDatabaseService to GraphKMStore, KnowledgeDecayTracker performs bulk re-stamping to normalize timestamps that may have been absent or inconsistently formatted in the source store. This is a non-trivial operation: GraphKMStore uses UUIDv7 time-ordered entity IDs (unlike the legacy IDs used by GraphDatabaseService), so migration involves not only ID translation but also the establishment of canonical `validFrom` values that correctly represent when each entity's knowledge was originally recorded. The result is an audit trail — provenance metadata on every entity — that makes the canonical store queryable for both current and historical knowledge states.
 
 ## Integration Points
 
-KnowledgeDecayTracker integrates with the rest of the system primarily through `EntityMetadata`, which is the shared shape used by all typed nodes in the GraphDatabaseService graph. Because staleness fields are part of this common metadata, any consumer of entities — including the VKB HTTP API exposed via VkbApiClient (located at `lib/ukb-unified/core/VkbApiClient.js` and dynamically imported with a fallback to direct LevelDB access) — receives decay state implicitly with every entity read.
+KnowledgeDecayTracker integrates with the write path of both ManualLearning and OnlineLearning, acting as a mandatory stamping layer before entities are committed to the graph. This makes it a shared dependency for all knowledge ingestion: neither provenance type bypasses it. The provenance metadata stamped by KnowledgeDecayTracker is the mechanism by which decay policies are later differentiated — the component reads provenance type to select the appropriate validity duration.
 
-The tracker integrates with write paths through PersistenceAgent rather than directly. ManualLearning and OnlineLearning, the two principal entity producers in KnowledgeManagement, both write through this agent, ensuring uniform application of staleness updates. The sibling GraphKnowledgeExporter, which subscribes to `entity:stored` events emitted by GraphDatabaseService, naturally picks up staleness fields as part of the exported entity payloads, propagating decay signals to downstream consumers in an eventually consistent manner.
+On the read side, the integration point is ValidityWindowEnforcer, which must be composed into every query path that should respect temporal validity. Because GraphKMStore is the canonical store, and because it is the target of migration from GraphDatabaseService, ValidityWindowEnforcer's enforcement logic is specifically relevant to GraphKMStore <USER_ID_REDACTED>. <USER_ID_REDACTED> against the legacy store during the migration window may need to handle entities that lack `validUntil` fields until re-stamping is complete.
 
-The downward integration is with InvalidatingCommitLinker, which acts as the producer for the `invalidating_commits` field. The relationship is explicit: KnowledgeDecayTracker defines the field's location and semantics within `EntityMetadata`, and InvalidatingCommitLinker is responsible for populating it. This separation means that improvements to commit-linkage heuristics can evolve independently of the surrounding staleness scoring logic.
-
-Note that KnowledgeDecayTracker is unrelated to sibling EntityTypeMigration (`scripts/migrate-graph-db-entity-types.js`), which is a one-shot consolidation script for legacy entity type names rather than a runtime decay mechanism — though the migration does ensure that staleness fields apply uniformly across the canonical six-type entity set.
+The migration tooling bridging GraphDatabaseService and GraphKMStore creates a transient integration surface where KnowledgeDecayTracker operates in bulk mode. This is architecturally distinct from its normal per-entity write-path behavior and implies that the component must handle both single-entity stamping and batch re-stamping without violating consistency guarantees on `validFrom` values.
 
 ## Usage Guidelines
 
-Developers working with knowledge entities should treat the staleness fields as **read-anywhere, write-through-PersistenceAgent**. Because every entity read already includes `staleness_score`, `staleness_check_at`, `staleness_method`, and `invalidating_commits`, consumers should never need a separate query to determine an entity's decay state — and conversely, should not attempt to maintain a parallel staleness store. When filtering or sorting entities by freshness, use `staleness_score` directly in range <USER_ID_REDACTED>; when scheduling re-evaluation, use `staleness_check_at` to prioritize the oldest evaluations.
+**Decay policy configuration should be provenance-driven.** When adding new knowledge sources beyond ManualLearning and OnlineLearning, developers must ensure that the new source provides a clear provenance type that KnowledgeDecayTracker can use to select a validity duration. Assigning a default, undifferentiated decay window to all new entity types undermines the system's ability to treat high-confidence knowledge differently from automatically inferred knowledge.
 
-When introducing new write paths or learning pipelines, follow the convention established by ManualLearning and OnlineLearning: do not implement staleness logic inline. Instead, route writes through PersistenceAgent so that decay updates remain centralized and uniformly applied. This preserves the architectural invariant that staleness logic lives in exactly one place, which in turn keeps `staleness_method` values meaningful across all entities.
+**Do not bypass KnowledgeDecayTracker on the write path.** Since `docs/architecture/memory-systems.md` establishes lifecycle management as a first-class concern, any entity written directly to the Graphology graph without passing through KnowledgeDecayTracker will lack `validFrom`/`validUntil` fields. This creates nodes that ValidityWindowEnforcer cannot reason about, potentially causing them to be incorrectly excluded or incorrectly included in query results depending on how the enforcer handles missing fields.
 
-When evolving scoring algorithms, always update the `staleness_method` field alongside `staleness_score`. Because the method identifier is recorded with each score, the system can distinguish between scores produced by different algorithms over time. This supports A/B comparisons, gradual rollouts, and post-hoc auditing — but only if the method field is conscientiously updated whenever the scoring logic changes. Similarly, when modifying or extending the heuristics in InvalidatingCommitLinker, remember that the `invalidating_commits` field is the primary evidence record backing any score, and its semantics (potentially invalidating, not definitively invalidating) should be preserved by any new linkage strategy.
+**During migration, treat re-stamping as a blocking step.** The normalization of timestamps when moving entities from LevelDB to GraphKMStore is not cosmetic — it is what makes the canonical store's temporal <USER_ID_REDACTED> meaningful. Running <USER_ID_REDACTED> against a partially migrated GraphKMStore before re-stamping is complete will yield unreliable results, as some entities will have correct validity windows and others will have legacy or absent timestamps.
+
+**Historical <USER_ID_REDACTED> are a supported use case.** Because ValidityWindowEnforcer checks validity at query time against a reference timestamp (rather than pruning expired nodes), the system supports asking "what did we know at time T?" by parameterizing that timestamp. Developers building query interfaces on top of KnowledgeManagement should expose this capability rather than hardcoding "now" as the only valid reference point.
+
+---
+
+### Key Architectural Patterns and Trade-offs Summary
+
+| Concern | Decision | Trade-off |
+|---|---|---|
+| Expiry model | Soft deletion via `validFrom`/`validUntil` | Graph grows over time; historical record preserved |
+| Enforcement timing | Read-time filtering (ValidityWindowEnforcer) | Expired nodes consume memory; <USER_ID_REDACTED> gain temporal flexibility |
+| Policy differentiation | Per-provenance decay rates | Requires provenance metadata on every entity |
+| Migration | Bulk re-stamping in KnowledgeDecayTracker | Migration is a blocking dependency for reliable temporal <USER_ID_REDACTED> |
+| ID scheme | UUIDv7 in GraphKMStore (inherited context) | Enables chronological ordering without coordination overhead |
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides graph-based knowledge storage, entity lifecycle management, and query capabilities for the Coding project. At its core it combines a Graphology in-memory graph with LevelDB persistent storage (via GraphDatabaseService), accessed either through a lock-free VKB HTTP API when the server is running or through direct file access as a fallback. The component manages typed entities (Project, Component, SubComponent, Pattern, Detail, System) with rich metadata including ontology classification, bi-temporal staleness tracking, embedding vectors, and hierarchy relationships.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing entity storage, querying, and lifecycle management. It uses a Graphology in-memory graph backed by LevelDB for persistence, storing entities with typed attributes (System, Project, Pattern) and relationships. The system supports multiple knowledge stores: a local LevelDB/Graphology store (GraphDatabaseService) and a canonical km-core shape store (GraphKMStore), with migration tooling to move between them.
 
 ### Children
-- [InvalidatingCommitLinker](./InvalidatingCommitLinker.md) -- The parent analysis explicitly names the invalidating_commits field within EntityMetadata as the artifact this logic populates, establishing a direct dependency: without commit linkage, staleness scores would be purely time-based and blind to actual code change history.
+- [ValidityWindowEnforcer](./ValidityWindowEnforcer.md) -- Based on the KnowledgeDecayTracker sub-component description, each entity in the GraphKMStore carries validFrom and validUntil fields that this enforcer checks at query time rather than at write time.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are stored as typed nodes (Project, Component, SubComponent, Pattern, Detail, System) in the GraphDatabaseService-backed graph, using the same ontology classification fields as automated entities
-- [OnlineLearning](./OnlineLearning.md) -- The batch analysis pipeline ingests git history, LSL sessions, and code analysis outputs, mapping findings to the canonical typed entity set (Project, Component, SubComponent, Pattern, Detail, System) before writing to GraphDatabaseService
-- [VkbApiClient](./VkbApiClient.md) -- VkbApiClient is located at lib/ukb-unified/core/VkbApiClient.js and is dynamically imported at runtime, so callers must handle the case where the import fails (server not running) and fall back to direct LevelDB access
-- [GraphKnowledgeExporter](./GraphKnowledgeExporter.md) -- GraphKnowledgeExporter subscribes to entity:stored events emitted by GraphDatabaseService, making exports eventually consistent with writes rather than synchronously blocking them
-- [EntityTypeMigration](./EntityTypeMigration.md) -- scripts/migrate-graph-db-entity-types.js consolidates legacy entity type names into the canonical six-type set (Project, Component, SubComponent, Pattern, Detail, System), rewriting node attributes in the Graphology graph
+- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are distinguished from automatically extracted knowledge by provenance metadata, ensuring human-curated facts are not overwritten by pipeline-generated observations during merge operations
+- [OnlineLearning](./OnlineLearning.md) -- docs/architecture/memory-systems.md identifies git history, LSL sessions, and code analysis as the three automatic extraction sources feeding OnlineLearning, each producing typed graph entities
+- [GraphKMStore](./GraphKMStore.md) -- GraphKMStore uses UUIDv7 entity IDs (time-ordered UUIDs) rather than the legacy IDs used by GraphDatabaseService/LevelDB, enabling chronological ordering and distributed ID generation without coordination
 
 
 ---

@@ -2,82 +2,78 @@
 
 **Type:** SubComponent
 
-Serves as The ontology classification system: upper/lower ontology definitions, entity type resolution, and validation. within the SemanticAnalysis component at hierarchy path Coding/SemanticAnalysis/Ontology
+`OntologyClassificationAgent` manages a three-phase lifecycle — initialize → classify → suggest extensions — ensuring the ontology registry is ready before any entity is classified and can propose new classes when observed entities don't fit existing ones
+
+# Ontology
 
 ## What It Is
 
-Ontology is a sub-component of SemanticAnalysis, located at the hierarchy path `Coding/SemanticAnalysis/Ontology`. It serves as the ontology classification system for the broader SemanticAnalysis pipeline, responsible for three tightly coupled concerns: upper/lower ontology definitions, entity type resolution, and validation. As an L2 SubComponent, it sits one level below SemanticAnalysis and operates alongside sibling components including Pipeline, Insights, OntologyRegistry, and GitStalenessDetector.
+The Ontology subsystem is a classification and metadata layer within SemanticAnalysis (`integrations/mcp-server-semantic-analysis`) responsible for assigning every extracted knowledge entity a structured ontological identity before it is persisted or consumed by downstream stages like Insights. It operates through `OntologyClassificationAgent`, which drives a three-phase lifecycle, backed by an external registry accessed via `LegacyOntologyAdapter`, and configured through the singleton `OntologyConfigManager`.
 
-The component does not have indexed code symbols at this time, which suggests it may be in early definition, is abstracted through runtime configuration, or its implementation is primarily expressed through the OntologyClassificationAgent within the parent SemanticAnalysis system rather than through standalone files.
+![Ontology — Architecture](images/ontology-architecture.png)
 
----
+Its purpose is narrow and well-bounded: take an entity produced by upstream pipeline agents, determine which ontology class it belongs to, record the confidence and method of that determination, and flag it if its source content is stale. The result is an `OntologyMetadata` record attached to the entity that carries the full audit context needed by validation, insight generation, and eventual persistence.
 
 ## Architecture and Design
 
-The design of Ontology reflects a layered classification philosophy that distinguishes between **upper ontology** (universal, domain-agnostic categories) and **lower ontology** (domain-specific, project-contextualized types). This two-tier ontological structure is a deliberate architectural decision that allows the system to remain general enough to classify arbitrary codebases while still resolving concrete, project-specific entity types.
+The dominant architectural pattern here is a **guarded lifecycle with an anti-corruption adapter**. The `OntologyClassificationAgent` enforces an `initialize → classify → suggest extensions` sequence — the initialize phase must complete before any classification is attempted. This guard pattern, documented in `docs/architecture/adding-new-agent.md` and formalized in the child component ThreePhaseOntologyLifecycle, prevents classification against an unloaded or partially loaded registry and is consistent with how all pipeline agents are structured through the shared `BaseAgent<TInput, TOutput>` contract.
+
+The anti-corruption layer is `LegacyOntologyAdapter`, which wraps `@fwornle/km-core`'s `OntologyRegistry` and presents the interface that `OntologyValidator` and `OntologyClassifier` were written against. This isolates both components from future changes in the upstream registry implementation — a deliberate trade-off that accepts a shim layer in exchange for zero call-site rewrites on the consumer side. This same adapter is what makes `OntologyConfigManager` (a sibling component) the single point of configuration truth: class hierarchy file paths, LLM mode toggles, and budget caps are all resolved at the config layer and never hard-coded into classifiers or validators.
+
+A second notable design decision is the **dual-mode classification strategy**: heuristic pattern matching for speed, LLM-assisted classification for accuracy, with a configurable budget cap on LLM calls. This makes cost a first-class design concern rather than an operational afterthought. The budget cap is configured through `OntologyConfigManager`, which is a singleton — all agents in a process share one configuration state, with an explicit `reset()` method for test isolation.
 
 ![Ontology — Relationship](images/ontology-relationship.png)
 
-Within the SemanticAnalysis pipeline, the OntologyClassificationAgent is the primary consumer of Ontology's definitions. That agent is responsible for classifying observations against these upper/lower hierarchies, meaning Ontology acts as the **schema authority** — it defines what valid classifications look like, while the agent performs the matching. This separation of schema from classification logic is a sound design decision: it allows ontology definitions to evolve independently of the LLM-driven classification mechanics.
-
-The sibling relationship with OntologyRegistry is architecturally significant. Where Ontology likely holds the **structural definitions and resolution logic**, OntologyRegistry likely handles **persistence and lookup** of classified entities. The two components together form a definition-and-registry pair — a common pattern in type systems and knowledge graphs where schema definition is kept separate from the runtime registry of instances.
-
-Validation is explicitly listed as a core responsibility of Ontology. This positions it not merely as a passive schema, but as an **active enforcement layer** — ensuring that entities resolved by the pipeline conform to recognized types before they are persisted or surfaced through Insights.
-
----
-
 ## Implementation Details
 
-No code symbols or key files are currently indexed for this component. Based on the observations and the parent context, the implementation likely manifests in one or more of the following forms:
+`OntologyClassificationAgent` is the central orchestrator. In the **initialize** phase it loads the ontology hierarchy — upper and lower class definitions — from file paths specified in `OntologyConfigManager`, meaning the hierarchy is externally editable without code changes. This is a significant maintainability affordance: new domain concepts can be introduced by editing configuration files rather than touching classifier logic.
 
-- **Upper ontology definitions**: A structured representation (likely declarative — JSON, YAML, or Python dataclasses) of universal entity categories such as `Function`, `Class`, `Module`, `Dependency`, or `Concept`. These would be domain-agnostic and stable across projects.
-- **Lower ontology definitions**: Project-contextualized or domain-specific subtypes that extend or specialize upper categories, resolved at classification time based on the target repository's language, framework, or coding conventions.
-- **Entity type resolution logic**: A resolver that takes a raw observation or AST node and maps it to a canonical ontology type, likely consuming signals from the CodeGraphAgent (Tree-sitter/Memgraph AST data) and SemanticAnalysisAgent (LLM-derived cross-correlations).
-- **Validation routines**: Rules that enforce type consistency, flag unresolvable entities, and potentially feed issue signals back through the BaseAgent's standard response envelope (confidence breakdown, issue detection, routing suggestions).
+In the **classify** phase, each entity passes through either heuristic or LLM-assisted classification, producing an `OntologyMetadata` record with four fields: ontology class, confidence score, classification method (`heuristic` or `llm`), and ontology version. The version field is particularly important for downstream auditability — the Insights stage, which operates on fully classified entities, can inspect which ontology snapshot was in effect when a given entity was classified.
 
-The absence of indexed symbols warrants attention — future indexing passes should surface the concrete classes and functions that implement these responsibilities.
+Before classification, `GitStalenessDetector` runs a two-pronged staleness check: reference-pattern regex scanning to identify structurally outdated content, combined with git-commit correlation to confirm whether the source has actually changed. Entities flagged as stale are prevented from entering classification, keeping the ontology registry clean of observations that may no longer reflect the codebase's current state.
 
----
+In the **suggest extensions** phase, entities that don't map cleanly to existing ontology classes surface as proposed new classes. This closes a feedback loop — the ontology can evolve in response to observed reality rather than requiring manual discovery of gaps.
 
 ## Integration Points
 
-Ontology integrates with the SemanticAnalysis pipeline at several critical junctures. The most direct integration is with **OntologyClassificationAgent**, which consumes Ontology's type hierarchy to classify processed observations. Without Ontology's definitions, the agent has no schema to classify against.
+The Ontology subsystem sits between the semantic LLM analysis stage and the Insights generation stage in the SemanticAnalysis pipeline. It receives unclassified entities from upstream agents and emits `OntologyMetadata`-annotated entities consumed by Insights and the persistence layer. Its dependency on `@fwornle/km-core`'s `OntologyRegistry` is fully mediated by `LegacyOntologyAdapter` — no other component in the ontology subsystem imports from `@fwornle/km-core` directly.
 
-The **OntologyRegistry** sibling depends on Ontology to know what types are valid before registering entity instances. This creates a directional dependency: Ontology must be initialized and stable before OntologyRegistry can operate correctly.
+LLM calls made during the LLM-assisted classification mode are routed through `@rapid/llm-proxy`'s `LLMService`, consistent with the parent SemanticAnalysis component's cross-cutting approach to LLM access with token usage telemetry via `attachTokenLogger`. The budget cap in `OntologyConfigManager` therefore acts in concert with telemetry infrastructure rather than replacing it.
 
-The **Pipeline** sibling, which coordinates the sequencing of agents within SemanticAnalysis, likely invokes ontology classification as a discrete stage — after raw data extraction (CodeGraphAgent, git/vibe processing) and before persistence or insight generation. This positions Ontology's resolution and validation logic as a **mid-pipeline gate**.
-
-The **Insights** sibling consumes the output of the classification pipeline, meaning the <USER_ID_REDACTED> and completeness of Ontology's type definitions directly determines the richness and accuracy of generated insights. Poorly defined or missing lower-ontology types would produce underspecified or misclassified entities in the Insights layer.
-
-The **GitStalenessDetector** sibling interacts with Ontology indirectly — stale entity detection (via file-reference and git-commit correlation, handled by ContentValidationAgent) needs to resolve entity types to understand what kinds of entities can become stale and how staleness should be interpreted per type.
-
----
+`OntologyConfigManager` is shared as a singleton with sibling pipeline agents. Because it holds mutable state (mode selection, file paths, budget cap), the `reset()` method is the designated mechanism for test isolation — developers must call it between tests rather than instantiating fresh config objects.
 
 ## Usage Guidelines
 
-Developers working with or extending Ontology should treat the upper ontology definitions as **stable contracts**. Changes to upper ontology types propagate through the entire classification pipeline, affecting OntologyClassificationAgent behavior, OntologyRegistry schemas, and Insights output simultaneously. Upper ontology changes should be treated with the same rigor as breaking API changes.
+**Lifecycle ordering is non-negotiable.** The initialize phase must complete before any classify call. Skipping or parallelizing initialization against classification will result in classification against an unloaded registry. ThreePhaseOntologyLifecycle formalizes this constraint, and the pattern is documented in `docs/architecture/adding-new-agent.md`.
 
-Lower ontology definitions are the appropriate extension point for project- or domain-specific classification needs. When onboarding a new repository type or language ecosystem, lower ontology entries should be added rather than modifying upper categories.
+**Ontology hierarchy is file-driven.** Upper and lower class definitions are loaded from paths in `OntologyConfigManager`. When introducing new domain concepts, edit those files rather than modifying classifier code. This is the intended extension mechanism and keeps the class hierarchy auditable outside the codebase.
 
-Validation logic within Ontology should be kept **stateless and deterministic**. Because it feeds into the BaseAgent response envelope (used across all agents in SemanticAnalysis), non-deterministic validation would introduce noise into confidence breakdowns and issue detection signals across the entire pipeline.
+**LLM mode carries a real cost.** The budget cap exists precisely because LLM calls are expensive at scale. Set it conservatively in batch pipeline runs and use heuristic mode as the default unless accuracy requirements justify the cost. Monitor token telemetry via `attachTokenLogger` to calibrate the cap over time.
 
-When the component gains indexed code symbols, developers should ensure that entity type resolution functions are independently testable against both upper and lower ontology layers. The two-tier structure implies two distinct resolution paths that should be exercised separately in tests to avoid conflation of universal and domain-specific classification failures.
+**Stale content is excluded, not corrected.** `GitStalenessDetector` flags and drops stale observations before classification — it does not attempt to refresh or re-derive them. If entities are being unexpectedly excluded from classification, the staleness detector's regex patterns and git-correlation thresholds in `OntologyConfigManager` are the first place to inspect.
 
-Finally, the relationship between Ontology and OntologyRegistry should be treated as **schema-before-registry**: any new entity type must be defined and validated within Ontology before it can be registered or <USER_ID_REDACTED> through OntologyRegistry. Enforcing this ordering prevents orphaned registry entries that reference undefined types.
+**Test isolation requires explicit reset.** Because `OntologyConfigManager` is a singleton, tests that modify configuration must call `reset()` on teardown. Failing to do so will cause configuration bleed between test cases in the same process, which can produce non-deterministic classification behavior that is difficult to trace.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a multi-agent pipeline within the mcp-server-semantic-analysis integration that processes git history, LSL (vibe) sessions, and AST-parsed code graphs to extract, classify, and persist structured knowledge entities. The system coordinates several specialized agents: CodeGraphAgent indexes repositories via Tree-sitter/Memgraph, SemanticAnalysisAgent performs LLM-driven cross-correlation of git/vibe/code data, OntologyClassificationAgent classifies observations against upper/lower ontology hierarchies, ContentValidationAgent detects stale entities via file-reference and git-commit correlation, and a BaseAgent abstract class provides the standard response envelope (confidence breakdown, issue detection, routing suggestions) used by all agents.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a batch-analysis pipeline over git history and LSL (vibe) sessions to extract, classify, validate, and persist structured knowledge entities. It coordinates several specialized agents in sequence: git history ingestion, vibe/LSL session ingestion, AST-based code graph construction, semantic LLM analysis, ontology classification, content validation, and insight generation. Each agent is built on a shared `BaseAgent<TInput, TOutput>` abstract class that wraps execution in a standardized `AgentResponse` envelope with confidence scoring, issue detection, routing suggestions, and retry guidance.
+
+The pipeline uses an ontology system backed by `@fwornle/km-core`'s `OntologyRegistry` (accessed via a `LegacyOntologyAdapter` shim) to classify extracted observations into upper/lower ontology classes with configurable heuristic and LLM-assisted classification modes. The `OntologyClassificationAgent` manages lifecycle (initialize → classify → suggest extensions) and attaches `OntologyMetadata` (class, confidence, method, version) to every entity before persistence. Storage was migrated from a legacy `GraphDatabaseAdapter`+`PersistenceAgent` trio to a `KmCoreAdapter` surface in Phase 42.x, with field names preserved for minimal call-site disruption.
+
+Key cross-cutting concerns include: LLM calls routed through `@rapid/llm-proxy`'s `LLMService` with token usage telemetry via `attachTokenLogger`; optional code-graph-rag integration via `CodeGraphAgent` (Tree-sitter AST + Memgraph) that gracefully degrades when the `uv` CLI or Memgraph TCP connection is unavailable; content staleness detection combining reference-pattern regex scanning and git-commit correlation via `GitStalenessDetector`; and trace files written to `logs/` for debugging non-fatally.
+
+### Children
+- [ThreePhaseOntologyLifecycle](./ThreePhaseOntologyLifecycle.md) -- Based on the parent context describing OntologyClassificationAgent, the initialize phase must complete before classify can be called, representing a guard pattern common in agent-based architectures documented in docs/architecture/adding-new-agent.md
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline is a sub-component of SemanticAnalysis
-- [Insights](./Insights.md) -- Insights is a sub-component of SemanticAnalysis
-- [OntologyRegistry](./OntologyRegistry.md) -- OntologyRegistry is a sub-component of SemanticAnalysis
-- [GitStalenessDetector](./GitStalenessDetector.md) -- GitStalenessDetector is a sub-component of SemanticAnalysis
+- [Pipeline](./Pipeline.md) -- All pipeline agents extend the shared `BaseAgent<TInput, TOutput>` abstract class, which wraps execution in a standardized `AgentResponse` envelope carrying confidence scores, detected issues, routing suggestions, and retry guidance
+- [Insights](./Insights.md) -- Insight generation is the final sequential stage in the pipeline, operating on fully classified and validated entities produced by upstream agents, making it dependent on the complete ontology metadata attached by `OntologyClassificationAgent`
+- [OntologyConfigManager](./OntologyConfigManager.md) -- `OntologyConfigManager` is implemented as a singleton, meaning all agents and subsystems within a process share one configuration state; the explicit `reset()` method exists specifically to restore defaults between unit tests without restarting the process
+- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- `LegacyOntologyAdapter` wraps `OntologyRegistry` from `@fwornle/km-core`, acting as an anti-corruption layer so that the legacy interface expected by `OntologyValidator` and `OntologyClassifier` is preserved even as the underlying registry implementation evolves
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 6 observations*

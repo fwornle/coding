@@ -2,87 +2,90 @@
 
 **Type:** SubComponent
 
-Serves as The batch processing pipeline agents: coordinator, observation generation, KG operators, deduplication, and persistence. within the SemanticAnalysis component at hierarchy path Coding/SemanticAnalysis/Pipeline
+The pipeline sequences at least seven discrete agents in order: git history ingestion, vibe/LSL session ingestion, AST-based code graph construction, semantic LLM analysis, ontology classification, content validation, and insight generation — each consuming the prior agent's output
 
-## What It Is
+## Pipeline
 
-Pipeline is a sub-component of SemanticAnalysis, located at the hierarchy path `Coding/SemanticAnalysis/Pipeline`. It serves as the **batch processing pipeline** within the broader SemanticAnalysis system, responsible for coordinating the agents and operational stages that together extract, classify, and persist structured knowledge: coordinator logic, observation generation, Knowledge Graph (KG) operators, deduplication, and persistence. It is an L2 SubComponent entity, meaning it sits one level below SemanticAnalysis in the project knowledge hierarchy, alongside sibling sub-components Ontology, Insights, OntologyRegistry, and GitStalenessDetector.
+### What It Is
+
+The Pipeline is the central orchestration sub-component of SemanticAnalysis (`integrations/mcp-server-semantic-analysis`), defining the sequential execution contract through which raw source artifacts — git history and LSL/vibe session data — are transformed into classified, validated, and persisted structured knowledge entities. It is not a single class but a composed runtime of at least seven discrete agents, each consuming the prior agent's output and producing a typed result wrapped in the shared `BaseAgentResponseEnvelope` contract.
+
+The pipeline's scope begins at data ingestion and ends at insight generation, encompassing every intermediate transformation: AST-based code graph construction, semantic LLM analysis, ontology classification, and content validation. All agents participating in this pipeline extend `BaseAgent<TInput, TOutput>`, making the Pipeline both a runtime execution order and an architectural contract.
 
 ---
 
-## Architecture and Design
+### Architecture and Design
 
 ![Pipeline — Architecture](images/pipeline-architecture.png)
 
-The Pipeline sub-component embodies a **staged batch processing** design philosophy within the SemanticAnalysis parent. Rather than handling individual, ad-hoc requests, Pipeline organizes work into discrete, ordered stages that each agent or operator in the system moves through sequentially. This maps directly to how SemanticAnalysis is described at the parent level: a multi-agent pipeline that ingests git history, LSL (vibe) sessions, and AST-parsed code graphs, then coordinates several specialized agents to produce structured output.
+The Pipeline follows a **linear staged-processing** architecture where each agent is a typed transformation unit: `TInput` from the prior stage becomes `TOutput` to the next. The strict sequential ordering — git history ingestion → vibe/LSL session ingestion → AST code graph construction → semantic LLM analysis → ontology classification → content validation → insight generation — reflects deliberate data dependency: each stage requires the enriched output of the one before it. Insight generation (the Insights sibling component) sits at the terminal position precisely because it depends on ontology metadata attached by `OntologyClassificationAgent`, which must itself follow semantic analysis.
 
-The five conceptual stages embedded in Pipeline's responsibility surface — coordination, observation generation, KG operations, deduplication, and persistence — reflect a deliberate separation of concerns. Coordination sits at the front, orchestrating which agents run and in what order. Observation generation is the LLM-driven or heuristic phase where raw data (git diffs, vibe session logs, AST code graphs) is transformed into semantic observations. KG operators handle the graph-layer manipulations against Memgraph. Deduplication ensures that repeated ingestion runs do not produce redundant entities. Persistence is the final write-through to durable storage.
-
-This linear staged architecture is a deliberate trade-off favoring **correctness and traceability over latency**. Batch pipelines are easier to audit, replay, and debug than streaming or event-driven alternatives, which is important in a system whose primary product is structured knowledge that other components (like OntologyRegistry and Insights) will consume downstream.
+The architectural keystone is `BaseAgent<TInput, TOutput>` and its output contract, the `BaseAgentResponseEnvelope`. Every agent in the pipeline, regardless of domain concern, wraps its result in an `AgentResponse` envelope carrying confidence scores, detected issues, routing suggestions, and retry guidance. This uniform envelope means the pipeline coordinator can make consistent decisions about whether to proceed, retry, or route differently without special-casing individual agents. The child component `BaseAgentResponseEnvelope` is therefore not just a data structure — it is the contract that makes the pipeline composable.
 
 ![Pipeline — Relationship](images/pipeline-relationship.png)
 
----
+A notable design decision is **non-fatal degradation as a first-class concern**. The `CodeGraphAgent`'s graceful degradation when the `uv` CLI or Memgraph TCP connection is unavailable exemplifies this: graph construction is skipped rather than aborting the run. Similarly, trace file writes to `logs/` are explicitly non-fatal. The pipeline prioritizes forward progress over completeness, accepting partial results rather than hard failures. This is a deliberate trade-off favoring availability of downstream insights over strict data integrity guarantees at every stage.
 
-## Implementation Details
-
-No code symbols or key files are currently indexed under the Pipeline sub-component, which means the canonical implementation details are not yet surfaced in the knowledge graph. However, the functional description grounds a clear picture of internal mechanics.
-
-The **coordinator** stage is the entry point. Based on the parent SemanticAnalysis description, this coordinator is responsible for dispatching work to the specialized agents: CodeGraphAgent (Tree-sitter/Memgraph indexing), SemanticAnalysisAgent (LLM-driven cross-correlation), OntologyClassificationAgent (ontology hierarchy classification), and ContentValidationAgent (staleness detection). The coordinator likely operates as an orchestration loop that sequences these agents, passes their outputs forward as inputs to subsequent stages, and collects a unified result envelope.
-
-The **observation generation** stage is where semantic signal is extracted from raw inputs. This is the most computationally intensive stage, relying on LLM inference via SemanticAnalysisAgent to cross-correlate git history, vibe session data, and AST-parsed code graphs. Observations at this stage are likely structured records with confidence scores, as the BaseAgent abstract class is documented to provide a standard response envelope including confidence breakdown, issue detection, and routing suggestions.
-
-The **KG operators** stage performs graph mutations — node upserts, edge creation, relationship classification — against the Memgraph backend, driven by the outputs of observation generation and OntologyClassificationAgent. **Deduplication** follows, comparing incoming entities against existing graph state to prevent duplicate nodes or edges across pipeline runs. **Persistence** finalizes the batch, committing all validated, deduplicated knowledge entities to durable storage.
+The migration from a legacy `GraphDatabaseAdapter` + `PersistenceAgent` trio to the `KmCoreAdapter` surface (completed in Phase 42.x) reveals a layered storage abstraction strategy. Field names were deliberately preserved during this migration to minimize call-site changes in downstream agents — a conservative, stability-first approach that treats internal agent code as a stable interface surface even when the persistence layer beneath it changes.
 
 ---
 
-## Integration Points
+### Implementation Details
 
-Pipeline is the operational backbone that connects every other sub-component of SemanticAnalysis into a coherent execution flow. Its relationship to sibling sub-components is functional, not merely organizational:
+Each pipeline stage is an agent class extending `BaseAgent<TInput, TOutput>`. The generic typing enforces that stage boundaries are explicit: the output type of agent *N* must match the input type of agent *N+1*, making type mismatches compile-time errors rather than runtime surprises.
 
-- **Ontology** and **OntologyRegistry** are upstream dependencies for the KG operators and observation classification stages. The pipeline must resolve entity types against the ontology hierarchy before persisting them.
-- **Insights** is a downstream consumer: the structured knowledge entities that Pipeline produces and persists are what the Insights sub-component draws on to generate higher-level analytical outputs.
-- **GitStalenessDetector** integrates into the pipeline's ContentValidationAgent stage, providing file-reference and git-commit correlation to flag entities that should be marked stale before persistence.
+The **`CodeGraphAgent`** is the most infrastructure-dependent stage. It integrates Tree-sitter AST parsing with a Memgraph graph database backend to construct a code relationship graph. Its graceful degradation logic checks for both the `uv` CLI availability and Memgraph TCP connectivity before attempting graph construction — if either is absent, it emits a degraded-but-valid `AgentResponse` and the pipeline continues. This makes local development and CI environments without Memgraph viable without code changes.
 
-At the agent boundary, Pipeline interfaces with all four specialized agents documented under SemanticAnalysis (CodeGraphAgent, SemanticAnalysisAgent, OntologyClassificationAgent, ContentValidationAgent) through the BaseAgent standard response envelope, which provides a consistent contract for confidence scores, detected issues, and routing decisions across every pipeline stage.
+LLM invocations across the semantic analysis stage and any other LLM-backed agents are routed uniformly through `@rapid/llm-proxy`'s `LLMService`. Token usage telemetry is attached via `attachTokenLogger`, enabling per-agent token accounting across a full batch run. This means the pipeline produces not only knowledge output but also a resource accounting record, which is critical for cost visibility in batch workloads. The `LegacyOntologyAdapter` shim — a sibling component — insulates the `OntologyClassificationAgent` from direct coupling to `@fwornle/km-core`'s `OntologyRegistry`, so the pipeline's classification stage remains stable even as the underlying registry implementation evolves.
 
----
+The `OntologyClassificationAgent` (part of the Ontology sibling) runs its three-phase lifecycle — initialize → classify → suggest extensions — within the pipeline sequence. Its position after semantic LLM analysis is intentional: classification operates on semantically enriched entities, and the suggest-extensions phase can propose new ontology classes when observed entities fall outside existing classifications. The `OntologyConfigManager` singleton governs configuration for this stage; because it is process-wide, all agents within a pipeline run share one configuration state.
 
-## Usage Guidelines
-
-Because Pipeline operates as a batch processor, developers working with or extending it should treat **idempotency as a first-class requirement**. The deduplication stage exists precisely because pipeline runs may be replayed (e.g., after a failed run or a re-index of a repository). Any new KG operator or persistence logic introduced into the pipeline must be safe to run multiple times against the same input without producing duplicate or inconsistent graph state.
-
-The coordinator's sequencing of agents is significant: stages are ordered for a reason (observe → classify → validate → deduplicate → persist), and inserting new agents or operators out of sequence risks passing unclassified or unvalidated data into the graph. New pipeline stages should be integrated at the coordinator level with explicit input/output contracts defined via the BaseAgent response envelope pattern.
-
-Since no code files are currently indexed under this sub-component, the immediate priority for maintainability is surfacing Pipeline's implementation files into the knowledge graph. Once indexed, the coordinator logic, KG operator implementations, and deduplication strategies will become navigable and referenceable — enabling the kind of targeted insight generation that sibling sub-components like OntologyRegistry and GitStalenessDetector benefit from.
+Debugging support is built into the pipeline via non-fatal trace file writes to `logs/`. These traces are written by individual agents and are designed to survive write failures silently, meaning trace infrastructure problems never propagate as pipeline failures. This is a pragmatic debugging affordance rather than a production observability system.
 
 ---
 
-## Architectural Patterns, Design Decisions, and Scalability
+### Integration Points
 
-| Dimension | Assessment |
-|---|---|
-| **Pattern** | Staged batch pipeline with agent coordinator |
-| **Key trade-off** | Correctness/replayability over low latency |
-| **Scalability** | Batch design scales horizontally by parallelizing independent agent stages; deduplication is the likely bottleneck at scale |
-| **Maintainability** | Currently limited by absence of indexed code symbols; coordinator-based design should support modular agent addition without full pipeline rewrites |
-| **Risk** | Tight coupling between pipeline stage ordering and agent output schemas; schema changes in BaseAgent response envelope ripple through all stages |
+The Pipeline's primary parent is SemanticAnalysis, which acts as the MCP server host and pipeline coordinator. The pipeline does not operate independently — it runs within the MCP server context that sequences agent invocations and manages the overall batch lifecycle.
 
-The most significant architectural decision embedded in Pipeline's design is the choice to make deduplication an **explicit pipeline stage** rather than delegating it to the persistence layer or the graph database. This places deduplication logic under the control of the pipeline coordinator, where it can be tuned or bypassed for specific run modes (e.g., a full re-index vs. an incremental update), rather than being an implicit side effect of graph upsert semantics.
+Storage integration runs through `KmCoreAdapter`, the current persistence surface following the Phase 42.x migration. Downstream agents reference field names that were preserved from the legacy `GraphDatabaseAdapter` API, meaning the integration point is stable at the field-name level even though the adapter implementation changed. The `LegacyOntologyAdapter` provides a similar anti-corruption boundary for ontology operations, connecting the pipeline's classification stage to `@fwornle/km-core`'s `OntologyRegistry` without exposing its evolving API directly to pipeline agents.
+
+LLM integration is centralized through `@rapid/llm-proxy`'s `LLMService` with `attachTokenLogger` — any pipeline agent making LLM calls should route through this surface to ensure token telemetry is captured. The `CodeGraphAgent` adds an external infrastructure dependency on Memgraph (TCP) and the `uv` CLI, both treated as optional via the degradation logic. The Insights sibling component acts as a consumer of the pipeline's full output, depending on the complete chain having run and ontology metadata being present on each entity.
+
+---
+
+### Usage Guidelines
+
+**Treat stage ordering as a hard dependency graph, not an implementation detail.** The semantic and classification stages must follow ingestion; insight generation must follow classification. Reordering agents will produce type errors at compile time (via the generic `BaseAgent` chain) and semantic errors at runtime (missing metadata on entities).
+
+**Never make pipeline-aborting failures out of infrastructure uncertainty.** The `CodeGraphAgent` pattern — check availability, degrade gracefully, emit a valid `AgentResponse` — is the model for any agent with optional external dependencies. The `BaseAgentResponseEnvelope`'s routing suggestions and retry guidance fields exist precisely to communicate degraded states upstream without throwing exceptions that halt the run.
+
+**Route all LLM calls through `LLMService` with `attachTokenLogger`.** Ad-hoc LLM calls that bypass this surface will produce blind spots in per-agent token accounting, making cost attribution for batch runs incomplete.
+
+**Respect the `KmCoreAdapter` field-name contract.** The deliberate field-name preservation during the storage migration means downstream agents carry implicit assumptions about field naming. Introducing field renames in `KmCoreAdapter` without auditing all agent call-sites will break the pipeline silently if those fields are not validated at the envelope level.
+
+**Do not rely on trace files for production observability.** Trace writes to `logs/` are non-fatal and may silently fail. They are a developer debugging aid. Production monitoring should be built on the token telemetry and `AgentResponse` envelope data, not on trace file presence.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a multi-agent pipeline within the mcp-server-semantic-analysis integration that processes git history, LSL (vibe) sessions, and AST-parsed code graphs to extract, classify, and persist structured knowledge entities. The system coordinates several specialized agents: CodeGraphAgent indexes repositories via Tree-sitter/Memgraph, SemanticAnalysisAgent performs LLM-driven cross-correlation of git/vibe/code data, OntologyClassificationAgent classifies observations against upper/lower ontology hierarchies, ContentValidationAgent detects stale entities via file-reference and git-commit correlation, and a BaseAgent abstract class provides the standard response envelope (confidence breakdown, issue detection, routing suggestions) used by all agents.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a batch-analysis pipeline over git history and LSL (vibe) sessions to extract, classify, validate, and persist structured knowledge entities. It coordinates several specialized agents in sequence: git history ingestion, vibe/LSL session ingestion, AST-based code graph construction, semantic LLM analysis, ontology classification, content validation, and insight generation. Each agent is built on a shared `BaseAgent<TInput, TOutput>` abstract class that wraps execution in a standardized `AgentResponse` envelope with confidence scoring, issue detection, routing suggestions, and retry guidance.
+
+The pipeline uses an ontology system backed by `@fwornle/km-core`'s `OntologyRegistry` (accessed via a `LegacyOntologyAdapter` shim) to classify extracted observations into upper/lower ontology classes with configurable heuristic and LLM-assisted classification modes. The `OntologyClassificationAgent` manages lifecycle (initialize → classify → suggest extensions) and attaches `OntologyMetadata` (class, confidence, method, version) to every entity before persistence. Storage was migrated from a legacy `GraphDatabaseAdapter`+`PersistenceAgent` trio to a `KmCoreAdapter` surface in Phase 42.x, with field names preserved for minimal call-site disruption.
+
+Key cross-cutting concerns include: LLM calls routed through `@rapid/llm-proxy`'s `LLMService` with token usage telemetry via `attachTokenLogger`; optional code-graph-rag integration via `CodeGraphAgent` (Tree-sitter AST + Memgraph) that gracefully degrades when the `uv` CLI or Memgraph TCP connection is unavailable; content staleness detection combining reference-pattern regex scanning and git-commit correlation via `GitStalenessDetector`; and trace files written to `logs/` for debugging non-fatally.
+
+### Children
+- [BaseAgentResponseEnvelope](./BaseAgentResponseEnvelope.md) -- Per the Pipeline sub-component description, every agent extending BaseAgent<TInput, TOutput> wraps its output in an AgentResponse envelope, enforcing a uniform contract across all SemanticAnalysis pipeline stages.
 
 ### Siblings
-- [Ontology](./Ontology.md) -- Ontology is a sub-component of SemanticAnalysis
-- [Insights](./Insights.md) -- Insights is a sub-component of SemanticAnalysis
-- [OntologyRegistry](./OntologyRegistry.md) -- OntologyRegistry is a sub-component of SemanticAnalysis
-- [GitStalenessDetector](./GitStalenessDetector.md) -- GitStalenessDetector is a sub-component of SemanticAnalysis
+- [Ontology](./Ontology.md) -- `OntologyClassificationAgent` manages a three-phase lifecycle — initialize → classify → suggest extensions — ensuring the ontology registry is ready before any entity is classified and can propose new classes when observed entities don't fit existing ones
+- [Insights](./Insights.md) -- Insight generation is the final sequential stage in the pipeline, operating on fully classified and validated entities produced by upstream agents, making it dependent on the complete ontology metadata attached by `OntologyClassificationAgent`
+- [OntologyConfigManager](./OntologyConfigManager.md) -- `OntologyConfigManager` is implemented as a singleton, meaning all agents and subsystems within a process share one configuration state; the explicit `reset()` method exists specifically to restore defaults between unit tests without restarting the process
+- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- `LegacyOntologyAdapter` wraps `OntologyRegistry` from `@fwornle/km-core`, acting as an anti-corruption layer so that the legacy interface expected by `OntologyValidator` and `OntologyClassifier` is preserved even as the underlying registry implementation evolves
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 6 observations*

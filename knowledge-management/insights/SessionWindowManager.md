@@ -2,86 +2,72 @@
 
 **Type:** SubComponent
 
-SessionWindowManager assigns LSL session entries to hourly time-window buckets (e.g., '0800-0900') that are embedded directly in LSL metadata, meaning the window label becomes part of the persisted file identity rather than a query-time annotation
-
-# SessionWindowManager — Technical Insight Document
+The LSLMetadata type defined in the transcript pipeline includes a `timeWindow` field (formatted as e.g. '0800-0900'), and the TranscriptAdapter contract in `lib/agent-api/transcript-api.js` assigns responsibility for populating this field to the adapter layer, meaning window computation happens at ingestion time
 
 ## What It Is
 
-SessionWindowManager is a SubComponent of the `LiveLoggingSystem` responsible for assigning LSL (Live Session Log) session entries to hourly time-window buckets — labels of the form `'0800-0900'` — and embedding those labels directly into LSL metadata so that the window identifier becomes part of the persisted file's identity. Rather than treating the window as a query-time annotation applied during read operations, SessionWindowManager makes the routing decision at write time, meaning the bucket label is materialized into the file system layout itself.
+SessionWindowManager is a SubComponent of LiveLoggingSystem responsible for determining which hourly time bucket a given session belongs to and producing the `timeWindow` field that drives downstream file routing. It is not directly implemented as a standalone file based on available observations — rather, its behavior is protocol-level logic that lives inside each agent adapter's `convertToLSL()` and `getCurrentSession()` implementations, as defined by the `TranscriptAdapter` abstract class in `lib/agent-api/transcript-api.js`. Its child component, TimeWindowFormatter, handles the concrete formatting of window values into strings like `'0800-0900'`.
 
-It sits within the broader live-logging pipeline alongside its siblings `RedactionEngine` and `TranscriptAdapterBase`. By the time SessionWindowManager processes a session entry, the content has already passed through `RedactionEngine` (whose configuration is gated by `LSLConfigValidator`), so SessionWindowManager operates exclusively on validated, redacted content — never on raw transcripts. It delegates the actual stamping of the window label onto persisted metadata to its child component, `WindowLabelFileIdentityEmbedder`.
-
-![SessionWindowManager — Architecture](images/session-window-manager-architecture.png)
-
-## Architecture and Design
-
-The architectural approach is a **write-time routing / file-identity embedding** pattern. Instead of writing all entries to a single rolling log and partitioning later via <USER_ID_REDACTED>, SessionWindowManager computes the destination bucket at the moment of write, and the bucket name is stored as part of the LSL metadata. This makes the file system itself an index — the hourly partition is materialized rather than computed.
-
-The component sits downstream of `RedactionEngine` in the pipeline. As described in the parent `LiveLoggingSystem` context, the polling infrastructure is provided by `TranscriptAdapter.watchTranscripts()` in `lib/agent-api/transcript-api.js`, which fires registered callbacks whenever new transcript entries are detected. SessionWindowManager is positioned to consume those entries after `RedactionEngine` has applied the validated rule set from `.specstory/config/redaction-config.yaml`. This ordering — validate → redact → window-route → persist — means SessionWindowManager never sees raw transcripts and is decoupled from the concerns of content sanitization.
-
-The window-assignment strategy uses **wall-clock hour alignment** rather than session-duration alignment. A session starting at 08:59 and ending at 09:10 spans the 0800-0900 / 0900-1000 boundary, and this is a known design tension. The observations indicate SessionWindowManager uses the session's start timestamp — obtained from the adapter's `getCurrentSession()` method (one of the five abstract methods of `TranscriptAdapterBase`) — as the assignment key. This keeps all entries from a single session in one file regardless of where they fall in real time, which is a deliberate trade-off: temporal precision at the entry level is sacrificed for session-level cohesion.
-
-The child component `WindowLabelFileIdentityEmbedder` carries out the actual embedding step. Because the label "becomes part of the persisted file identity," this embedder runs before the LSL entry is flushed to disk, tightly coupling it to whatever hourly calculation logic SessionWindowManager applies.
-
-## Implementation Details
-
-SessionWindowManager's core mechanic is timestamp-to-bucket conversion. For each session it processes, it reads the session start time via `getCurrentSession()` and computes an hourly window label in the `HHMM-HHMM` format. The first half of the label is the floor of the start hour; the second half is the next hour. That label is then attached to the LSL metadata via `WindowLabelFileIdentityEmbedder` before persistence, making it part of the file's discoverable identity.
-
-Because all entries from a single session share the start-timestamp-derived label, individual entry timestamps are not used for routing. This is a deliberate simplification: it avoids the per-entry routing overhead and guarantees that a session's transcript is never fragmented across files purely because the conversation extended past an hour mark. However, it does mean the file label may not accurately describe the wall-clock time of later entries in a long session.
-
-A critical implementation concern arises from how `TranscriptAdapter.watchTranscripts()` manages state. The polling loop in `lib/agent-api/transcript-api.js` resets its `lastEntryCount` cursor only on adapter instantiation, never persisting it across process restarts. Consequently, after a restart, all entries are replayed from the beginning of the transcript. SessionWindowManager must therefore be **idempotent with respect to replay**: re-processing the same session entries must not create duplicate window-file segments. This implies the file-write path must use the embedded window label plus session identity as a deduplication key, or the persistence layer must overwrite/merge rather than append blindly.
-
-Boundary-crossing sessions are another implementation hotspot. Because routing happens at write time and uses the session start timestamp, a session that spans 08:59 → 09:10 is assigned to `0800-0900` in its entirety. There is no automatic split. The observation explicitly flags that "sessions that span an hourly boundary would require explicit handling to avoid being silently truncated or duplicated across two window files" — meaning callers and maintainers must be aware that the natural file identity will not subdivide such sessions unless explicit logic is added.
-
-![SessionWindowManager — Relationship](images/session-window-manager-relationship.png)
-
-## Integration Points
-
-SessionWindowManager integrates with three principal collaborators. Upstream, it depends on the polling and session-discovery contract provided by `TranscriptAdapterBase` in `lib/agent-api/transcript-api.js`. Specifically, it consumes the output of `getCurrentSession()` to obtain the start timestamp used for bucket assignment, and it relies on `watchTranscripts()` to deliver newly observed entries. Any concrete adapter — for Claude Code, Copilot CLI, or future agents — must implement these methods to be compatible.
-
-Laterally, it is coupled to `RedactionEngine`, its sibling under `LiveLoggingSystem`. The pipeline ordering ensures that by the time SessionWindowManager assigns a window, the content has already been sanitized according to `.specstory/config/redaction-config.yaml`. Indirectly, this means SessionWindowManager is also dependent on `LSLConfigValidator` — if validation rejects the redaction configuration, the persistence pipeline halts before SessionWindowManager would normally act. SessionWindowManager itself does not interact with `LSLConfigValidator` directly; the relationship is mediated through `RedactionEngine`.
-
-Downstream, SessionWindowManager owns and drives `WindowLabelFileIdentityEmbedder`. The embedder is responsible for writing the computed window label into LSL metadata such that the file system reflects the bucket assignment. This child relationship is tight: any change to the label format (e.g., switching from hourly to half-hourly) would necessarily ripple into the embedder's behavior.
-
-## Usage Guidelines
-
-Developers extending or interacting with SessionWindowManager should treat the window label as **a stable element of file identity**, not as a re-derivable annotation. Once embedded, the label is part of the persisted artifact, and downstream consumers may rely on it for file discovery. Changing the labeling scheme is therefore a breaking change requiring a migration plan for existing log files.
-
-When implementing new `TranscriptAdapterBase` concrete classes, ensure `getCurrentSession()` returns a stable, reliable start timestamp. SessionWindowManager uses this value as the sole input for window assignment; an unreliable or shifting start time would cause session entries to migrate between window files unpredictably. Additionally, because `lastEntryCount` in `watchTranscripts()` is reset on every process restart, adapter authors should either filter already-processed entries in their `readTranscripts()` implementation or rely on SessionWindowManager's idempotency guarantees — but should not assume the polling loop alone prevents replay.
-
-Be explicit about hour-boundary behavior. The current design routes an entire session to the window of its start timestamp, even if it spans into the next hour. If you need entries from after 09:00 in the example session to land in the `0900-1000` file, you must add explicit boundary-split logic — SessionWindowManager will not do it automatically.
-
-Finally, never bypass `RedactionEngine` when feeding content to SessionWindowManager. The pipeline assumes redacted input, and writing raw transcripts directly through the window-routing stage would persist unsanitized content into LSL files, defeating the validation guarantees enforced upstream by `LSLConfigValidator`.
+The component's scope is narrow but load-bearing: it produces a single metadata field (`timeWindow`) whose value directly determines the filesystem path where session files are written. There is no further transformation between SessionWindowManager's output and the file routing decision.
 
 ---
 
-## Summary of Analytical Findings
+## Architecture and Design
 
-**1. Architectural patterns identified:** Write-time routing with materialized file-identity partitioning; pipeline composition (validate → redact → window-route → persist); delegation to a single-purpose child (`WindowLabelFileIdentityEmbedder`); polling-driven consumer pattern via `TranscriptAdapterBase.watchTranscripts()`.
+![SessionWindowManager — Architecture](images/session-window-manager-architecture.png)
 
-**2. Design decisions and trade-offs:** Wall-clock hour alignment over session-duration alignment trades temporal entry-level precision for session-level cohesion. Using session start time as the sole routing key trades per-entry accuracy for atomicity. Embedding the window into file identity trades query-time flexibility for filesystem-as-index simplicity. The replay tolerance requirement (driven by non-persistent `lastEntryCount`) trades restart resilience for idempotency complexity in the write path.
+The most consequential architectural decision visible in the observations is that **window computation is assigned to the adapter layer at ingestion time**, not to a shared downstream utility. This is codified in the `TranscriptAdapter` contract in `lib/agent-api/transcript-api.js`, which requires each adapter subclass to implement `convertToLSL()` — the transformation step where raw agent-native records are mapped to `LSLSession`/`LSLEntry` objects, including their `timeWindow` metadata. The implication is that SessionWindowManager's bucketing logic is replicated, not centralized: the `docs/architecture/adding-new-agent.md` guide explicitly notes that any new agent implementation must re-implement this hourly-bucketing logic, characterizing it as protocol-level behavior rather than a shared utility.
 
-**3. System structure insights:** SessionWindowManager is a narrow, downstream stage in `LiveLoggingSystem`'s pipeline. It sits parallel to `RedactionEngine` (which it depends on transitively for clean input) and consumes from `TranscriptAdapterBase`'s polling output. Its single child, `WindowLabelFileIdentityEmbedder`, exists solely to materialize the routing decision into persisted metadata.
+This design trades reuse for strict interface boundaries. By embedding window computation inside the adapter rather than in a shared service, the architecture keeps the adapter self-contained and avoids a shared-state dependency. The trade-off is that correctness of bucketing must be verified independently for every new adapter implementation, and any change to the windowing format (currently `'HHMM-HHMM'`) must be coordinated across all adapters.
 
-**4. Scalability considerations:** Hourly partitioning naturally bounds file size growth per bucket, aiding scalability of downstream readers. However, long-running sessions that span many hours but stay in a single file (due to start-timestamp routing) can produce unbalanced bucket sizes. The replay-on-restart behavior could create scalability concerns for adapters with large transcript histories — restart cost is O(total entries), not O(new entries).
+The relationship between SessionWindowManager and its sibling components — RedactionEngine and TranscriptAdapterRegistry — is one of sequential pipeline stages rather than peer collaboration. TranscriptAdapterRegistry manages which adapters are available; SessionWindowManager (embedded in those adapters) determines the time bucket; RedactionEngine operates on the resulting content. SessionWindowManager's output does not feed into RedactionEngine's logic, which is driven by pattern configuration in `.specstory/config/redaction-config.yaml`.
 
-**5. Maintainability assessment:** The component has clear boundaries — input contract from `TranscriptAdapterBase.getCurrentSession()`, output delegation to `WindowLabelFileIdentityEmbedder`, lateral dependency on `RedactionEngine`'s output. Risks to maintainability include implicit assumptions (boundary-crossing not handled automatically, idempotency required for replay) that are not enforced by types or interfaces and must be respected by convention. Documenting the hour-boundary policy and the replay-tolerance requirement is essential for new contributors, especially given the absence of code symbols in the current observation set, which suggests this component's contract is currently behavioral rather than explicitly typed.
+---
+
+## Implementation Details
+
+![SessionWindowManager — Relationship](images/session-window-manager-relationship.png)
+
+The concrete formatting of the `timeWindow` string is delegated to TimeWindowFormatter, which produces values in the `'HHMM-HHMM'` format (e.g., `'0800-0900'`). This format is embedded in the `LSLMetadata` type and treated as the canonical representation throughout the pipeline. Because file routing is described as directly driven by this field with no further transformation, the format is effectively a filesystem naming convention — changing it would require renaming existing stored files or implementing a migration layer.
+
+The `getCurrentSession()` method mandated by `TranscriptAdapter` in `lib/agent-api/transcript-api.js` is the live-ingestion entry point for SessionWindowManager's logic. When a live agent session is active, `getCurrentSession()` must identify the correct open hourly bucket and return a session object whose `timeWindow` reflects that bucket. This means SessionWindowManager must evaluate the current wall-clock time and round (or truncate) it to the nearest hour boundary — a computation that TimeWindowFormatter presumably encapsulates.
+
+The `convertToLSL()` method handles the historical/batch path: raw agent-native records carry their own timestamps, and the adapter must derive `timeWindow` from those timestamps during transformation. Both paths — live via `getCurrentSession()` and batch via `convertToLSL()` — must produce consistent `timeWindow` values for the same logical hour, since downstream routing treats them identically.
+
+---
+
+## Integration Points
+
+SessionWindowManager's primary integration surface is the `LSLMetadata.timeWindow` field it populates, which is then consumed by the file routing layer to determine the write path. This makes SessionWindowManager an implicit dependency of every component that reads or writes session files — a silent contract that is easy to overlook when adding new agents.
+
+Within LiveLoggingSystem, SessionWindowManager sits between the adapter layer (TranscriptAdapterRegistry dispatches to the correct adapter, which embeds the windowing logic) and whatever file I/O component consumes the populated `LSLSession` objects. The parent component LiveLoggingSystem owns the overall ingestion pipeline, and SessionWindowManager's output is a prerequisite for that pipeline to route correctly.
+
+The child component TimeWindowFormatter encapsulates the string formatting concern, which means changes to the window format string (e.g., adding date prefix, changing separator) should be localized to TimeWindowFormatter without requiring changes to the bucketing logic itself — provided adapters consistently delegate formatting rather than inline the string construction.
+
+---
+
+## Usage Guidelines
+
+When implementing a new agent adapter — as described in `docs/architecture/adding-new-agent.md` — developers must implement the hourly-bucketing logic themselves rather than calling a shared utility. This is the most common source of potential inconsistency: two adapters could produce different `timeWindow` values for the same timestamp if they implement the boundary rounding differently. The convention to follow is the `'HHMM-HHMM'` format produced by TimeWindowFormatter, and new adapters should use TimeWindowFormatter directly rather than reimplementing the string construction.
+
+Because the `timeWindow` field directly determines filesystem paths, it must be treated as immutable once written. Sessions should not have their `timeWindow` recalculated after initial assignment in `convertToLSL()` or `getCurrentSession()`, as doing so would create a mismatch between the field value and the file's actual location. Any scenario where a session spans an hour boundary (e.g., a conversation started at 08:58 and still active at 09:02) requires a deliberate policy decision — the current architecture does not expose how this edge case is handled, and new adapter authors should clarify this before implementation.
+
+The protocol-level nature of SessionWindowManager's behavior — explicitly noted in the architecture guide — means it should be thought of as a **contract to implement**, not a **service to call**. Developers should resist the temptation to centralize this logic into a shared utility without also updating the `TranscriptAdapter` interface contract and all existing adapter implementations, since the contract and the implementation are currently co-located by design.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The TranscriptAdapter abstract base class in lib/agent-api/transcript-api.js enforces a strict interface contract via five abstract methods: getAgentType(), getTranscriptDirectory(), readTranscripts(), convertToLSL(), and getCurrentSession(). Concrete adapters for Claude Code and Copilot CLI must implement all five. The base class itself provides the polling infrastructure via watchTranscripts(), which calls setInterval at a default 1000ms cadence, reads transcripts, compares the new entry count against an in-memory lastEntryCount cursor, and fires all registered callbacks (stored in a Set) only when new entries are detected. This design means the polling loop is entirely stateless with respect to entry content — it tracks only counts, not hashes or timestamps — so any adapter that reorders or replaces existing entries without changing the total count would silently suppress callbacks. New developers should be aware that lastEntryCount is reset only on adapter instantiation, not across process restarts persisted to disk, meaning a restart always replays all entries from the beginning unless the adapter's readTranscripts() implementation itself filters already-processed entries.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The TranscriptAdapter abstract class in `lib/agent-api/transcript-api.js` enforces a strict interface contract that all agent-specific adapters must satisfy. Subclasses must implement five methods: `getAgentType()` (returns a string identifier like 'claude' or 'copilot'), `getTranscriptDirectory()` (returns the filesystem path where native transcripts are stored), `readTranscripts()` (reads raw agent-native files), `convertToLSL()` (transforms them into the unified LSLSession/LSLEntry format), and `getCurrentSession()` (returns the active session for live ingestion). This adapter pattern means that adding a new agent source — say, a Cursor or Gemini CLI — requires only implementing this interface without touching any downstream pipeline code. The LSLMetadata type includes a `timeWindow` field (formatted as e.g. '0800-0900') that the adapter is responsible for populating, meaning the adapter layer also owns the hourly-bucketing logic that drives file routing downstream.
 
 ### Children
-- [WindowLabelFileIdentityEmbedder](./WindowLabelFileIdentityEmbedder.md) -- Inferred from parent context (no source files available): the parent description states the window label is 'embedded directly in LSL metadata' and 'becomes part of the persisted file identity', meaning this embedder runs before the LSL entry is flushed to disk, coupling it tightly to HourlyWindowCalculator's output.
+- [TimeWindowFormatter](./TimeWindowFormatter.md) -- Per the SubComponent context, the LSLMetadata type includes a timeWindow field formatted as e.g. '0800-0900', and the TranscriptAdapter contract in lib/agent-api/transcript-api.js assigns window computation to the adapter layer at ingestion time.
 
 ### Siblings
-- [RedactionEngine](./RedactionEngine.md) -- RedactionEngine reads its rule set from .specstory/config/redaction-config.yaml, meaning redaction behavior is fully externalized and can be changed without code deployment, but an invalid config can block all persistence if LSLConfigValidator rejects it
-- [TranscriptAdapterBase](./TranscriptAdapterBase.md) -- TranscriptAdapter in lib/agent-api/transcript-api.js declares five abstract methods — getAgentType(), getTranscriptDirectory(), readTranscripts(), convertToLSL(), and getCurrentSession() — that every concrete adapter must implement, providing a single extension point for adding new agent integrations
+- [RedactionEngine](./RedactionEngine.md) -- RedactionEngine is configured via `.specstory/config/redaction-config.yaml`, which acts as the authoritative pattern registry for what constitutes sensitive data across all agent adapters
+- [TranscriptAdapterRegistry](./TranscriptAdapterRegistry.md) -- The TranscriptAdapter abstract class in `lib/agent-api/transcript-api.js` enforces five mandatory methods — `getAgentType()`, `getTranscriptDirectory()`, `readTranscripts()`, `convertToLSL()`, `getCurrentSession()` — forming a strict interface contract all agent adapters must satisfy
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 5 observations*
