@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ProxyMediatedLLMClient
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ProxyMediatedLLMClient] as proxy_mediated_llmclient #LightBlue
+[ProxyUrlResolver] as proxy_url_resolver #F0F0F0
+[DMRLocalInferenceProvider] as dmrlocal_inference_provider #F0F0F0
+[MockModeProvider] as mock_mode_provider #F0F0F0
+[AgentModeRouter] as agent_mode_router #F0F0F0
+[ProcessTagInjector] as process_tag_injector #E8F5E8
+
+llmabstraction --> proxy_mediated_llmclient
+proxy_url_resolver -[hidden]- proxy_mediated_llmclient
+dmrlocal_inference_provider -[hidden]- proxy_mediated_llmclient
+mock_mode_provider -[hidden]- proxy_mediated_llmclient
+agent_mode_router -[hidden]- proxy_mediated_llmclient
+proxy_mediated_llmclient --> process_tag_injector
+
+@enduml

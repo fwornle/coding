@@ -1,29 +1,29 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "scripts/" {
-  component "health-coordinator.js" as coordinator <<core>>
+package "Consumers" {
+  component "Health Coordinator" as hc <<core>>
+  component "Service Starter Framework\nlib/service-starter.js" as ssf <<core>>
 }
 
-package "lib/utils/service-probe.js" {
-  component "probeHttpHealth()" as httpProbe <<api>>
-  component "probeTcpPort()" as tcpProbe <<api>>
+package "ServiceProbeLibrary\nlib/utils/service-probe.js" {
+  component "HTTP Probe Strategy" as http <<api>>
+  component "TCP Probe Strategy" as tcp <<api>>
 }
 
 package "Monitored Services" {
-  component "Next.js Dashboard" as nextjs <<external>>
-  component "Node.js API" as nodeapi <<external>>
-  component "Memgraph" as memgraph <<external>>
-  component "Redis" as redis <<external>>
+  component "Constraint Monitor API" as cma <<api>>
+  component "Dashboard Service" as dash <<api>>
+  component "Port-Level Services" as ports <<external>>
 }
 
-coordinator --> httpProbe : "HTTP services\nreturns: running | stopped | unknown\n(SPEC R6: never 'healthy')"
-coordinator --> tcpProbe : "non-HTTP services\nreturns: running | stopped | unknown\n(SPEC R6: never 'healthy')"
+hc --> http : "runtime liveness checks"
+hc --> tcp : "runtime liveness checks"
+ssf --> http : "startup health gating"
+ssf --> tcp : "startup health gating"
 
-httpProbe --> nextjs : "HTTP/HTTPS\n2xx/3xx → running"
-httpProbe --> nodeapi : "HTTP/HTTPS\n2xx/3xx → running"
-
-tcpProbe --> memgraph : "net.Socket\nBolt protocol"
-tcpProbe --> redis : "net.Socket\nTCP port"
+http --> cma : "probes REST endpoint"
+http --> dash : "probes REST endpoint"
+tcp --> ports : "probes port reachability"
 
 @enduml

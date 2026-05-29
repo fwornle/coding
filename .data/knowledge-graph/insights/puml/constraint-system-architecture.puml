@@ -1,40 +1,40 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Configuration" {
-  component "User Config\n~/.coding-tools/hooks.json" as userCfg <<storage>>
-  component "Project Config\n.coding/hooks.json" as projCfg <<storage>>
-  component "HookConfigLoader" as hcl <<core>>
+title ConstraintSystem - Hook-Based Enforcement Architecture
+
+package "Hook Infrastructure" {
+    component "UnifiedHookManager" as uhm <<core>>
+    component "HookConfigLoader" as hcl <<core>>
 }
 
-package "Hook Engine" {
-  component "Claude Code\nHook Mechanism" as ccHook <<external>>
-  component "UnifiedHookManager" as uhm <<core>>
+package "Configuration Sources" {
+    component "User Config\n~/.coding-tools/hooks.json" as ucfg <<external>>
+    component "Project Config\n.coding/hooks.json" as pcfg <<external>>
+    component "DEFAULT_CONFIG" as dcfg <<core>>
 }
 
-package "Violation Management" {
-  component "ViolationCaptureService" as vcs <<core>>
-  component "Statistics Engine\ncalculateStatistics()" as stats <<api>>
+package "Violation Persistence" {
+    component "ViolationCaptureService" as vcs <<core>>
+    database "Session Log\nsession-violations.jsonl" as slog <<storage>>
+    database "Violation History\nviolation-history.json" as vhist <<storage>>
 }
 
-package "Persistence & Reporting" {
-  database "Session Log\nsession-violations.jsonl" as sessionLog <<storage>>
-  database "Violation History\nviolation-history.json" as historyLog <<storage>>
-  component "Dashboard" as dashboard <<external>>
+package "Validation Agents" {
+    component "ContentValidationAgent" as cva <<agent>>
 }
 
-userCfg --> hcl : "provides defaults"
-projCfg --> hcl : "overrides"
-hcl --> uhm : "merged config\n(timeout, stopOnError)"
+ucfg --> hcl : "loaded first"
+pcfg --> hcl : "overrides user config"
+dcfg --> hcl : "fallback structure"
 
-ccHook --> uhm : "pre/post-tool\nlifecycle events"
-uhm --> vcs : "violation events\n(priority-sorted handlers)"
+hcl --> uhm : "registers handlers\n(priority-sorted)"
 
-vcs --> sessionLog : "live stream (JSONL)"
-vcs --> historyLog : "persist (cap 1000)"
-vcs --> stats : "in-memory array"
+uhm --> vcs : "routes violations\non pre/post-tool events"
 
-historyLog --> dashboard : "history display"
-stats --> dashboard : "real-time metrics\n(24h counts, severity)"
+vcs --> slog : "writes JSONL"
+vcs --> vhist : "persists (cap 1000)"
+
+cva --> uhm : "scoped via\nagents[] filter"
 
 @enduml

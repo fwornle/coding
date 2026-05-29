@@ -7,13 +7,15 @@ title Hierarchy Context: Pipeline
 [Pipeline] as pipeline #LightBlue
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
-[OntologyRegistry] as ontology_registry #F0F0F0
-[GitStalenessDetector] as git_staleness_detector #F0F0F0
+[OntologyConfigManager] as ontology_config_manager #F0F0F0
+[LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
+[BaseAgentResponseEnvelope] as base_agent_response_envelope #E8F5E8
 
 semantic_analysis --> pipeline
 ontology -[hidden]- pipeline
 insights -[hidden]- pipeline
-ontology_registry -[hidden]- pipeline
-git_staleness_detector -[hidden]- pipeline
+ontology_config_manager -[hidden]- pipeline
+legacy_ontology_adapter -[hidden]- pipeline
+pipeline --> base_agent_response_envelope
 
 @enduml

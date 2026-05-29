@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ContentValidationAgent
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[ContentValidationAgent] as content_validation_agent #LightBlue
+[ConstraintDashboard] as constraint_dashboard #F0F0F0
+[UnifiedHookManager] as unified_hook_manager #F0F0F0
+[GitHistoryStalenessSignal] as git_history_staleness_signal #E8F5E8
+
+constraint_system --> content_validation_agent
+constraint_dashboard -[hidden]- content_validation_agent
+unified_hook_manager -[hidden]- content_validation_agent
+content_validation_agent --> git_history_staleness_signal
+
+@enduml

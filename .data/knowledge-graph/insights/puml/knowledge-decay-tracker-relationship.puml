@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KnowledgeDecayTracker
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[KnowledgeDecayTracker] as knowledge_decay_tracker #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphKMStore] as graph_kmstore #F0F0F0
+[ValidityWindowEnforcer] as validity_window_enforcer #E8F5E8
+
+knowledge_management --> knowledge_decay_tracker
+manual_learning -[hidden]- knowledge_decay_tracker
+online_learning -[hidden]- knowledge_decay_tracker
+graph_kmstore -[hidden]- knowledge_decay_tracker
+knowledge_decay_tracker --> validity_window_enforcer
+
+@enduml

@@ -1,31 +1,33 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-top to bottom direction
-
-package "Pipeline Runtime" {
-    component "Pipeline Agents" as agents <<agent>>
-    component "Entity Classifier" as classifier <<core>>
+package "Configuration Core" {
+  component "OntologyConfigManager" as ocm <<core>>
 }
 
-package "Config Management (Singleton)" {
-    component "OntologyConfigManager" as ocm <<core>>
-    component "In-Memory Cache" as cache <<storage>>
-    component "Hot-Reload Watcher" as hotreload <<core>>
+package "Ontology Files" {
+  component "Upper Ontology Definition" as upper <<storage>>
+  component "Lower Ontology Definition" as lower <<storage>>
 }
 
-package "Ontology File Storage" {
-    database "Upper Ontology Files\n(YAML / JSON)" as upper
-    database "Lower Ontology Files\n(YAML / JSON)" as lower
+package "Consumers" {
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "MCP Server Process" as mcp <<api>>
 }
 
-agents     --> ocm       : "reads shared config"
-classifier --> ocm       : "classification thresholds"
-ocm        --> cache     : "stores parsed definitions"
-ocm        --> upper     : "loads on startup / reload"
-ocm        --> lower     : "loads custom taxonomy"
-hotreload  ..> upper     : "watches for changes"
-hotreload  ..> lower     : "watches for changes"
-hotreload  ..> ocm       : "triggers cache invalidation"
+package "Test Support" {
+  component "Unit Test Harness" as tests <<cli>>
+}
+
+upper --> ocm : "file path registered"
+lower --> ocm : "file path registered"
+
+ocm --> oca : "LLM budget cap\n& confidence thresholds"
+ocm --> mcp : "hot-reload config\non file change"
+
+tests --> ocm : "reset() restores defaults"
+
+ocm ..> upper : "reloads on disk change"
+ocm ..> lower : "reloads on disk change"
 
 @enduml

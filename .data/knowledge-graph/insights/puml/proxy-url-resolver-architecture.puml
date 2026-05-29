@@ -1,0 +1,33 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Environment Variables" {
+  component "RAPID_LLM_PROXY_URL" as rapid <<external>>
+  component "LLM_CLI_PROXY_URL" as cli <<external>>
+  component "LLM_PROXY_URL" as legacy <<external>>
+}
+
+package "Resolution Logic" {
+  component "ProxyUrlResolver" as resolver <<core>>
+  component "Default: localhost:12435" as fallback <<core>>
+}
+
+package "Proxy Infrastructure" {
+  component "rapid-llm-proxy daemon" as proxy <<api>>
+  component "/api/complete endpoint" as endpoint <<api>>
+}
+
+package "Consumers" {
+  component "LLM Call Sites" as callsites <<cli>>
+}
+
+rapid --> resolver : "priority 1"
+cli --> resolver : "priority 2"
+legacy --> resolver : "priority 3"
+fallback --> resolver : "last resort"
+
+resolver --> endpoint : "routes to"
+endpoint --> proxy : "single ingress"
+callsites --> resolver : "resolves URL"
+
+@enduml

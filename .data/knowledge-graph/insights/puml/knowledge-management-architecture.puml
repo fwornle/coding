@@ -1,30 +1,40 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Core Knowledge Store" {
-  component "GraphDatabaseService" as gds <<core>>
-  component "Graphology Graph" as graphology <<storage>>
+package "Knowledge Stores" {
+  component "GraphDatabaseService" as gds <<storage>>
   database "LevelDB" as leveldb
+  component "GraphKMStore" as kmstore <<storage>>
 }
 
-package "Migration Pipeline" {
-  component "Entity Type Migration" as etm <<cli>>
-  component "LevelDB to km-core Migration" as kmcmig <<cli>>
+package "Graph Engine" {
+  component "Graphology In-Memory Graph" as graphology <<core>>
 }
 
-package "Code Intelligence" {
+package "Migration & Export" {
+  component "migrate-graph-db-entity-types" as migrateTypes <<cli>>
+  component "migrate-leveldb-to-kmcore" as migrateLKM <<cli>>
+  component "Per-Domain JSON Exports" as exports <<storage>>
+}
+
+package "Agents & Observability" {
   component "CodeGraphAgent" as cga <<agent>>
-  database "Memgraph" as memgraph
+  component "UKBTraceReport" as ukb <<core>>
+  database "Memgraph" as memgraph <<external>>
 }
 
-component "UKB Trace Report" as ukb <<core>>
+graphology --> leveldb : persists via\n_persistGraphToLevel()
+gds --> graphology : manages
+gds --> leveldb : stores {nodes,edges,metadata}
 
-gds --> graphology : "manages in-memory graph"
-gds --> leveldb : "batch-writes single-key JSON blob"
-etm --> gds : "canonicalizes entity types\n(System / Project / Pattern)"
-kmcmig --> leveldb : "reads B-shape blobs"
-kmcmig --> ukb : "emits provenance traces"
-cga --> memgraph : "indexes AST entities (Cypher/Bolt)"
-gds ..> ukb : "knowledge lifecycle events"
+migrateTypes --> gds : remaps legacy\nentity types
+migrateLKM --> leveldb : reads node keys\n'{team}:{entity Name}'
+migrateLKM --> kmstore : writes canonical\nentities
+migrateLKM --> exports : produces\n<domain>.json
+
+cga --> memgraph : TCP connection\nhealth check
+cga --> ukb : reports pipeline\ndata loss
+
+ukb ..> migrateLKM : audits inputCount\n/ outputCount
 
 @enduml

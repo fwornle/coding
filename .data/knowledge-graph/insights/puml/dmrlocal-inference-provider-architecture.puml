@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+' DMRLocalInferenceProvider Architecture
+
+package "Execution Path Selection" {
+    component "workflow-progress.json" as wpj <<core>>
+    component "DMR Path" as dmrPath <<core>>
+    component "Mock Path" as mockPath <<core>>
+    component "Cloud-Proxy Path" as cloudPath <<core>>
+}
+
+package "DMR Local Inference" {
+    component "DMRLocalInferenceProvider" as dmrProvider <<core>>
+    component "DMR_PORT (env var)" as dmrPort <<core>>
+    component "OpenAI-Compatible Endpoint\nlocalhost:${DMR_PORT}/engines/v1" as dmrEndpoint <<api>>
+}
+
+package "SDK & Normalization" {
+    component "OpenAI SDK\nRequest Formatter" as openaiSDK <<external>>
+    component "SDK-Shape Normalizer" as normalizer <<core>>
+    component "Downstream Consumers" as consumers <<agent>>
+}
+
+wpj --> dmrPath : "selects"
+wpj --> mockPath : "selects"
+wpj --> cloudPath : "selects"
+
+dmrPath --> dmrProvider : "activates"
+dmrPort ..> dmrEndpoint : "resolves URL"
+dmrProvider --> dmrEndpoint : "targets"
+dmrProvider --> openaiSDK : "reuses formatting"
+dmrEndpoint --> normalizer : "response"
+normalizer --> consumers : "normalized output"
+
+@enduml

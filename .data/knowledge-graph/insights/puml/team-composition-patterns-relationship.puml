@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TeamCompositionPatterns
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[TeamCompositionPatterns] as team_composition_patterns #LightBlue
+[AgentConfigConventions] as agent_config_conventions #F0F0F0
+[CLIToolConventions] as clitool_conventions #F0F0F0
+[LLMRoutingPatterns] as llmrouting_patterns #F0F0F0
+[KnowledgeManagementPatterns] as knowledge_management_patterns #F0F0F0
+[ConstraintEnforcementPatterns] as constraint_enforcement_patterns #F0F0F0
+[HealthMonitoringArchitecture] as health_monitoring_architecture #F0F0F0
+
+coding_patterns --> team_composition_patterns
+agent_config_conventions -[hidden]- team_composition_patterns
+clitool_conventions -[hidden]- team_composition_patterns
+llmrouting_patterns -[hidden]- team_composition_patterns
+knowledge_management_patterns -[hidden]- team_composition_patterns
+constraint_enforcement_patterns -[hidden]- team_composition_patterns
+health_monitoring_architecture -[hidden]- team_composition_patterns
+
+@enduml

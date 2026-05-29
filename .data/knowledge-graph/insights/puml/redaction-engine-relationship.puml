@@ -5,9 +5,13 @@ title Hierarchy Context: RedactionEngine
 
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [RedactionEngine] as redaction_engine #LightBlue
-[SessionWindowingManager] as session_windowing_manager #F0F0F0
+[SessionWindowManager] as session_window_manager #F0F0F0
+[TranscriptAdapterRegistry] as transcript_adapter_registry #F0F0F0
+[RedactionConfigLoader] as redaction_config_loader #E8F5E8
 
 live_logging_system --> redaction_engine
-session_windowing_manager -[hidden]- redaction_engine
+session_window_manager -[hidden]- redaction_engine
+transcript_adapter_registry -[hidden]- redaction_engine
+redaction_engine --> redaction_config_loader
 
 @enduml

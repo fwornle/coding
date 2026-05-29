@@ -1,25 +1,31 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "SemanticAnalysis" {
-    package "Insights" {
-        component "Insight Generation" as ig <<core>>
-        component "Pattern Catalog Extraction" as pce <<core>>
-        component "Knowledge Report Authoring" as kra <<core>>
-    }
+package "Upstream Pipeline" {
+    component "OntologyClassificationAgent" as oca <<agent>>
 }
 
-package "Knowledge Hierarchy" {
-    component "Coding (L0)" as l0 <<external>>
-    component "SemanticAnalysis (L1)" as l1 <<api>>
-    component "Insights (L2)" as l2 <<core>>
+package "Insights SubComponent" {
+    component "InsightGeneratorAgent" as iga <<agent>>
+    component "PatternCatalogExtractor" as pce <<core>>
+    component "KnowledgeReportAuthor" as kra <<core>>
 }
 
-l0 --> l1 : contains
-l1 --> l2 : contains
+package "LLM Infrastructure" {
+    component "LLMService" as llm <<external>>
+    component "attachTokenLogger" as atl <<core>>
+}
 
-ig --> pce : feeds
-pce --> kra : informs
-kra --> l2 : produces
+component "BaseAgent<TInput, TOutput>" as base <<core>>
+component "AgentResponse" as ar <<api>>
+
+oca --> iga : "classified & validated entities"
+base --> iga : "extends"
+iga --> pce : "delegates pattern extraction"
+iga --> kra : "delegates report authoring"
+kra --> llm : "routes LLM calls"
+llm --> atl : "token tracking"
+iga --> ar : "wraps output"
+pce --> ar : "wraps output"
 
 @enduml

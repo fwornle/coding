@@ -14,8 +14,8 @@ title Hierarchy Context: SemanticAnalysis
 [Pipeline] as pipeline #E8F5E8
 [Ontology] as ontology #E8F5E8
 [Insights] as insights #E8F5E8
-[OntologyRegistry] as ontology_registry #E8F5E8
-[GitStalenessDetector] as git_staleness_detector #E8F5E8
+[OntologyConfigManager] as ontology_config_manager #E8F5E8
+[LegacyOntologyAdapter] as legacy_ontology_adapter #E8F5E8
 
 coding --> semantic_analysis
 live_logging_system -[hidden]- semantic_analysis
@@ -27,7 +27,7 @@ constraint_system -[hidden]- semantic_analysis
 semantic_analysis --> pipeline
 semantic_analysis --> ontology
 semantic_analysis --> insights
-semantic_analysis --> ontology_registry
-semantic_analysis --> git_staleness_detector
+semantic_analysis --> ontology_config_manager
+semantic_analysis --> legacy_ontology_adapter
 
 @enduml

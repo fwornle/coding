@@ -1,18 +1,30 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
-
-package "LiveLoggingSystem" {
-    component "LSLConverter" as lslconv <<core>>
-    component "LSLConfigValidator" as lslval <<core>>
-    component "RedactionEngine" as redact <<core>>
-}
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Configuration" {
-    database "redaction-config.yaml" as redactcfg <<storage>>
+  component "redaction-config.yaml" as redactConfig <<storage>>
 }
 
-redactcfg --> redact : "provides category-based\npattern rules"
-lslval --> redact : "validates options"
-lslconv --> redact : "applies redaction\ntransformation"
+package "Agent Adapter Layer" {
+  component "TranscriptAdapter" as adapter <<api>>
+  component "readTranscripts()" as readRaw <<core>>
+  component "convertToLSL()" as convertLSL <<core>>
+}
+
+package "Unified LSL Format" {
+  component "LSLSession / LSLEntry" as lslOutput <<core>>
+}
+
+package "Redaction Pipeline" {
+  component "RedactionEngine" as redact <<core>>
+  component "Redacted LSL Output" as redactedLSL <<storage>>
+}
+
+redactConfig --> redact : "configures patterns"
+readRaw --> adapter : "feeds raw agent files"
+adapter --> convertLSL : "transforms"
+convertLSL --> lslOutput : "produces"
+lslOutput --> redact : "post-process"
+redact --> redactedLSL : "sanitized output"
 
 @enduml

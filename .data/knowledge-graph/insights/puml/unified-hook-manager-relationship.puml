@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: UnifiedHookManager
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[UnifiedHookManager] as unified_hook_manager #LightBlue
+[ConstraintDashboard] as constraint_dashboard #F0F0F0
+[ContentValidationAgent] as content_validation_agent #F0F0F0
+[ToolLifecycleInterceptor] as tool_lifecycle_interceptor #E8F5E8
+
+constraint_system --> unified_hook_manager
+constraint_dashboard -[hidden]- unified_hook_manager
+content_validation_agent -[hidden]- unified_hook_manager
+unified_hook_manager --> tool_lifecycle_interceptor
+
+@enduml

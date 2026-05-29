@@ -6,10 +6,12 @@ title Hierarchy Context: TranscriptAdapterRegistry
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [TranscriptAdapterRegistry] as transcript_adapter_registry #LightBlue
 [SessionWindowManager] as session_window_manager #F0F0F0
-[UserHashService] as user_hash_service #F0F0F0
+[RedactionEngine] as redaction_engine #F0F0F0
+[TranscriptAdapterContract] as transcript_adapter_contract #E8F5E8
 
 live_logging_system --> transcript_adapter_registry
 session_window_manager -[hidden]- transcript_adapter_registry
-user_hash_service -[hidden]- transcript_adapter_registry
+redaction_engine -[hidden]- transcript_adapter_registry
+transcript_adapter_registry --> transcript_adapter_contract
 
 @enduml

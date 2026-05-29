@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MockModeProvider
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[MockModeProvider] as mock_mode_provider #LightBlue
+[ProxyUrlResolver] as proxy_url_resolver #F0F0F0
+[ProxyMediatedLLMClient] as proxy_mediated_llmclient #F0F0F0
+[DMRLocalInferenceProvider] as dmrlocal_inference_provider #F0F0F0
+[AgentModeRouter] as agent_mode_router #F0F0F0
+
+llmabstraction --> mock_mode_provider
+proxy_url_resolver -[hidden]- mock_mode_provider
+proxy_mediated_llmclient -[hidden]- mock_mode_provider
+dmrlocal_inference_provider -[hidden]- mock_mode_provider
+agent_mode_router -[hidden]- mock_mode_provider
+
+@enduml

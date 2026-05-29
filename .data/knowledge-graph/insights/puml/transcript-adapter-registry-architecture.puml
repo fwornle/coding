@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Adapter Interface Contract" {
+  component "TranscriptAdapter\n(Abstract Base)" as base <<core>>
+  component "getAgentType()" as getType <<api>>
+  component "getTranscriptDirectory()" as getDir <<api>>
+  component "readTranscripts()" as readT <<api>>
+  component "convertToLSL()" as toLSL <<api>>
+  component "getCurrentSession()" as getSession <<api>>
+}
+
+package "Concrete Adapters" {
+  component "ClaudeAdapter" as claude <<agent>>
+  component "CopilotAdapter" as copilot <<agent>>
+  component "CursorAdapter\n(future)" as cursor <<external>>
+  component "GeminiCLIAdapter\n(future)" as gemini <<external>>
+}
+
+package "Downstream Consumers" {
+  component "LSL Output Router" as router <<core>>
+}
+
+base --> getType : enforces
+base --> getDir : enforces
+base --> readT : enforces
+base --> toLSL : enforces
+base --> getSession : enforces
+
+claude --> base : implements
+copilot --> base : implements
+cursor ..> base : planned
+gemini ..> base : planned
+
+getType --> router : "agent tag\n('claude','copilot')"
+toLSL --> router : "LSL output"
+
+@enduml

@@ -1,31 +1,30 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Extraction Sources" {
-  component "Git History Ingestion" as git <<external>>
-  component "LSL Session Analysis" as lsl <<external>>
-  component "Code Analysis" as code <<external>>
+    component "Git History" as git <<external>>
+    component "LSL Sessions" as lsl <<external>>
+    component "Code Analysis" as code <<external>>
 }
 
-package "Batch Analysis Pipeline" {
-  component "batch-analysis.yaml\n(DAG Steps)" as dag <<core>>
-  component "GraphDatabaseService.js" as gds <<core>>
+package "OnlineLearning Pipeline" {
+    component "batch-analysis.yaml\nOrchestrator" as orchestrator <<core>>
+    component "Ontology Classifier" as classifier <<core>>
+    component "Provenance Stamper" as provenance <<core>>
 }
 
-package "Graph Layer" {
-  component "Graphology Graph\n(isDirty / flush cycle)" as graphology <<core>>
+package "Knowledge Store" {
+    database "GraphDatabaseService" as graph <<storage>>
+    component "KnowledgeDecayTracker" as decay <<core>>
 }
 
-package "Persistence" {
-  database "LevelDB" as leveldb <<storage>>
-}
+git --> orchestrator : "typed entities"
+lsl --> orchestrator : "typed entities"
+code --> orchestrator : "typed entities"
 
-git --> dag : "graph mutations"
-lsl --> dag : "graph mutations"
-code --> dag : "DEFINES / DEPENDS_ON_EXTERNAL\nCONTAINS_FILE edges"
-
-dag --> gds : "accumulated step outputs"
-gds --> graphology : "write nodes & edges"
-graphology --> leveldb : "flush() → single 'graph' key\n(monolithic JSON blob)"
+orchestrator --> classifier : "raw entities"
+classifier --> provenance : "classified entities"
+provenance --> graph : "source: pipeline"
+provenance --> decay : "decay policy signal"
 
 @enduml

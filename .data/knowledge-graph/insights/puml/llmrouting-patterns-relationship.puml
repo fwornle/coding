@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMRoutingPatterns
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[LLMRoutingPatterns] as llmrouting_patterns #LightBlue
+[AgentConfigConventions] as agent_config_conventions #F0F0F0
+[TeamCompositionPatterns] as team_composition_patterns #F0F0F0
+[CLIToolConventions] as clitool_conventions #F0F0F0
+[KnowledgeManagementPatterns] as knowledge_management_patterns #F0F0F0
+[ConstraintEnforcementPatterns] as constraint_enforcement_patterns #F0F0F0
+[HealthMonitoringArchitecture] as health_monitoring_architecture #F0F0F0
+
+coding_patterns --> llmrouting_patterns
+agent_config_conventions -[hidden]- llmrouting_patterns
+team_composition_patterns -[hidden]- llmrouting_patterns
+clitool_conventions -[hidden]- llmrouting_patterns
+knowledge_management_patterns -[hidden]- llmrouting_patterns
+constraint_enforcement_patterns -[hidden]- llmrouting_patterns
+health_monitoring_architecture -[hidden]- llmrouting_patterns
+
+@enduml

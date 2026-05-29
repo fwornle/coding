@@ -1,18 +1,39 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "SemanticAnalysis" {
-    package "Ontology" {
-        component "Upper Ontology\nDefinitions" as upperOntology <<core>>
-        component "Lower Ontology\nDefinitions" as lowerOntology <<core>>
-        component "Entity Type\nResolution" as entity Resolution <<core>>
-        component "Ontology\nValidation" as validation <<core>>
-    }
+package "Orchestration" {
+  component "OntologyClassificationAgent" as agent <<agent>>
+  component "OntologyConfigManager" as config <<core>>
 }
 
-upperOntology --> lowerOntology : "specializes"
-lowerOntology --> entity Resolution : "informs"
-entity Resolution --> validation : "validates against"
-upperOntology --> validation : "constrains"
+package "Classification" {
+  component "OntologyClassifier" as classifier <<core>>
+  component "OntologyValidator" as validator <<core>>
+  component "GitStalenessDetector" as staleness <<core>>
+}
+
+package "Metadata & Output" {
+  component "OntologyMetadata" as metadata <<core>>
+}
+
+package "Registry & Adapter" {
+  component "LegacyOntologyAdapter" as adapter <<api>>
+  database "OntologyRegistry\n(@fwornle/km-core)" as registry <<external>>
+}
+
+agent --> config : "reads modes & paths"
+agent --> staleness : "checks staleness"
+agent --> classifier : "delegates classification"
+agent --> metadata : "produces"
+
+config --> classifier : "configures heuristic/LLM mode"
+
+staleness --> classifier : "gates input"
+
+classifier --> validator : "validates classes"
+classifier --> adapter : "resolves classes"
+
+validator --> adapter : "accesses registry via"
+adapter --> registry : "wraps"
 
 @enduml

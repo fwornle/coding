@@ -1,43 +1,55 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Supervision Layer" {
-  component "api-service.js\nSupervisor" as apiSupervisor <<core>>
-  component "dashboard-service.js\nSupervisor" as dashSupervisor <<core>>
+package "Docker Compose Environment" {
+  component "docker-compose.yml" as compose <<core>>
+  component "Dockerfile.coding-services" as dockerfile <<core>>
+  component "supervisord.conf" as supervisord <<core>>
+  component "entrypoint.sh" as entrypoint <<cli>>
 }
 
-package "Health & Lifecycle" {
-  component "health-coordinator.js" as healthCoord <<core>>
-  component "service-probe.js\n(HTTP + TCP dual-probe)" as serviceProbe <<core>>
-  component "service-starter.js\nstartServiceWithRetry()" as serviceStarter <<core>>
-  component "ProcessStateManager\n(PSM Singleton)" as psm <<core>>
+package "Co-located Services (single container)" {
+  component "Semantic Analysis MCP" as mcp <<api>>
+  component "Constraint Monitor API\n:3031" as constraintApi <<api>>
+  component "Next.js Dashboard\n:3030" as dashboard <<api>>
+  component "code-graph-rag" as rag <<core>>
 }
 
-package "Dockerized Services" {
-  component "Next.js Dashboard\n:3030" as nextjs <<api>>
-  component "Constraint API\ndashboard-server.js :3031" as constraintApi <<api>>
-  database "Memgraph\n(Bolt Protocol)" as memgraph
-  database "Redis" as redis
+package "Infrastructure" {
+  database "Memgraph\n(Bolt TCP)" as memgraph <<storage>>
+  database "Redis\n(TCP cache)" as redis <<storage>>
 }
 
-' Health coordinator polls service-probe
-healthCoord --> serviceProbe : "polls every 5s\n(running/stopped/unknown)"
+package "Service Lifecycle" {
+  component "service-starter.js\n(retry + backoff)" as starter <<core>>
+  component "service-probe.js\n(HTTP / TCP probes)" as probe <<core>>
+  component "ProcessStateManager" as psm <<core>>
+}
 
-' Service probe targets
-serviceProbe --> nextjs : "probeHttpHealth()"
-serviceProbe --> constraintApi : "probeHttpHealth()"
-serviceProbe --> memgraph : "probeTcpPort()"
-serviceProbe --> redis : "probeTcpPort()"
+compose --> dockerfile : builds
+compose --> memgraph : orchestrates
+compose --> redis : orchestrates
+dockerfile --> entrypoint : runs
+entrypoint --> supervisord : delegates supervision
 
-' Supervision relationships
-apiSupervisor --> constraintApi : "spawns & forwards SIGTERM"
-dashSupervisor --> nextjs : "spawns & forwards SIGTERM"
-apiSupervisor --> serviceStarter : "retry + backoff\n(maxRetries=3, 30s timeout)"
-dashSupervisor --> serviceStarter : "retry + backoff\n(maxRetries=3, 30s timeout)"
-apiSupervisor ..> psm : "registers child\n(non-fatal)"
-dashSupervisor ..> psm : "registers child\n(non-fatal)"
+supervisord --> mcp : manages
+supervisord --> constraintApi : manages
+supervisord --> dashboard : manages
+supervisord --> rag : manages
 
-' Frontend-to-backend wiring
-nextjs --> constraintApi : "NEXT_PUBLIC_API_BASE_URL\nhttp://localhost:3031"
+starter --> probe : uses
+starter --> memgraph : waits for (TCP)
+starter --> redis : waits for (TCP)
+probe --> memgraph : probeTcpPort()
+probe --> redis : probeTcpPort()
+probe --> mcp : probeHttpHealth()
+
+constraintApi --> psm : registers
+dashboard --> psm : registers
+dashboard ..> constraintApi : "http://localhost:3031"
+
+mcp --> memgraph : graph queries
+rag --> memgraph : graph queries
+mcp --> redis : caching
 
 @enduml

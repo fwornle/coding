@@ -11,10 +11,10 @@ title Hierarchy Context: LLMAbstraction
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[DMRProvider] as dmrprovider #E8F5E8
-[LLMMockService] as llmmock_service #E8F5E8
-[LLMWithProcess] as llmwith_process #E8F5E8
-[LLMStateManager] as llmstate_manager #E8F5E8
+[ProviderRouter] as provider_router #E8F5E8
+[WorkflowStateManager] as workflow_state_manager #E8F5E8
+[ResponseNormalizer] as response_normalizer #E8F5E8
+[PublicCloudAdapters] as public_cloud_adapters #E8F5E8
 
 coding --> llmabstraction
 live_logging_system -[hidden]- llmabstraction
@@ -23,9 +23,9 @@ knowledge_management -[hidden]- llmabstraction
 coding_patterns -[hidden]- llmabstraction
 constraint_system -[hidden]- llmabstraction
 semantic_analysis -[hidden]- llmabstraction
-llmabstraction --> dmrprovider
-llmabstraction --> llmmock_service
-llmabstraction --> llmwith_process
-llmabstraction --> llmstate_manager
+llmabstraction --> provider_router
+llmabstraction --> workflow_state_manager
+llmabstraction --> response_normalizer
+llmabstraction --> public_cloud_adapters
 
 @enduml

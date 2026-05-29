@@ -1,0 +1,39 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Legacy Store" {
+  database "GraphDatabaseService" as gds <<storage>>
+  database "LevelDB" as ldb <<storage>>
+  component "Graphology" as graphology <<core>>
+}
+
+package "Migration Layer" {
+  component "Migration Tooling" as migration <<cli>>
+  component "KnowledgeManagement" as km <<core>>
+}
+
+package "GraphKMStore" {
+  component "GraphKMStore" as gkms <<core>>
+  component "UUIDv7 ID Generator" as uuid <<core>>
+  component "Ontology Class Metadata" as ontology <<core>>
+  database "Per-Domain JSON Exports" as jsonexp <<storage>>
+}
+
+package "Consumers" {
+  component "Downstream Consumers" as consumers <<external>>
+  component "km-core Schema Contract" as schema <<api>>
+}
+
+gds --> migration : "source entities"
+ldb --> gds : "backs"
+graphology --> gds : "graph engine"
+migration --> km : "coordinated by"
+km --> gkms : "writes migrated entities"
+gkms --> uuid : "generates IDs"
+gkms --> ontology : "stores alongside entities"
+gkms --> jsonexp : "partitions by domain"
+gkms --> schema : "enforces"
+schema --> consumers : "consumed by"
+jsonexp --> consumers : "partial domain loads"
+
+@enduml

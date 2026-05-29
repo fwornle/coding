@@ -1,22 +1,59 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Pipeline (Batch Processing)" {
-    component "Coordinator" as coordinator <<core>>
-    component "Observation Generation" as obsgen <<agent>>
-    component "KG Operators" as kgops <<core>>
-    component "Deduplication" as dedup <<core>>
-    component "Persistence" as persist <<storage>>
+left to right direction
+
+package "Pipeline Agents" {
+    component "GitHistoryAgent" as git <<agent>>
+    component "VibeSessionAgent" as vibe <<agent>>
+    component "CodeGraphAgent" as codegraph <<agent>>
+    component "SemanticLLMAgent" as semantic <<agent>>
+    component "OntologyAgent" as ontology <<agent>>
+    component "ValidationAgent" as validation <<agent>>
+    component "InsightAgent" as insight <<agent>>
 }
 
-package "SemanticAnalysis" {
-    component "Semantic Analysis" as semanalysis <<core>>
+package "Shared Infrastructure" {
+    component "BaseAgent<TInput,TOutput>" as base <<core>>
+    component "LLMService" as llm <<api>>
+    component "attachTokenLogger" as tokenlog <<core>>
 }
 
-semanalysis --> coordinator : "orchestrates"
-coordinator --> obsgen : "triggers"
-obsgen --> kgops : "feeds"
-kgops --> dedup : "passes"
-dedup --> persist : "writes"
+package "Storage" {
+    component "KmCoreAdapter" as kmcore <<storage>>
+    database "Memgraph" as memgraph <<storage>>
+}
+
+package "Support" {
+    component "logs/" as logs <<external>>
+    component "Tree-sitter" as treesitter <<cli>>
+    component "uv CLI" as uv <<cli>>
+}
+
+git --> vibe : output
+vibe --> codegraph : output
+codegraph --> semantic : output
+semantic --> ontology : output
+ontology --> validation : output
+validation --> insight : output
+
+git ..> base : extends
+codegraph ..> base : extends
+semantic ..> base : extends
+insight ..> base : extends
+
+semantic --> llm : routes LLM calls
+llm --> tokenlog : attaches telemetry
+
+codegraph --> treesitter : AST parsing
+codegraph --> uv : graph build
+codegraph --> memgraph : stores graph
+
+insight --> kmcore : persists results
+kmcore ..> memgraph : adapter surface
+
+git ..> logs : trace (non-fatal)
+codegraph ..> logs : trace (non-fatal)
+insight ..> logs : trace (non-fatal)
 
 @enduml

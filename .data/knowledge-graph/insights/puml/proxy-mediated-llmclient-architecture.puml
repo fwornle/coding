@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Client Layer" {
+  component "llm-with-process.ts" as llmwp <<core>>
+  component "ProxyMediatedLLMClient" as pmlc <<core>>
+}
+
+package "Proxy Daemon" {
+  component "rapid-llm-proxy\n:12435" as proxy <<api>>
+  component "/api/complete" as endpoint <<api>>
+  component "Token Usage Telemetry" as telemetry <<core>>
+  component "Tier-Based Router" as router <<core>>
+}
+
+package "Providers" {
+  cloud "Anthropic" as anthropic <<external>>
+  cloud "OpenAI" as openai <<external>>
+  cloud "Groq" as groq <<external>>
+}
+
+llmwp --> pmlc : "injects process tag"
+pmlc --> endpoint : "POST /api/complete"
+endpoint --> telemetry : "attributes tokens"
+endpoint --> router : "routes request"
+proxy --> telemetry
+router --> anthropic : "provider auth\n+ formatting"
+router --> openai : "provider auth\n+ formatting"
+router --> groq : "provider auth\n+ formatting"
+pmlc <-- proxy : "normalized SDK-shape\nresponse"
+
+@enduml

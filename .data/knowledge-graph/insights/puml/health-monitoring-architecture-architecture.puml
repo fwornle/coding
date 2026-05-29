@@ -1,0 +1,41 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title HealthMonitoringArchitecture – 4-Layer Health Monitoring
+
+package "Documentation Layer" {
+  component "docs/health-system/README.md" as readme <<core>>
+  component "4-Layer Architecture\nImplementation Plan" as plan <<core>>
+}
+
+package "Observation Layer" {
+  component "DOCKER_TIMEOUT\nSignal Monitor" as dockerTimeout <<external>>
+  component "Deployment\nObservables" as deployObs <<api>>
+}
+
+package "Health System Core" {
+  component "Layer 1: Signal Collection" as layer1 <<core>>
+  component "Layer 2: Signal Processing" as layer2 <<core>>
+  component "Layer 3: Health Evaluation" as layer3 <<core>>
+  component "Layer 4: Reporting & Action" as layer4 <<core>>
+}
+
+package "Infrastructure Targets" {
+  component "System Architecture\n(docs/architecture/)" as sysArch <<external>>
+  component "Constraints Monitor\n(docs/constraints/)" as constraints <<external>>
+}
+
+readme --> plan : "defines"
+plan --> layer1 : "specifies"
+
+dockerTimeout --> deployObs : "emits signal"
+deployObs --> layer1 : "feeds"
+
+layer1 --> layer2 : "raw signals"
+layer2 --> layer3 : "processed data"
+layer3 --> layer4 : "health status"
+
+layer4 --> sysArch : "monitors"
+layer4 --> constraints : "monitors"
+
+@enduml

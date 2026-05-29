@@ -5,11 +5,13 @@ title Hierarchy Context: SessionWindowManager
 
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [SessionWindowManager] as session_window_manager #LightBlue
-[UserHashService] as user_hash_service #F0F0F0
+[RedactionEngine] as redaction_engine #F0F0F0
 [TranscriptAdapterRegistry] as transcript_adapter_registry #F0F0F0
+[TimeWindowFormatter] as time_window_formatter #E8F5E8
 
 live_logging_system --> session_window_manager
-user_hash_service -[hidden]- session_window_manager
+redaction_engine -[hidden]- session_window_manager
 transcript_adapter_registry -[hidden]- session_window_manager
+session_window_manager --> time_window_formatter
 
 @enduml

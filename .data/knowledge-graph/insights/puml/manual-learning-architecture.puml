@@ -1,35 +1,27 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-' ManualLearning SubComponent Architecture
-
-package "Manual Input" {
-  component "Human-Authored Entities" as humanInput <<external>>
+package "Manual Input Channel" {
+    component "ManualLearning" as ml <<core>>
+    component "Provenance Metadata" as prov <<core>>
 }
 
-package "Graph Service Layer" {
-  component "GraphDatabaseService.js" as gds <<core>>
-  component "Graphology In-Memory Graph" as graphology <<core>>
-  component "isDirty Deferred-Write Flag" as dirtyFlag <<core>>
-  component "_persistGraphToLevel()" as flushFn <<api>>
+package "Graph Layer" {
+    component "Graphology In-Memory Graph" as graphology <<storage>>
+    component "GraphDatabaseService" as gds <<api>>
+    database "Knowledge Graph" as kg <<storage>>
 }
 
-package "Canonical Schema" {
-  component "KmCoreStore Format\n(UUIDv7 + Ontology)" as kmCore <<core>>
+package "Lifecycle Management" {
+    component "KnowledgeDecayTracker" as kdt <<core>>
 }
 
-package "Persistence Layer" {
-  database "LevelDB" as leveldb <<storage>>
-  component "Single 'graph' Blob Key" as graphBlob <<storage>>
-}
-
-humanInput --> gds : "write entities"
-gds --> graphology : "mutates in-memory graph"
-gds --> dirtyFlag : "sets isDirty=true"
-dirtyFlag ..> flushFn : "explicit flush required\n(no auto-trigger)"
-flushFn --> leveldb : "full deserialize/mutate/reserialize"
-leveldb --> graphBlob : "stores under key 'graph'\n(no manual/automated partition)"
-humanInput ..> kmCore : "must conform to"
-gds ..> kmCore : "no schema gate enforced"
+ml --> prov : "stamps at creation"
+ml --> graphology : "direct write\n(bypasses batch pipeline)"
+ml --> gds : "persists via"
+graphology --> kg : "syncs to"
+gds --> kg : "stores entities\n(System/Project/Pattern)"
+kdt --> kg : "applies validFrom/\nvalidUntil lifecycle"
+prov --> kdt : "supplies timestamps"
 
 @enduml

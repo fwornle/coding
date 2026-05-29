@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CLIToolConventions
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[CLIToolConventions] as clitool_conventions #LightBlue
+[AgentConfigConventions] as agent_config_conventions #F0F0F0
+[TeamCompositionPatterns] as team_composition_patterns #F0F0F0
+[LLMRoutingPatterns] as llmrouting_patterns #F0F0F0
+[KnowledgeManagementPatterns] as knowledge_management_patterns #F0F0F0
+[ConstraintEnforcementPatterns] as constraint_enforcement_patterns #F0F0F0
+[HealthMonitoringArchitecture] as health_monitoring_architecture #F0F0F0
+[TokenUsageCLI] as token_usage_cli #E8F5E8
+
+coding_patterns --> clitool_conventions
+agent_config_conventions -[hidden]- clitool_conventions
+team_composition_patterns -[hidden]- clitool_conventions
+llmrouting_patterns -[hidden]- clitool_conventions
+knowledge_management_patterns -[hidden]- clitool_conventions
+constraint_enforcement_patterns -[hidden]- clitool_conventions
+health_monitoring_architecture -[hidden]- clitool_conventions
+clitool_conventions --> token_usage_cli
+
+@enduml

@@ -1,0 +1,31 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Configuration Layer" {
+  component "config/agents/" as agentScripts <<core>>
+  component "config/agent-profiles.json" as agentProfiles <<storage>>
+}
+
+package "Contract & API" {
+  component "Agent Abstraction API" as abstractionAPI <<api>>
+  component "AGENT_NAME\nAGENT_REQUIRES_COMMANDS" as envVars <<core>>
+}
+
+package "Documentation & Onboarding" {
+  component "adding-new-agent.md" as addingAgent <<external>>
+  component "agent-integration-guide.md" as integrationGuide <<external>>
+  component "agent-abstraction-api.md" as apiRef <<external>>
+}
+
+component "Orchestration Tooling" as orchestration <<agent>>
+
+agentScripts --> agentProfiles : "merges into"
+agentScripts --> envVars : "projects to runtime"
+agentProfiles --> orchestration : "queried by"
+abstractionAPI --> orchestration : "contracts for"
+envVars --> orchestration : "links to live process"
+addingAgent --> agentScripts : "codifies convention"
+integrationGuide --> agentScripts : "mirrors convention"
+apiRef --> abstractionAPI : "defines"
+
+@enduml

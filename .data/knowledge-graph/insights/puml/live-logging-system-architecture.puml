@@ -1,39 +1,38 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Agent Adapter Layer" {
+package "Agent Adapters" {
   component "TranscriptAdapter" as adapter <<api>>
-  component "Claude Code Adapter" as claude <<agent>>
-  component "Copilot CLI Adapter" as copilot <<agent>>
+  component "ClaudeCodeAdapter" as claude <<agent>>
 }
 
 package "LSL Core" {
   component "LSLConverter" as converter <<core>>
-  component "LSLMetadata" as metadata <<core>>
+  component "LSLConfigValidator" as validator <<core>>
+  component "watchTranscripts()" as watcher <<core>>
 }
 
-package "Configuration & Validation" {
-  component "LSLConfigValidator" as validator <<cli>>
-  database "lsl-config.json" as lslconfig <<storage>>
-  database "redaction-config.yaml" as redactconfig <<storage>>
+package "Semantic Analysis" {
+  component "OntologyClassificationAgent" as ontology <<agent>>
+  component "AsyncLoggingSubsystem" as asynclog <<core>>
 }
 
-package "Output Storage" {
-  database "JSONL Log Files" as jsonllogs <<storage>>
-  database "Markdown Logs" as mdlogs <<storage>>
+package "Storage" {
+  database "LSL Log Files\n(by userHash/project/timeWindow)" as logfiles <<storage>>
+  database "Semantic Analysis Logs\n(CODING_REPO/.data/logs)" as semlogs <<storage>>
 }
 
-claude --> adapter : "extends"
-copilot --> adapter : "extends"
-adapter --> converter : "converts transcripts"
-converter --> metadata : "annotates with userHash+timeWindow"
-metadata --> jsonllogs : "routes per-user file paths"
-converter --> redactconfig : "reads redaction patterns"
-converter --> jsonllogs : "toJSONL()"
-converter --> mdlogs : "toMarkdown()"
-validator --> lslconfig : "validates schema"
-validator --> redactconfig : "validates patterns"
-validator --> converter : "configures maxContentLength"
-validator --> metadata : "enforces userHashLength 6-12"
+component "LSLConfigValidator\n(lsl-config.json\nredaction-config.yaml)" as config <<external>>
+
+claude --> adapter : implements
+adapter --> watcher : readTranscripts()
+watcher --> converter : raw entries
+converter --> logfiles : toMarkdown()\ntoJSONL()
+validator --> converter : validates config\n& redaction rules
+config --> validator : reads
+
+converter --> ontology : LSL typed entries
+ontology --> asynclog : classification results
+asynclog --> semlogs : buffered writes\n(50 entries / 100ms)
 
 @enduml

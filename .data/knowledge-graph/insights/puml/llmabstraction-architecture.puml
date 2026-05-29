@@ -1,35 +1,37 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Agent Layer" {
-  component "wave-agent / wave-controller" as waveAgent <<agent>>
-}
-
-package "LLM Abstraction Layer" {
-  component "llm-mock-service\n(getLLMMode)" as mockService <<core>>
-  component "llm-with-process\n(MetricsTrackerLike)" as llmProcess <<core>>
-}
-
-package "Proxy Layer" {
-  component "rapid-llm-proxy\n(port 12435)" as proxy <<api>>
+package "LLM Mode Control" {
+  component "llm-mock-service.ts" as mockSvc <<core>>
+  database "workflow-progress.json" as wpJson <<storage>>
 }
 
 package "Provider Layer" {
-  component "dmr-provider" as dmrProvider <<core>>
-  cloud "Anthropic / OpenAI / Groq" as publicAPIs
-  component "Docker Model Runner (DMR)" as dmr <<external>>
+  component "dmr-provider.ts" as dmrProv <<core>>
+  component "llm-with-process.ts" as llmProc <<core>>
+  cloud "Anthropic / OpenAI" as publicCloud <<external>>
+  component "Docker Model Runner" as dmr <<external>>
+  component "rapid-llm-proxy" as proxy <<api>>
+  component "Mock Service" as mock <<external>>
 }
 
-database "workflow-progress.json" as workflowConfig <<storage>>
-database "token-usage.db\n(.data/llm-proxy)" as tokenDb <<storage>>
+package "Consumers" {
+  component "Wave Agents" as agents <<agent>>
+  component "MetricsTracker" as metrics <<core>>
+}
 
-waveAgent --> mockService : "getLLMMode()\n(mock / local / public)"
-waveAgent --> llmProcess : "LLM completion calls"
-mockService --> workflowConfig : "reads llmState\n& per-agent overrides"
-llmProcess --> proxy : "POST /api/complete\n(+process field)"
-proxy --> dmrProvider : "local mode"
-proxy --> publicAPIs : "public mode"
-dmrProvider --> dmr : "localhost:DMR_PORT\n/engines/v1"
-proxy --> tokenDb : "per-step token\nattribution"
+wpJson --> mockSvc : "globalMode\n& perAgentOverrides"
+mockSvc --> llmProc : "resolves provider"
+mockSvc --> dmrProv : "resolves provider"
+mockSvc --> mock : "mock mode"
+
+llmProc --> proxy : "POST /api/complete\n(with process tag)"
+llmProc --> metrics : "records token usage"
+dmrProv --> dmr : "OpenAI-compatible API\nhttp://DMR_HOST:DMR_PORT"
+proxy --> publicCloud : "routes to cloud"
+
+agents --> mockSvc : "getLLMMode()"
+agents --> llmProc : "direct-fetch calls"
+agents --> metrics : "getMetricsTracker()"
 
 @enduml

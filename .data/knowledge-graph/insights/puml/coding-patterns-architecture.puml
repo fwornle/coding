@@ -1,32 +1,52 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Routing & Agent Layer" {
-  component "LLM Tier Router" as router <<core>>
-  component "Agent Backend" as agent <<agent>>
-  component "Hook System" as hooks <<core>>
+package "Agent Layer" {
+  component "claude.sh" as claude <<agent>>
+  component "copilot.sh" as copilot <<agent>>
+  component "mastra.sh" as mastra <<agent>>
+  component "opencode.sh" as opencode <<agent>>
+  component "agent-profiles.json" as profiles <<core>>
 }
 
-package "MCP Integrations" {
-  component "mcp-constraint-monitor" as monitor <<api>>
-  component "mcp-server-semantic-analysis" as semantic <<api>>
-  component "code-graph-rag" as ragTool <<api>>
+package "CLI Entrypoints (bin/)" {
+  component "ckb" as ckb <<cli>>
+  component "vkb" as vkb <<cli>>
+  component "llm" as llm <<cli>>
+  component "log-session / graph-sync / status" as misc <<cli>>
 }
 
-package "Knowledge & Graph Storage" {
-  database "Knowledge Graph\n(Memgraph)" as kg <<storage>>
-  component "Knowledge Pipeline" as pipeline <<core>>
+package "Configuration & Routing" {
+  component "llm-providers.yaml" as llmprov <<core>>
+  component "config/teams/" as teams <<core>>
+  component "knowledge-management.json" as kmmgmt <<storage>>
+  component "health-verification-rules.json" as healthrules <<storage>>
 }
 
-router --> agent : "selects tier\n(fast / capable)"
-agent --> hooks : "emits lifecycle events"
-hooks --> monitor : "constraint callbacks"
-monitor --> hooks : "registers handlers"
-agent --> semantic : "semantic analysis queries"
-agent --> ragTool : "RAG context queries"
-ragTool --> kg : "graph traversal\n(CONTAINS_*, DEFINES, DEPENDS_ON)"
-pipeline --> kg : "observe → store → retrieve"
-pipeline --> agent : "injects context"
-ragTool --> pipeline : "operationalizes retrieval"
+package "Deployment & Observability" {
+  component "Dockerfile.coding-services" as dockerfile <<external>>
+  component "supervisord.conf + entrypoint.sh" as supervisor <<core>>
+  component "docs/health-system/" as healthdocs <<core>>
+  component "docs/constraints/" as constraints <<core>>
+}
+
+claude --> profiles : registers
+copilot --> profiles : registers
+mastra --> profiles : registers
+opencode --> profiles : registers
+
+profiles --> teams : resolves team topology
+
+llm --> llmprov : routes via
+llmprov ..> profiles : selects agent
+
+ckb --> kmmgmt : configured by
+vkb --> kmmgmt : configured by
+
+healthrules --> healthdocs : governs
+healthrules --> constraints : enforces
+
+dockerfile --> supervisor : orchestrates
+supervisor --> profiles : loads agents
 
 @enduml

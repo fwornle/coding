@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintEnforcementPatterns
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ConstraintEnforcementPatterns] as constraint_enforcement_patterns #LightBlue
+[AgentConfigConventions] as agent_config_conventions #F0F0F0
+[TeamCompositionPatterns] as team_composition_patterns #F0F0F0
+[CLIToolConventions] as clitool_conventions #F0F0F0
+[LLMRoutingPatterns] as llmrouting_patterns #F0F0F0
+[KnowledgeManagementPatterns] as knowledge_management_patterns #F0F0F0
+[HealthMonitoringArchitecture] as health_monitoring_architecture #F0F0F0
+[ConstraintMonitoringSystem] as constraint_monitoring_system #E8F5E8
+
+coding_patterns --> constraint_enforcement_patterns
+agent_config_conventions -[hidden]- constraint_enforcement_patterns
+team_composition_patterns -[hidden]- constraint_enforcement_patterns
+clitool_conventions -[hidden]- constraint_enforcement_patterns
+llmrouting_patterns -[hidden]- constraint_enforcement_patterns
+knowledge_management_patterns -[hidden]- constraint_enforcement_patterns
+health_monitoring_architecture -[hidden]- constraint_enforcement_patterns
+constraint_enforcement_patterns --> constraint_monitoring_system
+
+@enduml

@@ -9,15 +9,13 @@ title Hierarchy Context: OntologyConfigManager
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
 [LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
-[BaseAgent] as base_agent #F0F0F0
-[SingletonOntologyConfig] as singleton_ontology_config #E8F5E8
+[SingletonResetPattern] as singleton_reset_pattern #E8F5E8
 
 semantic_analysis --> ontology_config_manager
 pipeline -[hidden]- ontology_config_manager
 ontology -[hidden]- ontology_config_manager
 insights -[hidden]- ontology_config_manager
 legacy_ontology_adapter -[hidden]- ontology_config_manager
-base_agent -[hidden]- ontology_config_manager
-ontology_config_manager --> singleton_ontology_config
+ontology_config_manager --> singleton_reset_pattern
 
 @enduml

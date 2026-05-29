@@ -1,44 +1,53 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Pipeline Coordination" {
-  component "Pipeline Coordinator" as coordinator <<core>>
+title SemanticAnalysis MCP Server — Component Architecture
+
+package "Ingestion Layer" {
+  component "GitHistoryAgent" as gitAgent <<agent>>
+  component "VibeSessionAgent" as vibeAgent <<agent>>
+}
+
+package "Analysis & Classification" {
+  component "CodeGraphAgent\n(Tree-sitter + Memgraph)" as codeGraph <<agent>>
+  component "SemanticAnalysisAgent\n(LLM-based)" as semAgent <<agent>>
+  component "OntologyClassificationAgent" as ontoAgent <<agent>>
+}
+
+package "Validation & Persistence" {
+  component "ContentValidationAgent\n(GitStalenessDetector)" as validAgent <<agent>>
+  component "KmCoreAdapter" as kmCore <<core>>
+}
+
+package "Cross-Cutting Infrastructure" {
   component "BaseAgent<TInput,TOutput>" as baseAgent <<core>>
-}
-
-package "Specialized Agents" {
-  component "CodeGraphAgent" as codeGraphAgent <<agent>>
-  component "SemanticAnalysisAgent" as semanticAgent <<agent>>
-  component "OntologyClassificationAgent" as ontologyAgent <<agent>>
-  component "ContentValidationAgent" as contentAgent <<agent>>
-}
-
-package "Adapters" {
-  component "LegacyOntologyAdapter" as legacyAdapter <<core>>
-  component "KmCoreAdapter" as kmAdapter <<core>>
-}
-
-package "External Infrastructure" {
+  cloud "LLMService\n(@rapid/llm-proxy)" as llmSvc <<external>>
+  component "OntologyRegistry\n(@fwornle/km-core)" as ontoReg <<core>>
+  component "LegacyOntologyAdapter" as legacyAdapt <<core>>
   database "Memgraph" as memgraph <<storage>>
-  component "LLMService\n(@rapid/llm-proxy)" as llmService <<external>>
-  component "OntologyRegistry\n(km-core)" as ontologyReg <<external>>
 }
 
-coordinator --> baseAgent : "template-method execute()"
-coordinator --> codeGraphAgent : "invokes"
-coordinator --> semanticAgent : "invokes"
-coordinator --> ontologyAgent : "invokes"
-coordinator --> contentAgent : "invokes"
+gitAgent --> baseAgent : extends
+vibeAgent --> baseAgent : extends
+codeGraph --> baseAgent : extends
+semAgent --> baseAgent : extends
+ontoAgent --> baseAgent : extends
+validAgent --> baseAgent : extends
 
-baseAgent --> codeGraphAgent : "base contract"
-baseAgent --> semanticAgent : "base contract"
-baseAgent --> ontologyAgent : "base contract"
-baseAgent --> contentAgent : "base contract"
+gitAgent --> semAgent : git history
+vibeAgent --> semAgent : vibe/LSL sessions
 
-codeGraphAgent --> memgraph : "TCP probe + queries"
-semanticAgent --> llmService : "LLM synthesis\n(attachTokenLogger)"
-ontologyAgent --> legacyAdapter : "legacy API surface"
-legacyAdapter --> ontologyReg : "wraps (migration shim)"
-contentAgent --> kmAdapter : "graphDB alias\n+ persistenceAgent alias"
+semAgent --> codeGraph : code graph context
+semAgent --> llmSvc : LLM calls\n(token telemetry)
+semAgent --> ontoAgent : classify entities
+
+codeGraph --> memgraph : AST index
+
+ontoAgent --> legacyAdapt : classify
+legacyAdapt --> ontoReg : OntologyRegistry
+
+ontoAgent --> validAgent : classified entities
+validAgent --> kmCore : persist
+validAgent --> llmSvc : validation calls
 
 @enduml

@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentConfigConventions
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentConfigConventions] as agent_config_conventions #LightBlue
+[TeamCompositionPatterns] as team_composition_patterns #F0F0F0
+[CLIToolConventions] as clitool_conventions #F0F0F0
+[LLMRoutingPatterns] as llmrouting_patterns #F0F0F0
+[KnowledgeManagementPatterns] as knowledge_management_patterns #F0F0F0
+[ConstraintEnforcementPatterns] as constraint_enforcement_patterns #F0F0F0
+[HealthMonitoringArchitecture] as health_monitoring_architecture #F0F0F0
+[AgentShellScriptProtocol] as agent_shell_script_protocol #E8F5E8
+[AgentAbstractionAPI] as agent_abstraction_api #E8F5E8
+
+coding_patterns --> agent_config_conventions
+team_composition_patterns -[hidden]- agent_config_conventions
+clitool_conventions -[hidden]- agent_config_conventions
+llmrouting_patterns -[hidden]- agent_config_conventions
+knowledge_management_patterns -[hidden]- agent_config_conventions
+constraint_enforcement_patterns -[hidden]- agent_config_conventions
+health_monitoring_architecture -[hidden]- agent_config_conventions
+agent_config_conventions --> agent_shell_script_protocol
+agent_config_conventions --> agent_abstraction_api
+
+@enduml

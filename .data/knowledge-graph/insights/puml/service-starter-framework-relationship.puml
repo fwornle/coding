@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ServiceStarterFramework
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ServiceStarterFramework] as service_starter_framework #LightBlue
+[ServiceProbeLibrary] as service_probe_library #F0F0F0
+
+dockerized_services --> service_starter_framework
+service_probe_library -[hidden]- service_starter_framework
+
+@enduml

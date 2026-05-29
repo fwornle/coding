@@ -1,0 +1,33 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Agent Adapter Layer" {
+  component "TranscriptAdapter" as adapter <<api>>
+  component "convertToLSL()" as convert <<core>>
+  component "getCurrentSession()" as getCurrentSession <<core>>
+}
+
+package "Session Window Management" {
+  component "SessionWindowManager" as swm <<core>>
+  component "Hourly Bucket Logic" as bucket <<core>>
+}
+
+package "LSL Data Model" {
+  component "LSLSession / LSLEntry" as lsl <<core>>
+  component "LSLMetadata (timeWindow)" as meta <<core>>
+}
+
+package "File System Output" {
+  database "Session Files\n(path per timeWindow)" as files <<storage>>
+}
+
+adapter --> convert : delegates
+adapter --> getCurrentSession : mandates
+convert --> swm : computes timeWindow
+getCurrentSession --> swm : resolves active bucket
+swm --> bucket : applies hourly bucketing
+bucket --> meta : populates timeWindow\n(e.g. '0800-0900')
+meta --> lsl : attached to
+lsl --> files : routed by timeWindow
+
+@enduml

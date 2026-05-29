@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphKMStore
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphKMStore] as graph_kmstore #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[KnowledgeDecayTracker] as knowledge_decay_tracker #F0F0F0
+[UUIDv7TimeOrderedIdentity] as uuidv7_time_ordered_identity #E8F5E8
+
+knowledge_management --> graph_kmstore
+manual_learning -[hidden]- graph_kmstore
+online_learning -[hidden]- graph_kmstore
+knowledge_decay_tracker -[hidden]- graph_kmstore
+graph_kmstore --> uuidv7_time_ordered_identity
+
+@enduml

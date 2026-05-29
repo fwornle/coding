@@ -1,0 +1,26 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Constraint Enforcement Layer" {
+    component "ContentValidationAgent" as cva <<agent>>
+}
+
+package "Data Sources" {
+    component "Git History" as git <<external>>
+    component "Filesystem" as fs <<external>>
+    component "GraphKMStore" as gkm <<storage>>
+}
+
+package "Validation Pipeline" {
+    component "Diagram Parser" as dp <<core>>
+    database "violation-history.json" as vh <<storage>>
+}
+
+git --> cva : "staleness signals"
+gkm --> cva : "entity observations"
+cva --> dp : "parse diagrams"
+dp --> cva : "file & entity refs"
+fs --> cva : "path resolution"
+cva --> vh : "staleness violations"
+
+@enduml

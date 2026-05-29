@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KnowledgeManagementPatterns
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[KnowledgeManagementPatterns] as knowledge_management_patterns #LightBlue
+[AgentConfigConventions] as agent_config_conventions #F0F0F0
+[TeamCompositionPatterns] as team_composition_patterns #F0F0F0
+[CLIToolConventions] as clitool_conventions #F0F0F0
+[LLMRoutingPatterns] as llmrouting_patterns #F0F0F0
+[ConstraintEnforcementPatterns] as constraint_enforcement_patterns #F0F0F0
+[HealthMonitoringArchitecture] as health_monitoring_architecture #F0F0F0
+[GraphKMStore] as graph_kmstore #E8F5E8
+
+coding_patterns --> knowledge_management_patterns
+agent_config_conventions -[hidden]- knowledge_management_patterns
+team_composition_patterns -[hidden]- knowledge_management_patterns
+clitool_conventions -[hidden]- knowledge_management_patterns
+llmrouting_patterns -[hidden]- knowledge_management_patterns
+constraint_enforcement_patterns -[hidden]- knowledge_management_patterns
+health_monitoring_architecture -[hidden]- knowledge_management_patterns
+knowledge_management_patterns --> graph_kmstore
+
+@enduml

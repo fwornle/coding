@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Execution Mode Control" {
+    database "workflow-progress.json" as wpj <<storage>>
+    component "Global Mode Flag" as gmf <<core>>
+    component "Per-Agent Mode Flag" as pamf <<core>>
+}
+
+package "LLM Abstraction Layer" {
+    component "LLMAbstraction" as llma <<core>>
+    component "MockModeProvider" as mmp <<core>>
+    component "Live Provider" as lp <<external>>
+}
+
+package "Response Normalization" {
+    component "SDK-Shape Normalizer" as ssn <<api>>
+}
+
+package "Downstream Consumers" {
+    component "Agent A (Mock)" as agentA <<agent>>
+    component "Agent B (Live)" as agentB <<agent>>
+}
+
+wpj --> gmf : "supplies"
+wpj --> pamf : "supplies"
+gmf --> llma : "sets execution path"
+pamf --> llma : "overrides per-agent"
+llma --> mmp : "routes mock calls"
+llma --> lp : "routes live calls"
+mmp --> ssn : "conforms to"
+lp --> ssn : "conforms to"
+ssn --> agentA : "normalized response"
+ssn --> agentB : "normalized response"
+
+@enduml

@@ -7,13 +7,15 @@ title Hierarchy Context: Ontology
 [Ontology] as ontology #LightBlue
 [Pipeline] as pipeline #F0F0F0
 [Insights] as insights #F0F0F0
-[OntologyRegistry] as ontology_registry #F0F0F0
-[GitStalenessDetector] as git_staleness_detector #F0F0F0
+[OntologyConfigManager] as ontology_config_manager #F0F0F0
+[LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
+[ThreePhaseOntologyLifecycle] as three_phase_ontology_lifecycle #E8F5E8
 
 semantic_analysis --> ontology
 pipeline -[hidden]- ontology
 insights -[hidden]- ontology
-ontology_registry -[hidden]- ontology
-git_staleness_detector -[hidden]- ontology
+ontology_config_manager -[hidden]- ontology
+legacy_ontology_adapter -[hidden]- ontology
+ontology --> three_phase_ontology_lifecycle
 
 @enduml

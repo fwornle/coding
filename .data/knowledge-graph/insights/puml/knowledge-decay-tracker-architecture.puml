@@ -1,0 +1,27 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Learning Sources" {
+  component "ManualLearning" as ml <<agent>>
+  component "OnlineLearning" as ol <<agent>>
+}
+
+package "Decay & Provenance Layer" {
+  component "KnowledgeDecayTracker" as kdt <<core>>
+}
+
+package "Knowledge Stores" {
+  database "GraphKMStore\n(Graphology)" as gkm <<storage>>
+  database "Legacy LevelDB" as ldb <<storage>>
+}
+
+component "GraphDatabaseService" as gds <<external>>
+
+ml --> kdt : "write path\n(entity creation)"
+ol --> kdt : "write path\n(entity creation)"
+ldb --> kdt : "bulk re-stamping\n(migration)"
+gds --> kdt : "migration provenance\nstamping"
+kdt --> gkm : "stores validFrom /\nvalidUntil metadata"
+kdt --> gkm : "read path\n(filters expired nodes)"
+
+@enduml

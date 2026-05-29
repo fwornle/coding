@@ -1,0 +1,32 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Documentation" {
+  component "system-overview.md" as sysoverview <<core>>
+  component "architecture-report.md" as archreport <<core>>
+}
+
+package "Configuration Layer" {
+  component "config/agent-profiles.json" as agentprofiles <<storage>>
+  component "config/agents/" as agentsdir <<storage>>
+  component "config/teams/" as teamsdir <<storage>>
+}
+
+package "Orchestration" {
+  component "bin/ entrypoints" as binentry <<cli>>
+}
+
+package "Runtime Agents" {
+  component "Registered Agent Profiles" as regagents <<agent>>
+  component "Team Topology Manifest" as teammanifest <<core>>
+}
+
+sysoverview --> teamsdir : "defines layer above"
+archreport --> binentry : "documents consumption"
+agentprofiles --> agentsdir : "declarative style"
+agentsdir --> regagents : "registers"
+teamsdir --> teammanifest : "declares"
+teammanifest --> regagents : "references agent names"
+binentry --> teammanifest : "consumes"
+
+@enduml

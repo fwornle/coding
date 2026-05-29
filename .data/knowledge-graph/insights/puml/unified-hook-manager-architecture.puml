@@ -1,0 +1,33 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Configuration Sources" {
+  component "User Config\n~/.coding-tools/hooks.json" as userConfig <<external>>
+  component "Project Config\n.coding/hooks.json" as projectConfig <<external>>
+}
+
+package "ConstraintSystem Core" {
+  component "UnifiedHookManager\nhook-manager.js" as hookManager <<core>>
+  component "Pre-Tool Handler" as preTool <<api>>
+  component "Post-Tool Handler" as postTool <<api>>
+}
+
+package "Handler Registry" {
+  component "Registered Handlers" as handlers <<api>>
+}
+
+package "Documentation" {
+  component "constraints/README.md" as readme <<external>>
+  component "constraint-monitoring-system.md" as monitorDoc <<external>>
+}
+
+userConfig --> hookManager : "loads global policy"
+projectConfig --> hookManager : "loads project policy"
+hookManager --> preTool : "routes pre-tool events"
+hookManager --> postTool : "routes post-tool events"
+preTool --> handlers : "blocks or allows"
+postTool --> handlers : "audits results"
+readme ..> hookManager : "documents"
+monitorDoc ..> hookManager : "documents"
+
+@enduml

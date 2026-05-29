@@ -1,0 +1,30 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Entrypoint Orchestration" {
+    component "Container Entrypoint" as entrypoint <<cli>>
+}
+
+package "ServiceStarterFramework" {
+    component "service-starter.js" as starter <<core>>
+    component "service-probe.js" as probe <<api>>
+}
+
+package "Supervised Services" {
+    component "Semantic Analysis MCP Server" as mcp <<api>>
+    component "Constraint Monitor API" as monitor <<api>>
+    component "Dashboard" as dashboard <<api>>
+    component "supervisord" as supervisord <<external>>
+}
+
+entrypoint --> starter : "invokes"
+starter --> probe : "delegates health checks"
+probe ..> mcp : "HTTP/TCP liveness"
+probe ..> monitor : "HTTP/TCP liveness"
+probe ..> dashboard : "HTTP/TCP liveness"
+starter --> mcp : "launch + verify"
+starter --> monitor : "launch + verify"
+starter --> dashboard : "launch + verify"
+starter --> supervisord : "hands off to"
+
+@enduml

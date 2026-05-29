@@ -1,0 +1,37 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+top to bottom direction
+
+package "Priority Resolution Chain" {
+    component "Per-Agent Override" as perAgent <<core>>
+    component "Global DMR Mode" as globalMode <<core>>
+    component "Legacy Flags" as legacyFlags <<core>>
+}
+
+package "Router Core" {
+    component "AgentModeRouter" as router <<core>>
+}
+
+package "Execution Paths" {
+    component "Mock Provider Path" as mockPath <<api>>
+    component "DMR Provider Path" as dmrPath <<api>>
+    component "Legacy Provider Path" as legacyPath <<api>>
+}
+
+package "State Persistence" {
+    database "workflow-progress.json" as progressJson <<storage>>
+}
+
+perAgent --> router : "highest priority"
+globalMode --> router : "fallback"
+legacyFlags --> router : "lowest priority"
+
+router --> mockPath : "routes to"
+router --> dmrPath : "routes to"
+router --> legacyPath : "routes to"
+
+router --> progressJson : "reads mode state"
+progressJson ..> router : "runtime toggle"
+
+@enduml

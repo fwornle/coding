@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HealthMonitoringArchitecture
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[HealthMonitoringArchitecture] as health_monitoring_architecture #LightBlue
+[AgentConfigConventions] as agent_config_conventions #F0F0F0
+[TeamCompositionPatterns] as team_composition_patterns #F0F0F0
+[CLIToolConventions] as clitool_conventions #F0F0F0
+[LLMRoutingPatterns] as llmrouting_patterns #F0F0F0
+[KnowledgeManagementPatterns] as knowledge_management_patterns #F0F0F0
+[ConstraintEnforcementPatterns] as constraint_enforcement_patterns #F0F0F0
+[FourLayerHealthTierModel] as four_layer_health_tier_model #E8F5E8
+
+coding_patterns --> health_monitoring_architecture
+agent_config_conventions -[hidden]- health_monitoring_architecture
+team_composition_patterns -[hidden]- health_monitoring_architecture
+clitool_conventions -[hidden]- health_monitoring_architecture
+llmrouting_patterns -[hidden]- health_monitoring_architecture
+knowledge_management_patterns -[hidden]- health_monitoring_architecture
+constraint_enforcement_patterns -[hidden]- health_monitoring_architecture
+health_monitoring_architecture --> four_layer_health_tier_model
+
+@enduml

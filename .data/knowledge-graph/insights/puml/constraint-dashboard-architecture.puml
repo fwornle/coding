@@ -1,23 +1,30 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "MCP Constraint Monitor" {
-
-    package "Core Engine" {
-        component "Rule Engine" as ruleEngine <<core>>
-        database "Persistence Store" as persistStore <<storage>>
-    }
-
-    package "Display Layer" {
-        component "Constraint Dashboard" as dashboard <<cli>>
-        component "Status Line" as statusLine <<cli>>
-    }
-
+package "Enforcement Pipeline" {
+  component "Hook Pipeline" as hooks <<core>>
+  component "Violation Classifier" as classifier <<core>>
 }
 
-ruleEngine --> persistStore : "writes violations"
-ruleEngine ..> statusLine : "push events\n(real-time counts)"
-dashboard --> persistStore : "queries via\nquery interface"
-statusLine ..> dashboard : "ambient counts /\ndrills into"
+package "MCP Sync Layer" {
+  database "violation-history.json" as violationDB <<storage>>
+}
+
+package "ConstraintDashboard" {
+  component "ConstraintDashboard" as dashboard <<cli>>
+  component "Session Statistics" as sessionStats <<core>>
+  component "Severity Breakdown" as severityView <<core>>
+}
+
+package "Documentation" {
+  component "constraint-monitoring-system.md" as docs <<external>>
+}
+
+hooks --> classifier : classifies
+classifier --> violationDB : writes tagged violations
+violationDB --> dashboard : reads history
+dashboard --> sessionStats : surfaces
+dashboard --> severityView : surfaces
+docs ..> dashboard : documents
 
 @enduml
