@@ -234,7 +234,7 @@ let _recentCalls: RecentCall[] = []
 let _loading = true
 let _error: string | null = null
 let _subscribers = new Set<() => void>()
-let _intervalId: ReturnType<typeof setInterval> | null = null
+let _intervalId: NodeJS.Timeout | number | null = null
 
 function notifySubscribers() {
   _subscribers.forEach(fn => fn())

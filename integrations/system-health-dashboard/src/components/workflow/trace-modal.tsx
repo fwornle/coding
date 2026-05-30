@@ -1,8 +1,13 @@
 'use client'
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
-import { useLLMBadgeForProcess } from './hooks'
+import { useLLMBadgeForProcess, useRecentCalls } from './hooks'
 import { WORKFLOW_AGENTS } from './constants'
+
+// Phase 52 D-03 — terminal fallback label when neither live token-usage rows
+// nor the static llmModel literal yield a value. Mirrors rapid-llm-proxy's
+// preference-order chain (claude-code → copilot → groq → openai → anthropic).
+const TIER_FALLBACK_LABEL = 'auto: claude-code → copilot → groq'
 import {
   Dialog,
   DialogContent,
@@ -139,6 +144,32 @@ const EntityFlowBadge = React.memo(function EntityFlowBadge({ flow }: { flow: Tr
       <ArrowRight className="h-2.5 w-2.5 text-zinc-500" />
       <span className="text-green-400">{flow.persisted}</span>
     </span>
+  )
+})
+
+/**
+ * Phase 52 D-03/D-08 — Per-sub-step badge with full fallback chain:
+ *   live (useLLMBadgeForProcess) → static llmModel literal → tier label.
+ * Extracted as a memoized component so the hook is called at component
+ * top-level (rule-of-hooks compliant) rather than inside a .map() body.
+ */
+const SubStepRow = React.memo(function SubStepRow({
+  processTag,
+  staticLlmModel,
+}: {
+  processTag?: string
+  staticLlmModel?: string | null
+}) {
+  const liveBadge = useLLMBadgeForProcess(processTag)
+  const displayLabel = liveBadge
+    ? `${liveBadge.provider}: ${shortenModel(liveBadge.model)}`
+    : (staticLlmModel && staticLlmModel !== 'none' && staticLlmModel !== 'pending')
+      ? shortenModel(staticLlmModel)
+      : TIER_FALLBACK_LABEL
+  return (
+    <Badge variant="outline" className="text-[10px] h-5 truncate max-w-[160px]" title={displayLabel}>
+      {displayLabel}
+    </Badge>
   )
 })
 
@@ -319,7 +350,9 @@ const AgentInstanceRow = React.memo(function AgentInstanceRow({
   waveDuration: number
 }) {
   const processTag = useMemo(() => {
-    const def = WORKFLOW_AGENTS.find(a => a.agentType === agent.agentType)
+    // WORKFLOW_AGENTS entries use `id` (not `agentType`); TraceAgentInstance.agentType
+    // is the string that matches that id (e.g. 'semantic_analysis', 'git_history').
+    const def = WORKFLOW_AGENTS.find(a => a.id === agent.agentType)
     return def?.processTag
   }, [agent.agentType])
   const llmBadge = useLLMBadgeForProcess(processTag)
@@ -391,6 +424,10 @@ export function TraceModal({
 }: TraceModalProps) {
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  // Phase 52 D-04 — single shared poll for /api/token-usage/recent; SubStepRow
+  // + AgentInstanceRow subscribe via useLLMBadgeForProcess. We read the error
+  // here at the modal level to surface a single banner instead of N per-row.
+  const { error: telemetryError } = useRecentCalls()
   const [selectedLevel, setSelectedLevel] = useState<{
     type: 'wave' | 'step' | 'agent'
     waveNumber?: number
@@ -621,11 +658,10 @@ export function TraceModal({
                     <div className="w-20 text-right text-xs text-muted-foreground">
                       {formatDuration(step.duration)}
                     </div>
-                    {step.llmProvider && step.llmProvider !== 'none' && step.llmProvider !== 'pending' && (
-                      <Badge variant="outline" className="text-[10px] h-5 truncate max-w-[90px]">
-                        {shortenModel(step.llmProvider)}
-                      </Badge>
-                    )}
+                    <SubStepRow
+                      processTag={WORKFLOW_AGENTS.find(a => a.id === step.name)?.processTag}
+                      staticLlmModel={step.llmProvider}
+                    />
                   </div>
                 )
               })}
@@ -670,6 +706,14 @@ export function TraceModal({
             Hierarchical trace: Wave &gt; Step &gt; Agent with LLM call detail
           </DialogDescription>
         </DialogHeader>
+
+        {/* Phase 52 D-04 — telemetry-fetch error banner */}
+        {telemetryError && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded border border-red-500/40 bg-red-500/10 text-xs text-red-400">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>{telemetryError}</span>
+          </div>
+        )}
 
         {/* Tab Bar */}
         <div className="flex gap-2 flex-shrink-0">

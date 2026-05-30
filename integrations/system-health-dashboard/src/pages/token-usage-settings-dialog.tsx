@@ -134,153 +134,131 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
           </div>
         )}
 
-        {!loading && data && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Available providers:</span>
-              {data.allProviders.map(p => (
-                <Badge
-                  key={p}
-                  variant={data.availableProviders.includes(p) ? 'default' : 'outline'}
-                  className={data.availableProviders.includes(p) ? '' : 'opacity-50'}
-                >
-                  {p}{data.availableProviders.includes(p) ? '' : ' (offline)'}
-                </Badge>
-              ))}
-            </div>
+        {!loading && data && (() => {
+          // Phase 52 D-11 — registry-driven primary section + legacy fallback for
+          // non-registry processes (e.g. observation-writer, health-coordinator).
+          const registryTags: string[] = Object.values(PROCESS_TAGS)
+          const registrySet = new Set<string>(registryTags)
+          const legacyProcs = (data.processes ?? []).filter(p => !registrySet.has(p))
 
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40 border-b">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium">Service (process)</th>
-                    <th className="text-left px-3 py-2 font-medium w-[200px]">Provider</th>
-                    <th className="text-left px-3 py-2 font-medium w-[220px]">Model</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Registry-driven rows (from PROCESS_TAGS) */}
-                  {Object.values(PROCESS_TAGS).map(proc => {
-                    const override = draft[proc] || {}
-                    const provider = override.provider || AUTO
-                    const models = provider !== AUTO ? data.settings.providerModels[provider] || [] : []
-                    return (
-                      <tr key={proc} className="border-b last:border-b-0">
-                        <td className="px-3 py-2 font-mono text-xs">{proc}</td>
-                        <td className="px-2 py-1">
-                          <Select
-                            value={provider}
-                            onValueChange={v => {
-                              if (v === AUTO) {
-                                setOverride(proc, null)
-                              } else {
-                                // Switching provider: reset model to first available for that provider
-                                const firstModel = data.settings.providerModels[v]?.[0]
-                                setOverride(proc, { provider: v, model: firstModel })
-                              }
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={AUTO}>(auto-route)</SelectItem>
-                              {data.allProviders.map(p => (
-                                <SelectItem
-                                  key={p}
-                                  value={p}
-                                  disabled={!data.availableProviders.includes(p)}
-                                >
-                                  {p}{!data.availableProviders.includes(p) ? ' (offline)' : ''}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="px-2 py-1">
-                          {provider === AUTO ? (
-                            <span className="text-xs text-muted-foreground italic px-2">—</span>
-                          ) : (
-                            <Select
-                              value={override.model || ''}
-                              onValueChange={v => setOverride(proc, { provider: override.provider, model: v })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="(default)" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {models.map(m => (
-                                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {/* Legacy rows — processes seen in API but not in PROCESS_TAGS registry */}
-                  {data.processes
-                    .filter(p => !Object.values(PROCESS_TAGS).includes(p))
-                    .map(proc => {
-                      const override = draft[proc] || {}
-                      const provider = override.provider || AUTO
-                      const models = provider !== AUTO ? data.settings.providerModels[provider] || [] : []
-                      return (
-                        <tr key={proc} className="border-b last:border-b-0 bg-muted/20">
-                          <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{proc}</td>
-                          <td className="px-2 py-1">
-                            <Select
-                              value={provider}
-                              onValueChange={v => {
-                                if (v === AUTO) {
-                                  setOverride(proc, null)
-                                } else {
-                                  const firstModel = data.settings.providerModels[v]?.[0]
-                                  setOverride(proc, { provider: v, model: firstModel })
-                                }
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value={AUTO}>(auto-route)</SelectItem>
-                                {data.allProviders.map(p => (
-                                  <SelectItem key={p} value={p} disabled={!data.availableProviders.includes(p)}>
-                                    {p}{!data.availableProviders.includes(p) ? ' (offline)' : ''}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="px-2 py-1">
-                            {provider === AUTO ? (
-                              <span className="text-xs text-muted-foreground italic px-2">—</span>
-                            ) : (
-                              <Select
-                                value={override.model || ''}
-                                onValueChange={v => setOverride(proc, { provider: override.provider, model: v })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="(default)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {models.map(m => (
-                                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
+          /**
+           * Single source of truth for the per-process row render. Extracting
+           * this lets both the registry section and the legacy section share
+           * identical Provider/Model Select wiring — no behavioural drift
+           * between sections.
+           */
+          const renderProcessRow = (proc: string, isLegacy: boolean) => {
+            const override = draft[proc] || {}
+            const provider = override.provider || AUTO
+            const models = provider !== AUTO ? data.settings.providerModels[provider] || [] : []
+            const rowClass = isLegacy
+              ? 'border-b last:border-b-0 bg-muted/20'
+              : 'border-b last:border-b-0'
+            const cellClass = isLegacy
+              ? 'px-3 py-2 font-mono text-xs text-muted-foreground'
+              : 'px-3 py-2 font-mono text-xs'
+            return (
+              <tr key={proc} className={rowClass}>
+                <td className={cellClass}>{proc}</td>
+                <td className="px-2 py-1">
+                  <Select
+                    value={provider}
+                    onValueChange={v => {
+                      if (v === AUTO) {
+                        setOverride(proc, null)
+                      } else {
+                        const firstModel = data.settings.providerModels[v]?.[0]
+                        setOverride(proc, { provider: v, model: firstModel })
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={AUTO}>(auto-route)</SelectItem>
+                      {data.allProviders.map(p => (
+                        <SelectItem
+                          key={p}
+                          value={p}
+                          disabled={!data.availableProviders.includes(p)}
+                        >
+                          {p}{!data.availableProviders.includes(p) ? ' (offline)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="px-2 py-1">
+                  {provider === AUTO ? (
+                    <span className="text-xs text-muted-foreground italic px-2">—</span>
+                  ) : (
+                    <Select
+                      value={override.model || ''}
+                      onValueChange={v => setOverride(proc, { provider: override.provider, model: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="(default)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {models.map(m => (
+                          <SelectItem key={m} value={m}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </td>
+              </tr>
+            )
+          }
+
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Available providers:</span>
+                {data.allProviders.map(p => (
+                  <Badge
+                    key={p}
+                    variant={data.availableProviders.includes(p) ? 'default' : 'outline'}
+                    className={data.availableProviders.includes(p) ? '' : 'opacity-50'}
+                  >
+                    {p}{data.availableProviders.includes(p) ? '' : ' (offline)'}
+                  </Badge>
+                ))}
+              </div>
+
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 border-b">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium">Service (process)</th>
+                      <th className="text-left px-3 py-2 font-medium w-[200px]">Provider</th>
+                      <th className="text-left px-3 py-2 font-medium w-[220px]">Model</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={3} className="bg-muted/40 font-medium px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Wave-analysis sub-steps (PROCESS_TAGS registry)
+                      </td>
+                    </tr>
+                    {registryTags.map(proc => renderProcessRow(proc, false))}
+                    {legacyProcs.length > 0 && (
+                      <>
+                        <tr>
+                          <td colSpan={3} className="bg-muted/40 font-medium px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Legacy / External processes (not in registry)
                           </td>
                         </tr>
-                      )
-                    })}
-                </tbody>
-              </table>
+                        {legacyProcs.map(proc => renderProcessRow(proc, true))}
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
         </div>
 
         <DialogFooter className="flex-shrink-0">
