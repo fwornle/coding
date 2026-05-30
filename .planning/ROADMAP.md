@@ -740,11 +740,11 @@ Plans:
 **Goal:** Make the dashboard's claim of "what model handled this sub-step" verifiable from live telemetry, drive process tags to per-sub-step granularity (zero `unknown` from semantic-analysis container), and give operators live `{n}/{N}` progress feedback during multi-minute wave-analysis runs.
 **Requirements**: D-01..D-15 (out-of-milestone bug-fix; decision IDs from 52-CONTEXT.md serve as requirement anchors)
 **Depends on:** Phase 51
-**Plans:** 1/3 plans executed
+**Plans:** 1/3 plans executed (Plan 01 fully closed — Tasks 1-5; D-10 zero-unknown gate PASS 2026-05-28T08:18Z)
 
 Plans:
 
-- [x] 52-01-PLAN.md — Process-tags registry + per-call-site override factory + wave1/2/3/4 tagging + semantic-analyzer strangler swap + zero-unknown gate (D-05, D-06, D-07, D-09, D-10, D-11)
+- [x] 52-01-PLAN.md — Process-tags registry + per-call-site override factory + wave1/2/3/4 tagging + semantic-analyzer strangler swap + zero-unknown gate (D-05, D-06, D-07, D-09, D-10, D-11). **CLOSED 2026-05-28** (Tasks 1-4 = 11 min, Task 5 = ~110 min after strangler-ordering follow-up fix; commits `e8fcb1e` submodule + `364e86d87` outer-repo pointer bump). D-10 PASS: 0 unknown rows since anchor 2026-05-28T07:16:29Z; per-tag breakdown confirms wave-1/2/3/4 sub-steps routed via PROCESS_TAGS registry (wave-analysis-wave4-diagram tagged correctly after fix). See 52-01-SUMMARY.md.
 - [ ] 52-02-PLAN.md — Dashboard live LLM badges from /api/token-usage/recent + processTag wiring on WORKFLOW_AGENTS (D-01, D-02, D-03, D-04, D-08)
 - [ ] 52-03-PLAN.md — Throttled per-item progress emission (wave1/2/3/4) + dashboard {n}/{N} ItemProgressBadge (D-12, D-13, D-14, D-15)
 
