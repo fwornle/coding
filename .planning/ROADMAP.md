@@ -571,7 +571,7 @@ Plans:
   3. Existing OKM REST consumers (VOKB viewer, `/api/entities`, `/api/relations`, `/api/search`, `/api/clusters`, `/api/rca-lookup`) continue to return the same shape they did before migration.
   4. OKM's per-domain JSON exports under `.data/exports/{domain}.json` continue to land with the same commit hygiene as before the migration.
 
-**Plans:** 6/11 plans executed
+**Plans:** 7/11 plans executed
 
 Plans:
 
@@ -589,7 +589,7 @@ Plans:
 
 **Wave 3** *(blocked on Waves 1+2)*
 
-- [ ] 43-07-PLAN.md — JSON-replay one-shot migration script; populate .data/leveldb-kmcore/ from .data/exports/{general,kpifw,raas}.json with legacyId.system=C stamping (D-G4.1, D-G4.3) — OKM
+- [x] 43-07-PLAN.md — JSON-replay one-shot migration script; populate .data/leveldb-kmcore/ from .data/exports/{general,kpifw,raas}.json with legacyId.system=C stamping (D-G4.1, D-G4.3) — OKM
 
 **Wave 4** *(blocked on 43-07; final-cleanup mirroring Phase 42 Plan 7)*
 
@@ -657,7 +657,7 @@ Plans:
 | 40. Ingest Pipeline & Layered Dedup | 12/12 | Complete    | 2026-05-22 |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
 | 42. Offline UKB Migration (B) | 6/7 | In Progress|  |
-| 43. OKM Cross-Repo Migration (C) | 6/11 | In Progress|  |
+| 43. OKM Cross-Repo Migration (C) | 7/11 | In Progress|  |
 | 44. REST API & Git Snapshots | 0/? | Not started | - |
 | 45. Unified Web Viewer | 0/? | Not started | - |
 | 46. Per-System Documentation & Onboarding | 0/? | Not started | - |
