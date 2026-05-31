@@ -20,10 +20,16 @@ package "Core Real-Time Systems" as realtime #E8F5E8 {
 
 ai -down-> realtime : all interactions
 
-' Knowledge Management (side by side, compact)
+' Knowledge Management - three systems on shared km-core kernel (v7.1)
 package "Knowledge Management" as km #FFF9E6 {
-  component "Continuous Learning\n(Automatic)" as learning <<core>>
-  component "UKB/VKB\n(Manual Capture)" as ukb <<cli>>
+  component "System A\nOnline Learning\n(observations/digests/insights)" as learning <<core>>
+  component "System B\nUKB / semantic-analysis\n(VKB viewer)" as ukb <<cli>>
+  component "System C\nOKB / OKM\n(VOKB viewer, port 3002)" as okb <<core>>
+  component "@fwornle/km-core\nshared kernel\n(GraphKMStore, Ontology,\n LayeredDedup, createKMRouter)" as kmcore <<core>>
+
+  learning --> kmcore
+  ukb --> kmcore
+  okb --> kmcore
 }
 
 realtime -down-> km : feeds content
@@ -72,11 +78,16 @@ note right of realtime
 end note
 
 note right of km
-  **Dual Knowledge Systems**
-  • Continuous Learning (auto)
-  • UKB/VKB (manual)
-  • Shared Graph DB storage
-  • Team-scoped isolation
+  **Three Knowledge Systems on km-core (v7.1)**
+  • System A: online learning
+    (observations/digests/insights)
+  • System B: UKB / semantic-analysis
+  • System C: OKB / OKM (cross-repo)
+  All three share **@fwornle/km-core** as
+  the single library — identical storage
+  schema, dedup pipeline, ontology
+  registry, and v7-strict ID minting.
+  See km-core-unified-architecture.
 end note
 
 note right of graphdb

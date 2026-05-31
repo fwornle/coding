@@ -115,13 +115,16 @@ note right of checkpoint
 end note
 
 note right of km_store
-  **km-core Persistence**
+  **km-core Persistence (System B)**
   • GraphKMStore wraps Graphology
-  • LevelDB: Persistent storage
+  • LevelDB: .data/knowledge-graph-migrated/
   • Entity resolution via ontology
   • mergeEntities() deduplication
   • KM_CORE_PERSISTENCE flag retired
   • Legacy persistence modules removed
+  • **Shared with Systems A (online learning)
+    and C (OKB/OKM) — see
+    km-core-unified-architecture**
 end note
 
 note right of extractor

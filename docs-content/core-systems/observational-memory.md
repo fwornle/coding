@@ -14,6 +14,8 @@ Observational Memory implements a three-tier memory hierarchy:
 
 The system uses SQLite (`.observations/observations.db`) as its runtime store and exports git-tracked JSON to `.data/observation-export/` for cross-machine portability — mirroring the UKB knowledge-export pattern.
 
+The observations API is also the **only mount point** for the shared `createKMRouter()` REST surface from `@fwornle/km-core`, exposed at `/api/km/` on port 12436. This makes Observational Memory the **System A** consumer in the [three-system km-core architecture](ukb-vkb.md#the-three-knowledge-systems-on-km-core).
+
 ![NavBar with all memory tiers](../images/memory-hierarchy-navbar.png)
 
 ## Architecture

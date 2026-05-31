@@ -48,7 +48,7 @@
 
 | Agent | Function |
 |-------|----------|
-| PersistenceAgent | Saves via km-core adapter (GraphKMStore) |
+| PersistenceAgent | Writes directly to `@fwornle/km-core`'s `GraphKMStore` (canonical path: `.data/knowledge-graph-migrated/`) |
 
 ## MCP Tools
 
@@ -89,8 +89,8 @@ Steps:
 8. CodeGraph.index()
 9. DocLinker.analyze()
 10. QA.validate()
-11. Persistence.save() — via `persistWithKmCore()`
-12. Deduplication.merge() — via km-core `mergeEntities()`
+11. Persistence.save() — `persistWithKmCore()` writes through the shared `@fwornle/km-core` `GraphKMStore`
+12. Deduplication.merge() — km-core `LayeredDeduplicator` (Jaccard → Cosine → LLM) + `mergeEntities()`
 13. ContentValidation.refresh()
 
 ### Incremental Analysis
@@ -159,9 +159,12 @@ extract_patterns {
 
 ## Storage
 
-- Entities: `.data/knowledge-graph/` (km-core: GraphKMStore backed by Graphology + LevelDB)
-- Auto-export: `shared-memory-coding.json` every 30 seconds
+- Entities: `.data/knowledge-graph-migrated/` — canonical km-core `GraphKMStore` (Graphology + LevelDB). The legacy `.data/knowledge-graph/` directory survives as a transitional readable copy; km-core is the unconditional persistence path.
+- Auto-export: `.data/knowledge-export/{team}.json` — git-tracked, debounced 5s after writes
+- Ontology: imported from `@fwornle/km-core/ontology` (shared upper layer with the observations API and the OKB)
 - Insights: `knowledge-management/insights/`
+
+This service is the **System B** consumer in the [three-system km-core architecture](../core-systems/ukb-vkb.md#the-three-knowledge-systems-on-km-core); System A (observations API) and System C (OKB) consume the same library.
 
 ## Health Check
 

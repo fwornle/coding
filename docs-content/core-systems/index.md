@@ -28,7 +28,7 @@ The coding infrastructure consists of six interconnected systems that work toget
 
     ---
 
-    14-agent AI system extracts insights from git history and conversation logs, building a searchable knowledge graph.
+    14-agent AI system extracts insights from git history and conversation logs, building a searchable knowledge graph. Persistence is delegated to **@fwornle/km-core**, the shared kernel that backs all three knowledge systems.
 
     ![UKB Workflow](../images/ukb-workflow-multi-agent-topology.png)
 
@@ -37,6 +37,34 @@ The coding infrastructure consists of six interconnected systems that work toget
     - Interactive web visualization
 
     [:octicons-arrow-right-24: Learn more](ukb-vkb.md)
+
+-   :material-eye:{ .lg .middle } **Observational Memory (online learning)**
+
+    ---
+
+    Real-time observation capture across all four agents (Claude, Copilot, OpenCode, Mastra), consolidated daily into thematic digests and weekly into persistent project insights.
+
+    - Three-tier memory hierarchy
+    - Single-owner SQLite + km-core graph store
+    - Truthfulness verification and coverage tracking
+
+    **Port**: 12436 (observations API, mounts km-core `/api/km/`)
+
+    [:octicons-arrow-right-24: Learn more](observational-memory.md)
+
+-   :material-database-search:{ .lg .middle } **OKB (Operational Knowledge Base)**
+
+    ---
+
+    Cross-repo knowledge base of root-cause analyses, runbooks, and operational documents. Lives in `_work/rapid-automations/integrations/operational-knowledge-management/`; consumes the same **@fwornle/km-core** library used by the UKB and the online-learning pipeline.
+
+    - LLM-driven ingestion + governance
+    - Four-tier ontology (upper + RaaS + KPI-FW + business)
+    - VOKB graph viewer
+
+    **Ports**: 8090 (OKB API), 3002 (VOKB viewer)
+
+    [:octicons-arrow-right-24: OKB docs (in rapid-automations)](https://bmw.ghe.com/adpnext-apps/rapid-automations/tree/main/integrations/operational-knowledge-management/docs)
 
 -   :material-shield-check:{ .lg .middle } **Constraint System**
 

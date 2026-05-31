@@ -2,6 +2,8 @@
 
 Automated knowledge classification with a six-facet upper ontology, team-specific lower ontologies, hybrid classification, and schema validation.
 
+The ontology lives inside **`@fwornle/km-core`** (`/ontology/`) and is shared by all three knowledge systems on the kernel — the UKB (System B), Observational Memory (System A), and the OKB (System C). System C composes additional domain-specific lower ontologies on top of the same upper layer (RaaS, KPI-FW, and per-business-area classes) — those extensions live alongside the OKB code and are documented in the [OKB ontology guide](https://bmw.ghe.com/adpnext-apps/rapid-automations/tree/main/integrations/operational-knowledge-management/docs/ontology.md).
+
 ![Six-Facet Ontology Structure](../images/ontology-six-facet-structure.png)
 
 ## Six-Facet Upper Ontology

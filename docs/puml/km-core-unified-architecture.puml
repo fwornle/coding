@@ -1,0 +1,115 @@
+@startuml km-core-unified-architecture
+!include _standard-style.puml
+
+title km-core — Unified Knowledge Management Kernel (v7.1, Phases 37–46)
+
+top to bottom direction
+skinparam nodesep 20
+skinparam ranksep 40
+skinparam packageStyle rectangle
+
+' ─── Layer 1: System entrypoints (three columns) ────────────────────────
+package "System A — Online Learning\n(coding repo, host process)" as sysA #E8F5E8 {
+  component "Observations API\nscripts/observations-api-server.mjs\nport 12436" as obs_api <<api>>
+  component "Reproject CLI\nscripts/reproject-online.mjs" as reproject <<cli>>
+}
+
+package "System B — UKB / semantic-analysis\n(integrations/mcp-server-semantic-analysis)" as sysB #E0E7FF {
+  component "MCP / SSE server\nport 3848" as mcp <<api>>
+  component "WaveController\n+ 14 agents" as wave <<agent>>
+}
+
+package "System C — OKB / OKM\n(rapid-automations/.../operational-knowledge-management)" as sysC #FCE4EC {
+  component "OKB API\nsrc/api/routes.ts\nport 8090" as okb_api <<api>>
+  component "Ingestion pipeline\nextractor + deduplicator" as okb_ingest <<core>>
+  component "VOKB viewer\nport 3002" as vokb <<api>>
+}
+
+' ─── Layer 2: km-core kernel (one row of components) ────────────────────
+package "@fwornle/km-core  (shared library — vendored as tarball in A, B, C)" as kmcore #FFF9E6 {
+  component "GraphKMStore\nGraphology + LevelDB" as store <<core>>
+  component "OntologyRegistry\nupper + lower" as ontology <<core>>
+  component "IngestPipeline\n+ EntityProvenance" as ingest <<core>>
+  component "LayeredDeduplicator\nJaccard → Cosine → LLM" as dedup <<core>>
+  component "maintenance\nresolveEntities,\nmergeEntities" as maint <<core>>
+  component "adapters/online\nreprojectFromOnlineStore" as adapter_online <<core>>
+  component "createKMRouter()\ncommon REST surface" as router <<api>>
+}
+
+' ─── Layer 3: storage (three columns aligned with systems) ──────────────
+package "Storage A" as stoA #F4FFF4 {
+  database ".observations/observations.db\nSQLite (single-owner)" as obs_sql <<storage>>
+  database ".data/knowledge-graph/\nGraphKMStore live" as a_store <<storage>>
+}
+
+package "Storage B" as stoB #EFF1FF {
+  database ".data/knowledge-graph-migrated/\nGraphKMStore canonical" as b_store <<storage>>
+  file ".data/knowledge-export/\n{team}.json — git-tracked" as b_export <<storage>>
+}
+
+package "Storage C" as stoC #FFEEF3 {
+  database ".data/leveldb-kmcore/\nGraphKMStore canonical" as c_store <<storage>>
+}
+
+' ─── Layer 1 → Layer 2: system consumption of km-core ──────────────────
+obs_api --> router        : **mounts** at /api/km/
+obs_api --> store         : library
+reproject --> adapter_online
+reproject --> maint       : resolveEntities + mergeEntities
+
+mcp --> wave
+wave --> store            : persistWithKmCore()
+wave --> dedup
+wave --> maint            : mergeEntities()
+
+okb_api --> store         : direct (no adapter)
+okb_api --> ontology      : @fwornle/km-core/ontology
+okb_ingest --> dedup
+okb_ingest --> maint
+vokb ..> okb_api          : read-only
+
+' ─── Internal kernel wiring (kept terse) ────────────────────────────────
+ingest --> dedup
+ingest --> store
+maint --> store
+router --> store
+
+' ─── Layer 2 → Layer 3: storage writes ──────────────────────────────────
+store --> obs_sql         : (System A only)
+store --> a_store
+store --> b_store
+store --> c_store
+b_store ..> b_export      : auto-export (5s debounce)
+
+' ─── Force column alignment ─────────────────────────────────────────────
+sysA -[hidden]right- sysB
+sysB -[hidden]right- sysC
+stoA -[hidden]right- stoB
+stoB -[hidden]right- stoC
+
+' ─── Notes ──────────────────────────────────────────────────────────────
+note top of kmcore
+  **Single source of truth (v7.1)**
+  All three systems consume the same
+  km-core library — identical storage
+  schema, dedup pipeline, ontology
+  registry, and v7-strict ID minting.
+end note
+
+note right of router
+  **Only System A** mounts createKMRouter
+  (at /api/km/ on port 12436).
+  B uses MCP/SSE for its tool surface;
+  C wraps km-core inside its own REST API.
+end note
+
+note bottom of sysC
+  **Adapter deletion (43-08e, 2026-05-31)**
+  Deleted: src/store/{km-store-adapter,
+  graph-store, sync-manager, persistence}.ts
+  + entire src/ontology/ dir.
+  Routes now call km-core directly; only
+  source-document-store.ts remains.
+end note
+
+@enduml

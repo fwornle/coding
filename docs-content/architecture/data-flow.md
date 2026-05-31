@@ -26,13 +26,13 @@ flowchart TB
 
     subgraph "Storage Layer"
         LSL --> FS[.specstory/history/]
-        SA --> GDB[GraphDB]
+        SA --> KMC[("@fwornle/km-core<br/>GraphKMStore<br/>shared by A/B/C")]
         CGR --> MG[Memgraph]
         SA --> QD[Qdrant]
     end
 
     subgraph "Visualization"
-        GDB --> VKB[VKB Server]
+        KMC --> VKB[VKB Server]
         FS --> VKB
     end
 ```
@@ -69,23 +69,36 @@ flowchart TD
 
 ## Knowledge Flow
 
-![Knowledge Capture Flow](../images/knowledge-capture-flow.png)
+![km-core Unified Architecture](../images/km-core-unified-architecture.png)
 
-**UKB Flow**:
+All three knowledge streams persist through the same **`@fwornle/km-core`** library — identical `GraphKMStore`, `OntologyRegistry`, `LayeredDeduplicator` (Jaccard → Cosine → LLM), and v7-strict ID minting.
 
-1. **Trigger**: MCP command or git analysis
-2. **Extract**: Patterns from commits or prompts
-3. **Classify**: 4-layer ontology pipeline
-4. **Store**: GraphDB (Graphology + LevelDB)
-5. **Export**: JSON for git tracking
+**System A — Online learning (observations/digests/insights)**:
 
-**Continuous Learning Flow**:
+1. **Capture**: ETM detects a completed prompt set; `ObservationApiClient` fires HTTP to the host obs-api (port 12436)
+2. **Summarize**: `ObservationWriter` calls the LLM proxy (Intent/Approach/Artifacts/Result)
+3. **Dedup**: content-hash + semantic keyword similarity (4h sliding window)
+4. **Store**: SQLite (`observations.db`) + km-core `GraphKMStore` (`.data/knowledge-graph/`)
+5. **REST**: km-core's `createKMRouter()` is mounted at `/api/km/` for entities / observations / digests / insights queries
+6. **Consolidate**: digests (daily) + insights (≥5 unsynthesized digests) via in-process LLM passes
+7. **Export**: git-tracked JSON to `.data/observation-export/`
 
-1. **Monitor**: LSL exchanges captured
-2. **Extract**: StreamingKnowledgeExtractor identifies insights
-3. **Embed**: Generate 384-dim or 1536-dim vectors
-4. **Store**: Qdrant (vectors) + SQLite (metadata)
-5. **Retrieve**: Semantic search available
+**System B — UKB / semantic-analysis Flow**:
+
+1. **Trigger**: MCP command (`ukb`, `ukb full`) or workflow execution
+2. **Extract**: 14 agents — git analysis, vibe history, semantic, web search, etc.
+3. **Classify**: 4-layer ontology pipeline via km-core's `OntologyRegistry`
+4. **Persist**: `persistWithKmCore()` writes to canonical `.data/knowledge-graph-migrated/`
+5. **Merge**: km-core `mergeEntities()` + `LayeredDeduplicator`
+6. **Export**: `.data/knowledge-export/{team}.json` (git-tracked, 5s debounce)
+
+**System C — OKB / OKM Flow** (cross-repo, `_work/rapid-automations/.../operational-knowledge-management`):
+
+1. **Ingest**: extractor reads markdown, Confluence, CodeBeamer, RCA docs
+2. **Dedup**: km-core `LayeredDeduplicator`
+3. **Resolve**: km-core `resolveEntities` against `@fwornle/km-core/ontology`
+4. **Store**: canonical `.data/leveldb-kmcore/` GraphKMStore
+5. **Serve**: OKB API (port 8090) + VOKB viewer (port 3002)
 
 ## Constraint Flow
 
@@ -114,21 +127,26 @@ The host-side Claude CLI talks to lightweight stdio proxies, which forward to th
 |--------|---------|--------|
 | LSL | `.specstory/history/` | Markdown |
 | Classification | `.specstory/logs/classification/` | JSONL + MD |
-| Knowledge (UKB) | `.data/knowledge-graph/` | LevelDB |
-| Knowledge Export | `.data/knowledge-export/` | JSON |
-| Continuous Learning | Qdrant + `.cache/knowledge.db` | Vectors + SQLite |
+| Observational Memory (System A) | `.observations/observations.db` + `.data/knowledge-graph/` | SQLite + km-core GraphKMStore |
+| Observation Export | `.data/observation-export/` | JSON (per tier) |
+| UKB (System B) | `.data/knowledge-graph-migrated/` | km-core GraphKMStore (LevelDB) |
+| UKB Export | `.data/knowledge-export/` | JSON per team |
+| OKB (System C) | `.data/leveldb-kmcore/` (in `operational-knowledge-management`) | km-core GraphKMStore (LevelDB) |
 | Health | `.health/` | JSON |
 
 ## Cross-System Integration
 
 ### LSL + Knowledge
 
-LSL data feeds both knowledge systems:
+LSL data feeds both Observational Memory (in-flight) and the UKB (manual / batch):
 
 ```
-LSL Exchange --> StreamingKnowledgeExtractor --> Qdrant
-LSL History --> UKB Git Analysis --> GraphDB
+LSL Exchange  --> ETM observation tap --> obs-api (port 12436)
+              --> ObservationWriter (km-core GraphKMStore + SQLite)
+LSL History   --> UKB git analysis    --> km-core GraphKMStore (canonical)
 ```
+
+OKB ingestion does not consume LSL — it pulls from documentation sources directly. All three streams converge on `@fwornle/km-core`'s `GraphKMStore`.
 
 ### Constraints + LSL
 

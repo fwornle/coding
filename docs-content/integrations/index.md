@@ -86,6 +86,34 @@ MCP servers and tools that extend the coding infrastructure.
 
     [:octicons-arrow-right-24: Details](llm-cli-proxy.md)
 
+-   :material-eye-outline:{ .lg .middle } **Observations API**
+
+    ---
+
+    Host-side single-owner API for observations / digests / insights. Also mounts the shared **`@fwornle/km-core` REST router** at `/api/km/`.
+
+    - Owns `observations.db` (SQLite, WAL mode)
+    - In-process consolidator + retrieval
+    - Forwarded into the container by the Health Dashboard
+
+    **Port**: 12436 (Host)
+
+    [:octicons-arrow-right-24: Details](../core-systems/observational-memory.md)
+
+-   :material-database-search:{ .lg .middle } **OKB (Operational Knowledge Base)**
+
+    ---
+
+    Cross-repo operational knowledge — RCAs, runbooks, design docs. Lives in [`rapid-automations/integrations/operational-knowledge-management`](https://bmw.ghe.com/adpnext-apps/rapid-automations/tree/main/integrations/operational-knowledge-management). Consumes the same **`@fwornle/km-core`** library as the UKB and the observations API.
+
+    - LLM-driven extraction + governance
+    - Four-tier ontology (upper + RaaS + KPI-FW + business)
+    - VOKB graph viewer
+
+    **Ports**: 8090 (API), 3002 (VOKB viewer)
+
+    [:octicons-arrow-right-24: OKB docs](https://bmw.ghe.com/adpnext-apps/rapid-automations/tree/main/integrations/operational-knowledge-management/docs)
+
 </div>
 
 ---
@@ -99,10 +127,14 @@ MCP servers and tools that extend the coding infrastructure.
 | Code Graph RAG | 3850 | HTTP/SSE | `/health` |
 | VKB Server | 8080 | HTTP | `/health` |
 | Health Dashboard | 3032 | HTTP | `/health` |
+| Health API | 3033 | HTTP | `/health` |
 | Memgraph | 7687 | Bolt | N/A |
 | Memgraph Lab | 3100 | HTTP | N/A |
 | Qdrant | 6333/6334 | HTTP/gRPC | `/health` |
 | LLM Proxy Bridge | 12435 | HTTP | `/health` |
+| Observations API (mounts km-core `/api/km/`) | 12436 | HTTP | `/health` |
+| OKB API (cross-repo) | 8090 | HTTP | `/health` |
+| VOKB viewer (cross-repo) | 3002 | HTTP | N/A |
 
 ---
 
