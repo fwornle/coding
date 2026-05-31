@@ -3,7 +3,7 @@ phase: 43-okm-cross-repo-migration-c
 plan: 08
 subsystem: storage-cutover
 tags: [okm, cutover, async-refactor, intelligence-graphology, adapter-event-subscription, partial]
-status: PARTIAL — sub-plans b+c+d landed; e+f still pending
+status: PARTIAL — sub-plans b+c+d+e all landed (PR #2 + PR #3); 43-08f operator checkpoint still pending. See 43-08e-SUMMARY.md for the adapter-deletion follow-up.
 
 requires:
   - phase: 43-okm-cross-repo-migration-c
@@ -107,7 +107,11 @@ tsc-clean. The 9-commit Phase 43 D-G arc is the PR diff at https://bmw.ghe.com/a
 
 ## Still to land (43-08e + 43-08f)
 
-### 43-08e — Legacy deletion + test refactor (was SCOPE-ASSESSMENT 43-08c, 1-2h)
+### 43-08e — Legacy deletion + test refactor — COMPLETE (PR #3, commits `21e6df1` + `49b0135`)
+
+See 43-08e-SUMMARY.md for the full landed scope. Headline: GraphKMStoreAdapter + IGraphStore + SyncManager + PersistenceManager + local ontology all DELETED; every Express route handler now async via 18 store* helpers; deterministic base64url edge-key codec; UUIDv7 minting in createEntity (km-core CORE-03); tsc 0; `npm test` 371/373 (was 323/325). Original scope sketch preserved below for record.
+
+### 43-08e — Legacy deletion + test refactor (was SCOPE-ASSESSMENT 43-08c, 1-2h) — ORIGINAL SCOPE
 
 Now that the adapter is the ONLY remaining IGraphStore consumer in production code, full removal requires:
 

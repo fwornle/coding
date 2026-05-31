@@ -593,11 +593,12 @@ Plans:
 
 **Wave 4** *(blocked on 43-07; final-cleanup mirroring Phase 42 Plan 7)*
 
-- [~] 43-08-PLAN.md — Storage cutover: atomic LevelDB swap + delete legacy backend + IGraphStore + adapter + flag + refactor every consumer to await km-core async API + cleanup grep gate (D-G3.1, D-G3.2) — OKM [autonomous: false; human-verify checkpoint] — PARTIAL: re-scoped into 43-08b/c-i/d (landed) + 43-08e/f (pending). See 43-08-SUMMARY.md.
+- [~] 43-08-PLAN.md — Storage cutover: atomic LevelDB swap + delete legacy backend + IGraphStore + adapter + flag + refactor every consumer to await km-core async API + cleanup grep gate (D-G3.1, D-G3.2) — OKM [autonomous: false; human-verify checkpoint] — PARTIAL: re-scoped into 43-08b/c-i/d + 43-08e-i/ii (all landed) + 43-08f (pending operator checkpoint). See 43-08-SUMMARY.md and 43-08e-SUMMARY.md.
   - [x] 43-08b — Bootstrap + intelligence cutover (`48bcdf6`, D-G3.2): pipeline + 7 intelligence modules + server + index + new src/lib/snapshot.ts; tsc 69→50
   - [x] 43-08c-i — Deduplicator cascade + pipeline shim removal (`c49a588`, D-G3.3); tsc 51→51 (clean ingestion path)
   - [x] 43-08d — Routes + server rewire via event-coherent adapter (`1db976d`, D-G3.4); tsc 51→0. PR #2 on bmw.ghe.com.
-  - [ ] 43-08e — Legacy deletion + test refactor: delete adapter + IGraphStore + SyncManager + Persistence + their unit tests; async-migrate the 38 legacy sync route handlers (entity/relation CRUD, query/stats/export, purge, deduplicateEdges) with substitutes for the ~10 IGraphStore-only methods (migrateEntityLayer, getEdges, getNeighbors, getStats, export, restore, clear, deduplicateEdges, beginBatch/endBatch); grep gate green
+  - [x] 43-08e-i — Adapter deletion + 38 sync route handlers → async via 18 store* helpers; edge-key codec (base64url tuple); UUIDv7 minting in createEntity (km-core CORE-03); 9 source-file deletions (`21e6df1`, D-G3.5 src/ checkpoint); tsc 0; grep gate green
+  - [x] 43-08e-ii — Test suite ported to km-core: fixture + 4 unit + 2 integration tests on GraphKMStore; 3 obsolete tests deleted (`49b0135`, D-G3.5 test checkpoint); 371/373 passing (was 323/325). PR #3 on bmw.ghe.com stacked on PR #2. Deferred: 13 tests inheriting pre-existing src/llm/* phantom imports (see 43-08e-SUMMARY.md).
   - [ ] 43-08f — Operator cutover checkpoint: atomic dir swap (.data/leveldb ↔ .data/leveldb-kmcore), OKM restart, /api/health + /api/stats smoke, Plan 06 rest-contract.test.ts pass (D-G5.1 SC#3) [autonomous: false; human-verify checkpoint]
 - [ ] 43-09-PLAN.md — Full re-embed pass with fastembed/all-MiniLM-L6-v2/384-dim; inline embedding storage (D-G7.1, D-G7.2) — OKM
 
