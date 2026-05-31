@@ -571,7 +571,35 @@ Plans:
   3. Existing OKM REST consumers (VOKB viewer, `/api/entities`, `/api/relations`, `/api/search`, `/api/clusters`, `/api/rca-lookup`) continue to return the same shape they did before migration.
   4. OKM's per-domain JSON exports under `.data/exports/{domain}.json` continue to land with the same commit hygiene as before the migration.
 
-**Plans:** TBD
+**Plans:** 11 plans across 5 waves
+
+Plans:
+
+**Wave 1 (parallel — no inter-plan dependencies)**
+
+- [ ] 43-01-PLAN.md — km-core schema pre-req (D-G4.2 layer-field verification + OntologyRegistry accessor parity audit + version tag) — independent km-core repo
+- [ ] 43-02-PLAN.md — OKM packaging: add lib/km-core submodule (HTTPS, public) + scripts/repack-km-core.sh helper (D-G1.1, D-G1.2, D-G1.4) — OKM
+- [ ] 43-03-PLAN.md — Delete vestigial @fwornle/km-core dep from rapid-automations root package.json (D-G1.3) — rapid-automations root
+
+**Wave 2** *(blocked on 43-01 + 43-02)*
+
+- [ ] 43-04-PLAN.md — OntologyRegistry unification: swap every OKM consumer to import from @fwornle/km-core/ontology (D-G2.2) — OKM
+- [ ] 43-05-PLAN.md — Route /api/cleanup/resolve-entities to km-core; delete local resolveEntities methods; revert /api/km mount (D-G2.3, D-G2.4) — OKM
+- [ ] 43-06-PLAN.md — Pre-cutover REST fixtures + Zod contract tests (D-G5.1 part 1, SC#3) — OKM
+
+**Wave 3** *(blocked on Waves 1+2)*
+
+- [ ] 43-07-PLAN.md — JSON-replay one-shot migration script; populate .data/leveldb-kmcore/ from .data/exports/{general,kpifw,raas}.json with legacyId.system=C stamping (D-G4.1, D-G4.3) — OKM
+
+**Wave 4** *(blocked on 43-07; final-cleanup mirroring Phase 42 Plan 7)*
+
+- [ ] 43-08-PLAN.md — Storage cutover: atomic LevelDB swap + delete legacy backend + IGraphStore + adapter + flag + refactor every consumer to await km-core async API + cleanup grep gate (D-G3.1, D-G3.2) — OKM [autonomous: false; human-verify checkpoint]
+- [ ] 43-09-PLAN.md — Full re-embed pass with fastembed/all-MiniLM-L6-v2/384-dim; inline embedding storage (D-G7.1, D-G7.2) — OKM
+
+**Wave 5** *(blocked on Waves 1-4)*
+
+- [ ] 43-10-PLAN.md — Post-cutover REST verification (3-gate D-G5.1 — Zod + byte-diff + VOKB viewer smoke); D-G6.1 bug-fix-only viewer edits allowed (SC#3, SC#4) — OKM [autonomous: false; human-verify checkpoint]
+- [ ] 43-11-PLAN.md — Push to bmw.ghe.com (both repos via HTTPS) + watch rapid-automations CI for GREEN (SC#1 close) + Phase 43 final sign-off — OKM + rapid-automations [autonomous: false; two human checkpoints]
 
 #### Phase 44: REST API & Git Snapshots
 
