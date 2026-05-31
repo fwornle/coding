@@ -107,6 +107,28 @@ function formatLlmTag(obs: Observation): string | null {
   return `${model}@${provider}`
 }
 
+/** Phase 51: classify whether an observation came from a sub-agent capture
+ *  (live-tier `/subagents/agent-*.jsonl` paths or opencode `sqlite:...#ses_*`
+ *  adapter URIs) vs the top-level parent session (`live-etm` / empty). */
+function isSubAgent(obs: Observation): boolean {
+  const s = obs.source || ''
+  if (!s || s === 'live-etm') return false
+  if (s.includes('/subagents/agent-')) return true
+  if (s.startsWith('sqlite:') && s.includes('#ses_')) return true
+  return false
+}
+
+function SubAgentBadge() {
+  return (
+    <span
+      className="text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-mono whitespace-nowrap"
+      title="Captured from a sub-agent transcript (Path A live tail or Path B sweep)"
+    >
+      ↳ sub-agent
+    </span>
+  )
+}
+
 function parseTokens(raw: string | LlmTokens | null | undefined): LlmTokens | null {
   if (!raw) return null
   if (typeof raw === 'string') {
@@ -120,6 +142,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
   const llmTag = formatLlmTag(observation)
   const tokens = parseTokens(observation.llmTokens)
   const isLow = observation.quality === 'low'
+  const isSub = isSubAgent(observation)
 
   if (compact && !isExpanded) {
     // Single-line compact row
@@ -129,6 +152,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
         onClick={onToggle}
       >
         <AgentBadge agent={observation.agent} />
+        {isSub && <SubAgentBadge />}
         <span className="text-[11px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
           {observation._origin === 'cold' && (
             <Snowflake className="w-3 h-3 text-sky-400/80 shrink-0" aria-label="From cold storage"><title>Older than retention window — served from JSON cold store.</title></Snowflake>
@@ -165,6 +189,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
           <div className="px-4 py-3 cursor-pointer">
             <div className="flex items-center gap-3 mb-0.5">
               <AgentBadge agent={observation.agent} />
+              {isSub && <SubAgentBadge />}
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 {observation._origin === 'cold' && (
                   <Snowflake className="w-3.5 h-3.5 text-sky-400/80 shrink-0" aria-label="From cold storage"><title>Older than retention window — served from JSON cold store.</title></Snowflake>
