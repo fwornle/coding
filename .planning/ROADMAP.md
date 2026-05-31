@@ -571,14 +571,14 @@ Plans:
   3. Existing OKM REST consumers (VOKB viewer, `/api/entities`, `/api/relations`, `/api/search`, `/api/clusters`, `/api/rca-lookup`) continue to return the same shape they did before migration.
   4. OKM's per-domain JSON exports under `.data/exports/{domain}.json` continue to land with the same commit hygiene as before the migration.
 
-**Plans:** 1/11 plans executed
+**Plans:** 2/11 plans executed
 
 Plans:
 
 **Wave 1 (parallel — no inter-plan dependencies)**
 
 - [x] 43-01-PLAN.md — km-core schema pre-req (D-G4.2 layer-field verification + OntologyRegistry accessor parity audit + version tag) — independent km-core repo
-- [ ] 43-02-PLAN.md — OKM packaging: add lib/km-core submodule (HTTPS, public) + scripts/repack-km-core.sh helper (D-G1.1, D-G1.2, D-G1.4) — OKM
+- [x] 43-02-PLAN.md — OKM packaging: add lib/km-core submodule (HTTPS, public) + scripts/repack-km-core.sh helper (D-G1.1, D-G1.2, D-G1.4) — OKM
 - [ ] 43-03-PLAN.md — Delete vestigial @fwornle/km-core dep from rapid-automations root package.json (D-G1.3) — rapid-automations root
 
 **Wave 2** *(blocked on 43-01 + 43-02)*
@@ -657,7 +657,7 @@ Plans:
 | 40. Ingest Pipeline & Layered Dedup | 12/12 | Complete    | 2026-05-22 |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
 | 42. Offline UKB Migration (B) | 6/7 | In Progress|  |
-| 43. OKM Cross-Repo Migration (C) | 1/11 | In Progress|  |
+| 43. OKM Cross-Repo Migration (C) | 2/11 | In Progress|  |
 | 44. REST API & Git Snapshots | 0/? | Not started | - |
 | 45. Unified Web Viewer | 0/? | Not started | - |
 | 46. Per-System Documentation & Onboarding | 0/? | Not started | - |
