@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: completed
+status: executing
 stopped_at: "Phase 43 context gathered — 17 decisions across 7 areas locked. Submodule packaging strategy resolves the SC#2 blocker; Storage+Ontology+Maintenance migration depth; final cleanup deletes adapter+IGraphStore; JSON-replay data continuity; km-core Entity extends with layer?; full re-embed; 3-gate REST verification."
-last_updated: "2026-05-31T05:54:12.682Z"
-last_activity: 2026-05-31 -- Phase 52 plan 03 dashboard half committed (5ad4f31f2); Phase 52 fully closed; pivot to Phase 43 ready
+last_updated: "2026-05-31T06:41:56.322Z"
+last_activity: 2026-05-31 -- Phase 43 planning complete
 progress:
   total_phases: 22
   completed_phases: 14
-  total_plans: 75
+  total_plans: 86
   completed_plans: 75
   percent: 64
 ---
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 43 (OKM Cross-Repo Migration / v7.1 INT-03) — NEXT (after Phase 52 close)
 Plan: discuss → plan cycle pending
-Status: Phase 52 fully closed (all 3 plans). Phase 52 was out-of-milestone bug-fix work; with it complete, the v7.1 milestone close-out chain (43 → 44 → 45 → 46) becomes the active priority. Phase 43 directory does not exist on disk (OpenCode's prior PLAN/DISCUSS docs were reverted in commit 8457dd56c on 2026-05-29). Open Blocker: OKM packaging strategy (submodule vs published npm vs vendored) — must be resolved in Phase 43's discuss phase.
+Status: Ready to execute
 Next step: `/gsd-discuss-phase 43` to bootstrap Phase 43 with a fresh discuss cycle. Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs).
-Last activity: 2026-05-31 -- Phase 52 plan 03 dashboard half committed (5ad4f31f2); Phase 52 fully closed; pivot to Phase 43 ready
+Last activity: 2026-05-31 -- Phase 43 planning complete
 
 ## Performance Metrics
 
