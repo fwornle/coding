@@ -571,7 +571,7 @@ Plans:
   3. Existing OKM REST consumers (VOKB viewer, `/api/entities`, `/api/relations`, `/api/search`, `/api/clusters`, `/api/rca-lookup`) continue to return the same shape they did before migration.
   4. OKM's per-domain JSON exports under `.data/exports/{domain}.json` continue to land with the same commit hygiene as before the migration.
 
-**Plans:** 3/11 plans executed
+**Plans:** 4/11 plans executed
 
 Plans:
 
@@ -583,7 +583,7 @@ Plans:
 
 **Wave 2** *(blocked on 43-01 + 43-02)*
 
-- [ ] 43-04-PLAN.md — OntologyRegistry unification: swap every OKM consumer to import from @fwornle/km-core/ontology (D-G2.2) — OKM
+- [x] 43-04-PLAN.md — OntologyRegistry unification: swap every OKM consumer to import from @fwornle/km-core/ontology (D-G2.2) — OKM
 - [ ] 43-05-PLAN.md — Route /api/cleanup/resolve-entities to km-core; delete local resolveEntities methods; revert /api/km mount (D-G2.3, D-G2.4) — OKM
 - [ ] 43-06-PLAN.md — Pre-cutover REST fixtures + Zod contract tests (D-G5.1 part 1, SC#3) — OKM
 
@@ -657,7 +657,7 @@ Plans:
 | 40. Ingest Pipeline & Layered Dedup | 12/12 | Complete    | 2026-05-22 |
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
 | 42. Offline UKB Migration (B) | 6/7 | In Progress|  |
-| 43. OKM Cross-Repo Migration (C) | 3/11 | In Progress|  |
+| 43. OKM Cross-Repo Migration (C) | 4/11 | In Progress|  |
 | 44. REST API & Git Snapshots | 0/? | Not started | - |
 | 45. Unified Web Viewer | 0/? | Not started | - |
 | 46. Per-System Documentation & Onboarding | 0/? | Not started | - |
