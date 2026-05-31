@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 52 plan 02 CLOSED (Tasks 1-5 gap-closure complete 2026-05-30; Task 6 visual UAT deferred to operator per autonomous:false); Plan 03 (per-item progress emission) remains open
-last_updated: "2026-05-30T09:00:00.000Z"
-last_activity: 2026-05-30 -- Phase 52 plan 02 gap-closure committed (93560c13e); SubStepRow + settings registry sections + useRecentCalls banner + AgentInstanceRow .agentType bug fix
+stopped_at: Phase 52 COMPLETE — all 3 plans closed (52-01 on 2026-05-28; 52-02 on 2026-05-30; 52-03 on 2026-05-31). Plans 52-02 + 52-03 Task 6 visual UAT deferred to operator per autonomous:false. Phase 52 unblocks v7.1 milestone close-out: next is Phase 43 (OKM Cross-Repo Migration).
+last_updated: "2026-05-31T08:00:00.000Z"
+last_activity: 2026-05-31 -- Phase 52 plan 03 dashboard half committed (5ad4f31f2: ItemProgressBadge + WaveGroup reducer extension); Phase 52 fully closed
 progress:
   total_phases: 22
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 75
-  completed_plans: 75
-  percent: 60
+  completed_plans: 76
+  percent: 61
 ---
 
 # Project State
@@ -51,11 +51,11 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 52 (dashboard-llm-routing-label-process-tag-observability-fix) — Plans 01+02 CLOSED
-Plan: 3 of 3 (Plan 01 done; Plan 02 gap-closure done; Plan 03 not started)
-Status: Phase 52 plan 02 closed (Tasks 1-5; gap-closure landed in commit 93560c13e). Remaining: Plan 52-03 (throttled per-item progress emission + dashboard {n}/{N} ItemProgressBadge). Plan 52-03 is independent of Plan 52-02 and can proceed without further setup. Phase 52 is out-of-milestone bug-fix work; v7.1 milestone close-out chain (43→44→45→46) is the higher-priority pivot once Phase 52 closes.
-Next step: Operator choice — (a) execute Plan 52-03 to finish Phase 52, OR (b) skip 52-03 and pivot now to v7.1: `/gsd-discuss-phase 43` to begin OKM Cross-Repo Migration. Phase 52-03 touches wave-controller emission code + adds a small ItemProgressBadge to the trace modal — modest scope, ~1-2 hours estimated. Phase 43 needs a fresh discuss cycle (OpenCode's prior PLAN/DISCUSS reverted in commit 8457dd56c on 2026-05-29).
-Last activity: 2026-05-30 -- Phase 52 plan 02 gap-closure complete (commit 93560c13e); SUMMARY written; Task 6 visual UAT deferred to operator
+Phase: 43 (OKM Cross-Repo Migration / v7.1 INT-03) — NEXT (after Phase 52 close)
+Plan: discuss → plan cycle pending
+Status: Phase 52 fully closed (all 3 plans). Phase 52 was out-of-milestone bug-fix work; with it complete, the v7.1 milestone close-out chain (43 → 44 → 45 → 46) becomes the active priority. Phase 43 directory does not exist on disk (OpenCode's prior PLAN/DISCUSS docs were reverted in commit 8457dd56c on 2026-05-29). Open Blocker: OKM packaging strategy (submodule vs published npm vs vendored) — must be resolved in Phase 43's discuss phase.
+Next step: `/gsd-discuss-phase 43` to bootstrap Phase 43 with a fresh discuss cycle. Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs).
+Last activity: 2026-05-31 -- Phase 52 plan 03 dashboard half committed (5ad4f31f2); Phase 52 fully closed; pivot to Phase 43 ready
 
 ## Performance Metrics
 
@@ -226,12 +226,13 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 42.2 P04 | ~80m | 4 tasks (+3 Rule 1/3 deviations) | 18 files (2 created, 10 modified, 6 deleted) |
 | Phase 52 P01 | ~11min Tasks 1-4 + ~110min Task 5 (2x production wave-analysis + Docker rebuild for strangler-ordering fix) | 5 tasks | 10 files + 1 follow-up semantic-analyzer.ts strangler-ordering fix |
 | Phase 52 P02 | ~30min gap-closure (original work in 5fa110552 on 2026-05-29; gap-closure on 2026-05-30) | 5 tasks (Task 6 visual UAT deferred to operator) | 3 files in gap-closure commit 93560c13e + 2 files from prior 5fa110552 commit = 5 total |
+| Phase 52 P03 | ~20min dashboard half (wave-controller half already in tree from ad523f7db on 2026-05-29) | 3 tasks (Task 4 visual UAT deferred to operator) | 2 files in commit 5ad4f31f2 (trace-modal.tsx + ukbSlice.ts) + wave-controller.ts from prior submodule commits |
 
 ## Session Continuity
 
-Last session: 2026-05-30T09:00:00.000Z
-Stopped at: Phase 52 plan 02 CLOSED (gap-closure commit 93560c13e); Plan 03 (per-item progress emission) remains open
-Resume with: Operator choice — (a) execute Plan 52-03 to finish Phase 52 (small scope: wave-controller throttled per-item emission + dashboard ItemProgressBadge; ~1-2 hours); OR (b) skip 52-03 and pivot to v7.1: `/gsd-discuss-phase 43` (OKM Cross-Repo Migration / INT-03). Phase 43 needs a fresh discuss cycle — OpenCode's prior PLAN/DISCUSS was reverted on 2026-05-29 (commit 8457dd56c). After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 Task 6 (visual UAT in browser) is operator-owned per autonomous:false — see 52-02-SUMMARY.md for manual verification steps.
+Last session: 2026-05-31T08:00:00.000Z
+Stopped at: Phase 52 COMPLETE — all 3 plans closed. v7.1 milestone close-out chain (43→44→45→46) is the active priority.
+Resume with: `/gsd-discuss-phase 43` to begin OKM Cross-Repo Migration (INT-03). Phase 43 needs a fresh discuss cycle — OpenCode's prior PLAN/DISCUSS was reverted on 2026-05-29 (commit 8457dd56c). After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps.
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
 
