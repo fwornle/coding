@@ -134,6 +134,34 @@ const renderWithCodeEvidence = (text: string): React.ReactNode => {
 
 // ---------- Memoized sub-components ----------
 
+/**
+ * Phase 52 D-15 — Wave-level live progress badge. Renders a compact
+ * `{n}/{N}` counter + thin blue progress bar inline with the other
+ * wave-row metrics. Guarded conditionally at the call site so legacy
+ * progress files (no itemsTotal) render the existing entity-flow arrow
+ * display only — no layout shift on older runs.
+ */
+const ItemProgressBadge = React.memo(function ItemProgressBadge({
+  completed,
+  total,
+}: {
+  completed: number
+  total: number
+}) {
+  const pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-mono" title={`${completed}/${total} items (${pct}%)`}>
+      <span className="text-zinc-400 tabular-nums">{completed}/{total}</span>
+      <span className="inline-block w-12 h-1 bg-zinc-700 rounded-full overflow-hidden">
+        <span
+          className="block h-full bg-blue-400 transition-all duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+    </span>
+  )
+})
+
 /** Entity flow inline badge: "9 > 7 > 6" */
 const EntityFlowBadge = React.memo(function EntityFlowBadge({ flow }: { flow: TraceEntityFlow }) {
   return (
@@ -524,7 +552,23 @@ export function TraceModal({
         persisted: Math.max(parent?.entityFlow.persisted ?? 0, subFlow.persisted),
       }
 
-      groups.push({ waveNumber, steps: waveSteps, totalDuration, totalLLMCalls, totalTokens, entityFlow })
+      // Phase 52 D-15 — surface per-item progress from the LAST step that
+      // emitted non-null itemsTotal (the currently-active or most-recently-
+      // active instrumented step). Steps without itemsTotal are ignored;
+      // when no step has emitted, the wave-level fields stay undefined and
+      // the dashboard falls back to the legacy arrow display.
+      let itemsCompleted: number | undefined
+      let itemsTotal: number | undefined
+      for (const step of waveSteps) {
+        const stepTotal = (step as any).outputs?.itemsTotal
+        const stepDone = (step as any).outputs?.itemsCompleted
+        if (typeof stepTotal === 'number' && stepTotal > 0) {
+          itemsTotal = stepTotal
+          itemsCompleted = typeof stepDone === 'number' ? stepDone : 0
+        }
+      }
+
+      groups.push({ waveNumber, steps: waveSteps, totalDuration, totalLLMCalls, totalTokens, entityFlow, itemsCompleted, itemsTotal })
     }
 
     return groups.sort((a, b) => a.waveNumber - b.waveNumber)
@@ -837,6 +881,10 @@ export function TraceModal({
                         </Badge>
                         {wg.totalTokens > 0 && (
                           <span className="text-[10px] text-zinc-500 tabular-nums">{wg.totalTokens.toLocaleString()}t</span>
+                        )}
+                        {/* Phase 52 D-15 — live per-item progress; legacy fallback when itemsTotal missing */}
+                        {wg.itemsTotal != null && wg.itemsTotal > 0 && wg.itemsCompleted != null && (
+                          <ItemProgressBadge completed={wg.itemsCompleted} total={wg.itemsTotal} />
                         )}
                         {/* Entity flow mini-badge */}
                         {(wg.entityFlow.produced > 0 || wg.entityFlow.persisted > 0) && (

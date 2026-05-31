@@ -165,6 +165,12 @@ export interface WaveGroup {
   totalLLMCalls: number
   totalTokens: number
   entityFlow: TraceEntityFlow
+  // Phase 52 D-15 — wave-level per-item progress surfaced from the last
+  // instrumented step's outputs.itemsCompleted/itemsTotal. Optional so
+  // legacy progress files (no per-item emission) keep rendering with the
+  // existing entity-flow arrow display only.
+  itemsCompleted?: number
+  itemsTotal?: number
 }
 
 // Step info for each workflow step
