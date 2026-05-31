@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: Phase 52 COMPLETE — all 3 plans closed (52-01 on 2026-05-28; 52-02 on 2026-05-30; 52-03 on 2026-05-31). Plans 52-02 + 52-03 Task 6 visual UAT deferred to operator per autonomous:false. Phase 52 unblocks v7.1 milestone close-out: next is Phase 43 (OKM Cross-Repo Migration).
-last_updated: "2026-05-31T08:00:00.000Z"
-last_activity: 2026-05-31 -- Phase 52 plan 03 dashboard half committed (5ad4f31f2: ItemProgressBadge + WaveGroup reducer extension); Phase 52 fully closed
+status: completed
+stopped_at: "Phase 43 context gathered — 17 decisions across 7 areas locked. Submodule packaging strategy resolves the SC#2 blocker; Storage+Ontology+Maintenance migration depth; final cleanup deletes adapter+IGraphStore; JSON-replay data continuity; km-core Entity extends with layer?; full re-embed; 3-gate REST verification."
+last_updated: "2026-05-31T05:54:12.682Z"
+last_activity: 2026-05-31 -- Phase 52 plan 03 dashboard half committed (5ad4f31f2); Phase 52 fully closed; pivot to Phase 43 ready
 progress:
   total_phases: 22
   completed_phases: 14
   total_plans: 75
-  completed_plans: 76
-  percent: 61
+  completed_plans: 75
+  percent: 64
 ---
 
 # Project State
@@ -230,8 +230,8 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-05-31T08:00:00.000Z
-Stopped at: Phase 52 COMPLETE — all 3 plans closed. v7.1 milestone close-out chain (43→44→45→46) is the active priority.
+Last session: 2026-05-31T05:54:12.670Z
+Stopped at: Phase 43 context gathered — 17 decisions across 7 areas locked. Submodule packaging strategy resolves the SC#2 blocker; Storage+Ontology+Maintenance migration depth; final cleanup deletes adapter+IGraphStore; JSON-replay data continuity; km-core Entity extends with layer?; full re-embed; 3-gate REST verification.
 Resume with: `/gsd-discuss-phase 43` to begin OKM Cross-Repo Migration (INT-03). Phase 43 needs a fresh discuss cycle — OpenCode's prior PLAN/DISCUSS was reverted on 2026-05-29 (commit 8457dd56c). After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps.
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
