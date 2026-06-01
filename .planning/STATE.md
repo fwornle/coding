@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: "Phase 43 Plan 09 FULLY COMPLETE — production re-embed executed 2026-06-01 (run-id phase-43-reembed-20260601T053526Z): 1665/1665 entities embedded with fastembed/all-MiniLM-L6-v2 384-dim in 63.7s, coverage100:true. Plans 43-01 through 43-09 all landed. Remaining: 43-10 (REST fixture-diff verification, 3-gate, autonomous:false — VOKB visual smoke required), 43-11 (phase close, autonomous:false — operator HTTPS push + CI watch). Out-of-band docs commit b99ac49ca (2026-06-01) landed cross-system km-core narrative + keystone PUML — overlaps Phase 46 scope; absorb when 46 opens."
-last_updated: "2026-06-01T05:40:00.000Z"
-last_activity: 2026-06-01 -- Phase 43 Plan 09 production re-embed COMPLETE: 1665 OKM entities now carry fastembed/all-MiniLM-L6-v2 384-dim embeddings (run-id phase-43-reembed-20260601T053526Z, coverage100:true verified). Ready to resume at Plan 43-10.
+status: completed
+stopped_at: "Phase 43 Wave 5 in progress — 10/13 plans done (43-01..43-09 + 43-10a landed; 43-10a restored TEST-ONLY src/store/ + src/llm/ + src/ontology/ + createServer overload shims so Plan 06 fixture-equality + recorder paths run again. OKM submodule 4dabb4c on refactor/43-08e-delete-adapter, outer rapid-automations gitlink bump 098ff84 on main, pushes deferred to Plan 11). Remaining: 43-10 (REST fixture-diff verification, 3-gate — now unblocked by 10a), 43-11 (phase close)."
+last_updated: "2026-06-01T10:30:00.000Z"
+last_activity: "2026-06-01 -- Plan 43-10a TEST-ONLY shim restoration COMPLETE (4 legacy tests pass; whole-suite failure count 13 → 3)"
 progress:
   total_phases: 22
   completed_phases: 14
-  total_plans: 86
-  completed_plans: 76
+  total_plans: 90
+  completed_plans: 87
   percent: 64
 ---
 
@@ -52,10 +52,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 43 (OKM Cross-Repo Migration / v7.1 INT-03) — IN PROGRESS, Wave 5
-Plan: 43-10 (REST fixture-diff verification, 3-gate; depends on 43-09 ✓ now fully complete with production embeddings landed)
-Status: Plan 43-09 fully complete (script + test + production re-embed: 1665 entities, coverage100:true). Ready to execute 43-10 (autonomous:false — VOKB visual smoke) → 43-11 (autonomous:false — operator push + CI watch).
+Plan: 43-10 (REST fixture-diff verification, 3-gate; now unblocked by 43-10a TEST-ONLY src/store/ shim restoration)
+Status: Plan 43-10a COMPLETE (TEST-ONLY shims restored — 6 new modules + 2 production-file touches; four legacy test files green; OKM `refactor/43-08e-delete-adapter` 4dabb4c + outer `main` 098ff84). Pushes deferred to Plan 11. Ready to execute 43-10 (autonomous:false — VOKB visual smoke) → 43-11 (autonomous:false — operator push + CI watch).
 Next step: `/gsd-execute-phase 43` to drive 43-10 → 43-11. Both remaining plans are autonomous:false — operator involvement required (VOKB visual smoke for 10, HTTPS push + CI watch for 11). Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by 2026-06-01 out-of-band docs commit b99ac49ca; absorb when 46 opens).
-Last activity: 2026-06-01 -- Plan 43-09 production re-embed COMPLETE (1665 entities, coverage100:true verified)
+Last activity: 2026-06-01 -- Plan 43-10a TEST-ONLY shim restoration COMPLETE (4 legacy tests pass; whole-suite failure count 13 → 3; src/store/ + src/llm/ + src/ontology/ + createServer overload all in place)
 
 ## Performance Metrics
 
@@ -179,6 +179,7 @@ Last activity: 2026-06-01 -- Plan 43-09 production re-embed COMPLETE (1665 entit
 - [Phase 52-01]: D-09 SemanticAnalyzer.analyzeContent strangler swap — when options.process is truthy non-empty string, route through llmWithProcessComplete with SDK MetricsTracker passed for getDetailedCalls() contract. SDK direct path preserved unchanged for orphan callers. Strangler gate is typeof check, not just truthy, to defend against empty-string slip-through that would store '' as the telemetry tag.
 - [Phase 52-01]: configure-wave-analysis-routing.sh extended in-phase with 9 per-sub-step entries. CHEAP (copilot/claude-haiku-4.5) for classify + diagram-repair recovery paths; HEAVY (copilot/claude-sonnet-4.6) for analyze/insight/generation/extract paths. Pre-Phase-52 wave-level entries preserved. Live proxy applied 9 new override changes; 13 total wave-analysis-* entries.
 - [Phase 43-09]: D-G7.1 / D-G7.2 re-embed script lands at OKM `scripts/reembed-okm-corpus.mjs` (320 LoC) + 4-case vitest integration test (336 LoC). Iterate every entity via `store.iterate(undefined, { includeSuperseded: true })` (defensive — Phase 42.2-02 lesson) → embed via `FastembedEmbeddingClient` (km-core export, Phase 42 D-52c — fastembed/all-MiniLM-L6-v2/384-dim) → `mergeAttributes(entity.id, { embedding, metadata: { ...existing, embeddingModel, embeddingRunId } })` for INLINE persistence per D-G7.2 (NO Qdrant; deferred Phase 44/45). Idempotent via `metadata.embeddingModel === 'fastembed/all-MiniLM-L6-v2'` fingerprint with `--resume`. 5% error budget per Phase 42 Plan 5 precedent. Canonical ontologyDir resolver reused VERBATIM from Plan 07's `resolveOntologyDir()` (both copies carry doc-comment cross-references; deduplicate when km-core ships `defaultOntologyDir()`). Embed input = `description` (fallback `name`) for cross-system parity with Phase 42 D-52c wave-controller. Dry-run: 1665 entities, 0 currently embedded, ~60s wall-clock (after ~22s fastembed cold-start). Production re-embed deferred to operator per execution-time scope clarification — runbook in 43-09-SUMMARY § "Operator Runbook". **Rule 1 deviations**: (a) qdrant grep returned 2 (negative-context doc-comment only — kept as anti-shallow guard); (b) macOS ONNX shutdown crash defeats `code === 1` assertion → added `exitedOk()` / `abortedOnBudget()` test helpers keyed off load-bearing stdout/stderr lines (emitted BEFORE the libc crash). **Topology**: 2-layer commits (OKM × 2 + rapid-automations × 1) — coding repo does NOT track `_work/rapid-automations` as submodule, so the user-prompt's "third coding-side pointer bump" does not exist. All 4 integration tests pass in 2.4s warm.
+- [Phase 43-10a]: TEST-ONLY src/store/ shim restoration (the "test suite restore" deferred in 43-08e SUMMARY line 159). Architectural decision drilled into the shim during execution: **in-memory graphology mirror, NOT a km-core delegation**. The four target tests (rest-contract / api-ingest / ingestion-pipeline / deduplicator) perform UNAWAITED synchronous calls (`graphStore.addEntity(e)` followed by immediate `graphStore.getAllEntities()` with no await) — fundamentally incompatible with km-core's async + LevelDB-backed surface. The shim presents BOTH sync legacy methods AND a duck-typed km-core surface (await-friendly because `await syncValue ≡ syncValue`). createServer overload accepts the legacy 8-arg shape via `_internalStore` duck-type detection; OntologyRegistry shim adds zero-arg construction + `.load(dir)` (two tests need it); createServer made sync overall (`init()` is a documented no-op so `await apiRoutes.init()` → `void apiRoutes.init()` is semantics-preserving). **8th file in scope (Rule 3)**: src/lib/snapshot.ts honors caller-supplied `Relation.key` when present — production km-core never sets this field (snap-* fallback preserved); the shim sets it so the REST byte-equal lock's normalizer regex (`geid_*_<n>` → `seed-edge-<n>`) produces deterministic fixture-matched output. **Known flaky** /api/clusters Louvain test is pre-existing — louvain captures `Math.random` REFERENCE at module load (DEFAULTS.rng) BEFORE the test's `beforeAll` reseeding runs, so seeding is effectively a no-op for louvain. Passes 10/10 in isolation, 8-9/10 when run after other tests. Out of Plan 10a scope; logged for a future modernization that passes `rng: seededRandom` explicitly to `louvain.detailed(...)`. **Topology**: OKM submodule commit on `refactor/43-08e-delete-adapter` (4dabb4c) + outer rapid-automations gitlink bump on `main` (098ff84) + coding planning-docs commit. Pushes deferred to Plan 11. Whole-suite failure count delta: 13 baseline → 3 (net -10).
 
 ### Blockers/Concerns
 
