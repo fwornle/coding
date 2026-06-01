@@ -44,12 +44,24 @@ key-decisions:
   - "macOS shutdown crash absorbed via abort-detection helpers, not papered over. Reason: rewriting the test to swallow `code === null` would mask real failures where the script exits anomalously without emitting a JSON summary. The helpers (`exitedOk()` / `abortedOnBudget()`) require the load-bearing stdout/stderr signal to be present — a hung or crashed-before-output script would still correctly fail the test."
 
 metrics:
-  duration: "~25 minutes (Task 1 script + dry-run + Task 2 test authoring + 4-test integration-test PASS + 1 iteration on abort detection helpers)"
+  duration: "~25 minutes (script + test authoring) + 64s production re-embed (operator-driven)"
   completed_date: "2026-06-01"
-  tasks_completed: 2  # Tasks 1 + 2 fully landed; Task 3 split: pointer-bump done, production run deferred to operator
+  tasks_completed: 3  # All tasks landed: script, test, production re-embed (operator-driven, run-id phase-43-reembed-20260601T053526Z, coverage100:true)
   files_created: 2    # script + test (within OKM submodule)
   files_modified: 1   # outer-repo OKM submodule pointer
   commits_made: 3     # OKM:2 + rapid-automations:1
+  production_re_embed:
+    run_id: "phase-43-reembed-20260601T053526Z"
+    total: 1665
+    embedded: 1665
+    skipped: 0
+    errors: 0
+    coverage: 1.0
+    coverage100: true
+    elapsed_ms: 63669
+    embedding_model: "fastembed/all-MiniLM-L6-v2"
+    embedding_dim: 384
+    verified_via: "scripts/_verify-43-09.mjs (throwaway; deleted post-verification per runbook)"
 ---
 
 # Phase 43 Plan 09: OKM Corpus Re-Embed (fastembed AllMiniLML6V2, 384-dim, inline)
@@ -176,7 +188,14 @@ Pre-existing failures (NOT caused by this plan; surface for downstream cleanup):
 - PLAN.md Task 3 originally included: "Run the PRODUCTION re-embed" + 100% coverage verification + commit. This SUMMARY captures the runbook + verification one-liner so the operator can complete that step independently.
 - The OKM-internal commits (script + test) and the outer-repo pointer bump are landed; only the in-place mutation of `.data/leveldb/` is deferred.
 
-## Operator Runbook (production re-embed — DEFERRED)
+## Operator Runbook (production re-embed — EXECUTED 2026-06-01)
+
+**Status:** COMPLETE. Run-id `phase-43-reembed-20260601T053526Z`. All 1665 entities embedded in 63.7s with zero errors. Verification: `{"total":1665,"withEmbedding":1665,"withCorrectModel":1665,"coverage100":true}`. Throwaway `scripts/_verify-43-09.mjs` deleted post-verification. Backup `.data/leveldb.pre-43-backup/` preserved.
+
+Runbook below retained for re-runs / disaster recovery.
+
+---
+
 
 When the operator is ready to run the production re-embed:
 
@@ -245,11 +264,11 @@ Expected: `{"total":1665,"withEmbedding":1665,"withCorrectModel":1665,"coverage1
 
 ### Step 4 — commit the operator-side runbook completion
 
-After verification passes, the operator may amend this SUMMARY's `metrics.tasks_completed` from 2 → 3 (or land a follow-up patch commit referencing the run-id) so downstream Plan 10 can grep `coverage100:true` from this file.
+After verification passes, the operator amends this SUMMARY's `metrics.tasks_completed` from 2 → 3 — done in the same commit as this amendment. Downstream Plan 10 can grep `coverage100: true` from `metrics.production_re_embed` above.
 
 ## Known Stubs / Residuals
 
-- **Production re-embed not yet executed.** Deferred to operator per execution-time scope clarification. Until executed, the 1665 entities in `.data/leveldb/` still have `embedding: undefined` and `metadata.embeddingModel: undefined`. This does NOT block Plan 10 (REST fixture-diff verification) — the search endpoint shape is unchanged regardless of whether embeddings are present (per PLAN.md objective: "the search endpoint shape itself is unchanged, so the fixture stays byte-equal regardless").
+- **Production re-embed: COMPLETE.** Run-id `phase-43-reembed-20260601T053526Z` (2026-06-01). 1665/1665 entities embedded with `fastembed/all-MiniLM-L6-v2` 384-dim; verification `coverage100:true`. Does not block Plan 10.
 - **macOS ONNX shutdown crash.** Cosmetic — `libc++abi: terminating due to uncaught exception of type std::__1::system_error` line on stderr after `process.exit(0)`. The exit status and JSON summary are correct; the crash happens during the libc-level shutdown phase. Tracked upstream in fastembed-js / onnxruntime-node; not actionable in this plan.
 - **Resolver block duplicated across Plan 07 and Plan 09 scripts.** Both copies carry a `// Keep IN SYNC with that script` doc comment. Deduplicate when km-core ships a `defaultOntologyDir()` helper (Phase 41 Plan 03 alluded to this, but it isn't shipped in km-core v0.1.0).
 - **Pre-existing test failures in OKM suite** (NOT caused by this plan; surface for downstream cleanup): cli-smoke.test.ts has 2 broken module-import paths (`/src/llm/providers/...` with leading `/`); 13 other test files fail at import/setup level — all predate Plan 09 per the baseline run.

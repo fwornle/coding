@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: "Phase 43 Wave 4 in progress — plans 43-01 through 43-09 landed (43-09 ships reembed-okm-corpus.mjs + 4-case integration test; production re-embed deferred to operator per execution-time scope clarification — runbook in 43-09-SUMMARY). Remaining: 43-10 (REST fixture-diff verification, 3-gate), 43-11 (phase close). Out-of-band docs commit b99ac49ca (2026-06-01) landed cross-system km-core narrative + keystone PUML — overlaps Phase 46 scope; absorb when 46 opens."
-last_updated: "2026-06-01T00:00:00.000Z"
-last_activity: 2026-06-01 -- Phase 43 Plan 09 landed: fastembed re-embed script (scripts/reembed-okm-corpus.mjs, 320 lines, OKM commit 2840196) + 4-case vitest integration test (tests/integration/reembed-okm-corpus.test.ts, OKM commit 23ebcd4) + outer rapid-automations submodule pointer bump (commit 2877e12). Production re-embed deferred to operator. Dry-run against .data/leveldb confirmed 1665 entities ready for embedding (0 currently embedded). Ready to resume at Plan 43-10.
+stopped_at: "Phase 43 Plan 09 FULLY COMPLETE — production re-embed executed 2026-06-01 (run-id phase-43-reembed-20260601T053526Z): 1665/1665 entities embedded with fastembed/all-MiniLM-L6-v2 384-dim in 63.7s, coverage100:true. Plans 43-01 through 43-09 all landed. Remaining: 43-10 (REST fixture-diff verification, 3-gate, autonomous:false — VOKB visual smoke required), 43-11 (phase close, autonomous:false — operator HTTPS push + CI watch). Out-of-band docs commit b99ac49ca (2026-06-01) landed cross-system km-core narrative + keystone PUML — overlaps Phase 46 scope; absorb when 46 opens."
+last_updated: "2026-06-01T05:40:00.000Z"
+last_activity: 2026-06-01 -- Phase 43 Plan 09 production re-embed COMPLETE: 1665 OKM entities now carry fastembed/all-MiniLM-L6-v2 384-dim embeddings (run-id phase-43-reembed-20260601T053526Z, coverage100:true verified). Ready to resume at Plan 43-10.
 progress:
   total_phases: 22
   completed_phases: 14
@@ -51,11 +51,11 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 43 (OKM Cross-Repo Migration / v7.1 INT-03) — IN PROGRESS, Wave 4
-Plan: 43-10 (REST fixture-diff verification, 3-gate; depends on 43-09 ✓)
-Status: 43-09 landed (script + integration test); production re-embed deferred to operator per execution-time scope clarification (runbook in 43-09-SUMMARY). Ready to execute 43-10 → 43-11 (phase close).
-Next step: `/gsd-execute-phase 43` to drive 43-10 → 43-11. Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by 2026-06-01 out-of-band docs commit b99ac49ca; absorb when 46 opens).
-Last activity: 2026-06-01 -- Phase 43 Plan 09 landed: fastembed re-embed script + test + outer pointer bump; production re-embed deferred to operator
+Phase: 43 (OKM Cross-Repo Migration / v7.1 INT-03) — IN PROGRESS, Wave 5
+Plan: 43-10 (REST fixture-diff verification, 3-gate; depends on 43-09 ✓ now fully complete with production embeddings landed)
+Status: Plan 43-09 fully complete (script + test + production re-embed: 1665 entities, coverage100:true). Ready to execute 43-10 (autonomous:false — VOKB visual smoke) → 43-11 (autonomous:false — operator push + CI watch).
+Next step: `/gsd-execute-phase 43` to drive 43-10 → 43-11. Both remaining plans are autonomous:false — operator involvement required (VOKB visual smoke for 10, HTTPS push + CI watch for 11). Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by 2026-06-01 out-of-band docs commit b99ac49ca; absorb when 46 opens).
+Last activity: 2026-06-01 -- Plan 43-09 production re-embed COMPLETE (1665 entities, coverage100:true verified)
 
 ## Performance Metrics
 
