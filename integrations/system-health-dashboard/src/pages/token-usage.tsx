@@ -30,6 +30,12 @@ const WINDOW_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'All time' },
 ]
 
+// Series contributing less than this fraction of the window's total tokens
+// are hidden from the Overview "By Model" table AND the Evolution chart's
+// stacked legend, so the two views agree. 0.5% of a 46M-token month is
+// ~230K — below that, the noise outweighs the signal.
+const MAIN_CONSUMER_THRESHOLD = 0.005
+
 // Stable color palette for the stacked-area Evolution chart. Cycles when
 // the number of stacked series exceeds the palette length.
 const EVOLUTION_PALETTE = [
@@ -340,7 +346,6 @@ export function TokenUsagePage() {
     : evoGroupBy === 'model' ? (summary.by_model_hour || [])
     : evoGroupBy === 'provider' ? (summary.by_provider_hour || [])
     : (summary.by_hour || []).map(h => ({ hour: h.hour, input: h.input_tokens, output: h.output_tokens }))
-  const MAIN_CONSUMER_THRESHOLD = 0.005   // 0.5% of window total
   const evoGrandTotal = summary.total_tokens || 1
   const evoKeyTotals = new Map<string, number>()
   for (const k of evoKeysRaw) {
@@ -568,12 +573,14 @@ export function TokenUsagePage() {
 
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">By Model</h4>
-                  {summary.by_model.map(m => (
-                    <div key={m.model} className="flex justify-between items-center text-sm py-1">
-                      <span className="text-muted-foreground truncate mr-2">{m.model}</span>
-                      <span className="font-mono text-xs">{formatTokens(m.total_tokens)}</span>
-                    </div>
-                  ))}
+                  {summary.by_model
+                    .filter(m => (m.total_tokens / (summary.total_tokens || 1)) >= MAIN_CONSUMER_THRESHOLD)
+                    .map(m => (
+                      <div key={m.model} className="flex justify-between items-center text-sm py-1">
+                        <span className="text-muted-foreground truncate mr-2">{m.model}</span>
+                        <span className="font-mono text-xs">{formatTokens(m.total_tokens)}</span>
+                      </div>
+                    ))}
                 </div>
               </CardContent>
             </Card>
