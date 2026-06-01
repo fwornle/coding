@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: "Phase 43 context gathered — 17 decisions across 7 areas locked. Submodule packaging strategy resolves the SC#2 blocker; Storage+Ontology+Maintenance migration depth; final cleanup deletes adapter+IGraphStore; JSON-replay data continuity; km-core Entity extends with layer?; full re-embed; 3-gate REST verification."
-last_updated: "2026-05-31T06:41:56.322Z"
-last_activity: 2026-05-31 -- Phase 43 planning complete
+stopped_at: "Phase 43 Wave 4 in progress — plans 43-01 through 43-09 landed (43-09 ships reembed-okm-corpus.mjs + 4-case integration test; production re-embed deferred to operator per execution-time scope clarification — runbook in 43-09-SUMMARY). Remaining: 43-10 (REST fixture-diff verification, 3-gate), 43-11 (phase close). Out-of-band docs commit b99ac49ca (2026-06-01) landed cross-system km-core narrative + keystone PUML — overlaps Phase 46 scope; absorb when 46 opens."
+last_updated: "2026-06-01T00:00:00.000Z"
+last_activity: 2026-06-01 -- Phase 43 Plan 09 landed: fastembed re-embed script (scripts/reembed-okm-corpus.mjs, 320 lines, OKM commit 2840196) + 4-case vitest integration test (tests/integration/reembed-okm-corpus.test.ts, OKM commit 23ebcd4) + outer rapid-automations submodule pointer bump (commit 2877e12). Production re-embed deferred to operator. Dry-run against .data/leveldb confirmed 1665 entities ready for embedding (0 currently embedded). Ready to resume at Plan 43-10.
 progress:
   total_phases: 22
   completed_phases: 14
   total_plans: 86
-  completed_plans: 75
+  completed_plans: 76
   percent: 64
 ---
 
@@ -33,10 +33,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 | 40 | Ingest Pipeline & Layered Dedup | shared | ✓ |
 | 41 | Online Learning Adapter & Post-Hoc Resolution | A (ODI) | ✓ |
 | 42 | Offline UKB Migration | B (mcp-server-semantic-analysis) | ✓ (closed via 42.1/42.1.1/42.1.2/42.2 chain; SC#1-6 gate cleared 2026-05-25 per 42.2-06-SUMMARY) |
-| **43** | **OKM Cross-Repo Migration** | **C (rapid-automations/OKM)** | **NEXT (after 50+51 backlog)** |
+| **43** | **OKM Cross-Repo Migration** | **C (rapid-automations/OKM)** | **IN PROGRESS — 9/11 plans done (43-01..43-09); resume at 43-10** |
 | 44 | REST API & Git Snapshots | shared (requires A+B+C) | pending |
 | 45 | Unified Web Viewer | shared (requires API) | pending |
-| 46 | Per-System Docs & Onboarding | shared | pending |
+| 46 | Per-System Docs & Onboarding | shared | pending (partially seeded — see [Roadmap Evolution] for the 2026-06-01 out-of-band docs commit) |
 
 **Out-of-milestone backlog (NOT v7.1 work — bug-fix phases that got slotted by number):**
 
@@ -51,11 +51,11 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 43 (OKM Cross-Repo Migration / v7.1 INT-03) — NEXT (after Phase 52 close)
-Plan: discuss → plan cycle pending
-Status: Ready to execute
-Next step: `/gsd-discuss-phase 43` to bootstrap Phase 43 with a fresh discuss cycle. Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs).
-Last activity: 2026-05-31 -- Phase 43 planning complete
+Phase: 43 (OKM Cross-Repo Migration / v7.1 INT-03) — IN PROGRESS, Wave 4
+Plan: 43-10 (REST fixture-diff verification, 3-gate; depends on 43-09 ✓)
+Status: 43-09 landed (script + integration test); production re-embed deferred to operator per execution-time scope clarification (runbook in 43-09-SUMMARY). Ready to execute 43-10 → 43-11 (phase close).
+Next step: `/gsd-execute-phase 43` to drive 43-10 → 43-11. Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by 2026-06-01 out-of-band docs commit b99ac49ca; absorb when 46 opens).
+Last activity: 2026-06-01 -- Phase 43 Plan 09 landed: fastembed re-embed script + test + outer pointer bump; production re-embed deferred to operator
 
 ## Performance Metrics
 
@@ -84,6 +84,7 @@ Last activity: 2026-05-31 -- Phase 43 planning complete
 - Phase 42.1.1 inserted after Phase 42.1: Ontology layout resolution — registry empty because loader expects .data/ontologies/{upper,lower}/ subdirs but files live flat at .data/ontologies/. Blocks 42.1 SC#6 + Phase 40 dedup type signal. See .planning/forensics/report-20260524-130355.md (URGENT)
 - Phase 42.1.1 plan 01 complete 2026-05-24: layer-1 of SC#6 root cause unblocked (ontologyPathResolver helper + OntologyConfigManager.{validatePaths,injectOntology} wired through resolver). 18/18 node:test pass against real `.data/ontologies/` flat layout for all 7 teams. Path-a invariant preserved (zero caller modifications, zero `.data/ontologies/*` modifications). NEW known residual surfaced during execution: the `Project` class — which `ensureProjectAnchor('Coding')` mints at runtime — is NOT declared in any on-disk ontology JSON (upper.json exposes File/Service/Feature/Contract/RuntimeDiagnostics; team ontologies declare L2 team-specific classes). Test C was softened per user Option A (drop `isValidClass('Project')`, add `domains.length === 8` + keep `isValidClass('Component')`). A follow-up ticket is required to add `Project` to `.data/ontologies/upper.json` before `/gsd-verify-phase 42.1` will pass — this is layer 2 of the SC#6 cascade and is separate from both 42.1 and 42.1.1. See `.planning/phases/42.1.1-…/42.1.1-01-SUMMARY.md` § Known Residuals.
 - Phase 42.2 inserted after Phase 42: Retire deferred 42-07 work: legacy persistence trio + atomic LevelDB dir-swap + canonical-emit gaps (URGENT)
+- 2026-06-01 docs commit (b99ac49ca, out-of-band — no phase wrapper): cross-system km-core centralization narrative landed in MkDocs + new keystone PUML `docs/puml/km-core-unified-architecture.puml` showing the 3-layer (entrypoints → kernel → storage) topology across Systems A (online learning / observations API on port 12436), B (UKB / semantic-analysis on port 3848), C (OKB / OKM on ports 8090 + 3002). MkDocs `--strict` build green. Overlaps Phase 46 scope — when 46 opens, absorb the existing diagram + page edits and focus the phase on per-system runbooks, onboarding, and the things the freeform commit did NOT cover (e.g., agent-side READMEs in the submodules, OKM's docs cross-link back into coding, retired-API redirects).
 
 ### Decisions
 
@@ -177,6 +178,7 @@ Last activity: 2026-05-31 -- Phase 43 planning complete
 - [Phase 52-01]: PROCESS_TAGS registry ships with 9 keys NOT 10 — WAVE3_RELATION_DISCOVERY omitted because kg-operators.ts edgePrediction is pure score-based math (cos+AA+CA), zero LLM call to tag. Future phase that introduces LLM-driven relation discovery re-adds the constant. Documented as @remarks in process-tags.ts.
 - [Phase 52-01]: D-09 SemanticAnalyzer.analyzeContent strangler swap — when options.process is truthy non-empty string, route through llmWithProcessComplete with SDK MetricsTracker passed for getDetailedCalls() contract. SDK direct path preserved unchanged for orphan callers. Strangler gate is typeof check, not just truthy, to defend against empty-string slip-through that would store '' as the telemetry tag.
 - [Phase 52-01]: configure-wave-analysis-routing.sh extended in-phase with 9 per-sub-step entries. CHEAP (copilot/claude-haiku-4.5) for classify + diagram-repair recovery paths; HEAVY (copilot/claude-sonnet-4.6) for analyze/insight/generation/extract paths. Pre-Phase-52 wave-level entries preserved. Live proxy applied 9 new override changes; 13 total wave-analysis-* entries.
+- [Phase 43-09]: D-G7.1 / D-G7.2 re-embed script lands at OKM `scripts/reembed-okm-corpus.mjs` (320 LoC) + 4-case vitest integration test (336 LoC). Iterate every entity via `store.iterate(undefined, { includeSuperseded: true })` (defensive — Phase 42.2-02 lesson) → embed via `FastembedEmbeddingClient` (km-core export, Phase 42 D-52c — fastembed/all-MiniLM-L6-v2/384-dim) → `mergeAttributes(entity.id, { embedding, metadata: { ...existing, embeddingModel, embeddingRunId } })` for INLINE persistence per D-G7.2 (NO Qdrant; deferred Phase 44/45). Idempotent via `metadata.embeddingModel === 'fastembed/all-MiniLM-L6-v2'` fingerprint with `--resume`. 5% error budget per Phase 42 Plan 5 precedent. Canonical ontologyDir resolver reused VERBATIM from Plan 07's `resolveOntologyDir()` (both copies carry doc-comment cross-references; deduplicate when km-core ships `defaultOntologyDir()`). Embed input = `description` (fallback `name`) for cross-system parity with Phase 42 D-52c wave-controller. Dry-run: 1665 entities, 0 currently embedded, ~60s wall-clock (after ~22s fastembed cold-start). Production re-embed deferred to operator per execution-time scope clarification — runbook in 43-09-SUMMARY § "Operator Runbook". **Rule 1 deviations**: (a) qdrant grep returned 2 (negative-context doc-comment only — kept as anti-shallow guard); (b) macOS ONNX shutdown crash defeats `code === 1` assertion → added `exitedOk()` / `abortedOnBudget()` test helpers keyed off load-bearing stdout/stderr lines (emitted BEFORE the libc crash). **Topology**: 2-layer commits (OKM × 2 + rapid-automations × 1) — coding repo does NOT track `_work/rapid-automations` as submodule, so the user-prompt's "third coding-side pointer bump" does not exist. All 4 integration tests pass in 2.4s warm.
 
 ### Blockers/Concerns
 
@@ -227,12 +229,13 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 52 P01 | ~11min Tasks 1-4 + ~110min Task 5 (2x production wave-analysis + Docker rebuild for strangler-ordering fix) | 5 tasks | 10 files + 1 follow-up semantic-analyzer.ts strangler-ordering fix |
 | Phase 52 P02 | ~30min gap-closure (original work in 5fa110552 on 2026-05-29; gap-closure on 2026-05-30) | 5 tasks (Task 6 visual UAT deferred to operator) | 3 files in gap-closure commit 93560c13e + 2 files from prior 5fa110552 commit = 5 total |
 | Phase 52 P03 | ~20min dashboard half (wave-controller half already in tree from ad523f7db on 2026-05-29) | 3 tasks (Task 4 visual UAT deferred to operator) | 2 files in commit 5ad4f31f2 (trace-modal.tsx + ukbSlice.ts) + wave-controller.ts from prior submodule commits |
+| Phase 43 P09 | ~25min | 2 tasks landed (script + integration test) + Task 3 split (pointer-bump done; production run deferred to operator) | 2 files created (scripts/reembed-okm-corpus.mjs, tests/integration/reembed-okm-corpus.test.ts) in OKM submodule (commits 2840196 + 23ebcd4) + outer rapid-automations pointer bump (commit 2877e12) |
 
 ## Session Continuity
 
-Last session: 2026-05-31T05:54:12.670Z
-Stopped at: Phase 43 context gathered — 17 decisions across 7 areas locked. Submodule packaging strategy resolves the SC#2 blocker; Storage+Ontology+Maintenance migration depth; final cleanup deletes adapter+IGraphStore; JSON-replay data continuity; km-core Entity extends with layer?; full re-embed; 3-gate REST verification.
-Resume with: `/gsd-discuss-phase 43` to begin OKM Cross-Repo Migration (INT-03). Phase 43 needs a fresh discuss cycle — OpenCode's prior PLAN/DISCUSS was reverted on 2026-05-29 (commit 8457dd56c). After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps.
+Last session: 2026-06-01
+Stopped at: Phase 43 Wave 4 in progress — 9/11 plans done (43-01..43-09 landed; 43-09 ships scripts/reembed-okm-corpus.mjs + 4-case integration test). Production re-embed deferred to operator per execution-time scope clarification (runbook in 43-09-SUMMARY § Operator Runbook). Remaining: 43-10 (REST fixture-diff verification, 3-gate), 43-11 (phase close). Out-of-band docs commit b99ac49ca (2026-06-01) landed cross-system km-core narrative + keystone PUML; overlaps Phase 46 scope.
+Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
 
