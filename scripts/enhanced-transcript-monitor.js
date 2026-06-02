@@ -153,6 +153,9 @@ class EnhancedTranscriptMonitor {
       debug: this.debug_enabled
     });
     this.isProcessing = false;
+    this.isProcessingSince = 0;
+    this.lastObservationWriteAt = Date.now();
+    this._lastStallDetectAt = 0;
     this.currentUserPromptSet = [];
     this.lastUserPromptTime = null;
     this.sessionFiles = new Map(); // Track multiple session files
@@ -833,6 +836,7 @@ class EnhancedTranscriptMonitor {
       // Store the observation ID so the NEXT prompt set can update it if needed
       if (result && result.lastObservationId) {
         this._lastObservationId = result.lastObservationId;
+        this.lastObservationWriteAt = Date.now();
       }
     }).catch(err => {
       process.stderr.write(`[ObservationTap] PromptSet error: ${err.message}\n`);
@@ -3923,9 +3927,37 @@ ORDER BY m.time_created ASC;`;
     const ARTIFACT_PATCH_INTERVAL = 150; // Every 150 cycles (5 minutes at 2s intervals)
 
     this.pollCount = 0;
+    const ISPROCESSING_WATCHDOG_MS = 60_000; // force-reset if guard stuck >60s
+    const STALL_DETECT_INTERVAL_MS = 5 * 60_000; // alert if no obs for 5min while jsonl active
     this.intervalId = setInterval(async () => {
       this.pollCount++;
-      if (this.isProcessing) return;
+      if (this.isProcessing) {
+        const stuckMs = Date.now() - (this.isProcessingSince || 0);
+        if (stuckMs > ISPROCESSING_WATCHDOG_MS) {
+          process.stderr.write(`[POLL] isProcessing forced-reset after ${Math.round(stuckMs / 1000)}s (pollCount=${this.pollCount})\n`);
+          this.isProcessing = false;
+          this.isProcessingSince = 0;
+        } else {
+          return;
+        }
+      }
+
+      // [STALL-DETECT] every ~60s: alert if no observation written for 5min while jsonl mtime is recent
+      if (this._pollDebugCounter !== undefined && this._pollDebugCounter % 30 === 1) {
+        const sinceLastObs = Date.now() - (this.lastObservationWriteAt || Date.now());
+        const sinceLastDetect = Date.now() - this._lastStallDetectAt;
+        if (sinceLastObs > STALL_DETECT_INTERVAL_MS && sinceLastDetect > STALL_DETECT_INTERVAL_MS) {
+          let jsonlMtimeMs = 0;
+          if (this.transcriptPath) {
+            try { jsonlMtimeMs = fs.statSync(this.transcriptPath).mtimeMs; } catch (_) { /* ignore */ }
+          }
+          const jsonlAgeMs = jsonlMtimeMs ? Date.now() - jsonlMtimeMs : Infinity;
+          if (jsonlAgeMs < STALL_DETECT_INTERVAL_MS) {
+            process.stderr.write(`[STALL-DETECT] no obs in ${Math.round(sinceLastObs / 1000)}s, jsonl mtime ${Math.round(jsonlAgeMs / 1000)}s ago, pollCount=${this.pollCount}\n`);
+            this._lastStallDetectAt = Date.now();
+          }
+        }
+      }
 
       // Periodically patch observations missing artifact info
       artifactPatchCounter++;
@@ -4083,6 +4115,7 @@ ORDER BY m.time_created ASC;`;
       // Multi-transcript processing: check ALL tracked transcripts for new content
       if (this.trackedTranscripts.size > 1) {
         this.isProcessing = true;
+        this.isProcessingSince = Date.now();
         try {
           await this._processAllTrackedTranscripts();
         } catch (error) {
@@ -4090,6 +4123,7 @@ ORDER BY m.time_created ASC;`;
           this.logHealthError(`Multi-transcript loop error: ${error.message}`);
         } finally {
           this.isProcessing = false;
+          this.isProcessingSince = 0;
         }
       } else {
         // Single-transcript fallback (original behavior)
@@ -4101,6 +4135,7 @@ ORDER BY m.time_created ASC;`;
           const FLUSH_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
           if (ageMs > FLUSH_THRESHOLD_MS) {
             this.isProcessing = true;
+            this.isProcessingSince = Date.now();
             try {
               console.log(`⏰ Time-based flush (single-transcript): ${this.currentUserPromptSet.length} exchanges held for ${Math.round(ageMs / 1000)}s`);
               this._firePromptSetObservation(this.currentUserPromptSet);
@@ -4114,6 +4149,7 @@ ORDER BY m.time_created ASC;`;
               this.debug(`Error in time-based flush: ${error.message}`);
             } finally {
               this.isProcessing = false;
+              this.isProcessingSince = 0;
             }
           }
         }
@@ -4121,6 +4157,7 @@ ORDER BY m.time_created ASC;`;
         if (!this.hasNewContent()) return;
 
         this.isProcessing = true;
+        this.isProcessingSince = Date.now();
         try {
           const exchanges = await this.getUnprocessedExchanges();
           console.log(`[ObsDebug-single] ${exchanges.length} exchanges, promptSet=${this.currentUserPromptSet.length}, lastUuid=${this.lastProcessedUuid?.slice(-8) || 'none'}`);
@@ -4133,6 +4170,7 @@ ORDER BY m.time_created ASC;`;
           this.logHealthError(`Monitoring loop error: ${error.message}`);
         } finally {
           this.isProcessing = false;
+          this.isProcessingSince = 0;
         }
       }
     }, this.config.checkInterval);

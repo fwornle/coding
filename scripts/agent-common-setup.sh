@@ -453,17 +453,42 @@ start_transcript_monitoring() {
   # coordinator at :3034 owns lifecycle now; this function just spawns ETM directly.
   # ETM (enhanced-transcript-monitor.js, reduced to a reporter in 33-04) POSTs
   # lsl_heartbeat signals to the coordinator on every poll cycle.
-  pkill -f "enhanced-transcript-monitor.js.*$(basename "$project_dir")" 2>/dev/null || true
-  cd "$project_dir"
-  # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd()
-  CODING_AGENT="${CODING_AGENT:-claude}" nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_dir" > transcript-monitor.log 2>&1 &
-  local new_pid=$!
 
-  sleep 1
-  if kill -0 "$new_pid" 2>/dev/null; then
-    log "Transcript monitoring started (PID: $new_pid)"
+  # Phase 54: if com.coding.etm launchd label is loaded, prefer kickstart (auto-respawn).
+  # Otherwise fall back to nohup spawn for backward compat.
+  local uid_gui="gui/$(id -u)"
+  if launchctl print "${uid_gui}/com.coding.etm" >/dev/null 2>&1; then
+    # Kill any orphan manually-spawned ETM that might still hold the transcript file
+    local orphan_pids
+    orphan_pids=$(pgrep -f 'enhanced-transcript-monitor\.js' 2>/dev/null | xargs -I{} sh -c 'launchctl print "'${uid_gui}'/com.coding.etm" 2>/dev/null | grep -q "pid = {}" || echo {}' || true)
+    if [ -n "$orphan_pids" ]; then
+      log "Killing orphan manual ETM(s) before kickstart: $orphan_pids"
+      echo "$orphan_pids" | xargs kill -TERM 2>/dev/null || true
+      sleep 1
+    fi
+    log "ETM managed by launchd (com.coding.etm) — kickstarting"
+    launchctl kickstart -k "${uid_gui}/com.coding.etm" >/dev/null 2>&1
+    sleep 1
+    local etm_pid
+    etm_pid=$(launchctl print "${uid_gui}/com.coding.etm" 2>/dev/null | sed -n 's/^	pid = \([0-9]*\)$/\1/p' | head -1)
+    if [ -n "$etm_pid" ] && kill -0 "$etm_pid" 2>/dev/null; then
+      log "Transcript monitoring kickstarted (launchd PID: $etm_pid)"
+    else
+      log "Warning: launchd kickstart did not produce a running ETM PID"
+    fi
   else
-    log "Error: Transcript monitoring failed to start"
+    pkill -f "enhanced-transcript-monitor.js.*$(basename "$project_dir")" 2>/dev/null || true
+    cd "$project_dir"
+    # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd()
+    CODING_AGENT="${CODING_AGENT:-claude}" nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_dir" > transcript-monitor.log 2>&1 &
+    local new_pid=$!
+
+    sleep 1
+    if kill -0 "$new_pid" 2>/dev/null; then
+      log "Transcript monitoring started (PID: $new_pid, nohup fallback)"
+    else
+      log "Error: Transcript monitoring failed to start"
+    fi
   fi
 }
 
