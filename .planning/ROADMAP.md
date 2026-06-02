@@ -605,7 +605,7 @@ Plans:
 **Wave 5** *(blocked on Waves 1-4)*
 
 - [x] 43-10a-PLAN.md — TEST-ONLY src/store/ + src/llm/ + src/ontology/ shims restored (the "test suite restore" follow-up deferred at 43-08e SUMMARY line 159); createServer overload accepts pre-08e 8-arg shape via `_internalStore` duck-type detection; the four legacy tests (rest-contract / api-ingest / ingestion-pipeline / deduplicator) flip from FAIL → PASS; whole-suite failure count 13 → 3 — OKM `4dabb4c` + rapid-automations `098ff84` (pushes deferred to Plan 11). Unblocks Plan 10 Gates 1 (REST byte-equal lock) + 2 (verify-post-migration.mjs bootstrap path).
-- [ ] 43-10-PLAN.md — Post-cutover REST verification (3-gate D-G5.1 — Zod + byte-diff + VOKB viewer smoke); D-G6.1 bug-fix-only viewer edits allowed (SC#3, SC#4) — OKM [autonomous: false; human-verify checkpoint]
+- [x] 43-10-PLAN.md — Post-cutover REST verification (3-gate D-G5.1 — Zod + byte-diff + VOKB viewer smoke); D-G6.1 bug-fix-only viewer edits allowed (SC#3, SC#4) — OKM [autonomous: false; human-verify checkpoint] ✓ 2026-06-02: Gate 1 9/10 (1 louvain flake, 10/10 in isolation); Gate 2 10/10 zero diff; Gate 3 4/4 PASS via gsd-browser visual smoke; NO viewer fixes needed. SC#4 path-corrected to .data/leveldb.exports/. OKM f451295 + rapid-automations d74812c. Includes 43-10a (TEST-ONLY shim restoration to unblock Gates 1+2; OKM 4dabb4c + rapid-automations 098ff84) inserted inline after the first execution pass surfaced Plan 08e's bootstrap deletion as a blocker.
 - [ ] 43-11-PLAN.md — Push to bmw.ghe.com (both repos via HTTPS) + watch rapid-automations CI for GREEN (SC#1 close) + Phase 43 final sign-off — OKM + rapid-automations [autonomous: false; two human checkpoints]
 
 #### Phase 44: REST API & Git Snapshots

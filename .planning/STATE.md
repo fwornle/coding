@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: completed
-stopped_at: "Phase 43 Wave 5 in progress — 10/13 plans done (43-01..43-09 + 43-10a landed; 43-10a restored TEST-ONLY src/store/ + src/llm/ + src/ontology/ + createServer overload shims so Plan 06 fixture-equality + recorder paths run again. OKM submodule 4dabb4c on refactor/43-08e-delete-adapter, outer rapid-automations gitlink bump 098ff84 on main, pushes deferred to Plan 11). Remaining: 43-10 (REST fixture-diff verification, 3-gate — now unblocked by 10a), 43-11 (phase close)."
-last_updated: "2026-06-01T10:30:00.000Z"
-last_activity: "2026-06-01 -- Plan 43-10a TEST-ONLY shim restoration COMPLETE (4 legacy tests pass; whole-suite failure count 13 → 3)"
+stopped_at: "Phase 43 Plan 10 COMPLETE — D-G5.1 three-gate verification all GREEN. Gate 1 (Zod rest-contract.test.ts) 9/10 (1 known louvain flake; 10/10 in isolation). Gate 2 (verify-post-migration.mjs byte-diff) 10/10 endpoints matched, ZERO diff. Gate 3 (VOKB visual smoke via gsd-browser) 4/4 checks PASS — no D-G6.1 viewer regressions. Phase 43 SC#2 + SC#3 + SC#4 verified at OKM-local level (SC#4 with path correction to .data/leveldb.exports/). SC#1 deferred to Plan 11. OKM commit f451295 on refactor/43-08e-delete-adapter, outer rapid-automations gitlink bump d74812c on main, pushes deferred to Plan 11. Plans 43-01..43-10 + 43-10a all landed. Remaining: 43-11 (phase close, autonomous:false — operator HTTPS push + CI watch)."
+last_updated: "2026-06-02T07:35:00.000Z"
+last_activity: "2026-06-02 -- Plan 43-10 D-G5.1 verification COMPLETE: Gates 1+2+3 all PASS; SUMMARY landed with full evidence + commit SHAs. Ready to resume at Plan 43-11."
 progress:
   total_phases: 22
   completed_phases: 14
   total_plans: 90
-  completed_plans: 87
-  percent: 64
+  completed_plans: 88
+  percent: 65
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 | 40 | Ingest Pipeline & Layered Dedup | shared | ✓ |
 | 41 | Online Learning Adapter & Post-Hoc Resolution | A (ODI) | ✓ |
 | 42 | Offline UKB Migration | B (mcp-server-semantic-analysis) | ✓ (closed via 42.1/42.1.1/42.1.2/42.2 chain; SC#1-6 gate cleared 2026-05-25 per 42.2-06-SUMMARY) |
-| **43** | **OKM Cross-Repo Migration** | **C (rapid-automations/OKM)** | **IN PROGRESS — 9/11 plans done (43-01..43-09); resume at 43-10** |
+| **43** | **OKM Cross-Repo Migration** | **C (rapid-automations/OKM)** | **IN PROGRESS — 10/11 plans done (43-01..43-10 + 43-10a); resume at 43-11 (operator push + CI watch)** |
 | 44 | REST API & Git Snapshots | shared (requires A+B+C) | pending |
 | 45 | Unified Web Viewer | shared (requires API) | pending |
 | 46 | Per-System Docs & Onboarding | shared | pending (partially seeded — see [Roadmap Evolution] for the 2026-06-01 out-of-band docs commit) |
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 43 (OKM Cross-Repo Migration / v7.1 INT-03) — IN PROGRESS, Wave 5
-Plan: 43-10 (REST fixture-diff verification, 3-gate; now unblocked by 43-10a TEST-ONLY src/store/ shim restoration)
-Status: Plan 43-10a COMPLETE (TEST-ONLY shims restored — 6 new modules + 2 production-file touches; four legacy test files green; OKM `refactor/43-08e-delete-adapter` 4dabb4c + outer `main` 098ff84). Pushes deferred to Plan 11. Ready to execute 43-10 (autonomous:false — VOKB visual smoke) → 43-11 (autonomous:false — operator push + CI watch).
-Next step: `/gsd-execute-phase 43` to drive 43-10 → 43-11. Both remaining plans are autonomous:false — operator involvement required (VOKB visual smoke for 10, HTTPS push + CI watch for 11). Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by 2026-06-01 out-of-band docs commit b99ac49ca; absorb when 46 opens).
-Last activity: 2026-06-01 -- Plan 43-10a TEST-ONLY shim restoration COMPLETE (4 legacy tests pass; whole-suite failure count 13 → 3; src/store/ + src/llm/ + src/ontology/ + createServer overload all in place)
+Plan: 43-11 (phase close, autonomous:false — operator HTTPS push + CI watch). Depends on 43-10 ✓ (D-G5.1 three gates all PASS).
+Status: Plan 43-10 D-G5.1 verification COMPLETE — Gate 1 (Zod) 9/10 (1 known louvain flake), Gate 2 (byte-diff) 10/10 zero diff, Gate 3 (VOKB visual smoke via gsd-browser) 4/4 PASS, no D-G6.1 viewer regressions. Phase 43 SC#2+SC#3+SC#4 verified at OKM-local level (SC#4 with path correction). SC#1 deferred to Plan 11. Three repos 1 ahead of origin each: OKM `refactor/43-08e-delete-adapter` (f451295), rapid-automations `main` (d74812c), coding `main` (this commit). Pushes deferred to Plan 11.
+Next step: `/gsd-execute-phase 43` to drive 43-11 (or operator pushes manually per the 43-11 PLAN.md runbook). Operator involvement required for HTTPS push + CI watch. Phase 43 is cross-repo (touches `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management`) and must keep rapid-automations CI green. After Phase 43 closes, the v7.1 chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by 2026-06-01 out-of-band docs commit b99ac49ca; absorb when 46 opens).
+Last activity: 2026-06-02 -- Plan 43-10 D-G5.1 verification COMPLETE (3 gates green, SUMMARY landed)
 
 ## Performance Metrics
 
