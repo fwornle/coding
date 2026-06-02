@@ -798,6 +798,27 @@ Plans:
 
 ---
 
+### Phase 54: ETM Hardening — launchd plist + isProcessing reset audit (BACKLOG)
+
+**Trigger:** 2026-06-02. ETM PID 98287 silently stalled for 16h 23m (Jun 1 16:58 UTC → Jun 2 07:25 UTC). Process alive (1m17s CPU over 18h55m) but `isProcessing` re-entrancy guard apparently locked `true` after an unhandled rejection somewhere in `_firePromptSetObservation`. No launchd wrapper means nothing respawned it. User noticed via dashboard knowledge indicator fading from green → orange → brown → black. Manual SIGTERM + nohup relaunch cleared it; first new observation landed within one 2s poll cycle.
+
+**Goal:** Make ETM auto-respawn on hang or crash (parity with the seven other coding-* launchd-managed services); make the `isProcessing` guard always clear via top-level try/finally; add a stall self-check so operators see a `[STALL-DETECT]` log line before the dashboard goes dark.
+
+**Requirements:**
+- ETM-01: ETM must auto-respawn after crash or hang (launchd KeepAlive)
+- ETM-02: `isProcessing` flag must never leak `true` across exceptions
+
+**Plans (3 planned, 0 executed):**
+- [ ] 54-01-PLAN.md — `~/Library/LaunchAgents/com.coding.etm.plist` modelled on `com.coding.obs-api.plist`; `KeepAlive: true`; logs to `~/Library/Logs/coding/etm-{out,err}.log`; `ThrottleInterval: 15`s
+- [ ] 54-02-PLAN.md — top-level try/finally around `enhanced-transcript-monitor.js:4085-4135`; force-reset watchdog if `isProcessing` true > 60s with `[POLL] isProcessing forced-reset after Ns` line; periodic stall self-check (`[STALL-DETECT]` if pollCount advanced but no obs write in 5min and Claude jsonl is fresh)
+- [ ] 54-03-PLAN.md — `bin/coding --claude` switches ETM startup to `launchctl kickstart`; collision handling for orphan manually-launched ETM; CLAUDE.md "Startup & Services" updated
+
+Could-have (defer): extend health-coordinator with ETM heartbeat surface; migrate ETM polling to fsevents-based file watcher.
+
+See `.planning/phases/54-etm-hardening-launchd-and-isprocessing-audit/54-CONTEXT.md`.
+
+---
+
 ## Backlog
 
 ### Phase 999.1: Extract Shared LLM Adapter Library (BACKLOG)

@@ -46,8 +46,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 - **Phase 50: LSL-grounded async observation resolver** — ✓ EXECUTED 2026-05-26 (3/3 plans merged; 181 tests passing; Plan 03 Task 4 human-verify checkpoint awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`)
 - **Phase 51: Agent-agnostic sub-agent capture** — PLANNED 2026-05-26 (11 plans / 6 waves committed; 4 RESEARCH-*.md artifacts shipped; ready for `/gsd-execute-phase 51` in a fresh session)
 - Phase 52: Dashboard LLM routing label + `process` tag observability fix
+- Phase 54: ETM hardening — launchd plist + isProcessing reset audit (NEW 2026-06-02; backlog). ETM stalled silently for 16h+ (PID 98287, no observation writes Jun 1 16:58 UTC → Jun 2 07:25 UTC) before manual SIGTERM+nohup restart cleared it. Three-plan scope: launchd plist so ETM auto-respawns like other coding services; top-level try/finally + watchdog around the `isProcessing` re-entrancy guard at `enhanced-transcript-monitor.js:4085-4135`; `bin/coding --claude` migrated to `launchctl kickstart` for ETM. Could-have: extend health-coordinator to surface ETM heartbeat so the next stall is caught by the 4-layer monitoring rather than the user noticing the dashboard "faded to black". See `.planning/phases/54-…/54-CONTEXT.md`.
 
-Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs`) that Phase 51 imports unchanged per D-Reuse. The rest of the backlog phases (47/48/49/52) remain unaddressed; pick up when blocking.
+Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs`) that Phase 51 imports unchanged per D-Reuse. The rest of the backlog phases (47/48/49/52/54) remain unaddressed; pick up when blocking.
 
 ## Current Position
 
