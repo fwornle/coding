@@ -1171,14 +1171,23 @@ function evaluateAutoHealFSM() {
   // _fallbackSummary() — exactly the failure mode this code is trying to
   // prevent. Keep bookkeeping intact so the dashboard shows degraded but do
   // NOT push to kickstart_timestamps (no cooldown debt) and do NOT dispatch.
-  const reason = currentState.proxy.reason || '';
-  const NON_ACTIONABLE_REASONS = new Set(['timeout', 'empty_content', 'oksub_missing']);
-  const isHttpClientError = /^http_4\d\d$/.test(reason);
-  if (NON_ACTIONABLE_REASONS.has(reason) || isHttpClientError) {
-    currentState.proxy.auto_heal_status = 'kickstart_pending';
-    log(`proxy auto-heal: skipping kickstart — reason='${reason}' is upstream/LLM-side, restart won't help (consecutive_failures=${currentState.proxy.consecutive_failures})`, 'INFO');
-    return;
-  }
+   const reason = currentState.proxy.reason || '';
+   const NON_ACTIONABLE_REASONS = new Set(['timeout', 'empty_content', 'oksub_missing']);
+   const isHttpClientError = /^http_4\d\d$/.test(reason);
+   // After a recent Proxydetox auto-heal (network change), the LLM proxy's HTTP
+   // connections are stale. In that case, "timeout" / "empty_content" ARE actionable
+   // because a restart refreshes the connections. Detect via recent kickstart timestamps.
+   const recentProxyHeal = (currentState.proxy.kickstart_timestamps || []).some(
+     ts => (Date.now() - ts) < 120_000  // Proxydetox was kickstarted in last 2 minutes
+   );
+   if ((NON_ACTIONABLE_REASONS.has(reason) || isHttpClientError) && !recentProxyHeal) {
+     currentState.proxy.auto_heal_status = 'kickstart_pending';
+     log(`proxy auto-heal: skipping kickstart — reason='${reason}' is upstream/LLM-side, restart won't help (consecutive_failures=${currentState.proxy.consecutive_failures})`, 'INFO');
+     return;
+   }
+   if (recentProxyHeal) {
+     log(`proxy auto-heal: recent proxydetox heal detected — treating reason='${reason}' as actionable (stale connections after network change)`, 'INFO');
+   }
 
   // Fire kickstart through the dispatcher (Pattern E — same code path as dashboard Restart button).
   currentState.proxy.kickstart_timestamps.push(now);
@@ -1580,9 +1589,20 @@ async function pollNetworkStatus() {
               execSync('curl -s --connect-timeout 3 --max-time 5 -x http://127.0.0.1:3128 -o /dev/null -w "%{http_code}" https://api.github.com 2>/dev/null | grep -q 200', { timeout: 8000 });
               proxyFunctional = true;
               log('network: proxydetox auto-healed — port 3128 listening and functional', 'INFO');
+              // Force immediate semantic re-probe and LLM proxy restart on next tick
+              // so the status line updates within 5-10s, not 60s
+              currentState.proxy.last_probe_end = null;  // force immediate semantic re-probe
+              currentState.proxy.consecutive_failures = 0;
             } catch {
               proxyFunctional = false;
               log('network: proxydetox kickstarted — port listening but still not functional', 'WARN');
+            }
+            // Also restart LLM proxy — its HTTP connections are stale after network change
+            try {
+              execSync(`launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy`, { timeout: 5000 });
+              log('network: LLM proxy kickstarted after proxydetox auto-heal (stale connections)', 'INFO');
+            } catch (e) {
+              log(`network: LLM proxy kickstart failed: ${e.message}`, 'WARN');
             }
           } else {
             log('network: proxydetox kickstart failed — port still dead', 'WARN');
