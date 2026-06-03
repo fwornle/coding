@@ -621,7 +621,39 @@ Plans:
   3. A's existing `/api/observations|digests|insights` endpoints remain callable but resolve internally to typed views over `/api/entities?ontologyClass=...` (no consumer breakage during transition).
   4. The git two-commit pattern and OKB-baseline guard from existing export hygiene still hold under the unified snapshot endpoint.
 
-**Plans:** TBD
+**Plans:** 11 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 44-01-PLAN.md — Wave 0 km-core test scaffolds (api-router, contracts, snapshot-roundtrip, observation-view) — supertest devDep + RED tests
+- [ ] 44-02-PLAN.md — Wave 0 coding-side test scaffolds (cross-system-parity, typed-views, okb-guard-snapshot-bypass, dashboard-observations) — RED tests
+- [ ] 44-03-PLAN.md — km-core Zod contracts + subpath exports (C-2)
+- [ ] 44-05-PLAN.md — km-core observation-view adapter (A-4 typed-view primitives)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 44-04-PLAN.md — km-core SnapshotManager (S-1/S-2/S-4) + coding-side OKB_SNAPSHOT=1 hook bypass (S-3 revised)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 44-06-PLAN.md — km-core createKmCoreRouter + 6 handler modules + Louvain port (R-1/R-2/C-1/C-3); 15 canonical endpoints
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 44-07-PLAN.md — A-side cutover: mount /api/v1 on obs-api + replace SQLite handlers with /api/coding/* typed views (R-4)
+- [ ] 44-08-PLAN.md — B-side cutover: mount /api/v1 on SSE server (same-port strategy per RESEARCH Example 3)
+- [ ] 44-09-PLAN.md — C-side OKM cutover: refactor routes.ts + viewer URL rewrites + fixture re-record + Zod schema-source migration (cross-repo, bmw.ghe.com HTTPS)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 44-10-PLAN.md — A-side SQLite → km-core migration (A-2) + backup + table drops (A-3) [autonomous: false; two human-verify checkpoints]
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 44-11-PLAN.md — End-of-phase verification: all 4 SCs + Wave 0 + cross-system parity + dashboard + VOKB visual smoke + restore round-trip [autonomous: false; human-verify checkpoint]
+
+**Waves:** 0 (Plans 01,02 — test scaffolds) → 1 (Plans 03,05 — contracts + observation-view) → 2 (Plan 04 — SnapshotManager + hook bypass) → 3 (Plan 06 — router + handlers) → 4 (Plans 07,08,09 — A/B/C cutover, parallel) → 5 (Plan 10 — SQLite migration + table drop) → 6 (Plan 11 — phase verification)
 
 #### Phase 45: Unified Web Viewer
 
@@ -805,10 +837,12 @@ Plans:
 **Goal:** Make ETM auto-respawn on hang or crash (parity with the seven other coding-* launchd-managed services); make the `isProcessing` guard always clear via top-level try/finally; add a stall self-check so operators see a `[STALL-DETECT]` log line before the dashboard goes dark.
 
 **Requirements:**
+
 - ETM-01: ETM must auto-respawn after crash or hang (launchd KeepAlive)
 - ETM-02: `isProcessing` flag must never leak `true` across exceptions
 
 **Plans (3 planned, 0 executed):**
+
 - [ ] 54-01-PLAN.md — `~/Library/LaunchAgents/com.coding.etm.plist` modelled on `com.coding.obs-api.plist`; `KeepAlive: true`; logs to `~/Library/Logs/coding/etm-{out,err}.log`; `ThrottleInterval: 15`s
 - [ ] 54-02-PLAN.md — top-level try/finally around `enhanced-transcript-monitor.js:4085-4135`; force-reset watchdog if `isProcessing` true > 60s with `[POLL] isProcessing forced-reset after Ns` line; periodic stall self-check (`[STALL-DETECT]` if pollCount advanced but no obs write in 5min and Claude jsonl is fresh)
 - [ ] 54-03-PLAN.md — `bin/coding --claude` switches ETM startup to `launchctl kickstart`; collision handling for orphan manually-launched ETM; CLAUDE.md "Startup & Services" updated

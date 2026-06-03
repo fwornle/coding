@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: verifying
+status: executing
 stopped_at: Phase 44 context gathered
-last_updated: "2026-06-03T10:19:58.731Z"
-last_activity: "2026-06-02 -- Phase 43 CLOSED (OKM PR #4 merged, CI green twice, all SCs verified)"
+last_updated: "2026-06-03T12:14:55.139Z"
+last_activity: 2026-06-03 -- Phase 44 planning complete
 progress:
   total_phases: 23
   completed_phases: 15
-  total_plans: 88
+  total_plans: 99
   completed_plans: 88
   percent: 65
 ---
@@ -54,10 +54,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 44 (REST API & Git Snapshots / v7.1) — NEXT
 Plan: discuss → plan cycle pending (Phase 44 directory not yet scaffolded)
-Status: Phase 43 CLOSED 2026-06-02. OKM PR #4 merged (34a0fc5); outer rapid-automations gitlink re-bumped to merge tip (0ce459c). All 4 Phase 43 SCs verified. v7.1 6/10 → 7/10 phases done. All three knowledge systems (A: online learning, B: UKB/semantic-analysis, C: OKM/OKB) now run on shared @fwornle/km-core — precondition for Phase 44's REST API + git-snapshot contract.
+Status: Ready to execute
 Next step: `/gsd-discuss-phase 44` to bootstrap. Phase 44 lands the common REST contract (entity CRUD, search, clusters, snapshots, ontology metadata) and git-snapshot/restore over `.data/exports/` so all three systems expose the same query surface — necessary precondition for Phase 45's unified viewer.
 Operator follow-ups before Phase 44 starts: (a) backup cleanup at 2026-06-03 (24h soak from CI green); (b) optional — Phase 54 backlog (ETM hardening — launchd plist + isProcessing audit, 3 plans drafted in 54-CONTEXT.md) when ETM stalls become a recurring issue.
-Last activity: 2026-06-02 -- Phase 43 CLOSED (OKM PR #4 merged, CI green twice, all SCs verified)
+Last activity: 2026-06-03 -- Phase 44 planning complete
 
 ## Performance Metrics
 
