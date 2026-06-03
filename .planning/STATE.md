@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: completed
-stopped_at: "Phase 43 CLOSED 2026-06-02. SC#1 verified — rapid-automations CI green twice (runs 108020147 + 108040202, 30s each); OKM PR #4 merged 2026-06-02T08:15:06Z with all 4 Wiz security scanners passing; merge commit 34a0fc5; outer gitlink re-bumped to merge tip (0ce459c). All 4 SCs verified. v7.1 milestone advances from 6 of 10 → 7 of 10 phases done. Remaining v7.1 phases: 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Operator follow-ups: backup cleanup at 2026-06-03 (24h soak), Phase 54 backlog (ETM hardening) when ready, Phase 44 is the next v7.1 phase."
-last_updated: "2026-06-02T08:25:00.000Z"
-last_activity: "2026-06-02 -- Phase 43 CLOSED: OKM PR #4 merged (34a0fc5); rapid-automations CI green twice; outer re-bumped to merge tip (0ce459c). v7.1 6/10 → 7/10."
+status: verifying
+stopped_at: Phase 44 context gathered
+last_updated: "2026-06-03T10:19:58.731Z"
+last_activity: "2026-06-02 -- Phase 43 CLOSED (OKM PR #4 merged, CI green twice, all SCs verified)"
 progress:
-  total_phases: 22
+  total_phases: 23
   completed_phases: 15
-  total_plans: 90
-  completed_plans: 89
+  total_plans: 88
+  completed_plans: 88
   percent: 65
 ---
 
@@ -236,8 +236,8 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-06-01
-Stopped at: Phase 43 Wave 4 in progress — 9/11 plans done (43-01..43-09 landed; 43-09 ships scripts/reembed-okm-corpus.mjs + 4-case integration test). Production re-embed deferred to operator per execution-time scope clarification (runbook in 43-09-SUMMARY § Operator Runbook). Remaining: 43-10 (REST fixture-diff verification, 3-gate), 43-11 (phase close). Out-of-band docs commit b99ac49ca (2026-06-01) landed cross-system km-core narrative + keystone PUML; overlaps Phase 46 scope.
+Last session: 2026-06-03T10:19:58.708Z
+Stopped at: Phase 44 context gathered
 Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
