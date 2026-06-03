@@ -428,7 +428,18 @@
       "Bash(nslookup muc.proxy-pac.bmwgroup.net fe80::f4a3:10ff:fe87:e064%en0)",
       "Bash(nslookup -type=AAAA muc.proxy-pac.bmwgroup.net)",
       "Bash(/bin/ls *)",
-      "Bash(/bin/test -d /Users/Q284340/Agentic/coding/.planning)"
+      "Bash(/bin/test -d /Users/Q284340/Agentic/coding/.planning)",
+      "Bash(grep -rnE \"from.*\\\\.\\\\./ontology/\\(registry|loader\\)|from.*src/ontology/\\(registry|loader\\)\" src/)",
+      "Bash(grep -lE \"from.*ontology/\\(registry|loader\\)\" tests/)",
+      "Bash(disown)",
+      "Bash(GH_HOST=bmw.ghe.com gh pr merge 4 --merge)",
+      "Bash(GH_HOST=bmw.ghe.com gh pr view 4 --json state,mergedAt,mergeCommit)",
+      "Bash(GH_HOST=bmw.ghe.com gh run list --repo adpnext-apps/rapid-automations --limit 2)",
+      "Bash(rm -f /private/var/folders/p_/8c3917zj4s9112wkng7zl5n80000gp/T/chromiumoxide-runner/SingletonLock)",
+      "Bash(rm -rf /private/var/folders/p_/8c3917zj4s9112wkng7zl5n80000gp/T/chromiumoxide-runner/Singleton*)",
+      "Bash(unlink /private/var/folders/p_/8c3917zj4s9112wkng7zl5n80000gp/T/chromiumoxide-runner/SingletonLock)",
+      "Bash(unlink /private/var/folders/p_/8c3917zj4s9112wkng7zl5n80000gp/T/chromiumoxide-runner/SingletonCookie)",
+      "Bash(unlink /private/var/folders/p_/8c3917zj4s9112wkng7zl5n80000gp/T/chromiumoxide-runner/SingletonSocket)"
     ],
     "deny": [],
     "ask": []
