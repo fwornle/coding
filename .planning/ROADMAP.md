@@ -621,7 +621,7 @@ Plans:
   3. A's existing `/api/observations|digests|insights` endpoints remain callable but resolve internally to typed views over `/api/entities?ontologyClass=...` (no consumer breakage during transition).
   4. The git two-commit pattern and OKB-baseline guard from existing export hygiene still hold under the unified snapshot endpoint.
 
-**Plans:** 4/11 plans executed
+**Plans:** 5/11 plans executed
 
 Plans:
 **Wave 1**
@@ -633,7 +633,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 44-04-PLAN.md — km-core SnapshotManager (S-1/S-2/S-4) + coding-side OKB_SNAPSHOT=1 hook bypass (S-3 revised)
+- [x] 44-04-PLAN.md — km-core SnapshotManager (S-1/S-2/S-4) + coding-side OKB_SNAPSHOT=1 hook bypass (S-3 revised)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -697,7 +697,7 @@ Plans:
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
 | 42. Offline UKB Migration (B) | 6/7 | In Progress|  |
 | 43. OKM Cross-Repo Migration (C) | 7/11 | In Progress|  |
-| 44. REST API & Git Snapshots | 4/11 | In Progress|  |
+| 44. REST API & Git Snapshots | 5/11 | In Progress|  |
 | 45. Unified Web Viewer | 0/? | Not started | - |
 | 46. Per-System Documentation & Onboarding | 0/? | Not started | - |
 
