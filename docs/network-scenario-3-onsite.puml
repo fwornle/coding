@@ -1,0 +1,55 @@
+@startuml network-scenario-3-onsite
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 8
+
+title **Scenario 3 — Onsite (Corporate WiFi / Ethernet, no VPN)**
+
+left to right direction
+
+node "MacBook" as MB {
+  [detect-network.sh] as DET
+  [Proxydetox\n:3128] as PD
+  [Claude CLI] as CLI
+  [OpenCode\n(Copilot provider)] as OC
+}
+
+rectangle "BMW Corporate Network (Onsite)" as CN {
+  [PAC Server\nmuc.proxy-pac.\nbmwgroup.net] as PAC
+  [Central Proxy\n(Squid/BlueCoat)] as CP
+  [Firewall\n(URL category filter)] as FW #FFCDD2
+}
+
+cloud "Internet" as INET {
+  [api.anthropic.com] as AN
+  [api.github.com] as GH
+}
+
+' Detection
+DET -[#green]-> PAC : 1. DNS resolves ✓\n→ INSIDE_CN=true
+
+' Claude flow (blocked)
+CLI -[#green,bold]-> PD : 2. https_proxy=:3128
+PD -[#green,bold]-> CP : 3. CONNECT :443
+CP -[#green,bold]-> FW : 4. URL category check
+FW -[#red,bold]-> AN : **BLOCKED (403)**\nCategory: "AI/ML APIs"\n(not approved)
+
+' OpenCode flow (works)
+OC -[#green,bold]-> PD
+FW -[#green,bold]-> GH : **ALLOWED** ✓\nCategory: "Dev Tools"
+
+note bottom of MB
+  **INSIDE_CN = true** (direct corporate DNS)
+  **Network detection passes** — proxy works fine.
+  **Same firewall policy as VPN** — api.anthropic.com
+  is blocked by URL category filter (AI/ML).
+  api.github.com passes (Developer Tools).
+
+  **Result: Claude BLOCKED. Use OpenCode + Copilot instead.**
+  (Copilot routes through api.github.com which is allowed)
+end note
+
+@enduml

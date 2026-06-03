@@ -1,0 +1,56 @@
+@startuml network-scenario-2-vpn
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 8
+
+title **Scenario 2 — Home WLAN + Cisco AnyConnect VPN**
+
+left to right direction
+
+node "MacBook" as MB {
+  [detect-network.sh] as DET
+  [Proxydetox\n:3128] as PD
+  [Claude CLI] as CLI
+  [Cisco AnyConnect] as VPN
+}
+
+cloud "Home Router\n→ ISP" as HOME
+
+rectangle "BMW Corporate Network\n(via VPN tunnel)" as CN {
+  [PAC Server\nmuc.proxy-pac.\nbmwgroup.net] as PAC
+  [Central Proxy\n(Squid/BlueCoat)] as CP
+  [Firewall\n(URL category filter)] as FW #FFCDD2
+}
+
+cloud "Internet" as INET {
+  [api.anthropic.com] as AN
+  [api.github.com] as GH
+}
+
+' VPN tunnel
+VPN -[#blue,bold]-> HOME : encrypted
+HOME -[#blue,bold]-> CN : IPsec/DTLS tunnel
+
+' Detection
+DET -[#green]-> PAC : 1. DNS resolves ✓\n→ INSIDE_CN=true
+
+' Traffic flow
+CLI -[#green,bold]-> PD : 2. https_proxy=:3128
+PD -[#green,bold]-> PAC : 3. fetch proxy.pac
+PD -[#green,bold]-> CP : 4. CONNECT :443
+CP -[#green,bold]-> FW : 5. URL check
+FW -[#red,bold]-x AN : 6. **BLOCKED** ✗\n(AI/ML category)
+FW -[#green,bold]-> GH : 6. **ALLOWED** ✓\n(Developer Tools category)
+
+note bottom of MB
+  **INSIDE_CN = true** (VPN provides corporate DNS)
+  **Same firewall policy as onsite** — api.anthropic.com
+  is blocked by URL category filter (AI/ML).
+  api.github.com passes (Developer Tools).
+  **Result: Claude Code ✗ | OpenCode (Copilot) ✓**
+end note
+
+@enduml

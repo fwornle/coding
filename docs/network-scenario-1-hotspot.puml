@@ -1,0 +1,48 @@
+@startuml network-scenario-1-hotspot
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 8
+
+title **Scenario 1 — Mobile Hotspot (Phone G5/LTE, no VPN)**
+
+left to right direction
+
+node "MacBook" as MB {
+  [detect-network.sh] as DET
+  [Proxydetox\n:3128] as PD
+  [Claude CLI] as CLI
+}
+
+database "Phone Hotspot\n(NAT, public IP\nvia carrier)" as HS
+
+cloud "Internet" as INET {
+  [api.github.com] as GH
+  [api.anthropic.com] as AN
+}
+
+rectangle "muc.proxy-pac.\nbmwgroup.net" as PAC #FFCDD2
+
+' Flow
+DET -[#red]-> PAC : 1. DNS lookup\n**NXDOMAIN**\n(no corp DNS)
+DET -[#green,bold]-> HS : 2. curl --noproxy '*'\n(test direct)
+HS -[#green,bold]-> GH : direct TCP/TLS ✓
+
+DET .[#gray,dashed].> PD : 3. if direct FAILS:\nset https_proxy=:3128
+PD .[#gray,dashed].> HS : DIRECT fallback\n(PAC unreachable)
+
+CLI -[#green,bold]-> HS : 4. OAuth + API
+HS -[#green,bold]-> AN : ✓ reachable
+
+note bottom of MB
+  **INSIDE_CN = false** (no corporate DNS)
+  **Detection logic:**
+  • Try direct curl → usually works on hotspot
+  • If cellular DNS is slow (>3s timeout) → fallback:
+    keep Proxydetox as proxy, it uses DIRECT mode
+  **Result: Claude works ✓**
+end note
+
+@enduml
