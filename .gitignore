@@ -9,6 +9,11 @@ claude-code-mcp-docker.json
 # Playwright MCP server artifacts (page snapshots, console logs)
 .playwright-mcp/
 
+# Phase 44 — Playwright E2E spec audit-trail screenshots (T-44-02-02).
+# Specs in tests/e2e/*.spec.ts write screenshots under tests/e2e/_artifacts/
+# for post-run inspection; not source-controlled.
+tests/e2e/_artifacts/
+
 # Editor directories and files
 .idea
 .vscode/*
