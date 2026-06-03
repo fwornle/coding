@@ -12,6 +12,11 @@
 
 set -euo pipefail
 
+# Phase 44 S-3: snapshot/restore bypass (SnapshotManager sets OKB_SNAPSHOT=1 via execGit env)
+if [ "${OKB_SNAPSHOT:-0}" = "1" ]; then
+    exit 0
+fi
+
 # Files that require an explicit KB-update commit message
 # Covers both coding repo (.data/knowledge-export/) and OKB submodule (.data/exports/)
 KB_PATTERN='\.data/(knowledge-export|exports)/.*\.json$'
