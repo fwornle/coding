@@ -62,7 +62,7 @@ MCP servers and tools that extend the coding infrastructure.
 
     System monitoring and knowledge visualization.
 
-    ![Health Dashboard](../images/health-dashboard-hero.png)
+    ![Health Dashboard](../images/health-mon.png)
 
     - VKB knowledge viewer
     - Health monitoring

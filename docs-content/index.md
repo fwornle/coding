@@ -78,7 +78,7 @@ vkb           # Opens http://localhost:8080
 
 3-layer supervision architecture ensures system reliability with automatic recovery.
 
-![Health Dashboard](images/health-dashboard-hero.png)
+![Health Dashboard](images/health-mon.png)
 
 - Process health monitoring with automatic restart
 - Service lifecycle management
