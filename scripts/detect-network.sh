@@ -103,10 +103,14 @@ detect_corporate_network() {
 # ============================================
 test_proxy_connectivity() {
   if [ "$INSIDE_CN" = "false" ]; then
-    # Outside CN: verify direct internet works
+    # Outside CN: verify internet works (try direct first, then via proxy if set)
     if timeout 5 curl -s --connect-timeout 3 --noproxy '*' https://api.github.com >/dev/null 2>&1; then
       PROXY_WORKING=true
       log "✅ Direct internet access working"
+    elif [ -n "${https_proxy:-${HTTPS_PROXY:-}}" ] && timeout 5 curl -s --connect-timeout 3 https://api.github.com >/dev/null 2>&1; then
+      # Proxy is set and works — internet IS available (just via proxy)
+      PROXY_WORKING=true
+      log "✅ Internet access working (via proxy, outside CN)"
     else
       PROXY_WORKING=false
       log "⚠️  No internet access (neither proxy nor direct)"
@@ -169,13 +173,35 @@ _sync_bash_profile_proxy() {
 configure_proxy_if_needed() {
   local profile="$HOME/.bash_profile"
 
-  # Outside CN: disable proxy
+  # Outside CN: try to disable proxy, but ONLY if direct internet works.
+  # On a hotspot, Proxydetox may still provide a working route (DIRECT fallback)
+  # even without corporate DNS. Don't unset proxy until we confirm direct works.
   if [ "$INSIDE_CN" = "false" ]; then
     _sync_bash_profile_proxy disabled
-    if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
-      log "Outside CN — disabling proxy (was: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"
+
+    # Test if direct internet works WITHOUT proxy
+    if timeout 5 curl -s --connect-timeout 3 --noproxy '*' https://api.github.com >/dev/null 2>&1; then
+      # Direct works — safe to remove proxy vars
+      if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
+        log "Outside CN — disabling proxy (direct works; was: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"
+      fi
+      unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy no_proxy NO_PROXY
+    else
+      # Direct doesn't work — keep proxy vars if set (Proxydetox DIRECT fallback may help)
+      if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
+        log "Outside CN — keeping proxy (direct failed; proxy: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"
+      elif pgrep -q proxydetox 2>/dev/null; then
+        # Proxydetox running but no env vars — set them to known default
+        log "Outside CN — direct failed but proxydetox running; setting proxy to 127.0.0.1:3128"
+        export HTTP_PROXY="http://127.0.0.1:3128"
+        export HTTPS_PROXY="http://127.0.0.1:3128"
+        export http_proxy="http://127.0.0.1:3128"
+        export https_proxy="http://127.0.0.1:3128"
+        export NO_PROXY="localhost,127.0.0.1"
+        export no_proxy="localhost,127.0.0.1"
+      fi
     fi
-    unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy no_proxy NO_PROXY
+
     # Restart proxydetox so it doesn't hold stale state (macOS only)
     if [ "$PLATFORM" = "macos" ]; then
       launchctl stop cc.colorto.proxydetox 2>/dev/null || true

@@ -1,10 +1,5 @@
 @startuml network-scenario-2-vpn
-!theme plain
-skinparam backgroundColor #FEFEFE
-skinparam defaultFontName "Helvetica"
-skinparam defaultFontSize 12
-skinparam shadowing false
-skinparam roundcorner 8
+!include _standard-style.puml
 
 title **Scenario 2 — Home WLAN + Cisco AnyConnect VPN**
 

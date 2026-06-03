@@ -1485,6 +1485,21 @@ function refreshLslStaleness() {
 // ---------------------------------------------------------------------------
 const NETWORK_PROBE_INTERVAL_MS = 15_000;
 
+// Sleep/wake detection: if time between ticks exceeds 3x TICK_MS, we likely woke from sleep
+let lastTickTimestamp = Date.now();
+function detectWakeFromSleep() {
+  const now = Date.now();
+  const gap = now - lastTickTimestamp;
+  lastTickTimestamp = now;
+  if (gap > TICK_MS * 3) {
+    log(`network: detected wake from sleep (gap=${Math.round(gap/1000)}s) — forcing immediate probe`, 'INFO');
+    // Clear last_probe_end to force immediate re-probe
+    currentState.network.last_probe_end = null;
+    return true;
+  }
+  return false;
+}
+
 /**
  * Detect network location and proxy status — INDEPENDENTLY.
  *
@@ -1525,11 +1540,67 @@ async function pollNetworkStatus() {
      proxyEnabledByUser = /^http_proxy=/m.test(bashProfile);
    } catch { /* file missing — treat as disabled */ }
 
-   // proxy_running = user enabled it AND proxydetox is actually listening
-   netState.proxy_running = proxyEnabledByUser && portListening;
-   netState.proxy_port_listening = portListening;  // raw: is proxydetox daemon alive?
-   netState.proxy_env_set = proxyEnvSet;           // track separately for debugging
-   netState.proxy_enabled_by_user = proxyEnabledByUser;  // the persistent toggle
+    // Auto-heal: detect and fix two failure modes:
+    //   1. Port dead (stale socket after sleep/wake) — portListening=false
+    //   2. Port alive but proxy broken (Proxydetox confused after VPN disconnect / network change)
+    //      — portListening=true but functional probe fails
+    let effectivePortListening = portListening;
+    let proxyFunctional = false;
+
+    if (proxyEnabledByUser) {
+      // Functional probe: actually try to proxy a request (not just TCP connect)
+      if (portListening) {
+        try {
+          execSync('curl -s --connect-timeout 3 --max-time 5 -x http://127.0.0.1:3128 -o /dev/null -w "%{http_code}" https://api.github.com 2>/dev/null | grep -q 200', { timeout: 8000 });
+          proxyFunctional = true;
+        } catch {
+          proxyFunctional = false;
+        }
+      }
+
+      // Need kickstart if: port dead OR port alive but not functional
+      const needsKickstart = !portListening || (portListening && !proxyFunctional);
+      if (needsKickstart) {
+        const reason = !portListening ? 'port 3128 dead (stale socket)' : 'port alive but proxy not functional (network change?)';
+        log(`network: proxy intent=ON but ${reason} — kickstarting proxydetox`, 'WARN');
+        try {
+          execSync('launchctl kickstart -k gui/$(id -u)/cc.colorto.proxydetox 2>/dev/null || launchctl start cc.colorto.proxydetox 2>/dev/null', { timeout: 5000 });
+          // Re-check after kickstart (give it 2s to bind + initialize)
+          await new Promise(r => setTimeout(r, 2000));
+          // Re-probe: port check
+          const portNow = await new Promise(resolve => {
+            const sock = net.connect({ host: '127.0.0.1', port: 3128, timeout: 2000 });
+            sock.once('connect', () => { sock.destroy(); resolve(true); });
+            sock.once('error', () => resolve(false));
+            sock.once('timeout', () => { sock.destroy(); resolve(false); });
+          });
+          if (portNow) {
+            // Re-probe: functional check
+            try {
+              execSync('curl -s --connect-timeout 3 --max-time 5 -x http://127.0.0.1:3128 -o /dev/null -w "%{http_code}" https://api.github.com 2>/dev/null | grep -q 200', { timeout: 8000 });
+              proxyFunctional = true;
+              log('network: proxydetox auto-healed — port 3128 listening and functional', 'INFO');
+            } catch {
+              proxyFunctional = false;
+              log('network: proxydetox kickstarted — port listening but still not functional', 'WARN');
+            }
+          } else {
+            log('network: proxydetox kickstart failed — port still dead', 'WARN');
+          }
+          effectivePortListening = portNow;
+        } catch (e) {
+          log(`network: proxydetox kickstart error: ${e.message}`, 'ERROR');
+          effectivePortListening = false;
+        }
+      }
+    }
+
+    // proxy_running = user enabled it AND proxydetox is actually listening AND functional
+    netState.proxy_running = proxyEnabledByUser && effectivePortListening;
+    netState.proxy_functional = proxyEnabledByUser ? proxyFunctional : false;
+    netState.proxy_port_listening = effectivePortListening;  // raw: is proxydetox daemon alive?
+    netState.proxy_env_set = proxyEnvSet;           // track separately for debugging
+    netState.proxy_enabled_by_user = proxyEnabledByUser;  // the persistent toggle
 
   // ── N: Network location (independent of P) ─────────────────────────────
   // Strategy: 3 independent signals, evaluated in priority order.
@@ -1590,13 +1661,13 @@ async function pollNetworkStatus() {
     netState.location = 'open';         // no corporate access whatsoever
   }
 
-  log(`network: location=${netState.location} (vpnCli=${vpnConnected}, pac=${pacResolved}, physCN=${onPhysicalCN}, px=${portListening}, envSet=${proxyEnvSet})`, 'DEBUG');
+   log(`network: location=${netState.location} (vpnCli=${vpnConnected}, pac=${pacResolved}, physCN=${onPhysicalCN}, px=${effectivePortListening}, envSet=${proxyEnvSet})`, 'DEBUG');
 
    // Auto-manage proxy env vars in THIS process based on user intent (bash_profile toggle):
    // - User enabled proxy (px) + port listening → set env vars so our probes use proxy
    // - User disabled proxy → clear env vars so our probes go direct
    const onCorporateNet = netState.location === 'corporate' || netState.location === 'vpn';
-   if (proxyEnabledByUser && portListening && !proxyEnvSet) {
+    if (proxyEnabledByUser && effectivePortListening && !proxyEnvSet) {
      const proxyUrl = 'http://127.0.0.1:3128';
      process.env.http_proxy = proxyUrl;
      process.env.https_proxy = proxyUrl;
@@ -1613,7 +1684,7 @@ async function pollNetworkStatus() {
 
    // 5. Check if proxy is functional (can actually CONNECT through to an external host)
    // Only test when user has proxy enabled — otherwise P:OFF (not ERR)
-   if (proxyEnabledByUser && portListening) {
+    if (proxyEnabledByUser && effectivePortListening) {
     netState.proxy_functional = await new Promise(resolve => {
       // Use CONNECT (actual tunnel) not plain GET (just checks if px process responds)
       const proxyReq = http.request({
@@ -1646,7 +1717,7 @@ async function pollNetworkStatus() {
       req.on('timeout', () => { req.destroy(); resolve(false); });
     };
 
-     if (netState.proxy_functional && proxyEnabledByUser) {
+    if (netState.proxy_functional && proxyEnabledByUser) {
       // Try via proxy first, fall back to direct
       const proxyReq = http.request({
         host: '127.0.0.1', port: 3128,
@@ -1670,15 +1741,21 @@ async function pollNetworkStatus() {
   // Also update proxy.networkMode to match (backwards compat for dashboard)
   currentState.proxy.networkMode = netState.location === 'open' ? 'public' : netState.location;
 
-   log(`network: location=${netState.location} proxy_enabled=${proxyEnabledByUser} port_listening=${portListening} proxy_running=${netState.proxy_running} proxy_functional=${netState.proxy_functional} internet=${netState.internet_reachable}`);
+   log(`network: location=${netState.location} proxy_enabled=${proxyEnabledByUser} port_listening=${effectivePortListening} proxy_running=${netState.proxy_running} proxy_functional=${netState.proxy_functional} internet=${netState.internet_reachable}`);
 }
 
 async function runAllChecks() {
-  // ----- Network environment detection (every 30s) -----
+  // Detect sleep/wake transitions — forces immediate network re-probe
+  detectWakeFromSleep();
+
+  // ----- Network environment detection (every 15s, or 5s if proxy is broken) -----
   const _netProbeAge = currentState.network.last_probe_end
     ? Date.now() - new Date(currentState.network.last_probe_end).getTime()
     : Infinity;
-  if (_netProbeAge >= NETWORK_PROBE_INTERVAL_MS) {
+  // Probe faster when proxy is enabled but not functional (healing in progress)
+  const _proxyHealing = currentState.network.proxy_enabled && !currentState.network.proxy_functional;
+  const _effectiveProbeInterval = _proxyHealing ? 5_000 : NETWORK_PROBE_INTERVAL_MS;
+  if (_netProbeAge >= _effectiveProbeInterval) {
     try {
       // Hard ceiling: pollNetworkStatus must complete within 15s or we abandon it.
       // This prevents a single hanging socket/DNS from freezing the entire runAllChecks loop.

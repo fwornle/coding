@@ -1,0 +1,63 @@
+@startuml network-transition-sequence
+!include _standard-style.puml
+
+title Network Transition — VPN Disconnect & Recovery
+
+actor "User" as U
+participant "MacBook\n(macOS)" as MAC #F5F5F5
+participant "Cisco\nAnyConnect" as VPN #E8F4FD
+participant "Proxydetox\n(port 3128)" as PD #FFF2E6
+participant "Health\nCoordinator" as HC #E8F5E8
+participant "OpenCode\nSession" as OC #E6F3FF
+participant "Corporate\nFirewall" as FW #FFEBEE
+participant "api.github.com" as GH #F5F5F5
+
+== Steady State: Connected via VPN ==
+
+OC -> PD: CONNECT api.github.com:443
+PD -> FW: HTTPS (via VPN tunnel)
+FW --> PD: 200 OK (github allowed)
+PD --> OC: response
+note right of OC: Session works
+
+== User Disconnects VPN ==
+
+U -> VPN: Disconnect
+VPN -> MAC: Remove utun interface\nRemove corporate DNS
+MAC --> VPN: done
+
+note over PD #FFEBEE
+  PAC URL (muc.proxy-pac.bmwgroup.net)
+  no longer resolvable.
+  Proxydetox confused — port open
+  but can't proxy requests.
+end note
+
+OC -> PD: CONNECT api.github.com:443
+PD --> OC: **error** (proxy broken)
+note right of OC #FFEBEE: Request fails!
+
+== Health Coordinator Detects & Heals (within 5s) ==
+
+HC -> HC: dig muc.proxy-pac.bmwgroup.net\n→ NXDOMAIN\nlocation = **open**
+HC -> PD: functional probe → **fail**
+HC -> HC: auto-heal: kickstart proxydetox
+
+note over PD #E8F5E8
+  Proxydetox restarts.
+  PAC unreachable → falls back
+  to **DIRECT** mode.
+end note
+
+HC -> PD: functional probe → **pass**
+HC -> HC: proxy_functional = true\nlocation = open
+
+== OpenCode Recovers (next request) ==
+
+OC -> PD: CONNECT api.github.com:443
+PD -> GH: HTTPS (**direct**, no proxy needed)
+GH --> PD: 200 OK
+PD --> OC: response
+note right of OC #E8F5E8: Session works again!\nNo manual px-px needed.
+
+@enduml

@@ -1,0 +1,64 @@
+@startuml proxy-auto-heal-sequence
+!include _standard-style.puml
+
+title Proxy Auto-Heal — Health Coordinator Self-Recovery
+
+participant "Health\nCoordinator" as HC #F5F5F5
+participant "Proxydetox\n(port 3128)" as PD #E8F4FD
+participant "launchctl" as LC #FFF2E6
+participant "tmux\nStatus Line" as TM #E8F5E8
+
+== Normal Operation (proxy healthy) ==
+
+HC -> PD: TCP probe port 3128
+PD --> HC: connected (< 100ms)
+HC -> PD: curl -x 127.0.0.1:3128\nhttps://api.github.com
+PD --> HC: HTTP 200
+HC -> HC: proxy_running = true\nproxy_functional = true
+TM -> HC: GET /health/state
+HC --> TM: P:ON (green)
+
+== Network Change (e.g. VPN disconnect) ==
+
+note over PD #FFEBEE
+  PAC URL unreachable on new network.
+  Proxydetox enters broken state —
+  port open but requests fail.
+end note
+
+HC -> PD: TCP probe port 3128
+PD --> HC: connected (port alive)
+HC -> PD: curl -x 127.0.0.1:3128\nhttps://api.github.com
+PD --> HC: **connection error** (broken)
+
+HC -> HC: proxy_functional = **false**\nproxyEnabledByUser = true\n→ auto-heal triggered
+
+|||
+
+== Auto-Heal ==
+
+HC -> LC: launchctl kickstart -k\ngui/501/com.coding.proxydetox
+LC -> PD: restart daemon
+LC --> HC: exit 0
+
+note over HC #E8F5E8
+  Wait 2s for daemon
+  to re-initialize
+end note
+
+HC -> PD: TCP probe port 3128
+PD --> HC: connected
+HC -> PD: curl -x 127.0.0.1:3128\nhttps://api.github.com
+PD --> HC: HTTP 200
+
+HC -> HC: proxy_running = true\nproxy_functional = true
+TM -> HC: GET /health/state
+HC --> TM: P:ON (green)
+
+note over HC #FFFACD
+  Total recovery time: ~5s
+  (detect on next probe cycle
+  + 2s daemon restart + verify)
+end note
+
+@enduml

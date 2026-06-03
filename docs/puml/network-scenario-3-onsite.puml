@@ -1,10 +1,5 @@
 @startuml network-scenario-3-onsite
-!theme plain
-skinparam backgroundColor #FEFEFE
-skinparam defaultFontName "Helvetica"
-skinparam defaultFontSize 12
-skinparam shadowing false
-skinparam roundcorner 8
+!include _standard-style.puml
 
 title **Scenario 3 — Onsite (Corporate WiFi / Ethernet, no VPN)**
 
