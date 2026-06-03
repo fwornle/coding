@@ -1,0 +1,120 @@
+@startuml network-scenario-no-vpn
+!include _standard-style.puml
+title **Scenario C — Outside Corporate Network, No VPN**
+caption INSIDE_CN=false | Proxy optional (falls back to DIRECT) | No firewall filtering
+
+left to right direction
+
+' === WORKSTATION ===
+rectangle "**Workstation** (localhost)" as WS #F0FFF0 {
+
+  rectangle "Local Proxy (per OS)" as PROXY #FFF8E1 {
+    component "**macOS**: Proxydetox :3128\nPAC fetch fails → DIRECT mode" as mac_proxy <<core>>
+    component "**Windows**: px :3128\nFalls back to DIRECT" as win_proxy <<core>>
+    component "**WSL**: CNTLM :3128\nor unset https_proxy entirely" as wsl_proxy <<core>>
+    component "**Linux**: CNTLM :3128\nor unset https_proxy" as lnx_proxy <<core>>
+
+    note bottom of PROXY
+      **PAC server unreachable** (no corporate DNS)
+      → Local proxy falls back to DIRECT connections
+      → Alternatively: unset https_proxy for direct access
+      **Kerberos KDC unreachable** → ticket expires, no renewal
+      This is **not a problem** — no corporate proxy to authenticate to
+    end note
+  }
+
+  rectangle "Applications" as APPS #FFFFFF {
+    component "Browser" as browser <<cli>>
+    component "VS Code + Copilot" as vscode <<cli>>
+    component "Git (HTTPS)" as git_https <<cli>>
+    component "Git (SSH)" as git_ssh <<cli>>
+    component "curl / npm / Docker" as cli_tools <<cli>>
+  }
+
+  rectangle "Environment" as CFG #F3E5F5 {
+    component "https_proxy=http://127.0.0.1:3128 (proxy in DIRECT mode)\nor unset https_proxy (bypass proxy entirely)\nno_proxy=localhost,*.bmwgroup.net" as env <<util>>
+  }
+}
+
+' === HOME NETWORK ===
+rectangle "**Home Network / ISP**" as HOME #E3F2FD {
+  component "**ISP Router**\nNAT, DHCP, ISP DNS" as router <<infra>>
+  note bottom of router
+    No corporate DNS → *.bmwgroup.net does NOT resolve
+    No URL-category filtering
+    No SSL inspection
+    Port 22 open (no firewall blocking SSH)
+  end note
+}
+
+' === ENDPOINTS ===
+rectangle "**External Endpoints**" as EXT #E8F4FD {
+  component "**cc-github.bmwgroup.net**\nGHE :443 / :22" as ghe <<api>>
+  component "**api.github.com**\nCopilot :443" as gh_api <<api>>
+  component "**api.anthropic.com**\nClaude :443" as anthropic <<api>>
+  component "**npm / Docker**\nregistries :443" as registries <<api>>
+}
+
+' === FLOW ===
+' Apps → proxy (DIRECT mode) or direct
+browser --> mac_proxy
+vscode --> mac_proxy
+cli_tools --> mac_proxy
+git_https --> mac_proxy
+git_ssh -[#43A047,bold]-> router : SSH :22 (direct)
+
+' Proxy DIRECT → router → internet
+mac_proxy -[#43A047,bold]-> router : DIRECT (no upstream proxy)
+win_proxy -[#43A047,bold]-> router : DIRECT
+wsl_proxy -[#43A047,bold]-> router : DIRECT
+lnx_proxy -[#43A047,bold]-> router : DIRECT
+
+' Router → endpoints (all allowed)
+router -[#43A047,bold]-> gh_api : ✓ Allowed :443
+router -[#43A047,bold]-> anthropic : ✓ **Allowed** :443\n(no URL filter!)
+router -[#43A047,bold]-> registries : ✓ Allowed :443
+router -[#43A047,bold]-> ghe : ✓ SSH :22 (direct)
+router -[#E53935,dashed]-> ghe : ✗ HTTPS :443 to GHE\n(internal DNS required)
+
+' === HEALTH MONITORING ===
+rectangle "**Health Monitoring** (coding/bin/coding)" as HEALTH #E1BEE7 {
+  note as hn
+    **Detection**: DNS for muc.proxy-pac.bmwgroup.net FAILS
+    → INSIDE_CN=false → network=open
+    **Proxy**: Port 3128 may still listen (DIRECT mode) or be stopped
+    **Auto-heal**: If proxy was ON, detect-network.sh may toggle it OFF
+    or leave Proxydetox in DIRECT fallback mode
+    **Status line**: N:OPEN P:OFF LLM:● (Claude available!)
+    **Important**: Claude/Anthropic API is now reachable (no firewall)
+  end note
+}
+
+' === OS-SPECIFIC NOTES ===
+note as os_notes
+  **OS-Specific Configuration (outside CN, no VPN):**
+
+  **macOS**: Proxydetox stays running, PAC fetch fails → DIRECT mode.
+  No action needed — transparent fallback.
+
+  **Windows**: px may need manual stop or will timeout on proxy auth.
+  System proxy (WinHTTP) should be cleared or set to direct.
+
+  **WSL / Linux**: Simplest approach: unset https_proxy in shell profile.
+  .netrc credentials are irrelevant (no corporate proxy).
+  Alternative: leave CNTLM running — it will CONNECT-forward without auth.
+
+  **All platforms**: SSH to cc-github.bmwgroup.net works on port 22
+  (no firewall), but DNS resolution requires /etc/hosts entry or
+  VPN. SSH to github.com works natively.
+end note
+
+legend bottom
+  |= Protocol |= Port |= Auth |= Status (no VPN) |
+  | HTTPS (Copilot) | 443 | OAuth Bearer | ✓ Works (direct) |
+  | HTTPS (Claude) | 443 | API Key | ✓ **Works** (no firewall!) |
+  | HTTPS (Git) | 443 | GCM / OAuth | ✓ Works (public repos / github.com) |
+  | SSH (Git) | 22 | SSH Key | ✓ Works (port open, no firewall) |
+  | HTTPS (GHE internal) | 443 | SSO/OAuth | ✗ DNS fails (internal only) |
+end legend
+
+@enduml

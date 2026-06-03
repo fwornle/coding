@@ -1,0 +1,116 @@
+@startuml network-scenario-hotspot
+!include _standard-style.puml
+title **Scenario D — Mobile Hotspot (4G/5G Tethering)**
+caption INSIDE_CN=false | No VPN | Direct internet via carrier | Cellular-specific quirks
+
+left to right direction
+
+' === WORKSTATION ===
+rectangle "**Workstation** (localhost)" as WS #F0FFF0 {
+
+  rectangle "Local Proxy (per OS)" as PROXY #FFF8E1 {
+    component "**macOS**: Proxydetox :3128\nDIRECT fallback (PAC unreachable)" as mac_proxy <<core>>
+    component "**Windows**: px :3128\nDIRECT fallback" as win_proxy <<core>>
+    component "**WSL**: CNTLM :3128 or unset\nhttps_proxy" as wsl_proxy <<core>>
+    component "**Linux**: CNTLM :3128 or unset\nhttps_proxy" as lnx_proxy <<core>>
+  }
+
+  rectangle "Applications" as APPS #FFFFFF {
+    component "Browser" as browser <<cli>>
+    component "VS Code + Copilot" as vscode <<cli>>
+    component "Git (HTTPS)" as git_https <<cli>>
+    component "Git (SSH)" as git_ssh <<cli>>
+    component "curl / npm / Docker" as cli_tools <<cli>>
+  }
+}
+
+' === CELLULAR NETWORK ===
+rectangle "**Cellular Network (Carrier)**" as CELL #FFECB3 {
+  component "**Carrier NAT / CGN**\n(Carrier-Grade NAT)\nShared public IP" as cgn <<infra>>
+  component "**Carrier DNS**\nNo *.bmwgroup.net resolution\nPotentially slow (>3s)" as cdns <<infra>>
+
+  note bottom of CELL
+    **Cellular-specific issues:**
+    • DNS resolution can be slow (>3s) — may trigger
+      detect-network.sh timeout → false negative
+    • Carrier-Grade NAT (CGN) — shared IP, some services
+      may rate-limit or flag shared IPs
+    • MTU issues possible (cellular MTU < 1500)
+    • Connection may drop briefly during handover (cell tower switch)
+    • IPv6-only carriers: some tools may fail without IPv4
+    • **No corporate DNS** → INSIDE_CN=false
+  end note
+}
+
+' === ENDPOINTS ===
+rectangle "**External Endpoints**" as EXT #E8F4FD {
+  component "**cc-github.bmwgroup.net**\nGHE :443 / :22" as ghe <<api>>
+  component "**api.github.com**\nCopilot :443" as gh_api <<api>>
+  component "**api.anthropic.com**\nClaude :443" as anthropic <<api>>
+  component "**npm / Docker**\nregistries :443" as registries <<api>>
+}
+
+' === FLOW ===
+browser --> mac_proxy
+vscode --> mac_proxy
+cli_tools --> mac_proxy
+git_https --> mac_proxy
+git_ssh -[#43A047,bold]-> cgn : SSH :22 (direct)
+
+mac_proxy -[#43A047,bold]-> cgn : DIRECT
+win_proxy -[#43A047,bold]-> cgn : DIRECT
+wsl_proxy -[#43A047,bold]-> cgn : DIRECT
+lnx_proxy -[#43A047,bold]-> cgn : DIRECT
+
+cgn -[#43A047,bold]-> gh_api : ✓ Allowed
+cgn -[#43A047,bold]-> anthropic : ✓ **Allowed** (no firewall)
+cgn -[#43A047,bold]-> registries : ✓ Allowed
+cgn -[#43A047,bold]-> ghe : ✓ SSH :22 (if DNS resolves)
+cgn -[#E53935,dashed]-> ghe : ✗ DNS fails for\ncc-github.bmwgroup.net\n(internal only)
+
+' === HEALTH MONITORING ===
+rectangle "**Health Monitoring** (coding/bin/coding)" as HEALTH #E1BEE7 {
+  note as hn
+    **Detection**: DNS for muc.proxy-pac.bmwgroup.net FAILS
+    → INSIDE_CN=false → network=open
+    **Known issue**: Carrier DNS can be slow (>3s)
+    → detect-network.sh may false-negative on direct connectivity test
+    **Fix**: Script preserves proxy env vars, retests via proxy as fallback
+    **Cellular handover**: Brief connection drops during cell tower switch
+    → health-coordinator detects via failed probe, waits for recovery
+    **Status line**: N:OPEN P:OFF LLM:●
+    **Auto-heal**: Accelerated probing (5s interval) after connectivity loss
+  end note
+}
+
+' === OS-SPECIFIC NOTES ===
+note as os_notes
+  **OS-Specific — Mobile Hotspot:**
+
+  **macOS**: WiFi interface connects to phone hotspot.
+  Proxydetox DIRECT fallback works transparently.
+  May need to disable "auto-join" for corporate WiFi to prevent flip-flopping.
+
+  **Windows**: Mobile hotspot via WiFi or USB tethering.
+  px falls back to DIRECT. WinHTTP system proxy should be cleared.
+  **WSL2 caveat**: Hyper-V vEthernet may not route through hotspot correctly
+  — may need `wsl --shutdown` and reconnect.
+
+  **Linux**: USB tethering (most reliable) or WiFi hotspot.
+  NetworkManager handles interface switch.
+  Unset https_proxy or let CNTLM fall back to DIRECT.
+
+  **All**: Bandwidth-limited — large npm installs / Docker pulls may be slow.
+  Consider using `--prefer-offline` for npm, cached Docker images.
+end note
+
+legend bottom
+  |= Protocol |= Port |= Auth |= Status (Hotspot) |= Caveat |
+  | HTTPS (Copilot) | 443 | OAuth Bearer | ✓ Works | Carrier DNS may be slow |
+  | HTTPS (Claude) | 443 | API Key | ✓ **Works** | Bandwidth-dependent |
+  | HTTPS (Git) | 443 | GCM / OAuth | ✓ Works | github.com only |
+  | SSH (Git) | 22 | SSH Key | ✓ Works | github.com only |
+  | HTTPS (GHE) | 443 | SSO | ✗ DNS fails | Internal DNS required |
+end legend
+
+@enduml

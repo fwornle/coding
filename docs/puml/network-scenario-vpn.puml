@@ -1,0 +1,123 @@
+@startuml network-scenario-vpn
+!include _standard-style.puml
+title **Scenario B — Outside Corporate Network, Connected via VPN**
+caption INSIDE_CN=true (via tunnel) | Proxy required | Same firewall policy as onsite
+
+left to right direction
+
+' === WORKSTATION ===
+rectangle "**Workstation** (localhost)" as WS #F0FFF0 {
+
+  rectangle "VPN Client" as VPN_CLIENT #E8F4FD {
+    component "**Cisco AnyConnect**\nFull-tunnel VPN\nAll traffic routed via BMW" as vpn <<infra>>
+    note bottom of vpn
+      Corporate DNS injected into resolver.
+      All traffic (except local) enters VPN tunnel.
+      Split-tunnel variant: only *.bmwgroup.net via tunnel.
+    end note
+  }
+
+  rectangle "Local Proxy (per OS)" as PROXY #FFF8E1 {
+    component "**macOS**: Proxydetox :3128\nKerberos via keychain" as mac_proxy <<core>>
+    component "**Windows**: px :3128\nNTLM via credential store" as win_proxy <<core>>
+    component "**WSL**: CNTLM :3128\nKerberos via kinit / .netrc" as wsl_proxy <<core>>
+    component "**Linux**: CNTLM :3128\nKerberos via kinit + keytab" as lnx_proxy <<core>>
+  }
+
+  rectangle "Applications" as APPS #FFFFFF {
+    component "Browser" as browser <<cli>>
+    component "VS Code + Copilot" as vscode <<cli>>
+    component "Git (HTTPS)" as git_https <<cli>>
+    component "Git (SSH)" as git_ssh <<cli>>
+    component "curl / npm / Docker" as cli_tools <<cli>>
+  }
+
+  rectangle "Environment Variables" as CFG #F3E5F5 {
+    component "https_proxy=http://127.0.0.1:3128\nno_proxy=localhost,*.bmwgroup.net,10.*" as env <<util>>
+  }
+}
+
+' === VPN TUNNEL ===
+rectangle "**VPN Tunnel** (encrypted, to BMW DC)" as TUNNEL #BBDEFB {
+}
+
+' === CORPORATE INFRASTRUCTURE ===
+rectangle "**Corporate Network Infrastructure**" as CORP #FFF3E0 {
+  component "**Central Proxy**\nproxy.muc.2.net:8080" as central_proxy <<infra>>
+  component "**Firewall / DLP**\nURL Category Filter" as firewall <<infra>>
+  component "**Kerberos KDC**\n(reachable via tunnel)" as kdc <<infra>>
+  component "**Corporate DNS**\n(injected by VPN client)" as dns <<infra>>
+}
+
+' === ENDPOINTS ===
+rectangle "**External Endpoints**" as EXT #E8F4FD {
+  component "**cc-github.bmwgroup.net**\nGHE :443 / :22" as ghe <<api>>
+  component "**api.github.com**\nCopilot :443" as gh_api <<api>>
+  component "**api.anthropic.com**\nClaude :443" as anthropic <<api>>
+  component "**npm / Docker**\nregistries :443" as registries <<api>>
+}
+
+' === FLOW ===
+' Apps → proxy
+browser --> mac_proxy
+vscode --> mac_proxy
+cli_tools --> mac_proxy
+git_https --> mac_proxy
+
+' Proxy → VPN tunnel → corporate
+mac_proxy -[#4A90E2,bold]-> TUNNEL : CONNECT :443\n+ Kerberos
+win_proxy -[#4A90E2,bold]-> TUNNEL
+wsl_proxy -[#4A90E2,bold]-> TUNNEL
+lnx_proxy -[#4A90E2,bold]-> TUNNEL
+
+TUNNEL -[#4A90E2,bold]-> central_proxy : tunnelled traffic
+
+' Kerberos
+mac_proxy ..> kdc : TGT (via tunnel)
+wsl_proxy ..> kdc : kinit (via tunnel)
+lnx_proxy ..> kdc : kinit (via tunnel)
+
+' Central → firewall → internet
+central_proxy -[#4A90E2,bold]-> firewall
+
+firewall -[#43A047,bold]-> ghe : ✓ Allowed
+firewall -[#43A047,bold]-> gh_api : ✓ Allowed (Dev Tools)
+firewall -[#E53935,bold]-> anthropic : ✗ BLOCKED (AI/ML)
+firewall -[#43A047,bold]-> registries : ✓ Allowed
+
+' SSH
+git_ssh -[#E53935,dashed]-> ghe : SSH :22 BLOCKED\n(same policy as onsite)
+
+' === HEALTH MONITORING ===
+rectangle "**Health Monitoring** (coding/bin/coding)" as HEALTH #E1BEE7 {
+  note as hn
+    **Detection**: DNS resolves muc.proxy-pac.bmwgroup.net ✓
+    VPN interface (utun*) detected → network=vpn
+    **Higher latency** than onsite (~50-150ms to PAC server)
+    **Risk**: VPN disconnect → stale proxy connections
+    **Auto-heal**: Detects mode flip vpn→open, restarts proxy + llm-cli-proxy
+    **Status line**: N:VPN P:ON LLM:●
+  end note
+}
+
+' === KEY DIFFERENCES ===
+note bottom of TUNNEL
+  **VPN-specific considerations:**
+  • All DNS queries use corporate resolvers (injected by VPN client)
+  • Kerberos KDC reachable via tunnel — ticket renewal works
+  • Higher RTT (~50-150ms) vs onsite (<5ms) — may cause probe timeouts
+  • VPN disconnect = instant loss of corporate DNS + proxy → health-coordinator detects within 15s
+  • **Windows**: Cisco AnyConnect may conflict with WSL2 networking (Hyper-V vEthernet)
+  • **Linux**: openconnect or Cisco AnyConnect CLI — same tunnel behaviour
+end note
+
+legend bottom
+  |= Protocol |= Port |= Auth |= Status via VPN |
+  | HTTPS (Copilot) | 443 | OAuth Bearer | ✓ Works (via proxy + tunnel) |
+  | HTTPS (Claude) | 443 | API Key | ✗ Blocked (same firewall as onsite) |
+  | HTTPS (Git) | 443 | GCM / OAuth | ✓ Works |
+  | SSH (Git) | 22 | SSH Key | ✗ Blocked (same policy) |
+  | HTTPS (npm/Docker) | 443 | Token | ✓ Works |
+end legend
+
+@enduml

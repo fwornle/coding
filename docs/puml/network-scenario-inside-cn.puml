@@ -1,0 +1,145 @@
+@startuml network-scenario-inside-cn
+!include _standard-style.puml
+title **Scenario A — Inside Corporate Network (Onsite, WiFi / Ethernet)**
+caption INSIDE_CN=true | Proxy required | Firewall URL-category filtering active
+
+left to right direction
+
+' === WORKSTATION (OS VARIANTS) ===
+rectangle "**Workstation** (localhost)" as WS #F0FFF0 {
+
+  rectangle "macOS" as MAC #E8F5E8 {
+    component "Proxydetox\nlocalhost:3128" as mac_proxy <<core>>
+    note right of mac_proxy
+      Kerberos auth via macOS keychain.
+      PAC file: muc.proxy-pac.bmwgroup.net/proxy.pac
+      (auto-configured via macOS Network Preferences)
+    end note
+  }
+
+  rectangle "Windows (native)" as WIN #E8F4FD {
+    component "px\nlocalhost:3128" as win_proxy <<core>>
+    note right of win_proxy
+      NTLM/Negotiate auth via Windows credential store.
+      WinHTTP system proxy used by BITS, Windows Update.
+      PAC configured via IE/System proxy settings.
+    end note
+  }
+
+  rectangle "WSL (Ubuntu on Windows)" as WSL #FFF9E6 {
+    component "CNTLM\nlocalhost:3128" as wsl_proxy <<core>>
+    note right of wsl_proxy
+      Kerberos via kinit or .netrc fallback.
+      Runs inside WSL; Windows apps use px separately.
+      PAC must be fetched manually or via curl.
+    end note
+  }
+
+  rectangle "Linux (Ubuntu native)" as LNX #FFE8E8 {
+    component "CNTLM\nlocalhost:3128" as lnx_proxy <<core>>
+    note right of lnx_proxy
+      Kerberos via kinit + keytab (or .netrc for NTLM fallback).
+      /etc/environment or shell profile: export https_proxy=...
+      No system-wide PAC support — manual proxy config.
+    end note
+  }
+
+  rectangle "Applications (all platforms)" as APPS #FFFFFF {
+    component "Browser" as browser <<cli>>
+    component "VS Code + Copilot" as vscode <<cli>>
+    component "Git (HTTPS)" as git_https <<cli>>
+    component "Git (SSH)" as git_ssh <<cli>>
+    component "curl / npm / Docker" as cli_tools <<cli>>
+  }
+
+  rectangle "Environment & Configuration" as CFG #F3E5F5 {
+    component "https_proxy=http://127.0.0.1:3128\nno_proxy=localhost,*.bmwgroup.net,10.*" as env <<util>>
+    component "git config http.proxy http://127.0.0.1:3128" as gitcfg <<util>>
+    component "SSH: ProxyCommand nc -X connect -x proxy:8080 %h %p" as sshcfg <<util>>
+  }
+}
+
+' === CORPORATE INFRASTRUCTURE ===
+rectangle "**Corporate Network Infrastructure**" as CORP #FFF3E0 {
+  component "**Central Proxy**\nproxy.muc.2.net:8080\n(Authenticated, Kerberos/NTLM)" as central_proxy <<infra>>
+  component "**Firewall / DLP**\nURL Category Filter\nSSL Inspection" as firewall <<infra>>
+  component "**Kerberos KDC**\nActive Directory\n(issues TGT/TGS)" as kdc <<infra>>
+  component "**PAC Server**\nmuc.proxy-pac.bmwgroup.net" as pac <<infra>>
+}
+
+' === ENDPOINTS ===
+rectangle "**External Endpoints (Internet)**" as EXT #E8F4FD {
+  component "**GitHub Enterprise**\ncc-github.bmwgroup.net\nHTTPS :443 | SSH :22" as ghe <<api>>
+  component "**GitHub.com API**\napi.github.com :443\n(Copilot)" as gh_api <<api>>
+  component "**Anthropic API**\napi.anthropic.com :443\n(Claude)" as anthropic <<api>>
+  component "**Registries**\nregistry.npmjs.org\ndocker.io :443" as registries <<api>>
+}
+
+' === CONNECTIONS: Apps → Local Proxy ===
+browser ..> env : reads
+vscode ..> gitcfg : http.proxy
+cli_tools ..> env : $https_proxy
+git_https ..> env : $https_proxy
+git_ssh ..> sshcfg : ProxyCommand
+
+' Apps → local proxy (all OS variants funnel through :3128)
+browser --> mac_proxy
+vscode --> mac_proxy
+cli_tools --> mac_proxy
+git_https --> mac_proxy
+
+' === Local Proxy → Central Proxy (with Kerberos/NTLM) ===
+mac_proxy -[#4A90E2,bold]-> central_proxy : CONNECT :443\n+ Kerberos ticket
+win_proxy -[#4A90E2,bold]-> central_proxy : CONNECT :443\n+ NTLM/Negotiate
+wsl_proxy -[#4A90E2,bold]-> central_proxy : CONNECT :443\n+ Kerberos/NTLM
+lnx_proxy -[#4A90E2,bold]-> central_proxy : CONNECT :443\n+ Kerberos/NTLM
+
+' Kerberos acquisition
+mac_proxy ..> kdc : TGT via keychain
+wsl_proxy ..> kdc : kinit / .netrc
+lnx_proxy ..> kdc : kinit + keytab
+pac ..> mac_proxy : proxy routing rules
+pac ..> win_proxy
+pac ..> wsl_proxy
+pac ..> lnx_proxy
+
+' === Central Proxy → Firewall → Internet ===
+central_proxy -[#4A90E2,bold]-> firewall : TLS CONNECT tunnel
+
+firewall -[#43A047,bold]-> ghe : **ALLOWED** ✓ Port 443\n(internal, no_proxy bypass)
+firewall -[#43A047,bold]-> gh_api : **ALLOWED** ✓ Port 443\nCategory: Dev Tools
+firewall -[#E53935,bold]-> anthropic : **BLOCKED** ✗\nCategory: AI/ML APIs
+firewall -[#43A047,bold]-> registries : **ALLOWED** ✓ Port 443
+
+' SSH
+git_ssh -[#E53935,dashed]-> ghe : **SSH :22 BLOCKED**\nfrom corporate network
+git_ssh ..> sshcfg : fallback:\nSSH-over-HTTPS via\nProxyCommand + port 443
+
+' === HEALTH MONITORING (optional, different color) ===
+rectangle "**Health Monitoring** (coding/bin/coding)" as HEALTH #E1BEE7 {
+  component "detect-network.sh\nINSIDE_CN=true" as detect <<util>>
+  component "health-coordinator.js\nProbes every 15s" as hc <<core>>
+
+  note bottom of HEALTH
+    **Probes**: Port 3128 alive → functional curl via proxy → LLM semantic test
+    **Auto-heal**: Kickstart Proxydetox/CNTLM on failure, restart llm-cli-proxy
+    **Status line**: N:CN P:ON LLM:● (all green in this scenario)
+    **Sleep/wake**: Re-probes immediately on tick gap >15s
+  end note
+}
+
+detect -[#9C27B0,dotted]-> pac : DNS resolves ✓\n→ corporate network
+hc -[#9C27B0,dotted]-> mac_proxy : port 3128\nalive?
+hc -[#9C27B0,dotted]-> gh_api : functional test\nvia proxy
+
+' === LEGEND ===
+legend bottom
+  |= Protocol |= Port |= Auth at Endpoint |= Proxy Behaviour |= Status in CN |
+  | HTTPS (Copilot) | 443 | OAuth Device Flow → Bearer | ✓ Proxied via CONNECT | ✓ Works |
+  | HTTPS (Claude) | 443 | API Key (x-api-key) | ✓ Proxied via CONNECT | ✗ Blocked by firewall |
+  | HTTPS (Git) | 443 | GCM / OAuth Token | ✓ Proxied via CONNECT | ✓ Works |
+  | SSH (Git) | 22 | SSH Key Pair | ✗ Port blocked in CN | ✗ Blocked (use ProxyCommand) |
+  | HTTPS (npm/Docker) | 443 | Token / Anonymous | ✓ Proxied via CONNECT | ✓ Works |
+end legend
+
+@enduml
