@@ -56,16 +56,30 @@ continuously monitors services, network connectivity, and proxy health.
 ## Proxy Auto-Heal
 
 The health coordinator automatically recovers from proxy failures caused by
-sleep/wake cycles or network transitions. See
-[Network Configuration — Auto-Heal](../guides/network-configuration.md#auto-heal-proxy-recovery)
-for the full sequence diagram and details.
+sleep/wake cycles or network transitions.
+
+![Proxy Auto-Heal Sequence](../images/proxy-auto-heal-sequence.png)
+
+See [Network Configuration — Auto-Heal](../guides/network-configuration.md#auto-heal-proxy-recovery)
+for details on each scenario.
 
 ### Failure Modes
 
 | Failure | Cause | Detection | Recovery |
 |---------|-------|-----------|----------|
-| Stale socket | Sleep/wake, launchd socket not re-bound | Port 3128 not responding | `launchctl kickstart -k` |
-| Broken proxy | VPN disconnect, PAC fetch fails mid-session | Functional probe fails (port alive but requests error) | `launchctl kickstart -k` → Proxydetox reinitializes |
+| Stale socket | Sleep/wake, launchd socket not re-bound | Port 3128 not responding | `launchctl kickstart -k` Proxydetox |
+| Broken proxy | VPN disconnect, PAC fetch fails mid-session | Functional probe fails (port alive but requests error) | `launchctl kickstart -k` Proxydetox |
+| Stale LLM proxy | Network change, HTTP connections held to old route | Semantic probe fails after proxy heal | `launchctl kickstart -k` LLM proxy |
+
+### Recovery Timing
+
+| Phase | Duration |
+|-------|----------|
+| Detect proxy broken (functional probe) | 5s (next tick) |
+| Kickstart Proxydetox + verify | ~3s |
+| Detect LLM stale (immediate re-probe) | 0s (forced) |
+| Kickstart LLM proxy + verify | ~3s |
+| **Total end-to-end recovery** | **~10s** |
 
 ### Sleep/Wake Detection
 

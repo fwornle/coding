@@ -5,6 +5,7 @@ title Proxy Auto-Heal — Health Coordinator Self-Recovery
 
 participant "Health\nCoordinator" as HC #F5F5F5
 participant "Proxydetox\n(port 3128)" as PD #E8F4FD
+participant "LLM Proxy\n(port 12435)" as LLM #F3E5F5
 participant "launchctl" as LC #FFF2E6
 participant "tmux\nStatus Line" as TM #E8F5E8
 
@@ -52,13 +53,42 @@ HC -> PD: curl -x 127.0.0.1:3128\nhttps://api.github.com
 PD --> HC: HTTP 200
 
 HC -> HC: proxy_running = true\nproxy_functional = true
+
+|||
+
+== LLM Proxy Recovery (immediate re-probe) ==
+
+note over HC #FFEBEE
+  Proxy healed but semantic_ok
+  may still be false — LLM proxy
+  holds stale HTTP connections.
+end note
+
+HC -> LLM: POST /api/complete\n{"process":"health","messages":[...]}
+LLM --> HC: **fetch failed** (stale conn)
+
+HC -> HC: semantic_ok = false\n+ recent proxy heal\n→ LLM proxy restart triggered
+
+HC -> LC: launchctl kickstart -k\ngui/501/com.coding.llm-cli-proxy
+LC -> LLM: restart daemon
+LC --> HC: exit 0
+
+note over HC #E8F5E8
+  Wait 2s for LLM proxy
+  to re-initialize
+end note
+
+HC -> LLM: POST /api/complete\n{"process":"health","messages":[...]}
+LLM --> HC: {"content":"OK"}
+
+HC -> HC: semantic_ok = true
 TM -> HC: GET /health/state
-HC --> TM: P:ON (green)
+HC --> TM: P:ON (green)\nLLM:● (green)
 
 note over HC #FFFACD
-  Total recovery time: ~5s
-  (detect on next probe cycle
-  + 2s daemon restart + verify)
+  Total recovery time: ~10s
+  (proxy heal ~5s + LLM probe
+  + 2s restart + verify)
 end note
 
 @enduml
