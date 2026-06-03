@@ -621,7 +621,7 @@ Plans:
   3. A's existing `/api/observations|digests|insights` endpoints remain callable but resolve internally to typed views over `/api/entities?ontologyClass=...` (no consumer breakage during transition).
   4. The git two-commit pattern and OKB-baseline guard from existing export hygiene still hold under the unified snapshot endpoint.
 
-**Plans:** 6/11 plans executed
+**Plans:** 9/11 plans executed
 
 Plans:
 **Wave 1**
@@ -641,9 +641,9 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 44-07-PLAN.md — A-side cutover: mount /api/v1 on obs-api + replace SQLite handlers with /api/coding/* typed views (R-4)
-- [ ] 44-08-PLAN.md — B-side cutover: mount /api/v1 on SSE server (same-port strategy per RESEARCH Example 3)
-- [ ] 44-09-PLAN.md — C-side OKM cutover: refactor routes.ts + viewer URL rewrites + fixture re-record + Zod schema-source migration (cross-repo, bmw.ghe.com HTTPS)
+- [x] 44-07-PLAN.md — A-side cutover: mount /api/v1 on obs-api + replace SQLite handlers with /api/coding/* typed views (R-4)
+- [x] 44-08-PLAN.md — B-side cutover: mount /api/v1 on SSE server (same-port strategy per RESEARCH Example 3)
+- [x] 44-09-PLAN.md — C-side OKM cutover: refactor routes.ts + viewer URL rewrites + fixture re-record + Zod schema-source migration (cross-repo, bmw.ghe.com HTTPS)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -697,7 +697,7 @@ Plans:
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
 | 42. Offline UKB Migration (B) | 6/7 | In Progress|  |
 | 43. OKM Cross-Repo Migration (C) | 7/11 | In Progress|  |
-| 44. REST API & Git Snapshots | 6/11 | In Progress|  |
+| 44. REST API & Git Snapshots | 9/11 | In Progress|  |
 | 45. Unified Web Viewer | 0/? | Not started | - |
 | 46. Per-System Documentation & Onboarding | 0/? | Not started | - |
 

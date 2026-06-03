@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: Phase 44 context gathered
-last_updated: "2026-06-03T12:17:55.654Z"
-last_activity: 2026-06-03 -- Phase 44 execution started
+status: paused
+stopped_at: Phase 44 Wave 4 — Plan 44-09 architectural blocker (Rule 4)
+last_updated: "2026-06-03T13:30:00.000Z"
+last_activity: 2026-06-03 -- Phase 44 paused after 44-07 + 44-08 (8/11 plans complete)
 progress:
   total_phases: 23
   completed_phases: 15
@@ -52,12 +52,11 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 44 (rest-api-git-snapshots) — EXECUTING
-Plan: 1 of 11
-Status: Executing Phase 44
-Next step: `/gsd-discuss-phase 44` to bootstrap. Phase 44 lands the common REST contract (entity CRUD, search, clusters, snapshots, ontology metadata) and git-snapshot/restore over `.data/exports/` so all three systems expose the same query surface — necessary precondition for Phase 45's unified viewer.
-Operator follow-ups before Phase 44 starts: (a) backup cleanup at 2026-06-03 (24h soak from CI green); (b) optional — Phase 54 backlog (ETM hardening — launchd plist + isProcessing audit, 3 plans drafted in 54-CONTEXT.md) when ETM stalls become a recurring issue.
-Last activity: 2026-06-03 -- Phase 44 execution started
+Phase: 44 (rest-api-git-snapshots) — **PAUSED** at Plan 44-09 (Rule 4 architectural blocker)
+Plan: 8 of 11 complete (Wave 0/1/2/3 done; Wave 4 split — 07+08 done, 09 paused)
+Status: Awaiting operator decision on km-core ↔ OKM wire-shape divergence
+Next step: Audit Plan 44-03 "verbatim lift" fidelity against OKM Phase 43 D-G5.1 fixtures; decide whether to refit km-core to OKM-verbatim (re-opens 44-06/07/08) or treat km-core as a new contract (re-records OKM fixtures + viewer expectations). See `.planning/phases/44-rest-api-git-snapshots/44-09-SUMMARY.md` checkpoint for the concrete shape mismatches (RelationSchema, StatsSchema).
+Last activity: 2026-06-03 -- Phase 44 paused after 44-07 + 44-08 (8/11 plans complete; 44-09 checkpoint reached)
 
 ## Performance Metrics
 
