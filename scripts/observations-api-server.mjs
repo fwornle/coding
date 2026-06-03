@@ -36,9 +36,21 @@ import { ColdStoreReader } from '../src/live-logging/ColdStoreReader.js';
 // and its TS dist deps.  Re-exported below for backwards-compatible discovery.
 import { _computeRetentionBoundary, _mergeObservations, _mergeDigests } from './observations-api-merge.mjs';
 
-// Phase 44 plan 04 — km-core common REST router mounted at /api/km/
-import { GraphKMStore } from '../lib/km-core/dist/store/GraphKMStore.js';
-import { createKMRouter } from '../lib/km-core/dist/api/router.js';
+// Phase 44 plan 07 — km-core canonical /api/v1 surface (root-barrel imports).
+// The legacy versioned-prefix-removed orphan-draft mount + the orphan-draft
+// router factory were REPLACED in this plan per CONTEXT R-4 hard cutover.
+// createKmCoreRouter (Plan 44-06) is the canonical 15-endpoint factory and
+// the observation-view reshapers (Plan 44-05) feed the typed views at
+// /api/coding/{observations,digests,insights}.
+import {
+  GraphKMStore,
+  createKmCoreRouter,
+  observationToLegacy,
+  digestToLegacy,
+  insightToLegacy,
+  defaultOntologyDir,
+} from '@fwornle/km-core';
+import { Router } from 'express';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -463,131 +475,10 @@ app.post('/api/observations/patch-artifacts/historical', async (_req, res) => {
   }
 });
 
-app.get('/api/observations', (req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
-
-  let { agent, from, to, project, q, limit: limitStr, offset: offsetStr } = req.query;
-  const limit = Math.min(parseInt(limitStr) || 50, 200);
-  const offset = parseInt(offsetStr) || 0;
-
-  try {
-    const where = [];
-    const params = {};
-
-    if (agent) {
-      const agents = Array.isArray(agent) ? agent : agent.split(',').map(a => a.trim());
-      where.push(`agent IN (${agents.map((_, i) => `@agent${i}`).join(',')})`);
-      agents.forEach((a, i) => { params[`agent${i}`] = a; });
-    }
-    if (from) {
-      where.push('created_at >= @from');
-      params.from = from;
-    }
-    if (to) {
-      where.push('created_at <= @to');
-      params.to = to.includes('T') ? to : `${to}T23:59:59.999Z`;
-    }
-    if (project) {
-      where.push("json_extract(metadata, '$.project') = @project");
-      params.project = project;
-    }
-    if (req.query.quality) {
-      const qualities = Array.isArray(req.query.quality) ? req.query.quality : req.query.quality.split(',');
-      where.push(`COALESCE(quality, 'normal') IN (${qualities.map((_, i) => `@quality${i}`).join(',')})`);
-      qualities.forEach((qq, i) => { params[`quality${i}`] = qq; });
-    }
-    if (q) {
-      try {
-        db.prepare('SELECT 1 FROM observations_fts LIMIT 0').get();
-        where.push('observations.rowid IN (SELECT rowid FROM observations_fts WHERE observations_fts MATCH @q)');
-      } catch {
-        where.push('summary LIKE @q');
-        q = `%${q}%`;
-      }
-      params.q = q;
-    }
-
-    const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
-
-    // Phase 35 plan 35-07: full-union pagination. When `from` reaches past the
-    // retention boundary, fetch the FULL SQLite-in-range slice (no LIMIT/OFFSET)
-    // and pass it with the full cold-in-range list to the merge module. The
-    // merge module does union+sort+slice and reports total = union size, so
-    // pagination can walk into cold rows on any page (not just page 0).
-    if (from && _writer?.retentionDays) {
-      const retentionBoundary = _computeRetentionBoundary(db, _writer.retentionDays);
-      if (from < retentionBoundary) {
-        const fullRows = db.prepare(`
-          SELECT id, summary as content, agent,
-                 session_id as sessionId,
-                 json_extract(metadata, '$.project') as project,
-                 created_at as timestamp,
-                 source_file as source,
-                 metadata,
-                 COALESCE(quality, 'normal') as quality
-          FROM observations ${whereClause}
-          ORDER BY created_at DESC
-        `).all(params);
-        const fullData = fullRows.map(row => {
-          let meta = {};
-          try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
-          const { metadata: _raw, ...rest } = row;
-          return {
-            ...rest,
-            llmModel: meta.llmModel || null,
-            llmProvider: meta.llmProvider || null,
-            llmTokens: meta.llmTokens || null,
-            llmLatencyMs: meta.llmLatencyMs || null,
-          };
-        });
-        const coldRows = ensureColdStore().readObservations({
-          from,
-          to: to || new Date().toISOString(),
-        });
-        const merged = _mergeObservations(fullData, coldRows, retentionBoundary, { limit, offset });
-        return res.json({ data: merged.data, total: merged.total, limit, offset, _metadata: merged._metadata });
-      }
-    }
-
-    const { total } = db.prepare(`SELECT COUNT(*) as total FROM observations ${whereClause}`).get(params);
-
-    params.limit = limit;
-    params.offset = offset;
-    const rows = db.prepare(`
-      SELECT id, summary as content, agent,
-             session_id as sessionId,
-             json_extract(metadata, '$.project') as project,
-             created_at as timestamp,
-             source_file as source,
-             metadata,
-             COALESCE(quality, 'normal') as quality
-      FROM observations ${whereClause}
-      ORDER BY created_at DESC
-      LIMIT @limit OFFSET @offset
-    `).all(params);
-
-    const data = rows.map(row => {
-      let meta = {};
-      try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
-      const { metadata: _raw, ...rest } = row;
-      return {
-        ...rest,
-        llmModel: meta.llmModel || null,
-        llmProvider: meta.llmProvider || null,
-        llmTokens: meta.llmTokens || null,
-        llmLatencyMs: meta.llmLatencyMs || null,
-      };
-    });
-
-    const _metadata = { fromColdStore: false };
-    res.json({ data, total, limit, offset, _metadata });
-  } catch (err) {
-    process.stderr.write(`[obs-api] /observations error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
-    res.status(500).json({ error: 'Failed to query observations' });
-  }
-});
+// Phase 44 plan 07 (R-4 hard cutover): the legacy SQLite-backed GET
+// /api/observations was REPLACED by /api/coding/observations (mounted
+// later in this file). There is no legacy URL fallback per CONTEXT R-4 —
+// requests to the old path return 404 from Express's default handler.
 
 app.get('/api/observations/projects', (_req, res) => {
   const db = getDb();
@@ -604,87 +495,9 @@ app.get('/api/observations/projects', (_req, res) => {
   }
 });
 
-app.get('/api/digests', (req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
-
-  const { date, from, to, q, project, limit: limitStr, offset: offsetStr } = req.query;
-  const limit = Math.min(parseInt(limitStr) || 50, 200);
-  const offset = parseInt(offsetStr) || 0;
-
-  try {
-    try { db.prepare('SELECT 1 FROM digests LIMIT 0').get(); } catch {
-      return res.json({ data: [], total: 0, limit, offset });
-    }
-
-    const where = [];
-    const params = {};
-    if (date) { where.push('date = @date'); params.date = date; }
-    if (from) { where.push('date >= @from'); params.from = from; }
-    if (to) { where.push('date <= @to'); params.to = to; }
-    if (q) { where.push('(theme LIKE @q OR summary LIKE @q)'); params.q = `%${q}%`; }
-    if (project) { where.push('project = @project'); params.project = project; }
-
-    const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
-
-    // Phase 35 plan 35-07: full-union pagination (see /api/observations for
-    // detail). Fetch FULL SQLite-in-range when `from` crosses the retention
-    // boundary; the merge module owns sort+slice and reports the union total.
-    if (from && _writer?.retentionDays) {
-      const retentionBoundary = _computeRetentionBoundary(db, _writer.retentionDays);
-      const retentionBoundaryDate = retentionBoundary.slice(0, 10);
-      const fromDatePart = from.length >= 10 ? from.slice(0, 10) : from;
-      if (fromDatePart < retentionBoundaryDate) {
-        const fullRows = db.prepare(`
-          SELECT id, date, theme, summary, observation_ids as observationIds,
-                 agents, files_touched as filesTouched, quality, created_at as createdAt,
-                 project
-          FROM digests ${whereClause}
-          ORDER BY date DESC, created_at DESC
-        `).all(params);
-        const fullData = fullRows.map(row => ({
-          ...row,
-          observationIds: JSON.parse(row.observationIds || '[]'),
-          agents: JSON.parse(row.agents || '[]'),
-          filesTouched: JSON.parse(row.filesTouched || '[]'),
-        }));
-        const coldRows = ensureColdStore().readDigests({
-          from: fromDatePart,
-          to: (to || new Date().toISOString()).slice(0, 10),
-        });
-        const merged = _mergeDigests(fullData, coldRows, retentionBoundaryDate, { limit, offset });
-        return res.json({ data: merged.data, total: merged.total, limit, offset, _metadata: merged._metadata });
-      }
-    }
-
-    const { total } = db.prepare(`SELECT COUNT(*) as total FROM digests ${whereClause}`).get(params);
-
-    params.limit = limit;
-    params.offset = offset;
-    const rows = db.prepare(`
-      SELECT id, date, theme, summary, observation_ids as observationIds,
-             agents, files_touched as filesTouched, quality, created_at as createdAt,
-             project
-      FROM digests ${whereClause}
-      ORDER BY date DESC, created_at DESC
-      LIMIT @limit OFFSET @offset
-    `).all(params);
-
-    const data = rows.map(row => ({
-      ...row,
-      observationIds: JSON.parse(row.observationIds || '[]'),
-      agents: JSON.parse(row.agents || '[]'),
-      filesTouched: JSON.parse(row.filesTouched || '[]'),
-    }));
-
-    const _metadata = { fromColdStore: false };
-    res.json({ data, total, limit, offset, _metadata });
-  } catch (err) {
-    process.stderr.write(`[obs-api] /digests error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
-    res.status(500).json({ error: 'Failed to query digests' });
-  }
-});
+// Phase 44 plan 07 (R-4 hard cutover): the legacy SQLite-backed GET
+// /api/digests was REPLACED by /api/coding/digests. Requests to the old
+// path return 404.
 
 app.get('/api/digests/projects', (_req, res) => {
   const db = getDb();
@@ -702,53 +515,9 @@ app.get('/api/digests/projects', (_req, res) => {
   }
 });
 
-app.get('/api/insights', (req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
-
-  const { topic, q, project, includeArchived } = req.query;
-  try {
-    try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch {
-      return res.json({ data: [], total: 0 });
-    }
-
-    const where = [];
-    const params = {};
-    if (topic) { where.push('topic = @topic'); params.topic = topic; }
-    if (q) { where.push('(topic LIKE @q OR summary LIKE @q)'); params.q = `%${q}%`; }
-    if (project) { where.push('project = @project'); params.project = project; }
-    // Auto-archived insights (stuck at ratio=0 for 30+ days) are hidden by
-    // default — they're conceptually deleted from the user's perspective.
-    // `?includeArchived=true` surfaces them again (for restoration or audit).
-    if (includeArchived !== 'true') {
-      where.push("(json_extract(metadata, '$.archivedAt') IS NULL)");
-    }
-
-    const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
-
-    const rows = db.prepare(`
-      SELECT id, topic, summary, confidence, digest_ids as digestIds,
-             last_updated as lastUpdated, created_at as createdAt, project,
-             metadata
-      FROM insights ${whereClause}
-      ORDER BY confidence DESC, last_updated DESC
-    `).all(params);
-
-    const data = rows.map(row => ({
-      ...row,
-      digestIds: JSON.parse(row.digestIds || '[]'),
-      metadata: row.metadata ? (() => {
-        try { return JSON.parse(row.metadata); } catch { return {}; }
-      })() : {},
-    }));
-
-    res.json({ data, total: data.length });
-  } catch (err) {
-    process.stderr.write(`[obs-api] /insights error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
-    res.status(500).json({ error: 'Failed to query insights' });
-  }
-});
+// Phase 44 plan 07 (R-4 hard cutover): the legacy SQLite-backed GET
+// /api/insights was REPLACED by /api/coding/insights. Requests to the
+// old path return 404.
 
 app.get('/api/insights/projects', (_req, res) => {
   const db = getDb();
@@ -1137,12 +906,13 @@ app.get('/api/consolidation/status', (_req, res) => {
   }
 });
 
-// ── Phase 44 plan 04: km-core GraphKMStore + common REST router ───────────
+// ── Phase 44 plan 07: km-core GraphKMStore + canonical REST router ────────
 //
-// Mount the km-core common REST router at /api/km/ so the observations API
-// server exposes the unified entity/relation/search surface alongside the
-// legacy SQLite-based endpoints.  The store opens asynchronously; requests
-// that arrive before hydration completes get a 503.
+// Mount the km-core canonical REST router at the versioned `/api/v` path so
+// the observations API server exposes the unified entity/relation/search
+// surface alongside the typed-view legacy reshape endpoints.  The store
+// opens asynchronously; requests that arrive before hydration completes
+// get a 503.
 
 const KG_DB_PATH = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'leveldb');
 const KG_EXPORT_DIR = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'exports');
@@ -1154,9 +924,15 @@ async function ensureKMStore() {
   if (_kmStore && _kmStoreReady) return _kmStore;
   if (_kmStore) return null; // init in progress
   try {
+    // CLAUDE.md mandatory rule: ALL GraphKMStore construction MUST pass
+    // `ontologyDir` (Phase 41 lesson, commits 87bc2f567 / fd35c5350) —
+    // otherwise default-class resolution throws `opts.classes omitted but
+    // store has no ontology registry`. `defaultOntologyDir()` walks up from
+    // the @fwornle/km-core package to find the bundled ontology directory.
     _kmStore = new GraphKMStore({
       dbPath: KG_DB_PATH,
       exportDir: KG_EXPORT_DIR,
+      ontologyDir: defaultOntologyDir(),
     });
     await _kmStore.open();
     _kmStoreReady = true;
@@ -1169,96 +945,249 @@ async function ensureKMStore() {
   }
 }
 
-// Mount km-core router at /api/km/ — deferred until store is ready.
-// We use a gate middleware: if the store isn't hydrated yet, 503.
-import { Router } from 'express';
-const kmSubRouter = Router();
+// ── Phase 44 plan 07 (R-4 hard cutover): canonical /api/v1 mount ──────────
+//
+// Mount the km-core canonical 15-endpoint surface at /api/v1 via the
+// keystone factory createKmCoreRouter (Plan 44-06). The prior orphan-draft
+// mount + alias endpoints + X-KM-Store-Available enrichment middleware
+// were REMOVED in this plan — there is NO dual-mount and NO deprecation
+// window per CONTEXT R-4. The same 503-until-ready hydration gate that
+// guarded the prior mount now guards /api/v1/ verbatim (RESEARCH Open Q5).
+const kmRouter = Router();
 
-// Gate: ensure store is hydrated before any km route runs
-kmSubRouter.use((_req, res, next) => {
+// Hydration gate: 503 until the GraphKMStore finishes opening. Preserved
+// verbatim from the prior orphan-draft mount to keep symmetry across A/B/C.
+kmRouter.use((_req, res, next) => {
   if (!_kmStoreReady || !_kmStore) {
     return res.status(503).json({ error: 'Knowledge graph store not ready' });
   }
   next();
 });
 
-app.use('/api/km', kmSubRouter);
+app.use('/api/v1', kmRouter);
 
-// After store opens, mount the actual km-core route handlers onto the sub-router
+// After the store opens, attach the canonical 15-endpoint surface. The
+// factory takes a Router-like instance + opts; opts.ontologyRegistry feeds
+// /ontology/*, opts.snapshotDir wires the SnapshotManager for /snapshots/*,
+// opts.restartCommand is surfaced in the restore handler's restartRequired
+// signal (S-2 revised — operator triggers `launchctl kickstart` to restart
+// the obs-api launchd job).
 function mountKMRoutes(store) {
-  createKMRouter(store, kmSubRouter, { readOnly: false });
-  process.stderr.write(`[obs-api] km-core REST routes mounted at /api/km/\n`);
-}
-
-// ── Phase 44 plan 04: backward-compatibility aliases ──────────────────────
-// These mount *additional* GET handlers that delegate to the km-core store
-// when it's available.  They sit on `/api/km/observations`, `/api/km/digests`,
-// and `/api/km/insights` so the legacy paths (`/api/observations` etc.) are
-// untouched — but callers can also hit the km-prefixed versions to get data
-// from the unified knowledge graph.
-//
-// We also install middleware on the *original* legacy GET routes so that,
-// when the km-core store is hydrated, the response is enriched with a
-// `_kmStoreAvailable: true` header — a signal to clients that the new
-// `/api/km/entities?ontologyClass=…` surface is ready.
-
-// Helper: query km-core store entities filtered by ontologyClass
-async function queryKMEntities(ontologyClass, { limit = 50, offset = 0, sort = 'updatedAt' } = {}) {
-  if (!_kmStore || !_kmStoreReady) return null;
-  try {
-    const all = [];
-    for await (const [, attrs] of _kmStore.graph.nodeEntries()) {
-      if (attrs.entityType === ontologyClass || attrs.ontologyClass === ontologyClass) {
-        all.push({ id: attrs.id ?? attrs.name, ...attrs });
-      }
-    }
-    // sort
-    if (sort === 'updatedAt') {
-      all.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
-    } else {
-      all.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-    }
-    return all.slice(offset, offset + limit);
-  } catch {
-    return null;
-  }
-}
-
-// Alias endpoints on the km sub-router
-kmSubRouter.get('/observations', async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-  const offset = parseInt(req.query.offset) || 0;
-  const entities = await queryKMEntities('RawObservation', { limit, offset });
-  if (entities === null) return res.status(503).json({ error: 'km-core store not ready' });
-  res.json(entities);
-});
-
-kmSubRouter.get('/digests', async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-  const offset = parseInt(req.query.offset) || 0;
-  const entities = await queryKMEntities('Digest', { limit, offset });
-  if (entities === null) return res.status(503).json({ error: 'km-core store not ready' });
-  res.json(entities);
-});
-
-kmSubRouter.get('/insights', async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-  const offset = parseInt(req.query.offset) || 0;
-  const entities = await queryKMEntities('Insight', { limit, offset });
-  if (entities === null) return res.status(503).json({ error: 'km-core store not ready' });
-  res.json(entities);
-});
-
-// Enrich legacy GET handlers with a header when km-core is available.
-// This runs before the existing handlers (Express runs middleware in order).
-for (const legacyPath of ['/api/observations', '/api/digests', '/api/insights']) {
-  app.use(legacyPath, (_req, res, next) => {
-    if (_kmStoreReady && _kmStore) {
-      res.set('X-KM-Store-Available', 'true');
-    }
-    next();
+  createKmCoreRouter(store, kmRouter, {
+    ontologyRegistry: store.ontology,
+    snapshotDir: KG_EXPORT_DIR,
+    restartCommand: 'launchctl kickstart -k gui/$(id -u) com.coding.obs-api',
   });
+  process.stderr.write(`[obs-api] km-core /api/v1 routes mounted\n`);
 }
+
+// ── Phase 44 plan 07 (A-4): /api/coding/* typed views ─────────────────────
+//
+// These replace the SQLite-backed legacy GETs at /api/observations,
+// /api/digests, /api/insights. Each handler iterates km-core entities
+// filtered by ontologyClass='Observation|Digest|Insight' (Pitfall 3
+// two-field OR-check), reshapes via the observation-view adapter
+// (Plan 44-05), applies the legacy query-string filters in JS, and
+// returns the EXACT same response envelope shape the dashboard at :3032
+// reads (Pitfall 2 — `{data, total, limit, offset, _metadata}`).
+//
+// Between Plan 07 landing and Plan 10 migrating SQLite → km-core, these
+// views return empty `data:[]` — that is by design. Plan 02 typed-views
+// test GREENs on shape; Plan 11 verifies dashboard rendering once data
+// flows from Plan 10.
+
+// Cap per-request scan size — RULE 2 (Rule 4 explicit cap per T-44-07-03).
+// The dashboard's default page size matches the legacy `limit=50`; legacy
+// handler hard-capped at 200 (Math.min(parseInt(limitStr) || 50, 200)),
+// so we preserve that ceiling.
+const TYPED_VIEW_DEFAULT_LIMIT = 50;
+const TYPED_VIEW_MAX_LIMIT = 200;
+
+function parseLimitOffset(req, defaultLimit = TYPED_VIEW_DEFAULT_LIMIT) {
+  const limit = Math.min(parseInt(req.query.limit) || defaultLimit, TYPED_VIEW_MAX_LIMIT);
+  const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+  return { limit, offset };
+}
+
+// Collect all km-core entities of an ontologyClass, applying the
+// Pitfall 3 two-field OR-check (entityType === cls || ontologyClass === cls).
+// Iterating the underlying graph is O(n) on the entity count — Plan 10's
+// migration delivers ~800 obs + ~250 digests + ~77 insights, well within
+// memory budget. T-44-07-03 mitigation: caller applies `limit` ceiling
+// before paging.
+async function collectByOntologyClass(cls) {
+  const matches = [];
+  for await (const [, attrs] of _kmStore.graph.nodeEntries()) {
+    if (attrs.entityType === cls || attrs.ontologyClass === cls) {
+      matches.push(attrs);
+    }
+  }
+  return matches;
+}
+
+// /api/coding/observations — replaces SQLite /api/observations.
+// Query params preserved verbatim: agent, project, from, to, q, quality,
+// limit, offset (Pitfall 2 contract).
+app.get('/api/coding/observations', async (_req, res) => {
+  try {
+    if (!_kmStoreReady || !_kmStore) {
+      return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    }
+    const req = _req;
+    const { agent, project, from, to, q, quality } = req.query;
+    const { limit, offset } = parseLimitOffset(req);
+
+    const entities = await collectByOntologyClass('Observation');
+    const reshaped = entities.map(observationToLegacy);
+
+    // Legacy filter semantics, ported from the prior SQLite WHERE-builder.
+    const agentSet = agent
+      ? new Set(
+          (Array.isArray(agent) ? agent : String(agent).split(',')).map((a) => String(a).trim())
+        )
+      : null;
+    const qualitySet = quality
+      ? new Set(Array.isArray(quality) ? quality : String(quality).split(','))
+      : null;
+    const qLower = q ? String(q).toLowerCase() : null;
+    const toExclusive = to && !String(to).includes('T') ? `${to}T23:59:59.999Z` : to;
+
+    let filtered = reshaped;
+    if (agentSet) filtered = filtered.filter((row) => agentSet.has(row.agent));
+    if (project) filtered = filtered.filter((row) => row.project === project);
+    if (from) filtered = filtered.filter((row) => row.timestamp && row.timestamp >= from);
+    if (toExclusive) filtered = filtered.filter((row) => row.timestamp && row.timestamp <= toExclusive);
+    if (qualitySet) filtered = filtered.filter((row) => qualitySet.has(row.quality ?? 'normal'));
+    if (qLower) {
+      filtered = filtered.filter((row) =>
+        typeof row.content === 'string' && row.content.toLowerCase().includes(qLower)
+      );
+    }
+
+    // Sort newest-first to match SQLite handler's `ORDER BY created_at DESC`.
+    filtered.sort((a, b) => (b.timestamp ?? '').localeCompare(a.timestamp ?? ''));
+    const total = filtered.length;
+    const data = filtered.slice(offset, offset + limit);
+
+    res.json({
+      data,
+      total,
+      limit,
+      offset,
+      _metadata: { fromColdStore: false, source: 'km-core' },
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/coding/observations error: ${err.message}\n`);
+    res.status(500).json({ error: 'Failed to query observations' });
+  }
+});
+
+// /api/coding/digests — replaces SQLite /api/digests.
+// Query params preserved: date, from, to, q, project, limit, offset.
+app.get('/api/coding/digests', async (_req, res) => {
+  try {
+    if (!_kmStoreReady || !_kmStore) {
+      return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    }
+    const req = _req;
+    const { date, from, to, q, project } = req.query;
+    const { limit, offset } = parseLimitOffset(req);
+
+    const entities = await collectByOntologyClass('Digest');
+    const reshaped = entities.map(digestToLegacy);
+
+    const qLower = q ? String(q).toLowerCase() : null;
+
+    let filtered = reshaped;
+    if (date) filtered = filtered.filter((row) => row.date === date);
+    if (from) filtered = filtered.filter((row) => row.date && row.date >= from);
+    if (to) filtered = filtered.filter((row) => row.date && row.date <= to);
+    if (project) filtered = filtered.filter((row) => row.project === project);
+    if (qLower) {
+      filtered = filtered.filter((row) =>
+        (typeof row.theme === 'string' && row.theme.toLowerCase().includes(qLower)) ||
+        (typeof row.summary === 'string' && row.summary.toLowerCase().includes(qLower))
+      );
+    }
+
+    // Newest-first by date — matches SQLite `ORDER BY date DESC, created_at DESC`.
+    filtered.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+    const total = filtered.length;
+    const data = filtered.slice(offset, offset + limit);
+
+    res.json({
+      data,
+      total,
+      limit,
+      offset,
+      _metadata: { fromColdStore: false, source: 'km-core' },
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/coding/digests error: ${err.message}\n`);
+    res.status(500).json({ error: 'Failed to query digests' });
+  }
+});
+
+// /api/coding/insights — replaces SQLite /api/insights.
+// Query params preserved: topic, q, project, includeArchived, limit, offset.
+// The legacy handler returned `{data, total}` (no limit/offset because
+// insights are scarce); we keep the same envelope but include limit+offset
+// to match the Pitfall 2 typed-view contract that Plan 02's test asserts.
+app.get('/api/coding/insights', async (_req, res) => {
+  try {
+    if (!_kmStoreReady || !_kmStore) {
+      return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    }
+    const req = _req;
+    const { topic, q, project, includeArchived } = req.query;
+    const { limit, offset } = parseLimitOffset(req);
+
+    const entities = await collectByOntologyClass('Insight');
+    // For insights we also need access to the underlying metadata.archivedAt
+    // (legacy behaviour: archived insights are hidden by default). The
+    // reshaper drops metadata, so we keep a parallel array of the original
+    // entities and zip the archive flag onto each row before filtering.
+    const reshaped = entities.map((entity) => {
+      const legacy = insightToLegacy(entity);
+      const m = (entity.metadata ?? {});
+      return { legacy, archivedAt: m.archivedAt ?? null };
+    });
+
+    const qLower = q ? String(q).toLowerCase() : null;
+    let filtered = reshaped;
+    if (includeArchived !== 'true') {
+      filtered = filtered.filter((row) => row.archivedAt === null || row.archivedAt === undefined);
+    }
+    if (topic) filtered = filtered.filter((row) => row.legacy.topic === topic);
+    if (project) filtered = filtered.filter((row) => row.legacy.project === project);
+    if (qLower) {
+      filtered = filtered.filter((row) =>
+        (typeof row.legacy.topic === 'string' && row.legacy.topic.toLowerCase().includes(qLower)) ||
+        (typeof row.legacy.summary === 'string' && row.legacy.summary.toLowerCase().includes(qLower))
+      );
+    }
+
+    // Sort by confidence DESC, then last_updated DESC — matches SQLite.
+    filtered.sort((a, b) => {
+      const c = (b.legacy.confidence ?? 0) - (a.legacy.confidence ?? 0);
+      if (c !== 0) return c;
+      return (b.legacy.last_updated ?? '').localeCompare(a.legacy.last_updated ?? '');
+    });
+    const total = filtered.length;
+    const data = filtered.slice(offset, offset + limit).map((row) => row.legacy);
+
+    res.json({
+      data,
+      total,
+      limit,
+      offset,
+      _metadata: { fromColdStore: false, source: 'km-core' },
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/coding/insights error: ${err.message}\n`);
+    res.status(500).json({ error: 'Failed to query insights' });
+  }
+});
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   process.stderr.write(`[obs-api] listening on http://0.0.0.0:${PORT} (db: ${DB_PATH})\n`);
