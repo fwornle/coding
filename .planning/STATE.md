@@ -4,8 +4,8 @@ milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
 stopped_at: Phase 44 context gathered
-last_updated: "2026-06-03T12:14:55.139Z"
-last_activity: 2026-06-03 -- Phase 44 planning complete
+last_updated: "2026-06-03T12:17:55.654Z"
+last_activity: 2026-06-03 -- Phase 44 execution started
 progress:
   total_phases: 23
   completed_phases: 15
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 52 — dashboard-llm-routing-label-process-tag-observability-fix
+**Current focus:** Phase 44 — rest-api-git-snapshots
 
 **v7.1 milestone status (KM-Core unification — 7 of 10 phases done):**
 
@@ -52,12 +52,12 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 44 (REST API & Git Snapshots / v7.1) — NEXT
-Plan: discuss → plan cycle pending (Phase 44 directory not yet scaffolded)
-Status: Ready to execute
+Phase: 44 (rest-api-git-snapshots) — EXECUTING
+Plan: 1 of 11
+Status: Executing Phase 44
 Next step: `/gsd-discuss-phase 44` to bootstrap. Phase 44 lands the common REST contract (entity CRUD, search, clusters, snapshots, ontology metadata) and git-snapshot/restore over `.data/exports/` so all three systems expose the same query surface — necessary precondition for Phase 45's unified viewer.
 Operator follow-ups before Phase 44 starts: (a) backup cleanup at 2026-06-03 (24h soak from CI green); (b) optional — Phase 54 backlog (ETM hardening — launchd plist + isProcessing audit, 3 plans drafted in 54-CONTEXT.md) when ETM stalls become a recurring issue.
-Last activity: 2026-06-03 -- Phase 44 planning complete
+Last activity: 2026-06-03 -- Phase 44 execution started
 
 ## Performance Metrics
 
