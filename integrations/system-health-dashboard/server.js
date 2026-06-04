@@ -4539,7 +4539,7 @@ class SystemHealthAPIServer {
      * Query params: agent, from, to, project, q, quality, limit, offset
      */
     handleGetObservations(req, res) {
-        return this._forwardObsApi(req, res, `/api/observations${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
+        return this._forwardObsApi(req, res, `/api/coding/observations${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
     }
 
     /**
@@ -4575,14 +4575,14 @@ class SystemHealthAPIServer {
      * GET /api/digests — paginated daily digests with filtering.
      */
     handleGetDigests(req, res) {
-        return this._forwardObsApi(req, res, `/api/digests${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
+        return this._forwardObsApi(req, res, `/api/coding/digests${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
     }
 
     /**
      * GET /api/insights — all project insights.
      */
     handleGetInsights(req, res) {
-        return this._forwardObsApi(req, res, `/api/insights${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
+        return this._forwardObsApi(req, res, `/api/coding/insights${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
     }
 
     /**
