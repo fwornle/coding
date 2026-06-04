@@ -51,6 +51,10 @@ import {
   defaultOntologyDir,
 } from '@fwornle/km-core';
 import { Router } from 'express';
+// Phase 44 Plan 14 — shared Artifacts-patch mutator used by both
+// `/patch-artifacts/recent` and `/patch-artifacts/historical`. Single
+// source of truth for the regex + meta merge.
+import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -73,7 +77,12 @@ const PRUNE_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
 let _coldStore = null;
 
 async function ensureWriter() {
-  if (_writer && _writer.db) return _writer;
+  // Phase 44 Plan 14 — readiness predicate switched from `_writer.db`
+  // (SQLite handle truthiness, was the only authority before Plan 14)
+  // to `_writer._kmStore` (km-core handle truthiness, the canonical
+  // write path after Plan 12). Re-entry shares the in-flight init
+  // promise so two simultaneous requests don't construct two writers.
+  if (_writer && _writer._kmStore) return _writer;
   if (_writerInit) return _writerInit;
   _writerInit = (async () => {
     // Phase 44 Plan 12: share the km-core store between the writer and the
@@ -93,10 +102,6 @@ async function ensureWriter() {
   } finally {
     _writerInit = null;
   }
-}
-
-function getDb() {
-  return _writer?.db || null;
 }
 
 // Retrieval service runs in this process (Phase 5: container has zero
@@ -149,17 +154,18 @@ function ensureColdStore() {
   return _coldStore;
 }
 
-function invalidateDb() {
-  if (_writer) {
-    try { _writer.close?.(); } catch { /* best effort */ }
-    _writer = null;
-  }
-}
-
-function isCorruptionError(err) {
-  const msg = err?.message || '';
-  return msg.includes('malformed') || msg.includes('corrupt') || msg.includes('disk I/O');
-}
+// Phase 44 Plan 14: `getDb()` / `invalidateDb()` / `isCorruptionError()`
+// REMOVED. Pre-Plan-14 these wrapped the SQLite handle for the legacy
+// /api/observations + /api/digests + /api/insights + /api/projects +
+// dashboard COUNT endpoints; all of those endpoints now route through
+// km-core via `ensureKMStore()`. The two surviving consolidation handlers
+// (/api/consolidation/run + /api/consolidation/status pipeline-stats
+// path) construct their own ObservationConsolidator on-demand which
+// opens its own SQLite handle — independent of the writer. The
+// SQLite-corruption-recovery code paths (was: `if (isCorruptionError(err))
+// invalidateDb()`) are obsolete because km-core failures surface as
+// JS exceptions with completely different messages; the catch-all
+// `res.status(500)` handler suffices.
 
 // Reading the heartbeat doubles as crash-recovery: if the pid that wrote it
 // is dead, or the file is older than 15× the 2s heartbeat interval (so the
@@ -238,6 +244,39 @@ let _lastStderrAt = null;
 // instead of leaving them orphaned past obs-api's exit.
 let _consolidationAbort = null;
 let _shuttingDown = false;
+
+// ── Phase 44 Plan 14 (T-44-14-06) — staleness-timestamp cache ─────────────
+//
+// The three staleness timestamps (lastObservationAt/lastDigestAt/
+// lastInsightAt) drive the dashboard's [📚] statusline badge and are
+// polled at the same cadence as /api/consolidation/status (~5s). Without
+// caching, each poll would O(N)-scan all entities of each class. The cache
+// is per-process, 5s TTL, manually invalidated on writer publish so a
+// fresh ETM observation surfaces within one poll cycle.
+//
+// Acceptance gate (T-44-14-06 mitigation): dashboard statusline stays
+// GREEN through 100 consecutive /api/consolidation/status polls.
+const STALENESS_TTL_MS = 5_000;
+const _stalenessCache = {
+  ts: 0,
+  value: null,  // { lastObservationAt, lastDigestAt, lastInsightAt }
+  invalidate() {
+    this.ts = 0;
+    this.value = null;
+  },
+  async get(store) {
+    const now = Date.now();
+    if (this.value && now - this.ts < STALENESS_TTL_MS) return this.value;
+    const [lastObservationAt, lastDigestAt, lastInsightAt] = await Promise.all([
+      store.lastModifiedByClass('Observation'),
+      store.lastModifiedByClass('Digest'),
+      store.lastModifiedByClass('Insight'),
+    ]);
+    this.value = { lastObservationAt, lastDigestAt, lastInsightAt };
+    this.ts = now;
+    return this.value;
+  },
+};
 
 // Keep-alive threshold: how long real stderr can be silent before _bumpHeartbeat
 // refreshes _lastStderrAt anyway. The consolidator's insight stage logs once
@@ -372,8 +411,12 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => {
+  // Phase 44 Plan 14 — readiness switched from `_writer.db` (SQLite
+  // handle) to `_writer._kmStore` (km-core handle, canonical write
+  // path). dbPath/dbExists kept for backwards-compatible payload shape;
+  // consumed by the dashboard's health view.
   res.json({
-    status: _writer && _writer.db ? 'ok' : 'starting',
+    status: _writer && _writer._kmStore ? 'ok' : 'starting',
     dbPath: DB_PATH,
     dbExists: fs.existsSync(DB_PATH),
     port: PORT,
@@ -382,8 +425,8 @@ app.get('/health', (_req, res) => {
 });
 
 app.get('/ready', (_req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ ready: false });
+  // Phase 44 Plan 14 — same readiness predicate as /health.
+  if (!_writer || !_writer._kmStore) return res.status(503).json({ ready: false });
   res.json({ ready: true });
 });
 
@@ -400,10 +443,13 @@ app.post('/api/observations/messages', async (req, res) => {
     }
     const writer = await ensureWriter();
     const result = await writer.processMessages(messages, metadata || {});
+    // Phase 44 Plan 14: a fresh write invalidates the staleness cache so
+    // the next /api/consolidation/status poll surfaces the new
+    // lastObservationAt within ~5s (T-44-14-06 SLA).
+    _stalenessCache.invalidate();
     res.json(result);
   } catch (err) {
     process.stderr.write(`[obs-api] /observations/messages error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: err.message || 'Failed to process messages' });
   }
 });
@@ -412,6 +458,16 @@ app.post('/api/observations/messages', async (req, res) => {
  * POST /api/observations/patch-artifacts/recent — backfill artifacts on
  * recent observations whose summary still says "Artifacts: none".
  * Body: { agent: string, modifiedFiles: string[] }
+ *
+ * Phase 44 Plan 14 — cut over from SQLite SELECT+UPDATE to km-core
+ * findByOntologyClass + per-entity predicate + putEntity replay. Scope
+ * is `agent === req.body.agent && properties.summary matches "Artifacts:
+ * none" && properties.createdAt > fourHoursAgoISO`, sorted DESC by
+ * createdAt, limited to 10. Shared `patchArtifactsInPlace` from
+ * scripts/lib/artifacts-patch-util.mjs handles the mutation; the entity
+ * is replayed via `kmStore.putEntity(mutated, { skipOntologyCheck: true })`
+ * which preserves id + legacyId + createdAt + provenance verbatim
+ * (trusted-path bulk semantics).
  */
 app.post('/api/observations/patch-artifacts/recent', async (req, res) => {
   try {
@@ -419,30 +475,38 @@ app.post('/api/observations/patch-artifacts/recent', async (req, res) => {
     if (!agent || !Array.isArray(modifiedFiles) || modifiedFiles.length === 0) {
       return res.status(400).json({ error: 'agent and non-empty modifiedFiles required' });
     }
-    const writer = await ensureWriter();
-    const db = writer.db;
-    const rows = db.prepare(
-      `SELECT id, summary, metadata FROM observations
-       WHERE agent = ? AND summary LIKE '%Artifacts: none%'
-        AND created_at > datetime('now', '-4 hours')
-       ORDER BY created_at DESC LIMIT 10`
-    ).all(agent);
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
 
-    const artifactsList = modifiedFiles.map(f => `edited ${f.split('/').pop()}`).join(', ');
-    const update = db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?');
+    const fourHoursAgoISO = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    const candidates = await store.findByOntologyClass('Observation');
+    const filtered = candidates.filter((e) => {
+      if ((e.metadata?.agent ?? null) !== agent) return false;
+      const summary = typeof e.metadata?.summary === 'string'
+        ? e.metadata.summary
+        : (typeof e.description === 'string' ? e.description : '');
+      if (!/Artifacts:\s*none/i.test(summary)) return false;
+      const createdAt = typeof e.createdAt === 'string' ? e.createdAt : '';
+      return createdAt > fourHoursAgoISO;
+    });
+    // ORDER BY created_at DESC LIMIT 10 — preserve the legacy contract.
+    filtered.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+    const targets = filtered.slice(0, 10);
+
     let patched = 0;
-    for (const row of rows) {
-      let meta = {};
-      try { meta = JSON.parse(row.metadata || '{}'); } catch { /* keep empty */ }
-      meta.modifiedFiles = Array.from(new Set([...(meta.modifiedFiles || []), ...modifiedFiles]));
-      const updatedSummary = row.summary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
-      update.run(updatedSummary, JSON.stringify(meta), row.id);
-      patched++;
+    for (const entity of targets) {
+      if (patchArtifactsInPlace(entity, modifiedFiles)) {
+        await store.putEntity(entity, { skipOntologyCheck: true });
+        patched += 1;
+      }
     }
+    // Writer publish would invalidate the staleness cache; this is a
+    // backfill (not a new write) so we explicitly bump too — the
+    // dashboard staleness clock should reflect the patch.
+    _stalenessCache.invalidate();
     res.json({ patched });
   } catch (err) {
     process.stderr.write(`[obs-api] /patch-artifacts/recent error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: err.message || 'Failed to patch recent artifacts' });
   }
 });
@@ -451,33 +515,47 @@ app.post('/api/observations/patch-artifacts/recent', async (req, res) => {
  * POST /api/observations/patch-artifacts/historical — one-time pass over
  * up to 500 historical rows: if metadata has modifiedFiles but summary
  * still says "Artifacts: none", fix the summary in place.
+ *
+ * Phase 44 Plan 14 — cut over from SQLite SELECT+UPDATE to km-core
+ * findByOntologyClass + per-entity predicate + per-entity
+ * patchArtifactsInPlace + putEntity replay. Each entity's
+ * `metadata.modifiedFiles` is the source of truth for the patched files;
+ * empty/missing modifiedFiles short-circuits per-entity (the util
+ * returns false). T-44-14-02 mitigation: limit 500 + per-entity work
+ * bounded; full historical scan completes well within the 2s budget on
+ * this machine at the current ~4k-observation scale.
  */
 app.post('/api/observations/patch-artifacts/historical', async (_req, res) => {
   try {
-    const writer = await ensureWriter();
-    const db = writer.db;
-    const rows = db.prepare(
-      `SELECT id, summary, metadata FROM observations
-       WHERE summary LIKE '%Artifacts: none%'
-       AND metadata IS NOT NULL AND metadata != '{}'
-       ORDER BY created_at DESC LIMIT 500`
-    ).all();
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
 
-    const update = db.prepare('UPDATE observations SET summary = ? WHERE id = ?');
+    const candidates = await store.findByOntologyClass('Observation');
+    const filtered = candidates.filter((e) => {
+      const summary = typeof e.metadata?.summary === 'string'
+        ? e.metadata.summary
+        : (typeof e.description === 'string' ? e.description : '');
+      if (!/Artifacts:\s*none/i.test(summary)) return false;
+      const mf = e.metadata?.modifiedFiles;
+      return Array.isArray(mf) && mf.length > 0;
+    });
+    filtered.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+    const targets = filtered.slice(0, 500);
+
     let patched = 0;
-    for (const row of rows) {
-      let meta = {};
-      try { meta = JSON.parse(row.metadata || '{}'); } catch { continue; }
-      if (!meta.modifiedFiles || meta.modifiedFiles.length === 0) continue;
-      const artifactsList = meta.modifiedFiles.map(f => `edited ${f.split('/').pop()}`).join(', ');
-      const updatedSummary = row.summary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
-      update.run(updatedSummary, row.id);
-      patched++;
+    for (const entity of targets) {
+      const mf = Array.isArray(entity.metadata?.modifiedFiles)
+        ? entity.metadata.modifiedFiles
+        : [];
+      if (patchArtifactsInPlace(entity, mf)) {
+        await store.putEntity(entity, { skipOntologyCheck: true });
+        patched += 1;
+      }
     }
-    res.json({ patched, scanned: rows.length });
+    _stalenessCache.invalidate();
+    res.json({ patched, scanned: targets.length });
   } catch (err) {
     process.stderr.write(`[obs-api] /patch-artifacts/historical error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: err.message || 'Failed to patch historical artifacts' });
   }
 });
@@ -487,17 +565,39 @@ app.post('/api/observations/patch-artifacts/historical', async (_req, res) => {
 // later in this file). There is no legacy URL fallback per CONTEXT R-4 —
 // requests to the old path return 404 from Express's default handler.
 
-app.get('/api/observations/projects', (_req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+// Phase 44 Plan 14 — projects-distinct endpoints cut over from SQLite to
+// km-core. Each endpoint iterates findByOntologyClass(class), projects
+// the per-entity `metadata.project` (with `properties.metadata.project`
+// fallback for legacy shapes), dedupes via Set, and returns sorted.
+// Empty-class behavior: findByOntologyClass returns []; the resulting
+// JSON is `[]` (matches the prior SQLite handler's `digests LIMIT 0`
+// empty-table guard, naturally).
+
+function _extractProject(entity) {
+  // Both placement variants survive in production: `metadata.project`
+  // (canonical, mirrors legacy-ingest.ts:266) and the row-level
+  // `properties.metadata.project` (legacy backfilled rows). Prefer the
+  // canonical placement; fall back to the legacy one.
+  const m = entity?.metadata ?? {};
+  if (typeof m.project === 'string' && m.project.length > 0) return m.project;
+  const nested = m.metadata && typeof m.metadata === 'object' ? m.metadata.project : null;
+  if (typeof nested === 'string' && nested.length > 0) return nested;
+  return null;
+}
+
+app.get('/api/observations/projects', async (_req, res) => {
   try {
-    const rows = db.prepare(
-      "SELECT DISTINCT json_extract(metadata, '$.project') as project FROM observations WHERE json_extract(metadata, '$.project') IS NOT NULL ORDER BY project"
-    ).all();
-    res.json(rows.map(r => r.project).filter(Boolean));
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    const entities = await store.findByOntologyClass('Observation');
+    const projects = new Set();
+    for (const e of entities) {
+      const p = _extractProject(e);
+      if (p) projects.add(p);
+    }
+    res.json([...projects].sort());
   } catch (err) {
     process.stderr.write(`[obs-api] /observations/projects error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: 'Failed to query projects' });
   }
 });
@@ -506,18 +606,19 @@ app.get('/api/observations/projects', (_req, res) => {
 // /api/digests was REPLACED by /api/coding/digests. Requests to the old
 // path return 404.
 
-app.get('/api/digests/projects', (_req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+app.get('/api/digests/projects', async (_req, res) => {
   try {
-    try { db.prepare('SELECT 1 FROM digests LIMIT 0').get(); } catch { return res.json([]); }
-    const rows = db.prepare(
-      'SELECT DISTINCT project FROM digests WHERE project IS NOT NULL ORDER BY project'
-    ).all();
-    res.json(rows.map(r => r.project).filter(Boolean));
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    const entities = await store.findByOntologyClass('Digest');
+    const projects = new Set();
+    for (const e of entities) {
+      const p = _extractProject(e);
+      if (p) projects.add(p);
+    }
+    res.json([...projects].sort());
   } catch (err) {
     process.stderr.write(`[obs-api] /digests/projects error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: 'Failed to query digest projects' });
   }
 });
@@ -526,45 +627,44 @@ app.get('/api/digests/projects', (_req, res) => {
 // /api/insights was REPLACED by /api/coding/insights. Requests to the
 // old path return 404.
 
-app.get('/api/insights/projects', (_req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+app.get('/api/insights/projects', async (_req, res) => {
   try {
-    try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch { return res.json([]); }
-    const rows = db.prepare(
-      'SELECT DISTINCT project FROM insights WHERE project IS NOT NULL ORDER BY project'
-    ).all();
-    res.json(rows.map(r => r.project).filter(Boolean));
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    const entities = await store.findByOntologyClass('Insight');
+    const projects = new Set();
+    for (const e of entities) {
+      const p = _extractProject(e);
+      if (p) projects.add(p);
+    }
+    res.json([...projects].sort());
   } catch (err) {
     process.stderr.write(`[obs-api] /insights/projects error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: 'Failed to query insight projects' });
   }
 });
 
-app.get('/api/projects', (_req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+app.get('/api/projects', async (_req, res) => {
   try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    // Parallel scan — three findByOntologyClass calls in flight at once.
+    // The aggregation is union-dedup across all three classes.
+    const [obs, digs, ins] = await Promise.all([
+      store.findByOntologyClass('Observation'),
+      store.findByOntologyClass('Digest'),
+      store.findByOntologyClass('Insight'),
+    ]);
     const all = new Set();
-    try {
-      const obs = db.prepare(
-        "SELECT DISTINCT json_extract(metadata, '$.project') as project FROM observations WHERE json_extract(metadata, '$.project') IS NOT NULL"
-      ).all();
-      for (const r of obs) if (r.project) all.add(r.project);
-    } catch { /* table may be missing */ }
-    try {
-      const digs = db.prepare('SELECT DISTINCT project FROM digests WHERE project IS NOT NULL').all();
-      for (const r of digs) if (r.project) all.add(r.project);
-    } catch { /* table may be missing */ }
-    try {
-      const ins = db.prepare('SELECT DISTINCT project FROM insights WHERE project IS NOT NULL').all();
-      for (const r of ins) if (r.project) all.add(r.project);
-    } catch { /* table may be missing */ }
+    for (const list of [obs, digs, ins]) {
+      for (const e of list) {
+        const p = _extractProject(e);
+        if (p) all.add(p);
+      }
+    }
     res.json([...all].sort());
   } catch (err) {
     process.stderr.write(`[obs-api] /projects error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: 'Failed to query projects' });
   }
 });
@@ -618,31 +718,42 @@ const PROJECT_COMPONENT_TAXONOMY = {
   ],
 };
 
-app.get('/api/projects/:project/coverage', (req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+app.get('/api/projects/:project/coverage', async (req, res) => {
   const { project } = req.params;
   if (!project) return res.status(400).json({ error: 'project required' });
   try {
-    try { db.prepare('SELECT 1 FROM insights LIMIT 0').get(); } catch {
-      return res.json({
-        project,
-        computedAt: new Date().toISOString(),
-        insights: { total: 0, fresh: 0, partial: 0, stale: 0, unverified: 0, avgRatio: 1 },
-        coverage: { filesReferenced: 0, componentsMentioned: [], componentsMissing: [] },
-        perInsight: [],
-      });
-    }
-    // Auto-archived insights are filtered out of Coverage — they're treated
-    // as deleted from the user's perspective. The /api/insights list
-    // applies the same default, so the two views stay consistent.
-    const rows = db.prepare(
-      `SELECT id, topic, confidence, summary, digest_ids as digestIds,
-              last_updated as lastUpdated, created_at as createdAt, project, metadata
-       FROM insights
-       WHERE project = ? AND json_extract(metadata, '$.archivedAt') IS NULL
-       ORDER BY last_updated DESC`
-    ).all(project);
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+
+    // Phase 44 Plan 14 — read source moved from SQLite to km-core. The
+    // ratio buckets, taxonomy-match componentsMentioned/Missing math,
+    // and perInsight payload shape are UNCHANGED — only the row source
+    // moves. legacy-ingest.ts:340-362 stamps topic/summary/confidence/
+    // digest_ids/last_updated/project into entity.metadata, so the
+    // existing field-extraction code reads from there with no shape
+    // drift. Auto-archived insights filtered out by the same
+    // `metadata.archivedAt === null` predicate the SQLite handler used.
+    const allInsights = await store.findByOntologyClass('Insight');
+    const rows = allInsights
+      .filter((e) => _extractProject(e) === project && !e.metadata?.archivedAt)
+      // ORDER BY last_updated DESC — preserve legacy ordering.
+      .sort((a, b) => {
+        const al = a.metadata?.last_updated ?? a.updatedAt ?? '';
+        const bl = b.metadata?.last_updated ?? b.updatedAt ?? '';
+        return String(bl).localeCompare(String(al));
+      })
+      // Project to the legacy row shape the downstream computation expects.
+      .map((e) => ({
+        id: e.legacyId?.id ?? e.id,
+        topic: e.metadata?.topic ?? e.name,
+        confidence: typeof e.metadata?.confidence === 'number' ? e.metadata.confidence : 0.8,
+        summary: e.metadata?.summary ?? e.description ?? '',
+        digestIds: Array.isArray(e.metadata?.digest_ids) ? e.metadata.digest_ids : [],
+        lastUpdated: e.metadata?.last_updated ?? e.updatedAt ?? null,
+        createdAt: e.createdAt ?? null,
+        project: _extractProject(e),
+        metadata: e.metadata ?? {},
+      }));
 
     const perInsight = [];
     const allReferencedFiles = new Set();
@@ -650,8 +761,7 @@ app.get('/api/projects/:project/coverage', (req, res) => {
     let ratioSum = 0, ratioCount = 0;
 
     for (const r of rows) {
-      let metadata = {};
-      try { metadata = r.metadata ? JSON.parse(r.metadata) : {}; } catch { /* keep empty */ }
+      const metadata = r.metadata && typeof r.metadata === 'object' ? r.metadata : {};
       const cv = metadata.codeVerification || null;
       const ratio = cv && typeof cv.verificationRatio === 'number' ? cv.verificationRatio : null;
 
@@ -722,7 +832,6 @@ app.get('/api/projects/:project/coverage', (req, res) => {
     });
   } catch (err) {
     process.stderr.write(`[obs-api] /projects/${project}/coverage error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: 'Failed to compute project coverage' });
   }
 });
@@ -763,6 +872,55 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
   try {
     await consolidator.init();
     const updated = await consolidator.resynthesizeInsight(id);
+
+    // Phase 44 Plan 14 Task 2(g) — mirror the resynthesized fields into
+    // the km-core entity via findByLegacyId + putEntity replay. The
+    // consolidator owns the LLM call + the SQLite UPDATE (deferred to
+    // Plan 44-15); km-core is the canonical going-forward state. The
+    // mirror keeps the dashboard read paths at /api/coding/insights in
+    // sync with the new summary/topic/confidence/last_updated, while
+    // preserving digest_ids + metadata.codeVerification verbatim
+    // (T-44-14-03 mitigation: only the four resynthesized fields and
+    // a fresh createdBy.runId mutate; everything else is preserved).
+    try {
+      const store = await ensureKMStore();
+      if (store) {
+        const entity = await store.findByLegacyId({ system: 'A', id });
+        if (entity) {
+          // Mutate ONLY the resynthesized fields. createdBy.runId carries
+          // the resynthesis-identifying stamp so downstream provenance
+          // queries can distinguish a resynthesized payload from an
+          // original synthesis.
+          const newRunId = 'insight-resynthesize-' + Date.now();
+          entity.metadata = {
+            ...(entity.metadata ?? {}),
+            summary: updated.summary,
+            topic: updated.topic,
+            confidence: updated.confidence,
+            last_updated: updated.lastUpdated,
+          };
+          entity.description = updated.summary;
+          entity.updatedAt = updated.lastUpdated || entity.updatedAt;
+          entity.name = (updated.topic || entity.name || '').slice(0, 80) || entity.name;
+          entity.createdBy = {
+            ...(entity.createdBy ?? {}),
+            provider: entity.createdBy?.provider ?? 'observation-writer',
+            model: entity.createdBy?.model ?? 'live-pipeline',
+            runId: newRunId,
+            timestamp: new Date().toISOString(),
+          };
+          await store.putEntity(entity, { skipOntologyCheck: true });
+          _stalenessCache.invalidate();
+        }
+      }
+    } catch (mirrorErr) {
+      // Mirror failure is non-fatal — the consolidator already wrote to
+      // SQLite (the deferred source) and the response payload already
+      // describes the result. Surface to stderr so the operator can
+      // catch a systematic drift.
+      process.stderr.write(`[obs-api] /insights/${id}/resynthesize km-core mirror failed: ${mirrorErr.message}\n`);
+    }
+
     const durationMs = Date.now() - startedAt;
     res.json({ ...updated, durationMs });
   } catch (err) {
@@ -777,7 +935,6 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
     if (err.code === 'LLM_FAILED' || err.code === 'PARSE_FAILED') {
       return res.status(502).json({ error: err.message });
     }
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: `Re-synthesis failed: ${err.message}` });
   } finally {
     try { consolidator.close(); } catch { /* best-effort */ }
@@ -816,7 +973,6 @@ app.post('/api/retrieve', async (req, res) => {
     res.json(result);
   } catch (err) {
     process.stderr.write(`[obs-api] /retrieve error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: 'Retrieval failed' });
   }
 });
@@ -843,7 +999,6 @@ app.post('/api/consolidation/run', (req, res) => {
   // Without the .catch we'd get an unhandledRejection log on every failed run.
   runConsolidation(req.body || {}).catch(err => {
     process.stderr.write(`[obs-api] /consolidation/run async error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
   });
   res.status(202).json({
     success: true,
@@ -854,39 +1009,63 @@ app.post('/api/consolidation/run', (req, res) => {
   });
 });
 
-app.get('/api/consolidation/status', (_req, res) => {
-  const db = getDb();
-  if (!db) return res.status(503).json({ error: 'Observations database unavailable' });
+app.get('/api/consolidation/status', async (_req, res) => {
   try {
-    const totalObs = db.prepare('SELECT COUNT(*) as cnt FROM observations').get().cnt;
-    const today = new Date().toISOString().split('T')[0];
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
 
-    let undigested = totalObs;
+    // Phase 44 Plan 14 Task 2(g) — split COUNTs onto km-core
+    // (countByOntologyClass) and the 3 staleness timestamps onto the
+    // 5s-TTL cache wrapping lastModifiedByClass. The 4 consolidator-
+    // pipeline stats (undigested / pendingPast / pendingToday /
+    // lowQuality) STAY on the consolidator's own SQLite handle because
+    // they depend on the `digested_at` column owned by the
+    // consolidator's bookkeeping — deferred to Plan 44-15 (consolidator
+    // cutover). Operator chose to keep payload shape identical so the
+    // dashboard at :3032 + health-coordinator [📚] badge see no shape
+    // drift.
+    const [totalObs, totalDigests, totalInsights, staleness] = await Promise.all([
+      store.countByOntologyClass('Observation'),
+      store.countByOntologyClass('Digest'),
+      store.countByOntologyClass('Insight'),
+      _stalenessCache.get(store),
+    ]);
+
+    // Pipeline stats from the consolidator's own SQLite handle. Open
+    // on-demand (mirrors the consolidation/run path's
+    // `new ObservationConsolidator({ dbPath: DB_PATH })` lazy-construct
+    // pattern). Wrapped in try/catch with safe defaults so a missing
+    // observations.db (post-Plan-44-15 archive) returns zeros instead
+    // of a 503 — the dashboard staleness clock keeps rendering.
+    let undigested = 0;
     let pendingPast = 0;
     let pendingToday = 0;
     let lowQuality = 0;
+    let consolidatorOpenedOk = false;
+    const pipelineStatsConsolidator = new ObservationConsolidator({ dbPath: DB_PATH });
     try {
-      undigested = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low'").get().cnt;
-      lowQuality = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality = 'low'").get().cnt;
-      pendingPast = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) < ?").get(today).cnt;
-      pendingToday = db.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) = ?").get(today).cnt;
-    } catch { /* digested_at column may not exist */ }
-
-    let totalDigests = 0;
-    try { totalDigests = db.prepare('SELECT COUNT(*) as cnt FROM digests').get().cnt; } catch { /* table may not exist */ }
-
-    let totalInsights = 0;
-    try { totalInsights = db.prepare('SELECT COUNT(*) as cnt FROM insights').get().cnt; } catch { /* table may not exist */ }
-
-    // Latest write timestamps per table — consumed by health-coordinator's
-    // knowledge_pipeline slice to drive the [📚] statusline badge. ISO-8601
-    // strings (the column type), null when the table is empty or absent.
-    let lastObservationAt = null;
-    try { lastObservationAt = db.prepare('SELECT MAX(created_at) AS t FROM observations').get().t || null; } catch { /* */ }
-    let lastDigestAt = null;
-    try { lastDigestAt = db.prepare('SELECT MAX(created_at) AS t FROM digests').get().t || null; } catch { /* */ }
-    let lastInsightAt = null;
-    try { lastInsightAt = db.prepare('SELECT MAX(created_at) AS t FROM insights').get().t || null; } catch { /* */ }
+      await pipelineStatsConsolidator.init();
+      consolidatorOpenedOk = true;
+      const today = new Date().toISOString().split('T')[0];
+      const cdb = pipelineStatsConsolidator.db;
+      if (cdb) {
+        try {
+          undigested = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low'").get().cnt;
+          lowQuality = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality = 'low'").get().cnt;
+          pendingPast = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) < ?").get(today).cnt;
+          pendingToday = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) = ?").get(today).cnt;
+        } catch { /* digested_at column may not exist on a fresh DB */ }
+      }
+    } catch (consolidatorErr) {
+      // Consolidator init failure is non-fatal — the dashboard sees the
+      // km-core counts + staleness clock; pipeline stats remain zero.
+      // Plan 44-15 archives this path entirely.
+      process.stderr.write(`[obs-api] /consolidation/status consolidator probe failed: ${consolidatorErr.message}\n`);
+    } finally {
+      if (consolidatorOpenedOk) {
+        try { pipelineStatsConsolidator.close(); } catch { /* best-effort */ }
+      }
+    }
 
     const inflight = readConsolidationHeartbeat();
 
@@ -894,7 +1073,9 @@ app.get('/api/consolidation/status', (_req, res) => {
       totalObs, undigested, lowQuality, pendingPast, pendingToday,
       digested: totalObs - undigested - lowQuality,
       totalDigests, totalInsights,
-      lastObservationAt, lastDigestAt, lastInsightAt,
+      lastObservationAt: staleness.lastObservationAt,
+      lastDigestAt: staleness.lastDigestAt,
+      lastInsightAt: staleness.lastInsightAt,
       inflight,
       // F1: last-completed run surface for the polling frontend. lastJob.id
       // advances on every new run; when (id !== prevId AND inflight === null)
@@ -908,7 +1089,6 @@ app.get('/api/consolidation/status', (_req, res) => {
     });
   } catch (err) {
     process.stderr.write(`[obs-api] /consolidation/status error: ${err.message}\n`);
-    if (isCorruptionError(err)) invalidateDb();
     res.status(500).json({ error: 'Failed to get consolidation status' });
   }
 });
