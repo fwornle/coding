@@ -90,9 +90,13 @@ WAVE_OVERRIDES = {
     'wave-analysis-wave4-diagram-repair':      CHEAP,
     'wave-analysis-wave4-pattern-extract':     HEAVY,
     'wave-analysis-wave4-docs':                HEAVY,
-    # Health/monitoring probes — must use copilot (HTTP) not claude-code (subprocess)
+    # Health/monitoring probes — must use copilot (HTTP) not claude-code (subprocess).
+    # observation-writer pinned to CHEAP (haiku): empirically ~98% of overnight
+    # calls return <10 output tokens (dedup churn / "no observation"), so paying
+    # sonnet rates is pure waste. Heavy synthesis paths use the per-sub-step
+    # wave-analysis-* tags above, not the generic observation-writer route.
     'health-coordinator':                      CHEAP,
-    'observation-writer':                      HEAVY,
+    'observation-writer':                      CHEAP,
 }
 
 def get_settings():

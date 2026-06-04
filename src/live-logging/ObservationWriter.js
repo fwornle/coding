@@ -584,6 +584,68 @@ export class ObservationWriter {
   }
 
   /**
+   * Compute the content-hash used for dedup. Must produce the identical
+   * value as the inline hash in writeObservation(). Callers in the
+   * pre-LLM path use this to short-circuit the summarize() call when the
+   * same exchange has already been observed (~98% of overnight wasted
+   * sonnet calls per the 2026-06-04 audit).
+   */
+  _computeContentHash(messages, metadata = {}) {
+    const userContent = messages
+      .filter(m => m.role === 'user')
+      .map(m => m.content)
+      .join('|');
+    const assistantContent = messages
+      .filter(m => m.role === 'assistant')
+      .map(m => typeof m.content === 'string' ? m.content.slice(0, 500) : '')
+      .join('|');
+    const sessionId = metadata.session_id || '';
+    return crypto.createHash('md5')
+      .update(`${sessionId}|${userContent}|${assistantContent}`)
+      .digest('hex');
+  }
+
+  /**
+   * Look up an existing observation by (agent, content_hash). Returns the
+   * existing row or null. Safe to call before init() — returns null.
+   */
+  _findExistingByContentHash(agent, contentHash) {
+    if (!this.db) return null;
+    return this.db.prepare(
+      'SELECT id, summary, metadata FROM observations WHERE agent = ? AND content_hash = ? LIMIT 1'
+    ).get(agent, contentHash) || null;
+  }
+
+  /**
+   * If an existing observation has "Artifacts: none" but the current fire
+   * has ground-truth modifiedFiles, patch the Artifacts line in place. No
+   * LLM call needed — modifiedFiles comes from deterministic tool-call
+   * extraction. Returns true if a patch was applied, false otherwise.
+   */
+  _maybePatchArtifacts(existing, metadata) {
+    const hasNoArtifacts = /Artifacts:\s*none/i.test(existing.summary);
+    const newModifiedFiles = metadata.modifiedFiles;
+    if (!hasNoArtifacts || !newModifiedFiles || newModifiedFiles.length === 0) {
+      return false;
+    }
+    const artifactsList = newModifiedFiles.map(f => {
+      const base = f.split('/').pop();
+      return `edited ${base}`;
+    }).join(', ');
+    const updatedSummary = existing.summary.replace(
+      /Artifacts:\s*none/i,
+      `Artifacts: ${artifactsList}`,
+    );
+    let existingMeta = {};
+    try { existingMeta = JSON.parse(existing.metadata || '{}'); } catch { /* ignore */ }
+    existingMeta.modifiedFiles = newModifiedFiles;
+    if (metadata.readFiles) existingMeta.readFiles = metadata.readFiles;
+    this.db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?')
+      .run(updatedSummary, JSON.stringify(existingMeta), existing.id);
+    return true;
+  }
+
+  /**
    * Write a single observation to the database.
    *
    * @param {string} summary - Observation summary text
@@ -610,42 +672,18 @@ export class ObservationWriter {
     }
 
     const agent = metadata.agent || null;
-
-    // Content-based dedup: hash user messages + assistant content + session context
-    // Include assistant content because identical user prompts (e.g. "Continue") in
-    // different sessions produce completely different exchanges.
-    const userContent = messages
-      .filter(m => m.role === 'user')
-      .map(m => m.content)
-      .join('|');
-    const assistantContent = messages
-      .filter(m => m.role === 'assistant')
-      .map(m => typeof m.content === 'string' ? m.content.slice(0, 500) : '')
-      .join('|');
-    const sessionId = metadata.session_id || '';
-    const hashInput = `${sessionId}|${userContent}|${assistantContent}`;
-    const contentHash = crypto.createHash('md5').update(hashInput).digest('hex');
-
-    const existing = this.db.prepare(
-      'SELECT id, summary, metadata FROM observations WHERE agent = ? AND content_hash = ? LIMIT 1'
-    ).get(agent, contentHash);
+    // Content-based dedup. Hash inputs: session id + user-message content +
+    // first 500 chars of each assistant message. Including assistant content
+    // is required because identical user prompts (e.g. "Continue") produce
+    // completely different exchanges across sessions.
+    // This is a TOCTOU-defense backstop: processMessages() runs the same
+    // check before calling the LLM, so a hit here means two fire-and-forget
+    // calls raced past the pre-LLM check before either wrote.
+    const contentHash = this._computeContentHash(messages, metadata);
+    const existing = this._findExistingByContentHash(agent, contentHash);
     if (existing) {
-      // If the existing observation has no artifacts but this re-fire does, patch it
-      const hasNoArtifacts = /Artifacts:\s*none/i.test(existing.summary);
-      const newModifiedFiles = metadata.modifiedFiles;
-      if (hasNoArtifacts && newModifiedFiles && newModifiedFiles.length > 0) {
-        const artifactsList = newModifiedFiles.map(f => {
-          const base = f.split('/').pop();
-          return `edited ${base}`;
-        }).join(', ');
-        const updatedSummary = existing.summary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
-        let existingMeta = {};
-        try { existingMeta = JSON.parse(existing.metadata || '{}'); } catch { /* ignore */ }
-        existingMeta.modifiedFiles = newModifiedFiles;
-        if (metadata.readFiles) existingMeta.readFiles = metadata.readFiles;
-        this.db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?')
-          .run(updatedSummary, JSON.stringify(existingMeta), existing.id);
-        process.stderr.write(`[ObservationWriter] Dedup+patch: updated ${existing.id.slice(0, 8)} with ${newModifiedFiles.length} artifacts\n`);
+      if (this._maybePatchArtifacts(existing, metadata)) {
+        process.stderr.write(`[ObservationWriter] Dedup+patch: updated ${existing.id.slice(0, 8)} with ${(metadata.modifiedFiles || []).length} artifacts\n`);
         return existing.id;
       }
       process.stderr.write(`[ObservationWriter] Dedup: same input already observed (hash=${contentHash.slice(0, 8)})\n`);
@@ -943,6 +981,28 @@ export class ObservationWriter {
 
     for (const chunk of chunks) {
       try {
+        // Pre-LLM content-hash dedup: the writeObservation() path catches
+        // duplicate fires by content_hash, but only AFTER paying for the
+        // summary. Per the 2026-06-04 audit, ~98% of overnight obs-writer
+        // calls returned <10 output tokens because dedup discarded them —
+        // the LLM was invoked, dedup hit, result thrown away. Short-circuit
+        // here when the (agent, content_hash) row already exists.
+        // The patch case (existing has "Artifacts: none" and we now have
+        // ground-truth modifiedFiles) is also LLM-free, handled inline.
+        const preAgent = metadata.agent || null;
+        const preHash = this._computeContentHash(chunk, metadata);
+        const preExisting = this._findExistingByContentHash(preAgent, preHash);
+        if (preExisting) {
+          if (this._maybePatchArtifacts(preExisting, metadata)) {
+            process.stderr.write(`[ObservationWriter] Pre-LLM dedup+patch: updated ${preExisting.id.slice(0, 8)} with ${(metadata.modifiedFiles || []).length} artifacts (no LLM call)\n`);
+          } else {
+            process.stderr.write(`[ObservationWriter] Pre-LLM dedup: same input already observed (hash=${preHash.slice(0, 8)}) — skipping LLM call\n`);
+          }
+          observations++;
+          lastObservationId = preExisting.id;
+          continue;
+        }
+
         // LLM summarization runs outside the lock (slow, ~5-15s)
         const { summary, llm, needs_lsl_resolution } = await this.summarize(chunk, metadata);
         let enrichedMeta = llm

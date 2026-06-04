@@ -480,10 +480,16 @@ class EnhancedTranscriptMonitor {
                 this._firePromptSetObservation(tracker.currentUserPromptSet);
               }
               // Update lastProcessedUuid BEFORE clearing the set — prevents
-              // re-reading the same exchanges on the next poll cycle (duplication fix)
+              // re-reading the same exchanges on the next poll cycle (duplication fix).
+              // Use lastMessageUuid (actual last message in the exchange) instead of
+              // id (= user-prompt uuid, the START of the exchange). Otherwise assistant/
+              // tool messages that arrive after the flush bump the unprocessed boundary
+              // past lastProcessedUuid → same exchange re-detected → re-fire loop. See
+              // overnight audit 2026-06-04: 1,506 wasted obs-writer calls from this bug.
               const lastFlushedExch = tracker.currentUserPromptSet[tracker.currentUserPromptSet.length - 1];
-              if (lastFlushedExch && (lastFlushedExch.id || lastFlushedExch.uuid)) {
-                this.lastProcessedUuid = lastFlushedExch.id || lastFlushedExch.uuid;
+              const flushedUuid = lastFlushedExch?.lastMessageUuid || lastFlushedExch?.id || lastFlushedExch?.uuid;
+              if (flushedUuid) {
+                this.lastProcessedUuid = flushedUuid;
               }
               tracker.currentUserPromptSet = [];
               tracker.lastProcessedUuid = this.lastProcessedUuid;
@@ -550,10 +556,12 @@ class EnhancedTranscriptMonitor {
             if (ageMs > FLUSH_THRESHOLD_MS) {
               console.log(`⏰ Time-based flush (no new exchanges): ${this.currentUserPromptSet.length} exchanges held for ${Math.round(ageMs / 1000)}s`);
               this._firePromptSetObservation(this.currentUserPromptSet);
-              // Update lastProcessedUuid so we don't re-read
+              // Update lastProcessedUuid so we don't re-read. Prefer lastMessageUuid
+              // over id — see comment in the multi-transcript flush above.
               const lastExch = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
-              if (lastExch && lastExch.id) {
-                this.lastProcessedUuid = lastExch.id;
+              const flushedUuid = lastExch?.lastMessageUuid || lastExch?.id;
+              if (flushedUuid) {
+                this.lastProcessedUuid = flushedUuid;
               }
               this.currentUserPromptSet = [];
             }
@@ -587,10 +595,12 @@ class EnhancedTranscriptMonitor {
                   this._firePromptSetObservation(this.currentUserPromptSet);
                 }
                 // Update lastProcessedUuid BEFORE clearing — prevents re-reading
-                // the same exchanges on next poll (duplication fix)
+                // the same exchanges on next poll. Prefer lastMessageUuid over id
+                // (id is the user-prompt start; assistant messages arrive after).
                 const lastFlushed = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
-                if (lastFlushed && (lastFlushed.id || lastFlushed.uuid)) {
-                  this.lastProcessedUuid = lastFlushed.id || lastFlushed.uuid;
+                const flushedUuid = lastFlushed?.lastMessageUuid || lastFlushed?.id || lastFlushed?.uuid;
+                if (flushedUuid) {
+                  this.lastProcessedUuid = flushedUuid;
                 }
                 this.currentUserPromptSet = [];
               }
@@ -3778,14 +3788,16 @@ ORDER BY m.time_created ASC;`;
           this.debug(`Time-based flush LSL write failed (non-critical): ${err.message}`);
         }
         
-        // Update lastProcessedUuid so next cycle doesn't re-read the same messages
+        // Update lastProcessedUuid so next cycle doesn't re-read the same messages.
+        // Prefer lastMessageUuid over id — see overnight-audit comment elsewhere.
         const lastExchange = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
-        if (lastExchange && lastExchange.id) {
-          this.lastProcessedUuid = lastExchange.id;
+        const flushedUuid = lastExchange?.lastMessageUuid || lastExchange?.id;
+        if (flushedUuid) {
+          this.lastProcessedUuid = flushedUuid;
           this.saveLastProcessedUuid();
-          this.debug(`📌 Updated lastProcessedUuid to ${lastExchange.id} after time-based flush`);
+          this.debug(`📌 Updated lastProcessedUuid to ${flushedUuid} after time-based flush`);
         }
-        
+
         this.currentUserPromptSet = [];
       } else {
         this.debug(`⏳ Holding ${this.currentUserPromptSet.length} exchanges in prompt set (age: ${Math.round(ageMs / 1000)}s) - waiting for user prompt or flush threshold`);
@@ -4137,11 +4149,14 @@ ORDER BY m.time_created ASC;`;
             this.isProcessing = true;
             this.isProcessingSince = Date.now();
             try {
-              console.log(`⏰ Time-based flush (single-transcript): ${this.currentUserPromptSet.length} exchanges held for ${Math.round(ageMs / 1000)}s`);
+              this.debug(`⏰ Time-based flush (single-transcript): ${this.currentUserPromptSet.length} exchanges held for ${Math.round(ageMs / 1000)}s`);
               this._firePromptSetObservation(this.currentUserPromptSet);
+              // Prefer lastMessageUuid over id — assistant messages can arrive after
+              // the user-prompt UUID and would otherwise re-trigger this exchange.
               const lastExch = this.currentUserPromptSet[this.currentUserPromptSet.length - 1];
-              if (lastExch && lastExch.id) {
-                this.lastProcessedUuid = lastExch.id;
+              const flushedUuid = lastExch?.lastMessageUuid || lastExch?.id;
+              if (flushedUuid) {
+                this.lastProcessedUuid = flushedUuid;
                 this.saveLastProcessedUuid(this.lastProcessedUuid);
               }
               this.currentUserPromptSet = [];

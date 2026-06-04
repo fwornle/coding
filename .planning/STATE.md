@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: paused
-stopped_at: Phase 44 Wave 4 — Plan 44-09 architectural blocker (Rule 4)
-last_updated: "2026-06-03T13:30:00.000Z"
-last_activity: 2026-06-03 -- Phase 44 paused after 44-07 + 44-08 (8/11 plans complete)
+status: awaiting-operator
+stopped_at: Phase 44 Wave 5 — Plan 44-10 checkpoint (operator service restarts required for live migration)
+last_updated: "2026-06-04T06:30:00.000Z"
+last_activity: 2026-06-04 -- Phase 44 Wave 4 closed + 44-10 script/backup landed (9.5/11 plans)
 progress:
   total_phases: 23
   completed_phases: 15
@@ -52,11 +52,18 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 44 (rest-api-git-snapshots) — **PAUSED** at Plan 44-09 (Rule 4 architectural blocker)
-Plan: 8 of 11 complete (Wave 0/1/2/3 done; Wave 4 split — 07+08 done, 09 paused)
-Status: Awaiting operator decision on km-core ↔ OKM wire-shape divergence
-Next step: Audit Plan 44-03 "verbatim lift" fidelity against OKM Phase 43 D-G5.1 fixtures; decide whether to refit km-core to OKM-verbatim (re-opens 44-06/07/08) or treat km-core as a new contract (re-records OKM fixtures + viewer expectations). See `.planning/phases/44-rest-api-git-snapshots/44-09-SUMMARY.md` checkpoint for the concrete shape mismatches (RelationSchema, StatsSchema).
-Last activity: 2026-06-03 -- Phase 44 paused after 44-07 + 44-08 (8/11 plans complete; 44-09 checkpoint reached)
+Phase: 44 (rest-api-git-snapshots) — **AWAITING OPERATOR** at Plan 44-10 Task 3 gate
+Plan: 9.5 of 11 complete (Waves 0/1/2/3/4 closed; 44-10 script + backup landed; 44-10 live migration + 44-11 verification gate operator-owned)
+Status: Awaiting operator-coordinated service restarts so live migration can run
+Next step: Operator action queue (see 44-10-SUMMARY.md for full detail):
+  1. `launchctl kickstart -k gui/$(id -u) com.coding.obs-api` (pick up 44-07 typed-view changes)
+  2. Sync `~/Agentic/km-core` to post-`c7bc236` (or symlink to `/Users/Q284340/Agentic/coding/lib/km-core` at HEAD)
+  3. `cd /Users/Q284340/Agentic/coding/docker && docker-compose build coding-services && docker-compose up -d coding-services` (pick up 44-08 B-side mount)
+  4. Dry-run: `node scripts/migrate-sqlite-to-kmcore.mjs --dry-run --run-id=phase-44-dryrun-$(date +%s) | tail -5`
+  5. Live: `node scripts/migrate-sqlite-to-kmcore.mjs --run-id=phase-44-live-$(date +%s) --verify | tee /tmp/migrate-phase-44.log`
+  6. Resume: `/gsd-execute-phase 44 --wave 6` to run Plan 44-11 verification gate
+  7. Operator-merge OKM PR #5 (https://bmw.ghe.com/adpnext-apps/operational-knowledge-management/pull/5) + restart C's service so cross-system-parity C-leg flips GREEN
+Last activity: 2026-06-04 -- Wave 4 closed (44-07/08/09 + amend); Plan 44-10 paused at checkpoint after script + backup
 
 ## Performance Metrics
 
