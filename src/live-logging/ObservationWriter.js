@@ -969,6 +969,30 @@ export class ObservationWriter {
       return { observations: 0, errors: 0 };
     }
 
+    // Skip sub-agent transcripts entirely. Sub-agents are tool calls of the
+    // parent session — the parent's observation already captures the spawn
+    // ("Intent: dispatch migration agent for 44-10"). Observing the subagent's
+    // internal "[tool: Read]" fragments separately produces only "No actionable
+    // content" duds (2026-06-04 dud-dump audit: 23 of 54 captured duds came
+    // from .../subagents/agent-*.jsonl paths).
+    if (typeof metadata.sourceFile === 'string' && metadata.sourceFile.includes('/subagents/')) {
+      process.stderr.write(`[ObservationWriter] Skipping sub-agent transcript: ${metadata.sourceFile}\n`);
+      return { observations: 0, errors: 0 };
+    }
+
+    // Skip prompt sets with no user-message-bearing exchange. The summary
+    // template requires user intent to fill the "Intent:" field; without a
+    // user message the LLM correctly responds "No actionable content."
+    // (2026-06-04 dud-dump audit: 39 of 54 captured duds had no <user> in the
+    // exchange XML — pure assistant tool-call chains from OpenCode continuation
+    // sessions and Claude sub-agents.) Filter out empty/whitespace-only too.
+    const hasUserMessage = messages.some(m => m.role === 'user' &&
+      typeof m.content === 'string' && m.content.trim().length > 0);
+    if (!hasUserMessage) {
+      process.stderr.write(`[ObservationWriter] Skipping: prompt has no user-message-bearing content (${messages.length} messages)\n`);
+      return { observations: 0, errors: 0 };
+    }
+
     // Group messages into chunks based on batchSize
     const chunks = [];
     for (let i = 0; i < messages.length; i += this.batchSize) {

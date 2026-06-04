@@ -129,6 +129,45 @@ describe('ObservationWriter — pre-LLM dedup', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
+  test('skip: sub-agent transcript source → no fetch, no DB write', async () => {
+    const writer = await newInitializedWriter('skip-subagent');
+    const messages = [
+      { role: 'user', content: 'real user prompt' },
+      { role: 'assistant', content: 'subagent did something' },
+    ];
+    const result = await writer.processMessages(messages, {
+      agent: 'claude',
+      session_id: 's1',
+      sourceFile: '/Users/u/.claude/projects/-Users-u-Agentic-coding/abc/subagents/agent-xyz.jsonl',
+    });
+    expect(result).toEqual({ observations: 0, errors: 0 });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('skip: no user-message-bearing content (continuation chain) → no fetch', async () => {
+    const writer = await newInitializedWriter('skip-no-user');
+    // Pure assistant-only chain — OpenCode continuation pattern.
+    const messages = [
+      { role: 'assistant', content: '[tool: bash]' },
+      { role: 'assistant', content: '[tool: read]\n[tool: read]' },
+      { role: 'assistant', content: 'Now let me check X' },
+    ];
+    const result = await writer.processMessages(messages, { agent: 'opencode', session_id: 's1' });
+    expect(result).toEqual({ observations: 0, errors: 0 });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('skip: user message present but whitespace-only → no fetch', async () => {
+    const writer = await newInitializedWriter('skip-whitespace-user');
+    const messages = [
+      { role: 'user', content: '   \n\t  ' },
+      { role: 'assistant', content: 'Some response' },
+    ];
+    const result = await writer.processMessages(messages, { agent: 'claude', session_id: 's1' });
+    expect(result).toEqual({ observations: 0, errors: 0 });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   test('pre-LLM patch path: existing has "Artifacts: none" and second fire adds modifiedFiles → patches without LLM', async () => {
     const writer = await newInitializedWriter('pre-llm-patch');
     const messages = [
