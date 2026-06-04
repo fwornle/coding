@@ -459,6 +459,33 @@ The plan's Task 2 envisioned this; SC#2 blocks it. After the SC#2 blockers are r
 N/A; plan type is `execute` (verification gate, not feature work). The Wave 0 stubs themselves are the gate; this plan records their state.
 
 ---
-*Phase: 44-rest-api-git-snapshots*
-*Plan 11 Task 1 completed: 2026-06-04T16:57:00Z*
-*Plan 11 Task 2 status: AWAITING OPERATOR ACTION*
+
+## Task 2 — Operator decision
+
+**Signal:** `issues: open sub-plans for SC#2 + SC#3, then re-run 44-11`
+
+**Recorded:** 2026-06-04 (this session)
+
+**Phase 44 close-out: HALTED.** ROADMAP Phase 44 entry remains `[ ]`. STATE.md Current Position does NOT advance to Phase 45.
+
+**Sub-plans to draft before re-running 44-11:**
+
+- **44-15 — Snapshot-dir routing fix.** Three independent legs:
+  - A: `.data/knowledge-graph/exports/` is gitignored at `.gitignore:204`. SnapshotManager's `git add -A` therefore can't stage exports. Decide: untrack the exports dir, or move SnapshotManager to a tracked subtree, or use `git add -f`. Per CONTEXT no-force-include preference, the cleanest path is likely to remove the ignore.
+  - B: `/coding/.git/index.lock` read-only inside `coding-services` container — the bind-mount strips write perms on `.git/`. Decide whether B's snapshot creation runs in-container or shells out to a host-side helper.
+  - C: OKM PR #5 unmerged + service not restarted. The `/api/v1` mount won't exist until that lands. Operator handles the PR merge + restart out-of-band; 44-15 just records the cross-system verification once C is up.
+
+- **44-16 — Typed-view shape lock for `digests` + `insights`.** Decide canonical key shape post-Plan-09:
+  - Option 1: snake_case at the boundary for symmetry with `observations` (the Pitfall-2 lock); change `scripts/observations-api-server.mjs` reshape handlers to emit `observation_ids` / `files_touched` / `digest_ids` / `last_updated`.
+  - Option 2: camelCase as the post-Plan-09 contract; rewrite `tests/integration/typed-views.test.js` shape assertions to expect camelCase.
+  - The dashboard renders all three correctly today, so consumer impact is bounded either way; the lock is about test/contract consistency.
+
+**Out-of-band operator items:**
+- Merge OKM PR #5 and restart C's service so `/api/v1` mounts.
+- Visual UI smokes (dashboard `:3032` + VOKB) deferred to the re-run.
+
+**Re-run sequence:** After 44-15 + 44-16 land, re-execute Plan 44-11. The new run will see SC#2 unblocked, SC#3 PASS, and Task 2 will then exercise the live-restart cycle + visual smokes.
+
+*Plan 11 Task 1 committed: 1d8ce72ce*
+*Plan 11 Task 2 status: ISSUES — sub-plans 44-15 + 44-16 to be drafted before Phase 44 close-out*
+*Pre-flight regression fix: 244dbc418 (ensureKMStore race — unrelated to plan body but blocked SC#1 evidence collection)*
