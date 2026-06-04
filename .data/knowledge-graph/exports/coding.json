@@ -1,0 +1,10 @@
+{
+  "attributes": {},
+  "options": {
+    "type": "directed",
+    "multi": true,
+    "allowSelfLoops": true
+  },
+  "nodes": [],
+  "edges": []
+}
