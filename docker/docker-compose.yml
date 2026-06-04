@@ -82,7 +82,7 @@ services:
       # corruption from concurrent openers across the Docker bind-mount boundary.
       - ${CODING_REPO:-.}/.specstory:/coding/.specstory
       - ${CODING_REPO:-.}/knowledge-management:/coding/knowledge-management
-      - ${CODING_REPO:-.}/.git:/coding/.git:ro
+      - ${CODING_REPO:-.}/.git:/coding/.git:rw
       # Workspace access (host repos)
       - ${HOME}/Agentic:/workspace:ro
       # km-core peer package — Phase 42 strangler adapter (Plan 01).
