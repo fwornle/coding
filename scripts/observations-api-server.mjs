@@ -31,6 +31,13 @@ import { ObservationConsolidator } from '../src/live-logging/ObservationConsolid
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
 import { ObservationPruner } from '../src/live-logging/ObservationPruner.js';
 import { ColdStoreReader } from '../src/live-logging/ColdStoreReader.js';
+// Phase 44 Plan 13 — obs-api opens its own SQLite handle for the two
+// remaining SQLite consumers (`ObservationPruner` + `RetrievalService`
+// keyword-search FTS5). The writer dropped its SQLite handle in Plan 13;
+// the consolidator (Plan 44-15 deferred) still opens its own handle for
+// the consolidation pipeline. Both keep working independently because
+// SQLite WAL mode allows multiple open connections per process.
+import { openDatabase as openLegacyDb } from '../src/live-logging/SafeDatabase.js';
 // Phase 35 plan 35-04 - pure merge helpers extracted into a sibling module so
 // the Jest integration test can import them without dragging in RetrievalService
 // and its TS dist deps.  Re-exported below for backwards-compatible discovery.
@@ -76,6 +83,23 @@ let _pruneInterval = null;
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
 let _coldStore = null;
 
+// Phase 44 Plan 13 — independent SQLite handle for the pruner + retrieval
+// service. The writer's SQLite handle was dropped in Plan 13; pruner +
+// retrieval still need direct SQLite access (the pruner DELETEs old rows;
+// retrieval uses FTS5 for keyword search). Lazy + idempotent.
+let _legacyDb = null;
+function ensureLegacyDb() {
+  if (_legacyDb) return _legacyDb;
+  try {
+    _legacyDb = openLegacyDb(DB_PATH);
+    process.stderr.write(`[obs-api] legacy SQLite handle opened: ${DB_PATH}\n`);
+  } catch (err) {
+    process.stderr.write(`[obs-api] failed to open legacy SQLite handle: ${err.message}\n`);
+    _legacyDb = null;
+  }
+  return _legacyDb;
+}
+
 async function ensureWriter() {
   // Phase 44 Plan 14 — readiness predicate switched from `_writer.db`
   // (SQLite handle truthiness, was the only authority before Plan 14)
@@ -113,7 +137,9 @@ function ensureRetrieval() {
   if (!process.env.QDRANT_URL) {
     process.env.QDRANT_URL = 'http://localhost:6333';
   }
-  _retrieval = new RetrievalService({ dbGetter: () => _writer?.db || null });
+  // Phase 44 Plan 13 — retrieval reads FTS5 directly off the legacy SQLite
+  // file (independent of the writer, which no longer holds a SQLite handle).
+  _retrieval = new RetrievalService({ dbGetter: () => ensureLegacyDb() });
   // Eager init warms fastembed; fire-and-forget so startup isn't blocked.
   _retrieval.initialize().catch((err) => {
     process.stderr.write(`[obs-api] retrieval init failed (lazy retry on first request): ${err.message}\n`);
@@ -122,15 +148,21 @@ function ensureRetrieval() {
 }
 
 // Phase 35 plan 35-04 - pruner factory + 1h interval scheduler.
-// The pruner is constructed lazily after ensureWriter resolves (so _writer.db
-// and _writer.retentionDays are populated). First prune fires immediately on
-// boot so an already-oversized DB shrinks without a 1h wait. Errors are logged
-// to stderr but never thrown - obs-api boot must remain crash-free even if the
-// pruner cannot run.
+// The pruner is constructed lazily after ensureWriter resolves (so the
+// writer's `retentionDays` is computed from its config-load). First prune
+// fires immediately on boot so an already-oversized DB shrinks without a 1h
+// wait. Errors are logged to stderr but never thrown - obs-api boot must
+// remain crash-free even if the pruner cannot run.
+//
+// Phase 44 Plan 13: pruner gets its SQLite handle from `ensureLegacyDb()`
+// (the obs-api-owned handle). The writer no longer holds a SQLite handle
+// post-Plan-13.
 function ensurePruner() {
   if (_pruner) return _pruner;
-  if (!_writer || !_writer.db || !_writer.retentionDays) return null;
-  _pruner = new ObservationPruner({ db: _writer.db, retentionDays: _writer.retentionDays });
+  if (!_writer || !_writer.retentionDays) return null;
+  const legacyDb = ensureLegacyDb();
+  if (!legacyDb) return null;
+  _pruner = new ObservationPruner({ db: legacyDb, retentionDays: _writer.retentionDays });
   try {
     const r = _pruner.prune();
     process.stderr.write(`[obs-api] initial prune: ${JSON.stringify(r)}\n`);
@@ -1483,6 +1515,13 @@ async function shutdown(signal) {
     if (_pipelineStatsConsolidator) {
       try { _pipelineStatsConsolidator.close(); } catch { /* best effort */ }
       _pipelineStatsConsolidator = null;
+    }
+    // Phase 44 Plan 13 — close the obs-api-owned legacy SQLite handle.
+    // SafeDatabase's shutdown hook will checkpoint the WAL; calling close()
+    // here lets readers see the final state without waiting for the hook.
+    if (_legacyDb) {
+      try { _legacyDb.close(); } catch { /* best effort */ }
+      _legacyDb = null;
     }
     // SIGKILL ourselves to skip Node's native destructor teardown.
     // process.exit(0) triggers the fastembed C++ cleanup path which hits a

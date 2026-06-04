@@ -12,13 +12,14 @@
  * migration ran. The fix is a hard cutover per CONTEXT R-4: every write
  * goes through km-core; no dual-write window; no feature flag.
  *
- * The SQLite handle (`this.db`) is preserved during the cutover window
- * because sibling obs-api endpoints (consolidation, FTS search, project
- * listings, dedup) still read from SQLite for historical data. Those
- * read paths migrate separately; the writer's READ helpers (dedup,
- * artifact patch) continue using `this.db` until their replacements
- * land. New WRITES go to km-core only — no SQLite INSERT in this file
- * after Plan 44-12.
+ * Phase 44 Plan 13 (writer-side deep cutover — wave 5.7): the SQLite
+ * handle is GONE. The three remaining helpers (`_findExistingByContentHash`,
+ * `_isSemanticallyDuplicate`, `_maybePatchArtifacts`) now read+write via
+ * km-core. The km-core helpers `findByContentHash` + `findRecentByAgent` +
+ * `findByLegacyId` + `putEntity` (replay) back them. No SQLite handle is
+ * constructed; the legacy startup ack log was retired. The `this.dbPath`
+ * field is preserved as a path string used to derive `projectRoot`
+ * for the redactor — it is a config path, NOT a handle.
  *
  * Routes LLM summarization calls through the coding LLM proxy (port from
  * LLM_CLI_PROXY_PORT env, default 12435) rather than direct Google/Anthropic
@@ -27,15 +28,12 @@
  * @module ObservationWriter
  */
 
-import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Redis from 'ioredis';
-import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
-import { openDatabase, closeDatabase } from './SafeDatabase.js';
 import { getLSLWindow } from '../../lib/lsl/window.mjs';
 // Phase 44 Plan 12: km-core write path. `GraphKMStore` is the canonical
 // store for the A-1 observation/digest/insight surface; the three
@@ -52,8 +50,6 @@ import {
   legacyDigestToEntity,
   legacyInsightToEntity,
 } from '@fwornle/km-core/adapters/legacy-ingest';
-
-const require = createRequire(import.meta.url);
 
 /**
  * Resolve the km-core ontology directory using the import.meta.resolve +
@@ -147,7 +143,6 @@ export class ObservationWriter {
       );
     }
     this.retentionDays = retentionDays;
-    this.db = null;
     /** @type {Map<string, number>} Recent content hashes → timestamp for dedup */
     this._recentHashes = new Map();
     this._dedupWindowMs = 60_000; // skip duplicates within 60s
@@ -189,85 +184,28 @@ export class ObservationWriter {
   }
 
   /**
-   * Initialize the database connection and ensure the observations table exists.
+   * Initialize the writer: opens the km-core GraphKMStore (canonical write
+   * target post-Plan-44-13) and the PII/secret redactor. No SQLite handle
+   * is opened — the writer is fully migrated to km-core for all
+   * read+write paths (`writeObservation`, `_findExistingByContentHash`,
+   * `_isSemanticallyDuplicate`, `_maybePatchArtifacts`).
+   *
+   * Phase 44 Plan 13: dropped the SQLite open helper call, the
+   * FTS5/triggers/index creation, the WAL checkpoint interval, the
+   * `_reopenDb` inode-rotation watchdog, and the row→JSON exporter wiring.
+   * The exporter is gone because the writer no longer populates SQLite;
+   * the legacy `.data/observation-export/*.json` files are now maintained
+   * by the consolidator (deferred to Plan 44-15) and ultimately by
+   * km-core's own JSON export under `.data/knowledge-graph/exports/`.
+   *
+   * The `this.dbPath` field is preserved as a path string — used to
+   * derive `projectRoot` for the redactor config lookup. It is a config
+   * path, NOT a handle.
    */
   async init() {
-    // Use SafeDatabase for crash-safe open with integrity check, WAL enforcement,
-    // auto-recovery, and shutdown handlers. All consumers of observations.db
-    // MUST use SafeDatabase to prevent corruption from concurrent/crashed writers.
-    this.db = openDatabase(this.dbPath);
-    // Snapshot the inode so the periodic checkpoint can detect external
-    // rotation (e.g. another process running SafeDatabase recovery and
-    // renaming the file to .corrupted-<ts>). Without this, a long-lived
-    // writer keeps its handle on the orphaned inode and silently writes
-    // into the rotated-out file while readers see the new fresh DB.
-    try { this._dbInode = fs.statSync(this.dbPath).ino; } catch { this._dbInode = null; }
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS observations (
-        id TEXT PRIMARY KEY,
-        summary TEXT,
-        messages TEXT,
-        agent TEXT,
-        session_id TEXT,
-        source_file TEXT,
-        created_at TEXT,
-        metadata TEXT
-      )
-    `);
-
-    // Add columns for dedup and quality (idempotent)
-    for (const col of ['content_hash TEXT', 'quality TEXT DEFAULT "normal"']) {
-      try { this.db.exec(`ALTER TABLE observations ADD COLUMN ${col}`); } catch { /* exists */ }
-    }
-    // Index for fast dedup lookups
-    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_obs_agent_hash ON observations(agent, content_hash)`);
-
-    // FTS5 full-text search table (content-sync with observations).
-    // Ensure triggers exist so every INSERT/UPDATE/DELETE keeps the index in sync.
-    try {
-      this.db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(summary, content='observations', content_rowid='rowid')`);
-      this.db.exec(`
-        CREATE TRIGGER IF NOT EXISTS observations_ai AFTER INSERT ON observations BEGIN
-          INSERT INTO observations_fts(rowid, summary) VALUES (new.rowid, new.summary);
-        END
-      `);
-      this.db.exec(`
-        CREATE TRIGGER IF NOT EXISTS observations_ad AFTER DELETE ON observations BEGIN
-          INSERT INTO observations_fts(observations_fts, rowid, summary) VALUES('delete', old.rowid, old.summary);
-        END
-      `);
-      this.db.exec(`
-        CREATE TRIGGER IF NOT EXISTS observations_au AFTER UPDATE ON observations BEGIN
-          INSERT INTO observations_fts(observations_fts, rowid, summary) VALUES('delete', old.rowid, old.summary);
-          INSERT INTO observations_fts(rowid, summary) VALUES (new.rowid, new.summary);
-        END
-      `);
-    } catch { /* FTS5 not available in this SQLite build — search falls back to LIKE */ }
-
-    // Periodic WAL checkpoint so readonly connections (e.g. Docker health dashboard) see fresh data.
-    // Also detects external DB rotation (SafeDatabase recovery on a different process)
-    // and reopens the handle — otherwise this process keeps writing to the orphaned
-    // inode while readers see the freshly restored file.
-    this._walCheckpointInterval = setInterval(() => {
-      try {
-        let currentInode = null;
-        try { currentInode = fs.statSync(this.dbPath).ino; } catch { /* file missing */ }
-        if (currentInode !== null && this._dbInode !== null && currentInode !== this._dbInode) {
-          process.stderr.write(`[ObservationWriter] DB rotated externally (inode ${this._dbInode} → ${currentInode}) — reopening\n`);
-          this._reopenDb();
-          return;
-        }
-        this.db.pragma('wal_checkpoint(PASSIVE)');
-      } catch { /* db may be closed */ }
-    }, 15_000); // every 15 seconds
-
-    // Git-friendly JSON export (mirrors UKB knowledge-export pattern)
-    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
-    this._exporter = new ObservationExporter({ db: this.db, projectRoot });
-    this._exportTimer = null;
-
-    // Initialize redactor for PII/secret scrubbing (same rules as LSL system)
+    // Initialize redactor for PII/secret scrubbing (same rules as LSL system).
+    // The redactor's configDir is derived from the (no-longer-opened) dbPath:
+    // ".observations/observations.db" → projectRoot = ".", config = ".specstory/config".
     try {
       const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
       this._redactor = new ConfigurableRedactor({
@@ -280,16 +218,11 @@ export class ObservationWriter {
       this._redactor = null;
     }
 
-    // Shutdown handlers are registered by SafeDatabase — no need to duplicate here.
-
-    process.stderr.write(`[ObservationWriter] Database initialized: ${this.dbPath}\n`);
-
-    // Phase 44 Plan 12: km-core is the canonical write path. When the
+    // Phase 44 Plan 13: km-core is the canonical write+read target. When the
     // caller supplied either `kmStore` directly OR an explicit
-    // `kmStoreDbPath`, eagerly open the store so the first write doesn't
-    // pay a cold-start. When neither is supplied (legacy unit-test path),
-    // defer — the first write call surfaces a clear error if the writer is
-    // exercised without km-core wiring.
+    // `kmStoreDbPath`, eagerly open the store so the first write doesn't pay
+    // a cold-start. When NEITHER is supplied, the first write throws — there
+    // is no SQLite-only fallback after Plan 13.
     if (this._kmStore || this._kmStoreDbPath) {
       try {
         await this._ensureKmStore();
@@ -348,24 +281,9 @@ export class ObservationWriter {
     await this._kmStore.open();
     this._ownsKmStore = true;
     process.stderr.write(
-      `[ObservationWriter] km-core GraphKMStore ready (dbPath=${this._kmStoreDbPath}, ontologyDir=${ontologyDir})\n`
+      `[ObservationWriter] kmStore initialized: ${this._kmStoreDbPath} (ontologyDir=${ontologyDir})\n`
     );
     return this._kmStore;
-  }
-
-  /**
-   * Reopen the DB handle after external rotation (e.g. SafeDatabase
-   * corruption recovery in a sibling process renamed the file to
-   * .corrupted-<ts>). Refreshes the exporter's `db` reference and
-   * snapshots the new inode. Schema/index/trigger CREATE statements
-   * are all IF NOT EXISTS so idempotent against the freshly-restored DB.
-   */
-  _reopenDb() {
-    try { closeDatabase(this.db); } catch { /* best effort */ }
-    this.db = openDatabase(this.dbPath);
-    try { this._dbInode = fs.statSync(this.dbPath).ino; } catch { this._dbInode = null; }
-    if (this._exporter) this._exporter.db = this.db;
-    process.stderr.write(`[ObservationWriter] Reopened DB (inode=${this._dbInode})\n`);
   }
 
   /**
@@ -776,14 +694,41 @@ export class ObservationWriter {
   }
 
   /**
-   * Look up an existing observation by (agent, content_hash). Returns the
-   * existing row or null. Safe to call before init() — returns null.
+   * Look up an existing observation by (agent, content_hash) via km-core.
+   *
+   * Phase 44 Plan 13: replaces the previous SQLite
+   *   `SELECT id, summary, metadata FROM observations WHERE agent=? AND
+   *    content_hash=? LIMIT 1`
+   * with `kmStore.findByContentHash(agent, contentHash)`. Returns the shape
+   * the previous SQLite row produced so the callers (`writeObservation`,
+   * `processMessages`) don't change.
+   *
+   * Shape returned: `{ id, summary, metadata }` where:
+   *   - id      = `entity.legacyId.id` (the row UUID — same as the value
+   *               the previous SQLite write produced via crypto.randomUUID()).
+   *   - summary = `entity.properties.summary`. legacy-ingest.ts:262-274
+   *               stores the summary string under `metadata.summary`; for
+   *               km-core entities the top-level `description` carries the
+   *               same value (set at adapter line 261). We surface
+   *               `metadata.summary` here for consistency with the SQLite
+   *               shape (Artifacts-patch regex matches on summary text).
+   *   - metadata = JSON string of `entity.metadata`. Pre-Plan-13 callers
+   *                JSON.parse the string in `_maybePatchArtifacts`; rather
+   *                than break that contract, we stringify here.
+   *
+   * Returns null when no match. Safe to call before init() (returns null).
    */
-  _findExistingByContentHash(agent, contentHash) {
-    if (!this.db) return null;
-    return this.db.prepare(
-      'SELECT id, summary, metadata FROM observations WHERE agent = ? AND content_hash = ? LIMIT 1'
-    ).get(agent, contentHash) || null;
+  async _findExistingByContentHash(agent, contentHash) {
+    if (!this._kmStore) return null;
+    const matches = await this._kmStore.findByContentHash(agent, contentHash);
+    if (matches.length === 0) return null;
+    const e = matches[0];
+    const meta = e.metadata || {};
+    return {
+      id: e.legacyId?.id ?? e.id,
+      summary: meta.summary ?? e.description ?? '',
+      metadata: typeof meta === 'string' ? meta : JSON.stringify(meta),
+    };
   }
 
   /**
@@ -791,13 +736,30 @@ export class ObservationWriter {
    * has ground-truth modifiedFiles, patch the Artifacts line in place. No
    * LLM call needed — modifiedFiles comes from deterministic tool-call
    * extraction. Returns true if a patch was applied, false otherwise.
+   *
+   * Phase 44 Plan 13: replaces the previous SQLite
+   *   `UPDATE observations SET summary=?, metadata=? WHERE id=?`
+   * with a km-core fetch-modify-putEntity replay:
+   *   1. `kmStore.findByLegacyId({ system: 'A', id: existing.id })`
+   *   2. mutate `entity.metadata.summary` (the Artifacts: substring) +
+   *      `entity.metadata.modifiedFiles` / `readFiles`.
+   *   3. mutate `entity.description` so the dashboard reshape via
+   *      observation-view.ts surfaces the patched text too.
+   *   4. `kmStore.putEntity(entity, { skipOntologyCheck: true })` — replay
+   *      preserves `entity.createdAt`, `entity.createdBy`, `entity.id`,
+   *      `entity.legacyId` verbatim (T-44-13-02 mitigation).
+   *
+   * Returns false when the existing summary doesn't carry "Artifacts: none"
+   * OR no new modifiedFiles were supplied. Caller's contract unchanged.
    */
-  _maybePatchArtifacts(existing, metadata) {
+  async _maybePatchArtifacts(existing, metadata) {
     const hasNoArtifacts = /Artifacts:\s*none/i.test(existing.summary);
     const newModifiedFiles = metadata.modifiedFiles;
     if (!hasNoArtifacts || !newModifiedFiles || newModifiedFiles.length === 0) {
       return false;
     }
+    if (!this._kmStore) return false;
+
     const artifactsList = newModifiedFiles.map(f => {
       const base = f.split('/').pop();
       return `edited ${base}`;
@@ -806,12 +768,47 @@ export class ObservationWriter {
       /Artifacts:\s*none/i,
       `Artifacts: ${artifactsList}`,
     );
-    let existingMeta = {};
-    try { existingMeta = JSON.parse(existing.metadata || '{}'); } catch { /* ignore */ }
-    existingMeta.modifiedFiles = newModifiedFiles;
-    if (metadata.readFiles) existingMeta.readFiles = metadata.readFiles;
-    this.db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?')
-      .run(updatedSummary, JSON.stringify(existingMeta), existing.id);
+
+    // Fetch the canonical entity (km-core is the single source of truth
+    // post-Plan-13). The Artifacts-patch path is idempotent — if the entity
+    // has since been overwritten by a successor (rare) the patch becomes a
+    // no-op fetch but the caller's `return true` contract still holds because
+    // the SQLite row would have been similarly stale.
+    const entity = await this._kmStore.findByLegacyId({
+      system: 'A',
+      id: existing.id,
+    });
+    if (!entity) {
+      process.stderr.write(
+        `[ObservationWriter] Artifacts-patch: legacyId ${existing.id} not found in km-core — skipping\n`
+      );
+      return false;
+    }
+
+    // Build the patched entity. T-44-13-02 invariant: PRESERVE the original
+    // entity.createdAt, entity.createdBy, entity.id, entity.legacyId verbatim;
+    // mutate ONLY metadata.summary + metadata.modifiedFiles + metadata.readFiles
+    // (and the top-level `description` which carries the same summary text for
+    // the dashboard reshape).
+    const patchedMeta = { ...(entity.metadata || {}) };
+    patchedMeta.summary = updatedSummary;
+    patchedMeta.modifiedFiles = newModifiedFiles;
+    if (metadata.readFiles) patchedMeta.readFiles = metadata.readFiles;
+
+    const patched = {
+      ...entity,
+      description: updatedSummary,
+      metadata: patchedMeta,
+    };
+
+    try {
+      await this._kmStore.putEntity(patched, { skipOntologyCheck: true });
+    } catch (err) {
+      process.stderr.write(
+        `[ObservationWriter] Artifacts-patch putEntity failed for ${existing.id}: ${err.message}\n`
+      );
+      return false;
+    }
     return true;
   }
 
@@ -823,9 +820,9 @@ export class ObservationWriter {
    * @param {Object} metadata - Additional metadata (agent, sessionId, sourceFile)
    */
   async writeObservation(summary, messages, metadata = {}) {
-    if (!this.db) {
-      throw new Error('Database not initialized. Call init() first.');
-    }
+    // Phase 44 Plan 13: km-core is the single canonical store. The legacy
+    // SQLite handle is gone; we require `_ensureKmStore()` to succeed.
+    const kmStore = await this._ensureKmStore();
 
     // Skip trivial and no-work observations (no value for learning)
     // Note: [Raw] fallback summaries are NOT skipped — they are stored as quality='low'
@@ -850,9 +847,9 @@ export class ObservationWriter {
     // check before calling the LLM, so a hit here means two fire-and-forget
     // calls raced past the pre-LLM check before either wrote.
     const contentHash = this._computeContentHash(messages, metadata);
-    const existing = this._findExistingByContentHash(agent, contentHash);
+    const existing = await this._findExistingByContentHash(agent, contentHash);
     if (existing) {
-      if (this._maybePatchArtifacts(existing, metadata)) {
+      if (await this._maybePatchArtifacts(existing, metadata)) {
         process.stderr.write(`[ObservationWriter] Dedup+patch: updated ${existing.id.slice(0, 8)} with ${(metadata.modifiedFiles || []).length} artifacts\n`);
         return existing.id;
       }
@@ -861,7 +858,7 @@ export class ObservationWriter {
     }
 
     // Semantic dedup: check if a very similar observation was written recently (same agent, last 5)
-    if (this._isSemanticallyDuplicate(agent, summary)) {
+    if (await this._isSemanticallyDuplicate(agent, summary)) {
       process.stderr.write(`[ObservationWriter] Dedup: semantically similar observation already exists\n`);
       return null;
     }
@@ -892,7 +889,6 @@ export class ObservationWriter {
     // (`skipOntologyCheck: true` — Observation/Digest/Insight classes are
     // NOT in the bundled km-core ontology; same precedent as the migration
     // script per CONTEXT R-4 hard cutover).
-    const kmStore = await this._ensureKmStore();
     const obsRow = {
       id,
       summary: redactedSummary,
@@ -929,8 +925,11 @@ export class ObservationWriter {
       });
     }
 
-    // Debounced JSON export — coalesce rapid-fire writes into one export
-    this._scheduleExport();
+    // Phase 44 Plan 13: removed `_scheduleExport()` — the previous debounced
+    // JSON export pulled rows from the legacy SQLite observations table,
+    // which is no longer populated by the writer. km-core's own JSON export
+    // under `.data/knowledge-graph/exports/` handles the entity-shaped
+    // equivalent on a separate debounce.
 
     return id;
   }
@@ -1010,20 +1009,6 @@ export class ObservationWriter {
     }
   }
 
-  /**
-   * Schedule a debounced JSON export. Coalesces rapid writes (e.g. batch
-   * processing) into a single export 10s after the last write.
-   */
-  _scheduleExport() {
-    if (!this._exporter) return;
-    if (this._exportTimer) clearTimeout(this._exportTimer);
-    this._exportTimer = setTimeout(() => {
-      try { this._exporter.exportObservations(); } catch (err) {
-        process.stderr.write(`[ObservationWriter] Export error: ${err.message}\n`);
-      }
-    }, 10_000);
-  }
-
   /** Stop words excluded from similarity comparisons */
   static _STOP_WORDS = new Set([
     'the', 'and', 'for', 'that', 'this', 'with', 'from', 'into', 'after',
@@ -1095,20 +1080,28 @@ export class ObservationWriter {
    * Jaccard > 0.45 OR stem-aware containment > 0.7 (containment catches the
    * asymmetric case where one Intent extends the other with qualifiers).
    */
-  _isSemanticallyDuplicate(agent, summary) {
-    if (!this.db) return false;
+  async _isSemanticallyDuplicate(agent, summary) {
+    if (!this._kmStore) return false;
 
     const newIntent = this._extractIntent(summary);
     const newApproach = this._extractApproach(summary);
     const newText = [newIntent, newApproach].filter(Boolean).join(' ');
     if (!newText || newText.length < 20) return false;
 
-    // Check last 50 observations within the past 4 hours (covers rapid-fire sessions)
-    const recent = this.db.prepare(
-      `SELECT summary FROM observations
-       WHERE agent = ? AND created_at > datetime('now', '-4 hours')
-       ORDER BY created_at DESC LIMIT 50`
-    ).all(agent);
+    // Phase 44 Plan 13: replaces the previous SQLite
+    //   `SELECT summary FROM observations WHERE agent=? AND
+    //    created_at > datetime('now', '-4 hours')
+    //    ORDER BY created_at DESC LIMIT 50`
+    // with `kmStore.findRecentByAgent(agent, fourHoursAgoISO, 50)`. The
+    // helper returns entities sorted by `metadata.createdAt` DESC and capped
+    // to limit. Map to the `{summary}` row shape so the keyword/Jaccard/
+    // containment loop below stays UNCHANGED — proven semantics, only the
+    // data source moves.
+    const fourHoursAgoISO = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    const entities = await this._kmStore.findRecentByAgent(agent, fourHoursAgoISO, 50);
+    const recent = entities.map((e) => ({
+      summary: (e.metadata && e.metadata.summary) || e.description || '',
+    }));
 
     const newKeywords = this._extractKeywords(newText);
     if (newKeywords.size < 3) return false;
@@ -1275,9 +1268,9 @@ export class ObservationWriter {
         // ground-truth modifiedFiles) is also LLM-free, handled inline.
         const preAgent = metadata.agent || null;
         const preHash = this._computeContentHash(chunk, metadata);
-        const preExisting = this._findExistingByContentHash(preAgent, preHash);
+        const preExisting = await this._findExistingByContentHash(preAgent, preHash);
         if (preExisting) {
-          if (this._maybePatchArtifacts(preExisting, metadata)) {
+          if (await this._maybePatchArtifacts(preExisting, metadata)) {
             process.stderr.write(`[ObservationWriter] Pre-LLM dedup+patch: updated ${preExisting.id.slice(0, 8)} with ${(metadata.modifiedFiles || []).length} artifacts (no LLM call)\n`);
           } else {
             process.stderr.write(`[ObservationWriter] Pre-LLM dedup: same input already observed (hash=${preHash.slice(0, 8)}) — skipping LLM call\n`);
@@ -1327,31 +1320,17 @@ export class ObservationWriter {
   }
 
   /**
-   * Close the database connection.
+   * Close the writer's km-core store (when owned) + Redis publisher.
+   *
+   * Phase 44 Plan 13: dropped the SQLite close+WAL-checkpoint + exporter
+   * flush — no SQLite handle is held anymore. km-core's own close()
+   * handles a debounced JSON export flush + LevelDB durable write.
    */
   async close() {
-    if (this._walCheckpointInterval) {
-      clearInterval(this._walCheckpointInterval);
-      this._walCheckpointInterval = null;
-    }
-    // Flush any pending export before closing
-    if (this._exportTimer) {
-      clearTimeout(this._exportTimer);
-      this._exportTimer = null;
-    }
-    if (this._exporter && this.db) {
-      try { this._exporter.exportObservations(); } catch { /* best effort */ }
-    }
     // Disconnect Redis publisher if active
     if (this._redisPub) {
       try { this._redisPub.disconnect(); } catch { /* best effort */ }
       this._redisPub = null;
-    }
-    if (this.db) {
-      try { this.db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
-      this.db.close();
-      this.db = null;
-      process.stderr.write('[ObservationWriter] Database connection closed.\n');
     }
     // Phase 44 Plan 12: close the km-core store only when we own it. When
     // the caller (obs-api) supplied it via `options.kmStore`, the caller

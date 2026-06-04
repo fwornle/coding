@@ -18,10 +18,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { jest } from '@jest/globals';
-import { createRequire } from 'node:module';
 
-const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
+// Phase 44 Plan 13 removed the better-sqlite3 import — the patch path now
+// reads back via km-core (`writer._kmStore.findByOntologyClass('Observation')`)
+// instead of opening the legacy SQLite db file directly.
 
 let tmpDir;
 let ObservationWriter;
@@ -98,18 +98,14 @@ async function newInitializedWriter(name) {
   return writer;
 }
 
-// Phase 44 Plan 12 (A-1 cutover): the dedup path
-// (_findExistingByContentHash + _maybePatchArtifacts) still reads from
-// SQLite via `this.db.prepare(...)`. After the SQLite WRITE path was cut,
-// the first write no longer populates the SQLite `observations` table —
-// so dedup never finds prior rows and the patch path never fires. The
-// two skipped tests below assert that historical dedup behavior; they
-// will go GREEN again after a follow-up plan migrates the dedup read
-// path to query km-core via `findByLegacyId`/`findByOntologyClass`
-// instead of SQLite. Tracked as a deferred follow-up in 44-12-SUMMARY.md
-// (§ "Out-of-scope dedup follow-up").
+// Phase 44 Plan 13 (writer dedup cutover): the dedup path
+// (_findExistingByContentHash + _maybePatchArtifacts) now reads+writes
+// via km-core. Both helpers were rewired on top of the new km-core
+// query helpers (`findByContentHash`, `findByLegacyId`, `putEntity`
+// replay). The two tests previously skipped post-Plan-44-12 are
+// RE-ENABLED here and assert the live km-core round-trip.
 describe('ObservationWriter — pre-LLM dedup', () => {
-  test.skip('second identical processMessages() call does NOT invoke fetch (DEFERRED post-44-12)', async () => {
+  test('second identical processMessages() call does NOT invoke fetch', async () => {
     const writer = await newInitializedWriter('pre-llm-no-fetch');
     const messages = [
       { role: 'user', content: 'investigate the proxy slowdown' },
@@ -190,7 +186,7 @@ describe('ObservationWriter — pre-LLM dedup', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  test.skip('pre-LLM patch path: existing has "Artifacts: none" and second fire adds modifiedFiles → patches without LLM (DEFERRED post-44-12)', async () => {
+  test('pre-LLM patch path: existing has "Artifacts: none" and second fire adds modifiedFiles → patches without LLM', async () => {
     const writer = await newInitializedWriter('pre-llm-patch');
     const messages = [
       { role: 'user', content: 'fix the routing config' },
@@ -211,12 +207,18 @@ describe('ObservationWriter — pre-LLM dedup', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1); // no second LLM call
     expect(result.observations).toBe(1);
 
-    // Inspect the DB to confirm the artifacts line was patched.
-    const dbPath = path.join(tmpDir, 'pre-llm-patch.db');
-    const db = new Database(dbPath, { readonly: true });
-    const row = db.prepare('SELECT summary FROM observations LIMIT 1').get();
-    db.close();
-    expect(row.summary).toMatch(/Artifacts:\s*edited configure-wave-analysis-routing\.sh/);
-    expect(row.summary).not.toMatch(/Artifacts:\s*none/i);
+    // Phase 44 Plan 13: inspect the persisted entity via km-core (not the
+    // legacy SQLite row). The writer owns the tmpdir-backed store via
+    // kmStoreDbPath lazy-init; grab the handle BEFORE close().
+    const km = writer._kmStore;
+    expect(km).toBeDefined();
+    const matches = await km.findByOntologyClass('Observation');
+    await writer.close();
+
+    expect(matches.length).toBeGreaterThan(0);
+    const entity = matches[0];
+    const persistedSummary = (entity.metadata && entity.metadata.summary) || entity.description || '';
+    expect(persistedSummary).toMatch(/Artifacts:\s*edited configure-wave-analysis-routing\.sh/);
+    expect(persistedSummary).not.toMatch(/Artifacts:\s*none/i);
   });
 });
