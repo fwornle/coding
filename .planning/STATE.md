@@ -52,9 +52,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 44 (rest-api-git-snapshots) — EXECUTING
-Plan: 2 of 14
-Status: Ready to execute
+Phase: 44 (rest-api-git-snapshots) — EXECUTING (close-out gated)
+Plan: 14 of 15 with SUMMARY (44-11 SUMMARY recorded operator `issues` signal; 44-15 just landed)
+Status: SC#2 closing — A PASS, B mount-verified-http-blocked, C BLOCKED:awaiting-OKM-PR-5
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
 
@@ -76,20 +76,41 @@ Wave 5.6 outcome (`/gsd-execute-phase 44 --wave 5.6` on 2026-06-04):
   - Live verification on pid 55095: 5 sampled endpoints HTTP 200, dashboard at :3032 renders 939/391/81 counters with 60+ clean refresh cycles, real-time ETM smoke proven by this very session's "Diagnose whether observations database is down" appearing at the top of the list
   - Plan 44-12 § "Deferred — Deep-Cutover Scope" items 4 + 6 annotated CLOSED
 
-Deep-cutover plan still pending:
+Wave 5.7 outcome (`/gsd-execute-phase 44 --wave 5.7` on 2026-06-04):
 
-  - **44-13 (wave 5.7, autonomous:true, depends_on: 44-12 + 44-14 — NOW UNBLOCKED)** — ObservationWriter dedup + Artifacts-patch cutover. Adds `findByContentHash` + `findRecentByAgent` km-core helpers. Drops `this.db` from writer entirely. Re-enables the 2 dedup tests skipped since 2026-06-04. 3 tasks.
+  - **Plan 44-13 LANDED.** 5 commits on main: km-core submodule `0ec0c93` (findByContentHash + findRecentByAgent), outer pointer `a062a7926`, writer cutover `b58616713` (drop this.db; route 3 helpers via km-core; obs-api-owned _legacyDb for pruner+retrieval), 381-line integration suite `7d97d3c6d` with T-44-13-01 perf gate (0.074ms avg — 27x under budget), SUMMARY `0a4385103`
+  - 2 dedup tests skipped since 2026-06-04 now GREEN; ObservationWriter unit suite 110/110
+  - Plan 44-12 § "Deferred — Deep-Cutover Scope" items 1 + 2 + 3 CLOSED
 
-Next step: execute 44-13, then draft + execute 44-15 (consolidator)
+Wave 6 outcome (`/gsd-execute-phase 44 --wave 6` — Plan 44-11 verification gate on 2026-06-04):
 
-  1. `/gsd-execute-phase 44 --wave 5.7` — runs Plan 44-13 (writer-side cutover; autonomous)
-  2. `/gsd:phase 44 add` — draft Plan 44-15 "ObservationConsolidator cutover to km-core" (3456-line consolidator; multi-stage; warrants its own plan)
-  3. `/gsd-execute-phase 44 --wave 5.8` — runs Plan 44-15
-  4. ONLY THEN: re-attempt the archive (`mv .observations/observations.db .data/backups/...`) — likely folded into 44-15 Task N or a small 44-16 archive plan
-  5. `/gsd-execute-phase 44 --wave 6` — runs Plan 44-11 verification gate (after 44-13/15 land)
-  6. Operator-merge OKM PR #5 (https://bmw.ghe.com/adpnext-apps/operational-knowledge-management/pull/5) + restart C's service for cross-system-parity C-leg GREEN
+  - **Pre-flight fix `244dbc418`:** `ensureKMStore` race in `scripts/observations-api-server.mjs` — concurrent callers from `ensureWriter` + listen handler raced; second caller hit `if (_kmStore) return null` early-return, so `mountKMRoutes` never ran and A's `/api/v1/*` 404'd post-restart. Patch caches the in-flight init promise; both callers await one open(). Verified `[obs-api] km-core /api/v1 routes mounted` now logs.
+  - **Plan 44-11 Task 1 LANDED** (commit `1d8ce72ce`): 464-line SUMMARY with per-SC evidence. 8 Wave 0 stubs run: 4 km-core GREEN, okb-guard GREEN, typed-views 2/4 (snake/camel divergence on digests + insights), cross-system-parity 2/6 (A+B PASS, C HTML fallback), dashboard e2e 3/3 timeout (data-testid missing).
+  - **Plan 44-11 Task 2** operator signal `issues` (commit `24f6d8b6c`): SC#1 PARTIAL PASS (C still SPA), SC#2 BLOCKED on all 3 legs (A gitignore, B container readonly, C no mount), SC#3 PARTIAL PASS (typed-view shape divergence), SC#4 PASS.
+  - **Phase 44 close-out HALTED.** Sub-plans queued: 44-15 (snapshot-dir routing fix) + 44-16 (typed-view shape lock).
 
-Last activity: 2026-06-04
+Wave 6.1 outcome (`/gsd-execute-phase 44 --wave 6.1` — Plan 44-15 on 2026-06-04):
+
+  - **Plan 44-15 LANDED.** 4 commits on main: plan draft `b50d313ae`, A-leg gitignore `ac8e86b12`, snapshot tag `144f7ec92` (158,591-line baseline of .data/knowledge-graph/exports/), docker mount `e2eef82e7` (.git:ro → .git:rw), CONTEXT amendment + SUMMARY `<this commit>`
+  - A leg SC#2: **PASS** end-to-end (snapshot create + mutate + restore + launchctl kickstart + bit-for-bit restore verified)
+  - B leg SC#2: **MOUNT-VERIFIED, HTTP-BLOCKED.** `.git:rw` mount writable inside container (docker exec + docker inspect both confirm); but `docker-compose up -d` recreate surfaced pre-existing infra gap — `mcp-server-semantic-analysis` lacks `node_modules/@modelcontextprotocol/sdk`, sse-server FATAL. NOT caused by 44-15; rolling back mount mode would NOT restore B. Separate infra fix needed (Dockerfile npm install OR runtime supervisord install OR host-side node_modules bind-mount).
+  - C leg SC#2: **BLOCKED:awaiting-OKM-PR-5** (Mode B per plan's dual-mode contract). All `/api/v1/*` probes return VOKB SPA HTML; PR #5 unmerged + C not restarted.
+  - 44-CONTEXT-amendment-3.md written: ratifies `.data/knowledge-graph/exports/` as canonical S-1 snapshot dir (original CONTEXT said `.data/exports/`; drift from Phase 41 km-core landing). Migration note documents the 7 touch sites a future re-route would need.
+
+Phase 44 close-out remains gated on:
+
+  1. **B infra fix (separate session):** restore `mcp-server-semantic-analysis` node_modules; re-run B-leg snapshot/restore round-trip
+  2. **Plan 44-16 (still to draft):** typed-view shape lock for `/api/coding/digests` + `/api/coding/insights` — decides camelCase vs snake_case after Plan 09. Dashboard renders all three correctly so consumer impact is bounded.
+  3. **Operator OKM PR #5 merge + C restart** (out-of-band on bmw.ghe.com)
+  4. **Plan 44-11 re-run** as the Phase 44 close-out gate
+
+Suggested next steps:
+
+  1. Operator restores B's node_modules (Dockerfile change recommended) and operator-merges OKM PR #5 + restarts C
+  2. Draft Plan 44-16 (typed-view shape lock) — small, focused, similar surface to 44-15
+  3. `/gsd-execute-phase 44 --wave 6` re-run after 44-16 lands + B+C are up → Phase 44 close-out
+
+Last activity: 2026-06-04 — Plan 44-15 (snapshot-dir routing fix) completed; A PASS, B mount-verified-http-blocked, C Mode B
 
 ## Performance Metrics
 
