@@ -53,26 +53,30 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 44 (rest-api-git-snapshots) — EXECUTING
-Plan: Wave 5.5 (44-12) SOFT-CLOSED 2026-06-04; Wave 6 (44-11) still pending
-Status: Executing Phase 44 — write-path cutover landed; deep cutover deferred to follow-up sub-plan
+Plan: Wave 5.5 (44-12) SOFT-CLOSED 2026-06-04; Wave 5.6 (44-14) + Wave 5.7 (44-13) DRAFTED 2026-06-04; Wave 6 (44-11) still pending
+Status: Executing Phase 44 — write-path cutover landed; deep-cutover plans 44-13 + 44-14 written, awaiting execution
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
   - Plan 44-12 Tasks 1+2 LANDED on main (commits `ef340013f`, `c2582c7ef`, submodule `0a6ac57`)
   - Plan 44-12 Task 3 SOFT-EXECUTED: launchctl restart done (recovered IOError 5 with `launchctl enable`); obs-api pid 73924 on :12436; SQLite archive NOT EXECUTED
-  - Plan 44-12 declared SOFT-CLOSED — the plan's must_haves "fully unused observations.db" claim was over-scoped; ~14 other consumers (writer dedup, legacy /api/*, consolidator, dashboard counts) still read+write the file
-  - Operator chose "Full hard cutover via follow-up sub-plan" — see 44-12-SUMMARY.md § "Operator Checkpoint Outcome" + § "Deferred — Deep-Cutover Scope"
+  - Plan 44-12 declared SOFT-CLOSED — must_haves "fully unused observations.db" was over-scoped; ~14 other consumers (writer dedup, legacy /api/*, consolidator, dashboard counts) still read+write the file
+  - Operator chose "Full hard cutover via follow-up sub-plan"
   - Plan 44-12 docs commit: `62eb10a5a docs(44-12): soft-close — write-path cut, deep cutover deferred to sub-plan`
 
-Next step: deep-cutover sub-plan(s) before Phase 44 closure
-  1. `/gsd:phase 44 add` — add 44-13 "ObservationWriter dedup + Artifacts-patch cutover to km-core" (writer side: lines 782, 813, 1107 in ObservationWriter.js)
-  2. `/gsd:phase 44 add` — add 44-14 "obs-api legacy `/api/*` + consolidator + dashboard counts cutover to km-core" (server side: ~14 sites in observations-api-server.mjs + ObservationConsolidator)
-  3. `/gsd-plan-phase 44` to plan 44-13 and 44-14
-  4. `/gsd-execute-phase 44 --wave <N>` to execute them
-  5. ONLY THEN: re-attempt the archive (`mv .observations/observations.db .data/backups/...`)
-  6. `/gsd-execute-phase 44 --wave 6` to run Plan 44-11 verification gate (after 44-13/44-14 land)
+Deep-cutover plans drafted 2026-06-04:
+  - **44-14 (wave 5.6, autonomous:false)** — obs-api legacy `/api/*` endpoints + dashboard COUNTs + staleness clock cutover to km-core. Adds `countByOntologyClass` + `lastModifiedByClass` km-core helpers. Removes `getDb()`/`invalidateDb()`/`isCorruptionError()`. Defers consolidator endpoints to Plan 44-15. ~10 endpoint migrations, 4 tasks (Task 4 = operator-checkpoint with gsd-browser screenshots).
+  - **44-13 (wave 5.7, autonomous:true, depends_on: 44-12 + 44-14)** — ObservationWriter dedup + Artifacts-patch cutover. Adds `findByContentHash` + `findRecentByAgent` km-core helpers. Drops `this.db` from writer entirely. Re-enables the 2 dedup tests skipped since 2026-06-04. Sequenced AFTER 44-14 so dropping the writer's handle doesn't 503 server endpoints. 3 tasks.
+
+Next step: execute 44-14, then 44-13, then draft + execute 44-15 (consolidator)
+  1. `/gsd-execute-phase 44 --wave 5.6` — runs Plan 44-14 (server-side cutover; operator-checkpoint at Task 4 needs gsd-browser visual verify)
+  2. `/gsd-execute-phase 44 --wave 5.7` — runs Plan 44-13 (writer-side cutover; autonomous)
+  3. `/gsd:phase 44 add` — draft Plan 44-15 "ObservationConsolidator cutover to km-core" (3456-line consolidator; multi-stage; warrants its own plan)
+  4. `/gsd-execute-phase 44 --wave 5.8` — runs Plan 44-15
+  5. ONLY THEN: re-attempt the archive (`mv .observations/observations.db .data/backups/...`) — likely folded into 44-15 Task N or a small 44-16 archive plan
+  6. `/gsd-execute-phase 44 --wave 6` — runs Plan 44-11 verification gate (after 44-13/14/15 land)
   7. Operator-merge OKM PR #5 (https://bmw.ghe.com/adpnext-apps/operational-knowledge-management/pull/5) + restart C's service for cross-system-parity C-leg GREEN
 
-Last activity: 2026-06-04 -- Wave 5.5 SOFT-CLOSED, deep cutover sub-plans needed before phase closure
+Last activity: 2026-06-04 -- Plans 44-13 + 44-14 drafted; ready for /gsd-execute-phase 44 --wave 5.6
 
 ## Performance Metrics
 

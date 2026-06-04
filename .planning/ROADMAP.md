@@ -697,7 +697,7 @@ Plans:
 | 41. Online Learning Adapter & Post-Hoc Resolution | 7/7 | Complete    | 2026-05-23 |
 | 42. Offline UKB Migration (B) | 6/7 | In Progress|  |
 | 43. OKM Cross-Repo Migration (C) | 7/11 | In Progress|  |
-| 44. REST API & Git Snapshots | 10/12 | In Progress (44-11 wave-6 pending; 44-12 SOFT-CLOSED 2026-06-04 — write-path landed, deep-cutover sub-plans 44-13/44-14 needed before archive + closure) |  |
+| 44. REST API & Git Snapshots | 10/14 | In Progress (Plans 44-13 + 44-14 added 2026-06-04 for deep cutover; 44-15 consolidator cutover still to draft; archive deferred to post-44-15) |  |
 | 45. Unified Web Viewer | 0/? | Not started | - |
 | 46. Per-System Documentation & Onboarding | 0/? | Not started | - |
 
