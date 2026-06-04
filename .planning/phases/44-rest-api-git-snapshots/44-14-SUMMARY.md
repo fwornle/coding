@@ -365,23 +365,91 @@ step remains deferred to a post-44-15 plan.
 Either manually annotate "Task 4 outcome" below OR re-resume the
 executor with operator confirmation for a final pass.
 
-## Task 4 Outcome (operator-filled)
+## Task 4 Outcome (operator-verified 2026-06-04)
 
-```
-[Operator: replace this block with the screenshots, curl outputs, and
-launchctl status confirming the runbook steps above completed
-successfully. Plan 44-14 is then officially CLOSED.]
+**[x] Step 1 — km-core dist rebuild SUCCESS**
+- `cd lib/km-core && npm run build` → tsc clean, no errors
+- Submodule commit `184f4a5` ships TS source; `dist/` regenerated locally for the obs-api consumer
 
-[ ] Step 1 — km-core dist rebuild SUCCESS
-[ ] Step 2 — obs-api launchctl restart SUCCESS (pid + status 0)
-[ ] Step 3 — gsd-browser dashboard screenshot OK (numeric counters,
-    GREEN [📚] badge, recent observations rendering)
-[ ] Step 4 — gsd-browser real-time observation screenshot OK
-    (current-minute row visible within ~35s of ETM trigger)
-[ ] Step 5 — all 5 migrated endpoints respond 200
-[ ] Step 6 — consolidator /run + /status return 200 + populated payload
-[ ] Step 7 — 44-12-SUMMARY.md items 4 + 6 annotated CLOSED
+**[x] Step 2 — obs-api launchctl restart SUCCESS**
+- `launchctl kickstart -k "gui/$(id -u)/com.coding.obs-api"`
+- `launchctl list | grep com.coding.obs-api` → `55095  -9  com.coding.obs-api` (the `-9` is the previous instance's SIGKILL exit code from kickstart; pid 55095 is the new live instance)
+- Port :12436 LISTEN confirmed via lsof
+- New process txt-segments verified pointing at the freshly-built `lib/km-core/node_modules/`
+
+**[x] Step 3 — Dashboard visual verify OK (gsd-browser was broken; regular browser used)**
+- gsd-browser daemon was returning CDP "send failed because receiver is gone" — fight not worth it
+- Operator opened `http://localhost:3032/observations` in regular Chrome
+- Top-line counters: **Observations 939**, **Digests 391**, **Insights 81** — all numeric, all matching the km-core `countByOntologyClass` payload exactly
+- Tab navigation rendered: Health / Observations / Digests / Insights / Coverage / Token Usage
+- 18 pages of observations rendering correctly
+- No `?` placeholders, no error banners
+- Second screenshot with DevTools open: console shows only `[INFO]` + `[TRACE]` levels (HealthRefreshManager, SSE workflow stream, UKB WebSocket, Refresh cycles #10-#60). No `[ERROR]` entries, no failed network calls.
+
+**[x] Step 4 — Real-time ETM smoke OK (proven by this very session)**
+- The top row at the moment of verification was "claude / Jun 4, 01:22 PM / coding / Intent: Diagnose whether the observations database is down or unavailable"
+- That row is **this orchestrator's own diagnosis session from minutes ago** — captured by ETM, written to km-core via the writer's `legacyObservationToEntity` → `putEntity` path (Plan 44-12), surfaced on the dashboard via the new `/api/coding/observations` typed view
+- End-to-end real-time smoke verified without needing the original 35s-sleep step
+
+**[x] Step 5 — All 5 migrated endpoints respond 200**
+
+Orchestrator-side curl (with the new code on pid 55095):
 ```
+/api/observations/projects  -> HTTP 200 (30 bytes)
+/api/digests/projects       -> HTTP 200 (30 bytes)
+/api/insights/projects      -> HTTP 200 (128 bytes)
+/api/projects               -> HTTP 200 (128 bytes)
+/api/consolidation/status   -> HTTP 200 (297 bytes)
+```
+
+**[x] Step 6 — Consolidator spot-check (NOT cut over by 44-14) OK**
+
+`GET /api/consolidation/status` payload after the cache fix:
+```json
+{
+  "totalObs": 939,           // km-core countByOntologyClass('Observation')
+  "undigested": 2,           // consolidator cdb (deferred to 44-15)
+  "lowQuality": 194,         // consolidator cdb
+  "pendingPast": 0,          // consolidator cdb
+  "pendingToday": 2,         // consolidator cdb
+  "digested": 743,           // totalObs - undigested - lowQuality
+  "totalDigests": 391,       // km-core countByOntologyClass('Digest')
+  "totalInsights": 81,       // km-core countByOntologyClass('Insight')
+  "lastObservationAt": "2026-06-04T11:22:42.857Z",
+  "lastDigestAt":      "2026-06-04T11:24:04.436Z",
+  "lastInsightAt":     "2026-06-04T11:18:58.839Z",
+  "inflight": null,
+  "lastJob": null
+}
+```
+
+The 3 entity-class counts flow from km-core helpers; the 3 ISO staleness timestamps flow from `lastModifiedByClass`; the 4 consolidator-pipeline stats flow from the cached `_pipelineStatsConsolidator.db` (deferred to Plan 44-15). All shapes preserved from the pre-cutover contract.
+
+**[x] Step 7 — `44-12-SUMMARY.md` items 4 + 6 annotated CLOSED**
+- Item 4 (legacy `/api/*` endpoints): CLOSED by Plan 44-14
+- Item 6 (dashboard COUNTs + staleness clock): CLOSED by Plan 44-14
+- Item 1 (writer dedup), Item 2 (Artifacts-patch UPDATE), Item 3 (semantic-dup): still deferred to Plan 44-13 (wave 5.7)
+- Item 5 (ObservationConsolidator): still deferred to Plan 44-15 (not yet drafted)
+- Archive step: still deferred to a post-44-15 plan
+
+### Mid-task fix-forward commit
+
+During Step 5 curl smoke, the orchestrator noticed `/api/consolidation/status`
+was constructing a fresh `ObservationConsolidator` on every call (~360
+`[Consolidator] Database initialized` log lines per hour at default
+dashboard poll rate). No fd leak — handles were closed in `finally` — but
+log spam was real. Operator chose "small fix-forward commit". Landed as
+`cc830ab38 fix(44-14): cache pipelineStatsConsolidator at module scope`:
+hoists the consolidator to a module-scope lazy cache (mirrors `_writer`/
+`_pruner`/`_retrieval`), with concurrent-init promise protection and
+shutdown-handler teardown. Verified: 10 consecutive `/status` calls
+produce 0 new init lines post-fix. Plan 44-14 scope unchanged —
+consolidator stays SQLite-backed, deferred to Plan 44-15.
+
+### Decision: Plan 44-14 CLOSED
+
+All 7 steps verified. The cutover is live and working end-to-end. Plan
+44-13 (writer dedup cutover, wave 5.7) is now unblocked.
 
 ## Files Created/Modified
 
@@ -400,7 +468,7 @@ successfully. Plan 44-14 is then officially CLOSED.]
     `_stalenessCache` + `_extractProject` helpers added; `_testHooks` +
     autostart guard for integration testing.
 
-## Self-Check: PARTIAL
+## Self-Check: PASSED
 
 **Write-path artifacts — PASSED:**
 - [x] `lib/km-core/src/store/GraphKMStore.ts` has `countByOntologyClass` (`grep -n countByOntologyClass` returns 4 hits, all in store source)
@@ -417,11 +485,14 @@ successfully. Plan 44-14 is then officially CLOSED.]
 - [x] `getDb`/`invalidateDb`/`isCorruptionError` gone (only doc-comment hits remain)
 - [x] All 4 SQL-keyword survivors confined to deferred consolidator-pipeline path
 
-**Plan acceptance — PENDING (Task 4):**
-- [ ] Operator launchctl restart succeeded (Task 4 Step 2)
-- [ ] gsd-browser dashboard screenshot shows numeric counters + GREEN [📚] badge (Task 4 Steps 3-4)
-- [ ] All 5 migrated endpoints + consolidator spot-check return 200 (Task 4 Steps 5-6)
-- [ ] 44-12-SUMMARY.md items 4 + 6 annotated CLOSED (Task 4 Step 7)
+**Plan acceptance — PASSED (Task 4 verified 2026-06-04):**
+- [x] km-core dist rebuild successful (`cd lib/km-core && npm run build` → tsc clean)
+- [x] Operator launchctl restart successful — obs-api pid 55095 on :12436
+- [x] Dashboard verified via regular browser tab (gsd-browser CDP daemon was broken; counters 939/391/81 numeric, no error banners, DevTools console clean across 60+ refresh cycles)
+- [x] Real-time ETM smoke verified end-to-end (this session's own diagnosis observation visible at the top of the list)
+- [x] All 5 migrated endpoints respond 200; consolidator spot-check payload matches expected shape
+- [x] 44-12-SUMMARY.md items 4 + 6 annotated CLOSED
+- [x] Mid-task fix-forward commit `cc830ab38` eliminates per-request consolidator init log spam
 
 ## TDD Gate Compliance
 

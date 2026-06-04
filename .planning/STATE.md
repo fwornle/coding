@@ -53,8 +53,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 44 (rest-api-git-snapshots) — EXECUTING
-Plan: Wave 5.5 (44-12) SOFT-CLOSED 2026-06-04; Wave 5.6 (44-14) + Wave 5.7 (44-13) DRAFTED 2026-06-04; Wave 6 (44-11) still pending
-Status: Executing Phase 44 — write-path cutover landed; deep-cutover plans 44-13 + 44-14 written, awaiting execution
+Plan: Wave 5.5 (44-12) SOFT-CLOSED; Wave 5.6 (44-14) CLOSED 2026-06-04; Wave 5.7 (44-13) DRAFTED + unblocked; Wave 6 (44-11) pending after deep cutover
+Status: Executing Phase 44 — server-side cutover landed live (10 endpoints + dashboard COUNTs to km-core); writer-side cutover next
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
   - Plan 44-12 Tasks 1+2 LANDED on main (commits `ef340013f`, `c2582c7ef`, submodule `0a6ac57`)
@@ -63,20 +63,29 @@ Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
   - Operator chose "Full hard cutover via follow-up sub-plan"
   - Plan 44-12 docs commit: `62eb10a5a docs(44-12): soft-close — write-path cut, deep cutover deferred to sub-plan`
 
-Deep-cutover plans drafted 2026-06-04:
-  - **44-14 (wave 5.6, autonomous:false)** — obs-api legacy `/api/*` endpoints + dashboard COUNTs + staleness clock cutover to km-core. Adds `countByOntologyClass` + `lastModifiedByClass` km-core helpers. Removes `getDb()`/`invalidateDb()`/`isCorruptionError()`. Defers consolidator endpoints to Plan 44-15. ~10 endpoint migrations, 4 tasks (Task 4 = operator-checkpoint with gsd-browser screenshots).
-  - **44-13 (wave 5.7, autonomous:true, depends_on: 44-12 + 44-14)** — ObservationWriter dedup + Artifacts-patch cutover. Adds `findByContentHash` + `findRecentByAgent` km-core helpers. Drops `this.db` from writer entirely. Re-enables the 2 dedup tests skipped since 2026-06-04. Sequenced AFTER 44-14 so dropping the writer's handle doesn't 503 server endpoints. 3 tasks.
+Wave 5.6 outcome (`/gsd-execute-phase 44 --wave 5.6` on 2026-06-04):
+  - **Plan 44-14 LANDED + LIVE-VERIFIED.** 6 commits on main: km-core submodule `184f4a5` + outer pointer `05b6ffa29`, artifacts-patch util `93589d09e`, 10-endpoint cutover `16360d48c`, integration test `df2bfb589`, partial SUMMARY `bbd75e8dd`, fix-forward consolidator cache `cc830ab38`, final SUMMARY `<this commit>`
+  - 10 obs-api legacy `/api/*` endpoints cut to km-core (patch-artifacts/recent + /historical, observations/digests/insights/projects, /api/projects, /api/projects/:project/coverage, insights/:id/resynthesize, consolidation/status COUNTs + staleness)
+  - 2 new km-core query helpers: `countByOntologyClass` + `lastModifiedByClass` (plus a refactored `findByLegacyId`)
+  - 1 new shared util: `scripts/lib/artifacts-patch-util.mjs` (also used by Plan 44-13's writer cutover)
+  - 12-test integration suite at `tests/integration/obs-api.legacy-endpoints.km-core.test.js` (490 lines, all GREEN; perf test passes at 1000 obs in ~150ms)
+  - `getDb()` / `invalidateDb()` / `isCorruptionError()` infrastructure REMOVED
+  - Mid-task fix-forward `cc830ab38`: cached `_pipelineStatsConsolidator` at module scope (eliminates ~360 init-log-lines/hour from dashboard polling)
+  - Live verification on pid 55095: 5 sampled endpoints HTTP 200, dashboard at :3032 renders 939/391/81 counters with 60+ clean refresh cycles, real-time ETM smoke proven by this very session's "Diagnose whether observations database is down" appearing at the top of the list
+  - Plan 44-12 § "Deferred — Deep-Cutover Scope" items 4 + 6 annotated CLOSED
 
-Next step: execute 44-14, then 44-13, then draft + execute 44-15 (consolidator)
-  1. `/gsd-execute-phase 44 --wave 5.6` — runs Plan 44-14 (server-side cutover; operator-checkpoint at Task 4 needs gsd-browser visual verify)
-  2. `/gsd-execute-phase 44 --wave 5.7` — runs Plan 44-13 (writer-side cutover; autonomous)
-  3. `/gsd:phase 44 add` — draft Plan 44-15 "ObservationConsolidator cutover to km-core" (3456-line consolidator; multi-stage; warrants its own plan)
-  4. `/gsd-execute-phase 44 --wave 5.8` — runs Plan 44-15
-  5. ONLY THEN: re-attempt the archive (`mv .observations/observations.db .data/backups/...`) — likely folded into 44-15 Task N or a small 44-16 archive plan
-  6. `/gsd-execute-phase 44 --wave 6` — runs Plan 44-11 verification gate (after 44-13/14/15 land)
-  7. Operator-merge OKM PR #5 (https://bmw.ghe.com/adpnext-apps/operational-knowledge-management/pull/5) + restart C's service for cross-system-parity C-leg GREEN
+Deep-cutover plan still pending:
+  - **44-13 (wave 5.7, autonomous:true, depends_on: 44-12 + 44-14 — NOW UNBLOCKED)** — ObservationWriter dedup + Artifacts-patch cutover. Adds `findByContentHash` + `findRecentByAgent` km-core helpers. Drops `this.db` from writer entirely. Re-enables the 2 dedup tests skipped since 2026-06-04. 3 tasks.
 
-Last activity: 2026-06-04 -- Plans 44-13 + 44-14 drafted; ready for /gsd-execute-phase 44 --wave 5.6
+Next step: execute 44-13, then draft + execute 44-15 (consolidator)
+  1. `/gsd-execute-phase 44 --wave 5.7` — runs Plan 44-13 (writer-side cutover; autonomous)
+  2. `/gsd:phase 44 add` — draft Plan 44-15 "ObservationConsolidator cutover to km-core" (3456-line consolidator; multi-stage; warrants its own plan)
+  3. `/gsd-execute-phase 44 --wave 5.8` — runs Plan 44-15
+  4. ONLY THEN: re-attempt the archive (`mv .observations/observations.db .data/backups/...`) — likely folded into 44-15 Task N or a small 44-16 archive plan
+  5. `/gsd-execute-phase 44 --wave 6` — runs Plan 44-11 verification gate (after 44-13/15 land)
+  6. Operator-merge OKM PR #5 (https://bmw.ghe.com/adpnext-apps/operational-knowledge-management/pull/5) + restart C's service for cross-system-parity C-leg GREEN
+
+Last activity: 2026-06-04 -- Wave 5.6 CLOSED; Plan 44-14 server-side cutover live and verified; ready for /gsd-execute-phase 44 --wave 5.7
 
 ## Performance Metrics
 

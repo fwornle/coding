@@ -131,19 +131,12 @@ the startup log:
 3. **Writer semantic-dup lookup → km-core query.** Replace the
    `last-50 / 4h` SQLite SELECT at line 1107 with a km-core time-windowed
    query by agent. Drop `this.db` after this lands.
-4. **Legacy obs-api endpoints → km-core.** Cut `/api/observations`,
-   `/api/observations/:id` (with its UPDATE), `/api/digests`, `/api/insights`,
-   project-list, and dashboard COUNT endpoints over to km-core. Either:
-   (a) deprecate the legacy paths and migrate consumers to `/api/coding/*`,
-   or (b) implement the legacy paths as thin adapters over km-core.
+4. **Legacy obs-api endpoints → km-core.** ✅ **CLOSED by Plan 44-14** (2026-06-04, commits `05b6ffa29` + `93589d09e` + `16360d48c` + `df2bfb589` + `bbd75e8dd` + `cc830ab38`). 10 endpoints cut: `/api/observations/messages`, `/api/observations/patch-artifacts/recent`, `/api/observations/patch-artifacts/historical`, `/api/observations/projects`, `/api/digests/projects`, `/api/insights/projects`, `/api/projects`, `/api/projects/:project/coverage`, `/api/insights/:id/resynthesize`, plus the km-core-sourced parts of `/api/consolidation/status`. `getDb()`/`invalidateDb()`/`isCorruptionError()` infrastructure removed. Verified live against pid 55095: 5 sampled endpoints all 200, dashboard at :3032 renders 939/391/81 counters with 60+ clean refresh cycles, real-time ETM smoke proven by the orchestrator's own diagnosis row at the top of the list.
 5. **ObservationConsolidator → km-core.** Cut the consolidator's
    read+write paths to km-core. This is the largest piece because the
    consolidator is a complex multi-stage pipeline; it may need its own
-   plan.
-6. **Then archive.** Once 1–5 land, `[ObservationWriter] Database
-   initialized` disappears from startup, no SQLite touches occur, and
-   `mv .observations/observations.db .data/backups/...` becomes safe.
-   Plan 44-10 Task 4 (legacy SQLite DROP) closes at that point.
+   plan. Still deferred to Plan 44-15 (not yet drafted).
+6. **Then archive.** ✅ **PARTIALLY CLOSED by Plan 44-14** — the dashboard COUNT + staleness-clock parts (item 6's evidence trigger) now flow from `countByOntologyClass` + `lastModifiedByClass` (kmCore). However, `[ObservationWriter] Database initialized` still appears in startup (writer's `this.db` not yet dropped — deferred to Plan 44-13 wave 5.7), and the consolidator still opens its own SQLite handle (deferred to Plan 44-15). Archive remains deferred until 44-13 + 44-15 ship — at that point Plan 44-10 Task 4 (legacy SQLite DROP) closes too.
 
 Estimated scope: 1–2 plans, multi-day. The writer-side work (1–3) is one
 plan; the obs-api work (4) is another; the consolidator (5) may warrant
