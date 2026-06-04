@@ -95,7 +95,18 @@ function writeConfig(name) {
 function newWriter(name) {
   const configPath = writeConfig(`${name}-config.json`);
   const dbPath = path.join(tmpDir, `${name}.db`);
-  return new ObservationWriter({ configPath, dbPath });
+  // Phase 44 Plan 12: ObservationWriter now requires a km-core store for
+  // writes (post-SQLite cutover). Use a tmpdir-backed LevelDB so this unit
+  // test doesn't contend with the production .data/knowledge-graph/leveldb
+  // LOCK (T-44-12-04 mitigation). Each test gets its own tmpDir.
+  const kmStoreDbPath = path.join(tmpDir, `${name}-km`, 'leveldb');
+  const kmStoreExportDir = path.join(tmpDir, `${name}-km`, 'exports');
+  return new ObservationWriter({
+    configPath,
+    dbPath,
+    kmStoreDbPath,
+    kmStoreExportDir,
+  });
 }
 
 describe('ObservationWriter._hasUnresolvedPronoun', () => {
@@ -199,8 +210,15 @@ describe('ObservationWriter.summarize — needs_lsl_resolution stamp', () => {
   });
 });
 
-describe('ObservationWriter.processMessages — DB persistence of needs_lsl_resolution', () => {
-  test('Test 7: stamp persists into observations.metadata JSON column', async () => {
+describe('ObservationWriter.processMessages — km-core persistence of needs_lsl_resolution', () => {
+  // Phase 44 Plan 12 (A-1 cutover): the writer no longer INSERTs into the
+  // SQLite observations table. Both tests below previously inspected
+  // `json_extract(metadata, '$.needs_lsl_resolution')` on the SQLite row;
+  // they now inspect `entity.metadata.needs_lsl_resolution` on the km-core
+  // entity surfaced via `kmStore.findByOntologyClass('Observation')`. The
+  // same property is being asserted — just on the new canonical store.
+
+  test('Test 7: stamp persists into km-core entity metadata', async () => {
     lslWindowMockReturn = { exchanges: [], sourceFile: null, byteCount: 0, windowSpanMs: 0 };
     const writer = newWriter('persist-stamp');
     await writer.init();
@@ -216,19 +234,24 @@ describe('ObservationWriter.processMessages — DB persistence of needs_lsl_reso
       sessionId: 'test-session',
     });
 
-    // Inspect the persisted row via a read-only Database handle.
-    const dbPath = writer.dbPath;
+    // Inspect the persisted row via the km-core store the writer just wrote
+    // to. The writer owns the tmpdir-backed store (lazy-init via
+    // kmStoreDbPath); we grab the handle BEFORE close().
+    const km = writer._kmStore;
+    expect(km).toBeDefined();
+    const matches = await km.findByOntologyClass('Observation');
     await writer.close();
 
-    const ro = new Database(dbPath, { readonly: true });
-    const row = ro.prepare(
-      `SELECT id, summary, json_extract(metadata, '$.needs_lsl_resolution') AS needs FROM observations ORDER BY created_at DESC LIMIT 1`
-    ).get();
-    ro.close();
-
-    expect(row).toBeDefined();
-    // SQLite json_extract returns 1 for true, 0 for false, NULL otherwise.
-    expect(row.needs).toBe(1);
+    expect(matches.length).toBeGreaterThan(0);
+    const entity = matches[0];
+    expect(entity.metadata).toBeDefined();
+    // The detector stamps `metadata.needs_lsl_resolution = true` when the
+    // pronoun trigger fires with an empty prior context. Note that the
+    // value travels through the writer's `_redact(JSON.stringify(metadata))`
+    // call (line 770 in ObservationWriter.js, post-Plan-44-12), then back
+    // through `parseMetadata` in legacy-ingest.ts — so it survives as
+    // boolean true on the persisted Entity.
+    expect(entity.metadata.needs_lsl_resolution).toBe(true);
   });
 
   test('Test 8: no stamp when pronoun absent + prior context empty', async () => {
@@ -247,17 +270,15 @@ describe('ObservationWriter.processMessages — DB persistence of needs_lsl_reso
       sessionId: 'test-session-2',
     });
 
-    const dbPath = writer.dbPath;
+    const km = writer._kmStore;
+    expect(km).toBeDefined();
+    const matches = await km.findByOntologyClass('Observation');
     await writer.close();
 
-    const ro = new Database(dbPath, { readonly: true });
-    const row = ro.prepare(
-      `SELECT id, summary, json_extract(metadata, '$.needs_lsl_resolution') AS needs FROM observations ORDER BY created_at DESC LIMIT 1`
-    ).get();
-    ro.close();
-
-    expect(row).toBeDefined();
-    // Absent or null → not stamped. SQLite's json_extract returns null when key missing.
-    expect(row.needs).toBeFalsy();
+    expect(matches.length).toBeGreaterThan(0);
+    const entity = matches[0];
+    expect(entity.metadata).toBeDefined();
+    // Absent or undefined → not stamped.
+    expect(entity.metadata.needs_lsl_resolution).toBeFalsy();
   });
 });

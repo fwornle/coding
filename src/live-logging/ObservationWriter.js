@@ -1,9 +1,28 @@
 /**
- * ObservationWriter - Writes normalized transcript messages as observations to LibSQL
+ * ObservationWriter - writes normalized transcript exchanges as observations,
+ * daily digests, and insights into km-core (`GraphKMStore`).
  *
- * Routes LLM summarization calls through the coding LLM proxy (port from LLM_CLI_PROXY_PORT env, default 12435)
- * rather than direct Google/Anthropic API calls, avoiding API key issues in
- * containerized environments.
+ * Phase 44 Plan 12 (A-1 architectural close-out): the WRITE path was cut
+ * from SQLite to km-core. Three public write methods now route through
+ * km-core's `putEntity` via the shared `legacy-ingest` adapter
+ * (lib/km-core/src/adapters/legacy-ingest.ts), eliminating the dual-source
+ * problem that Plan 44-07's read-only cutover left exposed: the dashboard
+ * at :3032 reads km-core via the typed views at /api/coding/*, so new
+ * observations written to SQLite were invisible until a manual `--resume`
+ * migration ran. The fix is a hard cutover per CONTEXT R-4: every write
+ * goes through km-core; no dual-write window; no feature flag.
+ *
+ * The SQLite handle (`this.db`) is preserved during the cutover window
+ * because sibling obs-api endpoints (consolidation, FTS search, project
+ * listings, dedup) still read from SQLite for historical data. Those
+ * read paths migrate separately; the writer's READ helpers (dedup,
+ * artifact patch) continue using `this.db` until their replacements
+ * land. New WRITES go to km-core only — no SQLite INSERT in this file
+ * after Plan 44-12.
+ *
+ * Routes LLM summarization calls through the coding LLM proxy (port from
+ * LLM_CLI_PROXY_PORT env, default 12435) rather than direct Google/Anthropic
+ * API calls, avoiding API key issues in containerized environments.
  *
  * @module ObservationWriter
  */
@@ -12,13 +31,58 @@ import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Redis from 'ioredis';
 import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { openDatabase, closeDatabase } from './SafeDatabase.js';
 import { getLSLWindow } from '../../lib/lsl/window.mjs';
+// Phase 44 Plan 12: km-core write path. `GraphKMStore` is the canonical
+// store for the A-1 observation/digest/insight surface; the three
+// `legacy*ToEntity` adapters are the SINGLE source of truth for the
+// SQLite-row → Entity field map (see lib/km-core/src/adapters/legacy-
+// ingest.ts). The migration script `scripts/migrate-sqlite-to-kmcore.mjs`
+// uses the same three helpers — the two consumers cannot drift.
+import {
+  GraphKMStore,
+  defaultOntologyDir,
+} from '@fwornle/km-core';
+import {
+  legacyObservationToEntity,
+  legacyDigestToEntity,
+  legacyInsightToEntity,
+} from '@fwornle/km-core/adapters/legacy-ingest';
 
 const require = createRequire(import.meta.url);
+
+/**
+ * Resolve the km-core ontology directory using the import.meta.resolve +
+ * walk-up pattern (mirrors `scripts/backfill-raw-observations.mjs:40` and
+ * `scripts/observations-api-server.mjs:935`). Falls back to the package's
+ * exported `defaultOntologyDir()` helper — which walks up from the
+ * @fwornle/km-core package root to the bundled ontology directory.
+ *
+ * CLAUDE.md mandatory rule (Phase 41 lesson, commits 87bc2f567 /
+ * fd35c5350): ANY host-side process constructing GraphKMStore MUST pass
+ * `ontologyDir`. Without it, default-class resolution throws `opts.classes
+ * omitted but store has no ontology registry`. Acceptance grep for
+ * `ontologyDir` in this file documents the rule's enforcement.
+ */
+function resolveKmCoreOntologyDir() {
+  // Primary: km-core's exported helper walks up from the package root.
+  try {
+    return defaultOntologyDir();
+  } catch { /* fall through */ }
+  // Fallback: import.meta.resolve walk-up (matches backfill-raw-observations
+  // and observations-api-server). This path triggers when the helper is
+  // unavailable (older km-core dist) — defence-in-depth, should never fire.
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    return path.resolve(here, '..', '..', 'lib', 'km-core', '.data', 'ontologies');
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Load the observations config from .observations/config.json
@@ -47,6 +111,15 @@ export class ObservationWriter {
    * @param {string} [options.model] - Model identifier for summarization
    * @param {number} [options.batchSize] - Messages per summarization batch
    * @param {string} [options.configPath] - Path to .observations/config.json
+   * @param {import('@fwornle/km-core').GraphKMStore} [options.kmStore] -
+   *   Phase 44 Plan 12: pre-constructed km-core store. When supplied (preferred
+   *   path — obs-api passes its own so writes + typed-view reads share one
+   *   store), the writer uses it as-is; when absent, the writer lazy-constructs
+   *   one in `init()` with `ontologyDir` resolved via the km-core helper.
+   * @param {string} [options.kmStoreDbPath] - LevelDB path when lazy-constructing
+   *   the kmStore (default: .data/knowledge-graph/leveldb — matches obs-api).
+   * @param {string} [options.kmStoreExportDir] - JSON export dir when lazy-
+   *   constructing the kmStore (default: .data/knowledge-graph/exports).
    */
   constructor(options = {}) {
     const configPath = options.configPath || path.resolve('.observations/config.json');
@@ -84,6 +157,35 @@ export class ObservationWriter {
     /** @type {import('ioredis').default|null} Redis publisher for embedding events (lazy-init, fire-and-forget) */
     this._redisPub = null;
     this._redisInitAttempted = false;
+
+    // ── Phase 44 Plan 12 (A-1 cutover): km-core write path ───────────────────
+    //
+    // kmStore can be supplied externally (preferred — obs-api passes its own
+    // so the writer + typed-view reads share one canonical store) OR lazy-
+    // constructed against an EXPLICIT `kmStoreDbPath` (T-44-12-04 mitigation:
+    // tests pass a tmpdir path to avoid contention with the live production
+    // store at .data/knowledge-graph/leveldb). The lazy-construction path
+    // requires `ontologyDir` per the CLAUDE.md mandatory rule (Phase 41
+    // lesson, commits 87bc2f567 / fd35c5350); resolved via km-core's
+    // `defaultOntologyDir()` helper, with import.meta.resolve walk-up as
+    // backup (mirrors scripts/backfill-raw-observations.mjs:40,95).
+    //
+    // When NEITHER `kmStore` NOR `kmStoreDbPath` is supplied, lazy-init is
+    // SKIPPED and the writer surfaces this as a clear error on the first
+    // write attempt. This preserves backward compat with legacy unit tests
+    // (tests/live-logging/ObservationWriter.*.test.js) that exercise the
+    // SQLite-only paths (dedup, retention floor) without a km-core
+    // dependency.
+    this._kmStore = options.kmStore || null;
+    this._kmStoreDbPath = options.kmStoreDbPath || null;
+    this._kmStoreExportDir = options.kmStoreExportDir || null;
+    /** True when this instance constructed the kmStore (and must close it) */
+    this._ownsKmStore = false;
+    /** Per-process run identifier — distinguishes writer-stamped rows in
+     *  provenance queries. Re-generated on every constructor call so a
+     *  service restart yields a fresh runId in the stamp. */
+    this._runId = 'obs-writer-' + Date.now() + '-' +
+      Math.random().toString(36).slice(2, 8);
   }
 
   /**
@@ -181,6 +283,74 @@ export class ObservationWriter {
     // Shutdown handlers are registered by SafeDatabase — no need to duplicate here.
 
     process.stderr.write(`[ObservationWriter] Database initialized: ${this.dbPath}\n`);
+
+    // Phase 44 Plan 12: km-core is the canonical write path. When the
+    // caller supplied either `kmStore` directly OR an explicit
+    // `kmStoreDbPath`, eagerly open the store so the first write doesn't
+    // pay a cold-start. When neither is supplied (legacy unit-test path),
+    // defer — the first write call surfaces a clear error if the writer is
+    // exercised without km-core wiring.
+    if (this._kmStore || this._kmStoreDbPath) {
+      try {
+        await this._ensureKmStore();
+      } catch (err) {
+        process.stderr.write(
+          `[ObservationWriter] km-core init failed (write path will throw): ${err.message}\n`
+        );
+        // Surface — the writer cannot honor its R-4 hard-cutover contract
+        // without km-core. Caller (obs-api) decides whether to retry or fail.
+        throw err;
+      }
+    }
+  }
+
+  /**
+   * Lazy-construct + open the km-core GraphKMStore. Idempotent — second
+   * call is a no-op when the store is already open. Honors the CLAUDE.md
+   * mandatory ontologyDir rule (Phase 41 lesson). Mirrors the lazy-init
+   * pattern in `scripts/observations-api-server.mjs:923-946`.
+   *
+   * When the constructor was supplied with `options.kmStore`, this method
+   * trusts it and only flips the `_ownsKmStore` flag to false (so close()
+   * does NOT tear down a store the caller still owns).
+   */
+  async _ensureKmStore() {
+    if (this._kmStore) {
+      // Caller-supplied; assume already opened. Mark as not-owned so we
+      // don't close it on shutdown.
+      this._ownsKmStore = false;
+      return this._kmStore;
+    }
+    if (!this._kmStoreDbPath) {
+      throw new Error(
+        '[ObservationWriter] km-core write path not configured — pass ' +
+        '`options.kmStore` (preferred) or `options.kmStoreDbPath` to the ' +
+        'constructor. Phase 44 Plan 12 cut the SQLite write path; calling ' +
+        'writeObservation/writeDigest/writeInsight without km-core wiring ' +
+        'is unsupported.'
+      );
+    }
+    const ontologyDir = resolveKmCoreOntologyDir();
+    if (!ontologyDir) {
+      throw new Error(
+        '[ObservationWriter] ontologyDir resolution failed — refusing to construct ' +
+        'GraphKMStore without ontologyDir per CLAUDE.md mandatory rule (Phase 41 ' +
+        'commits 87bc2f567 / fd35c5350).'
+      );
+    }
+    const exportDir = this._kmStoreExportDir
+      || path.join(path.dirname(this._kmStoreDbPath), 'exports');
+    this._kmStore = new GraphKMStore({
+      dbPath: this._kmStoreDbPath,
+      exportDir,
+      ontologyDir,
+    });
+    await this._kmStore.open();
+    this._ownsKmStore = true;
+    process.stderr.write(
+      `[ObservationWriter] km-core GraphKMStore ready (dbPath=${this._kmStoreDbPath}, ontologyDir=${ontologyDir})\n`
+    );
+    return this._kmStore;
   }
 
   /**
@@ -712,23 +882,38 @@ export class ObservationWriter {
     const messageTimestamp = messages.find(m => m.createdAt)?.createdAt;
     const nowISO = messageTimestamp || new Date().toISOString();
 
-    const stmt = this.db.prepare(`
-      INSERT INTO observations (id, summary, messages, agent, session_id, source_file, created_at, metadata, content_hash, quality)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
+    // ── Phase 44 Plan 12 (A-1 cutover): write to km-core ──────────────────
+    //
+    // The legacy SQLite INSERT INTO observations is GONE. Every observation
+    // is shaped via the shared `legacyObservationToEntity` adapter (same
+    // helper the migration script uses — single source of truth for the
+    // field map, Pitfall 3, legacyId placement, and Phase 39 D-30
+    // provenance) and persisted via `kmStore.putEntity` on the trusted path
+    // (`skipOntologyCheck: true` — Observation/Digest/Insight classes are
+    // NOT in the bundled km-core ontology; same precedent as the migration
+    // script per CONTEXT R-4 hard cutover).
+    const kmStore = await this._ensureKmStore();
+    const obsRow = {
       id,
-      redactedSummary,
-      JSON.stringify(redactedMessages),
+      summary: redactedSummary,
+      messages: JSON.stringify(redactedMessages),
       agent,
-      metadata.sessionId || null,
-      metadata.sourceFile || null,
-      nowISO,
-      this._redact(JSON.stringify(metadata)),
-      contentHash,
+      session_id: metadata.sessionId || null,
+      source_file: metadata.sourceFile || null,
+      created_at: nowISO,
+      metadata: this._redact(JSON.stringify(metadata)),
+      content_hash: contentHash,
       quality,
-    );
+    };
+    try {
+      const entity = legacyObservationToEntity(obsRow, this._runId, nowISO);
+      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+    } catch (err) {
+      process.stderr.write(
+        `[ObservationWriter] km-core putEntity (observation) failed: ${err.message}\n`
+      );
+      throw err;
+    }
 
     // Fire-and-forget: publish embedding event to Redis (per D-05)
     this._initRedis();
@@ -748,6 +933,81 @@ export class ObservationWriter {
     this._scheduleExport();
 
     return id;
+  }
+
+  /**
+   * Phase 44 Plan 12: write a daily-digest entity into km-core.
+   *
+   * The legacy SQLite consolidator (ObservationConsolidator.consolidateDay)
+   * historically owned digest persistence. Post-cutover, digests are
+   * persisted via this method through the shared `legacyDigestToEntity`
+   * adapter so they land in km-core with the canonical `legacyId.system='A'`
+   * + Pitfall 3 (BOTH entityType + ontologyClass) + Phase 39 D-30
+   * provenance shape. Consumers migrate to call this method instead of
+   * direct SQLite writes in a follow-up phase; this method exists today so
+   * the writer surfaces the full A-1 write contract in one place.
+   *
+   * @param {Object} row  Digest row matching `LegacyDigestRow` (see
+   *   lib/km-core/src/adapters/legacy-ingest.ts). At minimum:
+   *   `{id, date, theme, summary, observation_ids[], agents[],
+   *   files_touched[], project, created_at}`.
+   * @returns {Promise<string>} The persisted entity's legacyId.id (= row.id).
+   */
+  async writeDigest(row) {
+    if (!row || typeof row !== 'object') {
+      throw new Error('[ObservationWriter] writeDigest: row required');
+    }
+    if (!row.id) {
+      throw new Error('[ObservationWriter] writeDigest: row.id required');
+    }
+    const kmStore = await this._ensureKmStore();
+    const ts = row.created_at || new Date().toISOString();
+    try {
+      const entity = legacyDigestToEntity(row, this._runId, ts);
+      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      return row.id;
+    } catch (err) {
+      process.stderr.write(
+        `[ObservationWriter] km-core putEntity (digest ${row.id}) failed: ${err.message}\n`
+      );
+      throw err;
+    }
+  }
+
+  /**
+   * Phase 44 Plan 12: write an insight entity into km-core.
+   *
+   * Symmetric counterpart of `writeDigest` for the 'Insight' ontology
+   * class. The shared `legacyInsightToEntity` adapter shapes the row;
+   * trusted-path putEntity (skipOntologyCheck:true) bypasses the bundled
+   * km-core ontology registry which doesn't ship the Insight class (same
+   * precedent as the migration script).
+   *
+   * @param {Object} row  Insight row matching `LegacyInsightRow` (see
+   *   lib/km-core/src/adapters/legacy-ingest.ts). At minimum:
+   *   `{id, topic, summary, confidence, digest_ids[], last_updated,
+   *   created_at, project}`.
+   * @returns {Promise<string>} The persisted entity's legacyId.id (= row.id).
+   */
+  async writeInsight(row) {
+    if (!row || typeof row !== 'object') {
+      throw new Error('[ObservationWriter] writeInsight: row required');
+    }
+    if (!row.id) {
+      throw new Error('[ObservationWriter] writeInsight: row.id required');
+    }
+    const kmStore = await this._ensureKmStore();
+    const ts = row.created_at || new Date().toISOString();
+    try {
+      const entity = legacyInsightToEntity(row, this._runId, ts);
+      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      return row.id;
+    } catch (err) {
+      process.stderr.write(
+        `[ObservationWriter] km-core putEntity (insight ${row.id}) failed: ${err.message}\n`
+      );
+      throw err;
+    }
   }
 
   /**
@@ -1093,5 +1353,14 @@ export class ObservationWriter {
       this.db = null;
       process.stderr.write('[ObservationWriter] Database connection closed.\n');
     }
+    // Phase 44 Plan 12: close the km-core store only when we own it. When
+    // the caller (obs-api) supplied it via `options.kmStore`, the caller
+    // owns the lifecycle — tearing it down here would break the typed-view
+    // handlers that still hold a reference.
+    if (this._kmStore && this._ownsKmStore) {
+      try { await this._kmStore.close(); } catch { /* best effort */ }
+      process.stderr.write('[ObservationWriter] km-core GraphKMStore closed.\n');
+    }
+    this._kmStore = null;
   }
 }

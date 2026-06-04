@@ -76,7 +76,14 @@ async function ensureWriter() {
   if (_writer && _writer.db) return _writer;
   if (_writerInit) return _writerInit;
   _writerInit = (async () => {
-    const w = new ObservationWriter({ dbPath: DB_PATH });
+    // Phase 44 Plan 12: share the km-core store between the writer and the
+    // typed-view handlers. obs-api opens the store FIRST so the writer
+    // doesn't lazy-init a second one (which would compete for the LevelDB
+    // LOCK and silently lose writes). Single source of truth — both
+    // /api/coding/* reads and the live writer share one GraphKMStore
+    // instance.
+    const kmStore = await ensureKMStore();
+    const w = new ObservationWriter({ dbPath: DB_PATH, kmStore });
     await w.init();
     _writer = w;
     return w;
