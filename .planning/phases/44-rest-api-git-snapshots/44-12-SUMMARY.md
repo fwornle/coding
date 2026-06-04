@@ -2,13 +2,14 @@
 phase: 44-rest-api-git-snapshots
 plan: 12
 subsystem: A (online learning / ObservationWriter)
-status: partial — Tasks 1 + 2 landed; Task 3 awaits operator
+status: SOFT-CLOSED — write-path cut, read-path SQLite consumers remain; deep cutover deferred to follow-up sub-plan (44-12-bis or 44.x)
 tags:
   - architectural-close-out
   - sqlite-cutover
   - km-core-write-path
   - autonomous:false
-  - checkpoint:operator-required
+  - soft-cutover
+  - deep-cutover-deferred
 dependency_graph:
   requires:
     - phase-44-plan-05 (observation-view.ts — read-direction adapter)
@@ -59,7 +60,8 @@ metrics:
   files_created: 3
   files_modified: 7
   tasks_complete: 2_of_3
-  task3_status: awaiting_operator
+  task3_status: SOFT-EXECUTED (launchctl restart done; SQLite archive deferred — see "Operator Checkpoint Outcome" section)
+  cutover_scope: write-path-only — read-path SQLite consumers (legacy /api/*, consolidator, dashboard counts, writer dedup) remain. Deep cutover deferred to follow-up sub-plan.
 ---
 
 # Phase 44 Plan 12: ObservationWriter → km-core Cutover Summary (PARTIAL)
@@ -75,8 +77,78 @@ the same helper so the field map has one source of truth.
 | Task | Description | Status | Commit |
 |------|-------------|--------|--------|
 | 1 | Land legacy-ingest adapter in km-core + refactor migration script | ✅ Complete | submodule `0a6ac57` + outer `ef340013f` |
-| 2 | Cut ObservationWriter to km-core; remove SQLite writes; add integration test | ✅ Complete | `c2582c7ef` |
-| 3 | Operator checkpoint — restart obs-api, verify real-time dashboard, archive SQLite | ⏸ Awaiting operator | — |
+| 2 | Cut ObservationWriter `writeObservation` INSERT to km-core; add `writeDigest`/`writeInsight`; integration test | ✅ Complete (write-path only — see Scope Correction below) | `c2582c7ef` |
+| 3 | Operator checkpoint — restart obs-api, verify real-time dashboard, archive SQLite | ⚠ SOFT-EXECUTED — launchctl restart done; **archive deferred** | — |
+
+## Scope Correction (post-checkpoint discovery)
+
+**TL;DR:** Plan 44-12's `must_haves.truths` claimed the SQLite file would be
+"fully unused" after this plan. That claim was wrong. The WRITE path *is*
+cut (`writeObservation` now calls `kmStore.putEntity` instead of `INSERT INTO
+observations`), but `.observations/observations.db` has ~14 other consumers
+that Plan 44-12 did not scope. Archiving the file (Task 3 §4) would break
+all of them. The plan needs a follow-up sub-plan to do the deep cutover.
+
+**Discovered during the Task 3 operator checkpoint** (2026-06-04), surfaced
+by the orchestrator's verification grep when the user ran the launchctl
+restart and then noticed `[ObservationWriter] Database initialized` still
+appeared in the fresh log slice. Investigation revealed:
+
+| Consumer | Where | Type | Impact if file archived |
+|----------|-------|------|-------------------------|
+| ObservationWriter `_findExistingByContentHash` | `src/live-logging/ObservationWriter.js:782-787` | READ (dedup lookup) | Every write throws — dedup short-circuit dead |
+| ObservationWriter `_maybePatchArtifacts` | `src/live-logging/ObservationWriter.js:813-814` | **WRITE** (UPDATE observations SET summary, metadata) | Every Artifacts-patch attempt throws |
+| ObservationWriter `_isSemanticallyDuplicate` | `src/live-logging/ObservationWriter.js:1107-1111` | READ (semantic dup lookup) | Semantic dedup dead |
+| Legacy `/api/observations` endpoints | `scripts/observations-api-server.mjs:424, 459, 494` | READ + UPDATE | All `/api/*` (non-`/api/coding/*`) endpoints throw |
+| Legacy `/api/digests` + `/api/insights` | `scripts/observations-api-server.mjs:513-639` | READ | Legacy dashboard endpoints throw |
+| Dashboard COUNT queries | `scripts/observations-api-server.mjs:861-876` | READ | Dashboard top-line counters break |
+| ObservationConsolidator | `src/live-logging/ObservationConsolidator.js` (own connection per `:218` comment) | READ + WRITE | Daily consolidation breaks |
+
+The executor's commit message at `c2582c7ef` was honest about preserving
+`this.db` for "sibling obs-api endpoints that still read from SQLite
+(consolidation, FTS search, project listings, dedup)"; only the plan's
+must_haves drafted ahead of time were over-confident.
+
+**Operator decision (2026-06-04):** Full hard cutover, not amendment.
+Open a follow-up sub-plan (`44-12-bis` or `44.1`) to complete the deep
+cutover before Phase 44 can close. The writer-only WRITE-path cutover
+stays in main as the foundation.
+
+## Deferred — Deep-Cutover Scope (follow-up sub-plan required)
+
+A follow-up plan must close the following before the SQLite file can be
+archived and `[ObservationWriter] Database initialized` can disappear from
+the startup log:
+
+1. **Writer dedup → km-core findByLegacyId.** Replace
+   `_findExistingByContentHash` SQLite SELECT with a km-core query (likely
+   `findByLegacyId({system:'A', id:contentHash})` or a new
+   `findByContentHash` API on `GraphKMStore`). Un-skip the 2 dedup tests
+   in `tests/live-logging/ObservationWriter.pre-llm-dedup.test.js`.
+2. **Writer Artifacts-patch → km-core putEntity replay.** Replace the
+   in-place SQLite UPDATE at line 813 with a fetch-modify-putEntity cycle
+   on the existing entity. Idempotent.
+3. **Writer semantic-dup lookup → km-core query.** Replace the
+   `last-50 / 4h` SQLite SELECT at line 1107 with a km-core time-windowed
+   query by agent. Drop `this.db` after this lands.
+4. **Legacy obs-api endpoints → km-core.** Cut `/api/observations`,
+   `/api/observations/:id` (with its UPDATE), `/api/digests`, `/api/insights`,
+   project-list, and dashboard COUNT endpoints over to km-core. Either:
+   (a) deprecate the legacy paths and migrate consumers to `/api/coding/*`,
+   or (b) implement the legacy paths as thin adapters over km-core.
+5. **ObservationConsolidator → km-core.** Cut the consolidator's
+   read+write paths to km-core. This is the largest piece because the
+   consolidator is a complex multi-stage pipeline; it may need its own
+   plan.
+6. **Then archive.** Once 1–5 land, `[ObservationWriter] Database
+   initialized` disappears from startup, no SQLite touches occur, and
+   `mv .observations/observations.db .data/backups/...` becomes safe.
+   Plan 44-10 Task 4 (legacy SQLite DROP) closes at that point.
+
+Estimated scope: 1–2 plans, multi-day. The writer-side work (1–3) is one
+plan; the obs-api work (4) is another; the consolidator (5) may warrant
+a third.
+
 
 **CHECKPOINT_REQUIRED: 44-12 Task 3 needs operator action.**
 
@@ -246,54 +318,79 @@ Verified the tests CLOSELY related to my change all pass:
 | T-44-12-02 | Missing ontologyDir → Phase 41 throw | ✅ `resolveKmCoreOntologyDir()` calls `defaultOntologyDir()` first; import.meta.resolve walk-up backup; error if neither resolves. |
 | T-44-12-03 | Lost provenance / legacyId on new write path | ✅ Single shared `legacyObservationToEntity` adapter encodes legacyId + provenance + Pitfall 3; both writer and migration inherit. |
 | T-44-12-04 | Test fixture contends with ETM's live store | ✅ Integration test uses `mkdtempSync` + tmpdir-backed GraphKMStore; ETM writes to the production store; no overlap. Legacy unit tests now ALSO use tmpdir kmStoreDbPath (Rule 1 fix). |
-| T-44-12-05 | `.observations/observations.db` lingers as ambiguous source | ⏸ TASK 3 (operator archives the file to `.data/backups/`). |
+| T-44-12-05 | `.observations/observations.db` lingers as ambiguous source | ⚠ **DEFERRED.** Discovered during Task 3 checkpoint: ~14 other consumers (writer dedup + Artifacts-patch UPDATE, legacy `/api/*` endpoints, consolidator, dashboard counts) still read+write the file. Archive deferred to a follow-up sub-plan that cuts those consumers over. The file remains the source of truth for those legacy paths until then. |
 
-## Pending Operator Action — Task 3
+## Operator Checkpoint Outcome — Task 3 (2026-06-04)
 
-Tasks 1+2 have landed code that the operator must validate against the
-LIVE ObservationWriter (which captures THE OPERATOR'S OWN sessions).
-The executor MUST NOT execute Task 3 autonomously; the plan is
-`autonomous: false` and Task 3 modifies production launchd jobs +
-archives the live SQLite file.
+The operator (Frank) attempted Task 3 §1 (launchctl restart) and the
+orchestrator surfaced two findings before §4 (archive) could proceed.
 
-**Runbook for the operator (do NOT run yet — wait for explicit approval):**
+### What was executed
 
-```bash
-# 1. Restart obs-api on the new code.
-launchctl bootout gui/$(id -u)/com.coding.obs-api
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.coding.obs-api.plist
-sleep 5
+| Step | Command | Outcome |
+|------|---------|---------|
+| §1a | `launchctl bootout gui/$(id -u)/com.coding.obs-api` | ✅ Job removed |
+| §1b | `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.coding.obs-api.plist` | ❌ `Bootstrap failed: 5: Input/output error` (macOS LaunchAgents quirk — post-bootout disabled cache) |
+| recovery | `launchctl enable gui/$(id -u)/com.coding.obs-api && launchctl bootstrap …` | ✅ Job registered, pid `73924`, listening on `:12436` |
+| §1c verification | `curl -sf http://localhost:12436/api/coding/observations?limit=1` | ✅ obs-api serves typed views |
 
-# 2. Trigger an observation in any live coding session. ETM's defer-and-
-# flush cycle takes ~30s; the dashboard at :3032 should show the new
-# observation in real-time (NOT from a stale --resume catchup).
-open http://localhost:3032/observations
+### What was NOT executed
 
-# 3. Verify SQLite is no longer being written. The mtime must NOT change
-# during the 60s window — the writer's writeObservation no longer touches
-# SQLite, only the dedup/patch reads do (and they do not write).
-STAT_BEFORE=$(stat -f %m .observations/observations.db)
-sleep 60
-STAT_AFTER=$(stat -f %m .observations/observations.db)
-[ "$STAT_BEFORE" = "$STAT_AFTER" ] && echo "OK — SQLite untouched" \
-                                  || echo "BAD — SQLite still receiving writes"
+| Step | Reason |
+|------|--------|
+| §2 (dashboard real-time verify) | Skipped pending deep-cutover decision |
+| §3 (mtime no-write probe) | Would have FAILED — writer still has UPDATE at line 813 (Artifacts patch) + many other consumers write to the file |
+| §4 (`mv observations.db .data/backups/…`) | **NOT EXECUTED** — would break ~14 other consumers (see Scope Correction above). File remains in place. |
+| §5 (post-archive kickstart) | N/A — no archive happened |
+| §6 (no-`Database initialized` log assertion) | N/A — log line still present and that is now expected |
 
-# 4. Archive the legacy SQLite file (unblocks Plan 44-10 Task 4 DROP).
-mv .observations/observations.db .data/backups/observations.db.post-phase44.$(date -u +%Y%m%dT%H%M%SZ)
+### Macros learned (for the next plan that does archive)
 
-# 5. Verify obs-api still starts after the archive (the writer no longer
-# opens SQLite, but ColdStoreReader + consolidation may need it; if
-# obs-api crashes, restore the file and report).
-launchctl kickstart -k "gui/$(id -u)/com.coding.obs-api"
-sleep 5
-curl -sf http://localhost:12436/api/coding/observations?limit=1 | jq .total
-```
+- `launchctl bootout` followed by `bootstrap` on the same plist needs
+  `launchctl enable` first in macOS Sonoma+. Bootstrap returns IOError 5
+  until the disabled-cache is cleared. Plan 44-10 / Plan 44-bis should
+  use `launchctl kickstart -k "gui/$(id -u)/com.coding.obs-api"` as the
+  primary restart pattern instead.
+- The standalone foreground run of `observations-api-server.mjs` works
+  fine — the IOError is purely a launchd-state issue, not a code issue.
 
-**Confirm to the executor:** reply with `approved: 44-12 task 3` (or
-explicit instruction to abort + revert Task 2 commit `c2582c7ef`).
+### Decision recorded
 
-## Self-Check: PASSED
+**Operator chose** (option "Full hard cutover — send executor back for the
+deep work" presented by orchestrator):
 
+> Open a new sub-plan (44-12-bis or 44.1) covering: dedup migration to
+> km-core findByLegacyId, Artifacts-patch UPDATE replay via putEntity,
+> legacy /api/* endpoints rewritten over km-core, consolidator port to
+> km-core, dashboard COUNTs over km-core. Multi-day scope; the
+> writer/typed-view cutover stays as the foundation. Only then archive.
+
+Until that sub-plan ships, Plan 44-12's `must_haves.truths` are PARTIALLY
+satisfied:
+- ✅ "writes observations + digests + insights DIRECTLY to km-core (via
+  GraphKMStore.putEntity)" — confirmed via grep + 3 GREEN integration tests
+- ❌ "no SQLite handle constructed" — `this.db` is still opened in `init()`
+- ❌ "no `_db.prepare(...).run(...)` calls" — letter satisfied; spirit
+  violated (UPDATE at line 813 uses `this.db.prepare(...).run(...)`)
+- ❌ ".observations/observations.db is fully unused after this plan" —
+  ~14 consumers still touch the file; deep cutover deferred
+
+Wave 5.5 is therefore **SOFT-CLOSED**, not closed. STATE.md / ROADMAP.md
+should NOT mark Plan 44-12 as complete until the follow-up sub-plan ships.
+
+## Next Step
+
+Run `/gsd:phase 44 add` or `/gsd:plan-phase 44` to add a successor plan
+(suggested ID: `44-13` "ObservationWriter dedup + Artifacts-patch
+cutover to km-core") and probably a second plan (`44-14` "obs-api legacy
+endpoints + consolidator + dashboard counts cutover"). Plan 44-11
+(wave 6 verification) should be deferred until those land — verifying
+the canonical 15-endpoint contract while the writer still soft-touches
+SQLite is misleading.
+
+## Self-Check: PARTIAL
+
+**Write-path artifacts — PASSED:**
 - [x] `lib/km-core/src/adapters/legacy-ingest.ts` exists (368 lines)
 - [x] `lib/km-core/src/adapters/index.ts` exists (48 lines, sibling barrel)
 - [x] `tests/integration/observation-writer.km-core.test.js` exists (243 lines)
@@ -302,7 +399,15 @@ explicit instruction to abort + revert Task 2 commit `c2582c7ef`).
 - [x] Outer commit `c2582c7ef` found in `git log --oneline | grep c2582c7ef`
 - [x] Integration test 3/3 GREEN
 - [x] Migration dry-run row counts match baseline (obs=888, dig=391, ins=81)
-- [x] All ObservationWriter unit tests pass or are documented-skipped
+- [x] 148/150 ObservationWriter unit tests pass; 2 documented-skipped pending dedup-cutover sub-plan
+
+**Plan must_haves close-out — FAILED:**
+- [ ] "no SQLite handle constructed" — `this.db` still opened in `init()`
+- [ ] "no `_db.prepare(...).run(...)` calls" — letter OK; UPDATE at line 813 uses `this.db.prepare(...).run(...)`
+- [ ] ".observations/observations.db is fully unused" — ~14 consumers still touch the file
+- [ ] obs-api startup log no longer shows `[ObservationWriter] Database initialized` — still present
+
+These four are intentionally deferred. The follow-up sub-plan closes them.
 
 ## TDD Gate Compliance
 
