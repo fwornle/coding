@@ -236,6 +236,17 @@ let _lastConsolidationError = null;     // { message } if last run threw
 let _lastConsolidationFinishedAt = null; // ISO timestamp, set in the finally of runConsolidation
 let _consolidationJobCounter = 0;       // bump on each new run start
 let _consolidationArgs = null;
+
+// Phase 44 Plan 14 fix: cache the pipeline-stats consolidator at module scope
+// so the dashboard's polling of /api/consolidation/status (default ~10s)
+// doesn't construct a fresh consolidator + open a fresh SQLite handle on
+// every call. Per-request construction caused ~360 `[Consolidator] Database
+// initialized` log lines/hour without any resource leak (handles were closed
+// in finally), just noise. Deferred-to-44-15 scope is unchanged: the
+// consolidator still owns its own SQLite handle; only the obs-api caching
+// strategy moves.
+let _pipelineStatsConsolidator = null;
+let _pipelineStatsConsolidatorInit = null;
 let _heartbeatInterval = null;
 let _lastStderrLine = '';
 let _lastStderrAt = null;
@@ -1031,23 +1042,38 @@ app.get('/api/consolidation/status', async (_req, res) => {
       _stalenessCache.get(store),
     ]);
 
-    // Pipeline stats from the consolidator's own SQLite handle. Open
-    // on-demand (mirrors the consolidation/run path's
-    // `new ObservationConsolidator({ dbPath: DB_PATH })` lazy-construct
-    // pattern). Wrapped in try/catch with safe defaults so a missing
-    // observations.db (post-Plan-44-15 archive) returns zeros instead
-    // of a 503 — the dashboard staleness clock keeps rendering.
+    // Pipeline stats from the consolidator's own SQLite handle. The
+    // consolidator is module-scope cached (`_pipelineStatsConsolidator`)
+    // so the dashboard's ~10s polling doesn't re-init on every call —
+    // see the cache declaration near the top of this file. First call
+    // pays the init cost; subsequent calls reuse the handle. Shutdown
+    // closes it in the SIGTERM/SIGINT handler. Wrapped in try/catch with
+    // safe defaults so a missing observations.db (post-Plan-44-15 archive)
+    // returns zeros instead of a 503 — the dashboard staleness clock
+    // keeps rendering.
     let undigested = 0;
     let pendingPast = 0;
     let pendingToday = 0;
     let lowQuality = 0;
-    let consolidatorOpenedOk = false;
-    const pipelineStatsConsolidator = new ObservationConsolidator({ dbPath: DB_PATH });
     try {
-      await pipelineStatsConsolidator.init();
-      consolidatorOpenedOk = true;
+      if (!_pipelineStatsConsolidator) {
+        if (!_pipelineStatsConsolidatorInit) {
+          _pipelineStatsConsolidatorInit = (async () => {
+            const c = new ObservationConsolidator({ dbPath: DB_PATH });
+            await c.init();
+            _pipelineStatsConsolidator = c;
+          })().catch((err) => {
+            // Reset the promise so the NEXT call retries. If init keeps
+            // failing the caller logs each attempt — bounded by request
+            // rate, not by an unbounded log loop.
+            _pipelineStatsConsolidatorInit = null;
+            throw err;
+          });
+        }
+        await _pipelineStatsConsolidatorInit;
+      }
       const today = new Date().toISOString().split('T')[0];
-      const cdb = pipelineStatsConsolidator.db;
+      const cdb = _pipelineStatsConsolidator?.db;
       if (cdb) {
         try {
           undigested = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low'").get().cnt;
@@ -1061,10 +1087,6 @@ app.get('/api/consolidation/status', async (_req, res) => {
       // km-core counts + staleness clock; pipeline stats remain zero.
       // Plan 44-15 archives this path entirely.
       process.stderr.write(`[obs-api] /consolidation/status consolidator probe failed: ${consolidatorErr.message}\n`);
-    } finally {
-      if (consolidatorOpenedOk) {
-        try { pipelineStatsConsolidator.close(); } catch { /* best-effort */ }
-      }
     }
 
     const inflight = readConsolidationHeartbeat();
@@ -1457,6 +1479,10 @@ async function shutdown(signal) {
   server.close(async () => {
     if (_writer) {
       try { await _writer.close?.(); } catch { /* best effort */ }
+    }
+    if (_pipelineStatsConsolidator) {
+      try { _pipelineStatsConsolidator.close(); } catch { /* best effort */ }
+      _pipelineStatsConsolidator = null;
     }
     // SIGKILL ourselves to skip Node's native destructor teardown.
     // process.exit(0) triggers the fastembed C++ cleanup path which hits a
