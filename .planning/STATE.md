@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: awaiting-operator
-stopped_at: Phase 44 Wave 5 — Plan 44-10 checkpoint (operator service restarts required for live migration)
-last_updated: "2026-06-04T06:30:00.000Z"
-last_activity: 2026-06-04 -- Phase 44 Wave 4 closed + 44-10 script/backup landed (9.5/11 plans)
+status: executing
+stopped_at: Phase 44 context gathered
+last_updated: "2026-06-04T11:39:54.182Z"
+last_activity: 2026-06-04 -- Phase 44 execution started
 progress:
   total_phases: 23
-  completed_phases: 15
-  total_plans: 99
-  completed_plans: 88
-  percent: 65
+  completed_phases: 16
+  total_plans: 100
+  completed_plans: 100
+  percent: 70
 ---
 
 # Project State
@@ -52,18 +52,27 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 44 (rest-api-git-snapshots) — **AWAITING OPERATOR** at Plan 44-10 Task 3 gate
-Plan: 9.5 of 11 complete (Waves 0/1/2/3/4 closed; 44-10 script + backup landed; 44-10 live migration + 44-11 verification gate operator-owned)
-Status: Awaiting operator-coordinated service restarts so live migration can run
-Next step: Operator action queue (see 44-10-SUMMARY.md for full detail):
-  1. `launchctl kickstart -k gui/$(id -u) com.coding.obs-api` (pick up 44-07 typed-view changes)
-  2. Sync `~/Agentic/km-core` to post-`c7bc236` (or symlink to `/Users/Q284340/Agentic/coding/lib/km-core` at HEAD)
-  3. `cd /Users/Q284340/Agentic/coding/docker && docker-compose build coding-services && docker-compose up -d coding-services` (pick up 44-08 B-side mount)
-  4. Dry-run: `node scripts/migrate-sqlite-to-kmcore.mjs --dry-run --run-id=phase-44-dryrun-$(date +%s) | tail -5`
-  5. Live: `node scripts/migrate-sqlite-to-kmcore.mjs --run-id=phase-44-live-$(date +%s) --verify | tee /tmp/migrate-phase-44.log`
-  6. Resume: `/gsd-execute-phase 44 --wave 6` to run Plan 44-11 verification gate
-  7. Operator-merge OKM PR #5 (https://bmw.ghe.com/adpnext-apps/operational-knowledge-management/pull/5) + restart C's service so cross-system-parity C-leg flips GREEN
-Last activity: 2026-06-04 -- Wave 4 closed (44-07/08/09 + amend); Plan 44-10 paused at checkpoint after script + backup
+Phase: 44 (rest-api-git-snapshots) — EXECUTING
+Plan: Wave 5.5 (44-12) SOFT-CLOSED 2026-06-04; Wave 6 (44-11) still pending
+Status: Executing Phase 44 — write-path cutover landed; deep cutover deferred to follow-up sub-plan
+
+Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
+  - Plan 44-12 Tasks 1+2 LANDED on main (commits `ef340013f`, `c2582c7ef`, submodule `0a6ac57`)
+  - Plan 44-12 Task 3 SOFT-EXECUTED: launchctl restart done (recovered IOError 5 with `launchctl enable`); obs-api pid 73924 on :12436; SQLite archive NOT EXECUTED
+  - Plan 44-12 declared SOFT-CLOSED — the plan's must_haves "fully unused observations.db" claim was over-scoped; ~14 other consumers (writer dedup, legacy /api/*, consolidator, dashboard counts) still read+write the file
+  - Operator chose "Full hard cutover via follow-up sub-plan" — see 44-12-SUMMARY.md § "Operator Checkpoint Outcome" + § "Deferred — Deep-Cutover Scope"
+  - Plan 44-12 docs commit: `62eb10a5a docs(44-12): soft-close — write-path cut, deep cutover deferred to sub-plan`
+
+Next step: deep-cutover sub-plan(s) before Phase 44 closure
+  1. `/gsd:phase 44 add` — add 44-13 "ObservationWriter dedup + Artifacts-patch cutover to km-core" (writer side: lines 782, 813, 1107 in ObservationWriter.js)
+  2. `/gsd:phase 44 add` — add 44-14 "obs-api legacy `/api/*` + consolidator + dashboard counts cutover to km-core" (server side: ~14 sites in observations-api-server.mjs + ObservationConsolidator)
+  3. `/gsd-plan-phase 44` to plan 44-13 and 44-14
+  4. `/gsd-execute-phase 44 --wave <N>` to execute them
+  5. ONLY THEN: re-attempt the archive (`mv .observations/observations.db .data/backups/...`)
+  6. `/gsd-execute-phase 44 --wave 6` to run Plan 44-11 verification gate (after 44-13/44-14 land)
+  7. Operator-merge OKM PR #5 (https://bmw.ghe.com/adpnext-apps/operational-knowledge-management/pull/5) + restart C's service for cross-system-parity C-leg GREEN
+
+Last activity: 2026-06-04 -- Wave 5.5 SOFT-CLOSED, deep cutover sub-plans needed before phase closure
 
 ## Performance Metrics
 
