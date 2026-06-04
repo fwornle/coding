@@ -58,6 +58,17 @@ import {
   GraphKMStore,
   defaultOntologyDir,
 } from '@fwornle/km-core';
+// Phase 44 Plan 12: the inverse-direction adapter is now lifted into km-core
+// as the SINGLE source of truth for SQLite-row → Entity field mapping. The
+// live writer (src/live-logging/ObservationWriter.js) imports the same three
+// helpers, so any future schema change lands in one place. The migration
+// script supplies its own (provider, model) to distinguish stamped rows
+// from live-writer rows in post-hoc provenance queries.
+import {
+  legacyObservationToEntity,
+  legacyDigestToEntity,
+  legacyInsightToEntity,
+} from '@fwornle/km-core/adapters/legacy-ingest';
 
 const require = createRequire(import.meta.url);
 // Canonical native binding for the embedded DB engine (already a root dep).
@@ -143,127 +154,34 @@ function printHelp() {
 // Parsing helpers
 // ----------------------------------------------------------------------------
 
-function parseJsonOr(raw, fallback) {
-  if (raw === null || raw === undefined || raw === '') return fallback;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-}
-
-function parseJsonArray(raw) {
-  const v = parseJsonOr(raw, []);
-  return Array.isArray(v) ? v : [];
-}
-
-function buildProvenance(runId, ts) {
-  return {
-    provider: 'phase-44-migration',
-    model: 'a-legacy-to-kmcore',
-    runId,
-    timestamp: ts,
-  };
-}
-
 // ----------------------------------------------------------------------------
-// Entity builders - one per source table.
+// Entity builders — Phase 44 Plan 12 refactor.
 //
-// Each builder honors Pitfall 3 (BOTH entityType + ontologyClass set) and
-// places legacyId at the top level (CF-D37). metadata preserves every
-// non-promoted column so the typed-view reshape (Plan 44-05) can surface
-// fields the legacy SELECTs returned.
+// The three buildXxxEntity functions (which used to live here, ~170-266 in
+// the pre-Plan-12 history) are LIFTED into the km-core adapter at
+// `lib/km-core/src/adapters/legacy-ingest.ts` (sibling of the Plan 44-05
+// observation-view.ts reshape — same field map walked the opposite
+// direction). Live writer + migration now share one source of truth so
+// the legacyId placement (CF-D37), Pitfall 3 (BOTH entityType +
+// ontologyClass), Phase 39 D-30 provenance stamp, and array/JSON parse
+// semantics are encoded once.
+//
+// We retain alias names for the local call-sites below. The (provider,
+// model) override distinguishes migration-stamped rows from live-writer
+// rows in post-hoc provenance queries.
 // ----------------------------------------------------------------------------
 
-function buildObservationEntity(row, runId, ts) {
-  const meta = parseJsonOr(row.metadata, {});
-  return {
-    id: undefined,
-    name: (row.summary || '').slice(0, 80) || '(no summary)',
-    entityType: 'Observation',
-    ontologyClass: 'Observation',
-    layer: 'evidence',
-    description: row.summary || '',
-    metadata: {
-      ...meta,
-      agent: row.agent,
-      project: meta.project ?? null,
-      session_id: row.session_id,
-      source_file: row.source_file,
-      content_hash: row.content_hash,
-      quality: row.quality,
-      digested_at: row.digested_at,
-      messages: row.messages,
-      summary: row.summary,
-      createdAt: row.created_at,
-    },
-    legacyId: { system: 'A', id: row.id },
-    createdAt: row.created_at,
-    updatedAt: row.created_at,
-    validFrom: row.created_at,
-    validUntil: null,
-    createdBy: buildProvenance(runId, ts),
-  };
-}
+const MIGRATION_PROVENANCE = {
+  provider: 'phase-44-migration',
+  model: 'a-legacy-to-kmcore',
+};
 
-function buildDigestEntity(row, runId, ts) {
-  const meta = parseJsonOr(row.metadata, {});
-  return {
-    id: undefined,
-    name: (row.theme || row.summary || '').slice(0, 80) || '(no theme)',
-    entityType: 'Digest',
-    ontologyClass: 'Digest',
-    layer: 'pattern',
-    description: row.summary || '',
-    metadata: {
-      ...meta,
-      date: row.date,
-      theme: row.theme,
-      summary: row.summary,
-      observation_ids: parseJsonArray(row.observation_ids),
-      agents: parseJsonArray(row.agents),
-      files_touched: parseJsonArray(row.files_touched),
-      project: row.project ?? meta.project ?? null,
-      quality: row.quality,
-      createdAt: row.created_at,
-    },
-    legacyId: { system: 'A', id: row.id },
-    createdAt: row.created_at,
-    updatedAt: row.created_at,
-    validFrom: row.created_at,
-    validUntil: null,
-    createdBy: buildProvenance(runId, ts),
-  };
-}
-
-function buildInsightEntity(row, runId, ts) {
-  const meta = parseJsonOr(row.metadata, {});
-  const lastUpdated = row['last_updated'];
-  return {
-    id: undefined,
-    name: (row.topic || row.summary || '').slice(0, 80) || '(no topic)',
-    entityType: 'Insight',
-    ontologyClass: 'Insight',
-    layer: 'pattern',
-    description: row.summary || '',
-    metadata: {
-      ...meta,
-      topic: row.topic,
-      summary: row.summary,
-      confidence: typeof row.confidence === 'number' ? row.confidence : 0.8,
-      digest_ids: parseJsonArray(row.digest_ids),
-      last_updated: lastUpdated,
-      project: row.project ?? meta.project ?? null,
-      createdAt: row.created_at,
-    },
-    legacyId: { system: 'A', id: row.id },
-    createdAt: row.created_at,
-    updatedAt: lastUpdated || row.created_at,
-    validFrom: row.created_at,
-    validUntil: null,
-    createdBy: buildProvenance(runId, ts),
-  };
-}
+const buildObservationEntity = (row, runId, ts) =>
+  legacyObservationToEntity(row, runId, ts, MIGRATION_PROVENANCE);
+const buildDigestEntity = (row, runId, ts) =>
+  legacyDigestToEntity(row, runId, ts, MIGRATION_PROVENANCE);
+const buildInsightEntity = (row, runId, ts) =>
+  legacyInsightToEntity(row, runId, ts, MIGRATION_PROVENANCE);
 
 // ----------------------------------------------------------------------------
 // Per-table migration driver
