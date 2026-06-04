@@ -1160,29 +1160,45 @@ const KG_EXPORT_DIR = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'exports'
 
 let _kmStore = null;
 let _kmStoreReady = false;
+// Cached in-flight init promise — concurrent ensureKMStore() callers share
+// one open() rather than the second caller getting back null. Plan 44-12
+// (commit c2582c7e) added `ensureWriter → ensureKMStore` so the writer and
+// the typed-view handlers share a store; on startup the listen handler then
+// fires a second ensureKMStore() in parallel. The prior `if (_kmStore) return
+// null` early-return resolved that second call to null, so mountKMRoutes()
+// never ran and /api/v1/* came back 404 (Plan 44-11 verification finding).
+let _kmStoreInit = null;
 
 async function ensureKMStore() {
   if (_kmStore && _kmStoreReady) return _kmStore;
-  if (_kmStore) return null; // init in progress
+  if (_kmStoreInit) return _kmStoreInit;
+  _kmStoreInit = (async () => {
+    try {
+      // CLAUDE.md mandatory rule: ALL GraphKMStore construction MUST pass
+      // `ontologyDir` (Phase 41 lesson, commits 87bc2f567 / fd35c5350) —
+      // otherwise default-class resolution throws `opts.classes omitted but
+      // store has no ontology registry`. `defaultOntologyDir()` walks up from
+      // the @fwornle/km-core package to find the bundled ontology directory.
+      _kmStore = new GraphKMStore({
+        dbPath: KG_DB_PATH,
+        exportDir: KG_EXPORT_DIR,
+        ontologyDir: defaultOntologyDir(),
+      });
+      await _kmStore.open();
+      _kmStoreReady = true;
+      process.stderr.write(`[obs-api] km-core GraphKMStore ready\n`);
+      return _kmStore;
+    } catch (err) {
+      process.stderr.write(`[obs-api] km-core store init failed: ${err.message}\n`);
+      _kmStore = null;
+      _kmStoreReady = false;
+      return null;
+    }
+  })();
   try {
-    // CLAUDE.md mandatory rule: ALL GraphKMStore construction MUST pass
-    // `ontologyDir` (Phase 41 lesson, commits 87bc2f567 / fd35c5350) —
-    // otherwise default-class resolution throws `opts.classes omitted but
-    // store has no ontology registry`. `defaultOntologyDir()` walks up from
-    // the @fwornle/km-core package to find the bundled ontology directory.
-    _kmStore = new GraphKMStore({
-      dbPath: KG_DB_PATH,
-      exportDir: KG_EXPORT_DIR,
-      ontologyDir: defaultOntologyDir(),
-    });
-    await _kmStore.open();
-    _kmStoreReady = true;
-    process.stderr.write(`[obs-api] km-core GraphKMStore ready\n`);
-    return _kmStore;
-  } catch (err) {
-    process.stderr.write(`[obs-api] km-core store init failed: ${err.message}\n`);
-    _kmStore = null;
-    return null;
+    return await _kmStoreInit;
+  } finally {
+    _kmStoreInit = null;
   }
 }
 
