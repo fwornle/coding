@@ -1009,20 +1009,20 @@ function parseLimitOffset(req, defaultLimit = TYPED_VIEW_DEFAULT_LIMIT) {
   return { limit, offset };
 }
 
-// Collect all km-core entities of an ontologyClass, applying the
-// Pitfall 3 two-field OR-check (entityType === cls || ontologyClass === cls).
+// Collect all km-core entities of an ontologyClass via the canonical
+// public API. `_kmStore.graph` is private (GraphKMStore.ts:137); the
+// earlier draft of this helper iterated it directly and threw
+// `.for is not iterable` at runtime. `store.findByOntologyClass(cls)`
+// is the canonical helper — it already enforces the Pitfall 3 two-field
+// OR-check (entityType === cls || ontologyClass === cls) at
+// GraphKMStore.ts:565 and respects D-34 active-only filtering.
+//
 // Iterating the underlying graph is O(n) on the entity count — Plan 10's
 // migration delivers ~800 obs + ~250 digests + ~77 insights, well within
 // memory budget. T-44-07-03 mitigation: caller applies `limit` ceiling
 // before paging.
 async function collectByOntologyClass(cls) {
-  const matches = [];
-  for await (const [, attrs] of _kmStore.graph.nodeEntries()) {
-    if (attrs.entityType === cls || attrs.ontologyClass === cls) {
-      matches.push(attrs);
-    }
-  }
-  return matches;
+  return _kmStore.findByOntologyClass(cls);
 }
 
 // /api/coding/observations — replaces SQLite /api/observations.
