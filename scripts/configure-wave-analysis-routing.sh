@@ -97,6 +97,15 @@ WAVE_OVERRIDES = {
     # wave-analysis-* tags above, not the generic observation-writer route.
     'health-coordinator':                      CHEAP,
     'observation-writer':                      CHEAP,
+    # Consolidator (src/live-logging/ObservationConsolidator.js _callLLM tags).
+    # User-triggered batch synthesis, not continuous, so the cost vs. ~30x
+    # latency tradeoff favors copilot. -digest / -insight are full synthesis
+    # workloads (sonnet). -compaction / -resynthesize are small refresh
+    # deltas over a single existing insight (haiku).
+    'consolidator-digest':                     HEAVY,
+    'consolidator-insight':                    HEAVY,
+    'consolidator-compaction':                 CHEAP,
+    'consolidator-resynthesize':               CHEAP,
 }
 
 def get_settings():
