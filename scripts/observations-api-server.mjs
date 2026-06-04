@@ -1376,23 +1376,49 @@ app.get('/api/coding/insights', async (_req, res) => {
   }
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  process.stderr.write(`[obs-api] listening on http://0.0.0.0:${PORT} (db: ${DB_PATH})\n`);
-  // Warm the writer first (opens DB rw + FTS triggers + WAL), then warm
-  // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
-  // doesn't pay a multi-second cold start.
-  ensureWriter()
-    .then(() => { ensureRetrieval(); ensurePruner(); })
-    .catch((err) => {
-      process.stderr.write(`[obs-api] startup init failed: ${err.message}\n`);
-    });
-  // Warm km-core store (independent of SQLite writer)
-  ensureKMStore()
-    .then((store) => { if (store) mountKMRoutes(store); })
-    .catch((err) => {
-      process.stderr.write(`[obs-api] km-core mount failed: ${err.message}\n`);
-    });
-});
+// Phase 44 Plan 14 — guard auto-listen so the integration test
+// (tests/integration/obs-api.legacy-endpoints.km-core.test.js) can
+// import this module without triggering a real :12436 bind. The test
+// sets OBSERVATIONS_API_NO_AUTOSTART=1, then drives the exported `app`
+// directly via supertest-style in-process fetch.
+const _autostart = process.env.OBSERVATIONS_API_NO_AUTOSTART !== '1';
+const server = _autostart
+  ? app.listen(PORT, '0.0.0.0', () => {
+      process.stderr.write(`[obs-api] listening on http://0.0.0.0:${PORT} (db: ${DB_PATH})\n`);
+      // Warm the writer first (opens DB rw + FTS triggers + WAL), then warm
+      // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
+      // doesn't pay a multi-second cold start.
+      ensureWriter()
+        .then(() => { ensureRetrieval(); ensurePruner(); })
+        .catch((err) => {
+          process.stderr.write(`[obs-api] startup init failed: ${err.message}\n`);
+        });
+      // Warm km-core store (independent of SQLite writer)
+      ensureKMStore()
+        .then((store) => { if (store) mountKMRoutes(store); })
+        .catch((err) => {
+          process.stderr.write(`[obs-api] km-core mount failed: ${err.message}\n`);
+        });
+    })
+  : null;
+
+// Export the Express app + a manual store-injector for tests. The test
+// can construct a tmpdir-backed GraphKMStore, hand it to _testHooks, then
+// hit the app via supertest-style requests without touching production
+// state.
+export const _testHooks = {
+  app,
+  setKMStoreForTest(store) {
+    _kmStore = store;
+    _kmStoreReady = true;
+    // Don't mount /api/v1 — the integration test exercises only the
+    // legacy /api/* surface that Plan 44-14 migrated. The /api/v1 router
+    // is exercised by lib/km-core's own integration tests.
+  },
+  invalidateStalenessCache() {
+    _stalenessCache.invalidate();
+  },
+};
 
 async function shutdown(signal) {
   // Include ppid so the next investigator can identify the SIGTERM sender —
@@ -1424,6 +1450,10 @@ async function shutdown(signal) {
   }
   if (_pruneInterval) { clearInterval(_pruneInterval); _pruneInterval = null; }
   _clearHeartbeat();
+  if (!server) {
+    // No autostart (integration-test path) — nothing to close.
+    return;
+  }
   server.close(async () => {
     if (_writer) {
       try { await _writer.close?.(); } catch { /* best effort */ }
@@ -1437,8 +1467,13 @@ async function shutdown(signal) {
   // Hard exit if graceful shutdown stalls
   setTimeout(() => process.kill(process.pid, 'SIGKILL'), 25_000).unref();
 }
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+if (_autostart) {
+  // Skip signal handlers in test mode — Jest reuses the process for many
+  // suites; installing a SIGINT/SIGTERM listener would interfere with
+  // Jest's own --watch and worker lifecycle.
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
 
 // Phase 35 plan 35-04 - re-export merge helpers for any caller that imports the
 // obs-api server module directly (back-compat with the original plan contract).
