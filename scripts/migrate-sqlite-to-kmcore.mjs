@@ -397,19 +397,32 @@ async function main() {
   // CLAUDE.md mandatory rule: pass ontologyDir on every GraphKMStore
   // construction (Phase 41 lesson). defaultOntologyDir walks up from
   // the km-core package root to the bundled ontology directory.
-  const store = makeStore({
-    dbPath: targetAbs,
-    exportDir,
-    ontologyDir: defaultOntologyDir(),
-    domains: ['coding'],
-  });
-  await store.open();
+  //
+  // --dry-run mode short-circuits the LevelDB open so the smoke run does
+  // not contend with a live obs-api holding the LOCK file (operator can
+  // verify projected source counts without restarting services).
+  let store = null;
+  if (!args.dryRun) {
+    store = makeStore({
+      dbPath: targetAbs,
+      exportDir,
+      ontologyDir: defaultOntologyDir(),
+      domains: ['coding'],
+    });
+    await store.open();
+  } else {
+    process.stderr.write(
+      '[migrate] dry-run: skipping GraphKMStore open (no writes will occur)\n',
+    );
+  }
 
   // Build seen-set from any pre-existing legacyId.system='A' entries so a
   // resumed run skips already-migrated rows. Empty store equals seen.size===0
   // equals fresh migration; same code path on re-run is safe.
+  // (--resume requires the store; --dry-run + --resume is a no-op for the
+  // resume scan and the operator is told so.)
   const seen = makeSet();
-  if (args.resume) {
+  if (args.resume && store) {
     let scanned = 0;
     for await (const entity of store.iterate()) {
       if (entity?.legacyId?.system === 'A' && entity?.legacyId?.id) {
@@ -420,6 +433,11 @@ async function main() {
     process.stderr.write(
       '[migrate] resume: scanned ' + scanned + ' entities, ' +
         seen.size + ' already-migrated A rows\n',
+    );
+  } else if (args.resume && !store) {
+    process.stderr.write(
+      '[migrate] --resume requested but --dry-run skipped store open; ' +
+        'seen-set stays empty (smoke counts only)\n',
     );
   }
 
@@ -455,14 +473,14 @@ async function main() {
   });
 
   let verification = null;
-  if (args.verify && !args.dryRun) {
+  if (args.verify && !args.dryRun && store) {
     verification = await verifyStore(store);
     process.stderr.write(
       '[migrate] verify: ' + JSON.stringify(verification) + '\n',
     );
   }
 
-  await store.close();
+  if (store) await store.close();
   db.close();
 
   const totalSource = obsRows.length + digRows.length + insRows.length;
