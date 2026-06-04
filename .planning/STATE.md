@@ -4,13 +4,13 @@ milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
 stopped_at: Phase 44 context gathered
-last_updated: "2026-06-04T11:39:54.182Z"
-last_activity: 2026-06-04 -- Phase 44 execution started
+last_updated: "2026-06-04T15:58:49.957Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 23
   completed_phases: 16
-  total_plans: 100
-  completed_plans: 100
+  total_plans: 102
+  completed_plans: 103
   percent: 70
 ---
 
@@ -53,10 +53,11 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 44 (rest-api-git-snapshots) — EXECUTING
-Plan: Wave 5.5 (44-12) SOFT-CLOSED; Wave 5.6 (44-14) CLOSED 2026-06-04; Wave 5.7 (44-13) DRAFTED + unblocked; Wave 6 (44-11) pending after deep cutover
-Status: Executing Phase 44 — server-side cutover landed live (10 endpoints + dashboard COUNTs to km-core); writer-side cutover next
+Plan: 2 of 14
+Status: Ready to execute
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
+
   - Plan 44-12 Tasks 1+2 LANDED on main (commits `ef340013f`, `c2582c7ef`, submodule `0a6ac57`)
   - Plan 44-12 Task 3 SOFT-EXECUTED: launchctl restart done (recovered IOError 5 with `launchctl enable`); obs-api pid 73924 on :12436; SQLite archive NOT EXECUTED
   - Plan 44-12 declared SOFT-CLOSED — must_haves "fully unused observations.db" was over-scoped; ~14 other consumers (writer dedup, legacy /api/*, consolidator, dashboard counts) still read+write the file
@@ -64,6 +65,7 @@ Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
   - Plan 44-12 docs commit: `62eb10a5a docs(44-12): soft-close — write-path cut, deep cutover deferred to sub-plan`
 
 Wave 5.6 outcome (`/gsd-execute-phase 44 --wave 5.6` on 2026-06-04):
+
   - **Plan 44-14 LANDED + LIVE-VERIFIED.** 6 commits on main: km-core submodule `184f4a5` + outer pointer `05b6ffa29`, artifacts-patch util `93589d09e`, 10-endpoint cutover `16360d48c`, integration test `df2bfb589`, partial SUMMARY `bbd75e8dd`, fix-forward consolidator cache `cc830ab38`, final SUMMARY `<this commit>`
   - 10 obs-api legacy `/api/*` endpoints cut to km-core (patch-artifacts/recent + /historical, observations/digests/insights/projects, /api/projects, /api/projects/:project/coverage, insights/:id/resynthesize, consolidation/status COUNTs + staleness)
   - 2 new km-core query helpers: `countByOntologyClass` + `lastModifiedByClass` (plus a refactored `findByLegacyId`)
@@ -75,9 +77,11 @@ Wave 5.6 outcome (`/gsd-execute-phase 44 --wave 5.6` on 2026-06-04):
   - Plan 44-12 § "Deferred — Deep-Cutover Scope" items 4 + 6 annotated CLOSED
 
 Deep-cutover plan still pending:
+
   - **44-13 (wave 5.7, autonomous:true, depends_on: 44-12 + 44-14 — NOW UNBLOCKED)** — ObservationWriter dedup + Artifacts-patch cutover. Adds `findByContentHash` + `findRecentByAgent` km-core helpers. Drops `this.db` from writer entirely. Re-enables the 2 dedup tests skipped since 2026-06-04. 3 tasks.
 
 Next step: execute 44-13, then draft + execute 44-15 (consolidator)
+
   1. `/gsd-execute-phase 44 --wave 5.7` — runs Plan 44-13 (writer-side cutover; autonomous)
   2. `/gsd:phase 44 add` — draft Plan 44-15 "ObservationConsolidator cutover to km-core" (3456-line consolidator; multi-stage; warrants its own plan)
   3. `/gsd-execute-phase 44 --wave 5.8` — runs Plan 44-15
@@ -85,7 +89,7 @@ Next step: execute 44-13, then draft + execute 44-15 (consolidator)
   5. `/gsd-execute-phase 44 --wave 6` — runs Plan 44-11 verification gate (after 44-13/15 land)
   6. Operator-merge OKM PR #5 (https://bmw.ghe.com/adpnext-apps/operational-knowledge-management/pull/5) + restart C's service for cross-system-parity C-leg GREEN
 
-Last activity: 2026-06-04 -- Wave 5.6 CLOSED; Plan 44-14 server-side cutover live and verified; ready for /gsd-execute-phase 44 --wave 5.7
+Last activity: 2026-06-04
 
 ## Performance Metrics
 
@@ -210,6 +214,9 @@ Last activity: 2026-06-04 -- Wave 5.6 CLOSED; Plan 44-14 server-side cutover liv
 - [Phase 52-01]: configure-wave-analysis-routing.sh extended in-phase with 9 per-sub-step entries. CHEAP (copilot/claude-haiku-4.5) for classify + diagram-repair recovery paths; HEAVY (copilot/claude-sonnet-4.6) for analyze/insight/generation/extract paths. Pre-Phase-52 wave-level entries preserved. Live proxy applied 9 new override changes; 13 total wave-analysis-* entries.
 - [Phase 43-09]: D-G7.1 / D-G7.2 re-embed script lands at OKM `scripts/reembed-okm-corpus.mjs` (320 LoC) + 4-case vitest integration test (336 LoC). Iterate every entity via `store.iterate(undefined, { includeSuperseded: true })` (defensive — Phase 42.2-02 lesson) → embed via `FastembedEmbeddingClient` (km-core export, Phase 42 D-52c — fastembed/all-MiniLM-L6-v2/384-dim) → `mergeAttributes(entity.id, { embedding, metadata: { ...existing, embeddingModel, embeddingRunId } })` for INLINE persistence per D-G7.2 (NO Qdrant; deferred Phase 44/45). Idempotent via `metadata.embeddingModel === 'fastembed/all-MiniLM-L6-v2'` fingerprint with `--resume`. 5% error budget per Phase 42 Plan 5 precedent. Canonical ontologyDir resolver reused VERBATIM from Plan 07's `resolveOntologyDir()` (both copies carry doc-comment cross-references; deduplicate when km-core ships `defaultOntologyDir()`). Embed input = `description` (fallback `name`) for cross-system parity with Phase 42 D-52c wave-controller. Dry-run: 1665 entities, 0 currently embedded, ~60s wall-clock (after ~22s fastembed cold-start). Production re-embed deferred to operator per execution-time scope clarification — runbook in 43-09-SUMMARY § "Operator Runbook". **Rule 1 deviations**: (a) qdrant grep returned 2 (negative-context doc-comment only — kept as anti-shallow guard); (b) macOS ONNX shutdown crash defeats `code === 1` assertion → added `exitedOk()` / `abortedOnBudget()` test helpers keyed off load-bearing stdout/stderr lines (emitted BEFORE the libc crash). **Topology**: 2-layer commits (OKM × 2 + rapid-automations × 1) — coding repo does NOT track `_work/rapid-automations` as submodule, so the user-prompt's "third coding-side pointer bump" does not exist. All 4 integration tests pass in 2.4s warm.
 - [Phase 43-10a]: TEST-ONLY src/store/ shim restoration (the "test suite restore" deferred in 43-08e SUMMARY line 159). Architectural decision drilled into the shim during execution: **in-memory graphology mirror, NOT a km-core delegation**. The four target tests (rest-contract / api-ingest / ingestion-pipeline / deduplicator) perform UNAWAITED synchronous calls (`graphStore.addEntity(e)` followed by immediate `graphStore.getAllEntities()` with no await) — fundamentally incompatible with km-core's async + LevelDB-backed surface. The shim presents BOTH sync legacy methods AND a duck-typed km-core surface (await-friendly because `await syncValue ≡ syncValue`). createServer overload accepts the legacy 8-arg shape via `_internalStore` duck-type detection; OntologyRegistry shim adds zero-arg construction + `.load(dir)` (two tests need it); createServer made sync overall (`init()` is a documented no-op so `await apiRoutes.init()` → `void apiRoutes.init()` is semantics-preserving). **8th file in scope (Rule 3)**: src/lib/snapshot.ts honors caller-supplied `Relation.key` when present — production km-core never sets this field (snap-* fallback preserved); the shim sets it so the REST byte-equal lock's normalizer regex (`geid_*_<n>` → `seed-edge-<n>`) produces deterministic fixture-matched output. **Known flaky** /api/clusters Louvain test is pre-existing — louvain captures `Math.random` REFERENCE at module load (DEFAULTS.rng) BEFORE the test's `beforeAll` reseeding runs, so seeding is effectively a no-op for louvain. Passes 10/10 in isolation, 8-9/10 when run after other tests. Out of Plan 10a scope; logged for a future modernization that passes `rng: seededRandom` explicitly to `louvain.detailed(...)`. **Topology**: OKM submodule commit on `refactor/43-08e-delete-adapter` (4dabb4c) + outer rapid-automations gitlink bump on `main` (098ff84) + coding planning-docs commit. Pushes deferred to Plan 11. Whole-suite failure count delta: 13 baseline → 3 (net -10).
+- [Phase ?]: [Plan-44-13] km-core findByContentHash + findRecentByAgent helpers land on GraphKMStore. Two new methods scan via metadata.agent + metadata.content_hash + metadata.createdAt (snake_case per legacy-ingest.ts). 9 new unit tests appended; 304/304 km-core vitest GREEN.
+- [Phase ?]: [Plan-44-13] ObservationWriter drops this.db entirely; 3 dedup helpers route through km-core. Artifacts-patch replay preserves createdAt + createdBy verbatim (T-44-13-02). ObservationExporter dropped from writer. 2 dedup tests re-enabled after Plan 44-12 deferral; 110/110 ObservationWriter unit tests GREEN.
+- [Phase ?]: [Plan-44-13] Rule 3 deviation — obs-api opens its own independent _legacyDb via SafeDatabase for pruner + retrieval. Writer-side cutover COMPLETE; ObservationConsolidator (Plan 44-15) is the last writer-side SQLite consumer holding observations.db. Perf gate measured 0.074ms avg (27x under 2ms budget at 1k entities).
 
 ### Blockers/Concerns
 
@@ -261,10 +268,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 52 P02 | ~30min gap-closure (original work in 5fa110552 on 2026-05-29; gap-closure on 2026-05-30) | 5 tasks (Task 6 visual UAT deferred to operator) | 3 files in gap-closure commit 93560c13e + 2 files from prior 5fa110552 commit = 5 total |
 | Phase 52 P03 | ~20min dashboard half (wave-controller half already in tree from ad523f7db on 2026-05-29) | 3 tasks (Task 4 visual UAT deferred to operator) | 2 files in commit 5ad4f31f2 (trace-modal.tsx + ukbSlice.ts) + wave-controller.ts from prior submodule commits |
 | Phase 43 P09 | ~25min | 2 tasks landed (script + integration test) + Task 3 split (pointer-bump done; production run deferred to operator) | 2 files created (scripts/reembed-okm-corpus.mjs, tests/integration/reembed-okm-corpus.test.ts) in OKM submodule (commits 2840196 + 23ebcd4) + outer rapid-automations pointer bump (commit 2877e12) |
+| Phase 44 P13 | 19 | 3 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-06-03T10:19:58.708Z
+Last session: 2026-06-04T15:58:14.919Z
 Stopped at: Phase 44 context gathered
 Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
