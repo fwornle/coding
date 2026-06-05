@@ -336,6 +336,14 @@ export function parseCopilot(eventLine) {
 export function parseSpecstory(mdContent, options = {}) {
   if (!mdContent || typeof mdContent !== 'string') return [];
 
+  // ETM-produced LSL tranche format (current): `## Prompt Set (ps_<id>)`
+  // blocks with `**User Request:**` + `### <ToolName>` sub-blocks. Detected
+  // by presence of the prompt-set marker near the top of the file. Falls
+  // through to the legacy ### Human/Assistant parser when not detected.
+  if (isLslTrancheFormat(mdContent)) {
+    return parseLslTranche(mdContent, options);
+  }
+
   const messages = [];
 
   // Try to extract a base timestamp from frontmatter or filename
@@ -365,6 +373,131 @@ export function parseSpecstory(mdContent, options = {}) {
       },
     });
     messageIndex++;
+  }
+
+  return messages;
+}
+
+/**
+ * Detect the ETM-produced LSL tranche format. Triggers on the first
+ * `## Prompt Set (ps_<id>)` block or the `<a name="ps_<id>">` anchor.
+ */
+function isLslTrancheFormat(content) {
+  // Scan only the first 4kB so a Cursor-export with an inline mention
+  // of "Prompt Set" in a code fence doesn't accidentally trigger.
+  const head = content.slice(0, 4096);
+  return /^##\s+Prompt Set\s*\(ps_\d+\)/m.test(head)
+    || /<a\s+name="ps_\d+"><\/a>/m.test(head);
+}
+
+/**
+ * Parse a single ETM LSL tranche file into MastraDBMessages.
+ *
+ * Each `## Prompt Set (ps_<id>)` block becomes a user + assistant pair:
+ *   - user message: the literal `**User Request:** <text>` value
+ *   - assistant message: tool-call synthesis (one line per `### <ToolName>`
+ *     sub-block, plus the first 200 chars of each tool's Output). This
+ *     gives the LLM enough signal to summarize the exchange into a
+ *     meaningful observation without exploding the token budget.
+ *
+ * Timestamps come from each prompt set's `**Time:** <ISO>` field; falls
+ * back to filename-derived base + per-set offset.
+ */
+function parseLslTranche(content, options = {}) {
+  const messages = [];
+  const baseTimestamp = extractSpecstoryTimestamp(content, options.sourceFile);
+  const sourceFile = options.sourceFile || undefined;
+
+  // Split on prompt-set headings while preserving the header line itself
+  // for downstream regex extraction. Use the `## Prompt Set (ps_<id>)`
+  // anchor so we don't split on `### <ToolName>` sub-headings.
+  const parts = content.split(/(?=^##\s+Prompt Set\s*\(ps_\d+\))/m);
+
+  let setIndex = 0;
+  for (const part of parts) {
+    if (!/^##\s+Prompt Set\s*\(ps_(\d+)\)/m.test(part)) continue;
+
+    const idMatch = part.match(/^##\s+Prompt Set\s*\(ps_(\d+)\)/m);
+    const psId = idMatch ? `ps_${idMatch[1]}` : `ps_${setIndex}`;
+
+    // Block-level timestamp; fall back to filename-derived ordering.
+    const timeMatch = part.match(/^\*\*Time:\*\*\s+(\S+)/m);
+    let blockTs;
+    if (timeMatch) {
+      const parsed = new Date(timeMatch[1]);
+      blockTs = isNaN(parsed.getTime()) ? offsetTimestamp(baseTimestamp, setIndex) : parsed.toISOString();
+    } else {
+      blockTs = offsetTimestamp(baseTimestamp, setIndex);
+    }
+
+    // First **User Request:** line in the block is the canonical user prompt.
+    // Subsequent identical occurrences in sibling tool blocks repeat it.
+    const userMatch = part.match(/^\*\*User Request:\*\*\s+(.+?)(?:\n|$)/m);
+    const userText = userMatch ? userMatch[1].trim() : '';
+
+    if (!userText) {
+      // No user prompt → cannot anchor an observation; skip the block.
+      setIndex++;
+      continue;
+    }
+
+    // Tool-call synthesis: one bullet per `### <ToolName>` sub-block plus
+    // a truncated Output preview. Cap to 4000 chars total to keep the
+    // assistant message bounded.
+    const toolBlocks = part.split(/(?=^###\s+\S)/m).slice(1);
+    const toolLines = [];
+    let synthLen = 0;
+    const SYNTH_CAP = 4000;
+    for (const tb of toolBlocks) {
+      const nameMatch = tb.match(/^###\s+(\S+)/);
+      const name = nameMatch ? nameMatch[1] : 'Tool';
+      const resultMatch = tb.match(/^\*\*Result:\*\*\s+(.+?)$/m);
+      const resultIcon = resultMatch ? resultMatch[1].trim().split(/\s+/)[0] : '';
+      // Pick first non-empty Output line, truncated.
+      const outMatch = tb.match(/\*\*Output:\*\*\s*```[a-z]*\n([\s\S]*?)```/);
+      const outPreview = outMatch
+        ? outMatch[1].trim().split('\n').slice(0, 2).join(' ').slice(0, 200)
+        : '';
+      const line = outPreview
+        ? `- ${name} ${resultIcon}: ${outPreview}`
+        : `- ${name} ${resultIcon}`;
+      if (synthLen + line.length > SYNTH_CAP) {
+        toolLines.push(`- ... (${toolBlocks.length - toolLines.length} more tool calls truncated)`);
+        break;
+      }
+      toolLines.push(line);
+      synthLen += line.length + 1;
+    }
+    const assistantText = toolLines.length > 0
+      ? `Tool-call synthesis (${toolBlocks.length} calls):\n${toolLines.join('\n')}`
+      : '(no tool calls)';
+
+    messages.push({
+      id: deterministicId(userText, blockTs),
+      role: 'user',
+      content: userText,
+      createdAt: blockTs,
+      metadata: {
+        agent: 'claude',
+        format: 'lsl-tranche',
+        sourceFile,
+        promptSetId: psId,
+      },
+    });
+    messages.push({
+      id: deterministicId(assistantText, blockTs),
+      role: 'assistant',
+      content: assistantText,
+      createdAt: offsetTimestamp(blockTs, 1),
+      metadata: {
+        agent: 'claude',
+        format: 'lsl-tranche',
+        sourceFile,
+        promptSetId: psId,
+      },
+    });
+
+    setIndex++;
   }
 
   return messages;
