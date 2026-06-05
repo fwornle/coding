@@ -397,7 +397,7 @@ coding --lsl-status
 - `AGENT_INSTALL_COMMAND="npm install -g mastracode"` — auto-installs on first launch
 - `agent_pre_launch()` — handles first-run OAuth setup, network-adaptive model selection, hooks config
 - Transcript capture via `MastraTranscriptReader` reading NDJSON from mastra lifecycle hooks
-- Observational memory via LibSQL at `.observations/observations.db`
+- Observational memory via km-core `GraphKMStore` at `.data/knowledge-graph/` (legacy LibSQL/SQLite `.observations/observations.db` archived 2026-06-05 under Phase 44 Plan 18)
 
 ![Mastracode running in coding](../images/coding-mastra.png)
 

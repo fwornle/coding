@@ -273,7 +273,7 @@ The merge helpers live in `observations-api-merge.mjs` rather than inside the se
 
 - `[Dashboard:ColdStore]` stderr line — one per request that served cold rows; reports `<path> served <coldRows> cold + <sqliteRows> sqlite (boundary=<ISO>)`
 - Snowflake icon (`lucide-react` `Snowflake`, sky-400/80) on every observation card and digest row whose `_origin === 'cold'`
-- Pre-swap snapshot — when the writer rolls SQLite, it leaves `.observations/observations.db.preswap.<YYYYMMDD-HHMMSS>` as a one-off safety copy. These are untracked; the operator decides when to delete them.
+- Pre-swap snapshot — historical: when the writer rolled SQLite, it left `.observations/observations.db.preswap.<YYYYMMDD-HHMMSS>` as a one-off safety copy. As of 2026-06-05 (Phase 44 Plan 18), the SQLite file has been archived to `.observations/observations.db.archived.2026-06-05` and is no longer the runtime store; the writer is km-core-native and no longer produces pre-swap snapshots.
 
 ## Auto-healing
 

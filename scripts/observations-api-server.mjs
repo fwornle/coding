@@ -66,13 +66,12 @@ import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-// Plan 44-18 Task 5 archive-rename target only. The legacy file is no longer
-// opened by any production code path in this process; this constant is kept
-// so the operator-gated rename in Task 5 has a single canonical source path.
-// Drop in Task 5 cleanup commit once the rename ships.
-const DB_PATH = process.env.OBSERVATIONS_DB_PATH || path.join(REPO_ROOT, '.observations', 'observations.db');
 const PORT = parseInt(process.env.OBSERVATIONS_API_PORT || '12436', 10);
-const HEARTBEAT_PATH = path.join(path.dirname(DB_PATH), 'consolidation-heartbeat.json');
+// Heartbeat path stays under `.observations/` (a sibling of the now-archived
+// SQLite file) — directory is preserved post-archive for consolidation
+// heartbeat + config.json. Derived directly from REPO_ROOT now that the
+// `DB_PATH` constant has been removed (Plan 44-18 Task 5 cleanup commit).
+const HEARTBEAT_PATH = path.join(REPO_ROOT, '.observations', 'consolidation-heartbeat.json');
 
 // Single writer that owns the SQLite file. All reads and writes go through
 // this instance — eliminates concurrent openers across the Docker bind-mount
@@ -88,11 +87,18 @@ let _pruneInterval = null;
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
 let _coldStore = null;
 
-// Plan 44-18 — the legacy SQLite handle has been removed. Pruner + RetrievalService
-// freshness-rerank both cut to km-core in Tasks 2-3. The `DB_PATH` constant above
-// is retained as the Task 5 archive-rename target only (file is archived to
-// `<DB_PATH>.archived.<UTC-YYYY-MM-DD>` in the operator gate). The constant
-// itself is no longer used as a sqlite handle source anywhere in this file.
+// Plan 44-18 Task 5 — the legacy SQLite file `.observations/observations.db`
+// has been archived to `.observations/observations.db.archived.2026-06-05`.
+// No production code path in this process opens that file anymore: the writer
+// is km-core-native (Plan 44-13), the consolidator + insights re-synth are
+// km-core-native (Plan 44-17), and pruner + retrieval freshness-rerank are
+// km-core-native (Plan 44-18 Tasks 2-3). The `DB_PATH` constant was dropped
+// from this file in the Task 5 cleanup commit; ObservationWriter and
+// ObservationConsolidator are constructed without an explicit `dbPath` — their
+// internal defaults resolve correctly from cwd=REPO_ROOT (launchd cwd, see
+// `com.coding.obs-api.plist`) and the path string is only used by those
+// classes to derive `projectRoot` for the redactor config lookup. Nothing in
+// this process reads or writes the archived SQLite file.
 
 async function ensureWriter() {
   // Phase 44 Plan 14 — readiness predicate switched from `_writer.db`
@@ -110,7 +116,10 @@ async function ensureWriter() {
     // /api/coding/* reads and the live writer share one GraphKMStore
     // instance.
     const kmStore = await ensureKMStore();
-    const w = new ObservationWriter({ dbPath: DB_PATH, kmStore });
+    // Plan 44-18 Task 5 — `dbPath` arg omitted; ObservationWriter defaults to
+    // `.observations/observations.db` (now archived) only to derive the
+    // redactor's `projectRoot`. The file is never opened.
+    const w = new ObservationWriter({ kmStore });
     await w.init();
     _writer = w;
     return w;
@@ -417,8 +426,10 @@ function runConsolidation(options = {}) {
     // the writer + typed-view handlers use (single-owner pattern from
     // ObservationWriter Plan 44-13).
     const kmStore = await ensureKMStore();
+    // Plan 44-18 Task 5 — `dbPath` arg omitted; ObservationConsolidator
+    // defaults to `.observations/observations.db` (now archived) only to
+    // derive `projectRoot`. The file is never opened.
     const consolidator = new ObservationConsolidator({
-      dbPath: DB_PATH,
       abortSignal: _consolidationAbort.signal,
       kmStore,
     });
@@ -466,13 +477,13 @@ app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => {
   // Phase 44 Plan 14 — readiness switched from `_writer.db` (SQLite
-  // handle) to `_writer._kmStore` (km-core handle, canonical write
-  // path). dbPath/dbExists kept for backwards-compatible payload shape;
-  // consumed by the dashboard's health view.
+  // handle) to `_writer._kmStore` (km-core handle, canonical write path).
+  // Plan 44-18 Task 5 — `dbPath` + `dbExists` fields dropped: the legacy
+  // SQLite file has been archived to `.observations/observations.db.archived.2026-06-05`
+  // and is no longer the runtime store. Health now reports km-core readiness
+  // only. The dashboard's health view consumes `status`/`role`.
   res.json({
     status: _writer && _writer._kmStore ? 'ok' : 'starting',
-    dbPath: DB_PATH,
-    dbExists: fs.existsSync(DB_PATH),
     port: PORT,
     role: 'single-owner-rw',
   });
@@ -925,7 +936,8 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
   // Phase 44 Plan 17: share obs-api's km-core store with the resynthesize
   // path (same single-owner pattern as the main consolidator).
   const kmStoreForResynth = await ensureKMStore();
-  const consolidator = new ObservationConsolidator({ dbPath: DB_PATH, kmStore: kmStoreForResynth });
+  // Plan 44-18 Task 5 — `dbPath` arg omitted; see note above ensureWriter().
+  const consolidator = new ObservationConsolidator({ kmStore: kmStoreForResynth });
   try {
     await consolidator.init();
     const updated = await consolidator.resynthesizeInsight(id);

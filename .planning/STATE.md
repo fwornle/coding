@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Plan 44-18 Tasks 1-4 complete; Task 5 awaiting operator gate
-last_updated: "2026-06-05T18:55:00.000Z"
+stopped_at: Plan 44-18 COMPLETE (all 5 tasks; Task 5 operator gate cleared "approved (archive)" 2026-06-05)
+last_updated: "2026-06-05T20:40:00.000Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 23
@@ -154,7 +154,7 @@ Plan 44-18 cutover outcome (2026-06-05, Tasks 1-4):
   - Task 4 (`c837dc421`): obs-api drops `_legacyDb` / `ensureLegacyDb` / `openLegacyDb` import / shutdown handler. New tests/integration/observation-pruner.km-core.test.js (238 lines, 5 GREEN, perf gate 1000-obs ≤ 1s / measured 48ms).
   - Production verification (obs-api pid 36727 post-restart): 0 legacy SQLite handle opens; first km-core prune correctly removed 517 obs + 131 digests from the live store; `/api/retrieve` returns 48 results for "docker timeout" probe.
   - Known deviation: KeywordSearch silently degrades to [] (the `_keywordSearch` helper short-circuits on missing db). Semantic search via Qdrant dominates the /api/retrieve response. Recorded as a Phase 45+ follow-up item in 44-18-SUMMARY.md "Known Deferred Items".
-  - **Task 5 (SQLite archive) — PENDING operator gate.** Executor returned `checkpoint:human-verify` payload. The deferred Plan 44-12 § "fully unused observations.db" promise — carried through 44-13, 44-14, 44-17 — is now ready to be honored on operator approval.
+  - **Task 5 (SQLite archive) — CLEARED 2026-06-05** with resolution **"approved (archive)"**. Rename target: `.observations/observations.db` → `.observations/observations.db.archived.2026-06-05` (sidecars `-shm`/`-wal` renamed alongside). obs-api script cleanup: `DB_PATH` constant dropped, `dbPath`/`dbExists` removed from `/health` payload, `dbPath` arg dropped from ObservationWriter + ObservationConsolidator construction (defaults still derive correct `projectRoot` from launchd cwd). `.gitignore` extended with `.observations/*.db.archived*`. Docs (`docs/observations/README.md`, `docs-content/core-systems/observational-memory.md`, `docs-content/release-notes.md`, `docs-content/architecture/data-flow.md`, `docs-content/architecture/health-monitoring.md`, `docs-content/integrations/index.md`, `docs-content/guides/status-line.md`, `docs-content/core-systems/ukb-vkb.md`, `docs/agent-integration-guide.md`, `docs-content/guides/agent-integration.md`) updated with archive notes. obs-api kickstarted post-cutover; `/health` returns `{"status":"ok"}` without any `dbPath`/`dbExists` field. 1-hour soak in progress at 2026-06-05T20:40Z; operator verifies launchd state at 2026-06-05T21:40Z (commands recorded in 44-18-SUMMARY.md). The deferred Plan 44-12 § "fully unused observations.db" promise — carried through 44-13, 44-14, 44-17 — is now finally honored.
 
 ## Performance Metrics
 

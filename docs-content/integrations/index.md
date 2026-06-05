@@ -92,7 +92,7 @@ MCP servers and tools that extend the coding infrastructure.
 
     Host-side single-owner API for observations / digests / insights. Also mounts the shared **`@fwornle/km-core` REST router** at `/api/km/`.
 
-    - Owns `observations.db` (SQLite, WAL mode)
+    - Runtime store: km-core `GraphKMStore` (`.data/knowledge-graph/`). Legacy `.observations/observations.db` (SQLite, WAL mode) was archived 2026-06-05 (Phase 44 Plan 18).
     - In-process consolidator + retrieval
     - Forwarded into the container by the Health Dashboard
 

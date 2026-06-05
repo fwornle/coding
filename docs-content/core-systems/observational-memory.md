@@ -2,6 +2,8 @@
 
 Real-time observation capture from live coding sessions across all agents, with LLM-powered summarization, consolidation into daily digests, and synthesis into persistent project insights. Inspired by Mastra's Observer/Reflector memory hierarchy, adapted for cross-agent project knowledge management.
 
+> **2026-06-05 update (Phase 44 Plan 18):** the runtime store is the km-core `GraphKMStore` (`.data/knowledge-graph/`). The SQLite file at `.observations/observations.db` was archived to `.observations/observations.db.archived.2026-06-05` once Plan 44-18 Tasks 1-4 cut Pruner + RetrievalService freshness-rerank to km-core (commits `cf6c8da45` → `c837dc421`). All four writer/consolidator/pruner/retrieval surfaces are now km-core-native. SQLite-WAL, single-owner, and corruption-recovery references below describe **historical** behavior preserved for context; current writes and reads flow through km-core only.
+
 ## Overview
 
 Observational Memory implements a three-tier memory hierarchy:

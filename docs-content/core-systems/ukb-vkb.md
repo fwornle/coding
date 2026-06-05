@@ -8,7 +8,7 @@ UKB is one of three knowledge systems built on the shared **@fwornle/km-core** k
 
 | System | Where it lives | Entrypoint | Storage path |
 |--------|----------------|------------|--------------|
-| **System A** — Online learning (observations/digests/insights) | `scripts/observations-api-server.mjs` (host) | Observations API, port 12436 | `.observations/observations.db` (SQLite) + `.data/knowledge-graph/` (GraphKMStore) |
+| **System A** — Online learning (observations/digests/insights) | `scripts/observations-api-server.mjs` (host) | Observations API, port 12436 | `.data/knowledge-graph/` (GraphKMStore — sole runtime store; legacy `.observations/observations.db` SQLite archived 2026-06-05 under Phase 44 Plan 18) |
 | **System B** — UKB / semantic-analysis | `integrations/mcp-server-semantic-analysis` (Docker) | MCP/SSE on port 3848 | `.data/knowledge-graph-migrated/` (GraphKMStore canonical) + `.data/knowledge-export/{team}.json` |
 | **System C** — OKB / OKM | `_work/rapid-automations/integrations/operational-knowledge-management` (cross-repo) | OKB API on port 8090, VOKB viewer on port 3002 | `.data/leveldb-kmcore/` (GraphKMStore canonical) |
 
@@ -73,7 +73,7 @@ Team-specific lower ontologies extend these with project-specific types (e.g., `
 The automatic per-exchange capture pipeline — observations, digests, insights — is documented separately in [Observational Memory](observational-memory.md). It is the **System A** consumer of km-core: the host-side observations API (`scripts/observations-api-server.mjs`, port 12436) **mounts the shared `createKMRouter()` at `/api/km/`** while owning its own SQLite runtime store. Storage layout:
 
 ```
-.observations/observations.db        # SQLite runtime store (single-owner host process)
+.observations/observations.db.archived.2026-06-05  # Archived legacy SQLite (Phase 44 Plan 18); not opened at runtime
 .data/observation-export/            # Git-tracked JSON exports per tier
   observations.json
   digests.json
@@ -107,7 +107,7 @@ vkb
 |--------|----------------|---------------------------------|----------------|
 | Trigger | Manual MCP command | Automatic per exchange | Document/RCA ingestion |
 | Input | Git commits, prompts | LSL exchanges (all agents) | Markdown, Confluence, CodeBeamer |
-| Runtime store | km-core GraphKMStore (`.data/knowledge-graph-migrated/`) | SQLite (`observations.db`) + km-core GraphKMStore | km-core GraphKMStore (`.data/leveldb-kmcore/`) |
+| Runtime store | km-core GraphKMStore (`.data/knowledge-graph-migrated/`) | km-core GraphKMStore (`.data/knowledge-graph/`) — legacy SQLite (`.observations/observations.db`) archived 2026-06-05 | km-core GraphKMStore (`.data/leveldb-kmcore/`) |
 | REST surface | MCP/SSE (port 3848) | km-core `createKMRouter` at `/api/km/` (port 12436) | OKB API (port 8090) — wraps km-core |
 | Collaboration | Git-tracked JSON export | Git-tracked JSON export | OKB API + VOKB viewer (port 3002) |
 | Search | Name/type-based via km-core | Keyword + semantic + RRF (in-process) | OKB API search endpoints |

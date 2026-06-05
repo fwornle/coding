@@ -297,6 +297,7 @@ logs/
 .observations/*.db.recovered*
 .observations/*.db.partial*
 .observations/*.db.empty*
+.observations/*.db.archived*
 
 # OpenCode plugin local state
 .opencode/

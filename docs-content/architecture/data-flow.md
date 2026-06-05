@@ -78,7 +78,7 @@ All three knowledge streams persist through the same **`@fwornle/km-core`** libr
 1. **Capture**: ETM detects a completed prompt set; `ObservationApiClient` fires HTTP to the host obs-api (port 12436)
 2. **Summarize**: `ObservationWriter` calls the LLM proxy (Intent/Approach/Artifacts/Result)
 3. **Dedup**: content-hash + semantic keyword similarity (4h sliding window)
-4. **Store**: SQLite (`observations.db`) + km-core `GraphKMStore` (`.data/knowledge-graph/`)
+4. **Store**: km-core `GraphKMStore` (`.data/knowledge-graph/`) — legacy SQLite (`.observations/observations.db`) was archived 2026-06-05 (Phase 44 Plan 18) and is no longer the runtime store
 5. **REST**: km-core's `createKMRouter()` is mounted at `/api/km/` for entities / observations / digests / insights queries
 6. **Consolidate**: digests (daily) + insights (≥5 unsynthesized digests) via in-process LLM passes
 7. **Export**: git-tracked JSON to `.data/observation-export/`
@@ -127,7 +127,7 @@ The host-side Claude CLI talks to lightweight stdio proxies, which forward to th
 |--------|---------|--------|
 | LSL | `.specstory/history/` | Markdown |
 | Classification | `.specstory/logs/classification/` | JSONL + MD |
-| Observational Memory (System A) | `.observations/observations.db` + `.data/knowledge-graph/` | SQLite + km-core GraphKMStore |
+| Observational Memory (System A) | `.data/knowledge-graph/` (legacy `.observations/observations.db` archived 2026-06-05) | km-core GraphKMStore |
 | Observation Export | `.data/observation-export/` | JSON (per tier) |
 | UKB (System B) | `.data/knowledge-graph-migrated/` | km-core GraphKMStore (LevelDB) |
 | UKB Export | `.data/knowledge-export/` | JSON per team |

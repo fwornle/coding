@@ -14,10 +14,11 @@ provides:
   - obs-api drops `_legacyDb` / `openLegacyDb` / `SafeDatabase` plumbing
   - .observations/observations.db has zero production-runtime consumers
   - 2 new integration tests covering the cutover (pruner perf, freshness-rerank multiplier)
-  - Task 5 operator-gated SQLite archive (pending — human-verify checkpoint)
+  - Task 5 operator-gated SQLite archive (CLEARED — `.observations/observations.db` archived to `.observations/observations.db.archived.2026-06-05`; DB_PATH dropped from obs-api; docs updated)
 affects:
-  - phase 45 (and later) — any consumer assuming .observations/observations.db can no longer rely on it being current; the file is frozen at the Task 5 archive timestamp
+  - phase 45 (and later) — `.observations/observations.db` is now archived as `.observations/observations.db.archived.2026-06-05`; any consumer assuming it being current is frozen at that timestamp
   - dashboards / monitors that read keyword-search results from /api/retrieve — keyword tier degrades to [] until KeywordSearch is also cut to km-core
+  - obs-api `/health` payload — `dbPath` + `dbExists` fields removed (Task 5 cleanup); dashboards reading these fields must fall back to `status` + `role` only
 
 # Tech tracking
 tech-stack:
@@ -37,12 +38,28 @@ key-files:
     - src/retrieval/retrieval-service.js
     - scripts/observations-api-server.mjs
     - tests/live-logging/ObservationPruner.test.js
+    - .gitignore (Task 5 — `.observations/*.db.archived*` pattern added)
+    - .planning/STATE.md (Task 5 close-out)
+    - docs/observations/README.md (Task 5 — archive note)
+    - docs/agent-integration-guide.md (Task 5 — observational memory source updated)
+    - docs-content/core-systems/observational-memory.md (Task 5 — archive note)
+    - docs-content/core-systems/ukb-vkb.md (Task 5 — runtime store table + tree)
+    - docs-content/release-notes.md (Task 5 — new section: SQLite → km-core cutover complete)
+    - docs-content/architecture/data-flow.md (Task 5 — runtime store + table)
+    - docs-content/architecture/health-monitoring.md (Task 5 — pre-swap snapshot historical)
+    - docs-content/integrations/index.md (Task 5 — obs-api owns km-core, not SQLite)
+    - docs-content/guides/agent-integration.md (Task 5 — observational memory source updated)
+    - docs-content/guides/status-line.md (Task 5 — badge data-source updated)
+  archived:
+    - .observations/observations.db → .observations/observations.db.archived.2026-06-05 (7.4 MB)
+    - .observations/observations.db-shm → .observations/observations.db.archived.2026-06-05-shm (32 KB sidecar)
+    - .observations/observations.db-wal → .observations/observations.db.archived.2026-06-05-wal (0 B sidecar)
 
 key-decisions:
   - "D-44-18-01: Pruner cutoff comparison uses top-level entity.createdAt (NOT metadata.created_at — the snake_case field doesn't exist on post-legacy-ingest entities; legacy-ingest stamps metadata.createdAt camelCase). Comparison is lexicographic on ISO-8601 strings."
   - "D-44-18-02: Pruner deletes in 100-id Promise.all chunks with one stderr progress line per chunk (T-44-18-01 mitigation). Measured 48ms for 1000-obs prune — 20x under the 1s budget."
   - "D-44-18-03: RetrievalService gains a kmStoreGetter constructor option mirroring the existing dbGetter pattern; lazy resolution inside _applyFreshnessRerank. _applyFreshnessRerank is now async and awaited."
-  - "D-44-18-04: DB_PATH constant kept in obs-api as the Task 5 archive-rename target only, with a 'drop in Task 5 cleanup' comment."
+  - "D-44-18-04: DB_PATH constant kept in obs-api as the Task 5 archive-rename target only, with a 'drop in Task 5 cleanup' comment. RESOLVED in Task 5 cleanup commit — DB_PATH dropped; HEARTBEAT_PATH derives directly from REPO_ROOT; ObservationWriter + ObservationConsolidator constructed without explicit `dbPath` (defaults still derive correct projectRoot from launchd cwd); `/health` payload no longer reports `dbPath` / `dbExists`."
   - "D-44-18-05: tests/live-logging/ObservationPruner.test.js was rewritten from scratch to exercise the constructor contract + module-source invariants; behavioral end-to-end coverage moved to tests/integration/observation-pruner.km-core.test.js (Task 4)."
 
 patterns-established:
@@ -52,22 +69,24 @@ patterns-established:
 requirements-completed: [API-01, API-02]
 
 # Metrics
-duration: ~2h25m (Tasks 1-4; Task 5 is operator-gated, pending)
+duration: ~2h25m (Tasks 1-4) + ~30m (Task 5 cleanup + archive + doc updates) = ~2h55m total
 completed: 2026-06-05
 ---
 
 # Phase 44 Plan 18: Pruner + Retrieval km-core Cutover + SQLite Archive Summary
 
-**Final SQLite consumers (ObservationPruner + RetrievalService freshness-rerank) cut to km-core; obs-api drops legacy `_legacyDb` plumbing; observations.db is ready for operator-gated archive (Task 5).**
+**Final SQLite consumers (ObservationPruner + RetrievalService freshness-rerank) cut to km-core; obs-api drops legacy `_legacyDb` plumbing AND the `DB_PATH` constant; `.observations/observations.db` archived to `.observations/observations.db.archived.2026-06-05`. The deferred Plan 44-12 § "fully unused observations.db" promise — carried through 44-13, 44-14, 44-17 — is now finally honored.**
 
 ## Performance
 
-- **Duration:** ~2h25m (Tasks 1-4; Task 5 operator-gated, pending)
+- **Duration:** ~2h55m total (Tasks 1-4 ~2h25m + Task 5 cleanup + archive + doc updates ~30m)
 - **Started:** 2026-06-05T14:26:55Z
 - **Completed (Tasks 1-4):** 2026-06-05T17:00Z (approx)
-- **Tasks:** 4/5 complete; Task 5 surfaced as `checkpoint:human-verify`
-- **Files modified:** 4 source files + 3 test files = 7 files
+- **Task 5 cleared (approved-archive):** 2026-06-05T20:40Z (approx)
+- **Tasks:** 5/5 complete
+- **Files modified:** 4 source files + 3 test files + 1 gitignore + 1 STATE + 10 docs = 19 files
 - **Files created:** 3 (audit doc + 2 integration tests)
+- **Files archived:** 3 (`.observations/observations.db{,-shm,-wal}` → `.archived.2026-06-05*`)
 
 ## Accomplishments
 
@@ -110,9 +129,15 @@ completed: 2026-06-05
 2. **Task 2: cut ObservationPruner to km-core** — `955ce3caa` (feat)
 3. **Task 3: cut RetrievalService freshness-rerank to km-core** — `4a85e1597` (feat)
 4. **Task 4: drop _legacyDb plumbing from obs-api + integration tests** — `c837dc421` (feat)
-5. **Task 5: human-verify checkpoint** — PENDING (operator gate)
+5. **Task 5 (operator gate CLEARED — "approved (archive)"):** Plan metadata + SUMMARY landed at `fae40b267` (Tasks 1-4 close-out). Task 5 chore commit lands the archive rename, DB_PATH removal, doc updates, STATE + SUMMARY update: `chore(44-18): archive .observations/observations.db + drop unused DB_PATH` (hash recorded in the executor return message at the bottom of this summary).
 
-**Plan metadata commit:** (this SUMMARY + STATE update will land after operator clears Task 5)
+**Operator decision:** approved (archive). Resolution path:
+1. `.observations/observations.db` renamed to `.observations/observations.db.archived.2026-06-05`; `-shm` and `-wal` sidecars renamed alongside for cleanliness.
+2. `.gitignore` extended with `.observations/*.db.archived*` (all three files gitignored — verified via `git check-ignore -v`).
+3. `DB_PATH` constant dropped from `scripts/observations-api-server.mjs`. `HEARTBEAT_PATH` derives directly from `REPO_ROOT`. `ObservationWriter` + `ObservationConsolidator` constructed without an explicit `dbPath` arg (their internal defaults still derive the correct `projectRoot` from launchd cwd = repo root). `/health` payload no longer reports `dbPath` / `dbExists`; reports `status` + `role` + `port` only.
+4. Docs updated with archive notes (10 files — `docs/observations/README.md`, `docs/agent-integration-guide.md`, `docs-content/core-systems/observational-memory.md`, `docs-content/core-systems/ukb-vkb.md`, `docs-content/release-notes.md` (new section), `docs-content/architecture/data-flow.md`, `docs-content/architecture/health-monitoring.md`, `docs-content/integrations/index.md`, `docs-content/guides/agent-integration.md`, `docs-content/guides/status-line.md`). Planning history (`.planning/phases/**`, `.planning/research/**`, `.planning/todos/**`, `.planning/milestones/**`) left untouched per operator instruction.
+5. obs-api kickstarted via `launchctl kickstart -k gui/$(id -u)/com.coding.obs-api`. Post-restart `/health` returns `{"status":"ok"}` without any `dbPath`/`dbExists` fields. Dashboard endpoints (`/digests`, `/insights`, `/retrieve`) continue to work.
+6. 1-hour soak NOT required inline. Soak in progress at 2026-06-05T20:40Z; operator verifies launchd state at 2026-06-05T21:40Z using the commands recorded in § "Operator Soak Commands" below.
 
 ## Files Created/Modified
 
@@ -143,9 +168,16 @@ completed: 2026-06-05
   `_applyFreshnessRerank` rewritten as async + km-core `findByLegacyId`.
 
 - `scripts/observations-api-server.mjs` — `_legacyDb` / `ensureLegacyDb` /
-  `openLegacyDb` import / shutdown handler block all removed. `ensurePruner`
-  is now async. `RetrievalService` constructed with `kmStoreGetter` only
-  (no `dbGetter`). DB_PATH constant retained as Task 5 archive target.
+  `openLegacyDb` import / shutdown handler block all removed (Task 4).
+  `ensurePruner` is now async. `RetrievalService` constructed with
+  `kmStoreGetter` only (no `dbGetter`). **Task 5 cleanup:** `DB_PATH`
+  constant removed entirely; `HEARTBEAT_PATH` rewired to derive from
+  `REPO_ROOT` directly; `ObservationWriter` + `ObservationConsolidator`
+  (both call sites — main consolidator + insights re-synth) constructed
+  without `dbPath` arg; `/health` payload drops `dbPath` / `dbExists`
+  fields. Remaining `DB_PATH` mentions in the file are only in comments
+  documenting the historical removal; the `KG_DB_PATH` constant for the
+  km-core LevelDB is unrelated and preserved.
 
 - `tests/live-logging/ObservationPruner.test.js` — Rewritten (4 tests):
   constructor invariants + module-source invariants. SQLite-tmpdir setup
@@ -262,7 +294,7 @@ well-bounded" scope) and is recorded as a known follow-up. No scope creep.
 
 **None** for Tasks 1-4 (the code-only cutover).
 
-**Task 5 is operator-gated** — see the checkpoint payload below.
+**Task 5 — CLEARED 2026-06-05** with operator decision "approved (archive)". Resolution + cleanup commit details are recorded in § "Task Commits" → item 5. The 1-hour soak is in progress; operator runs the commands in § "Operator Soak Commands" at +1h to confirm launchd daemons stayed healthy.
 
 ## Self-Check
 
@@ -287,16 +319,64 @@ All 7 files present. All 4 commit hashes (`cf6c8da45`, `955ce3caa`,
 
 ## Next Phase Readiness
 
-- Tasks 1-4 complete.
-- `.observations/observations.db` has zero production-runtime consumers.
-- Task 5 (SQLite archive) is the operator gate; once cleared, the deferred
-  Plan 44-12 § "fully unused observations.db" promise — carried through
-  44-13, 44-14, 44-17 — is finally honored.
+- All 5 tasks complete.
+- `.observations/observations.db` archived to `.observations/observations.db.archived.2026-06-05` (with `-shm`/`-wal` sidecars renamed alongside; all three gitignored under `.observations/*.db.archived*`).
+- `DB_PATH` constant + `dbPath`/`dbExists` health-payload fields removed from obs-api.
+- obs-api kickstart confirmed healthy post-rename.
+- The deferred Plan 44-12 § "fully unused observations.db" promise — carried through 44-13, 44-14, 44-17 — is **finally honored**.
 
 ## Task 5 Checkpoint Payload (for operator)
 
-See the structured "CHECKPOINT REACHED" message returned by the executor.
+Cleared 2026-06-05 with resolution "approved (archive)". See § "Task Commits" → item 5 for the resolution path and the cleanup commit hash.
+
+## Operator Soak Commands
+
+Run these at +1h from the kickstart timestamp (2026-06-05T21:40Z target):
+
+```bash
+# 1. All 8 launchd-managed daemons should be in state 0 with no kickstart_count bumps in the last hour
+launchctl list | grep com.coding | awk '{print $1, $2, $3}'
+# Expect: PID stable, exit code 0, no flapping. Daemons:
+#   com.coding.obs-api, com.coding.health-coordinator, com.coding.etm,
+#   com.coding.sub-agent-live-claude, com.coding.sub-agent-live-copilot, com.coding.sub-agent-live-opencode,
+#   com.coding.sub-agent-sweep, com.coding.lsl-resolver
+
+# 2. obs-api /health stays healthy, with no dbPath/dbExists fields
+curl -s http://localhost:12436/health | python3 -m json.tool
+# Expect: {"status":"ok","port":12436,"role":"single-owner-rw"}
+
+# 3. Tail obs-api log for any legacyDb / observations.db errors during the soak window
+tail -200 /tmp/obs-api.log | grep -iE "legacyDb|observations\.db|ENOENT.*\.db" | grep -v archived
+# Expect: 0 matches
+
+# 4. /api/retrieve still returns results (sanity probe — semantic + working-memory tiers)
+curl -s "http://localhost:12436/api/retrieve?q=docker+timeout&limit=5" | python3 -c "import sys,json; d=json.load(sys.stdin); print('results:', len(d.get('results', [])))"
+# Expect: results: 5 (or whatever non-zero number)
+
+# 5. Dashboard endpoints render cleanly
+curl -s "http://localhost:12436/api/digests/projects" | python3 -c "import sys,json; print('projects:', len(json.load(sys.stdin)))"
+curl -s "http://localhost:12436/api/insights/projects" | python3 -c "import sys,json; print('projects:', len(json.load(sys.stdin)))"
+# Expect: both return non-empty project lists
+
+# 6. Confirm the archive file is on disk and the live file is gone
+ls -la .observations/ | grep -E 'observations\.db'
+# Expect: only .archived.2026-06-05* entries; no bare observations.db
+
+# 7. Confirm next consolidator pass (or staleness status) is clean
+curl -s "http://localhost:12436/api/consolidation/status" | python3 -m json.tool | head -20
+# Expect: no errors; counts read from km-core; staleness ISO timestamps fresh
+```
+
+If any check fails:
+- **launchd flapping**: `launchctl print gui/$(id -u)/<label>` shows the recent exit history. Cross-reference with `/tmp/obs-api.log`.
+- **obs-api 500 on /api/retrieve**: roll back via `git revert <task5-commit-hash>` and re-link the archived file: `mv .observations/observations.db.archived.2026-06-05 .observations/observations.db`. Then re-kickstart.
+- **dbPath/dbExists missing fields cause dashboard breakage**: known shape change (operator-approved). Dashboard health view should fall back to `status` + `role`.
+
+## Threat Flags
+
+None — Task 5 changes do not introduce new attack surface. File rename is on-disk only; `/health` payload removed two fields rather than added new ones.
 
 ---
 *Phase: 44-rest-api-git-snapshots*
 *Completed (Tasks 1-4): 2026-06-05*
+*Completed (Task 5 — operator gate cleared, archive + cleanup): 2026-06-05*

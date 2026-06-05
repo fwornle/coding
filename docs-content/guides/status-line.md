@@ -108,7 +108,7 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 
 ### Knowledge Pipeline Indicators
 
-The badge reflects the freshness of the **observation → digest → insight** pipeline (the `obs_api` service backed by `.observations/observations.db`). Verdict is driven by *observation* freshness only — digest and insight cadences are intentionally slower and don't gate the badge. Source: `state.knowledge_pipeline` at the coordinator's `/health/state` (populated by `pollKnowledgePipeline`, which calls `obs_api`'s `/api/consolidation/status`).
+The badge reflects the freshness of the **observation → digest → insight** pipeline (the `obs_api` service backed by km-core `GraphKMStore` at `.data/knowledge-graph/`; the legacy `.observations/observations.db` SQLite store was archived 2026-06-05 under Phase 44 Plan 18). Verdict is driven by *observation* freshness only — digest and insight cadences are intentionally slower and don't gate the badge. Source: `state.knowledge_pipeline` at the coordinator's `/health/state` (populated by `pollKnowledgePipeline`, which calls `obs_api`'s `/api/consolidation/status`).
 
 | Status | Icon | Meaning |
 |--------|------|---------|

@@ -2,6 +2,8 @@
 
 Real-time observation capture from live coding sessions across all agents, with LLM-powered summarization and a browsable dashboard. Inspired by the observational memory concepts in the Mastra codebase, adapted to work across all supported coding agents.
 
+> **2026-06-05 update (Phase 44 Plan 18):** the runtime store is the km-core `GraphKMStore` (`.data/knowledge-graph/`). The legacy SQLite file at `.observations/observations.db` has been archived to `.observations/observations.db.archived.2026-06-05` and is no longer opened by any production code path — writer, consolidator, pruner, retrieval freshness-rerank are all km-core-native. References to SQLite below describe historical context; current writes/reads flow through km-core.
+
 ## What It Does
 
 Observational Memory captures per-exchange observations during coding sessions. Each user-assistant exchange is summarized by an LLM into a structured observation (Intent, Approach, Artifacts, Result), then stored in a local SQLite database.

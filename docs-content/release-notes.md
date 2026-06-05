@@ -4,6 +4,22 @@ Highlights since the v6.0 Knowledge Context Injection milestone (commit `0fdb766
 
 ---
 
+## Observational Memory — SQLite → km-core cutover complete (2026-06-05)
+
+Phase 44 Plans 12 → 18 finished cutting every production code path off the legacy `.observations/observations.db` SQLite file. The file was archived to `.observations/observations.db.archived.2026-06-05` after Plan 44-18 Tasks 1-4 landed (commits `cf6c8da45` → `c837dc421`).
+
+| Surface | Path | Pre-cutover | Post-cutover |
+|---------|------|-------------|--------------|
+| Write path | `src/live-logging/ObservationWriter.js` | SQLite single-owner writer (Plan 44-13) | km-core `GraphKMStore.putEntity` |
+| Consolidator + insights re-synth | `src/live-logging/ObservationConsolidator.js` | SQLite reads for day-range scan + insight metadata | km-core `findByOntologyClass` + `getEntity` (Plan 44-17) |
+| Retention pruner | `src/live-logging/ObservationPruner.js` | SQLite cutoff DELETE | km-core `findByOntologyClass` + per-entity `deleteEntity` (Plan 44-18 Task 2) |
+| Retrieval freshness-rerank | `src/retrieval/retrieval-service.js` | SQLite `json_extract` over insights | km-core `getEntity` per insight id (Plan 44-18 Task 3) |
+| obs-api `/health` | `scripts/observations-api-server.mjs` | reported `dbPath` + `dbExists` for the SQLite file | reports km-core readiness only (Plan 44-18 Task 5) |
+
+The deferred Plan 44-12 § "fully unused observations.db" success criterion — carried through 44-13, 44-14, 44-17 — is now honored. obs-api keeps running cleanly with no SQLite handle; the `DB_PATH` constant was dropped from the script in the Task 5 cleanup commit. The archived file is preserved in `.observations/` (gitignored under `*.db.archived*`) for one-shot historical inspection should a regression need pre-cutover data.
+
+---
+
 ## Constraint System
 
 A run-through of the persisted `violation-history.json` showed that 9,387 of 9,780 lifetime violations (96 %) were `no-magic-numbers` — its `\b\d{2,}\b` pattern matched any 2+ digit number including port numbers, PIDs, and Bash command digits. Critical-severity rules like `no-hardcoded-secrets` had fired exactly once in the same window. A second sweep uncovered a config split-brain: host hooks loaded `${CODING_REPO}/.constraint-monitor.yaml` while the in-container dashboard loaded a stale `integrations/mcp-constraint-monitor/constraints.yaml`. Same rules diverged across the two — `no-console-log` ran as `error` on the host but `warning` in the dashboard.
