@@ -112,6 +112,27 @@ Suggested next steps:
 
 Last activity: 2026-06-04 — Plan 44-15 (snapshot-dir routing fix) completed; A PASS, B mount-verified-http-blocked, C Mode B
 
+Session 2026-06-05 outcome (context-clear handoff):
+
+  - Plan 44-15 SC#2.B reopened + closed end-to-end (commits b5e2048 submodule + f5509ac95 outer Dockerfile + 5b5d33b68 docs)
+  - ETM observation routing fixed (`ab72e0d5b`): always uses ObservationApiClient → obs-api; eliminated pre-44-13 direct-writer fallback that was silently dedup-skipping every new exchange via stale SQLite hash
+  - 16h observation gap recovered (`df4622b87`): 44 new obs in km-core via `convert-transcripts.js claude <jsonl>` after routing fix to ObservationApiClient
+  - LSL tranche parser auto-detects ETM format (`6aad3a47b`)
+  - Bridge script `scripts/bridge-obs-from-kmcore.mjs` mirrored 135 km-core obs into SQLite so the still-SQLite-based ObservationConsolidator can see them
+  - Plan 44-17 drafted (`10004ebf7`): ObservationConsolidator → km-core cutover, 5 tasks, deletes bridge script + archives `.observations/observations.db` at Task 5
+
+OPEN at handoff:
+
+  - LLM proxy override consumption for consolidator routing: `processOverrides[consolidator-digest]` is set to copilot but proxy log shows auto-select to claude-code (CLI) which times out at 15s. Override branch at `~/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:1473-1478` not firing. Resume by probing `/api/complete` directly with `process:consolidator-digest` and watching for `process-override [...]` log line. See [[session_handoff_phase44_closeout]] for the full diagnostic.
+
+Phase 44 close-out gates remaining:
+
+  1. Resolve proxy routing → enables consolidator
+  2. Draft + execute Plan 44-16 (typed-view shape lock for digests + insights)
+  3. Execute Plan 44-17 (consolidator cutover) — depends on (1)
+  4. Operator: merge OKM PR #5 + restart C
+  5. Plan 44-11 re-run as close-out gate
+
 ## Performance Metrics
 
 **Velocity:**
