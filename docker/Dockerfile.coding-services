@@ -110,11 +110,33 @@ RUN cd lib/llm && npm install --ignore-scripts 2>/dev/null || true
 # path is the dist/ bind-mount; this RUN is the CI/fresh-image safety net.
 RUN cd lib/km-core && npm install --ignore-scripts 2>/dev/null || true
 
+# Build km-core BEFORE packing — km-core/package.json `files` is ["dist",
+# "README.md", "LICENSE"], so a pack without dist produces an empty effective
+# tarball. The previous km-core build step lived later in the file (post-
+# integration-install) and only worked because the runtime bind-mount of
+# ~/Agentic/km-core overlaid the missing dist at runtime. Moving the build
+# here makes the tarball self-contained.
+RUN cd lib/km-core && npm run build
+
+# Pack km-core so the mcp-server-semantic-analysis integration's `npm install`
+# can resolve `"@fwornle/km-core": "file:../../lib/km-core/fwornle-km-core-0.1.0.tgz"`
+# (submodule package.json line 26 — Plan 44-08 commit 40d0c74 introduced this
+# tarball ref but no build step ever generated the tarball; npm install silently
+# ENOENT'd, then `|| true` swallowed the failure, leaving node_modules empty and
+# sse-server FATAL at runtime on `ERR_MODULE_NOT_FOUND: @modelcontextprotocol/sdk`.
+# Pre-built dist/ from the preceding RUN makes the tarball self-contained.
+RUN cd lib/km-core && npm pack && mv fwornle-km-core-*.tgz fwornle-km-core-0.1.0.tgz
+
 # Re-install integration deps after source COPY (node-deps stage installs may
 # have been overwritten by COPY integrations/ since .dockerignore excludes node_modules)
 RUN cd integrations/mcp-constraint-monitor && npm install --ignore-scripts 2>/dev/null || true
 RUN cd integrations/mcp-constraint-monitor/dashboard && npm install 2>/dev/null || true
-RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps 2>/dev/null || true
+# `2>/dev/null || true` REMOVED for mcp-server-semantic-analysis: a silent
+# failure here leaves the SSE server FATAL at runtime (sse-server.js can't
+# resolve `@modelcontextprotocol/sdk`). If this step fails the image build
+# must fail loudly so the operator sees the cause instead of hitting it as
+# a "service stopped" violation on the dashboard hours later.
+RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps
 
 # Patch broken JSDoc comment in @rapid/llm-proxy network-detect.js
 # The comment contains "utun*/" which prematurely closes the /* block, breaking ESM parsing
@@ -132,10 +154,10 @@ RUN cd lib/km-core && npm rebuild classic-level 2>/dev/null || true
 
 # Build TypeScript projects (run build in each directory)
 RUN cd lib/llm && npm run build 2>/dev/null || true
-# KM-Core fallback build (CI/fresh-image). Host's dist/ bind-mount overrides at
-# runtime, but failures here must propagate (no `|| true`) so a broken fallback
-# fails the image build instead of producing a silently-broken container.
-RUN cd lib/km-core && npm run build
+# NOTE: km-core's `npm run build` moved earlier (immediately before the
+# `npm pack` step that produces the tarball for the integration's npm install).
+# Same fallback-build intent — failures propagate, no `|| true` — just at the
+# correct point in the dependency chain.
 RUN cd integrations/mcp-server-semantic-analysis && npm run build 2>/dev/null || true
 RUN cd integrations/system-health-dashboard && npm run build 2>/dev/null || true
 
