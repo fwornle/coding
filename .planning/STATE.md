@@ -129,7 +129,7 @@ Phase 44 close-out gates remaining:
 
   1. Resolve proxy routing → enables consolidator (RESOLVED 2026-06-05: live consolidation succeeded with 7 created + 25 updated insights via copilot+haiku route at commit 038eff0b1)
   2. Draft + execute Plan 44-16 (typed-view shape lock for digests + insights)
-  3. Execute Plan 44-17 (consolidator cutover) — **COMPLETE 2026-06-05** at Tasks 1–4 (commits 13876e204 audit + f3701499f cutover + e74444aba tests + Task 4 chore). Task 5 (operator gate for SQLite archive) PENDING.
+  3. Execute Plan 44-17 (consolidator cutover) — **COMPLETE 2026-06-05** at all 5 tasks (commits 13876e204 audit + f3701499f cutover + e74444aba tests + 398060586 chore + 10d713ed3 docs + Task 5 operator-gate close). Task 5 operator gate cleared 2026-06-05 with resolution "approved (keep)" — `.observations/observations.db` retained read-only for pruner + retrieval FTS5; final archive scheduled for Plan 44-18.
   4. Operator: merge OKM PR #5 + restart C
   5. Plan 44-11 re-run as close-out gate
 
@@ -144,6 +144,7 @@ Plan 44-17 cutover outcome (2026-06-05):
       1. `ObservationPruner` (scripts/observations-api-server.mjs:165) — DELETEs old rows for retention. Pre-Plan-44-13 design; deferred to 44-18.
       2. `RetrievalService` keyword-search FTS5 (scripts/observations-api-server.mjs:142) — reads via `dbGetter`. Deferred to 44-18.
     Both consumers were intentionally deferred by Plan 44-13 per its source comment at lines 35-39. Task 5 operator gate authorizes the archive ONLY when the operator agrees to lose the pruner + FTS5 keyword search (or accepts that 44-18 will cut them over before archive).
+  - Task 5 operator gate **CLEARED 2026-06-05** with resolution **"approved (keep)"** — `.observations/observations.db` retained in place as read-only for `ObservationPruner` + `RetrievalService` FTS5 until Plan 44-18 cuts both consumers over. Operator runbook addendum: do NOT delete/archive/move the file before 44-18 lands; the two consumers will 500 on retention sweeps + keyword searches if it disappears. After 44-18 cuts over pruner + retrieval, the file is archivable in one shot (move to `.observations/archive/`, remove `dbGetter` wiring).
 
 ## Performance Metrics
 
