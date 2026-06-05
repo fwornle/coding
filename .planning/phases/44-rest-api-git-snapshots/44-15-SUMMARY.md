@@ -13,7 +13,7 @@ status: complete (B-leg HTTP-blocked by pre-existing infra; mount-mode change ve
 Plan 44-11 SC#2 advances from **BLOCKED on all 3 legs** to:
 
 - **A**: PASS — full snapshot/restore round-trip verified end-to-end
-- **B**: MOUNT-VERIFIED, HTTP-BLOCKED — `.git:rw` mount confirmed writable inside `coding-services` container, but B's HTTP endpoint is down due to a pre-existing infrastructure gap surfaced (not caused) by the container recreate
+- **B**: **PASS** (closed 2026-06-05 in a follow-up session — see `## Task 2 reopened` below). Mount-verified at original landing; HTTP gap resolved via npm-pack Dockerfile fix + SnapshotManager cwd fix + container git config.
 - **C**: BLOCKED:awaiting-OKM-PR-5 — Mode B per Plan 44-15 dual-mode contract; operator-owned out-of-band
 
 Phase 44 close-out is still gated on (i) B-leg HTTP recovery (separate infra fix, not 44-15 scope), (ii) Plan 44-16 (typed-view shape lock for digests + insights), and (iii) Plan 44-11 re-run.
@@ -172,5 +172,54 @@ Plus snapshot commit `144f7ec92` (`chore(snapshot): phase-44-verify-A`) — crea
 4. **Plan 44-11 re-run:** Phase 44 close-out gate.
 
 ---
-*Plan 44-15 completed: 2026-06-04*
-*Phase 44 close-out remains gated on items 1-4 above.*
+
+## Task 2 reopened — B-leg HTTP recovery + snapshot round-trip (2026-06-05)
+
+The B-leg infrastructure gap noted in Task 2.5 was closed in a follow-up session. Three root causes uncovered + fixed:
+
+1. **`@modelcontextprotocol/sdk` missing from container** — `mcp-server-semantic-analysis/package.json:26` declares `"@fwornle/km-core": "file:../../lib/km-core/fwornle-km-core-0.1.0.tgz"` (Plan 44-08 submodule commit `40d0c74`), but no build step ever generated the tarball. The Dockerfile's `npm install` errored with ENOENT and `|| true` swallowed it, leaving the integration's node_modules entirely empty. Runtime bind-mount `${HOME}/Agentic/km-core` overlaid km-core but couldn't help npm install resolve the file ref at build time.
+   - **Durable fix** (commit `f5509ac95`): add `RUN cd lib/km-core && npm run build && npm pack && mv fwornle-km-core-*.tgz fwornle-km-core-0.1.0.tgz` to `docker/Dockerfile.coding-services` *before* the integration's `npm install`. Move the km-core build step to immediately before pack so the tarball is self-contained (km-core's `files` field is `["dist","README.md","LICENSE"]`). Remove `2>/dev/null || true` from the `mcp-server-semantic-analysis npm install` line so future failures surface loudly.
+   - **In-session transient fix**: `npm install` inside the container (skipping the broken km-core file ref) + JSDoc patch on `@rapid/llm-proxy/dist/network-detect.js` (mirroring Dockerfile:122-125).
+
+2. **SnapshotManager git ops failed with `fatal: in unpopulated submodule 'integrations/mcp-server-semantic-analysis'`** — `execGit` passed `GIT_DIR` + `GIT_WORK_TREE` env vars but inherited the caller's cwd. B's sse-server starts with cwd inside that submodule per `docker/supervisord.conf:27`, so git's parent-vs-submodule logic refused the `git add`.
+   - **Durable fix** (km-core submodule commit `b5e2048`, outer pointer bump `f5509ac95`): SnapshotManager.execGit now sets `cwd: env.workTree` explicitly in the execSync options. Robust to any caller cwd.
+
+3. **`Author identity unknown`** — container runs as root with no system git config; bind-mounted host `.git` is owned by `Q284340`, so git also rejected operations with `dubious ownership`.
+   - **Durable fix** (Dockerfile commit `f5509ac95`): `git config --system --add safe.directory '*'` + `git config --system user.email "snapshot-bot@coding.local"` + `git config --system user.name "Snapshot Bot"`. Container-issued snapshot commits are now visually distinguishable from operator commits on the host.
+   - **In-session transient**: same three `git config --global` commands inside the running container.
+
+### B-leg snapshot round-trip evidence (post-fix)
+
+| Step | Command | Result |
+|------|---------|--------|
+| Pre-stats | `GET http://localhost:3848/api/v1/stats` | `nodes=2213, edges=0, activeSnapshot=null` |
+| Snapshot POST | `POST http://localhost:3848/api/v1/snapshots {label:"phase-44-verify-B"}` | HTTP 201 + `id:"snapshot/phase-44-verify-B-2026-06-05T05-44-36-838Z"`, `commit_sha:5d85ee2535bf`, `domains_present:["coding","general"]` |
+| Mutate POST | `POST http://localhost:3848/api/v1/entities {verify-stub-B}` | HTTP 201, id `019e9650-110c-7bae-9414-3995c5e64067`; stats `nodes: 2213 → 2214` |
+| Restore POST | `POST .../api/v1/snapshots/<url-encoded-tag>/restore {confirmDestructive:true}` | HTTP 200 + `restored:true, restartRequired:true, restartCommand:"docker-compose restart coding-services"` |
+| Container restart | `cd docker && docker-compose restart coding-services` | container restarted in ~5s; B endpoint live on second probe |
+| Post-restart stats | `GET http://localhost:3848/api/v1/stats` | `nodes=2213` — **bit-for-bit restore; verify-stub-B wiped** (`/api/v1/entities?ontologyClass=VerifyStub` returns 0 entities) |
+
+### Updated SC#2 per-leg progression
+
+| System | Pre-44-15 | After 44-15 first pass (2026-06-04) | After 44-15 reopen (2026-06-05) |
+|--------|-----------|------------------------------------|--------------------------------|
+| A (12436) | BLOCKED | PASS | PASS |
+| B (3848)  | BLOCKED | MOUNT-VERIFIED, HTTP-BLOCKED | **PASS** |
+| C (3002)  | BLOCKED | BLOCKED:awaiting-OKM-PR-5 | BLOCKED:awaiting-OKM-PR-5 |
+
+### Files modified in the reopen
+
+| File | Change | Commit |
+|------|--------|--------|
+| `lib/km-core/src/snapshots/SnapshotManager.ts` (submodule) | `execGit` sets `cwd: env.workTree` | submodule `b5e2048` |
+| `lib/km-core` (outer pointer bump) | track submodule HEAD | `f5509ac95` |
+| `docker/Dockerfile.coding-services` | git config --system + km-core build-before-pack + npm pack + remove `\|\| true` swallower | `f5509ac95` |
+| `.planning/phases/44-rest-api-git-snapshots/44-15-SUMMARY.md` | this section | follow-up commit |
+| `.planning/STATE.md` | reflect SC#2.B closed | follow-up commit |
+
+Note: Dockerfile fixes intentionally NOT rebuilt in this session (B is currently live via the in-container transient fix from this session). The next operator-initiated `docker-compose build coding-services` validates the durable infra.
+
+---
+*Plan 44-15 first pass completed: 2026-06-04*
+*Plan 44-15 SC#2.B reopen completed: 2026-06-05*
+*Phase 44 close-out remains gated on: Plan 44-16 (typed-view shape lock) + operator OKM PR #5 merge + C restart + Plan 44-11 re-run.*
