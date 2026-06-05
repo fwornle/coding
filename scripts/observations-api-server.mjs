@@ -150,29 +150,32 @@ function ensureRetrieval() {
 // Phase 35 plan 35-04 - pruner factory + 1h interval scheduler.
 // The pruner is constructed lazily after ensureWriter resolves (so the
 // writer's `retentionDays` is computed from its config-load). First prune
-// fires immediately on boot so an already-oversized DB shrinks without a 1h
+// fires immediately on boot so an already-oversized graph shrinks without a 1h
 // wait. Errors are logged to stderr but never thrown - obs-api boot must
 // remain crash-free even if the pruner cannot run.
 //
-// Phase 44 Plan 13: pruner gets its SQLite handle from `ensureLegacyDb()`
-// (the obs-api-owned handle). The writer no longer holds a SQLite handle
-// post-Plan-13.
-function ensurePruner() {
+// Phase 44 Plan 18: pruner reads + deletes through km-core exclusively
+// (no more SQLite handle). `prune()` is async — `Promise.resolve().then`
+// wraps the call so the synchronous caller path stays unchanged while
+// errors still flow to the catch.
+async function ensurePruner() {
   if (_pruner) return _pruner;
   if (!_writer || !_writer.retentionDays) return null;
-  const legacyDb = ensureLegacyDb();
-  if (!legacyDb) return null;
-  _pruner = new ObservationPruner({ db: legacyDb, retentionDays: _writer.retentionDays });
+  const kmStore = await ensureKMStore();
+  if (!kmStore) return null;
+  _pruner = new ObservationPruner({ kmStore, retentionDays: _writer.retentionDays });
   try {
-    const r = _pruner.prune();
+    const r = await _pruner.prune();
     process.stderr.write(`[obs-api] initial prune: ${JSON.stringify(r)}\n`);
   } catch (err) {
     process.stderr.write(`[obs-api] initial prune failed: ${err.message}\n`);
   }
   _pruneInterval = setInterval(() => {
-    try { _pruner.prune(); } catch (err) {
-      process.stderr.write(`[obs-api] periodic prune failed: ${err.message}\n`);
-    }
+    Promise.resolve()
+      .then(() => _pruner.prune())
+      .catch((err) => {
+        process.stderr.write(`[obs-api] periodic prune failed: ${err.message}\n`);
+      });
   }, PRUNE_INTERVAL_MS);
   _pruneInterval.unref?.();
   return _pruner;
