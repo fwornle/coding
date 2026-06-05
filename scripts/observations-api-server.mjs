@@ -137,9 +137,16 @@ function ensureRetrieval() {
   if (!process.env.QDRANT_URL) {
     process.env.QDRANT_URL = 'http://localhost:6333';
   }
-  // Phase 44 Plan 13 — retrieval reads FTS5 directly off the legacy SQLite
-  // file (independent of the writer, which no longer holds a SQLite handle).
-  _retrieval = new RetrievalService({ dbGetter: () => ensureLegacyDb() });
+  // Plan 44-18 — retrieval reads insight metadata through km-core
+  // (`kmStoreGetter`). The `dbGetter` is retained until Task 4 drops the
+  // legacy handle entirely; keyword-search (FTS5 over observations) still
+  // uses it transitionally. After Task 4 the dbGetter returns null and
+  // the keyword-search path degrades to []; semantic search via Qdrant
+  // dominates the response.
+  _retrieval = new RetrievalService({
+    dbGetter: () => ensureLegacyDb(),
+    kmStoreGetter: () => (_kmStoreReady ? _kmStore : null),
+  });
   // Eager init warms fastembed; fire-and-forget so startup isn't blocked.
   _retrieval.initialize().catch((err) => {
     process.stderr.write(`[obs-api] retrieval init failed (lazy retry on first request): ${err.message}\n`);

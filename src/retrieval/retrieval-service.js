@@ -32,7 +32,14 @@ export class RetrievalService {
    * @param {object} options
    * @param {number} [options.scoreThreshold=0.82] - Minimum Qdrant similarity score (D-04)
    * @param {number} [options.defaultBudget=1000] - Default token budget (D-08)
-   * @param {function} [options.dbGetter] - Function returning a better-sqlite3 db instance
+   * @param {function} [options.dbGetter] - DEPRECATED — kept only so the
+   *   keyword-search path (which still reads FTS5 from the legacy SQLite
+   *   handle via KeywordSearch.search) keeps working until that consumer
+   *   is itself cut. The freshness-rerank path no longer uses this.
+   * @param {function} [options.kmStoreGetter] - Function returning a
+   *   `GraphKMStore` instance. Called lazily inside `_applyFreshnessRerank`
+   *   so the service stays construction-eager but km-core-access-lazy
+   *   (mirrors the prior `dbGetter` pattern). Plan 44-18 (D-44-18-03).
    */
   constructor(options = {}) {
     // Default 0.70 (was 0.82). MiniLM-L6-v2 cosine similarities cluster
@@ -46,7 +53,13 @@ export class RetrievalService {
     this.embeddingService = null;
     this.qdrantClient = null;
     this.keywordSearch = new KeywordSearch();
+    // Plan 44-18 — freshness rerank reads through km-core. The legacy
+    // `dbGetter` is kept for the keyword-search path (KeywordSearch.search
+    // still uses FTS5 against the legacy SQLite file). When the SQLite
+    // file is archived in Task 5 the dbGetter will return null and
+    // _keywordSearch degrades to [] (graceful — already in the catch).
     this.dbGetter = options.dbGetter ?? null;
+    this.kmStoreGetter = options.kmStoreGetter ?? null;
     this.codingRoot = options.codingRoot
       || process.env.CODING_REPO
       || new URL('../../', import.meta.url).pathname.replace(/\/$/, '');
@@ -152,7 +165,9 @@ export class RetrievalService {
     // insight gets ~0.65×, and a 0.0-ratio insight is heavily demoted (0.3×)
     // without being filtered out entirely. Only applies to the `insights`
     // tier; digests/kg_entities/observations don't have a verification field.
-    this._applyFreshnessRerank(fused);
+    // Plan 44-18: async because the metadata lookup now goes through
+    // km-core `findByLegacyId` (was a single SQLite SELECT).
+    await this._applyFreshnessRerank(fused);
 
     fused.sort((a, b) => b.rrfScore - a.rrfScore);
 
@@ -301,9 +316,9 @@ export class RetrievalService {
 
   /**
    * Demote insights whose verification ratio is below 1.0. The consolidator's
-   * verifier persists `metadata.codeVerification.verificationRatio` for every
-   * insight; we look it up via the supplied SQLite handle and scale the
-   * rrfScore by a floored linear function of the ratio.
+   * verifier persists `metadata.codeVerification.verificationRatio` on every
+   * insight entity; this method looks it up via the km-core store and scales
+   * the rrfScore by a floored linear function of the ratio.
    *
    *   ratio == 1.0 → multiplier 1.0   (no penalty)
    *   ratio == 0.5 → multiplier 0.65  (mild)
@@ -311,39 +326,48 @@ export class RetrievalService {
    *
    * Only applies to results from the `insights` tier — digests/kg_entities/
    * observations don't have a code-claim verification signal. Fails open: if
-   * no DB getter is configured, or the lookup raises, the results pass
+   * no km-core getter is configured, or the lookup raises, the results pass
    * through unchanged.
    *
+   * Plan 44-18 — was a single SQLite `SELECT json_extract(metadata, ...) FROM
+   * insights WHERE id IN (...)` against the legacy SQLite handle; now an
+   * `await Promise.all(ids.map(id => kmStore.findByLegacyId({system:'A',id})))`
+   * batch with the metadata path read off the resolved entity. T-44-18-02
+   * perf gate: 20 ids ≤ 50ms (asserted in integration test).
+   *
    * @param {Array<object>} results - Fused results with rrfScore
+   * @returns {Promise<void>}
    */
-  _applyFreshnessRerank(results) {
+  async _applyFreshnessRerank(results) {
     if (!Array.isArray(results) || results.length === 0) return;
-    if (!this.dbGetter) return;
+    if (!this.kmStoreGetter) return;
 
     const insightResults = results.filter(
       (r) => r.tier === 'insights' && r.rrfScore && r.id != null
     );
     if (insightResults.length === 0) return;
 
-    let db;
+    let kmStore;
     try {
-      db = this.dbGetter();
+      kmStore = this.kmStoreGetter();
     } catch {
       return;
     }
-    if (!db) return;
+    if (!kmStore || typeof kmStore.findByLegacyId !== 'function') return;
 
-    // Batch-fetch verification ratios for every insight in scope.
+    // Resolve each insight id to its km-core entity in parallel. legacyId
+    // `{ system: 'A', id }` is the convention from legacy-ingest.ts — the
+    // SQLite row id is preserved verbatim. Per-call lookup is O(N) over
+    // the Insight class (~3.9k entries today, sub-ms each); 20 in flight
+    // saturates the LevelDB read path cleanly. T-44-18-02 mitigation.
     const ids = [...new Set(insightResults.map((r) => String(r.id)))];
-    const placeholders = ids.map(() => '?').join(',');
-    let rows;
+    let entities;
     try {
-      rows = db.prepare(
-        `SELECT id,
-                json_extract(metadata, '$.codeVerification.verificationRatio') AS ratio
-         FROM insights
-         WHERE id IN (${placeholders})`
-      ).all(...ids);
+      entities = await Promise.all(
+        ids.map((id) =>
+          kmStore.findByLegacyId({ system: 'A', id }).catch(() => null)
+        )
+      );
     } catch (err) {
       process.stderr.write(
         `[RetrievalService] Freshness rerank lookup failed (non-fatal): ${err.message}\n`
@@ -352,9 +376,11 @@ export class RetrievalService {
     }
 
     const ratioById = new Map();
-    for (const row of rows) {
-      const r = Number(row.ratio);
-      if (Number.isFinite(r)) ratioById.set(String(row.id), r);
+    for (let i = 0; i < ids.length; i++) {
+      const entity = entities[i];
+      if (!entity) continue;
+      const ratio = Number(entity?.metadata?.codeVerification?.verificationRatio);
+      if (Number.isFinite(ratio)) ratioById.set(ids[i], ratio);
     }
 
     for (const result of insightResults) {
