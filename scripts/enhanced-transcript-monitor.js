@@ -702,21 +702,25 @@ class EnhancedTranscriptMonitor {
    */
   async _initObservationWriter() {
     try {
-      // When OBS_API_URL is set, route writes through the host Observations API
-      // (single-owner pattern; no direct SQLite handle in this process).
-      // Otherwise fall back to direct DB writes for legacy/standalone use.
-      if (process.env.OBS_API_URL) {
-        this.observationWriter = new ObservationApiClient({ baseUrl: process.env.OBS_API_URL });
-        await this.observationWriter.init();
-        this.debug(`[ObservationTap] HTTP client initialized (${process.env.OBS_API_URL})`);
-      } else {
-        this.observationWriter = new ObservationWriter({
-          dbPath: path.join(codingRoot, '.observations', 'observations.db'),
-          batchSize: 2,
-        });
-        await this.observationWriter.init();
-        this.debug('[ObservationTap] Direct writer initialized');
-      }
+      // Plan 44-13 cut the writer to km-core for all dedup/patch paths. The
+      // "Direct writer" fallback that used to work standalone is no longer
+      // viable without explicit km-core wiring (kmStoreDbPath), and even then
+      // it would race obs-api on the shared LevelDB. Always route through
+      // ObservationApiClient → obs-api → single-owner writer.
+      //
+      // OBS_API_URL env var still overrides the default base URL if obs-api
+      // runs on a non-standard port. The default (http://localhost:12436) is
+      // already correct for the standard launchd-managed obs-api setup.
+      //
+      // Lesson: 2026-06-05 observation stall — ETM was running pre-44-13 code
+      // in memory (started before the writer cutover commit). The fallback's
+      // SQLite dedup matched a stale row and silently dropped every new
+      // exchange. Fix: never fall back; the HTTP client default makes ETM
+      // robust to the launchd plist not setting OBS_API_URL.
+      const baseUrl = process.env.OBS_API_URL || 'http://localhost:12436';
+      this.observationWriter = new ObservationApiClient({ baseUrl });
+      await this.observationWriter.init();
+      this.debug(`[ObservationTap] HTTP client initialized (${baseUrl})`);
     } catch (err) {
       process.stderr.write(`[ObservationTap] Init failed (non-blocking): ${err.message}\n`);
       this.observationWriter = null;
