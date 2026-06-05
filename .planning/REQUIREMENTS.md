@@ -86,7 +86,7 @@
 | INT-02 | Phase 42 | Complete |
 | INT-03 | Phase 43 | Pending |
 | API-01 | Phase 44 | Complete |
-| API-02 | Phase 44 | Pending |
+| API-02 | Phase 44 | Complete |
 | UI-01 | Phase 45 | Pending |
 | DOC-01 | Phase 46 | Pending |
 

@@ -4,13 +4,13 @@ milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
 stopped_at: Phase 44 context gathered
-last_updated: "2026-06-04T15:58:49.957Z"
-last_activity: 2026-06-04
+last_updated: "2026-06-05T13:57:27.205Z"
+last_activity: 2026-06-05
 progress:
   total_phases: 23
   completed_phases: 16
-  total_plans: 102
-  completed_plans: 103
+  total_plans: 104
+  completed_plans: 106
   percent: 70
 ---
 
@@ -53,8 +53,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 44 (rest-api-git-snapshots) — EXECUTING (close-out gated)
-Plan: 14 of 15 with SUMMARY (44-11 SUMMARY recorded operator `issues` signal; 44-15 just landed)
-Status: SC#2 closing — A PASS, B mount-verified-http-blocked, C BLOCKED:awaiting-OKM-PR-5
+Plan: 15 of 15 with SUMMARY (44-11 SUMMARY recorded operator `issues` signal; 44-15 just landed)
+Status: Ready to execute
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
 
@@ -110,7 +110,7 @@ Suggested next steps:
   2. Draft Plan 44-16 (typed-view shape lock) — small, focused, similar surface to 44-15
   3. `/gsd-execute-phase 44 --wave 6` re-run after 44-16 lands + B+C are up → Phase 44 close-out
 
-Last activity: 2026-06-04 — Plan 44-15 (snapshot-dir routing fix) completed; A PASS, B mount-verified-http-blocked, C Mode B
+Last activity: 2026-06-05
 
 Session 2026-06-05 outcome (context-clear handoff):
 
@@ -271,6 +271,9 @@ Plan 44-17 cutover outcome (2026-06-05):
 - [Phase ?]: [Plan-44-13] km-core findByContentHash + findRecentByAgent helpers land on GraphKMStore. Two new methods scan via metadata.agent + metadata.content_hash + metadata.createdAt (snake_case per legacy-ingest.ts). 9 new unit tests appended; 304/304 km-core vitest GREEN.
 - [Phase ?]: [Plan-44-13] ObservationWriter drops this.db entirely; 3 dedup helpers route through km-core. Artifacts-patch replay preserves createdAt + createdBy verbatim (T-44-13-02). ObservationExporter dropped from writer. 2 dedup tests re-enabled after Plan 44-12 deferral; 110/110 ObservationWriter unit tests GREEN.
 - [Phase ?]: [Plan-44-13] Rule 3 deviation — obs-api opens its own independent _legacyDb via SafeDatabase for pruner + retrieval. Writer-side cutover COMPLETE; ObservationConsolidator (Plan 44-15) is the last writer-side SQLite consumer holding observations.db. Perf gate measured 0.074ms avg (27x under 2ms budget at 1k entities).
+- [Phase ?]: Plan 44-17 chose Option A (metadata.digested_at) for consolidator idempotency
+- [Phase ?]: Plan 44-17: no new km-core bounded-date helper — predicate-form countByOntologyClass suffices (perf gate 462ms at 1k obs)
+- [Phase ?]: Plan 44-17: ObservationExporter wiring dropped — km-core has its own per-domain JSON export
 
 ### Blockers/Concerns
 
@@ -323,10 +326,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 52 P03 | ~20min dashboard half (wave-controller half already in tree from ad523f7db on 2026-05-29) | 3 tasks (Task 4 visual UAT deferred to operator) | 2 files in commit 5ad4f31f2 (trace-modal.tsx + ukbSlice.ts) + wave-controller.ts from prior submodule commits |
 | Phase 43 P09 | ~25min | 2 tasks landed (script + integration test) + Task 3 split (pointer-bump done; production run deferred to operator) | 2 files created (scripts/reembed-okm-corpus.mjs, tests/integration/reembed-okm-corpus.test.ts) in OKM submodule (commits 2840196 + 23ebcd4) + outer rapid-automations pointer bump (commit 2877e12) |
 | Phase 44 P13 | 19 | 3 tasks | 5 files |
+| Phase 44 P17 | 58 | - tasks | - files |
 
 ## Session Continuity
 
-Last session: 2026-06-04T15:58:14.919Z
+Last session: 2026-06-05T13:57:27.193Z
 Stopped at: Phase 44 context gathered
 Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
