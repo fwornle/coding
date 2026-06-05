@@ -127,11 +127,23 @@ OPEN at handoff:
 
 Phase 44 close-out gates remaining:
 
-  1. Resolve proxy routing → enables consolidator
+  1. Resolve proxy routing → enables consolidator (RESOLVED 2026-06-05: live consolidation succeeded with 7 created + 25 updated insights via copilot+haiku route at commit 038eff0b1)
   2. Draft + execute Plan 44-16 (typed-view shape lock for digests + insights)
-  3. Execute Plan 44-17 (consolidator cutover) — depends on (1)
+  3. Execute Plan 44-17 (consolidator cutover) — **COMPLETE 2026-06-05** at Tasks 1–4 (commits 13876e204 audit + f3701499f cutover + e74444aba tests + Task 4 chore). Task 5 (operator gate for SQLite archive) PENDING.
   4. Operator: merge OKM PR #5 + restart C
   5. Plan 44-11 re-run as close-out gate
+
+Plan 44-17 cutover outcome (2026-06-05):
+
+  - All 45 consolidator SQLite call sites + 22 FROM/INSERT statements migrated to km-core (commit f3701499f).
+  - Bridge script `scripts/bridge-obs-from-kmcore.mjs` DELETED — single source of truth restored, no more SQLite/km-core divergence.
+  - Idempotency: Option A chosen — `metadata.digested_at` on Observation entities (mirrors the legacy SQLite column 1:1).
+  - Integration suite (6 tests, 590 lines) GREEN — perf gate T-44-17-01: 462ms over 1000 obs (budget 500ms dev).
+  - Writer + obs-api suites stay GREEN (16/16).
+  - `.observations/observations.db` SQLite archivability: NOT YET — two remaining consumers identified in obs-api `_legacyDb` audit:
+      1. `ObservationPruner` (scripts/observations-api-server.mjs:165) — DELETEs old rows for retention. Pre-Plan-44-13 design; deferred to 44-18.
+      2. `RetrievalService` keyword-search FTS5 (scripts/observations-api-server.mjs:142) — reads via `dbGetter`. Deferred to 44-18.
+    Both consumers were intentionally deferred by Plan 44-13 per its source comment at lines 35-39. Task 5 operator gate authorizes the archive ONLY when the operator agrees to lose the pruner + FTS5 keyword search (or accepts that 44-18 will cut them over before archive).
 
 ## Performance Metrics
 
