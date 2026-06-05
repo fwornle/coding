@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
- * observations-api-server — Host-side HTTP gateway for .observations/observations.db.
+ * observations-api-server — Host-side HTTP gateway for the km-core knowledge store.
  *
- * Single-owner pattern (mirrors OKB/VKB): this process is the only one that opens
- * observations.db at runtime. The dashboard (in coding-services container) and any
- * other client reach it via HTTP at host.docker.internal:12436. Eliminates the
- * Docker bind-mount + SQLite WAL/SHM corruption that plagued the prior layout.
+ * Single-owner pattern (mirrors OKB/VKB): this process owns the on-disk km-core
+ * GraphKMStore and the dashboard (in coding-services container) and any other
+ * client reaches it via HTTP at host.docker.internal:12436. Plan 44-18 finalized
+ * the km-core cutover: the legacy SQLite file at .observations/ is no longer
+ * read or written by any production code path — see .planning/phases/
+ * 44-rest-api-git-snapshots/44-18-AUDIT.md for the migration history.
  *
  * Phase 1 surface (read-only): mirrors system-health-dashboard/server.js handlers.
  *
@@ -31,13 +33,12 @@ import { ObservationConsolidator } from '../src/live-logging/ObservationConsolid
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
 import { ObservationPruner } from '../src/live-logging/ObservationPruner.js';
 import { ColdStoreReader } from '../src/live-logging/ColdStoreReader.js';
-// Phase 44 Plan 13 — obs-api opens its own SQLite handle for the two
-// remaining SQLite consumers (`ObservationPruner` + `RetrievalService`
-// keyword-search FTS5). The writer dropped its SQLite handle in Plan 13;
-// the consolidator (Plan 44-15 deferred) still opens its own handle for
-// the consolidation pipeline. Both keep working independently because
-// SQLite WAL mode allows multiple open connections per process.
-import { openDatabase as openLegacyDb } from '../src/live-logging/SafeDatabase.js';
+// Plan 44-18 — the legacy SQLite handle is gone. ObservationPruner cut to
+// km-core in Plan 44-18 Task 2 (no more direct SQLite reads). RetrievalService
+// freshness-rerank cut to km-core in Plan 44-18 Task 3. KeywordSearch (FTS5
+// over the legacy SQLite file) loses its handle here and degrades silently
+// to [] until that path is also cut to km-core; semantic search via Qdrant
+// continues to dominate /api/retrieve responses.
 // Phase 35 plan 35-04 - pure merge helpers extracted into a sibling module so
 // the Jest integration test can import them without dragging in RetrievalService
 // and its TS dist deps.  Re-exported below for backwards-compatible discovery.
@@ -65,6 +66,10 @@ import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
+// Plan 44-18 Task 5 archive-rename target only. The legacy file is no longer
+// opened by any production code path in this process; this constant is kept
+// so the operator-gated rename in Task 5 has a single canonical source path.
+// Drop in Task 5 cleanup commit once the rename ships.
 const DB_PATH = process.env.OBSERVATIONS_DB_PATH || path.join(REPO_ROOT, '.observations', 'observations.db');
 const PORT = parseInt(process.env.OBSERVATIONS_API_PORT || '12436', 10);
 const HEARTBEAT_PATH = path.join(path.dirname(DB_PATH), 'consolidation-heartbeat.json');
@@ -83,22 +88,11 @@ let _pruneInterval = null;
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
 let _coldStore = null;
 
-// Phase 44 Plan 13 — independent SQLite handle for the pruner + retrieval
-// service. The writer's SQLite handle was dropped in Plan 13; pruner +
-// retrieval still need direct SQLite access (the pruner DELETEs old rows;
-// retrieval uses FTS5 for keyword search). Lazy + idempotent.
-let _legacyDb = null;
-function ensureLegacyDb() {
-  if (_legacyDb) return _legacyDb;
-  try {
-    _legacyDb = openLegacyDb(DB_PATH);
-    process.stderr.write(`[obs-api] legacy SQLite handle opened: ${DB_PATH}\n`);
-  } catch (err) {
-    process.stderr.write(`[obs-api] failed to open legacy SQLite handle: ${err.message}\n`);
-    _legacyDb = null;
-  }
-  return _legacyDb;
-}
+// Plan 44-18 — the legacy SQLite handle has been removed. Pruner + RetrievalService
+// freshness-rerank both cut to km-core in Tasks 2-3. The `DB_PATH` constant above
+// is retained as the Task 5 archive-rename target only (file is archived to
+// `<DB_PATH>.archived.<UTC-YYYY-MM-DD>` in the operator gate). The constant
+// itself is no longer used as a sqlite handle source anywhere in this file.
 
 async function ensureWriter() {
   // Phase 44 Plan 14 — readiness predicate switched from `_writer.db`
@@ -129,7 +123,7 @@ async function ensureWriter() {
 }
 
 // Retrieval service runs in this process (Phase 5: container has zero
-// access to observations.db). Qdrant is reachable via localhost:6333
+// access to the host data store). Qdrant is reachable via localhost:6333
 // (port-mapped from coding-qdrant container).
 let _retrieval = null;
 function ensureRetrieval() {
@@ -137,14 +131,13 @@ function ensureRetrieval() {
   if (!process.env.QDRANT_URL) {
     process.env.QDRANT_URL = 'http://localhost:6333';
   }
-  // Plan 44-18 — retrieval reads insight metadata through km-core
-  // (`kmStoreGetter`). The `dbGetter` is retained until Task 4 drops the
-  // legacy handle entirely; keyword-search (FTS5 over observations) still
-  // uses it transitionally. After Task 4 the dbGetter returns null and
-  // the keyword-search path degrades to []; semantic search via Qdrant
-  // dominates the response.
+  // Plan 44-18 (Task 4) — retrieval reads insight metadata exclusively
+  // through km-core (`kmStoreGetter`). The `dbGetter` is gone with the rest
+  // of the legacy plumbing; KeywordSearch.search() receives `null` and the
+  // _keywordSearch helper short-circuits to [] (graceful degradation —
+  // already the catch in the helper). Semantic search via Qdrant continues
+  // to dominate the /api/retrieve response.
   _retrieval = new RetrievalService({
-    dbGetter: () => ensureLegacyDb(),
     kmStoreGetter: () => (_kmStoreReady ? _kmStore : null),
   });
   // Eager init warms fastembed; fire-and-forget so startup isn't blocked.
@@ -262,10 +255,12 @@ function readConsolidationHeartbeat() {
 
 // ── Consolidation runner state ─────────────────────────────────────────────
 //
-// The consolidator runs IN-PROCESS here (single-owner pattern). It opens its
-// own better-sqlite3 connection to observations.db; multiple connections in
-// the same process share state safely under WAL mode, so this coexists with
-// the writer instance without the Docker bind-mount corruption pattern.
+// The consolidator runs IN-PROCESS here (single-owner pattern). Plan 44-17
+// cut its persistence path to km-core; before that it opened its own
+// better-sqlite3 connection. The single-owner pattern survives the cutover:
+// km-core's GraphKMStore is shared between writer + consolidator + retrieval
+// via `ensureKMStore()` so all three see the same in-memory graph and
+// LevelDB-backed persistence.
 
 let _consolidationPromise = null;
 let _consolidationStartedAt = null;
@@ -1465,7 +1460,7 @@ app.get('/api/coding/insights', async (_req, res) => {
 const _autostart = process.env.OBSERVATIONS_API_NO_AUTOSTART !== '1';
 const server = _autostart
   ? app.listen(PORT, '0.0.0.0', () => {
-      process.stderr.write(`[obs-api] listening on http://0.0.0.0:${PORT} (db: ${DB_PATH})\n`);
+      process.stderr.write(`[obs-api] listening on http://0.0.0.0:${PORT} (km-core data root: ${path.dirname(KG_DB_PATH)})\n`);
       // Warm the writer first (opens DB rw + FTS triggers + WAL), then warm
       // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
       // doesn't pay a multi-second cold start.
@@ -1543,13 +1538,9 @@ async function shutdown(signal) {
       try { _pipelineStatsConsolidator.close(); } catch { /* best effort */ }
       _pipelineStatsConsolidator = null;
     }
-    // Phase 44 Plan 13 — close the obs-api-owned legacy SQLite handle.
-    // SafeDatabase's shutdown hook will checkpoint the WAL; calling close()
-    // here lets readers see the final state without waiting for the hook.
-    if (_legacyDb) {
-      try { _legacyDb.close(); } catch { /* best effort */ }
-      _legacyDb = null;
-    }
+    // Plan 44-18 (Task 4) — the prior legacy SQLite shutdown handler is
+    // gone. Pruner + retrieval-service freshness-rerank are km-core-only;
+    // no sqlite handle remains in this process to close.
     // SIGKILL ourselves to skip Node's native destructor teardown.
     // process.exit(0) triggers the fastembed C++ cleanup path which hits a
     // libc++ mutex bug ("mutex lock failed: Invalid argument") and crashes
