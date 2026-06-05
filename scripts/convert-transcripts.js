@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { parseClaude, parseCopilot, parseSpecstory } from '../src/live-logging/TranscriptNormalizer.js';
-import { ObservationWriter } from '../src/live-logging/ObservationWriter.js';
+import { ObservationApiClient } from '../src/live-logging/ObservationApiClient.js';
 import { SpecstoryBatchConverter } from '../src/live-logging/SpecstoryBatchConverter.js';
 
 const USAGE = `
@@ -90,7 +90,13 @@ async function handleClaude(filePath) {
 
   process.stderr.write(`[convert] Claude: processing ${filePath}\n`);
 
-  const writer = new ObservationWriter();
+  // Plan 44-13: ObservationWriter requires explicit km-core wiring and
+  // would race obs-api on the shared LevelDB lock if instantiated here.
+  // Route through ObservationApiClient → obs-api → single-owner writer.
+  // Default base URL matches the launchd-managed obs-api setup.
+  const writer = new ObservationApiClient({
+    baseUrl: process.env.OBS_API_URL || 'http://localhost:12436',
+  });
   await writer.init();
 
   let totalLines = 0;
@@ -178,7 +184,10 @@ async function handleCopilot(filePath) {
 
   process.stderr.write(`[convert] Copilot: processing ${filePath}\n`);
 
-  const writer = new ObservationWriter();
+  // Plan 44-13: same routing rationale as the claude path above.
+  const writer = new ObservationApiClient({
+    baseUrl: process.env.OBS_API_URL || 'http://localhost:12436',
+  });
   await writer.init();
 
   let totalLines = 0;

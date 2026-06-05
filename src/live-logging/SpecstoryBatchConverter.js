@@ -13,28 +13,43 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseSpecstory } from './TranscriptNormalizer.js';
 import { ObservationWriter } from './ObservationWriter.js';
+import { ObservationApiClient } from './ObservationApiClient.js';
 
 export class SpecstoryBatchConverter {
   /**
    * @param {Object} [options]
    * @param {string} [options.manifestPath] - Path to conversion manifest JSON
    * @param {boolean} [options.force] - Re-process already-converted files
-   * @param {Object} [options.writerOptions] - Options passed to ObservationWriter
+   * @param {Object} [options.writerOptions] - Options passed to ObservationWriter (legacy direct path)
+   * @param {boolean} [options.useApiClient=true] - Route via obs-api HTTP. Default true post-Plan-44-13:
+   *   the direct ObservationWriter requires explicit km-core wiring and would race obs-api on the
+   *   shared LevelDB lock. The HTTP client defaults to http://localhost:12436 (matches launchd
+   *   obs-api setup); set OBS_API_URL env to override.
+   * @param {string} [options.obsApiUrl] - Explicit base URL for ObservationApiClient (overrides env).
    */
   constructor(options = {}) {
     this.manifestPath = options.manifestPath || '.observations/conversion-manifest.json';
     this.force = options.force || false;
     this.writerOptions = options.writerOptions || {};
+    this.useApiClient = options.useApiClient !== false; // default true post-44-13
+    this.obsApiUrl = options.obsApiUrl || process.env.OBS_API_URL || 'http://localhost:12436';
     this.writer = null;
     this.manifest = null;
   }
 
   /**
-   * Initialize the converter: load manifest and create ObservationWriter.
+   * Initialize the converter: load manifest and create the writer.
+   * Post-Plan-44-13 default: ObservationApiClient → obs-api → single-owner km-core writer.
+   * Set `useApiClient: false` + supply `writerOptions.kmStore` or `writerOptions.kmStoreDbPath`
+   * for tests/standalone scenarios.
    */
   async init() {
     this.manifest = this.loadManifest();
-    this.writer = new ObservationWriter(this.writerOptions);
+    if (this.useApiClient) {
+      this.writer = new ObservationApiClient({ baseUrl: this.obsApiUrl });
+    } else {
+      this.writer = new ObservationWriter(this.writerOptions);
+    }
     await this.writer.init();
   }
 
