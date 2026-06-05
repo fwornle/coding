@@ -1172,7 +1172,7 @@ export class ObservationConsolidator {
     const totalProjects = digestsByProject.size;
     process.stderr.write(`[Consolidator] Stage 2/2: synthesizing ${digests.length} digests into insights — ${totalProjects} project(s): ${breakdown}\n`);
 
-    const DIGEST_CHUNK_SIZE = 30;
+    const DIGEST_CHUNK_SIZE = 5;
     const allInsightEntries = [];
 
     let projectIdx = 0;
@@ -1182,6 +1182,16 @@ export class ObservationConsolidator {
       const existingForProject = allExistingInsights.filter(
         i => (i.project || 'unknown') === project
       );
+
+      // Pre-tokenize every existing insight once. With 30+ insights summing to
+      // ~30k+ tokens, passing them all into every chunk pegs the prompt at
+      // ~38k input and pushes the response past max_tokens — chunks return
+      // empty content. Topical filter picks ~10 relevant ones per chunk.
+      const existingTokens = existingForProject.map(i => ({
+        ref: i,
+        tokens: this._tokenize(`${i.topic} ${i.summary}`),
+      }));
+      const RELEVANT_K = 10;
 
       const digestChunks = [];
       for (let i = 0; i < projDigests.length; i += DIGEST_CHUNK_SIZE) {
@@ -1196,11 +1206,21 @@ export class ObservationConsolidator {
           `[${d.date}] ${d.theme}\n${d.summary}`
         ).join('\n\n---\n\n');
 
-        // Combine DB insights for this project with insights produced in
-        // earlier chunks of the same project run, so the LLM keeps merging
-        // duplicates instead of restating them.
+        // Score existing insights by topical overlap with this chunk's
+        // digests. Insights produced in earlier chunks of the same project
+        // run are kept whole (small set) so the LLM still sees them and
+        // can merge into them rather than restate.
+        const chunkTokens = this._tokenize(
+          chunk.map(d => `${d.theme} ${d.summary}`).join(' ')
+        );
+        const relevantExisting = existingTokens
+          .map(e => ({ entry: e.ref, score: this._jaccard(chunkTokens, e.tokens) }))
+          .filter(e => e.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, RELEVANT_K)
+          .map(e => ({ topic: e.entry.topic, summary: e.entry.summary }));
         const currentInsights = [
-          ...existingForProject.map(i => ({ topic: i.topic, summary: i.summary })),
+          ...relevantExisting,
           ...projectInsightEntries,
         ];
         const existingBlock = currentInsights.length > 0
