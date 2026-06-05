@@ -407,9 +407,15 @@ function runConsolidation(options = {}) {
 
   _consolidationAbort = new AbortController();
   _consolidationPromise = (async () => {
+    // Phase 44 Plan 17: consolidator is km-core-native. Share obs-api's
+    // GraphKMStore instance so reads + writes go through the same store
+    // the writer + typed-view handlers use (single-owner pattern from
+    // ObservationWriter Plan 44-13).
+    const kmStore = await ensureKMStore();
     const consolidator = new ObservationConsolidator({
       dbPath: DB_PATH,
       abortSignal: _consolidationAbort.signal,
+      kmStore,
     });
     try {
       await consolidator.init();
@@ -911,7 +917,10 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
   _resynthesizeInflight = true;
   const startedAt = Date.now();
 
-  const consolidator = new ObservationConsolidator({ dbPath: DB_PATH });
+  // Phase 44 Plan 17: share obs-api's km-core store with the resynthesize
+  // path (same single-owner pattern as the main consolidator).
+  const kmStoreForResynth = await ensureKMStore();
+  const consolidator = new ObservationConsolidator({ dbPath: DB_PATH, kmStore: kmStoreForResynth });
   try {
     await consolidator.init();
     const updated = await consolidator.resynthesizeInsight(id);
@@ -1074,46 +1083,38 @@ app.get('/api/consolidation/status', async (_req, res) => {
       _stalenessCache.get(store),
     ]);
 
-    // Pipeline stats from the consolidator's own SQLite handle. The
-    // consolidator is module-scope cached (`_pipelineStatsConsolidator`)
-    // so the dashboard's ~10s polling doesn't re-init on every call —
-    // see the cache declaration near the top of this file. First call
-    // pays the init cost; subsequent calls reuse the handle. Shutdown
-    // closes it in the SIGTERM/SIGINT handler. Wrapped in try/catch with
-    // safe defaults so a missing observations.db (post-Plan-44-15 archive)
-    // returns zeros instead of a 503 — the dashboard staleness clock
-    // keeps rendering.
+    // Phase 44 Plan 17: pipeline stats now route through km-core's
+    // countByOntologyClass instead of a cached SQLite-backed consolidator.
+    // The `_pipelineStatsConsolidator` cache + close path below are dead
+    // code post-cutover (left in place so the SIGTERM handler is a no-op
+    // when null). km-core's GraphKMStore is a process-wide singleton
+    // via `ensureKMStore()` — no per-call init cost.
+    // Wrapped in try/catch with safe defaults so a missing km-core store
+    // returns zeros instead of a 503.
     let undigested = 0;
     let pendingPast = 0;
     let pendingToday = 0;
     let lowQuality = 0;
     try {
-      if (!_pipelineStatsConsolidator) {
-        if (!_pipelineStatsConsolidatorInit) {
-          _pipelineStatsConsolidatorInit = (async () => {
-            const c = new ObservationConsolidator({ dbPath: DB_PATH });
-            await c.init();
-            _pipelineStatsConsolidator = c;
-          })().catch((err) => {
-            // Reset the promise so the NEXT call retries. If init keeps
-            // failing the caller logs each attempt — bounded by request
-            // rate, not by an unbounded log loop.
-            _pipelineStatsConsolidatorInit = null;
-            throw err;
-          });
-        }
-        await _pipelineStatsConsolidatorInit;
-      }
+      // Phase 44 Plan 17: pipeline-stats counts via km-core countByOntologyClass
+      // (predicate form). The previous SQLite path used 4 indexed COUNT(*)
+      // queries; km-core's countByOntologyClass scans the Observation class
+      // once per call with a predicate filter. At ~4k entities the 4 calls
+      // sum to a few ms — acceptable for a /consolidation/status response.
       const today = new Date().toISOString().split('T')[0];
-      const cdb = _pipelineStatsConsolidator?.db;
-      if (cdb) {
-        try {
-          undigested = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low'").get().cnt;
-          lowQuality = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality = 'low'").get().cnt;
-          pendingPast = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) < ?").get(today).cnt;
-          pendingToday = cdb.prepare("SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL AND quality != 'low' AND date(created_at) = ?").get(today).cnt;
-        } catch { /* digested_at column may not exist on a fresh DB */ }
-      }
+      try {
+        const kmStoreForStats = await ensureKMStore();
+        const isUndigested = e => !(e.metadata?.digested_at);
+        const isLow = e => e.metadata?.quality === 'low';
+        const isNotLow = e => e.metadata?.quality !== 'low';
+        const dayPrefix = e => (typeof e.metadata?.createdAt === 'string' ? e.metadata.createdAt.slice(0, 10) : '');
+        [undigested, lowQuality, pendingPast, pendingToday] = await Promise.all([
+          kmStoreForStats.countByOntologyClass('Observation', { predicate: e => isUndigested(e) && isNotLow(e) }),
+          kmStoreForStats.countByOntologyClass('Observation', { predicate: e => isUndigested(e) && isLow(e) }),
+          kmStoreForStats.countByOntologyClass('Observation', { predicate: e => isUndigested(e) && isNotLow(e) && dayPrefix(e) < today }),
+          kmStoreForStats.countByOntologyClass('Observation', { predicate: e => isUndigested(e) && isNotLow(e) && dayPrefix(e) === today }),
+        ]);
+      } catch { /* km-core unavailable — leave counters at 0 */ }
     } catch (consolidatorErr) {
       // Consolidator init failure is non-fatal — the dashboard sees the
       // km-core counts + staleness clock; pipeline stats remain zero.

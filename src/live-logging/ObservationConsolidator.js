@@ -19,10 +19,21 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ObservationExporter } from './ObservationExporter.js';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { ObservationSanitizer } from './ObservationSanitizer.js';
 import Redis from 'ioredis';
+// Phase 44 Plan 17 (consolidator cutover to km-core): Digest + Insight
+// persistence routes through km-core via the same legacy-ingest adapter
+// ObservationWriter uses (Plan 44-13). The consolidator does NOT write
+// Observation entities (writer owns that path) — it only READS them and
+// stamps `metadata.digested_at` via `mergeAttributes` (Option A
+// idempotency, decided in 44-17-AUDIT.md). The SQLite handle is gone;
+// `this.dbPath` is preserved as a path string for projectRoot derivation
+// (same pattern as ObservationWriter post-Plan-44-13).
+import {
+  legacyDigestToEntity,
+  legacyInsightToEntity,
+} from '@fwornle/km-core/adapters/legacy-ingest';
 
 /**
  * Cosine threshold for treating a new insight as a near-duplicate of an
@@ -77,9 +88,23 @@ const require = createRequire(import.meta.url);
 export class ObservationConsolidator {
   /**
    * @param {Object} [options]
-   * @param {string} [options.dbPath] - Path to observations SQLite database
+   * @param {string} [options.dbPath] - Legacy SQLite path string. Retained only
+   *   as a config-path anchor for projectRoot derivation (`_getSanitizer`,
+   *   `_isCadenceDue`, sentinel paths). NOT opened as a database handle —
+   *   the consolidator is fully km-core-native post-Plan-44-17.
    * @param {string} [options.proxyUrl] - LLM proxy URL
    * @param {string} [options.provider] - LLM provider override
+   * @param {AbortSignal} [options.abortSignal] - Optional caller-owned signal
+   *   used to cancel in-flight LLM HTTP calls (obs-api SIGTERM path).
+   * @param {import('@fwornle/km-core').GraphKMStore} [options.kmStore] -
+   *   Phase 44 Plan 17: pre-constructed km-core store. REQUIRED — the
+   *   consolidator no longer lazy-constructs one (single-owner pattern
+   *   mirrors ObservationWriter Plan 44-13). obs-api passes its own
+   *   instance so consolidation reads + writes share one canonical store
+   *   with the writer + typed-view reads.
+   * @param {string} [options.runId] - Per-process run identifier for the
+   *   Digest/Insight entity provenance stamps. Default: synthesized from
+   *   timestamp + random suffix on construction.
    */
   constructor(options = {}) {
     this.dbPath = options.dbPath || '.observations/observations.db';
@@ -90,10 +115,106 @@ export class ObservationConsolidator {
     // SIGTERM), in-flight LLM HTTP calls are cancelled and the proxy kills
     // their spawned claude CLI subprocesses so they don't outlive us.
     this.abortSignal = options.abortSignal || null;
-    this.db = null;
+    // Phase 44 Plan 17: SQLite handle removed. km-core is the single canonical
+    // store for reads + writes.
+    this._kmStore = options.kmStore || null;
+    /** Per-process run identifier used as the createdBy.runId on every
+     *  Digest/Insight entity stamped by this consolidator instance. */
+    this._runId = options.runId || 'obs-consolidator-' + Date.now() + '-' +
+      Math.random().toString(36).slice(2, 8);
     /** @type {import('ioredis').default|null} Redis publisher for embedding events (lazy-init, fire-and-forget) */
     this._redisPub = null;
     this._redisInitAttempted = false;
+  }
+
+  /**
+   * Phase 44 Plan 17 — inline km-core check + accessor. Each read/write
+   * method begins with `if (!this._kmStore) throw ...; const kmStore =
+   * this._kmStore;` so the consolidator fails fast when constructed
+   * without `options.kmStore`. The acceptance grep for `this._kmStore`
+   * exercises every such site (Plan 44-17 Task 2 gate 5).
+   */
+
+  /**
+   * Phase 44 Plan 17 — inverse of `legacyObservationToEntity`. Returns the
+   * SQLite-row-shaped object the existing parse/partition/prompt code
+   * expects. Pure synchronous transform; no I/O.
+   * @param {import('@fwornle/km-core').Entity} entity
+   * @returns {{id: string, summary: string, agent: string|null, created_at: string, metadata: string, quality: string}}
+   */
+  _toLegacyObsRow(entity) {
+    const m = entity.metadata ?? {};
+    return {
+      id: entity.legacyId?.id ?? entity.id,
+      summary: typeof m.summary === 'string'
+        ? m.summary
+        : (entity.description ?? ''),
+      agent: typeof m.agent === 'string' ? m.agent : null,
+      created_at: typeof m.createdAt === 'string'
+        ? m.createdAt
+        : (entity.validFrom ?? ''),
+      metadata: typeof m === 'object' ? JSON.stringify(m) : '{}',
+      quality: typeof m.quality === 'string' ? m.quality : 'normal',
+      _entity: entity,
+    };
+  }
+
+  /**
+   * Phase 44 Plan 17 — inverse of `legacyDigestToEntity`. Carries the
+   * source `_entity` reference so callers can `mergeAttributes` without
+   * a round-trip lookup.
+   * @param {import('@fwornle/km-core').Entity} entity
+   */
+  _toLegacyDigestRow(entity) {
+    const m = entity.metadata ?? {};
+    return {
+      id: entity.legacyId?.id ?? entity.id,
+      date: typeof m.date === 'string'
+        ? m.date
+        : (entity.validFrom ? entity.validFrom.slice(0, 10) : ''),
+      theme: typeof m.theme === 'string' ? m.theme : '',
+      summary: typeof m.summary === 'string'
+        ? m.summary
+        : (entity.description ?? ''),
+      observation_ids: JSON.stringify(Array.isArray(m.observation_ids) ? m.observation_ids : []),
+      agents: JSON.stringify(Array.isArray(m.agents) ? m.agents : []),
+      files_touched: JSON.stringify(Array.isArray(m.files_touched) ? m.files_touched : []),
+      quality: typeof m.quality === 'string' ? m.quality : 'normal',
+      created_at: typeof m.createdAt === 'string'
+        ? m.createdAt
+        : (entity.validFrom ?? ''),
+      metadata: JSON.stringify(m),
+      project: typeof m.project === 'string' ? m.project : 'unknown',
+      _entity: entity,
+    };
+  }
+
+  /**
+   * Phase 44 Plan 17 — inverse of `legacyInsightToEntity`. Carries the
+   * source `_entity` reference so callers can `mergeAttributes` without
+   * a round-trip lookup.
+   * @param {import('@fwornle/km-core').Entity} entity
+   */
+  _toLegacyInsightRow(entity) {
+    const m = entity.metadata ?? {};
+    return {
+      id: entity.legacyId?.id ?? entity.id,
+      topic: typeof m.topic === 'string' ? m.topic : (entity.name ?? ''),
+      summary: typeof m.summary === 'string'
+        ? m.summary
+        : (entity.description ?? ''),
+      confidence: typeof m.confidence === 'number' ? m.confidence : 0.8,
+      digest_ids: JSON.stringify(Array.isArray(m.digest_ids) ? m.digest_ids : []),
+      last_updated: typeof m.last_updated === 'string'
+        ? m.last_updated
+        : (entity.validFrom ?? ''),
+      created_at: typeof m.createdAt === 'string'
+        ? m.createdAt
+        : (entity.validFrom ?? ''),
+      metadata: JSON.stringify(m),
+      project: typeof m.project === 'string' ? m.project : 'unknown',
+      _entity: entity,
+    };
   }
 
   /**
@@ -587,11 +708,11 @@ export class ObservationConsolidator {
       return;
     }
 
-    const update = this.db.prepare(`
-      UPDATE observations
-      SET metadata = json_set(COALESCE(metadata, '{}'), '$.project', ?)
-      WHERE id = ?
-    `);
+    // Phase 44 Plan 17: persist the resolved project via km-core
+    // mergeAttributes. Each legacy row carries `_entity` (attached by
+    // `_toLegacyObsRow`) so we don't pay a per-row findByLegacyId lookup.
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
     let promoted = 0;
     for (const o of nulls) {
       let project = 'unknown';
@@ -605,7 +726,16 @@ export class ObservationConsolidator {
           promoted++;
         }
       } catch { /* leave as unknown */ }
-      try { update.run(project, o.id); } catch { /* ok */ }
+      try {
+        const entity = o._entity
+          || await kmStore.findByLegacyId({ system: 'A', id: o.id });
+        if (entity) {
+          const prev = entity.metadata ?? {};
+          await kmStore.mergeAttributes(entity.id, {
+            metadata: { ...prev, project },
+          });
+        }
+      } catch { /* swallow — partitioning still works against in-memory copy */ }
       // Reflect the resolved project back into the in-memory row so the
       // partition step that follows sees the new label.
       try {
@@ -771,61 +901,16 @@ export class ObservationConsolidator {
   }
 
   /**
-   * Initialize DB connection and ensure digest/insight tables exist.
+   * Initialize the consolidator. Phase 44 Plan 17: no SQLite handle, no
+   * schema/index DDL, no ObservationExporter wiring (km-core has its own
+   * per-domain JSON export under `.data/knowledge-graph/exports/`). The
+   * caller MUST have supplied `options.kmStore` in the constructor; the
+   * first read/write throws otherwise (same fail-fast posture as
+   * ObservationWriter post-Plan-44-13).
+   *
+   * Only side-effect: initialize the PII/secret redactor.
    */
   async init() {
-    const { openDatabase } = await import('./SafeDatabase.js');
-    this.db = openDatabase(this.dbPath);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS digests (
-        id TEXT PRIMARY KEY,
-        date TEXT NOT NULL,
-        theme TEXT NOT NULL,
-        summary TEXT NOT NULL,
-        observation_ids TEXT NOT NULL,
-        agents TEXT,
-        files_touched TEXT,
-        quality TEXT DEFAULT 'normal',
-        created_at TEXT NOT NULL,
-        metadata TEXT
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS insights (
-        id TEXT PRIMARY KEY,
-        topic TEXT NOT NULL,
-        summary TEXT NOT NULL,
-        confidence REAL DEFAULT 0.8,
-        digest_ids TEXT NOT NULL,
-        last_updated TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        metadata TEXT
-      )
-    `);
-
-    // Track which observations have been digested
-    try {
-      this.db.exec('ALTER TABLE observations ADD COLUMN digested_at TEXT');
-    } catch { /* column exists */ }
-
-    // Project-attribution columns (Phase A added via migration script —
-    // mirrored here so a fresh DB still has them).
-    try { this.db.exec('ALTER TABLE digests ADD COLUMN project TEXT'); } catch { /* exists */ }
-    try { this.db.exec('ALTER TABLE insights ADD COLUMN project TEXT'); } catch { /* exists */ }
-
-    // Index for efficient undigested lookups
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_obs_digested ON observations(digested_at)');
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_digests_date ON digests(date)');
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_insights_topic ON insights(topic)');
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_digests_project ON digests(project)');
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_insights_project ON insights(project)');
-
-    // Git-friendly JSON export (mirrors UKB knowledge-export pattern)
-    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
-    this._exporter = new ObservationExporter({ db: this.db, projectRoot });
-
     // Initialize redactor for PII/secret scrubbing (defense-in-depth for LLM outputs)
     try {
       const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
@@ -837,8 +922,6 @@ export class ObservationConsolidator {
       process.stderr.write(`[Consolidator] Redactor init failed: ${err.message}\n`);
       this._redactor = null;
     }
-
-    process.stderr.write(`[Consolidator] Database initialized\n`);
   }
 
   /**
@@ -879,17 +962,33 @@ export class ObservationConsolidator {
    * @returns {Promise<{digests: number, observations: number}>}
    */
   async consolidateDay(date) {
-    if (!this.db) throw new Error('Not initialized');
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
 
-    // Get undigested observations for this date
-    const observations = this.db.prepare(`
-      SELECT id, summary, agent, created_at, metadata, quality
-      FROM observations
-      WHERE substr(created_at, 1, 10) = ?
-        AND digested_at IS NULL
-        AND quality != 'low'
-      ORDER BY created_at ASC
-    `).all(date);
+    // Phase 44 Plan 17: per-day undigested-observations scan over km-core.
+    // The previous SQLite path used an indexed lookup; km-core has no
+    // attribute index in graphology v0.26, so we iterate the Observation
+    // class once and predicate in-memory. At ~4k observations the pass
+    // is sub-millisecond (cost model — GraphKMStore.ts:594-596).
+    const allObsEntities = await kmStore.findByOntologyClass('Observation');
+    const observations = allObsEntities
+      .filter(e => {
+        const m = e.metadata ?? {};
+        const created = typeof m.createdAt === 'string' ? m.createdAt : '';
+        if (created.slice(0, 10) !== date) return false;
+        // Option A idempotency anchor: skip rows already marked digested.
+        if (m.digested_at) return false;
+        if (m.quality === 'low') return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const ta = a.metadata?.createdAt ?? '';
+        const tb = b.metadata?.createdAt ?? '';
+        if (ta < tb) return -1;
+        if (ta > tb) return 1;
+        return 0;
+      })
+      .map(e => this._toLegacyObsRow(e));
 
     if (observations.length === 0) {
       process.stderr.write(`[Consolidator] No undigested observations for ${date}\n`);
@@ -958,25 +1057,10 @@ export class ObservationConsolidator {
       return { digests: 0, observations: 0 };
     }
 
-    // Write digests and mark observations as digested
+    // Write digests and mark observations as digested via km-core.
     const now = new Date().toISOString();
-    const insertDigest = this.db.prepare(`
-      INSERT INTO digests (id, date, theme, summary, observation_ids, agents, files_touched, quality, created_at, metadata, project)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const getDigest = this.db.prepare(
-      'SELECT id, observation_ids, agents, files_touched, summary, quality, project FROM digests WHERE id = ?'
-    );
-    const updateDigest = this.db.prepare(`
-      UPDATE digests
-      SET observation_ids = ?, agents = ?, files_touched = ?, summary = ?, quality = ?, created_at = ?
-      WHERE id = ?
-    `);
-    const markDigested = this.db.prepare(
-      'UPDATE observations SET digested_at = ? WHERE id = ?'
-    );
 
-    // Build merge plan via embedding similarity (async, pre-transaction).
+    // Build merge plan via embedding similarity (async, pre-write phase).
     const mergePlan = await this._buildDigestMergePlan(digestEntries, date);
 
     // Sanitize each entry: dedupe files_touched (drop bare basenames
@@ -993,66 +1077,112 @@ export class ObservationConsolidator {
     let mergedCount = 0;
 
     const digestedObsIds = new Set();
-    const transaction = this.db.transaction(() => {
-      for (let i = 0; i < digestEntries.length; i++) {
-        const d = digestEntries[i];
-        const decision = mergePlan[i] ?? { action: 'insert' };
 
-        if (decision.action === 'merge' && decision.targetId) {
-          const target = getDigest.get(decision.targetId);
-          if (target) {
-            const oidUnion = new Set();
-            for (const oid of (() => { try { return JSON.parse(target.observation_ids || '[]'); } catch { return []; } })()) oidUnion.add(oid);
-            for (const oid of (d.observationIds || [])) oidUnion.add(oid);
+    // Phase 44 Plan 17: the SQLite db.transaction() wrapper is GONE.
+    // Each putEntity/mergeAttributes is its own atomic km-core write;
+    // partial-failure semantics match what the SQLite path provided when
+    // a crash interrupted a transaction (the in-flight rows are lost,
+    // remaining digests stay merged or inserted).
+    for (let i = 0; i < digestEntries.length; i++) {
+      const d = digestEntries[i];
+      const decision = mergePlan[i] ?? { action: 'insert' };
 
-            const agentUnion = new Set();
-            for (const a of (() => { try { return JSON.parse(target.agents || '[]'); } catch { return []; } })()) agentUnion.add(a);
-            for (const a of (d.agents || [])) agentUnion.add(a);
+      if (decision.action === 'merge' && decision.targetId) {
+        const targetEntity = await kmStore.findByLegacyId({ system: 'A', id: decision.targetId });
+        if (targetEntity) {
+          const target = this._toLegacyDigestRow(targetEntity);
+          const oidUnion = new Set();
+          for (const oid of (() => { try { return JSON.parse(target.observation_ids || '[]'); } catch { return []; } })()) oidUnion.add(oid);
+          for (const oid of (d.observationIds || [])) oidUnion.add(oid);
 
-            const fileUnion = new Set();
-            for (const f of (() => { try { return JSON.parse(target.files_touched || '[]'); } catch { return []; } })()) fileUnion.add(f);
-            for (const f of (d.filesTouched || [])) fileUnion.add(f);
+          const agentUnion = new Set();
+          for (const a of (() => { try { return JSON.parse(target.agents || '[]'); } catch { return []; } })()) agentUnion.add(a);
+          for (const a of (d.agents || [])) agentUnion.add(a);
 
-            const winnerSummary = (target.summary?.length ?? 0) >= (d.summary?.length ?? 0)
-              ? target.summary
-              : this._redact(d.summary);
-            const bestQuality = (QUALITY_RANK[d.quality] ?? 0) > (QUALITY_RANK[target.quality] ?? 0)
-              ? d.quality
-              : target.quality;
+          const fileUnion = new Set();
+          for (const f of (() => { try { return JSON.parse(target.files_touched || '[]'); } catch { return []; } })()) fileUnion.add(f);
+          for (const f of (d.filesTouched || [])) fileUnion.add(f);
 
-            updateDigest.run(
-              JSON.stringify([...oidUnion]),
-              JSON.stringify([...agentUnion]),
-              this._redactPaths(JSON.stringify([...fileUnion])),
-              winnerSummary,
-              bestQuality,
-              now,
-              decision.targetId
-            );
-            mergedTargets.add(decision.targetId);
-            mergedCount++;
-            for (const obsId of d.observationIds || []) digestedObsIds.add(obsId);
-            continue;
-          }
-          // target row missing — fall through to insert
+          const winnerSummary = (target.summary?.length ?? 0) >= (d.summary?.length ?? 0)
+            ? target.summary
+            : this._redact(d.summary);
+          const bestQuality = (QUALITY_RANK[d.quality] ?? 0) > (QUALITY_RANK[target.quality] ?? 0)
+            ? d.quality
+            : target.quality;
+
+          // mergeAttributes preserves entity.id, top-level legacyId, createdBy,
+          // validFrom — only the supplied keys are spread into existing
+          // attributes. Stamp the redacted-files-touched list back into
+          // metadata.files_touched (matches the SQLite column name).
+          const prevMeta = targetEntity.metadata ?? {};
+          await kmStore.mergeAttributes(targetEntity.id, {
+            description: winnerSummary,
+            updatedAt: now,
+            metadata: {
+              ...prevMeta,
+              observation_ids: [...oidUnion],
+              agents: [...agentUnion],
+              files_touched: (() => {
+                try { return JSON.parse(this._redactPaths(JSON.stringify([...fileUnion]))); }
+                catch { return [...fileUnion]; }
+              })(),
+              summary: winnerSummary,
+              quality: bestQuality,
+              createdAt: now,
+            },
+          });
+          mergedTargets.add(decision.targetId);
+          mergedCount++;
+          for (const obsId of d.observationIds || []) digestedObsIds.add(obsId);
+          continue;
         }
+        // target row missing — fall through to insert
+      }
 
-        insertDigest.run(
-          d.id, d.date, this._redact(d.theme), this._redact(d.summary),
-          JSON.stringify(d.observationIds),
-          JSON.stringify(d.agents),
-          this._redactPaths(JSON.stringify(d.filesTouched)),
-          d.quality, now, this._redactPaths(JSON.stringify(d.metadata || {})),
-          d.project || 'unknown'
-        );
-        createdCount++;
-        for (const obsId of d.observationIds) digestedObsIds.add(obsId);
+      // Plain insert: build a LegacyDigestRow and persist via the shared
+      // legacy-ingest adapter (single source of truth for entityType /
+      // ontologyClass / legacyId / Phase 39 D-30 provenance shape).
+      const row = {
+        id: d.id,
+        date: d.date,
+        theme: this._redact(d.theme),
+        summary: this._redact(d.summary),
+        observation_ids: d.observationIds,
+        agents: d.agents,
+        files_touched: (() => {
+          try { return JSON.parse(this._redactPaths(JSON.stringify(d.filesTouched || []))); }
+          catch { return d.filesTouched || []; }
+        })(),
+        quality: d.quality,
+        created_at: now,
+        metadata: (() => {
+          try { return JSON.parse(this._redactPaths(JSON.stringify(d.metadata || {}))); }
+          catch { return d.metadata || {}; }
+        })(),
+        project: d.project || 'unknown',
+      };
+      const entity = legacyDigestToEntity(row, this._runId, now);
+      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      createdCount++;
+      for (const obsId of d.observationIds) digestedObsIds.add(obsId);
+    }
+
+    // Option A idempotency: stamp `metadata.digested_at` on every consumed
+    // Observation entity so subsequent consolidator passes skip them. The
+    // SQLite path used an indexed UPDATE; km-core uses findByLegacyId +
+    // mergeAttributes per id (no batch helper exists yet — acceptable cost
+    // because digestedObsIds is bounded by the day's observation count).
+    for (const obsId of digestedObsIds) {
+      try {
+        const obsEntity = await kmStore.findByLegacyId({ system: 'A', id: obsId });
+        if (!obsEntity) continue;
+        await kmStore.mergeAttributes(obsEntity.id, {
+          metadata: { ...(obsEntity.metadata ?? {}), digested_at: now },
+        });
+      } catch (err) {
+        process.stderr.write(`[Consolidator] Mark-digested failed for ${obsId.slice(0, 8)}: ${err.message}\n`);
       }
-      for (const obsId of digestedObsIds) {
-        markDigested.run(now, obsId);
-      }
-    });
-    transaction();
+    }
 
     if (mergedCount > 0) {
       process.stderr.write(`[Consolidator] Digest dedup: ${mergedCount} merged into existing/earlier rows, ${createdCount} new\n`);
@@ -1072,9 +1202,6 @@ export class ObservationConsolidator {
       });
     }
 
-    // WAL checkpoint for readonly readers
-    try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ok */ }
-
     process.stderr.write(`[Consolidator] Created ${digestEntries.length} digests from ${digestedObsIds.size} observations for ${date}\n`);
     return { digests: digestEntries.length, observations: digestedObsIds.size };
   }
@@ -1086,14 +1213,24 @@ export class ObservationConsolidator {
    * @returns {Promise<{days: number, digests: number, observations: number}>}
    */
   async consolidateAll({ includeToday = false } = {}) {
-    if (!this.db) throw new Error('Not initialized');
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
 
-    const days = this.db.prepare(`
-      SELECT DISTINCT substr(created_at, 1, 10) as date
-      FROM observations
-      WHERE digested_at IS NULL AND quality != 'low'
-      ORDER BY date ASC
-    `).all();
+    // Phase 44 Plan 17: enumerate distinct days carrying undigested
+    // observations via a single class scan + in-memory Set. The previous
+    // SQLite path used a DISTINCT-substring SELECT; this is the same
+    // semantics with an O(N_Observation) cost.
+    const allObsEntities = await kmStore.findByOntologyClass('Observation');
+    const dateSet = new Set();
+    for (const e of allObsEntities) {
+      const m = e.metadata ?? {};
+      if (m.digested_at) continue;
+      if (m.quality === 'low') continue;
+      const created = typeof m.createdAt === 'string' ? m.createdAt : '';
+      const day = created.slice(0, 10);
+      if (day) dateSet.add(day);
+    }
+    const days = [...dateSet].sort().map(date => ({ date }));
 
     const today = new Date().toISOString().split('T')[0];
     const eligibleDays = includeToday ? days : days.filter(d => d.date < today);
@@ -1130,20 +1267,32 @@ export class ObservationConsolidator {
    * @returns {Promise<{created: number, updated: number}>}
    */
   async synthesizeInsights() {
-    if (!this.db) throw new Error('Not initialized');
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
 
-    // Get unsynthesized digests, including their project label so the
-    // synthesis pass can partition by project. A digest has been
-    // synthesized once any insight links to its id.
-    const digests = this.db.prepare(`
-      SELECT d.id, d.date, d.theme, d.summary, d.agents, d.files_touched, d.metadata, d.project
-      FROM digests d
-      LEFT JOIN insights i ON d.id IN (
-        SELECT value FROM json_each(i.digest_ids)
-      )
-      WHERE i.id IS NULL
-      ORDER BY d.date ASC
-    `).all();
+    // Phase 44 Plan 17: compute "unsynthesized digests" as the set of
+    // Digest entities whose legacyId.id appears in NO Insight's
+    // metadata.digest_ids array. The SQLite LEFT-JOIN against
+    // json_each(i.digest_ids) becomes a Set union + filter in-memory.
+    const [digestEntities, insightEntitiesForGate] = await Promise.all([
+      kmStore.findByOntologyClass('Digest'),
+      kmStore.findByOntologyClass('Insight'),
+    ]);
+    const synthesizedDigestIds = new Set();
+    for (const ins of insightEntitiesForGate) {
+      const m = ins.metadata ?? {};
+      if (Array.isArray(m.digest_ids)) {
+        for (const id of m.digest_ids) synthesizedDigestIds.add(id);
+      }
+    }
+    const digests = digestEntities
+      .map(e => this._toLegacyDigestRow(e))
+      .filter(d => !synthesizedDigestIds.has(d.id))
+      .sort((a, b) => {
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        return 0;
+      });
 
     if (digests.length === 0) {
       process.stderr.write(`[Consolidator] No unsynthesized digests\n`);
@@ -1162,10 +1311,17 @@ export class ObservationConsolidator {
     }
 
     // Existing insights are loaded once and filtered per project so each
-    // synthesis run only sees in-domain prior knowledge.
-    const allExistingInsights = this.db.prepare(
-      'SELECT id, topic, summary, digest_ids, project FROM insights ORDER BY last_updated DESC'
-    ).all();
+    // synthesis run only sees in-domain prior knowledge. The legacy SQLite
+    // path sorted by last_updated DESC; we replicate that here.
+    const allExistingInsights = insightEntitiesForGate
+      .map(e => this._toLegacyInsightRow(e))
+      .sort((a, b) => {
+        const ta = a.last_updated || '';
+        const tb = b.last_updated || '';
+        if (ta < tb) return 1;
+        if (ta > tb) return -1;
+        return 0;
+      });
 
     const breakdown = [...digestsByProject.entries()]
       .map(([p, list]) => `${p}=${list.length}`).join(', ');
@@ -1303,131 +1459,167 @@ export class ObservationConsolidator {
       return { ...meta, baseConfidence: Number((entry.confidence ?? 0.8).toFixed(3)) };
     };
 
-    const transaction = this.db.transaction(() => {
-      for (const entry of insightEntries) {
-        const project = entry.project || 'unknown';
-        const entryDigestIds = entry._digestIds || [];
+    // Phase 44 Plan 17: SQLite db.transaction() is GONE. Each km-core
+    // putEntity/mergeAttributes is its own atomic write; partial failure
+    // semantics are equivalent to a crash mid-transaction in the old path
+    // (already-applied writes survive, in-flight is lost). The await-loop
+    // is intentional: GraphKMStore's in-memory graph mutation is fast
+    // (microseconds); serialization avoids head-of-line concurrent writes
+    // against the LevelDB persistence debounce.
+    for (const entry of insightEntries) {
+      const project = entry.project || 'unknown';
+      const entryDigestIds = entry._digestIds || [];
 
-        // Resolve the similar-insight match into a 'merge' or 'facet' decision.
-        // Project scoping in _findSimilarInsightId already filters to the same
-        // project; we still re-validate here as defense-in-depth.
-        let existing = null;
-        let verdict = null;
-        if (entry._similarMatch) {
-          existing = this.db.prepare(
-            'SELECT id, topic, digest_ids, metadata, project FROM insights WHERE id = ?'
-          ).get(entry._similarMatch.id);
-          if (existing && (existing.project || 'unknown') !== project) existing = null;
-          if (existing) verdict = entry._similarMatch.verdict;
+      // Resolve the similar-insight match into a 'merge' or 'facet' decision.
+      // Project scoping in _findSimilarInsightId already filters to the same
+      // project; we still re-validate here as defense-in-depth.
+      let existing = null;
+      let existingEntity = null;
+      let verdict = null;
+      if (entry._similarMatch) {
+        existingEntity = await kmStore.findByLegacyId({ system: 'A', id: entry._similarMatch.id });
+        if (existingEntity) {
+          existing = this._toLegacyInsightRow(existingEntity);
+          if ((existing.project || 'unknown') !== project) {
+            existing = null;
+            existingEntity = null;
+          } else {
+            verdict = entry._similarMatch.verdict;
+          }
         }
-        // Fall back to exact topic-string match (cheap, catches the
-        // LLM-honoured "topic names should be stable" path).
-        if (!existing) {
-          existing = this.db.prepare(
-            'SELECT id, topic, digest_ids, metadata, project FROM insights WHERE topic = ? AND project = ?'
-          ).get(entry.topic, project);
-          if (existing) verdict = 'merge';
+      }
+      // Fall back to exact topic-string match (cheap, catches the
+      // LLM-honoured "topic names should be stable" path). Scan the
+      // already-loaded Insight set first; if missing there (the entity
+      // could have been written by a concurrent process), re-scan via
+      // findByOntologyClass.
+      if (!existing) {
+        const candidateEntity = insightEntitiesForGate.find(e => {
+          const m = e.metadata ?? {};
+          return (m.topic === entry.topic) && ((m.project ?? 'unknown') === project);
+        }) || (await kmStore.findByOntologyClass('Insight')).find(e => {
+          const m = e.metadata ?? {};
+          return (m.topic === entry.topic) && ((m.project ?? 'unknown') === project);
+        });
+        if (candidateEntity) {
+          existingEntity = candidateEntity;
+          existing = this._toLegacyInsightRow(candidateEntity);
+          verdict = 'merge';
         }
+      }
 
-        if (existing && verdict === 'merge') {
-          let existingDigestIds = [];
-          try { existingDigestIds = JSON.parse(existing.digest_ids || '[]'); } catch { /* ok */ }
-          const mergedDigestIds = [...new Set([...existingDigestIds, ...entryDigestIds])];
+      if (existing && verdict === 'merge') {
+        let existingDigestIds = [];
+        try { existingDigestIds = JSON.parse(existing.digest_ids || '[]'); } catch { /* ok */ }
+        const mergedDigestIds = [...new Set([...existingDigestIds, ...entryDigestIds])];
 
-          // Use json_patch so the freshly-parsed scope/scope_warning are
-          // overlayed onto existing metadata without clobbering any unrelated
-          // fields a future caller might have added. RFC 7396 patches:
-          // {} = no-op; null values would delete keys, but we never emit nulls.
-          this.db.prepare(`
-            UPDATE insights
-            SET summary = ?, digest_ids = ?, last_updated = ?, confidence = ?,
-                metadata = json_patch(COALESCE(metadata, '{}'), ?)
-            WHERE id = ?
-          `).run(
-            this._redact(entry.summary), JSON.stringify(mergedDigestIds),
-            now, entry.confidence,
-            this._redactPaths(JSON.stringify(withBaseConfidence(entry))),
-            existing.id
-          );
-          embeddingQueue.push({ id: existing.id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
-          updated++;
-        } else if (existing && verdict === 'facet') {
-          // Insert as a NEW insight, then cross-link both the new one and
-          // the existing match as facets of a shared parent topic. The
-          // parent topic is derived from the longest common identifier-prefix
-          // of the two topics; falls back to the existing topic if no
-          // meaningful prefix exists.
-          const newId = crypto.randomUUID();
-          this.db.prepare(`
-            INSERT INTO insights (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata, project)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            newId, this._redact(entry.topic), this._redact(entry.summary),
-            entry.confidence, JSON.stringify(entryDigestIds),
-            now, now,
-            this._redactPaths(JSON.stringify(withBaseConfidence(entry))),
-            project
-          );
+        // js-object spread mirrors SQLite json_patch RFC-7396 semantics for
+        // non-null values; null-valued keys ARE accepted into metadata
+        // (json_patch would have deleted them, but downstream readers
+        // null-check, they don't iterate keys). withBaseConfidence sets
+        // metadata.baseConfidence verbatim.
+        const baseMetaPatch = (() => {
+          try { return JSON.parse(this._redactPaths(JSON.stringify(withBaseConfidence(entry)))); }
+          catch { return withBaseConfidence(entry); }
+        })();
+        const prevMeta = existingEntity.metadata ?? {};
+        await kmStore.mergeAttributes(existingEntity.id, {
+          description: this._redact(entry.summary),
+          updatedAt: now,
+          metadata: {
+            ...prevMeta,
+            summary: this._redact(entry.summary),
+            digest_ids: mergedDigestIds,
+            last_updated: now,
+            confidence: entry.confidence,
+            ...baseMetaPatch,
+          },
+        });
+        embeddingQueue.push({ id: existing.id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
+        updated++;
+      } else if (existing && verdict === 'facet') {
+        // Insert as a NEW insight, then cross-link both the new one and
+        // the existing match as facets of a shared parent topic. The
+        // parent topic is derived from the longest common identifier-prefix
+        // of the two topics; falls back to the existing topic if no
+        // meaningful prefix exists.
+        const newId = crypto.randomUUID();
+        const newRow = {
+          id: newId,
+          topic: this._redact(entry.topic),
+          summary: this._redact(entry.summary),
+          confidence: entry.confidence,
+          digest_ids: entryDigestIds,
+          last_updated: now,
+          created_at: now,
+          metadata: (() => {
+            try { return JSON.parse(this._redactPaths(JSON.stringify(withBaseConfidence(entry)))); }
+            catch { return withBaseConfidence(entry); }
+          })(),
+          project,
+        };
+        const newEntity = legacyInsightToEntity(newRow, this._runId, now);
+        await kmStore.putEntity(newEntity, { skipOntologyCheck: true });
+        // The inserted entity's km-core id is needed for the facet patch
+        // below. findByLegacyId is the canonical post-write lookup.
+        const insertedEntity = await kmStore.findByLegacyId({ system: 'A', id: newId });
 
-          const parentTopic = this._deriveParentTopic(entry.topic, existing.topic);
-          const existingMeta = (() => {
-            try { return JSON.parse(existing.metadata || '{}'); } catch { return {}; }
-          })();
-          const existingRelated = new Set(
-            Array.isArray(existingMeta.relatedInsightIds) ? existingMeta.relatedInsightIds : []
-          );
-          existingRelated.add(newId);
+        const parentTopic = this._deriveParentTopic(entry.topic, existing.topic);
+        const existingMeta = existingEntity.metadata ?? {};
+        const existingRelated = new Set(
+          Array.isArray(existingMeta.relatedInsightIds) ? existingMeta.relatedInsightIds : []
+        );
+        existingRelated.add(newId);
 
-          // Patch the existing row's metadata to add the new sibling.
-          this.db.prepare(`
-            UPDATE insights
-            SET last_updated = ?,
-                metadata = json_patch(COALESCE(metadata, '{}'), ?)
-            WHERE id = ?
-          `).run(
-            now,
-            JSON.stringify({
-              parentTopic,
-              relatedInsightIds: [...existingRelated],
-              facetGroupedAt: now,
-            }),
-            existing.id
-          );
+        // Patch the existing entity's metadata with the new sibling.
+        await kmStore.mergeAttributes(existingEntity.id, {
+          updatedAt: now,
+          metadata: {
+            ...existingMeta,
+            parentTopic,
+            relatedInsightIds: [...existingRelated],
+            facetGroupedAt: now,
+          },
+        });
 
-          // Patch the new row with its own facet metadata.
-          this.db.prepare(`
-            UPDATE insights
-            SET metadata = json_patch(COALESCE(metadata, '{}'), ?)
-            WHERE id = ?
-          `).run(
-            JSON.stringify({
+        // Patch the new row with its own facet metadata.
+        if (insertedEntity) {
+          const newMeta = insertedEntity.metadata ?? {};
+          await kmStore.mergeAttributes(insertedEntity.id, {
+            metadata: {
+              ...newMeta,
               parentTopic,
               relatedInsightIds: [existing.id, ...existingRelated].filter((x) => x !== newId),
               facetGroupedAt: now,
-            }),
-            newId
-          );
-
-          embeddingQueue.push({ id: newId, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
-          created++;
-          facetLinked++;
-        } else {
-          const id = crypto.randomUUID();
-          this.db.prepare(`
-            INSERT INTO insights (id, topic, summary, confidence, digest_ids, last_updated, created_at, metadata, project)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            id, this._redact(entry.topic), this._redact(entry.summary),
-            entry.confidence, JSON.stringify(entryDigestIds),
-            now, now, this._redactPaths(JSON.stringify(withBaseConfidence(entry))),
-            project
-          );
-          embeddingQueue.push({ id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
-          created++;
+            },
+          });
         }
+
+        embeddingQueue.push({ id: newId, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
+        created++;
+        facetLinked++;
+      } else {
+        const id = crypto.randomUUID();
+        const row = {
+          id,
+          topic: this._redact(entry.topic),
+          summary: this._redact(entry.summary),
+          confidence: entry.confidence,
+          digest_ids: entryDigestIds,
+          last_updated: now,
+          created_at: now,
+          metadata: (() => {
+            try { return JSON.parse(this._redactPaths(JSON.stringify(withBaseConfidence(entry)))); }
+            catch { return withBaseConfidence(entry); }
+          })(),
+          project,
+        };
+        const entity = legacyInsightToEntity(row, this._runId, now);
+        await kmStore.putEntity(entity, { skipOntologyCheck: true });
+        embeddingQueue.push({ id, summary: this._redact(entry.summary), topic: entry.topic, confidence: entry.confidence, project });
+        created++;
       }
-    });
-    transaction();
+    }
 
     // Fire-and-forget: publish embedding events for new/updated insights
     for (const item of embeddingQueue) {
@@ -1455,8 +1647,6 @@ export class ObservationConsolidator {
       })(),
       new Promise((r) => setTimeout(r, KG_PUSH_TIMEOUT_MS)),
     ]);
-
-    try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ok */ }
 
     process.stderr.write(`[Consolidator] Insights: ${created} created, ${updated} updated, ${facetLinked} facet-linked (mirrored to KG as 'online' entities)\n`);
     return { created, updated, facetLinked };
@@ -1560,12 +1750,27 @@ export class ObservationConsolidator {
     const digestResult = await this.consolidateAll({ includeToday });
     let insightResult = { created: 0, updated: 0 };
 
-    // Only synthesize insights if we have enough digests (>= 5 unsynthesized)
-    const unsynthesizedCount = this.db.prepare(`
-      SELECT COUNT(*) as cnt FROM digests d
-      LEFT JOIN insights i ON d.id IN (SELECT value FROM json_each(i.digest_ids))
-      WHERE i.id IS NULL
-    `).get().cnt;
+    // Only synthesize insights if we have enough digests (>= 5 unsynthesized).
+    // Phase 44 Plan 17: replaces the SQLite LEFT-JOIN unsynth count with a
+    // km-core equivalent: gather every Insight's digest_ids into a Set,
+    // then count Digests whose legacyId.id is not in it.
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
+    const [allInsightsForCount, allDigestsForCount] = await Promise.all([
+      kmStore.findByOntologyClass('Insight'),
+      kmStore.findByOntologyClass('Digest'),
+    ]);
+    const synthesizedDigestIdSet = new Set();
+    for (const ins of allInsightsForCount) {
+      const m = ins.metadata ?? {};
+      if (Array.isArray(m.digest_ids)) {
+        for (const id of m.digest_ids) synthesizedDigestIdSet.add(id);
+      }
+    }
+    const unsynthesizedCount = allDigestsForCount.reduce((cnt, d) => {
+      const legId = d.legacyId?.id ?? d.id;
+      return synthesizedDigestIdSet.has(legId) ? cnt : cnt + 1;
+    }, 0);
 
     if (unsynthesizedCount >= 5) {
       insightResult = await this.synthesizeInsights();
@@ -1573,8 +1778,8 @@ export class ObservationConsolidator {
       process.stderr.write(`[Consolidator] Only ${unsynthesizedCount} unsynthesized digests — waiting for >= 5 before insight synthesis\n`);
     }
 
-    // Apply confidence decay to existing insights
-    this._decayConfidence();
+    // Apply confidence decay to existing insights (now async after Plan 44-17)
+    await this._decayConfidence();
 
     // Optional cadence-guarded compaction pass. Makes LLM calls per cluster,
     // so gated to once per COMPACTION_MIN_DAYS by default and only run when
@@ -1636,12 +1841,12 @@ export class ObservationConsolidator {
       process.stderr.write(`[Consolidator] Orphan relink sweep failed: ${err.message}\n`);
     }
 
-    // Export all tiers to git-tracked JSON after consolidation
-    if (this._exporter) {
-      try { this._exporter.exportAll(); } catch (err) {
-        process.stderr.write(`[Consolidator] Export error: ${err.message}\n`);
-      }
-    }
+    // Phase 44 Plan 17: ObservationExporter wiring removed. km-core
+    // GraphKMStore exports per-domain JSON to `.data/knowledge-graph/exports/`
+    // via the auto-debounced Exporter (Plan 03). The legacy
+    // `.data/observation-export/*.json` files stop updating; ColdStoreReader
+    // (Plan 35) reads the historical snapshot but new digests/insights
+    // land in km-core's own exports going forward.
 
     return { ...digestResult, ...insightResult };
   }
@@ -1718,8 +1923,9 @@ export class ObservationConsolidator {
    *
    * Floor stays at 0.3 (matches the previous behaviour).
    */
-  _decayConfidence() {
-    if (!this.db) return;
+  async _decayConfidence() {
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
 
     // Drag coefficients — kept as module-local constants so the breakdown
     // recorded on each insight remains interpretable months later.
@@ -1732,10 +1938,16 @@ export class ObservationConsolidator {
     const TRUTHFULNESS_THRESHOLD = 0.5;
     const TRUTHFULNESS_MAX = 0.20;         // (0.5 - 0) * 0.4
 
-    const insights = this.db.prepare(
-      `SELECT id, confidence, last_updated, metadata FROM insights`
-    ).all();
-    if (insights.length === 0) return;
+    // Phase 44 Plan 17: load all Insights via km-core. The legacy SQLite
+    // SELECT returned (id, confidence, last_updated, metadata); we get the
+    // same projection via _toLegacyInsightRow and keep both shapes around
+    // (entity for mergeAttributes, row for parsing).
+    const insightEntities = await kmStore.findByOntologyClass('Insight');
+    if (insightEntities.length === 0) return;
+    const insights = insightEntities.map(e => ({
+      ...this._toLegacyInsightRow(e),
+      _entity: e,
+    }));
 
     // Parse metadata once + compute the oldest last_updated across all
     // insights so we know how far back the per-root git log needs to reach.
@@ -1759,17 +1971,13 @@ export class ObservationConsolidator {
         referencedFiles,
         ratio,
         totalClaims,
+        _entity: ins._entity,
       };
     });
 
     const now = Date.now();
     const oldestLastUpdatedMs = parsed.reduce((min, p) => Math.min(min, p.lastUpdatedMs), now);
     const churnIndex = this._computeChurnIndex(this._defaultSearchRoots(), oldestLastUpdatedMs);
-
-    const updateConfidence = this.db.prepare('UPDATE insights SET confidence = ? WHERE id = ?');
-    const updateMeta = this.db.prepare(
-      "UPDATE insights SET metadata = json_patch(COALESCE(metadata, '{}'), ?) WHERE id = ?"
-    );
 
     let adjusted = 0;
     let backfilled = 0;
@@ -1867,11 +2075,18 @@ export class ObservationConsolidator {
       metaPatch.staleDragApplied = null;
       metaPatch.staleDragAt = null;
 
-      updateMeta.run(JSON.stringify(metaPatch), p.id);
-
+      // Phase 44 Plan 17: merge both meta + confidence into one km-core
+      // mergeAttributes call when both change. RFC-7396 json_patch semantics
+      // (delete-on-null) are NOT preserved by the JS object spread; null
+      // keys accumulate but downstream readers null-check.
+      const prevMeta = p._entity.metadata ?? {};
+      const nextMeta = { ...prevMeta, ...metaPatch };
       if (Math.abs(finalConfidence - p.currentConfidence) >= 0.005) {
-        updateConfidence.run(finalConfidence, p.id);
+        nextMeta.confidence = finalConfidence;
+        await kmStore.mergeAttributes(p._entity.id, { metadata: nextMeta });
         adjusted++;
+      } else {
+        await kmStore.mergeAttributes(p._entity.id, { metadata: nextMeta });
       }
     }
 
@@ -2000,11 +2215,16 @@ export class ObservationConsolidator {
    * @returns {Promise<{ clusters: number, merges: number, facets: number, separated: number, dryRun: boolean, clusterTopics?: string[][] }>}
    */
   async compactInsights({ project = 'coding', dryRun = true, clustersOnly = false } = {}) {
-    if (!this.db) throw new Error('Not initialized');
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
 
-    const insights = this.db.prepare(
-      'SELECT id, topic, summary, confidence, digest_ids, metadata, project FROM insights WHERE project = ?'
-    ).all(project);
+    // Phase 44 Plan 17: load Insights via km-core, filter by project,
+    // and reshape to the legacy row shape the existing clustering /
+    // LLM prompt code reads.
+    const insightEntities = await kmStore.findByOntologyClass('Insight');
+    const insights = insightEntities
+      .filter(e => ((e.metadata?.project) ?? 'unknown') === project)
+      .map(e => this._toLegacyInsightRow(e));
 
     if (insights.length < 2) {
       return { clusters: 0, merges: 0, facets: 0, separated: 0, dryRun };
@@ -2134,9 +2354,13 @@ export class ObservationConsolidator {
 
     for (const clusterIds of clusters) {
       const members = clusterIds.map((id) => insightById.get(id));
-      const verifications = members.map((m) =>
-        this.verifyInsight(m, { roots: searchRoots, persist: false })
-      );
+      // Phase 44 Plan 17: verifyInsight is now async; await each call.
+      // The pass is serialized anyway (each call shells out to git);
+      // no perf regression vs the sync SQLite path.
+      const verifications = [];
+      for (const m of members) {
+        verifications.push(await this.verifyInsight(m, { roots: searchRoots, persist: false }));
+      }
       const prompt = this._buildCompactionPrompt(members, verifications);
       const response = await this._callLLM(prompt, 'consolidator-compaction');
       if (!response) {
@@ -2172,56 +2396,55 @@ export class ObservationConsolidator {
       const canonical = members[0];
       const others = members.slice(1);
 
-      const tx = this.db.transaction(() => {
-        if (verdict.action === 'MERGE') {
-          const allDigests = new Set(JSON.parse(canonical.digest_ids || '[]'));
-          for (const o of others) {
-            for (const d of JSON.parse(o.digest_ids || '[]')) allDigests.add(d);
-          }
-          this.db.prepare(`
-            UPDATE insights
-            SET digest_ids = ?, last_updated = ?,
-                metadata = json_patch(COALESCE(metadata, '{}'), ?)
-            WHERE id = ?
-          `).run(
-            JSON.stringify([...allDigests]),
-            now,
-            JSON.stringify({
-              absorbed: others.map((o) => ({ id: o.id, topic: o.topic })),
-              consolidatedAt: now,
-              consolidationReason: verdict.reason || 'compactInsights MERGE',
-            }),
-            canonical.id
-          );
-          for (const o of others) {
-            this.db.prepare('DELETE FROM insights WHERE id = ?').run(o.id);
-          }
-          merges++;
-        } else if (verdict.action === 'FACET') {
-          const parentTopic = verdict.parentTopic
-            || members.reduce((acc, m) => acc ? this._deriveParentTopic(acc, m.topic) : m.topic, '');
-          const ids = members.map((m) => m.id);
-          for (const m of members) {
-            const others = ids.filter((x) => x !== m.id);
-            this.db.prepare(`
-              UPDATE insights
-              SET last_updated = ?,
-                  metadata = json_patch(COALESCE(metadata, '{}'), ?)
-              WHERE id = ?
-            `).run(
-              now,
-              JSON.stringify({
-                parentTopic,
-                relatedInsightIds: others,
-                facetGroupedAt: now,
-              }),
-              m.id
-            );
-          }
-          facets++;
+      // Phase 44 Plan 17: SQLite db.transaction() removed. Each MERGE/FACET
+      // step is a sequence of awaited km-core writes; partial-failure
+      // matches the cadence-guarded weekly compaction pass's tolerance for
+      // mid-cluster interruption (resumable on the next pass).
+      if (verdict.action === 'MERGE') {
+        const allDigests = new Set(JSON.parse(canonical.digest_ids || '[]'));
+        for (const o of others) {
+          for (const d of JSON.parse(o.digest_ids || '[]')) allDigests.add(d);
         }
-      });
-      tx();
+        const canonicalPrev = canonical._entity?.metadata ?? {};
+        await kmStore.mergeAttributes(canonical._entity.id, {
+          updatedAt: now,
+          metadata: {
+            ...canonicalPrev,
+            digest_ids: [...allDigests],
+            last_updated: now,
+            absorbed: others.map((o) => ({ id: o.id, topic: o.topic })),
+            consolidatedAt: now,
+            consolidationReason: verdict.reason || 'compactInsights MERGE',
+          },
+        });
+        for (const o of others) {
+          try {
+            await kmStore.deleteEntity(o._entity.id);
+          } catch (err) {
+            process.stderr.write(`[Compaction] deleteEntity failed for ${o.id.slice(0, 8)}: ${err.message}\n`);
+          }
+        }
+        merges++;
+      } else if (verdict.action === 'FACET') {
+        const parentTopic = verdict.parentTopic
+          || members.reduce((acc, m) => acc ? this._deriveParentTopic(acc, m.topic) : m.topic, '');
+        const ids = members.map((m) => m.id);
+        for (const m of members) {
+          const othersList = ids.filter((x) => x !== m.id);
+          const prev = m._entity?.metadata ?? {};
+          await kmStore.mergeAttributes(m._entity.id, {
+            updatedAt: now,
+            metadata: {
+              ...prev,
+              last_updated: now,
+              parentTopic,
+              relatedInsightIds: othersList,
+              facetGroupedAt: now,
+            },
+          });
+        }
+        facets++;
+      }
     }
 
     process.stderr.write(
@@ -2603,7 +2826,7 @@ export class ObservationConsolidator {
    * @param {boolean}  [options.persist=true]  write result back to SQLite
    * @returns {{ id: string, totalClaims: number, verifiedClaims: number, ratio: number, staleClaims: Array<{raw:string, type:string}> }}
    */
-  verifyInsight(insight, { roots, persist = true } = {}) {
+  async verifyInsight(insight, { roots, persist = true } = {}) {
     const searchRoots = roots || this._defaultSearchRoots();
     const claims = this._extractCodeClaims(insight.summary || '');
     const results = this._verifyCodeClaims(claims, searchRoots);
@@ -2659,13 +2882,21 @@ export class ObservationConsolidator {
       ...(zeroTracking || {}),
     };
 
-    if (persist && this.db) {
+    if (persist) {
       try {
-        this.db.prepare(`
-          UPDATE insights
-          SET metadata = json_patch(COALESCE(metadata, '{}'), ?)
-          WHERE id = ?
-        `).run(JSON.stringify({ codeVerification: verification }), insight.id);
+        if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
+        // The insight argument may already carry _entity (callers in
+        // verifyInsights pass the legacy row that bundles the entity).
+        // Otherwise resolve via legacyId.
+        const entity = insight._entity
+          || await kmStore.findByLegacyId({ system: 'A', id: insight.id });
+        if (entity) {
+          const prev = entity.metadata ?? {};
+          await kmStore.mergeAttributes(entity.id, {
+            metadata: { ...prev, codeVerification: verification },
+          });
+        }
       } catch (err) {
         process.stderr.write(`[verifier] Persist failed for ${insight.id}: ${err.message}\n`);
       }
@@ -2684,10 +2915,14 @@ export class ObservationConsolidator {
    * @returns {Promise<{ scanned: number, freshCount: number, staleCount: number, avgRatio: number, results: Array }>}
    */
   async verifyInsights({ project = 'coding', persist = true } = {}) {
-    if (!this.db) throw new Error('Not initialized');
-    const insights = this.db.prepare(
-      'SELECT id, topic, summary, metadata FROM insights WHERE project = ?'
-    ).all(project);
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
+
+    // Phase 44 Plan 17: load Insights via km-core, filter by project.
+    const insightEntities = await kmStore.findByOntologyClass('Insight');
+    const insights = insightEntities
+      .filter(e => ((e.metadata?.project) ?? 'unknown') === project)
+      .map(e => this._toLegacyInsightRow(e));
     if (insights.length === 0) {
       return { scanned: 0, freshCount: 0, staleCount: 0, unverifiableCount: 0, archivedCount: 0, avgRatio: 1, results: [] };
     }
@@ -2695,7 +2930,7 @@ export class ObservationConsolidator {
     process.stderr.write(`[verifier] Verifying ${insights.length} insights against ${roots.length} root(s)\n`);
     const results = [];
     for (const ins of insights) {
-      results.push({ topic: ins.topic, ...this.verifyInsight(ins, { roots, persist }) });
+      results.push({ topic: ins.topic, ...(await this.verifyInsight(ins, { roots, persist })) });
     }
     // Bands. Null ratio = UNVERIFIABLE (no claims to measure); not counted
     // toward fresh/partial/stale and excluded from avgRatio.
@@ -2713,27 +2948,30 @@ export class ObservationConsolidator {
     // Coverage tab + Insights list. Persist guard: only run when we're
     // actually writing metadata back this pass.
     let archivedCount = 0;
-    if (persist && this.db) {
+    if (persist) {
       const ARCHIVE_THRESHOLD_MS = 30 * 86400 * 1000;
       const now = Date.now();
-      const archiveStmt = this.db.prepare(
-        "UPDATE insights SET metadata = json_patch(COALESCE(metadata, '{}'), ?) WHERE id = ?"
-      );
+      // Build a quick lookup so the "already archived?" check doesn't
+      // require a second km-core query per insight.
+      const entityByLegacyId = new Map(insights.map(i => [i.id, i._entity]));
       for (const r of results) {
         if (r.verificationRatio !== 0) continue;
         if (!r.firstZeroAt) continue;
         const stuckMs = now - new Date(r.firstZeroAt).getTime();
         if (!Number.isFinite(stuckMs) || stuckMs < ARCHIVE_THRESHOLD_MS) continue;
-        // Re-read to avoid double-archiving on every sweep.
-        const row = this.db.prepare(
-          "SELECT json_extract(metadata, '$.archivedAt') AS archivedAt FROM insights WHERE id = ?"
-        ).get(r.id);
-        if (row && row.archivedAt) continue;
+        const entity = entityByLegacyId.get(r.id);
+        if (!entity) continue;
+        // Avoid double-archiving on every sweep.
+        const prev = entity.metadata ?? {};
+        if (prev.archivedAt) continue;
         try {
-          archiveStmt.run(JSON.stringify({
-            archivedAt: new Date(now).toISOString(),
-            archiveReason: `stuck at verificationRatio=0 for ${Math.floor(stuckMs / 86400000)} days — code claims no longer exist`,
-          }), r.id);
+          await kmStore.mergeAttributes(entity.id, {
+            metadata: {
+              ...prev,
+              archivedAt: new Date(now).toISOString(),
+              archiveReason: `stuck at verificationRatio=0 for ${Math.floor(stuckMs / 86400000)} days — code claims no longer exist`,
+            },
+          });
           archivedCount++;
         } catch (err) {
           process.stderr.write(`[verifier] Archive failed for ${r.id}: ${err.message}\n`);
@@ -2784,24 +3022,33 @@ export class ObservationConsolidator {
    * @returns {Promise<{ id, topic, summary, confidence, codeVerification, kgPushed: boolean }>}
    */
   async resynthesizeInsight(insightId) {
-    if (!this.db) throw new Error('Not initialized');
-    const insight = this.db.prepare(
-      'SELECT id, topic, summary, confidence, digest_ids, project, metadata FROM insights WHERE id = ?'
-    ).get(insightId);
-    if (!insight) {
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
+    // Phase 44 Plan 17: load via km-core findByLegacyId. The insight is
+    // identified by its legacy SQLite id (preserved in legacyId.id).
+    const insightEntity = await kmStore.findByLegacyId({ system: 'A', id: insightId });
+    if (!insightEntity) {
       const err = new Error(`Insight not found: ${insightId}`);
       err.code = 'NOT_FOUND';
       throw err;
     }
+    const insight = { ...this._toLegacyInsightRow(insightEntity), _entity: insightEntity };
 
     let digestIds = [];
     try { digestIds = JSON.parse(insight.digest_ids || '[]'); } catch { /* keep empty */ }
+    // Resolve each digest id via km-core. Missing ids drop out (mirrors the
+    // SQLite IN-clause behavior — pruned digests just don't appear).
     const digests = digestIds.length > 0
-      ? this.db.prepare(
-          `SELECT id, date, theme, summary FROM digests
-           WHERE id IN (${digestIds.map(() => '?').join(',')})
-           ORDER BY date ASC`
-        ).all(...digestIds)
+      ? (await Promise.all(
+          digestIds.map(id => kmStore.findByLegacyId({ system: 'A', id }))
+        ))
+        .filter(Boolean)
+        .map(e => this._toLegacyDigestRow(e))
+        .sort((a, b) => {
+          if (a.date < b.date) return -1;
+          if (a.date > b.date) return 1;
+          return 0;
+        })
       : [];
 
     // Two source modes:
@@ -2826,8 +3073,8 @@ export class ObservationConsolidator {
 
     // Pre-flight verifier pass — gives the LLM the explicit stale list.
     // We don't persist this one; we'll re-verify and persist the NEW
-    // summary at the end of the pipeline so SQLite state stays consistent.
-    const preVerify = this.verifyInsight(insight, { persist: false });
+    // summary at the end of the pipeline so km-core state stays consistent.
+    const preVerify = await this.verifyInsight(insight, { persist: false });
 
     const digestBlock = sourceMode === 'digests'
       ? digests.map((d) => `[${d.date}] ${d.theme}\n${d.summary}`).join('\n\n---\n\n')
@@ -2897,15 +3144,30 @@ export class ObservationConsolidator {
       ...(replacement.metadata || {}),
     });
 
-    this.db.prepare(`
-      UPDATE insights
-      SET topic = ?, summary = ?, confidence = ?, last_updated = ?,
-          metadata = json_patch(COALESCE(metadata, '{}'), ?)
-      WHERE id = ?
-    `).run(newTopic, newSummary, newConfidence, now, metaPatch, insightId);
+    // Phase 44 Plan 17: km-core mergeAttributes for the resynthesized
+    // fields. Mirror name/description on the top-level entity too so
+    // queries on entity.name + entity.description reflect the new content
+    // (the legacy SQLite topic/summary columns are mirrored to those
+    // top-level fields by legacyInsightToEntity at write time).
+    const prevMeta = insightEntity.metadata ?? {};
+    let metaPatchObj;
+    try { metaPatchObj = JSON.parse(metaPatch); } catch { metaPatchObj = {}; }
+    await kmStore.mergeAttributes(insightEntity.id, {
+      name: (newTopic || '').slice(0, 80) || insightEntity.name,
+      description: newSummary,
+      updatedAt: now,
+      metadata: {
+        ...prevMeta,
+        topic: newTopic,
+        summary: newSummary,
+        confidence: newConfidence,
+        last_updated: now,
+        ...metaPatchObj,
+      },
+    });
 
     // Re-verify the brand-new summary; persists fresh codeVerification.
-    const postVerify = this.verifyInsight(
+    const postVerify = await this.verifyInsight(
       { id: insightId, summary: newSummary, metadata: null },
       { persist: true }
     );
@@ -3441,24 +3703,29 @@ Produce updated/new insights. Each insight MUST be a structured reference articl
   }
 
   /**
-   * Get consolidation status.
+   * Get consolidation status. Phase 44 Plan 17: routes through km-core
+   * countByOntologyClass (uses the existing predicate-form for the
+   * undigested filter).
    */
-  getStatus() {
-    if (!this.db) return null;
-
-    const totalObs = this.db.prepare('SELECT COUNT(*) as cnt FROM observations').get().cnt;
-    const undigested = this.db.prepare('SELECT COUNT(*) as cnt FROM observations WHERE digested_at IS NULL').get().cnt;
-    const totalDigests = this.db.prepare('SELECT COUNT(*) as cnt FROM digests').get().cnt;
-    const totalInsights = this.db.prepare('SELECT COUNT(*) as cnt FROM insights').get().cnt;
-
+  async getStatus() {
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
+    const [totalObs, undigested, totalDigests, totalInsights] = await Promise.all([
+      kmStore.countByOntologyClass('Observation'),
+      kmStore.countByOntologyClass('Observation', {
+        predicate: e => !(e.metadata?.digested_at),
+      }),
+      kmStore.countByOntologyClass('Digest'),
+      kmStore.countByOntologyClass('Insight'),
+    ]);
     return { totalObs, undigested, totalDigests, totalInsights };
   }
 
   close() {
-    if (this.db) {
-      try { this.db.close(); } catch { /* ok */ }
-      this.db = null;
-    }
+    // Phase 44 Plan 17: the km-core GraphKMStore is owned by the caller
+    // (obs-api passes its own per ObservationWriter pattern), so it is
+    // NOT closed here. Only the consolidator-owned Redis socket needs
+    // explicit teardown.
     // ioredis keeps a TCP socket open with reconnection logic; without an
     // explicit disconnect the Node event loop never drains and the wrapper
     // process hangs after printing its summary lines. .disconnect() is sync
