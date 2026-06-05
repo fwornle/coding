@@ -12,6 +12,24 @@
 
 ---
 
+## v7.3 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution (QUEUED, not active)
+
+**Why:** Today we have no quantitative basis for recommending agent / model / framework / spec-level choices to dev teams. The proxy's `/api/token-usage` Evolution chart covers background services (wave-analysis, observation-writer, health-coordinator), but the agent-side spend — user ↔ CA conversations, sub-agents, per-tool-call breakdowns — is invisible. Without per-task attribution across both sides, "approach X cost Y for task type Z" is anecdote, not evidence.
+
+**Goal:** Build a measurement rig that quantifies, per task, the full cost across all four supported agents (Claude Code, Copilot CLI, OpenCode, Mastra) AND the proxy-routed background services that run during the task. Attribution at the best granularity each agent surfaces (Claude per-turn + per-reasoning-step for extended thinking, Copilot per-session-aggregate or per-turn pending verification, OpenCode per-llm-call via proxy, Mastra TBD). Time-series on one timeline via the existing `.observations/token-usage.db` extended with `agent`, `task_id`, `tool_call_id`, `parent_call_id`, `granularity_tier`, `reasoning_tokens`. Full snapshot/restore for reproducibility (git + KB + `.planning/` + routing config + MCP inventory + external HTTP fixtures). New km-core KB of `Experiment / Run / Route / Step / Decision / Outcome / Report` entities and a "Performance" dashboard tab (slotted after Tokens).
+
+**Scoping artifacts:**
+- `.planning/notes/v73-perf-measurement-exploration.md` — 7 architectural decisions + 9-phase shape sketch with Phase 3 flagged FOUNDATIONAL
+- `.planning/notes/v73-token-attribution-contract.md` — storage / measurement-span / per-agent adapter contracts
+- `.planning/spikes/copilot-proxy-interception.md` — completed spike (4-approach verdict table + recommendation)
+- `~/.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_perf_measurement_requirements.md` — hard requirements
+
+**Out of scope:** VS Code Copilot Chat (state.vscdb opaque); policy automation / auto-routing (queued as v7.4); currency conversion (v7.4).
+
+**Status:** Queued. Do NOT activate while v7.1 (KM Unification) is in progress. The full `/gsd-new-milestone` workflow (requirements + roadmap) runs after v7.1 ships and v7.2 is sequenced. Todo: `.planning/todos/pending/start-v73-milestone.md`.
+
+---
+
 ## v6.0 v6.0 (Shipped: 2026-04-25)
 
 **Phases completed:** 7 phases, 11 plans, 25 tasks
