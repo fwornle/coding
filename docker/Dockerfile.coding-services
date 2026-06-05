@@ -19,6 +19,21 @@ RUN apt-get update && apt-get install -y \
     plantuml \
     && rm -rf /var/lib/apt/lists/*
 
+# Configure git system-wide for in-container git ops (Plan 44-15 SC#2.B).
+# Two settings:
+# 1. `safe.directory '*'` — git refuses to operate on a repo whose owner
+#    differs from the running UID. Host bind-mounts `${CODING_REPO}/.git`
+#    into the container as owner=Q284340; the container runs as root.
+#    Without this, every `git` command from inside the container errors
+#    `fatal: detected dubious ownership in repository at '/coding'`.
+# 2. `user.email` / `user.name` — SnapshotManager issues `git commit` to
+#    tag snapshot baselines; commit requires an author identity. Use a
+#    distinct "Snapshot Bot" identity so container-issued snapshot commits
+#    are visually distinguishable from operator commits on the host.
+RUN git config --system --add safe.directory '*' && \
+    git config --system user.email "snapshot-bot@coding.local" && \
+    git config --system user.name "Snapshot Bot"
+
 # Install uv for Python dependency management
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
