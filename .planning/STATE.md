@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 44 context gathered
-last_updated: "2026-06-05T13:57:27.205Z"
+stopped_at: Plan 44-18 Tasks 1-4 complete; Task 5 awaiting operator gate
+last_updated: "2026-06-05T18:55:00.000Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 23
@@ -145,6 +145,16 @@ Plan 44-17 cutover outcome (2026-06-05):
       2. `RetrievalService` keyword-search FTS5 (scripts/observations-api-server.mjs:142) — reads via `dbGetter`. Deferred to 44-18.
     Both consumers were intentionally deferred by Plan 44-13 per its source comment at lines 35-39. Task 5 operator gate authorizes the archive ONLY when the operator agrees to lose the pruner + FTS5 keyword search (or accepts that 44-18 will cut them over before archive).
   - Task 5 operator gate **CLEARED 2026-06-05** with resolution **"approved (keep)"** — `.observations/observations.db` retained in place as read-only for `ObservationPruner` + `RetrievalService` FTS5 until Plan 44-18 cuts both consumers over. Operator runbook addendum: do NOT delete/archive/move the file before 44-18 lands; the two consumers will 500 on retention sweeps + keyword searches if it disappears. After 44-18 cuts over pruner + retrieval, the file is archivable in one shot (move to `.observations/archive/`, remove `dbGetter` wiring).
+
+Plan 44-18 cutover outcome (2026-06-05, Tasks 1-4):
+
+  - Task 1 audit (`cf6c8da45`): documented the 4 SQLite call sites + km-core replacement map. Critical finding D-44-18-01 — pruner cutoff must use top-level `entity.createdAt` (NOT `metadata.created_at` snake_case, which doesn't exist on post-legacy-ingest entities).
+  - Task 2 (`955ce3caa`): ObservationPruner cut to km-core. Constructor signature `{ kmStore, retentionDays }`. `prune()` now async; deletes via 100-id `Promise.all` chunks. ObservationPruner.test.js rewritten (4 tests GREEN).
+  - Task 3 (`4a85e1597`): RetrievalService freshness-rerank cut to km-core. New `kmStoreGetter` lazy option; `_applyFreshnessRerank` async + km-core `findByLegacyId`. New tests/integration/retrieval-service.freshness-rerank.km-core.test.js (239 lines, 4 GREEN, perf gate 20-id ≤ 50ms / measured <1ms).
+  - Task 4 (`c837dc421`): obs-api drops `_legacyDb` / `ensureLegacyDb` / `openLegacyDb` import / shutdown handler. New tests/integration/observation-pruner.km-core.test.js (238 lines, 5 GREEN, perf gate 1000-obs ≤ 1s / measured 48ms).
+  - Production verification (obs-api pid 36727 post-restart): 0 legacy SQLite handle opens; first km-core prune correctly removed 517 obs + 131 digests from the live store; `/api/retrieve` returns 48 results for "docker timeout" probe.
+  - Known deviation: KeywordSearch silently degrades to [] (the `_keywordSearch` helper short-circuits on missing db). Semantic search via Qdrant dominates the /api/retrieve response. Recorded as a Phase 45+ follow-up item in 44-18-SUMMARY.md "Known Deferred Items".
+  - **Task 5 (SQLite archive) — PENDING operator gate.** Executor returned `checkpoint:human-verify` payload. The deferred Plan 44-12 § "fully unused observations.db" promise — carried through 44-13, 44-14, 44-17 — is now ready to be honored on operator approval.
 
 ## Performance Metrics
 
