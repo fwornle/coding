@@ -243,7 +243,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 - [x] **Phase 42.1: UKB Project-Anchor Parity** - Restore the `findBestParent` + post-sweep `contains`-edge pass that Phase 42-07 Phase B1 removed when replacing `persistence-agent.persistEntities` with `persistWithKmCore`. Without this, every `ukb full` orphans new entities from the `Coding` Project anchor (forensic 2026-05-24 evidence: +64 entities, 0 new edges to Coding). (closed via 42.1.1 + 42.1.2 + structural fix in 42.2-06; remaining residual = 18 ghost orphans in stale general.json which next clean wave-analysis will overwrite.)
 - [x] **Phase 43: OKM Cross-Repo Migration (C)** - Cross-repo refactor of `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` onto KM-Core; rapid-automations CI stays green. (CLOSED 2026-06-02: OKM PR #4 merged 34a0fc5; CI green twice — 108020147 + 108040202; all 4 SCs verified)
 - [x] **Phase 44: REST API & Git Snapshots** - Common entity/search/clusters/snapshots/ontology REST contract + git-snapshot/restore identical across A/B/C. (completed 2026-06-04)
-- [ ] **Phase 45: Unified Web Viewer** - Single viewer parameterized by ontology config; VKB (B) and VOKB (C) users migrate without functional regression.
+- [ ] **Phase 45: Unified Web Viewer** (6 plans planned) - Single viewer parameterized by ontology config; VKB (B) and VOKB (C) users migrate without functional regression.
 - [ ] **Phase 46: Per-System Documentation & Onboarding** - Each system's README documents which configs it owns; KM-Core ships an architecture diagram + onboarding guide.
 
 ### Phase Details
@@ -668,8 +668,35 @@ Plans:
   3. A VKB or VOKB user can switch to the unified viewer for daily work and not regress on any task they used to perform in the legacy viewer.
   4. The viewer's data layer reads exclusively through the Phase 44 REST contract — no direct LevelDB or SQLite access from the frontend.
 
-**Plans:** TBD
+**Plans:** 6 plans across 6 waves (strictly serial — `panels/SidePanel.tsx` co-edit forces sequencing of 03 -> 04 -> 05)
 **UI hint**: yes
+
+Plans:
+
+**Wave 1**
+
+- [ ] 45-01-PLAN.md — Scaffold greenfield `integrations/unified-viewer/` (Vite + React 18 + TS + Tailwind 3 + shadcn `new-york` preset verbatim from dashboard) + ApiClient with camelCase Zod schemas (Plan 44-16 wire-shape lock) + React Router DOM 7 routing with `/viewer/{system}` + `key={system}` remount + Zustand store + 15 shadcn primitives + SYSTEM_ENDPOINTS config
+
+**Wave 2** *(depends on Wave 1)*
+
+- [ ] 45-02-PLAN.md — WebGL graph renderer at `src/graph/` using `@react-sigma/core` + `sigma` + `graphology` + ForceAtlas2 web-worker layout; FNV-1a HSL color fallback per UI-SPEC § Color; per-state stroke + opacity contract via sigma's `nodeReducer`; click/double-click/pan/zoom/hover wired
+
+**Wave 3** *(depends on Wave 2)*
+
+- [ ] 45-03-PLAN.md — User-facing chrome — FilterRail (search + level + class) + EntityDetailPanel + NavBar + SidePanel tab shell + Footer + 8 State Contract surfaces + global keyboard model (`/`, `Esc`, `?`, `f`) + IconButton primitive (non-optional `ariaLabel` TS-narrowed) closes UI-SPEC § Icon-only controls FLAG remediation
+
+**Wave 4** *(depends on Wave 3)*
+
+- [ ] 45-04-PLAN.md — MarkdownViewer panel (B's signature) — verbatim port of VKB `MarkdownViewer.tsx` minus Mermaid (per D-45-04) + theme-gated highlight.js + `useMarkdownHistory` + km-core handler extension at `lib/km-core/src/api/handlers/ontology.ts` with `?withDisplay=true` gated branch (preserves OKM `rest-contract.test.ts:257` BC) + `.data/ontologies/coding.display.json` seed file
+
+**Wave 5** *(depends on Wave 4 — both touch `panels/SidePanel.tsx`)*
+
+- [ ] 45-05-PLAN.md — `OkmRcaClient` (separate from km-core ApiClient — RCA endpoints live at `/api/okm/rca/*`, NOT `/api/v1/*`) + `RcaOpsPanel` Option A verbatim port of VOKB ingestion-ops panel (UI-SPEC PLANNER NOTE + RESEARCH § Open Question #2) — 3 grouped dir lists + 5 shadcn-mapped stage pills + SSE subscription + 120s watchdog + EventSource cleanup discipline
+
+**Wave 6** *(depends on Plans 02 + 03 + 04 + 05)*
+
+- [ ] 45-06-PLAN.md — Cross-system smoke + Wave 0 operator probes — 4 probes (C CORS, C SSE, lucide-react icon completeness, display-overlay strategy) + 9-spec Playwright suite under `tests/e2e/unified-viewer/` covering system-routing / entity-detail / expand-neighbors / filter-search / state-reset / markdown-viewer / rca-ingestion (mock fallback if CAP unreachable) / error-states / webgl-context (20-cycle Pitfall 8) + operator cutover gate
+
 
 #### Phase 46: Per-System Documentation & Onboarding
 
