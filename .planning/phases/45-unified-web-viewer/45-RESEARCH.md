@@ -798,7 +798,9 @@ function loadDisplayOverlay(ontologyDir: string, system: string): Record<string,
 | A7 | The `okbClient` in VOKB at `_work/.../viewer/src/api/okbClient.ts` line 497 subscribes to SSE at `/api/okm/ingest/progress`. The C backend at production (`okm.cc.bmwgroup.net`) actually serves this SSE endpoint — not just localhost. | Open Question #2 / RCA port-spec | If wrong: Option A RCA panel can only "show progress" in dev, not production. Verify in Phase 45 Wave 0 by curl-probing `https://okm.cc.bmwgroup.net/api/okm/ingest/progress`. MEDIUM risk. |
 | A8 | `slopcheck install` (v installed in `~/Library/Python/3.9/bin/`) is the only available slopcheck variant. Other install methods (e.g., a `--check-only` mode that doesn't trigger `npm install` afterwards) may exist in later versions but weren't tested here. | Package Legitimacy Audit | If wrong: future research can use a cleaner scan; the audit table here is still correct. LOW risk. |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All five Open Questions from `45-CONTEXT.md` have a researcher recommendation below. Each recommendation is `RESOLVED` (adopted into the 6 plans). OQ#5 (C-system CORS) remains LOW-confidence in the wild and final-resolves via Plan 06 Wave 0 operator probes; the 3-tier fallback below is the planned response.
 
 ### 1. Graph library choice (greenfield -> no inherited dependency)
 
@@ -823,7 +825,7 @@ function loadDisplayOverlay(ontologyDir: string, system: string): Record<string,
 | Integration cost from spec | 1 (you write 800+ lines like VOKB) | 4 (provides everything UI-SPEC needs — node fill callbacks, opacity, click events, zoom controls) | 4 (declarative API matches UI-SPEC well; opacity per-node supported) | 3 (style stylesheets diverge from UI-SPEC's per-state stroke contract) |
 | **TOTAL** | **20** | **28** | **25** | **22** |
 
-**Recommendation: `@react-sigma/core` + `sigma` + `graphology`.**
+**RESOLVED: Recommendation — `@react-sigma/core` + `sigma` + `graphology`.** Adopted in Plan 02 (`integrations/unified-viewer/src/graph/`).
 
 Three decisive factors:
 1. **Same data model as km-core.** km-core's `GraphKMStore` is built on `graphology` (verified at `lib/km-core/src/store/GraphKMStore.ts` indirect reference). The viewer using `graphology` end-to-end means we can `.import()` a serialized graph directly from km-core's export if we ever need a debug pathway.
@@ -850,7 +852,7 @@ Three decisive factors:
 
 **Cross-reference to D-45-04's success criterion:** "MVP must let a VKB or VOKB user do their daily work." VOKB users' "daily work" in the RCA domain is *triggering ingestion* and *watching progress* — not (only) walking from a Finding to its RootCause. Hence:
 
-**Recommendation: Option A (verbatim port as RCA Ingestion Ops panel).**
+**RESOLVED: Recommendation — Option A (verbatim port as RCA Ingestion Ops panel).** Adopted in Plan 05; `OkmRcaClient` lives outside the pure `ApiClient` because `/api/okm/rca/*` is OUTSIDE km-core `/api/v1/*`.
 
 Three reasons:
 1. **Operator parity.** A VOKB user opening `/viewer/cap` for the first time MUST see the same affordance set (the three directory lists + Ingest buttons + pipeline stage progress). Otherwise they perceive a regression.
@@ -895,6 +897,8 @@ Three reasons:
 | Modal shell | `fixed inset-0 bg-black bg-opacity-50` — full-screen modal overlay with Close button | Lines 152-153, 393-401 |
 | ESC handler | Global `keydown` listener calls `onClose` | Lines 126-138 |
 
+**RESOLVED: Recommendation — verbatim port of the react-markdown + remark-gfm + rehype-highlight stack; STRIP the Mermaid hook (lines 250-266) + modal shell (lines 152-153, 393-401) for MVP per D-45-04.** Adopted in Plan 04.
+
 **Port-spec (planner-actionable):**
 
 | Action | Detail |
@@ -932,7 +936,7 @@ Three reasons:
 
 **The problem:** Phase 45 D-45-03 wants the response to be objects `{name, level, parent, display?}` — NOT strings. This is a **shape change**, not an additive extension. We need to coexist with OKM's contract.
 
-**Recommendation: Gated extension via query parameter `?withDisplay=true`.**
+**RESOLVED: Recommendation — Gated extension via query parameter `?withDisplay=true`.** Adopted in Plan 04 (`lib/km-core/src/api/handlers/ontology.ts` BC-preserving extension; OKM `rest-contract.test.ts:257` byte-equal default shape).
 
 Three reasons:
 1. **Preserves OKM's existing wire contract.** Without `?withDisplay=true`, the response remains `z.array(z.string())` — `rest-contract.test.ts:257` keeps passing.
@@ -974,7 +978,7 @@ The "domain selector" comes from the system's `OntologyRegistry.domains` set OR 
 - Whether the corporate network has a transparent proxy that intercepts these requests.
 - Whether SSO redirects work transparently in fetch() calls (typically they don't — fetch needs `credentials: 'include'` AND CORS-credentials headers).
 
-**Recommendation: 3-tier fallback plan to be confirmed in Wave 0:**
+**RESOLVED: Recommendation — 3-tier fallback plan, final-resolved by Plan 06 Wave 0 operator probe:**
 
 1. **Tier 1 (preferred): Direct CORS.** Viewer's ApiClient calls `https://okm.cc.bmwgroup.net/api/v1/entities` directly with `credentials: 'include'`. If the OKM service has CORS for `localhost:*` or production-host origins, this works with zero backend changes. Browser handles SSO redirect natively. Verify with `curl -H "Origin: http://localhost:12437" -I https://okm.cc.bmwgroup.net/api/v1/entities` from the operator's BMW corporate laptop.
 
