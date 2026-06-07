@@ -21,36 +21,36 @@ describe('makeNodeReducer — sigma per-frame state translation', () => {
     })
   })
 
-  test('default state — returns 1px border with full opacity, hidden:false', () => {
+  test('default state — returns 1px slate-300 border with full opacity, hidden:false', () => {
     const reducer = makeNodeReducer(null)
     const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8, ontologyClass: 'Observation', level: 3 })
     expect(result.hidden).toBe(false)
-    expect((result as { borderColor?: string }).borderColor).toBe('hsl(var(--border))')
+    expect((result as { borderColor?: string }).borderColor).toBe('#cbd5e1')
     expect((result as { borderSize?: number }).borderSize).toBe(1)
     expect((result as { opacity?: number }).opacity).toBe(1.0)
   })
 
-  test('hover state — 2px ring stroke', () => {
+  test('hover state — 2px blue-400 ring stroke', () => {
     const reducer = makeNodeReducer('a')
     const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8, ontologyClass: 'Observation', level: 3 })
-    expect((result as { borderColor?: string }).borderColor).toBe('hsl(var(--ring))')
+    expect((result as { borderColor?: string }).borderColor).toBe('#60a5fa')
     expect((result as { borderSize?: number }).borderSize).toBe(2)
   })
 
-  test('selected state — 3px primary stroke + glow', () => {
+  test('selected state — 3px blue-500 stroke + glow', () => {
     useViewerStore.setState({ selectedNodeId: 'a' })
     const reducer = makeNodeReducer(null)
     const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8, ontologyClass: 'Observation', level: 3 })
-    expect((result as { borderColor?: string }).borderColor).toBe('hsl(var(--primary))')
+    expect((result as { borderColor?: string }).borderColor).toBe('#3b82f6')
     expect((result as { borderSize?: number }).borderSize).toBe(3)
     expect((result as { glow?: { size: number } }).glow?.size).toBe(4)
   })
 
-  test('search-match state — 2px amber stroke', () => {
+  test('search-match state — 2px amber-500 stroke', () => {
     useViewerStore.setState({ searchQuery: 'alp' })
     const reducer = makeNodeReducer(null)
     const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8, ontologyClass: 'Observation', level: 3 })
-    expect((result as { borderColor?: string }).borderColor).toBe('hsl(45, 100%, 50%)')
+    expect((result as { borderColor?: string }).borderColor).toBe('#f59e0b')
     expect((result as { borderSize?: number }).borderSize).toBe(2)
   })
 

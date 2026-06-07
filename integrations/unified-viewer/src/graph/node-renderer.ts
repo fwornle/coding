@@ -22,24 +22,33 @@ export interface StrokeStyle {
  * Table source: UI-SPEC § Color State color overlays (lines 142-152).
  */
 export function nodeStrokeForState(state: NodeState): StrokeStyle | null {
+  // Plan 04 checkpoint (round 2): the prior CSS-var stroke colors
+  // (`hsl(var(--*))`) were unparseable by sigma's WebGL renderer and
+  // silently fell back to white. The white halo around selected nodes
+  // then collided with the (also light) dark-mode label color,
+  // making selected-node labels unreadable. All stroke colors are now
+  // explicit hex matching the rest of the Plan 03 round-2 palette:
+  //   default:      slate-300  (#cbd5e1) — subtle border on both themes
+  //   hover:        blue-400   (#60a5fa)
+  //   selected:     blue-500   (#3b82f6) + glow #3b82f64d (0.3 alpha)
+  //   search-match: amber-500  (#f59e0b)  was hsl(45,100%,50%) — same-ish hue, hex form
+  //   filter-dimmed/-hidden: unchanged in shape (opacity / null)
   switch (state) {
     case 'default':
-      return { width: 1, color: 'hsl(var(--border))', opacity: 1.0 }
+      return { width: 1, color: '#cbd5e1', opacity: 1.0 }
     case 'hover':
-      return { width: 2, color: 'hsl(var(--ring))', opacity: 1.0 }
+      return { width: 2, color: '#60a5fa', opacity: 1.0 }
     case 'selected':
       return {
         width: 3,
-        color: 'hsl(var(--primary))',
+        color: '#3b82f6',
         opacity: 1.0,
-        // UI-SPEC line 147: "4px outer glow 0 0 4px hsl(var(--primary)/0.3)"
-        glow: { color: 'hsl(var(--primary)/0.3)', size: 4 },
+        glow: { color: '#3b82f64d', size: 4 },
       }
     case 'search-match':
-      // UI-SPEC line 148 — the ONE hardcoded non-token color in the viewer.
-      return { width: 2, color: 'hsl(45, 100%, 50%)', opacity: 1.0 }
+      return { width: 2, color: '#f59e0b', opacity: 1.0 }
     case 'filter-dimmed':
-      return { width: 1, color: 'hsl(var(--border))', opacity: 0.25 }
+      return { width: 1, color: '#cbd5e1', opacity: 0.25 }
     case 'filter-hidden':
       return null
   }

@@ -4,29 +4,29 @@
 import { describe, test, expect } from 'vitest'
 import { nodeStrokeForState, edgeStateForRelation } from './node-renderer'
 
-describe('nodeStrokeForState — UI-SPEC § Color State color overlays (lines 142-152)', () => {
-  test('Test 1: default → 1px border, opacity 1.0', () => {
+describe('nodeStrokeForState — Plan 04 round 2: hex palette (sigma WebGL cannot parse hsl(var(--*)))', () => {
+  test('Test 1: default → 1px slate-300 border, opacity 1.0', () => {
     expect(nodeStrokeForState('default')).toEqual({
       width: 1,
-      color: 'hsl(var(--border))',
+      color: '#cbd5e1',
       opacity: 1.0,
     })
   })
 
-  test('Test 2: selected → 3px primary, opacity 1.0, + 4px outer glow at 0.3 alpha', () => {
+  test('Test 2: selected → 3px blue-500 stroke, opacity 1.0, + 4px outer glow', () => {
     const stroke = nodeStrokeForState('selected')
     expect(stroke).toEqual({
       width: 3,
-      color: 'hsl(var(--primary))',
+      color: '#3b82f6',
       opacity: 1.0,
-      glow: { color: 'hsl(var(--primary)/0.3)', size: 4 },
+      glow: { color: '#3b82f64d', size: 4 },
     })
   })
 
-  test('Test 3: search-match → 2px amber hsl(45, 100%, 50%) — the hardcoded non-token color', () => {
+  test('Test 3: search-match → 2px amber-500 stroke', () => {
     expect(nodeStrokeForState('search-match')).toEqual({
       width: 2,
-      color: 'hsl(45, 100%, 50%)',
+      color: '#f59e0b',
       opacity: 1.0,
     })
   })
@@ -35,7 +35,7 @@ describe('nodeStrokeForState — UI-SPEC § Color State color overlays (lines 14
     const stroke = nodeStrokeForState('filter-dimmed')
     expect(stroke?.opacity).toBe(0.25)
     expect(stroke?.width).toBe(1)
-    expect(stroke?.color).toBe('hsl(var(--border))')
+    expect(stroke?.color).toBe('#cbd5e1')
   })
 
   test('Test 5: filter-hidden → null (caller decodes "do not render")', () => {

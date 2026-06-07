@@ -4,6 +4,7 @@
 //   + § Typography — active NavLink uses font-bold + accent underline
 //     (sole display-weight exception per UI-SPEC)
 
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Keyboard, Moon, Sun } from 'lucide-react'
 import { SYSTEM_LABELS, VALID_SYSTEMS, type System } from '@/config/system-endpoints'
@@ -34,14 +35,23 @@ export function NavBar({ onOpenHelpDialog }: NavBarProps) {
   const theme = useViewerStore((s) => s.theme)
   const setTheme = useViewerStore((s) => s.setTheme)
 
+  // Sync the document root .dark class with the store's theme on mount
+  // AND on every change. Previously the toggle only happened inside the
+  // click handler, so if localStorage persisted 'dark' from a prior
+  // session the store loaded 'dark' but `<html>` never got the `.dark`
+  // class — visually the app stayed light, the Sun icon (= "currently
+  // dark") was shown, and the first click visually did nothing while
+  // flipping the store to 'light' and the icon to Moon.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  }, [theme])
+
   const handleThemeToggle = () => {
     const next = theme === 'light' ? 'dark' : 'light'
     setTheme(next)
     persistTheme(next)
-    // Toggle the document root for Tailwind's `dark:` variants
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', next === 'dark')
-    }
+    // DOM sync now happens via the useEffect above; no inline toggle.
     Logger.info(Logger.Categories.PANELS, `Theme switched to ${next}`)
   }
 
