@@ -8,9 +8,9 @@ last_updated: "2026-06-07T10:35:00.000Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 23
-  completed_phases: 16
-  total_plans: 105
-  completed_plans: 107
+  completed_phases: 17
+  total_plans: 121
+  completed_plans: 123
   percent: 70
 ---
 
@@ -44,11 +44,11 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 - Phase 48: VKB graph strips `entity_type='System'` nodes when their team is unchecked
 - Phase 49: 187 orphan VKB entities (~24%) lack project-anchor relations
 - **Phase 50: LSL-grounded async observation resolver** — ✓ EXECUTED 2026-05-26 (3/3 plans merged; 181 tests passing; Plan 03 Task 4 human-verify checkpoint awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`)
-- **Phase 51: Agent-agnostic sub-agent capture** — PLANNED 2026-05-26 (11 plans / 6 waves committed; 4 RESEARCH-*.md artifacts shipped; ready for `/gsd-execute-phase 51` in a fresh session)
+- **Phase 51: Agent-agnostic sub-agent capture** — ✓ COMPLETE 2026-05-27. 16 plans landed (11 original + 5 gap-closure 51-12 → 51-16). HUMAN-UAT `status: resolved`, `passed_at: 2026-05-27T18:35:00Z`, `closed_by: 51-16-PLAN.md`. 6 ACs verified (4 PASS, 2 PARTIAL). Final closure commit `cc0c35b65 docs(phase-51): update tracking after wave 3 (51-16 closure)`. Three documented follow-ups still open in `.planning/todos/pending/`: `opencode-schema-migration-update.md`, `sweep-llm-proxy-probe-fix.md`, `json-export-missing-source-field.md`.
 - Phase 52: Dashboard LLM routing label + `process` tag observability fix
 - Phase 54: ETM hardening — launchd plist + isProcessing reset audit (NEW 2026-06-02; backlog). ETM stalled silently for 16h+ (PID 98287, no observation writes Jun 1 16:58 UTC → Jun 2 07:25 UTC) before manual SIGTERM+nohup restart cleared it. Three-plan scope: launchd plist so ETM auto-respawns like other coding services; top-level try/finally + watchdog around the `isProcessing` re-entrancy guard at `enhanced-transcript-monitor.js:4085-4135`; `bin/coding --claude` migrated to `launchctl kickstart` for ETM. Could-have: extend health-coordinator to surface ETM heartbeat so the next stall is caught by the 4-layer monitoring rather than the user noticing the dashboard "faded to black". See `.planning/phases/54-…/54-CONTEXT.md`.
 
-Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs`) that Phase 51 imports unchanged per D-Reuse. The rest of the backlog phases (47/48/49/52/54) remain unaddressed; pick up when blocking.
+Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs`) that Phase 51 (now ✓) imports unchanged per D-Reuse. The rest of the backlog phases (47/48/49/52/54) remain unaddressed; pick up when blocking.
 
 ## Current Position
 
