@@ -4,8 +4,7 @@
 //   + UI-SPEC § Icon-only controls table — collapse toggle uses
 //     "Show filters" / "Hide filters" state-dependent aria-label.
 
-import { useEffect, useMemo, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
 import type { ApiClient } from '@/api/ApiClient'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -15,6 +14,16 @@ import { Logger } from '@/lib/logging'
 
 export interface FilterRailProps {
   apiClient: ApiClient
+  /**
+   * Ontology classes derived from the actual entity payload — not the
+   * hardcoded /api/v1/ontology/classes 4-element list. Wave 3 checkpoint
+   * surfaced that the ontology endpoint returned a typed-views subset
+   * (LearningArtifact / Observation / Digest / Insight) that excluded
+   * the wave-analysis hierarchy classes used by most live entities. The
+   * caller (UnifiedViewer) computes this `Set(entities.ontologyClass)`
+   * so every togglable class corresponds to real, filterable data.
+   */
+  classOptions: readonly string[]
   /** Returned from useKeyboardShortcuts so `/` focuses our search input. */
   registerSearchInputRef: (input: HTMLInputElement | null) => void
 }
@@ -26,7 +35,7 @@ const LEVELS: ReadonlyArray<{ value: Level; label: string }> = [
   { value: 3, label: 'L3' },
 ]
 
-export function FilterRail({ apiClient, registerSearchInputRef }: FilterRailProps) {
+export function FilterRail({ classOptions, registerSearchInputRef }: FilterRailProps) {
   const searchQuery = useViewerStore((s) => s.searchQuery)
   const setSearch = useViewerStore((s) => s.setSearch)
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
@@ -46,16 +55,11 @@ export function FilterRail({ apiClient, registerSearchInputRef }: FilterRailProp
     return () => registerSearchInputRef(null)
   }, [registerSearchInputRef])
 
-  // Ontology classes — fetched once per system via TanStack Query (the
-  // useGraphData hook owns the same query key elsewhere; here we hit the
-  // same cache so no duplicate fetch fires).
-  const ontologyQ = useQuery({
-    queryKey: ['ontology', apiClient.base],
-    queryFn: () => apiClient.listOntologyClasses(),
-    staleTime: 30_000,
-  })
-
-  const classes = useMemo(() => ontologyQ.data ?? [], [ontologyQ.data])
+  // Ontology classes — derived by the caller from the live entity payload
+  // (see UnifiedViewer.tsx classOptions). Wave 3 checkpoint replaced the
+  // separate /api/v1/ontology/classes fetch with this prop-driven list so
+  // the togglable classes correspond 1:1 with classes present in the data.
+  const classes = classOptions
 
   // Width contract: w-64 expanded, w-12 collapsed (UI-SPEC § Layout Contract row 3).
   const widthClass = collapsed ? 'w-12' : 'w-64'
@@ -146,12 +150,7 @@ export function FilterRail({ apiClient, registerSearchInputRef }: FilterRailProp
 
       <div className="space-y-2" data-testid="filter-class-section">
         <div className="text-xs font-medium text-muted-foreground">Class</div>
-        {ontologyQ.isLoading && (
-          <p className="text-xs text-muted-foreground" data-testid="filter-class-loading">
-            Loading classes…
-          </p>
-        )}
-        {!ontologyQ.isLoading && classes.length === 0 && (
+        {classes.length === 0 && (
           <p className="text-xs text-muted-foreground" data-testid="filter-class-empty">
             No classes available.
           </p>
@@ -170,16 +169,16 @@ export function FilterRail({ apiClient, registerSearchInputRef }: FilterRailProp
 }
 
 interface ClassListProps {
-  classes: ReadonlyArray<{ name: string; display?: { color?: string } }>
+  classes: readonly string[]
   selected: ReadonlySet<string>
   onToggle: (name: string) => void
 }
 
 function ClassList({ classes, selected, onToggle }: ClassListProps) {
   // Empty selected set = "all classes visible" per T-45-03-03 mitigation.
-  // We never seed defaults from a hardcoded list — only the server's set.
-  // Surface this via a small caption when relevant so the user knows their
-  // empty-set means everything is in scope.
+  // We never seed defaults from a hardcoded list — only the live set
+  // derived from the entity payload. Surface this via a debug log so the
+  // operator knows the empty-set means everything is in scope.
   useEffect(() => {
     if (selected.size === 0 && classes.length > 0) {
       Logger.debug(
@@ -193,20 +192,20 @@ function ClassList({ classes, selected, onToggle }: ClassListProps) {
 
   return (
     <div className="max-h-60 overflow-y-auto space-y-1" data-testid="filter-class-list">
-      {classes.map((cls) => {
-        const isSelected = selected.has(cls.name)
+      {classes.map((name) => {
+        const isSelected = selected.has(name)
         return (
           <label
-            key={cls.name}
+            key={name}
             className="flex items-center gap-2 text-sm cursor-pointer"
-            data-testid={`filter-class-${cls.name}`}
+            data-testid={`filter-class-${name}`}
           >
             <Checkbox
               checked={isSelected}
-              onCheckedChange={() => onToggle(cls.name)}
-              aria-label={cls.name}
+              onCheckedChange={() => onToggle(name)}
+              aria-label={name}
             />
-            <span className="truncate">{cls.name}</span>
+            <span className="truncate">{name}</span>
           </label>
         )
       })}

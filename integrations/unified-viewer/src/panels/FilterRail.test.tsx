@@ -31,14 +31,22 @@ function makeApiClient(overrides: Partial<ApiClient> = {}): ApiClient {
   } as unknown as ApiClient
 }
 
-function renderRail(apiClient: ApiClient, register = vi.fn()) {
+function renderRail(
+  apiClient: ApiClient,
+  register = vi.fn(),
+  classOptions: readonly string[] = ['Observation', 'Insight', 'Digest'],
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   return render(
     <QueryClientProvider client={client}>
       <TooltipProvider delayDuration={0}>
-        <FilterRail apiClient={apiClient} registerSearchInputRef={register} />
+        <FilterRail
+          apiClient={apiClient}
+          classOptions={classOptions}
+          registerSearchInputRef={register}
+        />
       </TooltipProvider>
     </QueryClientProvider>,
   )

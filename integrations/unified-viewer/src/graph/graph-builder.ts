@@ -9,7 +9,30 @@
 import Graph from 'graphology'
 import { classColor } from './color-fallback'
 import type { Entity, NodeState, OntologyClass, Relation } from './types'
-import type { ViewerState } from '@/store/viewer-store'
+import type { Level, ViewerState } from '@/store/viewer-store'
+
+/**
+ * Backend entities (Phase 44 /api/v1/entities) ship `entityType` but not
+ * `level`. Map the well-known hierarchy class names to filter levels so
+ * the Level checkboxes in FilterRail have a visible effect. Mapping
+ * derived from .planning memory notes: Project = L0, Component = L1,
+ * SubComponent = L2, Detail = L3. System / root nodes pin to L0.
+ */
+export function deriveLevel(ontologyClass: string | undefined): Level | undefined {
+  switch (ontologyClass) {
+    case 'System':
+    case 'Project':
+      return 0
+    case 'Component':
+      return 1
+    case 'SubComponent':
+      return 2
+    case 'Detail':
+      return 3
+    default:
+      return undefined
+  }
+}
 
 /**
  * Build a graphology Graph from API payloads. Random initial positions —
@@ -29,6 +52,11 @@ export function buildGraph(
   for (const e of entities) {
     const cls = ontology.find((c) => c.name === e.ontologyClass)
     const color = cls?.display?.color ?? classColor(e.ontologyClass, theme)
+    // Backend payloads omit `level` — derive it from the well-known
+    // ontology hierarchy so FilterRail's L0/L1/L2/L3 toggles actually
+    // exclude nodes. Falls back to `e.level` when the backend ever
+    // populates the field directly.
+    const level = e.level ?? deriveLevel(e.ontologyClass)
     // mergeNode (not addNode) is idempotent — re-applying the same id with
     // the same attributes is a no-op rather than a throw.
     graph.mergeNode(e.id, {
@@ -38,7 +66,7 @@ export function buildGraph(
       label: e.name,
       color,
       ontologyClass: e.ontologyClass,
-      level: e.level,
+      level,
       description: e.description,
     })
   }

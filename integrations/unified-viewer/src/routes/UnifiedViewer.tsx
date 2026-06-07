@@ -11,7 +11,7 @@
 // Contract surfaces. The graph canvas remains Plan 02's SigmaCanvas;
 // Plan 03 just sits around it.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   isValidSystem,
@@ -21,6 +21,7 @@ import {
 import { ApiClient } from '@/api/ApiClient'
 import { SigmaCanvas } from '@/graph/SigmaCanvas'
 import { useGraphData } from '@/graph/useGraphData'
+import { deriveLevel } from '@/graph/graph-builder'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useViewerStore } from '@/store/viewer-store'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
@@ -71,17 +72,47 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
 
   const { entities, relations, isLoading, error } = useGraphData(apiClient, system)
 
+  // Log fetch errors exactly once per error transition, not on every render.
+  // Plan 03 wired Logger.error inline inside the canvas IIFE which fired
+  // on every re-render while in the error state — the operator checkpoint
+  // surfaced the resulting console spam.
+  useEffect(() => {
+    if (error) {
+      Logger.error(Logger.Categories.API, `Graph fetch failed: ${error.message}`)
+    }
+  }, [error])
+
+  // Derive the actual ontology classes present in the fetched entities so
+  // FilterRail's "Class" section reflects reality. The km-core
+  // /api/v1/ontology/classes endpoint returns a hardcoded 4-element list
+  // (LearningArtifact / Observation / Digest / Insight) that doesn't
+  // include the wave-analysis hierarchy classes (System / Project /
+  // Component / SubComponent / Detail), so deriving from entities is the
+  // only truthful representation until Plan 45-04 lands the display
+  // overlay endpoint.
+  const classOptions = useMemo<readonly string[]>(() => {
+    const set = new Set<string>()
+    for (const e of entities) {
+      if (typeof e.ontologyClass === 'string' && e.ontologyClass.length > 0) {
+        set.add(e.ontologyClass)
+      }
+    }
+    return Array.from(set).sort()
+  }, [entities])
+
   const searchQuery = useViewerStore((s) => s.searchQuery)
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
   const selectedClasses = useViewerStore((s) => s.selectedClasses)
 
   // Visible-count predicate — same rules computeNodeState uses (UI-SPEC).
+  // Level derivation mirrors graph-builder.ts so the Footer count and
+  // the graph visibility stay consistent under the L0/L1/L2/L3 toggles.
   const visibleCount = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return entities.reduce((n, e) => {
+      const level = e.level ?? deriveLevel(e.ontologyClass)
       const levelOk =
-        e.level === undefined ||
-        visibleLevels.has(e.level as 0 | 1 | 2 | 3)
+        level === undefined || visibleLevels.has(level)
       const classOk =
         selectedClasses.size === 0 ||
         (typeof e.ontologyClass === 'string' && selectedClasses.has(e.ontologyClass))
@@ -96,8 +127,6 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   const canvas = (() => {
     if (isLoading) return <InitialLoadingState system={system} />
     if (error) {
-      const message = error.message
-      Logger.error(Logger.Categories.API, `Graph fetch failed: ${message}`)
       if (isCorsError(error)) {
         return (
           <ErrorCorsState
@@ -146,6 +175,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
         <div className="flex flex-1 overflow-hidden">
           <FilterRail
             apiClient={apiClient}
+            classOptions={classOptions}
             registerSearchInputRef={registerSearchInputRef}
           />
           <main

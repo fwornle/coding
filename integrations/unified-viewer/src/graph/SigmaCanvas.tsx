@@ -58,6 +58,15 @@ export function SigmaCanvas({ apiClient, system }: SigmaCanvasProps) {
         style={{ height: '100%', width: '100%', background: 'transparent' }}
         settings={{
           allowInvalidContainer: true,
+          // Label density — sigma's defaults render every node's label at
+          // every zoom level, producing unreadable text-soup on >200-node
+          // graphs (Plan 03 checkpoint feedback). Raise the size threshold
+          // + lower density so labels only show when the user zooms in
+          // close enough that they don't overlap.
+          renderEdgeLabels: false,
+          labelRenderedSizeThreshold: 12,
+          labelDensity: 0.07,
+          labelGridCellSize: 150,
         }}
       >
         <GraphSetup apiClient={apiClient} system={system} />
