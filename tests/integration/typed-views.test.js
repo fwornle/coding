@@ -1,27 +1,30 @@
 /**
  * tests/integration/typed-views.test.js
  *
- * Phase 44 Wave 0 — RED test stub.
+ * Phase 44 Plan 16 — POST-LOCK wire-shape contract.
  *
- * Asserts the A-side legacy typed-view contract for the URLs Plan 44-07 will
- * land at /api/coding/{observations,digests,insights}. Pitfall 2 lock — the
- * dashboard at :3032 reads these URLs, so the response shape is brittle and
- * MUST be preserved verbatim across the SQLite→km-core cutover.
+ * Asserts the A-side legacy typed-view contract for /api/coding/{observations,
+ * digests,insights}. Pitfall 2 lock — the dashboard at :3032 reads these URLs,
+ * so the response shape is brittle and MUST be preserved verbatim.
  *
- * EXPECTED FAILURE MODE (RED today):
- *   * A's obs-api currently serves `/api/observations`, `/api/digests`,
- *     `/api/insights` (legacy paths WITHOUT the /coding/ prefix).
- *   * The /api/coding/* paths do NOT exist today — Plan 44-07 mounts them
- *     as typed views reading km-core entities and reshaping via
- *     lib/km-core/src/adapters/observation-view.ts.
- *   * `fetch http://localhost:12436/api/coding/observations?limit=1` returns
- *     HTTP 404 today; the response-shape assertions then fail because we
- *     branched on `res.status === 200` (the assertion message names the URL
- *     and current status).
- *
- * GOES GREEN after: Plan 44-07 mounts /api/coding/{observations,digests,
- *   insights} as typed views over km-core, AND Plan 44-10 has migrated the
- *   SQLite rows into km-core entities so the views return non-empty arrays.
+ * WIRE-SHAPE LOCK (Plan 44-16, 2026-06-07):
+ *   * Digests + Insights serialize multi-word fields as camelCase:
+ *     observationIds, filesTouched, digestIds, lastUpdated, createdAt.
+ *   * Observations stay snake_case where the SQL column was already snake_case
+ *     (session_id) — the pre-cutover SQL handler did NOT alias session_id, so
+ *     it rode through unchanged. All other observation fields are single-word.
+ *   * Rationale (do not relitigate without an amendment):
+ *       1. Pre-cutover SQLite handler aliased columns to camelCase
+ *          (`observation_ids AS observationIds`, etc. — documented inline at
+ *          lib/km-core/src/adapters/observation-view.ts:74-75,95-96).
+ *       2. 17 dashboard reader sites consume camelCase verbatim
+ *          (integrations/system-health-dashboard/src/pages/{digests,insights,
+ *          coverage}.tsx + store/slices/ukbSlice.ts + markdown-text.tsx).
+ *       3. lib/km-core/src/adapters/observation-view.ts emits camelCase by
+ *          design (Plan 44-05).
+ *       4. The Wave 0 RED stub asserted snake_case based on SQL column
+ *          names alone — a spec error; corrected here.
+ *   * See: .planning/phases/44-rest-api-git-snapshots/44-CONTEXT-amendment-4.md
  *
  * Runner: Jest 29 (matches the repo's existing tests/integration/*.test.js
  *   convention — package.json `"test": "... jest"`).
@@ -43,9 +46,9 @@ const REQUIRED_DIGEST_KEYS = [
   'date',
   'theme',
   'summary',
-  'observation_ids',
+  'observationIds',
   'agents',
-  'files_touched',
+  'filesTouched',
   'project',
 ];
 
@@ -54,8 +57,8 @@ const REQUIRED_INSIGHT_KEYS = [
   'topic',
   'summary',
   'confidence',
-  'digest_ids',
-  'last_updated',
+  'digestIds',
+  'lastUpdated',
   'project',
 ];
 
@@ -121,9 +124,9 @@ describe('A typed views — /api/coding/{observations,digests,insights} (Phase 4
     expect(typeof row.id).toBe('string');
     expect(typeof row.theme).toBe('string');
     expect(typeof row.summary).toBe('string');
-    expect(Array.isArray(row.observation_ids)).toBe(true);
+    expect(Array.isArray(row.observationIds)).toBe(true);
     expect(Array.isArray(row.agents)).toBe(true);
-    expect(Array.isArray(row.files_touched)).toBe(true);
+    expect(Array.isArray(row.filesTouched)).toBe(true);
   });
 
   test('GET /api/coding/insights returns legacy insight shape', async () => {
@@ -136,8 +139,8 @@ describe('A typed views — /api/coding/{observations,digests,insights} (Phase 4
     expect(typeof row.topic).toBe('string');
     expect(typeof row.summary).toBe('string');
     expect(typeof row.confidence).toBe('number');
-    expect(Array.isArray(row.digest_ids)).toBe(true);
-    expect(typeof row.last_updated).toBe('string');
+    expect(Array.isArray(row.digestIds)).toBe(true);
+    expect(typeof row.lastUpdated).toBe('string');
   });
 
   test('GET /api/coding/observations?agent=claude&project=coding filters server-side', async () => {
