@@ -6,13 +6,14 @@
 // state can leak across /viewer/coding -> /viewer/okb transitions
 // (Pitfall 2 lock).
 //
-// ViewerCore in this plan is a STUB layout (NavBar wordmark + 3 placeholder
-// regions for FilterRail / GraphCanvas / SidePanel). Real implementations
-// land in Plans 02-05.
+// ViewerCore composes the layout shell. The GraphCanvas region renders
+// the live <SigmaCanvas/> (Plan 02). FilterRail and SidePanel remain
+// stubs until Plan 03 lands.
 
 import { useParams } from 'react-router-dom'
 import { isValidSystem, SYSTEM_ENDPOINTS, SYSTEM_LABELS, type System } from '@/config/system-endpoints'
 import { ApiClient } from '@/api/ApiClient'
+import { SigmaCanvas } from '@/graph/SigmaCanvas'
 import { UnknownSystem } from './UnknownSystem'
 
 interface ViewerCoreProps {
@@ -48,13 +49,10 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
           </div>
         </aside>
         <main
-          className="flex-1 bg-background p-4 overflow-hidden"
+          className="flex-1 bg-background overflow-hidden relative"
           data-testid="viewer-canvas"
         >
-          <div className="text-xs font-medium text-muted-foreground">Graph Canvas</div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            (Plan 02 wires SigmaCanvas — force-directed render.)
-          </div>
+          <SigmaCanvas apiClient={apiClient} system={system} />
         </main>
         <aside
           className="w-96 bg-card border-l border-border p-4 overflow-y-auto"

@@ -5,9 +5,18 @@
 // Test 5: Switching :system unmounts and re-mounts the subtree
 //         (proven via a DOM-ref check — the wordmark element is a NEW DOM node).
 
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
+
+// Mock SigmaCanvas — its sigma + graphology-layout-forceatlas2 imports
+// trip ESM-resolution under jsdom (Plan 02 wires the live component). The
+// routing tests below only care about the wordmark + baseurl, not the
+// canvas internals — those have dedicated reducer tests in graph/.
+vi.mock('@/graph/SigmaCanvas', () => ({
+  SigmaCanvas: () => null,
+}))
+
 import { UnifiedViewer } from './UnifiedViewer'
 import { UnknownSystem } from './UnknownSystem'
 
