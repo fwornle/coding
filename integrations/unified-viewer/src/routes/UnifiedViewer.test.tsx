@@ -44,10 +44,19 @@ describe('UnifiedViewer routing', () => {
     cleanup()
   })
 
-  test('/viewer/foo redirects to /viewer/coding (invalid system)', () => {
+  test('/viewer/foo renders UnknownSystem (invalid system slug under /viewer/)', () => {
+    // Per 45-01-PLAN.md Task 2 Test 4 + Task 3 manual check #4 + UI-SPEC § Routing
+    // line 231: /viewer/{unknown} must render the UnknownSystem 404 page with
+    // three labelled links — NOT silently redirect to /viewer/coding.
     renderAt('/viewer/foo')
-    // After redirect, the Coding wordmark should appear
-    expect(screen.getByTestId('viewer-wordmark')).toHaveTextContent('Coding')
+    const unknown = screen.getByTestId('unknown-system')
+    expect(unknown).toBeInTheDocument()
+    const links = screen.getByTestId('unknown-system-links').querySelectorAll('a')
+    expect(links).toHaveLength(3)
+    const labels = Array.from(links).map((a) => a.textContent)
+    expect(labels).toContain('Coding')
+    expect(labels).toContain('OKB')
+    expect(labels).toContain('CAP')
     cleanup()
   })
 

@@ -10,9 +10,10 @@
 // regions for FilterRail / GraphCanvas / SidePanel). Real implementations
 // land in Plans 02-05.
 
-import { useParams, Navigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { isValidSystem, SYSTEM_ENDPOINTS, SYSTEM_LABELS, type System } from '@/config/system-endpoints'
 import { ApiClient } from '@/api/ApiClient'
+import { UnknownSystem } from './UnknownSystem'
 
 interface ViewerCoreProps {
   system: System
@@ -75,7 +76,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
 export function UnifiedViewer() {
   const { system } = useParams<{ system: string }>()
   if (!isValidSystem(system)) {
-    return <Navigate to="/viewer/coding" replace />
+    return <UnknownSystem />
   }
   // Construct a fresh ApiClient per remount. Because <ViewerCore key={system}/>
   // unmounts the subtree on system change, this instance is also disposed,
