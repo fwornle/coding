@@ -72,7 +72,12 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  // Phase 45 Plan 04: @tailwindcss/typography plugin is REQUIRED because
+  // MarkdownViewerPanel wraps rendered markdown in `prose prose-sm
+  // dark:prose-invert max-w-none` per UI-SPEC § MarkdownViewer Panel.
+  // Without this, prose-* classes are no-ops and the markdown renders
+  // un-styled.
+  plugins: [require('@tailwindcss/typography')],
 }
 
 export default config

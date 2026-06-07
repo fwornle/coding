@@ -9,6 +9,7 @@ import type { ApiClient } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EntityDetailPanel } from './EntityDetailPanel'
+import { MarkdownViewerPanel } from './MarkdownViewerPanel'
 import { Logger } from '@/lib/logging'
 
 export interface SidePanelProps {
@@ -64,13 +65,8 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
         </TabsContent>
 
         {showMarkdown && (
-          <TabsContent value="markdown" className="px-4 pb-4">
-            <div
-              data-testid="tab-markdown-placeholder"
-              className="p-md text-sm text-muted-foreground"
-            >
-              Markdown panel — landing in Plan 04
-            </div>
+          <TabsContent value="markdown" className="px-4 pb-4 h-[calc(100vh-8rem)]">
+            <MarkdownViewerPanel apiClient={apiClient} system={system} />
           </TabsContent>
         )}
 

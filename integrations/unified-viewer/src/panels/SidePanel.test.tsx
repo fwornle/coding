@@ -10,6 +10,7 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useViewerStore } from '@/store/viewer-store'
 
 vi.mock('@/graph/useGraphData', () => ({
@@ -27,7 +28,18 @@ import type { ApiClient } from '@/api/ApiClient'
 
 function renderPanel(system: 'coding' | 'okb' | 'cap') {
   const apiClient = { base: 'http://test.local' } as ApiClient
-  return render(<SidePanel apiClient={apiClient} system={system} />)
+  // QueryClientProvider is required because the okb Markdown tab now hosts
+  // MarkdownViewerPanel, which uses TanStack Query to fetch markdown_url
+  // content. The cap branch's RCA panel placeholder doesn't need it but
+  // wrapping all renders is harmless.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SidePanel apiClient={apiClient} system={system} />
+    </QueryClientProvider>,
+  )
 }
 
 describe('SidePanel', () => {
@@ -57,7 +69,7 @@ describe('SidePanel', () => {
     expect(screen.getByTestId('tab-rca')).toBeInTheDocument()
   })
 
-  test('Test 2a: switching to Markdown tab (okb) renders the Plan 04 placeholder', () => {
+  test('Test 2a: switching to Markdown tab (okb) renders the Plan 04 MarkdownViewerPanel empty state', () => {
     renderPanel('okb')
     const trigger = screen.getByTestId('tab-markdown')
     // Radix Tabs use a mouse-down + click pair internally; mousedown
@@ -65,8 +77,11 @@ describe('SidePanel', () => {
     fireEvent.pointerDown(trigger, { pointerType: 'mouse', button: 0 })
     fireEvent.mouseDown(trigger)
     fireEvent.click(trigger)
-    expect(screen.getByTestId('tab-markdown-placeholder')).toHaveTextContent(
-      'Markdown panel — landing in Plan 04',
+    // Plan 04 replaced the placeholder with the real MarkdownViewerPanel.
+    // Since selectedNodeId is null in beforeEach, the panel renders its
+    // empty state (data-testid="markdown-empty").
+    expect(screen.getByTestId('markdown-empty')).toHaveTextContent(
+      'Select a node with a description to view its markdown.',
     )
   })
 
