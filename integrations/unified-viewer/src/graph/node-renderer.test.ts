@@ -43,34 +43,34 @@ describe('nodeStrokeForState — UI-SPEC § Color State color overlays (lines 14
   })
 })
 
-describe('edgeStateForRelation — UI-SPEC § Color Edges (line 152)', () => {
-  test('Test 6a: incident on selected node → primary-incident style', () => {
+describe('edgeStateForRelation — Plan 03 round 2 hex palette (sigma WebGL cannot parse hsl(var(--*)))', () => {
+  test('Test 6a: incident on selected node → primary blue, opacity 1.0', () => {
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, 'a')
-    expect(s).toEqual({ color: 'hsl(var(--primary)/0.6)', opacity: 1.0 })
+    expect(s).toEqual({ color: '#3b82f6', opacity: 1.0 })
 
     const s2 = edgeStateForRelation({ from: 'a', to: 'b' }, 'b')
-    expect(s2).toEqual({ color: 'hsl(var(--primary)/0.6)', opacity: 1.0 })
+    expect(s2).toEqual({ color: '#3b82f6', opacity: 1.0 })
   })
 
-  test('Test 6b: non-incident (selected=c) → default style', () => {
+  test('Test 6b: non-incident (selected=c) → default slate, opacity 0.6', () => {
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, 'c')
-    expect(s).toEqual({ color: 'hsl(var(--border))', opacity: 0.5 })
+    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.6 })
   })
 
-  test('Test 6c: both endpoints dimmed → dim-incident style', () => {
+  test('Test 6c: both endpoints dimmed → near-invisible slate, opacity 0.15', () => {
     const dimmed = new Set(['a', 'b'])
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, null, dimmed)
-    expect(s).toEqual({ color: 'hsl(var(--border))', opacity: 0.1 })
+    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.15 })
   })
 
-  test('Test 6d: only one endpoint dimmed → default style', () => {
+  test('Test 6d: only one endpoint dimmed → default slate', () => {
     const dimmed = new Set(['a'])
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, null, dimmed)
-    expect(s).toEqual({ color: 'hsl(var(--border))', opacity: 0.5 })
+    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.6 })
   })
 
-  test('Test 6e: null selectedNodeId, no dimmed set → default style', () => {
+  test('Test 6e: null selectedNodeId, no dimmed set → default slate', () => {
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, null)
-    expect(s).toEqual({ color: 'hsl(var(--border))', opacity: 0.5 })
+    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.6 })
   })
 })

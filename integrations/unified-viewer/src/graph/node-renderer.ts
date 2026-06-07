@@ -65,14 +65,19 @@ export function edgeStateForRelation(
   selectedNodeId: string | null,
   dimmedNodeIds?: ReadonlySet<string>,
 ): EdgeStyle {
-  // Priority 1: incident on the selected node
+  // Plan 03 round 2 (cont'd from black-nodes fix): sigma's WebGL color
+  // parser silently rejects `hsl(var(--*))` CSS-var strings and falls
+  // back to invisible. Use fixed hex values so edges actually render —
+  // theme-aware variants land when SigmaCanvas wires a theme-conditional
+  // settings hook. Colors picked from the Plan 03 round 2 slate scale:
+  //   default:  #cbd5e1 (slate-300) at opacity 0.6
+  //   incident: #3b82f6 (blue-500)  at opacity 1.0 — matches selected stroke
+  //   dimmed:   #cbd5e1 at opacity 0.15 (mostly invisible)
   if (selectedNodeId !== null && (edge.from === selectedNodeId || edge.to === selectedNodeId)) {
-    return { color: 'hsl(var(--primary)/0.6)', opacity: 1.0 }
+    return { color: '#3b82f6', opacity: 1.0 }
   }
-  // Priority 2: incident only on dimmed nodes (both endpoints dimmed)
   if (dimmedNodeIds && dimmedNodeIds.has(edge.from) && dimmedNodeIds.has(edge.to)) {
-    return { color: 'hsl(var(--border))', opacity: 0.1 }
+    return { color: '#cbd5e1', opacity: 0.15 }
   }
-  // Default
-  return { color: 'hsl(var(--border))', opacity: 0.5 }
+  return { color: '#cbd5e1', opacity: 0.6 }
 }
