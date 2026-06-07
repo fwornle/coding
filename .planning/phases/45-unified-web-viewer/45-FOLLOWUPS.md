@@ -102,3 +102,34 @@ CORS-locked from a localhost origin. Both are outside Phase 45's scope.
 - Operator UX: until the backends exist, the ErrorCorsState / ErrorUnreachableState
   components correctly inform the operator. Consider a "Backend not configured"
   variant that's friendlier than "CORS blocked".
+
+## Backend has 0 relations even though it has 1000 entities (Plan 03 round 3)
+
+**Surfaced during:** Plan 45-03 round 3 operator checkpoint ("no edges visible ever").
+
+**Diagnosis:** `curl http://localhost:12436/api/v1/entities` returns 1000 entities;
+`curl http://localhost:12436/api/v1/relations` returns `{"success":true,"data":[]}`
+— empty array. The relations store is genuinely empty, not a query bug. The
+frontend's graph-builder + edge reducer are wired correctly; with no input data
+there is nothing for sigma to draw.
+
+**Historical context (per `.planning/memory` notes):** the wave-analysis pipeline
+has at times produced ~178 relations, but those are not currently surfaced via the
+REST API or the underlying GraphKMStore. The discrepancy may be due to:
+- wave-analysis writing to a different store than what km-core's `findRelations`
+  reads from (e.g. Memgraph vs LevelDB).
+- The Phase 42.2 LSL re-keying never resurfacing the relation triples on the
+  current store.
+- A persistence path that drops relations during dedup / merge.
+
+**Where to dig:**
+- `lib/km-core/src/store/GraphKMStore.ts:583` — `addRelation()` write path.
+- `lib/km-core/src/store/GraphKMStore.ts:609` — `findRelations()` query path.
+- `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` —
+  does the wave controller actually call `addRelation` or only `addEntity`?
+- `.data/knowledge-graph/leveldb/` — LevelDB sublevels for relation keys (look for
+  `r:` or `rel:` prefixes).
+
+**What Phase 45 does (mitigation):** graph-builder + node-renderer now use hex
+colors throughout so as soon as the data backfills, edges will render visibly
+(slate at opacity 0.6 default, blue at opacity 1.0 incident-on-selected).
