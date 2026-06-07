@@ -303,22 +303,28 @@ describe('RcaOpsPanel (Plan 45-05 Task 2)', () => {
 
   // Panel Test 9 -----------------------------------------------------------
   test('Test 9 (watchdog T-45-05-02): no SSE message for 120s → STALE error card auto-clears runningPipeline', async () => {
-    vi.useFakeTimers()
     harness.listDirs.mockResolvedValue(POPULATED_DIRS)
     renderPanel()
-    // findByTestId uses real timers internally — switch back briefly.
-    vi.useRealTimers()
     await screen.findByTestId('rca-row-kpifw-0')
-    vi.useFakeTimers()
 
-    fireEvent.click(screen.getAllByRole('button', { name: /^Ingest$/ })[0])
-    // Emit one event to seed lastEventAt to "now".
+    // Switch to fake timers AFTER the initial query resolves so React Query's
+    // internal microtask plumbing doesn't get stuck. We must fake Date too so
+    // the watchdog's `Date.now() - lastEventAtRef.current` math advances.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+
+    // Click + emit inside act so the watchdog useEffect registers its
+    // setInterval against the FAKE timer API before we advance.
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /^Ingest$/ })[0])
+    })
+    // Emit one event to seed lastEventAt to "now" (fake-Date now).
     emit({ type: 'stage', stage: 'extract' })
 
-    // Advance 121s past the watchdog window. The watchdog effect ticks at
-    // an internal interval (≤30s) and detects staleness once threshold passes.
+    // Advance 130s past the watchdog window. The watchdog effect ticks at
+    // an internal interval (5s) and detects staleness once threshold passes.
+    // We need to cross the 120s mark, plus enough slack for the next 5s tick.
     await act(async () => {
-      vi.advanceTimersByTime(121_000)
+      vi.advanceTimersByTime(130_000)
     })
 
     const completion = screen.getByTestId('rca-completion-card')

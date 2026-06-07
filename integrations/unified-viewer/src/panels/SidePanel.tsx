@@ -10,6 +10,7 @@ import type { System } from '@/config/system-endpoints'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EntityDetailPanel } from './EntityDetailPanel'
 import { MarkdownViewerPanel } from './MarkdownViewerPanel'
+import { RcaOpsPanel } from './RcaOpsPanel'
 import { Logger } from '@/lib/logging'
 
 export interface SidePanelProps {
@@ -71,13 +72,8 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
         )}
 
         {showRca && (
-          <TabsContent value="rca" className="px-4 pb-4">
-            <div
-              data-testid="tab-rca-placeholder"
-              className="p-md text-sm text-muted-foreground"
-            >
-              RCA panel — landing in Plan 05
-            </div>
+          <TabsContent value="rca" className="px-4 pb-4 h-[calc(100vh-8rem)]">
+            <RcaOpsPanel apiClient={apiClient} system={system} />
           </TabsContent>
         )}
       </Tabs>
