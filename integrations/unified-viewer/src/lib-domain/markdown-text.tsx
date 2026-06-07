@@ -2,8 +2,8 @@
 //   integrations/system-health-dashboard/src/components/markdown-text.tsx
 // per 45-PATTERNS.md § markdown-text.tsx (Plan 45-03 Task 1).
 //
-// XSS guarantee (T-45-03-01): this renderer does NOT use dangerouslySetInnerHTML
-// and does NOT eval any HTML in `text` — every node is a React element built
+// XSS guarantee (T-45-03-01): this renderer never injects raw HTML.
+// Every node is a React element built
 // from the parsed string via `renderInline` / `flushList`. A `<script>` token
 // in the input renders as escaped text inside a <p> or <li>, never as a DOM
 // script tag. See markdown-text.test.tsx for the regression test.

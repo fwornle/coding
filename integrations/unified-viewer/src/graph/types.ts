@@ -15,6 +15,19 @@ export interface Entity {
   level?: 0 | 1 | 2 | 3
   description?: string
   metadata?: Record<string, unknown>
+  // Phase 39 DATA-02 provenance + identity fields (Plan 44-16 camelCase lock).
+  // Marked optional + present in the index signature because pre-Phase-39
+  // entities don't carry them.
+  parent?: string
+  createdAt?: string
+  createdBy?: string
+  confirmationCount?: number
+  lastConfirmedAt?: string
+  lastConfirmedBy?: string
+  lastSegment?: string
+  /** Index signature lets the EntityDetailPanel Raw section render any
+   *  additional server-side fields without a TS-strict break. */
+  [k: string]: unknown
 }
 
 export interface Relation {

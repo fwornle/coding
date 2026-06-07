@@ -14,25 +14,25 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 export interface IconButtonProps {
   /** Lucide icon component. */
-  icon: LucideIcon
+  icon: LucideIcon;
   /**
    * Accessible name. Required — screen readers announce this in lieu of
    * visible text. Per UI-SPEC § Icon-only controls table, the exact copy
    * is part of the design contract (no executor discretion).
    */
-  ariaLabel: string
+  ariaLabel: string;
   /** Tooltip text shown on hover/focus. Falls back to `ariaLabel` when omitted. */
-  tooltipText?: string
+  tooltipText?: string;
   /** Click handler. */
-  onClick?: () => void
+  onClick?: () => void;
   /** Shadcn Button variant — defaults to `ghost`. */
-  variant?: 'ghost' | 'outline' | 'default'
+  variant?: 'ghost' | 'outline' | 'default';
   /** Shadcn Button size — defaults to `icon`. */
-  size?: 'icon' | 'icon-sm' | 'icon-lg' | 'sm'
+  size?: 'icon' | 'icon-sm' | 'icon-lg' | 'sm';
   /** Disabled flag forwarded to the underlying <button>. */
-  disabled?: boolean
+  disabled?: boolean;
   /** Optional `data-testid` for test targeting. */
-  'data-testid'?: string
+  'data-testid'?: string;
 }
 
 /**
