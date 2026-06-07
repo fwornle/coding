@@ -1,14 +1,28 @@
-// Phase 45 Plan 01 — Task 1 placeholder entry. Task 2 OVERWRITES this with
-// the React + QueryClient + Router shell (PATTERN SOURCE: 45-PATTERNS.md § main.tsx).
-// The placeholder exists so `vite build` succeeds at the end of Task 1 — the
-// shape-lock test runs independently of bundle integrity, but Task 1's <done>
-// requires the package to build.
+// PATTERN SOURCE: integrations/system-health-dashboard/src/main.tsx:1-10
+// + 45-PATTERNS.md § main.tsx (QueryClient defaults)
+//
+// React.StrictMode + QueryClientProvider (staleTime 30s, refetchOnWindowFocus true).
+// No Redux Provider — Zustand stores are provider-less.
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import App from './App'
 import './index.css'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: true,
+    },
+  },
+})
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <div>Loading Unified Viewer (Task 2 wires the real router)…</div>
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </React.StrictMode>,
 )

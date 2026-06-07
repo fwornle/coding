@@ -1,0 +1,133 @@
+// PATTERN SOURCES:
+//   integrations/system-health-dashboard/src/store/middleware/apiMiddleware.ts:10-30 (fetch+throw idiom)
+//   integrations/system-health-dashboard/src/pages/digests.tsx:29-34 (envelope `body.data` shape)
+//   lib/km-core/src/api/handlers/ontology.ts:50-68 (canonical /api/v1 routes)
+//   45-PATTERNS.md § ApiClient.ts (the class structure)
+//
+// km-core /api/v1 REST client + Phase 44 typed-views endpoints.
+//
+// The `?withDisplay=true` ontology branch targets Plan 04's extension (the server
+// side lands later). Until Plan 04 ships, the existing handler returns a string
+// array — we transparently map it to `[{name: s}]` so the graph renderer in Plan
+// 02 sees a uniform shape regardless of which side ships first.
+
+import type { Digest, Insight, Observation } from './schemas'
+
+interface ApiSuccess<T> { success: true; data: T }
+interface ApiError { success: false; error: string }
+
+/** km-core canonical entity shape (Phase 44 /api/v1/entities). */
+export interface Entity {
+  id: string
+  name: string
+  ontologyClass: string
+  description?: string | null
+  level?: number
+  [k: string]: unknown
+}
+
+/** km-core canonical relation shape (Phase 44 /api/v1/relations). */
+export interface Relation {
+  from: string
+  to: string
+  type?: string
+  [k: string]: unknown
+}
+
+/** Ontology class — pre-Plan-04 returns `string[]`, post-Plan-04 returns objects. */
+export interface OntologyClass {
+  name: string
+  level?: number
+  parent?: string | null
+  display?: {
+    color?: string
+    icon?: string
+    shape?: string
+  }
+}
+
+/** Entity neighborhood payload (Phase 44 /api/v1/entities/:id/neighbors). */
+export interface NeighborhoodPayload {
+  entity: Entity
+  neighbors: Entity[]
+  relations: Relation[]
+}
+
+/** Phase 44 typed-view envelope shape (matches Pitfall 2 envelope in typed-views.test.js). */
+export interface TypedViewEnvelope<T> {
+  data: T[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export class ApiClient {
+  constructor(private readonly baseUrl: string) {}
+
+  /** Expose baseUrl for diagnostics + error-banner copy. */
+  get base(): string {
+    return this.baseUrl
+  }
+
+  private async get<T>(path: string): Promise<T> {
+    const url = `${this.baseUrl}${path}`
+    const res = await fetch(url, { headers: { Accept: 'application/json' } })
+    if (!res.ok) {
+      throw new Error(`${url} → HTTP ${res.status}`)
+    }
+    const body = (await res.json()) as ApiSuccess<T> | ApiError
+    if (!body.success) {
+      throw new Error(body.error)
+    }
+    return body.data
+  }
+
+  listEntities(): Promise<Entity[]> {
+    return this.get<Entity[]>('/api/v1/entities')
+  }
+
+  listRelations(): Promise<Relation[]> {
+    return this.get<Relation[]>('/api/v1/relations')
+  }
+
+  /**
+   * Phase 45 Plan 04 extension. Targets `?withDisplay=true` by default.
+   * BC fallback: if the server still returns `string[]` (current pre-Plan-04
+   * shape), map to `[{name: s}]` so callers see a uniform OntologyClass[].
+   */
+  async listOntologyClasses(): Promise<OntologyClass[]> {
+    const raw = await this.get<unknown>('/api/v1/ontology/classes?withDisplay=true')
+    if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') {
+      // Pre-Plan-04 shape — wrap so consumers can rely on `.name`.
+      return (raw as string[]).map((name) => ({ name }))
+    }
+    return raw as OntologyClass[]
+  }
+
+  /** Back-compat path — explicit pre-Plan-04 shape (array of class-name strings). */
+  listOntologyClassesNoDisplay(): Promise<string[]> {
+    return this.get<string[]>('/api/v1/ontology/classes')
+  }
+
+  getNeighbors(id: string, depth = 1): Promise<NeighborhoodPayload> {
+    const safeId = encodeURIComponent(id)
+    return this.get<NeighborhoodPayload>(
+      `/api/v1/entities/${safeId}/neighbors?depth=${depth}`,
+    )
+  }
+
+  // Phase 44 typed views (camelCase wire shape per Plan 44-16 lock).
+  // Path is system-specific — `/api/coding/*` for A. Other systems will mount
+  // their own typed-view paths in later phases; coding is what's live today.
+  listDigests(limit = 50): Promise<TypedViewEnvelope<Digest>> {
+    return this.get<TypedViewEnvelope<Digest>>(`/api/coding/digests?limit=${limit}`)
+  }
+
+  listInsights(limit = 50): Promise<TypedViewEnvelope<Insight>> {
+    return this.get<TypedViewEnvelope<Insight>>(`/api/coding/insights?limit=${limit}`)
+  }
+
+  listObservations(limit = 50): Promise<TypedViewEnvelope<Observation>> {
+    return this.get<TypedViewEnvelope<Observation>>(`/api/coding/observations?limit=${limit}`)
+  }
+}
