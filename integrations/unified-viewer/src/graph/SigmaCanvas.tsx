@@ -64,9 +64,11 @@ export function SigmaCanvas({ apiClient, system }: SigmaCanvasProps) {
           // + lower density so labels only show when the user zooms in
           // close enough that they don't overlap.
           renderEdgeLabels: false,
-          labelRenderedSizeThreshold: 12,
-          labelDensity: 0.07,
-          labelGridCellSize: 150,
+          labelRenderedSizeThreshold: 6,
+          labelDensity: 0.4,
+          labelGridCellSize: 80,
+          labelSize: 12,
+          labelWeight: '500',
         }}
       >
         <GraphSetup apiClient={apiClient} system={system} />

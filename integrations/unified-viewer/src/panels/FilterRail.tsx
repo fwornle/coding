@@ -40,8 +40,10 @@ export function FilterRail({ classOptions, registerSearchInputRef }: FilterRailP
   const setSearch = useViewerStore((s) => s.setSearch)
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
   const toggleLevel = useViewerStore((s) => s.toggleLevel)
+  const setVisibleLevels = useViewerStore((s) => s.setVisibleLevels)
   const selectedClasses = useViewerStore((s) => s.selectedClasses)
   const toggleClass = useViewerStore((s) => s.toggleClass)
+  const setSelectedClasses = useViewerStore((s) => s.setSelectedClasses)
   const collapsed = useViewerStore((s) => s.filterRailCollapsed)
   const setCollapsed = useViewerStore((s) => s.setFilterRailCollapsed)
 
@@ -120,7 +122,21 @@ export function FilterRail({ classOptions, registerSearchInputRef }: FilterRailP
       </div>
 
       <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">Level</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-medium text-muted-foreground">Level</div>
+          <SelectAllNone
+            allLabel="All"
+            noneLabel="None"
+            onAll={() => {
+              setVisibleLevels(new Set<Level>([0, 1, 2, 3]))
+              Logger.info(Logger.Categories.FILTERS, 'Selected all levels')
+            }}
+            onNone={() => {
+              setVisibleLevels(new Set<Level>())
+              Logger.info(Logger.Categories.FILTERS, 'Cleared all levels')
+            }}
+          />
+        </div>
         <div className="space-y-1">
           {LEVELS.map(({ value, label }) => {
             const checked = visibleLevels.has(value)
@@ -134,7 +150,7 @@ export function FilterRail({ classOptions, registerSearchInputRef }: FilterRailP
                   checked={checked}
                   onCheckedChange={() => {
                     toggleLevel(value)
-                    Logger.debug(
+                    Logger.info(
                       Logger.Categories.FILTERS,
                       `Level ${label} ${checked ? 'hidden' : 'shown'}`,
                     )
@@ -149,7 +165,25 @@ export function FilterRail({ classOptions, registerSearchInputRef }: FilterRailP
       </div>
 
       <div className="space-y-2" data-testid="filter-class-section">
-        <div className="text-xs font-medium text-muted-foreground">Class</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-medium text-muted-foreground">Class</div>
+          <SelectAllNone
+            allLabel="All"
+            noneLabel="None"
+            disabled={classes.length === 0}
+            onAll={() => {
+              setSelectedClasses(new Set(classes))
+              Logger.info(
+                Logger.Categories.FILTERS,
+                `Selected all ${classes.length} classes`,
+              )
+            }}
+            onNone={() => {
+              setSelectedClasses(new Set<string>())
+              Logger.info(Logger.Categories.FILTERS, 'Cleared all classes')
+            }}
+          />
+        </div>
         {classes.length === 0 && (
           <p className="text-xs text-muted-foreground" data-testid="filter-class-empty">
             No classes available.
@@ -160,11 +194,49 @@ export function FilterRail({ classOptions, registerSearchInputRef }: FilterRailP
           selected={selectedClasses}
           onToggle={(name) => {
             toggleClass(name)
-            Logger.debug(Logger.Categories.FILTERS, `Class toggled: ${name}`)
+            Logger.info(Logger.Categories.FILTERS, `Class toggled: ${name}`)
           }}
         />
       </div>
     </aside>
+  )
+}
+
+interface SelectAllNoneProps {
+  allLabel: string
+  noneLabel: string
+  disabled?: boolean
+  onAll: () => void
+  onNone: () => void
+}
+
+function SelectAllNone({ allLabel, noneLabel, disabled, onAll, onNone }: SelectAllNoneProps) {
+  const base =
+    'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ' +
+    'text-muted-foreground hover:text-foreground hover:bg-accent ' +
+    'disabled:opacity-40 disabled:cursor-not-allowed'
+  return (
+    <div className="flex items-center gap-1" data-testid="filter-select-all-none">
+      <button
+        type="button"
+        onClick={onAll}
+        disabled={disabled}
+        className={base}
+        aria-label={`Select ${allLabel}`}
+      >
+        {allLabel}
+      </button>
+      <span className="text-[10px] text-muted-foreground">·</span>
+      <button
+        type="button"
+        onClick={onNone}
+        disabled={disabled}
+        className={base}
+        aria-label={`Select ${noneLabel}`}
+      >
+        {noneLabel}
+      </button>
+    </div>
   )
 }
 

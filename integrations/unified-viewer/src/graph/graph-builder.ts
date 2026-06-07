@@ -18,19 +18,32 @@ import type { Level, ViewerState } from '@/store/viewer-store'
  * derived from .planning memory notes: Project = L0, Component = L1,
  * SubComponent = L2, Detail = L3. System / root nodes pin to L0.
  */
-export function deriveLevel(ontologyClass: string | undefined): Level | undefined {
+export function deriveLevel(ontologyClass: string | undefined): Level {
+  // Plan 03 checkpoint round 2: unknown classes previously returned
+  // undefined → fell through every level filter unconditionally. They
+  // now pin to L0 so toggling L0 actually hides them, matching the
+  // operator's mental model.
   switch (ontologyClass) {
-    case 'System':
-    case 'Project':
-      return 0
     case 'Component':
+    case 'Container':
+    case 'Config':
+    case 'Knowledge':
       return 1
     case 'SubComponent':
+    case 'Feature':
+    case 'File':
+    case 'Observation':
       return 2
     case 'Detail':
+    case 'Port':
+    case 'Fault':
+    case 'Digest':
+    case 'Insight':
+    case 'LearningArtifact':
       return 3
+    // 'System' / 'Project' + every unknown class → L0
     default:
-      return undefined
+      return 0
   }
 }
 
@@ -72,8 +85,12 @@ export function buildGraph(
   }
   for (const r of relations) {
     if (!graph.hasNode(r.from) || !graph.hasNode(r.to)) continue
-    // mergeEdge is idempotent on undirected (key) edges
-    graph.mergeEdge(r.from, r.to, { size: 1, color: 'hsl(var(--border))', type: r.type })
+    // mergeEdge is idempotent on undirected (key) edges.
+    // Plan 03 checkpoint round 2: CSS-var color `hsl(var(--border))`
+    // is not parseable by sigma's WebGL renderer and was rendering
+    // invisible. Use a fixed slate hex with a slightly larger size
+    // so relations are actually visible against the canvas background.
+    graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', type: r.type })
   }
   return graph
 }
@@ -120,7 +137,9 @@ export function mergeIntoGraph(
   }
   for (const r of payload.relations) {
     if (!graph.hasNode(r.from) || !graph.hasNode(r.to)) continue
-    graph.mergeEdge(r.from, r.to, { size: 1, color: 'hsl(var(--border))', type: r.type })
+    // See buildGraph note — fixed hex edges so sigma's WebGL renderer
+    // actually shows them.
+    graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', type: r.type })
   }
   return graph.order - before
 }
@@ -153,35 +172,39 @@ export function computeNodeState(
   store: Pick<ViewerState, 'selectedNodeId' | 'searchQuery' | 'visibleLevels' | 'selectedClasses'>,
   hoveredNodeId: string | null = null,
 ): NodeState {
-  // 1. hover wins over everything except selected
-  // (selected stroke is wider, but UI-SPEC keeps selected above hover)
+  // Plan 03 checkpoint round 2 — semantic rewrite:
+  //   "what's checked is what's visible"
+  //   - visibleLevels: Set of levels currently visible. Empty = nothing.
+  //   - selectedClasses: Set of classes currently visible. Empty = nothing.
+  //   - Search hides non-matches outright (the prior `filter-dimmed`
+  //     opacity overlay is invisible in sigma's WebGL renderer).
+  // The caller (UnifiedViewer) auto-populates selectedClasses with
+  // every class present in the data on first load so the default
+  // experience is "all visible".
+
   if (store.selectedNodeId === nodeId) return 'selected'
   if (hoveredNodeId === nodeId) return 'hover'
 
+  // Level predicate — entities always have a derived level (deriveLevel
+  // pins unknown classes to L0), so the Set membership is authoritative.
+  const level = attrs.level as 0 | 1 | 2 | 3 | undefined
+  const levelOk = level !== undefined && store.visibleLevels.has(level)
+  if (!levelOk) return 'filter-hidden'
+
+  // Class predicate — explicit Set membership; empty Set = nothing.
+  const cls = attrs.ontologyClass as string | undefined
+  const classOk =
+    typeof cls === 'string' && store.selectedClasses.has(cls)
+  if (!classOk) return 'filter-hidden'
+
+  // Search predicate — hide non-matches (no dim because sigma can't render opacity).
   const q = store.searchQuery.trim().toLowerCase()
-  const labelText = ((attrs.label ?? attrs.name ?? '') as string).toLowerCase()
-  const descText = ((attrs.description ?? '') as string).toLowerCase()
-  const isSearchActive = q.length > 0
-  const isSearchMatch = isSearchActive && (labelText.includes(q) || descText.includes(q))
-
-  // Filter exclusion check
-  const levelOk = attrs.level === undefined ||
-    store.visibleLevels.has(attrs.level as 0 | 1 | 2 | 3)
-  const classOk = store.selectedClasses.size === 0 ||
-    (typeof attrs.ontologyClass === 'string' && store.selectedClasses.has(attrs.ontologyClass))
-  const filterExcludes = !(levelOk && classOk)
-
-  if (isSearchActive) {
-    // Search dominates filter — matches dim if excluded, else default-search-match
-    if (isSearchMatch) {
-      return filterExcludes ? 'filter-dimmed' : 'search-match'
-    }
-    // Search active, not a match → dimmed (graceful overlap)
-    return 'filter-dimmed'
+  if (q.length > 0) {
+    const labelText = ((attrs.label ?? attrs.name ?? '') as string).toLowerCase()
+    const descText = ((attrs.description ?? '') as string).toLowerCase()
+    const isMatch = labelText.includes(q) || descText.includes(q)
+    return isMatch ? 'search-match' : 'filter-hidden'
   }
-
-  // No search → filter excludes hides the node entirely
-  if (filterExcludes) return 'filter-hidden'
 
   return 'default'
 }

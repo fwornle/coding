@@ -10,12 +10,14 @@ import { useViewerStore } from '@/store/viewer-store'
 
 describe('makeNodeReducer — sigma per-frame state translation', () => {
   beforeEach(() => {
-    // Reset store between tests
+    // Reset store between tests. Plan 03 round 2 semantic: empty
+    // selectedClasses = nothing visible, so seed with 'Observation' so
+    // tests of the default-render path see a visible node.
     useViewerStore.setState({
       selectedNodeId: null,
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
-      selectedClasses: new Set(),
+      selectedClasses: new Set(['Observation']),
     })
   })
 
@@ -30,7 +32,7 @@ describe('makeNodeReducer — sigma per-frame state translation', () => {
 
   test('hover state — 2px ring stroke', () => {
     const reducer = makeNodeReducer('a')
-    const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8 })
+    const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8, ontologyClass: 'Observation', level: 3 })
     expect((result as { borderColor?: string }).borderColor).toBe('hsl(var(--ring))')
     expect((result as { borderSize?: number }).borderSize).toBe(2)
   })
@@ -38,7 +40,7 @@ describe('makeNodeReducer — sigma per-frame state translation', () => {
   test('selected state — 3px primary stroke + glow', () => {
     useViewerStore.setState({ selectedNodeId: 'a' })
     const reducer = makeNodeReducer(null)
-    const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8 })
+    const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8, ontologyClass: 'Observation', level: 3 })
     expect((result as { borderColor?: string }).borderColor).toBe('hsl(var(--primary))')
     expect((result as { borderSize?: number }).borderSize).toBe(3)
     expect((result as { glow?: { size: number } }).glow?.size).toBe(4)
@@ -47,14 +49,27 @@ describe('makeNodeReducer — sigma per-frame state translation', () => {
   test('search-match state — 2px amber stroke', () => {
     useViewerStore.setState({ searchQuery: 'alp' })
     const reducer = makeNodeReducer(null)
-    const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8 })
+    const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8, ontologyClass: 'Observation', level: 3 })
     expect((result as { borderColor?: string }).borderColor).toBe('hsl(45, 100%, 50%)')
     expect((result as { borderSize?: number }).borderSize).toBe(2)
   })
 
-  test('filter-dimmed state — opacity 0.25', () => {
+  test('search hides non-match (Plan 03 round 2: search now HIDES, not dims)', () => {
+    useViewerStore.setState({ searchQuery: 'zzz-no-match' })
+    const reducer = makeNodeReducer(null)
+    const result = reducer('a', {
+      name: 'Alpha',
+      label: 'Alpha',
+      color: '#ff0000',
+      size: 8,
+      ontologyClass: 'Observation',
+      level: 3,
+    })
+    expect(result.hidden).toBe(true)
+  })
+
+  test('filter-hidden state — hidden: true', () => {
     useViewerStore.setState({
-      searchQuery: 'alp',
       visibleLevels: new Set([0, 1, 2]),
     })
     const reducer = makeNodeReducer(null)
@@ -66,13 +81,11 @@ describe('makeNodeReducer — sigma per-frame state translation', () => {
       ontologyClass: 'Observation',
       level: 3,
     })
-    expect((result as { opacity?: number }).opacity).toBe(0.25)
+    expect(result.hidden).toBe(true)
   })
 
-  test('filter-hidden state — hidden: true', () => {
-    useViewerStore.setState({
-      visibleLevels: new Set([0, 1, 2]),
-    })
+  test('empty selectedClasses Set → all nodes hidden', () => {
+    useViewerStore.setState({ selectedClasses: new Set<string>() })
     const reducer = makeNodeReducer(null)
     const result = reducer('a', {
       name: 'Alpha',

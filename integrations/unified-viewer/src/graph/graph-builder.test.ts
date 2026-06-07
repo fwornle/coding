@@ -78,15 +78,18 @@ describe('mergeIntoGraph — idempotency (T-45-02-04 mitigation)', () => {
   })
 })
 
-describe('computeNodeState — UI-SPEC § Color State precedence', () => {
+describe('computeNodeState — Plan 03 checkpoint round 2 semantics', () => {
+  // Semantic: "what's checked is what's visible". Empty Set = nothing.
+  // baseStore seeds selectedClasses with the canonical test class so the
+  // default tests assert the "visible by default" path.
   const baseStore = {
     selectedNodeId: null,
     searchQuery: '',
     visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
-    selectedClasses: new Set<string>(),
+    selectedClasses: new Set<string>(['Observation']),
   }
 
-  test('default when no selection, no search, no filter exclusion', () => {
+  test('default when no selection, no search, class+level checked', () => {
     const s = computeNodeState('a', { name: 'Alpha', ontologyClass: 'Observation', level: 3 }, baseStore)
     expect(s).toBe('default')
   })
@@ -97,11 +100,16 @@ describe('computeNodeState — UI-SPEC § Color State precedence', () => {
   })
 
   test('hover when id matches hoveredNodeId (and not selected)', () => {
-    const s = computeNodeState('a', { name: 'Alpha' }, baseStore, 'a')
+    const s = computeNodeState(
+      'a',
+      { name: 'Alpha', ontologyClass: 'Observation', level: 3 },
+      baseStore,
+      'a',
+    )
     expect(s).toBe('hover')
   })
 
-  test('search-match when search non-empty and name includes query', () => {
+  test('search-match when class+level visible AND search query matches', () => {
     const s = computeNodeState(
       'a',
       { name: 'Alpha', ontologyClass: 'Observation', level: 3 },
@@ -110,7 +118,7 @@ describe('computeNodeState — UI-SPEC § Color State precedence', () => {
     expect(s).toBe('search-match')
   })
 
-  test('filter-hidden when level not in visibleLevels and search inactive', () => {
+  test('filter-hidden when level not in visibleLevels (search inactive)', () => {
     const s = computeNodeState(
       'a',
       { name: 'Alpha', ontologyClass: 'Observation', level: 3 },
@@ -119,20 +127,34 @@ describe('computeNodeState — UI-SPEC § Color State precedence', () => {
     expect(s).toBe('filter-hidden')
   })
 
-  test('filter-dimmed when filter excludes BUT search-match overrides hide', () => {
+  test('filter-hidden when search active and node does not match (regardless of class/level)', () => {
+    // Plan 03 round 2: search now HIDES non-matches outright (the prior
+    // filter-dimmed opacity overlay is invisible in sigma WebGL).
     const s = computeNodeState(
       'a',
       { name: 'Alpha', ontologyClass: 'Observation', level: 3 },
-      { ...baseStore, visibleLevels: new Set([0, 1, 2]), searchQuery: 'alp' },
+      { ...baseStore, searchQuery: 'zzz-no-match' },
     )
-    expect(s).toBe('filter-dimmed')
+    expect(s).toBe('filter-hidden')
   })
 
-  test('selected class filter — class not in set when set non-empty → hidden', () => {
+  test('filter-hidden when ontologyClass NOT in selectedClasses Set', () => {
     const s = computeNodeState(
       'a',
       { name: 'Alpha', ontologyClass: 'Observation', level: 3 },
       { ...baseStore, selectedClasses: new Set(['Digest']) },
+    )
+    expect(s).toBe('filter-hidden')
+  })
+
+  test('filter-hidden when selectedClasses is empty Set (nothing visible)', () => {
+    // Plan 03 round 2 flipped the semantic from "empty = all" to
+    // "empty = nothing". UnifiedViewer auto-seeds the set on first
+    // load so the default UX still shows everything.
+    const s = computeNodeState(
+      'a',
+      { name: 'Alpha', ontologyClass: 'Observation', level: 3 },
+      { ...baseStore, selectedClasses: new Set<string>() },
     )
     expect(s).toBe('filter-hidden')
   })

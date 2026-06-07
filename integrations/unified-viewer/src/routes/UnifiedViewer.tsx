@@ -104,18 +104,45 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
   const selectedClasses = useViewerStore((s) => s.selectedClasses)
 
-  // Visible-count predicate — same rules computeNodeState uses (UI-SPEC).
-  // Level derivation mirrors graph-builder.ts so the Footer count and
-  // the graph visibility stay consistent under the L0/L1/L2/L3 toggles.
+  // Auto-populate selectedClasses on first load. Plan 03 checkpoint
+  // round 2 flipped the filter semantic from "empty Set = all visible"
+  // to "what's checked is what's visible". To keep the default
+  // experience as "everything shown", we seed selectedClasses with
+  // every classOption on first load. Subsequent renders only top up
+  // newly-discovered classes (data refresh) — never remove operator
+  // selections.
+  useEffect(() => {
+    if (classOptions.length === 0) return
+    const currentSel = useViewerStore.getState().selectedClasses
+    const missing = classOptions.filter((c) => !currentSel.has(c))
+    if (currentSel.size === 0) {
+      useViewerStore.getState().setSelectedClasses(new Set(classOptions))
+      Logger.info(
+        Logger.Categories.FILTERS,
+        `Auto-selected ${classOptions.length} classes on first load`,
+      )
+    } else if (missing.length > 0) {
+      // Top up — new classes appeared in the data; add them to the
+      // current selection so they're visible by default.
+      const next = new Set(currentSel)
+      for (const c of missing) next.add(c)
+      useViewerStore.getState().setSelectedClasses(next)
+      Logger.info(
+        Logger.Categories.FILTERS,
+        `Added ${missing.length} newly-discovered classes to selection`,
+      )
+    }
+  }, [classOptions])
+
+  // Visible-count predicate — mirrors computeNodeState in graph-builder.
+  // Semantic: "what's checked is what's visible" (empty Set = nothing).
   const visibleCount = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return entities.reduce((n, e) => {
       const level = e.level ?? deriveLevel(e.ontologyClass)
-      const levelOk =
-        level === undefined || visibleLevels.has(level)
+      const levelOk = level !== undefined && visibleLevels.has(level)
       const classOk =
-        selectedClasses.size === 0 ||
-        (typeof e.ontologyClass === 'string' && selectedClasses.has(e.ontologyClass))
+        typeof e.ontologyClass === 'string' && selectedClasses.has(e.ontologyClass)
       const searchOk =
         q.length === 0 ||
         e.name.toLowerCase().includes(q) ||

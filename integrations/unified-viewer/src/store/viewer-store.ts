@@ -36,6 +36,8 @@ export interface ViewerState {
   setSearch: (q: string) => void
   toggleLevel: (level: Level) => void
   toggleClass: (className: string) => void
+  setVisibleLevels: (levels: Set<Level>) => void
+  setSelectedClasses: (classes: Set<string>) => void
   setTheme: (t: ThemePref) => void
   setFilterRailCollapsed: (collapsed: boolean) => void
   reset: () => void
@@ -79,6 +81,9 @@ export const useViewerStore = create<ViewerState>((set) => ({
       else next.add(className)
       return { selectedClasses: next }
     }),
+
+  setVisibleLevels: (levels) => set({ visibleLevels: new Set(levels) }),
+  setSelectedClasses: (classes) => set({ selectedClasses: new Set(classes) }),
 
   setTheme: (t) => set({ theme: t }),
   setFilterRailCollapsed: (collapsed) => set({ filterRailCollapsed: collapsed }),
