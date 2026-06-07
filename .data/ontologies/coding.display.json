@@ -1,0 +1,12 @@
+{
+  "Observation":  { "color": "#3b82f6", "icon": "Activity",  "shape": "circle" },
+  "Digest":       { "color": "#10b981", "icon": "FileText",  "shape": "circle" },
+  "Insight":      { "color": "#f59e0b", "icon": "Lightbulb", "shape": "circle" },
+  "Component":    { "color": "#8b5cf6", "icon": "Package",   "shape": "square" },
+  "SubComponent": { "color": "#a78bfa", "icon": "Package",   "shape": "square" },
+  "Detail":       { "color": "#6b7280", "icon": "Layers",    "shape": "circle" },
+  "LSLSession":   { "color": "#0ea5e9", "icon": "Terminal",  "shape": "circle" },
+  "MCPAgent":     { "color": "#ec4899", "icon": "Bot",       "shape": "diamond" },
+  "ConstraintRule": { "color": "#ef4444", "icon": "Shield",   "shape": "diamond" },
+  "WorkflowDefinition": { "color": "#14b8a6", "icon": "GitBranch", "shape": "square" }
+}
