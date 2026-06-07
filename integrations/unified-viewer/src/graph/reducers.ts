@@ -15,6 +15,29 @@ import { useViewerStore } from '@/store/viewer-store'
  * at call time so selection/search/filter changes flow through without
  * re-mounting the sigma instance.
  */
+/**
+ * Per-state label color. Plan 04 round 2 operator feedback: bright
+ * blue selected/hover rings + the global theme-conditional label
+ * color (light gray in dark mode, dark slate in light mode) collide
+ * on selected/hovered nodes — light-on-bright is hard to read. The
+ * reducer returns an override on selected/hover/search-match so the
+ * label always renders in near-black on the bright ring backdrop;
+ * other states fall through to sigma's `labelColor.color` global
+ * theme fallback (configured in SigmaCanvas).
+ */
+function labelColorForState(
+  state: ReturnType<typeof computeNodeState>,
+): string | undefined {
+  switch (state) {
+    case 'selected':
+    case 'hover':
+    case 'search-match':
+      return '#0a0a0a'
+    default:
+      return undefined
+  }
+}
+
 export function makeNodeReducer(hoveredNode: string | null) {
   return function nodeReducer(
     node: string,
@@ -33,6 +56,12 @@ export function makeNodeReducer(hoveredNode: string | null) {
       borderSize: stroke.width,
       opacity: stroke.opacity,
       glow: stroke.glow,
+      labelColor: labelColorForState(state),
+      // forceLabel so selected/hovered/search-match labels render even
+      // when they'd be filtered by labelRenderedSizeThreshold (operator
+      // round 2: "I want to see what I picked").
+      forceLabel:
+        state === 'selected' || state === 'hover' || state === 'search-match',
     }
   }
 }

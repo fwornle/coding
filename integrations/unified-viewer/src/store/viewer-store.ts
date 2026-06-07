@@ -44,13 +44,12 @@ export interface ViewerState {
 }
 
 function readPersistedThemeForStore(): ThemePref {
-  if (typeof window === 'undefined') return 'light'
-  try {
-    const stored = window.localStorage.getItem('viewer-theme')
-    return stored === 'dark' ? 'dark' : 'light'
-  } catch {
-    return 'light'
-  }
+  // Plan 04 round 2: operator requested "after hard reload, I want light
+  // mode". Drop the localStorage read entirely — every fresh page load
+  // starts in light. NavBar still writes to localStorage on every toggle
+  // for parity with other persisted UI prefs, but the read path is gone
+  // so a hard reload always returns to a known light-mode baseline.
+  return 'light'
 }
 
 export const useViewerStore = create<ViewerState>((set) => ({

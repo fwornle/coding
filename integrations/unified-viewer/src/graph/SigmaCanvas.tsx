@@ -172,7 +172,14 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
             edge,
             data as Parameters<ReturnType<typeof makeEdgeReducer>>[1],
           ),
-        labelColor: { color: t === 'dark' ? '#e2e8f0' : '#1e293b' },
+        // Per-node labelColor attribute (set by nodeReducer for
+        // selected/hover/search-match states) takes precedence over the
+        // theme-conditional fallback. Selected nodes get near-black
+        // labels for contrast against the bright blue selection ring.
+        labelColor: {
+          attribute: 'labelColor',
+          color: t === 'dark' ? '#e2e8f0' : '#1e293b',
+        },
       }
     }
     const unsub = useViewerStore.subscribe(() => {
