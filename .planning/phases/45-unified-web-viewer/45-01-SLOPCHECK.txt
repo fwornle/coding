@@ -1,0 +1,120 @@
+/Users/Q284340/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+[1mslopcheck[0m scanning /Users/Q284340/Agentic/coding/integrations/unified-viewer...
+  found 44 dependencies
+
+
+  [92m[OK][0m [1m@radix-ui/react-switch[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-slot[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-separator[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-dialog[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-collapsible[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-select[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-accordion[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-progress[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-scroll-area[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-tabs[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mclass-variance-authority[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mclsx[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@tanstack/react-query[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mlucide-react[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@radix-ui/react-tooltip[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@tailwindcss/typography[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mgraphology[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mreact[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@react-sigma/core[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mhighlight.js[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mradix-ui[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mreact-dom[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mtailwind-merge[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mreact-markdown[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mzod[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@playwright/test[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mrehype-highlight[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mreact-router-dom[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mremark-gfm[0m [2m(npm)[0m
+
+  [92m[OK][0m [1msigma[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@testing-library/jest-dom[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mzustand[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@types/react[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@types/node[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mpostcss[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@testing-library/react[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@vitejs/plugin-react[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mtailwindcss[0m [2m(npm)[0m
+
+  [92m[OK][0m [1m@types/react-dom[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mjsdom[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mautoprefixer[0m [2m(npm)[0m
+
+  [92m[OK][0m [1mtypescript[0m [2m(npm)[0m
+
+  [93m[1m[SUS][0m [1mvitest[0m [2m(npm)[0m
+    [93m> Suspiciously close to 'vite'. Could be a typosquat.[0m
+    [96m? Did you mean: [1mvite[0m
+
+  [92m[OK][0m [1mvite[0m [2m(npm)[0m
+
+==================================================
+  scanned 44 packages
+  [93m[1m1 SUS[0m -- worth a second look
+  [92m43 OK[0m
+
+
+==================================================
+PHASE 45 PLAN 01 EXECUTOR NOTE (2026-06-07)
+==================================================
+
+The [SUS] flag on `vitest` is a known false-positive of slopcheck's typosquat
+heuristic. `vitest` is the canonical Vite-team test runner:
+  - Registry: https://www.npmjs.com/package/vitest
+  - GitHub:   https://github.com/vitest-dev/vitest (~13k+ stars)
+  - Authors:  Anthony Fu + Vite core team (same maintainers as `vite` itself)
+  - Downloads: ~6M+ weekly
+
+`vitest` and `vite` are intentionally similar names — they are sibling packages
+from the same team. The package was already pre-approved in:
+  - 45-PATTERNS.md § package.json (line "vitest: ^1.x" in devDependencies)
+  - 45-RESEARCH.md § Package Legitimacy Audit (returned [OK] in original audit)
+
+DISPOSITION: ACCEPTED. No further action required. All 44 packages safe.
