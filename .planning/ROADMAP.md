@@ -668,26 +668,26 @@ Plans:
   3. A VKB or VOKB user can switch to the unified viewer for daily work and not regress on any task they used to perform in the legacy viewer.
   4. The viewer's data layer reads exclusively through the Phase 44 REST contract — no direct LevelDB or SQLite access from the frontend.
 
-**Plans:** 6 plans across 6 waves (strictly serial — `panels/SidePanel.tsx` co-edit forces sequencing of 03 -> 04 -> 05)
+**Plans:** 4/6 plans executed
 **UI hint**: yes
 
 Plans:
 
 **Wave 1**
 
-- [ ] 45-01-PLAN.md — Scaffold greenfield `integrations/unified-viewer/` (Vite + React 18 + TS + Tailwind 3 + shadcn `new-york` preset verbatim from dashboard) + ApiClient with camelCase Zod schemas (Plan 44-16 wire-shape lock) + React Router DOM 7 routing with `/viewer/{system}` + `key={system}` remount + Zustand store + 15 shadcn primitives + SYSTEM_ENDPOINTS config
+- [x] 45-01-PLAN.md — Scaffold greenfield `integrations/unified-viewer/` (Vite + React 18 + TS + Tailwind 3 + shadcn `new-york` preset verbatim from dashboard) + ApiClient with camelCase Zod schemas (Plan 44-16 wire-shape lock) + React Router DOM 7 routing with `/viewer/{system}` + `key={system}` remount + Zustand store + 15 shadcn primitives + SYSTEM_ENDPOINTS config
 
 **Wave 2** *(depends on Wave 1)*
 
-- [ ] 45-02-PLAN.md — WebGL graph renderer at `src/graph/` using `@react-sigma/core` + `sigma` + `graphology` + ForceAtlas2 web-worker layout; FNV-1a HSL color fallback per UI-SPEC § Color; per-state stroke + opacity contract via sigma's `nodeReducer`; click/double-click/pan/zoom/hover wired
+- [x] 45-02-PLAN.md — WebGL graph renderer at `src/graph/` using `@react-sigma/core` + `sigma` + `graphology` + ForceAtlas2 web-worker layout; FNV-1a HSL color fallback per UI-SPEC § Color; per-state stroke + opacity contract via sigma's `nodeReducer`; click/double-click/pan/zoom/hover wired
 
 **Wave 3** *(depends on Wave 2)*
 
-- [ ] 45-03-PLAN.md — User-facing chrome — FilterRail (search + level + class) + EntityDetailPanel + NavBar + SidePanel tab shell + Footer + 8 State Contract surfaces + global keyboard model (`/`, `Esc`, `?`, `f`) + IconButton primitive (non-optional `ariaLabel` TS-narrowed) closes UI-SPEC § Icon-only controls FLAG remediation
+- [x] 45-03-PLAN.md — User-facing chrome — FilterRail (search + level + class) + EntityDetailPanel + NavBar + SidePanel tab shell + Footer + 8 State Contract surfaces + global keyboard model (`/`, `Esc`, `?`, `f`) + IconButton primitive (non-optional `ariaLabel` TS-narrowed) closes UI-SPEC § Icon-only controls FLAG remediation
 
 **Wave 4** *(depends on Wave 3)*
 
-- [ ] 45-04-PLAN.md — MarkdownViewer panel (B's signature) — verbatim port of VKB `MarkdownViewer.tsx` minus Mermaid (per D-45-04) + theme-gated highlight.js + `useMarkdownHistory` + km-core handler extension at `lib/km-core/src/api/handlers/ontology.ts` with `?withDisplay=true` gated branch (preserves OKM `rest-contract.test.ts:257` BC) + `.data/ontologies/coding.display.json` seed file
+- [x] 45-04-PLAN.md — MarkdownViewer panel (B's signature) — verbatim port of VKB `MarkdownViewer.tsx` minus Mermaid (per D-45-04) + theme-gated highlight.js + `useMarkdownHistory` + km-core handler extension at `lib/km-core/src/api/handlers/ontology.ts` with `?withDisplay=true` gated branch (preserves OKM `rest-contract.test.ts:257` BC) + `.data/ontologies/coding.display.json` seed file
 
 **Wave 5** *(depends on Wave 4 — both touch `panels/SidePanel.tsx`)*
 
@@ -725,7 +725,7 @@ Plans:
 | 42. Offline UKB Migration (B) | 6/7 | In Progress|  |
 | 43. OKM Cross-Repo Migration (C) | 7/11 | In Progress|  |
 | 44. REST API & Git Snapshots | 18/16 | Complete   | 2026-06-05 |
-| 45. Unified Web Viewer | 0/? | Not started | - |
+| 45. Unified Web Viewer | 4/6 | In Progress|  |
 | 46. Per-System Documentation & Onboarding | 0/? | Not started | - |
 
 ### Phase 47: ObservationWriter: preserve prompt text when image attachments are present

@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: Phase 45 planning complete — 6 PLAN.md files in 6 strictly-serial waves; plan-checker APPROVED after 1 revision (2 blockers cleared, 5 warnings as known quality items); ready for /gsd-execute-phase 45
-last_updated: "2026-06-07T14:35:00.000Z"
+status: verifying
+stopped_at: Phase 44 context gathered
+last_updated: "2026-06-07T17:54:42.574Z"
 last_activity: 2026-06-07
-resume_file: .planning/phases/45-unified-web-viewer/45-01-PLAN.md
 progress:
   total_phases: 23
-  completed_phases: 17
-  total_plans: 121
-  completed_plans: 123
+  completed_phases: 16
+  total_plans: 112
+  completed_plans: 112
   percent: 70
 ---
 
@@ -55,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 44 (rest-api-git-snapshots) — EXECUTING (close-out gated)
 Plan: 15 of 15 with SUMMARY (44-11 SUMMARY recorded operator `issues` signal; 44-15 just landed)
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
 
@@ -144,6 +143,7 @@ Plan 44-17 cutover outcome (2026-06-05):
       1. `ObservationPruner` (scripts/observations-api-server.mjs:165) — DELETEs old rows for retention. Pre-Plan-44-13 design; deferred to 44-18.
       2. `RetrievalService` keyword-search FTS5 (scripts/observations-api-server.mjs:142) — reads via `dbGetter`. Deferred to 44-18.
     Both consumers were intentionally deferred by Plan 44-13 per its source comment at lines 35-39. Task 5 operator gate authorizes the archive ONLY when the operator agrees to lose the pruner + FTS5 keyword search (or accepts that 44-18 will cut them over before archive).
+
   - Task 5 operator gate **CLEARED 2026-06-05** with resolution **"approved (keep)"** — `.observations/observations.db` retained in place as read-only for `ObservationPruner` + `RetrievalService` FTS5 until Plan 44-18 cuts both consumers over. Operator runbook addendum: do NOT delete/archive/move the file before 44-18 lands; the two consumers will 500 on retention sweeps + keyword searches if it disappears. After 44-18 cuts over pruner + retrieval, the file is archivable in one shot (move to `.observations/archive/`, remove `dbGetter` wiring).
 
 Plan 44-18 cutover outcome (2026-06-05, Tasks 1-4):
@@ -164,6 +164,12 @@ Plan 44-16 cutover outcome (2026-06-07, all 4 tasks):
   - Task 4 (`94af0c9b0`): live verification — `npx jest tests/integration/typed-views.test.js` 4/4 GREEN (advances Plan 44-11 SC#3 from 2/4 PARTIAL PASS to 4/4 PASS). Wire-curl key sets match the test verbatim. Dashboard at :3032 renders `/digests` + `/insights` with camelCase reader paths proven live via gsd-browser screenshots: `digest.observationIds.length` → "3 obs"/"1 obs" badges; `insight.digestIds.length` → "289 source digests"; `new Date(insight.lastUpdated)` → "Updated 1d ago". Screenshots at `/tmp/44-16-smoke/{digests,insights}.png`.
   - Three independent ratification sites pin the contract: `tests/integration/typed-views.test.js` + `observation-view.ts` LOCKED-contract block + `44-CONTEXT-amendment-4.md`. A wire-shape change requires editing all three simultaneously.
   - **Task 4 operator gate CLEARED 2026-06-07** with resolution **"approved"** — camelCase ratified; Phase 44 close-out gate #2 closed. Remaining Phase 44 gates: OKM PR #5 merge + C restart (operator out-of-band on bmw.ghe.com), then Plan 44-11 re-run as final close-out gate.
+
+Phase 45 Plan 04 outcome (2026-06-07, 2 implementation tasks complete + checkpoint:human-verify pending):
+
+  - Task 1 (submodule `b7194cc` + outer `4b0286d`): km-core `/api/v1/ontology/classes` extended with `?withDisplay=true` gated branch. Strict-equal `"true"` check preserves the OKM `rest-contract.test.ts:257` BC string-array shape when absent (T-45-04-03). Enriched branch returns `Array<{name, level?, parent?, display?}>` with display sourced from `.data/ontologies/{system}.display.json` via new `loadDisplayOverlay(ontologyDir, system)` helper. Helper throws on empty `ontologyDir` per CLAUDE.md Phase-41 invariant (T-45-04-06). Seed `.data/ontologies/coding.display.json` ships 10 class display hints. Rule 1 fix: `OntologyRegistry` auto-discovery now skips `*.display.json` files. 317/317 km-core tests pass (+13 new).
+  - Task 2 (`9c75609`): MarkdownViewerPanel — B-system signature panel for `/viewer/okb`. react-markdown@10 + remark-gfm + rehype-highlight; VERBATIM port of VKB's 6-step sanitizer (XSS layer 1 — no `rehype-raw`, T-45-04-01). Component overrides for h1-h6 (anchor IDs), img (`..` escape rejection per T-45-04-05), pre (Mermaid → UI-SPEC placeholder per D-45-04), code (preserve `language-*` for rehype-highlight CSS — fixed v10 className shape `"hljs language-X"`), a (anchor smooth-scroll, .md cross-link via `useMarkdownHistory`, external links get `target="_blank" rel="noopener noreferrer"` per T-45-04-02). Theme-gated highlight.js CSS via dynamic `<link>` element. History nav IconButtons with aria-labels `"Previous viewed entity"` / `"Next viewed entity"` — closes the 7th of 7 UI-SPEC § Icon-only controls. 171/171 viewer tests pass (+34 new).
+  - Task 3 (checkpoint:human-verify) pending operator: restart obs-api / coding-services to pick up the new handler, then run the 12 verification steps in 45-04-PLAN.md including curl shape probes, /viewer/coding seeded-color check, /viewer/okb Markdown panel smoke (Mermaid placeholder + GFM rendering + theme swap + cross-link history nav + XSS-clean console).
 
 ## Performance Metrics
 

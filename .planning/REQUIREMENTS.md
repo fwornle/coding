@@ -87,7 +87,7 @@
 | INT-03 | Phase 43 | Pending |
 | API-01 | Phase 44 | Complete |
 | API-02 | Phase 44 | Complete |
-| UI-01 | Phase 45 | Pending |
+| UI-01 | Phase 45 | In Progress (Plans 01-04 done; Plans 05-06 pending) |
 | DOC-01 | Phase 46 | Pending |
 
 **Coverage:** 17/17 v7.1 requirements mapped, no orphans.
