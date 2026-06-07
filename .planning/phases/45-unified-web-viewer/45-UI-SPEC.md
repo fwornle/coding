@@ -1,10 +1,13 @@
 ---
 phase: 45
 slug: unified-web-viewer
-status: draft
+status: approved
 shadcn_initialized: true
 preset: inherited-from-system-health-dashboard (style="new-york", baseColor="neutral", iconLibrary="lucide", cssVariables=true)
 created: 2026-06-07
+reviewed_at: 2026-06-07
+reviewer: gsd-ui-checker
+verdict: APPROVED (5 PASS, 1 FLAG addressed in Interaction Contract § Icon-only controls)
 ---
 
 # Phase 45 — UI Design Contract
@@ -200,6 +203,22 @@ Edges follow the same rule: default `hsl(var(--border))` at opacity 0.5; highlig
 | `?` | Open keyboard-shortcut help dialog (Radix Dialog) — content lists all shortcuts above |
 
 The `?` help dialog header reads `Keyboard shortcuts`; body is a two-column table; close button reads `Close`.
+
+### Icon-only controls (accessibility — non-optional)
+
+All icon-only buttons MUST carry an `aria-label` matching the action and render a `<Tooltip>` on hover/focus. Affected controls:
+
+| Control | `aria-label` | Tooltip text |
+|---------|--------------|--------------|
+| Zoom-in button | `Zoom in` | `Zoom in` |
+| Zoom-out button | `Zoom out` | `Zoom out` |
+| Fit-to-view button | `Fit graph to view` | `Fit to view` |
+| Theme toggle | `Toggle theme` | `Light / Dark` (matches current state) |
+| Keyboard help (`?`) | `Show keyboard shortcuts` | `Keyboard shortcuts (?)` |
+| Mobile filter toggle | `Show filters` / `Hide filters` (state-dependent) | matches `aria-label` |
+| MarkdownViewer history-nav back/forward | `Previous viewed entity` / `Next viewed entity` | matches `aria-label` |
+
+Lucide icons + Radix `<Tooltip>` primitive (both already vetted in the shadcn baseline) are the implementation path; no new dependencies introduced. Executors do NOT have discretion to omit the `aria-label` or tooltip — both are part of the design contract.
 
 ### Routing (D-45-02)
 
@@ -447,11 +466,11 @@ Whatever the planner picks (direct CORS, backend proxy through A or B, OAuth on 
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS (FLAG addressed — Interaction Contract § "Icon-only controls" now mandates `aria-label` + `<Tooltip>` for all 7 affected controls)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** APPROVED 2026-06-07 by gsd-ui-checker; FLAG remediated by gsd-ui-phase orchestrator with a 7-row Icon-only controls table inside the Interaction Contract section.
