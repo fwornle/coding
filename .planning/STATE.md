@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Plan 44-18 COMPLETE (all 5 tasks; Task 5 operator gate cleared "approved (archive)" 2026-06-05)
-last_updated: "2026-06-05T20:40:00.000Z"
-last_activity: 2026-06-05
+stopped_at: Plan 44-16 COMPLETE (all 4 tasks; Task 4 operator gate cleared "approved" 2026-06-07 — camelCase wire-shape lock ratified)
+last_updated: "2026-06-07T10:35:00.000Z"
+last_activity: 2026-06-07
 progress:
   total_phases: 23
   completed_phases: 16
-  total_plans: 104
-  completed_plans: 106
+  total_plans: 105
+  completed_plans: 107
   percent: 70
 ---
 
@@ -100,17 +100,16 @@ Wave 6.1 outcome (`/gsd-execute-phase 44 --wave 6.1` — Plan 44-15 on 2026-06-0
 Phase 44 close-out remains gated on:
 
   1. **B infra fix (separate session):** restore `mcp-server-semantic-analysis` node_modules; re-run B-leg snapshot/restore round-trip
-  2. **Plan 44-16 (still to draft):** typed-view shape lock for `/api/coding/digests` + `/api/coding/insights` — decides camelCase vs snake_case after Plan 09. Dashboard renders all three correctly so consumer impact is bounded.
+  2. **Plan 44-16 (typed-view shape lock) — ✓ COMPLETE 2026-06-07.** camelCase ratified for `/api/coding/{digests,insights}`. 4/4 tasks done; operator gate cleared "approved" 2026-06-07. See § "Plan 44-16 cutover outcome" below.
   3. **Operator OKM PR #5 merge + C restart** (out-of-band on bmw.ghe.com)
   4. **Plan 44-11 re-run** as the Phase 44 close-out gate
 
 Suggested next steps:
 
   1. Operator restores B's node_modules (Dockerfile change recommended) and operator-merges OKM PR #5 + restarts C
-  2. Draft Plan 44-16 (typed-view shape lock) — small, focused, similar surface to 44-15
-  3. `/gsd-execute-phase 44 --wave 6` re-run after 44-16 lands + B+C are up → Phase 44 close-out
+  2. `/gsd-execute-phase 44 --wave 6` re-run after B+C are up → Phase 44 close-out (Plan 44-11 final re-run)
 
-Last activity: 2026-06-05
+Last activity: 2026-06-07
 
 Session 2026-06-05 outcome (context-clear handoff):
 
@@ -128,7 +127,7 @@ OPEN at handoff:
 Phase 44 close-out gates remaining:
 
   1. Resolve proxy routing → enables consolidator (RESOLVED 2026-06-05: live consolidation succeeded with 7 created + 25 updated insights via copilot+haiku route at commit 038eff0b1)
-  2. Draft + execute Plan 44-16 (typed-view shape lock for digests + insights)
+  2. **Plan 44-16 (typed-view shape lock) — ✓ COMPLETE 2026-06-07** (commits 8e18edeba draft + 68402a8dd audit + 518a8bbb6 test + km-core `33a3c57` + outer 87e460c39 amendment + 94af0c9b0 SUMMARY). Operator gate cleared "approved" 2026-06-07 — camelCase ratified for `/api/coding/{digests,insights}`. typed-views.test.js advances 2/4 → 4/4 GREEN.
   3. Execute Plan 44-17 (consolidator cutover) — **COMPLETE 2026-06-05** at all 5 tasks (commits 13876e204 audit + f3701499f cutover + e74444aba tests + 398060586 chore + 10d713ed3 docs + Task 5 operator-gate close). Task 5 operator gate cleared 2026-06-05 with resolution "approved (keep)" — `.observations/observations.db` retained read-only for pruner + retrieval FTS5; final archive scheduled for Plan 44-18.
   4. Operator: merge OKM PR #5 + restart C
   5. Plan 44-11 re-run as close-out gate
@@ -155,6 +154,15 @@ Plan 44-18 cutover outcome (2026-06-05, Tasks 1-4):
   - Production verification (obs-api pid 36727 post-restart): 0 legacy SQLite handle opens; first km-core prune correctly removed 517 obs + 131 digests from the live store; `/api/retrieve` returns 48 results for "docker timeout" probe.
   - Known deviation: KeywordSearch silently degrades to [] (the `_keywordSearch` helper short-circuits on missing db). Semantic search via Qdrant dominates the /api/retrieve response. Recorded as a Phase 45+ follow-up item in 44-18-SUMMARY.md "Known Deferred Items".
   - **Task 5 (SQLite archive) — CLEARED 2026-06-05** with resolution **"approved (archive)"**. Rename target: `.observations/observations.db` → `.observations/observations.db.archived.2026-06-05` (sidecars `-shm`/`-wal` renamed alongside). obs-api script cleanup: `DB_PATH` constant dropped, `dbPath`/`dbExists` removed from `/health` payload, `dbPath` arg dropped from ObservationWriter + ObservationConsolidator construction (defaults still derive correct `projectRoot` from launchd cwd). `.gitignore` extended with `.observations/*.db.archived*`. Docs (`docs/observations/README.md`, `docs-content/core-systems/observational-memory.md`, `docs-content/release-notes.md`, `docs-content/architecture/data-flow.md`, `docs-content/architecture/health-monitoring.md`, `docs-content/integrations/index.md`, `docs-content/guides/status-line.md`, `docs-content/core-systems/ukb-vkb.md`, `docs/agent-integration-guide.md`, `docs-content/guides/agent-integration.md`) updated with archive notes. obs-api kickstarted post-cutover; `/health` returns `{"status":"ok"}` without any `dbPath`/`dbExists` field. 1-hour soak in progress at 2026-06-05T20:40Z; operator verifies launchd state at 2026-06-05T21:40Z (commands recorded in 44-18-SUMMARY.md). The deferred Plan 44-12 § "fully unused observations.db" promise — carried through 44-13, 44-14, 44-17 — is now finally honored.
+
+Plan 44-16 cutover outcome (2026-06-07, all 4 tasks):
+
+  - Task 1 audit (`68402a8dd`): documented the wire-shape divergence — `/api/coding/digests` + `/api/coding/insights` emit camelCase (`observationIds, filesTouched, digestIds, lastUpdated`), Wave 0 RED stub asserted snake_case. Four pieces of evidence converged on camelCase: pre-cutover SQLite SQL-alias contract, 17 dashboard reader sites, post-Plan-44-05 adapter shape, Wave 0 mis-spec. Zero snake_case readers in dashboard production code (one comment-only mention at `insights.tsx:173` — conceptual prose, not a field access).
+  - Task 2 (`518a8bbb6`): rewrote `tests/integration/typed-views.test.js` REQUIRED_DIGEST_KEYS + REQUIRED_INSIGHT_KEYS + per-test expectations to camelCase. Observations test + server-side filter test unchanged (already conformed). Header JSDoc replaced "EXPECTED FAILURE MODE (RED today)" with "WIRE-SHAPE LOCK (Plan 44-16)" + four-bullet rationale + pointer to 44-CONTEXT-amendment-4.md.
+  - Task 3 (km-core submodule `33a3c57` + outer `87e460c39`): load-bearing `LOCKED contract — Pitfall 2 wire-shape lock` comment block above `digestToLegacy` + `insightToLegacy` in `lib/km-core/src/adapters/observation-view.ts`. Comment-only change; km-core test suite stays GREEN (304/304). Wrote `.planning/phases/44-rest-api-git-snapshots/44-CONTEXT-amendment-4.md` (92 lines) — ratifies camelCase as canonical wire shape, rejects dual-emit (10% bytes-on-wire growth + decision deferral + no concrete Python consumer today), amends Pitfall 2 wording, provides future-planner guidance for Phase 45 viewer.
+  - Task 4 (`94af0c9b0`): live verification — `npx jest tests/integration/typed-views.test.js` 4/4 GREEN (advances Plan 44-11 SC#3 from 2/4 PARTIAL PASS to 4/4 PASS). Wire-curl key sets match the test verbatim. Dashboard at :3032 renders `/digests` + `/insights` with camelCase reader paths proven live via gsd-browser screenshots: `digest.observationIds.length` → "3 obs"/"1 obs" badges; `insight.digestIds.length` → "289 source digests"; `new Date(insight.lastUpdated)` → "Updated 1d ago". Screenshots at `/tmp/44-16-smoke/{digests,insights}.png`.
+  - Three independent ratification sites pin the contract: `tests/integration/typed-views.test.js` + `observation-view.ts` LOCKED-contract block + `44-CONTEXT-amendment-4.md`. A wire-shape change requires editing all three simultaneously.
+  - **Task 4 operator gate CLEARED 2026-06-07** with resolution **"approved"** — camelCase ratified; Phase 44 close-out gate #2 closed. Remaining Phase 44 gates: OKM PR #5 merge + C restart (operator out-of-band on bmw.ghe.com), then Plan 44-11 re-run as final close-out gate.
 
 ## Performance Metrics
 
