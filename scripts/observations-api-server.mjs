@@ -1252,6 +1252,12 @@ function mountKMRoutes(store) {
     ontologyRegistry: store.ontology,
     snapshotDir: KG_EXPORT_DIR,
     restartCommand: 'launchctl kickstart -k gui/$(id -u) com.coding.obs-api',
+    // Phase 45 Plan 04 follow-up — wire the display-overlay loader. The
+    // overlay file lives at `.data/ontologies/{system}.display.json`,
+    // NOT at km-core's default `lib/km-core/ontology` dir — point the
+    // handler explicitly at the operator-side data root.
+    ontologyDir: path.join(process.cwd(), '.data', 'ontologies'),
+    displayOverlaySystem: 'coding',
   });
   process.stderr.write(`[obs-api] km-core /api/v1 routes mounted\n`);
 }
