@@ -10,16 +10,20 @@
 //   4. TRACE-level falls back to console.info (not a missing-method crash)
 //   5. Public surface matches VOKB (`Levels`, `Categories`, get/set/enable/disable)
 
+import type { MockInstance } from 'vitest'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { Logger } from './Logger'
 import { LogCategories, LogLevels } from './config/loggingConfig'
 
 describe('Logger', () => {
-  // Capture console.* calls per-test. Reset between tests.
-  let errorSpy: ReturnType<typeof vi.spyOn>
-  let warnSpy: ReturnType<typeof vi.spyOn>
-  let infoSpy: ReturnType<typeof vi.spyOn>
-  let debugSpy: ReturnType<typeof vi.spyOn>
+  // Capture console.* calls per-test. Reset between tests. The MockInstance
+  // generic stays unparameterised — strict typing here would couple to
+  // vitest's internal MockInstance shape, which differs between minor
+  // versions; the cast at spy assignment time is good enough.
+  let errorSpy: MockInstance
+  let warnSpy: MockInstance
+  let infoSpy: MockInstance
+  let debugSpy: MockInstance
 
   beforeEach(() => {
     // Clean localStorage between tests so default state is predictable.

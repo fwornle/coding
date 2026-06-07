@@ -33,8 +33,8 @@ import '@react-sigma/core/lib/style.css'
 import type { ApiClient } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
 import { useViewerStore } from '@/store/viewer-store'
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { IconButton } from '@/components/IconButton'
 import { useGraphData } from './useGraphData'
 import { buildGraph } from './graph-builder'
 import { classColor } from './color-fallback'
@@ -171,50 +171,23 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
  */
 function ZoomControls() {
   const { zoomIn, zoomOut, reset } = useCamera({ duration: 300, factor: 1.5 })
+  // IconButton is the single source of truth for icon-only controls
+  // (UI-SPEC § Icon-only controls). Tooltip text comes from ariaLabel by
+  // default; Fit-to-view overrides via tooltipText to match the UI-SPEC
+  // table cell "Fit to view" while keeping the spec aria-label.
   return (
     <div
       className="absolute bottom-4 right-4 z-10 flex flex-col gap-2 rounded-md border border-border bg-card p-1 shadow-sm"
       data-testid="zoom-controls"
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label="Zoom in"
-            onClick={() => zoomIn()}
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Zoom in</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label="Zoom out"
-            onClick={() => zoomOut()}
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Zoom out</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label="Fit graph to view"
-            onClick={() => reset()}
-          >
-            <Maximize className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Fit to view</TooltipContent>
-      </Tooltip>
+      <IconButton icon={ZoomIn} ariaLabel="Zoom in" onClick={() => zoomIn()} />
+      <IconButton icon={ZoomOut} ariaLabel="Zoom out" onClick={() => zoomOut()} />
+      <IconButton
+        icon={Maximize}
+        ariaLabel="Fit graph to view"
+        tooltipText="Fit to view"
+        onClick={() => reset()}
+      />
     </div>
   )
 }
