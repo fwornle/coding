@@ -153,20 +153,32 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
 
   // Reducer wiring — re-run when selection/search/filter changes, but
   // critically does NOT call loadGraph or restart the layout.
+  //
+  // Plan 04 checkpoint (round 2): theme-aware labelColor. Sigma's default
+  // labelColor is black, so dark mode rendered black-on-black labels.
+  // Slate-200 for dark / slate-800 for light keeps labels legible without
+  // touching the per-class node fill palette.
   useEffect(() => {
+    const themeSettings = () => {
+      const t = useViewerStore.getState().theme
+      return {
+        nodeReducer: (node: string, data: Record<string, unknown>) =>
+          makeNodeReducer(hoveredNode)(
+            node,
+            data as Parameters<ReturnType<typeof makeNodeReducer>>[1],
+          ),
+        edgeReducer: (edge: string, data: Record<string, unknown>) =>
+          makeEdgeReducer()(
+            edge,
+            data as Parameters<ReturnType<typeof makeEdgeReducer>>[1],
+          ),
+        labelColor: { color: t === 'dark' ? '#e2e8f0' : '#1e293b' },
+      }
+    }
     const unsub = useViewerStore.subscribe(() => {
-      // The actual reducer reads from the store on every frame via the
-      // setSettings closure, so we just trigger a settings refresh here.
-      setSettings({
-        nodeReducer: (node, data) => makeNodeReducer(hoveredNode)(node, data),
-        edgeReducer: (edge, data) => makeEdgeReducer()(edge, data),
-      })
+      setSettings(themeSettings())
     })
-    // Apply once at mount with whatever hover state we currently have
-    setSettings({
-      nodeReducer: (node, data) => makeNodeReducer(hoveredNode)(node, data),
-      edgeReducer: (edge, data) => makeEdgeReducer()(edge, data),
-    })
+    setSettings(themeSettings())
     return () => unsub()
   }, [hoveredNode, setSettings])
 
