@@ -10,6 +10,7 @@
 // the live <SigmaCanvas/> (Plan 02). FilterRail and SidePanel remain
 // stubs until Plan 03 lands.
 
+import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { isValidSystem, SYSTEM_ENDPOINTS, SYSTEM_LABELS, type System } from '@/config/system-endpoints'
 import { ApiClient } from '@/api/ApiClient'
@@ -73,12 +74,16 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
 
 export function UnifiedViewer() {
   const { system } = useParams<{ system: string }>()
-  if (!isValidSystem(system)) {
+  // Memoize the ApiClient per :system. Without this, every render of
+  // UnifiedViewer produced a new instance, which propagated as an
+  // unstable dependency into GraphSetup's useEffect — re-firing on every
+  // render and tripping React's max-update-depth guard.
+  const apiClient = useMemo(
+    () => (isValidSystem(system) ? new ApiClient(SYSTEM_ENDPOINTS[system]) : null),
+    [system],
+  )
+  if (!isValidSystem(system) || !apiClient) {
     return <UnknownSystem />
   }
-  // Construct a fresh ApiClient per remount. Because <ViewerCore key={system}/>
-  // unmounts the subtree on system change, this instance is also disposed,
-  // and the next system's instance starts clean — no shared mutable state.
-  const apiClient = new ApiClient(SYSTEM_ENDPOINTS[system])
   return <ViewerCore key={system} system={system} apiClient={apiClient} />
 }

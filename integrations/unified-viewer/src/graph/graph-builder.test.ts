@@ -35,10 +35,13 @@ describe('buildGraph', () => {
 
   test('falls back to FNV-1a hash color when ontology has no display.color', () => {
     const g = buildGraph(entities, [], ontology, 'dark')
-    // No display.color for Observation → hash fallback
+    // No display.color for Observation → hash fallback. Output is hex
+    // (#rrggbb) — Sigma's WebGL parser silently rejects hsl() strings, so
+    // the FNV-derived hue is HSL→hex converted before storage. See
+    // color-fallback.ts and color-fallback.test.ts for the hue contract.
     const colorA = g.getNodeAttribute('a', 'color')
     expect(typeof colorA).toBe('string')
-    expect(colorA).toMatch(/^hsl\(\d+, 65%, 60%\)$/)
+    expect(colorA).toMatch(/^#[0-9a-f]{6}$/)
   })
 
   test('skips relations with missing endpoints', () => {

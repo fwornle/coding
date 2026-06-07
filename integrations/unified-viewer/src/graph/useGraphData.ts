@@ -10,6 +10,7 @@
 // stays at the QueryClient default (true) so the viewer picks up new
 // entities written by the backend while the user keeps the tab open.
 
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { ApiClient, Entity as ApiEntity, OntologyClass as ApiOntologyClass, Relation as ApiRelation } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
@@ -51,13 +52,30 @@ export function useGraphData(apiClient: ApiClient, system: System): GraphDataRes
     staleTime: 30_000,
   })
 
+  // Memoize the array transforms so the hook returns stable references
+  // across renders. Without this, the inline `.map(...)` produced a fresh
+  // `relations` array every render, tripping GraphSetup's useEffect into a
+  // re-render loop and React's max-update-depth guard.
+  const entities = useMemo(
+    () => (entitiesQ.data ?? []) as Entity[],
+    [entitiesQ.data],
+  )
+  const relations = useMemo(
+    () =>
+      ((relationsQ.data ?? []) as ApiRelation[]).map(
+        (r) => ({ from: r.from, to: r.to, type: r.type ?? 'related' }) as Relation,
+      ),
+    [relationsQ.data],
+  )
+  const ontology = useMemo(
+    () => (ontologyQ.data ?? []) as OntologyClass[],
+    [ontologyQ.data],
+  )
+
   return {
-    entities: (entitiesQ.data ?? []) as Entity[],
-    relations: ((relationsQ.data ?? []) as ApiRelation[]).map(
-      // ApiRelation has optional `type`; our domain Relation requires it.
-      (r) => ({ from: r.from, to: r.to, type: r.type ?? 'related' }) as Relation,
-    ),
-    ontology: (ontologyQ.data ?? []) as OntologyClass[],
+    entities,
+    relations,
+    ontology,
     isLoading: entitiesQ.isLoading || relationsQ.isLoading || ontologyQ.isLoading,
     error:
       (entitiesQ.error as Error | null) ??
