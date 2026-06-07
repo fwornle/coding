@@ -2,6 +2,43 @@
 // Imported by vitest.config.ts setupFiles.
 import '@testing-library/jest-dom/vitest'
 
+// jsdom 25 in this project ships a stubbed `localStorage` object that has
+// NO Storage methods (setItem/getItem/removeItem all undefined). The
+// Logger's _load/_save calls silently swallow these errors and fall back
+// to defaults, which is fine in production but breaks persistence tests
+// (Plan 45-03 Task 0 — Logger). Install a minimal in-memory polyfill if
+// `setItem` is missing so unit tests can verify round-trip behaviour.
+if (typeof window !== 'undefined' && typeof window.localStorage?.setItem !== 'function') {
+  const memoryStore = new Map<string, string>()
+  const polyfill: Storage = {
+    get length(): number {
+      return memoryStore.size
+    },
+    clear(): void {
+      memoryStore.clear()
+    },
+    getItem(key: string): string | null {
+      return memoryStore.has(key) ? (memoryStore.get(key) as string) : null
+    },
+    key(index: number): string | null {
+      return Array.from(memoryStore.keys())[index] ?? null
+    },
+    removeItem(key: string): void {
+      memoryStore.delete(key)
+    },
+    setItem(key: string, value: string): void {
+      memoryStore.set(key, String(value))
+    },
+  }
+  Object.defineProperty(window, 'localStorage', {
+    value: polyfill,
+    writable: true,
+    configurable: true,
+  })
+  // Also expose on globalThis so bare `localStorage` references work
+  ;(globalThis as { localStorage?: Storage }).localStorage = polyfill
+}
+
 // Stub WebGL2RenderingContext at module-load time. The `sigma` package
 // references `WebGL2RenderingContext.prototype` at top-level (see
 // node_modules/sigma/dist/index-*.cjs.dev.js around line 145) — jsdom does
