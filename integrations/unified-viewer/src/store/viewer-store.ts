@@ -44,12 +44,23 @@ export interface ViewerState {
 }
 
 function readPersistedThemeForStore(): ThemePref {
-  // Plan 04 round 2: operator requested "after hard reload, I want light
-  // mode". Drop the localStorage read entirely — every fresh page load
-  // starts in light. NavBar still writes to localStorage on every toggle
-  // for parity with other persisted UI prefs, but the read path is gone
-  // so a hard reload always returns to a known light-mode baseline.
-  return 'light'
+  // Plan 04 round 3: respect the OS-level color scheme on every fresh
+  // page load. Hard reload no longer reads localStorage — instead it
+  // probes `prefers-color-scheme: dark` and falls back to light if the
+  // media query is unavailable (jsdom / SSR). NavBar still writes
+  // localStorage on toggle for in-session consistency across remounts,
+  // but the read path uses the OS hint so the app always starts in
+  // sync with the user's system theme.
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'light'
+  }
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light'
+  } catch {
+    return 'light'
+  }
 }
 
 export const useViewerStore = create<ViewerState>((set) => ({
