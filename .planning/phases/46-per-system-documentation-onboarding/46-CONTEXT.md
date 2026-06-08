@@ -65,6 +65,19 @@ Each of A (coding repo / obs-api), B (mcp-server-semantic-analysis), C (rapid-au
 - Each system README references the PNG inline via relative path.
 - Plan must include a one-shot step to render PUML → PNG (via `plantuml` CLI, NEVER `java -jar`) and commit both.
 
+### D-46-06: Shipped docs reference features by name, not by milestone shorthand
+
+**Decision (2026-06-08 amendment, after Plan 46-05 visual-check checkpoint):** Phase 46 shipped artifacts (READMEs, AGENTS.md, ONBOARDING.md, the README-TEMPLATE.md) MUST reference features and changes by their concrete name (e.g., "the `/api/v1/` REST contract", "the `SnapshotManager` git-tag backend", "the display-overlay surface") — never by phase/plan/wave/milestone-version shorthand ("Phase 44 wire-shape lock", "Phase 45 viewer", "v7.x unification", "Plan 46-05 / Wave 3"). Planning artifacts (this CONTEXT.md, RESEARCH.md, PATTERNS.md, plan files, SUMMARYs, debug sessions) may continue using milestone shorthand.
+
+**Why:** Same forward-looking reasoning as D-46-05. READMEs travel with their repos and are read standalone. "Phase 44" is GSD planning vocabulary — a future contributor reading this in 2027 has no way to look up what "Phase 44" delivered without crawling internal planning artifacts. By contrast, "the `/api/v1/` REST contract" is self-describing and ages gracefully — the contract either still exists in the codebase or it doesn't.
+
+**Implementation:**
+- Drop verbal references like "Phase 44 added X", "Phase 45 unified viewer", "stabilized through Phase 44/45", "Phase 46 SC-3".
+- Drop code-block delimiter comments like `// Canonical types (Phase 37+)` — rephrase as semantic delimiters (`// Canonical types`).
+- Drop the stale forward-reference notes from Wave 1 (e.g., "ONBOARDING.md ships in Plan 46-05 / Wave 3" — that's a planning hint that becomes wrong once it ships).
+- The OKM README's branch reference (`gsd/44-09-rest-cutover-v2`) is dropped — branch context belongs in PR descriptions, not the README that survives the merge.
+- Plan 46-06 cross-reference sweep additionally greps for residual `Phase \d` / `Plan \d{2}-\d{2}` / `Wave \d` / `v7\.[0-9x]` patterns.
+
 ### D-46-05: Shipped docs use system names, not A/B/C labels
 
 **Decision (2026-06-08 amendment, after Plan 46-03 visual-check checkpoint):** Phase 46 shipped artifacts (READMEs, AGENTS.md, ONBOARDING.md, the README-TEMPLATE.md) MUST reference systems by their concrete names — `coding`, `mcp-server-semantic-analysis`, `operational-knowledge-management` (or its OKM short-form) — never by the v7.1 internal alphabetical shorthand A/B/C. Planning artifacts (this CONTEXT.md, RESEARCH.md, PATTERNS.md, plan files, SUMMARYs) may continue using A/B/C as internal milestone shorthand.

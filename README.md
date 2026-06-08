@@ -113,7 +113,7 @@ The `coding` system does NOT own per-agent prompts (that's `mcp-server-semantic-
 
 ![Coding system architecture](docs/images/coding-system-architecture.png)
 
-The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.lsl-resolver`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`, `com.coding.etm`) plus a four-container Docker stack (`coding-services`, Qdrant, Memgraph, Redis) supervised by supervisord. Live conversations land in `.specstory/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `mcp-server-semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer (Phase 45) serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
+The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.lsl-resolver`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`, `com.coding.etm`) plus a four-container Docker stack (`coding-services`, Qdrant, Memgraph, Redis) supervised by supervisord. Live conversations land in `.specstory/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `mcp-server-semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
 
 ## Where to Edit
 
@@ -141,7 +141,7 @@ npm test
 curl 'http://localhost:12436/api/v1/entities' | jq '.data | length'
 ```
 
-For a guided contributor onboarding walkthrough — clone → run KM-Core tests → register a new SubComponent → ingest a sample entity → verify in the unified viewer → cleanup — see [`lib/km-core/docs/ONBOARDING.md`](lib/km-core/docs/ONBOARDING.md). (Forward reference: ONBOARDING.md ships in Plan 46-05 / Wave 3.)
+For a guided contributor onboarding walkthrough — clone → run KM-Core tests → register a new SubComponent → ingest a sample entity → verify in the unified viewer → cleanup — see [`lib/km-core/docs/ONBOARDING.md`](lib/km-core/docs/ONBOARDING.md).
 
 ---
 
