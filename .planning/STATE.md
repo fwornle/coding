@@ -3,16 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
-stopped_at: Phase 45 complete (6/6 plans, MVP shipped 2026-06-08). 190/190 vitest + 19/19 Playwright E2E pass. obs-api wired for display-overlay. Operator probes 1+2 (BMW corp network reachability) remain deferred — Plan 45-06-OPERATOR-PROBES.md tracks. Next: Phase 46.
-last_updated: "2026-06-08T06:55:00.000Z"
+stopped_at: Completed 46-01-PLAN.md
+last_updated: "2026-06-08T11:15:45.348Z"
 last_activity: 2026-06-08
-resume_file: .planning/phases/46-per-system-docs-onboarding/
 progress:
   total_phases: 23
-  completed_phases: 18
-  total_plans: 129
-  completed_plans: 129
-  percent: 78
+  completed_phases: 17
+  total_plans: 118
+  completed_plans: 115
+  percent: 74
 ---
 
 # Project State
@@ -22,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 44 — rest-api-git-snapshots
+**Current focus:** Phase 46 — per-system-documentation-onboarding
 
 **v7.1 milestone status (KM-Core unification — 7 of 10 phases done):**
 
@@ -53,9 +52,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 44 (rest-api-git-snapshots) — EXECUTING (close-out gated)
-Plan: 15 of 15 with SUMMARY (44-11 SUMMARY recorded operator `issues` signal; 44-15 just landed)
-Status: Phase complete — ready for verification
+Phase: 46 (per-system-documentation-onboarding) — EXECUTING
+Plan: 2 of 6
+Status: Ready to execute
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
 
@@ -110,7 +109,7 @@ Suggested next steps:
   1. Operator restores B's node_modules (Dockerfile change recommended) and operator-merges OKM PR #5 + restarts C
   2. `/gsd-execute-phase 44 --wave 6` re-run after B+C are up → Phase 44 close-out (Plan 44-11 final re-run)
 
-Last activity: 2026-06-07
+Last activity: 2026-06-08
 
 Session 2026-06-05 outcome (context-clear handoff):
 
@@ -301,6 +300,8 @@ Phase 45 Plan 04 outcome (2026-06-07, 2 implementation tasks complete + checkpoi
 - [Phase ?]: Plan 44-17 chose Option A (metadata.digested_at) for consolidator idempotency
 - [Phase ?]: Plan 44-17: no new km-core bounded-date helper — predicate-form countByOntologyClass suffices (perf gate 462ms at 1k obs)
 - [Phase ?]: Plan 44-17: ObservationExporter wiring dropped — km-core has its own per-domain JSON export
+- [Phase ?]: Phase 46-01: PUMLs placed at outer-repo canonical docs/puml/ (NOT submodule-local) to avoid constraint-regex incompatibility with relative include paths — orchestrator-authorized 2026-06-08
+- [Phase ?]: Phase 46-01: README image refs use ../../docs/images/km-core-*.png — relative climb from lib/km-core/ into outer repo; standalone-km-core consumption would break image links (trade-off accepted)
 
 ### Blockers/Concerns
 
@@ -354,11 +355,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 43 P09 | ~25min | 2 tasks landed (script + integration test) + Task 3 split (pointer-bump done; production run deferred to operator) | 2 files created (scripts/reembed-okm-corpus.mjs, tests/integration/reembed-okm-corpus.test.ts) in OKM submodule (commits 2840196 + 23ebcd4) + outer rapid-automations pointer bump (commit 2877e12) |
 | Phase 44 P13 | 19 | 3 tasks | 5 files |
 | Phase 44 P17 | 58 | - tasks | - files |
+| Phase 46-per-system-documentation-onboarding P01 | 8min | 5 tasks | 9 files |
 
 ## Session Continuity
 
-Last session: 2026-06-05T13:57:27.193Z
-Stopped at: Phase 44 context gathered
+Last session: 2026-06-08T11:15:37.987Z
+Stopped at: Completed 46-01-PLAN.md
 Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):

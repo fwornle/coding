@@ -715,7 +715,7 @@ Plans:
 
 Plans:
 
-- [ ] 46-01-PLAN.md — README-TEMPLATE.md + KM-Core README rewrite + 2 KM-Core PUMLs (architecture + ingest sequence) + PNG generation (template anchor; Wave 1)
+- [x] 46-01-PLAN.md — README-TEMPLATE.md + KM-Core README rewrite + 2 KM-Core PUMLs (architecture + ingest sequence) + PNG generation (template anchor; Wave 1)
 - [ ] 46-02-PLAN.md — A's project-root README: insert 5 template sections after Quick Start (Wave 2)
 - [ ] 46-03-PLAN.md — B's README rewrite (≤200 lines) + new AGENTS.md companion + b-architecture PUML + submodule pointer bump (Wave 2)
 - [ ] 46-04-PLAN.md — C's NEW README in OKM external repo on branch gsd/44-09-rest-cutover-v2 + okm-architecture PUML (Wave 2)

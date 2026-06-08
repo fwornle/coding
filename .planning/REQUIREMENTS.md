@@ -88,6 +88,6 @@
 | API-01 | Phase 44 | Complete |
 | API-02 | Phase 44 | Complete |
 | UI-01 | Phase 45 | Complete (6/6 plans executed, MVP shipped 2026-06-08) |
-| DOC-01 | Phase 46 | Pending |
+| DOC-01 | Phase 46 | Complete |
 
 **Coverage:** 17/17 v7.1 requirements mapped, no orphans.
