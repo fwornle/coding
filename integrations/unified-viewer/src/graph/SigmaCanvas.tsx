@@ -72,6 +72,7 @@ export function SigmaCanvas({ apiClient, system }: SigmaCanvasProps) {
         }}
       >
         <GraphSetup apiClient={apiClient} system={system} />
+        <TestHookExposer />
         <TooltipProvider delayDuration={400}>
           <ZoomControls />
         </TooltipProvider>
@@ -194,6 +195,27 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
 
 // makeNodeReducer + makeEdgeReducer live in ./reducers (pure module —
 // importable from tests without sigma's WebGL context).
+
+/**
+ * Plan 06 test hook — exposes the sigma instance on `window.__viewerSigma`
+ * in dev + test modes only. Playwright specs inspect graph order via
+ * `page.evaluate(() => window.__viewerSigma?.getGraph()?.order)` to assert
+ * the expand-neighbors flow added nodes. Production builds skip the
+ * assignment (gated on `import.meta.env.MODE !== 'production'`).
+ */
+function TestHookExposer() {
+  const sigma = useSigma()
+  useEffect(() => {
+    if (import.meta.env.MODE === 'production') return
+    if (typeof window === 'undefined') return
+    ;(window as unknown as { __viewerSigma?: unknown }).__viewerSigma = sigma
+    return () => {
+      const w = window as unknown as { __viewerSigma?: unknown }
+      if (w.__viewerSigma === sigma) delete w.__viewerSigma
+    }
+  }, [sigma])
+  return null
+}
 
 /**
  * Floating zoom-control cluster — bottom-right corner. Per UI-SPEC §

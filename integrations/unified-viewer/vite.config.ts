@@ -34,6 +34,12 @@ export default defineConfig({
     },
   },
   server: {
+    // host: true binds Vite to BOTH 127.0.0.1 (IPv4) and ::1 (IPv6). Default
+    // 'localhost' on macOS resolves IPv6-only, which breaks Node's default
+    // http.get probe (resolves IPv4 first) used by Playwright's
+    // `webServer.url` reuseExistingServer check. Plan 06 E2E spec discovery
+    // relies on this — see tests/e2e/unified-viewer/* and playwright.config.ts.
+    host: true,
     port: 5173,
     strictPort: true,
   },
