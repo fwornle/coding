@@ -40,7 +40,7 @@
 
 ### Unified viewer (UI)
 
-- [ ] **UI-01:** A single web viewer renders any KM-Core graph parameterized by ontology config; both VKB (B) and VOKB (C) users migrate to it without functional regression.
+- [x] **UI-01:** A single web viewer renders any KM-Core graph parameterized by ontology config; both VKB (B) and VOKB (C) users migrate to it without functional regression. *(Phase 45 MVP — 2026-06-08; VKB+VOKB stay live as fallback per CONTEXT.md Deferred Ideas)*
 
 ### Per-system integration (INT)
 
@@ -87,7 +87,7 @@
 | INT-03 | Phase 43 | Pending |
 | API-01 | Phase 44 | Complete |
 | API-02 | Phase 44 | Complete |
-| UI-01 | Phase 45 | In Progress (Plans 01-04 done; Plans 05-06 pending) |
+| UI-01 | Phase 45 | Complete (6/6 plans executed, MVP shipped 2026-06-08) |
 | DOC-01 | Phase 46 | Pending |
 
 **Coverage:** 17/17 v7.1 requirements mapped, no orphans.
