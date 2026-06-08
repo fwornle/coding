@@ -75,7 +75,7 @@ Each of A (coding repo / obs-api), B (mcp-server-semantic-analysis), C (rapid-au
 3. **Persistence** — observing how the wave-analysis pipeline materializes it.
 4. **Verification** — querying via `/api/v1/entities?ontologyClass=SubComponent` and seeing the entity surface in the unified viewer at `/viewer/coding`.
 
-**Why fictional, not real:** Avoids polluting the live KG with a "tutorial entity" that subsequent runs would dedupe or merge. The plan must specify a cleanup step (purge the tutorial entity via `scripts/purge-knowledge-entities.js`).
+**Why fictional, not real:** Avoids polluting the live KG with a "tutorial entity" that subsequent runs would dedupe or merge. The plan must specify a cleanup step. **NOTE (post plan-checker correction):** the `scripts/purge-knowledge-entities.js` script filters by date+team only, NOT by entity name — running it for cleanup would catastrophically sweep ALL same-day entities. The corrected cleanup uses the km-core REST DELETE endpoint directly: `curl -X DELETE http://localhost:12436/api/v1/entities/{id}` against the entity's UUIDv7 captured at ingest time. See Plan 46-05 Step 7.
 
 **Verifiable steps** (per SC3, each step has a command + expected output):
 - `git clone ...` → working tree at repo root
@@ -84,7 +84,7 @@ Each of A (coding repo / obs-api), B (mcp-server-semantic-analysis), C (rapid-au
 - (Edit) add `LslHeartbeatRotator` SubComponent entry
 - `(via ObservationWriter)` ingest a tutorial observation → entity persisted
 - `curl http://localhost:12436/api/v1/entities | jq '.data[] | select(.name == "LslHeartbeatRotator")'` → entity surfaces
-- (Cleanup) `node scripts/purge-knowledge-entities.js ...` → entity removed
+- (Cleanup) `curl -X DELETE http://localhost:12436/api/v1/entities/{id}` (id captured from ingest response) → entity removed; re-query returns empty
 
 ## Scope Boundaries (locked)
 
