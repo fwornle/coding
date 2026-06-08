@@ -4,13 +4,13 @@ milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: executing
 stopped_at: Completed 46-01-PLAN.md
-last_updated: "2026-06-08T11:24:44.548Z"
+last_updated: "2026-06-08T12:28:34.971Z"
 last_activity: 2026-06-08
 progress:
   total_phases: 23
   completed_phases: 17
   total_plans: 118
-  completed_plans: 116
+  completed_plans: 117
   percent: 74
 ---
 
@@ -53,7 +53,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 46 (per-system-documentation-onboarding) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
@@ -303,6 +303,7 @@ Phase 45 Plan 04 outcome (2026-06-07, 2 implementation tasks complete + checkpoi
 - [Phase ?]: Phase 46-01: PUMLs placed at outer-repo canonical docs/puml/ (NOT submodule-local) to avoid constraint-regex incompatibility with relative include paths — orchestrator-authorized 2026-06-08
 - [Phase ?]: Phase 46-01: README image refs use ../../docs/images/km-core-*.png — relative climb from lib/km-core/ into outer repo; standalone-km-core consumption would break image links (trade-off accepted)
 - [Phase ?]: Plan 46-03: B README rewritten to 6-section template (61 lines, was 573 — SC-1 5-min discoverability); long-form moved to docs/AGENTS.md; b-architecture PUML at outer-repo canonical with no-prefix include (Plan 46-01 pattern); submodule commit 312f798 pushed to fwornle main; outer-repo pointer bumped
+- [Phase ?]: Plan 46-04: OKM README + okm-architecture PUML + PNG authored inside external BMW GHE repo on branch gsd/44-09-rest-cutover-v2; 2 OKM commits (dbde155 PUML+PNG, bcfb14d README); D-46-05 naming applied (concrete system names, no A/B/C); BMW GHE push DEFERRED to operator per orchestrator-dispatch override; coding repo NOT modified (OKM is external sibling repo, not coding submodule); PUML uses no-prefix !include _standard-style.puml at OKMs canonical docs/puml/ (no bootstrap needed); README 47 lines, all 5 section headings + 3 SC-4 cross-refs verified
 
 ### Blockers/Concerns
 
@@ -358,10 +359,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 44 P17 | 58 | - tasks | - files |
 | Phase 46-per-system-documentation-onboarding P01 | 8min | 5 tasks | 9 files |
 | Phase 46 P03 | 17min | 5 tasks | 5 files |
+| Phase 46-per-system-documentation-onboarding P04 | 5min | 4 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-06-08T11:24:33.813Z
+Last session: 2026-06-08T12:28:23.248Z
 Stopped at: Completed 46-01-PLAN.md
 Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
