@@ -1,0 +1,71 @@
+@startuml km-core-ingest-sequence
+!include _standard-style.puml
+
+title KM-Core Ingest Sequence — Consumer → IngestPipeline → Dedup → Store → Exports → Events
+
+' Sequence diagrams use left-to-right by participant order; vertical time axis.
+
+actor "Consumer\n(A: ObservationWriter /\n B: wave-controller /\n C: ingest adapter)" as consumer
+
+participant "IngestPipeline\n(Phase 40)" as pipeline <<core>>
+participant "Dedup\n(LayeredDeduplicator)" as dedup <<core>>
+participant "GraphKMStore\n(extends EventEmitter)" as store <<core>>
+participant "Exports\n(.data/exports/*.json)" as exports <<storage>>
+participant "Events\n(entity:put / entity:delete\nrelation:added / relation:removed)" as events <<core>>
+
+== Ingest a new entity ==
+
+consumer -> pipeline : ingest(entity, opts)\n[ProvenanceStamp threaded through stages]
+activate pipeline
+
+pipeline -> pipeline : extract / synthesize\n(caller-pluggable)
+
+pipeline -> dedup : check(entity)
+activate dedup
+dedup -> dedup : Exact name match (Jaccard)
+dedup -> dedup : Embedding cosine (if no exact)
+dedup -> dedup : LLM semantic (if no embedding)
+dedup --> pipeline : DedupResult\n{decision, survivor?, mergeOps?}
+deactivate dedup
+
+alt Survivor is the new entity (no duplicate)
+  pipeline -> store : putEntity(entity, provenance)
+  activate store
+  store -> store : validate (registryBackedValidator)
+  store -> store : stamp UUIDv7 + ProvenanceStamp
+  store -> store : graphology + LevelDB write
+  store -->> events : emit('entity:put', payload)
+  store -->> exports : enqueue debounced write
+  store --> pipeline : { id, status: 'created' }
+  deactivate store
+else Duplicate detected (merge into survivor)
+  pipeline -> store : mergeEntities(survivor, duplicate)
+  activate store
+  store -> store : close duplicate (SUPERSEDED_BY)
+  store -> store : rewire edges to survivor
+  store -> store : fold descriptionSegments
+  store -->> events : emit('entity:put', payload)\nemit('relation:added', SUPERSEDED_BY)
+  store -->> exports : enqueue debounced write
+  store --> pipeline : { id: survivor.id, status: 'merged' }
+  deactivate store
+end
+
+pipeline --> consumer : IngestResult\n{id, status, stages: [...]}
+deactivate pipeline
+
+== Async export flush (5s debounce) ==
+
+exports -> exports : atomic temp + rename\nper-domain JSON file
+
+== Event subscribers ==
+
+events -->> consumer : event payload\n(consumer may subscribe for\nRedis pub/sub bridges, etc.)
+
+note over store
+  All writes go through GraphKMStore.
+  Per-system config (ontology, LLM, dedup
+  thresholds) configures these stages but
+  does NOT bypass the store.
+end note
+
+@enduml
