@@ -97,6 +97,54 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 
 ---
 
+## Configurations Owned
+
+The `coding` system (this repo) is one of three sibling consumers of the shared [`@fwornle/km-core`](lib/km-core/README.md) core. The four standard configuration slots are owned here as follows:
+
+- **Ontology:** `.data/ontologies/coding-ontology.json` — coding-domain class declarations (`Component`, `SubComponent`, `Detail`, `LiveLoggingSystem`-attached SubComponents, etc.). This ontology is also READ by `mcp-server-semantic-analysis` for wave-analysis classification, but it is OWNED here.
+- **LLM providers:** `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` (host-side launchd-managed proxy on port 12435 routing through Claude Code, GitHub Copilot, Groq, Anthropic, OpenAI, Gemini, GitHub Models, DMR, Ollama) + `scripts/configure-wave-analysis-routing.sh` (per-process `processOverrides` — routes `wave-analysis-*` through `copilot`, keeps `health-coordinator` / `observation-writer` on `claude-code`).
+- **Ingest adapters:** `src/live-logging/` — `ObservationWriter`, ETM (`com.coding.etm`), `lsl-resolver`, `sub-agent-live-{claude,copilot,opencode}`. All host-side observation writers ingest into the obs-api at `http://localhost:12436` (km-core REST router).
+- **Domain dedup:** `src/live-logging/ObservationWriter.js` — Jaccard text similarity at 0.45, containment threshold 0.7, 4-keyword floor (per the dedup rules in `MEMORY.md > ObservationWriter`).
+- **Redaction:** `src/live-logging/redaction-patterns.json` — PII redaction patterns applied at ingest before any observation is persisted (the 98.3% security-effectiveness surface).
+
+The `coding` system does NOT own per-agent prompts (that's `mcp-server-semantic-analysis`'s `config/agents/*.json`) and does NOT own RaaS / KPI-FW / business lower ontologies (those are owned by [`operational-knowledge-management`](https://bmw.ghe.com/adpnext-apps/operational-knowledge-management)).
+
+## Architecture
+
+![Coding system architecture](docs/images/coding-system-architecture.png)
+
+The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.lsl-resolver`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`, `com.coding.etm`) plus a four-container Docker stack (`coding-services`, Qdrant, Memgraph, Redis) supervised by supervisord. Live conversations land in `.specstory/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `mcp-server-semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer (Phase 45) serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
+
+## Where to Edit
+
+| To add… | Edit… | Verify |
+|---------|-------|--------|
+| A new ontology class (or class property) | `.data/ontologies/coding-ontology.json` (`classes` block) | `curl http://localhost:12436/api/v1/ontology/classes \| jq '.data \| keys'` |
+| A new LLM provider | `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` (env exports for the provider's API key + provider list) + restart the host daemon | `launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy && launchctl list \| grep com.coding.llm-cli-proxy` |
+| A per-process LLM routing override | `scripts/configure-wave-analysis-routing.sh` (or call `POST /api/process-overrides` directly) | `bash scripts/configure-wave-analysis-routing.sh --show` |
+| A new ingest source (writer) | New writer under `src/live-logging/<Writer>.js` + test in `tests/live-logging/*.test.js` | `npm test -- tests/live-logging` |
+| A domain dedup rule change | `src/live-logging/ObservationWriter.js` (Jaccard / containment / keyword constants) | `npm test -- tests/live-logging/observation-writer.test.js` |
+| A new redaction pattern | `src/live-logging/redaction-patterns.json` | `npm test -- tests/live-logging/redaction` |
+
+Every row gives a path AND a verification command — this table is the SC-1 (5-minute-discoverability) enforcement surface for the coding system.
+
+## Related Systems
+
+- [KM-Core](lib/km-core/README.md) — shared `Entity` / `Relation` / `Layer` / `ProvenanceStamp` types, `GraphKMStore`, ontology registry, ingest pipeline, REST router (`/api/v1/`), git-tag snapshot manager. The `coding` system consumes km-core as the canonical persistence + REST contract.
+- [mcp-server-semantic-analysis](integrations/mcp-server-semantic-analysis/README.md) — sister consumer; drives the 14-agent wave-analysis workflow on SSE port `3848`, writing into the same km-core core. Submodule under `integrations/`.
+- [operational-knowledge-management](https://bmw.ghe.com/adpnext-apps/operational-knowledge-management) — sister consumer (external BMW GHE repo, "OKM" for short); owns RaaS / KPI-FW / business lower ontologies and the operational-incident ingest adapters. Consumes the same km-core core for storage + REST.
+
+## Tests / Verify
+
+```bash
+npm test
+curl 'http://localhost:12436/api/v1/entities' | jq '.data | length'
+```
+
+For a guided contributor onboarding walkthrough — clone → run KM-Core tests → register a new SubComponent → ingest a sample entity → verify in the unified viewer → cleanup — see [`lib/km-core/docs/ONBOARDING.md`](lib/km-core/docs/ONBOARDING.md). (Forward reference: ONBOARDING.md ships in Plan 46-05 / Wave 3.)
+
+---
+
 ## 🎯 What It Provides
 
 ### Core Capabilities
