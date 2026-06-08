@@ -65,6 +65,18 @@ Each of A (coding repo / obs-api), B (mcp-server-semantic-analysis), C (rapid-au
 - Each system README references the PNG inline via relative path.
 - Plan must include a one-shot step to render PUML → PNG (via `plantuml` CLI, NEVER `java -jar`) and commit both.
 
+### D-46-05: Shipped docs use system names, not A/B/C labels
+
+**Decision (2026-06-08 amendment, after Plan 46-03 visual-check checkpoint):** Phase 46 shipped artifacts (READMEs, AGENTS.md, ONBOARDING.md, the README-TEMPLATE.md) MUST reference systems by their concrete names — `coding`, `mcp-server-semantic-analysis`, `operational-knowledge-management` (or its OKM short-form) — never by the v7.1 internal alphabetical shorthand A/B/C. Planning artifacts (this CONTEXT.md, RESEARCH.md, PATTERNS.md, plan files, SUMMARYs) may continue using A/B/C as internal milestone shorthand.
+
+**Why:** READMEs live inside their respective repos and travel with them. The `mcp-server-semantic-analysis` README, for example, lives in its own GitHub repo and is read by people who have no idea what "B" refers to. KM-Core is also forward-looking — when Systems D/E/F arrive in future milestones, today's A/B/C labels become arbitrary historical artifacts. Concrete system names age out gracefully; alphabetical milestone shorthand does not.
+
+**Implementation:**
+- `lib/km-core/docs/README-TEMPLATE.md` uses `{other-system-name}` placeholders.
+- All four shipped READMEs (KM-Core, coding root, mcp-server-semantic-analysis, OKM) and the new AGENTS.md reference systems by name.
+- Related Systems list items use `[system-name](path)` (no letter prefix).
+- Plan 46-06 cross-reference audit additionally greps for residual `^# [A-C]:` titles and `\b[A-C]:[ ]+(coding|mcp-server|OKM)` body refs.
+
 ### D-46-04: Onboarding exercise = add a fictional `LslHeartbeatRotator` SubComponent
 
 **Decision:** The KM-Core onboarding guide walks the contributor through registering and ingesting a fictional new `LslHeartbeatRotator` entity under the existing `LiveLoggingSystem` Component in the coding KG.
