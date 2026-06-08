@@ -711,13 +711,13 @@ Plans:
   3. The onboarding guide walks a new developer from clone → run KM-Core tests → register a new lower ontology → ingest a sample entity, with each step verifiable.
   4. Each system's README cross-references the others and KM-Core, so a contributor entering through any of the four doors can navigate to the others.
 
-**Plans:** 6 plans
+**Plans:** 2/6 plans executed
 
 Plans:
 
 - [x] 46-01-PLAN.md — README-TEMPLATE.md + KM-Core README rewrite + 2 KM-Core PUMLs (architecture + ingest sequence) + PNG generation (template anchor; Wave 1)
 - [ ] 46-02-PLAN.md — A's project-root README: insert 5 template sections after Quick Start (Wave 2)
-- [ ] 46-03-PLAN.md — B's README rewrite (≤200 lines) + new AGENTS.md companion + b-architecture PUML + submodule pointer bump (Wave 2)
+- [x] 46-03-PLAN.md — B's README rewrite (≤200 lines) + new AGENTS.md companion + b-architecture PUML + submodule pointer bump (Wave 2)
 - [ ] 46-04-PLAN.md — C's NEW README in OKM external repo on branch gsd/44-09-rest-cutover-v2 + okm-architecture PUML (Wave 2)
 - [ ] 46-05-PLAN.md — lib/km-core/docs/ONBOARDING.md (7-step LslHeartbeatRotator exercise) + cleanup-verifier spec (Wave 3)
 - [ ] 46-06-PLAN.md — Final cross-reference sweep across 4 READMEs to verify SC-4 (Wave 4)
@@ -735,7 +735,7 @@ Plans:
 | 43. OKM Cross-Repo Migration (C) | 7/11 | In Progress|  |
 | 44. REST API & Git Snapshots | 18/16 | Complete   | 2026-06-05 |
 | 45. Unified Web Viewer | 6/6 | Complete    | 2026-06-08 |
-| 46. Per-System Documentation & Onboarding | 0/6 | Not started | - |
+| 46. Per-System Documentation & Onboarding | 2/6 | In Progress|  |
 
 ### Phase 47: ObservationWriter: preserve prompt text when image attachments are present
 
