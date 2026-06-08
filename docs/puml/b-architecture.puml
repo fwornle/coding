@@ -1,0 +1,111 @@
+@startuml b-architecture
+!include _standard-style.puml
+
+title B: mcp-server-semantic-analysis — 14 Agents Grouped by Role
+
+top to bottom direction
+
+' ============================================================
+' Client + transport layer
+' ============================================================
+package "MCP Client Transport" as transport #FAFAFA {
+  [Claude Code\n(stdio / SSE)] as client <<external>>
+  [stdio-proxy.js\n+ HTTP-SSE @ :3848] as proxy <<infra>>
+}
+
+' ============================================================
+' Orchestration layer
+' ============================================================
+package "Orchestration" as orchestration_pkg #FFF2E6 {
+  [CoordinatorAgent\nworkflow definitions\n{{step}} templating] as coord <<infra>>
+  [WaveController\nextract -> analyze -> classify\n-> persist -> dedup -> predict -> merge] as wave <<infra>>
+}
+
+' ============================================================
+' LLM-enhanced agents (8) — use SemanticAnalyzer
+' ============================================================
+package "LLM-Enhanced Agents (8)" as llm_pkg #FFE6E6 {
+  [GitHistoryAgent\ncommits since checkpoint\n+ architectural decisions] as git <<agent>>
+  [VibeHistoryAgent\nsession summaries\n+ pattern analysis] as vibe <<agent>>
+  [SemanticAnalysisAgent\ncode <-> conversation\ndeep correlation] as semantic <<agent>>
+  [WebSearchAgent\n40% keyword + 60% semantic\nrelevance scoring] as web <<agent>>
+  [InsightGenerationAgent\ninsight + diagram\ngeneration] as insight <<agent>>
+  [ObservationGenerationAgent\nstructured observations\n+ domain classification] as obs <<agent>>
+  [QualityAssuranceAgent\nsemantic validation\nfragment + quality detection] as qa <<agent>>
+  [PersistenceAgent\nontology classifier\n+ persist via km-core] as persist <<agent>>
+}
+
+' ============================================================
+' Infrastructure agents (2) — embedding-enhanced
+' ============================================================
+package "Infrastructure Agents (2)" as infra_pkg #E8F4FD {
+  [DeduplicationAgent\nOpenAI embeddings\ncosine similarity + Jaccard fallback] as dedup <<core>>
+  [ContentValidationAgent\nstale entity detection\nrefresh recommendations] as content <<core>>
+}
+
+' ============================================================
+' Configuration + LLM provider chain (per-system config, NOT owned by km-core)
+' ============================================================
+package "Configurations Owned (B)" as configs #FFF9E6 {
+  [config/agents/*.json\nper-agent prompts] as agent_cfg <<external>>
+  [config/workflows/*.json\nprocessOverrides routing] as wf_cfg <<external>>
+  [lib/llm/\n6-tier provider chain\nGroq -> Gemini -> Custom -> Claude -> OpenAI -> Ollama] as llm_chain <<external>>
+}
+
+' ============================================================
+' Persistence — writes through km-core (shared core)
+' ============================================================
+package "Persistence (via @fwornle/km-core)" as persist_pkg #E8F5E8 {
+  [POST /api/v1/entities\nkm-core REST router] as rest <<api>>
+  database "GraphKMStore\nGraphology + LevelDB" as store <<storage>>
+}
+
+' ============================================================
+' Wiring — orchestration flow
+' ============================================================
+client -down-> proxy : MCP protocol
+proxy -down-> coord : tool invocations
+
+coord -down-> wave : execute_workflow("wave-analysis")
+wave -down-> git : Step 1
+wave -down-> vibe : Step 2
+wave -down-> semantic : Step 3 ({{git}}, {{vibe}})
+wave -down-> web : Step 4 ({{semantic}})
+wave -down-> insight : Step 5
+wave -down-> obs : Step 6 ({{insights}})
+wave -down-> qa : Step 7 ({{observations}})
+wave -down-> persist : Step 8 (qa-approved)
+
+' Infrastructure wiring
+wave -right-> dedup : pre-persist dedup pass
+persist -left-> content : staleness checks
+
+' Configuration flows IN to agents (read-only)
+agent_cfg -up-> llm_pkg : prompts per agent
+wf_cfg -up-> coord : workflow definition
+wf_cfg -up-> llm_chain : processOverrides
+llm_chain -up-> llm_pkg : SemanticAnalyzer
+llm_chain -up-> dedup : embeddings + LLM fallback
+
+' Persistence — single canonical write path
+persist -down-> rest : entityType + ontologyClass
+rest -down-> store : putEntity
+
+' ============================================================
+' Trust boundary note
+' ============================================================
+note bottom of llm_pkg
+  **LLM-enhanced agents** call out to the 6-tier SemanticAnalyzer
+  provider chain. processOverrides in config/workflows/*.json
+  route wave-analysis-* through copilot (fast); other processes
+  default to claude-code.
+end note
+
+note bottom of persist_pkg
+  **Persistence boundary**: B writes ONLY through km-core's REST
+  router. The 8 LLM agents and 2 infra agents converge on
+  PersistenceAgent, which is the single canonical writer.
+  km-core owns the wire shape (Phase 44 lock).
+end note
+
+@enduml
