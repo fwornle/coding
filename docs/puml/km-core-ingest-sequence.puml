@@ -5,9 +5,9 @@ title KM-Core Ingest Sequence — Consumer → IngestPipeline → Dedup → Stor
 
 ' Sequence diagrams use left-to-right by participant order; vertical time axis.
 
-actor "Consumer\n(A: ObservationWriter /\n B: wave-controller /\n C: ingest adapter)" as consumer
+actor "Consumer\n(ObservationWriter /\n wave-controller /\n ingest adapter)" as consumer
 
-participant "IngestPipeline\n(Phase 40)" as pipeline <<core>>
+participant "IngestPipeline" as pipeline <<core>>
 participant "Dedup\n(LayeredDeduplicator)" as dedup <<core>>
 participant "GraphKMStore\n(extends EventEmitter)" as store <<core>>
 participant "Exports\n(.data/exports/*.json)" as exports <<storage>>

@@ -1,7 +1,7 @@
-@startuml b-architecture
+@startuml mcp-server-semantic-analysis-architecture
 !include _standard-style.puml
 
-title B: mcp-server-semantic-analysis — 14 Agents Grouped by Role
+title mcp-server-semantic-analysis — 14 Agents Grouped by Role
 
 top to bottom direction
 
@@ -46,7 +46,7 @@ package "Infrastructure Agents (2)" as infra_pkg #E8F4FD {
 ' ============================================================
 ' Configuration + LLM provider chain (per-system config, NOT owned by km-core)
 ' ============================================================
-package "Configurations Owned (B)" as configs #FFF9E6 {
+package "Configurations Owned" as configs #FFF9E6 {
   [config/agents/*.json\nper-agent prompts] as agent_cfg <<external>>
   [config/workflows/*.json\nprocessOverrides routing] as wf_cfg <<external>>
   [lib/llm/\n6-tier provider chain\nGroq -> Gemini -> Custom -> Claude -> OpenAI -> Ollama] as llm_chain <<external>>
@@ -102,10 +102,10 @@ note bottom of llm_pkg
 end note
 
 note bottom of persist_pkg
-  **Persistence boundary**: B writes ONLY through km-core's REST
-  router. The 8 LLM agents and 2 infra agents converge on
+  **Persistence boundary**: this server writes ONLY through km-core's
+  REST router. The 8 LLM agents and 2 infra agents converge on
   PersistenceAgent, which is the single canonical writer.
-  km-core owns the wire shape (Phase 44 lock).
+  km-core owns the wire shape.
 end note
 
 @enduml

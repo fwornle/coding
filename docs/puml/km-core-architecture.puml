@@ -6,12 +6,12 @@ title KM-Core Architecture — Shared Core vs Per-System Configuration
 top to bottom direction
 
 ' ============================================================
-' Consumer layer — A / B / C / future systems
+' Consumer layer — any system can adopt this contract
 ' ============================================================
 package "Consumer Systems" as consumers #FAFAFA {
-  [A: coding\n(obs-api, ObservationWriter)] as sysA <<external>>
-  [B: mcp-server-semantic-analysis\n(wave-analysis, agents)] as sysB <<external>>
-  [C: OKM\n(RaaS / KPI-FW / business)] as sysC <<external>>
+  [coding\n(obs-api, ObservationWriter)] as sysA <<external>>
+  [mcp-server-semantic-analysis\n(wave-analysis, agents)] as sysB <<external>>
+  [operational-knowledge-management\n(RaaS / KPI-FW / business)] as sysC <<external>>
 }
 
 ' ============================================================
@@ -32,18 +32,18 @@ package "@fwornle/km-core (SHARED CORE)" as core #E8F5E8 {
     folder ".data/exports/\ngit-tracked" as exports <<storage>>
   }
 
-  package "Ontology Registry (Phase 38)" as ont_pkg #F0F0F0 {
+  package "Ontology Registry" as ont_pkg #F0F0F0 {
     [OntologyRegistry\nupper.json + lower-*.json\nextends-chain resolution] as registry <<core>>
     [registryBackedValidator\n(pluggable)] as validator <<core>>
-    [display-overlay\n(Phase 45)] as overlay <<core>>
+    [display-overlay\nrendering hints] as overlay <<core>>
   }
 
-  package "Ingest Pipeline (Phase 40)" as pipeline_pkg #F0F0F0 {
+  package "Ingest Pipeline" as pipeline_pkg #F0F0F0 {
     [IngestPipeline\n4-stage extract / synth / dedup / store] as pipeline <<core>>
     [LayeredDeduplicator\nExact / Embedding / LLM] as dedup <<core>>
   }
 
-  package "REST + Snapshots (Phase 44)" as api_pkg #F0F0F0 {
+  package "REST + Snapshots" as api_pkg #F0F0F0 {
     [createKmCoreRouter\n~15 endpoints under /api/v1/] as rest <<api>>
     [Zod contracts\napi/contracts] as contracts <<api>>
     [SnapshotManager\ngit-tag snapshots] as snapshots <<core>>
@@ -54,10 +54,10 @@ package "@fwornle/km-core (SHARED CORE)" as core #E8F5E8 {
 ' PER-SYSTEM CONFIG — NOT owned by km-core
 ' ============================================================
 package "Per-System Configuration (NOT owned by km-core)" as per_system #FFF9E6 {
-  [Ontology files\n.data/ontologies/*.json\nA: coding-ontology / C: RaaS, KPI-FW] as ontology_files <<external>>
-  [LLM provider config\nB: config/workflows/*.json\nA: rapid-llm-proxy] as llm_config <<external>>
-  [Ingest adapters\nA: ObservationWriter\nB: wave-controller\nC: MkDocs / Confluence] as adapters <<external>>
-  [Domain dedup / scoring\nA: Jaccard 0.45 / 4-keyword\nC: src/intelligence/dedup] as domain_eval <<external>>
+  [Ontology files\n.data/ontologies/*.json\ncoding-ontology / RaaS / KPI-FW / business] as ontology_files <<external>>
+  [LLM provider config\nconfig/workflows/*.json\nprovider chains, processOverrides] as llm_config <<external>>
+  [Ingest adapters\nObservationWriter / wave-controller\nMkDocs / Confluence / ServiceNow] as adapters <<external>>
+  [Domain dedup / scoring\nJaccard, 4-keyword floor\nsrc/intelligence/dedup] as domain_eval <<external>>
 }
 
 ' ============================================================
@@ -84,14 +84,14 @@ exporter -down-> exports : atomic write
 store -down-> events : emits
 store -right-> validator : pre-write check
 validator -up-> registry : resolved class
-registry -right-> overlay : display hints (Phase 45)
+registry -right-> overlay : display hints
 snapshots -right-> exports : git tag / restore
 
 ' ============================================================
 ' Per-system config flows IN to core surfaces (read-only)
 ' ============================================================
 ontology_files -up-> registry : load on startup
-llm_config -up-> dedup : LLM matcher (Phase 40)
+llm_config -up-> dedup : LLM matcher
 adapters -up-> pipeline : entity stream
 domain_eval -up-> dedup : custom thresholds
 
