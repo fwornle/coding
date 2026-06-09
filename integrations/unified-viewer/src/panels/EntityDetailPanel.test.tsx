@@ -189,6 +189,9 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   test('Test 5: clicking a neighbor calls setSelectedNode(neighborId)', () => {
     useViewerStore.setState({ selectedNodeId: 'e1' })
     renderPanel()
+    // Phase 55 — Neighbors are inside Relationships breakdown; expand the
+    // DERIVED_FROM group first (which contains e2 + e3 outgoing).
+    fireEvent.click(screen.getByTestId('relationship-group-header-DERIVED_FROM'))
     const neighbor = screen.getByTestId('neighbor-e2')
     fireEvent.click(neighbor)
     expect(useViewerStore.getState().selectedNodeId).toBe('e2')
@@ -197,6 +200,9 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   test('Test 5b: incoming relations also list — clicking the source neighbor selects it', () => {
     useViewerStore.setState({ selectedNodeId: 'e1' })
     renderPanel()
+    // Phase 55 — Incoming relations land in their own group (CAUSED_BY) which
+    // we must expand to reach neighbor-e3.
+    fireEvent.click(screen.getByTestId('relationship-group-header-CAUSED_BY'))
     const incoming = screen.getByTestId('neighbor-e3')
     fireEvent.click(incoming)
     expect(useViewerStore.getState().selectedNodeId).toBe('e3')
