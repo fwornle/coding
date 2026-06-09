@@ -204,6 +204,8 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             apiClient={apiClient}
             classOptions={classOptions}
             registerSearchInputRef={registerSearchInputRef}
+            system={system}
+            entities={entities}
           />
           <main
             className="flex-1 bg-background overflow-hidden relative"
