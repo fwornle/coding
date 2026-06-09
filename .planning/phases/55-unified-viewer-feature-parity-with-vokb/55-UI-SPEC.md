@@ -1,10 +1,12 @@
 ---
 phase: 55
 slug: unified-viewer-feature-parity-with-vokb
-status: draft
+status: approved
 shadcn_initialized: true
 preset: inherited-from-phase-45 (style="new-york", baseColor="neutral", iconLibrary="lucide", cssVariables=true)
 created: 2026-06-09
+reviewed_at: 2026-06-09
+review_verdict: 7 PASS + 1 FLAG (Dimension 3 LIVE-pulse token clarification applied in §3.5 and §12)
 context_source: .planning/phases/55-unified-viewer-feature-parity-with-vokb/55-CONTEXT.md
 prior_spec: .planning/phases/45-unified-web-viewer/45-UI-SPEC.md (inherited verbatim where not amended)
 vokb_source: _work/rapid-automations/integrations/operational-knowledge-management/viewer/src/
@@ -117,7 +119,7 @@ Phase 45 dominant/secondary/destructive roles inherited verbatim. Phase 55 expan
 2. Active sub-tab in Entity panel (Default/Evolution/Confidence/Timeline)
 3. Active mode-switch toggle (Knowledge Graph ↔ Issue Triage)
 4. Primary CTA in Issue Triage: "View in Graph" button on RCA chain rows
-5. LIVE indicator pulse ring (stats bar) — small dot animation only, NOT a full button
+5. LIVE indicator pulse ring (stats bar) — small dot animation only, NOT a full button. **Token override:** uses `bg-emerald-500` (semantic-green, fixed) — NOT the `hsl(var(--primary))` accent token. Justification: this is a status-state signal whose meaning is "live data connection", which is semantically green across the codebase (matches `Observation` node fill at `GraphVisualization.tsx:31-176`); reusing the brand accent here would conflict with the dark-neutral primary token in light theme. This is the only declared exception to the accent contract — no other surface may invoke this carve-out without an explicit UI-SPEC amendment.
 6. Currently-selected node ring color override in graph canvas
 
 **Semantic palette (LOCKED — translated from VOKB `GraphVisualization.tsx:31-176`):**
@@ -424,7 +426,7 @@ Markdown and Entity now follow the same width rule. The width transition uses a 
 **When LIVE shows `LIVE` (vs `Polling`):**
 
 - The viewer attempts SSE connection on mount (`GET /api/v1/stream` if available; coding-specific stream for ETM at `/api/coding/observations/stream`).
-- If SSE handshake succeeds: `state = 'LIVE'`. Pulse dot is rendered, 1.5s `pulse` animation cycle (Tailwind `animate-pulse` with `bg-emerald-500` — accent reserved use).
+- If SSE handshake succeeds: `state = 'LIVE'`. Pulse dot is rendered, 1.5s `pulse` animation cycle (Tailwind `animate-pulse` with `bg-emerald-500` — **semantic-green, fixed — NOT the primary accent token**; this is the explicit accent carve-out documented in §3.5 item 5).
 - If SSE handshake fails or disconnects: `state = 'Polling'`. Dot is gray (`bg-muted-foreground`), no animation. A poll cycle every 30s keeps stats fresh.
 - Reconnection: exponential backoff (1, 2, 4, 8, 16s capped). Each attempt logs to `Logger.debug(LogCategories.NETWORK)`.
 
