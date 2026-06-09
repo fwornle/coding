@@ -1,4 +1,5 @@
 // PATTERN SOURCE: 45-RESEARCH.md § Pattern 1 (lines 367-384)
+//   + 55-PATTERNS.md § routes/UnifiedViewer.tsx (EXTEND)
 //
 // CRITICAL: key={system} guarantees full unmount on system switch.
 // React unmounts the entire subtree (including module-scoped Zustand
@@ -10,9 +11,18 @@
 // Footer + global keyboard shortcuts + KeyboardHelpDialog + the State
 // Contract surfaces. The graph canvas remains Plan 02's SigmaCanvas;
 // Plan 03 just sits around it.
+//
+// Phase 55 Plan 07 extensions:
+//   - StatsBar mounted between NavBar and the flex content row.
+//   - LegendPanel mounted as the bottomSlot of FilterRail.
+//   - mode-aware central canvas: kg → <SigmaCanvas/>, triage → lazy
+//     <TriagePlaceholder/> (Plan 55-10 Task 2 swaps the lazy import path
+//     to point at IssueTriageView).
+//   - URL `?mode=triage` persistence via useSearchParams.
+//   - Keyboard shortcut `m` flips the mode via setMode.
 
-import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import {
   isValidSystem,
   SYSTEM_ENDPOINTS,
@@ -30,6 +40,8 @@ import { NavBar } from '@/panels/NavBar'
 import { FilterRail } from '@/panels/FilterRail'
 import { SidePanel } from '@/panels/SidePanel'
 import { Footer } from '@/panels/Footer'
+import { StatsBar } from '@/panels/StatsBar'
+import { LegendPanel } from '@/panels/LegendPanel'
 import {
   EmptyFilterState,
   EmptyNoDataState,
@@ -41,9 +53,20 @@ import {
 import { UnknownSystem } from './UnknownSystem'
 import { Logger } from '@/lib/logging'
 
+// Plan 55-07 lazy slot for the Triage canvas. Plan 55-10 Task 2 swaps the
+// import path to '@/routes/IssueTriageView' (single-line edit, see plan).
+const TriagePlaceholder = lazy(() => import('./TriagePlaceholder'))
+
 interface ViewerCoreProps {
   system: System
   apiClient: ApiClient
+}
+
+function entitiesHaveIncidents(entities: ReadonlyArray<{ entityType?: unknown; ontologyClass?: unknown }>): boolean {
+  return entities.some((e) => {
+    const t = ((e.entityType as string | undefined) ?? (e.ontologyClass as string | undefined) ?? '')
+    return /incident|failureincident/i.test(t)
+  })
 }
 
 function isCorsError(err: Error | null): boolean {
@@ -71,6 +94,62 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   })
 
   const { entities, relations, isLoading, error } = useGraphData(apiClient, system)
+
+  // Phase 55 — Zustand mode slice.
+  const mode = useViewerStore((s) => s.mode)
+  const setMode = useViewerStore((s) => s.setMode)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const hasIncidents = useMemo(() => entitiesHaveIncidents(entities), [entities])
+
+  // Hydrate mode from `?mode=triage` URL param on first load (and on system
+  // remount). Only honored if the entity set actually has incidents — per
+  // UI-SPEC §9, the Triage mode is hidden entirely otherwise.
+  useEffect(() => {
+    const urlMode = searchParams.get('mode')
+    if (urlMode === 'triage' && hasIncidents) {
+      setMode('triage')
+    } else if (urlMode === 'kg') {
+      setMode('kg')
+    }
+    // No dep on setMode — Zustand setters are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasIncidents])
+
+  // Persist mode → URL. Strip `?mode=kg` (the default) to keep the URL clean.
+  useEffect(() => {
+    const current = searchParams.get('mode')
+    if (mode === 'triage' && current !== 'triage') {
+      const next = new URLSearchParams(searchParams)
+      next.set('mode', 'triage')
+      setSearchParams(next, { replace: true })
+    } else if (mode === 'kg' && current === 'triage') {
+      const next = new URLSearchParams(searchParams)
+      next.delete('mode')
+      setSearchParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+
+  // Phase 55 keyboard shortcut `m` — toggles mode (no-op if hidden).
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'm' && event.key !== 'M') return
+      // Skip when an input or textarea has focus (same discipline as the
+      // shared useKeyboardShortcuts hook).
+      const el = document.activeElement
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement | null)?.isContentEditable) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (entities.length === 0) return
+      const next = mode === 'kg' ? 'triage' : 'kg'
+      if (next === 'triage' && !hasIncidents) return // Triage hidden — no-op
+      setMode(next)
+      Logger.info(Logger.Categories.PANELS, `Mode keyboard toggle → ${next}`)
+      event.preventDefault()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [mode, hasIncidents, entities.length, setMode])
 
   // Log fetch errors exactly once per error transition, not on every render.
   // Plan 03 wired Logger.error inline inside the canvas IIFE which fired
@@ -192,13 +271,35 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
         />
       )
     }
+    // Mode-aware canvas: kg → SigmaCanvas; triage → lazy TriagePlaceholder
+    // (Plan 55-10 Task 2 swaps the lazy import path to IssueTriageView).
+    if (mode === 'triage' && hasIncidents) {
+      return (
+        <Suspense
+          fallback={
+            <div
+              data-testid="triage-suspense-fallback"
+              className="flex items-center justify-center h-full text-sm text-muted-foreground"
+            >
+              Loading triage…
+            </div>
+          }
+        >
+          <TriagePlaceholder />
+        </Suspense>
+      )
+    }
     return <SigmaCanvas apiClient={apiClient} system={system} />
   })()
 
   return (
     <TooltipProvider delayDuration={400}>
       <div className="flex flex-col h-screen bg-background text-foreground">
-        <NavBar onOpenHelpDialog={() => setHelpDialogOpen(true)} />
+        <NavBar
+          onOpenHelpDialog={() => setHelpDialogOpen(true)}
+          entities={entities}
+        />
+        <StatsBar apiClient={apiClient} system={system} />
         <div className="flex flex-1 overflow-hidden">
           <FilterRail
             apiClient={apiClient}
@@ -206,6 +307,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             registerSearchInputRef={registerSearchInputRef}
             system={system}
             entities={entities}
+            bottomSlot={<LegendPanel className="pt-2" />}
           />
           <main
             className="flex-1 bg-background overflow-hidden relative"
