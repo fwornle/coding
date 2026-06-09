@@ -7,7 +7,12 @@
 //   - 45-UI-SPEC.md § Color State (state transitions)
 
 import Graph from 'graphology'
-import { classColor } from './color-fallback'
+import {
+  borderStyleFallback,
+  classColor,
+  pulseRuleFallback,
+  shapeFallback,
+} from './color-fallback'
 import type { Entity, NodeState, OntologyClass, Relation } from './types'
 import type { Level, ViewerState } from '@/store/viewer-store'
 
@@ -62,6 +67,22 @@ export function buildGraph(
   theme: 'light' | 'dark',
 ): Graph {
   const graph = new Graph({ multi: false, allowSelfLoops: true, type: 'undirected' })
+
+  // Plan 55-05 (UI-SPEC §14 rule #4): orphan-on-current-view rule is
+  // applied AT BUILD TIME. Pre-compute "has any relation in the current
+  // view" per node id BEFORE stamping nodes, so each node carries the
+  // correct `borderStyle` attribute when it lands in the graph. Only
+  // count relations whose BOTH endpoints exist in `entities` — relations
+  // pointing at non-existent ids are skipped at edge-merge time below.
+  const entityIds = new Set<string>(entities.map((e) => e.id))
+  const hasRelationsById = new Set<string>()
+  for (const r of relations) {
+    if (entityIds.has(r.from) && entityIds.has(r.to)) {
+      hasRelationsById.add(r.from)
+      hasRelationsById.add(r.to)
+    }
+  }
+
   for (const e of entities) {
     const cls = ontology.find((c) => c.name === e.ontologyClass)
     const color = cls?.display?.color ?? classColor(e.ontologyClass, theme)
@@ -70,6 +91,30 @@ export function buildGraph(
     // exclude nodes. Falls back to `e.level` when the backend ever
     // populates the field directly.
     const level = e.level ?? deriveLevel(e.ontologyClass)
+
+    // Plan 55-05 (UI-SPEC §14 rules #2, #4, #5): the fallback chain.
+    //   shape:       overlay → shapeFallback(class) → 'circle'
+    //   borderStyle: overlay==='dashed' → dashed
+    //                else hasRelations? solid : dashed
+    //                (orphan rule wins over overlay's solid; overlay
+    //                 'dashed' wins over the orphan check via the first
+    //                 branch — i.e. an entity overlay-marked dashed
+    //                 stays dashed even with relations)
+    //   pulseRule:   overlay → pulseRuleFallback (null)
+    const shape = cls?.display?.shape ?? shapeFallback(e.ontologyClass)
+    const hasRelations = hasRelationsById.has(e.id)
+    const overlayBorder = cls?.display?.borderStyle
+    const borderStyle: 'solid' | 'dashed' =
+      overlayBorder === 'dashed'
+        ? 'dashed'
+        : borderStyleFallback(e.ontologyClass, hasRelations)
+    // pulseRule overlay can be `null` (explicit "no pulse") OR `undefined`
+    // (overlay didn't specify). Both fall back to pulseRuleFallback (null).
+    // We surface the chosen rule string (or null) so the per-frame reducer
+    // can evaluate it against the entity's updatedAt / metadata.
+    const pulseRule: string | null =
+      cls?.display?.pulseRule ?? pulseRuleFallback(e.ontologyClass)
+
     // mergeNode (not addNode) is idempotent — re-applying the same id with
     // the same attributes is a no-op rather than a throw.
     graph.mergeNode(e.id, {
@@ -81,6 +126,15 @@ export function buildGraph(
       ontologyClass: e.ontologyClass,
       level,
       description: e.description,
+      // Plan 55-05 visual encoding attrs (consumed by the reducer +
+      // sigma node program registered in SigmaCanvas).
+      shape,
+      borderStyle,
+      pulseRule,
+      // Pulse evaluator needs these; thread through verbatim so the
+      // reducer can call evaluatePulseRule(rule, attrs as Entity).
+      updatedAt: (e as { updatedAt?: string }).updatedAt,
+      metadata: e.metadata,
     })
   }
   for (const r of relations) {
@@ -110,17 +164,60 @@ export function mergeIntoGraph(
   theme: 'light' | 'dark',
 ): number {
   const before = graph.order
+  // For incremental merges we cannot trivially recompute the orphan rule
+  // for every PRE-EXISTING node (that would require a full graph scan on
+  // every neighbor expand). Strategy:
+  //   - For the NEW nodes in this payload, compute "has relation in this
+  //     payload's relation set" — same as buildGraph does for the full
+  //     payload.
+  //   - For nodes that GAIN a relation through this merge, flip their
+  //     `borderStyle` to 'solid' if currently 'dashed' AND they didn't
+  //     come in with an explicit overlay 'dashed' (we can't easily tell
+  //     after the fact, so we re-derive from current ontology overlay).
+  //     This keeps the visual contract correct over time.
   for (const e of payload.entities) {
     const cls = ontology.find((c) => c.name === e.ontologyClass)
     const color = cls?.display?.color ?? classColor(e.ontologyClass, theme)
+    // Plan 55-05 attrs — derive at merge time. For the brand-new node
+    // path, hasRelations is computed from the payload's relations.
+    const shape = cls?.display?.shape ?? shapeFallback(e.ontologyClass)
+    const hasRelationsInPayload = payload.relations.some(
+      (r) => r.from === e.id || r.to === e.id,
+    )
+    const overlayBorder = cls?.display?.borderStyle
+    const borderStyle: 'solid' | 'dashed' =
+      overlayBorder === 'dashed'
+        ? 'dashed'
+        : borderStyleFallback(e.ontologyClass, hasRelationsInPayload)
+    const pulseRule: string | null =
+      cls?.display?.pulseRule ?? pulseRuleFallback(e.ontologyClass)
+
     if (graph.hasNode(e.id)) {
       // Idempotent attribute merge — extends existing node without re-creating.
+      // For existing nodes, only flip `borderStyle` from 'dashed' to 'solid'
+      // if THIS merge introduces a relation that makes it non-orphan
+      // (and the overlay doesn't say 'dashed').
+      const existingBorder = graph.getNodeAttribute(e.id, 'borderStyle') as
+        | 'solid'
+        | 'dashed'
+        | undefined
+      const nextBorder: 'solid' | 'dashed' =
+        overlayBorder === 'dashed'
+          ? 'dashed'
+          : hasRelationsInPayload || existingBorder === 'solid'
+            ? 'solid'
+            : (existingBorder ?? 'dashed')
       graph.mergeNodeAttributes(e.id, {
         label: e.name,
         color,
         ontologyClass: e.ontologyClass,
         level: e.level,
         description: e.description,
+        shape,
+        borderStyle: nextBorder,
+        pulseRule,
+        updatedAt: (e as { updatedAt?: string }).updatedAt,
+        metadata: e.metadata,
       })
     } else {
       graph.addNode(e.id, {
@@ -132,6 +229,11 @@ export function mergeIntoGraph(
         ontologyClass: e.ontologyClass,
         level: e.level,
         description: e.description,
+        shape,
+        borderStyle,
+        pulseRule,
+        updatedAt: (e as { updatedAt?: string }).updatedAt,
+        metadata: e.metadata,
       })
     }
   }
@@ -140,6 +242,23 @@ export function mergeIntoGraph(
     // See buildGraph note — fixed hex edges so sigma's WebGL renderer
     // actually shows them.
     graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', type: r.type })
+    // Flip endpoints' borderStyle from 'dashed' → 'solid' on edge add
+    // UNLESS their ontology overlay opts into 'dashed' explicitly. We
+    // don't have ontology lookup here, so optimistically clear the
+    // orphan flag — subsequent ontology overlay refreshes can re-apply.
+    for (const endpoint of [r.from, r.to]) {
+      const cur = graph.getNodeAttribute(endpoint, 'borderStyle')
+      if (cur === 'dashed') {
+        const cls = graph.getNodeAttribute(endpoint, 'ontologyClass') as
+          | string
+          | undefined
+        const overlay = ontology.find((c) => c.name === cls)?.display
+          ?.borderStyle
+        if (overlay !== 'dashed') {
+          graph.setNodeAttribute(endpoint, 'borderStyle', 'solid')
+        }
+      }
+    }
   }
   return graph.order - before
 }

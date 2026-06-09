@@ -39,7 +39,12 @@ import { useGraphData } from './useGraphData'
 import { buildGraph } from './graph-builder'
 import { classColor } from './color-fallback'
 import { makeEventHandlers } from './events'
-import { makeEdgeReducer, makeNodeReducer } from './reducers'
+import {
+  makeEdgeReducer,
+  makeNodeReducer,
+  setReducedMotion,
+  SHAPE_NODE_PROGRAMS,
+} from './reducers'
 
 export interface SigmaCanvasProps {
   apiClient: ApiClient
@@ -69,6 +74,14 @@ export function SigmaCanvas({ apiClient, system }: SigmaCanvasProps) {
           labelGridCellSize: 80,
           labelSize: 12,
           labelWeight: '500',
+          // Plan 55-05 (UI-SPEC §14): per-shape node-program dispatch.
+          // Each node's reducer output carries `type: <shape>` (set from
+          // the graph-builder-stamped `shape` attribute); sigma dispatches
+          // each draw to the right program. V1 has all 5 shapes mapped to
+          // NodeCircleProgram — see SHAPE_NODE_PROGRAMS for the upgrade
+          // path to custom diamond/square/triangle/hexagon programs.
+          nodeProgramClasses: SHAPE_NODE_PROGRAMS,
+          defaultNodeType: 'circle',
         }}
       >
         <GraphSetup apiClient={apiClient} system={system} />
@@ -187,7 +200,29 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
       setSettings(themeSettings())
     })
     setSettings(themeSettings())
-    return () => unsub()
+
+    // Plan 55-05 (UI-SPEC §12 + §15): subscribe to the reduced-motion
+    // media query and push changes into the reducer module. Piggy-backed
+    // on this existing effect (instead of a new mount-restart effect) to
+    // preserve the Phase 45 invariant — same hook count as before Plan
+    // 55, and the layout does NOT restart on filter / selection change.
+    let mql: MediaQueryList | null = null
+    let mqlListener: ((ev: MediaQueryListEvent) => void) | null = null
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      mql = window.matchMedia('(prefers-reduced-motion: reduce)')
+      setReducedMotion(mql.matches === true)
+      mqlListener = (ev: MediaQueryListEvent) => {
+        setReducedMotion(ev.matches === true)
+      }
+      mql.addEventListener?.('change', mqlListener)
+    }
+
+    return () => {
+      unsub()
+      if (mql && mqlListener) {
+        mql.removeEventListener?.('change', mqlListener)
+      }
+    }
   }, [hoveredNode, setSettings])
 
   return null
