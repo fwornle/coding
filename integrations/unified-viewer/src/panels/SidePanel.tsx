@@ -2,7 +2,8 @@
 // CONTRACT: 45-UI-SPEC.md § Layout Contract row 4
 //   - default w-96; w-[30rem] when Markdown tab is active
 //   - Entity tab always present; Markdown only on system='okb'
-//   - Phase 55 D-55-01b: RCA tab + RcaOpsPanel are gone (cap dropped)
+//   - Phase 55 D-55-01b: cap system dropped → side-panel tab inventory is
+//     entity + (markdown when okb). The RCA tab and its panel are gone.
 
 import { useState } from 'react'
 import type { ApiClient } from '@/api/ApiClient'

@@ -35,11 +35,13 @@ describe('NavBar', () => {
     cleanup()
   })
 
-  test('Test 1: renders three NavLinks Coding/OKB/CAP; active matches :system', () => {
+  test('Test 1: renders two NavLinks Coding/OKB; active matches :system (Phase 55)', () => {
+    // Phase 55: 2-system viewer (CAP dropped per D-55-01b).
     renderAt('/viewer/okb')
     expect(screen.getByTestId('nav-link-coding')).toHaveTextContent('Coding')
     expect(screen.getByTestId('nav-link-okb')).toHaveTextContent('OKB')
-    expect(screen.getByTestId('nav-link-cap')).toHaveTextContent('CAP')
+    // CAP nav link is gone.
+    expect(screen.queryByTestId('nav-link-cap')).toBeNull()
     expect(screen.getByTestId('nav-link-okb')).toHaveAttribute('data-active', 'true')
     expect(screen.getByTestId('nav-link-coding')).toHaveAttribute('data-active', 'false')
     // Active link styled with font-bold + accent underline per UI-SPEC § Typography

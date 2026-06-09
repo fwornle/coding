@@ -1,14 +1,16 @@
-// PATTERN SOURCE: 45-01-PLAN.md Task 2 <behavior> Tests 4 + 5
+// PATTERN SOURCE: 45-01-PLAN.md Task 2 <behavior> Tests 4 + 5,
+// AMENDED by 55-01-PLAN.md Task 3 (CAP system dropped, D-55-01b).
 //
 // Test 4: /viewer/coding renders ViewerCore with the active NavLink reading
 //         "Coding"; /viewer/unknown renders UnknownSystem.
 // Test 5: Switching :system unmounts and re-mounts the subtree
 //         (proven via a DOM-ref check — the active nav-link is a NEW DOM node).
 //
-// Plan 03 update: the wordmark is now the static "Unified Viewer" string
-// in NavBar. System identity surfaces in the active NavLink (font-bold
-// + accent underline per UI-SPEC § Typography). Tests below assert
-// against `nav-link-{system}` data-testid with data-active="true".
+// Phase 55: only `coding` and `okb` are valid systems. `/viewer/cap` falls
+// through to UnknownSystem. The wordmark is the static "Unified Viewer"
+// string in NavBar. System identity surfaces in the active NavLink (font-bold
+// + accent underline per UI-SPEC § Typography). Tests below assert against
+// `nav-link-{system}` data-testid with data-active="true".
 
 import { describe, test, expect, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
@@ -56,7 +58,7 @@ function renderAt(path: string) {
   )
 }
 
-describe('UnifiedViewer routing', () => {
+describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
   test('/viewer/coding renders ViewerCore with the Coding nav-link active', () => {
     renderAt('/viewer/coding')
     // Wordmark is the static "Unified Viewer" per UI-SPEC § Layout Contract row 1.
@@ -78,41 +80,43 @@ describe('UnifiedViewer routing', () => {
     cleanup()
   })
 
-  test('/viewer/cap renders ViewerCore with the CAP nav-link active', () => {
+  test('/viewer/cap renders UnknownSystem (cap is no longer a valid system per D-55-01b)', () => {
+    // Phase 55: cap is dropped. /viewer/cap must NOT render ViewerCore;
+    // it must fall through UnifiedViewer's isValidSystem guard to UnknownSystem.
     renderAt('/viewer/cap')
-    expect(screen.getByTestId('viewer-wordmark')).toHaveTextContent('Unified Viewer')
-    const active = screen.getByTestId('nav-link-cap')
-    expect(active).toHaveAttribute('data-active', 'true')
-    expect(active).toHaveTextContent('CAP')
+    const unknown = screen.getByTestId('unknown-system')
+    expect(unknown).toBeInTheDocument()
+    // Only 2 recovery links — Coding + OKB (CAP is gone).
+    const links = screen.getByTestId('unknown-system-links').querySelectorAll('a')
+    expect(links).toHaveLength(2)
+    const labels = Array.from(links).map((a) => a.textContent)
+    expect(labels).toContain('Coding')
+    expect(labels).toContain('OKB')
+    expect(labels).not.toContain('CAP')
     cleanup()
   })
 
   test('/viewer/foo renders UnknownSystem (invalid system slug under /viewer/)', () => {
-    // Per 45-01-PLAN.md Task 2 Test 4 + Task 3 manual check #4 + UI-SPEC § Routing
-    // line 231: /viewer/{unknown} must render the UnknownSystem 404 page with
-    // three labelled links — NOT silently redirect to /viewer/coding.
     renderAt('/viewer/foo')
     const unknown = screen.getByTestId('unknown-system')
     expect(unknown).toBeInTheDocument()
     const links = screen.getByTestId('unknown-system-links').querySelectorAll('a')
-    expect(links).toHaveLength(3)
+    expect(links).toHaveLength(2)
     const labels = Array.from(links).map((a) => a.textContent)
     expect(labels).toContain('Coding')
     expect(labels).toContain('OKB')
-    expect(labels).toContain('CAP')
     cleanup()
   })
 
-  test('/foo renders UnknownSystem with three labelled links', () => {
+  test('/foo renders UnknownSystem with two labelled links (Phase 55)', () => {
     renderAt('/foo')
     const unknown = screen.getByTestId('unknown-system')
     expect(unknown).toBeInTheDocument()
     const links = screen.getByTestId('unknown-system-links').querySelectorAll('a')
-    expect(links).toHaveLength(3)
+    expect(links).toHaveLength(2)
     const labels = Array.from(links).map((a) => a.textContent)
     expect(labels).toContain('Coding')
     expect(labels).toContain('OKB')
-    expect(labels).toContain('CAP')
     cleanup()
   })
 
