@@ -39,6 +39,7 @@ import { sanitizeMarkdownHtml } from '@/lib-domain/sanitize-markdown'
 import { useMarkdownHistory } from '@/hooks/useMarkdownHistory'
 import { IconButton } from '@/components/IconButton'
 import { Logger } from '@/lib/logging'
+import { EntityIdentityHeader } from './EntityIdentityHeader'
 
 export interface MarkdownViewerPanelProps {
   apiClient: ApiClient
@@ -462,6 +463,12 @@ export function MarkdownViewerPanel({ apiClient, system }: MarkdownViewerPanelPr
           {filename}
         </h2>
       </header>
+
+      {/* Phase 55 (Plan 09 Task 3) — shared EntityIdentityHeader harmonizes the
+          Markdown panel's identity block with EntityDetailPanel. Renders ABOVE
+          the markdown body so the class chip + L/parent/created/last-confirmed
+          row stays visible whether the body is text or a fetched .md file. */}
+      <EntityIdentityHeader entity={entity} theme={theme} />
 
       <div
         ref={contentRef}
