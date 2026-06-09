@@ -53,11 +53,13 @@ describe('State Contract components', () => {
   })
 
   test('Test 5: ErrorUnreachableState — destructive classes + body interpolation + Retry', () => {
+    // Phase 55: switched from system="cap" (dropped per D-55-01b) to system="okb".
+    // The hallucinated corporate URL is purged (D-55-01c).
     const onRetry = vi.fn()
     render(
       <ErrorUnreachableState
-        system="cap"
-        baseUrl="https://okm.cc.bmwgroup.net"
+        system="okb"
+        baseUrl="http://localhost:8090"
         onRetry={onRetry}
       />,
     )
@@ -67,7 +69,7 @@ describe('State Contract components', () => {
     expect(banner.className).toMatch(/border-destructive\/30/)
     expect(
       screen.getByText(
-        /Cannot reach cap API at https:\/\/okm\.cc\.bmwgroup\.net\. Check that the service is running and accessible\./,
+        /Cannot reach okb API at http:\/\/localhost:8090\. Check that the service is running and accessible\./,
       ),
     ).toBeInTheDocument()
     screen.getByRole('button', { name: 'Retry' }).click()
@@ -75,10 +77,11 @@ describe('State Contract components', () => {
   })
 
   test('Test 6: ErrorCorsState — CORS-specific copy with system + baseUrl interpolated', () => {
-    render(<ErrorCorsState system="cap" baseUrl="https://x.example.com" />)
+    // Phase 55: system="okb" replaces system="cap" (D-55-01b).
+    render(<ErrorCorsState system="okb" baseUrl="https://x.example.com" />)
     expect(
       screen.getByText(
-        /Browser blocked the request to https:\/\/x\.example\.com \(CORS\)\. The cap service must allow this origin or be reached through a proxy\./,
+        /Browser blocked the request to https:\/\/x\.example\.com \(CORS\)\. The okb service must allow this origin or be reached through a proxy\./,
       ),
     ).toBeInTheDocument()
   })

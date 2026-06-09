@@ -1,173 +1,51 @@
-// Phase 45 Plan 06 — Spec 7: RCA ingestion ops (CAP).
+// Phase 55 Plan 01 Task 3 — 55-cap-removal smoke test.
 //
-// PER-TASK VERIFICATION MAP: 45-VALIDATION.md row "rca-ingestion"
-// SOURCE-OF-TRUTH: integrations/unified-viewer/src/panels/RcaOpsPanel.tsx
-//                  + integrations/unified-viewer/src/api/OkmRcaClient.ts
+// REPLACES the Phase 45 Plan 06 RCA-ingestion mock-mode spec. The CAP
+// system is GONE (D-55-01b), so RCA ingestion ops no longer exist in
+// the unified viewer. This file remains at its Phase 45 path so the
+// 55-01-PLAN.md verification command (which greps this filename) keeps
+// working through the cutover.
 //
-// Per 45-06-PLAN.md Task 2 spec-7: this test runs in MOCK mode because
-// the BMW CAP backend (https://okm.cc.bmwgroup.net) is not reachable from
-// the Plan 06 executor's network — Probe 1/2 are DEFERRED-TO-OPERATOR
-// per 45-06-OPERATOR-PROBES.md. Even when the operator's CAP probes are
-// GREEN, the executor can't run them; so this spec is mock-only by design.
+// PER-TASK VERIFICATION MAP: 55-01-PLAN.md Task 3 <behavior>
+// SOURCE-OF-TRUTH: integrations/unified-viewer/src/routes/UnifiedViewer.tsx
+//                  + integrations/unified-viewer/src/routes/UnknownSystem.tsx
+//                  + integrations/unified-viewer/src/config/system-endpoints.ts
 //
 // What this spec asserts:
-//   1. Route /api/okm/rca/dirs to a fixture that returns one RaaS dir.
-//   2. Route /api/okm/ingest/progress to a server-sent-events stream that
-//      emits connected → stage(extract) → stage(dedup) → ... → complete.
-//      Because Playwright doesn't natively stream SSE through page.route,
-//      we install a `TestEventSource` shim via an init script that
-//      intercepts the EventSource constructor and feeds messages on a
-//      timer.
-//   3. /viewer/cap loads, the RCA tab shows the dir list with one row,
-//      clicking Ingest cycles through the stage pills and reaches the
-//      completion card.
+//   1. /viewer/cap falls through to UnknownSystem (NOT the viewer chrome).
+//   2. The page body contains zero `cc.bmwgroup.net` substring.
+//   3. The page body contains no `(CORS)` banner copy from Phase 45's
+//      hallucinated URL.
+//   4. The UnknownSystem page's recovery links list only Coding + OKB
+//      (no CAP link).
 
 import { test, expect } from '@playwright/test'
 
-// Fixture: one RaaS dir to ingest.
-const RCA_DIRS_FIXTURE = {
-  kpifw: [],
-  raas: [
-    {
-      path: '/data/rca/raas/2026-06-07T12-00-00Z',
-      timestamp: '2026-06-07T12:00:00Z',
-      findingCount: 5,
-    },
-  ],
-  e2e: [],
-}
-
-// SSE script the test-init injects to mock EventSource.
-const TEST_EVENT_SOURCE_INIT = `
-(() => {
-  const RealEventSource = window.EventSource;
-  class TestEventSource {
-    constructor(url) {
-      this.url = url;
-      this.readyState = 0;
-      this.onmessage = null;
-      this.onerror = null;
-      this.onopen = null;
-      // Park outbound events on the instance so the test can fire them.
-      window.__testSseInstances = window.__testSseInstances || [];
-      window.__testSseInstances.push(this);
-      // Auto-emit "connected" on next tick so the panel registers a handshake.
-      setTimeout(() => {
-        this.readyState = 1;
-        this._emit({ type: 'connected' });
-      }, 0);
-    }
-    _emit(payload) {
-      if (typeof this.onmessage === 'function') {
-        this.onmessage({ data: JSON.stringify(payload) });
-      }
-    }
-    close() {
-      this.readyState = 2;
-    }
-    addEventListener() { /* no-op for MVP */ }
-    removeEventListener() { /* no-op for MVP */ }
-  }
-  window.EventSource = TestEventSource;
-  window.__testSseEmitAll = (payload) => {
-    (window.__testSseInstances || []).forEach(es => es._emit(payload));
-  };
-  window.__realEventSource = RealEventSource;
-})();
-`
-
-test.describe('Unified Viewer — RCA ingestion (mock mode)', () => {
-  test('mocked SSE drives the stage pills through to completion', async ({
+test.describe('Unified Viewer — 55 CAP removal smoke (Phase 55 Plan 01 Task 3)', () => {
+  test('/viewer/cap renders UnknownSystem with no cc.bmwgroup.net / no (CORS) banner', async ({
     page,
   }) => {
-    // 1. Inject the TestEventSource BEFORE any page script runs.
-    await page.addInitScript(TEST_EVENT_SOURCE_INIT)
-
-    // 2. Mock the dir listing.
-    await page.route('**/api/okm/rca/dirs', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(RCA_DIRS_FIXTURE),
-      }),
-    )
-
-    // 3. Mock the ingest POST.
-    await page.route('**/api/okm/rca/ingest', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, runId: 'mock-run-1' }),
-      }),
-    )
-
-    // 4. Even though Probe 1 deferred, intercept entities/relations/
-    //    ontology so /viewer/cap mounts the CAP-system shell without
-    //    waiting for an unreachable backend.
-    await page.route('**/api/v1/entities', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, data: [] }),
-      }),
-    )
-    await page.route('**/api/v1/relations', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, data: [] }),
-      }),
-    )
-    await page.route('**/api/v1/ontology/classes**', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, data: [] }),
-      }),
-    )
-
     await page.goto('/viewer/cap')
-    await page.getByTestId('tab-rca').click()
 
-    // RCA panel should render the one RaaS row.
-    await expect(page.getByTestId('rca-ops-panel')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByTestId('rca-group-raas')).toBeVisible()
-    const ingestBtn = page.getByTestId('rca-row-raas-0').getByRole('button')
-    await expect(ingestBtn).toBeVisible()
+    // 1. UnknownSystem renders — viewer chrome does NOT.
+    await expect(page.getByTestId('unknown-system')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: 'Unknown system' })).toBeVisible()
+    // Verify the viewer chrome did NOT mount.
+    await expect(page.getByTestId('viewer-navbar')).toHaveCount(0)
+    await expect(page.getByTestId('viewer-canvas')).toHaveCount(0)
 
-    // Click Ingest — flips runningPipeline.
-    await ingestBtn.click()
+    // 2. No `cc.bmwgroup.net` anywhere on the page (D-55-01c).
+    const body = await page.locator('body').textContent()
+    expect(body ?? '').not.toContain('cc.bmwgroup.net')
 
-    // Drive the SSE stream forward — emit stage transitions.
-    const stages: string[] = ['extract', 'dedup', 'store', 'synthesize', 'resolve']
-    for (const stage of stages) {
-      await page.evaluate((s) => {
-        const w = window as unknown as {
-          __testSseEmitAll?: (p: unknown) => void
-        }
-        w.__testSseEmitAll?.({ type: 'stage', stage: s })
-      }, stage)
-      // Tiny wait between events so React renders the pill transition.
-      await page.waitForTimeout(100)
-    }
-    // Emit a progress event and a complete event.
-    await page.evaluate(() => {
-      const w = window as unknown as {
-        __testSseEmitAll?: (p: unknown) => void
-      }
-      w.__testSseEmitAll?.({ type: 'progress', progress: 100 })
-      w.__testSseEmitAll?.({
-        type: 'complete',
-        message: 'Ingestion complete (mock)',
-      })
-    })
+    // 3. No misleading `(CORS)` banner from the Phase 45 hallucinated URL.
+    expect(body ?? '').not.toMatch(/\(CORS\)/)
 
-    // The completion card surfaces.
-    await expect(page.getByTestId('rca-completion-card')).toBeVisible({
-      timeout: 5_000,
-    })
-    await expect(page.getByTestId('rca-completion-card')).toContainText(
-      'Ingestion complete (mock)',
-    )
+    // 4. Recovery links — Coding + OKB only (CAP dropped per D-55-01b).
+    const links = page.getByTestId('unknown-system-links')
+    await expect(links).toBeVisible()
+    await expect(links.getByRole('link', { name: 'Coding' })).toBeVisible()
+    await expect(links.getByRole('link', { name: 'OKB' })).toBeVisible()
+    await expect(links.getByRole('link', { name: 'CAP' })).toHaveCount(0)
   })
 })

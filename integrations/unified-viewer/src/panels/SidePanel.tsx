@@ -1,8 +1,9 @@
-// PATTERN SOURCE: 45-PATTERNS.md § SidePanel.tsx
+// PATTERN SOURCE: 45-PATTERNS.md § SidePanel.tsx, AMENDED by 55-01-PLAN.md Task 2
 // CONTRACT: 45-UI-SPEC.md § Layout Contract row 4
-//   - default w-96; w-[30rem] when Markdown OR RCA tab is active
-//   - Entity tab always present; Markdown only on system='okb'; RCA only on system='cap'
-//   - Plan 03 wires the SHELL; Plan 04 ports MarkdownViewer; Plan 05 ports RCA panel.
+//   - default w-96; w-[30rem] when Markdown tab is active
+//   - Entity tab always present; Markdown only on system='okb'
+//   - Phase 55 D-55-01b: cap system dropped → side-panel tab inventory is
+//     entity + (markdown when okb). The RCA tab and its panel are gone.
 
 import { useState } from 'react'
 import type { ApiClient } from '@/api/ApiClient'
@@ -10,7 +11,6 @@ import type { System } from '@/config/system-endpoints'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EntityDetailPanel } from './EntityDetailPanel'
 import { MarkdownViewerPanel } from './MarkdownViewerPanel'
-import { RcaOpsPanel } from './RcaOpsPanel'
 import { Logger } from '@/lib/logging'
 
 export interface SidePanelProps {
@@ -18,19 +18,15 @@ export interface SidePanelProps {
   system: System
 }
 
-type TabValue = 'entity' | 'markdown' | 'rca'
+type TabValue = 'entity' | 'markdown'
 
 export function SidePanel({ apiClient, system }: SidePanelProps) {
   const [tab, setTab] = useState<TabValue>('entity')
 
   const showMarkdown = system === 'okb'
-  const showRca = system === 'cap'
 
-  // Width contract — w-96 default, w-[30rem] when Markdown or RCA active.
-  const widthClass =
-    (tab === 'markdown' && showMarkdown) || (tab === 'rca' && showRca)
-      ? 'w-[30rem]'
-      : 'w-96'
+  // Width contract — w-96 default, w-[30rem] when Markdown active.
+  const widthClass = tab === 'markdown' && showMarkdown ? 'w-[30rem]' : 'w-96'
 
   return (
     <aside
@@ -40,8 +36,16 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
       <Tabs
         value={tab}
         onValueChange={(next) => {
-          setTab(next as TabValue)
-          Logger.info(Logger.Categories.PANELS, `SidePanel tab → ${next}`)
+          // Defensive: narrow whatever Radix hands us back to a known TabValue.
+          // The UI cannot produce 'rca' (no trigger renders one), but a
+          // future regression would silently render unknown content if we
+          // skipped this guard.
+          if (next === 'entity' || next === 'markdown') {
+            setTab(next)
+            Logger.info(Logger.Categories.PANELS, `SidePanel tab → ${next}`)
+          } else {
+            Logger.warn(Logger.Categories.PANELS, `Unknown SidePanel tab "${next}" — ignored`)
+          }
         }}
         className="h-full"
       >
@@ -54,11 +58,6 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
               Markdown
             </TabsTrigger>
           )}
-          {showRca && (
-            <TabsTrigger value="rca" data-testid="tab-rca">
-              RCA
-            </TabsTrigger>
-          )}
         </TabsList>
 
         <TabsContent value="entity" className="px-4 pb-4">
@@ -68,12 +67,6 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
         {showMarkdown && (
           <TabsContent value="markdown" className="px-4 pb-4 h-[calc(100vh-8rem)]">
             <MarkdownViewerPanel apiClient={apiClient} system={system} />
-          </TabsContent>
-        )}
-
-        {showRca && (
-          <TabsContent value="rca" className="px-4 pb-4 h-[calc(100vh-8rem)]">
-            <RcaOpsPanel apiClient={apiClient} system={system} />
           </TabsContent>
         )}
       </Tabs>
