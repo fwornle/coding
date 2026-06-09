@@ -34,9 +34,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 | 41 | Online Learning Adapter & Post-Hoc Resolution | A (ODI) | ✓ |
 | 42 | Offline UKB Migration | B (mcp-server-semantic-analysis) | ✓ (closed via 42.1/42.1.1/42.1.2/42.2 chain; SC#1-6 gate cleared 2026-05-25 per 42.2-06-SUMMARY) |
 | 43 | OKM Cross-Repo Migration | C (rapid-automations/OKM) | ✓ (11/11 plans landed; OKM PR #4 merged 2026-06-02T08:15Z; CI green; merge commit 34a0fc5; outer re-bumped 0ce459c. All 4 SCs verified.) |
-| **44** | **REST API & Git Snapshots** | **shared (requires A+B+C — all on km-core)** | **NEXT** |
-| 45 | Unified Web Viewer | shared (requires API) | pending |
-| 46 | Per-System Docs & Onboarding | shared | pending (partially seeded — see [Roadmap Evolution] for the 2026-06-01 out-of-band docs commit) |
+| 44 | REST API & Git Snapshots | shared (requires A+B+C — all on km-core) | ✓ (completed 2026-06-04) |
+| 45 | Unified Viewer Routing Layer (descope of "Unified Web Viewer") | shared (requires API) | ✓ (routing layer only; UI feature parity → Phase 55. Operator review 2026-06-09 against VOKB: ~15% surface parity; descope locked in 45-VERIFICATION.md) |
+| 46 | Per-System Docs & Onboarding | shared | ✓ (completed 2026-06-09; one HUMAN-UAT pending: operator dry-run of ONBOARDING.md) |
 
 **Out-of-milestone backlog (NOT v7.1 work — bug-fix phases that got slotted by number):**
 
@@ -47,8 +47,9 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 - **Phase 51: Agent-agnostic sub-agent capture** — ✓ COMPLETE 2026-05-27. 16 plans landed (11 original + 5 gap-closure 51-12 → 51-16). HUMAN-UAT `status: resolved`, `passed_at: 2026-05-27T18:35:00Z`, `closed_by: 51-16-PLAN.md`. 6 ACs verified (4 PASS, 2 PARTIAL). Final closure commit `cc0c35b65 docs(phase-51): update tracking after wave 3 (51-16 closure)`. Three documented follow-ups still open in `.planning/todos/pending/`: `opencode-schema-migration-update.md`, `sweep-llm-proxy-probe-fix.md`, `json-export-missing-source-field.md`.
 - Phase 52: Dashboard LLM routing label + `process` tag observability fix
 - Phase 54: ETM hardening — launchd plist + isProcessing reset audit (NEW 2026-06-02; backlog). ETM stalled silently for 16h+ (PID 98287, no observation writes Jun 1 16:58 UTC → Jun 2 07:25 UTC) before manual SIGTERM+nohup restart cleared it. Three-plan scope: launchd plist so ETM auto-respawns like other coding services; top-level try/finally + watchdog around the `isProcessing` re-entrancy guard at `enhanced-transcript-monitor.js:4085-4135`; `bin/coding --claude` migrated to `launchctl kickstart` for ETM. Could-have: extend health-coordinator to surface ETM heartbeat so the next stall is caught by the 4-layer monitoring rather than the user noticing the dashboard "faded to black". See `.planning/phases/54-…/54-CONTEXT.md`.
+- **Phase 55: Unified Viewer Feature Parity with VOKB (NEW 2026-06-09; backlog).** Phase 45 ("Unified Web Viewer") was reframed 2026-06-09 as "Unified Viewer Routing Layer" after operator visual review against `localhost:3002` (VOKB) showed the unified viewer at `localhost:5173/viewer/*` delivers ~15% of VOKB's surface area. The routing layer (system-endpoints, multi-base ApiClient, ontology display-overlay) is real and stays shipped; the UI feature parity work — OKB data routing (currently shows coding KG, not OKM), CAP environment-bound error UX (currently misleading "CORS" message when actual failure is DNS / VPN), legend, node-shape encoding, VOKB feature port (Layer/Domain filters, Ontology Class tree with counts, Trending Patterns, Issue Triage tab, Stats bar, Entity Details sub-tabs, Relationships by edge type, Sources & Evidence, Occurrence History), Markdown/Entity panel UX harmonisation — moves to Phase 55. Ten SCs locked in 55-CONTEXT.md; six open Q's for `/gsd-discuss-phase 55`. Phase 45 stays checked-off in ROADMAP under the new framing; 45-VERIFICATION.md captures the descope honestly. See `.planning/phases/55-unified-viewer-feature-parity-with-vokb/55-CONTEXT.md`.
 
-Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs`) that Phase 51 (now ✓) imports unchanged per D-Reuse. The rest of the backlog phases (47/48/49/52/54) remain unaddressed; pick up when blocking.
+Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-convert.mjs`) that Phase 51 (now ✓) imports unchanged per D-Reuse. The rest of the backlog phases (47/48/49/52/54/55) remain unaddressed; pick up when blocking.
 
 ## Current Position
 

@@ -243,7 +243,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 - [x] **Phase 42.1: UKB Project-Anchor Parity** - Restore the `findBestParent` + post-sweep `contains`-edge pass that Phase 42-07 Phase B1 removed when replacing `persistence-agent.persistEntities` with `persistWithKmCore`. Without this, every `ukb full` orphans new entities from the `Coding` Project anchor (forensic 2026-05-24 evidence: +64 entities, 0 new edges to Coding). (closed via 42.1.1 + 42.1.2 + structural fix in 42.2-06; remaining residual = 18 ghost orphans in stale general.json which next clean wave-analysis will overwrite.)
 - [x] **Phase 43: OKM Cross-Repo Migration (C)** - Cross-repo refactor of `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` onto KM-Core; rapid-automations CI stays green. (CLOSED 2026-06-02: OKM PR #4 merged 34a0fc5; CI green twice — 108020147 + 108040202; all 4 SCs verified)
 - [x] **Phase 44: REST API & Git Snapshots** - Common entity/search/clusters/snapshots/ontology REST contract + git-snapshot/restore identical across A/B/C. (completed 2026-06-04)
-- [x] **Phase 45: Unified Web Viewer** (6/6 plans executed) - Single viewer parameterized by ontology config; VKB (B) and VOKB (C) users migrate without functional regression. (MVP shipped 2026-06-08 — VKB + VOKB stay live as fallback per CONTEXT.md Deferred Ideas)
+- [x] **Phase 45: Unified Viewer Routing Layer** (6/6 plans executed) - Routing scaffold (system-endpoints, multi-base ApiClient, ontology display-overlay) + minimal viewer shell. NOTE: the shipped UI is ~15% of VOKB's feature surface — operator 2026-06-09 visual review (see 45-VERIFICATION.md) confirmed unified viewer is functionally a regression for VOKB users. VKB+VOKB stay primary; the actual unified-viewer UI work (legend, OKB data routing, VOKB feature parity, node-shape encoding, Markdown/Entity panel UX, CAP environment-bound error UX) is split into Phase 55. The "MVP shipped" sign-off on 2026-06-08 was premature — the routing layer is real and useful, the viewer is a stub. Honest framing locked 2026-06-09.
 - [x] **Phase 46: Per-System Documentation & Onboarding** - Each system's README documents which configs it owns; KM-Core ships an architecture diagram + onboarding guide. (completed 2026-06-09)
 
 ### Phase Details
@@ -655,9 +655,13 @@ Plans:
 
 **Waves:** 0 (Plans 01,02 — test scaffolds) → 1 (Plans 03,05 — contracts + observation-view) → 2 (Plan 04 — SnapshotManager + hook bypass) → 3 (Plan 06 — router + handlers) → 4 (Plans 07,08,09 — A/B/C cutover, parallel) → 5 (Plan 10 — SQLite migration + table drop) → 6 (Plan 11 — phase verification)
 
-#### Phase 45: Unified Web Viewer
+#### Phase 45: Unified Viewer Routing Layer
 
-**Goal:** Replace the two divergent viewers (VKB sigma.js for B, VOKB D3 for C) with a single web viewer parameterized by ontology configuration, so VKB and VOKB users migrate without losing functionality and KM-Core has one frontend surface to maintain.
+> **Descope note 2026-06-09:** Phase 45's original goal (UI parity with VKB+VOKB) was not delivered. What shipped is a routing scaffold + minimal viewer shell. Operator visual review against `localhost:3002` (VOKB) confirmed ~85% of VOKB's surface is missing from the unified viewer. The remaining feature-parity work — legend, OKB data routing, VOKB feature parity (Layer/Domain filters, Ontology Class tree with counts, Trending Patterns, Issue Triage tab, Stats bar, Entity Details sub-tabs, Relationships by edge-type, Sources & Evidence, Occurrence History), node-shape encoding, Markdown/Entity panel UX, CAP environment-bound error UX — is tracked in Phase 55. Phase 45 is left checked-off in the milestone log because the routing layer is real, but the UI is a stub. See `.planning/phases/45-unified-web-viewer/45-VERIFICATION.md` for the full gap inventory.
+
+**Goal (original):** Replace the two divergent viewers (VKB sigma.js for B, VOKB D3 for C) with a single web viewer parameterized by ontology configuration, so VKB and VOKB users migrate without losing functionality and KM-Core has one frontend surface to maintain.
+
+**Goal (post-descope):** Land the routing layer (system-endpoints config, multi-base ApiClient, ontology display-overlay) and a minimal viewer shell that proves the routing layer works end-to-end. UI feature parity deferred to Phase 55.
 
 **Depends on:** Phase 42, Phase 44
 **Requirements:** UI-01
@@ -886,6 +890,46 @@ Plans:
 Could-have (defer): extend health-coordinator with ETM heartbeat surface; migrate ETM polling to fsevents-based file watcher.
 
 See `.planning/phases/54-etm-hardening-launchd-and-isprocessing-audit/54-CONTEXT.md`.
+
+### Phase 55: Unified Viewer Feature Parity with VOKB (BACKLOG)
+
+**Trigger:** 2026-06-09. Operator visual comparison of unified viewer (`localhost:5173/viewer/{coding,okb,cap}`) against the legacy VOKB at `localhost:3002` revealed that the unified viewer is functionally a regression for VOKB users. Phase 45 shipped the routing layer + a minimal viewer shell; the actual UI is ~15% of VOKB's surface area. "MVP shipped with VKB+VOKB as fallback" was a premature framing — the verifier was never run, and a side-by-side screenshot comparison would have caught the depth gap immediately.
+
+**Goal:** Bring the unified viewer to ≥90% feature parity with VOKB (the richer of the two legacy viewers), so VKB and VOKB users can actually migrate without losing functionality. Phase 45's routing layer is preserved as the scaffolding; this phase fills in the UI.
+
+**Depends on:** Phase 45 (routing layer + display-overlay), Phase 44 (REST + typed views)
+
+**Requirements:** UI-02 (NEW — operator-driven feature-parity requirement; complements UI-01 which now covers routing only)
+
+**Success Criteria** (what must be TRUE):
+
+1. **Data routing correctness.** OKB tab fetches from actual OKM data source (route to `:8090` for local-dev OKM or document the precondition), not from semantic-analysis's mirror of the coding KG. A new visitor to the OKB tab sees RaaS / KPI-FW / business entities, not `CodeAnalyzer` / `PersistenceAgent`.
+2. **CAP environment-bound UX.** CAP tab detects DNS failure / TLS handshake failure and shows "OKM corporate URL unreachable — are you on the BMW VPN?" instead of the current misleading "(CORS)" banner. No misleading CORS error when the actual failure is DNS.
+3. **Legend present.** Color and shape encoding for nodes (entity type, layer, confidence, etc.) is documented in an always-visible or one-click legend. Mirror VOKB's encoding wherever feasible.
+4. **Node shape encoding by entity type.** Distinct shapes (square / diamond / circle) for distinct entity classes, matching VOKB's convention.
+5. **Filter parity with VOKB.** Layer filter (Evidence / Pattern), Domain filter (RaaS / KPI-FW / General or system-equivalent), full Ontology Class tree with per-class counts. Show All Relations / Show Clusters / Merged Only / Hide Documentation toggles.
+6. **Header stats bar.** Total nodes, total edges, evidence count, pattern count, orphan count, connectivity %, LIVE indicator — matching VOKB's stats bar pattern.
+7. **Entity Details parity.** Right-side panel includes sub-tabs (Default / Evolution / Confidence / Timeline), Relationships breakdown by edge type with counts, Sources & Evidence with per-source icons, Occurrence History with date stamps.
+8. **Markdown / Entity panel UX.** Markdown tab keeps the metadata header (Class chip, Level, Parent, Created, Last confirmed) and renders the description with markdown formatting. Entity tab unchanged. Side-panel widths harmonized between tabs.
+9. **Trending Patterns sidebar.** Sparklines for top patterns (analog of VOKB's "Trending Patterns" left-sidebar surface).
+10. **Issue Triage mode.** A separate viewer mode targeting operational triage (analog of VOKB's "Issue Triage" tab; may be partial in v1).
+
+**Plans (TBD — to be scaffolded by `/gsd-discuss-phase 55`):**
+
+The work is large enough to need a real discuss-phase. Rough sizing: ~6-8 plans covering data-routing fix, environment-bound UX, legend + node shapes, filter parity, header stats, entity-details parity, panel-UX harmonisation, trending + triage modes. Some of these will need a UI-SPEC.md.
+
+**Out of scope (explicit):**
+
+- The "what data should OKB tab actually show" architectural question — that's part of SC-1, but if the operator chooses "mirror OKM data into coding's km-core" instead of "proxy to :8090", a separate phase covers the mirror pipeline.
+- Migration of VKB / VOKB consumers off their legacy viewers — Phase 45's routing layer + this phase's UI parity unblocks that, but the consumer-side cutover is a separate operator decision.
+- BMW corporate CORS / DNS configuration for `https://okm.cc.bmwgroup.net` — environment-bound, not in this phase.
+
+**Process amendment (post-mortem on Phase 45):**
+
+- Every phase close-out MUST produce a VERIFICATION.md, even when the phase shipped under an MVP-fallback caveat. The verifier itself should distinguish "must_have failure" from "MVP-deferred".
+- For viewer-touching plans, the verifier MUST include a side-by-side screenshot comparison against the legacy viewer being replaced (or a documented justification for the absence).
+
+See `.planning/phases/55-unified-viewer-feature-parity-with-vokb/55-CONTEXT.md` (to be authored by `/gsd-discuss-phase 55`).
 
 ---
 

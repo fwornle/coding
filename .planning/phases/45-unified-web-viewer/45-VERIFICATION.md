@@ -1,9 +1,37 @@
 ---
 phase: 45-unified-web-viewer
 verified: 2026-06-09T07:30:00Z
-status: gaps_found
-score: 2/4 success criteria substantively verified (coding tab works; OKB-CORS just fixed inline but OKB-data-source + CAP-VPN are unaddressed)
+amended: 2026-06-09T08:30:00Z
+status: passed_with_descope
+score: 2/4 (descoped — see descope_note. Original SC was unified UI parity with VKB+VOKB; what shipped is the routing layer + minimal viewer shell. UI parity moved to Phase 55.)
 overrides_applied: 0
+descope_note: |
+  Operator visual review on 2026-06-09 against localhost:3002 (VOKB) showed
+  the unified viewer is functionally a regression — ~85% of VOKB's surface
+  area (Layer/Domain filters, Ontology Class tree with counts, Trending
+  Patterns, Issue Triage tab, Stats bar, Entity Details sub-tabs,
+  Relationships by edge type, Sources & Evidence, Occurrence History,
+  node-shape encoding, legend) is absent from the unified viewer.
+
+  Plus three direct UX / data bugs the same review caught:
+    - OKB tab shows the coding KG, not OKM data (data-routing bug — G02
+      severity escalated from warning to critical).
+    - CAP tab error UX claims "CORS" but actual failure is DNS / VPN
+      (misleading; G03 severity escalated).
+    - Markdown tab is strictly worse than Entity tab (no metadata header;
+      tracked as new gap G06 — moved to Phase 55).
+
+  Decision (operator, 2026-06-09): re-frame Phase 45 as
+  "Unified Viewer Routing Layer" rather than "Unified Web Viewer".
+  Routing layer (system-endpoints, multi-base ApiClient, ontology
+  display-overlay) is real and useful — that part of Phase 45 stays
+  shipped. UI feature parity work moves to Phase 55
+  ("Unified Viewer Feature Parity with VOKB"). Phase 45 stays checked-off
+  in ROADMAP under the new framing; this VERIFICATION.md records the
+  descope honestly.
+
+  New gaps recorded in Phase 55's 55-CONTEXT.md and inherit-flagged below
+  (G05-G08). G01 stays CLOSED. G02 / G03 / G04 carry forward to Phase 55.
 gaps_found:
   - id: 45-G01-OKB-CORS
     severity: critical
@@ -30,7 +58,24 @@ gaps_found:
   - id: 45-G04-MISSING-VERIFICATION
     severity: process
     truth: "Phase 45 was marked complete in ROADMAP via the 'MVP shipped 2026-06-08 — VKB + VOKB stay live as fallback' note without the verifier ever running. That's how G01–G03 escaped detection until the operator demonstrated the OKB-tab failure visually."
-    classification: "PROCESS — record the slip; do not re-open Phase 45 for this alone. Going forward: every phase close must produce a VERIFICATION.md, even when the phase shipped under an MVP-fallback caveat (the verifier itself should distinguish 'must_have failure' from 'MVP-deferred')."
+    classification: "PROCESS — recorded as a phase-55 process amendment (every phase close must produce a VERIFICATION.md; the verifier itself should distinguish 'must_have failure' from 'MVP-deferred'; viewer-touching plans must include a side-by-side screenshot comparison against the legacy viewer being replaced)."
+inherited_to_phase_55:
+  - id: 45-G02-OKB-DATA-SOURCE (escalated to critical)
+    inherited_as: SC-1 (Data routing correctness) — OKB tab must show real OKM data, not the coding KG. See 55-CONTEXT.md Q-55-01.
+  - id: 45-G03-CAP-VPN-DEPENDENCY (escalated; UX bug separated from environment dependency)
+    inherited_as: SC-2 (CAP environment-bound UX) — show "are you on the BMW VPN?" instead of misleading CORS banner. The environment dependency itself stays out-of-scope.
+  - id: 45-G05-NO-LEGEND
+    description: "Color and shape encoding for nodes (entity type, layer, confidence, ...) is undocumented. VOKB has a legend; unified viewer doesn't."
+    inherited_as: SC-3 (Legend present)
+  - id: 45-G06-MARKDOWN-ENTITY-UX
+    description: "Markdown tab shows only description text (no metadata header); Entity tab shows description + Class chip + Level + Parent + Created + Last confirmed. Markdown is strictly worse. Plus side-panel widths differ between tabs."
+    inherited_as: SC-8 (Markdown/Entity panel UX)
+  - id: 45-G07-VOKB-FEATURE-PARITY
+    description: "~85% of VOKB's surface area (Layer/Domain filters, Ontology Class tree with counts, Trending Patterns, Issue Triage, Stats bar, Entity Details sub-tabs, Relationships by edge type, Sources & Evidence, Occurrence History) absent from unified viewer."
+    inherited_as: SC-5 through SC-10 in Phase 55
+  - id: 45-G08-NODE-SHAPE-ENCODING
+    description: "VOKB encodes entity type via shape (square / diamond / circle); unified viewer is all circles."
+    inherited_as: SC-4 (Node shape encoding by entity type)
 human_verification:
   - test: "Reload http://localhost:5173/viewer/okb in the browser after the CORS fix"
     expected: "FilterRail no longer shows the red CORS-blocked banner; entities + relations + ontology classes load; clicking a node opens EntityDetailPanel with real data."
