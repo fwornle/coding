@@ -62,3 +62,88 @@ export function _classHue(className: string): number {
   }
   return h % 360
 }
+
+// -----------------------------------------------------------------------
+// Plan 55-05: shape / borderStyle / pulseRule fallback helpers.
+//
+// Mirrors the contract of `classColor` — these helpers are the "no
+// overlay was provided" path. The renderer's fallback chain (UI-SPEC §14
+// rules 1–5) is:
+//
+//   color:       display.color   || classColor(...)
+//   shape:       display.shape   || shapeFallback(...) || 'circle'
+//   borderStyle: display.borderStyle === 'dashed'
+//                  || (entity has 0 relations → dashed)
+//                  || solid
+//   pulseRule:   display.pulseRule && evaluatePulseRule(rule, entity)
+//
+// The SHAPE_PALETTE below is the verbatim 16-class table from UI-SPEC
+// §14 (the `coding.display.json` initial values). Drift breaks the
+// renderer's visual contract — keep this table in sync with that spec.
+// -----------------------------------------------------------------------
+
+export type ShapeKind = 'circle' | 'diamond' | 'square' | 'triangle' | 'hexagon'
+
+const SHAPE_PALETTE: Readonly<Record<string, ShapeKind>> = {
+  // Hierarchy
+  Project: 'hexagon',
+  Component: 'square',
+  SubComponent: 'square',
+  Detail: 'circle',
+  // Typed views (LSL pipeline outputs)
+  Observation: 'circle',
+  Digest: 'diamond',
+  Insight: 'diamond',
+  LearningArtifact: 'diamond',
+  Pattern: 'diamond',
+  // Infrastructure / business
+  Service: 'square',
+  File: 'square',
+  Feature: 'hexagon',
+  Contract: 'square',
+  RuntimeDiagnostics: 'triangle',
+  System: 'hexagon',
+  Knowledge: 'circle',
+} as const
+
+/**
+ * UI-SPEC §14 fallback rule #2 — `display.shape || shapeFallback(...) || 'circle'`.
+ * Unknown classes fall back to `'circle'` (per spec) so an overlay with
+ * an unrecognized class name silently renders as a circle rather than
+ * crashing the renderer (T-55-05-02 mitigation).
+ */
+export function shapeFallback(className: string): ShapeKind {
+  return SHAPE_PALETTE[className] ?? 'circle'
+}
+
+/**
+ * UI-SPEC §14 fallback rule #4 — orphan-on-current-view rule.
+ *
+ * The class name is intentionally unused: the rule is purely a function
+ * of "does this entity have any relations in the current view?". Caller
+ * (graph-builder) computes `hasRelations` from the built graphology
+ * Graph BEFORE stamping the attribute, so the rule honors the live
+ * filter state rather than a backend snapshot.
+ *
+ * The displayed border style is then overridden by `display.borderStyle
+ * === 'dashed'` (overlay can opt into dashed even with relations) — this
+ * fallback only kicks in when no overlay is present.
+ */
+export function borderStyleFallback(
+  _className: string,
+  hasRelations: boolean,
+): 'solid' | 'dashed' {
+  return hasRelations ? 'solid' : 'dashed'
+}
+
+/**
+ * UI-SPEC §14 fallback rule #5 — pulse is overlay-driven only.
+ *
+ * No pulse without an explicit `display.pulseRule` from the overlay. The
+ * class-name argument is unused but kept in the signature to mirror the
+ * shape of the other two helpers (consistent caller idiom in
+ * graph-builder.ts).
+ */
+export function pulseRuleFallback(_className: string): string | null {
+  return null
+}
