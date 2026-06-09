@@ -96,13 +96,20 @@ describe('nodeStrokeForState — Plan 55-05 borderStyle + halo extensions', () =
     expect(stroke?.width).toBe(1)
   })
 
-  test('default with no extension params → borderStyle defaults to solid (BC)', () => {
+  test('no extension params → borderStyle/halo absent (BC: Phase 45 contract intact)', () => {
     const stroke = nodeStrokeForState('default')
     expect(stroke).not.toBeNull()
-    // Default = solid (UI-SPEC §14 rule #4: 'solid' unless overlay or
-    // orphan flips it)
-    expect(stroke?.borderStyle).toBe('solid')
+    // BC: existing call sites that don't thread the new params see the
+    // prior literal shape — `borderStyle`/`halo` are NOT in the object
+    // (the Phase 45 reducer test asserts a strict `toEqual` deep match;
+    // that contract is preserved here).
+    expect(stroke?.borderStyle).toBeUndefined()
     expect(stroke?.halo).toBeUndefined()
+  })
+
+  test('explicit borderStyle=solid → key is present with value solid', () => {
+    const stroke = nodeStrokeForState('default', 'solid')
+    expect(stroke?.borderStyle).toBe('solid')
   })
 
   test('pulseRuleResult=true → stroke carries halo with phase 0..1', () => {
