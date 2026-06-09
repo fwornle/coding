@@ -57,6 +57,7 @@ import {
   digestToLegacy,
   insightToLegacy,
   defaultOntologyDir,
+  SnapshotManager,
 } from '@fwornle/km-core';
 import { Router } from 'express';
 // Phase 44 Plan 14 — shared Artifacts-patch mutator used by both
@@ -1262,6 +1263,101 @@ function mountKMRoutes(store) {
   process.stderr.write(`[obs-api] km-core /api/v1 routes mounted\n`);
 }
 
+// ── Phase 55 Plan 06: composed /api/v1/stats endpoint ─────────────────────
+//
+// UI-SPEC §18 row 1 — the unified-viewer StatsBar consumes a single
+// composed envelope rather than fanning out to /api/v1/graph/connectivity
+// + /api/v1/graph/orphans + /api/v1/entities?count=true. Implementation
+// composes the underlying km-core helpers (countByOntologyClass,
+// lastModifiedByClass) with a degree-walk on the raw Graphology instance
+// (graph.degree(node)) for orphans.  Wire-shape mirrors `OkbStats` from
+// `_work/.../viewer/src/api/okbClient.ts:35-45` (Phase 55 PATTERNS lock).
+//
+// Active snapshot: walks `git tag -l 'snapshot/*' --sort=-creatordate` via
+// the SnapshotManager.listSnapshots() helper — newest is the active head;
+// null when no snapshot tags exist (fresh repo / first launch).
+//
+// Registered on kmRouter so the existing hydration gate (line ~1236)
+// applies — 503 until the GraphKMStore has finished opening.
+kmRouter.get('/stats', async (_req, res) => {
+  try {
+    const store = _kmStore;
+    const graph = store.graph;
+    const nodeCount = graph.order;
+    const edgeCount = graph.size;
+
+    const [evidenceCount, patternCount, componentCount] = await Promise.all([
+      store.countByOntologyClass('Observation'),
+      store.countByOntologyClass('Pattern'),
+      store.countByOntologyClass('Component'),
+    ]);
+
+    // Orphan walk (mirrors /api/v1/graph/orphans handler logic but counts only).
+    let orphanCount = 0;
+    graph.forEachNode((id) => {
+      if (graph.degree(id) === 0) orphanCount += 1;
+    });
+    // Connectivity is the inverse density of orphans against the node
+    // population — 1.0 means every node touches at least one edge.
+    const connectivity = nodeCount > 0
+      ? 1 - (orphanCount / nodeCount)
+      : 1;
+
+    // lastUpdated: maximum createdAt across all known ontology classes.
+    // Falls back to "now" on a completely empty store so the
+    // unified-viewer StatsBar never renders a missing-field state.
+    const observedClasses = ['Observation', 'Digest', 'Insight', 'Pattern', 'Component'];
+    const lastUpdatedCandidates = await Promise.all(
+      observedClasses.map((cls) => store.lastModifiedByClass(cls).catch(() => null)),
+    );
+    let lastUpdated = null;
+    for (const ts of lastUpdatedCandidates) {
+      if (typeof ts === 'string' && (lastUpdated === null || ts > lastUpdated)) {
+        lastUpdated = ts;
+      }
+    }
+    if (lastUpdated === null) lastUpdated = new Date().toISOString();
+
+    // Active snapshot: newest entry from SnapshotManager.listSnapshots().
+    // Returns null when no snapshot tags are present OR when the listing
+    // throws (no git repo, etc.) — the unified-viewer StatsBar renders
+    // "no snapshot" affordances in that case rather than a hard error.
+    let activeSnapshot = null;
+    try {
+      const sm = new SnapshotManager({ exportDir: KG_EXPORT_DIR });
+      const snapshots = await sm.listSnapshots();
+      if (Array.isArray(snapshots) && snapshots.length > 0) {
+        const head = snapshots[0];
+        activeSnapshot = {
+          hash: head.commit_sha,
+          message: head.message,
+          date: head.timestamp,
+        };
+      }
+    } catch {
+      // Fall through — activeSnapshot stays null.
+    }
+
+    res.json({
+      success: true,
+      data: {
+        nodeCount,
+        edgeCount,
+        evidenceCount,
+        patternCount,
+        orphanCount,
+        componentCount,
+        connectivity,
+        lastUpdated,
+        activeSnapshot,
+      },
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/v1/stats error: ${err.message}\n`);
+    res.status(500).json({ success: false, error: 'Failed to compute viewer stats' });
+  }
+});
+
 // ── Phase 44 plan 07 (A-4): /api/coding/* typed views ─────────────────────
 //
 // These replace the SQLite-backed legacy GETs at /api/observations,
@@ -1505,9 +1601,22 @@ export const _testHooks = {
   setKMStoreForTest(store) {
     _kmStore = store;
     _kmStoreReady = true;
-    // Don't mount /api/v1 — the integration test exercises only the
-    // legacy /api/* surface that Plan 44-14 migrated. The /api/v1 router
-    // is exercised by lib/km-core's own integration tests.
+    // Phase 55 Plan 06: legacy /api/* tests still skip /api/v1 mount via
+    // the dedicated mountV1RoutesForTest hook below. Tests that need the
+    // /api/v1/stats surface (or the BC /api/v1/graph/* routes) must
+    // explicitly call mountV1RoutesForTest() after setKMStoreForTest.
+  },
+  // Phase 55 Plan 06 Task 1 — opt-in hook for tests that exercise the
+  // /api/v1 surface (stats and the BC graph routes). Calls into
+  // mountKMRoutes with the test-injected store, which registers the
+  // canonical 15-endpoint surface (incl. /graph/connectivity + /graph/orphans).
+  // Idempotent for a single test fixture; tests that wire one store per
+  // `beforeAll` only need to call this once.
+  mountV1RoutesForTest() {
+    if (!_kmStore) {
+      throw new Error('mountV1RoutesForTest called before setKMStoreForTest');
+    }
+    mountKMRoutes(_kmStore);
   },
   invalidateStalenessCache() {
     _stalenessCache.invalidate();
