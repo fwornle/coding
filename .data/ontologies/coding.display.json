@@ -1,12 +1,18 @@
 {
-  "Observation":  { "color": "#3b82f6", "icon": "Activity",  "shape": "circle" },
-  "Digest":       { "color": "#10b981", "icon": "FileText",  "shape": "circle" },
-  "Insight":      { "color": "#f59e0b", "icon": "Lightbulb", "shape": "circle" },
-  "Component":    { "color": "#8b5cf6", "icon": "Package",   "shape": "square" },
-  "SubComponent": { "color": "#a78bfa", "icon": "Package",   "shape": "square" },
-  "Detail":       { "color": "#6b7280", "icon": "Layers",    "shape": "circle" },
-  "LSLSession":   { "color": "#0ea5e9", "icon": "Terminal",  "shape": "circle" },
-  "MCPAgent":     { "color": "#ec4899", "icon": "Bot",       "shape": "diamond" },
-  "ConstraintRule": { "color": "#ef4444", "icon": "Shield",   "shape": "diamond" },
-  "WorkflowDefinition": { "color": "#14b8a6", "icon": "GitBranch", "shape": "square" }
+  "Project":            { "color": "#0ea5e9", "icon": "🏗", "shape": "hexagon",  "borderStyle": "solid", "pulseRule": null },
+  "Component":          { "color": "#3b82f6", "icon": "🧩", "shape": "square",   "borderStyle": "solid", "pulseRule": null },
+  "SubComponent":       { "color": "#60a5fa", "icon": "🔧", "shape": "square",   "borderStyle": "solid", "pulseRule": null },
+  "Detail":             { "color": "#93c5fd", "icon": "🔹", "shape": "circle",   "borderStyle": "solid", "pulseRule": null },
+  "Observation":        { "color": "#10b981", "icon": "📝", "shape": "circle",   "borderStyle": "solid", "pulseRule": "lastUpdatedWithin:60s" },
+  "Digest":             { "color": "#f59e0b", "icon": "📋", "shape": "diamond",  "borderStyle": "solid", "pulseRule": null },
+  "Insight":            { "color": "#a855f7", "icon": "💡", "shape": "diamond",  "borderStyle": "solid", "pulseRule": null },
+  "LearningArtifact":   { "color": "#ec4899", "icon": "🎓", "shape": "diamond",  "borderStyle": "solid", "pulseRule": null },
+  "Pattern":            { "color": "#fb923c", "icon": "🔁", "shape": "diamond",  "borderStyle": "solid", "pulseRule": null },
+  "Service":            { "color": "#14b8a6", "icon": "⚙",  "shape": "square",   "borderStyle": "solid", "pulseRule": null },
+  "File":               { "color": "#9ca3af", "icon": "📄", "shape": "square",   "borderStyle": "solid", "pulseRule": null },
+  "Feature":            { "color": "#22c55e", "icon": "✨", "shape": "hexagon",  "borderStyle": "solid", "pulseRule": null },
+  "Contract":           { "color": "#8b5cf6", "icon": "📜", "shape": "square",   "borderStyle": "solid", "pulseRule": null },
+  "RuntimeDiagnostics": { "color": "#ef4444", "icon": "🚨", "shape": "triangle", "borderStyle": "solid", "pulseRule": "lastUpdatedWithin:5m" },
+  "System":             { "color": "#64748b", "icon": "🌐", "shape": "hexagon",  "borderStyle": "solid", "pulseRule": null },
+  "Knowledge":          { "color": "#06b6d4", "icon": "📚", "shape": "circle",   "borderStyle": "solid", "pulseRule": null }
 }
