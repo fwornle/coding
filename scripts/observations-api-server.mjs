@@ -1358,6 +1358,173 @@ kmRouter.get('/stats', async (_req, res) => {
   }
 });
 
+// ── Phase 55 Plan 06: /api/v1/trends?top=N ────────────────────────────────
+//
+// Wire-shape per okbClient.ts:62-78 (TrendingPattern). Walks Pattern-class
+// entities, scores by occurrenceCount * exp(-ageHours / TRENDS_HALFLIFE_H).
+// occurrenceCount is read from `entity.metadata.occurrences.length` when
+// the writer maintains an occurrences[] array; otherwise the Phase 39
+// confirmationCount is the fallback (every confirmation == one occurrence).
+//
+// Returns sorted desc by trendScore, sliced to top (default 20, max 100 —
+// upper cap per Plan-spec to bound the response shape).
+const TRENDS_DEFAULT_TOP = 20;
+const TRENDS_MAX_TOP = 100;
+const TRENDS_HALFLIFE_HOURS = 720; // 30 days — exposed as a constant for tunability.
+
+function computeTrendScore(entity, nowMs) {
+  const meta = entity.metadata || {};
+  const occurrences = Array.isArray(meta.occurrences) ? meta.occurrences : null;
+  const occurrenceCount = occurrences
+    ? occurrences.length
+    : (meta.provenance?.confirmationCount ?? 1);
+  // Age decay anchored at `createdAt`. The shorter half-life weights very
+  // recent patterns higher; the 30-day default matches the OKB convention.
+  const createdAtMs = Date.parse(entity.createdAt || '') || nowMs;
+  const ageHours = Math.max(0, (nowMs - createdAtMs) / 3_600_000);
+  const decay = Math.exp(-ageHours / TRENDS_HALFLIFE_HOURS);
+  return occurrenceCount * decay;
+}
+
+function computeTrendBuckets(entity, nowMs) {
+  // Phase 55 D-55-06 default — bucket counts read from
+  // `entity.metadata.trends` when the writer maintains it; otherwise
+  // collapse to a single "all entries land in the active window" stub
+  // (occurrenceCount in last7Days; 0/0 for the longer windows). Frontend
+  // already treats absent fields as 0 per okbClient.ts:62-78.
+  const meta = entity.metadata || {};
+  if (meta.trends && typeof meta.trends === 'object') {
+    const t = meta.trends;
+    return {
+      last7Days: Number(t.last7Days ?? 0),
+      last30Days: Number(t.last30Days ?? 0),
+      last90Days: Number(t.last90Days ?? 0),
+    };
+  }
+  const createdAtMs = Date.parse(entity.createdAt || '') || nowMs;
+  const ageDays = (nowMs - createdAtMs) / 86_400_000;
+  const occurrenceCount = Array.isArray(meta.occurrences)
+    ? meta.occurrences.length
+    : (meta.provenance?.confirmationCount ?? 1);
+  return {
+    last7Days: ageDays <= 7 ? occurrenceCount : 0,
+    last30Days: ageDays <= 30 ? occurrenceCount : 0,
+    last90Days: ageDays <= 90 ? occurrenceCount : 0,
+  };
+}
+
+kmRouter.get('/trends', async (req, res) => {
+  try {
+    const rawTop = parseInt(req.query.top, 10);
+    const top = Math.min(
+      Math.max(Number.isFinite(rawTop) && rawTop > 0 ? rawTop : TRENDS_DEFAULT_TOP, 1),
+      TRENDS_MAX_TOP,
+    );
+    const entities = await _kmStore.findByOntologyClass('Pattern');
+    const nowMs = Date.now();
+    const scored = entities.map((entity) => {
+      const trendScore = computeTrendScore(entity, nowMs);
+      return {
+        nodeId: entity.id,
+        entity: {
+          id: entity.id,
+          name: entity.name,
+          entityType: entity.entityType,
+          ...(entity.description ? { description: entity.description } : {}),
+        },
+        trendScore,
+        trends: computeTrendBuckets(entity, nowMs),
+      };
+    });
+    scored.sort((a, b) => b.trendScore - a.trendScore);
+    const patterns = scored.slice(0, top);
+    res.json({ success: true, data: { patterns } });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/v1/trends error: ${err.message}\n`);
+    res.status(500).json({ success: false, error: 'Failed to compute trends' });
+  }
+});
+
+// ── Phase 55 Plan 06: /api/v1/entities/:id/confidence ─────────────────────
+//
+// Wire-shape per UI-SPEC §18 row 8 + plan <interfaces> block —
+// `{overall, bands:{high,moderate,low}, segments[]}`. A 404 is returned
+// for unknown ids; UI-SPEC §16 prescribes the frontend silently degrades
+// to a client-side heuristic in that case (NOT a hard error banner).
+//
+// Overall score is averaged across `metadata.descriptionSegments[].confidence`
+// when present. The Phase 39 fallback path (entities without per-segment
+// confidence) collapses to 0.7 when there is at least one confirmation,
+// otherwise 0.5 — matching the conservative default the okbClient
+// fallback heuristic uses (NodeDetails.tsx:165-213).
+function classifyConfidence(score) {
+  if (score >= 0.8) return 'high';
+  if (score >= 0.6) return 'moderate';
+  return 'low';
+}
+
+kmRouter.get('/entities/:id/confidence', async (req, res) => {
+  try {
+    const id = req.params.id;
+    let entity;
+    try {
+      entity = await _kmStore.getEntity(id);
+    } catch {
+      entity = undefined;
+    }
+    if (!entity) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+    const meta = entity.metadata || {};
+    const segments = Array.isArray(meta.descriptionSegments) ? meta.descriptionSegments : [];
+    let overall;
+    if (segments.length > 0) {
+      const sum = segments.reduce((acc, s) => acc + (Number.isFinite(s.confidence) ? s.confidence : 0.5), 0);
+      overall = sum / segments.length;
+    } else {
+      const confirmations = meta.provenance?.confirmationCount ?? 0;
+      overall = confirmations > 0 ? 0.7 : 0.5;
+    }
+    // Clamp to [0, 1] defensively — a bad segment value MUST NOT yield a
+    // value outside the documented contract.
+    overall = Math.max(0, Math.min(1, overall));
+
+    // Band counts: how many segments land in each confidence bucket.
+    // When there are no segments, all weight is on the overall band so
+    // the StatsBar pill renders something predictable.
+    const bands = { high: 0, moderate: 0, low: 0 };
+    if (segments.length > 0) {
+      for (const s of segments) {
+        const c = Number.isFinite(s.confidence) ? Math.max(0, Math.min(1, s.confidence)) : 0.5;
+        bands[classifyConfidence(c)] += 1;
+      }
+    } else {
+      bands[classifyConfidence(overall)] = 1;
+    }
+
+    const segmentsOut = segments.map((s, idx) => {
+      const c = Number.isFinite(s.confidence) ? Math.max(0, Math.min(1, s.confidence)) : 0.5;
+      const out = {
+        segmentId: typeof s.segmentId === 'string' && s.segmentId.length > 0
+          ? s.segmentId
+          : `seg-${idx}`,
+        confidence: c,
+      };
+      if (typeof s.source === 'string') out.source = s.source;
+      else if (typeof s.provider === 'string') out.source = s.provider;
+      return out;
+    });
+
+    res.json({
+      success: true,
+      data: { overall, bands, segments: segmentsOut },
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/v1/entities/:id/confidence error: ${err.message}\n`);
+    res.status(500).json({ success: false, error: 'Failed to compute entity confidence' });
+  }
+});
+
 // ── Phase 44 plan 07 (A-4): /api/coding/* typed views ─────────────────────
 //
 // These replace the SQLite-backed legacy GETs at /api/observations,
