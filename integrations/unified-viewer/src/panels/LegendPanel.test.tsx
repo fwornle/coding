@@ -70,8 +70,8 @@ describe('LegendPanel', () => {
 describe('LegendPanel — Logger discipline', () => {
   test('ZERO raw console.* in LegendPanel.tsx', async () => {
     const { readFileSync } = await import('node:fs')
-    const { fileURLToPath } = await import('node:url')
-    const filePath = fileURLToPath(new URL('./LegendPanel.tsx', import.meta.url))
+    const path = await import('node:path')
+    const filePath = path.resolve(process.cwd(), 'src/panels/LegendPanel.tsx')
     const src = readFileSync(filePath, 'utf8')
     expect(src).not.toMatch(/console\.(log|warn|error|info|debug)/)
   })
