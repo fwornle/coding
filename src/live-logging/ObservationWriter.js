@@ -32,9 +32,80 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { EventEmitter } from 'node:events';
 import Redis from 'ioredis';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { getLSLWindow } from '../../lib/lsl/window.mjs';
+
+// Phase 55 Plan 06 Task 3 — process-wide observation-write event bus.
+//
+// The obs-api SSE endpoint `/api/coding/observations/stream` (Plan 55-06)
+// needs a hook to broadcast each successful observation write to long-poll
+// HTTP listeners. The writer is constructed lazily by obs-api so an
+// instance-local EventEmitter would force callers to traverse the
+// writer-init pipeline before subscribing; a module-level emitter sidesteps
+// that ordering constraint entirely and is the canonical pattern for
+// "process-wide write taps" in this codebase.
+//
+// Emitted events:
+//   'written'   — payload = the observation row that was persisted
+//                 (shape mirrors writeObservation's obsRow object — see
+//                 below at the `_observationEmitter.emit(...)` call site).
+//
+// Listener responsibility: handlers MUST NOT throw — listener exceptions
+// surface inside the writer's hot path and could derail subsequent observation
+// processing. The SSE handler wraps its res.write in a try/catch per
+// `subscribeObservationWritten` documentation.
+const _observationEmitter = new EventEmitter();
+// Defensive cap — production has at most ~2 SSE clients (the unified-viewer
+// dev server + one tab). The default Node EventEmitter cap of 10 is fine,
+// but bump to 32 to silence the warning under brief multi-client conditions.
+_observationEmitter.setMaxListeners(32);
+
+/**
+ * Subscribe to observation-write events emitted by ObservationWriter.
+ *
+ * Returns an unsubscribe function — call it inside `req.on('close')` (the
+ * canonical SSE pattern) to release the listener slot when the HTTP client
+ * disconnects. Calling the returned function more than once is a no-op.
+ *
+ * Phase 55 Plan 06 Task 3 — added so `/api/coding/observations/stream` can
+ * fan each write out to every connected SSE client without bolting a
+ * Redis subscription onto the request hot path.
+ *
+ * @param {(obs: object) => void} listener — invoked with the persisted row.
+ * @returns {() => void} unsubscribe handle (idempotent).
+ */
+export function subscribeObservationWritten(listener) {
+  if (typeof listener !== 'function') {
+    throw new TypeError('subscribeObservationWritten requires a function listener');
+  }
+  _observationEmitter.on('written', listener);
+  let unsubscribed = false;
+  return () => {
+    if (unsubscribed) return;
+    unsubscribed = true;
+    _observationEmitter.off('written', listener);
+  };
+}
+
+/**
+ * Test-only helper to reset the listener registry between integration tests.
+ * Production code does NOT call this — listeners are scoped to a single
+ * SSE connection lifetime and are released by their own unsubscribe hooks.
+ */
+export function _resetObservationEmitterForTests() {
+  _observationEmitter.removeAllListeners('written');
+}
+
+/**
+ * Test-only helper to fire a synthetic `written` event without going through
+ * the LLM/dedup pipeline. Used by the `/api/coding/observations/stream`
+ * integration test to drive the SSE handler deterministically.
+ */
+export function _emitObservationWrittenForTests(row) {
+  _observationEmitter.emit('written', row);
+}
 // Phase 44 Plan 12: km-core write path. `GraphKMStore` is the canonical
 // store for the A-1 observation/digest/insight surface; the three
 // `legacy*ToEntity` adapters are the SINGLE source of truth for the
@@ -909,6 +980,21 @@ export class ObservationWriter {
         `[ObservationWriter] km-core putEntity (observation) failed: ${err.message}\n`
       );
       throw err;
+    }
+
+    // Phase 55 Plan 06 Task 3 — broadcast the persisted row to any
+    // subscribers (the obs-api SSE handler at /api/coding/observations/stream
+    // is the canonical consumer). Each listener runs synchronously, but the
+    // SSE handler wraps res.write in try/catch so a single broken connection
+    // cannot derail the writer hot path. We intentionally emit the obsRow
+    // (post-redaction) — the SSE consumer expects the same wire shape the
+    // legacy /api/coding/observations REST endpoint produces.
+    try {
+      _observationEmitter.emit('written', obsRow);
+    } catch (err) {
+      process.stderr.write(
+        `[ObservationWriter] observation-emit listener threw (non-fatal): ${err.message}\n`
+      );
     }
 
     // Fire-and-forget: publish embedding event to Redis (per D-05)
