@@ -28,7 +28,7 @@ import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ObservationWriter } from '../src/live-logging/ObservationWriter.js';
+import { ObservationWriter, subscribeObservationWritten } from '../src/live-logging/ObservationWriter.js';
 import { ObservationConsolidator } from '../src/live-logging/ObservationConsolidator.js';
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
 import { ObservationPruner } from '../src/live-logging/ObservationPruner.js';
@@ -57,6 +57,7 @@ import {
   digestToLegacy,
   insightToLegacy,
   defaultOntologyDir,
+  SnapshotManager,
 } from '@fwornle/km-core';
 import { Router } from 'express';
 // Phase 44 Plan 14 — shared Artifacts-patch mutator used by both
@@ -1262,6 +1263,268 @@ function mountKMRoutes(store) {
   process.stderr.write(`[obs-api] km-core /api/v1 routes mounted\n`);
 }
 
+// ── Phase 55 Plan 06: composed /api/v1/stats endpoint ─────────────────────
+//
+// UI-SPEC §18 row 1 — the unified-viewer StatsBar consumes a single
+// composed envelope rather than fanning out to /api/v1/graph/connectivity
+// + /api/v1/graph/orphans + /api/v1/entities?count=true. Implementation
+// composes the underlying km-core helpers (countByOntologyClass,
+// lastModifiedByClass) with a degree-walk on the raw Graphology instance
+// (graph.degree(node)) for orphans.  Wire-shape mirrors `OkbStats` from
+// `_work/.../viewer/src/api/okbClient.ts:35-45` (Phase 55 PATTERNS lock).
+//
+// Active snapshot: walks `git tag -l 'snapshot/*' --sort=-creatordate` via
+// the SnapshotManager.listSnapshots() helper — newest is the active head;
+// null when no snapshot tags exist (fresh repo / first launch).
+//
+// Registered on kmRouter so the existing hydration gate (line ~1236)
+// applies — 503 until the GraphKMStore has finished opening.
+kmRouter.get('/stats', async (_req, res) => {
+  try {
+    const store = _kmStore;
+    const graph = store.graph;
+    const nodeCount = graph.order;
+    const edgeCount = graph.size;
+
+    const [evidenceCount, patternCount, componentCount] = await Promise.all([
+      store.countByOntologyClass('Observation'),
+      store.countByOntologyClass('Pattern'),
+      store.countByOntologyClass('Component'),
+    ]);
+
+    // Orphan walk (mirrors /api/v1/graph/orphans handler logic but counts only).
+    let orphanCount = 0;
+    graph.forEachNode((id) => {
+      if (graph.degree(id) === 0) orphanCount += 1;
+    });
+    // Connectivity is the inverse density of orphans against the node
+    // population — 1.0 means every node touches at least one edge.
+    const connectivity = nodeCount > 0
+      ? 1 - (orphanCount / nodeCount)
+      : 1;
+
+    // lastUpdated: maximum createdAt across all known ontology classes.
+    // Falls back to "now" on a completely empty store so the
+    // unified-viewer StatsBar never renders a missing-field state.
+    const observedClasses = ['Observation', 'Digest', 'Insight', 'Pattern', 'Component'];
+    const lastUpdatedCandidates = await Promise.all(
+      observedClasses.map((cls) => store.lastModifiedByClass(cls).catch(() => null)),
+    );
+    let lastUpdated = null;
+    for (const ts of lastUpdatedCandidates) {
+      if (typeof ts === 'string' && (lastUpdated === null || ts > lastUpdated)) {
+        lastUpdated = ts;
+      }
+    }
+    if (lastUpdated === null) lastUpdated = new Date().toISOString();
+
+    // Active snapshot: newest entry from SnapshotManager.listSnapshots().
+    // Returns null when no snapshot tags are present OR when the listing
+    // throws (no git repo, etc.) — the unified-viewer StatsBar renders
+    // "no snapshot" affordances in that case rather than a hard error.
+    let activeSnapshot = null;
+    try {
+      const sm = new SnapshotManager({ exportDir: KG_EXPORT_DIR });
+      const snapshots = await sm.listSnapshots();
+      if (Array.isArray(snapshots) && snapshots.length > 0) {
+        const head = snapshots[0];
+        activeSnapshot = {
+          hash: head.commit_sha,
+          message: head.message,
+          date: head.timestamp,
+        };
+      }
+    } catch {
+      // Fall through — activeSnapshot stays null.
+    }
+
+    res.json({
+      success: true,
+      data: {
+        nodeCount,
+        edgeCount,
+        evidenceCount,
+        patternCount,
+        orphanCount,
+        componentCount,
+        connectivity,
+        lastUpdated,
+        activeSnapshot,
+      },
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/v1/stats error: ${err.message}\n`);
+    res.status(500).json({ success: false, error: 'Failed to compute viewer stats' });
+  }
+});
+
+// ── Phase 55 Plan 06: /api/v1/trends?top=N ────────────────────────────────
+//
+// Wire-shape per okbClient.ts:62-78 (TrendingPattern). Walks Pattern-class
+// entities, scores by occurrenceCount * exp(-ageHours / TRENDS_HALFLIFE_H).
+// occurrenceCount is read from `entity.metadata.occurrences.length` when
+// the writer maintains an occurrences[] array; otherwise the Phase 39
+// confirmationCount is the fallback (every confirmation == one occurrence).
+//
+// Returns sorted desc by trendScore, sliced to top (default 20, max 100 —
+// upper cap per Plan-spec to bound the response shape).
+const TRENDS_DEFAULT_TOP = 20;
+const TRENDS_MAX_TOP = 100;
+const TRENDS_HALFLIFE_HOURS = 720; // 30 days — exposed as a constant for tunability.
+
+function computeTrendScore(entity, nowMs) {
+  const meta = entity.metadata || {};
+  const occurrences = Array.isArray(meta.occurrences) ? meta.occurrences : null;
+  const occurrenceCount = occurrences
+    ? occurrences.length
+    : (meta.provenance?.confirmationCount ?? 1);
+  // Age decay anchored at `createdAt`. The shorter half-life weights very
+  // recent patterns higher; the 30-day default matches the OKB convention.
+  const createdAtMs = Date.parse(entity.createdAt || '') || nowMs;
+  const ageHours = Math.max(0, (nowMs - createdAtMs) / 3_600_000);
+  const decay = Math.exp(-ageHours / TRENDS_HALFLIFE_HOURS);
+  return occurrenceCount * decay;
+}
+
+function computeTrendBuckets(entity, nowMs) {
+  // Phase 55 D-55-06 default — bucket counts read from
+  // `entity.metadata.trends` when the writer maintains it; otherwise
+  // collapse to a single "all entries land in the active window" stub
+  // (occurrenceCount in last7Days; 0/0 for the longer windows). Frontend
+  // already treats absent fields as 0 per okbClient.ts:62-78.
+  const meta = entity.metadata || {};
+  if (meta.trends && typeof meta.trends === 'object') {
+    const t = meta.trends;
+    return {
+      last7Days: Number(t.last7Days ?? 0),
+      last30Days: Number(t.last30Days ?? 0),
+      last90Days: Number(t.last90Days ?? 0),
+    };
+  }
+  const createdAtMs = Date.parse(entity.createdAt || '') || nowMs;
+  const ageDays = (nowMs - createdAtMs) / 86_400_000;
+  const occurrenceCount = Array.isArray(meta.occurrences)
+    ? meta.occurrences.length
+    : (meta.provenance?.confirmationCount ?? 1);
+  return {
+    last7Days: ageDays <= 7 ? occurrenceCount : 0,
+    last30Days: ageDays <= 30 ? occurrenceCount : 0,
+    last90Days: ageDays <= 90 ? occurrenceCount : 0,
+  };
+}
+
+kmRouter.get('/trends', async (req, res) => {
+  try {
+    const rawTop = parseInt(req.query.top, 10);
+    const top = Math.min(
+      Math.max(Number.isFinite(rawTop) && rawTop > 0 ? rawTop : TRENDS_DEFAULT_TOP, 1),
+      TRENDS_MAX_TOP,
+    );
+    const entities = await _kmStore.findByOntologyClass('Pattern');
+    const nowMs = Date.now();
+    const scored = entities.map((entity) => {
+      const trendScore = computeTrendScore(entity, nowMs);
+      return {
+        nodeId: entity.id,
+        entity: {
+          id: entity.id,
+          name: entity.name,
+          entityType: entity.entityType,
+          ...(entity.description ? { description: entity.description } : {}),
+        },
+        trendScore,
+        trends: computeTrendBuckets(entity, nowMs),
+      };
+    });
+    scored.sort((a, b) => b.trendScore - a.trendScore);
+    const patterns = scored.slice(0, top);
+    res.json({ success: true, data: { patterns } });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/v1/trends error: ${err.message}\n`);
+    res.status(500).json({ success: false, error: 'Failed to compute trends' });
+  }
+});
+
+// ── Phase 55 Plan 06: /api/v1/entities/:id/confidence ─────────────────────
+//
+// Wire-shape per UI-SPEC §18 row 8 + plan <interfaces> block —
+// `{overall, bands:{high,moderate,low}, segments[]}`. A 404 is returned
+// for unknown ids; UI-SPEC §16 prescribes the frontend silently degrades
+// to a client-side heuristic in that case (NOT a hard error banner).
+//
+// Overall score is averaged across `metadata.descriptionSegments[].confidence`
+// when present. The Phase 39 fallback path (entities without per-segment
+// confidence) collapses to 0.7 when there is at least one confirmation,
+// otherwise 0.5 — matching the conservative default the okbClient
+// fallback heuristic uses (NodeDetails.tsx:165-213).
+function classifyConfidence(score) {
+  if (score >= 0.8) return 'high';
+  if (score >= 0.6) return 'moderate';
+  return 'low';
+}
+
+kmRouter.get('/entities/:id/confidence', async (req, res) => {
+  try {
+    const id = req.params.id;
+    let entity;
+    try {
+      entity = await _kmStore.getEntity(id);
+    } catch {
+      entity = undefined;
+    }
+    if (!entity) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+    const meta = entity.metadata || {};
+    const segments = Array.isArray(meta.descriptionSegments) ? meta.descriptionSegments : [];
+    let overall;
+    if (segments.length > 0) {
+      const sum = segments.reduce((acc, s) => acc + (Number.isFinite(s.confidence) ? s.confidence : 0.5), 0);
+      overall = sum / segments.length;
+    } else {
+      const confirmations = meta.provenance?.confirmationCount ?? 0;
+      overall = confirmations > 0 ? 0.7 : 0.5;
+    }
+    // Clamp to [0, 1] defensively — a bad segment value MUST NOT yield a
+    // value outside the documented contract.
+    overall = Math.max(0, Math.min(1, overall));
+
+    // Band counts: how many segments land in each confidence bucket.
+    // When there are no segments, all weight is on the overall band so
+    // the StatsBar pill renders something predictable.
+    const bands = { high: 0, moderate: 0, low: 0 };
+    if (segments.length > 0) {
+      for (const s of segments) {
+        const c = Number.isFinite(s.confidence) ? Math.max(0, Math.min(1, s.confidence)) : 0.5;
+        bands[classifyConfidence(c)] += 1;
+      }
+    } else {
+      bands[classifyConfidence(overall)] = 1;
+    }
+
+    const segmentsOut = segments.map((s, idx) => {
+      const c = Number.isFinite(s.confidence) ? Math.max(0, Math.min(1, s.confidence)) : 0.5;
+      const out = {
+        segmentId: typeof s.segmentId === 'string' && s.segmentId.length > 0
+          ? s.segmentId
+          : `seg-${idx}`,
+        confidence: c,
+      };
+      if (typeof s.source === 'string') out.source = s.source;
+      else if (typeof s.provider === 'string') out.source = s.provider;
+      return out;
+    });
+
+    res.json({
+      success: true,
+      data: { overall, bands, segments: segmentsOut },
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/v1/entities/:id/confidence error: ${err.message}\n`);
+    res.status(500).json({ success: false, error: 'Failed to compute entity confidence' });
+  }
+});
+
 // ── Phase 44 plan 07 (A-4): /api/coding/* typed views ─────────────────────
 //
 // These replace the SQLite-backed legacy GETs at /api/observations,
@@ -1470,6 +1733,178 @@ app.get('/api/coding/insights', async (_req, res) => {
   }
 });
 
+// ── Phase 55 Plan 06 Task 3: SSE /api/coding/observations/stream ──────────
+//
+// Broadcasts every successful observation write to all connected HTTP
+// clients via the process-wide `subscribeObservationWritten` bus
+// (ObservationWriter.js, added in Plan 55-06). Each client gets a single
+// long-lived response; each emit becomes a `data: <json>\n\n` frame.
+//
+// `req.on('close')` releases the listener slot — verified by the Plan 55-06
+// integration test (`obs-api.coding-observations-stream.test.js`).
+// SSE handler reference: integrations/mcp-server-semantic-analysis/src/sse-server.ts:136.
+app.get('/api/coding/observations/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  // Allow the unified-viewer dev server (any localhost origin) to consume
+  // this stream — the global cors() middleware already sets the wildcard
+  // Access-Control-Allow-Origin for plain GET, but SSE clients sometimes
+  // require a flushed-headers signal before they treat the connection as
+  // "open" (Chrome's EventSource impl).
+  res.flushHeaders();
+
+  const send = (obs) => {
+    try {
+      res.write(`data: ${JSON.stringify(obs)}\n\n`);
+    } catch (err) {
+      // The connection has gone away mid-frame — log once and let the
+      // req.on('close') unsubscribe path clean up.
+      process.stderr.write(`[obs-api] SSE write failed (non-fatal): ${err.message}\n`);
+    }
+  };
+
+  let unsubscribe;
+  try {
+    unsubscribe = subscribeObservationWritten(send);
+  } catch (err) {
+    process.stderr.write(`[obs-api] SSE subscribe failed: ${err.message}\n`);
+    res.end();
+    return;
+  }
+  req.on('close', () => {
+    try { unsubscribe(); } catch { /* idempotent */ }
+  });
+});
+
+// ── Phase 55 Plan 06 Task 3: GET /api/coding/lsl/sessions ─────────────────
+//
+// Walks the LSL history directory (env-overridable for tests via
+// OBSERVATIONS_LSL_HISTORY_DIR; defaults to `.specstory/history` relative
+// to REPO_ROOT). Parses the Phase 51 filename convention:
+//   {YYYY-MM-DD}_{HHMM-HHMM}[-{idx}][_S{slot}-{sub-idx}-{sub-hash}][_partN]_{hash}.md
+// per `.planning/phases/51-.../51-CONTEXT.md`. For each session, derives:
+//   - `id` from the hash group
+//   - `startAt`/`endAt` from the HHMM-HHMM range (UTC ISO via the date prefix)
+//   - `observationCount` + `entityIds` via km-core findByLegacyId on the sid
+//     (best-effort; empty array when the writer has not yet associated entities).
+//
+// Hard caps: ?limit defaults to 200, max 500. ?since defaults to last 7d.
+// Malformed ?since silently falls back to the 7d default (T-55-06-03 mitigation —
+// the parameter is NEVER used as a filesystem path component).
+const LSL_DEFAULT_LIMIT = 200;
+const LSL_MAX_LIMIT = 500;
+const LSL_DEFAULT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const LSL_FILE_REGEX = new RegExp(
+  '^(\\d{4}-\\d{2}-\\d{2})'   // date
+  + '_(\\d{4})-(\\d{4})'      // HHMM-HHMM
+  + '(?:-(\\d+))?'             // optional -idx (sub-agent variant 1)
+  + '(?:_S(\\d+)-(\\d+)-([^_]+))?' // optional _S{slot}-{sub-idx}-{sub-hash} (variant 2)
+  + '(?:-part\\d+)?'           // optional -partN
+  + '_([A-Za-z0-9]+)\\.md$'   // _<hash>.md
+);
+
+function* _walkLslDir(rootDir) {
+  let entries;
+  try {
+    entries = fs.readdirSync(rootDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = path.join(rootDir, entry.name);
+    if (entry.isDirectory()) {
+      yield* _walkLslDir(full);
+    } else if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'README.md') {
+      yield full;
+    }
+  }
+}
+
+function _parseLslFilename(basename) {
+  const m = LSL_FILE_REGEX.exec(basename);
+  if (!m) return null;
+  const [, date, startHHMM, endHHMM, , , , subHash, hash] = m;
+  // ISO at the boundary of each HHMM slot, UTC. The trailing `:00Z` is
+  // appended so Date.parse round-trips cleanly across runtimes.
+  const startHH = startHHMM.slice(0, 2);
+  const startMM = startHHMM.slice(2, 4);
+  const endHH = endHHMM.slice(0, 2);
+  const endMM = endHHMM.slice(2, 4);
+  const startAt = `${date}T${startHH}:${startMM}:00.000Z`;
+  const endAt = `${date}T${endHH}:${endMM}:00.000Z`;
+  // Session id prefers the explicit sub-agent hash when present; otherwise
+  // the parent-session hash from the filename.
+  const id = subHash || hash;
+  return { id, startAt, endAt };
+}
+
+app.get('/api/coding/lsl/sessions', async (req, res) => {
+  try {
+    const rawLimit = parseInt(req.query.limit, 10);
+    const limit = Math.min(
+      Math.max(Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : LSL_DEFAULT_LIMIT, 1),
+      LSL_MAX_LIMIT,
+    );
+    // T-55-06-03 mitigation: parse ?since as ISO via new Date; if NaN, fall
+    // back to "last 7 days" silently. The string is never used as a path.
+    let sinceMs;
+    const sinceStr = typeof req.query.since === 'string' ? req.query.since : '';
+    const sinceDate = sinceStr ? new Date(sinceStr) : null;
+    if (sinceDate && Number.isFinite(sinceDate.getTime())) {
+      sinceMs = sinceDate.getTime();
+    } else {
+      sinceMs = Date.now() - LSL_DEFAULT_WINDOW_MS;
+    }
+    const sinceISO = new Date(sinceMs).toISOString();
+
+    const historyDir = process.env.OBSERVATIONS_LSL_HISTORY_DIR
+      || path.join(REPO_ROOT, '.specstory', 'history');
+
+    const nowMs = Date.now();
+    const sessions = [];
+    for (const file of _walkLslDir(historyDir)) {
+      const parsed = _parseLslFilename(path.basename(file));
+      if (!parsed) continue;
+      if (parsed.startAt < sinceISO) continue;
+      // Currently-running heuristic: when endAt is in the future, surface
+      // null so the unified-viewer LslTimelineStrip renders the live pulse.
+      const endAt = Date.parse(parsed.endAt) > nowMs ? null : parsed.endAt;
+      // Per-session entity aggregation: opt-in via km-core findByLegacyId.
+      // The km-core store doesn't currently index by `metadata.lslSessionIds`,
+      // so a full scan would dominate the hot path. Aggregate via
+      // findByLegacyId when the writer tags rows with `system: 'A'` and the
+      // session id as legacyId.id; fall back to an empty array otherwise.
+      let entityIds = [];
+      try {
+        if (_kmStoreReady && _kmStore) {
+          const entity = await _kmStore.findByLegacyId({ system: 'A', id: parsed.id });
+          if (entity && typeof entity.id === 'string') {
+            entityIds = [entity.id];
+          }
+        }
+      } catch (err) {
+        // Best-effort — never let a per-session lookup error 500 the whole list.
+        process.stderr.write(`[obs-api] /api/coding/lsl/sessions findByLegacyId for ${parsed.id} failed: ${err.message}\n`);
+      }
+      sessions.push({
+        id: parsed.id,
+        startAt: parsed.startAt,
+        endAt,
+        observationCount: entityIds.length,
+        entityIds,
+      });
+    }
+    sessions.sort((a, b) => (b.startAt > a.startAt ? 1 : b.startAt < a.startAt ? -1 : 0));
+    const sliced = sessions.slice(0, limit);
+    res.json({ success: true, data: { sessions: sliced } });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/coding/lsl/sessions error: ${err.message}\n`);
+    res.status(500).json({ success: false, error: 'Failed to list LSL sessions' });
+  }
+});
+
 // Phase 44 Plan 14 — guard auto-listen so the integration test
 // (tests/integration/obs-api.legacy-endpoints.km-core.test.js) can
 // import this module without triggering a real :12436 bind. The test
@@ -1505,9 +1940,22 @@ export const _testHooks = {
   setKMStoreForTest(store) {
     _kmStore = store;
     _kmStoreReady = true;
-    // Don't mount /api/v1 — the integration test exercises only the
-    // legacy /api/* surface that Plan 44-14 migrated. The /api/v1 router
-    // is exercised by lib/km-core's own integration tests.
+    // Phase 55 Plan 06: legacy /api/* tests still skip /api/v1 mount via
+    // the dedicated mountV1RoutesForTest hook below. Tests that need the
+    // /api/v1/stats surface (or the BC /api/v1/graph/* routes) must
+    // explicitly call mountV1RoutesForTest() after setKMStoreForTest.
+  },
+  // Phase 55 Plan 06 Task 1 — opt-in hook for tests that exercise the
+  // /api/v1 surface (stats and the BC graph routes). Calls into
+  // mountKMRoutes with the test-injected store, which registers the
+  // canonical 15-endpoint surface (incl. /graph/connectivity + /graph/orphans).
+  // Idempotent for a single test fixture; tests that wire one store per
+  // `beforeAll` only need to call this once.
+  mountV1RoutesForTest() {
+    if (!_kmStore) {
+      throw new Error('mountV1RoutesForTest called before setKMStoreForTest');
+    }
+    mountKMRoutes(_kmStore);
   },
   invalidateStalenessCache() {
     _stalenessCache.invalidate();
