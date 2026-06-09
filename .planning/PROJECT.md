@@ -137,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-22 — Phase 40 complete (Ingest Pipeline & Layered Dedup: 4-stage extract→dedup→store→synthesize orchestrator + Jaccard/cosine/LLM dedup layers in km-core; PIPE-01 + DEDUP-01 satisfied). Phases 37/38/39/40 of v7.1 shipped.*
+*Last updated: 2026-06-09 — Phase 46 complete (Per-System Documentation & Onboarding: canonical 6-section README template + per-system READMEs for `coding`, `mcp-server-semantic-analysis`, `operational-knowledge-management` + KM-Core architecture diagrams + verifiable ONBOARDING.md with LslHeartbeatRotator exercise; DOC-01 satisfied; one human-UAT item outstanding: operator dry-run of ONBOARDING.md). v7.1 Phases 37–46 all shipped — milestone (Knowledge Management Unification) ready for /gsd-complete-milestone audit.*
