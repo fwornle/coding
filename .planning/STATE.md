@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: verifying
-stopped_at: Completed 46-06-PLAN.md
-last_updated: "2026-06-09T04:45:06.306Z"
+status: ready_to_plan
+stopped_at: Phase 46 complete (6/6) — ready to discuss Phase 47
+last_updated: 2026-06-09T05:07:32.751Z
 last_activity: 2026-06-09
 progress:
   total_phases: 23
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 46 — per-system-documentation-onboarding
+**Current focus:** Phase 47 — observationwriter preserve prompt text when image attachment
 
 **v7.1 milestone status (KM-Core unification — 7 of 10 phases done):**
 
@@ -52,9 +52,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 46 (per-system-documentation-onboarding) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
+Phase: 47
+Plan: Not started
+Status: Ready to plan
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
 
@@ -175,7 +175,7 @@ Phase 45 Plan 04 outcome (2026-06-07, 2 implementation tasks complete + checkpoi
 
 **Velocity:**
 
-- Total plans completed: 76 (v6.0)
+- Total plans completed: 82 (v6.0)
 - Average duration: 3 min
 - Total execution time: 0.05 hours
 

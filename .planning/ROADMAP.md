@@ -735,7 +735,7 @@ Plans:
 | 43. OKM Cross-Repo Migration (C) | 7/11 | In Progress|  |
 | 44. REST API & Git Snapshots | 18/16 | Complete   | 2026-06-05 |
 | 45. Unified Web Viewer | 6/6 | Complete    | 2026-06-08 |
-| 46. Per-System Documentation & Onboarding | 6/6 | Complete   | 2026-06-09 |
+| 46. Per-System Documentation & Onboarding | 6/6 | Complete    | 2026-06-09 |
 
 ### Phase 47: ObservationWriter: preserve prompt text when image attachments are present
 
