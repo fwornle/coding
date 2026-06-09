@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: executing
-stopped_at: Completed 46-01-PLAN.md
-last_updated: "2026-06-08T16:41:22.727Z"
-last_activity: 2026-06-08
+status: verifying
+stopped_at: Completed 46-06-PLAN.md
+last_updated: "2026-06-09T04:45:06.306Z"
+last_activity: 2026-06-09
 progress:
   total_phases: 23
-  completed_phases: 17
+  completed_phases: 18
   total_plans: 118
-  completed_plans: 119
-  percent: 74
+  completed_plans: 120
+  percent: 78
 ---
 
 # Project State
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 46 (per-system-documentation-onboarding) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
 
@@ -109,7 +109,7 @@ Suggested next steps:
   1. Operator restores B's node_modules (Dockerfile change recommended) and operator-merges OKM PR #5 + restarts C
   2. `/gsd-execute-phase 44 --wave 6` re-run after B+C are up → Phase 44 close-out (Plan 44-11 final re-run)
 
-Last activity: 2026-06-08
+Last activity: 2026-06-09
 
 Session 2026-06-05 outcome (context-clear handoff):
 
@@ -308,6 +308,7 @@ Phase 45 Plan 04 outcome (2026-06-07, 2 implementation tasks complete + checkpoi
 - [Phase ?]: Plan 46-02 additive insertion preserves Quick Start byte-for-byte — 5 new sections at lines 100-145
 - [Phase ?]: Plan 46-05 ONBOARDING.md uses standalone vitest config (tests/onboarding/vitest.config.ts) to keep .spec.ts out of default npm test while making manual invocation a single command
 - [Phase ?]: Plan 46-05 cleanup-amnesia mitigation: dispatch prompt's <critical_cleanup_correction> overrules plan's '! grep' gate — purge-knowledge-entities.js is EXPLICITLY warned against in ONBOARDING.md Step 7 with the rationale that it filters by date+team only, NOT by entity name
+- [Phase ?]: Phase 46 SC-4 cross-reference audit complete: 12/12 inbound links PASS; D-46-05 sweep caught + fixed 3 residual B labels in AGENTS.md inline
 
 ### Blockers/Concerns
 
@@ -366,11 +367,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 46-per-system-documentation-onboarding P04 | 5min | 4 tasks | 3 files |
 | Phase 46 P02 | 2min | 2 tasks | 1 files |
 | Phase 46 P05 | 18min | 3 tasks | 3 files |
+| Phase 46 P06 | 6min | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-06-08T16:41:03.794Z
-Stopped at: Completed 46-01-PLAN.md
+Last session: 2026-06-09T04:45:06.291Z
+Stopped at: Completed 46-06-PLAN.md
 Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):

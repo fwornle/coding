@@ -244,7 +244,7 @@ Extract a shared **KM-Core** from the three knowledge-management systems (A: Onl
 - [x] **Phase 43: OKM Cross-Repo Migration (C)** - Cross-repo refactor of `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` onto KM-Core; rapid-automations CI stays green. (CLOSED 2026-06-02: OKM PR #4 merged 34a0fc5; CI green twice — 108020147 + 108040202; all 4 SCs verified)
 - [x] **Phase 44: REST API & Git Snapshots** - Common entity/search/clusters/snapshots/ontology REST contract + git-snapshot/restore identical across A/B/C. (completed 2026-06-04)
 - [x] **Phase 45: Unified Web Viewer** (6/6 plans executed) - Single viewer parameterized by ontology config; VKB (B) and VOKB (C) users migrate without functional regression. (MVP shipped 2026-06-08 — VKB + VOKB stay live as fallback per CONTEXT.md Deferred Ideas)
-- [ ] **Phase 46: Per-System Documentation & Onboarding** - Each system's README documents which configs it owns; KM-Core ships an architecture diagram + onboarding guide.
+- [x] **Phase 46: Per-System Documentation & Onboarding** - Each system's README documents which configs it owns; KM-Core ships an architecture diagram + onboarding guide. (completed 2026-06-09)
 
 ### Phase Details
 
@@ -711,7 +711,7 @@ Plans:
   3. The onboarding guide walks a new developer from clone → run KM-Core tests → register a new lower ontology → ingest a sample entity, with each step verifiable.
   4. Each system's README cross-references the others and KM-Core, so a contributor entering through any of the four doors can navigate to the others.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -720,7 +720,7 @@ Plans:
 - [x] 46-03-PLAN.md — B's README rewrite (≤200 lines) + new AGENTS.md companion + b-architecture PUML + submodule pointer bump (Wave 2)
 - [x] 46-04-PLAN.md — C's NEW README in OKM external repo on branch gsd/44-09-rest-cutover-v2 + okm-architecture PUML (Wave 2)
 - [x] 46-05-PLAN.md — lib/km-core/docs/ONBOARDING.md (7-step LslHeartbeatRotator exercise) + cleanup-verifier spec (Wave 3)
-- [ ] 46-06-PLAN.md — Final cross-reference sweep across 4 READMEs to verify SC-4 (Wave 4)
+- [x] 46-06-PLAN.md — Final cross-reference sweep across 4 READMEs to verify SC-4 (Wave 4)
 
 ### Progress
 
@@ -735,7 +735,7 @@ Plans:
 | 43. OKM Cross-Repo Migration (C) | 7/11 | In Progress|  |
 | 44. REST API & Git Snapshots | 18/16 | Complete   | 2026-06-05 |
 | 45. Unified Web Viewer | 6/6 | Complete    | 2026-06-08 |
-| 46. Per-System Documentation & Onboarding | 5/6 | In Progress|  |
+| 46. Per-System Documentation & Onboarding | 6/6 | Complete   | 2026-06-09 |
 
 ### Phase 47: ObservationWriter: preserve prompt text when image attachments are present
 
