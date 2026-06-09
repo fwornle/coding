@@ -40,7 +40,8 @@
 
 ### Unified viewer (UI)
 
-- [x] **UI-01:** A single web viewer renders any KM-Core graph parameterized by ontology config; both VKB (B) and VOKB (C) users migrate to it without functional regression. *(Phase 45 MVP — 2026-06-08; VKB+VOKB stay live as fallback per CONTEXT.md Deferred Ideas)*
+- [x] **UI-01:** A single web viewer renders any KM-Core graph parameterized by ontology config; both VKB (B) and VOKB (C) users migrate to it without functional regression. *(Phase 45 MVP — 2026-06-08; routing layer + minimal viewer shell. UI-02 closes the surface-area gap.)*
+- [ ] **UI-02:** Unified viewer reaches ≥90% feature parity with VOKB (the richer of the two legacy viewers) plus four coding-specific surfaces (hierarchy navigator, LSL timeline, ETM live tail, workflow status) so VKB+VOKB users can migrate without losing functionality. Surfaces: stats bar, legend, node-shape/border/pulse encoding, layer/domain/ontology filters with per-class counts + cluster toggles, entity-detail sub-tabs (Default/Evolution/Confidence/Timeline) with relationships breakdown + sources & evidence + occurrence history, harmonized markdown/entity panel widths, trending sparklines, issue triage mode, plus the four coding-only additions. *(NEW — Phase 45 retrospective added 2026-06-09 after operator visual review revealed unified viewer shipped at ~15% of VOKB's surface.)*
 
 ### Per-system integration (INT)
 
@@ -88,6 +89,7 @@
 | API-01 | Phase 44 | Complete |
 | API-02 | Phase 44 | Complete |
 | UI-01 | Phase 45 | Complete (6/6 plans executed, MVP shipped 2026-06-08) |
+| UI-02 | Phase 55 | Ready for planning (2026-06-09) |
 | DOC-01 | Phase 46 | Complete |
 
-**Coverage:** 17/17 v7.1 requirements mapped, no orphans.
+**Coverage:** 18/18 requirements mapped (17 v7.1 + UI-02 added post-v7.1 from Phase 45 retrospective), no orphans.
