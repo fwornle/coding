@@ -913,13 +913,13 @@ See `.planning/phases/54-etm-hardening-launchd-and-isprocessing-audit/54-CONTEXT
 9. **Trending Patterns sidebar.** Sparklines for top patterns (analog of VOKB's "Trending Patterns" left-sidebar surface).
 10. **Issue Triage mode.** A separate viewer mode targeting operational triage (analog of VOKB's "Issue Triage" tab; may be partial in v1).
 
-**Plans:** 13 plans across 6 waves
+**Plans:** 1/13 plans executed
 
 Plans:
 **Wave 1**
 
 - [ ] 55-01-PLAN.md — Routing fix + CAP drop (D-55-01a/b/c) + RcaOpsPanel deletion + cc.bmwgroup.net purge
-- [ ] 55-02-PLAN.md — Encoding overlay schema extension (borderStyle/pulseRule) in km-core + coding.display.json (D-55-03)
+- [x] 55-02-PLAN.md — Encoding overlay schema extension (borderStyle/pulseRule) in km-core + coding.display.json (D-55-03)
 - [ ] 55-03-PLAN.md — Shared modules: vokb-palette.ts (semantic palette) + lib-domain/evidence-types.ts (port from VOKB)
 - [ ] 55-04-PLAN.md — Zustand store extensions (filter slices, mode, etmObservations ring buffer, hierarchy/LSL filters)
 
