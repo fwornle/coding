@@ -66,7 +66,10 @@ RUN ARCH=$(uname -m) && \
 
 # Copy and install each integration's dependencies separately
 COPY integrations/mcp-server-semantic-analysis/package*.json ./integrations/mcp-server-semantic-analysis/
-RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps 2>/dev/null || true
+# --no-package-lock matches the final-stage install below; see the rationale
+# comment there. The cache-warming intent of this stage is preserved without
+# the EINTEGRITY trap on file: deps.
+RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps --no-package-lock 2>/dev/null || true
 
 COPY integrations/mcp-constraint-monitor/package*.json ./integrations/mcp-constraint-monitor/
 RUN cd integrations/mcp-constraint-monitor && npm install --ignore-scripts 2>/dev/null || true
@@ -140,7 +143,9 @@ RUN cd lib/km-core && npm run build
 # ENOENT'd, then `|| true` swallowed the failure, leaving node_modules empty and
 # sse-server FATAL at runtime on `ERR_MODULE_NOT_FOUND: @modelcontextprotocol/sdk`.
 # Pre-built dist/ from the preceding RUN makes the tarball self-contained.
-RUN cd lib/km-core && npm pack && mv fwornle-km-core-*.tgz fwornle-km-core-0.1.0.tgz
+RUN cd lib/km-core && npm pack && \
+    f=$(ls fwornle-km-core-*.tgz | head -1) && \
+    if [ "$f" != "fwornle-km-core-0.1.0.tgz" ]; then mv "$f" fwornle-km-core-0.1.0.tgz; fi
 
 # Re-install integration deps after source COPY (node-deps stage installs may
 # have been overwritten by COPY integrations/ since .dockerignore excludes node_modules)
@@ -151,7 +156,15 @@ RUN cd integrations/mcp-constraint-monitor/dashboard && npm install 2>/dev/null 
 # resolve `@modelcontextprotocol/sdk`). If this step fails the image build
 # must fail loudly so the operator sees the cause instead of hitting it as
 # a "service stopped" violation on the dashboard hours later.
-RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps
+#
+# --no-package-lock bypasses the lockfile during this install. Required because
+# `@fwornle/km-core` is a file: dep pointing at the locally-packed
+# `fwornle-km-core-0.1.0.tgz` produced one RUN step above. Every time km-core
+# source changes (any commit in lib/km-core/), the new tarball gets a different
+# SHA512 than the hash pinned in package-lock.json, causing EINTEGRITY. The
+# lockfile is regenerated host-side; in-container we install without verifying
+# integrity against the stale pinned hash.
+RUN cd integrations/mcp-server-semantic-analysis && npm install --ignore-scripts --legacy-peer-deps --no-package-lock
 
 # Patch broken JSDoc comment in @rapid/llm-proxy network-detect.js
 # The comment contains "utun*/" which prematurely closes the /* block, breaking ESM parsing
