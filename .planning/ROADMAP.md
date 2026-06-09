@@ -701,7 +701,6 @@ Plans:
 
 - [x] 45-06-PLAN.md — Cross-system smoke + Wave 0 operator probes — 4 probes (C CORS, C SSE, lucide-react icon completeness, display-overlay strategy) + 9-spec Playwright suite under `tests/e2e/unified-viewer/` covering system-routing / entity-detail / expand-neighbors / filter-search / state-reset / markdown-viewer / rca-ingestion (mock fallback if CAP unreachable) / error-states / webgl-context (20-cycle Pitfall 8) + operator cutover gate
 
-
 #### Phase 46: Per-System Documentation & Onboarding
 
 **Goal:** Each of A, B, C ships a README documenting which configurations it owns (ontology files, LLM provider config, ingest adapter config, domain eval logic), and KM-Core ships an architecture diagram + onboarding guide — so future contributors can tell at a glance where to add a new ontology class, LLM provider, or ingest source without reading source.
@@ -917,20 +916,44 @@ See `.planning/phases/54-etm-hardening-launchd-and-isprocessing-audit/54-CONTEXT
 **Plans:** 13 plans across 6 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 55-01-PLAN.md — Routing fix + CAP drop (D-55-01a/b/c) + RcaOpsPanel deletion + cc.bmwgroup.net purge
 - [ ] 55-02-PLAN.md — Encoding overlay schema extension (borderStyle/pulseRule) in km-core + coding.display.json (D-55-03)
 - [ ] 55-03-PLAN.md — Shared modules: vokb-palette.ts (semantic palette) + lib-domain/evidence-types.ts (port from VOKB)
 - [ ] 55-04-PLAN.md — Zustand store extensions (filter slices, mode, etmObservations ring buffer, hierarchy/LSL filters)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 55-05-PLAN.md — Renderer extension: SigmaCanvas shapes + dashed border + pulse halo with prefers-reduced-motion (depends_on: 55-03)
 - [ ] 55-06-PLAN.md — Backend endpoints: /api/v1/stats + /api/v1/trends + /api/v1/entities/:id/confidence + /api/coding/observations/stream (SSE) + /api/coding/lsl/sessions (depends_on: 55-02)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 55-07-PLAN.md — Shell wiring: StatsBar + LegendPanel + NavBar mode toggle + UnifiedViewer route + KeyboardHelpDialog (depends_on: 55-01,55-03,55-04,55-06)
 - [ ] 55-08-PLAN.md — Filter rail parity: LayerFilter + DomainFilter + OntologyFilter (groupingSchema) + GraphToggles (depends_on: 55-04)
 - [ ] 55-09-PLAN.md — Entity detail expansion: 4 sub-tabs + Relationships + Sources & Evidence + Occurrence History + Markdown harmonization (depends_on: 55-01,55-03,55-04)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 55-10-PLAN.md — Trending Patterns sidebar + IssueTriageView (Mode B) (depends_on: 55-03,55-04,55-06)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 55-11-PLAN.md — Coding-only surfaces batch 1: HierarchyNavigator + LslTimelineStrip (depends_on: 55-04,55-06,55-07,55-08)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 55-12-PLAN.md — Coding-only surfaces batch 2: EtmTailSheet (SSE) + WorkflowStatusPanel + NavBar ETM trigger (depends_on: 55-04,55-06,55-07,55-11)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 55-13-PLAN.md — E2E test suite + side-by-side VOKB screenshot harness + operator parity gate (depends_on: 55-01,55-05,55-07,55-08,55-09,55-10,55-11,55-12)
 
+**Cross-cutting constraints:**
+
+- Logger discipline: ZERO raw `console.*` in any file touched
+- Logger discipline: ZERO raw `console.*`
 
 **Out of scope (explicit):**
 
