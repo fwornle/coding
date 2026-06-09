@@ -53,6 +53,22 @@ export interface NeighborhoodPayload {
   relations: Relation[]
 }
 
+/**
+ * Phase 55 — confidence payload returned by `/api/v1/entities/:id/confidence`.
+ * UI-SPEC §18 row 8. Backend wired in Plan 55-06; the EntityDetailPanel
+ * Confidence sub-tab consumes this lazily and falls back to a client
+ * heuristic on 404 / network error (UI-SPEC §16).
+ */
+export interface ConfidenceSegment {
+  runId: string
+  score: number
+  label: 'High' | 'Moderate' | 'Low'
+}
+export interface ConfidencePayload {
+  overall: { score: number; label: 'High' | 'Moderate' | 'Low' }
+  segments: ConfidenceSegment[]
+}
+
 /** Phase 44 typed-view envelope shape (matches Pitfall 2 envelope in typed-views.test.js). */
 export interface TypedViewEnvelope<T> {
   data: T[]
@@ -114,6 +130,18 @@ export class ApiClient {
     return this.get<NeighborhoodPayload>(
       `/api/v1/entities/${safeId}/neighbors?depth=${depth}`,
     )
+  }
+
+  /**
+   * Phase 55 Plan 09 — lazy fetch the Confidence sub-tab bands.
+   * Backend wired in Plan 55-06 (UI-SPEC §18 row 8). The EntityDetailPanel
+   * Confidence sub-tab calls this once per `selectedNodeId`; on rejection
+   * (404 / network), it falls back to the client heuristic per NodeDetails.tsx
+   * :165-213 (UI-SPEC §16).
+   */
+  getEntityConfidence(id: string): Promise<ConfidencePayload> {
+    const safeId = encodeURIComponent(id)
+    return this.get<ConfidencePayload>(`/api/v1/entities/${safeId}/confidence`)
   }
 
   // Phase 44 typed views (camelCase wire shape per Plan 44-16 lock).

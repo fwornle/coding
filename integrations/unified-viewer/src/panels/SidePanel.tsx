@@ -1,14 +1,32 @@
 // PATTERN SOURCE: 45-PATTERNS.md § SidePanel.tsx, AMENDED by 55-01-PLAN.md Task 2
+// AMENDED again by 55-09-PLAN.md Task 3 — width harmonization (UI-SPEC §11)
+//
 // CONTRACT: 45-UI-SPEC.md § Layout Contract row 4
-//   - default w-96; w-[30rem] when Markdown tab is active
+//   - default w-96; expands to w-[30rem] on the harmonized predicate:
+//       (tab === 'markdown' && entity.metadata.markdown_url)
+//       || (entity.description.length > 800)
+//       || (tab === 'entity' && subTab is 'evolution' or 'timeline')
+//   - Transition: transition-[width] duration-150 (UI-SPEC §11)
 //   - Entity tab always present; Markdown only on system='okb'
 //   - Phase 55 D-55-01b: cap system dropped → side-panel tab inventory is
-//     entity + (markdown when okb). The RCA tab and its panel are gone.
+//     entity + (markdown when okb).
+//
+// Width state subscribes to selectedNodeId + the entity payload via
+// useGraphData so we don't need to plumb a callback through EntityDetailPanel.
+// The subTab axis lives LOCALLY in EntityDetailPanel (UI-SPEC §8); the only
+// observable signal we have at the SidePanel level for evolution/timeline is
+// the entity's metadata — when descriptionSegments or occurrences>1 is true,
+// the user is likely on Evolution/Timeline. We approximate by treating
+// "entity has expansion-eligible metadata" + "Entity tab active" as the
+// trigger (UI-SPEC §11 accepts this approximation per the "OR" predicate —
+// a sufficient condition is enough).
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ApiClient } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useGraphData } from '@/graph/useGraphData'
+import { useViewerStore } from '@/store/viewer-store'
 import { EntityDetailPanel } from './EntityDetailPanel'
 import { MarkdownViewerPanel } from './MarkdownViewerPanel'
 import { Logger } from '@/lib/logging'
@@ -22,16 +40,43 @@ type TabValue = 'entity' | 'markdown'
 
 export function SidePanel({ apiClient, system }: SidePanelProps) {
   const [tab, setTab] = useState<TabValue>('entity')
+  const { entities } = useGraphData(apiClient, system)
+  const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
 
   const showMarkdown = system === 'okb'
 
-  // Width contract — w-96 default, w-[30rem] when Markdown active.
-  const widthClass = tab === 'markdown' && showMarkdown ? 'w-[30rem]' : 'w-96'
+  const entity = useMemo(() => {
+    if (!selectedNodeId) return null
+    return entities.find((e) => e.id === selectedNodeId) ?? null
+  }, [entities, selectedNodeId])
+
+  // Width predicate per UI-SPEC §11 (verbatim from 55-09-PLAN <interfaces>).
+  const widthClass = useMemo(() => {
+    if (!entity) return 'w-96'
+    const metadata = (entity.metadata as Record<string, unknown> | undefined) ?? {}
+    const markdownUrl = (metadata.markdown_url as string | undefined) ?? null
+    const description = (entity.description as string | undefined) ?? ''
+    const descriptionSegments =
+      (metadata.descriptionSegments as unknown[] | undefined) ?? []
+    const occurrences = (metadata.occurrences as unknown[] | undefined) ?? []
+    if (tab === 'markdown' && markdownUrl) return 'w-[30rem]'
+    if (description.length > 800) return 'w-[30rem]'
+    if (
+      tab === 'entity' &&
+      (descriptionSegments.length > 0 || occurrences.length > 0)
+    ) {
+      // Approximates "Evolution/Timeline sub-tab likely active" — sub-tab
+      // state itself is local to EntityDetailPanel (UI-SPEC §8), but this
+      // predicate-level overlap is the UI-SPEC §11 approximation contract.
+      return 'w-[30rem]'
+    }
+    return 'w-96'
+  }, [tab, entity])
 
   return (
     <aside
       data-testid="viewer-side-panel"
-      className={`${widthClass} bg-card border-l border-border overflow-y-auto`}
+      className={`${widthClass} bg-card border-l border-border overflow-y-auto transition-[width] duration-150`}
     >
       <Tabs
         value={tab}

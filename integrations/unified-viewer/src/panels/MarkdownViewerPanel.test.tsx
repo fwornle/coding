@@ -253,4 +253,42 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
     const backBtn = screen.getByTestId('markdown-back')
     expect(backBtn).toBeDisabled()
   })
+
+  // ===== Phase 55 additions (Plan 55-09 Task 3) =====
+
+  test('Phase 55 — EntityIdentityHeader renders ABOVE the markdown body', () => {
+    useViewerStore.setState({ selectedNodeId: 'e1' })
+    const { container } = renderPanel()
+    // Identity header is mounted by Task 1's shared component.
+    const header = container.querySelector('[data-testid="entity-identity-header"]')
+    expect(header).not.toBeNull()
+    // It must appear BEFORE markdown-content in document order.
+    const content = container.querySelector('[data-testid="markdown-content"]')
+    expect(content).not.toBeNull()
+    const headerIndex = Array.from(container.querySelectorAll('*')).indexOf(header!)
+    const contentIndex = Array.from(container.querySelectorAll('*')).indexOf(content!)
+    expect(headerIndex).toBeLessThan(contentIndex)
+  })
+
+  test('Phase 55 — entity name appears in the identity header (parity with EntityDetailPanel)', () => {
+    useViewerStore.setState({ selectedNodeId: 'e1' })
+    renderPanel()
+    // identity-name is rendered by EntityIdentityHeader (Task 1).
+    expect(screen.getByTestId('identity-name').textContent).toBe('Hello Entity')
+  })
+
+  test('Phase 55 — Phase 45 sanitizer pipeline UNCHANGED — <script> still escaped', () => {
+    // Regression guard: the EntityIdentityHeader addition must not weaken the
+    // existing XSS layer from Plan 45-04. Re-run the Test 7b assertion.
+    mockEntities.push({
+      id: 'xss-bc',
+      name: 'XSS BC sample',
+      ontologyClass: 'Observation',
+      description: '<script>alert(1)</script>',
+    })
+    useViewerStore.setState({ selectedNodeId: 'xss-bc' })
+    const { container } = renderPanel()
+    expect(container.querySelectorAll('script').length).toBe(0)
+    mockEntities.pop()
+  })
 })

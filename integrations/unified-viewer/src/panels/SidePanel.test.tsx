@@ -19,9 +19,33 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useViewerStore } from '@/store/viewer-store'
 
+// Mock entities — Phase 55 width-harmonization tests need entities that
+// trigger the w-[30rem] predicate (markdown_url or description.length > 800).
+const mockEntities: Array<{
+  id: string
+  name: string
+  ontologyClass: string
+  description?: string
+  metadata?: { markdown_url?: string }
+}> = [
+  {
+    id: 'mdurl',
+    name: 'Markdown URL Entity',
+    ontologyClass: 'Observation',
+    description: 'short desc',
+    metadata: { markdown_url: 'docs/intro.md' },
+  },
+  {
+    id: 'longdesc',
+    name: 'Long Description Entity',
+    ontologyClass: 'Observation',
+    description: 'x'.repeat(900), // > 800 chars triggers width expansion
+  },
+]
+
 vi.mock('@/graph/useGraphData', () => ({
   useGraphData: () => ({
-    entities: [],
+    entities: mockEntities,
     relations: [],
     ontology: [],
     isLoading: false,
@@ -110,5 +134,37 @@ describe('SidePanel (Phase 55 — RCA tab dropped)', () => {
 
   test('Test 5: SidePanel renders without throwing for system="okb"', () => {
     expect(() => renderPanel('okb')).not.toThrow()
+  })
+
+  // ===== Phase 55 width harmonization (Plan 55-09 Task 3) =====
+
+  test('Phase 55 — default width is w-96 when no entity selected', () => {
+    const { container } = renderPanel('coding')
+    const aside = container.querySelector('[data-testid="viewer-side-panel"]')
+    expect(aside).not.toBeNull()
+    expect(aside!.className).toMatch(/\bw-96\b/)
+    // Transition class present per UI-SPEC §11 (150ms transition-[width])
+    expect(aside!.className).toContain('transition-[width]')
+    expect(aside!.className).toContain('duration-150')
+  })
+
+  test('Phase 55 — width expands to w-[30rem] when entity has markdown_url + Markdown tab', () => {
+    // Mount with a selected entity that carries markdown_url; click Markdown tab.
+    useViewerStore.setState({ selectedNodeId: 'mdurl' })
+    const { container } = renderPanel('okb')
+    // Switch to Markdown tab
+    const trigger = screen.getByTestId('tab-markdown')
+    fireEvent.pointerDown(trigger, { pointerType: 'mouse', button: 0 })
+    fireEvent.mouseDown(trigger)
+    fireEvent.click(trigger)
+    const aside = container.querySelector('[data-testid="viewer-side-panel"]')
+    expect(aside!.className).toMatch(/w-\[30rem\]/)
+  })
+
+  test('Phase 55 — width expands to w-[30rem] when entity.description.length > 800', () => {
+    useViewerStore.setState({ selectedNodeId: 'longdesc' })
+    const { container } = renderPanel('coding')
+    const aside = container.querySelector('[data-testid="viewer-side-panel"]')
+    expect(aside!.className).toMatch(/w-\[30rem\]/)
   })
 })
