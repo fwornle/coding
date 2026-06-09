@@ -2,7 +2,12 @@
 // If the visual contract drifts in UI-SPEC, this file MUST update too.
 
 import { describe, test, expect } from 'vitest'
-import { nodeStrokeForState, edgeStateForRelation } from './node-renderer'
+import {
+  nodeStrokeForState,
+  edgeStateForRelation,
+  evaluatePulseRule,
+} from './node-renderer'
+import type { Entity } from './types'
 
 describe('nodeStrokeForState — Plan 04 round 2: hex palette (sigma WebGL cannot parse hsl(var(--*)))', () => {
   test('Test 1: default → 1px slate-300 border, opacity 1.0', () => {
@@ -72,5 +77,139 @@ describe('edgeStateForRelation — Plan 03 round 2 hex palette (sigma WebGL cann
   test('Test 6e: null selectedNodeId, no dimmed set → default slate', () => {
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, null)
     expect(s).toEqual({ color: '#cbd5e1', opacity: 0.6 })
+  })
+})
+
+// -----------------------------------------------------------------------
+// Plan 55-05: borderStyle + halo extensions to StrokeStyle, plus the
+// `evaluatePulseRule` pure function. UI-SPEC §12 + §14.
+// -----------------------------------------------------------------------
+
+describe('nodeStrokeForState — Plan 55-05 borderStyle + halo extensions', () => {
+  test('default + borderStyle=dashed → stroke carries borderStyle:dashed', () => {
+    const stroke = nodeStrokeForState('default', 'dashed')
+    expect(stroke).not.toBeNull()
+    expect(stroke?.borderStyle).toBe('dashed')
+    // Base style preserved (UI-SPEC §14 rule #4 is a border-style overlay,
+    // not a color/width overlay)
+    expect(stroke?.color).toBe('#cbd5e1')
+    expect(stroke?.width).toBe(1)
+  })
+
+  test('no extension params → borderStyle/halo absent (BC: Phase 45 contract intact)', () => {
+    const stroke = nodeStrokeForState('default')
+    expect(stroke).not.toBeNull()
+    // BC: existing call sites that don't thread the new params see the
+    // prior literal shape — `borderStyle`/`halo` are NOT in the object
+    // (the Phase 45 reducer test asserts a strict `toEqual` deep match;
+    // that contract is preserved here).
+    expect(stroke?.borderStyle).toBeUndefined()
+    expect(stroke?.halo).toBeUndefined()
+  })
+
+  test('explicit borderStyle=solid → key is present with value solid', () => {
+    const stroke = nodeStrokeForState('default', 'solid')
+    expect(stroke?.borderStyle).toBe('solid')
+  })
+
+  test('pulseRuleResult=true → stroke carries halo with phase 0..1', () => {
+    const stroke = nodeStrokeForState('default', 'solid', true)
+    expect(stroke).not.toBeNull()
+    expect(stroke?.halo).toBeDefined()
+    // halo.color tracks the per-state base color (UI-SPEC §12: "node fill at 50% alpha"
+    // is wired in SigmaCanvas via the color; node-renderer hands it the base color).
+    expect(stroke?.halo?.color).toBe('#cbd5e1')
+    // phase = (Date.now() % 1500) / 1500 — bound to [0, 1)
+    expect(stroke?.halo?.phase).toBeGreaterThanOrEqual(0)
+    expect(stroke?.halo?.phase).toBeLessThan(1)
+  })
+
+  test('pulseRuleResult=false → no halo', () => {
+    const stroke = nodeStrokeForState('selected', 'solid', false)
+    expect(stroke?.halo).toBeUndefined()
+  })
+
+  test('filter-hidden state remains null regardless of borderStyle/halo', () => {
+    expect(nodeStrokeForState('filter-hidden', 'dashed', true)).toBeNull()
+  })
+})
+
+describe('evaluatePulseRule — Plan 55-05 (UI-SPEC §12)', () => {
+  // Minimal entity factory — the helper only reads `updatedAt` and
+  // `metadata.occurrences[].timestamp`.
+  function mkEntity(over: Partial<Entity>): Entity {
+    return {
+      id: 'e',
+      name: 'Eve',
+      ontologyClass: 'Observation',
+      ...over,
+    } as Entity
+  }
+
+  test('null rule → false (no pulse)', () => {
+    expect(evaluatePulseRule(null, mkEntity({}))).toBe(false)
+  })
+
+  test('lastUpdatedWithin:60s — updatedAt 30s ago → true', () => {
+    const e = mkEntity({ updatedAt: new Date(Date.now() - 30_000).toISOString() })
+    expect(evaluatePulseRule('lastUpdatedWithin:60s', e)).toBe(true)
+  })
+
+  test('lastUpdatedWithin:60s — updatedAt 61s ago → false', () => {
+    const e = mkEntity({ updatedAt: new Date(Date.now() - 61_000).toISOString() })
+    expect(evaluatePulseRule('lastUpdatedWithin:60s', e)).toBe(false)
+  })
+
+  test('lastUpdatedWithin:5m — parses 5m correctly (300_000ms)', () => {
+    // 4m59s ago → within 5m
+    const eIn = mkEntity({ updatedAt: new Date(Date.now() - 299_000).toISOString() })
+    expect(evaluatePulseRule('lastUpdatedWithin:5m', eIn)).toBe(true)
+    // 5m01s ago → outside 5m
+    const eOut = mkEntity({ updatedAt: new Date(Date.now() - 301_000).toISOString() })
+    expect(evaluatePulseRule('lastUpdatedWithin:5m', eOut)).toBe(false)
+  })
+
+  test('recentlyMerged:1h — occurrence 1s ago → true', () => {
+    const e = mkEntity({
+      metadata: {
+        occurrences: [
+          { timestamp: new Date(Date.now() - 1_000).toISOString() },
+        ],
+      },
+    })
+    expect(evaluatePulseRule('recentlyMerged:1h', e)).toBe(true)
+  })
+
+  test('recentlyMerged:1h — occurrence 2h ago → false', () => {
+    const e = mkEntity({
+      metadata: {
+        occurrences: [
+          { timestamp: new Date(Date.now() - 2 * 3_600_000).toISOString() },
+        ],
+      },
+    })
+    expect(evaluatePulseRule('recentlyMerged:1h', e)).toBe(false)
+  })
+
+  test('recentlyMerged:1h — empty / missing occurrences → false', () => {
+    expect(evaluatePulseRule('recentlyMerged:1h', mkEntity({}))).toBe(false)
+    expect(
+      evaluatePulseRule(
+        'recentlyMerged:1h',
+        mkEntity({ metadata: { occurrences: [] } }),
+      ),
+    ).toBe(false)
+  })
+
+  test('unknown rule → false (silently, no throw — T-55-05-02 mitigation)', () => {
+    expect(evaluatePulseRule('unknownRule', mkEntity({}))).toBe(false)
+    expect(evaluatePulseRule('lastUpdatedWithin:42y', mkEntity({}))).toBe(false)
+  })
+
+  test('missing updatedAt → false (no spurious true from 1970 epoch math)', () => {
+    // If updatedAt is absent, "now - 0" would be > any window — we must
+    // guard against that. False is the safe choice.
+    const e = mkEntity({})
+    expect(evaluatePulseRule('lastUpdatedWithin:60s', e)).toBe(false)
   })
 })

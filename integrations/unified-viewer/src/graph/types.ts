@@ -43,7 +43,15 @@ export interface OntologyClass {
   display?: {
     color?: string
     icon?: string
-    shape?: 'circle' | 'square' | 'diamond'
+    // Plan 55-05 (UI-SPEC §14): extended shape union from 3 → 5 values.
+    // 'triangle' + 'hexagon' added for RuntimeDiagnostics + Project/System/Feature.
+    shape?: 'circle' | 'square' | 'diamond' | 'triangle' | 'hexagon'
+    // Plan 55-05 (UI-SPEC §14): NEW. Defaults to 'solid'; 'dashed' means
+    // "render with a dash pattern" (orphan-on-current-view OR overlay opt-in).
+    borderStyle?: 'solid' | 'dashed'
+    // Plan 55-05 (UI-SPEC §14): NEW. Per-class pulse expression. Null
+    // means no pulse. Evaluated per-entity by evaluatePulseRule.
+    pulseRule?: string | null
   }
 }
 
