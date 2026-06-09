@@ -914,9 +914,23 @@ See `.planning/phases/54-etm-hardening-launchd-and-isprocessing-audit/54-CONTEXT
 9. **Trending Patterns sidebar.** Sparklines for top patterns (analog of VOKB's "Trending Patterns" left-sidebar surface).
 10. **Issue Triage mode.** A separate viewer mode targeting operational triage (analog of VOKB's "Issue Triage" tab; may be partial in v1).
 
-**Plans (TBD — to be scaffolded by `/gsd-discuss-phase 55`):**
+**Plans:** 13 plans across 6 waves
 
-The work is large enough to need a real discuss-phase. Rough sizing: ~6-8 plans covering data-routing fix, environment-bound UX, legend + node shapes, filter parity, header stats, entity-details parity, panel-UX harmonisation, trending + triage modes. Some of these will need a UI-SPEC.md.
+Plans:
+- [ ] 55-01-PLAN.md — Routing fix + CAP drop (D-55-01a/b/c) + RcaOpsPanel deletion + cc.bmwgroup.net purge
+- [ ] 55-02-PLAN.md — Encoding overlay schema extension (borderStyle/pulseRule) in km-core + coding.display.json (D-55-03)
+- [ ] 55-03-PLAN.md — Shared modules: vokb-palette.ts (semantic palette) + lib-domain/evidence-types.ts (port from VOKB)
+- [ ] 55-04-PLAN.md — Zustand store extensions (filter slices, mode, etmObservations ring buffer, hierarchy/LSL filters)
+- [ ] 55-05-PLAN.md — Renderer extension: SigmaCanvas shapes + dashed border + pulse halo with prefers-reduced-motion (depends_on: 55-03)
+- [ ] 55-06-PLAN.md — Backend endpoints: /api/v1/stats + /api/v1/trends + /api/v1/entities/:id/confidence + /api/coding/observations/stream (SSE) + /api/coding/lsl/sessions (depends_on: 55-02)
+- [ ] 55-07-PLAN.md — Shell wiring: StatsBar + LegendPanel + NavBar mode toggle + UnifiedViewer route + KeyboardHelpDialog (depends_on: 55-01,55-03,55-04,55-06)
+- [ ] 55-08-PLAN.md — Filter rail parity: LayerFilter + DomainFilter + OntologyFilter (groupingSchema) + GraphToggles (depends_on: 55-04)
+- [ ] 55-09-PLAN.md — Entity detail expansion: 4 sub-tabs + Relationships + Sources & Evidence + Occurrence History + Markdown harmonization (depends_on: 55-01,55-03,55-04)
+- [ ] 55-10-PLAN.md — Trending Patterns sidebar + IssueTriageView (Mode B) (depends_on: 55-03,55-04,55-06)
+- [ ] 55-11-PLAN.md — Coding-only surfaces batch 1: HierarchyNavigator + LslTimelineStrip (depends_on: 55-04,55-06,55-07,55-08)
+- [ ] 55-12-PLAN.md — Coding-only surfaces batch 2: EtmTailSheet (SSE) + WorkflowStatusPanel + NavBar ETM trigger (depends_on: 55-04,55-06,55-07,55-11)
+- [ ] 55-13-PLAN.md — E2E test suite + side-by-side VOKB screenshot harness + operator parity gate (depends_on: 55-01,55-05,55-07,55-08,55-09,55-10,55-11,55-12)
+
 
 **Out of scope (explicit):**
 
