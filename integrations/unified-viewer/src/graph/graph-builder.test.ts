@@ -78,6 +78,111 @@ describe('mergeIntoGraph — idempotency (T-45-02-04 mitigation)', () => {
   })
 })
 
+// -----------------------------------------------------------------------
+// Plan 55-05 — graph-builder threads shape/borderStyle/pulseRule onto
+// per-node attributes from the ApiClient ontology overlay payload. The
+// UI-SPEC §14 fallback chain is applied at build time:
+//   overlay → shapeFallback / borderStyleFallback / pulseRuleFallback
+// The orphan-on-current-view rule (#4) is applied AT BUILD TIME: nodes
+// with zero relations in the current view get borderStyle:'dashed' even
+// if the overlay says 'solid'.
+// -----------------------------------------------------------------------
+
+describe('buildGraph — Plan 55-05 shape/borderStyle/pulseRule threading', () => {
+  test('overlay-supplied shape/borderStyle/pulseRule stamp onto node attributes', () => {
+    const ont: OntologyClass[] = [
+      {
+        name: 'Observation',
+        display: {
+          color: '#10b981',
+          shape: 'circle',
+          borderStyle: 'solid',
+          pulseRule: 'lastUpdatedWithin:60s',
+        },
+      },
+    ]
+    const ents: Entity[] = [
+      { id: 'o1', name: 'Obs1', ontologyClass: 'Observation', level: 2 },
+      { id: 'o2', name: 'Obs2', ontologyClass: 'Observation', level: 2 },
+    ]
+    const rels: Relation[] = [{ from: 'o1', to: 'o2', type: 'relates_to' }]
+    const g = buildGraph(ents, rels, ont, 'dark')
+    expect(g.getNodeAttribute('o1', 'shape')).toBe('circle')
+    expect(g.getNodeAttribute('o1', 'borderStyle')).toBe('solid')
+    expect(g.getNodeAttribute('o1', 'pulseRule')).toBe('lastUpdatedWithin:60s')
+  })
+
+  test('missing overlay class → falls back to shapeFallback/borderStyleFallback/pulseRuleFallback', () => {
+    // No ontology entry for 'Project' at all.
+    const ents: Entity[] = [
+      { id: 'p1', name: 'Proj1', ontologyClass: 'Project' },
+      { id: 'p2', name: 'Proj2', ontologyClass: 'Project' },
+    ]
+    const rels: Relation[] = [{ from: 'p1', to: 'p2', type: 'has' }]
+    const g = buildGraph(ents, rels, [], 'dark')
+    // shapeFallback('Project') === 'hexagon' per UI-SPEC §14
+    expect(g.getNodeAttribute('p1', 'shape')).toBe('hexagon')
+    // borderStyleFallback(_, hasRelations=true) === 'solid'
+    expect(g.getNodeAttribute('p1', 'borderStyle')).toBe('solid')
+    // pulseRuleFallback → null
+    expect(g.getNodeAttribute('p1', 'pulseRule')).toBeNull()
+  })
+
+  test('UI-SPEC §14 rule #4: orphan (zero relations in current view) → dashed, even if overlay says solid', () => {
+    // The overlay says solid, but the node has no relations → dashed wins.
+    const ont: OntologyClass[] = [
+      { name: 'Detail', display: { shape: 'circle', borderStyle: 'solid' } },
+    ]
+    const ents: Entity[] = [
+      { id: 'd1', name: 'Orphan', ontologyClass: 'Detail' },
+    ]
+    const g = buildGraph(ents, [], ont, 'dark')
+    expect(g.getNodeAttribute('d1', 'borderStyle')).toBe('dashed')
+  })
+
+  test('non-orphan with overlay borderStyle="dashed" → keeps dashed (overlay wins over solid default)', () => {
+    const ont: OntologyClass[] = [
+      { name: 'Detail', display: { borderStyle: 'dashed' } },
+    ]
+    const ents: Entity[] = [
+      { id: 'd1', name: 'A', ontologyClass: 'Detail' },
+      { id: 'd2', name: 'B', ontologyClass: 'Detail' },
+    ]
+    const rels: Relation[] = [{ from: 'd1', to: 'd2', type: 'r' }]
+    const g = buildGraph(ents, rels, ont, 'dark')
+    // Has relations AND overlay says dashed → dashed (overlay wins).
+    expect(g.getNodeAttribute('d1', 'borderStyle')).toBe('dashed')
+  })
+
+  test('shape unknown to overlay AND shapeFallback → defaults to circle', () => {
+    const ents: Entity[] = [
+      { id: 'x', name: 'X', ontologyClass: 'TotallyNewClass' },
+      { id: 'y', name: 'Y', ontologyClass: 'TotallyNewClass' },
+    ]
+    const rels: Relation[] = [{ from: 'x', to: 'y', type: 'r' }]
+    const g = buildGraph(ents, rels, [], 'dark')
+    expect(g.getNodeAttribute('x', 'shape')).toBe('circle')
+  })
+
+  test('threads updatedAt + metadata onto node attributes (renderer needs them for pulse evaluation)', () => {
+    const stamp = new Date(Date.now() - 30_000).toISOString()
+    const ents: Entity[] = [
+      {
+        id: 'o1',
+        name: 'Obs1',
+        ontologyClass: 'Observation',
+        updatedAt: stamp,
+        metadata: { occurrences: [{ timestamp: stamp }] },
+      } as Entity,
+    ]
+    const g = buildGraph(ents, [], [], 'dark')
+    expect(g.getNodeAttribute('o1', 'updatedAt')).toBe(stamp)
+    expect(g.getNodeAttribute('o1', 'metadata')).toEqual({
+      occurrences: [{ timestamp: stamp }],
+    })
+  })
+})
+
 describe('computeNodeState — Plan 03 checkpoint round 2 semantics', () => {
   // Semantic: "what's checked is what's visible". Empty Set = nothing.
   // baseStore seeds selectedClasses with the canonical test class so the
