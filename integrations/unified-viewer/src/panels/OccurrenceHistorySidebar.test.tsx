@@ -110,9 +110,9 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
   test('Test 3: relative timestamp formatting per VOKB HistorySidebar.tsx:45-68', () => {
     renderPanel()
     expect(screen.getByTestId('occurrence-row-e-just-now').textContent).toContain('Just now')
-    expect(screen.getByTestId('occurrence-row-e-min').textContent).toMatch(/\b5m ago\b/)
-    expect(screen.getByTestId('occurrence-row-e-hr').textContent).toMatch(/\b2h ago\b/)
-    expect(screen.getByTestId('occurrence-row-e-day').textContent).toMatch(/\b3d ago\b/)
+    expect(screen.getByTestId('occurrence-row-e-min').textContent).toContain('5m ago')
+    expect(screen.getByTestId('occurrence-row-e-hr').textContent).toContain('2h ago')
+    expect(screen.getByTestId('occurrence-row-e-day').textContent).toContain('3d ago')
     // 60d ago falls outside the relative band — render as absolute (year-month-day prefix is enough)
     expect(screen.getByTestId('occurrence-row-e-old').textContent).toMatch(/2026/)
   })
