@@ -1,5 +1,7 @@
 // PATTERN SOURCE: 45-PATTERNS.md § useKeyboardShortcuts.ts
+//   + 55-11-PLAN.md Task 1 (registerSequence extension — closes W-6)
 // CONTRACT: 45-UI-SPEC.md § Keyboard table — `/` `Esc` `?` `f`
+//   + 55-UI-SPEC.md §10 — `g h` two-key sequence (hierarchy focus search)
 //
 // Single document-level keydown listener. Reads the Zustand store
 // imperatively so the handlers always see fresh state without re-renders.
@@ -12,6 +14,15 @@
 // The hook exposes a `registerSearchInputRef(ref)` so FilterRail can
 // hand us the search input ref; `/` calls preventDefault() then
 // `searchInputRef.current?.focus()` so the slash never enters the input.
+//
+// Phase 55-11 extension:
+//   `registerSequence(key1, key2, handler, opts?)` registers a two-key
+//   sequence. When the user presses `key1` then `key2` within `windowMs`
+//   (default 800ms) AND no <input>/<textarea>/contenteditable is focused,
+//   the handler fires. A third key in between cancels the sequence.
+//   Returns an `unregister()` function for useEffect cleanup. The
+//   single document keydown listener owns all sequence state — components
+//   never wire ad-hoc per-instance state machines (closes plan-checker W-6).
 
 import { useEffect, useRef } from 'react'
 import { useViewerStore } from '@/store/viewer-store'
@@ -32,9 +43,29 @@ export interface KeyboardShortcutBindings {
   onCloseHelpDialog: () => boolean
 }
 
+interface SequenceRegistration {
+  key2: string
+  handler: () => void
+  windowMs: number
+}
+
 export interface KeyboardShortcutHandle {
   /** FilterRail registers its search <input> here so `/` can focus it. */
   registerSearchInputRef: (input: HTMLInputElement | null) => void
+  /**
+   * Register a two-key sequence (e.g., 'g h'). The handler fires when the
+   * user presses key1 then key2 within `windowMs` (default 800ms). The
+   * sequence is SKIPPED when an <input>/<textarea>/contenteditable has
+   * focus, so typing 'github' or 'graph' into the search box does NOT
+   * trigger `g h`. Returns an unregister function suitable for useEffect
+   * cleanup.
+   */
+  registerSequence: (
+    key1: string,
+    key2: string,
+    handler: () => void,
+    opts?: { windowMs?: number },
+  ) => () => void
 }
 
 function isInputFocused(): boolean {
@@ -44,10 +75,48 @@ function isInputFocused(): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement).isContentEditable === true
 }
 
+// Module-level sequence registry. We keep this at module scope (not inside
+// the hook) so multiple `useKeyboardShortcuts` callers within the same
+// page can each register without re-installing the document listener — the
+// hook itself still installs/uninstalls its own document listener per call
+// site; the registry is just a shared lookup.
+const sequenceRegistry: Map<string, SequenceRegistration[]> = new Map()
+
+function registerSequenceImpl(
+  key1: string,
+  key2: string,
+  handler: () => void,
+  opts?: { windowMs?: number },
+): () => void {
+  const windowMs = opts?.windowMs ?? 800
+  const reg: SequenceRegistration = { key2, handler, windowMs }
+  const list = sequenceRegistry.get(key1) ?? []
+  list.push(reg)
+  sequenceRegistry.set(key1, list)
+  return () => {
+    const current = sequenceRegistry.get(key1) ?? []
+    const next = current.filter((r) => r !== reg)
+    if (next.length === 0) sequenceRegistry.delete(key1)
+    else sequenceRegistry.set(key1, next)
+  }
+}
+
+/**
+ * Test-only helper: clear all sequence registrations. Component test suites
+ * that register sequences via `onReady` harnesses should call this in
+ * `beforeEach` to guarantee isolation across tests — since the registry is
+ * module-level (shared across the page) any leaked registrations would
+ * accumulate across the file's test bodies.
+ */
+export function _resetSequenceRegistryForTests(): void {
+  sequenceRegistry.clear()
+}
+
 /**
  * Global keyboard shortcut handler. Mount ONCE per route (typically inside
  * ViewerCore). The hook returns a handle exposing `registerSearchInputRef`
- * which FilterRail uses to hand over its search input ref.
+ * which FilterRail uses to hand over its search input ref, and
+ * `registerSequence` for two-key shortcuts (Phase 55-11).
  *
  * Each call to the hook installs/uninstalls its own listener — calling it
  * twice on the same page would double-fire handlers.
@@ -61,7 +130,23 @@ export function useKeyboardShortcuts(
   const bindingsRef = useRef(bindings)
   bindingsRef.current = bindings
 
+  // Pending sequence state — lives in a ref so the listener doesn't have
+  // to re-bind every time a key fires.
+  const pendingSequenceRef = useRef<{
+    key1: string
+    expiresAt: number
+  } | null>(null)
+  const sequenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
+    function clearPendingSequence() {
+      pendingSequenceRef.current = null
+      if (sequenceTimerRef.current !== null) {
+        clearTimeout(sequenceTimerRef.current)
+        sequenceTimerRef.current = null
+      }
+    }
+
     function onKeyDown(event: KeyboardEvent) {
       // Esc fires regardless of focus (UI-SPEC override)
       if (event.key === 'Escape') {
@@ -89,13 +174,76 @@ export function useKeyboardShortcuts(
         return
       }
 
-      // The remaining shortcuts (`/` `?` `f`) skip when an input/textarea
-      // has focus, so the user can type these characters normally.
-      if (isInputFocused()) return
+      // The remaining shortcuts (`/` `?` `f` + registered sequences) skip
+      // when an input/textarea has focus, so the user can type these
+      // characters normally.
+      if (isInputFocused()) {
+        // Also clear any pending sequence — leaving focused-input typing
+        // mid-sequence would otherwise risk a spurious match when focus
+        // returns to document.body.
+        clearPendingSequence()
+        return
+      }
 
       // Allow modifier-combined keys (Cmd-/, Ctrl-/, etc.) to fall through
       // to the browser — only the unmodified key triggers the shortcut.
-      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        // Also clear pending sequence on modifier — modifier combos are
+        // not part of any sequence binding.
+        clearPendingSequence()
+        return
+      }
+
+      // ---- Two-key sequence handling (Phase 55-11) ----
+
+      // If a sequence is pending, check whether the current key matches
+      // any registered second key for that prefix.
+      if (pendingSequenceRef.current !== null) {
+        const { key1, expiresAt } = pendingSequenceRef.current
+        if (Date.now() <= expiresAt) {
+          const regs = sequenceRegistry.get(key1) ?? []
+          const match = regs.find((r) => r.key2 === event.key)
+          if (match) {
+            event.preventDefault()
+            clearPendingSequence()
+            try {
+              match.handler()
+            } catch (err) {
+              Logger.error(
+                Logger.Categories.PANELS,
+                `Sequence handler '${key1} ${event.key}' threw: ${(err as Error).message}`,
+              )
+            }
+            Logger.debug(Logger.Categories.PANELS, `Sequence fired: ${key1} ${event.key}`)
+            return
+          }
+        }
+        // Either expired or the second key doesn't match — clear and fall
+        // through. The new key might be a fresh sequence prefix below.
+        clearPendingSequence()
+      }
+
+      // If the new key registers as a sequence prefix, start a pending
+      // window. Note: this also runs for the single-character shortcuts
+      // (`/`, `?`, `f`) since those don't appear in the registry by
+      // default.
+      const startRegs = sequenceRegistry.get(event.key)
+      if (startRegs && startRegs.length > 0) {
+        // Use the longest windowMs across registrations for this prefix.
+        const windowMs = startRegs.reduce((max, r) => Math.max(max, r.windowMs), 0)
+        pendingSequenceRef.current = {
+          key1: event.key,
+          expiresAt: Date.now() + windowMs,
+        }
+        if (sequenceTimerRef.current !== null) {
+          clearTimeout(sequenceTimerRef.current)
+        }
+        sequenceTimerRef.current = setTimeout(clearPendingSequence, windowMs)
+        // Do NOT preventDefault here — the user may also be using `g` as a
+        // regular keypress; we only commit the sequence on the second key.
+        // BUT: if this same key is also a registered single-char shortcut
+        // (below), let the switch run.
+      }
 
       switch (event.key) {
         case '/':
@@ -125,12 +273,20 @@ export function useKeyboardShortcuts(
     }
 
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      if (sequenceTimerRef.current !== null) {
+        clearTimeout(sequenceTimerRef.current)
+        sequenceTimerRef.current = null
+      }
+      pendingSequenceRef.current = null
+    }
   }, [])
 
   return {
     registerSearchInputRef: (input: HTMLInputElement | null) => {
       searchInputRef.current = input
     },
+    registerSequence: registerSequenceImpl,
   }
 }

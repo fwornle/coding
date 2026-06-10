@@ -226,9 +226,12 @@ describe('FilterRail', () => {
   test('Phase 55-08: HierarchyNavigator lazy mount is PRESENT on coding', async () => {
     renderRail(makeApiClient(), vi.fn(), [], 'coding')
     await waitFor(() => {
+      // 55-11 overwrote the 55-08 placeholder with the real HierarchyNavigator
+      // (testid="hierarchy-navigator"). The fallback can also win briefly under
+      // jsdom test conditions — accept either as proof the slot is mounted.
       const fallback = screen.queryByTestId('hierarchy-navigator-fallback')
-      const placeholder = screen.queryByTestId('hierarchy-navigator-placeholder')
-      expect(fallback || placeholder).not.toBeNull()
+      const real = screen.queryByTestId('hierarchy-navigator')
+      expect(fallback || real).not.toBeNull()
     })
   })
 

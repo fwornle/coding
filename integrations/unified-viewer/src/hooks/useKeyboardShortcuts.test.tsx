@@ -23,7 +23,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, act } from '@testing-library/react'
 import { useEffect, useState } from 'react'
-import { useKeyboardShortcuts } from './useKeyboardShortcuts'
+import { useKeyboardShortcuts, _resetSequenceRegistryForTests } from './useKeyboardShortcuts'
 import { useViewerStore } from '@/store/viewer-store'
 
 interface HarnessProps {
@@ -61,6 +61,7 @@ function Harness({
 
 describe('useKeyboardShortcuts', () => {
   beforeEach(() => {
+    _resetSequenceRegistryForTests()
     useViewerStore.setState({
       selectedNodeId: null,
       selectedEdgeId: null,
@@ -73,6 +74,7 @@ describe('useKeyboardShortcuts', () => {
   })
 
   afterEach(() => {
+    _resetSequenceRegistryForTests()
     vi.useRealTimers()
   })
 

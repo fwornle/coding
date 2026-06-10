@@ -67,7 +67,8 @@ function makeEntities(): Entity[] {
 }
 
 beforeEach(() => {
-  // Reset store
+  // Reset store (cast: `entities` is not on ViewerState — store is driven via
+  // the prop in production; in tests we drive via setState as the harness).
   useViewerStore.setState({
     selectedNodeId: null,
     selectedEdgeId: null,
@@ -76,9 +77,9 @@ beforeEach(() => {
     selectedClasses: new Set<string>(),
     theme: 'light',
     filterRailCollapsed: false,
-    entities: makeEntities() as unknown as Entity[],
     hierarchySubtreeFilter: null,
-  })
+    ...({ entities: makeEntities() } as Record<string, unknown>),
+  } as Parameters<typeof useViewerStore.setState>[0])
 })
 
 afterEach(() => {
@@ -162,7 +163,7 @@ describe('HierarchyNavigator', () => {
       entities: [
         { id: 'noise', name: 'NotInTree', ontologyClass: 'Pattern' } as unknown as Entity,
       ],
-    })
+    } as unknown as Parameters<typeof useViewerStore.setState>[0])
     render(<HierarchyNavigator system="coding" />)
     expect(screen.getByText(/No hierarchy data yet/)).toBeTruthy()
     expect(screen.getByText(/Run wave-analysis to populate/)).toBeTruthy()
