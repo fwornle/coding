@@ -41,13 +41,52 @@ $ curl -s http://localhost:8080/api/relations | jq '[.relations[].relation_type]
 
 So the relations exist somewhere — just not in the km-core unified backing store / export. Phase 55's unified viewer is the messenger surfacing this; the bug is upstream.
 
-## Likely root causes
+## Root cause (confirmed 2026-06-10T21:50Z via investigation)
 
-1. **wave-analysis persist step doesn't write relations to LevelDB.** The wave controller may be writing entities only and skipping the relation graph. Trace `wave-controller.ts` `persistEntities` / `persistRelations` and confirm relations actually land in the LevelDB graph.
-2. **`exportToGraphology()` (or the equivalent exporter) drops relations.** The store may have edges but the export step iterates only nodes. Confirm whether the LevelDB graph itself has edges; if yes, the bug is in the exporter.
-3. **Phase 42.x ingest migration may have lost relations.** When the km-core migration from the legacy SQLite store ran, the relation table may have been dropped or unmapped.
+**The Phase 44 migration ported entity nodes but NOT relations from the legacy store into the new km-core LevelDB. VKB at :8080 still reads from a frozen 2026-05-24 legacy export, which is why it still shows 1124 relations and looks "fine"; the unified viewer correctly reads the new km-core store, which never received the relations.**
 
-Likely class: same as the "Embeddings not reaching GraphDB" item in MEMORY.md / Phase 10 — relations don't reach the unified backing store, just like embeddings.
+### Evidence chain
+
+| Source | Schema | Nodes | Edges | Date |
+|--------|--------|-------|-------|------|
+| `.data/exports/coding.json` (read by VKB at :8080 via `memory-visualizer/api-server.py` → `lib/vkb-server/db-query-cli.js`, symlinked at `.data/knowledge-export/coding.json`) | LEGACY `{entities, relations}` with `from/to/relationType` keys | 928 | **1124** | 2026-05-24 (frozen) |
+| `.data/knowledge-graph/leveldb/` (live km-core store; read by `/api/v1/*` on :12436 and by `/viewer/coding` on :5173) | km-core Phase 44 graphology `{nodes, edges, attributes, options}` | 1177 | **0** | 2026-06-10 (live) |
+| `.data/knowledge-graph.legacy-pre-42.2.bak*` (both backups) | km-core graphology, opened via `GraphKMStore` | 0 | 0 | empty stubs (12K / 9.5M files but `store.open()` reports 0/0) |
+
+Key facts:
+- The two schemas have **zero node-key overlap** — the legacy export uses entity-name keys; the new store uses UUIDv7 keys. So a relation in the legacy export referring to `from: "CollectiveKnowledge"` does NOT resolve to the new node `019e5559-69cf-75e2-9e01-2bdc4bdab936` (also named CollectiveKnowledge) without a name-resolution pass.
+- `/api/v1/stats` → `{nodeCount: 1177, edgeCount: 0, orphanCount: 1177, connectivity: 0}`. The unified viewer is faithfully reporting reality.
+- `/api/v1/snapshots` returns two snapshots: `phase-44-verify-A` (2026-06-04) and `phase-44-verify-B` (2026-06-05). Both inspected via `git show --stat` are **metadata-only commits** (no files diff in git — actual snapshot data lives elsewhere). Both already had 0 edges when created.
+- The store's `lastUpdated: 2026-06-10T19:30:36Z` — it IS being written to. Live ObservationWriter / Digest / Insight paths add nodes (consistent with node count growth 928 → 1177) but **none of them call `addRelation`**. Verified via grep:
+  - `src/live-logging/ObservationWriter.js` — zero `addRelation` calls
+  - `src/observations/`, `src/consolidation/` — zero `addRelation` calls
+  - `integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts` — zero `addRelation` calls
+- The only live edge-writing paths in the codebase are:
+  - `wave-controller.persistWithKmCore` (batch wave-analysis pipeline)
+  - `lib/km-core/dist/adapters/online/reprojectFromOnlineStore.js:295`
+  - `lib/km-core/dist/maintenance/mergeEntities.js:157, 193`
+  - REST `POST /api/v1/relations`
+- **Last `wave-analysis` trace: 2026-05-29** (12 days ago). The traces store summaries only; the recorded `entityCounts` per wave are non-zero (wave1=8, wave2=23, wave3=19), but the trace doesn't reveal whether `relationshipsStored` was non-zero. We can't directly check from disk evidence whether the May-29 wave persisted any relations.
+
+### Diagnosis split
+
+Two non-exclusive possibilities:
+
+**A) "Run wave-analysis" path.** If wave-controller's relation persist is functional today, then simply running a fresh `wave-analysis` will repopulate edges (`contains` from anchor-pass + agent-emitted relationships). The store's apparent "edges=0" reflects "wave-analysis hasn't run since the schema cutover."
+
+**B) "Persist path is broken" path.** If wave-controller's relation persist silently fails (or `storeRelationship` throws but is swallowed by the try/catch wrapper at `wave-controller.ts:2466`), then running wave-analysis won't fix it. The `relationshipErrors` count would be high in the logs but the trace summary wouldn't necessarily surface it.
+
+The fastest disambiguation is to **run wave-analysis end-to-end and watch the docker logs for the `[WaveController] km-core persistence complete` line + check `relationshipsStored` count**.
+
+### Why VKB looks healthy and unified doesn't
+
+VKB at :8080 (`memory-visualizer`) is a frozen artifact. It reads `.data/exports/coding.json` (last refreshed 2026-05-24 by `chore: refresh knowledge-graph export` commit `576122898`) and has 1124 relations baked in. It has not been re-synced from the post-Phase-44 km-core store. So:
+
+- VKB shows a connected graph because it's looking at a 2.5-week-old snapshot
+- Unified viewer shows a disconnected graph because it's looking at live truth
+- The unified viewer is the more honest of the two; VKB is showing stale data
+
+After this bug is fixed, VKB and unified-viewer would converge — or VKB should be retired in favor of unified.
 
 ## Reproduction
 
@@ -79,17 +118,63 @@ Every consumer of the Phase 44 km-core unified API is currently rendering a rela
 
 This is the **largest single blocker** to Phase 55 closing — bigger than the OKB contract bridge, bigger than any of the C-1..C-8 VKB-feature gaps.
 
-## Suggested first step
+## Two viable fix paths
 
-1. Read `wave-controller.ts` `persistEntities` / `persistRelations` / `persistFromOperator`. Confirm whether `persistRelations` is even called, and whether it writes to LevelDB.
-2. Probe LevelDB directly (not via the export):
-   ```bash
-   ls -la .data/knowledge-graph/leveldb/
-   # then use a leveldb CLI to count edges OR add a debug script
-   ```
-3. If LevelDB has edges but `general.json` doesn't → bug is in the exporter.
-4. If LevelDB has no edges → bug is in the persist step (wave-analysis isn't writing relations).
-5. Compare to Phase 41 (online-learning adapter) — does the online ingest persist relations correctly?
+### Path 1 — Run wave-analysis, see if edges populate (cheapest disambiguation, ~5 min)
+
+```bash
+# Reset sticky debug state (MEMORY.md warning)
+curl -s -X POST http://localhost:3033/api/ukb/mock-llm        -H "Content-Type: application/json" -d '{"enabled": false}'
+curl -s -X POST http://localhost:3033/api/ukb/single-step-mode -H "Content-Type: application/json" -d '{"enabled": false}'
+
+# Trigger wave-analysis (PRODUCTION mode, not debug)
+# Via MCP: mcp__semantic-analysis__execute_workflow workflow_name="wave-analysis" async_mode=true parameters={"team":"coding"}
+
+# Watch docker logs in another terminal
+docker logs -f coding-services 2>&1 | grep -E "WaveController|persistence complete|relationshipsStored"
+
+# After completion, re-check:
+curl -s http://localhost:12436/api/v1/stats | python3 -m json.tool
+# If edgeCount > 0 → Path 1 worked, this is just "wave hasn't run since cutover"
+# If edgeCount == 0 → Path 2 needed (persist path is broken)
+```
+
+### Path 2 — Backfill from legacy export, then debug persist (if Path 1 reveals broken persist)
+
+```bash
+# Two sub-paths:
+# 2a) Write a backfill script that reads .data/exports/coding.json (1124 legacy relations),
+#     name-resolves from/to against the live km-core store (entity name → UUIDv7), and
+#     issues store.addRelation() for each. This restores connectivity immediately.
+#     Risk: legacy relations are 17 days old; some entities may have been renamed/merged
+#     and the legacy from/to names won't resolve cleanly. Errors should be logged not thrown.
+#
+# 2b) Bisect persist path. Read wave-controller.persistWithKmCore (line 2380+ in src/agents/wave-controller.ts).
+#     The relationship sweep iterates over relationships (line 2450) and calls
+#     this.kmCoreAdapter.storeRelationship → store.addRelation. If storeRelationship
+#     throws and the try/catch at 2466 swallows it, the trace would still show
+#     "completed". Add structured logging of relationshipErrors > 0 to surface the swallow.
+#     Look at storeRelationship in km-core-adapter.ts:493-516 — it requires that BOTH
+#     from-entity and to-entity already exist in the store. If wave persists entities in
+#     parallel and the relationship sweep runs before the entity sweep completes for some
+#     entity, the findEntityByName fails. That would explain partial-or-zero edge persist.
+```
+
+## Suggested investigation order
+
+1. **Run Path 1 first.** It's the cheapest disambiguator.
+2. **Read MEMORY.md for the 2026-05-26 "Knowledge Base Edge Regression Root Cause Identified and Fixed" digest details.** That fix may have been reverted by a subsequent commit (worth checking `git log --all --grep="edge"` since 2026-05-26 for any revert).
+3. **If Path 1 doesn't restore edges:** spawn a `/gsd-debug` session focused on `wave-controller.persistWithKmCore` relationship sweep. The hypothesis to test first is "storeRelationship is throwing on findEntityByName because the entity sweep hasn't fully committed before the relationship sweep starts."
+
+## Why this matters (updated)
+
+Without edges, ALL unified-viewer surfaces that depend on graph topology are broken:
+- KG mode renders a shotgun blast of 1177 orphans
+- Issue Triage (OKB) can't walk Symptoms / Root Causes / Resolutions chains because there are no edges
+- Trending Patterns can't show entity → trend relationships
+- HierarchyNavigator can't render the Project → Component → SubComponent → Detail tree
+
+This is **the single largest blocker** to Phase 55's parity goal. The 8 VKB-feature gaps and the 6 OKB-feature gaps in 55-VERIFICATION.md are downstream cosmetics by comparison.
 
 ## Scope
 
