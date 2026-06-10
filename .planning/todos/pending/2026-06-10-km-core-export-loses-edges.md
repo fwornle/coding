@@ -120,7 +120,40 @@ This is the **largest single blocker** to Phase 55 closing — bigger than the O
 
 ## Two viable fix paths
 
-### Path 1 — Run wave-analysis, see if edges populate (cheapest disambiguation, ~5 min)
+### Path 1 — TRIED 2026-06-10T19:53Z — FAILED INSTANTLY (and the failure IS the diagnosis)
+
+Triggered wave-analysis via `mcp__semantic-analysis__execute_workflow` with `{workflow_name: "wave-analysis", async_mode: true, parameters: {team: "coding"}}`. Sticky debug state reset first. Workflow runner spawned PID 23747 inside coding-services container, lasted <700ms, exit code 1.
+
+Failure log (`/coding/.data/workflow-logs/wf_1781121216243_lqju8p.log`):
+```
+[2026-06-10T19:53:37.040Z] ERROR: [WaveController] km-core adapter bootstrap failed (fatal — no legacy fallback)
+  error: "Database failed to open"
+[2026-06-10T19:53:37.040Z] ERROR: [WaveController] Fatal error during wave execution
+  error: "Database failed to open"
+[2026-06-10T19:53:37.051Z] EXIT: code=1
+```
+
+Root cause: **LevelDB lock contention.** Phase 44 Plan 12 made `obs-api` the single owner of `.data/knowledge-graph/leveldb/` to prevent concurrent-opener WAL corruption. That obs-api process runs continuously on the HOST and holds an exclusive LevelDB write lock 24/7. The wave-analysis pipeline runs INSIDE the coding-services Docker container, and `WaveController` initialization opens its own `GraphKMStore` against the same `.data/knowledge-graph/leveldb/` path via the bind-mount. Result: `LEVEL_LOCKED` → `Database failed to open` → wave-controller bootstrap aborts before any agent runs.
+
+**Implication:** wave-analysis has been STRUCTURALLY BROKEN since the Phase 44 cutover (~2026-06-04). The "last successful run was 2026-05-29" timing exactly matches the pre-cutover state. Every attempt since cutover has failed at bootstrap. No edges have been added since.
+
+This also explains the earlier prober probe failure: when I tried `node scripts/.tmp-probe-kmstore-edges.mjs` earlier in this investigation, it threw the same `Database failed to open` / `LEVEL_LOCKED` error. obs-api on host is grabbing the lock the moment the container starts (or never releases it across runs).
+
+The TODO has thus pivoted from "data integrity bug" to "wave-analysis pipeline is structurally incompatible with the Phase 44 single-owner design." Both are true; the single-owner conflict is the IMMEDIATE blocker. The Phase 44 migration not porting legacy relations is a SEPARATE prior bug — even if Path 2 backfill restored edges, every subsequent wave-analysis run would still fail until the lock contention is resolved.
+
+### Path 1.5 — Resolved fix paths (in priority order)
+
+Three options for the lock contention:
+
+**1.5a — Wave-analysis pushes through obs-api REST.** Replace `WaveController`'s direct `GraphKMStore` init with calls to `POST /api/v1/relations` (and `POST /api/v1/entities` if needed). Same API contract the unified-viewer uses. Architecturally clean. Estimated change: ~1 day in `wave-controller.ts` + `km-core-adapter.ts` swap.
+
+**1.5b — Shared GraphKMStore handle via IPC.** obs-api exposes a Unix domain socket or in-process RPC; wave-controller connects to that instead of opening LevelDB directly. More invasive; touches km-core itself.
+
+**1.5c — Operational workaround (NOT a real fix).** Stop obs-api → run wave-analysis → restart obs-api. Works once. Leaves the structural bug. Useful as a one-shot to get edges populated NOW while 1.5a is being planned.
+
+### Path 2 — Backfill from legacy export, then debug persist (if Path 1 reveals broken persist)
+
+(Still valid as a complementary fix to repopulate the 1124 pre-cutover legacy relations into the new graph schema with name-resolution. Should be sequenced AFTER 1.5a so the new wave-analysis adds NEW edges on top of the backfilled legacy ones.)
 
 ```bash
 # Reset sticky debug state (MEMORY.md warning)
