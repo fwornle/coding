@@ -145,7 +145,7 @@ describe('LslTimelineStrip', () => {
     try {
       await waitFor(() => expect(r.fetchImpl).toHaveBeenCalled())
       const initialCalls = (r.fetchImpl as unknown as { mock: { calls: [string][] } }).mock.calls.length
-      const btn24h = screen.getByRole('radio', { name: /24h/ })
+      const btn24h = screen.getByLabelText('24 hours')
       act(() => {
         fireEvent.click(btn24h)
       })
@@ -262,7 +262,7 @@ describe('LslTimelineStrip', () => {
         expect(screen.getByText(/No sessions recorded in this time window/)).toBeTruthy()
       })
       // Toggle group still visible
-      expect(screen.getByRole('radio', { name: /24h/ })).toBeTruthy()
+      expect(screen.getByLabelText('24 hours')).toBeTruthy()
     } finally {
       r.restore()
     }

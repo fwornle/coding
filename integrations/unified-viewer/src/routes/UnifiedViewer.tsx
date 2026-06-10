@@ -43,6 +43,7 @@ import { SidePanel } from '@/panels/SidePanel'
 import { Footer } from '@/panels/Footer'
 import { StatsBar } from '@/panels/StatsBar'
 import { LegendPanel } from '@/panels/LegendPanel'
+import LslTimelineStrip from '@/panels/coding/LslTimelineStrip'
 import {
   EmptyFilterState,
   EmptyNoDataState,
@@ -320,6 +321,9 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
           </main>
           <SidePanel apiClient={apiClient} system={system} />
         </div>
+        {/* Phase 55-11: LslTimelineStrip (Surface #14) — coding-only.
+            Mounted between the main content row and the Footer per UI-SPEC §6. */}
+        {system === 'coding' && <LslTimelineStrip system={system} apiClient={apiClient} />}
         <Footer total={entities.length} visible={visibleCount} edges={relations.length} />
         <KeyboardHelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} />
       </div>
