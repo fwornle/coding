@@ -186,4 +186,16 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     // plan — only the import here is swapped).
     expect(src).not.toMatch(/TriagePlaceholder/)
   })
+
+  test('Phase 55-11: LslTimelineStrip is mounted (coding-only) between main content row and Footer', async () => {
+    // Source-grep audit: UnifiedViewer.tsx imports LslTimelineStrip and gates
+    // it on system === 'coding'.
+    const { readFileSync } = await import('node:fs')
+    const path = await import('node:path')
+    const filePath = path.resolve(process.cwd(), 'src/routes/UnifiedViewer.tsx')
+    const src = readFileSync(filePath, 'utf8')
+    expect(src).toMatch(/LslTimelineStrip/)
+    // The mount line must be coding-gated and inside the JSX (not just import).
+    expect(src).toMatch(/system === ['"]coding['"][^]*LslTimelineStrip/)
+  })
 })
