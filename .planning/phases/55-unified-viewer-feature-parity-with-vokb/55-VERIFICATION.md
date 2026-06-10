@@ -283,3 +283,81 @@ The walkthrough is not a total loss — `/viewer/coding` (where the coding KG is
 ### Lesson for future verifier work
 
 Side-by-side comparison MEANS open both viewers, walk a real user task end-to-end on each (e.g. "find the AWS Credential Authentication Failure incident, see its 3 symptoms + 4 root causes + 4 resolutions"), and check whether the same task is doable in both. Testid-presence + baseline-screenshot-write is necessary but not sufficient. Add this to the gsd-verifier prompt / `/gsd-ui-review` checklist.
+
+---
+
+## /viewer/coding vs VKB :8080 — Honest Walk (2026-06-10T21:30Z)
+
+Following the OKB rollback, walked `/viewer/coding` end-to-end against VKB at :8080 (the legacy coding KG viewer, "DDD Coding Insights Visualizer"). Methodology: open both viewers, walk a real user task ("find LLM Token Usage, see its detail, check its relationships"), screenshot both sides.
+
+Evidence archived in `tests/e2e/unified-viewer/55-fixtures/expected-vokb-screenshots/`:
+- `vkb-coding-landing-2026-06-10.png` — VKB landing with 928 entities / 1124 relations / History feed (936 insights)
+- `vkb-coding-entity-detail-llmtoken-2026-06-10.png` — VKB with "LLM Token Usage Tracking" selected: full Node Details panel + selected-node highlight ring
+- `unified-coding-landing-2026-06-10b.png` — Unified landing with 1115 nodes / 0 edges / 1115 orphans / 0% connectivity
+- `unified-coding-entity-detail-2026-06-10b.png` — Unified with "Git Security — OAuth Token..." selected: Entity tab with Description / Purpose / Architecture / Key Files
+
+### The big finding: the data is broken, not the viewer
+
+`/viewer/coding`'s StatsBar reports **edges: 0 / orphans: 1115 / connectivity: 0%** — and it is correct. The unified viewer is faithfully showing what km-core gives it:
+
+```
+$ python3 -c "import json; d=json.load(open('.data/knowledge-graph/exports/general.json')); print('nodes:', len(d['nodes']), 'edges:', len(d['edges']))"
+nodes: 1174  edges: 0
+
+$ curl -s http://localhost:12436/api/v1/relations
+{"success":true,"data":[]}
+```
+
+The canonical Phase 44 km-core export `.data/knowledge-graph/exports/general.json` has **zero edges**. The `/api/v1/relations` endpoint correctly returns an empty list. VKB at :8080 shows 1124 relations because it reads from its **own legacy SQLite store**:
+
+```
+$ curl -s http://localhost:8080/api/relations | jq '.relations | length, (group_by(.relation_type) | map({(.[0].relation_type): length}) | add)'
+1000
+{"contains": 791, "related_to": 201, "parent-child": 7, "includes": 1}
+```
+
+Two different data sources, only one populated with edges. The unified viewer correctly inherits the broken side because Phase 44 wired it to km-core.
+
+**This is a v7.1 KM-Core data integrity bug, not a Phase 55 UI bug.** Phase 55 is the messenger, not the perpetrator. Either:
+- the wave-analysis pipeline isn't persisting relations to LevelDB, OR
+- `exportToGraphology()` is dropping them on export.
+
+Likely the same class of issue as the open "Embeddings not reaching GraphDB" item from Phase 10 / current MEMORY.md notes — relations don't reach the unified backing store, just like embeddings.
+
+### Real VKB-only features missing from unified `/viewer/coding`
+
+Even setting aside the data bug, VKB has surfaces unified doesn't:
+
+| # | VKB feature | Unified equivalent | Severity |
+|---|-------------|--------------------|----------|
+| C-1 | **Learning Source toggle** (Batch / Online / Combined) — lets the user switch between the deterministic batch-analysis output, the streaming online-learning output, and their union | None — unified shows only one fused view | MEDIUM (may be obsolete post-KM-Core unification; needs scope clarification) |
+| C-2 | **Teams / Views filter** (Coding 308 / Raas / UI / General with live counts) — multi-tenant team partitioning | None — unified is implicitly single-team | MEDIUM (multi-tenant is real; missing) |
+| C-3 | **History / Insights feed** (right sidebar, 936 entries, newest-first, each row: title + type + date + team + Manual/Auto badge) — real audit feed of recently added insights | LslTimelineStrip serves a different purpose (LSL session activity, not entity history) | MEDIUM (auditability gap) |
+| C-4 | **Standalone Entity Type + Relation Type filters** as separate facets in the filter rail | Folded into OntologyFilter ("Project / Component / SubComponent / Detail / Digest / Observation / Insight / …") | LOW (design choice, arguably an improvement) |
+| C-5 | **Inline node-color legend** at the top of the graph canvas ("Project · Component · SubComponent · Detail · Online/Auto · Has Insight Docs") — always visible | LegendPanel exists but is collapsed by default + has different structure | LOW (cosmetic UX gap) |
+| C-6 | **Provenance chips on Entity Detail** — `Source: online`, `Team: coding`, `Confidence: 100%` rendered as styled chips at top of Node Details panel | Unified shows class badge + version + dates, but the `Source` / `Team` / `Confidence` triple is not displayed as first-class chips | MEDIUM (provenance discoverability) |
+| C-7 | **Selected-node ring** on graph canvas — clear red ring around the active node, easy to spot in a dense layout | Unclear; need to confirm. If present, it's much subtler. | LOW |
+| C-8 | **Node label visibility** — VKB shows labels on every node by default, even at low zoom | Unified shows sparse labels (probably density-thresholded) | LOW (design choice) |
+
+### What `/viewer/coding` actually does well
+
+- StatsBar reports honest numbers (including the alarming `0% connectivity`) — does not paper over the data bug
+- Ontology Class filter is data-driven and shows real counts (Evidence 899, Pattern 101, SubComponent 347, Detail 312, Digest 153, Observation 137, Insight 82, …)
+- Search input applies live highlight to matching nodes in the graph canvas (green-tint)
+- EntityDetailPanel + EntityIdentityHeader render structured Description / Purpose / Architecture / Key Files for selected entities, with markdown formatting
+- LslTimelineStrip provides a session-activity surface VKB doesn't have (coding-only addition)
+- HierarchyNavigator, EtmTailSheet, WorkflowStatusPanel — coding-only additions, mounted
+
+### Verdict for `/viewer/coding`
+
+Unlike `/viewer/okb` which is a hard regression, `/viewer/coding` is **structurally and functionally adequate, blocked by upstream data**. The viewer works; the served data has no edges. The 8 VKB-feature gaps are real but secondary to the data bug — fixing the data bug would resolve the "shotgun blast of disconnected dots" appearance and re-enable the relationship-graph use cases that drive most of why anyone opens a knowledge-graph viewer.
+
+### Required scope to actually close Phase 55 (extended)
+
+Adding to the 6 OKB-side gaps above:
+
+7. **Fix km-core relations pipeline.** Either the wave-analysis persist step isn't writing relations to LevelDB, or `exportToGraphology()` drops them at export time. Trace the round-trip from relation creation → LevelDB → export → ApiClient consumption. (Likely the same root cause as the "Embeddings not reaching GraphDB" notes in MEMORY.md — relations don't reach the unified backing store.) Without this, `/viewer/coding` will continue to render a relation-less graph.
+8. **(Optional) Port Learning Source toggle** if the Batch/Online/Combined dichotomy is still meaningful post-unification, or document why it's obsolete in UI-SPEC and remove it from the parity expectations.
+9. **(Optional) Port Teams / Views filter** for multi-tenant team partitioning.
+10. **(Optional) Build Insights History feed** — right-sidebar audit feed of recently added insights with newest-first ordering, paginated, with the type + date + team + Manual/Auto provenance badges. Useful for "what's new in the KG today" review.
+11. **Add provenance chips** (Source / Team / Confidence) to EntityIdentityHeader, behind UI-SPEC §10 if not already specified.
