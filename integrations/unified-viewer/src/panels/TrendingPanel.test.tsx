@@ -106,8 +106,16 @@ describe('TrendingPanel', () => {
       expect(screen.getByText('OOM kill loop')).toBeInTheDocument()
       expect(screen.getByText('Stale lease cache')).toBeInTheDocument()
 
-      // Each row carries a score-coded dot
-      const rows = screen.getAllByTestId(/^trending-row-/)
+      // Each row carries a score-coded dot. The row's own testid is exactly
+      // `trending-row-<nodeId>` — sub-elements use suffixes (`-dot`,
+      // `-sparkline`, etc.) so filter to the row-level testid only.
+      const allRowMatches = screen.getAllByTestId(/^trending-row-/)
+      const rows = allRowMatches.filter((el) => {
+        const tid = el.getAttribute('data-testid') || ''
+        // Row testid matches `trending-row-<id>` with NO further `-suffix`.
+        return /^trending-row-[^-]+(?:-[^-]+)*$/.test(tid)
+          && !/-dot$|-sparkline$|-score-badge$|-trend-counts$/.test(tid)
+      })
       expect(rows).toHaveLength(3)
       for (const row of rows) {
         expect(row.querySelector('[data-testid$="-dot"]')).not.toBeNull()
