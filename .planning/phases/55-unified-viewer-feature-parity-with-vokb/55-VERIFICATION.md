@@ -1,9 +1,10 @@
 ---
 phase: 55-unified-viewer-feature-parity-with-vokb
 verified: 2026-06-10T09:00:00Z
-human_verified: 2026-06-10T17:55:00Z
-status: passed
-score: 10/10
+human_verified_attempt: 2026-06-10T17:55:00Z (FALSE POSITIVE — rolled back at 2026-06-10T18:10:00Z)
+status: human_needed
+score: 6/10
+score_correction: "Was 10/10 from automated grep + 16/16 testid presence probe. Both methodologies are insufficient — same false-positive class as Phase 45. Real visual side-by-side comparison shows /viewer/okb is a hard regression vs VOKB (broken stats, broken trends, wrong ontology filter, no RCA detail panel, empty graph). Re-scoring to 6/10 pending OKB-side rework."
 overrides_applied: 1
 overrides:
   - must_have: "Node shape encoding by entity type — distinct canvas shapes (square / diamond / circle) per entity class"
@@ -18,7 +19,7 @@ human_verification:
   - test: "Side-by-side visual comparison of unified viewer (/viewer/coding) vs VOKB at localhost:3002"
     expected: "All 16 UI-SPEC §7 surfaces are visually present: StatsBar, LayerFilter, DomainFilter, OntologyFilter, GraphToggles, TrendingPanel, IssueTriageView, EntityDetailPanel 4-sub-tabs, Relationships breakdown, Sources & Evidence, Occurrence History, LegendPanel, HierarchyNavigator (coding), LslTimelineStrip (coding), EtmTailSheet (coding), WorkflowStatusPanel (coding). Operator confirms 'roughly similar to VOKB' threshold is met for all 12 ported VOKB surfaces."
     why_human: "Pixel-level and layout-level parity requires a running VOKB instance at :3002 for comparison. Structural diff is infeasible via grep. Plan 55-13 Task 4 (checkpoint:human-verify) was explicitly deferred to post-merge operator review."
-    result: "passed (2026-06-10T17:55Z): 16/16 surfaces PRESENT on /viewer/coding via gsd-browser DOM probe against the real data-testid catalog. EntityDetailPanel + EntityIdentityHeader render after node selection (`CollectiveKnowledge` System class). Evolution/Confidence/Timeline sub-tabs + Tab-Markdown are conditionally rendered per their test contracts (visible when entity has merge history / markdown source); their conditional absence on a thin entity is by-design, not a gap. Side-by-side capture against VOKB at :3002 archived under tests/e2e/unified-viewer/55-fixtures/expected-vokb-screenshots/. Design-system divergence (shadcn theme + lighter density vs VOKB legacy layout) is allowed by UI-SPEC §3 — parity contract is structural + functional, not pixel-level. See 55-HUMAN-UAT.md item 2 for the per-surface table."
+    result: "FAILED — operator visual review on 2026-06-10T18:10Z rejected the prior 'passed' (testid-presence) verdict. The DOM-testid probe was the wrong methodology: 'element with testid X exists' is not the same as 'feature X works'. The probe was done on /viewer/coding only, where the bug is small; /viewer/okb is a hard regression vs VOKB. See 'Real Gaps Identified by Operator Visual Review' section below for the per-surface failure analysis. Required: OKB-side rework (data wiring + RCA detail panel + ontology filter + trends API) before re-attempting the gate."
   - test: "Verify OKB tab at /viewer/okb shows OKM data (RaaS / KPI-FW / business entities) not coding KG entities"
     expected: "When OKM Express is running at :8090, the OKB graph canvas shows entity types like Incident, RootCause, FailurePattern — not CodeAnalyzer, PersistenceAgent, ObservationWriter. The ApiClient base URL for OKB is confirmed as http://localhost:8090."
     why_human: "SC-1 requires live OKM Express data at :8090. The routing is verified statically (system-endpoints.ts), but the data content check requires both OKM Express running AND actual OKM entities in its km-core store."
@@ -31,9 +32,9 @@ human_verification:
 # Phase 55: Unified Viewer Feature Parity with VOKB — Verification Report
 
 **Phase Goal:** Bring the unified viewer to ≥90% feature parity with VOKB (the richer of the two legacy viewers), so VKB and VOKB users can actually migrate without losing functionality. Phase 45's routing layer is preserved as the scaffolding; this phase fills in the UI.
-**Verified:** 2026-06-10T09:00:00Z (automated) + 2026-06-10T17:55:00Z (human)
-**Status:** passed — 10/10 SCs achieved + 4/4 human-verification items resolved (2 passed, 1 documented-limitation tracked in todo, 1 implicit via E2E suite CAP-removal coverage)
-**Re-verification:** No — initial verification
+**Verified:** 2026-06-10T09:00:00Z (automated — insufficient methodology)
+**Status:** human_needed — automated checks and testid-presence probe both gave false positives. Operator visual comparison of /viewer/okb vs VOKB :3002 Issue Triage on 2026-06-10T18:10:00Z surfaced a hard regression that the entire E2E suite missed.
+**Re-verification:** Required after OKB-side rework lands (see "Real Gaps Identified by Operator Visual Review" section below).
 
 ---
 
@@ -229,3 +230,56 @@ The `human_needed` status is driven by the 4 items above that require running se
 
 _Verified: 2026-06-10T09:00:00Z_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## Real Gaps Identified by Operator Visual Review (2026-06-10T18:10Z)
+
+The prior 10/10 automated score + 16/16 testid-presence probe both gave false positives. Operator surfaced these gaps via the only methodology that actually works: side-by-side visual comparison of `/viewer/okb` vs VOKB :3002 Issue Triage. The screenshots are the source of truth; the testid catalog is not.
+
+### Hard regressions on `/viewer/okb` (vs VOKB Issue Triage)
+
+| # | Surface | VOKB :3002 (Issue Triage) | Unified `/viewer/okb` (:5173) | Severity |
+|---|---------|---------------------------|-------------------------------|----------|
+| 1 | Data wiring | Server connected, 1665 nodes / 18958 edges | Red banner: `Cannot reach okb API at http://localhost:8090` | BLOCKER |
+| 2 | StatsBar values | `1665 nodes · 18958 edges · 1321 evidence · 344 patterns · 44 orphans · 95% connected · LIVE` | All values render as `—`; `Could not load stats` in red | BLOCKER (downstream of #1) |
+| 3 | Trending Patterns | 10 named patterns with metric scores (`Missing Required Sensor Streams 0.0`, …) | `Trending Patterns: Could not load trends` (red text + Retry link) | BLOCKER (downstream of #1) |
+| 4 | Ontology Class filter | OKM's real classes with counts: `Component 199, DataAsset 152, Infrastructure 95, Job 22, Pipeline 25, Service 134, Session 25, Step 61` | Generic `Level L0/L1/L2/L3` checkboxes — NOT OKM's actual ontology | BLOCKER (wrong ontology schema entirely) |
+| 5 | RCA detail panel | Full styled three-section panel: `SYMPTOMS (3)`, `ROOT CAUSES (4)`, `RESOLUTIONS (4)`, each card showing the relationship type (`has symptom`, `derived from`, `has root cause`, `resolved by`) and the source domain (`raas`) | Does NOT EXIST in the unified viewer. Right panel only shows `Click any node to see its details.` placeholder. There is no analog of the RCA chain visualization that is the entire value-prop of VOKB's Issue Triage view. | BLOCKER (whole surface missing) |
+| 6 | Incident list | 31 incidents, each row: title, connection count, domain badge, date | Empty — no nodes load (downstream of #1) | BLOCKER (downstream of #1) |
+| 7 | View-in-Graph link | Top-right of incident detail: `View in Graph` button switches to KG mode focused on the entity | Not present in unified IssueTriageView | HIGH |
+
+### What the E2E suite missed (and why)
+
+The 9 spec files + 36 tests in `tests/e2e/unified-viewer/55-*.spec.ts` ALL passed/skipped for `/viewer/okb` despite the surface being broken. Sample false-positives:
+
+- `55-okb-routing.spec.ts › OKB tab fetches from localhost:8090 (NOT :3848)` — PASSES because the request target is correct. The fact that the response is 404 (contract mismatch) is not asserted.
+- `55-okb-routing.spec.ts › OKB body does not contain coding-typical entity names` — PASSES because the body is **empty**. The test does not assert positively that OKM entity names ARE present.
+- `55-stats-bar.spec.ts › StatsBar renders 6 metric cells + LIVE chip on /viewer/okb` — PASSES because the 6 cell `data-testid`s render even when the metric values are `—` / `Could not load stats`. No assertion on the cell text content.
+- `55-issue-triage.spec.ts › /viewer/coding?mode=triage mounts two-pane Triage view` — PASSES because `triage-left-pane` and `triage-right-pane` testids exist, even though neither pane carries the RCA detail panel (Symptoms / Root Causes / Resolutions) that defines what "Issue Triage" actually means in VOKB.
+- `55-side-by-side-screenshots.spec.ts › unified-viewer: every UI-SPEC §17 surface is present (selector contract)` — PASSES because it asserts CSS selector existence, NOT structural equivalence to the VOKB pixel reference (the actual side-by-side comparison test is the screenshot capture, which only writes baselines).
+
+The class of error: **structural presence asserted, functional correctness not.** Same trap Phase 45 fell into. The ROADMAP process amendment after Phase 45 ("for viewer-touching plans, the verifier MUST include a side-by-side screenshot comparison against the legacy viewer being replaced") was followed in letter (screenshots captured + archived) but not in spirit — no comparison was actually done between the two screenshots, only baselines written.
+
+### What still genuinely works (validated by operator visual review of `/viewer/coding`)
+
+The walkthrough is not a total loss — `/viewer/coding` (where the coding KG is the data source and Phase 44's `/api/v1/entities` contract IS served) genuinely renders most surfaces. StatsBar shows real values, the graph renders 1115 nodes, EntityDetailPanel + EntityIdentityHeader populate on node click. The coding-only additions (HierarchyNavigator, LslTimelineStrip, EtmTailSheet, WorkflowStatusPanel) all mount. So Phase 55 partially landed: the coding-system surfaces work, the OKB-system surfaces don't.
+
+### Required scope to actually close Phase 55
+
+(This is a list of gaps, not a plan. `/gsd-plan-phase 55 --gaps` or a follow-up Phase 56 should turn these into concrete plans.)
+
+1. **OKB data wiring.** Bridge the `/api/v1/entities` vs `/api/entities` contract mismatch (the existing TODO `2026-06-10-okm-express-api-contract-bridge.md`). Without this nothing else on /viewer/okb works.
+2. **OKB ontology integration.** The current `Level L0/L1/L2/L3` filter is wrong; it should reflect OKM's actual ontology hierarchy (Component / DataAsset / Infrastructure / Job / Pipeline / Service / Session / Step) with live counts. Need a `system=okb` overlay in OntologyFilter, or per-system ontology loader.
+3. **OKB trends endpoint.** OKM Express needs `/api/trends` or equivalent for the Trending Patterns sidebar; alternatively unified-viewer skips the panel for OKB. Either way, the current "Could not load trends" red banner is unacceptable.
+4. **RCA detail panel (the big one).** The Issue Triage value-add of VOKB is the Symptoms/Root Causes/Resolutions BFS-walk over `has_symptom` / `has_root_cause` / `resolved_by` edges, rendered as a structured three-section panel. Unified `IssueTriageView` has the mode switch and two-pane scaffolding but lacks this panel entirely. Spec, implement, test against VOKB's actual rendering.
+5. **`View in Graph` action.** Bridge from the incident detail back to the graph mode focused on the entity. Not a hard feature but it's part of how VOKB users actually triage.
+6. **E2E test rewrite.** The current OKB tests assert presence not behaviour. Rewrite them to:
+   - Positively assert OKM entity names appear in body (not "not coding names")
+   - Positively assert stats values are numeric (not "stats-bar testid exists")
+   - Positively assert RCA panel children exist when an incident is selected
+   - Add a real pixel-diff comparison gate against the VOKB reference screenshot for the Issue Triage view
+
+### Lesson for future verifier work
+
+Side-by-side comparison MEANS open both viewers, walk a real user task end-to-end on each (e.g. "find the AWS Credential Authentication Failure incident, see its 3 symptoms + 4 root causes + 4 resolutions"), and check whether the same task is doable in both. Testid-presence + baseline-screenshot-write is necessary but not sufficient. Add this to the gsd-verifier prompt / `/gsd-ui-review` checklist.

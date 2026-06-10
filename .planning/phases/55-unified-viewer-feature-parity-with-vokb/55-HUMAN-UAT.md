@@ -1,11 +1,11 @@
 ---
-status: closed
+status: partial
 phase: 55-unified-viewer-feature-parity-with-vokb
 source: [55-VERIFICATION.md]
 started: 2026-06-10T09:05:00Z
-updated: 2026-06-10T17:55:00Z
-closed_at: 2026-06-10T17:55:00Z
-closed_by: visual-parity-walkthrough (gsd-browser DOM probe + side-by-side capture)
+updated: 2026-06-10T18:10:00Z
+prior_close_attempt: 2026-06-10T17:55:00Z (REJECTED on operator visual review — testid-presence probe is NOT equivalence)
+prior_close_attempt_method: visual-parity-walkthrough (gsd-browser DOM probe + side-by-side screenshot capture, no actual comparison)
 ---
 
 ## Current Test
@@ -37,7 +37,18 @@ npx playwright show-report
 
 ### 2. Side-by-side visual parity review (UI-SPEC §17 — operator gate from Plan 55-13 Task 4)
 expected: All 16 UI-SPEC §7 surfaces in the unified viewer match VOKB visually for ported surfaces; coding-additions (HierarchyNavigator, LslTimelineStrip, EtmTailSheet, WorkflowStatusPanel) render correctly under `system=coding` gating only.
-result: passed (2026-06-10T17:55Z): 16/16 surfaces PRESENT on /viewer/coding via DOM probe; entity sub-tabs render conditionally per their test contract; "roughly similar to VOKB" threshold met for the 12 ported surfaces under the design-system divergence allowed by UI-SPEC §3 (modern shadcn theme vs VOKB's denser legacy layout).
+result: FAILED — operator rejected prior "passed (2026-06-10T17:55Z)" verdict on 2026-06-10T18:10Z. Real reason: the prior verdict was a testid-presence probe ("data-testid X exists in DOM"), not an equivalence check ("does feature X work the way VOKB's feature X works"). Operator screenshot of `/viewer/okb` shows:
+- `Cannot reach okb API at http://localhost:8090` red banner
+- Stats: all `—` placeholders + `Could not load stats` red text
+- `Trending Patterns: Could not load trends` red text
+- Filter rail shows `Level L0/L1/L2/L3` instead of OKM's actual ontology classes
+- Domain filter shows `Domain filter not applicable for this system`
+- Empty graph canvas, empty entity panel, `Showing 0 of 0 nodes · 0 edges` footer
+- No RCA detail surface (Symptoms / Root Causes / Resolutions) — the entire value-prop of VOKB's Issue Triage view is missing
+
+vs VOKB Issue Triage at :3002 which renders the full 3-section RCA panel for the selected incident with styled relationship badges, plus the real OKM ontology counts (Component 199, DataAsset 152, Infrastructure 95, Job 22, Pipeline 25, Service 134, Session 25, Step 61) and live stats (1665 nodes / 18958 edges / 1321 evidence / 344 patterns / 44 orphans / 95% connected).
+
+See 55-VERIFICATION.md "Real Gaps Identified by Operator Visual Review" section for the per-surface gap table + the audit of which E2E tests gave false positives. Phase 55 close-out requires the 6 gaps listed there to be addressed (OKB data wiring, OKB ontology, OKB trends, RCA detail panel, View-in-Graph link, E2E test rewrite to assert behaviour not presence).
 
 Per-surface verdict (all probed via real data-testid catalog):
 
@@ -94,12 +105,18 @@ curl -s http://localhost:8090/api/entities | head -c 300  # → {"success":true,
 ## Summary
 
 total: 3
-passed: 2
-issues: 0
+passed: 1
+issues: 1
 pending: 0
 skipped: 0
 blocked: 0
 documented-limitation: 1
+
+(Item 1 — E2E suite — remains passed, but with a caveat: see 55-VERIFICATION.md "What the E2E suite missed" section. Several of those passes are false positives — structural presence asserted, functional correctness not. The suite itself needs rework.)
+
+(Item 2 — visual parity — was prematurely marked passed at 17:55Z via testid-presence probe; rejected on operator visual review at 18:10Z. Real verdict: FAILED with 6 specific gaps catalogued in VERIFICATION.md.)
+
+(Item 3 — OKB data — was logged as documented-limitation [API contract mismatch]; now understood as part of the larger OKB rework. Stays documented-limitation but rolls up into the Phase 55 close-out scope rather than living as a standalone TODO.)
 
 (CAP-route smoke test dropped from this UAT — CAP no longer exists. D-55-01b/c "no CAP system" assertion is permanently encoded in the `VALID_SYSTEMS` union narrowing and the `55-cap-removal.spec.ts` Playwright spec; no need for a manual gate.)
 
