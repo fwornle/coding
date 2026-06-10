@@ -144,7 +144,15 @@ export function buildGraph(
     // is not parseable by sigma's WebGL renderer and was rendering
     // invisible. Use a fixed slate hex with a slightly larger size
     // so relations are actually visible against the canvas background.
-    graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', type: r.type })
+    //
+    // CRITICAL: Sigma reserves the `type` attribute as the edge-program
+    // selector ("arrow", "curve", etc.). Passing a relation type like
+    // "includes" / "parent-child" / "related_to" through it crashes the
+    // WebGL renderer ("could not find a suitable program for edge type X").
+    // We stash the actual relation type under `relationType` for downstream
+    // consumers (tooltips, filters) and leave `type` unset so Sigma uses
+    // its default program.
+    graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', relationType: r.type })
   }
   return graph
 }
@@ -240,8 +248,9 @@ export function mergeIntoGraph(
   for (const r of payload.relations) {
     if (!graph.hasNode(r.from) || !graph.hasNode(r.to)) continue
     // See buildGraph note — fixed hex edges so sigma's WebGL renderer
-    // actually shows them.
-    graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', type: r.type })
+    // actually shows them. `type` is Sigma's program selector, so the
+    // actual relation type lives under `relationType`.
+    graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', relationType: r.type })
     // Flip endpoints' borderStyle from 'dashed' → 'solid' on edge add
     // UNLESS their ontology overlay opts into 'dashed' explicitly. We
     // don't have ontology lookup here, so optimistically clear the

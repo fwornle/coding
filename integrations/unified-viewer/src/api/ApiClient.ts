@@ -102,8 +102,28 @@ export class ApiClient {
     return this.get<Entity[]>('/api/v1/entities')
   }
 
-  listRelations(): Promise<Relation[]> {
-    return this.get<Relation[]>('/api/v1/relations')
+  async listRelations(): Promise<Relation[]> {
+    // Phase 44 wire shape is the graphology edge envelope:
+    //   { key, source, target, attributes: { type, metadata, createdAt } }
+    // (km-core/api/handlers/relations.js emits via relationToWire per
+    // 44-CONTEXT-amendment.md). Normalize to {from, to, type} here so the
+    // graph-builder's `r.from`/`r.to` reads keep working — otherwise every
+    // edge is silently dropped at graph-build time because `r.from` is
+    // undefined and `graph.hasNode(undefined)` is false.
+    const raw = await this.get<Array<{
+      key?: string
+      source?: string
+      target?: string
+      from?: string
+      to?: string
+      type?: string
+      attributes?: { type?: string; metadata?: unknown; createdAt?: string }
+    }>>('/api/v1/relations')
+    return raw.map((r) => ({
+      from: r.source ?? r.from ?? '',
+      to: r.target ?? r.to ?? '',
+      type: r.attributes?.type ?? r.type,
+    }))
   }
 
   /**
