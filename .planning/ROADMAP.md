@@ -913,7 +913,7 @@ See `.planning/phases/54-etm-hardening-launchd-and-isprocessing-audit/54-CONTEXT
 9. **Trending Patterns sidebar.** Sparklines for top patterns (analog of VOKB's "Trending Patterns" left-sidebar surface).
 10. **Issue Triage mode.** A separate viewer mode targeting operational triage (analog of VOKB's "Issue Triage" tab; may be partial in v1).
 
-**Plans:** 8/13 plans executed
+**Plans:** 9/13 plans executed
 
 Plans:
 **Wave 1**
@@ -930,7 +930,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 55-07-PLAN.md — Shell wiring: StatsBar + LegendPanel + NavBar mode toggle + UnifiedViewer route + KeyboardHelpDialog (depends_on: 55-01,55-03,55-04,55-06)
+- [x] 55-07-PLAN.md — Shell wiring: StatsBar + LegendPanel + NavBar mode toggle + UnifiedViewer route + KeyboardHelpDialog (depends_on: 55-01,55-03,55-04,55-06)
 - [x] 55-08-PLAN.md — Filter rail parity: LayerFilter + DomainFilter + OntologyFilter (groupingSchema) + GraphToggles (depends_on: 55-04)
 - [x] 55-09-PLAN.md — Entity detail expansion: 4 sub-tabs + Relationships + Sources & Evidence + Occurrence History + Markdown harmonization (depends_on: 55-01,55-03,55-04)
 
