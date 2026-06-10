@@ -349,6 +349,9 @@ describe('EtmTailSheet', () => {
   })
 
   test('Test 12: click row with referencedEntities[0] calls setSelectedNode', async () => {
+    // referencedEntities is a Phase 55 extension carried alongside the
+    // canonical Observation shape — cast through `unknown` to bypass the
+    // strict Zod-inferred type until the schema is widened in a future plan.
     useViewerStore.setState({
       etmObservations: [
         {
@@ -359,7 +362,7 @@ describe('EtmTailSheet', () => {
           artifacts: [],
           timestamp: '2026-06-10T10:00:00.000Z',
           referencedEntities: ['entity-7'],
-        },
+        } as unknown as import('@/api/schemas').Observation,
       ],
       etmSheetOpen: true,
     })
