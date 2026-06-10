@@ -1,4 +1,5 @@
 // PATTERN SOURCE: 45-03-PLAN.md Task 1 Keyboard Test 1-5 + T-45-03-04 mitigation
+//   + 55-11-PLAN.md Task 1 <behavior> (hook extension: registerSequence)
 //
 // Test scaffolding renders a tiny harness component:
 //   - mounts useKeyboardShortcuts with mockable bindings
@@ -11,9 +12,16 @@
 //   - bindings.onCloseHelpDialog() called when Esc inside an open dialog
 //   - Zustand store mutations (setSelectedNode(null), setFilterRailCollapsed flip)
 //   - Skip-when-input-focused: `/` typed INTO a focused input does NOT preventDefault.
+//
+// Phase 55-11 extension (Task 1):
+//   - registerSequence('g','h', handler) fires handler within 800ms window
+//   - sequence does NOT fire when interval > 800ms
+//   - sequence does NOT fire when a third key intercedes
+//   - sequence is SKIPPED when input is focused (typing 'github' safe)
+//   - unregister fn removes the binding
 
-import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, fireEvent, act } from '@testing-library/react'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, act } from '@testing-library/react'
 import { useEffect, useState } from 'react'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useViewerStore } from '@/store/viewer-store'
@@ -22,17 +30,20 @@ interface HarnessProps {
   onOpenHelpDialog?: () => void
   onCloseHelpDialog?: () => boolean
   inputFocused?: boolean
+  onReady?: (handle: ReturnType<typeof useKeyboardShortcuts>) => void
 }
 
 function Harness({
   onOpenHelpDialog = vi.fn(),
   onCloseHelpDialog = vi.fn(() => false),
   inputFocused,
+  onReady,
 }: HarnessProps) {
-  const { registerSearchInputRef } = useKeyboardShortcuts({
+  const handle = useKeyboardShortcuts({
     onOpenHelpDialog,
     onCloseHelpDialog,
   })
+  const { registerSearchInputRef } = handle
   const [inputRef, setInputRef] = useState<HTMLInputElement | null>(null)
   useEffect(() => {
     registerSearchInputRef(inputRef)
@@ -40,6 +51,11 @@ function Harness({
   useEffect(() => {
     if (inputFocused && inputRef) inputRef.focus()
   }, [inputFocused, inputRef])
+  useEffect(() => {
+    onReady?.(handle)
+    // We only want this to run once with the stable handle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return <input ref={setInputRef} data-testid="search-input" />
 }
 
@@ -54,6 +70,10 @@ describe('useKeyboardShortcuts', () => {
       theme: 'light',
       filterRailCollapsed: false,
     })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   test('Test 1: `/` while no input focused → search input gets focused, preventDefault asserted', () => {
@@ -149,5 +169,117 @@ describe('useKeyboardShortcuts', () => {
     expect(document.activeElement).not.toBe(input)
     // selected node NOT cleared on this first Esc — only on the next one
     expect(useViewerStore.getState().selectedNodeId).toBe('node-99')
+  })
+
+  // ---- Phase 55-11 Task 1: registerSequence two-key sequence support ----
+
+  test('Test 7 (Phase 55-11): registerSequence(g, h) fires handler when g then h pressed within 800ms', () => {
+    vi.useFakeTimers()
+    const handler = vi.fn()
+    let unregister: (() => void) | undefined
+    render(
+      <Harness
+        onReady={(h) => {
+          unregister = h.registerSequence('g', 'h', handler)
+        }}
+      />,
+    )
+    expect(handler).not.toHaveBeenCalled()
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
+    })
+    expect(handler).not.toHaveBeenCalled()
+    // advance a bit but stay inside the window
+    act(() => {
+      vi.advanceTimersByTime(200)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }))
+    })
+    expect(handler).toHaveBeenCalledTimes(1)
+    unregister?.()
+  })
+
+  test('Test 8 (Phase 55-11): registerSequence does NOT fire when interval > 800ms', () => {
+    vi.useFakeTimers()
+    const handler = vi.fn()
+    render(
+      <Harness
+        onReady={(h) => {
+          h.registerSequence('g', 'h', handler)
+        }}
+      />,
+    )
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
+    })
+    act(() => {
+      vi.advanceTimersByTime(1000)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }))
+    })
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  test('Test 9 (Phase 55-11): registerSequence does NOT fire when third key intercedes', () => {
+    vi.useFakeTimers()
+    const handler = vi.fn()
+    render(
+      <Harness
+        onReady={(h) => {
+          h.registerSequence('g', 'h', handler)
+        }}
+      />,
+    )
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }))
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }))
+    })
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  test('Test 10 (Phase 55-11): registerSequence input-focus guard — typing "gh" into search input does NOT fire', () => {
+    const handler = vi.fn()
+    const { getByTestId } = render(
+      <Harness
+        inputFocused
+        onReady={(h) => {
+          h.registerSequence('g', 'h', handler)
+        }}
+      />,
+    )
+    const input = getByTestId('search-input') as HTMLInputElement
+    expect(document.activeElement).toBe(input)
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }))
+    })
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  test('Test 11 (Phase 55-11): unregister fn removes the binding', () => {
+    vi.useFakeTimers()
+    const handler = vi.fn()
+    let unregister: (() => void) | undefined
+    render(
+      <Harness
+        onReady={(h) => {
+          unregister = h.registerSequence('g', 'h', handler)
+        }}
+      />,
+    )
+    // First sequence should fire
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
+      vi.advanceTimersByTime(100)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }))
+    })
+    expect(handler).toHaveBeenCalledTimes(1)
+    // Unregister, then sequence should NOT fire again
+    unregister?.()
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
+      vi.advanceTimersByTime(100)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }))
+    })
+    expect(handler).toHaveBeenCalledTimes(1)
   })
 })
