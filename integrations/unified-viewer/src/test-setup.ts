@@ -56,3 +56,20 @@ if (typeof (globalThis as { WebGLRenderingContext?: unknown }).WebGLRenderingCon
   ;(globalThis as { WebGLRenderingContext: unknown }).WebGLRenderingContext =
     WebGLRenderingContextStub
 }
+
+// Stub ResizeObserver — Radix UI's Tooltip/Popover layers reference it at
+// portal-mount time. jsdom does not provide ResizeObserver, so importing
+// any Radix overlay component into a test crashes with
+// `ReferenceError: ResizeObserver is not defined` during portal teardown.
+// Provide a minimal no-op stub so unit tests can mount Radix overlays.
+if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === 'undefined') {
+  class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  ;(globalThis as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub
+  if (typeof window !== 'undefined') {
+    ;(window as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub
+  }
+}

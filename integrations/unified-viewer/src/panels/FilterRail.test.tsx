@@ -195,7 +195,12 @@ describe('FilterRail', () => {
       { id: 'b', name: 'B', ontologyClass: 'Observation' } as Entity,
     ]
     renderRail(makeApiClient(), vi.fn(), [], 'coding', entities)
-    expect(screen.getByText('Hierarchy')).toBeInTheDocument()
+    // 55-11 added a HierarchyNavigator under the lazy slot whose section
+    // header is also "Hierarchy". When the Suspense resolves quickly under
+    // jsdom this test would see two matches; use getAllByText to accept
+    // either situation. The CODING_SCHEMA group named "Hierarchy" MUST be
+    // present (count ≥ 1); the Typed Views group is unique.
+    expect(screen.getAllByText('Hierarchy').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Typed Views')).toBeInTheDocument()
   })
 
@@ -226,9 +231,12 @@ describe('FilterRail', () => {
   test('Phase 55-08: HierarchyNavigator lazy mount is PRESENT on coding', async () => {
     renderRail(makeApiClient(), vi.fn(), [], 'coding')
     await waitFor(() => {
+      // 55-11 overwrote the 55-08 placeholder with the real HierarchyNavigator
+      // (testid="hierarchy-navigator"). The fallback can also win briefly under
+      // jsdom test conditions — accept either as proof the slot is mounted.
       const fallback = screen.queryByTestId('hierarchy-navigator-fallback')
-      const placeholder = screen.queryByTestId('hierarchy-navigator-placeholder')
-      expect(fallback || placeholder).not.toBeNull()
+      const real = screen.queryByTestId('hierarchy-navigator')
+      expect(fallback || real).not.toBeNull()
     })
   })
 
