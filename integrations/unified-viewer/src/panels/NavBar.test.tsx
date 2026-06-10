@@ -151,4 +151,64 @@ describe('NavBar', () => {
     expect(screen.getByLabelText('Knowledge Graph mode')).toBeInTheDocument()
     expect(screen.getByLabelText('Issue Triage mode')).toBeInTheDocument()
   })
+
+  // ------------------------- Phase 55-12 ETM tail trigger -------------------------
+
+  test('Phase 55-12: ETM tail trigger renders on coding tab when system === "coding"', () => {
+    renderAt('/viewer/coding', vi.fn(), [])
+    // 📡 (Radio) icon button — dynamic aria-label depends on etmSheetOpen.
+    useViewerStore.setState({ etmSheetOpen: false })
+    cleanup()
+    renderAt('/viewer/coding', vi.fn(), [])
+    expect(screen.getByTestId('etm-tail-trigger')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open observation stream' })).toBeInTheDocument()
+  })
+
+  test('Phase 55-12: ETM tail trigger is NOT rendered on okb tab', () => {
+    renderAt('/viewer/okb', vi.fn(), [])
+    expect(screen.queryByTestId('etm-tail-trigger')).toBeNull()
+  })
+
+  test('Phase 55-12: ETM tail trigger aria-label flips when etmSheetOpen', () => {
+    useViewerStore.setState({ etmSheetOpen: true })
+    renderAt('/viewer/coding', vi.fn(), [])
+    expect(screen.getByRole('button', { name: 'Close observation stream' })).toBeInTheDocument()
+  })
+
+  test('Phase 55-12: clicking ETM tail trigger toggles etmSheetOpen', () => {
+    useViewerStore.setState({ etmSheetOpen: false })
+    renderAt('/viewer/coding', vi.fn(), [])
+    fireEvent.click(screen.getByTestId('etm-tail-trigger'))
+    expect(useViewerStore.getState().etmSheetOpen).toBe(true)
+    fireEvent.click(screen.getByTestId('etm-tail-trigger'))
+    expect(useViewerStore.getState().etmSheetOpen).toBe(false)
+  })
+
+  test('Phase 55-12: when etmSheetOpen === false and there are recent observations, badge shows count', () => {
+    const now = new Date()
+    useViewerStore.setState({
+      etmSheetOpen: false,
+      etmObservations: [
+        {
+          id: 'a',
+          agent: 'claude',
+          project: 'p',
+          content: 'c',
+          artifacts: [],
+          timestamp: now.toISOString(),
+        },
+        {
+          id: 'b',
+          agent: 'copilot',
+          project: 'p',
+          content: 'c',
+          artifacts: [],
+          timestamp: now.toISOString(),
+        },
+      ],
+    })
+    renderAt('/viewer/coding', vi.fn(), [])
+    const badge = screen.getByTestId('etm-tail-trigger-badge')
+    expect(badge.textContent).toBe('2')
+  })
 })

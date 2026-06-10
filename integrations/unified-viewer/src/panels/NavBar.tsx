@@ -6,10 +6,14 @@
 //   + 55-UI-SPEC.md §9 — Mode switch (Knowledge Graph ↔ Issue Triage),
 //     hidden when `entities.length === 0`; Triage item hidden when entity
 //     set lacks `Incident`/`FailureIncident` types.
+//   + 55-UI-SPEC.md §13.3 + 55-12-PLAN.md Task 3 — coding-only 📡 ETM tail
+//     trigger; aria-label flips between Open/Close observation stream;
+//     badge shows unread observation count (last 30s, since the sheet last
+//     closed) when the sheet is closed.
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Keyboard, Moon, Sun } from 'lucide-react'
+import { Keyboard, Moon, Radio, Sun } from 'lucide-react'
 import { SYSTEM_LABELS, VALID_SYSTEMS, type System } from '@/config/system-endpoints'
 import { IconButton } from '@/components/IconButton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -55,6 +59,44 @@ export function NavBar({ onOpenHelpDialog, entities = [] }: NavBarProps) {
   const setTheme = useViewerStore((s) => s.setTheme)
   const mode = useViewerStore((s) => s.mode)
   const setMode = useViewerStore((s) => s.setMode)
+
+  // Phase 55-12 — ETM tail trigger (coding-only).
+  const etmSheetOpen = useViewerStore((s) => s.etmSheetOpen)
+  const setEtmSheetOpen = useViewerStore((s) => s.setEtmSheetOpen)
+  const etmObservations = useViewerStore((s) => s.etmObservations)
+  // Track the id of the newest observation seen the last time the sheet was
+  // open — so the badge count only counts truly-unread items. Defaults to
+  // null on first mount; after the sheet opens (or closes), we snapshot the
+  // newest id and zero the badge.
+  const [lastSeenObsId, setLastSeenObsId] = useState<string | null>(null)
+  const lastSheetOpenRef = useRef(etmSheetOpen)
+
+  useEffect(() => {
+    if (etmSheetOpen && !lastSheetOpenRef.current) {
+      // Sheet just opened — record what the user has now seen.
+      setLastSeenObsId(etmObservations[0]?.id ?? null)
+    }
+    lastSheetOpenRef.current = etmSheetOpen
+  }, [etmSheetOpen, etmObservations])
+
+  const unreadCount = useMemo(() => {
+    if (etmSheetOpen) return 0
+    if (lastSeenObsId === null) {
+      // Initial state — count all observations that arrived recently (last 30s).
+      const cutoff = Date.now() - 30_000
+      return etmObservations.filter((o) => {
+        const t = Date.parse(o.timestamp)
+        return Number.isFinite(t) ? t >= cutoff : true
+      }).length
+    }
+    const seenIdx = etmObservations.findIndex((o) => o.id === lastSeenObsId)
+    if (seenIdx === -1) {
+      // Last seen scrolled off the ring buffer — count all observations
+      // since they're all newer than what the user saw.
+      return etmObservations.length
+    }
+    return seenIdx
+  }, [etmSheetOpen, etmObservations, lastSeenObsId])
 
   const hasEntities = entities.length > 0
   const hasIncidents = hasEntities && entitiesHaveIncidents(entities)
@@ -148,6 +190,35 @@ export function NavBar({ onOpenHelpDialog, entities = [] }: NavBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {currentSystem === 'coding' && (
+          <div className="relative">
+            <IconButton
+              icon={Radio}
+              ariaLabel={
+                etmSheetOpen ? 'Close observation stream' : 'Open observation stream'
+              }
+              tooltipText="Observation stream (t)"
+              onClick={() => {
+                const next = !etmSheetOpen
+                setEtmSheetOpen(next)
+                Logger.info(
+                  Logger.Categories.PANELS,
+                  `ETM tail sheet ${next ? 'opened' : 'closed'} via NavBar`,
+                )
+              }}
+              data-testid="etm-tail-trigger"
+            />
+            {!etmSheetOpen && unreadCount > 0 && (
+              <span
+                data-testid="etm-tail-trigger-badge"
+                className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-emerald-500 text-[10px] text-white font-semibold flex items-center justify-center pointer-events-none tabular-nums"
+                aria-label={`${unreadCount} unread observations`}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </div>
+        )}
         <IconButton
           icon={theme === 'dark' ? Sun : Moon}
           ariaLabel="Toggle theme"

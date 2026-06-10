@@ -44,6 +44,8 @@ import { Footer } from '@/panels/Footer'
 import { StatsBar } from '@/panels/StatsBar'
 import { LegendPanel } from '@/panels/LegendPanel'
 import LslTimelineStrip from '@/panels/coding/LslTimelineStrip'
+import EtmTailSheet from '@/panels/coding/EtmTailSheet'
+import WorkflowStatusPanel from '@/panels/coding/WorkflowStatusPanel'
 import {
   EmptyFilterState,
   EmptyNoDataState,
@@ -325,6 +327,12 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             Mounted between the main content row and the Footer per UI-SPEC §6. */}
         {system === 'coding' && <LslTimelineStrip system={system} apiClient={apiClient} />}
         <Footer total={entities.length} visible={visibleCount} edges={relations.length} />
+        {/* Phase 55-12: WorkflowStatusPanel (Surface #16) — coding-only.
+            Mounted BELOW the Footer per UI-SPEC §13.4. */}
+        {system === 'coding' && <WorkflowStatusPanel system={system} />}
+        {/* Phase 55-12: EtmTailSheet (Surface #15) — coding-only overlay.
+            Sheet is portaled by Radix; layout-neutral when closed. */}
+        {system === 'coding' && <EtmTailSheet system={system} apiClient={apiClient} />}
         <KeyboardHelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} />
       </div>
     </TooltipProvider>
