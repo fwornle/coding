@@ -73,3 +73,36 @@ if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === 'unde
     ;(window as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub
   }
 }
+
+// Stub EventSource — jsdom does not implement the EventSource interface,
+// so any component that opens an SSE connection on mount (e.g. Phase 55-12's
+// EtmTailSheet) crashes the test render with `ReferenceError: EventSource
+// is not defined`. The stub is a no-op constructor that records the URL
+// and exposes onopen/onmessage/onerror/close so the SSE-consumer tests
+// can drive it directly (matches the MockEventSource pattern those tests
+// install locally; the stub here is the fallback for OTHER tests that
+// happen to mount EtmTailSheet incidentally).
+if (typeof (globalThis as { EventSource?: unknown }).EventSource === 'undefined') {
+  class EventSourceStub {
+    url: string
+    readyState = 0
+    onopen: ((ev: Event) => void) | null = null
+    onmessage: ((ev: MessageEvent) => void) | null = null
+    onerror: ((ev: Event) => void) | null = null
+    constructor(url: string) {
+      this.url = url
+    }
+    close(): void {
+      this.readyState = 2
+    }
+    addEventListener(): void {}
+    removeEventListener(): void {}
+    dispatchEvent(): boolean {
+      return false
+    }
+  }
+  ;(globalThis as { EventSource: unknown }).EventSource = EventSourceStub
+  if (typeof window !== 'undefined') {
+    ;(window as unknown as { EventSource: unknown }).EventSource = EventSourceStub
+  }
+}
