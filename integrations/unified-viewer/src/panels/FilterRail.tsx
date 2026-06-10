@@ -18,7 +18,7 @@
 //     and HierarchyNavigator coding-only gate) and `entities` (counts are
 //     derived from this list inside the filter children).
 
-import { useEffect, useRef, lazy, Suspense } from 'react'
+import { useEffect, useRef, lazy, Suspense, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
 import type { ApiClient } from '@/api/ApiClient'
 import type { Entity } from '@/api/ApiClient'
@@ -58,6 +58,9 @@ export interface FilterRailProps {
   system: System
   /** Entity array — child filter components derive count badges. */
   entities: readonly Entity[]
+  /** Phase 55 — slot for the LegendPanel (or any other end-of-rail surface).
+   * Mounted at the BOTTOM of the vertical stack per UI-SPEC §6 row 12. */
+  bottomSlot?: ReactNode
 }
 
 const LEVELS: ReadonlyArray<{ value: Level; label: string }> = [
@@ -73,6 +76,7 @@ export function FilterRail({
   registerSearchInputRef,
   system,
   entities,
+  bottomSlot,
 }: FilterRailProps) {
   const searchQuery = useViewerStore((s) => s.searchQuery)
   const setSearch = useViewerStore((s) => s.setSearch)
@@ -244,6 +248,9 @@ export function FilterRail({
           <HierarchyNavigator system={system} />
         </Suspense>
       )}
+
+      {/* Phase 55 plan 07 — bottom slot for LegendPanel (UI-SPEC §6 row 12). */}
+      {bottomSlot}
     </aside>
   )
 }

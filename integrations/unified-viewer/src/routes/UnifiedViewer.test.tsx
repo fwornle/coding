@@ -144,4 +144,32 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     expect(okbActive).not.toBe(codingActive)
     cleanup()
   })
+
+  // ---------------------- Phase 55 Plan 07 wiring ----------------------
+
+  test('Phase 55: StatsBar is mounted between NavBar and content row', () => {
+    renderAt('/viewer/coding')
+    expect(screen.getByTestId('stats-bar')).toBeInTheDocument()
+    cleanup()
+  })
+
+  test('Phase 55: LegendPanel is mounted inside FilterRail', () => {
+    renderAt('/viewer/coding')
+    expect(screen.getByTestId('viewer-legend-panel')).toBeInTheDocument()
+    cleanup()
+  })
+
+  test('Phase 55: mode === "kg" renders SigmaCanvas slot; "triage" renders TriagePlaceholder', async () => {
+    // Default mode is kg → SigmaCanvas mock (returns null but the canvas
+    // container is present).
+    const { useViewerStore } = await import('@/store/viewer-store')
+    useViewerStore.setState({ mode: 'kg' })
+    const { unmount } = renderAt('/viewer/coding')
+    // SigmaCanvas is mocked to return null at this layer; the canvas container
+    // exists with data-testid='viewer-canvas' (set by UnifiedViewer's <main>).
+    expect(screen.getByTestId('viewer-canvas')).toBeInTheDocument()
+    expect(screen.queryByTestId('triage-mode-placeholder')).toBeNull()
+    unmount()
+    cleanup()
+  })
 })

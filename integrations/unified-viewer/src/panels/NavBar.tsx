@@ -1,15 +1,20 @@
-// PATTERN SOURCE: 45-PATTERNS.md § NavBar.tsx
+// PATTERN SOURCE: 45-PATTERNS.md § NavBar.tsx + 55-PATTERNS.md § NavBar.tsx (EXTEND)
 // CONTRACT: 45-UI-SPEC.md § Layout Contract row 1 (sticky top-0 h-16)
 //   + § Icon-only controls (Theme toggle, Keyboard help)
 //   + § Typography — active NavLink uses font-bold + accent underline
 //     (sole display-weight exception per UI-SPEC)
+//   + 55-UI-SPEC.md §9 — Mode switch (Knowledge Graph ↔ Issue Triage),
+//     hidden when `entities.length === 0`; Triage item hidden when entity
+//     set lacks `Incident`/`FailureIncident` types.
 
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Keyboard, Moon, Sun } from 'lucide-react'
 import { SYSTEM_LABELS, VALID_SYSTEMS, type System } from '@/config/system-endpoints'
 import { IconButton } from '@/components/IconButton'
-import { useViewerStore } from '@/store/viewer-store'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useViewerStore, type ViewerMode } from '@/store/viewer-store'
+import type { Entity } from '@/api/ApiClient'
 import { Logger } from '@/lib/logging'
 
 export interface NavBarProps {
@@ -18,6 +23,20 @@ export interface NavBarProps {
    * the same setter that the `?` keyboard shortcut uses.
    */
   onOpenHelpDialog: () => void
+  /**
+   * Current entity set — drives the visibility predicates for the Mode
+   * ToggleGroup (UI-SPEC §9). Pass `[]` to hide the toggle entirely.
+   */
+  entities?: ReadonlyArray<Entity>
+}
+
+// Phase 55 — predicate used to decide whether the Issue Triage mode is
+// applicable. Mirrors 55-PATTERNS.md § IssueTriageView guidance.
+function entitiesHaveIncidents(entities: ReadonlyArray<Entity>): boolean {
+  return entities.some((e) => {
+    const t = (e.entityType as string | undefined) ?? (e.ontologyClass as string | undefined) ?? ''
+    return /incident|failureincident/i.test(t)
+  })
 }
 
 function persistTheme(t: 'light' | 'dark') {
@@ -29,11 +48,16 @@ function persistTheme(t: 'light' | 'dark') {
   }
 }
 
-export function NavBar({ onOpenHelpDialog }: NavBarProps) {
+export function NavBar({ onOpenHelpDialog, entities = [] }: NavBarProps) {
   const params = useParams<{ system: string }>()
   const currentSystem = params.system as string | undefined
   const theme = useViewerStore((s) => s.theme)
   const setTheme = useViewerStore((s) => s.setTheme)
+  const mode = useViewerStore((s) => s.mode)
+  const setMode = useViewerStore((s) => s.setMode)
+
+  const hasEntities = entities.length > 0
+  const hasIncidents = hasEntities && entitiesHaveIncidents(entities)
 
   // Sync the document root .dark class with the store's theme on mount
   // AND on every change. Previously the toggle only happened inside the
@@ -66,28 +90,61 @@ export function NavBar({ onOpenHelpDialog }: NavBarProps) {
         </span>
       </div>
 
-      <div className="flex items-center gap-4" data-testid="viewer-nav-links">
-        {VALID_SYSTEMS.map((sys) => {
-          const isActive = sys === currentSystem
-          return (
-            <Link
-              key={sys}
-              to={`/viewer/${sys}`}
-              data-testid={`nav-link-${sys}`}
-              data-active={isActive ? 'true' : 'false'}
-              aria-current={isActive ? 'page' : undefined}
-              className={
-                'text-sm transition-colors px-2 py-1 ' +
-                (isActive
-                  ? 'font-bold text-primary underline underline-offset-4 decoration-2 decoration-primary'
-                  : 'text-foreground/80 hover:text-foreground')
-              }
-              onClick={() => Logger.info(Logger.Categories.ROUTING, `NavBar → ${sys}`)}
-            >
-              {SYSTEM_LABELS[sys as System]}
-            </Link>
-          )
-        })}
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4" data-testid="viewer-nav-links">
+          {VALID_SYSTEMS.map((sys) => {
+            const isActive = sys === currentSystem
+            return (
+              <Link
+                key={sys}
+                to={`/viewer/${sys}`}
+                data-testid={`nav-link-${sys}`}
+                data-active={isActive ? 'true' : 'false'}
+                aria-current={isActive ? 'page' : undefined}
+                className={
+                  'text-sm transition-colors px-2 py-1 ' +
+                  (isActive
+                    ? 'font-bold text-primary underline underline-offset-4 decoration-2 decoration-primary'
+                    : 'text-foreground/80 hover:text-foreground')
+                }
+                onClick={() => Logger.info(Logger.Categories.ROUTING, `NavBar → ${sys}`)}
+              >
+                {SYSTEM_LABELS[sys as System]}
+              </Link>
+            )
+          })}
+        </div>
+
+        {hasEntities && (
+          <ToggleGroup
+            type="single"
+            value={mode}
+            onValueChange={(v) => {
+              // Radix unsets the value to empty when the same item is clicked
+              // again; preserve the current selection in that case.
+              if (!v) return
+              setMode(v as ViewerMode)
+              Logger.info(Logger.Categories.PANELS, `Mode switched to ${v}`)
+            }}
+            variant="outline"
+            size="sm"
+            data-testid="viewer-mode-toggle"
+            aria-label="View mode"
+          >
+            <ToggleGroupItem value="kg" aria-label="Knowledge Graph mode" data-testid="mode-item-kg">
+              Knowledge Graph
+            </ToggleGroupItem>
+            {hasIncidents && (
+              <ToggleGroupItem
+                value="triage"
+                aria-label="Issue Triage mode"
+                data-testid="mode-item-triage"
+              >
+                Issue Triage
+              </ToggleGroupItem>
+            )}
+          </ToggleGroup>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
