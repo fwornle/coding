@@ -3,7 +3,7 @@ status: partial
 phase: 55-unified-viewer-feature-parity-with-vokb
 source: [55-VERIFICATION.md]
 started: 2026-06-10T09:05:00Z
-updated: 2026-06-10T09:05:00Z
+updated: 2026-06-10T09:12:00Z
 ---
 
 ## Current Test
@@ -46,21 +46,15 @@ Reproduction:
 - Inspect graph node labels; assert they are OKM-shaped, not coding-shaped
 - DevTools Network tab: confirm requests target `http://localhost:8090`, not `:3848`
 
-### 4. CAP route smoke test (D-55-01b/c — operator regression check)
-expected: Navigating to `http://localhost:5173/viewer/cap` renders the `UnknownSystem` view (NOT the prior `RcaOpsPanel`). DOM does NOT contain string `cc.bmwgroup.net`. No misleading `(CORS)` banner.
-result: [pending]
-
-Reproduction:
-- `curl -s http://localhost:5173/viewer/cap | grep -i 'cc.bmwgroup\|cap\|rca'` → should be empty
-- Manual: open the URL; expect "Unknown System" fallback
-
 ## Summary
 
-total: 4
+total: 3
 passed: 0
 issues: 0
-pending: 4
+pending: 3
 skipped: 0
 blocked: 0
+
+(CAP-route smoke test dropped from this UAT — CAP no longer exists. D-55-01b/c "no CAP system" assertion is permanently encoded in the `VALID_SYSTEMS` union narrowing and the `55-cap-removal.spec.ts` Playwright spec; no need for a manual gate.)
 
 ## Gaps
