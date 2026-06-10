@@ -16,8 +16,9 @@
 //   - StatsBar mounted between NavBar and the flex content row.
 //   - LegendPanel mounted as the bottomSlot of FilterRail.
 //   - mode-aware central canvas: kg → <SigmaCanvas/>, triage → lazy
-//     <TriagePlaceholder/> (Plan 55-10 Task 2 swaps the lazy import path
-//     to point at IssueTriageView).
+//     <IssueTriageView/> (Plan 55-10 Task 2 swapped the lazy import here
+//     from the 55-07 stub to the real Mode B canvas at
+//     '@/routes/IssueTriageView').
 //   - URL `?mode=triage` persistence via useSearchParams.
 //   - Keyboard shortcut `m` flips the mode via setMode.
 
@@ -53,9 +54,11 @@ import {
 import { UnknownSystem } from './UnknownSystem'
 import { Logger } from '@/lib/logging'
 
-// Plan 55-07 lazy slot for the Triage canvas. Plan 55-10 Task 2 swaps the
-// import path to '@/routes/IssueTriageView' (single-line edit, see plan).
-const TriagePlaceholder = lazy(() => import('./TriagePlaceholder'))
+// Plan 55-10 Task 2 swap: the lazy import path moved from the 55-07 stub
+// to '@/routes/IssueTriageView' (the real Mode B canvas). The stub file
+// stays on disk per plan — only the import here is swapped (single-line
+// edit per 55-10 PLAN.md key_links).
+const IssueTriageView = lazy(() => import('@/routes/IssueTriageView'))
 
 interface ViewerCoreProps {
   system: System
@@ -271,8 +274,8 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
         />
       )
     }
-    // Mode-aware canvas: kg → SigmaCanvas; triage → lazy TriagePlaceholder
-    // (Plan 55-10 Task 2 swaps the lazy import path to IssueTriageView).
+    // Mode-aware canvas: kg → SigmaCanvas; triage → lazy IssueTriageView
+    // (Plan 55-10 Task 2 swapped from the 55-07 stub to the real view).
     if (mode === 'triage' && hasIncidents) {
       return (
         <Suspense
@@ -285,7 +288,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             </div>
           }
         >
-          <TriagePlaceholder />
+          <IssueTriageView entities={entities} relations={relations} />
         </Suspense>
       )
     }
