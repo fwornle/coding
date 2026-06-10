@@ -172,4 +172,18 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     unmount()
     cleanup()
   })
+
+  test('Phase 55-10: UnifiedViewer.tsx lazy-imports IssueTriageView (NOT TriagePlaceholder)', async () => {
+    // Source-grep audit: the TriagePlaceholder import shipped by 55-07 Task 2
+    // is replaced by the real IssueTriageView lazy import (55-10 Task 2).
+    const { readFileSync } = await import('node:fs')
+    const path = await import('node:path')
+    const filePath = path.resolve(process.cwd(), 'src/routes/UnifiedViewer.tsx')
+    const src = readFileSync(filePath, 'utf8')
+    expect(src).toMatch(/lazy\(\(\) => import\('@\/routes\/IssueTriageView'\)\)/)
+    // The placeholder MUST be gone from this file (the file at
+    // src/routes/TriagePlaceholder.tsx stays on disk as documented in the
+    // plan — only the import here is swapped).
+    expect(src).not.toMatch(/TriagePlaceholder/)
+  })
 })
