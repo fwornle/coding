@@ -1,0 +1,2 @@
+# Keep the golden-fixture directory tracked even when no PNGs are committed.
+# See README.md for capture procedure.
