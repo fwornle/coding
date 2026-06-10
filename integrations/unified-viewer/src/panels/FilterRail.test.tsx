@@ -209,15 +209,17 @@ describe('FilterRail', () => {
     expect(screen.getByText('Lower Ontology')).toBeInTheDocument()
   })
 
-  test('Phase 55-08: TrendingPanel lazy mount is present (placeholder or fallback)', async () => {
+  test('Phase 55-08: TrendingPanel lazy mount is present (real component or fallback)', async () => {
     renderRail(makeApiClient())
-    // Suspense fallback may render briefly; eventually the placeholder content
-    // (data-testid="trending-panel-placeholder") shows up since 55-10 has not
-    // shipped yet. We accept either as proof the slot is mounted.
+    // 55-10 shipped the real TrendingPanel component (overwriting the
+    // 55-08 placeholder). The Suspense fallback may render briefly; once
+    // the lazy chunk resolves, the real `trending-panel` testid appears.
+    // (The 55-08 `trending-panel-placeholder` testid is gone.) Accept
+    // either the fallback or the real testid as proof the slot is mounted.
     await waitFor(() => {
       const fallback = screen.queryByTestId('trending-panel-fallback')
-      const placeholder = screen.queryByTestId('trending-panel-placeholder')
-      expect(fallback || placeholder).not.toBeNull()
+      const real = screen.queryByTestId('trending-panel')
+      expect(fallback || real).not.toBeNull()
     })
   })
 
