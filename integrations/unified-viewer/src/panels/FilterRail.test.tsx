@@ -195,7 +195,12 @@ describe('FilterRail', () => {
       { id: 'b', name: 'B', ontologyClass: 'Observation' } as Entity,
     ]
     renderRail(makeApiClient(), vi.fn(), [], 'coding', entities)
-    expect(screen.getByText('Hierarchy')).toBeInTheDocument()
+    // 55-11 added a HierarchyNavigator under the lazy slot whose section
+    // header is also "Hierarchy". When the Suspense resolves quickly under
+    // jsdom this test would see two matches; use getAllByText to accept
+    // either situation. The CODING_SCHEMA group named "Hierarchy" MUST be
+    // present (count ≥ 1); the Typed Views group is unique.
+    expect(screen.getAllByText('Hierarchy').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Typed Views')).toBeInTheDocument()
   })
 
