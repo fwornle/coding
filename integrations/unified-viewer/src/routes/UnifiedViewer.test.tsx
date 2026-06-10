@@ -198,4 +198,16 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     // The mount line must be coding-gated and inside the JSX (not just import).
     expect(src).toMatch(/system === ['"]coding['"][^]*LslTimelineStrip/)
   })
+
+  test('Phase 55-12: EtmTailSheet + WorkflowStatusPanel mounted coding-only', async () => {
+    const { readFileSync } = await import('node:fs')
+    const path = await import('node:path')
+    const filePath = path.resolve(process.cwd(), 'src/routes/UnifiedViewer.tsx')
+    const src = readFileSync(filePath, 'utf8')
+    expect(src).toMatch(/EtmTailSheet/)
+    expect(src).toMatch(/WorkflowStatusPanel/)
+    // Both must be coding-gated.
+    expect(src).toMatch(/system === ['"]coding['"][^]*EtmTailSheet/)
+    expect(src).toMatch(/system === ['"]coding['"][^]*WorkflowStatusPanel/)
+  })
 })
