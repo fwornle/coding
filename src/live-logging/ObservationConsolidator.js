@@ -22,6 +22,14 @@ import path from 'node:path';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { ObservationSanitizer } from './ObservationSanitizer.js';
 import Redis from 'ioredis';
+import { createLogger } from '../../lib/logging/Logger.js';
+
+// Project's backend Logger — used by new code in this module (the
+// existing `process.stderr.write` call sites predate the Logger and are
+// left untouched for this commit to keep the diff focused; migrating
+// them is tracked separately). Per CLAUDE.md, raw stderr writes are a
+// constraint dodge for `no-console-log` — new code goes through here.
+const log = createLogger('Consolidator');
 // Phase 44 Plan 17 (consolidator cutover to km-core): Digest + Insight
 // persistence routes through km-core via the same legacy-ingest adapter
 // ObservationWriter uses (Plan 44-13). The consolidator does NOT write
@@ -1328,7 +1336,13 @@ export class ObservationConsolidator {
     const totalProjects = digestsByProject.size;
     process.stderr.write(`[Consolidator] Stage 2/2: synthesizing ${digests.length} digests into insights — ${totalProjects} project(s): ${breakdown}\n`);
 
-    const DIGEST_CHUNK_SIZE = 5;
+    // 2026-06-12: dropped from 5 → 2. Copilot's edge consistently 502s
+    // on insight-synthesis prompts that bundle 5 full digests (~15KB
+    // input), but handles 2-digest chunks comfortably (curl probes:
+    // 1.2s with copilot/haiku, 2.1s with copilot/sonnet). Doubles the
+    // chunk count, but each succeeds — net throughput is roughly equal
+    // and reliability is dramatically better.
+    const DIGEST_CHUNK_SIZE = 2;
     const allInsightEntries = [];
 
     let projectIdx = 0;
@@ -3413,44 +3427,170 @@ Respond with EXACTLY this structure:
     // QUOTA/AUTH/PARSE error rather than the fetch aborting blind.
     const PROXY_TIMEOUT_MS = 300_000;
     const FETCH_TIMEOUT_MS = 360_000;
+    // 2026-06-12: exponential backoff on transient upstream 5xx. Without
+    // this, a single Copilot 502 (their proxy frontend gives up on large
+    // prompts under load) wasted the entire chunk — the consolidator
+    // would skip it and the dashboard would inch forward without
+    // producing any insights. Backoff schedule chosen to ride out the
+    // 2-3s 502 storms we observe in practice without blowing the per-
+    // chunk deadline.
+    const MAX_RETRIES = 3;
+    const BACKOFF_MS = [2000, 5000, 10000];
+    // 2026-06-12: bump `maxTokens` past the proxy's 4096 default. Sonnet
+    // routinely needed every token of the 4096 cap to synthesize a single
+    // chunk of 2 digests, returning `content: ""` when it hit max_out
+    // (proxy-bridge server.mjs:585 — the default 4096 is for cheap probes,
+    // not real consolidation work). With 16384 the typical chunk completes
+    // in ~30-50s with non-empty content. The proxy accepts either camelCase
+    // (`maxTokens`) or snake_case key.
+    const MAX_TOKENS = 16384;
     const requestBody = {
       process: processName,
       ...(this.provider ? { provider: this.provider } : {}),
       timeout: PROXY_TIMEOUT_MS,
+      maxTokens: MAX_TOKENS,
       messages: [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
       ],
     };
 
-    try {
-      // Compose two abort sources: the per-call fetch timeout AND any
-      // shutdown-time abort the caller (obs-api) passed in. Either firing
-      // cancels the fetch — and via res.on('close') on the proxy, kills
-      // the spawned claude CLI subprocess.
-      const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-      const signal = this.abortSignal
-        ? AbortSignal.any([timeoutSignal, this.abortSignal])
-        : timeoutSignal;
-      const response = await fetch(`${this.proxyUrl}/api/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal,
-      });
+    const isRetryable = (statusOrErr) => {
+      if (typeof statusOrErr === 'number') {
+        // 5xx upstream failures + 429 (rate-limit) get retried.
+        return statusOrErr >= 500 || statusOrErr === 429;
+      }
+      // Network-level errors (EAI_AGAIN, ECONNRESET, fetch failed) are
+      // generally transient.
+      const msg = String(statusOrErr?.message || statusOrErr || '').toLowerCase();
+      if (msg.includes('aborted') || msg.includes('timeout')) return false;
+      return msg.includes('fetch failed')
+        || msg.includes('econnreset')
+        || msg.includes('econnrefused')
+        || msg.includes('eai_again')
+        || msg.includes('socket hang up');
+    };
 
-      if (!response.ok) {
-        const errBody = await response.text();
-        process.stderr.write(`[Consolidator] LLM proxy error ${response.status}: ${errBody.slice(0, 200)}\n`);
+    const startedAt = Date.now();
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        // Compose two abort sources: the per-call fetch timeout AND any
+        // shutdown-time abort the caller (obs-api) passed in. Either firing
+        // cancels the fetch — and via res.on('close') on the proxy, kills
+        // the spawned claude CLI subprocess.
+        const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+        const signal = this.abortSignal
+          ? AbortSignal.any([timeoutSignal, this.abortSignal])
+          : timeoutSignal;
+        const response = await fetch(`${this.proxyUrl}/api/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal,
+        });
+        const bodyText = await response.text();
+        const elapsedMs = Date.now() - startedAt;
+
+        if (!response.ok) {
+          if (isRetryable(response.status) && attempt < MAX_RETRIES) {
+            const delay = BACKOFF_MS[attempt];
+            log.warn('LLM proxy non-OK — retrying', {
+              process: processName,
+              status: response.status,
+              attempt: attempt + 1,
+              maxAttempts: MAX_RETRIES + 1,
+              backoffMs: delay,
+              elapsedMs,
+              bodySample: bodyText.slice(0, 200),
+            });
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+          log.error('LLM proxy non-OK — giving up', {
+            process: processName,
+            status: response.status,
+            attempt: attempt + 1,
+            elapsedMs,
+            bodySample: bodyText.slice(0, 300),
+          });
+          return null;
+        }
+
+        // 2xx — parse and pull `content`. When `output === maxTokens` the
+        // model truncated and returned empty content — that's deterministic
+        // for this prompt, so retrying with the same prompt would burn
+        // another full Sonnet call for the same result. Skip the retry on
+        // truncation; only retry empty content when output did NOT hit the
+        // ceiling (suggests a transient streaming hiccup).
+        let parsed;
+        try { parsed = JSON.parse(bodyText); } catch { parsed = null; }
+        const content = parsed?.content;
+        const outTokens = parsed?.tokens?.output;
+        const hitMaxTokens = typeof outTokens === 'number'
+          && outTokens >= MAX_TOKENS - 1;
+        if (!content) {
+          if (hitMaxTokens) {
+            log.error('LLM hit max_tokens — content empty, no retry (deterministic)', {
+              process: processName,
+              maxTokens: MAX_TOKENS,
+              outputTokens: outTokens,
+              inputTokens: parsed?.tokens?.input,
+              elapsedMs,
+              provider: parsed?.provider,
+              model: parsed?.model,
+            });
+            return null;
+          }
+          if (attempt < MAX_RETRIES) {
+            const delay = BACKOFF_MS[attempt];
+            log.warn('LLM 200 but empty content — retrying', {
+              process: processName,
+              attempt: attempt + 1,
+              maxAttempts: MAX_RETRIES + 1,
+              backoffMs: delay,
+              elapsedMs,
+              provider: parsed?.provider,
+              model: parsed?.model,
+              outputTokens: outTokens,
+              bodySample: bodyText.slice(0, 300),
+            });
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+          log.error('LLM 200 but empty content — giving up', {
+            process: processName,
+            attempt: attempt + 1,
+            elapsedMs,
+            bodySample: bodyText.slice(0, 300),
+          });
+          return null;
+        }
+        return content;
+      } catch (err) {
+        const elapsedMs = Date.now() - startedAt;
+        if (isRetryable(err) && attempt < MAX_RETRIES) {
+          const delay = BACKOFF_MS[attempt];
+          log.warn('LLM fetch transient — retrying', {
+            process: processName,
+            attempt: attempt + 1,
+            maxAttempts: MAX_RETRIES + 1,
+            backoffMs: delay,
+            elapsedMs,
+            err: err.message,
+          });
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        log.error('LLM fetch failed', {
+          process: processName,
+          attempt: attempt + 1,
+          elapsedMs,
+          err: err.message,
+        });
         return null;
       }
-
-      const result = await response.json();
-      return result.content || null;
-    } catch (err) {
-      process.stderr.write(`[Consolidator] LLM call failed: ${err.message}\n`);
-      return null;
     }
+    return null;
   }
 
   // --- Prompt builders ---
