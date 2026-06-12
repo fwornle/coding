@@ -33,6 +33,7 @@ import { ObservationConsolidator } from '../src/live-logging/ObservationConsolid
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
 import { ObservationPruner } from '../src/live-logging/ObservationPruner.js';
 import { ColdStoreReader } from '../src/live-logging/ColdStoreReader.js';
+import { ObservationExporter } from '../src/live-logging/ObservationExporter.js';
 // Plan 44-18 — the legacy SQLite handle is gone. ObservationPruner cut to
 // km-core in Plan 44-18 Task 2 (no more direct SQLite reads). RetrievalService
 // freshness-rerank cut to km-core in Plan 44-18 Task 3. KeywordSearch (FTS5
@@ -197,6 +198,44 @@ function ensureColdStore() {
   if (_coldStore) return _coldStore;
   _coldStore = new ColdStoreReader({});
   return _coldStore;
+}
+
+// 2026-06-12: km-core-backed ObservationExporter wiring. Plan 44-18 archived
+// the legacy SQLite file but left the exporter pointed at it, so the cold
+// store at .data/observation-export/ froze on Jun 5 and the dashboard's
+// /api/coding/observations view fell ~7 days behind km-core. The fix is in
+// ObservationExporter.js (now reads via `kmStore.graph`); this wires a
+// debounced trigger on each successful write so the cold store stays fresh.
+//
+// Cadence: 30s debounce — coalesces bursts (e.g. a sweep flushing 40
+// observations in 5 seconds runs the exporter exactly once instead of 40
+// times). Errors are best-effort and logged; nothing in the write hot path
+// is blocked.
+let _exporter = null;
+let _exportTimer = null;
+const EXPORT_DEBOUNCE_MS = 30_000;
+function ensureExporter() {
+  if (_exporter) return _exporter;
+  if (!_kmStoreReady || !_kmStore) return null;
+  _exporter = new ObservationExporter({
+    kmStore: _kmStore,
+    projectRoot: REPO_ROOT,
+  });
+  return _exporter;
+}
+function scheduleExport() {
+  if (_exportTimer) return;
+  _exportTimer = setTimeout(() => {
+    _exportTimer = null;
+    const exporter = ensureExporter();
+    if (!exporter) return;
+    try {
+      exporter.exportAll();
+    } catch (err) {
+      process.stderr.write(`[obs-api] ObservationExporter.exportAll failed: ${err.message}\n`);
+    }
+  }, EXPORT_DEBOUNCE_MS);
+  _exportTimer.unref?.();
 }
 
 // Phase 44 Plan 14: `getDb()` / `invalidateDb()` / `isCorruptionError()`
@@ -2099,7 +2138,23 @@ const server = _autostart
         });
       // Warm km-core store (independent of SQLite writer)
       ensureKMStore()
-        .then((store) => { if (store) mountKMRoutes(store); })
+        .then((store) => {
+          if (store) mountKMRoutes(store);
+          // 2026-06-12: subscribe the debounced cold-store exporter to the
+          // write bus + schedule an initial pass so the .data/observation-
+          // export/ JSON files catch up on whatever was added to km-core
+          // while obs-api wasn't running. The exporter is a no-op when the
+          // store hasn't initialised yet (guarded by ensureExporter()).
+          if (store) {
+            subscribeObservationWritten(() => scheduleExport());
+            scheduleExport();
+            // Re-run hourly as a belt-and-suspenders against missed write
+            // events (e.g., an observation lands during a coordinator
+            // failure and the event bus is briefly orphaned).
+            const hourly = setInterval(scheduleExport, 60 * 60 * 1000);
+            hourly.unref?.();
+          }
+        })
         .catch((err) => {
           process.stderr.write(`[obs-api] km-core mount failed: ${err.message}\n`);
         });

@@ -1,15 +1,21 @@
 /**
  * ObservationExporter - Git-friendly JSON export of observations, digests, and insights.
  *
- * Mirrors the UKB knowledge-export pattern: SQLite stays as the runtime store,
- * this module exports human-readable JSON to `.data/observation-export/` for
- * git tracking, cross-machine portability, and backup.
+ * Reads from a km-core `GraphKMStore` (post Plan 44-18 — the legacy SQLite
+ * file at `.observations/observations.db` was archived on 2026-06-05) and
+ * writes human-readable JSON to `.data/observation-export/` for git tracking,
+ * cross-machine portability, and backup. The dashboard's
+ * `/api/coding/observations` endpoint reads this directory via ColdStoreReader.
+ *
+ * Backwards-compat: a legacy `db` (better-sqlite3 handle) is still accepted
+ * so the pre-44 test fixture continues to work, but production callers
+ * MUST pass `kmStore`. When both are present, `kmStore` wins.
  *
  * Exported files:
  *   observations.json  — structured summaries (no raw messages)
- *   digests.json        — daily thematic digests
- *   insights.json       — persistent project knowledge
- *   metadata.json       — export stats and timestamp
+ *   digests.json       — daily thematic digests
+ *   insights.json      — persistent project knowledge
+ *   metadata.json      — export stats and timestamp
  *
  * @module ObservationExporter
  */
@@ -28,12 +34,21 @@ function safeParseJson(s) {
 export class ObservationExporter {
   /**
    * @param {Object} options
-   * @param {import('better-sqlite3').Database} options.db - Open SQLite database handle
+   * @param {Object} [options.kmStore] - km-core GraphKMStore handle (preferred).
+   *   Must expose `.graph` (the underlying Graphology instance) so we can
+   *   iterate nodes + read attributes. The store does NOT need to be open
+   *   exclusively — read-only iteration is safe alongside writes.
+   * @param {import('better-sqlite3').Database} [options.db] - Legacy SQLite
+   *   handle. Used only when `kmStore` is absent (test fixtures, Plan 44-pre
+   *   environments). When the file is the archived 4KB stub, the SELECT
+   *   throws and the export returns []; the safety-merge below preserves
+   *   the historic JSON unchanged.
    * @param {string} [options.projectRoot] - Project root (for resolving export dir)
    * @param {string} [options.exportDir] - Override export directory path
    */
-  constructor({ db, projectRoot, exportDir }) {
-    this.db = db;
+  constructor({ kmStore, db, projectRoot, exportDir }) {
+    this.kmStore = kmStore || null;
+    this.db = db || null;
     this.exportDir = exportDir || path.resolve(projectRoot || '.', DEFAULT_EXPORT_DIR);
   }
 
@@ -174,7 +189,55 @@ export class ObservationExporter {
   }
 
 
+  /**
+   * Iterate every km-core node with the given entityType. Returns plain
+   * `{ id, attrs }` records — callers do the type-specific projection.
+   * Throws if no kmStore is wired (callers should fall back to SQLite).
+   *
+   * @private
+   * @param {string} entityType
+   * @returns {Array<{id: string, attrs: any}>}
+   */
+  _kmEntitiesByType(entityType) {
+    if (!this.kmStore || !this.kmStore.graph) {
+      throw new Error('ObservationExporter: kmStore.graph not available');
+    }
+    const graph = this.kmStore.graph;
+    const out = [];
+    for (const id of graph.nodes()) {
+      const attrs = graph.getNodeAttributes(id);
+      if (attrs && attrs.entityType === entityType) out.push({ id, attrs });
+    }
+    return out;
+  }
+
   _exportObservations() {
+    // km-core path (production, post Plan 44-18).
+    if (this.kmStore && this.kmStore.graph) {
+      const rows = this._kmEntitiesByType('Observation');
+      const mapped = rows
+        .map(({ id, attrs }) => {
+          const m = (attrs && attrs.metadata) || {};
+          return {
+            id,
+            summary: attrs.description || attrs.name || '',
+            agent: m.agent || attrs.agent || 'unknown',
+            project: m.project || 'coding',
+            source: m.source || null,
+            quality: m.quality || 'normal',
+            createdAt: attrs.createdAt || null,
+            digestedAt: m.digestedAt || null,
+            llm: m.llmModel ? { model: m.llmModel, provider: m.llmProvider || null } : null,
+            modifiedFiles: Array.isArray(m.modifiedFiles) ? m.modifiedFiles : null,
+          };
+        })
+        .filter((r) => r.quality !== 'low');
+      mapped.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      return mapped;
+    }
+    // Legacy SQLite path — kept for test fixtures that still set up an
+    // in-memory better-sqlite3 handle. Production never reaches here.
+    if (!this.db) return [];
     const rows = this.db.prepare(`
       SELECT id, summary, agent, session_id, source_file, created_at,
              quality, content_hash, digested_at,
@@ -187,19 +250,11 @@ export class ObservationExporter {
       WHERE quality != 'low'
       ORDER BY created_at ASC
     `).all();
-
-    return rows.map(r => ({
+    return rows.map((r) => ({
       id: r.id,
       summary: r.summary,
       agent: r.agent,
       project: r.project || null,
-      // metadata.source distinguishes the producer pipeline ('sub-agent',
-      // 'sub-agent-backfill', etc). Plan 51-14 (CR-03) stamps this for
-      // sub-agent live writes; backfill stamps 'sub-agent-backfill'.
-      // Without this column in the export, consumers reading the JSON
-      // couldn't filter by tier (the DB tagging was always correct; only
-      // the export projection was incomplete). See:
-      //   .planning/todos/completed/json-export-missing-source-field.md
       source: r.source || null,
       quality: r.quality,
       createdAt: r.created_at,
@@ -210,15 +265,37 @@ export class ObservationExporter {
   }
 
   _exportDigests() {
+    if (this.kmStore && this.kmStore.graph) {
+      const rows = this._kmEntitiesByType('Digest');
+      const mapped = rows.map(({ id, attrs }) => {
+        const m = (attrs && attrs.metadata) || {};
+        return {
+          id,
+          date: (attrs.createdAt || '').slice(0, 10),
+          theme: m.theme || attrs.name || '',
+          summary: attrs.description || '',
+          observationIds: Array.isArray(m.observationIds) ? m.observationIds : [],
+          agents: Array.isArray(m.agents) ? m.agents : [],
+          filesTouched: Array.isArray(m.filesTouched) ? m.filesTouched : [],
+          quality: m.quality || 'normal',
+          createdAt: attrs.createdAt || null,
+          metadata: m,
+          project: m.project || 'coding',
+        };
+      });
+      mapped.sort((a, b) => {
+        const cmp = (a.date || '').localeCompare(b.date || '');
+        if (cmp !== 0) return cmp;
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+      });
+      return mapped;
+    }
+    if (!this.db) return [];
     try {
       this.db.prepare('SELECT 1 FROM digests LIMIT 0').get();
     } catch {
-      return []; // table doesn't exist yet
+      return [];
     }
-
-    // Project may be missing from older DBs that pre-date Phase A — fall
-    // back to NULL via COALESCE in the projection so the column read
-    // doesn't fail before the schema is upgraded.
     const hasProject = this._tableHasColumn('digests', 'project');
     const projectExpr = hasProject ? 'project' : 'NULL AS project';
     const rows = this.db.prepare(`
@@ -228,8 +305,7 @@ export class ObservationExporter {
       FROM digests
       ORDER BY date ASC, created_at ASC
     `).all();
-
-    return rows.map(r => ({
+    return rows.map((r) => ({
       id: r.id,
       date: r.date,
       theme: r.theme,
@@ -245,12 +321,35 @@ export class ObservationExporter {
   }
 
   _exportInsights() {
+    if (this.kmStore && this.kmStore.graph) {
+      const rows = this._kmEntitiesByType('Insight');
+      const mapped = rows.map(({ id, attrs }) => {
+        const m = (attrs && attrs.metadata) || {};
+        return {
+          id,
+          topic: attrs.name || m.topic || '',
+          summary: attrs.description || '',
+          confidence: typeof m.confidence === 'number' ? m.confidence : 0.5,
+          digestIds: Array.isArray(m.digestIds) ? m.digestIds : [],
+          lastUpdated: attrs.updatedAt || attrs.createdAt || null,
+          createdAt: attrs.createdAt || null,
+          metadata: m,
+          project: m.project || 'coding',
+        };
+      });
+      mapped.sort((a, b) => {
+        const cmp = (b.confidence || 0) - (a.confidence || 0);
+        if (cmp !== 0) return cmp;
+        return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+      });
+      return mapped;
+    }
+    if (!this.db) return [];
     try {
       this.db.prepare('SELECT 1 FROM insights LIMIT 0').get();
     } catch {
-      return []; // table doesn't exist yet
+      return [];
     }
-
     const hasProject = this._tableHasColumn('insights', 'project');
     const projectExpr = hasProject ? 'project' : 'NULL AS project';
     const rows = this.db.prepare(`
@@ -260,8 +359,7 @@ export class ObservationExporter {
       FROM insights
       ORDER BY confidence DESC, last_updated DESC
     `).all();
-
-    return rows.map(r => ({
+    return rows.map((r) => ({
       id: r.id,
       topic: r.topic,
       summary: r.summary,
@@ -289,9 +387,16 @@ export class ObservationExporter {
 
   _updateMetadataCounts() {
     let obsCnt = 0, digestCnt = 0, insightCnt = 0;
-    try { obsCnt = this.db.prepare("SELECT COUNT(*) as c FROM observations WHERE quality != 'low'").get().c; } catch { /* ok */ }
-    try { digestCnt = this.db.prepare('SELECT COUNT(*) as c FROM digests').get().c; } catch { /* ok */ }
-    try { insightCnt = this.db.prepare('SELECT COUNT(*) as c FROM insights').get().c; } catch { /* ok */ }
+    if (this.kmStore && this.kmStore.graph) {
+      // km-core path — re-iterate is cheap (single pass over node names).
+      try { obsCnt = this._kmEntitiesByType('Observation').filter((r) => (r.attrs?.metadata?.quality !== 'low')).length; } catch { /* ok */ }
+      try { digestCnt = this._kmEntitiesByType('Digest').length; } catch { /* ok */ }
+      try { insightCnt = this._kmEntitiesByType('Insight').length; } catch { /* ok */ }
+    } else if (this.db) {
+      try { obsCnt = this.db.prepare("SELECT COUNT(*) as c FROM observations WHERE quality != 'low'").get().c; } catch { /* ok */ }
+      try { digestCnt = this.db.prepare('SELECT COUNT(*) as c FROM digests').get().c; } catch { /* ok */ }
+      try { insightCnt = this.db.prepare('SELECT COUNT(*) as c FROM insights').get().c; } catch { /* ok */ }
+    }
 
     // Trust the DB count after consolidation legitimately drops rows — the
     // previous Math.max heuristic kept the higher number forever, so a single
