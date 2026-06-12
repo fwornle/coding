@@ -1572,17 +1572,48 @@ async function collectByOntologyClass(cls) {
 // /api/coding/observations — replaces SQLite /api/observations.
 // Query params preserved verbatim: agent, project, from, to, q, quality,
 // limit, offset (Pitfall 2 contract).
+//
+// 2026-06-11 cutover: this endpoint used to call collectByOntologyClass(
+// 'Observation') against km-core. We've separated the graph store (km-core,
+// for the VKB/unified-viewer hierarchy) from the time-series event log
+// (.data/observation-export/observations.json, written by ObservationExporter
+// on every consolidator pass). Observations and Digests no longer live as
+// graph nodes — they belong in the events list, read via ColdStoreReader.
+// Insights stay in km-core because they ARE graph-worthy (long-lived synthesis
+// of patterns across the codebase). See user request 2026-06-11:
+//   "you need to separate the vkb viewer content (insights only) from the
+//    tabs in the health monitoring board (observations, digests, insights)".
 app.get('/api/coding/observations', async (_req, res) => {
   try {
-    if (!_kmStoreReady || !_kmStore) {
-      return res.status(503).json({ error: 'Knowledge graph store not ready' });
-    }
     const req = _req;
     const { agent, project, from, to, q, quality } = req.query;
     const { limit, offset } = parseLimitOffset(req);
 
-    const entities = await collectByOntologyClass('Observation');
-    const reshaped = entities.map(observationToLegacy);
+    const reader = ensureColdStore();
+    // ColdStoreReader caps any single read at 366 days. The legacy contract
+    // accepts open-ended `from`/`to`; map missing bounds to the last 365 days
+    // (the longest window the reader will accept). Downstream filters still
+    // narrow on `from`/`to` after the read, so the response respects what the
+    // caller asked for. (2026-06-11 cutover.)
+    const nowIso = new Date().toISOString();
+    const yearAgoIso = new Date(Date.now() - 364 * 24 * 60 * 60 * 1000).toISOString();
+    const readFrom = from || yearAgoIso;
+    const readTo = to || nowIso;
+    // ColdStoreReader returns JSON rows verbatim — shape:
+    //   {id, summary, agent, project, quality, createdAt, digestedAt, llm, modifiedFiles}
+    // Adapt to the legacy /api/coding/observations contract used by the
+    // dashboard (Pitfall 2): keys are id, agent, project, content, timestamp,
+    // quality, artifacts.
+    const rows = reader.readObservations({ from: readFrom, to: readTo });
+    const reshaped = rows.map((r) => ({
+      id: r.id,
+      agent: typeof r.agent === 'string' ? r.agent : 'unknown',
+      project: typeof r.project === 'string' ? r.project : 'unknown',
+      content: typeof r.summary === 'string' ? r.summary : '',
+      artifacts: Array.isArray(r.modifiedFiles) ? r.modifiedFiles : [],
+      timestamp: typeof r.createdAt === 'string' ? r.createdAt : '',
+      quality: typeof r.quality === 'string' ? r.quality : 'normal',
+    }));
 
     // Legacy filter semantics, ported from the prior SQLite WHERE-builder.
     const agentSet = agent
@@ -1618,7 +1649,7 @@ app.get('/api/coding/observations', async (_req, res) => {
       total,
       limit,
       offset,
-      _metadata: { fromColdStore: false, source: 'km-core' },
+      _metadata: { fromColdStore: true, source: 'observation-export' },
     });
   } catch (err) {
     process.stderr.write(`[obs-api] /api/coding/observations error: ${err.message}\n`);
@@ -1628,17 +1659,41 @@ app.get('/api/coding/observations', async (_req, res) => {
 
 // /api/coding/digests — replaces SQLite /api/digests.
 // Query params preserved: date, from, to, q, project, limit, offset.
+//
+// 2026-06-11 cutover: same separation as /api/coding/observations — Digests
+// are time-series events (one per day per theme) and belong in the dashboard
+// list, not as graph nodes. Read from .data/observation-export/digests.json
+// via ColdStoreReader.
 app.get('/api/coding/digests', async (_req, res) => {
   try {
-    if (!_kmStoreReady || !_kmStore) {
-      return res.status(503).json({ error: 'Knowledge graph store not ready' });
-    }
     const req = _req;
     const { date, from, to, q, project } = req.query;
     const { limit, offset } = parseLimitOffset(req);
 
-    const entities = await collectByOntologyClass('Digest');
-    const reshaped = entities.map(digestToLegacy);
+    const reader = ensureColdStore();
+    // Same 365-day window as /api/coding/observations — see that handler for
+    // rationale.
+    const nowDateStr = new Date().toISOString().slice(0, 10);
+    const yearAgoStr = new Date(Date.now() - 364 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const readFrom = from || yearAgoStr;
+    const readTo = to || nowDateStr;
+    // Digest JSON shape from ObservationExporter:
+    //   {id, date, theme, summary, observation_ids[], agents[], files_touched[],
+    //    quality, created_at, project}
+    // Adapt to the legacy contract used by the dashboard.
+    const rows = reader.readDigests({ from: readFrom, to: readTo });
+    const reshaped = rows.map((r) => ({
+      id: r.id,
+      date: r.date,
+      theme: typeof r.theme === 'string' ? r.theme : '',
+      summary: typeof r.summary === 'string' ? r.summary : '',
+      observationIds: Array.isArray(r.observation_ids) ? r.observation_ids : (Array.isArray(r.observationIds) ? r.observationIds : []),
+      agents: Array.isArray(r.agents) ? r.agents : [],
+      filesTouched: Array.isArray(r.files_touched) ? r.files_touched : (Array.isArray(r.filesTouched) ? r.filesTouched : []),
+      quality: typeof r.quality === 'string' ? r.quality : 'normal',
+      createdAt: r.created_at || r.createdAt || '',
+      project: typeof r.project === 'string' ? r.project : 'unknown',
+    }));
 
     const qLower = q ? String(q).toLowerCase() : null;
 
@@ -1664,7 +1719,7 @@ app.get('/api/coding/digests', async (_req, res) => {
       total,
       limit,
       offset,
-      _metadata: { fromColdStore: false, source: 'km-core' },
+      _metadata: { fromColdStore: true, source: 'observation-export' },
     });
   } catch (err) {
     process.stderr.write(`[obs-api] /api/coding/digests error: ${err.message}\n`);
@@ -1731,6 +1786,60 @@ app.get('/api/coding/insights', async (_req, res) => {
     process.stderr.write(`[obs-api] /api/coding/insights error: ${err.message}\n`);
     res.status(500).json({ error: 'Failed to query insights' });
   }
+});
+
+// ── 2026-06-11: SSE /api/v1/stream ────────────────────────────────────────
+//
+// The unified-viewer's StatsBar opens an EventSource against
+// `${apiClient.base}/api/v1/stream` to receive live km-core stats. Until
+// today the endpoint didn't exist on obs-api, so the viewer's console
+// spammed `GET /api/v1/stream 404 (Not Found)` + `[API] [WARN] StatsBar
+// SSE connection dropped (attempt #N)` once per backoff retry forever.
+//
+// Lightweight implementation: every 10s we emit a `data: <stats>\n\n`
+// frame computed from km-core via the same `/api/v1/stats` handler.
+// `req.on('close')` clears the interval so we don't leak.
+app.get('/api/v1/stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const emit = async () => {
+    try {
+      if (!_kmStoreReady || !_kmStore) return;
+      // Reuse the same shape that /api/v1/stats returns so StatsBar's
+      // parser (which tolerates both `{success,data}` envelope and the
+      // bare ViewerStats shape) works without a second adapter.
+      const graph = _kmStore.graph;
+      const nodeCount = graph.order;
+      const edgeCount = graph.size;
+      let orphans = 0;
+      for (const id of graph.nodes()) {
+        if (graph.degree(id) === 0) orphans++;
+      }
+      const connectivity = nodeCount > 0 ? (nodeCount - orphans) / nodeCount : 0;
+      const stats = {
+        nodeCount,
+        edgeCount,
+        evidenceCount: 0,
+        patternCount: 0,
+        orphanCount: orphans,
+        componentCount: 0,
+        connectivity,
+        lastUpdated: new Date().toISOString(),
+      };
+      res.write(`data: ${JSON.stringify({ success: true, data: stats })}\n\n`);
+    } catch (err) {
+      process.stderr.write(`[obs-api] /api/v1/stream emit failed (non-fatal): ${err.message}\n`);
+    }
+  };
+
+  // Send one immediately so the client transitions from connecting → live
+  // without waiting 10s.
+  await emit();
+  const interval = setInterval(emit, 10_000);
+  req.on('close', () => clearInterval(interval));
 });
 
 // ── Phase 55 Plan 06 Task 3: SSE /api/coding/observations/stream ──────────
@@ -1826,14 +1935,20 @@ function _parseLslFilename(basename) {
   const m = LSL_FILE_REGEX.exec(basename);
   if (!m) return null;
   const [, date, startHHMM, endHHMM, , , , subHash, hash] = m;
-  // ISO at the boundary of each HHMM slot, UTC. The trailing `:00Z` is
-  // appended so Date.parse round-trips cleanly across runtimes.
+  // 2026-06-12: LSL filenames use the writer's LOCAL time (CEST, etc.) —
+  // NOT UTC. The prior parser stamped them with a trailing 'Z' which
+  // mis-bucketed every session by the local-tz offset (entities created
+  // at 05:00 UTC ended up in a "07:00 UTC" bucket on a CEST host). Parse
+  // as local time and convert to UTC ISO via toISOString().
   const startHH = startHHMM.slice(0, 2);
   const startMM = startHHMM.slice(2, 4);
   const endHH = endHHMM.slice(0, 2);
   const endMM = endHHMM.slice(2, 4);
-  const startAt = `${date}T${startHH}:${startMM}:00.000Z`;
-  const endAt = `${date}T${endHH}:${endMM}:00.000Z`;
+  const startLocal = new Date(`${date}T${startHH}:${startMM}:00`);
+  const endLocal = new Date(`${date}T${endHH}:${endMM}:00`);
+  if (Number.isNaN(startLocal.getTime()) || Number.isNaN(endLocal.getTime())) return null;
+  const startAt = startLocal.toISOString();
+  const endAt = endLocal.toISOString();
   // Session id prefers the explicit sub-agent hash when present; otherwise
   // the parent-session hash from the filename.
   const id = subHash || hash;
@@ -1863,6 +1978,72 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       || path.join(REPO_ROOT, '.specstory', 'history');
 
     const nowMs = Date.now();
+
+    // 2026-06-12: real per-bucket observation count + entityIds. Previously
+    // we only ran findByLegacyId for the session prefix (which finds the
+    // session ENTITY itself, not the observations created during the hour
+    // bucket), so observationCount was always 0 or 1 and entityIds was at
+    // most one. Now we pre-scan all km-core entities once, group by hour
+    // bucket of their createdAt + project team, and look up per file.
+    // O(n) scan with O(1) lookup — for ~900 entities this is sub-ms.
+    // 2026-06-12: switched from hour-slice bucketing to RANGE-MATCH
+    // aggregation. LSL file timestamps are parsed local→UTC; entities'
+    // createdAt is already UTC. Their UTC hours don't align when the
+    // host TZ is non-UTC, so slice(0,13) buckets diverged. Instead we
+    // pre-scan all entities into a sorted list, then for each parsed
+    // LSL session do a linear scan to find entities whose createdAt
+    // falls in [startAt, endAt). For ~900 entities × ~200 sessions
+    // that's ~180k comparisons — sub-ms.
+    const TYPE_RANK = (t) => {
+      if (t === 'Insight') return 0;
+      if (t === 'Observation' || t === 'Digest') return 9;
+      return 5;
+    };
+    const HIDDEN_FROM_VIEWER = new Set(['Observation', 'Digest']);
+    const allEnts = []; // [{id, type, hidden, createdMs}]
+    try {
+      if (_kmStoreReady && _kmStore && _kmStore.graph) {
+        const graph = _kmStore.graph;
+        for (const id of graph.nodes()) {
+          const attrs = graph.getNodeAttributes(id);
+          const created = attrs.createdAt
+            || (attrs.metadata && attrs.metadata.createdAt);
+          if (typeof created !== 'string') continue;
+          const createdMs = Date.parse(created);
+          if (!Number.isFinite(createdMs)) continue;
+          allEnts.push({
+            id,
+            type: attrs.entityType,
+            hidden: HIDDEN_FROM_VIEWER.has(attrs.entityType)
+              || (typeof attrs.name === 'string' && attrs.name.startsWith('[Raw]')),
+            createdMs,
+          });
+        }
+      }
+    } catch (err) {
+      process.stderr.write(`[obs-api] /api/coding/lsl/sessions bucket scan failed: ${err.message}\n`);
+    }
+    // Keyed by session-startAt ISO so we can look it up below in the
+    // file-walk loop.
+    const entitiesBySessionStart = new Map();
+    // 2026-06-12: every tick must be clickable. Return ALL entityIds in
+    // the bucket, sorted by TYPE_RANK so the FIRST one is the best
+    // selection target — Insights bubble up; if none, the user gets the
+    // top non-stream entity; if still none, an Observation. The graph
+    // won't react when the selected entity is hidden (Observation/
+    // Digest), but the right panel still shows its content so the user
+    // can read what was captured during that session.
+    const aggregateForRange = (startMs, endMs) => {
+      const matches = allEnts.filter(
+        (e) => e.createdMs >= startMs && e.createdMs < endMs,
+      );
+      matches.sort((a, b) => TYPE_RANK(a.type) - TYPE_RANK(b.type));
+      return {
+        entityIds: matches.map((x) => x.id),
+        totalCount: matches.length,
+      };
+    };
+
     const sessions = [];
     for (const file of _walkLslDir(historyDir)) {
       const parsed = _parseLslFilename(path.basename(file));
@@ -1870,29 +2051,23 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       if (parsed.startAt < sinceISO) continue;
       // Currently-running heuristic: when endAt is in the future, surface
       // null so the unified-viewer LslTimelineStrip renders the live pulse.
-      const endAt = Date.parse(parsed.endAt) > nowMs ? null : parsed.endAt;
-      // Per-session entity aggregation: opt-in via km-core findByLegacyId.
-      // The km-core store doesn't currently index by `metadata.lslSessionIds`,
-      // so a full scan would dominate the hot path. Aggregate via
-      // findByLegacyId when the writer tags rows with `system: 'A'` and the
-      // session id as legacyId.id; fall back to an empty array otherwise.
-      let entityIds = [];
-      try {
-        if (_kmStoreReady && _kmStore) {
-          const entity = await _kmStore.findByLegacyId({ system: 'A', id: parsed.id });
-          if (entity && typeof entity.id === 'string') {
-            entityIds = [entity.id];
-          }
-        }
-      } catch (err) {
-        // Best-effort — never let a per-session lookup error 500 the whole list.
-        process.stderr.write(`[obs-api] /api/coding/lsl/sessions findByLegacyId for ${parsed.id} failed: ${err.message}\n`);
-      }
+      const endAtRaw = parsed.endAt;
+      const endAt = Date.parse(endAtRaw) > nowMs ? null : endAtRaw;
+      // 2026-06-12: RANGE match — find entities created within
+      // [startAt, endAt) (or [startAt, now) when still running).
+      const startMs = Date.parse(parsed.startAt);
+      const endMs = endAt ? Date.parse(endAt) : Date.now() + 1;
+      const { entityIds, totalCount } =
+        (Number.isFinite(startMs) && Number.isFinite(endMs))
+          ? aggregateForRange(startMs, endMs)
+          : { entityIds: [], totalCount: 0 };
+      // Persist for the client side (debug / future per-session API).
+      entitiesBySessionStart.set(parsed.startAt, entityIds);
       sessions.push({
         id: parsed.id,
         startAt: parsed.startAt,
         endAt,
-        observationCount: entityIds.length,
+        observationCount: totalCount,
         entityIds,
       });
     }

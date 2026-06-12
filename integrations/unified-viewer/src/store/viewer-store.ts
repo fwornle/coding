@@ -70,6 +70,20 @@ export interface ViewerState {
   selectedNodeId: string | null
   selectedEdgeId: string | null
 
+  // 2026-06-11: ancestry path of `selectedNodeId` (System → … → selected).
+  // When non-empty, reducer dims every node NOT in this set so the path
+  // through the hierarchy is visually traced from the clicked node back
+  // to the root — VKB reference behaviour. Empty = no path highlight.
+  pathToSelected: ReadonlySet<string>
+
+  // 2026-06-11: VKB-style filter rail additions.
+  //   - learningSource: 'batch' (manual/UKB) | 'online' (auto/ETM) | 'combined' (both)
+  //   - selectedTeams: empty Set = "all visible"; populated = exact filter
+  // Drives computeNodeState: nodes whose metadata.source / metadata.team
+  // don't match get filter-hidden.
+  learningSource: 'batch' | 'online' | 'combined'
+  selectedTeams: ReadonlySet<string>
+
   // Filters
   searchQuery: string
   visibleLevels: Set<Level>
@@ -83,6 +97,11 @@ export interface ViewerState {
   // UI
   theme: ThemePref
   filterRailCollapsed: boolean
+  // 2026-06-11: which graph renderer drives the central canvas. `d3`
+  // ports VKB's original force-directed SVG view verbatim — chosen
+  // automatically for the coding/VKB tab. `sigma` keeps the WebGL
+  // viewer for OKB / Knowledge-Graph tabs.
+  renderer: 'd3' | 'sigma'
 
   // Phase 45 actions
   setSelectedNode: (id: string | null) => void
@@ -136,10 +155,18 @@ export interface ViewerState {
   // ---------- Phase 55 — coding-only hierarchy / LSL slices ----------
   hierarchySubtreeFilter: string | null
   lslSessionFilter: string[]
+  // 2026-06-12: the entity-id set the LSL session filter resolves to.
+  // Mirrors `lslSessionFilter` semantically (which is just IDs) so the
+  // D3 graph predicate can intersect entities against it cheaply.
+  // null = "no filter" (every visible entity passes); empty set = "this
+  // session has zero clickable entities — show nothing". The strip is
+  // the producer; the graph + side panel are consumers.
+  lslFilterEntityIds: ReadonlySet<string> | null
   setHierarchySubtreeFilter: (rootId: string | null) => void
   setLslSessionFilter: (ids: string[]) => void
   addLslSessionFilter: (id: string) => void
   clearLslSessionFilter: () => void
+  setLslFilterEntityIds: (ids: ReadonlySet<string> | null) => void
 }
 
 function readPersistedThemeForStore(): ThemePref {
@@ -164,10 +191,18 @@ export const useViewerStore = create<ViewerState>((set) => ({
   // ---------- Phase 45 baseline ----------
   selectedNodeId: null,
   selectedEdgeId: null,
+  pathToSelected: new Set<string>(),
   searchQuery: '',
   visibleLevels: new Set<Level>([0, 1, 2, 3]),
   selectedClasses: new Set<string>(),
+  // VKB-style filters (2026-06-11). Default Combined + all teams visible.
+  learningSource: 'combined',
+  selectedTeams: new Set<string>(),
   theme: readPersistedThemeForStore(),
+  // Default to the D3 renderer — that's the VKB-parity engine. The
+  // UnifiedViewer route can override to 'sigma' for systems that
+  // intentionally want the WebGL viewer (OKB / Knowledge-Graph).
+  renderer: 'd3' as const,
   filterRailCollapsed: false,
 
   setSelectedNode: (id) => set({ selectedNodeId: id }),
@@ -221,13 +256,32 @@ export const useViewerStore = create<ViewerState>((set) => ({
 
   toggleLayer: (layer) =>
     set((s) => {
-      const idx = s.selectedLayers.indexOf(layer)
-      if (idx >= 0) {
-        const next = s.selectedLayers.slice()
-        next.splice(idx, 1)
-        return { selectedLayers: next }
+      // 2026-06-12: two related UX bugs the empty-array sentinel kept
+      // re-creating.
+      // (A) Initial state is `selectedLayers = []` meaning "all visible".
+      //     Clicking Evidence used to push `['evidence']` ⇒ Pattern looked
+      //     unchecked. Fix: materialise the full set first, then toggle.
+      // (B) After (A), the user unchecks Evidence then unchecks Pattern.
+      //     The naive splice leaves `[]` which collapses BACK to "all
+      //     visible" so both checkboxes light up again. Fix: when a
+      //     removal would empty the array, emit `['__none__']` — the
+      //     reading code (D3 filter predicate, sigma graph-builder)
+      //     treats this as "none visible" instead of all.
+      // (C) Clicking anything from the `['__none__']` state turns ONLY
+      //     that one on (the user just chose it explicitly).
+      const ALL_LAYERS = ['evidence', 'pattern']
+      if (s.selectedLayers.includes('__none__')) {
+        // Coming out of "none visible" — selecting this one only.
+        return { selectedLayers: [layer] }
       }
-      return { selectedLayers: [...s.selectedLayers, layer] }
+      const base = s.selectedLayers.length === 0 ? ALL_LAYERS.slice() : s.selectedLayers
+      const idx = base.indexOf(layer)
+      if (idx >= 0) {
+        const next = base.slice()
+        next.splice(idx, 1)
+        return { selectedLayers: next.length === 0 ? ['__none__'] : next }
+      }
+      return { selectedLayers: [...base, layer] }
     }),
 
   toggleDomain: (domain) =>
@@ -252,7 +306,32 @@ export const useViewerStore = create<ViewerState>((set) => ({
       return { selectedOntologyClasses: [...s.selectedOntologyClasses, cls] }
     }),
 
-  setSelectedOntologyClasses: (classes) => set({ selectedOntologyClasses: classes.slice() }),
+  setSelectedOntologyClasses: (classes) =>
+    set((s) => {
+      // 2026-06-12: bridge to the legacy `selectedClasses: Set<string>`
+      // field that the graph-builder + D3GraphCanvas still read from.
+      // Without this sync, OntologyFilter checkboxes update the new
+      // `selectedOntologyClasses` array but never reach the graph
+      // predicate. The `__none__` sentinel collapses to an empty Set
+      // here so the readers' "empty = none visible if learningSource
+      // != combined; else all visible" semantics still hold via the
+      // explicit value below.
+      const arr = classes.slice()
+      const isNoneSentinel = arr.length === 1 && arr[0] === '__none__'
+      // If the new array is "all visible" (length 0), keep the legacy
+      // Set populated with everything currently in it so the graph
+      // doesn't suddenly hide all nodes. Otherwise the new array IS
+      // the source of truth.
+      const nextLegacy: Set<string> = isNoneSentinel
+        ? new Set<string>()
+        : arr.length === 0
+          ? s.selectedClasses
+          : new Set(arr)
+      return {
+        selectedOntologyClasses: arr,
+        selectedClasses: nextLegacy,
+      }
+    }),
 
   toggleShowEdges: () => set((s) => ({ showEdges: !s.showEdges })),
   toggleShowClusters: () => set((s) => ({ showClusters: !s.showClusters })),
@@ -290,6 +369,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
   // ---------- Phase 55 — coding-only hierarchy / LSL ----------
   hierarchySubtreeFilter: null,
   lslSessionFilter: [],
+  lslFilterEntityIds: null,
 
   setHierarchySubtreeFilter: (rootId) => set({ hierarchySubtreeFilter: rootId }),
   setLslSessionFilter: (ids) => set({ lslSessionFilter: ids.slice() }),
@@ -303,5 +383,6 @@ export const useViewerStore = create<ViewerState>((set) => ({
       return { lslSessionFilter: [...s.lslSessionFilter, id] }
     }),
 
-  clearLslSessionFilter: () => set({ lslSessionFilter: [] }),
+  clearLslSessionFilter: () => set({ lslSessionFilter: [], lslFilterEntityIds: null }),
+  setLslFilterEntityIds: (ids) => set({ lslFilterEntityIds: ids }),
 }))
