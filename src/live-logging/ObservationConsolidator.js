@@ -1368,18 +1368,28 @@ export class ObservationConsolidator {
         digestChunks.push(projDigests.slice(i, i + DIGEST_CHUNK_SIZE));
       }
 
+      // 2026-06-12: chunks within the same project no longer run strictly
+      // sequentially — each Sonnet call is 60-90s, and at 22 chunks the
+      // pass took ~25min wall-clock. We now process chunks in BATCHES of
+      // CHUNK_CONCURRENCY: every chunk in a batch fires its LLM call
+      // concurrently and sees the same `projectInsightEntries` snapshot
+      // (the cross-chunk awareness ONLY needs to look at *prior* batches'
+      // results — chunks within a batch can't see each other anyway, and
+      // the post-batch merge folds them in for the next batch's view).
+      // Net: 4x wall-clock speedup with the same quality / dedup behavior
+      // we had with the old in-batch group of size 1.
+      const CHUNK_CONCURRENCY = 4;
       let projectInsightEntries = [];
-      for (let ci = 0; ci < digestChunks.length; ci++) {
-        const chunk = digestChunks[ci];
 
+      const buildChunkPrompt = (chunk, snapshot) => {
         const digestBlock = chunk.map(d =>
           `[${d.date}] ${d.theme}\n${d.summary}`
         ).join('\n\n---\n\n');
 
         // Score existing insights by topical overlap with this chunk's
-        // digests. Insights produced in earlier chunks of the same project
-        // run are kept whole (small set) so the LLM still sees them and
-        // can merge into them rather than restate.
+        // digests. Insights produced in *prior batches* of the same
+        // project run are kept whole (small set) so the LLM still sees
+        // them and can merge into them rather than restate.
         const chunkTokens = this._tokenize(
           chunk.map(d => `${d.theme} ${d.summary}`).join(' ')
         );
@@ -1391,36 +1401,58 @@ export class ObservationConsolidator {
           .map(e => ({ topic: e.entry.topic, summary: e.entry.summary }));
         const currentInsights = [
           ...relevantExisting,
-          ...projectInsightEntries,
+          ...snapshot,
         ];
         const existingBlock = currentInsights.length > 0
           ? currentInsights.map(i => `## ${i.topic}\n${i.summary}`).join('\n\n')
           : 'None yet.';
 
-        process.stderr.write(`[Consolidator] Insight synthesis ${project} chunk ${ci + 1}/${digestChunks.length} (${chunk.length} digests)\n`);
+        return this._buildInsightPrompt(digestBlock, existingBlock, chunk.length);
+      };
 
-        const prompt = this._buildInsightPrompt(digestBlock, existingBlock, chunk.length);
-        const result = await this._callLLM(prompt, 'consolidator-insight');
+      for (let batchStart = 0; batchStart < digestChunks.length; batchStart += CHUNK_CONCURRENCY) {
+        const batchEnd = Math.min(batchStart + CHUNK_CONCURRENCY, digestChunks.length);
+        const snapshot = [...projectInsightEntries];
 
-        if (!result) {
-          process.stderr.write(`[Consolidator] LLM call failed for ${project} insight chunk ${ci + 1}, skipping\n`);
-          continue;
+        // Fire each chunk in the batch concurrently. Each promise resolves
+        // to `{ ci, chunkInsights }` (or null on LLM failure).
+        const batchPromises = [];
+        for (let ci = batchStart; ci < batchEnd; ci++) {
+          const chunk = digestChunks[ci];
+          process.stderr.write(`[Consolidator] Insight synthesis ${project} chunk ${ci + 1}/${digestChunks.length} (${chunk.length} digests)\n`);
+          const prompt = buildChunkPrompt(chunk, snapshot);
+          batchPromises.push(
+            this._callLLM(prompt, 'consolidator-insight').then((result) => {
+              if (!result) {
+                process.stderr.write(`[Consolidator] LLM call failed for ${project} insight chunk ${ci + 1}, skipping\n`);
+                return null;
+              }
+              const chunkInsights = this._parseInsights(result, chunk);
+              for (const ni of chunkInsights) {
+                ni.project = project;
+                ni._digestIds = chunk.map(d => d.id);
+              }
+              return chunkInsights;
+            })
+          );
         }
 
-        const chunkInsights = this._parseInsights(result, chunk);
-        for (const newInsight of chunkInsights) {
-          newInsight.project = project;
-          newInsight._digestIds = chunk.map(d => d.id);
-          const existingIdx = projectInsightEntries.findIndex(e => e.topic === newInsight.topic);
-          if (existingIdx >= 0) {
-            // Preserve digest-id provenance across chunks so a topic
-            // touched twice within the same project run still records
-            // every contributing digest.
-            const prior = projectInsightEntries[existingIdx]._digestIds || [];
-            newInsight._digestIds = [...new Set([...prior, ...newInsight._digestIds])];
-            projectInsightEntries[existingIdx] = newInsight;
-          } else {
-            projectInsightEntries.push(newInsight);
+        const batchResults = await Promise.all(batchPromises);
+        // Merge in deterministic order (ci-asc within the batch) so a
+        // topic produced by two chunks in the same batch keeps the later
+        // chunk's version with merged digest provenance — same semantic
+        // as the prior sequential loop.
+        for (const chunkInsights of batchResults) {
+          if (!chunkInsights) continue;
+          for (const newInsight of chunkInsights) {
+            const existingIdx = projectInsightEntries.findIndex(e => e.topic === newInsight.topic);
+            if (existingIdx >= 0) {
+              const prior = projectInsightEntries[existingIdx]._digestIds || [];
+              newInsight._digestIds = [...new Set([...prior, ...newInsight._digestIds])];
+              projectInsightEntries[existingIdx] = newInsight;
+            } else {
+              projectInsightEntries.push(newInsight);
+            }
           }
         }
       }
