@@ -129,6 +129,20 @@ export class ObservationExporter {
   _mergeWithExisting(dbObs, dbDigests, dbInsights) {
     const result = { observations: dbObs, digests: dbDigests, insights: dbInsights };
 
+    // Content-key extractor — defines a "same record" identity stronger
+    // than the bare `id`. Used to suppress duplicates when km-core mints
+    // a new UUID v7 for what is logically the same legacy SQLite row.
+    // Without this, a digest re-keyed from `019eb732-…` (graphology key)
+    // to `288fdf74-…` (legacyId.id) would be seen as a brand-new row by
+    // the id-only set check and accumulate every export pass.
+    const contentKey = (filename, r) => {
+      if (filename === 'digests.json') return `D|${r.date || ''}|${r.theme || ''}`;
+      if (filename === 'insights.json') return `I|${r.topic || ''}`;
+      // Observations don't suffer the same re-keying because their export
+      // shape was stable across Plan 44; key on id alone for them.
+      return `O|${r.id || ''}`;
+    };
+
     const mergeArrays = (dbRecords, filename) => {
       if (!dbRecords) return null;
       try {
@@ -141,9 +155,14 @@ export class ObservationExporter {
         // deleted by consolidation and must not be resurrected.
         const tombstoned = this._collectTombstones(dbRecords);
 
-        const dbIds = new Set(dbRecords.map(r => r.id));
-        const preserved = existing.filter(r => !dbIds.has(r.id) && !tombstoned.has(r.id));
-        const resurrected = existing.filter(r => !dbIds.has(r.id) && tombstoned.has(r.id));
+        const dbIds = new Set(dbRecords.map((r) => r.id));
+        const dbContentKeys = new Set(dbRecords.map((r) => contentKey(filename, r)));
+        const preserved = existing.filter((r) =>
+          !dbIds.has(r.id) &&
+          !tombstoned.has(r.id) &&
+          !dbContentKeys.has(contentKey(filename, r)),
+        );
+        const resurrected = existing.filter((r) => !dbIds.has(r.id) && tombstoned.has(r.id));
         const merged = [...preserved, ...dbRecords];
         process.stderr.write(
           `[ObservationExporter] Safety merge for ${filename}: kept ${preserved.length} historic + ${dbRecords.length} current = ${merged.length} total` +
@@ -269,16 +288,25 @@ export class ObservationExporter {
       const rows = this._kmEntitiesByType('Digest');
       const mapped = rows.map(({ id, attrs }) => {
         const m = (attrs && attrs.metadata) || {};
+        // km-core metadata uses SNAKE_CASE for the legacy SQLite-derived
+        // relationship fields — observation_ids, files_touched (see the
+        // wire-shape lock in @fwornle/km-core's digestToLegacy). Reading
+        // camelCase here returned undefined → empty arrays → the dashboard
+        // showed "0 obs" on every km-core-sourced digest.
         return {
-          id,
-          date: (attrs.createdAt || '').slice(0, 10),
+          id: (attrs.legacyId && attrs.legacyId.id) || id,
+          date: m.date || (attrs.createdAt || '').slice(0, 10),
           theme: m.theme || attrs.name || '',
-          summary: attrs.description || '',
-          observationIds: Array.isArray(m.observationIds) ? m.observationIds : [],
+          summary: m.summary || attrs.description || '',
+          observationIds: Array.isArray(m.observation_ids)
+            ? m.observation_ids
+            : (Array.isArray(m.observationIds) ? m.observationIds : []),
           agents: Array.isArray(m.agents) ? m.agents : [],
-          filesTouched: Array.isArray(m.filesTouched) ? m.filesTouched : [],
+          filesTouched: Array.isArray(m.files_touched)
+            ? m.files_touched
+            : (Array.isArray(m.filesTouched) ? m.filesTouched : []),
           quality: m.quality || 'normal',
-          createdAt: attrs.createdAt || null,
+          createdAt: m.createdAt || attrs.createdAt || null,
           metadata: m,
           project: m.project || 'coding',
         };
@@ -325,14 +353,20 @@ export class ObservationExporter {
       const rows = this._kmEntitiesByType('Insight');
       const mapped = rows.map(({ id, attrs }) => {
         const m = (attrs && attrs.metadata) || {};
+        // Same snake_case convention as Digest — km-core stores digest_ids
+        // and last_updated under the legacy SQLite naming. insightToLegacy
+        // in @fwornle/km-core reads m.digest_ids; do likewise here so the
+        // ColdStore JSON matches the dashboard's km-core-backed view.
         return {
-          id,
-          topic: attrs.name || m.topic || '',
-          summary: attrs.description || '',
-          confidence: typeof m.confidence === 'number' ? m.confidence : 0.5,
-          digestIds: Array.isArray(m.digestIds) ? m.digestIds : [],
-          lastUpdated: attrs.updatedAt || attrs.createdAt || null,
-          createdAt: attrs.createdAt || null,
+          id: (attrs.legacyId && attrs.legacyId.id) || id,
+          topic: m.topic || attrs.name || '',
+          summary: m.summary || attrs.description || '',
+          confidence: typeof m.confidence === 'number' ? m.confidence : 0,
+          digestIds: Array.isArray(m.digest_ids)
+            ? m.digest_ids
+            : (Array.isArray(m.digestIds) ? m.digestIds : []),
+          lastUpdated: m.last_updated || attrs.updatedAt || attrs.createdAt || null,
+          createdAt: m.createdAt || attrs.createdAt || null,
           metadata: m,
           project: m.project || 'coding',
         };
