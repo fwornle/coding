@@ -252,6 +252,15 @@ export class ObservationWriter {
      *  service restart yields a fresh runId in the stamp. */
     this._runId = 'obs-writer-' + Date.now() + '-' +
       Math.random().toString(36).slice(2, 8);
+
+    // Anchor-edge cache. Every Observation/Digest/Insight written by this
+    // class would otherwise land as a km-core orphan (zero edges). We attach
+    // each new node to the LiveLoggingSystem Component so the unified viewer
+    // doesn't show a rotating outer ring of disconnected dots. Resolved
+    // lazily at first write — null until then, null on lookup failure (the
+    // anchor edge is a best-effort, never break the write hot path).
+    this._anchorId = null;
+    this._anchorResolveAttempted = false;
   }
 
   /**
@@ -355,6 +364,69 @@ export class ObservationWriter {
       `[ObservationWriter] kmStore initialized: ${this._kmStoreDbPath} (ontologyDir=${ontologyDir})\n`
     );
     return this._kmStore;
+  }
+
+  /**
+   * Resolve (and cache) the id of the LiveLoggingSystem Component node — the
+   * anchor every Observation/Digest/Insight gets a `capturedBy` edge to.
+   * Without this anchor every new node lands as an orphan and the unified
+   * viewer renders the outer-ring dot-art the user has objected to (2026-06-11).
+   *
+   * Scans nodes once via Components ontology class and matches by name. Result
+   * cached on the instance — restart re-resolves. Returns null if the anchor
+   * does not exist (a fresh km-core with no project hierarchy yet); callers
+   * MUST treat null as "skip anchoring" rather than failing the write.
+   */
+  async _resolveAnchorId(kmStore) {
+    if (this._anchorId) return this._anchorId;
+    if (this._anchorResolveAttempted) return null;
+    this._anchorResolveAttempted = true;
+    try {
+      const components = await kmStore.findByOntologyClass('Component');
+      const lsl = components.find((e) => e && e.name === 'LiveLoggingSystem');
+      if (lsl && lsl.id) {
+        this._anchorId = lsl.id;
+        process.stderr.write(
+          `[ObservationWriter] anchor resolved: LiveLoggingSystem = ${lsl.id}\n`
+        );
+        return lsl.id;
+      }
+      process.stderr.write(
+        `[ObservationWriter] anchor lookup: LiveLoggingSystem Component not found — writes will be orphan-prone\n`
+      );
+      return null;
+    } catch (err) {
+      process.stderr.write(
+        `[ObservationWriter] anchor resolve failed (continuing without anchor): ${err.message}\n`
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Attach a `capturedBy` edge from the just-written entity to the
+   * LiveLoggingSystem anchor. Best-effort: any failure (anchor missing,
+   * duplicate-edge race, store error) logs to stderr and returns — the
+   * observation/digest/insight write is already durable.
+   */
+  async _anchorEntity(kmStore, fromId, relationType = 'capturedBy') {
+    if (!fromId) return;
+    const anchorId = await this._resolveAnchorId(kmStore);
+    if (!anchorId) return;
+    try {
+      await kmStore.addRelation({
+        from: fromId,
+        to: anchorId,
+        type: relationType,
+        metadata: { source: 'observation-writer', anchoredAt: new Date().toISOString() },
+      });
+    } catch (err) {
+      // Source/Target-not-found can race with a putEntity in-flight; treat
+      // as benign. Other errors get one-line logged.
+      process.stderr.write(
+        `[ObservationWriter] anchor edge ${fromId}->${anchorId} failed (non-fatal): ${err.message}\n`
+      );
+    }
   }
 
   /**
@@ -974,7 +1046,19 @@ export class ObservationWriter {
     };
     try {
       const entity = legacyObservationToEntity(obsRow, this._runId, nowISO);
-      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      // Ontology normalization (2026-06-11): the legacy adapter sets
+      // entityType='Observation' AND ontologyClass='Observation', which
+      // pollutes the 4-class hierarchy {Project, Component, SubComponent,
+      // Detail} that VKB + unified-viewer color/filter against. Keep
+      // entityType='Observation' as a free-form category tag, but force
+      // ontologyClass='Detail' so the node renders inside the hierarchy.
+      // Also stamp `metadata.source='auto'` so VKB's data-processor
+      // (lib/vkb-server/data-processor.js:175) maps it to the 'online'
+      // bucket → red dot, not blue.
+      entity.ontologyClass = 'Detail';
+      entity.metadata = { ...entity.metadata, source: 'auto' };
+      const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      await this._anchorEntity(kmStore, mintedId);
     } catch (err) {
       process.stderr.write(
         `[ObservationWriter] km-core putEntity (observation) failed: ${err.message}\n`
@@ -1049,7 +1133,11 @@ export class ObservationWriter {
     const ts = row.created_at || new Date().toISOString();
     try {
       const entity = legacyDigestToEntity(row, this._runId, ts);
-      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      // See writeObservation for the rationale.
+      entity.ontologyClass = 'Detail';
+      entity.metadata = { ...entity.metadata, source: 'auto' };
+      const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      await this._anchorEntity(kmStore, mintedId);
       return row.id;
     } catch (err) {
       process.stderr.write(
@@ -1085,7 +1173,11 @@ export class ObservationWriter {
     const ts = row.created_at || new Date().toISOString();
     try {
       const entity = legacyInsightToEntity(row, this._runId, ts);
-      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      // See writeObservation for the rationale.
+      entity.ontologyClass = 'Detail';
+      entity.metadata = { ...entity.metadata, source: 'auto' };
+      const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      await this._anchorEntity(kmStore, mintedId);
       return row.id;
     } catch (err) {
       process.stderr.write(
