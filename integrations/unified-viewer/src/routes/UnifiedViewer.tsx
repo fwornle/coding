@@ -31,6 +31,7 @@ import {
 } from '@/config/system-endpoints'
 import { ApiClient } from '@/api/ApiClient'
 import { SigmaCanvas } from '@/graph/SigmaCanvas'
+import { D3GraphCanvas } from '@/graph/D3GraphCanvas'
 import { useGraphData } from '@/graph/useGraphData'
 import { deriveLevel } from '@/graph/graph-builder'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -104,6 +105,9 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   // Phase 55 — Zustand mode slice.
   const mode = useViewerStore((s) => s.mode)
   const setMode = useViewerStore((s) => s.setMode)
+  // 2026-06-11: subscribe to the renderer flag so the NavBar toggle
+  // remounts the central canvas reactively (D3 ↔ Sigma).
+  const renderer = useViewerStore((s) => s.renderer)
   const [searchParams, setSearchParams] = useSearchParams()
   const hasIncidents = useMemo(() => entitiesHaveIncidents(entities), [entities])
 
@@ -219,11 +223,55 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
     }
   }, [classOptions])
 
-  // Visible-count predicate — mirrors computeNodeState in graph-builder.
-  // Semantic: "what's checked is what's visible" (empty Set = nothing).
+  // Visible-count predicate — mirrors the FULL D3GraphCanvas filter
+  // pipeline so the Footer "Showing X of Y" actually changes when the
+  // user toggles LearningSource / Teams / Layer / HideDocNodes. The
+  // previous version only saw level/class/search, which is why every
+  // other filter looked like it had no effect.
+  const learningSource = useViewerStore((s) => s.learningSource)
+  const selectedTeams = useViewerStore((s) => s.selectedTeams)
+  const selectedLayers = useViewerStore((s) => s.selectedLayers)
+  const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
   const visibleCount = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return entities.reduce((n, e) => {
+      // [Raw] placeholders are not real knowledge — match D3 viewer's hide.
+      if (typeof e.name === 'string' && e.name.startsWith('[Raw]')) return n
+      // Observations + Digests are raw stream items — hide from the count
+      // since the D3 viewer hides them too.
+      const etype = (e as unknown as { entityType?: string }).entityType
+      if (etype === 'Observation' || etype === 'Digest') return n
+      const meta = (e.metadata as { team?: string; source?: string; layer?: string; doc?: boolean } | undefined) ?? {}
+      // Teams
+      if (selectedTeams.size > 0) {
+        if (selectedTeams.has('__none__')) return n
+        const team = meta.team ?? 'coding'
+        if (!selectedTeams.has(team)) return n
+      }
+      // LearningSource (structural backbone exempt — same as graph-builder)
+      if (learningSource && learningSource !== 'combined') {
+        const ocls = e.ontologyClass
+        const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
+        if (!isStructural) {
+          const isAuto = meta.source === 'auto' || meta.source === 'online'
+          if (learningSource === 'online' && !isAuto) return n
+          if (learningSource === 'batch' && isAuto) return n
+        }
+      }
+      // Layer
+      if (selectedLayers.includes('__none__')) return n
+      if (selectedLayers.length > 0) {
+        const layer = meta.layer ?? (e as unknown as { layer?: string }).layer
+        const inferred = layer
+          ?? (e.ontologyClass === 'Insight' || e.ontologyClass === 'Pattern' ? 'pattern' : 'evidence')
+        if (!selectedLayers.includes(inferred)) return n
+      }
+      // Doc-nodes
+      if (hideDocNodes) {
+        const isDoc = meta.doc === true || e.ontologyClass === 'Documentation'
+        if (isDoc) return n
+      }
+      // Class + Level + Search
       const level = e.level ?? deriveLevel(e.ontologyClass)
       const levelOk = level !== undefined && visibleLevels.has(level)
       const classOk =
@@ -234,7 +282,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
         (typeof e.description === 'string' && e.description.toLowerCase().includes(q))
       return n + (levelOk && classOk && searchOk ? 1 : 0)
     }, 0)
-  }, [entities, searchQuery, visibleLevels, selectedClasses])
+  }, [entities, searchQuery, visibleLevels, selectedClasses, learningSource, selectedTeams, selectedLayers, hideDocNodes])
 
   const canvas = (() => {
     if (isLoading) return <InitialLoadingState system={system} />
@@ -295,7 +343,18 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
         </Suspense>
       )
     }
-    return <SigmaCanvas apiClient={apiClient} system={system} />
+    // 2026-06-11: VKB-parity port — coding/VKB tab uses the D3 viewer
+    // (verbatim port of memory-visualizer's GraphVisualization). OKB and
+    // any other system stay on the sigma WebGL canvas. The user can flip
+    // back to sigma via the NavBar renderer toggle.
+    // NOTE: `renderer` is captured at parent-render time (see the
+    // subscribed value at the top of this component) so the toggle
+    // re-mounts the canvas reactively.
+    const useD3 = system === 'coding' && renderer === 'd3'
+    return useD3
+      ? <D3GraphCanvas apiClient={apiClient} system={system} />
+      : <SigmaCanvas apiClient={apiClient} system={system} />
+
   })()
 
   return (

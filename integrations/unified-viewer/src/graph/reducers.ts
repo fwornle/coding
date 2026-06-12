@@ -33,15 +33,37 @@ import { useViewerStore } from '@/store/viewer-store'
 // Exporting as a value (not a default) so unit tests can assert the
 // map's keys (5 shapes) and value typeof (function/constructor).
 import { NodeCircleProgram } from 'sigma/rendering'
+// 2026-06-11: Stock NodeCircleProgram ignores borderColor/borderSize —
+// our reducer's per-frame borderColor writes were silently dropped. Use
+// @sigma/node-border's factory to build a program that paints a 2px
+// border ring driven by the `borderColor` node attribute, on top of a
+// `color`-filled inner. Non-insight nodes get borderColor = transparent
+// (default), so they look identical to the plain circle program. The
+// reducer overrides borderColor to dark-blue for hasInsightDoc nodes,
+// which materialises as the VKB "Has Insight Doc" ring.
+import { createNodeBorderProgram } from '@sigma/node-border'
+
+const NodeCircleWithBorderProgram = createNodeBorderProgram({
+  borders: [
+    {
+      color: { attribute: 'borderColor', defaultValue: 'rgba(0,0,0,0)' },
+      size: { value: 2, mode: 'pixels' },
+    },
+    {
+      color: { attribute: 'color' },
+      size: { fill: true },
+    },
+  ],
+})
 
 type NodeProgramConstructor = typeof NodeCircleProgram
 
 export const SHAPE_NODE_PROGRAMS: Readonly<Record<string, NodeProgramConstructor>> = {
-  circle: NodeCircleProgram,
-  diamond: NodeCircleProgram, // TODO: ship custom diamond program in a follow-up plan
-  square: NodeCircleProgram, // TODO: ship custom square program in a follow-up plan
-  triangle: NodeCircleProgram, // TODO: ship custom triangle program in a follow-up plan
-  hexagon: NodeCircleProgram, // TODO: ship custom hexagon program in a follow-up plan
+  circle: NodeCircleWithBorderProgram as unknown as NodeProgramConstructor,
+  diamond: NodeCircleWithBorderProgram as unknown as NodeProgramConstructor,
+  square: NodeCircleWithBorderProgram as unknown as NodeProgramConstructor,
+  triangle: NodeCircleWithBorderProgram as unknown as NodeProgramConstructor,
+  hexagon: NodeCircleWithBorderProgram as unknown as NodeProgramConstructor,
 } as const
 
 /**
@@ -151,11 +173,21 @@ export function makeNodeReducer(hoveredNode: string | null) {
       halo = { ...halo, phase: 0.5 }
     }
 
+    // 2026-06-11: VKB-style "Has Insight Doc" indicator. When the entity
+    // has an attached insight (graph-builder set hasInsightDoc on Insight-
+    // type entities), override the default-state stroke to a 2px dark-blue
+    // ring so the user can spot them at a glance. Hover/selected states
+    // still win — the user's interaction signal takes precedence.
+    const hasInsightDoc = (data as { hasInsightDoc?: boolean }).hasInsightDoc === true
+    const finalStroke = hasInsightDoc && state === 'default'
+      ? { ...stroke, color: '#1565c0', width: 2 }
+      : stroke
+
     return {
       ...data,
       hidden: false,
-      borderColor: stroke.color,
-      borderSize: stroke.width,
+      borderColor: finalStroke.color,
+      borderSize: finalStroke.width,
       opacity: stroke.opacity,
       glow: stroke.glow,
       // Plan 55-05 visual overlays:
@@ -163,9 +195,15 @@ export function makeNodeReducer(hoveredNode: string | null) {
         ? { borderStyle: stroke.borderStyle }
         : {}),
       ...(halo !== undefined ? { halo } : {}),
-      // sigma's per-program dispatch: read `type` from `shape` so the
-      // nodeProgramClasses map (SHAPE_NODE_PROGRAMS) routes each node
-      // to its WebGL program (v1: all five share NodeCircleProgram).
+      // 2026-06-11 ROLLBACK: restore the per-node `type: shape` forward.
+      // I'd removed it thinking React-Sigma's settings HMR was dropping
+      // nodeProgramClasses, but the real cause was an invalid
+      // `zoomToSizeRatioFunction` I'd added that made the whole settings
+      // object fail validation silently (SHAPE_NODE_PROGRAMS never got
+      // through, so 'circle' itself wasn't registered). Without `type`
+      // here Sigma needed `defaultNodeType: 'circle'` to resolve — but
+      // that hit the same dropped-settings code path. Both rollbacks
+      // were done together.
       ...(data.shape !== undefined ? { type: data.shape as string } : {}),
       labelColor: labelColorForState(state),
       // forceLabel so selected/hovered/search-match labels render even
@@ -187,9 +225,26 @@ export function makeEdgeReducer() {
     data: { source?: string; target?: string; color?: string; size?: number },
   ) {
     const store = useViewerStore.getState()
+    const theme = store.theme
     const from = (data.source ?? '') as string
     const to = (data.target ?? '') as string
-    const style = edgeStateForRelation({ from, to }, store.selectedNodeId)
+    // Pick a theme-aware base for the dimmed off-path edges below.
+    const dimBase = theme === 'dark' ? '#334155' : '#cbd5e1'
+    // 2026-06-11: when both endpoints are on the ancestry path, paint the
+    // edge in the VKB blue so the user can trace System → Project →
+    // Component → SubComponent → Detail visually. Otherwise fall through
+    // to the existing primary-incident logic.
+    const path = store.pathToSelected
+    if (path && path.size > 0) {
+      if (path.has(from) && path.has(to)) {
+        // Path edges are slightly thicker than baseline 0.5 so the trace
+        // reads against the muted hairlines, but still thin (VKB style).
+        return { ...data, color: '#1565c0', opacity: 1.0, size: 1.2 }
+      }
+      // Edges outside the path get dimmed to match the dimmed nodes.
+      return { ...data, color: dimBase, opacity: 0.08 }
+    }
+    const style = edgeStateForRelation({ from, to }, store.selectedNodeId, undefined, theme)
     return {
       ...data,
       color: style.color,

@@ -24,9 +24,15 @@ export const SYSTEM_ENDPOINTS: Record<System, string> = {
   okb:    import.meta.env.VITE_BACKEND_OKB_URL    ?? 'http://localhost:8090',
 } as const
 
+// 2026-06-11: tab labels switched from 'Coding'/'OKB' to 'VKB'/'VOKB' per
+// user request — the underlying systems have always been the *V*isual
+// Knowledge Base (km-core graph store) and the *V*isual *O*perational
+// *K*nowledge *B*ase (OKM Express). The route slugs `/viewer/coding` and
+// `/viewer/okb` stay as-is for URL back-compat; only the visible label
+// changes.
 export const SYSTEM_LABELS: Record<System, string> = {
-  coding: 'Coding',
-  okb: 'OKB',
+  coding: 'VKB',
+  okb: 'VOKB',
 } as const
 
 /** Type guard — narrows a string to `System` if it matches one of the two slugs. */

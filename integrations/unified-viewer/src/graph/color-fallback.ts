@@ -12,43 +12,64 @@
 // Output is hex (#rrggbb) — Sigma's WebGL color parser rejects hsl()
 // strings; hex is universal.
 
-const PALETTE = {
-  // Hierarchy — blue scale (darker = closer to root)
-  System: '#1e3a8a',       // navy-900
-  Project: '#1d4ed8',      // blue-700
-  Component: '#3b82f6',    // blue-500
-  SubComponent: '#60a5fa', // blue-400
-  Detail: '#93c5fd',       // blue-300
-
-  // Container / structural metadata — teal scale
-  Container: '#0d9488',    // teal-600
-  Config: '#0891b2',       // cyan-600
-  File: '#06b6d4',         // cyan-500
-  Port: '#22d3ee',         // cyan-400
-
-  // Behavior / runtime — amber scale
-  Feature: '#d97706',      // amber-600
-  Fault: '#dc2626',        // red-600
-
-  // Typed-views (LSL pipeline outputs) — amber scale
-  Observation: '#f59e0b',     // amber-500
-  Digest: '#b45309',          // amber-700
-  Insight: '#7c2d12',         // orange-900
-  LearningArtifact: '#854d0e', // amber-800
-
-  // Knowledge meta
-  Knowledge: '#7c3aed',    // violet-600
-
-  // Default — neutral slate
-  __default__: '#94a3b8',  // slate-400
+// 2026-06-11: palette aligned with the VKB reference
+// (integrations/memory-visualizer/src/components/KnowledgeGraph/index.tsx
+// :112-130) per user request "the viewer distinguishes between batch mode
+// learned (via the waves, shades of blue) and online learned nodes
+// (shades of light-red)".
+//
+// Two orthogonal axes drive node fill:
+//   1. ontologyClass: hierarchy depth (Project=darkest → Detail=lightest)
+//   2. metadata.source: 'auto' (online-learned by ETM/consolidator) → red
+//      shades; everything else → blue shades.
+//
+// Free-form entityType (Process, Container, File, Port, Config, Fault,
+// etc.) is NO LONGER painted as a distinct color — those were the
+// "aboriginal dot-art" palette the user objected to. With `ontologyClass`
+// normalized to one of the 4 canonical classes (Phase-2026-06-11 patch),
+// the hierarchy palette covers every entity.
+const BATCH_PALETTE = {
+  Project:      '#00897b',  // teal/green (VKB reference)
+  Component:    '#1565c0',  // dark blue
+  SubComponent: '#42a5f5',  // medium blue
+  Detail:       '#90caf9',  // light blue
+  // System sits above Project; reuse Project's teal so the root node stays
+  // recognisable.
+  System:       '#00695c',  // teal-800
 } as const
 
-export function classColor(className: string, _theme: 'light' | 'dark'): string {
-  // Theme is reserved for future variants but the palette is theme-
-  // independent today — both dark and light tokens read the same hex
-  // because the canvas background is `bg-background` and hex sits on top.
-  const c = (PALETTE as Record<string, string>)[className]
-  return c ?? PALETTE.__default__
+// Online (source='auto') uses light-red shades by hierarchy. Most online
+// entities are Insights (which collapse to ontologyClass='Detail') so the
+// lightest red dominates; deeper-than-Detail isn't used in practice.
+const ONLINE_PALETTE = {
+  Project:      '#e57373',  // red-300
+  Component:    '#ef5350',  // red-400
+  SubComponent: '#f48fb1',  // pink-200
+  Detail:       '#ffb6c1',  // light-pink — VKB reference Online/Auto value
+  System:       '#c62828',  // red-800
+} as const
+
+const DEFAULT_BATCH = '#94a3b8' // slate-400 — non-hierarchy classes
+const DEFAULT_ONLINE = '#ffb6c1' // light-pink
+
+/**
+ * Per-class fill. `source` is the per-entity learning provenance:
+ *   - 'auto'   → online-learned (ObservationWriter / consolidator output) → red
+ *   - else     → batch / manual / migration-imported → blue
+ *
+ * Third argument is theme; reserved for future variants. The palette today
+ * is theme-independent because the canvas background is `bg-background` and
+ * hex sits on top.
+ */
+export function classColor(
+  className: string,
+  _theme: 'light' | 'dark',
+  source?: string,
+): string {
+  const palette = source === 'auto' ? ONLINE_PALETTE : BATCH_PALETTE
+  const fallback = source === 'auto' ? DEFAULT_ONLINE : DEFAULT_BATCH
+  const c = (palette as Record<string, string>)[className]
+  return c ?? fallback
 }
 
 /** Internal export — kept for tests that pin the hierarchy contract. */

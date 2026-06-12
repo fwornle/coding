@@ -28,6 +28,8 @@ import { IconButton } from '@/components/IconButton'
 import { useViewerStore, type Level } from '@/store/viewer-store'
 import { Logger } from '@/lib/logging'
 import { LayerFilter } from '@/panels/filters/LayerFilter'
+import { LearningSourceFilter } from '@/panels/filters/LearningSourceFilter'
+import { TeamsFilter } from '@/panels/filters/TeamsFilter'
 import { DomainFilter } from '@/panels/filters/DomainFilter'
 import {
   OntologyFilter,
@@ -159,6 +161,12 @@ export function FilterRail({
         />
       </div>
 
+      {/* 2026-06-11: VKB-style Learning Source + Teams filters above the
+          Phase 45 Level/Layer/Ontology rail. computeNodeState reads them
+          alongside the legacy filters. */}
+      <LearningSourceFilter />
+      <TeamsFilter entities={entities} />
+
       {/* Level (Phase 45 BC) */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -270,8 +278,10 @@ function SelectAllNone({
   onAll,
   onNone,
 }: SelectAllNoneProps) {
+  // 2026-06-12: lowercase (matches Hierarchy / Typed Views subgroup
+  // "all | none" links — was previously inconsistent with those).
   const base =
-    'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ' +
+    'text-[10px] lowercase tracking-wide px-1.5 py-0.5 rounded ' +
     'text-muted-foreground hover:text-foreground hover:bg-accent ' +
     'disabled:opacity-40 disabled:cursor-not-allowed'
   return (

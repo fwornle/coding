@@ -83,14 +83,134 @@ export function buildGraph(
     }
   }
 
+  // 2026-06-11 (tenth iteration): HIERARCHICAL ISLAND LAYOUT.
+  // User feedback: "I want the layout to show those islands — round
+  // around each project, projects around the central node". The single
+  // ring (ninth iteration) flattened all topology and made it impossible
+  // to read the System → Project → Component → … structure.
+  //
+  // Strategy:
+  //   1. System (CollectiveKnowledge) pinned at (0, 0).
+  //   2. Projects (Coding, Normalisa, Timeline, DynArch) on a ring
+  //      around System at PROJECT_R.
+  //   3. For each Project, BFS down through hierarchy edges
+  //      (parent-child / contains / has_insight) to claim its descendant
+  //      subtree. Each node belongs to AT MOST one project (first claim
+  //      wins, deterministic by Project iteration order).
+  //   4. Each Project's subtree is packed into a disc around its
+  //      Project node, disc radius proportional to sqrt(subtree size).
+  //   5. Unowned entities (Observations / Digests pointing at System
+  //      via capturedBy, or true orphans) scatter on an outer ring.
+  //
+  // This produces VKB's "islands of related nodes around projects" look
+  // and gives the path-trace visible blue lines: the click handler walks
+  // parent-child edges back to System, and those edges now span sensible
+  // distances across the canvas.
+  const HIERARCHY_REL = new Set(['parent-child', 'contains', 'has_insight'])
+  const systemEnt = entities.find((e) => e.ontologyClass === 'System')
+  const projectEnts = entities.filter((e) => e.ontologyClass === 'Project')
+
+  // BFS from each project to claim its subtree. Hierarchy edges are
+  // directional but ownership should follow either direction (some
+  // legacy data has the edge reversed) — treat them as undirected for
+  // ownership only.
+  const ownerOf = new Map<string, string>() // entityId → projectId
+  if (systemEnt) ownerOf.set(systemEnt.id, systemEnt.id)
+  for (const p of projectEnts) {
+    if (ownerOf.has(p.id)) continue
+    ownerOf.set(p.id, p.id)
+    const queue: string[] = [p.id]
+    while (queue.length) {
+      const cur = queue.shift() as string
+      for (const r of relations) {
+        if (!HIERARCHY_REL.has(r.type)) continue
+        const next = r.from === cur ? r.to : r.to === cur ? r.from : null
+        if (!next) continue
+        if (ownerOf.has(next)) continue
+        if (next === systemEnt?.id) continue
+        ownerOf.set(next, p.id)
+        queue.push(next)
+      }
+    }
+  }
+
+  // Compute project positions on a ring around System.
+  const PROJECT_R = 1400
+  const projectPos = new Map<string, { x: number; y: number }>()
+  projectEnts.forEach((p, i) => {
+    const angle = (i / Math.max(projectEnts.length, 1)) * 2 * Math.PI - Math.PI / 2
+    projectPos.set(p.id, {
+      x: PROJECT_R * Math.cos(angle),
+      y: PROJECT_R * Math.sin(angle),
+    })
+  })
+
+  // Bucket children by project so each disc can be sized to its content.
+  const childrenByProject = new Map<string, string[]>()
+  for (const [entId, pId] of ownerOf) {
+    if (entId === pId) continue
+    if (!childrenByProject.has(pId)) childrenByProject.set(pId, [])
+    childrenByProject.get(pId)!.push(entId)
+  }
+
+  // Place each subtree node inside its project's disc. Random angle +
+  // varying radius distributes them through the disc (not a hard ring).
+  const positionFor = new Map<string, { x: number; y: number }>()
+  childrenByProject.forEach((kids, pId) => {
+    const pPos = projectPos.get(pId)
+    if (!pPos) return
+    const discR = Math.max(180, Math.sqrt(kids.length) * 32)
+    kids.forEach((kid) => {
+      const angle = Math.random() * 2 * Math.PI
+      const r = discR * Math.sqrt(Math.random()) // uniform in disc
+      positionFor.set(kid, {
+        x: pPos.x + r * Math.cos(angle),
+        y: pPos.y + r * Math.sin(angle),
+      })
+    })
+  })
+
+  // Unowned (no path back to a Project via hierarchy edges) scatter on
+  // a wide outer ring well clear of the project discs.
+  const ORPHAN_RING = PROJECT_R * 2.2
   for (const e of entities) {
     const cls = ontology.find((c) => c.name === e.ontologyClass)
-    const color = cls?.display?.color ?? classColor(e.ontologyClass, theme)
+    // 2026-06-11: pass entity source (auto vs manual) into classColor so
+    // online-learned nodes render in the red palette instead of the blue
+    // hierarchy. The overlay (ontology.display.color) still wins when
+    // present.
+    const entSource = (e.metadata as { source?: string } | undefined)?.source
+    const color = cls?.display?.color ?? classColor(e.ontologyClass, theme, entSource)
     // Backend payloads omit `level` — derive it from the well-known
     // ontology hierarchy so FilterRail's L0/L1/L2/L3 toggles actually
     // exclude nodes. Falls back to `e.level` when the backend ever
     // populates the field directly.
     const level = e.level ?? deriveLevel(e.ontologyClass)
+    // 2026-06-11 (tenth iteration): hierarchical seed lookups.
+    //   1. System → origin
+    //   2. Project → pre-computed ring position
+    //   3. Owned child → pre-computed disc position around its Project
+    //   4. Unowned → outer scatter ring
+    let seedX: number
+    let seedY: number
+    if (systemEnt && e.id === systemEnt.id) {
+      seedX = 0
+      seedY = 0
+    } else if (projectPos.has(e.id)) {
+      const p = projectPos.get(e.id) as { x: number; y: number }
+      seedX = p.x
+      seedY = p.y
+    } else if (positionFor.has(e.id)) {
+      const p = positionFor.get(e.id) as { x: number; y: number }
+      seedX = p.x
+      seedY = p.y
+    } else {
+      // Unowned: outer ring scatter so they're visible but separate.
+      const angle = Math.random() * 2 * Math.PI
+      const r = ORPHAN_RING * (0.85 + Math.random() * 0.3)
+      seedX = r * Math.cos(angle)
+      seedY = r * Math.sin(angle)
+    }
 
     // Plan 55-05 (UI-SPEC §14 rules #2, #4, #5): the fallback chain.
     //   shape:       overlay → shapeFallback(class) → 'circle'
@@ -117,10 +237,28 @@ export function buildGraph(
 
     // mergeNode (not addNode) is idempotent — re-applying the same id with
     // the same attributes is a no-op rather than a throw.
+    //
+    // size:4 matches the VKB reference node radius — the old `size:8`
+    // produced "mega-dot" nodes that occluded each other after collapse.
+    // Position is the circular seed computed above.
+    // 2026-06-11: VKB-style "Has Insight Doc" indicator. Any entity whose
+    // name COULD have a markdown insight document under
+    // knowledge-management/insights/ gets the border. The same predicate
+    // used by the "View Insight Document" link in EntityDetailPanel: short
+    // PascalCase identifier (no spaces / punctuation, <=60 chars). This
+    // matches the legend chip in the VKB reference and the bordered nodes
+    // VKB shows for Components/SubComponents with attached docs — not just
+    // Insight-type entities.
+    const nameStr = (e.name as string) || ''
+    const hasInsightDoc =
+      nameStr.length > 0 && nameStr.length <= 60 && !/[\s:()/?#]/.test(nameStr)
     graph.mergeNode(e.id, {
-      x: Math.random(),
-      y: Math.random(),
-      size: 8,
+      x: seedX,
+      y: seedY,
+      // 2026-06-11: VKB-parity bump 2 → 5. The previous size:2 was a
+      // "mega-dot" overcorrection from earlier in the day — VKB nodes
+      // are visibly chunky (~5-6 px) and the user wants the same.
+      size: 5,
       label: e.name,
       color,
       ontologyClass: e.ontologyClass,
@@ -131,6 +269,7 @@ export function buildGraph(
       shape,
       borderStyle,
       pulseRule,
+      hasInsightDoc,
       // Pulse evaluator needs these; thread through verbatim so the
       // reducer can call evaluatePulseRule(rule, attrs as Entity).
       updatedAt: (e as { updatedAt?: string }).updatedAt,
@@ -152,7 +291,25 @@ export function buildGraph(
     // We stash the actual relation type under `relationType` for downstream
     // consumers (tooltips, filters) and leave `type` unset so Sigma uses
     // its default program.
-    graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', relationType: r.type })
+    // 2026-06-11: weight `capturedBy` low so FA2 doesn't drag every
+    // Insight into a tight cluster around LiveLoggingSystem (the anchor
+    // hub). ObservationWriter adds these edges to keep new entities from
+    // becoming orphans, but they're structural plumbing, not semantic
+    // relations — they shouldn't dominate the force layout. Edge weight
+    // 0.05 (vs default 1.0 for real relations) makes them invisible to
+    // FA2's attraction while still keeping them in the graph for
+    // click/navigation. FA2's `edgeWeightInfluence: 1` setting (default)
+    // reads this attribute.
+    const layoutWeight = r.type === 'capturedBy' ? 0.05 : 1.0
+    // 2026-06-11: edge thickness dropped from 1.5 → 0.5 to match VKB's
+    // thin hairline edges. With 1300+ edges in the graph the old 1.5
+    // size painted a uniform gray haze that obscured the nodes.
+    graph.mergeEdge(r.from, r.to, {
+      size: 0.5,
+      color: '#cbd5e1',
+      relationType: r.type,
+      weight: layoutWeight,
+    })
   }
   return graph
 }
@@ -185,7 +342,8 @@ export function mergeIntoGraph(
   //     This keeps the visual contract correct over time.
   for (const e of payload.entities) {
     const cls = ontology.find((c) => c.name === e.ontologyClass)
-    const color = cls?.display?.color ?? classColor(e.ontologyClass, theme)
+    const entSource = (e.metadata as { source?: string } | undefined)?.source
+    const color = cls?.display?.color ?? classColor(e.ontologyClass, theme, entSource)
     // Plan 55-05 attrs — derive at merge time. For the brand-new node
     // path, hasRelations is computed from the payload's relations.
     const shape = cls?.display?.shape ?? shapeFallback(e.ontologyClass)
@@ -229,9 +387,9 @@ export function mergeIntoGraph(
       })
     } else {
       graph.addNode(e.id, {
-        x: Math.random(),
-        y: Math.random(),
-        size: 8,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        size: 2,
         label: e.name,
         color,
         ontologyClass: e.ontologyClass,
@@ -297,7 +455,14 @@ export interface NodeAttrs {
 export function computeNodeState(
   nodeId: string,
   attrs: NodeAttrs,
-  store: Pick<ViewerState, 'selectedNodeId' | 'searchQuery' | 'visibleLevels' | 'selectedClasses'>,
+  // `pathToSelected` is optional so existing test fixtures don't need
+  // updating; the runtime check below tolerates `undefined`. (Path
+  // highlight was added 2026-06-11 as a VKB-reference feature.)
+  store: Pick<ViewerState, 'selectedNodeId' | 'searchQuery' | 'visibleLevels' | 'selectedClasses'> & {
+    pathToSelected?: ReadonlySet<string>
+    learningSource?: 'batch' | 'online' | 'combined'
+    selectedTeams?: ReadonlySet<string>
+  },
   hoveredNodeId: string | null = null,
 ): NodeState {
   // Plan 03 checkpoint round 2 — semantic rewrite:
@@ -312,6 +477,46 @@ export function computeNodeState(
 
   if (store.selectedNodeId === nodeId) return 'selected'
   if (hoveredNodeId === nodeId) return 'hover'
+
+  // 2026-06-11: ancestry path highlight (VKB reference). When a node is
+  // selected, the click handler computes the ancestor chain via
+  // contains/parent-child edges and stores it in `pathToSelected`. Nodes
+  // outside the path get the dimmed style so the hierarchy trace stands
+  // out. When nothing is selected the path is empty → this branch is a
+  // no-op.
+  if (store.pathToSelected && store.pathToSelected.size > 0 && !store.pathToSelected.has(nodeId)) {
+    return 'filter-dimmed'
+  }
+
+  // 2026-06-11: Learning Source predicate. 'combined' (default) lets
+  // everything through. 'batch' shows only entities whose
+  // metadata.source !== 'auto' (i.e. manual / migration / wave-analysis).
+  // 'online' shows the opposite. EXCEPTION: System / Project /
+  // Component nodes are structural backbone — they ALWAYS render
+  // regardless of source so the hierarchy stays anchored even when the
+  // user is filtering to online-only or batch-only. VKB reference
+  // behaviour: the green System node + dark-blue Components stay put;
+  // only Detail/SubComponent/leaf nodes follow the source filter.
+  if (store.learningSource && store.learningSource !== 'combined') {
+    const ocls = attrs.ontologyClass as string | undefined
+    const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
+    if (!isStructural) {
+      const meta = attrs.metadata as { source?: string } | undefined
+      const isAuto = (meta?.source) === 'auto'
+      if (store.learningSource === 'online' && !isAuto) return 'filter-hidden'
+      if (store.learningSource === 'batch' && isAuto) return 'filter-hidden'
+    }
+  }
+
+  // 2026-06-11: Teams predicate. Empty set = "all visible" (same convention
+  // as LayerFilter / OntologyFilter). The sentinel `__none__` means "none
+  // visible" — emitted by the TeamsFilter "None" button.
+  if (store.selectedTeams && store.selectedTeams.size > 0) {
+    if (store.selectedTeams.has('__none__')) return 'filter-hidden'
+    const meta = attrs.metadata as { team?: string } | undefined
+    const team = meta?.team ?? 'coding'
+    if (!store.selectedTeams.has(team)) return 'filter-hidden'
+  }
 
   // Level predicate — entities always have a derived level (deriveLevel
   // pins unknown classes to L0), so the Set membership is authoritative.

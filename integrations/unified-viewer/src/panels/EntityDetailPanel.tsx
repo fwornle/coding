@@ -42,6 +42,7 @@ import { MarkdownText } from '@/lib-domain/markdown-text'
 import { EmptyNodeDetailState } from '@/lib-domain/states'
 import { Logger } from '@/lib/logging'
 import { EntityIdentityHeader } from './EntityIdentityHeader'
+import { InsightDocumentModal } from './InsightDocumentModal'
 import {
   CONFIDENCE_COLOR,
   RUN_COLORS,
@@ -152,6 +153,24 @@ function relativeTime(iso: string | undefined): string {
   if (ageMs < 24 * 60 * 60_000) return `${Math.floor(ageMs / (60 * 60_000))}h ago`
   if (ageMs < 7 * 24 * 60 * 60_000) return `${Math.floor(ageMs / (24 * 60 * 60_000))}d ago`
   return new Date(t).toISOString().slice(0, 10)
+}
+
+/**
+ * 2026-06-12: Render an ISO timestamp in the viewer-host's local timezone
+ * instead of the raw UTC string. The user is on CEST (UTC+2) and seeing
+ * `2026-06-12T05:28:07.593Z` in the right panel was confusing — the
+ * "X minutes ago" reads correctly but the absolute time looked two hours
+ * stale. Format as `YYYY-MM-DD HH:MM:SS` in LOCAL tz, fall back to the
+ * raw value when un-parseable so we don't lose data.
+ */
+function formatLocalTimestamp(iso: string | undefined): string {
+  if (!iso) return '—'
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return iso
+  const d = new Date(t)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} `
+    + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 /** Visibility predicate per UI-SPEC §8 + 55-09-PLAN <interfaces> (verbatim). */
@@ -339,7 +358,16 @@ function ConfidenceContent({
       </div>
     )
   }
-  const overallStyle = CONFIDENCE_COLOR[payload.overall.label]
+  // 2026-06-11: defensive fallback. CONFIDENCE_COLOR is keyed by the
+  // literal label union 'High' | 'Moderate' | 'Low' — but the API or
+  // heuristic can return anything (we've seen empty strings cause a
+  // TypeError: "Cannot read properties of undefined (reading 'class')"
+  // crash at EntityDetailPanel.tsx:345). Fall back to a neutral grey.
+  const DEFAULT_CONFIDENCE_STYLE = {
+    class: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+    dot: 'bg-gray-400',
+  }
+  const overallStyle = CONFIDENCE_COLOR[payload.overall.label] ?? DEFAULT_CONFIDENCE_STYLE
   return (
     <div data-testid="subtab-content-confidence" className="space-y-3">
       <div className={`inline-flex items-center gap-2 rounded px-2 py-1 ${overallStyle.class}`}>
@@ -350,7 +378,7 @@ function ConfidenceContent({
       </div>
       <ul className="space-y-1">
         {payload.segments.map((seg, i) => {
-          const s = CONFIDENCE_COLOR[seg.label]
+          const s = CONFIDENCE_COLOR[seg.label] ?? DEFAULT_CONFIDENCE_STYLE
           return (
             <li key={i} className="flex items-center gap-2 text-xs">
               <span className={`inline-block w-1.5 h-1.5 rounded-full ${s.dot}`} />
@@ -502,6 +530,8 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
   const [descViewMode, setDescViewMode] = useState<SubTab>('default')
   // Track which Relationship group is expanded (single-open accordion).
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null)
+  // 2026-06-11: InsightDocument modal open state.
+  const [insightModalOpen, setInsightModalOpen] = useState(false)
 
   const entity = useMemo(() => {
     if (!selectedNodeId) return null
@@ -631,10 +661,54 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
     { id: 'timeline', label: 'Timeline', visible: visibility.showTimeline },
   ]
 
+  // 2026-06-11: VKB-style "View Insight Document" link. Markdown files
+  // under knowledge-management/insights/ are named after the entity's
+  // SHORT PascalCase identifier (e.g. `ConfigurationManagement.md`). An
+  // entity whose `name` contains spaces, colons, or is longer than ~60
+  // chars is almost certainly an auto-generated Observation/Insight
+  // description rather than a documented component — hide the link in
+  // that case so the user doesn't click into a 404.
+  const insightDocUrl = (() => {
+    const name = (entity.name as string | undefined) || ''
+    if (!name) return null
+    // Reject names that look like a free-form intent / summary, not a
+    // PascalCase component identifier.
+    if (name.length > 60) return null
+    if (/[\s:()/?#]/.test(name)) return null
+    return `http://localhost:8080/knowledge-management/insights/${encodeURIComponent(name)}.md`
+  })()
+
   return (
     <div data-testid="entity-detail-panel" className="space-y-6 py-2">
       {/* Phase 55 — shared identity header (Task 1) */}
       <EntityIdentityHeader entity={entity} theme={theme} />
+
+      {/* 2026-06-11: VKB-style "View Insight Document" card. Opens an
+          in-app modal that fetches the .md from VKB and renders it with
+          react-markdown — same chain MarkdownViewerPanel uses for OKB.
+          User feedback: "why don't you just re-use the code?!" — done. */}
+      {insightDocUrl && (
+        <>
+          <button
+            type="button"
+            onClick={() => setInsightModalOpen(true)}
+            data-testid="view-insight-document"
+            className="flex items-center gap-2 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 hover:bg-green-100 transition-colors dark:bg-green-900/20 dark:border-green-800 dark:text-green-200 dark:hover:bg-green-900/30 w-full"
+          >
+            <span aria-hidden className="text-base">📄</span>
+            <span className="font-medium underline decoration-dotted underline-offset-2">
+              View Insight Document
+            </span>
+          </button>
+          {insightModalOpen && (
+            <InsightDocumentModal
+              url={insightDocUrl}
+              title={`${entity.name as string}.md`}
+              onClose={() => setInsightModalOpen(false)}
+            />
+          )}
+        </>
+      )}
 
       {/* Pill bar (UI-SPEC §8 + NodeDetails.tsx:893-935 verbatim micro-type) */}
       <div className="flex gap-1" role="tablist" aria-label="Entity detail sub-tabs">
@@ -681,10 +755,10 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
             <Kv label="Class" value={className} valueMono />
             <Kv label="Level" value={String(entity.level ?? '—')} />
             <Kv label="Parent" value={(entity.parent as string | undefined) ?? '—'} valueMono />
-            <Kv label="Created" value={(entity.createdAt as string | undefined) ?? '—'} tabularNums />
+            <Kv label="Created" value={formatLocalTimestamp(entity.createdAt as string | undefined)} tabularNums />
             <Kv
               label="Last confirmed"
-              value={(entity.lastConfirmedAt as string | undefined) ?? '—'}
+              value={formatLocalTimestamp(entity.lastConfirmedAt as string | undefined)}
               tabularNums
             />
           </Section>

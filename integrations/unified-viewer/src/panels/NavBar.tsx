@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Keyboard, Moon, Radio, Sun } from 'lucide-react'
+import { Keyboard, Moon, Radio, Sun, Workflow } from 'lucide-react'
 import { SYSTEM_LABELS, VALID_SYSTEMS, type System } from '@/config/system-endpoints'
 import { IconButton } from '@/components/IconButton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -219,6 +219,25 @@ export function NavBar({ onOpenHelpDialog, entities = [] }: NavBarProps) {
             )}
           </div>
         )}
+        {/* 2026-06-11: renderer toggle — `d3` is the VKB-parity SVG view
+            (default), `sigma` is the WebGL canvas used by OKB. Visible
+            on the coding system so the user can A/B-compare both ports
+            without a code change. */}
+        <IconButton
+          icon={Workflow}
+          ariaLabel="Toggle graph renderer"
+          tooltipText={
+            useViewerStore.getState().renderer === 'd3'
+              ? 'Renderer: D3 (click for Sigma)'
+              : 'Renderer: Sigma (click for D3)'
+          }
+          onClick={() => {
+            const next = useViewerStore.getState().renderer === 'd3' ? 'sigma' : 'd3'
+            useViewerStore.setState({ renderer: next })
+            Logger.info(Logger.Categories.STORE, `Renderer → ${next}`)
+          }}
+          data-testid="renderer-toggle"
+        />
         <IconButton
           icon={theme === 'dark' ? Sun : Moon}
           ariaLabel="Toggle theme"

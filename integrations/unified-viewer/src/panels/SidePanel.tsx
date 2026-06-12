@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useGraphData } from '@/graph/useGraphData'
 import { useViewerStore } from '@/store/viewer-store'
 import { EntityDetailPanel } from './EntityDetailPanel'
+import { HistorySidebar } from './HistorySidebar'
 import { MarkdownViewerPanel } from './MarkdownViewerPanel'
 import { Logger } from '@/lib/logging'
 
@@ -94,19 +95,45 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
         }}
         className="h-full"
       >
-        <TabsList className="m-2" data-testid="side-panel-tabs-list">
-          <TabsTrigger value="entity" data-testid="tab-entity">
-            Entity
-          </TabsTrigger>
-          {showMarkdown && (
-            <TabsTrigger value="markdown" data-testid="tab-markdown">
-              Markdown
+        <div className="flex items-center justify-between m-2">
+          <TabsList data-testid="side-panel-tabs-list">
+            <TabsTrigger value="entity" data-testid="tab-entity">
+              Entity
             </TabsTrigger>
+            {showMarkdown && (
+              <TabsTrigger value="markdown" data-testid="tab-markdown">
+                Markdown
+              </TabsTrigger>
+            )}
+          </TabsList>
+          {/* 2026-06-11: close button — VKB has one + ESC. ESC alone isn't
+              discoverable. Clicking clears selection AND ancestry path so
+              the dim-overlay drops too. */}
+          {entity && (
+            <button
+              type="button"
+              onClick={() => {
+                useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
+              }}
+              className="h-7 w-7 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
+              aria-label="Close details panel"
+              data-testid="side-panel-close"
+            >
+              <span aria-hidden className="text-base leading-none">×</span>
+            </button>
           )}
-        </TabsList>
+        </div>
 
         <TabsContent value="entity" className="px-4 pb-4">
-          <EntityDetailPanel apiClient={apiClient} system={system} />
+          {/* 2026-06-11: when no node is selected the SidePanel shows the
+              VKB-style History feed instead of EntityDetailPanel's empty
+              state. Mirrors integrations/memory-visualizer's
+              HistorySidebar contract. */}
+          {entity ? (
+            <EntityDetailPanel apiClient={apiClient} system={system} />
+          ) : (
+            <HistorySidebar apiClient={apiClient} system={system} />
+          )}
         </TabsContent>
 
         {showMarkdown && (

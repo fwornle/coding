@@ -210,20 +210,23 @@ export function edgeStateForRelation(
   edge: Pick<Relation, 'from' | 'to'>,
   selectedNodeId: string | null,
   dimmedNodeIds?: ReadonlySet<string>,
+  theme: 'light' | 'dark' = 'light',
 ): EdgeStyle {
-  // Plan 03 round 2 (cont'd from black-nodes fix): sigma's WebGL color
-  // parser silently rejects `hsl(var(--*))` CSS-var strings and falls
-  // back to invisible. Use fixed hex values so edges actually render —
-  // theme-aware variants land when SigmaCanvas wires a theme-conditional
-  // settings hook. Colors picked from the Plan 03 round 2 slate scale:
-  //   default:  #cbd5e1 (slate-300) at opacity 0.6
-  //   incident: #3b82f6 (blue-500)  at opacity 1.0 — matches selected stroke
-  //   dimmed:   #cbd5e1 at opacity 0.15 (mostly invisible)
+  // 2026-06-11: theme-aware edge color. The previous fixed `#cbd5e1`
+  // (slate-300) was tuned for light backgrounds — on the dark theme it
+  // rendered as a bright haze that dominated the canvas. In dark mode
+  // we want edges to recede; slate-700/600 at low opacity gives the
+  // VKB-style faint hairline look against the slate-900 background.
+  //   light default:  #cbd5e1 (slate-300) at opacity 0.35
+  //   dark default:   #334155 (slate-700) at opacity 0.5
+  //   incident:       #3b82f6 (blue-500) at opacity 1.0 — same both themes
+  //   dimmed:         theme-aware base at opacity 0.08 (nearly invisible)
+  const baseColor = theme === 'dark' ? '#334155' : '#cbd5e1'
   if (selectedNodeId !== null && (edge.from === selectedNodeId || edge.to === selectedNodeId)) {
     return { color: '#3b82f6', opacity: 1.0 }
   }
   if (dimmedNodeIds && dimmedNodeIds.has(edge.from) && dimmedNodeIds.has(edge.to)) {
-    return { color: '#cbd5e1', opacity: 0.15 }
+    return { color: baseColor, opacity: 0.08 }
   }
-  return { color: '#cbd5e1', opacity: 0.6 }
+  return { color: baseColor, opacity: theme === 'dark' ? 0.5 : 0.35 }
 }

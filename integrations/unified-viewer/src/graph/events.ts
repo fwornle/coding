@@ -56,11 +56,51 @@ function isValidLevel(n: number | undefined): n is 0 | 1 | 2 | 3 {
 export function makeEventHandlers(deps: EventHandlerDeps): EventHandlers {
   return {
     handleClickNode(nodeId: string) {
-      deps.setStore({ selectedNodeId: nodeId })
+      // 2026-06-11: compute ancestry path back to a root via incoming
+      // `contains` / `parent-child` edges and pin it on the store. The
+      // reducer dims everything outside the path so the user sees the
+      // hierarchy trace from the clicked node up to its System / Project
+      // ancestor (VKB reference behaviour: "path from CollectiveKnowledge
+      // (green) to project (dark blue), to component, sub-component
+      // until the selected node").
+      const path = new Set<string>([nodeId])
+      const graph = deps.graph
+      let cursor: string | null = nodeId
+      // Cap traversal at 8 hops — defensive against accidental cycles in
+      // the hierarchy data (a properly-modelled graph is at most 5 deep:
+      // System → Project → Component → SubComponent → Detail).
+      // 2026-06-11: traverse a broader set of "this node lives under that
+      // parent" relations. `contains` and `parent-child` are the canonical
+      // hierarchy edges; `capturedBy` is what ObservationWriter stamps on
+      // every Observation/Digest/Insight pointing at LiveLoggingSystem;
+      // `has_insight` is the symmetric edge from Components to their
+      // Insight nodes. Without these, clicking an Observation / Insight
+      // node finds no parent and the path stays at size 1 → no visible
+      // trace.
+      const HIERARCHY_REL: ReadonlySet<string> = new Set([
+        'contains', 'parent-child', 'capturedBy', 'has_insight',
+      ])
+      for (let i = 0; cursor && i < 8; i++) {
+        let parent: string | null = null
+        try {
+          graph.forEachInEdge(cursor, (_edgeId, attrs, source) => {
+            if (parent) return
+            const t = (attrs as { relationType?: string }).relationType
+            if (t && HIERARCHY_REL.has(t)) parent = source
+          })
+        } catch {
+          // Node missing — bail out cleanly.
+          break
+        }
+        if (!parent || path.has(parent)) break
+        path.add(parent)
+        cursor = parent
+      }
+      deps.setStore({ selectedNodeId: nodeId, pathToSelected: path })
     },
 
     handleClickStage() {
-      deps.setStore({ selectedNodeId: null })
+      deps.setStore({ selectedNodeId: null, pathToSelected: new Set<string>() })
     },
 
     async handleDoubleClickNode(nodeId: string): Promise<number> {

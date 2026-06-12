@@ -27,8 +27,20 @@ export function EntityIdentityHeader({ entity, theme }: EntityIdentityHeaderProp
   const borderColor = classColor(className, theme)
   const level = entity.level !== undefined ? `L${entity.level}` : 'L—'
   const parent = (entity.parent as string | undefined) ?? '—'
-  const createdAt = (entity.createdAt as string | undefined) ?? '—'
-  const lastConfirmedAt = (entity.lastConfirmedAt as string | undefined) ?? '—'
+  // 2026-06-12: render timestamps in the viewer's local timezone. Raw
+  // UTC ISO strings (`2026-06-12T05:28:07.593Z`) were confusing on a
+  // CEST host where the wall clock showed 07:28.
+  const fmtLocal = (iso: string | undefined): string => {
+    if (!iso) return '—'
+    const t = Date.parse(iso)
+    if (!Number.isFinite(t)) return iso
+    const d = new Date(t)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} `
+      + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  }
+  const createdAt = fmtLocal(entity.createdAt as string | undefined)
+  const lastConfirmedAt = fmtLocal(entity.lastConfirmedAt as string | undefined)
 
   return (
     <header className="space-y-2" data-testid="entity-identity-header">

@@ -26,7 +26,7 @@ import {
   useSetSettings,
   useSigma,
 } from '@react-sigma/core'
-import { useWorkerLayoutForceAtlas2 } from '@react-sigma/layout-forceatlas2'
+import forceLayout from 'graphology-layout-force'
 import { Maximize, ZoomIn, ZoomOut } from 'lucide-react'
 import '@react-sigma/core/lib/style.css'
 
@@ -82,6 +82,13 @@ export function SigmaCanvas({ apiClient, system }: SigmaCanvasProps) {
           // path to custom diamond/square/triangle/hexagon programs.
           nodeProgramClasses: SHAPE_NODE_PROGRAMS,
           defaultNodeType: 'circle',
+          // 2026-06-11 ROLLBACK: previously added zoomToSizeRatioFunction
+          // here. Suspected it was making the @react-sigma settings prop
+          // type-check fail silently, causing nodeProgramClasses to be
+          // dropped and the canvas to crash with "could not find a
+          // suitable program for node type 'circle'". Removed to restore
+          // canvas. Node size is controlled solely by graph-builder's
+          // `size: 2` attribute now.
         }}
       >
         <GraphSetup apiClient={apiClient} system={system} />
@@ -103,9 +110,12 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
   const loadGraph = useLoadGraph()
   const registerEvents = useRegisterEvents()
   const setSettings = useSetSettings()
-  const { start: startLayout, stop: stopLayout } = useWorkerLayoutForceAtlas2({
-    settings: { gravity: 1, scalingRatio: 10 },
-  })
+  // 2026-06-11 (eighth iteration): FA2 collapsed the connected component
+  // into a tight ball at the centroid no matter how we tuned it. VKB uses
+  // d3.forceSimulation with forceLink.distance(150) + forceManyBody(-500)
+  // + forceCenter, which produces an even radial spread with hubs in the
+  // middle and leaves on the outside. graphology-layout-force is the
+  // closest in-ecosystem port (no d3 dep). Synchronous; iterates in-place.
 
   const { entities, relations, ontology, isLoading } = useGraphData(apiClient, system)
   const theme = useViewerStore((s) => s.theme)
@@ -119,13 +129,27 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
     if (entities.length === 0) return
 
     const graph = buildGraph(entities, relations, ontology, theme)
-    loadGraph(graph)
 
-    // Start worker-mode layout; stop after ~3s so the simulation settles
-    // without spinning indefinitely. Web-worker mode keeps the main thread
-    // responsive (T-45-02-02 mitigation).
-    startLayout()
-    const stopTimer = setTimeout(() => stopLayout(), 3000)
+    // 2026-06-11 (tenth iteration): the graph-builder now seeds nodes
+    // hierarchically (System at origin, Projects on a ring around it,
+    // each Project's subtree packed in a disc). That deterministic
+    // layout IS the final positioning — running circular or aggressive
+    // force layout on top destroys the cluster structure. We do a tiny
+    // force-layout polish pass (low repulsion, low gravity) to nudge
+    // overlapping nodes apart inside each disc without breaking the
+    // island shape.
+    forceLayout.assign(graph, {
+      maxIterations: 100,
+      settings: {
+        repulsion: 5,
+        attraction: 0.001,
+        gravity: 0.0,
+        inertia: 0.4,
+        maxMove: 5,
+      },
+    })
+    loadGraph(graph)
+    const stopTimer = setTimeout(() => { /* no-op */ }, 0)
 
     // Wire event handlers — closure over the just-built graph.
     const handlers = makeEventHandlers({
@@ -150,7 +174,6 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
 
     return () => {
       clearTimeout(stopTimer)
-      stopLayout()
     }
   }, [
     apiClient,
@@ -160,8 +183,6 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
     ontology,
     registerEvents,
     relations,
-    startLayout,
-    stopLayout,
     theme,
   ])
 

@@ -206,7 +206,28 @@ export function OntologyFilter({
       <Checkbox
         checked={isSelected(cls)}
         onCheckedChange={() => {
-          toggleOntologyClass(cls)
+          // 2026-06-12: same empty-set-sentinel bug Teams + Layer had.
+          // selectedOntologyClasses === [] means "all visible". Clicking
+          // one used to push `[cls]` which made every other class look
+          // unchecked. Materialise the full available list first, then
+          // toggle the clicked class. Also handle the symmetric
+          // `['__none__']` "none visible" sentinel — clicking from that
+          // state selects ONLY the clicked class.
+          if (selectedOntologyClasses.includes('__none__')) {
+            setSelectedOntologyClasses([cls])
+          } else {
+            const base = selectedOntologyClasses.length === 0
+              ? availableClasses.slice()
+              : selectedOntologyClasses
+            const idx = base.indexOf(cls)
+            if (idx >= 0) {
+              const next = base.slice()
+              next.splice(idx, 1)
+              setSelectedOntologyClasses(next.length === 0 ? ['__none__'] : next)
+            } else {
+              setSelectedOntologyClasses([...base, cls])
+            }
+          }
           Logger.info(
             Logger.Categories.FILTERS,
             `OntologyFilter toggle: ${cls}`,
