@@ -4,6 +4,8 @@
 // but DOES NOT clear visibleLevels (filter defaults persist across in-system reset by
 // design — cross-system reset is the remount).
 import { describe, test, expect, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { useViewerStore, type ViewerState } from './viewer-store'
 
 // Alias for the few tests that call getInitialState() via a generic cast — we
@@ -354,5 +356,165 @@ describe('useViewerStore — Phase 55 action setters (Task 2)', () => {
     useViewerStore.getState().setSelectedClasses(new Set(['A', 'B']))
     expect(useViewerStore.getState().selectedClasses.has('A')).toBe(true)
     expect(useViewerStore.getState().selectedClasses.has('B')).toBe(true)
+  })
+})
+
+// ----------------------------------------------------------------------------
+// Phase 56 Plan 01 — cross-pane selection sync
+//
+// PATTERN SOURCE: 56-01-PLAN.md Task 1 <behavior> + 56-PATTERNS.md § viewer-store.ts (EXTEND).
+// CONTEXT.md decisions: shared state lives in viewer-store; no panel keeps a
+// local selection; Esc + click-empty-bg cascades through ALL three panes via
+// a single store action; selection scope covers both entity nodes AND
+// aggregate LSL session selection.
+//
+// `setSelection({ ... })` is the atomic multi-field write that downstream
+// Plans 02/03/04 use to keep subscribers consistent. `clearSelection()` is
+// the cross-pane variant of `clearLslSessionFilter()` — it also clears LSL
+// filter slices so Esc + bg-click leave the user in a fully cleared state.
+//
+// Source-grep gates assert the five selection-sync identifiers are present
+// in the store source so a silent rename (e.g. `setSelection` → `applySelection`)
+// cannot pass tsc and slip through review.
+// ----------------------------------------------------------------------------
+
+describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
+  const initial = () =>
+    (useViewerStore as unknown as { getInitialState: () => ViewerState }).getInitialState()
+
+  beforeEach(() => {
+    useViewerStore.setState({
+      selectionSource: null,
+      highlightedRowKey: null,
+      selectedSessionId: null,
+      selectedNodeId: null,
+      selectedEdgeId: null,
+      pathToSelected: new Set<string>(),
+      lslSessionFilter: [],
+      lslFilterEntityIds: null,
+    })
+  })
+
+  test('initial state: selectionSource === null', () => {
+    expect(initial().selectionSource).toBeNull()
+  })
+
+  test('initial state: highlightedRowKey === null', () => {
+    expect(initial().highlightedRowKey).toBeNull()
+  })
+
+  test('initial state: selectedSessionId === null', () => {
+    expect(initial().selectedSessionId).toBeNull()
+  })
+
+  test('setSelection({ nodeId, source: "graph" }) writes nodeId + source atomically and resets pathToSelected', () => {
+    useViewerStore.setState({ pathToSelected: new Set<string>(['old1', 'old2']) })
+    useViewerStore.getState().setSelection({ nodeId: 'e1', source: 'graph' })
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBe('e1')
+    expect(s.selectionSource).toBe('graph')
+    // pathToSelected reset when nodeId changes and no explicit path provided
+    expect(s.pathToSelected.size).toBe(0)
+  })
+
+  test('setSelection({ nodeId, source, pathToSelected }) honors the explicit path', () => {
+    const path = new Set<string>(['e1', 'sys'])
+    useViewerStore.getState().setSelection({ nodeId: 'e1', source: 'graph', pathToSelected: path })
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBe('e1')
+    expect(s.selectionSource).toBe('graph')
+    expect(Array.from(s.pathToSelected).sort()).toEqual(['e1', 'sys'])
+  })
+
+  test('setSelection({ sessionId, source: "timeline" }) writes sessionId + source without touching selectedNodeId', () => {
+    useViewerStore.setState({ selectedNodeId: 'keep-me' })
+    useViewerStore.getState().setSelection({ sessionId: 'sess-x', source: 'timeline' })
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBe('keep-me')
+    expect(s.selectedSessionId).toBe('sess-x')
+    expect(s.selectionSource).toBe('timeline')
+  })
+
+  test('setSelection({ nodeId, highlightedRowKey, source }) writes all three; getState snapshot is coherent', () => {
+    useViewerStore.getState().setSelection({
+      nodeId: 'e2',
+      highlightedRowKey: 'row-e2',
+      source: 'history',
+    })
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBe('e2')
+    expect(s.highlightedRowKey).toBe('row-e2')
+    expect(s.selectionSource).toBe('history')
+  })
+
+  test('clearSelection() nulls selectedNodeId, selectedEdgeId, selectionSource, highlightedRowKey, selectedSessionId AND empties lslSessionFilter AND nulls lslFilterEntityIds AND resets pathToSelected', () => {
+    useViewerStore.setState({
+      selectedNodeId: 'n',
+      selectedEdgeId: 'e',
+      selectionSource: 'graph',
+      highlightedRowKey: 'r',
+      selectedSessionId: 's',
+      pathToSelected: new Set<string>(['a', 'b']),
+      lslSessionFilter: ['sess1'],
+      lslFilterEntityIds: new Set<string>(['x']),
+    })
+    useViewerStore.getState().clearSelection()
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBeNull()
+    expect(s.selectedEdgeId).toBeNull()
+    expect(s.selectionSource).toBeNull()
+    expect(s.highlightedRowKey).toBeNull()
+    expect(s.selectedSessionId).toBeNull()
+    expect(s.pathToSelected.size).toBe(0)
+    expect(s.lslSessionFilter).toEqual([])
+    expect(s.lslFilterEntityIds).toBeNull()
+  })
+
+  test('clearSelection() does NOT touch searchQuery, selectedClasses, visibleLevels', () => {
+    useViewerStore.setState({
+      searchQuery: 'docker',
+      selectedClasses: new Set<string>(['Component']),
+      visibleLevels: new Set([1, 2]),
+      selectedNodeId: 'n',
+    })
+    useViewerStore.getState().clearSelection()
+    const s = useViewerStore.getState()
+    expect(s.searchQuery).toBe('docker')
+    expect(s.selectedClasses.has('Component')).toBe(true)
+    expect(s.visibleLevels.has(1)).toBe(true)
+    expect(s.visibleLevels.has(2)).toBe(true)
+  })
+
+  test('reset() also clears the three new Phase 56 fields', () => {
+    useViewerStore.setState({
+      selectionSource: 'graph',
+      highlightedRowKey: 'rk',
+      selectedSessionId: 'sid',
+    })
+    useViewerStore.getState().reset()
+    const s = useViewerStore.getState()
+    expect(s.selectionSource).toBeNull()
+    expect(s.highlightedRowKey).toBeNull()
+    expect(s.selectedSessionId).toBeNull()
+  })
+
+  test('source-grep gate: viewer-store.ts source contains the 5 Phase 56 identifiers (word-boundary regex)', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/store/viewer-store.ts'),
+      'utf8',
+    )
+    expect(src).toMatch(/\bsetSelection\b/)
+    expect(src).toMatch(/\bclearSelection\b/)
+    expect(src).toMatch(/\bselectionSource\b/)
+    expect(src).toMatch(/\bhighlightedRowKey\b/)
+    expect(src).toMatch(/\bselectedSessionId\b/)
+  })
+
+  test('Logger discipline: viewer-store.ts source has no raw console.* call', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/store/viewer-store.ts'),
+      'utf8',
+    )
+    expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
   })
 })
