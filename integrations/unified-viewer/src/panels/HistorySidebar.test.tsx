@@ -3,7 +3,7 @@
 // CONTRACT: 56-02-PLAN.md Task 1 <behavior> + <action> steps 6-7
 //           UI-SPEC §7 row 10 — chronological history feed (Insights only).
 //
-// Tests (7 in total):
+// Tests (9 in total):
 //   1. renders data-history-id on each row (latent bug fix — scroll selector
 //      at HistorySidebar.tsx line 106 was dead code before this plan).
 //   2. clicking a row writes selection atomically — single getState snapshot
@@ -18,6 +18,17 @@
 //   6. source-grep gate — `data-history-id` literal must be present in
 //      source (catches regressions that drop the attribute again).
 //   7. Logger discipline — no raw console.* in HistorySidebar.tsx source.
+//   8. (CR-01) clicking a row CLEARS the LSL session-filter scope + sibling
+//      session-tick fields that a prior timeline-tick click left behind.
+//      Seed the store with a non-empty LSL filter + selectedSessionId/StartAt
+//      BEFORE the click; assert ALL of them are cleared AFTER the click. This
+//      locks the audit-contract-#5 cascade-clear semantics for sidebars so a
+//      history-row click after a tick click leaves the graph in a coherent
+//      "show everything visible" state — not the broken state where the D3
+//      predicate stays narrowed to the previous session's entities.
+//   9. (CR-01) source-grep acceptance gate: HistorySidebar.tsx MUST have
+//      zero inline `useViewerStore.setState({...})` call sites — the only
+//      selection writer path is the canonical `setSelection` action.
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
@@ -82,6 +93,9 @@ function renderPanel() {
 describe('HistorySidebar (Plan 56-02 Task 1)', () => {
   beforeEach(() => {
     // Reset selection-sync slice baseline (Phase 56 fields explicit).
+    // 2026-06-13 (CR-01): also reset the LSL filter slice + the sibling
+    // selectedSessionStartAt so Test 8 starts from a clean slate and the
+    // pre-seeded LSL state it writes cannot leak from a prior test.
     useViewerStore.setState({
       selectedNodeId: null,
       selectedEdgeId: null,
@@ -89,6 +103,9 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
       selectionSource: null,
       highlightedRowKey: null,
       selectedSessionId: null,
+      selectedSessionStartAt: null,
+      lslSessionFilter: [],
+      lslFilterEntityIds: null,
     })
     cleanup()
     // jsdom does not implement scrollIntoView on Element.prototype — the
@@ -185,5 +202,81 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
       'utf8',
     )
     expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
+  })
+
+  // ====================================================================
+  // CR-01 fix (2026-06-13): the HistorySidebar row-click handler used to
+  // call `useViewerStore.setState({...})` with a 4-field payload that did
+  // NOT clear the LSL session-filter scope or the sibling session-tick
+  // fields. After a timeline-tick click set `lslFilterEntityIds` +
+  // `lslSessionFilter` + `selectedSessionId/StartAt`, a history-row click
+  // left those stale — the D3 graph stayed narrowed to the previous
+  // session's entities while the side panel had already swapped to a
+  // different entity's detail. Broken UX with no recovery path short of
+  // pressing Esc.
+  //
+  // The fix routes through the canonical `setSelection` store action
+  // with explicit nulls/empties for the LSL + session-tick fields, so
+  // subscribers see one coherent snapshot. The two tests below lock the
+  // contract: (Test 8) functional — pre-seed the stale state, click,
+  // assert cleared; (Test 9) source-grep — no inline setState remains.
+  // ====================================================================
+
+  test('Test 8 (CR-01): clicking a row clears the stale LSL session-filter scope + sibling session-tick fields that a prior timeline-tick click left behind', () => {
+    // Pre-seed the store with the EXACT state a timeline-tick click leaves
+    // behind: non-empty LSL filter (graph predicate narrowed to a session's
+    // entities) + sibling session-tick fields populated. This is the state
+    // the user lands in after clicking a tick on the LslTimelineStrip.
+    useViewerStore.setState({
+      selectedNodeId: 'prev-entity',
+      selectionSource: 'timeline',
+      highlightedRowKey: 'prev-entity',
+      selectedSessionId: 'sess-X',
+      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+      lslSessionFilter: ['sess-X'],
+      lslFilterEntityIds: new Set<string>(['e1', 'e2', 'prev-entity']),
+    })
+
+    renderPanel()
+    const row = document.querySelector('[data-history-id="i-min"]') as HTMLElement
+    expect(row).not.toBeNull()
+    fireEvent.click(row)
+
+    // Single getState snapshot — every field must reflect the post-click
+    // contract. The history-row click MUST replace the selection AND
+    // cascade-clear the LSL session-filter scope so the graph predicate
+    // stops narrowing to the previous session's entities.
+    const s = useViewerStore.getState()
+    // Selection moved to the clicked row.
+    expect(s.selectedNodeId).toBe('i-min')
+    expect(s.highlightedRowKey).toBe('i-min')
+    expect(s.selectionSource).toBe('history')
+    expect(s.pathToSelected.size).toBe(0)
+    // Sibling session-tick fields MUST be cleared (audit §7 R2: they are
+    // always written/cleared together; the previous tick-set values are now
+    // stale because the user navigated to a different entity context).
+    expect(s.selectedSessionId).toBeNull()
+    expect(s.selectedSessionStartAt).toBeNull()
+    // LSL session-filter scope MUST be cleared so the D3 graph's
+    // `visibleEntities` predicate stops intersecting against the previous
+    // tick's entity set. This is the audit-contract-#5 cascade-clear
+    // semantics for sidebars: a history-row click is a "fresh" selection
+    // scope that should not inherit the previous pane's filter.
+    expect(s.lslSessionFilter).toEqual([])
+    expect(s.lslFilterEntityIds).toBeNull()
+  })
+
+  test('Test 9 (CR-01): source-grep acceptance gate — HistorySidebar.tsx has zero inline useViewerStore.setState({...}) call sites', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/panels/HistorySidebar.tsx'),
+      'utf8',
+    )
+    // The CR-01 fix locked the contract: the only path to write selection
+    // from this file is `useViewerStore.getState().setSelection({...})`.
+    // Any future regression that re-introduces an inline `setState({...})`
+    // for selection writes would re-open CR-01.
+    expect(src).not.toMatch(/useViewerStore\.setState\s*\(/)
+    // Positive assertion: the canonical setSelection call IS present.
+    expect(src).toMatch(/useViewerStore\.getState\(\)\.setSelection\s*\(/)
   })
 })

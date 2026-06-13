@@ -105,16 +105,40 @@ export function OccurrenceHistorySidebar(_: OccurrenceHistorySidebarProps) {
             data-testid={`occurrence-row-${entity.id}`}
             className={`${baseClass} ${highlightClass}`}
             onClick={() => {
-              // Phase 56 atomic 4-field write — replaces the single-field
-              // `setSelectedNode(entity.id)` call so consumers see one
-              // consistent snapshot (selectedNodeId + highlightedRowKey +
-              // selectionSource + pathToSelected reset) instead of a
-              // setState window where any subset is visible.
-              useViewerStore.setState({
-                selectedNodeId: entity.id,
+              // 2026-06-13 (Phase 56 / CR-01 fix): route through the
+              // canonical `setSelection` store action instead of an inline
+              // `setState({...})`. Two reasons:
+              //   1. Audit contract #5 (single source of truth for selection
+              //      writes) — every cross-pane selection write should funnel
+              //      through `setSelection`/`clearSelection` so the LSL
+              //      filter cascade, sibling-field invariants, and
+              //      reference-stability guards live in ONE place (the store).
+              //   2. CR-01: the previous inline `setState` payload wrote only
+              //      4 fields (selectedNodeId, pathToSelected,
+              //      highlightedRowKey, selectionSource) and silently LEFT
+              //      `lslFilterEntityIds` + `lslSessionFilter` + the sibling
+              //      `selectedSessionId`/`selectedSessionStartAt` fields
+              //      stale from a prior timeline-tick click. Result: a
+              //      history-row click after a tick click left the D3 graph
+              //      narrowed to the previous session's entities while the
+              //      side panel showed a different entity's detail — broken
+              //      UX with no obvious recovery path.
+              // The cascade-clear is the audit-prescribed behaviour: when
+              // the user navigates via history, the LSL session-scope
+              // selection MUST clear so the graph predicate doesn't keep
+              // narrowing to an unrelated session.
+              useViewerStore.getState().setSelection({
+                nodeId: entity.id,
                 pathToSelected: new Set<string>(),
                 highlightedRowKey: entity.id,
-                selectionSource: 'history',
+                source: 'history',
+                // Explicitly clear the LSL session-filter scope and the
+                // sibling session-tick fields so a stale tick filter doesn't
+                // leak across panes (CR-01).
+                sessionId: null,
+                sessionStartAt: null,
+                lslSessionFilter: [],
+                lslFilterEntityIds: null,
               })
               Logger.info(
                 Logger.Categories.PANELS,
