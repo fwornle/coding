@@ -1,92 +1,93 @@
-// D3GraphCanvas Phase 56 source-grep gates.
+// D3GraphCanvas Phase 56.1 source-grep gates.
 //
 // We do NOT render D3GraphCanvas in jsdom — d3.forceSimulation + the
 // zoomBehavior pan-to-node primitive require a real SVG layout engine that
 // jsdom doesn't ship (Layout, getBoundingClientRect, getCTM are all stubs).
 // Per 56-PATTERNS.md the in-tree gate idiom for this file is a **source
 // readFileSync + regex** assertion (mirrors LslTimelineStrip.test.tsx:271-277
-// Logger-discipline gate), which is exactly what locks the Phase 56
+// Logger-discipline gate), which is exactly what locks the Phase 56 + 56.1
 // invariants on D3GraphCanvas:
 //
 //   1. Node click routes through `useViewerStore.getState().setSelection({...})`
-//      with `nodeId: d.id`, `pathToSelected: new Set(...)`,
-//      `highlightedRowKey: d.id`, `source: 'graph'`, `sessionId: null`.
-//      (CR-02 fix 2026-06-13: was an inline 5-field `setState({...})` that
-//      cleared `selectedSessionId` but silently left
-//      `selectedSessionStartAt` stale — sibling-clear invariant violation.
-//      Routing through `setSelection` puts the paired clear in the action
-//      body — see viewer-store.ts:330-335.)
+//      with `nodeIds: new Set([d.id])`, `bucketKeys: new Set()`,
+//      `focal: { nodeId: d.id, bucketKey: null }`, `pathToSelected: new Set(...)`,
+//      `highlightedRowKey: d.id`, `source: 'graph'`.
+//      (Phase 56.1 D-5 drill collapse: ALWAYS shrinks any prior halo to
+//      single-focal mode and clears the timeline halo. Routing through the
+//      action keeps the sibling-field clears + reference-stability guards
+//      where they can't be forgotten — viewer-store.ts:399-490.)
 //   2. Background click goes through useViewerStore.getState().clearSelection()
 //      (single store action — no partial setState).
-//   3. 2026-06-13 (continuation 2 SPEC CHANGE): the AC #3 visual contract
-//      is fulfilled by applySelectionStyling (selection ring + ancestry
-//      trace), NOT by a viewport pan. The centering useEffect (originally
-//      committed in 989c04558) is REMOVED. The grep gates assert ABSENCE
-//      of the centering signature (G6/G7/G8 inverted) and PRESENCE of the
-//      applySelectionStyling primitive that carries the new contract.
-//   4. The MAIN useEffect dep list at lines 599-606 still OMITS selectedNodeId
-//      — listing it there would rebuild the SVG + restart the force simulation
-//      on every click (the comment-block invariant the file has carried since
-//      Phase 45).
-//   5. Audit contract #5 acceptance grep (CR-02 fix): zero inline
-//      `useViewerStore.setState({...})` call sites remain in this file —
-//      both the node onClick and the bg-click route through store actions.
+//   3. 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the AC #3 visual
+//      contract is fulfilled by applySelectionStyling (selection ring +
+//      ancestry trace), NOT by a viewport pan. The centering useEffect
+//      (originally committed in 989c04558) is REMOVED. The grep gates
+//      assert ABSENCE of the centering signature (G6/G7/G8 inverted) and
+//      PRESENCE of the applySelectionStyling primitive that carries the
+//      new contract.
+//   4. The MAIN useEffect dep list at lines ~660-672 OMITS every Phase 56.1
+//      selection field — selectedNodeIds, focalNodeId, selectedBucketKeys,
+//      focalBucketKey (and the carried-forward Phase 56 pathToSelected) —
+//      listing any of them there would rebuild the SVG + restart the force
+//      simulation on every click (the comment-block invariant the file has
+//      carried since Phase 45; Phase 56-PATTERNS Locked Contract #3).
+//   5. Audit contract #5 acceptance grep (CR-02 fix carried forward): zero
+//      inline `useViewerStore.setState({...})` call sites remain in this
+//      file — both the node onClick and the bg-click route through store
+//      actions (setSelection / clearSelection).
+//   6. Phase 56.1 two-tier render: source contains both halo (#60a5fa) and
+//      focal (#ff0000) stroke colors + data-focal + data-halo markers.
+//   7. Phase 56.1 trace-from-focal-only: ancestry computation reads
+//      focalNodeId (not selectedNodeIds or the obsolete selectedNodeId).
+//   8. Phase 56.1 useCallback dep list for applySelectionStyling renames the
+//      Phase 56 [selectedNodeId, ...] to [selectedNodeIds, focalNodeId, ...].
 //
 // Logger discipline is also gate-tested (zero console.* in the source) per
 // PATTERNS.md "Phase 56 must add the same gate".
 //
-// The functional test at the bottom (G14) exercises the store-side sibling-
-// clear contract that `setSelection` enforces, mirroring what the node-click
-// handler triggers. We can't fire the actual d3 click in jsdom, so we drive
-// `setSelection` with the exact payload shape the handler produces — that's
-// the same store mutation the live handler invokes after this CR-02 fix.
+// Phase 56's G14 functional sibling-clear test (selectedSessionId /
+// selectedSessionStartAt) is REMOVED — Plan 01 removed those two fields
+// from the store schema (replaced by selectedBucketKeys + focalBucketKey).
+// The sibling-clear concern is now built into the deriveFocal helper inside
+// setSelection (verified by viewer-store.test.ts's 28-test Phase 56.1
+// multi-selection describe block, not here). G14 is repurposed as a
+// source-grep gate for the new no-selection guard predicate.
 
-import { describe, test, expect, beforeEach } from 'vitest'
+import { describe, test, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { useViewerStore } from '@/store/viewer-store'
 
 const SOURCE_PATH = resolve(process.cwd(), 'src/graph/D3GraphCanvas.tsx')
 const src = readFileSync(SOURCE_PATH, 'utf8')
 
-describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
-  test('Phase 56 G1 [CR-02 update]: node click payload includes source: "graph" (via setSelection action)', () => {
-    // 2026-06-13 (CR-02 fix): the click handler now routes through
-    // `setSelection({...})` whose parameter is named `source`, not
-    // `selectionSource`. Single-quoted form is the in-tree convention.
+describe('D3GraphCanvas — Phase 56.1 source-grep gates', () => {
+  test('Phase 56.1 G1: node click payload includes source: "graph" (via setSelection action)', () => {
+    // Single-quoted form is the in-tree convention.
     expect(src).toMatch(/source:\s*'graph'/)
   })
 
-  test('Phase 56 G2: node click payload includes highlightedRowKey: d.id', () => {
+  test('Phase 56.1 G2: node click payload includes highlightedRowKey: d.id', () => {
     expect(src).toMatch(/highlightedRowKey:\s*d\.id/)
   })
 
-  test('Phase 56 G3 [CR-02 update]: node click payload passes sessionId: null (sibling-clear handled by setSelection)', () => {
-    // 2026-06-13 (CR-02 fix): the previous inline `setState` wrote
-    // `selectedSessionId: null` directly but silently left
-    // `selectedSessionStartAt` stale (sibling-clear invariant violation —
-    // audit §7 R2). The click handler now passes `sessionId: null` to
-    // `setSelection`, which atomically also clears `selectedSessionStartAt`
-    // (viewer-store.ts:330-335: `else if (sessionId !== undefined) {
-    // nextSessionStartAt = null }`). The functional test G14 below proves
-    // the paired clear happens at runtime.
-    expect(src).toMatch(/sessionId:\s*null/)
+  test('Phase 56.1 G3 [D-5 drill collapse]: node click writes nodeIds: new Set([d.id]) AND bucketKeys: new Set()', () => {
+    // Phase 56.1 D-5: a graph click ALWAYS collapses to single-focal mode,
+    // even when the clicked node was already part of a halo selection.
+    // The payload must therefore write BOTH a single-element nodeIds Set
+    // AND an empty bucketKeys Set so the timeline halo is dropped.
+    expect(src).toMatch(/nodeIds:\s*new Set<string>\(\[d\.id\]\)/)
+    expect(src).toMatch(/bucketKeys:\s*new Set<string>\(\)/)
   })
 
-  test('Phase 56 G4: bg-click handler invokes useViewerStore.getState().clearSelection()', () => {
+  test('Phase 56.1 G4: bg-click handler invokes useViewerStore.getState().clearSelection()', () => {
     expect(src).toMatch(/useViewerStore\.getState\(\)\.clearSelection\(\)/)
   })
 
-  test('Phase 56 G5: bg-click handler no longer writes the partial setState payload it had pre-Phase-56', () => {
+  test('Phase 56.1 G5: bg-click handler does NOT contain a direct setState payload', () => {
     // The Phase 45 baseline at lines 427-431 wrote:
     //   useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
-    // INSIDE the `if (event.target === svgRef.current)` branch. After Phase
-    // 56 that branch invokes clearSelection() instead. We assert the bg-click
-    // route does NOT contain the old direct setState shape.
-    // (The node onClick still uses setState({...}) for the 5-field payload —
-    // that's a DIFFERENT setState call, in a different handler. We narrow by
-    // checking the unique `event.target === svgRef.current` line is followed
-    // by clearSelection, NOT setState.)
+    // INSIDE the `if (event.target === svgRef.current)` branch. Phase 56
+    // converted that to clearSelection(); Phase 56.1 preserves the routing.
     const bgBlockMatch = src.match(
       /if\s*\(\s*event\.target\s*===\s*svgRef\.current\s*\)\s*\{?\s*([^}]+?)\}/,
     )
@@ -103,8 +104,11 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
     // second-smoke feedback ("Maybe the zoom is not a good idea …") the
     // centering effect is REMOVED. This inverted assertion is the source-
     // grep lock for the retraction: if a future plan re-adds a centering
-    // effect with the original triple-deps signature, this gate fires.
+    // effect with the original triple-deps signature (or its Phase 56.1
+    // rename to [focalNodeId, selectionSource, visibleEntities]), this
+    // gate fires.
     expect(src).not.toMatch(/\}, \[selectedNodeId, selectionSource, visibleEntities\]\)/)
+    expect(src).not.toMatch(/\}, \[focalNodeId, selectionSource, visibleEntities\]\)/)
   })
 
   test('Phase 56 G7 [retracted — spec change 2026-06-13]: no "selectionSource === \'graph\'" early-bail (only present in the retracted centering effect)', () => {
@@ -112,8 +116,8 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
     // `selectionSource === 'graph'` in this file was the centering
     // effect's loop-safety bail. With the effect gone, the comparison
     // should not appear in the source. (Other uses of selectionSource —
-    // e.g. as the literal value written on node click `selectionSource:
-    // 'graph'` — match a DIFFERENT regex and are covered by G1.)
+    // e.g. as the literal value written on node click `source: 'graph'`
+    // — match a DIFFERENT regex and are covered by G1.)
     expect(src).not.toMatch(/selectionSource\s*===\s*'graph'/)
   })
 
@@ -129,16 +133,33 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
     expect(matches.length).toBe(1)
   })
 
-  test('Phase 56 G9: MAIN useEffect dep list still OMITS selectedNodeId (critical Phase 45 invariant)', () => {
+  test('Phase 56.1 G9 [audit-locked viewport stability]: MAIN useEffect dep list OMITS every selection field (selectedNodeIds, focalNodeId, selectedBucketKeys, focalBucketKey, pathToSelected) AND the obsolete selectedNodeId / selectedSessionId / selectedSessionStartAt', () => {
     // The main effect's dep list signature starts with `[visibleEntities,
     // visibleRelations` — matches the exact regex the PLAN.md verification
-    // node oneliner uses. If selectedNodeId ever drifts into that list the
-    // whole SVG rebuilds + the force simulation restarts on every click.
+    // node oneliner uses. If ANY selection field ever drifts into that
+    // list the whole SVG rebuilds + the force simulation restarts on every
+    // click — Phase 56-PATTERNS Locked Contract #3 / Phase 45 G9 viewport
+    // stability invariant.
+    //
+    // Phase 56.1 obligation: lock the exact verbatim dep list as the
+    // single canonical form, then assert the Phase 56.1 selection field
+    // names + the deleted Phase 56 names + pathToSelected are all absent.
+    expect(src).toMatch(/}, \[visibleEntities, visibleRelations, theme, isLoading\]/)
     const mainBlocks = src.match(/}, \[visibleEntities, visibleRelations[^\]]+\]\)/g)
     expect(mainBlocks).not.toBeNull()
     expect(mainBlocks!.length).toBeGreaterThanOrEqual(1)
     for (const block of mainBlocks!) {
+      // Phase 56.1 new field names — MUST NOT appear:
+      expect(block).not.toMatch(/\bselectedNodeIds\b/)
+      expect(block).not.toMatch(/\bfocalNodeId\b/)
+      expect(block).not.toMatch(/\bselectedBucketKeys\b/)
+      expect(block).not.toMatch(/\bfocalBucketKey\b/)
+      // Carried-forward Phase 56 invariant — MUST NOT appear:
+      expect(block).not.toMatch(/\bpathToSelected\b/)
+      // Deleted Phase 56 field names — MUST NOT re-appear:
       expect(block).not.toMatch(/\bselectedNodeId\b/)
+      expect(block).not.toMatch(/\bselectedSessionId\b/)
+      expect(block).not.toMatch(/\bselectedSessionStartAt\b/)
     }
   })
 
@@ -159,16 +180,7 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
     expect(src).not.toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectionSource\)/)
   })
 
-  // ====================================================================
-  // T-D [audit §6.4 / §6.6]: `pathToSelected` is the store's single source
-  // of truth for the ancestry trace. `applySelectionStyling` MUST read it
-  // from the store INSTEAD of re-running `computeAncestryPath` inline as
-  // its primary source. Source-grep adapt of the audit's runtime viewport-
-  // stability test (jsdom can't host the d3 SVG layout, per file header).
-  // The Commit-5 fix has the function read `pathToSelected` from the
-  // store with `computeAncestryPath` only as a fallback.
-  // ====================================================================
-  test('Phase 56 G12 [audit §6.4 / §6.6 — T-D]: applySelectionStyling reads pathToSelected from the store (not exclusively inline)', () => {
+  test('Phase 56 G12 [audit §6.4 / §6.6]: applySelectionStyling reads pathToSelected from the store (not exclusively inline)', () => {
     // After Commit 5: the file must contain a subscription/read of the
     // store field. Match a Zustand read using either subscription idiom or
     // `useViewerStore.getState().pathToSelected`.
@@ -177,101 +189,100 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
     expect(hasSubscription || hasGetStateRead).toBe(true)
   })
 
-  test('Phase 56 G13 [audit §6.7 — T-D viewport stability]: main render effect dep list still does NOT include selectedNodeId NOR pathToSelected NOR selectedSessionId', () => {
-    // Viewport stability contract: a non-graph selection must NOT
-    // invalidate visibleEntities/visibleRelations and therefore must not
-    // restart the force simulation. The audit's §6.7 contract narrowed
-    // by the audit's §4.3 root cause: only `visibleEntities` and
-    // `visibleRelations` may invalidate the main effect; selection slice
-    // fields must NOT appear in the dep list.
-    const mainBlocks = src.match(/}, \[visibleEntities, visibleRelations[^\]]+\]\)/g)
-    expect(mainBlocks).not.toBeNull()
-    for (const block of mainBlocks!) {
-      expect(block).not.toMatch(/\bselectedNodeId\b/)
-      expect(block).not.toMatch(/\bpathToSelected\b/)
-      expect(block).not.toMatch(/\bselectedSessionId\b/)
-      expect(block).not.toMatch(/\bselectedSessionStartAt\b/)
-    }
-  })
-
-  test('Phase 56 G15 [CR-02 fix — audit contract #5]: zero inline useViewerStore.setState({...}) call sites remain in D3GraphCanvas.tsx', () => {
-    // 2026-06-13 (CR-02 fix): the node-click handler previously used an
-    // inline `useViewerStore.setState({...})` 5-field payload. That site
-    // was the last inline `setState({...})` in this file (the bg-click was
-    // already converted to `clearSelection()` in an earlier Phase 56
-    // commit). After CR-02 it now routes through `setSelection({...})`,
-    // putting the sibling-clear invariant for `selectedSessionId` +
-    // `selectedSessionStartAt` in the store action body where it can't
-    // be forgotten. This gate locks the acceptance grep from audit
-    // contract #5 ("zero `useViewerStore.setState({...})` call sites in
-    // any consumer component that participates in selection") for this
-    // file. If a future plan re-introduces an inline payload, this gate
-    // fires immediately.
+  test('Phase 56.1 G13 [Contract #5 — single source of truth]: zero inline useViewerStore.setState({...}) call sites remain in D3GraphCanvas.tsx', () => {
+    // Phase 56's CR-02 fix removed the last inline setState({...}) site
+    // (node-click handler). Phase 56.1 D-5 drill-collapse refactor keeps
+    // the same routing through the canonical setSelection action — passing
+    // the new multi-set fields (nodeIds, bucketKeys, focal) instead of the
+    // deleted single-selection fields. This gate locks the acceptance grep
+    // from audit contract #5 for this file. If a future plan re-introduces
+    // an inline payload, this gate fires immediately.
     const matches = src.match(/useViewerStore\.setState\s*\(/g) ?? []
     expect(matches.length).toBe(0)
   })
-})
 
-// ======================================================================
-// G14 — functional sibling-clear test (CR-02 fix).
-//
-// This block is OUTSIDE the source-grep describe so it can carry its own
-// store-reset `beforeEach`. We can't fire the actual d3 click in jsdom
-// (per the file header), so we drive `useViewerStore.getState().setSelection(...)`
-// with the EXACT payload shape the node-click handler now passes (see
-// D3GraphCanvas.tsx around lines 537-545). That's the same store mutation
-// the live handler invokes — testing it proves the sibling-clear works at
-// runtime, complementing the source-grep gates above.
-// ======================================================================
-describe('D3GraphCanvas — Phase 56 node-click sibling-clear (CR-02 functional)', () => {
-  beforeEach(() => {
-    // Reset only the selection slice fields we touch in this block —
-    // other Phase 55/56 fields are unrelated to this test.
-    useViewerStore.setState({
-      selectedNodeId: null,
-      pathToSelected: new Set<string>(),
-      selectionSource: null,
-      highlightedRowKey: null,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
-      lslSessionFilter: [],
-      lslFilterEntityIds: null,
-    })
+  // ====================================================================
+  // Phase 56.1 NEW gates G14-G20 — locks the two-tier render contract,
+  // the drill-collapse click payload, the trace-from-focal-only contract,
+  // and the renamed useCallback dep list. Each gate maps directly to a
+  // CONTEXT.md decision or PATTERNS.md §4 invariant.
+  // ====================================================================
+
+  test('Phase 56.1 G14 [D-1 + D-4]: applySelectionStyling no-selection guard uses (focalNodeId === null && selectedNodeIds.size === 0)', () => {
+    // The Phase 56 guard was `if (!selectedNodeId)`. Phase 56.1 replaces
+    // it with a two-condition predicate: NO focal AND NO halo. With the
+    // store's deriveFocal invariant (focalNodeId === null iff
+    // selectedNodeIds.size === 0) this is belt-and-braces but it documents
+    // the contract intent for any future reader.
+    expect(src).toMatch(/focalNodeId === null && selectedNodeIds\.size === 0/)
   })
 
-  test('G14: simulating the node-click code path clears BOTH selectedSessionId AND selectedSessionStartAt (sibling-clear invariant — audit §7 R2)', () => {
-    // 1. Seed the store with both LSL session fields populated, as if a
-    //    timeline tick was the previous writer.
-    useViewerStore.setState({
-      selectedSessionId: 'sess-X',
-      selectedSessionStartAt: '2026-06-13T11:00:00Z',
-    })
-    expect(useViewerStore.getState().selectedSessionId).toBe('sess-X')
-    expect(useViewerStore.getState().selectedSessionStartAt).toBe('2026-06-13T11:00:00Z')
+  test('Phase 56.1 G15 [D-4]: two-tier ring colors present in source (#60a5fa halo + #ff0000 focal)', () => {
+    // Phase 56.1 D-4: halo uses the lighter blue (#60a5fa, opacity 0.6,
+    // stroke-width 2); focal preserves the Phase 56 red (#ff0000, opacity
+    // 1, stroke-width 4). Both strokes must appear in the source.
+    expect(src).toContain('#60a5fa')
+    expect(src).toContain('#ff0000')
+  })
 
-    // 2. Invoke the same store mutation the node-click handler now triggers.
-    //    Payload shape mirrors D3GraphCanvas.tsx node onClick body verbatim
-    //    (sans the actual `computeAncestryPath` call — we use a stub path
-    //    Set since the sibling-clear contract is independent of ancestry).
-    useViewerStore.getState().setSelection({
-      nodeId: 'node-Y',
-      pathToSelected: new Set<string>(['root', 'node-Y']),
-      highlightedRowKey: 'node-Y',
-      source: 'graph',
-      sessionId: null,
-    })
+  test('Phase 56.1 G16 [D-4 + E2E observability]: data-focal + data-halo markers present on .node <g> writes', () => {
+    // Phase 56.1 D-4: in addition to the inline stroke (which an E2E spec
+    // would have to assert against by reading SVG attrs and color-matching),
+    // applySelectionStyling writes `data-focal="true"` on the focal node's
+    // parent <g> and `data-halo="true"` on each halo node's parent <g>.
+    // Plan 06's E2E assertions select by these data-attrs.
+    expect(src).toMatch(/data-focal/)
+    expect(src).toMatch(/data-halo/)
+  })
 
-    // 3. The CR-02 sibling-clear assertion: BOTH session fields are null.
-    //    Before the fix, `selectedSessionStartAt` would still be
-    //    '2026-06-13T11:00:00Z' here, leaving stale state for any future
-    //    consumer that reads it independently of `selectedSessionId`.
-    const s = useViewerStore.getState()
-    expect(s.selectedSessionId).toBeNull()
-    expect(s.selectedSessionStartAt).toBeNull()
+  test('Phase 56.1 G17 [D-5 drill collapse]: graph click routes through setSelection action (not inline setState)', () => {
+    // The click handler must use `useViewerStore.getState().setSelection({...`
+    // with `nodeIds: new Set(...)`. Multi-line regex catches the action
+    // call followed by the nodeIds key on the next line.
+    expect(src).toMatch(
+      /useViewerStore\.getState\(\)\.setSelection\(\{[\s\S]*?nodeIds:\s*new Set/,
+    )
+    // Bonus: count inline setState occurrences (G13 already does this but
+    // we re-assert here so a single removed gate doesn't open the door).
+    const inlineSetState = src.match(/useViewerStore\.setState\s*\(\s*\{/g) ?? []
+    expect(inlineSetState.length).toBe(0)
+  })
 
-    // 4. Sanity: the new selectedNodeId write also happened atomically.
-    expect(s.selectedNodeId).toBe('node-Y')
-    expect(s.highlightedRowKey).toBe('node-Y')
-    expect(s.selectionSource).toBe('graph')
+  test('Phase 56.1 G18 [Contract #5]: background click routes through clearSelection()', () => {
+    // Lockstep with G4 (positive assertion) + G5 (negative assertion of
+    // inline setState inside the bg-click branch). This gate adds an
+    // extra check that the routing literally uses the action form.
+    expect(src).toMatch(/useViewerStore\.getState\(\)\.clearSelection\(\)/)
+  })
+
+  test('Phase 56.1 G19 [D-4 trace from focal only]: pathToSelected trace reads focalNodeId, not selectedNodeIds or the obsolete selectedNodeId', () => {
+    // Phase 56.1 D-4: drawing the central-CK trace from every halo node
+    // would be O(N×depth) visual noise at N>=5. The trace is keyed on
+    // focalNodeId only. The applySelectionStyling closure must therefore
+    // call computeAncestryPath / deriveAncestryFromStorePath with
+    // focalNodeId as the entry point.
+    // Positive: either inline computation or store-path derivation
+    // references focalNodeId in the ancestry call.
+    expect(src).toMatch(/computeAncestryPath\(focalNodeId,/)
+    expect(src).toMatch(/deriveAncestryFromStorePath\(focalNodeId,/)
+    // Negative: no leftover call using the deleted Phase 56 single-id name.
+    expect(src).not.toMatch(/computeAncestryPath\(selectedNodeId,/)
+    expect(src).not.toMatch(/deriveAncestryFromStorePath\(selectedNodeId,/)
+    // Negative: trace must NOT iterate over selectedNodeIds for ancestry
+    // computation (multi-trace would be the discretion-overridden form).
+    expect(src).not.toMatch(/computeAncestryPath\(selectedNodeIds/)
+  })
+
+  test('Phase 56.1 G20 [D-1 useCallback dep list rename]: applySelectionStyling useCallback dep list contains selectedNodeIds AND focalNodeId AND pathToSelected AND visibleRelations AND theme', () => {
+    // Phase 56's dep list was [selectedNodeId, pathToSelected, visibleRelations, theme].
+    // Phase 56.1 renames the first entry to selectedNodeIds and ADDS focalNodeId.
+    // Match the useCallback's tail dep-list line for applySelectionStyling.
+    expect(src).toMatch(
+      /useCallback\([\s\S]*?\[selectedNodeIds,\s*focalNodeId,\s*pathToSelected,\s*visibleRelations,\s*theme\][\s\S]*?\)/,
+    )
+    // Negative: the deleted Phase 56 dep-list form must not appear.
+    expect(src).not.toMatch(
+      /\[selectedNodeId,\s*pathToSelected,\s*visibleRelations,\s*theme\]/,
+    )
   })
 })
