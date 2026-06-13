@@ -284,4 +284,79 @@ describe('useKeyboardShortcuts', () => {
     })
     expect(handler).toHaveBeenCalledTimes(1)
   })
+
+  // ---- Phase 56 Task 2: Esc routes through clearSelection() ----
+  //
+  // CONTEXT.md decision: "Esc + click-background clears selection in all three
+  // panes simultaneously. Implementation must go through the store, not
+  // per-pane handlers." Test 12 asserts the cascade — selecting a node AND
+  // setting an LSL filter, then pressing Esc, leaves BOTH cleared. Pre-
+  // Phase-56 the Esc handler only called setSelectedNode(null) and the LSL
+  // filter survived; Phase 56 routes through clearSelection() so the entire
+  // selection slice + LSL filter clear together.
+
+  test('Test 12 (Phase 56): Esc with selectedNodeId + lslSessionFilter set → BOTH cleared (cascade through clearSelection)', () => {
+    useViewerStore.setState({
+      selectedNodeId: 'node-42',
+      lslSessionFilter: ['sess-keep'],
+      lslFilterEntityIds: new Set<string>(['x', 'y']),
+      selectionSource: 'graph',
+      highlightedRowKey: 'row-42',
+      selectedSessionId: 'sess-42',
+    })
+    render(<Harness />)
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBeNull()
+    expect(s.lslSessionFilter).toEqual([])
+    expect(s.lslFilterEntityIds).toBeNull()
+    expect(s.selectionSource).toBeNull()
+    expect(s.highlightedRowKey).toBeNull()
+    expect(s.selectedSessionId).toBeNull()
+  })
+
+  test('Test 13 (Phase 56): Esc with no selection: clearSelection() NOT called (guard preserved)', () => {
+    // The Phase 45 guard `if (selectedNodeId !== null)` must remain so Esc
+    // on an already-cleared state is a no-op (event.preventDefault not
+    // called, no Logger spam). We verify the guard by checking that an LSL
+    // filter set BEFORE Esc survives — clearSelection() would also empty
+    // it, so its survival proves the guard skipped the call.
+    useViewerStore.setState({
+      selectedNodeId: null,
+      lslSessionFilter: ['preserve-me'],
+    })
+    render(<Harness />)
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    // selectedNodeId stays null (was already), and the LSL filter is NOT
+    // wiped because clearSelection() never fired.
+    expect(useViewerStore.getState().lslSessionFilter).toEqual(['preserve-me'])
+  })
+
+  test('Test 14 (Phase 56): Esc inside focused search input: clears focus first, does NOT clear selection (BC preserved)', () => {
+    useViewerStore.setState({
+      selectedNodeId: 'node-99',
+      lslSessionFilter: ['preserve-me'],
+    })
+    const { getByTestId } = render(<Harness inputFocused />)
+    const input = getByTestId('search-input') as HTMLInputElement
+    expect(document.activeElement).toBe(input)
+    act(() => {
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    // Input blurred (Phase 55 behaviour)
+    expect(document.activeElement).not.toBe(input)
+    // Selection slice + LSL filter unchanged on first Esc
+    expect(useViewerStore.getState().selectedNodeId).toBe('node-99')
+    expect(useViewerStore.getState().lslSessionFilter).toEqual(['preserve-me'])
+  })
 })
