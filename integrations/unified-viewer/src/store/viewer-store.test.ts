@@ -387,6 +387,9 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
       selectionSource: null,
       highlightedRowKey: null,
       selectedSessionId: null,
+      // 2026-06-13 (audit §6.2): the sibling field must be reset too so each
+      // test starts from a clean slate.
+      selectedSessionStartAt: null,
       selectedNodeId: null,
       selectedEdgeId: null,
       pathToSelected: new Set<string>(),
@@ -405,6 +408,10 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
 
   test('initial state: selectedSessionId === null', () => {
     expect(initial().selectedSessionId).toBeNull()
+  })
+
+  test('initial state: selectedSessionStartAt === null (audit §6.2 — option A — additive sibling of selectedSessionId)', () => {
+    expect(initial().selectedSessionStartAt).toBeNull()
   })
 
   test('setSelection({ nodeId, source: "graph" }) writes nodeId + source atomically and resets pathToSelected', () => {
@@ -435,6 +442,45 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     expect(s.selectionSource).toBe('timeline')
   })
 
+  test('setSelection({ sessionId, sessionStartAt, source: "timeline" }) writes BOTH session fields together (audit §6.2 + §7 R2 round-trip)', () => {
+    useViewerStore.getState().setSelection({
+      sessionId: 'sess-x',
+      sessionStartAt: '2026-06-13T11:00:00Z',
+      source: 'timeline',
+    })
+    const s = useViewerStore.getState()
+    expect(s.selectedSessionId).toBe('sess-x')
+    expect(s.selectedSessionStartAt).toBe('2026-06-13T11:00:00Z')
+    expect(s.selectionSource).toBe('timeline')
+  })
+
+  test('setSelection({ sessionId, source }) without sessionStartAt resets sessionStartAt to null (audit §7 R2 — never leave the sibling stale)', () => {
+    // Pre-seed both fields with a "previous tranche" snapshot — the analogue
+    // of clicking tranche A of sess-X first (sets both id and startAt).
+    useViewerStore.setState({
+      selectedSessionId: 'sess-prev',
+      selectedSessionStartAt: '2026-06-13T10:00:00Z',
+    })
+    // Now write only sessionId (no sessionStartAt). The action MUST null the
+    // sibling — otherwise the (id, startAt) pair becomes inconsistent.
+    useViewerStore.getState().setSelection({ sessionId: 'sess-new', source: 'timeline' })
+    const s = useViewerStore.getState()
+    expect(s.selectedSessionId).toBe('sess-new')
+    expect(s.selectedSessionStartAt).toBeNull()
+  })
+
+  test('setSelection({ nodeId, source }) without sessionId preserves both session fields (audit §6.2 — only sibling-reset when sessionId is in args)', () => {
+    useViewerStore.setState({
+      selectedSessionId: 'sess-keep',
+      selectedSessionStartAt: '2026-06-13T10:00:00Z',
+    })
+    useViewerStore.getState().setSelection({ nodeId: 'e1', source: 'graph' })
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBe('e1')
+    expect(s.selectedSessionId).toBe('sess-keep')
+    expect(s.selectedSessionStartAt).toBe('2026-06-13T10:00:00Z')
+  })
+
   test('setSelection({ nodeId, highlightedRowKey, source }) writes all three; getState snapshot is coherent', () => {
     useViewerStore.getState().setSelection({
       nodeId: 'e2',
@@ -447,13 +493,14 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     expect(s.selectionSource).toBe('history')
   })
 
-  test('clearSelection() nulls selectedNodeId, selectedEdgeId, selectionSource, highlightedRowKey, selectedSessionId AND empties lslSessionFilter AND nulls lslFilterEntityIds AND resets pathToSelected', () => {
+  test('clearSelection() nulls selectedNodeId, selectedEdgeId, selectionSource, highlightedRowKey, selectedSessionId, selectedSessionStartAt AND empties lslSessionFilter AND nulls lslFilterEntityIds AND resets pathToSelected', () => {
     useViewerStore.setState({
       selectedNodeId: 'n',
       selectedEdgeId: 'e',
       selectionSource: 'graph',
       highlightedRowKey: 'r',
       selectedSessionId: 's',
+      selectedSessionStartAt: '2026-06-13T11:00:00Z',
       pathToSelected: new Set<string>(['a', 'b']),
       lslSessionFilter: ['sess1'],
       lslFilterEntityIds: new Set<string>(['x']),
@@ -465,6 +512,8 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     expect(s.selectionSource).toBeNull()
     expect(s.highlightedRowKey).toBeNull()
     expect(s.selectedSessionId).toBeNull()
+    // 2026-06-13 (audit §6.2 + §7 R2): paired clear with selectedSessionId.
+    expect(s.selectedSessionStartAt).toBeNull()
     expect(s.pathToSelected.size).toBe(0)
     expect(s.lslSessionFilter).toEqual([])
     expect(s.lslFilterEntityIds).toBeNull()
@@ -485,20 +534,22 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     expect(s.visibleLevels.has(2)).toBe(true)
   })
 
-  test('reset() also clears the three new Phase 56 fields', () => {
+  test('reset() also clears the four Phase 56 selection fields (incl. selectedSessionStartAt per audit §6.2)', () => {
     useViewerStore.setState({
       selectionSource: 'graph',
       highlightedRowKey: 'rk',
       selectedSessionId: 'sid',
+      selectedSessionStartAt: '2026-06-13T11:00:00Z',
     })
     useViewerStore.getState().reset()
     const s = useViewerStore.getState()
     expect(s.selectionSource).toBeNull()
     expect(s.highlightedRowKey).toBeNull()
     expect(s.selectedSessionId).toBeNull()
+    expect(s.selectedSessionStartAt).toBeNull()
   })
 
-  test('source-grep gate: viewer-store.ts source contains the 5 Phase 56 identifiers (word-boundary regex)', () => {
+  test('source-grep gate: viewer-store.ts source contains the 6 Phase 56 identifiers (word-boundary regex) — incl. selectedSessionStartAt per audit §6.2', () => {
     const src = readFileSync(
       path.resolve(process.cwd(), 'src/store/viewer-store.ts'),
       'utf8',
@@ -508,6 +559,7 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     expect(src).toMatch(/\bselectionSource\b/)
     expect(src).toMatch(/\bhighlightedRowKey\b/)
     expect(src).toMatch(/\bselectedSessionId\b/)
+    expect(src).toMatch(/\bselectedSessionStartAt\b/)
   })
 
   test('Logger discipline: viewer-store.ts source has no raw console.* call', () => {

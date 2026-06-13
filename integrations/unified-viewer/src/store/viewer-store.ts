@@ -88,14 +88,25 @@ export interface ViewerState {
   // HistorySidebar / OccurrenceHistorySidebar. `selectionSource` lets
   // consumers avoid feedback loops on their own clicks; `highlightedRowKey`
   // is the history-sidebar row to scroll/highlight (often === selectedNodeId
-  // but may differ for aggregate selections); `selectedSessionId` is the
-  // LSL session-tick aggregate selection per CONTEXT.md selection-scope
-  // decision. ALL three are written atomically via `setSelection({...})`
-  // (or via `useViewerStore.setState({...})` from in-tree consumers) so
-  // subscribers see a coherent snapshot — never a half-written state.
+  // but may differ for aggregate selections); `selectedSessionId` +
+  // `selectedSessionStartAt` together identify the LSL session-tick bucket
+  // (composite key — a single session id is sliced into many tranches that
+  // share `id` but differ in `startAt`). ALL of these are written atomically
+  // via `setSelection({...})` (or via `useViewerStore.setState({...})` from
+  // in-tree consumers) so subscribers see a coherent snapshot — never a
+  // half-written state.
+  //
+  // 2026-06-13 (state-flow audit `b29bdb34c5d54c09962c2724c1311825da412d8b`
+  // §6.2 — option A): `selectedSessionStartAt` is the additive companion to
+  // `selectedSessionId`. The tick-ring predicate in LslTimelineStrip now
+  // derives the selected-bucket key from the composite `${id}|${startAt}` so
+  // a click on one tranche of `sess-X` no longer rings every other tranche
+  // of the same session id. The two fields are ALWAYS written + cleared
+  // together — never one without the other (audit §7 R2).
   selectionSource: SelectionSource
   highlightedRowKey: string | null
   selectedSessionId: string | null
+  selectedSessionStartAt: string | null
 
   // 2026-06-11: VKB-style filter rail additions.
   //   - learningSource: 'batch' (manual/UKB) | 'online' (auto/ETM) | 'combined' (both)
@@ -149,6 +160,10 @@ export interface ViewerState {
   setSelection: (args: {
     nodeId?: string | null
     sessionId?: string | null
+    // 2026-06-13 (audit §6.2 — option A): pass the SESSION-bucket startAt
+    // alongside `sessionId` so the strip's tick-ring predicate can identify
+    // the SPECIFIC tranche. Atomically set/cleared together with sessionId.
+    sessionStartAt?: string | null
     highlightedRowKey?: string | null
     source: SelectionSource
     pathToSelected?: ReadonlySet<string>
@@ -236,6 +251,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
   selectionSource: null,
   highlightedRowKey: null,
   selectedSessionId: null,
+  // 2026-06-13 (audit §6.2 — option A): paired with selectedSessionId.
+  selectedSessionStartAt: null,
   searchQuery: '',
   visibleLevels: new Set<Level>([0, 1, 2, 3]),
   selectedClasses: new Set<string>(),
@@ -259,10 +276,23 @@ export const useViewerStore = create<ViewerState>((set) => ({
   // origin; `pathToSelected` defaults to an empty Set when nodeId changes
   // (the graph recomputes ancestry on next render) but is preserved if the
   // caller didn't move the node (e.g. timeline-only writes).
-  setSelection: ({ nodeId, sessionId, highlightedRowKey, source, pathToSelected }) =>
+  setSelection: ({ nodeId, sessionId, sessionStartAt, highlightedRowKey, source, pathToSelected }) =>
     set((s) => {
       const nextNodeId = nodeId !== undefined ? nodeId : s.selectedNodeId
       const nextSessionId = sessionId !== undefined ? sessionId : s.selectedSessionId
+      // 2026-06-13 (audit §6.2 + §7 R2): session id and startAt are SIBLING
+      // fields. When the caller passes `sessionId` we look at `sessionStartAt`
+      // too. If the caller passed sessionStartAt explicitly, use it; otherwise
+      // — when `sessionId` is in args at all — reset startAt to null so we
+      // never end up with a "session selected" snapshot where startAt is
+      // stale from an earlier tranche. If the caller didn't touch sessionId,
+      // preserve startAt as-is.
+      let nextSessionStartAt: string | null = s.selectedSessionStartAt
+      if (sessionStartAt !== undefined) {
+        nextSessionStartAt = sessionStartAt
+      } else if (sessionId !== undefined) {
+        nextSessionStartAt = null
+      }
       const nextHighlightedRowKey =
         highlightedRowKey !== undefined ? highlightedRowKey : s.highlightedRowKey
       // pathToSelected: explicit > reset-on-nodeId-change > preserve.
@@ -275,6 +305,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
       return {
         selectedNodeId: nextNodeId,
         selectedSessionId: nextSessionId,
+        selectedSessionStartAt: nextSessionStartAt,
         highlightedRowKey: nextHighlightedRowKey,
         selectionSource: source,
         pathToSelected: nextPath,
@@ -292,6 +323,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
       selectionSource: null,
       highlightedRowKey: null,
       selectedSessionId: null,
+      // 2026-06-13 (audit §6.2 + §7 R2): paired clear with selectedSessionId.
+      selectedSessionStartAt: null,
       pathToSelected: new Set<string>(),
       lslSessionFilter: [],
       lslFilterEntityIds: null,
@@ -335,6 +368,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
       selectionSource: null,
       highlightedRowKey: null,
       selectedSessionId: null,
+      // 2026-06-13 (audit §6.2 + §7 R2): paired clear with selectedSessionId.
+      selectedSessionStartAt: null,
     }),
 
   // ---------- Phase 55 — VOKB filtersSlice parity ----------
