@@ -968,6 +968,17 @@ Plans:
 
 See `.planning/phases/55-unified-viewer-feature-parity-with-vokb/55-CONTEXT.md` (to be authored by `/gsd-discuss-phase 55`).
 
+### Phase 56: Unified Viewer — Bidirectional Selection & Timeline Scale
+
+**Goal:** As a developer exploring the unified knowledge graph viewer at localhost:5173/viewer/coding, I want to pivot between graph, timeline, and history-sidebar via a single shared selection, so that I never lose context when switching panes.
+**Mode:** mvp
+**Requirements**: TBD
+**Depends on:** Phase 55
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 56 to break down)
+
 ---
 
 ## Backlog
