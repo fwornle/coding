@@ -174,10 +174,20 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity)
   const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null)
+  // 2026-06-13 (Phase 56): the live d3Nodes array (force-simulation mutates
+  // x/y on these). Centering effect reads from this ref because the source
+  // `visibleEntities` are never mutated — they're mapped INTO d3Nodes at
+  // the top of the main effect.
+  const d3NodesRef = useRef<D3Node[]>([])
 
   const { entities, relations, isLoading } = useGraphData(apiClient, system)
   const theme = useViewerStore((s) => s.theme)
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  // 2026-06-13 (Phase 56): subscribe to selectionSource so the centering
+  // effect re-runs when a non-graph pane (history sidebar / timeline tick)
+  // drives the selection. Loop-safety: the effect bails when source ===
+  // 'graph' so the user's own graph clicks don't trigger a pan-to-self.
+  const selectionSource = useViewerStore((s) => s.selectionSource)
   const selectedTeams = useViewerStore((s) => s.selectedTeams)
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
   const selectedClasses = useViewerStore((s) => s.selectedClasses)
@@ -372,6 +382,54 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     applySelectionStyling(d3.select(svgRef.current))
   }, [applySelectionStyling])
 
+  // 2026-06-13 (Phase 56): history/timeline-driven centering effect.
+  //
+  // (a) Narrow dep list — [selectedNodeId, selectionSource, visibleEntities]
+  //     ONLY. Crucially we do NOT depend on `theme` / `visibleRelations` /
+  //     anything else in the main effect — otherwise a filter or theme
+  //     change would re-pan the graph and disorient the user. The main
+  //     useEffect dep list (lines below) STILL omits selectedNodeId per
+  //     the Phase 45 invariant — that is what stops every click from
+  //     rebuilding the SVG; this centering effect handles the visual
+  //     follow-up of out-of-graph selections separately.
+  //
+  // (b) Loop-safety — when selectionSource === 'graph' we early-bail.
+  //     The user just clicked a node in the graph; panning to the click
+  //     target would feel jarring and would compete with d3-zoom's own
+  //     focus-on-click behaviour (which we don't currently invoke, but
+  //     leaving the bail in place keeps us safe from a future click
+  //     handler that does).
+  //
+  // (c) Cold-click race tolerance — the node's `x` / `y` come from the
+  //     force simulation, which doesn't settle synchronously after a
+  //     filter change. When the user clicks a sidebar row before the
+  //     force has resolved a position, we bail without panning; the
+  //     user still sees the selection ring + path-trace via
+  //     applySelectionStyling. The effect will not re-fire automatically
+  //     when the position settles (visibleEntities is reference-stable
+  //     across ticks) — but the selection ring is enough; this is a
+  //     non-fatal degraded path, not a regression.
+  //
+  // (d) Pan primitive — uses zoomBehaviorRef + d3.zoomIdentity +
+  //     transition().duration(500), the EXACT idiom fitToScreen uses at
+  //     line ~557. No new external API surface.
+  useEffect(() => {
+    if (!svgRef.current || !selectedNodeId) return
+    if (selectionSource === 'graph') return
+    // Read from the LIVE d3Nodes (force-simulation-mutated) — the source
+    // `visibleEntities` are immutable Entity[] without x/y. d3NodesRef is
+    // populated at the top of the main render effect.
+    const node = d3NodesRef.current.find((n) => n.id === selectedNodeId)
+    if (!node || typeof node.x !== 'number' || typeof node.y !== 'number') return
+    if (!zoomBehaviorRef.current) return
+    const svg = d3.select(svgRef.current)
+    const { width, height } = svgRef.current.getBoundingClientRect()
+    const transform = d3.zoomIdentity
+      .translate(width / 2 - node.x, height / 2 - node.y)
+      .scale(1)
+    svg.transition().duration(500).call(zoomBehaviorRef.current.transform, transform)
+  }, [selectedNodeId, selectionSource, visibleEntities])
+
   // Main render — rebuild on filtered data or theme change.
   useEffect(() => {
     if (isLoading) return
@@ -405,6 +463,11 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       fx: null,
       fy: null,
     }))
+    // 2026-06-13 (Phase 56): expose d3Nodes (the array d3.forceSimulation
+    // will mutate in place) to the centering effect via ref. We assign
+    // BEFORE wiring forceSimulation so the centering effect sees the
+    // array as soon as the simulation produces x/y on the first tick.
+    d3NodesRef.current = d3Nodes
     const d3Links: D3Link[] = visibleRelations.map((r) => ({
       source: r.from,
       target: r.to,
@@ -424,9 +487,16 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     svg.call(zoomBehavior)
 
     // Background click deselects.
+    // 2026-06-13 (Phase 56): route through the canonical clearSelection()
+    // store action so the cascade fires identically to the Esc key path
+    // (useKeyboardShortcuts:Esc -> clearSelection). The action clears the
+    // entire Phase 56 selection slice + the LSL filter slice in one set(),
+    // matching CONTEXT.md D-04 ("Esc + click-background clears in all
+    // three panes simultaneously. Implementation must go through the
+    // store, not per-pane handlers").
     svg.on('click', (event) => {
       if (event.target === svgRef.current) {
-        useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
+        useViewerStore.getState().clearSelection()
       }
     })
 
@@ -492,9 +562,20 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       .call(makeDrag(simulation))
       .on('click', (event: MouseEvent, d) => {
         const path = computeAncestryPath(d.id, visibleRelations)
+        // 2026-06-13 (Phase 56): atomic 5-field write — node id, path, the
+        // history-sidebar highlight key, source = 'graph' (so the centering
+        // effect can short-circuit on self-originated selections), and
+        // selectedSessionId = null because a graph click is not session-scoped.
+        // Subscribers (HistorySidebar, OccurrenceHistorySidebar,
+        // LslTimelineStrip) see a coherent snapshot in one set() — never a
+        // half-written state where selectedNodeId moved but highlightedRowKey
+        // is stale.
         useViewerStore.setState({
           selectedNodeId: d.id,
           pathToSelected: new Set(path.nodeDepths.keys()),
+          highlightedRowKey: d.id,
+          selectionSource: 'graph',
+          selectedSessionId: null,
         })
         event.stopPropagation()
       })
