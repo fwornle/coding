@@ -164,12 +164,18 @@ export function useKeyboardShortcuts(
           Logger.debug(Logger.Categories.PANELS, 'Esc: closed help dialog')
           return
         }
-        // Finally fall back to deselecting the current node
-        const { selectedNodeId, setSelectedNode } = useViewerStore.getState()
+        // Finally fall back to deselecting the current node. Phase 56:
+        // route through the store-level `clearSelection()` so the LSL
+        // session filter + the cross-pane selection slice (selectionSource,
+        // highlightedRowKey, selectedSessionId) all clear in one atomic
+        // snapshot. The `selectedNodeId !== null` guard stays so Esc on an
+        // already-cleared state is a no-op (no Logger spam, no
+        // preventDefault), preserving the Phase 45 semantic.
+        const { selectedNodeId, clearSelection } = useViewerStore.getState()
         if (selectedNodeId !== null) {
-          setSelectedNode(null)
+          clearSelection()
           event.preventDefault()
-          Logger.debug(Logger.Categories.STORE, 'Esc: deselected node')
+          Logger.debug(Logger.Categories.STORE, 'Esc: cleared selection (all panes)')
         }
         return
       }
