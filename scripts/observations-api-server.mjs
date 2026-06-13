@@ -821,6 +821,26 @@ const PROJECT_COMPONENT_TAXONOMY = {
     { name: 'rapid-agentic-sandbox', aliases: ['rapid-agentic-sandbox', 'sandbox'] },
     { name: 'rapidscribe-meeting', aliases: ['rapidscribe', 'meeting'] },
   ],
+  sketcher: [
+    { name: 'RapidToolkit', aliases: ['rapid-toolkit', 'rapid toolkit'] },
+    { name: 'TeamsIntegration', aliases: ['teams channel', 'graph api', 'microsoft graph', 'teams'] },
+    { name: 'ReportGeneration', aliases: ['analysis report', 'markdown report', 'pdf conversion'] },
+    { name: 'TmuxStatusline', aliases: ['tmux', 'statusline', 'status line', 'proxy badge'] },
+    { name: 'OnlineLearning', aliases: ['online learning', 'code graph ingestion', 'batch analysis'] },
+  ],
+  'onboarding-repro': [
+    { name: 'LiveSessionLogging', aliases: ['live session logging', 'lsl', 'specstory'] },
+    { name: 'OpenCodePlugin', aliases: ['opencode', 'compaction guard'] },
+    { name: 'BrandschutzAgent', aliases: ['brandschutz', 'articulate rise', 'fire safety'] },
+    { name: 'ObservationsDashboard', aliases: ['observations dashboard', 'observation dashboard', 'etm'] },
+    { name: 'MultiAgentSkills', aliases: ['multi-agent', 'skill', 'agent skill', 'command discovery'] },
+  ],
+  daFrankTeam: [
+    { name: 'HackathonGame', aliases: ['kraken', 'browser game', 'hackathon', 'spa'] },
+  ],
+  'ai-transformation-day-hackathon': [
+    { name: 'AIKrakenSPA', aliases: ['kraken', 'spa', 'information hub', 'skills marketplace'] },
+  ],
 };
 
 app.get('/api/projects/:project/coverage', async (req, res) => {

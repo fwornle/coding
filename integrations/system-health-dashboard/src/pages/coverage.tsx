@@ -169,7 +169,12 @@ function ProjectCoverageCard({ data }: { data: CoverageResponse }) {
             <div className="text-2xl font-semibold">
               {c.componentsMentioned.length}<span className="text-muted-foreground">/{c.componentsMentioned.length + c.componentsMissing.length}</span>
             </div>
-            {c.componentsMissing.length > 0 ? (
+            {c.componentsMentioned.length + c.componentsMissing.length === 0 ? (
+              <div className="text-xs flex items-start gap-1 text-muted-foreground">
+                <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                <span>no taxonomy defined for this project</span>
+              </div>
+            ) : c.componentsMissing.length > 0 ? (
               <div className="text-xs flex items-start gap-1 text-amber-400">
                 <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
                 <span>missing: {c.componentsMissing.join(', ')}</span>
