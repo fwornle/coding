@@ -4,7 +4,16 @@
 //                 suite RED.
 //
 // Spec 1 covers AC #2 (graph → others highlight).
-// Spec 2 covers AC #3 (history sidebar → graph + timeline).
+// Spec 2 covers AC #3 (history sidebar → graph + timeline). 2026-06-13
+//        SPEC CHANGE (continuation 2): the original AC #3 wording was
+//        "centers/highlights" the corresponding graph node. The
+//        centering clause was retracted per operator second-smoke
+//        feedback. The visual contract is now ring + ancestry trace +
+//        EntityDetailPanel — the viewport is intentionally untouched.
+//        This spec asserts the store-side cascade + the timeline tick
+//        ring (the only visible cross-pane surface that can react to
+//        history-driven selection without the §7 row 11 EntityDetailPanel
+//        swap). It does NOT assert any viewport transform.
 // Spec 3 covers AC #4 (timeline tick → graph + history).
 // Spec 4 covers AC #7 (Esc clears all three panes — store-side + visual
 //        cascade fully GREEN after Plan 04 D3GraphCanvas bg-click →
@@ -157,9 +166,15 @@ test.describe('Unified Viewer — Phase 56 bidirectional selection', () => {
   test('Spec 2 — clicking a history sidebar row drives graph + timeline (AC #3)', async ({
     page,
   }) => {
-    // AC #3: Selecting a row in the history sidebar centers/highlights the
-    // corresponding node in the graph AND highlights the matching timeline
-    // tick. Plan 02 makes the click write atomically through setSelection().
+    // AC #3 (post 2026-06-13 spec change): Selecting a row in the history
+    // sidebar HIGHLIGHTS the corresponding node in the graph (selection
+    // ring + ancestry trace + EntityDetailPanel mount) AND highlights the
+    // matching timeline tick. The original "centers/highlights" wording
+    // was retracted per operator second-smoke feedback — the viewport is
+    // intentionally untouched. We assert the store cascade + the timeline
+    // ring; the graph-side ring is unit-tested in D3GraphCanvas.test.ts
+    // and the EntityDetailPanel mount is the visible side-panel surface.
+    // Plan 02 makes the click write atomically through setSelection().
 
     const firstRow = page.locator('[data-history-id]').first()
     await expect(firstRow).toBeVisible({ timeout: 10_000 })

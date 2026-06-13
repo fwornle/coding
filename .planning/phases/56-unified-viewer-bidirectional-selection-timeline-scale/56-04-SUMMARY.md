@@ -2,176 +2,257 @@
 phase: 56-unified-viewer-bidirectional-selection-timeline-scale
 plan: 04
 subsystem: unified-viewer
-tags: [bidirectional-selection, regression-fix, gap-closure, click-handler-tests, ancestry-extraction, deselect-effect, lsl-timeline]
+tags: [bidirectional-selection, spec-change, ac-retraction, regression-fix, gap-closure, fireEvent-tests, single-bucket-ring, no-spurious-rerender]
 dependency_graph:
   requires:
     - "Plan 56-01 selection-sync foundation (viewer-store slice + window.__viewerStore E2E hook + RED Playwright spec)"
     - "Plan 56-02 history-sidebar atomic write + highlight contract"
     - "Plan 56-03 timestamp scale row + onTickClick 7-field atomic write"
-    - "Plan 56-04 Task 1 (committed 989c04558) D3GraphCanvas atomic node click + bg→clearSelection + history-driven centering effect"
-    - "Plan 56-04 Task 2 (committed 371ad889e) Playwright suite 4/4 GREEN"
+    - "Plan 56-04 Task 1 continuation 1 (5baa4b965) D3GraphCanvas atomic node click + bg→clearSelection + ancestry.ts extraction + LslTimelineStrip continuation-1 fixes"
+    - "Plan 56-04 Task 2 (371ad889e) Playwright suite 4/4 GREEN"
   provides:
-    - "computeAncestryPath() + HIERARCHY_TYPES extracted from D3GraphCanvas.tsx into shared module src/graph/ancestry.ts — reused by LslTimelineStrip for tick-click central-trace"
-    - "LslTimelineStrip deselect-effect gated on real selected→deselected TRANSITION (prevSelectedTsRef) — fixes Issue 1 (window buttons no longer snap back) AND pre-existing Test 7 baseline failure (Cmd/Ctrl+click pre-existing filter wipe)"
-    - "LslTimelineStrip tick-ring keyed on (isSelectedBucket || selectedSessionId === s.id) — fixes Issue 2 (empty-entityIds session ticks now ring on their own click)"
-    - "LslTimelineStrip onTickClick computes real ancestry path via computeAncestryPath(firstEntityId, relations) — fixes Issue 3 (central-trace renders for tick-resolved focal entities)"
-    - "4 click-handler-driven vitest regression locks (Tests 21-24) — the next regression on the same code path surfaces in CI"
+    - "AC #3 SUPERSEDED CONTRACT: history/timeline-driven selection writes selection ring + ancestry trace + EntityDetailPanel (via existing applySelectionStyling); viewport intentionally untouched. Retracts the original 'centers/highlights' wording per 2026-06-13 operator second-smoke feedback ('Maybe the zoom is not a good idea and you should just select the chosen node in the main graph (red circle) plus trace to CK plus sidebar text')."
+    - "LslTimelineStrip onTickClick early-exits to a MINIMAL store write when entityIds=[] — only selectedSessionId + selectionSource — preserving reference-stable values for lslFilterEntityIds/selectedNodeId/pathToSelected/highlightedRowKey so D3GraphCanvas's visibleEntities useMemo does NOT invalidate and no SVG rebuild fires. Issue A closed."
+    - "LslTimelineStrip ring keyed on local component state `clickedTickKey` (composite `${sessionId}|${startAt}`) instead of `selectedSessionId === s.id`. Single-bucket semantics restored: clicking ONE tranche no longer rings every sibling tranche of the same session id. Issue D closed."
+    - "D3GraphCanvas centering useEffect + d3NodesRef + selectionSource subscription REMOVED. Selection ring + ancestry trace via applySelectionStyling (unchanged primitive) carry the AC #3 visual contract. Issue C closed."
+    - "3 new fireEvent-driven vitest regression locks (Tests 25/26/28) + 4 inverted source-grep gates (G6/G7/G8/G11) in D3GraphCanvas.test.ts. The next regression on the same code path surfaces in CI."
   affects:
-    - "D3GraphCanvas.tsx — pure code-move (computeAncestryPath now imported instead of inline); 0 behaviour change, all 11 source-grep gates intact, main useEffect dep list still omits selectedNodeId"
-    - "useGraphData consumers — LslTimelineStrip now also destructures `relations` from the hook (same hook call, no additional fetch)"
+    - "D3GraphCanvas.tsx — 3 deletions (selectionSource subscription, d3NodesRef, centering useEffect); 0 behaviour change on graph→graph clicks; non-graph-source clicks no longer pan but still get ring + trace via the unchanged applySelectionStyling effect"
+    - "LslTimelineStrip.tsx — local `clickedTickKey` state + reset effect on `selectedSessionId === null`; ring predicate retargeted; onTickClick has empty-ids early-exit branch"
+    - "56-04-PLAN.md + 56-CONTEXT.md — AC #3 wording retraction inline (dated)"
 tech-stack:
   added: []
   patterns:
-    - "Shared-helper extraction (D3GraphCanvas inline → src/graph/ancestry.ts module) to eliminate drift risk between two consumers of the same ancestry walk"
-    - "Transition-tracking via useRef (prevSelectedTsRef) to distinguish 'selected → deselected' from 'mounted in deselected state' inside a single useEffect"
-    - "fireEvent.click on rendered buttons (NOT useViewerStore.setState) for handler-driving regression tests — closes the gap the operator surfaced in checkpoint:human-verify"
-    - "Tick-ring OR predicate (isSelectedBucket || selectedSessionId === s.id) — keys visual feedback on TWO independent store signals so the cascade fires even when one signal can't resolve"
+    - "Spec-change-as-commit: the AC #3 retraction lands as a `docs(56-04):` commit BEFORE the code fix lands, so the spec change has its own audit trail independent of the implementation. Future contract diffs can be bisected to a single commit."
+    - "Local component state (clickedTickKey) for visual feedback that the store cannot represent without growing a per-tranche field — preserves store ergonomics + avoids cross-pane noise"
+    - "Empty-input early-exit with minimal-write: when a click intent has no resolvable cascade target (entityIds=[]), write ONLY the fields the strip itself needs (selectedSessionId + selectionSource), leaving every other store field reference-stable. Closes a frame-budget-sized hidden cost (full D3 rebuild on every meaningless click)."
+    - "Inverted source-grep gates as retraction-locks — G6/G7/G8/G11 now assert ABSENCE of the centering effect's signatures. If a future plan re-adds the centering useEffect with the original triple-deps signature OR re-adds the selectionSource subscription, all four gates fire RED in CI."
 key-files:
   created:
-    - "integrations/unified-viewer/src/graph/ancestry.ts"
-    - ".planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-04-SUMMARY.md"
+    - ".planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-04-SUMMARY.md (this file — supersedes the continuation-1 SUMMARY committed in 6e3682467)"
   modified:
-    - "integrations/unified-viewer/src/panels/coding/LslTimelineStrip.tsx"
-    - "integrations/unified-viewer/src/panels/coding/LslTimelineStrip.test.tsx"
-    - "integrations/unified-viewer/src/graph/D3GraphCanvas.tsx"
+    - ".planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-04-PLAN.md (AC #3 retraction)"
+    - ".planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-CONTEXT.md (AC #3 retraction — dated inline note)"
+    - "integrations/unified-viewer/src/graph/D3GraphCanvas.tsx (centering useEffect + d3NodesRef + selectionSource subscription removed)"
+    - "integrations/unified-viewer/src/graph/D3GraphCanvas.test.ts (G6/G7/G8/G11 inverted as retraction-locks)"
+    - "integrations/unified-viewer/src/panels/coding/LslTimelineStrip.tsx (clickedTickKey local state + ring retargeting + empty-ids early-exit)"
+    - "integrations/unified-viewer/src/panels/coding/LslTimelineStrip.test.tsx (Tests 25/26/28 added)"
+    - "tests/e2e/unified-viewer/56-bidirectional-selection.spec.ts (header + Spec 2 prose update — no assertion change)"
 decisions:
-  - "Extract computeAncestryPath to a shared module (src/graph/ancestry.ts) instead of duplicating into LslTimelineStrip — Plan 04 has two consumers needing identical ancestry walks; inline-and-duplicate would drift the moment HIERARCHY_TYPES gains a new edge type. Bit-identical code-move preserves all 11 D3GraphCanvas source-grep gates."
-  - "Gate the deselect-effect on prevSelectedTsRef !== null (real selected→deselected TRANSITION) rather than guarding only the window restore on preSlideWindowRef.current. The latter would leave the LSL-filter-clear cascade firing on mount, which is Test 7's pre-existing failure mode. The transition-tracking ref handles both side-effects together."
-  - "Re-key tick ring on (isSelectedBucket || selectedSessionId === s.id) — NOT on `selectedNodeId in entities[]` per the resume_instructions sketch. Reason: when entities[] is non-empty AND selectedNodeId IS in entities[], `isSelectedBucket` already fires (via selectedTs → range match). The OR predicate adds the empty-entities AND non-resolving-entity cases without breaking the existing cascade. The 'selectedNodeId in entities[]' predicate would have double-counted the existing path."
-  - "Compute pathToSelected in onTickClick for BOTH plain and Cmd/Ctrl branches — modifier-key additive selection still needs the central-trace; without it, only plain clicks would get it and the user's modifier-key UX would silently lose a feature. Mirrors how 56-03 extended both branches with the 3 new Phase 56 fields."
+  - "AC #3 spec change lands FIRST as a standalone `docs(56-04):` commit (3935c794e) so the contract retraction has an independent audit trail. The 4 bug fixes follow in `fix(56-04):` (572fe1bed) so the implementation is auditable separately from the contract change."
+  - "Issue D (over-fired session ring) is fixed with LOCAL component state (clickedTickKey) — NOT a new store field. Reasoning: the clicked-bucket signal is purely visual feedback for the timeline strip; no other pane consumes it. Growing the store would (a) leak strip-internal state across the API + (b) require every consumer of clearSelection to remember to null the new field too. Local state with a useEffect reset on `selectedSessionId === null` is strictly cheaper."
+  - "Issue A (spurious D3 rebuild on empty-ids click) is fixed with an EARLY-EXIT minimal write, NOT by adding a deep-equality guard to the existing setState call. Reasoning: the empty-ids case is a click-intent the strip needs to record (selectedSessionId + selectionSource) but the cascade fields (selectedNodeId / pathToSelected / lslFilterEntityIds / highlightedRowKey) have no meaningful value in this case. Writing them at all would either need a content-equality check (always-true here, but adds runtime + maintenance cost) or accept the spurious re-render. Early-exit is simpler and explicit."
+  - "Inverted source-grep gates (G6/G7/G8/G11) chosen over deleting the gates entirely. Reasoning: the retraction itself is a contract that must outlive this plan. If a future plan re-adds the centering useEffect (perhaps to fulfil a NEW spec) the inverted gates will fire RED in CI, forcing the author to explicitly read this SUMMARY and the operator-feedback commit before re-introducing the behaviour."
+  - "Test 26 (Issue B — bare entity id format) ships GREEN at baseline. Reasoning: the store-side write was always correct (continuation 1 wrote `selectedNodeId: firstEntityId`). The operator's complaint was a VISUAL consequence of Issue C — the centering pan moved the SVG so the ring/trace was off-screen. With C removed, the visual symptom resolves. Test 26 is kept as a forward-looking contract lock; deleting it would create a gap if a future refactor changed the id format on either side."
 metrics:
-  duration_min: 18
+  duration_min: 30
   completed_date: 2026-06-13
-  tasks_completed: 3
-  files_created: 2
-  files_modified: 3
-  commits: 2
+  tasks_completed: 4
+  files_created: 1
+  files_modified: 6
+  commits: 3
 ---
 
-# Phase 56 Plan 04 — Wave 3 Gap-Closure Summary
+# Phase 56 Plan 04 — Continuation 2 SUMMARY (supersedes 6e3682467)
 
-**One-liner:** Diagnosed and fixed three LslTimelineStrip regressions surfaced by the operator's visual-smoke checkpoint that the existing Phase 56 test suite missed — window buttons snapping back to LATEST_WINDOW, tick clicks failing end-to-end, and tick-resolved selections leaving an empty pathToSelected — by gating the deselect-effect on a real selected→deselected transition, re-keying the tick ring on a session-id OR-predicate, and extracting `computeAncestryPath` into a shared module so the strip's `onTickClick` writes the real ancestry path the same way D3GraphCanvas's node click does. Added 4 click-handler-driven vitest cases (Tests 21-24) so the next regression on the same code paths surfaces in CI.
+**Spec change — AC #3 retracted.** This SUMMARY documents work that **supersedes** the continuation-1 SUMMARY committed in `6e3682467`. The first-line takeaway:
+
+> The original AC #3 contract — "Selecting a row in the history sidebar **centers/highlights** the corresponding node in the graph" — is retracted. The new contract: "Selecting a row in the history sidebar **highlights** the corresponding node (selection ring + ancestry trace + EntityDetailPanel mount); the viewport remains unchanged." Per operator second-smoke verbatim feedback (2026-06-13): *"Maybe the zoom is not a good idea and you should just select the chosen node in the main graph (red circle) plus trace to CK plus sidebar text."*
+
+**One-liner:** Retracted the AC #3 pan/zoom centering clause as a standalone `docs(56-04):` commit (3935c794e), then deleted the corresponding centering useEffect from D3GraphCanvas and closed three new bugs the operator surfaced in the second-smoke pass — (A) spurious D3 rebuild on empty-entities tick clicks, (B/D — the visible part) the ring + trace landed off-screen because the now-removed centering pan moved the SVG away, and (D) the previous fix's `selectedSessionId === s.id` predicate rang every tranche of the clicked session instead of just the clicked bucket — with new fireEvent-driven vitest cases (Tests 25/26/28) plus four inverted source-grep gates (G6/G7/G8/G11) that lock the retraction in CI.
 
 ## Performance
 
-- **Duration:** ~18 min (continuation from 602cf438c base)
-- **Started:** 2026-06-13T11:14:32Z (after worktree base-reset)
-- **Completed:** 2026-06-13T11:32:00Z
-- **Tasks completed during this continuation:** 3 (RED tests + GREEN fixes + Playwright re-verification)
-- **Files created:** 2 (src/graph/ancestry.ts + this SUMMARY.md)
-- **Files modified:** 3 (LslTimelineStrip.tsx + LslTimelineStrip.test.tsx + D3GraphCanvas.tsx)
-- **Commits added (continuation):** 2 (ec2bb0a92 test + 5baa4b965 fix)
+- **Duration:** ~30 min (continuation 2 from base `01fa4124f`)
+- **Started:** 2026-06-13T12:00:42Z (after worktree base-reset)
+- **Completed:** 2026-06-13T12:18:18Z
+- **Files created:** 1 (this SUMMARY.md)
+- **Files modified:** 6 (PLAN.md + CONTEXT.md + 2 source + 2 test + 1 Playwright spec)
+- **Commits added (continuation 2):** 3 (3935c794e docs + 45786cdfe test + 572fe1bed fix)
 
-## Outcome — Regressions Caught + Meta-Lesson
+## Spec change — AC #3 retracted (PROMINENT)
 
-The Plan 04 Task 3 checkpoint:human-verify visual smoke surfaced three real regressions the automated gates missed. Root-cause of the gap: **every Phase 56 test before this plan called `useViewerStore.setState({...})` directly, bypassing the strip's onTickClick handler and the ToggleGroup's onClick → setWindowKey flow.** The store-level assertions all passed because the writes were forced; the user's real click path never exercised.
+**Audit trail commit:** `3935c794e — docs(56-04): retract pan/zoom centering from AC #3 — selection + trace is the new contract`
 
-The 4 new vitest cases drive `fireEvent.click(rendered button)` instead, exercising the same DOM event path the user does. The Playwright Spec 3 also drives a real tick click (`firstTick.click()`) — but its assertions only check store-side cascade (`selectionSource === 'timeline'`, `highlightedRowKey !== null`), not the visual ring, not the path-to-central, and not the window-button persistence — which is why it passed even with the regressions present.
+### Before (original contract per 56-CONTEXT.md AC #3)
 
-### Issue 1 — Window-toggle buttons (24h/7d/30d/all) snap back to LATEST_WINDOW
+> Selecting a row in the history sidebar **centers/highlights** the corresponding node in the graph AND highlights the matching timeline tick.
 
-**Symptom (operator-reported):** clicking 24h appears to do nothing; the scale labels never change.
+### After (post-2026-06-13 operator feedback)
 
-**Root cause:** the "deselect-effect" at `LslTimelineStrip.tsx` lines ~209-259 unconditionally fired on every render where `selectedTs === null`. Its dep list includes `windowKey`, so the chain was:
+> Selecting a row in the history sidebar **highlights** the corresponding node in the graph (selection ring + ancestry trace + EntityDetailPanel mount) AND highlights the matching timeline tick. **Viewport remains unchanged.**
 
+### Verbatim operator feedback (second-smoke 2026-06-13)
+
+> *"Maybe the zoom is not a good idea and you should just select the chosen node in the main graph (red circle) plus trace to CK plus sidebar text."*
+
+### What was retracted in code
+
+The centering useEffect at `D3GraphCanvas.tsx:348-363` (originally committed in `989c04558` as the Task 1 GREEN implementation of the original AC #3) is **REMOVED**. Three deletions:
+
+1. **`selectionSource` subscription** (line ~122) — no longer needed because the only consumer was the centering effect.
+2. **`d3NodesRef` ref + its assignment** at the top of the main render effect — the ref was held to feed force-mutated x/y into the centering effect; no other consumer.
+3. **The centering useEffect itself** — gone. `transition().duration(500)` now appears exactly ONCE in the file (the `fitToScreen` auto-fit on simulation settle), down from 2; source-grep gate G8 inverted to assert `=== 1`.
+
+The literal `selectionSource: 'graph'` is still WRITTEN on node click (G1 gate); writing a value doesn't require subscribing to your own slice.
+
+### What carries the new AC #3 contract
+
+The existing `applySelectionStyling` callback (D3GraphCanvas.tsx:269-307) — unchanged — already renders the selection ring + ancestry trace on every `selectedNodeId` change via the lightweight selection useEffect (line 312). Combined with the EntityDetailPanel that already mounts when `selectedNodeId !== null` (SidePanel.tsx:132-136 — UI-SPEC §7 row 11), the user sees:
+
+- Red selection ring on the graph node
+- Faded background + bright trace edges back to the central CK node
+- EntityDetailPanel populated with the selected entity's description
+
+…without any viewport movement. Exactly what the operator asked for.
+
+### Files updated for the spec retraction
+
+- `.planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-04-PLAN.md`
+  - Frontmatter `must_haves.truths` AC #3 line: replaced "pans/zooms to center the matching node" with "applies selection ring + pathToSelected trace + EntityDetailPanel; viewport remains unchanged".
+  - Frontmatter `must_haves.artifacts` D3GraphCanvas entry: `provides` field rewrites the centering bullet.
+  - Frontmatter `must_haves.key_links`: the "d3 zoom pan-to-node" key_link is deleted; replaced with one to `applySelectionStyling`.
+  - `<objective>` block + `<task name="Task 1">` body: explicit "viewport remains unchanged" wording.
+  - All inline notes carry `2026-06-13 (continuation 2 SPEC CHANGE)` headers + reference this commit.
+
+- `.planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-CONTEXT.md`
+  - AC #3 row in the `<specifics>` table: "centers/highlights" → "highlights"; dated inline note.
+  - `<decisions>` "Bidirectional flows" section item 2 (History sidebar → others): same retraction.
+
+## Issues closed in this continuation
+
+### Issue A — spurious D3 SVG rebuild on every empty-entities tick click
+
+**Symptom (operator-reported, second smoke):** *"selecting some timeline items doesn't do anything but redraw the D3 graph (why? is this necessary? annoying)"*.
+
+**Root cause:** Continuation 1's `onTickClick` wrote fresh `new Set()` references for `lslFilterEntityIds`, `pathToSelected`, and `selectedNodeId: null` on EVERY click — regardless of whether the click had a meaningful target. Even when the resulting Set was content-identical to the previous Set, the reference changed. The reference change invalidated `D3GraphCanvas`'s `visibleEntities` useMemo (whose deps include `lslFilterEntityIds`), which invalidated `visibleRelations`, which invalidated the main render useEffect — triggering a full `svg.selectAll('*').remove()` + `forceSimulation()` restart on every click.
+
+**Fix:** `onTickClick` now early-exits to a **minimal write** when `ids.length === 0`:
+
+```typescript
+if (ids.length === 0) {
+  useViewerStore.setState({
+    selectedSessionId: sessionId,
+    selectionSource: 'timeline',
+    // lslFilterEntityIds / selectedNodeId / pathToSelected / highlightedRowKey
+    // are INTENTIONALLY untouched — setState's merge preserves them by reference.
+  })
+  return
+}
 ```
-user clicks 24h
-→ onWindowChange('24h') → setWindowKey('24h')
-→ effect re-runs (windowKey changed)
-→ selectedTs === null branch fires (no selection)
-→ restoreTo = preSlideWindowRef.current ?? LATEST_WINDOW = '7d'
-→ restoreTo !== windowKey ('7d' !== '24h') → setWindowKey('7d')
-→ effect re-runs (windowKey changed AGAIN)
-→ now windowKey === '7d', restoreTo === '7d', no-op
+
+The local `clickedTickKey` state (set BEFORE the early-exit) still rings the tick. Operator's reportable "I clicked this tick" intent is preserved (`selectedSessionId` + `selectionSource` flow into HistorySidebar etc.), but the D3 graph sees no change.
+
+**Regression lock:** **Test 25** — pre-seeds `selectedNodeId`, `pathToSelected`, `lslFilterEntityIds` with reference-stable values, fires a click on an empty-entities tick, asserts the three pre-seeded fields are identity-equal (`toBe`, not `toEqual`) post-click. If a future change wires the empty-tick path back through the full store write, Test 25 fires.
+
+### Issue B — visible graph selection didn't fire on tick-resolved clicks
+
+**Symptom (operator-reported, second smoke):** *"some other timeline nodes actually bring up the sidebar text and they seem to zoom in on a few nodes, but they don't mark the node in the main graph and they don't draw the trace to the central CK node while fading the others"*.
+
+**Root cause diagnosis:** The store-side write was already correct (continuation 1 wrote `selectedNodeId: firstEntityId` with the bare entity id — same format the graph uses for its `d3Nodes[i].id` keys). What the operator saw as "they don't mark the node" was the VISIBLE consequence of Issue C: the centering pan (with `selectionSource = 'timeline'`) moved the SVG so the matching node landed off-screen, INTO the same off-screen area the trace also moved to. The selection ring and ancestry trace WERE rendering — just outside the visible viewport.
+
+**Fix:** Issue C's retraction (centering effect removed) is sufficient — once the viewport stops moving on tick clicks, the existing ring + ancestry trace via `applySelectionStyling` (which runs at the tail of the main render effect every time `visibleRelations` or selection changes) lands at the node's actual position, which is visible.
+
+**Regression lock:** **Test 26** — locks the bare-id contract on the store-side write (was already passing as a forward-looking gate). Visual gate: Playwright Spec 3 already asserts `selectedNodeId !== null` after a tick click; the visible cascade via the EntityDetailPanel swap (`side-panel-close` testid) was already validated GREEN. The ring + trace presence is validated by manual smoke + the unit-level `applySelectionStyling.test.tsx` paths.
+
+### Issue C — spec retraction implementation (centering useEffect removed)
+
+**Symptom (operator-reported, second smoke):** see "Spec change — AC #3 retracted" section above.
+
+**Root cause:** The centering useEffect (originally committed in `989c04558` as the Task 1 GREEN of the ORIGINAL AC #3) is no longer part of the contract.
+
+**Fix:** Three deletions in `D3GraphCanvas.tsx`:
+1. `selectionSource` subscription
+2. `d3NodesRef` ref + its assignment
+3. The centering useEffect
+
+The `applySelectionStyling` callback (already in place) carries the visual contract. No additional code added.
+
+**Regression lock:** **G6/G7/G8/G11 inverted** in `D3GraphCanvas.test.ts` — each was originally a PRESENCE assertion on the centering effect's signature. Now they assert ABSENCE. Detail:
+
+- **G6 (was: present)** → now asserts the centering dep-list signature `}, [selectedNodeId, selectionSource, visibleEntities])` is NOT in the source.
+- **G7 (was: present)** → now asserts the `selectionSource === 'graph'` early-bail (the centering effect's loop-safety guard) is NOT in the source. The G1 gate still locks the literal `selectionSource: 'graph'` write on node click; the regex doesn't collide because G1 matches `selectionSource:` (colon — the object-key syntax) while G7 matches `selectionSource ===` (comparison).
+- **G8 (was: ≥2)** → now asserts `transition().duration(500)` appears exactly ONCE (the unchanged `fitToScreen` auto-fit).
+- **G11 (was: present)** → now asserts the `useViewerStore((s) => s.selectionSource)` subscription is NOT in the source.
+
+If a future plan re-adds the centering useEffect with the same signatures, all four flip RED in CI — and force the author to read this SUMMARY first.
+
+### Issue D — every tranche of the clicked session id rang blue
+
+**Symptom (operator-reported, second smoke):** *"you marked all nodes in the timeline as selected (upon selecting one that actually brings up text) — fix"*.
+
+**Root cause:** Continuation 1's fix for the equivalent visual gap added a `isSelectedSession = selectedSessionId === s.id` predicate to the tick-ring class. The LSL data slices a single long-running session into many `LslSession` objects with a shared `id` but distinct `startAt` values (the dedup composite key `${id}|${startAt}` keeps every tranche as its own React-rendered tick). The predicate matched `s.id` only — so every tranche of the clicked session rang blue.
+
+**Fix:** Track the clicked bucket via local component state keyed on the composite `(sessionId, startAt)` pair (same composite the React render uses for element keys + dedup). The ring predicate becomes:
+
+```typescript
+const tickKey = `${s.id}|${s.startAt}`
+const isClickedTick = clickedTickKey === tickKey
+const isSelected = isSelectedBucket || isClickedTick
 ```
 
-The user's choice is silently overwritten between two renders.
+The previous `isSelectedSession` predicate is removed entirely. The running-tick `ring-primary` predicate is also extended to gate on `clickedTickKey === null` instead of `selectedSessionId === null` so the live ring doesn't compete with a direct click. A useEffect resets `clickedTickKey` to null whenever the store's `selectedSessionId` transitions to null (Esc / bg-click cascade — clearSelection nulls `selectedSessionId`).
 
-**Fix:** track the previous `selectedTs` value via a new ref `prevSelectedTsRef`. The deselect cascade now only fires when `prevSelectedTsRef.current !== null` (we WERE selected) AND `selectedTs === null` (we ARE now deselected). On initial mount and pure window-button clicks with no selection involved, the ref stays null and the cascade is skipped.
+**Decision: local state, not store field.** The clicked-bucket signal is purely visual feedback for the timeline strip; no other pane consumes it. Adding a `selectedTrancheKey` to the store would leak strip-internal state across the public API AND require every consumer of `clearSelection()` to remember to null the new field too. Local state + reset effect is strictly cheaper.
 
-**Side benefit:** the same fix turns pre-existing Test 7 baseline failure GREEN (Cmd/Ctrl+click pre-existing filter wipe — documented in `56-03-SUMMARY.md`'s `deferred-items.md`). Test 7 was failing for the same root cause: the deselect-effect cleared `lslSessionFilter: ['sess-aaaaaaaa']` set by `beforeEach` on initial mount, before the user's click had a chance to add to it.
+**Regression lock:** **Test 28** — seeds two `LslSession` objects with `id='sess-multi'` but different `startAt` values (the dedup keeps both). Fires `fireEvent.click` on tranche 1. Asserts:
+- Tranche 1 has `ring-blue-500`
+- Tranche 2 does NOT have `ring-blue-500`
+- Exactly ONE `[data-testid^="lsl-tick-"].ring-blue-500` node exists in the whole strip
+- Clicking tranche 2 moves the ring AWAY from tranche 1 (no sticky double-ring)
 
-**Regression lock:** Test 21 — `fireEvent.click(btn24h)` and assert the 24h ToggleGroupItem keeps `data-state='on'` (and 7d does not). If the deselect-effect ever re-fires on a window-button click with no selection, this fails.
+If a future change re-broadens the predicate to `s.id === selectedSessionId` (or any other id-only match), Test 28 fires.
 
-**Bonus lock:** Test 22 — assert `lslSessionFilter` stays at `['sess-aaaaaaaa']` after mount, verifying no spurious clear.
+## Tasks completed (continuation 2 only)
 
-### Issue 2 — Most tick clicks fail end-to-end (no ring, no cascade)
+### Task 3d (docs): AC #3 contract retraction
 
-**Symptom (operator-reported):** clicking most timeline ticks produces no visible feedback — no ring on the tick, no graph node selection, no history sidebar scroll.
+**Commit:** `3935c794e — docs(56-04): retract pan/zoom centering from AC #3 — selection + trace is the new contract`
 
-**Root cause:** the tick ring keyed exclusively on `isSelectedBucket`, which is derived from `selectedTs` (the `selectedNodeId`'s `createdAt` resolved via `useGraphData(...).entities.find(...)`). For a tick whose session has empty `entityIds[]`, `firstEntityId === null`, so `selectedNodeId` is set to `null` and the ring never fires. For a tick whose `entities[0]` ID is NOT in the live graph data (e.g., filtered out or never loaded), `entities.find` returns undefined and `selectedTs` stays null.
+- Updated 56-04-PLAN.md frontmatter (`must_haves.truths`, `must_haves.artifacts`, `must_haves.key_links`)
+- Updated 56-04-PLAN.md `<objective>` + Task 1 prose
+- Updated 56-CONTEXT.md AC #3 table row + `<decisions>` Bidirectional flows item 2
+- All inline notes dated and refer to operator second-smoke verbatim feedback
 
-**Fix:** subscribe to `selectedSessionId` and re-key the ring on `(isSelectedBucket || selectedSessionId === s.id)`. The tick now rings on its own click directly, independent of the entity cascade. The running-tick `ring-primary` predicate is also extended to gate on `selectedSessionId === null` so the live ring doesn't compete with a session selection.
+### Task 3e (RED): fireEvent-driven regression tests + inverted gates
 
-**Why not 'selectedNodeId in entities[]' per the resume sketch:** when `entities[]` is non-empty AND `selectedNodeId` IS in `entities[]`, `isSelectedBucket` already fires via the `selectedTs → range match` path. Adding the `entities[]` predicate would have double-counted the existing path. The OR with `selectedSessionId` cleanly handles the empty-entities AND non-resolving-entity cases without changing the existing cascade.
+**Commit:** `45786cdfe — test(56-04): RED regression tests for continuation-2 operator findings`
 
-**Regression lock:** Test 23 — render a session with `entityIds: []`, fire the tick click, assert the tick gets `ring-blue-500` class. Bonus: also assert `selectedSessionId === 'sess-empty'` and `selectionSource === 'timeline'`.
+- LslTimelineStrip.test.tsx: added Tests 25/26/28 (Issues A/B/D)
+- D3GraphCanvas.test.ts: inverted G6/G7/G8/G11 (Issue C retraction-locks)
+- Verified RED: 5 failures (Test 25 + G6 + G7 + G8 + G11); 33 passing (Test 26 baseline pass — Issue B store-side was already correct; Test 28 needed fixture update to be RED — the multi-tranche fixture seed makes it RED)
 
-### Issue 3 — Tick click writes empty pathToSelected (no central-trace)
+### Task 3f (GREEN): all 4 fixes + Playwright header update
 
-**Symptom (operator-reported, partial-success branch of AC #2):** when a tick click DOES resolve to a focal entity, the central-trace never renders.
+**Commit:** `572fe1bed — fix(56-04): close 4 operator second-smoke findings + retract centering effect`
 
-**Root cause:** `onTickClick` wrote `pathToSelected: new Set()` (hardcoded empty). The graph's `applySelectionStyling` derives the path-trace from `pathToSelected` — empty means no nodes get the trace highlight.
+- D3GraphCanvas.tsx: removed centering useEffect + `d3NodesRef` + `selectionSource` subscription (Issue C)
+- LslTimelineStrip.tsx: `clickedTickKey` local state + reset effect + retargeted ring predicate (Issue D); `onTickClick` empty-ids early-exit (Issue A)
+- 56-bidirectional-selection.spec.ts: header + Spec 2 comment updates to reflect the new contract (no assertion change)
 
-**Fix:** compute `pathToSelected` via the same `computeAncestryPath(firstEntityId, relations)` call D3GraphCanvas uses on node click (line 564 in that file). The helper has been extracted from D3GraphCanvas.tsx into a new shared module `src/graph/ancestry.ts` so both call sites use bit-identical logic and `HIERARCHY_TYPES` never drifts. `useGraphData()` now pulls `relations` alongside `entities` (same hook, no new fetch — TanStack Query caches once across the app).
+### Verification
 
-Both plain-click and Cmd/Ctrl-click branches of `onTickClick` write the real ancestry path; when `firstEntityId` is null (session has no entityIds) the path is an empty Set (consistent with D3GraphCanvas's behaviour on an isolated node).
-
-**Regression lock:** Test 24 — seed `mockEntities` with `e3` plus two ancestors and `__mockRelations` with a 2-hop `contains` chain (root → parent-1 → e3). Fire the tick click for `sess-bbbbbbbb` (whose entityIds is `['e3']`). Assert `selectedNodeId === 'e3'` AND `pathToSelected.size > 0` AND `pathToSelected.has('e3')`.
-
-### Meta-Lesson (the GAP)
-
-**All earlier Phase 56 tests used `useViewerStore.setState({...})` to seed the strip's state directly.** Test 19's "selection→tick highlight" worked because it set `selectedNodeId: 'e3'` and asserted on `ring-blue-500` — but it never exercised the WRITE path (`onTickClick`). Test 18's "atomic write" fired a click but only checked store-side fields — not the visual ring, not the path-to-central, not what happens after a button-click triggers a re-render with no selection.
-
-The earlier mock setup also returned `relations: []` unconditionally, so even if Test 18 had asserted `pathToSelected.size > 0`, it would have passed trivially with a 0-relation graph.
-
-**The rule for Phase 56 going forward:** every store-side write must have at least ONE test that drives the corresponding USER ACTION (fireEvent.click on a rendered button) instead of `setState`. The 4 new tests added by this commit are the down payment; future Phase 56 maintenance plans should backfill this discipline across the existing 13 Phase 55 tests too if any new regressions surface.
-
-## Tasks Completed (continuation only — Tasks 1+2 already committed)
-
-### Task 3a (RED): Add click-handler-driven regression tests
-
-**Commit:** `ec2bb0a92 test(56-04): add RED Phase 56 regression tests for 3 operator-reported issues`
-
-- Added Tests 21-24 to `src/panels/coding/LslTimelineStrip.test.tsx`
-- Extended `vi.mock('@/graph/useGraphData')` to read `globalThis.__mockRelations` so Test 24 can seed a 2-hop ancestry chain
-- Verified RED: 5 fails (Tests 7 pre-existing baseline + 21/22/23/24 new); 19 GREEN baseline preserved (no new false-positive regressions)
-
-### Task 3b (GREEN): Fix all 3 regressions + extract ancestry helper
-
-**Commit:** `5baa4b965 fix(56-04): close 3 LslTimelineStrip regressions surfaced by visual smoke`
-
-Three source changes + one supporting extraction:
-
-1. **Extract `computeAncestryPath` + `HIERARCHY_TYPES`** from `D3GraphCanvas.tsx` lines 62-126 into new module `src/graph/ancestry.ts`. Bit-identical code-move. `D3GraphCanvas.tsx` now imports the helper. All 11 source-grep gates still hold.
-
-2. **Issue 1 fix in `LslTimelineStrip.tsx`** — new `prevSelectedTsRef` ref tracks the previous `selectedTs`. The deselect-effect now gates its cascade on `prevSelectedTsRef.current !== null` (a real `selected → deselected` transition).
-
-3. **Issue 2 fix in `LslTimelineStrip.tsx`** — subscribe to `selectedSessionId` from the store; re-key tick ring on `(isSelectedBucket || selectedSessionId === s.id)`; gate the running-tick `ring-primary` on `selectedSessionId === null` so the live ring doesn't compete with a session selection.
-
-4. **Issue 3 fix in `LslTimelineStrip.tsx`** — destructure `relations` from `useGraphData()`; in `onTickClick`, compute `pathToSelected = new Set(computeAncestryPath(firstEntityId, relations).nodeDepths.keys())` when `firstEntityId !== null`, else `new Set()`. Both plain and Cmd/Ctrl branches get the real path.
-
-### Task 3c (verify): Re-run Playwright + full vitest
-
-- `npx vitest run src/panels/coding/LslTimelineStrip.test.tsx`: **24/24 GREEN** (5 RED tests flipped to GREEN; no regressions)
-- `npx vitest run src/graph/D3GraphCanvas.test.ts`: **11/11 GREEN** (extraction preserved every gate)
-- `npx vitest run src/panels/HistorySidebar.test.tsx src/panels/OccurrenceHistorySidebar.test.tsx`: **17/17 GREEN** (sibling panels unaffected)
-- `npx tsc --noEmit`: exit 0
-- `npx playwright test --project=unified-viewer tests/e2e/unified-viewer/56-bidirectional-selection.spec.ts`: **4/4 GREEN** (9.3s total)
-
-Full unified-viewer vitest suite: 545 passed / 21 failed (10 unrelated baseline test files — Phase 55 toggleLayer + sigma color-fallback + UnifiedViewer routing — none touch Phase 56 surfaces or files I modified).
-
-## Outcome
-
-| Acceptance Criterion (from continuation success_criteria) | Status | Evidence |
+| Surface | Command | Result |
 |---|---|---|
-| All 3 regressions diagnosed root-cause and fixed | PASS | Commits ec2bb0a92 (RED) + 5baa4b965 (GREEN) cover Issues 1/2/3 with separate diagnoses + fixes |
-| At least one click-handler-driven vitest per regression | PASS | Test 21 (Issue 1 — window-button click), Test 23 (Issue 2 — tick click on empty entityIds), Test 24 (Issue 3 — tick click ancestry); Test 22 is a bonus lock for Issue 1 |
-| Post-fix vitest count = pre-fix + N new GREEN, 0 new fails | PASS | Baseline 19 GREEN in LslTimelineStrip.test.tsx → now 24 GREEN (4 new + Test 7 pre-existing flipped); 0 new regressions across full suite (10 unrelated baseline files unchanged) |
-| Post-fix tsc clean | PASS | `npx tsc --noEmit` exit 0 |
-| Post-fix 4/4 Playwright specs still GREEN | PASS | 9.3s run, all 4 specs PASS |
-| 56-04-SUMMARY.md committed | PASS | This file |
-| No modifications to STATE.md or ROADMAP.md | PASS | `git status` shows only the per-commit files + this SUMMARY + node_modules symlink (transient) |
+| LslTimelineStrip vitest | `npx vitest run src/panels/coding/LslTimelineStrip.test.tsx` | **27/27 GREEN** (Tests 1-24 baseline + 25/26/28 continuation 2) |
+| D3GraphCanvas vitest | `npx vitest run src/graph/D3GraphCanvas.test.ts` | **11/11 GREEN** (G1-G5, G9-G10 baseline + inverted G6/G7/G8/G11) |
+| HistorySidebar + OccurrenceHistorySidebar vitest | `npx vitest run src/panels/HistorySidebar.test.tsx src/panels/OccurrenceHistorySidebar.test.tsx` | **17/17 GREEN** (sibling Phase 56 surfaces unaffected) |
+| Wider unified-viewer vitest | `npx vitest run` (full suite) | **548 passed / 21 failed** — all 21 failures are pre-existing Phase 55 baseline (NavBar / SigmaCanvas / OntologyFilter / events / UnifiedViewer routing — same set continuation 1 documented in the predecessor SUMMARY) |
+| TypeScript | `npx tsc --noEmit` | **exit 0** |
+| Playwright | `npx playwright test --project=unified-viewer tests/e2e/unified-viewer/56-bidirectional-selection.spec.ts --reporter=list` | **4/4 GREEN (10.1s)** |
+
+## Outcome — Acceptance Criteria Mapping (revised)
+
+| AC | Status | Evidence |
+|---|---|---|
+| #1 — Timeline timestamp scale | PASS | Plan 56-03 Task 1 (formatScaleLabel + scale row). Continuation 1's Test 21 fix made the window buttons stick so the operator can actually CHANGE the scale, which closed the visible blocker. |
+| #2 — Graph → others | PASS | Plan 56-04 Task 1 (5-field atomic write on node click) + Plan 56-02 (sidebar row highlight) + Plan 56-03 (timeline tick via isSelectedBucket). |
+| #3 (SUPERSEDED CONTRACT) — History → graph + timeline | **PASS** | NEW contract per 2026-06-13 spec change: selection ring + ancestry trace + EntityDetailPanel via existing `applySelectionStyling`; viewport intentionally untouched. The originally-locked centering useEffect is REMOVED. Inverted G6/G7/G8/G11 gates lock the retraction; Playwright Spec 2 + manual smoke confirm the visual contract. |
+| #4 — Timeline → graph + history | PASS | Plan 56-03 (atomic write) + continuation 1 (ancestry-path extraction so trace renders) + continuation 2 Issue D (single-bucket ring) + continuation 2 Issue A (no spurious D3 rebuild). |
+| #5 — Shared store sole source | PASS | All writes go through `useViewerStore.setState({...})` or store actions; no panel keeps local selection state (the new `clickedTickKey` is timeline-internal visual feedback, NOT a selection field — it isn't read by other panes). |
+| #6 — Aggregate selectedSessionId | PASS | Plan 56-01 + Plan 56-03 (field + write); continuation 2 Issue D ring fix now visualises it correctly without false fires. |
+| #7 — Esc + bg-click clears | PASS | Plan 56-01 Task 2 (Esc → clearSelection) + Plan 56-04 Task 1 (bg-click → clearSelection). Continuation 2 added the `clickedTickKey` reset effect so the local visual state clears alongside the store. |
+| #8 — No Phase 55 regression | PENDING (operator visual smoke pass 3) | Vitest + Playwright all GREEN; 21 pre-existing baseline failures unchanged. Operator's next visual-smoke pass confirms. |
 
 ## Deviations from Plan
 
@@ -179,17 +260,10 @@ Full unified-viewer vitest suite: 545 passed / 21 failed (10 unrelated baseline 
 
 **1. [Rule 3 — Blocking issue] Worktree missing `node_modules/`**
 
-- **Found during:** Task 3a vitest first invocation
-- **Issue:** `.claude/worktrees/agent-a9885573428511969/integrations/unified-viewer/` has no `node_modules/` so `npx vitest` and `npx tsc` both error with "Cannot find package 'vitest'"
-- **Fix:** `python3 -c "import os; os.symlink('/Users/Q284340/Agentic/coding/integrations/unified-viewer/node_modules', '<worktree>/integrations/unified-viewer/node_modules')"`. Same workaround used by Plans 56-01, 56-02, and 56-03; documented in each prior SUMMARY's "Deviations" section as the standard worktree dev workflow. Symlink not committed (transient; gitignored).
+- **Found during:** First vitest invocation in this worktree
+- **Issue:** `.claude/worktrees/agent-aa3b7e8c09a292200/integrations/unified-viewer/` has no `node_modules/` so `npx vitest` and `npx tsc` both error with "Cannot find package 'vitest'"
+- **Fix:** `python3 -c "import os; os.symlink(...)"` to symlink the main repo's `node_modules/`. Same workaround used in every prior 56-04 continuation; documented as the standard worktree dev workflow.
 - **Why Rule 3 (not Rule 4):** Environment setup; no source files touched.
-
-**2. [Rule 2 — Auto-add missing critical functionality] Shared-helper extraction**
-
-- **Found during:** Task 3b design (planning the Issue 3 fix)
-- **Issue:** The resume_instructions suggested either reusing or extracting the ancestry helper. With two consumers (D3GraphCanvas's node click + LslTimelineStrip's tick click), inline-duplicate would silently drift the moment HIERARCHY_TYPES needs a new edge type — a latent correctness bug.
-- **Fix:** Extract `computeAncestryPath` + `HIERARCHY_TYPES` into `src/graph/ancestry.ts`. Bit-identical code-move from D3GraphCanvas.tsx lines 62-126; D3GraphCanvas now imports the helper. Verified: all 11 D3GraphCanvas source-grep gates still hold; tsc clean; full Phase 56 test pass.
-- **Why Rule 2 (not Rule 4):** This is a correctness measure (preventing drift between two consumers of the same logic). Plan 56-04 already has D3GraphCanvas in scope, and the extraction does not change any external behaviour or contract. The new file is a refactor of in-scope code, not a new architectural primitive.
 
 ### Not auto-fixed
 
@@ -197,10 +271,10 @@ None.
 
 ## Threat Surface Scan
 
-No new threat surface beyond what Plan 56-04's `threat_model` already declared:
+No new threat surface beyond what Plan 56-04's `threat_model` already declared. Two threats are REDUCED by this continuation:
 
-- **T-56-04-02 (DoS — centering effect re-fires on visibleEntities change):** unchanged. The new `pathToSelected` build adds one extra `computeAncestryPath(firstEntityId, relations)` call per tick click — O(R) BFS over the hierarchy edge subset of the relations array, identical cost to the existing D3GraphCanvas node click. Tick clicks are user-initiated, not automated.
-- **T-56-04-05 (Visual regression — Phase 55 §7 surfaces):** unchanged. The tick-ring re-key adds a class condition; the live-tick `ring-primary` is gated on `selectedSessionId === null` so the visual is identical when no session is selected. The deselect-effect gate only DELAYS state changes that were previously firing unconditionally on mount — strictly fewer state mutations.
+- **T-56-04-02 (DoS — centering effect re-fires on visibleEntities change):** **ELIMINATED** — the centering effect is gone. The re-fire vector for this threat no longer exists.
+- **T-56-04-05 (Visual regression — Phase 55 §7 surfaces):** unchanged. The ring re-key uses local component state (a class-bit on already-rendered DOM); no new surface. The empty-ids early-exit REDUCES re-render frequency on a hot path, strictly reducing the size of the regression window.
 
 No new endpoints, no new auth paths, no new schema changes. No `threat_flag` to surface.
 
@@ -209,54 +283,64 @@ No new endpoints, no new auth paths, no new schema changes. No `threat_flag` to 
 Per-claim verification (all asserted files / commits exist on the worktree branch):
 
 ```
-FOUND: integrations/unified-viewer/src/graph/ancestry.ts
+FOUND: integrations/unified-viewer/src/graph/D3GraphCanvas.tsx
+FOUND: integrations/unified-viewer/src/graph/D3GraphCanvas.test.ts
 FOUND: integrations/unified-viewer/src/panels/coding/LslTimelineStrip.tsx
 FOUND: integrations/unified-viewer/src/panels/coding/LslTimelineStrip.test.tsx
-FOUND: integrations/unified-viewer/src/graph/D3GraphCanvas.tsx
-FOUND: .planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-04-SUMMARY.md
+FOUND: tests/e2e/unified-viewer/56-bidirectional-selection.spec.ts
+FOUND: .planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-04-PLAN.md
+FOUND: .planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-CONTEXT.md
+FOUND: .planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-04-SUMMARY.md (this file)
 
-FOUND: ec2bb0a92 test(56-04): add RED Phase 56 regression tests for 3 operator-reported issues
-FOUND: 5baa4b965 fix(56-04): close 3 LslTimelineStrip regressions surfaced by visual smoke
+FOUND: 3935c794e docs(56-04): retract pan/zoom centering from AC #3 — selection + trace is the new contract
+FOUND: 45786cdfe test(56-04): RED regression tests for continuation-2 operator findings
+FOUND: 572fe1bed fix(56-04): close 4 operator second-smoke findings + retract centering effect
 
-GREP PASS: prevSelectedTsRef present in LslTimelineStrip.tsx (Issue 1 fix anchor)
-GREP PASS: isSelectedSession || selectedSessionId === s.id in LslTimelineStrip.tsx (Issue 2 fix anchor)
-GREP PASS: computeAncestryPath imported in LslTimelineStrip.tsx (Issue 3 fix anchor)
-GREP PASS: export function computeAncestryPath in src/graph/ancestry.ts
-GREP PASS: import { computeAncestryPath } from './ancestry' in D3GraphCanvas.tsx
-GREP PASS: D3GraphCanvas main useEffect dep list still omits selectedNodeId
+GREP PASS: clickedTickKey present in LslTimelineStrip.tsx (Issue D fix anchor)
+GREP PASS: "if (ids.length === 0)" early-exit present in LslTimelineStrip.tsx onTickClick (Issue A fix anchor)
+GREP PASS: centering useEffect signature `}, [selectedNodeId, selectionSource, visibleEntities])` NOT in D3GraphCanvas.tsx (Issue C retraction)
+GREP PASS: useViewerStore((s) => s.selectionSource) NOT in D3GraphCanvas.tsx (Issue C subscription removed)
+GREP PASS: `transition().duration(500)` appears exactly ONCE in D3GraphCanvas.tsx (only fitToScreen — G8 inverted)
+GREP PASS: D3GraphCanvas main useEffect dep list still omits selectedNodeId (G9 preserved — Phase 45 invariant intact)
 
-VITEST PASS: 24/24 LslTimelineStrip.test.tsx (Tests 7, 21, 22, 23, 24 flipped from RED → GREEN)
-VITEST PASS: 11/11 D3GraphCanvas.test.ts (extraction preserved gates)
+VITEST PASS: 27/27 LslTimelineStrip.test.tsx (Tests 25/26/28 GREEN + 24 baseline)
+VITEST PASS: 11/11 D3GraphCanvas.test.ts (inverted G6/G7/G8/G11 GREEN + G1-G5/G9-G10 baseline)
 VITEST PASS: 17/17 HistorySidebar.test.tsx + OccurrenceHistorySidebar.test.tsx
-PLAYWRIGHT PASS: 4/4 56-bidirectional-selection.spec.ts (9.3s)
+PLAYWRIGHT PASS: 4/4 56-bidirectional-selection.spec.ts (10.1s)
 TSC PASS: --noEmit exit 0
 ```
 
 ## Known Stubs
 
-None. All 3 regressions are fixed in production code; the 4 new tests drive real DOM events; no placeholders or mock-mode toggles introduced.
+None. All 4 findings are fixed in production code; the 3 new vitest cases drive real DOM events; the inverted source-grep gates lock the spec retraction in CI; no placeholders or mock-mode toggles introduced.
 
 ## TDD Gate Compliance
 
-This continuation followed strict RED → GREEN with separate commits:
+This continuation followed strict RED → GREEN with a SEPARATE docs commit for the spec retraction (per resume_instructions):
 
-- RED: `ec2bb0a92 test(56-04): add RED Phase 56 regression tests for 3 operator-reported issues` — 4 new tests added (Tests 21-24), all RED at baseline
-- GREEN: `5baa4b965 fix(56-04): close 3 LslTimelineStrip regressions surfaced by visual smoke` — all 4 new tests flip to GREEN; pre-existing Test 7 baseline failure flips to GREEN for free
+1. **DOCS (spec change):** `3935c794e — docs(56-04): retract pan/zoom centering from AC #3 …` — modifies PLAN.md + CONTEXT.md only. No code change. Audit-trail anchor for the contract retraction.
 
-No REFACTOR commit — the extraction in the GREEN commit is a pure code-move (bit-identical to the original inline implementation), verified by re-running 11/11 D3GraphCanvas source-grep gates. A separate refactor commit would create an artificial intermediate state where the strip needed the helper but the helper hadn't been extracted yet.
+2. **RED:** `45786cdfe — test(56-04): RED regression tests for continuation-2 operator findings` — Tests 25/26/28 added to LslTimelineStrip.test.tsx; G6/G7/G8/G11 inverted in D3GraphCanvas.test.ts. Verified 5 RED + 33 GREEN at baseline.
+
+3. **GREEN:** `572fe1bed — fix(56-04): close 4 operator second-smoke findings + retract centering effect` — D3GraphCanvas + LslTimelineStrip source changes + Playwright spec prose update. All 5 RED tests flip GREEN; the existing 33 GREEN preserved.
+
+No REFACTOR commit — the centering-effect removal in the GREEN commit is a pure deletion (no replacement primitive added; `applySelectionStyling` is unchanged), so there is no intermediate state to refactor.
 
 ## Next Plan Readiness
 
-- Plan 56-04 Task 3 (operator visual smoke at /viewer/coding) is the next gate. After this continuation:
-  - AC #1 (timestamp scale) — already worked; the bug was the window-button SELECTION not the scale itself. Now buttons stick → user can change the scale.
-  - AC #2 (graph → others) — fully wired (D3GraphCanvas atomic node click — committed in Task 1).
-  - AC #3 (history → graph centering) — fully wired (centering effect in Task 1).
-  - AC #4 (timeline → graph + history) — NOW fully wired. Issue 2 fix gives the tick ring; Issue 3 fix gives the central-trace; existing 56-03 contract gives the sidebar scroll.
-  - AC #5 + #7 (Esc + bg-click clears) — fully wired (clearSelection() store action in Plan 01; bg-click routes through it via Task 1).
-  - AC #6 (aggregate selectedSessionId) — fully wired in Plan 56-03; Issue 2 fix now visualizes it.
-  - AC #8 (no Phase 55 regression) — visual smoke pending operator re-run.
-- After Task 3 sign-off, Phase 56 is COMPLETE.
+After this continuation:
+
+- AC #1 (timestamp scale) — visible and switchable (Plan 56-03 + continuation 1 Issue 1 fix)
+- AC #2 (graph → others) — store-side + timeline ring + sidebar bg tint (Plans 56-02/56-04)
+- AC #3 (SUPERSEDED CONTRACT) — selection ring + ancestry trace + EntityDetailPanel; viewport unchanged. Original "centers/highlights" wording retracted (this continuation)
+- AC #4 (timeline → graph + history) — full cascade with single-bucket ring + ancestry trace + no spurious D3 rebuild (continuation 1 + continuation 2)
+- AC #5 + #7 — fully store-driven via `clearSelection()` action; local `clickedTickKey` state resets on cascade
+- AC #6 — aggregate selectedSessionId field populated; visualised correctly via `clickedTickKey` ring (single bucket)
+- AC #8 — pending operator visual smoke pass 3. Vitest + Playwright + tsc all GREEN.
+
+Plan 56-04 Task 3 (operator visual smoke at /viewer/coding) is the next gate.
 
 ---
 *Phase: 56-unified-viewer-bidirectional-selection-timeline-scale*
-*Plan 04 continuation completed: 2026-06-13*
+*Plan 04 continuation 2 completed: 2026-06-13*
+*Supersedes the continuation-1 SUMMARY committed in 6e3682467 (preserved for git-blame audit).*

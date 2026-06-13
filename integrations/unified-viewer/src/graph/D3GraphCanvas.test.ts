@@ -5,7 +5,7 @@
 // jsdom doesn't ship (Layout, getBoundingClientRect, getCTM are all stubs).
 // Per 56-PATTERNS.md the in-tree gate idiom for this file is a **source
 // readFileSync + regex** assertion (mirrors LslTimelineStrip.test.tsx:271-277
-// Logger-discipline gate), which is exactly what locks the four Phase 56
+// Logger-discipline gate), which is exactly what locks the Phase 56
 // invariants on D3GraphCanvas:
 //
 //   1. Node click writes the 5-field atomic Phase 56 payload (selectedNodeId,
@@ -13,8 +13,12 @@
 //      selectedSessionId: null).
 //   2. Background click goes through useViewerStore.getState().clearSelection()
 //      (single store action — no partial setState).
-//   3. A centering useEffect exists that pans on selectedNodeId change AND
-//      bails when selectionSource === 'graph' (loop-safety).
+//   3. 2026-06-13 (continuation 2 SPEC CHANGE): the AC #3 visual contract
+//      is fulfilled by applySelectionStyling (selection ring + ancestry
+//      trace), NOT by a viewport pan. The centering useEffect (originally
+//      committed in 989c04558) is REMOVED. The grep gates assert ABSENCE
+//      of the centering signature (G6/G7/G8 inverted) and PRESENCE of the
+//      applySelectionStyling primitive that carries the new contract.
 //   4. The MAIN useEffect dep list at lines 599-606 still OMITS selectedNodeId
 //      — listing it there would rebuild the SVG + restart the force simulation
 //      on every click (the comment-block invariant the file has carried since
@@ -72,26 +76,37 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
     expect(inside).not.toMatch(/setState\s*\(\s*\{/)
   })
 
-  test('Phase 56 G6: centering useEffect subscribes to selectionSource and selectedNodeId', () => {
-    // The new effect's dep list must include selectedNodeId AND selectionSource;
-    // visibleEntities is also in the deps so the pan re-runs after the force
-    // simulation settles a previously-undefined node. We assert via a deps
-    // signature that contains all three identifiers and does NOT contain the
-    // full main-effect prefix `visibleRelations, theme`.
-    expect(src).toMatch(/\}, \[selectedNodeId, selectionSource, visibleEntities\]\)/)
+  test('Phase 56 G6 [retracted — spec change 2026-06-13]: no centering useEffect dep signature present', () => {
+    // 2026-06-13 (continuation 2 SPEC CHANGE): the original G6 asserted
+    // that the centering useEffect's dep list `[selectedNodeId,
+    // selectionSource, visibleEntities]` was present. Per operator
+    // second-smoke feedback ("Maybe the zoom is not a good idea …") the
+    // centering effect is REMOVED. This inverted assertion is the source-
+    // grep lock for the retraction: if a future plan re-adds a centering
+    // effect with the original triple-deps signature, this gate fires.
+    expect(src).not.toMatch(/\}, \[selectedNodeId, selectionSource, visibleEntities\]\)/)
   })
 
-  test('Phase 56 G7: centering effect early-bails when selectionSource === "graph"', () => {
-    // The self-originated guard prevents a feedback re-pan after the user
-    // clicks a node. Pattern lives inside the centering effect.
-    expect(src).toMatch(/selectionSource\s*===\s*'graph'/)
+  test('Phase 56 G7 [retracted — spec change 2026-06-13]: no "selectionSource === \'graph\'" early-bail (only present in the retracted centering effect)', () => {
+    // 2026-06-13 (continuation 2 SPEC CHANGE): the only consumer of
+    // `selectionSource === 'graph'` in this file was the centering
+    // effect's loop-safety bail. With the effect gone, the comparison
+    // should not appear in the source. (Other uses of selectionSource —
+    // e.g. as the literal value written on node click `selectionSource:
+    // 'graph'` — match a DIFFERENT regex and are covered by G1.)
+    expect(src).not.toMatch(/selectionSource\s*===\s*'graph'/)
   })
 
-  test('Phase 56 G8: centering effect uses the in-tree d3.zoomIdentity + transition().duration(500) idiom (same as fitToScreen)', () => {
-    // Two distinct sites use this idiom now: fitToScreen (line ~557) and the
-    // new centering effect. We expect AT LEAST 2 matches of duration(500).
+  test('Phase 56 G8 [retracted — spec change 2026-06-13]: only ONE transition().duration(500) site remains (fitToScreen)', () => {
+    // 2026-06-13 (continuation 2 SPEC CHANGE): the original G8 asserted
+    // ≥2 matches because the centering effect duplicated the fitToScreen
+    // idiom. With the centering effect removed, exactly ONE site uses
+    // `transition().duration(500)` — the one-shot auto-fit at the end of
+    // the force simulation. If a future plan re-adds a viewport-pan call
+    // on selection change (the retracted behaviour), this count drifts
+    // above 1 and the gate fires.
     const matches = src.match(/transition\(\)\.duration\(500\)/g) ?? []
-    expect(matches.length).toBeGreaterThanOrEqual(2)
+    expect(matches.length).toBe(1)
   })
 
   test('Phase 56 G9: MAIN useEffect dep list still OMITS selectedNodeId (critical Phase 45 invariant)', () => {
@@ -111,8 +126,16 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
     expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
   })
 
-  test('Phase 56 G11: selectionSource subscription is present (so React re-runs the centering effect on change)', () => {
-    // Use the in-tree subscribe idiom: useViewerStore((s) => s.selectionSource)
-    expect(src).toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectionSource\)/)
+  test('Phase 56 G11 [retracted — spec change 2026-06-13]: selectionSource subscription no longer required', () => {
+    // 2026-06-13 (continuation 2 SPEC CHANGE): the original G11 locked the
+    // selectionSource subscription that re-ran the centering effect. With
+    // the centering effect removed, the subscription is unused. The
+    // selectionSource LITERAL is still WRITTEN on node click (G1) — that
+    // payload doesn't require the file to subscribe to its own slice.
+    // Keeping a dead subscription would add a spurious re-render on every
+    // selectionSource transition, so we assert ABSENCE. If a future plan
+    // re-introduces the centering effect (and therefore re-adds the
+    // subscription), this gate fires.
+    expect(src).not.toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectionSource\)/)
   })
 })

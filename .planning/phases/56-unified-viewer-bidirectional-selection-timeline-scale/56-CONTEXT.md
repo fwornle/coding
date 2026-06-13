@@ -44,7 +44,12 @@ no observation-api change, no Memgraph change.
      `OccurrenceHistorySidebar`.
    - Highlights the matching timeline tick(s) in `LslTimelineStrip`.
 2. **History sidebar → others.** Clicking a row in the history sidebars:
-   - Centers / highlights the corresponding node in `D3GraphCanvas`.
+   - Highlights the corresponding node in `D3GraphCanvas` (selection ring +
+     ancestry trace + EntityDetailPanel mount). **2026-06-13 spec change:**
+     the original wording said "Centers / highlights"; the centering
+     clause was retracted per operator second-smoke feedback. The viewport
+     is intentionally left untouched on history-driven selection — the
+     visual contract is the ring + ancestry trace + sidebar text.
    - Highlights the matching tick in `LslTimelineStrip`.
 3. **Timeline → others.** Clicking a tick or session segment in
    `LslTimelineStrip`:
@@ -136,7 +141,7 @@ no observation-api change, no Memgraph change.
 |---|---|
 | 1 | `LslTimelineStrip` shows a readable timestamp scale for the active range — not raw ms / unlabeled ticks. |
 | 2 | Selecting a node in the graph highlights its row(s) in the history sidebar AND ticks on the timeline (graph → others). |
-| 3 | Selecting a row in the history sidebar centers/highlights the corresponding node in the graph AND highlights the matching timeline tick (history → others). |
+| 3 | Selecting a row in the history sidebar highlights the corresponding node in the graph (selection ring + ancestry trace + EntityDetailPanel) AND highlights the matching timeline tick (history → others). **2026-06-13 spec change:** the original wording said "centers/highlights" — the centering clause was retracted per operator second-smoke feedback ("Maybe the zoom is not a good idea and you should just select the chosen node in the main graph (red circle) plus trace to CK plus sidebar text"). Viewport is intentionally untouched on history-driven selection. |
 | 4 | Clicking a timeline tick or session-segment selects the corresponding node(s) in the graph AND scrolls/highlights the matching history sidebar row(s) (timeline → others). |
 | 5 | Shared selection state lives in `viewer-store.ts`. No panel keeps an independent selection. |
 | 6 | Selection works for both entity nodes (Insight/SubComponent/Detail/etc.) AND aggregate selections (LSL session, ancestry path). |

@@ -27,6 +27,20 @@ import type { Entity, Relation } from './types'
 // trace render when its tick click resolves a focal entity. The original
 // inline implementation at lines 62-126 was bit-identical to this
 // import — extraction is a pure code-move, no behaviour change here.
+//
+// 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the previous version
+// of this file also defined a centering useEffect that panned the SVG
+// viewport when `selectionSource !== 'graph'` AND `selectedNodeId` changed.
+// The operator's second-smoke feedback retracted that contract: "Maybe the
+// zoom is not a good idea and you should just select the chosen node in
+// the main graph (red circle) plus trace to CK plus sidebar text." AC #3
+// is now fulfilled by the existing `applySelectionStyling` (ring + ancestry
+// trace) + the EntityDetailPanel mount that already fires on selectedNodeId
+// !== null. The viewport is intentionally untouched on non-graph selection.
+// The `selectionSource` subscription, the `d3NodesRef` (used to read mutated
+// x/y for centering), and the centering useEffect itself are all removed.
+// See `docs(56-04): retract pan/zoom centering from AC #3 …` for the spec
+// audit trail.
 import { computeAncestryPath } from './ancestry'
 
 interface D3Node {
@@ -106,20 +120,28 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity)
   const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null)
-  // 2026-06-13 (Phase 56): the live d3Nodes array (force-simulation mutates
-  // x/y on these). Centering effect reads from this ref because the source
-  // `visibleEntities` are never mutated — they're mapped INTO d3Nodes at
-  // the top of the main effect.
-  const d3NodesRef = useRef<D3Node[]>([])
+  // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): `d3NodesRef`
+  // was previously held to feed mutated x/y into the centering effect.
+  // The centering effect is removed (operator second-smoke feedback —
+  // see `docs(56-04): retract pan/zoom centering from AC #3 …`); the
+  // ref had no other consumer, so it's dropped too. If a future plan
+  // needs to read the simulation's mutated positions, restore this ref
+  // and assign it at the top of the main render effect — but DO NOT
+  // bring back the centering useEffect with it; the AC #3 contract is
+  // ring + ancestry trace + EntityDetailPanel, NOT viewport pan.
 
   const { entities, relations, isLoading } = useGraphData(apiClient, system)
   const theme = useViewerStore((s) => s.theme)
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
-  // 2026-06-13 (Phase 56): subscribe to selectionSource so the centering
-  // effect re-runs when a non-graph pane (history sidebar / timeline tick)
-  // drives the selection. Loop-safety: the effect bails when source ===
-  // 'graph' so the user's own graph clicks don't trigger a pan-to-self.
-  const selectionSource = useViewerStore((s) => s.selectionSource)
+  // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the previous
+  // `selectionSource` subscription was added in 989c04558 to re-run the
+  // centering useEffect on non-graph selection sources. With the centering
+  // effect retracted (operator second-smoke feedback), this subscription
+  // is no longer needed AND would trigger spurious re-renders on every
+  // `selectionSource` change — net slowdown for zero behavioural benefit.
+  // The literal `selectionSource: 'graph'` is still WRITTEN on node click
+  // (see the .on('click') handler below); writing it does not require us
+  // to subscribe to our own slice.
   const selectedTeams = useViewerStore((s) => s.selectedTeams)
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
   const selectedClasses = useViewerStore((s) => s.selectedClasses)
@@ -314,53 +336,17 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     applySelectionStyling(d3.select(svgRef.current))
   }, [applySelectionStyling])
 
-  // 2026-06-13 (Phase 56): history/timeline-driven centering effect.
-  //
-  // (a) Narrow dep list — [selectedNodeId, selectionSource, visibleEntities]
-  //     ONLY. Crucially we do NOT depend on `theme` / `visibleRelations` /
-  //     anything else in the main effect — otherwise a filter or theme
-  //     change would re-pan the graph and disorient the user. The main
-  //     useEffect dep list (lines below) STILL omits selectedNodeId per
-  //     the Phase 45 invariant — that is what stops every click from
-  //     rebuilding the SVG; this centering effect handles the visual
-  //     follow-up of out-of-graph selections separately.
-  //
-  // (b) Loop-safety — when selectionSource === 'graph' we early-bail.
-  //     The user just clicked a node in the graph; panning to the click
-  //     target would feel jarring and would compete with d3-zoom's own
-  //     focus-on-click behaviour (which we don't currently invoke, but
-  //     leaving the bail in place keeps us safe from a future click
-  //     handler that does).
-  //
-  // (c) Cold-click race tolerance — the node's `x` / `y` come from the
-  //     force simulation, which doesn't settle synchronously after a
-  //     filter change. When the user clicks a sidebar row before the
-  //     force has resolved a position, we bail without panning; the
-  //     user still sees the selection ring + path-trace via
-  //     applySelectionStyling. The effect will not re-fire automatically
-  //     when the position settles (visibleEntities is reference-stable
-  //     across ticks) — but the selection ring is enough; this is a
-  //     non-fatal degraded path, not a regression.
-  //
-  // (d) Pan primitive — uses zoomBehaviorRef + d3.zoomIdentity +
-  //     transition().duration(500), the EXACT idiom fitToScreen uses at
-  //     line ~557. No new external API surface.
-  useEffect(() => {
-    if (!svgRef.current || !selectedNodeId) return
-    if (selectionSource === 'graph') return
-    // Read from the LIVE d3Nodes (force-simulation-mutated) — the source
-    // `visibleEntities` are immutable Entity[] without x/y. d3NodesRef is
-    // populated at the top of the main render effect.
-    const node = d3NodesRef.current.find((n) => n.id === selectedNodeId)
-    if (!node || typeof node.x !== 'number' || typeof node.y !== 'number') return
-    if (!zoomBehaviorRef.current) return
-    const svg = d3.select(svgRef.current)
-    const { width, height } = svgRef.current.getBoundingClientRect()
-    const transform = d3.zoomIdentity
-      .translate(width / 2 - node.x, height / 2 - node.y)
-      .scale(1)
-    svg.transition().duration(500).call(zoomBehaviorRef.current.transform, transform)
-  }, [selectedNodeId, selectionSource, visibleEntities])
+  // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the
+  // history/timeline-driven centering useEffect that lived here
+  // (originally committed in 989c04558 as the AC #3 implementation) is
+  // REMOVED per operator second-smoke feedback. AC #3 is now fulfilled
+  // by the existing `applySelectionStyling` (ring + ancestry trace) that
+  // runs via the lightweight selection useEffect above + the
+  // EntityDetailPanel mount that fires on `selectedNodeId !== null`. The
+  // viewport is intentionally untouched on non-graph selection. See
+  // `docs(56-04): retract pan/zoom centering from AC #3 …` for the spec
+  // audit trail; source-grep gates G6/G7/G8/G11 in D3GraphCanvas.test.ts
+  // lock the retraction in place.
 
   // Main render — rebuild on filtered data or theme change.
   useEffect(() => {
@@ -395,11 +381,13 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       fx: null,
       fy: null,
     }))
-    // 2026-06-13 (Phase 56): expose d3Nodes (the array d3.forceSimulation
-    // will mutate in place) to the centering effect via ref. We assign
-    // BEFORE wiring forceSimulation so the centering effect sees the
-    // array as soon as the simulation produces x/y on the first tick.
-    d3NodesRef.current = d3Nodes
+    // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the previous
+    // `d3NodesRef.current = d3Nodes` assignment fed the (now-removed)
+    // centering useEffect — dropped along with the ref. If a future plan
+    // needs to read the simulation's mutated x/y from outside this
+    // effect, restore the ref + the assignment, but do NOT restore the
+    // centering effect with it (the AC #3 contract is selection ring +
+    // ancestry trace + EntityDetailPanel, NOT viewport pan).
     const d3Links: D3Link[] = visibleRelations.map((r) => ({
       source: r.from,
       target: r.to,

@@ -200,13 +200,34 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   const clearLslSessionFilter = useViewerStore((s) => s.clearLslSessionFilter)
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
   // 2026-06-13 (Phase 56-04 fix #2): subscribe to selectedSessionId so the
-  // tick-ring predicate can fire on (selectedSessionId === s.id) too.
-  // Without this, tick clicks on sessions whose entityIds[] is empty
-  // (or whose entities aren't in the live graph data) leave the tick
-  // ringless because the `selectedTs → isSelectedBucket` cascade can't
-  // resolve a node id to a createdAt timestamp. AC #2 regression.
+  // strip can clear its local clicked-tick state when ANOTHER pane clears
+  // the selection (Esc / bg-click cascade). The ring predicate itself uses
+  // the local `clickedTickKey` state instead of `selectedSessionId === s.id`
+  // — see continuation-2 fix #D below.
   const selectedSessionId = useViewerStore((s) => s.selectedSessionId)
   const stripRef = useRef<HTMLDivElement | null>(null)
+  // 2026-06-13 (Phase 56-04 continuation 2 fix #D): track the SPECIFIC
+  // (sessionId, startAt) bucket the user clicked. The previous fix used
+  // `isSelectedSession = selectedSessionId === s.id` which fired on EVERY
+  // tranche of the same session id — in the live LSL data a session is
+  // sliced into many `LslSession` objects sharing `id` but distinct
+  // `startAt`, so every tranche rang blue on a single click. The local
+  // state below identifies the clicked bucket via the same composite key
+  // (`${id}|${startAt}`) the React render uses, so only the actually-
+  // clicked tick rings.
+  //
+  // Reset rule: a graph→timeline cascade (selectedNodeId changes due to a
+  // graph node click or a sidebar row click) clears the local bucket key
+  // so the direct-click highlight doesn't persist alongside the graph-
+  // driven `isSelectedBucket` (timestamp range) ring. clearSelection() in
+  // the store nulls `selectedSessionId`; the effect below resets local
+  // state whenever the store's session id transitions to null.
+  const [clickedTickKey, setClickedTickKey] = useState<string | null>(null)
+  useEffect(() => {
+    if (selectedSessionId === null) {
+      setClickedTickKey(null)
+    }
+  }, [selectedSessionId])
   // 2026-06-12: reverse mapping — when a node is selected anywhere
   // (graph click, HistorySidebar click, search), we light up the tick
   // for its createdAt hour-bucket. Look up the entity by id from the
@@ -398,6 +419,42 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   ) {
     e.stopPropagation()
     const ids = session?.entityIds ?? []
+    // 2026-06-13 (Phase 56-04 continuation 2 fix #D): record the clicked
+    // bucket via the composite (id, startAt) key. The render predicate
+    // for `ring-blue-500` uses this local state to single out the actually-
+    // clicked tick (NOT every tranche of the same session id, which was
+    // the previous over-fired predicate).
+    const tickKey = session ? `${sessionId}|${session.startAt}` : sessionId
+    setClickedTickKey(tickKey)
+    // 2026-06-13 (Phase 56-04 continuation 2 fix #A): when the clicked
+    // session has NO entity ids (entityIds=[]), the broader store cascade
+    // (selectedNodeId / pathToSelected / lslFilterEntityIds) has nothing
+    // meaningful to write. The previous code unconditionally wrote a fresh
+    // `new Set()` for each of those fields on every click — stable content
+    // but new reference, which invalidated the D3 graph's `visibleEntities`
+    // useMemo and triggered a full SVG rebuild + force-simulation restart
+    // on every empty-tick click. Operator complaint: "selecting some
+    // timeline items doesn't do anything but redraw the D3 graph (why? is
+    // this necessary? annoying)". Early-exit with only the minimal
+    // session-scope fields so the ring still fires (via clickedTickKey)
+    // and the cross-pane state still reflects the click intent (the
+    // selectedSessionId + selectionSource pair the history sidebar's
+    // 56-02 contract expects).
+    if (ids.length === 0) {
+      useViewerStore.setState({
+        selectedSessionId: sessionId,
+        selectionSource: 'timeline',
+        // selectedNodeId / pathToSelected / lslFilterEntityIds / highlightedRowKey
+        // are INTENTIONALLY untouched — the store's existing values are
+        // preserved by setState's merge semantics, so the D3 graph's
+        // useMemo deps remain reference-stable and no re-render fires.
+      })
+      Logger.info(
+        Logger.Categories.PANELS,
+        `LslTimelineStrip tick (empty session) → ${sessionId} (minimal write — no D3 re-render)`,
+      )
+      return
+    }
     // 2026-06-13 (Phase 56-04 fix #3): compute the ancestry-path the
     // same way D3GraphCanvas's node click does (lines 564, 573-579 in
     // that file) so the central-trace renders when the focal entity
@@ -596,20 +653,24 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
                 && Number.isFinite(startMs)
                 && selectedTs >= startMs
                 && selectedTs < endMs
-              // 2026-06-13 (Phase 56-04 fix #2): re-key the ring to ALSO
-              // fire when the tick's session id matches selectedSessionId.
-              // Without this, clicking a tick whose entityIds[] is empty
-              // (or doesn't intersect the live graph data) leaves the tick
-              // ringless — the operator-reported AC #2 regression. The
-              // selectedBucket path remains the primary signal (graph→
-              // timeline cascade); the selectedSessionId path is the
-              // direct tick-click ring for sessions without a cascading
-              // graph node.
-              const isSelectedSession = selectedSessionId === s.id
-              const isSelected = isSelectedBucket || isSelectedSession
+              // 2026-06-13 (Phase 56-04 continuation 2 fix #D): the
+              // direct-click ring is keyed on the LOCAL `clickedTickKey`
+              // composite (id + startAt) — NOT on `selectedSessionId
+              // === s.id`. The previous predicate rang EVERY tranche of
+              // the same session id; the LSL data is sliced into many
+              // `LslSession` objects sharing `id` but distinct `startAt`,
+              // so a single click lit up every sibling tranche. With the
+              // composite key, only THE clicked bucket rings.
+              //
+              // Graph→timeline cascade (isSelectedBucket via timestamp
+              // range match) continues to handle the case where a node
+              // selection drives the ring without a direct tick click.
+              const tickKey = `${s.id}|${s.startAt}`
+              const isClickedTick = clickedTickKey === tickKey
+              const isSelected = isSelectedBucket || isClickedTick
               const ringClass = isSelected
                 ? 'ring-2 ring-blue-500'
-                : (isRunning && selectedTs === null && selectedSessionId === null)
+                : (isRunning && selectedTs === null && clickedTickKey === null)
                   ? 'ring-2 ring-primary'
                   : ''
               const fillClass = 'bg-pink-300 hover:bg-pink-400'
