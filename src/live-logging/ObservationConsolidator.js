@@ -2965,14 +2965,22 @@ export class ObservationConsolidator {
     const kmStore = this._kmStore;
         // The insight argument may already carry _entity (callers in
         // verifyInsights pass the legacy row that bundles the entity).
-        // Otherwise resolve via legacyId.
+        // Otherwise resolve via legacyId, then fall back to getEntity()
+        // for insights that were created without a legacyId stamp — same
+        // post-Phase-44 gap that bit the resynthesize handler. Without
+        // this fallback, `codeVerification` silently never gets written
+        // and the Coverage tab keeps the tile gray even after a
+        // successful re-synthesis.
         const entity = insight._entity
-          || await kmStore.findByLegacyId({ system: 'A', id: insight.id });
+          || await kmStore.findByLegacyId({ system: 'A', id: insight.id })
+          || await kmStore.getEntity(insight.id);
         if (entity) {
           const prev = entity.metadata ?? {};
           await kmStore.mergeAttributes(entity.id, {
             metadata: { ...prev, codeVerification: verification },
           });
+        } else {
+          process.stderr.write(`[verifier] No entity for insight id=${insight.id} — codeVerification not persisted\n`);
         }
       } catch (err) {
         process.stderr.write(`[verifier] Persist failed for ${insight.id}: ${err.message}\n`);
