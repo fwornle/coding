@@ -33774,5 +33774,271 @@
       "createdAt": "2026-06-13T03:46:02.244Z"
     },
     "project": "coding"
+  },
+  {
+    "id": "ca3ba2c8-afa0-443d-a4b3-760555230cc9",
+    "date": "2026-06-13",
+    "theme": "Parallel verification, coverage tab repair, and ghost digest cleanup",
+    "summary": "The session carried over a dual-track plan: run multi-project verification in the background while concurrently staging and committing pending fixes. A verification script was created at `/tmp/verify-all-projects.sh` and executed against coding, rapid-automations, km-core, daFrankTeam, sketcher, onboarding-repro, and unknown projects.\n\nTwo commits landed covering:\n- `scripts/observations-api-server.mjs` — verify endpoint logic and project-root resolution (returns `null` for projects without on-disk checkouts rather than a false negative)\n- `src/live-logging/ObservationConsolidator.js` — coverage tab rendering fix\n- `scripts/evict-ghost-digests.mjs` + `.data/observation-export/digests.json` — ghost digest entry cleanup\n\nOutcome: rapid-automations reached 100% freshness (15/15); coding project improved to 48 total insights (39 fresh, 6 unverified pending re-run). Auto-generated files (`.data/observation-export/*.json`, `.data/knowledge-graph/exports/general.json`, `.observations/conversion-manifest.json`) were intentionally left uncommitted as churn.",
+    "observationIds": [
+      "edecb2e4-7ab9-4f01-9b82-7e6ffea5af7b",
+      "4d3b1536-f410-41e8-a8ce-a58caf69e88c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/observations-api-server.mjs",
+      "src/live-logging/ObservationConsolidator.js",
+      "scripts/evict-ghost-digests.mjs",
+      ".data/observation-export/digests.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-13T03:57:28.047Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-13",
+      "theme": "Parallel verification, coverage tab repair, and ghost digest cleanup",
+      "summary": "The session carried over a dual-track plan: run multi-project verification in the background while concurrently staging and committing pending fixes. A verification script was created at `/tmp/verify-all-projects.sh` and executed against coding, rapid-automations, km-core, daFrankTeam, sketcher, onboarding-repro, and unknown projects.\n\nTwo commits landed covering:\n- `scripts/observations-api-server.mjs` — verify endpoint logic and project-root resolution (returns `null` for projects without on-disk checkouts rather than a false negative)\n- `src/live-logging/ObservationConsolidator.js` — coverage tab rendering fix\n- `scripts/evict-ghost-digests.mjs` + `.data/observation-export/digests.json` — ghost digest entry cleanup\n\nOutcome: rapid-automations reached 100% freshness (15/15); coding project improved to 48 total insights (39 fresh, 6 unverified pending re-run). Auto-generated files (`.data/observation-export/*.json`, `.data/knowledge-graph/exports/general.json`, `.observations/conversion-manifest.json`) were intentionally left uncommitted as churn.",
+      "observation_ids": [
+        "edecb2e4-7ab9-4f01-9b82-7e6ffea5af7b",
+        "4d3b1536-f410-41e8-a8ce-a58caf69e88c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "scripts/observations-api-server.mjs",
+        "src/live-logging/ObservationConsolidator.js",
+        "scripts/evict-ghost-digests.mjs",
+        ".data/observation-export/digests.json"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-13T03:57:28.047Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a733b734-7f40-4fd4-826b-ca9ea0768ad4",
+    "date": "2026-06-13",
+    "theme": "Coding project gray insight re-verification and resolution",
+    "summary": "Following the coverage improvements in the prior session, a targeted re-verification pass was run against the coding project to address the 6 gray-marked insights.\n\n- The verifier applied the null-ratio rule: insights without backticked code claims render gray by design rather than as an error\n- 2 of the 6 gray items were resolved to fresh or partial status by successfully matching against actual code claims\n- 4 remaining gray insights were confirmed to have no verifiable code claims and are correctly left as unverifiable\n\nFinal coding project state: **48 total** — 41 fresh, 2 partial, 1 stale, 4 gray. No artifacts were modified; this was a read/verify-only pass.",
+    "observationIds": [
+      "bd4705b9-d925-4263-a0e6-2aa20f9c58a6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-06-13T03:57:28.047Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-06-13",
+      "theme": "Coding project gray insight re-verification and resolution",
+      "summary": "Following the coverage improvements in the prior session, a targeted re-verification pass was run against the coding project to address the 6 gray-marked insights.\n\n- The verifier applied the null-ratio rule: insights without backticked code claims render gray by design rather than as an error\n- 2 of the 6 gray items were resolved to fresh or partial status by successfully matching against actual code claims\n- 4 remaining gray insights were confirmed to have no verifiable code claims and are correctly left as unverifiable\n\nFinal coding project state: **48 total** — 41 fresh, 2 partial, 1 stale, 4 gray. No artifacts were modified; this was a read/verify-only pass.",
+      "observation_ids": [
+        "bd4705b9-d925-4263-a0e6-2aa20f9c58a6"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-13T03:57:28.047Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f852ac69-9930-450a-8b03-48c33a8a7edc",
+    "date": "2026-06-13",
+    "theme": "Unknown insight deletion and km-core reclassification to coding project",
+    "summary": "Two cleanup operations were scoped and confirmed to remediate lingering data-integrity issues in the coding project's insight dataset:\n\n- **Phase 1 — Delete:** 11 insights classified under an \"unknown\" project to be removed via DELETE API calls, eliminating misclassified entries from the coding project data\n- **Phase 2 — Reclassify:** 8 insights currently attributed to `km-core` to be reassigned to the coding project via PATCH operations, preserving metadata while correcting project ownership\n- km-core entity handlers and store merge logic were inspected to validate the PATCH/DELETE approach before execution\n\nA re-verification pass of the coding project is planned as a follow-on step to resolve the remaining gray state after reclassification is applied. No artifact files were modified during this scoping phase.",
+    "observationIds": [
+      "45e13390-0ca8-4d20-be24-d0495688e149",
+      "76f92168-3ac9-414b-9b50-7defa16e44a5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-06-13T03:57:28.047Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-13",
+      "theme": "Unknown insight deletion and km-core reclassification to coding project",
+      "summary": "Two cleanup operations were scoped and confirmed to remediate lingering data-integrity issues in the coding project's insight dataset:\n\n- **Phase 1 — Delete:** 11 insights classified under an \"unknown\" project to be removed via DELETE API calls, eliminating misclassified entries from the coding project data\n- **Phase 2 — Reclassify:** 8 insights currently attributed to `km-core` to be reassigned to the coding project via PATCH operations, preserving metadata while correcting project ownership\n- km-core entity handlers and store merge logic were inspected to validate the PATCH/DELETE approach before execution\n\nA re-verification pass of the coding project is planned as a follow-on step to resolve the remaining gray state after reclassification is applied. No artifact files were modified during this scoping phase.",
+      "observation_ids": [
+        "45e13390-0ca8-4d20-be24-d0495688e149",
+        "76f92168-3ac9-414b-9b50-7defa16e44a5"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-06-13T03:57:28.047Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f309a9e2-7e7b-4728-b469-82852ff71a94",
+    "date": "2026-06-13",
+    "theme": "Fix Dashboard False-Positive 0/0 Taxonomy Coverage Bug",
+    "summary": "The goal was to investigate and fix a misleading dashboard rendering bug in the observations API server where component coverage displayed as \"✓ all taxonomy components mentioned\" with **0/0** metrics — a false-positive success state that masked missing data or misconfiguration.\n\n- Diagnostic inspection covered project structures and author taxonomy metadata across `sketcher`, `onboarding-repro`, `daFrankTeam`, and `ai-transformation-day-hackathon`\n- Root cause identified: the coverage calculation did not guard against a zero-denominator case, causing a green checkmark to render even when no components were found\n- Fix applied directly to `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs` to correct aggregation logic and dashboard rendering\n- Dashboard now only surfaces success indicators when actual, non-zero coverage data exists, eliminating the misleading 0/0 display",
+    "observationIds": [
+      "5192f454-3105-4e74-b9fd-0e715b98f7c9",
+      "d6897b11-45c6-4beb-8e9e-d1fa143ff24d",
+      "27c3eaf6-c034-40c9-b928-9ff2674eced6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-13T05:10:17.051Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-06-13",
+      "theme": "Fix Dashboard False-Positive 0/0 Taxonomy Coverage Bug",
+      "summary": "The goal was to investigate and fix a misleading dashboard rendering bug in the observations API server where component coverage displayed as \"✓ all taxonomy components mentioned\" with **0/0** metrics — a false-positive success state that masked missing data or misconfiguration.\n\n- Diagnostic inspection covered project structures and author taxonomy metadata across `sketcher`, `onboarding-repro`, `daFrankTeam`, and `ai-transformation-day-hackathon`\n- Root cause identified: the coverage calculation did not guard against a zero-denominator case, causing a green checkmark to render even when no components were found\n- Fix applied directly to `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs` to correct aggregation logic and dashboard rendering\n- Dashboard now only surfaces success indicators when actual, non-zero coverage data exists, eliminating the misleading 0/0 display",
+      "observation_ids": [
+        "5192f454-3105-4e74-b9fd-0e715b98f7c9",
+        "d6897b11-45c6-4beb-8e9e-d1fa143ff24d",
+        "27c3eaf6-c034-40c9-b928-9ff2674eced6"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-13T05:10:17.051Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "247abae9-f238-4605-bfad-c48c24bdb999",
+    "date": "2026-06-13",
+    "theme": "Bulk Project Reclassification and Taxonomy Cleanup",
+    "summary": "Following the API server fixes, the agent proceeded with a bulk data consolidation effort targeting project classification accuracy and schema hygiene.\n\n- 9 projects reclassified via API-driven tool calls\n- `sketcher` taxonomy stripped entirely to reduce data footprint\n- `onboarding-repro` scope trimmed to clarify project boundaries\n- Changes applied via further edits to `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs`\n- Service was restarted and all four affected projects were re-verified post-reclassification to confirm correct application of changes\n- End state: reclassification confirmed complete, taxonomy consolidated, onboarding-repro scope reduced",
+    "observationIds": [
+      "885659f5-fd98-4cfa-b866-058470372124",
+      "75d0fe97-86d2-4e4e-a0d7-9f133b0a06e7"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-13T05:10:17.051Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-13",
+      "theme": "Bulk Project Reclassification and Taxonomy Cleanup",
+      "summary": "Following the API server fixes, the agent proceeded with a bulk data consolidation effort targeting project classification accuracy and schema hygiene.\n\n- 9 projects reclassified via API-driven tool calls\n- `sketcher` taxonomy stripped entirely to reduce data footprint\n- `onboarding-repro` scope trimmed to clarify project boundaries\n- Changes applied via further edits to `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs`\n- Service was restarted and all four affected projects were re-verified post-reclassification to confirm correct application of changes\n- End state: reclassification confirmed complete, taxonomy consolidated, onboarding-repro scope reduced",
+      "observation_ids": [
+        "885659f5-fd98-4cfa-b866-058470372124",
+        "75d0fe97-86d2-4e4e-a0d7-9f133b0a06e7"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-13T05:10:17.051Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "86d7fd1b-b038-4a46-8955-ce51a230a97c",
+    "date": "2026-06-13",
+    "theme": "Project Observation Reclassification and Taxonomy Cleanup",
+    "summary": "The goal was to reclassify project observations and tidy up taxonomy and project scope as part of a background verification workflow.\n\n- Modified `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs` to support reclassification operations, then restarted the service via `launchctl`\n- Executed reclassification of **9 projects** across the observations data store\n- Stashed uncommitted data changes to keep the working tree clean and prevent them mixing into commits\n- Configured git to push over HTTPS (port 443) as a workaround since SSH port 22 was blocked on the current network\n- Planned follow-on steps: strip the `sketcher` taxonomy, reduce scope of `onboarding-repro`, re-verify the four affected projects, and confirm final git state",
+    "observationIds": [
+      "c353d2d2-f62f-4f23-afb8-33e1c1dfdc5b",
+      "fb6e0098-5535-40fc-b5e9-19854f776398"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-13T05:29:47.959Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-13",
+      "theme": "Project Observation Reclassification and Taxonomy Cleanup",
+      "summary": "The goal was to reclassify project observations and tidy up taxonomy and project scope as part of a background verification workflow.\n\n- Modified `/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs` to support reclassification operations, then restarted the service via `launchctl`\n- Executed reclassification of **9 projects** across the observations data store\n- Stashed uncommitted data changes to keep the working tree clean and prevent them mixing into commits\n- Configured git to push over HTTPS (port 443) as a workaround since SSH port 22 was blocked on the current network\n- Planned follow-on steps: strip the `sketcher` taxonomy, reduce scope of `onboarding-repro`, re-verify the four affected projects, and confirm final git state",
+      "observation_ids": [
+        "c353d2d2-f62f-4f23-afb8-33e1c1dfdc5b",
+        "fb6e0098-5535-40fc-b5e9-19854f776398"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-13T05:29:47.959Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a9e9ade4-c708-4549-adc7-dc0be5f1e56e",
+    "date": "2026-06-13",
+    "theme": "SSH Config Fixed to Bypass Corporate Proxy for GitHub",
+    "summary": "The goal was to resolve SSH connection failures to GitHub caused by a `ProxyCommand` directive that depended on a corporate proxy service unavailable on public networks.\n\n- Diagnosed that the existing `Host github.com` block in `~/.ssh/config` forced traffic through `proxydetox` at `127.0.0.1:3128`, which fails when the proxy is not running\n- Solution: replaced the `ProxyCommand` with a direct connection to `ssh.github.com:443` (GitHub's alternate SSH-over-HTTPS endpoint), which works on both corporate and public networks\n- Preserved existing `IdentityFile` and agent-forwarding settings in the block\n- Created a timestamped backup of `~/.ssh/config` before modifying it\n- Pre-seeded `known_hosts` with GitHub's host key to suppress first-connection prompts\n- Change was reviewed and approved by the user before being applied",
+    "observationIds": [
+      "4beed9ae-c54e-4fa0-b107-407b3c0a05ad",
+      "0290d46c-76dc-488f-9d86-ab959e154abb",
+      "79113fd8-bec6-478a-9f7a-d295c9e50df5"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.ssh/config"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-13T05:29:47.959Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-06-13",
+      "theme": "SSH Config Fixed to Bypass Corporate Proxy for GitHub",
+      "summary": "The goal was to resolve SSH connection failures to GitHub caused by a `ProxyCommand` directive that depended on a corporate proxy service unavailable on public networks.\n\n- Diagnosed that the existing `Host github.com` block in `~/.ssh/config` forced traffic through `proxydetox` at `127.0.0.1:3128`, which fails when the proxy is not running\n- Solution: replaced the `ProxyCommand` with a direct connection to `ssh.github.com:443` (GitHub's alternate SSH-over-HTTPS endpoint), which works on both corporate and public networks\n- Preserved existing `IdentityFile` and agent-forwarding settings in the block\n- Created a timestamped backup of `~/.ssh/config` before modifying it\n- Pre-seeded `known_hosts` with GitHub's host key to suppress first-connection prompts\n- Change was reviewed and approved by the user before being applied",
+      "observation_ids": [
+        "4beed9ae-c54e-4fa0-b107-407b3c0a05ad",
+        "0290d46c-76dc-488f-9d86-ab959e154abb",
+        "79113fd8-bec6-478a-9f7a-d295c9e50df5"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/.ssh/config"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-13T05:29:47.959Z"
+    },
+    "project": "coding"
   }
 ]
