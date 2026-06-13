@@ -47,6 +47,11 @@ import { Logger } from '@/lib/logging'
 import { useViewerStore } from '@/store/viewer-store'
 import type { ApiClient } from '@/api/ApiClient'
 import { useGraphData } from '@/graph/useGraphData'
+// 2026-06-13 (Phase 56-04 fix #3): the strip's onTickClick now needs to
+// compute the same ancestry-path the graph-side click does so the
+// central-trace renders when a tick click resolves a focal entity.
+// Shared with D3GraphCanvas via the extracted helper module.
+import { computeAncestryPath } from '@/graph/ancestry'
 
 export type LslWindow = '24h' | '7d' | '30d' | 'all'
 
@@ -176,17 +181,42 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // click), we restore this so the strip snaps back to the latest view
   // instead of being stuck on 30d.
   const preSlideWindowRef = useRef<LslWindow | null>(null)
+  // 2026-06-13 (Phase 56-04 fix #1): track the PREVIOUS selectedTs so
+  // the deselect-effect can distinguish "transitioned from selected →
+  // deselected" (user pressed Esc / bg-clicked the graph) from "mounted
+  // with no selection" (the user is just looking at the strip). The
+  // original effect fired on every mount where `selectedTs === null`,
+  // which meant clicking any window button (24h/30d/all) was instantly
+  // snapped back to the LATEST_WINDOW default by the same effect — the
+  // operator-reported AC #1 regression. The strip now only fires the
+  // restore + LSL-filter clear when prevSelectedTsRef !== null (we WERE
+  // selected last render) AND selectedTs === null (we ARE now
+  // deselected). On pure initial mount the ref stays null and no
+  // cascade fires. This also fixes the pre-existing Test 7 baseline
+  // failure (Cmd/Ctrl+click prior-filter wipe) for the same reason.
+  const prevSelectedTsRef = useRef<number | null>(null)
   const setLslSessionFilter = useViewerStore((s) => s.setLslSessionFilter)
   const addLslSessionFilter = useViewerStore((s) => s.addLslSessionFilter)
   const clearLslSessionFilter = useViewerStore((s) => s.clearLslSessionFilter)
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  // 2026-06-13 (Phase 56-04 fix #2): subscribe to selectedSessionId so the
+  // tick-ring predicate can fire on (selectedSessionId === s.id) too.
+  // Without this, tick clicks on sessions whose entityIds[] is empty
+  // (or whose entities aren't in the live graph data) leave the tick
+  // ringless because the `selectedTs → isSelectedBucket` cascade can't
+  // resolve a node id to a createdAt timestamp. AC #2 regression.
+  const selectedSessionId = useViewerStore((s) => s.selectedSessionId)
   const stripRef = useRef<HTMLDivElement | null>(null)
   // 2026-06-12: reverse mapping — when a node is selected anywhere
   // (graph click, HistorySidebar click, search), we light up the tick
   // for its createdAt hour-bucket. Look up the entity by id from the
   // shared data hook (TanStack Query caches it once across the app, so
   // this is free).
-  const { entities } = useGraphData(apiClient, system)
+  // 2026-06-13 (Phase 56-04 fix #3): also pull `relations` so the tick-
+  // click handler can compute pathToSelected the same way D3GraphCanvas
+  // does on node click — without it, the central-trace stays blank when
+  // a tick selection resolves to a focal entity.
+  const { entities, relations } = useGraphData(apiClient, system)
   // 2026-06-12: range-match — slice-by-hour was unreliable because LSL
   // file times (UTC after parser) don't align with entity createdAt
   // UTC hour boundaries. We now expose the selected entity's createdAt
@@ -206,13 +236,26 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // falls OUTSIDE the current window. e.g. user picks an 18-day-old
   // node while window=7d — we bump to 30d. If even 30d isn't enough,
   // we stay at 30d (the strip will just clip the tick on the left).
+  //
+  // 2026-06-13 (Phase 56-04 fix #1): the deselect branch is gated on
+  // a real selected → deselected TRANSITION (prevSelectedTsRef !== null
+  // AND selectedTs === null). The original code fired the cascade on
+  // every mount where `selectedTs === null`, which meant:
+  //   (a) clicking 24h/30d/all snapped back to LATEST_WINDOW (the
+  //       deselect-effect re-fired on every windowKey change because
+  //       windowKey is in the dep list)
+  //   (b) any pre-existing `lslSessionFilter` (e.g. the one Test 7's
+  //       beforeEach set) got wiped on mount
+  // Now we only restore + clear LSL state when the user goes from a
+  // real selection back to no-selection (Esc / bg-click on graph).
   useEffect(() => {
-    // 2026-06-12: when selection clears, restore the pre-slide window
-    // (if we slid it) or fall back to the LATEST_WINDOW default. This
-    // is the "ESC resets the timeline window to the latest span" UX —
-    // ESC clears selectedNodeId via the global shortcut, our effect
-    // fires here.
     if (selectedTs === null) {
+      // Only run the restore + LSL-clear cascade when we WERE selected.
+      // First mount (and any selection-less re-render triggered by
+      // windowKey changes) leaves state alone.
+      const wasSelected = prevSelectedTsRef.current !== null
+      prevSelectedTsRef.current = null
+      if (!wasSelected) return
       const restoreTo = preSlideWindowRef.current ?? LATEST_WINDOW
       preSlideWindowRef.current = null
       // 2026-06-12: deselect (ESC / bg click) ALSO clears the LSL
@@ -238,6 +281,8 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       }
       return
     }
+    // Selection is active — remember it for the next deselect transition.
+    prevSelectedTsRef.current = selectedTs
     const ageMs = Date.now() - selectedTs
     if (ageMs <= WINDOW_MS[windowKey]) return
     const next: LslWindow | null =
@@ -353,6 +398,21 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   ) {
     e.stopPropagation()
     const ids = session?.entityIds ?? []
+    // 2026-06-13 (Phase 56-04 fix #3): compute the ancestry-path the
+    // same way D3GraphCanvas's node click does (lines 564, 573-579 in
+    // that file) so the central-trace renders when the focal entity
+    // has a parent chain. Without this, `pathToSelected: new Set()`
+    // was hardcoded and the trace stayed blank — the operator-reported
+    // AC #2 partial-success regression. Returns an empty Set when the
+    // focal entity has no relations in the live graph (which is fine —
+    // matches D3GraphCanvas's behaviour on an isolated node).
+    const firstEntityId = ids[0] ?? null
+    const path = firstEntityId !== null
+      ? computeAncestryPath(firstEntityId, relations)
+      : null
+    const pathToSelected: Set<string> = path !== null
+      ? new Set<string>(path.nodeDepths.keys())
+      : new Set<string>()
     if (e.metaKey || e.ctrlKey) {
       // 2026-06-12: Cmd/Ctrl click — UNION the session's entityIds with
       // the existing filter set. Lets the user assemble a multi-session
@@ -374,6 +434,10 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
         highlightedRowKey: ids[0] ?? null,
         selectionSource: 'timeline',
         selectedSessionId: sessionId,
+        // 2026-06-13 (Phase 56-04 fix #3): same pathToSelected write as
+        // the plain-click branch so a Cmd/Ctrl additive selection also
+        // gets the central-trace.
+        pathToSelected,
       })
       Logger.info(
         Logger.Categories.PANELS,
@@ -386,7 +450,6 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // shows its content and the graph's path-trace centers on it. The
     // server sorts visible-first (Insight → other → Observation), so the
     // first id is the best click target.
-    const firstEntityId = ids[0] ?? null
     // 2026-06-13 [Phase 56-03 AC #4 store side]: 7-field atomic snapshot.
     // The pre-existing 4 fields (selectedNodeId, pathToSelected,
     // lslSessionFilter, lslFilterEntityIds) ship the graph + LSL filter
@@ -396,7 +459,9 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // signal (AC #6 partial — selectedSessionId now populated).
     useViewerStore.setState({
       selectedNodeId: firstEntityId,
-      pathToSelected: new Set<string>(),
+      // 2026-06-13 (Phase 56-04 fix #3): real ancestry path instead of
+      // hardcoded new Set() so the central-trace renders.
+      pathToSelected,
       lslSessionFilter: [sessionId],
       lslFilterEntityIds: new Set<string>(ids),
       highlightedRowKey: firstEntityId,
@@ -531,9 +596,20 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
                 && Number.isFinite(startMs)
                 && selectedTs >= startMs
                 && selectedTs < endMs
-              const ringClass = isSelectedBucket
+              // 2026-06-13 (Phase 56-04 fix #2): re-key the ring to ALSO
+              // fire when the tick's session id matches selectedSessionId.
+              // Without this, clicking a tick whose entityIds[] is empty
+              // (or doesn't intersect the live graph data) leaves the tick
+              // ringless — the operator-reported AC #2 regression. The
+              // selectedBucket path remains the primary signal (graph→
+              // timeline cascade); the selectedSessionId path is the
+              // direct tick-click ring for sessions without a cascading
+              // graph node.
+              const isSelectedSession = selectedSessionId === s.id
+              const isSelected = isSelectedBucket || isSelectedSession
+              const ringClass = isSelected
                 ? 'ring-2 ring-blue-500'
-                : (isRunning && selectedTs === null)
+                : (isRunning && selectedTs === null && selectedSessionId === null)
                   ? 'ring-2 ring-primary'
                   : ''
               const fillClass = 'bg-pink-300 hover:bg-pink-400'

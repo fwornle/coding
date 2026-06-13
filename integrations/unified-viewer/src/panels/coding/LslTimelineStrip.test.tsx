@@ -33,13 +33,21 @@ import path from 'node:path'
 // `vi.mock('@/graph/useGraphData')` idiom.
 const mockEntities: Array<{ id: string; createdAt: string }> = []
 vi.mock('@/graph/useGraphData', () => ({
-  useGraphData: () => ({
-    entities: mockEntities,
-    relations: [],
-    ontology: [],
-    isLoading: false,
-    error: null,
-  }),
+  useGraphData: () => {
+    // 2026-06-13 [Phase 56-04 Test 24]: tests can seed
+    // `globalThis.__mockRelations` to exercise the ancestry-path branch
+    // of onTickClick. Defaults to [] for all earlier tests.
+    const rel =
+      (globalThis as unknown as { __mockRelations?: unknown[] }).__mockRelations
+      ?? []
+    return {
+      entities: mockEntities,
+      relations: rel,
+      ontology: [],
+      isLoading: false,
+      error: null,
+    }
+  },
 }))
 
 import LslTimelineStrip, { formatScaleLabel } from './LslTimelineStrip'
@@ -422,5 +430,160 @@ describe('LslTimelineStrip', () => {
     expect(src).toMatch(/selectedSessionId/)
     // Container height bumped past h-8
     expect(src).toMatch(/h-1[24]/)
+  })
+
+  // ====================================================================
+  // Phase 56 Plan 04 — regression locks for the 3 issues the operator
+  // reported in the 2026-06-13 visual smoke. These tests drive the real
+  // click HANDLERS (fireEvent.click on rendered buttons) — NOT
+  // useViewerStore.setState — so they exercise the same code path the
+  // user does. The earlier Phase 56 tests (Tests 14-20) bypassed the
+  // handlers and missed these three regressions; that gap is the
+  // meta-lesson documented in 56-04-SUMMARY.md.
+  // ====================================================================
+
+  test('Test 21 [Issue 1]: clicking 24h window button STICKS (deselect-effect must not snap back when there was no slide)', async () => {
+    // REGRESSION: the deselect-effect at LslTimelineStrip.tsx lines ~209-259
+    // unconditionally fires on every mount where selectedTs === null
+    // (i.e. no node selected). It calls setWindowKey(LATEST_WINDOW = '7d'),
+    // so the moment the user clicks 24h, the effect snaps it back to 7d
+    // and the scale labels never refresh. The fix gates the restore on
+    // `preSlideWindowRef.current !== null` so only AUTO-SLID windows
+    // (selection-driven) are restored on deselect; user-chosen windows
+    // stay put.
+    //
+    // Drive the real button click (not setState) and assert the rendered
+    // 24h ToggleGroupItem stays selected (data-state="on"). The toggle
+    // group binds `value={windowKey}` so if windowKey snaps back to 7d,
+    // the 24h button will show data-state="off" and the 7d button
+    // data-state="on".
+    useViewerStore.setState({ selectedNodeId: null })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByLabelText('24 hours'))
+      const btn24h = screen.getByLabelText('24 hours')
+      act(() => {
+        fireEvent.click(btn24h)
+      })
+      // STRICT: data-state must remain 'on' for 24h. If the deselect-effect
+      // snaps windowKey back to 7d, this assertion fires.
+      await waitFor(() => {
+        const btn = screen.getByLabelText('24 hours')
+        expect(btn.getAttribute('data-state')).toBe('on')
+      })
+      // Defence-in-depth: 7d button must NOT be selected.
+      const btn7d = screen.getByLabelText('7 days')
+      expect(btn7d.getAttribute('data-state')).not.toBe('on')
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 22 [Issue 1 — Cmd/Ctrl+click regression]: tick with no selection survives the mount', async () => {
+    // REGRESSION: Test 7 (existing baseline) fails for the same root
+    // cause as Issue 1 — the deselect-effect clears `lslSessionFilter`
+    // on mount before the Cmd/Ctrl+click runs. This is a stricter
+    // version of Test 7 that locks the fix at the source: the effect
+    // must NOT clear `lslSessionFilter` on mount when there's no slide
+    // memory.
+    useViewerStore.setState({
+      lslSessionFilter: ['sess-aaaaaaaa'],
+      selectedNodeId: null,
+    })
+    const r = renderStrip()
+    try {
+      // Wait one tick — the deselect-effect would fire here in the
+      // baseline (broken) code.
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      // After mount, the filter must still be ['sess-aaaaaaaa']:
+      // a user-set filter with no selection is NOT something the
+      // strip is allowed to clear unprompted.
+      expect(useViewerStore.getState().lslSessionFilter).toEqual(['sess-aaaaaaaa'])
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 23 [Issue 2]: tick click rings its own tick AND sets selectedSessionId even when entityIds[] is empty', async () => {
+    // REGRESSION: when a session has entityIds=[] (no live graph nodes
+    // mapped to it), the tick click writes selectedNodeId: null and
+    // the tick ring keyed on selectedTs→isSelectedBucket never fires.
+    // The fix: re-key the tick ring on (isSelectedBucket || selectedSessionId === s.id)
+    // so the tick always rings on its own click, even when the entity
+    // cascade can't fire.
+    useViewerStore.setState({ selectedNodeId: null, selectedSessionId: null })
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-empty',
+          startAt: nowMinusHours(2),
+          endAt: nowMinusHours(1.5),
+          observationCount: 0,
+          entityIds: [], // EMPTY — no entities to cascade to
+        },
+      ],
+    })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-empty'))
+      const tick = screen.getByTestId('lsl-tick-sess-empty')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      // Even with empty entityIds, the store must record the tick click
+      const s = useViewerStore.getState()
+      expect(s.selectedSessionId).toBe('sess-empty')
+      expect(s.selectionSource).toBe('timeline')
+      // And the tick must ring (selectedSessionId === s.id key fires).
+      await waitFor(() => {
+        const t = screen.getByTestId('lsl-tick-sess-empty')
+        expect(t.className).toMatch(/ring-blue-500/)
+      })
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 24 [Issue 3]: tick click computes pathToSelected when firstEntityId resolves to a graph node with relations', async () => {
+    // REGRESSION: LslTimelineStrip.onTickClick writes pathToSelected:
+    // new Set() (empty). The graph's path-to-central renderer never
+    // lights up. The fix: when firstEntityId !== null, compute
+    // computeAncestryPath(firstEntityId, relations) the same way
+    // D3GraphCanvas.tsx's node click does (lines 564, 573-579).
+    //
+    // We seed mockEntities + add relations to the mock so the strip
+    // can resolve the ancestry chain.
+    mockEntities.length = 0
+    mockEntities.push({ id: 'e3', createdAt: nowMinusHours(1.75) } as never)
+    mockEntities.push({ id: 'parent-1', createdAt: nowMinusHours(2) } as never)
+    mockEntities.push({ id: 'root', createdAt: nowMinusHours(3) } as never)
+    // Mutate the mock's relations
+    ;(globalThis as unknown as { __mockRelations?: unknown }).__mockRelations = [
+      { from: 'parent-1', to: 'e3', type: 'contains' },
+      { from: 'root', to: 'parent-1', type: 'contains' },
+    ]
+    useViewerStore.setState({
+      selectedNodeId: null,
+      pathToSelected: new Set<string>(),
+    })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      const tick = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      expect(s.selectedNodeId).toBe('e3')
+      // pathToSelected must contain at least 'e3' and its ancestors.
+      // Strict: size > 0 (empty means the ancestry path was never built).
+      expect(s.pathToSelected.size).toBeGreaterThan(0)
+      // Must include the node itself.
+      expect(s.pathToSelected.has('e3')).toBe(true)
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
+      useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
+    }
   })
 })
