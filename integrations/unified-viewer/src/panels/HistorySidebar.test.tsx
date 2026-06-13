@@ -91,6 +91,14 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
       selectedSessionId: null,
     })
     cleanup()
+    // jsdom does not implement scrollIntoView on Element.prototype — the
+    // HistorySidebar useEffect calls it whenever `selectedNodeId` is set, so
+    // every test that flips selection during render needs this stub or the
+    // React passive-effect commit throws TypeError. Test 5 spies on the same
+    // method; this default stub is the safe baseline.
+    if (typeof (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView !== 'function') {
+      ;(Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = () => {}
+    }
   })
 
   test('Test 1: renders data-history-id on every row (fixes dead-code selector at line 106)', () => {
