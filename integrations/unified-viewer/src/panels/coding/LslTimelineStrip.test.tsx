@@ -543,6 +543,202 @@ describe('LslTimelineStrip', () => {
     }
   })
 
+  // ====================================================================
+   // Phase 56 Plan 04 continuation 2 — regression locks for the 4 issues
+   // the operator reported in the SECOND visual smoke (2026-06-13).
+   //
+   // Issue A: clicking a tick with empty entityIds triggered a spurious
+   //          D3 re-render via `lslFilterEntityIds: new Set()` reference
+   //          changes — annoying for the user. Fix: when ids[] is empty,
+   //          do NOT touch `lslFilterEntityIds`/`selectedNodeId`/
+   //          `pathToSelected`; only write the minimal session-scope
+   //          fields the operator's "tick was clicked" intent requires.
+   //
+   // Issue B: ticks with non-empty entityIds set `selectedNodeId` but the
+   //          graph node ring + ancestry trace didn't visibly fire because
+   //          the spurious centering useEffect (now removed in Issue C
+   //          fix) panned the SVG so the visual cascade was off-screen.
+   //          Assert at the store level that the writes are correct;
+   //          visual gate is in D3GraphCanvas.test.ts G7 + Playwright.
+   //
+   // Issue D: the tick ring fired on EVERY tranche of the same session id
+   //          (the dedup composite key is `id|startAt`, but the previous
+   //          fix's `isSelectedSession = selectedSessionId === s.id`
+   //          predicate matched all tranches of the same session). Fix:
+   //          track the clicked tick's `(id, startAt)` bucket via local
+   //          component state so only THAT specific tick rings on direct
+   //          click. The `isSelectedBucket` (timestamp range) predicate
+   //          continues to handle the graph→timeline cascade.
+   // ====================================================================
+
+  test('Test 25 [Issue A]: clicking a tick with empty entityIds does NOT touch lslFilterEntityIds/selectedNodeId/pathToSelected (avoids spurious D3 re-render)', async () => {
+    // Pre-seed the three fields the strip MUST NOT change for an empty tick.
+    const preSeededPath = new Set<string>(['pre-seeded'])
+    const preSeededLslIds = new Set<string>(['pre-seeded-1', 'pre-seeded-2'])
+    useViewerStore.setState({
+      selectedNodeId: 'pre-existing-node',
+      pathToSelected: preSeededPath,
+      lslFilterEntityIds: preSeededLslIds,
+      selectedSessionId: null,
+      selectionSource: null,
+    })
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-empty',
+          startAt: nowMinusHours(2),
+          endAt: nowMinusHours(1.5),
+          observationCount: 0,
+          entityIds: [],
+        },
+      ],
+    })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-empty'))
+      const tick = screen.getByTestId('lsl-tick-sess-empty')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      // Only the minimal session-scope fields are mutated.
+      expect(s.selectedSessionId).toBe('sess-empty')
+      expect(s.selectionSource).toBe('timeline')
+      // CRITICAL: pre-seeded fields are PRESERVED — same reference, not
+      // a fresh empty Set (which would trigger a D3 re-render).
+      expect(s.selectedNodeId).toBe('pre-existing-node')
+      expect(s.pathToSelected).toBe(preSeededPath)
+      expect(s.lslFilterEntityIds).toBe(preSeededLslIds)
+    } finally {
+      r.restore()
+      useViewerStore.setState({
+        selectedNodeId: null,
+        pathToSelected: new Set(),
+        lslFilterEntityIds: null,
+        selectedSessionId: null,
+        selectionSource: null,
+      })
+    }
+  })
+
+  test('Test 26 [Issue B]: tick click with non-empty entityIds writes selectedNodeId as the bare entity id the graph expects', async () => {
+    // The graph's d3Nodes are keyed off `e.id` directly (D3GraphCanvas.tsx
+    // line 380) and applySelectionStyling filters on `.id === selectedNodeId`
+    // (lines 281-283). The strip MUST write the BARE entity id (no prefix,
+    // no envelope) so the graph's selection styling fires.
+    useViewerStore.setState({
+      selectedNodeId: null,
+      pathToSelected: new Set(),
+      highlightedRowKey: null,
+    })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      const tick = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      // sess-bbbbbbbb.entityIds === ['e3'] — bare id, no prefix
+      expect(s.selectedNodeId).toBe('e3')
+      // highlightedRowKey must also be bare id — the HistorySidebar
+      // matches on `data-history-id={entity.id}` directly.
+      expect(s.highlightedRowKey).toBe('e3')
+    } finally {
+      r.restore()
+      useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
+    }
+  })
+
+  test('Test 28 [Issue D]: clicking ONE tranche of a session leaves SIBLING tranches of the SAME session WITHOUT the ring-blue-500 class (single-bucket semantics)', async () => {
+    // REGRESSION (operator second-smoke 2026-06-13): "you marked all
+    // nodes in the timeline as selected (upon selecting one that actually
+    // brings up text)". Root cause: the previous fix's predicate
+    // `isSelectedSession = selectedSessionId === s.id` matched EVERY
+    // tranche of the same session. In the live LSL data, a single
+    // long-running session is sliced into many `LslSession` objects with
+    // a shared `id` but distinct `startAt` values — so every tranche
+    // of the clicked session rang blue.
+    //
+    // Fix: ring the clicked TRANCHE (identified by the composite `(id,
+    // startAt)` key the React render uses) — not every tranche of the
+    // same session id. The component tracks the clicked bucket via local
+    // state.
+    //
+    // Test fixture: two tranches of the SAME session id `sess-multi`
+    // (distinct `startAt` values so the dedup keeps both). Clicking
+    // tranche-1 must NOT ring tranche-2.
+    mockEntities.length = 0
+    useViewerStore.setState({
+      selectedNodeId: null,
+      selectedSessionId: null,
+    })
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-multi',
+          startAt: nowMinusHours(3),
+          endAt: nowMinusHours(2.5),
+          observationCount: 5,
+          entityIds: [],
+        },
+        {
+          id: 'sess-multi',
+          startAt: nowMinusHours(1),
+          endAt: nowMinusHours(0.5),
+          observationCount: 3,
+          entityIds: [],
+        },
+      ],
+    })
+    try {
+      // Both tranches share `data-testid="lsl-tick-sess-multi"` — narrow
+      // by the data-session-id attribute (also `sess-multi`) AND fetch
+      // both via getAllByTestId.
+      await waitFor(() => {
+        const ticks = screen.getAllByTestId('lsl-tick-sess-multi')
+        expect(ticks.length).toBe(2)
+      })
+      const ticks = screen.getAllByTestId('lsl-tick-sess-multi')
+      const tranche1 = ticks[0]
+      const tranche2 = ticks[1]
+      // Click tranche 1
+      act(() => {
+        fireEvent.click(tranche1)
+      })
+      // Tranche 1 rings — direct click feedback.
+      await waitFor(() => {
+        const refreshed = screen.getAllByTestId('lsl-tick-sess-multi')
+        expect(refreshed[0].className).toMatch(/ring-blue-500/)
+      })
+      // Tranche 2 MUST NOT ring (different bucket, even though same
+      // session id). The OLD predicate would have lit BOTH.
+      const refreshedAfter = screen.getAllByTestId('lsl-tick-sess-multi')
+      expect(refreshedAfter[1].className).not.toMatch(/ring-blue-500/)
+      // Defence-in-depth: cross-check via DOM order — only ONE node has
+      // ring-blue-500 across the whole strip.
+      const allRingedTicks = document.querySelectorAll(
+        '[data-testid^="lsl-tick-"].ring-blue-500',
+      )
+      expect(allRingedTicks.length).toBe(1)
+      // Same DOM element as tranche1.
+      expect(allRingedTicks[0]).toBe(refreshedAfter[0])
+      // Bonus reference check for Test 28b: clicking tranche 2 should
+      // move the ring AWAY from tranche 1 (not keep both ringed).
+      act(() => {
+        fireEvent.click(refreshedAfter[1])
+      })
+      await waitFor(() => {
+        const ticksNow = screen.getAllByTestId('lsl-tick-sess-multi')
+        expect(ticksNow[1].className).toMatch(/ring-blue-500/)
+        expect(ticksNow[0].className).not.toMatch(/ring-blue-500/)
+      })
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      useViewerStore.setState({ selectedNodeId: null, selectedSessionId: null })
+    }
+  })
+
   test('Test 24 [Issue 3]: tick click computes pathToSelected when firstEntityId resolves to a graph node with relations', async () => {
     // REGRESSION: LslTimelineStrip.onTickClick writes pathToSelected:
     // new Set() (empty). The graph's path-to-central renderer never
