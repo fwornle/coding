@@ -3,6 +3,15 @@
 // useViewerStore.getState().reset() clears in-system selection + search + selectedClasses,
 // but DOES NOT clear visibleLevels (filter defaults persist across in-system reset by
 // design — cross-system reset is the remount).
+//
+// PHASE 56.1 (Plan 01 Task 2) — the Phase 56 single-selection slice has been
+// promoted to many-to-many (selectedNodeIds: ReadonlySet<string> + focalNodeId
+// + selectedBucketKeys: ReadonlySet<string> + focalBucketKey). The Phase 56
+// describe-block at the bottom of this file has been REWRITTEN to assert the
+// multi-set shape + audit-locked reference-stability invariants (56-PATTERNS
+// Locked Contract #3 + 56.1-PATTERNS §1 invariants table). Phase 45 + Phase 55
+// describe-blocks are preserved verbatim — only the field references in their
+// beforeEach() seed snapshots are updated (selectedNodeId → selectedNodeIds).
 import { describe, test, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -14,9 +23,10 @@ type ViewerStateAny = ViewerState
 
 describe('useViewerStore', () => {
   beforeEach(() => {
-    // Restore fresh defaults before each test
+    // Restore fresh defaults before each test (Phase 56.1 multi-set shape).
     useViewerStore.setState({
-      selectedNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
       selectedEdgeId: null,
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
@@ -26,21 +36,23 @@ describe('useViewerStore', () => {
     })
   })
 
-  test('reset() clears selectedNodeId, selectedEdgeId, searchQuery, selectedClasses', () => {
+  test('reset() clears focalNodeId (via setSelectedNode), selectedEdgeId, searchQuery, selectedClasses', () => {
     const store = useViewerStore.getState()
     store.setSelectedNode('n1')
     store.setSelectedEdge('e1')
     store.setSearch('foo')
     store.toggleClass('Observation')
 
-    expect(useViewerStore.getState().selectedNodeId).toBe('n1')
+    expect(useViewerStore.getState().focalNodeId).toBe('n1')
+    expect(useViewerStore.getState().selectedNodeIds.has('n1')).toBe(true)
     expect(useViewerStore.getState().selectedEdgeId).toBe('e1')
     expect(useViewerStore.getState().searchQuery).toBe('foo')
     expect(useViewerStore.getState().selectedClasses.has('Observation')).toBe(true)
 
     useViewerStore.getState().reset()
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBeNull()
+    expect(s.focalNodeId).toBeNull()
+    expect(s.selectedNodeIds.size).toBe(0)
     expect(s.selectedEdgeId).toBeNull()
     expect(s.searchQuery).toBe('')
     expect(s.selectedClasses.size).toBe(0)
@@ -160,9 +172,12 @@ describe('useViewerStore — Phase 55 initial state (Task 1)', () => {
     expect(initial().lslSessionFilter).toEqual([])
   })
 
-  test('BC: Phase 45 fields still present with their original initial values', () => {
+  test('BC: Phase 45 fields still present with their original initial values (selectedNodeIds replaces selectedNodeId per Phase 56.1)', () => {
     const s = initial()
-    expect(s.selectedNodeId).toBeNull()
+    // Phase 56.1: selectedNodeId is GONE — replaced by selectedNodeIds (empty Set) + focalNodeId (null).
+    expect(s.selectedNodeIds).toBeInstanceOf(Set)
+    expect(s.selectedNodeIds.size).toBe(0)
+    expect(s.focalNodeId).toBeNull()
     expect(s.selectedEdgeId).toBeNull()
     expect(s.searchQuery).toBe('')
     expect(s.visibleLevels.has(0)).toBe(true)
@@ -188,7 +203,8 @@ describe('useViewerStore — Phase 55 initial state (Task 1)', () => {
 describe('useViewerStore — Phase 55 action setters (Task 2)', () => {
   beforeEach(() => {
     useViewerStore.setState({
-      selectedNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
       selectedEdgeId: null,
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
@@ -337,12 +353,15 @@ describe('useViewerStore — Phase 55 action setters (Task 2)', () => {
     expect(useViewerStore.getState().lslSessionFilter).toEqual([])
   })
 
-  test('BC: Phase 45 actions setSelectedNode / setSelectedEdge / setSearch still work identically', () => {
+  test('BC: Phase 45 actions setSelectedNode / setSelectedEdge / setSearch still work (multi-set semantics via Phase 56.1 imperative API)', () => {
     useViewerStore.getState().setSelectedNode('node-1')
     useViewerStore.getState().setSelectedEdge('edge-1')
     useViewerStore.getState().setSearch('hello')
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBe('node-1')
+    // Phase 56.1 imperative shim: id=string → singleton Set + focal=id.
+    expect(s.selectedNodeIds.has('node-1')).toBe(true)
+    expect(s.selectedNodeIds.size).toBe(1)
+    expect(s.focalNodeId).toBe('node-1')
     expect(s.selectedEdgeId).toBe('edge-1')
     expect(s.searchQuery).toBe('hello')
   })
@@ -360,25 +379,39 @@ describe('useViewerStore — Phase 55 action setters (Task 2)', () => {
 })
 
 // ----------------------------------------------------------------------------
-// Phase 56 Plan 01 — cross-pane selection sync
+// Phase 56.1 Plan 01 — many-to-many cross-pane selection sync
 //
-// PATTERN SOURCE: 56-01-PLAN.md Task 1 <behavior> + 56-PATTERNS.md § viewer-store.ts (EXTEND).
-// CONTEXT.md decisions: shared state lives in viewer-store; no panel keeps a
-// local selection; Esc + click-empty-bg cascades through ALL three panes via
-// a single store action; selection scope covers both entity nodes AND
-// aggregate LSL session selection.
+// PATTERN SOURCE:
+//   - 56.1-01-PLAN.md Task 1+2 <behavior>
+//   - 56.1-PATTERNS.md §1 (REFACTOR pattern: 56.1 schema delta + focal-
+//     derivation rule + AUDIT-LOCKED invariants table)
+//   - 56.1-CONTEXT.md §D-1 (data model), §D-7 (contract evolution)
+//   - 56-PATTERNS.md §Locked Contract #3 (viewport stability — dep-list
+//     invariant + sameSetMembership guard)
 //
-// `setSelection({ ... })` is the atomic multi-field write that downstream
-// Plans 02/03/04 use to keep subscribers consistent. `clearSelection()` is
-// the cross-pane variant of `clearLslSessionFilter()` — it also clears LSL
-// filter slices so Esc + bg-click leave the user in a fully cleared state.
+// EVOLUTION FROM PHASE 56:
+//   - selectedNodeId: string|null            → selectedNodeIds: ReadonlySet<string>
+//                                            + focalNodeId: string|null
+//   - selectedSessionId: string|null         → selectedBucketKeys: ReadonlySet<string>
+//   - selectedSessionStartAt: string|null    + focalBucketKey: string|null
 //
-// Source-grep gates assert the five selection-sync identifiers are present
-// in the store source so a silent rename (e.g. `setSelection` → `applySelection`)
-// cannot pass tsc and slip through review.
+// setSelection now accepts multi-set inputs (Set | string[]) for both axes,
+// derives focal from insertion order, and preserves Set references on
+// identical-content writes via sameSetMembership (the same audit-locked
+// guard that already wraps lslFilterEntityIds in Phase 56).
+//
+// AUDIT-LOCKED INVARIANTS asserted here:
+//   - #2/#3 (viewport stability): identical-content writes to selectedNodeIds
+//     and selectedBucketKeys preserve the existing Set reference
+//   - #4 (clearSelection coverage): all 4 selection fields + LSL slice +
+//     pathToSelected cleared
+//   - #5 (WR-04 — reset coverage): reset() matches clearSelection() coverage
+//
+// Source-grep sentinel at the bottom asserts the four new field names are
+// present in viewer-store.ts so a silent refactor cannot pass tsc.
 // ----------------------------------------------------------------------------
 
-describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
+describe('useViewerStore — Phase 56.1 multi-selection', () => {
   const initial = () =>
     (useViewerStore as unknown as { getInitialState: () => ViewerState }).getInitialState()
 
@@ -386,11 +419,10 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     useViewerStore.setState({
       selectionSource: null,
       highlightedRowKey: null,
-      selectedSessionId: null,
-      // 2026-06-13 (audit §6.2): the sibling field must be reset too so each
-      // test starts from a clean slate.
-      selectedSessionStartAt: null,
-      selectedNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       selectedEdgeId: null,
       pathToSelected: new Set<string>(),
       lslSessionFilter: [],
@@ -398,122 +430,188 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     })
   })
 
-  test('initial state: selectionSource === null', () => {
-    expect(initial().selectionSource).toBeNull()
+  // -------------------- Initial state --------------------
+
+  test('initial state: selectedNodeIds is a Set with size 0', () => {
+    const s = initial()
+    expect(s.selectedNodeIds).toBeInstanceOf(Set)
+    expect(s.selectedNodeIds.size).toBe(0)
   })
 
-  test('initial state: highlightedRowKey === null', () => {
-    expect(initial().highlightedRowKey).toBeNull()
+  test('initial state: focalNodeId === null', () => {
+    expect(initial().focalNodeId).toBeNull()
   })
 
-  test('initial state: selectedSessionId === null', () => {
-    expect(initial().selectedSessionId).toBeNull()
+  test('initial state: selectedBucketKeys is a Set with size 0', () => {
+    const s = initial()
+    expect(s.selectedBucketKeys).toBeInstanceOf(Set)
+    expect(s.selectedBucketKeys.size).toBe(0)
   })
 
-  test('initial state: selectedSessionStartAt === null (audit §6.2 — option A — additive sibling of selectedSessionId)', () => {
-    expect(initial().selectedSessionStartAt).toBeNull()
+  test('initial state: focalBucketKey === null', () => {
+    expect(initial().focalBucketKey).toBeNull()
   })
 
-  test('setSelection({ nodeId, source: "graph" }) writes nodeId + source atomically and resets pathToSelected', () => {
-    useViewerStore.setState({ pathToSelected: new Set<string>(['old1', 'old2']) })
-    useViewerStore.getState().setSelection({ nodeId: 'e1', source: 'graph' })
+  // -------------------- setSelection multi-set writes --------------------
+
+  test('setSelection({ nodeIds: ["a","b","c"], source: "graph" }) — selectedNodeIds size 3, focalNodeId === "c" (last in insertion order)', () => {
+    useViewerStore.getState().setSelection({ nodeIds: ['a', 'b', 'c'], source: 'graph' })
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBe('e1')
+    expect(s.selectedNodeIds.size).toBe(3)
+    expect(s.selectedNodeIds.has('a')).toBe(true)
+    expect(s.selectedNodeIds.has('b')).toBe(true)
+    expect(s.selectedNodeIds.has('c')).toBe(true)
+    // Insertion-order derivation: last in iteration order = 'c'.
+    expect(s.focalNodeId).toBe('c')
     expect(s.selectionSource).toBe('graph')
-    // pathToSelected reset when nodeId changes and no explicit path provided
-    expect(s.pathToSelected.size).toBe(0)
   })
 
-  test('setSelection({ nodeId, source, pathToSelected }) honors the explicit path', () => {
-    const path = new Set<string>(['e1', 'sys'])
-    useViewerStore.getState().setSelection({ nodeId: 'e1', source: 'graph', pathToSelected: path })
+  test('setSelection({ nodeIds: ["a","b"], focal: { nodeId: "a" }, source: "graph" }) — explicit focal override wins', () => {
+    useViewerStore
+      .getState()
+      .setSelection({ nodeIds: ['a', 'b'], focal: { nodeId: 'a' }, source: 'graph' })
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBe('e1')
-    expect(s.selectionSource).toBe('graph')
-    expect(Array.from(s.pathToSelected).sort()).toEqual(['e1', 'sys'])
+    expect(s.selectedNodeIds.size).toBe(2)
+    expect(s.focalNodeId).toBe('a')
   })
 
-  test('setSelection({ sessionId, source: "timeline" }) writes sessionId + source without touching selectedNodeId', () => {
-    useViewerStore.setState({ selectedNodeId: 'keep-me' })
-    useViewerStore.getState().setSelection({ sessionId: 'sess-x', source: 'timeline' })
+  test('setSelection({ nodeIds: new Set(), source: "graph" }) — empty Set empties selectedNodeIds and focal becomes null', () => {
+    // Pre-seed
+    useViewerStore.getState().setSelection({ nodeIds: ['x', 'y'], source: 'graph' })
+    expect(useViewerStore.getState().selectedNodeIds.size).toBe(2)
+    // Now empty
+    useViewerStore.getState().setSelection({ nodeIds: new Set<string>(), source: 'graph' })
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBe('keep-me')
-    expect(s.selectedSessionId).toBe('sess-x')
-    expect(s.selectionSource).toBe('timeline')
+    expect(s.selectedNodeIds.size).toBe(0)
+    expect(s.focalNodeId).toBeNull()
   })
 
-  test('setSelection({ sessionId, sessionStartAt, source: "timeline" }) writes BOTH session fields together (audit §6.2 + §7 R2 round-trip)', () => {
+  test('setSelection({ bucketKeys: ["sess-A|2026","sess-B|2026"], source: "timeline" }) — selectedBucketKeys.size === 2, focalBucketKey === last inserted', () => {
     useViewerStore.getState().setSelection({
-      sessionId: 'sess-x',
-      sessionStartAt: '2026-06-13T11:00:00Z',
+      bucketKeys: ['sess-A|2026', 'sess-B|2026'],
       source: 'timeline',
     })
     const s = useViewerStore.getState()
-    expect(s.selectedSessionId).toBe('sess-x')
-    expect(s.selectedSessionStartAt).toBe('2026-06-13T11:00:00Z')
+    expect(s.selectedBucketKeys.size).toBe(2)
+    expect(s.focalBucketKey).toBe('sess-B|2026')
     expect(s.selectionSource).toBe('timeline')
   })
 
-  test('setSelection({ sessionId, source }) without sessionStartAt resets sessionStartAt to null (audit §7 R2 — never leave the sibling stale)', () => {
-    // Pre-seed both fields with a "previous tranche" snapshot — the analogue
-    // of clicking tranche A of sess-X first (sets both id and startAt).
-    useViewerStore.setState({
-      selectedSessionId: 'sess-prev',
-      selectedSessionStartAt: '2026-06-13T10:00:00Z',
-    })
-    // Now write only sessionId (no sessionStartAt). The action MUST null the
-    // sibling — otherwise the (id, startAt) pair becomes inconsistent.
-    useViewerStore.getState().setSelection({ sessionId: 'sess-new', source: 'timeline' })
-    const s = useViewerStore.getState()
-    expect(s.selectedSessionId).toBe('sess-new')
-    expect(s.selectedSessionStartAt).toBeNull()
+  // ------ Reference-stability (AUDIT-LOCKED invariant — viewport stability) ------
+
+  test('setSelection preserves selectedNodeIds reference on identical-content writes (audit invariant — viewport stability)', () => {
+    useViewerStore.getState().setSelection({ nodeIds: ['a'], source: 'graph' })
+    const ref1 = useViewerStore.getState().selectedNodeIds
+    // Second write with IDENTICAL content (array, same single member).
+    useViewerStore.getState().setSelection({ nodeIds: ['a'], source: 'graph' })
+    const ref2 = useViewerStore.getState().selectedNodeIds
+    // Reference MUST be preserved so downstream useMemo (visibleEntities) deps
+    // do not invalidate — 56-PATTERNS Locked Contract #3.
+    expect(ref2).toBe(ref1)
   })
 
-  test('setSelection({ nodeId, source }) without sessionId preserves both session fields (audit §6.2 — only sibling-reset when sessionId is in args)', () => {
-    useViewerStore.setState({
-      selectedSessionId: 'sess-keep',
-      selectedSessionStartAt: '2026-06-13T10:00:00Z',
-    })
-    useViewerStore.getState().setSelection({ nodeId: 'e1', source: 'graph' })
-    const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBe('e1')
-    expect(s.selectedSessionId).toBe('sess-keep')
-    expect(s.selectedSessionStartAt).toBe('2026-06-13T10:00:00Z')
+  test('setSelection preserves selectedBucketKeys reference on identical-content writes (audit invariant — same as Sets axis)', () => {
+    useViewerStore.getState().setSelection({ bucketKeys: ['k1'], source: 'timeline' })
+    const ref1 = useViewerStore.getState().selectedBucketKeys
+    useViewerStore.getState().setSelection({ bucketKeys: ['k1'], source: 'timeline' })
+    const ref2 = useViewerStore.getState().selectedBucketKeys
+    expect(ref2).toBe(ref1)
   })
 
-  test('setSelection({ nodeId, highlightedRowKey, source }) writes all three; getState snapshot is coherent', () => {
-    useViewerStore.getState().setSelection({
-      nodeId: 'e2',
-      highlightedRowKey: 'row-e2',
-      source: 'history',
-    })
-    const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBe('e2')
-    expect(s.highlightedRowKey).toBe('row-e2')
-    expect(s.selectionSource).toBe('history')
+  test('setSelection writes a fresh selectedNodeIds reference when content differs', () => {
+    useViewerStore.getState().setSelection({ nodeIds: ['a', 'b'], source: 'graph' })
+    const ref1 = useViewerStore.getState().selectedNodeIds
+    useViewerStore.getState().setSelection({ nodeIds: ['a', 'b', 'c'], source: 'graph' })
+    const ref2 = useViewerStore.getState().selectedNodeIds
+    expect(ref2).not.toBe(ref1)
+    expect(ref2.has('c')).toBe(true)
   })
 
-  test('clearSelection() nulls selectedNodeId, selectedEdgeId, selectionSource, highlightedRowKey, selectedSessionId, selectedSessionStartAt AND empties lslSessionFilter AND nulls lslFilterEntityIds AND resets pathToSelected', () => {
+  // ------ Preserve-on-omit semantics ------
+
+  test('setSelection({ source: "graph" }) — no node/bucket args — preserves prior state (referential equality on both Sets)', () => {
+    // Seed both axes.
+    useViewerStore
+      .getState()
+      .setSelection({ nodeIds: ['a', 'b'], bucketKeys: ['k1'], source: 'graph' })
+    const prevNodes = useViewerStore.getState().selectedNodeIds
+    const prevBuckets = useViewerStore.getState().selectedBucketKeys
+    const prevFocalNode = useViewerStore.getState().focalNodeId
+    const prevFocalBucket = useViewerStore.getState().focalBucketKey
+    // Source-only write — no axis args.
+    useViewerStore.getState().setSelection({ source: 'graph' })
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeIds).toBe(prevNodes)
+    expect(s.selectedBucketKeys).toBe(prevBuckets)
+    expect(s.focalNodeId).toBe(prevFocalNode)
+    expect(s.focalBucketKey).toBe(prevFocalBucket)
+  })
+
+  test('setSelection accepts both Set<string> and string[] for nodeIds (normalises to Set internally)', () => {
+    useViewerStore.getState().setSelection({ nodeIds: new Set(['x', 'y']), source: 'graph' })
+    const s1 = useViewerStore.getState()
+    expect(s1.selectedNodeIds).toBeInstanceOf(Set)
+    expect(s1.selectedNodeIds.size).toBe(2)
+    useViewerStore.getState().setSelection({ nodeIds: ['p', 'q', 'r'], source: 'graph' })
+    const s2 = useViewerStore.getState()
+    expect(s2.selectedNodeIds).toBeInstanceOf(Set)
+    expect(s2.selectedNodeIds.size).toBe(3)
+    expect(s2.selectedNodeIds.has('q')).toBe(true)
+  })
+
+  test('setSelection accepts both Set<string> and string[] for bucketKeys', () => {
+    useViewerStore
+      .getState()
+      .setSelection({ bucketKeys: new Set(['k1', 'k2']), source: 'timeline' })
+    expect(useViewerStore.getState().selectedBucketKeys.size).toBe(2)
+    useViewerStore.getState().setSelection({ bucketKeys: ['k3'], source: 'timeline' })
+    expect(useViewerStore.getState().selectedBucketKeys.size).toBe(1)
+    expect(useViewerStore.getState().selectedBucketKeys.has('k3')).toBe(true)
+  })
+
+  test('setSelection({ nodeIds, source, pathToSelected }) honors explicit pathToSelected', () => {
+    const path = new Set<string>(['n', 'sys'])
+    useViewerStore
+      .getState()
+      .setSelection({ nodeIds: ['n'], source: 'graph', pathToSelected: path })
+    const s = useViewerStore.getState()
+    expect(s.focalNodeId).toBe('n')
+    expect(Array.from(s.pathToSelected).sort()).toEqual(['n', 'sys'])
+  })
+
+  test('setSelection({ nodeIds, source }) without explicit path resets pathToSelected to empty Set', () => {
+    useViewerStore.setState({ pathToSelected: new Set<string>(['old1', 'old2']) })
+    useViewerStore.getState().setSelection({ nodeIds: ['e1'], source: 'graph' })
+    expect(useViewerStore.getState().pathToSelected.size).toBe(0)
+  })
+
+  // ------ clearSelection (invariant #4) ------
+
+  test('clearSelection() empties all 4 selection fields + pathToSelected + lslSessionFilter ([]) + lslFilterEntityIds (null) + selectedEdgeId', () => {
     useViewerStore.setState({
-      selectedNodeId: 'n',
       selectedEdgeId: 'e',
       selectionSource: 'graph',
       highlightedRowKey: 'r',
-      selectedSessionId: 's',
-      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+      selectedNodeIds: new Set<string>(['n1', 'n2']),
+      focalNodeId: 'n2',
+      selectedBucketKeys: new Set<string>(['k1']),
+      focalBucketKey: 'k1',
       pathToSelected: new Set<string>(['a', 'b']),
       lslSessionFilter: ['sess1'],
       lslFilterEntityIds: new Set<string>(['x']),
     })
     useViewerStore.getState().clearSelection()
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBeNull()
     expect(s.selectedEdgeId).toBeNull()
     expect(s.selectionSource).toBeNull()
     expect(s.highlightedRowKey).toBeNull()
-    expect(s.selectedSessionId).toBeNull()
-    // 2026-06-13 (audit §6.2 + §7 R2): paired clear with selectedSessionId.
-    expect(s.selectedSessionStartAt).toBeNull()
+    // Set fields cleared to fresh empty Set (NOT null).
+    expect(s.selectedNodeIds).toBeInstanceOf(Set)
+    expect(s.selectedNodeIds.size).toBe(0)
+    expect(s.focalNodeId).toBeNull()
+    expect(s.selectedBucketKeys).toBeInstanceOf(Set)
+    expect(s.selectedBucketKeys.size).toBe(0)
+    expect(s.focalBucketKey).toBeNull()
     expect(s.pathToSelected.size).toBe(0)
     expect(s.lslSessionFilter).toEqual([])
     expect(s.lslFilterEntityIds).toBeNull()
@@ -524,7 +622,8 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
       searchQuery: 'docker',
       selectedClasses: new Set<string>(['Component']),
       visibleLevels: new Set([1, 2]),
-      selectedNodeId: 'n',
+      selectedNodeIds: new Set<string>(['n']),
+      focalNodeId: 'n',
     })
     useViewerStore.getState().clearSelection()
     const s = useViewerStore.getState()
@@ -534,32 +633,103 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     expect(s.visibleLevels.has(2)).toBe(true)
   })
 
-  test('reset() also clears the four Phase 56 selection fields (incl. selectedSessionStartAt per audit §6.2)', () => {
+  // ------ reset() WR-04 closure (invariant #5) ------
+
+  test('reset() clears LSL slice + pathToSelected (WR-04 closure)', () => {
+    // Phase 56's reset() left lslSessionFilter, lslFilterEntityIds, and
+    // pathToSelected untouched — the gap surfaced as WR-04 in the Phase 56
+    // review and is closed here. This test guards the closure.
     useViewerStore.setState({
-      selectionSource: 'graph',
-      highlightedRowKey: 'rk',
-      selectedSessionId: 'sid',
-      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+      selectedNodeIds: new Set<string>(['n']),
+      focalNodeId: 'n',
+      lslSessionFilter: ['sess-a', 'sess-b'],
+      lslFilterEntityIds: new Set<string>(['e1', 'e2']),
+      pathToSelected: new Set<string>(['p1', 'p2']),
     })
     useViewerStore.getState().reset()
     const s = useViewerStore.getState()
-    expect(s.selectionSource).toBeNull()
-    expect(s.highlightedRowKey).toBeNull()
-    expect(s.selectedSessionId).toBeNull()
-    expect(s.selectedSessionStartAt).toBeNull()
+    expect(s.lslSessionFilter).toEqual([])
+    expect(s.lslFilterEntityIds).toBeNull()
+    expect(s.pathToSelected.size).toBe(0)
+    // And the selection slice is cleared too.
+    expect(s.selectedNodeIds.size).toBe(0)
+    expect(s.focalNodeId).toBeNull()
+    expect(s.selectedBucketKeys.size).toBe(0)
+    expect(s.focalBucketKey).toBeNull()
   })
 
-  test('source-grep gate: viewer-store.ts source contains the 6 Phase 56 identifiers (word-boundary regex) — incl. selectedSessionStartAt per audit §6.2', () => {
+  // ------ Phase 56 LSL guard still holds (carried-forward audit invariant #3) ------
+
+  test('T-C [audit §4.4 R3 — carried forward]: setLslFilterEntityIds with identical content preserves the existing Set reference', () => {
+    const first = new Set<string>(['a', 'b', 'c'])
+    useViewerStore.getState().setLslFilterEntityIds(first)
+    const after1 = useViewerStore.getState().lslFilterEntityIds
+    expect(after1).toBe(first)
+    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['c', 'a', 'b']))
+    const after2 = useViewerStore.getState().lslFilterEntityIds
+    expect(after2).toBe(after1)
+  })
+
+  test('T-C [audit §4.4 R3 — carried forward]: setLslFilterEntityIds with DIFFERENT content writes a fresh reference', () => {
+    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a', 'b']))
+    const ref1 = useViewerStore.getState().lslFilterEntityIds
+    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a', 'b', 'c']))
+    const ref2 = useViewerStore.getState().lslFilterEntityIds
+    expect(ref2).not.toBe(ref1)
+    expect(ref2).toBeInstanceOf(Set)
+    expect((ref2 as Set<string>).has('c')).toBe(true)
+  })
+
+  test('T-C [audit §4.4 R3 — carried forward]: setLslFilterEntityIds(null) when current is null preserves null (no spurious write)', () => {
+    useViewerStore.getState().setLslFilterEntityIds(null)
+    useViewerStore.getState().setLslFilterEntityIds(null)
+    expect(useViewerStore.getState().lslFilterEntityIds).toBeNull()
+  })
+
+  test('T-C [audit §4.4 R3 — carried forward]: setLslFilterEntityIds(null) when current is a Set writes null', () => {
+    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a']))
+    useViewerStore.getState().setLslFilterEntityIds(null)
+    expect(useViewerStore.getState().lslFilterEntityIds).toBeNull()
+  })
+
+  // ------ Source-grep sentinels (structural lock) ------
+
+  test('56.1 selection slice: required field names present in source', () => {
     const src = readFileSync(
       path.resolve(process.cwd(), 'src/store/viewer-store.ts'),
       'utf8',
     )
+    // The four NEW Phase 56.1 selection-slice field names MUST appear in the
+    // store source so a silent rename in a future refactor cannot pass tsc.
+    expect(src).toMatch(/\bselectedNodeIds\b/)
+    expect(src).toMatch(/\bfocalNodeId\b/)
+    expect(src).toMatch(/\bselectedBucketKeys\b/)
+    expect(src).toMatch(/\bfocalBucketKey\b/)
+    // And the action surface stays named.
     expect(src).toMatch(/\bsetSelection\b/)
     expect(src).toMatch(/\bclearSelection\b/)
     expect(src).toMatch(/\bselectionSource\b/)
     expect(src).toMatch(/\bhighlightedRowKey\b/)
-    expect(src).toMatch(/\bselectedSessionId\b/)
-    expect(src).toMatch(/\bselectedSessionStartAt\b/)
+  })
+
+  test('56.1 selection slice: three Phase 56 single-selection field names are gone from active source', () => {
+    // Comment-only mentions (the historical "Promotes Phase 56's one-to-one
+    // selection (selectedNodeId)" comment) are allowed; active source paths
+    // MUST NOT contain the deleted names.
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/store/viewer-store.ts'),
+      'utf8',
+    )
+    const nonCommentLines = src
+      .split('\n')
+      .filter((line) => !/^\s*\/\//.test(line))
+      .join('\n')
+    // selectedNodeId (without trailing 's') MUST NOT appear in active source.
+    // Use look-behind/look-ahead to exclude the new `selectedNodeIds`.
+    const stripped = nonCommentLines.replace(/selectedNodeIds/g, '')
+    expect(stripped).not.toMatch(/\bselectedNodeId\b/)
+    expect(stripped).not.toMatch(/\bselectedSessionId\b/)
+    expect(stripped).not.toMatch(/\bselectedSessionStartAt\b/)
   })
 
   test('Logger discipline: viewer-store.ts source has no raw console.* call', () => {
@@ -568,51 +738,5 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
       'utf8',
     )
     expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
-  })
-
-  // ====================================================================
-  // T-C [audit §4.4 R3]: setLslFilterEntityIds must preserve REFERENCE
-  // equality when content does not change. The audit's diagnosis is:
-  //   - The D3GraphCanvas main render effect deps include `visibleEntities`
-  //   - `visibleEntities` is `useMemo([... lslFilterEntityIds])`
-  //   - If `setLslFilterEntityIds(newSetWithSameContent)` produces a fresh
-  //     `Set` reference, useMemo invalidates → SVG rebuilds + force restarts
-  //   - This IS the "zoom feel" Issue 1 root cause (audit §4.3)
-  // The fix lives in Commit 4. This test is RED at Commit 2.
-  // ====================================================================
-  test('T-C [audit §4.4 R3]: setLslFilterEntityIds with identical content preserves the existing Set reference (no spurious re-render)', () => {
-    const first = new Set<string>(['a', 'b', 'c'])
-    useViewerStore.getState().setLslFilterEntityIds(first)
-    const after1 = useViewerStore.getState().lslFilterEntityIds
-    expect(after1).toBe(first)
-    // Now write a NEW Set with the SAME content. The reference MUST be
-    // preserved (after2 === after1) so downstream useMemo deps don't
-    // invalidate.
-    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['c', 'a', 'b']))
-    const after2 = useViewerStore.getState().lslFilterEntityIds
-    expect(after2).toBe(after1)
-  })
-
-  test('T-C [audit §4.4 R3]: setLslFilterEntityIds with DIFFERENT content writes a fresh reference', () => {
-    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a', 'b']))
-    const ref1 = useViewerStore.getState().lslFilterEntityIds
-    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a', 'b', 'c']))
-    const ref2 = useViewerStore.getState().lslFilterEntityIds
-    expect(ref2).not.toBe(ref1)
-    // Content actually changed.
-    expect(ref2).toBeInstanceOf(Set)
-    expect((ref2 as Set<string>).has('c')).toBe(true)
-  })
-
-  test('T-C [audit §4.4 R3]: setLslFilterEntityIds(null) when current is null preserves null (no spurious write)', () => {
-    useViewerStore.getState().setLslFilterEntityIds(null)
-    useViewerStore.getState().setLslFilterEntityIds(null)
-    expect(useViewerStore.getState().lslFilterEntityIds).toBeNull()
-  })
-
-  test('T-C [audit §4.4 R3]: setLslFilterEntityIds(null) when current is a Set writes null', () => {
-    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a']))
-    useViewerStore.getState().setLslFilterEntityIds(null)
-    expect(useViewerStore.getState().lslFilterEntityIds).toBeNull()
   })
 })
