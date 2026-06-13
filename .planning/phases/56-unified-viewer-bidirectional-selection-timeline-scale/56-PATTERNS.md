@@ -1101,10 +1101,74 @@ cascade can't fire" — that policy is exactly the multi-tick leak Issue
 Future plans extending this rule should bring those remaining sites
 into the action regime and add the matching acceptance greps.
 
+### 6. Phantom-id resolution (round-4 operator-approved 2026-06-13)
+
+> **A non-graph writer (timeline tick, sidebar row, future deep-link)
+> MUST resolve its target entity to the closest graph-visible ancestor
+> before writing `selectedNodeId`. If no visible ancestor exists, write
+> `selectedNodeId: null` and the sidebar-only path (session id +
+> startAt + lslFilterEntityIds still cascade — only the graph target
+> is omitted).**
+>
+> Implementation: `pickFirstResolvable(entityIds, visibleIds, relations)`
+> in `graph/ancestry.ts`, fed by `useVisibleEntityIds(apiClient, system)`
+> in `graph/useVisibleEntityIds.ts`. The shared `isEntityVisible`
+> predicate in `graph/visibility-predicate.ts` keeps the strip's
+> visible-set derivation bit-identical to D3GraphCanvas's
+> `visibleEntities` memo.
+>
+> Predicate: `visibleIds.has(resolvedId)` MUST be true for any non-null
+> `selectedNodeId` write originating outside `D3GraphCanvas`.
+
+**Why this exists:** the audit-driven refactor (commits `884af2425` →
+`2b7f5f67d`, merged at `0cde8dc1d`) closed the 3 round-3 issues at the
+state-model layer, but the operator's 4th smoke surfaced a scope-level
+mismatch the audit didn't catch. The D3 graph deliberately filters
+Observations/Digests/Details out of the rendered set, but the
+LslTimelineStrip's bucket entityIds are usually Detail-level (per
+`scripts/observations-api-server.mjs` TYPE_RANK sort). Writing the
+bucket's raw `ids[0]` to `selectedNodeId` produced a phantom that no D3
+node matched:
+
+- `applySelectionStyling` found no `.node` for the phantom id → no red ring
+- `pathToSelected` (via `computeAncestryPath`) resolved to the bucket
+  entity's higher ancestors → those nodes stayed visible while non-trace
+  nodes faded
+- The trace LINE between phantom-Intent and its visible ancestor (e.g.
+  LiveLoggingSystem) couldn't render because phantom-Intent isn't a D3 node
+- The sidebar showed the phantom-Intent's text — which DISAGREED with
+  the highlighted-via-pathToSelected node in the graph
+
+**Operator decision (locked 2026-06-13, post 4th smoke):** resolve to
+the closest graph-visible ancestor. The bucket's `entities[]` is walked,
+and each entity's ancestry is walked, until a graph-visible entity is
+found. That ancestor's id becomes `selectedNodeId`. Sidebar shows the
+ancestor's text, matching the highlighted node. Bucket's raw entities
+still feed `lslFilterEntityIds` for the LSL fade (a separate concern
+from the graph selection target).
+
+**Lock layers:**
+- `graph/ancestry.ts`: `pickFirstResolvable` + `resolveToVisibleAncestor`
+  exported, direct unit tests in `graph/ancestry.test.ts` (10 tests).
+- `graph/visibility-predicate.ts`: shared `isEntityVisible` predicate
+  consumed by both D3GraphCanvas and `useVisibleEntityIds`.
+- `graph/useVisibleEntityIds.ts`: hook that exposes the visible-id set
+  to non-graph writers.
+- `LslTimelineStrip.tsx onTickClick`: calls `pickFirstResolvable` before
+  any `setSelection` write.
+- `LslTimelineStrip.test.tsx`: Tests T-F (33), T-G (34), T-H (35), and
+  the source-grep gate (36).
+- This document, Locked Contract #6.
+
+**Note: this contract is ADDITIVE to the 5 audit-prescribed contracts
+above.** It does not relax or modify any of them; it adds a NEW gate
+between non-graph writers and the store's `selectedNodeId` slot.
+
 ---
 
 These contracts are intended to be DURABLE — any future plan that
 relaxes them must justify the relaxation in its own SUMMARY against
 the audit's specific finding. The audit itself (`56-STATE-FLOW.md`)
-is the canonical reference for the diagnoses that produced these
-contracts.
+is the canonical reference for the diagnoses that produced contracts
+1-5; contract 6 was added in round 4 to close a scope-level mismatch
+the audit did not anticipate.

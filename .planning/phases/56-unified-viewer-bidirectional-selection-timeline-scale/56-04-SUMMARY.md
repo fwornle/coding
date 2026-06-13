@@ -212,3 +212,101 @@ Gates verified:
 - Playwright suite `56-bidirectional-selection.spec.ts`: 4/4 GREEN ✓
 
 ## Self-Check: PASSED
+
+---
+
+### Round 4 — Phantom-id resolution
+
+The state-model refactor (audit-driven, commits `884af2425` → `2b7f5f67d`,
+merged at `0cde8dc1d`) closed the 3 round-3 issues but didn't catch a
+scope-level mismatch: the D3 graph filters Observations/Digests/Details
+out of the rendered set, but `LslTimelineStrip.onTickClick` was writing
+the bucket's `entities[0].id` to `selectedNodeId` regardless. When that
+id matched no rendered node, the cascade produced a phantom selection
+(no ring, faded ancestors visible, sidebar disagreeing with graph).
+
+Fix: `pickFirstResolvable(bucket.entityIds, visibleIds, relations)` in
+`graph/ancestry.ts`. Walks the bucket's entities and their ancestries
+until finding one in the visible set. That ancestor becomes
+`selectedNodeId`. The sidebar then shows that ancestor's text, matching
+the highlighted node. Sidebar-only mode (no ring, no trace) fires when
+no visible ancestor exists. The bucket's raw entityIds still feed
+`lslFilterEntityIds` for the LSL fade (separate concern — graph fade
+vs. graph selection target).
+
+Locked in `56-PATTERNS.md` #6 (additive to the 5 audit-prescribed
+contracts).
+
+### Round 4 — Implementation details
+
+3 source files added, 3 modified:
+
+**Added:**
+- `integrations/unified-viewer/src/graph/ancestry.ts` extended with
+  `resolveToVisibleAncestor` + `pickFirstResolvable` exports
+- `integrations/unified-viewer/src/graph/visibility-predicate.ts` (new
+  file) — shared `isEntityVisible` predicate. Bit-identical extraction
+  of the D3GraphCanvas.visibleEntities filter body; preserves the
+  Phase 45 main-effect-dep-list invariant.
+- `integrations/unified-viewer/src/graph/useVisibleEntityIds.ts` (new
+  file) — small hook that derives the Set<string> of graph-visible
+  entity ids from the same store fields the D3 canvas uses. Both
+  D3GraphCanvas and LslTimelineStrip consume the shared predicate
+  through their respective memo / hook surfaces; the dep lists stay
+  per-consumer-scoped so reference stability is preserved within each.
+
+**Modified:**
+- `integrations/unified-viewer/src/graph/D3GraphCanvas.tsx` — the
+  visibleEntities useMemo body now calls `isEntityVisible(e, filters)`.
+  Behaviour bit-identical to pre-refactor; dep list unchanged.
+- `integrations/unified-viewer/src/panels/coding/LslTimelineStrip.tsx`
+  — onTickClick subscribes to `useVisibleEntityIds`, calls
+  `pickFirstResolvable` before any setSelection write. Resolved id
+  becomes `selectedNodeId` + `highlightedRowKey`; raw bucket ids stay
+  in `lslFilterEntityIds`. Empty-bucket branch unchanged.
+- `integrations/unified-viewer/src/panels/coding/LslTimelineStrip.test.tsx`
+  — Tests 33-36 added: T-F (phantom resolves to ancestor), T-G (no
+  visible ancestor → sidebar-only), T-H (visible entity passes
+  through), Test 36 (source-grep gate for `pickFirstResolvable` +
+  `@/graph/ancestry` import).
+
+**Added test file:**
+- `integrations/unified-viewer/src/graph/ancestry.test.ts` (new) — 10
+  direct unit tests for `resolveToVisibleAncestor` +
+  `pickFirstResolvable`.
+
+### Round 4 — Test results
+
+- `integrations/unified-viewer/src/graph/ancestry.test.ts`: 10/10 GREEN
+- `integrations/unified-viewer/src/graph/D3GraphCanvas.test.ts`: 13/13
+  GREEN (G9 + G12 + G13 source-grep gates all hold)
+- `integrations/unified-viewer/src/panels/coding/LslTimelineStrip.test.tsx`:
+  34/34 GREEN (previous 30 + new 4 round-4 tests)
+- Full vitest: 21 failed | 575 passed (596 total) — same 21 baseline
+  failures vs `0cde8dc1d`, +14 net new tests all passing, **0 new
+  failures**
+- `npx tsc --noEmit`: exit 0
+- Source-grep gates: `useViewerStore.setState` count in
+  LslTimelineStrip.tsx still 0; main render-effect dep list unchanged
+
+### Round 4 — Self-Check
+
+Files created (3):
+- `integrations/unified-viewer/src/graph/ancestry.test.ts`
+- `integrations/unified-viewer/src/graph/visibility-predicate.ts`
+- `integrations/unified-viewer/src/graph/useVisibleEntityIds.ts`
+
+Files modified (5):
+- `integrations/unified-viewer/src/graph/ancestry.ts`
+- `integrations/unified-viewer/src/graph/D3GraphCanvas.tsx`
+- `integrations/unified-viewer/src/panels/coding/LslTimelineStrip.tsx`
+- `integrations/unified-viewer/src/panels/coding/LslTimelineStrip.test.tsx`
+- `.planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-PATTERNS.md`
+
+Commits (4) — verified all present:
+- `22f95feed` test(56-04): RED tests for tick → graph phantom-id resolution …
+- `77c532c65` feat(56-04): resolve tick → closest graph-visible ancestor …
+- `9621ef9f8` docs(56): PATTERNS.md — lock phantom-id resolution rule …
+- (this SUMMARY revision commit)
+
+## Round 4 Self-Check: PASSED

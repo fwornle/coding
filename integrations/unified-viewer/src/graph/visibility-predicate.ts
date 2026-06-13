@@ -1,0 +1,120 @@
+// Phase 56 Plan 04 round 4 — pure visibility predicate.
+//
+// Extracted from D3GraphCanvas.tsx `visibleEntities` useMemo body
+// (lines 244-337) so the predicate can be shared between the D3 canvas
+// and the new `useVisibleEntityIds` hook (the LSL strip's source of truth
+// for round-4 phantom-id resolution).
+//
+// Behaviour is bit-identical to the prior inline predicate. Tests:
+//   - D3GraphCanvas test gates G1-G5 + G9-G13 (source-grep) continue to
+//     pass — D3GraphCanvas still computes its `visibleEntities` memo via
+//     this predicate; the dep list shape is preserved.
+//   - Round-4 RED tests T-F/T-G/T-H (LslTimelineStrip.test.tsx) drive
+//     the strip's onTickClick path through `useVisibleEntityIds`, which
+//     calls this predicate.
+
+import type { Entity } from './types'
+
+export interface VisibilityFilters {
+  /** Already-lowercased search query for case-insensitive substring match. */
+  searchQueryLowered: string
+  selectedTeams: ReadonlySet<string>
+  learningSource: 'combined' | 'online' | 'batch' | string
+  selectedLayers: readonly string[]
+  hideDocNodes: boolean
+  selectedClasses: ReadonlySet<string>
+  visibleLevels: ReadonlySet<0 | 1 | 2 | 3>
+  lslFilterEntityIds: ReadonlySet<string> | null
+}
+
+/**
+ * Returns true when the entity should render in the D3 graph (and in
+ * any consumer that wants the SAME predicate the D3 canvas uses).
+ *
+ * Mirror of `D3GraphCanvas.tsx:244-337` — see comments there for the
+ * rationale of each filter step (structural-exemption rules for teams /
+ * learningSource / LSL filter, the `[Raw]` stub exclusion, the
+ * Observation/Digest hard exclusion, layer inference fallback, etc.).
+ */
+export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean {
+  // Hide raw-stub placeholders (LLM-failure transcript rows).
+  if (typeof e.name === 'string' && e.name.startsWith('[Raw]')) return false
+
+  // Hide raw stream rows (Observation / Digest). The classifier may have
+  // re-labeled them as ontologyClass=Detail, so we check the canonical
+  // `entityType` field here.
+  const etype = (e as unknown as { entityType?: string }).entityType
+  if (etype === 'Observation' || etype === 'Digest') return false
+
+  const meta = (e.metadata as {
+    team?: string
+    source?: string
+    layer?: string
+    doc?: boolean
+  } | undefined) ?? {}
+
+  // Teams predicate — structural backbone (System/Project/Component) exempt.
+  if (filters.selectedTeams.size > 0) {
+    if (filters.selectedTeams.has('__none__')) return false
+    const ocls = e.ontologyClass
+    const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
+    if (!isStructural) {
+      const team = meta.team ?? 'coding'
+      if (!filters.selectedTeams.has(team)) return false
+    }
+  }
+
+  // Learning Source predicate — structural backbone exempt.
+  if (filters.learningSource && filters.learningSource !== 'combined') {
+    const ocls = e.ontologyClass
+    const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
+    if (!isStructural) {
+      const isAuto = meta.source === 'auto' || meta.source === 'online'
+      if (filters.learningSource === 'online' && !isAuto) return false
+      if (filters.learningSource === 'batch' && isAuto) return false
+    }
+  }
+
+  // Layer predicate — empty array = "all visible", `__none__` = "none visible".
+  if (filters.selectedLayers.includes('__none__')) return false
+  if (filters.selectedLayers.length > 0) {
+    const layer = (meta as { layer?: string }).layer
+      ?? ((e as unknown as { layer?: string }).layer)
+    const inferred = layer
+      ?? (e.ontologyClass === 'Insight' || e.ontologyClass === 'Pattern' ? 'pattern' : 'evidence')
+    if (!filters.selectedLayers.includes(inferred)) return false
+  }
+
+  // Doc-nodes hide toggle.
+  if (filters.hideDocNodes) {
+    const isDoc = (meta as { doc?: boolean }).doc === true
+      || e.ontologyClass === 'Documentation'
+    if (isDoc) return false
+  }
+
+  // Class predicate (empty Set = nothing visible).
+  const cls = e.ontologyClass as string | undefined
+  if (typeof cls !== 'string' || !filters.selectedClasses.has(cls)) return false
+
+  // Level predicate.
+  const lvl = e.level as 0 | 1 | 2 | 3 | undefined
+  if (typeof lvl === 'number' && !filters.visibleLevels.has(lvl)) return false
+
+  // Text filter (substring over name + description, lower-cased).
+  if (filters.searchQueryLowered.length > 0) {
+    const name = (e.name ?? '').toLowerCase()
+    const desc = ((e as unknown as { description?: string }).description ?? '').toLowerCase()
+    if (!name.includes(filters.searchQueryLowered) && !desc.includes(filters.searchQueryLowered)) {
+      return false
+    }
+  }
+
+  // LSL session filter — structural backbone exempt so anchors stay visible.
+  if (filters.lslFilterEntityIds && filters.lslFilterEntityIds.size > 0) {
+    const ocls = e.ontologyClass
+    const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
+    if (!isStructural && !filters.lslFilterEntityIds.has(e.id)) return false
+  }
+
+  return true
+}
