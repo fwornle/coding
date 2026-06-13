@@ -39,11 +39,17 @@ export type Level = 0 | 1 | 2 | 3
 export type ThemePref = 'light' | 'dark'
 export type ViewerMode = 'kg' | 'triage'
 
-// ---------- Phase 56 — cross-pane selection sync ----------
+// ---------- Phase 56 / 56.1 — cross-pane selection sync ----------
 //
 // 'graph' | 'timeline' | 'history' tags WHO drove the current selection so
 // consumers can avoid feedback loops (e.g. timeline doesn't re-center on
 // its own click). `null` = no selection / selection cleared.
+//
+// Phase 56.1 evolution: the source tag continues to disambiguate sidebar
+// mode (timeline source + non-empty selectedBucketKeys → bucket-card list;
+// graph source + selectedNodeIds.size > 1 → bucket-card list of buckets
+// touching focal; otherwise EntityDetailPanel for focalNodeId). The set
+// of valid sources is unchanged.
 export type SelectionSource = 'graph' | 'timeline' | 'history' | null
 
 // Inline shape per 55-PATTERNS.md TrendingPanel section / okbClient.ts:68-78.
@@ -74,39 +80,61 @@ export const ETM_OBSERVATION_RING_BUFFER_MAX = 100
 export interface ViewerState {
   // ---------- Phase 45 — preserved verbatim (BC) ----------
   // Selection
-  selectedNodeId: string | null
   selectedEdgeId: string | null
 
-  // 2026-06-11: ancestry path of `selectedNodeId` (System → … → selected).
+  // 2026-06-11: ancestry path of `focalNodeId` (System → … → selected).
   // When non-empty, reducer dims every node NOT in this set so the path
   // through the hierarchy is visually traced from the clicked node back
   // to the root — VKB reference behaviour. Empty = no path highlight.
+  // Phase 56.1: the trace is drawn from `focalNodeId` only (NOT every
+  // halo node in `selectedNodeIds`) — per CONTEXT.md D-4 + discretion #2.
   pathToSelected: ReadonlySet<string>
 
-  // ---------- Phase 56 — cross-pane selection sync ----------
-  // Shared selection slice consumed by D3GraphCanvas, LslTimelineStrip and
-  // HistorySidebar / OccurrenceHistorySidebar. `selectionSource` lets
-  // consumers avoid feedback loops on their own clicks; `highlightedRowKey`
-  // is the history-sidebar row to scroll/highlight (often === selectedNodeId
-  // but may differ for aggregate selections); `selectedSessionId` +
-  // `selectedSessionStartAt` together identify the LSL session-tick bucket
-  // (composite key — a single session id is sliced into many tranches that
-  // share `id` but differ in `startAt`). ALL of these are written atomically
-  // via `setSelection({...})` (or via `useViewerStore.setState({...})` from
-  // in-tree consumers) so subscribers see a coherent snapshot — never a
-  // half-written state.
+  // ---------- Phase 56.1 — many-to-many cross-pane selection sync ----------
   //
-  // 2026-06-13 (state-flow audit `b29bdb34c5d54c09962c2724c1311825da412d8b`
-  // §6.2 — option A): `selectedSessionStartAt` is the additive companion to
-  // `selectedSessionId`. The tick-ring predicate in LslTimelineStrip now
-  // derives the selected-bucket key from the composite `${id}|${startAt}` so
-  // a click on one tranche of `sess-X` no longer rings every other tranche
-  // of the same session id. The two fields are ALWAYS written + cleared
-  // together — never one without the other (audit §7 R2).
+  // Promotes Phase 56's one-to-one selection (`selectedNodeId: string|null`,
+  // `selectedSessionId|StartAt: string|null`) to many-to-many Sets with
+  // derived focal singletons. The four selection-slice fields:
+  //
+  //   selectedNodeIds: ReadonlySet<string>      // multi-set of graph nodes
+  //   focalNodeId: string | null                // derived (insertion-order)
+  //   selectedBucketKeys: ReadonlySet<string>   // multi-set of `${sid}|${startAt}`
+  //   focalBucketKey: string | null             // derived (insertion-order)
+  //
+  // Focal derivation is "last id added" (insertion-order semantics). The
+  // focal MUST always be a member of its owning Set when the Set is
+  // non-empty; null when the Set is empty. Consumers NEVER write focal
+  // fields directly — they pass `focal: {nodeId?, bucketKey?}` to
+  // `setSelection` (or omit it to use insertion-order derivation).
+  //
+  // AUDIT-LOCKED INVARIANTS preserved across the refactor:
+  //   - Invariant #2/#3 (56-PATTERNS Locked Contract #3 — viewport
+  //     stability): `sameSetMembership` deep-equal guard wraps the writes
+  //     to `selectedNodeIds`, `selectedBucketKeys` AND `lslFilterEntityIds`
+  //     so identical-content writes preserve the existing Set reference and
+  //     downstream `useMemo` deps (D3GraphCanvas `visibleEntities`) do not
+  //     invalidate. This is the load-bearing piece that stops the
+  //     "graph re-layouts on every tick click" cascade (audit §4.4).
+  //   - Invariant #4 (`clearSelection()` field coverage): clears the full
+  //     selection slice + LSL slice + pathToSelected as a single snapshot.
+  //   - Invariant #5 (WR-04 — `reset()` field coverage): mirrors
+  //     `clearSelection()` field coverage; closes the WR-04 gap that left
+  //     `lslSessionFilter`/`lslFilterEntityIds`/`pathToSelected` untouched.
+  //
+  // `selectionSource` (graph|timeline|history|null) lets consumers avoid
+  // feedback loops and disambiguates sidebar mode in multi-mode.
+  // `highlightedRowKey` is the history-sidebar row to scroll/highlight
+  // (often === focalNodeId but may differ for aggregate selections).
+  //
+  // ALL writes route through `setSelection({...})` (or the imperative
+  // `setSelectedNode`/`clearSelection` siblings) so subscribers see a
+  // coherent snapshot — never a half-written state.
   selectionSource: SelectionSource
   highlightedRowKey: string | null
-  selectedSessionId: string | null
-  selectedSessionStartAt: string | null
+  selectedNodeIds: ReadonlySet<string>
+  focalNodeId: string | null
+  selectedBucketKeys: ReadonlySet<string>
+  focalBucketKey: string | null
 
   // 2026-06-11: VKB-style filter rail additions.
   //   - learningSource: 'batch' (manual/UKB) | 'online' (auto/ETM) | 'combined' (both)
@@ -147,23 +175,37 @@ export interface ViewerState {
   setFilterRailCollapsed: (collapsed: boolean) => void
   reset: () => void
 
-  // ---------- Phase 56 — cross-pane selection sync actions ----------
-  // setSelection: atomic multi-field write. Only keys passed in `args` are
-  // overwritten; unspecified keys are preserved. `source` is required so
-  // every selection carries its origin. When `nodeId` is supplied and no
-  // explicit `pathToSelected` is passed, `pathToSelected` is reset to an
-  // empty Set (the graph recomputes ancestry on the next render).
-  // clearSelection: cross-pane variant of `clearLslSessionFilter()`. Nulls
-  // the entire selection slice AND the LSL filter slice so Esc + bg-click
-  // leave the user in a fully cleared state — see CONTEXT.md "Esc +
-  // click-background clears in all three panes".
+  // ---------- Phase 56.1 — many-to-many cross-pane selection sync actions ----------
+  // setSelection: atomic multi-field write — accepts multi-set inputs (Set
+  // or string[]) for both axes (graph nodes + timeline buckets) plus an
+  // optional explicit `focal` override. Focal derivation defaults to
+  // "last id added" (insertion order) — see deriveFocal() helper below.
+  // Only keys passed in `args` are overwritten; unspecified keys are
+  // preserved. `source` is required so every selection carries its origin.
+  // When `nodeIds` is supplied and no explicit `pathToSelected` is passed,
+  // `pathToSelected` is reset to an empty Set (the graph recomputes
+  // ancestry from the focal on the next render).
+  //
+  // The `sameSetMembership` deep-equal guard is applied to `selectedNodeIds`,
+  // `selectedBucketKeys` AND `lslFilterEntityIds` — identical-content writes
+  // preserve the existing Set references (audit-locked invariant — viewport
+  // stability per 56-PATTERNS Locked Contract #3 + 56.1-PATTERNS §1
+  // invariants #2/#3).
+  //
+  // clearSelection: cross-pane variant of `clearLslSessionFilter()`. Empties
+  // the entire selection slice AND the LSL filter slice AND pathToSelected
+  // so Esc + bg-click leave the user in a fully cleared state — see
+  // CONTEXT.md "Esc + click-background clears in all three panes".
   setSelection: (args: {
-    nodeId?: string | null
-    sessionId?: string | null
-    // 2026-06-13 (audit §6.2 — option A): pass the SESSION-bucket startAt
-    // alongside `sessionId` so the strip's tick-ring predicate can identify
-    // the SPECIFIC tranche. Atomically set/cleared together with sessionId.
-    sessionStartAt?: string | null
+    nodeIds?: ReadonlySet<string> | string[]
+    bucketKeys?: ReadonlySet<string> | string[]
+    // Explicit focal override — wins over insertion-order derivation when
+    // the caller knows precisely which member should be focal (e.g. graph
+    // click on a halo node should refocus to that node, not the "last
+    // added" one). Pass `null` to explicitly null the focal even when the
+    // owning Set is non-empty (rare; insertion-order derivation is the
+    // default). Per-axis: pass `nodeId` and/or `bucketKey`.
+    focal?: { nodeId?: string | null; bucketKey?: string | null }
     highlightedRowKey?: string | null
     source: SelectionSource
     pathToSelected?: ReadonlySet<string>
@@ -255,6 +297,42 @@ function sameSetMembership(
   return true
 }
 
+// Phase 56.1: normalise Set | string[] inputs to ReadonlySet<string>.
+// `undefined` passes through (signals "preserve current value"); a Set is
+// returned identity (no copy); an array becomes a fresh Set.
+function asSet(
+  input: ReadonlySet<string> | string[] | undefined,
+): ReadonlySet<string> | undefined {
+  if (input === undefined) return undefined
+  if (input instanceof Set) return input
+  return new Set<string>(input)
+}
+
+// Phase 56.1: derive the focal element from a (prev, next, explicit) triple
+// per CONTEXT.md D-1 + 56.1-PATTERNS §1 deriveFocal rule.
+//   - explicit !== undefined wins (caller override, including explicit null)
+//   - next.size === 0 → null
+//   - else last "added" id (in next, not in prev); if no new additions,
+//     fall back to last iteration-order element of next (Set preserves
+//     insertion order in ES2015+, so this is deterministic).
+function deriveFocal(
+  prev: ReadonlySet<string>,
+  next: ReadonlySet<string>,
+  explicit: string | null | undefined,
+): string | null {
+  if (explicit !== undefined) return explicit
+  if (next.size === 0) return null
+  // Walk next in iteration order; track the last element AND the last
+  // newly-added element in a single pass.
+  let last: string | null = null
+  let lastAdded: string | null = null
+  for (const id of next) {
+    last = id
+    if (!prev.has(id)) lastAdded = id
+  }
+  return lastAdded ?? last
+}
+
 function readPersistedThemeForStore(): ThemePref {
   // Plan 04 round 3: respect the OS-level color scheme on every fresh
   // page load. Hard reload no longer reads localStorage — instead it
@@ -275,15 +353,15 @@ function readPersistedThemeForStore(): ThemePref {
 
 export const useViewerStore = create<ViewerState>((set) => ({
   // ---------- Phase 45 baseline ----------
-  selectedNodeId: null,
   selectedEdgeId: null,
   pathToSelected: new Set<string>(),
-  // ---------- Phase 56 — cross-pane selection sync (initial) ----------
+  // ---------- Phase 56.1 — many-to-many cross-pane selection sync (initial) ----------
   selectionSource: null,
   highlightedRowKey: null,
-  selectedSessionId: null,
-  // 2026-06-13 (audit §6.2 — option A): paired with selectedSessionId.
-  selectedSessionStartAt: null,
+  selectedNodeIds: new Set<string>(),
+  focalNodeId: null,
+  selectedBucketKeys: new Set<string>(),
+  focalBucketKey: null,
   searchQuery: '',
   visibleLevels: new Set<Level>([0, 1, 2, 3]),
   selectedClasses: new Set<string>(),
@@ -297,20 +375,35 @@ export const useViewerStore = create<ViewerState>((set) => ({
   renderer: 'd3' as const,
   filterRailCollapsed: false,
 
-  setSelectedNode: (id) => set({ selectedNodeId: id }),
+  // Phase 56.1: imperative one-node setter. Routes through the multi-set
+  // semantics — `id=null` empties the Set; `id=string` produces a singleton
+  // Set + focal = id. Callers (e.g. useKeyboardShortcuts) keep the same
+  // string|null API surface; the multi-set machinery is internal.
+  setSelectedNode: (id) =>
+    set(() => ({
+      selectedNodeIds: id === null ? new Set<string>() : new Set<string>([id]),
+      focalNodeId: id,
+    })),
   setSelectedEdge: (id) => set({ selectedEdgeId: id }),
 
-  // ---------- Phase 56 — cross-pane selection sync setters ----------
+  // ---------- Phase 56.1 — many-to-many cross-pane selection sync setters ----------
   // Atomic multi-field write. The argument shape lets callers update only
   // the fields they care about — the merge below preserves any key that
   // wasn't passed. `source` is required so every selection carries its
-  // origin; `pathToSelected` defaults to an empty Set when nodeId changes
+  // origin; `pathToSelected` defaults to an empty Set when `nodeIds` changes
   // (the graph recomputes ancestry on next render) but is preserved if the
   // caller didn't move the node (e.g. timeline-only writes).
+  //
+  // Reference stability (audit-locked invariant — 56-PATTERNS Locked
+  // Contract #3 + 56.1-PATTERNS §1 invariants #2/#3): identical-content
+  // writes to `selectedNodeIds`, `selectedBucketKeys`, and `lslFilterEntityIds`
+  // preserve the existing Set reference via `sameSetMembership`. This stops
+  // the "graph re-layouts on every tick click" cascade from regressing
+  // through the multi-set evolution.
   setSelection: ({
-    nodeId,
-    sessionId,
-    sessionStartAt,
+    nodeIds,
+    bucketKeys,
+    focal,
     highlightedRowKey,
     source,
     pathToSelected,
@@ -318,34 +411,55 @@ export const useViewerStore = create<ViewerState>((set) => ({
     lslFilterEntityIds,
   }) =>
     set((s) => {
-      const nextNodeId = nodeId !== undefined ? nodeId : s.selectedNodeId
-      const nextSessionId = sessionId !== undefined ? sessionId : s.selectedSessionId
-      // 2026-06-13 (audit §6.2 + §7 R2): session id and startAt are SIBLING
-      // fields. When the caller passes `sessionId` we look at `sessionStartAt`
-      // too. If the caller passed sessionStartAt explicitly, use it; otherwise
-      // — when `sessionId` is in args at all — reset startAt to null so we
-      // never end up with a "session selected" snapshot where startAt is
-      // stale from an earlier tranche. If the caller didn't touch sessionId,
-      // preserve startAt as-is.
-      let nextSessionStartAt: string | null = s.selectedSessionStartAt
-      if (sessionStartAt !== undefined) {
-        nextSessionStartAt = sessionStartAt
-      } else if (sessionId !== undefined) {
-        nextSessionStartAt = null
-      }
+      const nodeIdsArg = asSet(nodeIds)
+      const bucketKeysArg = asSet(bucketKeys)
+
+      // selectedNodeIds: explicit > preserve. Reference-stability guard
+      // (audit invariant #2 — viewport stability per 56-PATTERNS Locked
+      // Contract #3) preserves the existing Set reference on identical
+      // content.
+      const nextSelectedNodeIds: ReadonlySet<string> =
+        nodeIdsArg !== undefined
+          ? sameSetMembership(s.selectedNodeIds, nodeIdsArg)
+            ? s.selectedNodeIds
+            : nodeIdsArg
+          : s.selectedNodeIds
+
+      // Focal derivation: explicit override (incl. null) > insertion-order
+      // last-added > last iteration-order element. When neither nodeIds
+      // nor explicit focal was passed, preserve the current focal.
+      const nextFocalNodeId: string | null =
+        nodeIdsArg !== undefined || focal?.nodeId !== undefined
+          ? deriveFocal(s.selectedNodeIds, nextSelectedNodeIds, focal?.nodeId)
+          : s.focalNodeId
+
+      const nextSelectedBucketKeys: ReadonlySet<string> =
+        bucketKeysArg !== undefined
+          ? sameSetMembership(s.selectedBucketKeys, bucketKeysArg)
+            ? s.selectedBucketKeys
+            : bucketKeysArg
+          : s.selectedBucketKeys
+
+      const nextFocalBucketKey: string | null =
+        bucketKeysArg !== undefined || focal?.bucketKey !== undefined
+          ? deriveFocal(s.selectedBucketKeys, nextSelectedBucketKeys, focal?.bucketKey)
+          : s.focalBucketKey
+
       const nextHighlightedRowKey =
         highlightedRowKey !== undefined ? highlightedRowKey : s.highlightedRowKey
-      // pathToSelected: explicit > reset-on-nodeId-change > preserve.
+
+      // pathToSelected: explicit > reset-on-nodeIds-change > preserve.
       let nextPath: ReadonlySet<string> = s.pathToSelected
       if (pathToSelected !== undefined) {
         nextPath = pathToSelected
-      } else if (nodeId !== undefined) {
+      } else if (nodeIds !== undefined) {
         nextPath = new Set<string>()
       }
-      // 2026-06-13 (audit §6.3 + §7 R4): LSL filter slice writes piggy-
-      // back on the same atomic snapshot when the caller passes them.
-      // Reference-stability guard is shared with `setLslFilterEntityIds`
-      // (see Commit 4 deep-equal helper).
+
+      // 2026-06-13 (audit §6.3 + §7 R4 — UNCHANGED from Phase 56): LSL
+      // filter slice writes piggy-back on the same atomic snapshot when
+      // the caller passes them. Reference-stability guard shared with
+      // `setLslFilterEntityIds` (audit invariant #3 — DO NOT alter).
       const nextLslSessionFilter =
         lslSessionFilter !== undefined ? lslSessionFilter.slice() : s.lslSessionFilter
       const nextLslFilterEntityIds =
@@ -354,10 +468,12 @@ export const useViewerStore = create<ViewerState>((set) => ({
             ? s.lslFilterEntityIds
             : lslFilterEntityIds
           : s.lslFilterEntityIds
+
       return {
-        selectedNodeId: nextNodeId,
-        selectedSessionId: nextSessionId,
-        selectedSessionStartAt: nextSessionStartAt,
+        selectedNodeIds: nextSelectedNodeIds,
+        focalNodeId: nextFocalNodeId,
+        selectedBucketKeys: nextSelectedBucketKeys,
+        focalBucketKey: nextFocalBucketKey,
         highlightedRowKey: nextHighlightedRowKey,
         selectionSource: source,
         pathToSelected: nextPath,
@@ -370,15 +486,22 @@ export const useViewerStore = create<ViewerState>((set) => ({
   // Mirrors `clearLslSessionFilter` (line below) but extends to the entire
   // selection slice + LSL filter — matches CONTEXT.md "Esc + click-background
   // clears in all three panes".
+  //
+  // Phase 56.1 (audit invariant #4): clears all 4 new selection fields
+  // (selectedNodeIds, focalNodeId, selectedBucketKeys, focalBucketKey),
+  // selectedEdgeId, the source + row tag, pathToSelected, and the LSL
+  // filter slice. Fresh `new Set()` instances (NOT null) for the Set
+  // fields so consumers can always call `.has()` / `.size` without
+  // null-check noise.
   clearSelection: () =>
     set({
-      selectedNodeId: null,
       selectedEdgeId: null,
       selectionSource: null,
       highlightedRowKey: null,
-      selectedSessionId: null,
-      // 2026-06-13 (audit §6.2 + §7 R2): paired clear with selectedSessionId.
-      selectedSessionStartAt: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       pathToSelected: new Set<string>(),
       lslSessionFilter: [],
       lslFilterEntityIds: null,
@@ -410,20 +533,29 @@ export const useViewerStore = create<ViewerState>((set) => ({
 
   // IN-SYSTEM clear button. Does NOT reset visibleLevels (filter defaults
   // should persist) or theme (UI pref). Cross-system reset is the remount.
-  // Phase 56: also clears the three cross-pane selection fields so reset()
-  // round-trips through the full selection slice — see 56-PATTERNS.md
-  // "extend reset() too".
+  //
+  // Phase 56.1 (WR-04 closure / audit invariant #5 — 56.1-PATTERNS §1
+  // invariants table): reset() now FULLY mirrors clearSelection()'s
+  // selection-slice + LSL-slice + pathToSelected coverage. Phase 56's
+  // reset() left `lslSessionFilter`, `lslFilterEntityIds`, and
+  // `pathToSelected` untouched — that gap surfaced as WR-04 in the
+  // Phase 56 review and is closed here. searchQuery + selectedClasses
+  // are still cleared (in-system clear button affordance from Phase 45).
   reset: () =>
     set({
-      selectedNodeId: null,
       selectedEdgeId: null,
       searchQuery: '',
       selectedClasses: new Set<string>(),
       selectionSource: null,
       highlightedRowKey: null,
-      selectedSessionId: null,
-      // 2026-06-13 (audit §6.2 + §7 R2): paired clear with selectedSessionId.
-      selectedSessionStartAt: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
+      // WR-04 closure: these three were missing from the Phase 56 reset.
+      lslSessionFilter: [],
+      lslFilterEntityIds: null,
+      pathToSelected: new Set<string>(),
     }),
 
   // ---------- Phase 55 — VOKB filtersSlice parity ----------
