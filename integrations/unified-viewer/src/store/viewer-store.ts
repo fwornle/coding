@@ -39,6 +39,13 @@ export type Level = 0 | 1 | 2 | 3
 export type ThemePref = 'light' | 'dark'
 export type ViewerMode = 'kg' | 'triage'
 
+// ---------- Phase 56 — cross-pane selection sync ----------
+//
+// 'graph' | 'timeline' | 'history' tags WHO drove the current selection so
+// consumers can avoid feedback loops (e.g. timeline doesn't re-center on
+// its own click). `null` = no selection / selection cleared.
+export type SelectionSource = 'graph' | 'timeline' | 'history' | null
+
 // Inline shape per 55-PATTERNS.md TrendingPanel section / okbClient.ts:68-78.
 // A shared type module can pull this out in 55-06 if the StatsBar / trends
 // endpoint introduces a wider surface; for now keep co-located with the
@@ -75,6 +82,20 @@ export interface ViewerState {
   // through the hierarchy is visually traced from the clicked node back
   // to the root — VKB reference behaviour. Empty = no path highlight.
   pathToSelected: ReadonlySet<string>
+
+  // ---------- Phase 56 — cross-pane selection sync ----------
+  // Shared selection slice consumed by D3GraphCanvas, LslTimelineStrip and
+  // HistorySidebar / OccurrenceHistorySidebar. `selectionSource` lets
+  // consumers avoid feedback loops on their own clicks; `highlightedRowKey`
+  // is the history-sidebar row to scroll/highlight (often === selectedNodeId
+  // but may differ for aggregate selections); `selectedSessionId` is the
+  // LSL session-tick aggregate selection per CONTEXT.md selection-scope
+  // decision. ALL three are written atomically via `setSelection({...})`
+  // (or via `useViewerStore.setState({...})` from in-tree consumers) so
+  // subscribers see a coherent snapshot — never a half-written state.
+  selectionSource: SelectionSource
+  highlightedRowKey: string | null
+  selectedSessionId: string | null
 
   // 2026-06-11: VKB-style filter rail additions.
   //   - learningSource: 'batch' (manual/UKB) | 'online' (auto/ETM) | 'combined' (both)
@@ -114,6 +135,25 @@ export interface ViewerState {
   setTheme: (t: ThemePref) => void
   setFilterRailCollapsed: (collapsed: boolean) => void
   reset: () => void
+
+  // ---------- Phase 56 — cross-pane selection sync actions ----------
+  // setSelection: atomic multi-field write. Only keys passed in `args` are
+  // overwritten; unspecified keys are preserved. `source` is required so
+  // every selection carries its origin. When `nodeId` is supplied and no
+  // explicit `pathToSelected` is passed, `pathToSelected` is reset to an
+  // empty Set (the graph recomputes ancestry on the next render).
+  // clearSelection: cross-pane variant of `clearLslSessionFilter()`. Nulls
+  // the entire selection slice AND the LSL filter slice so Esc + bg-click
+  // leave the user in a fully cleared state — see CONTEXT.md "Esc +
+  // click-background clears in all three panes".
+  setSelection: (args: {
+    nodeId?: string | null
+    sessionId?: string | null
+    highlightedRowKey?: string | null
+    source: SelectionSource
+    pathToSelected?: ReadonlySet<string>
+  }) => void
+  clearSelection: () => void
 
   // ---------- Phase 55 — VOKB filtersSlice parity ----------
   selectedLayers: string[] // empty = "all visible" (UI-SPEC §10)
@@ -192,6 +232,10 @@ export const useViewerStore = create<ViewerState>((set) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
   pathToSelected: new Set<string>(),
+  // ---------- Phase 56 — cross-pane selection sync (initial) ----------
+  selectionSource: null,
+  highlightedRowKey: null,
+  selectedSessionId: null,
   searchQuery: '',
   visibleLevels: new Set<Level>([0, 1, 2, 3]),
   selectedClasses: new Set<string>(),
@@ -207,6 +251,52 @@ export const useViewerStore = create<ViewerState>((set) => ({
 
   setSelectedNode: (id) => set({ selectedNodeId: id }),
   setSelectedEdge: (id) => set({ selectedEdgeId: id }),
+
+  // ---------- Phase 56 — cross-pane selection sync setters ----------
+  // Atomic multi-field write. The argument shape lets callers update only
+  // the fields they care about — the merge below preserves any key that
+  // wasn't passed. `source` is required so every selection carries its
+  // origin; `pathToSelected` defaults to an empty Set when nodeId changes
+  // (the graph recomputes ancestry on next render) but is preserved if the
+  // caller didn't move the node (e.g. timeline-only writes).
+  setSelection: ({ nodeId, sessionId, highlightedRowKey, source, pathToSelected }) =>
+    set((s) => {
+      const nextNodeId = nodeId !== undefined ? nodeId : s.selectedNodeId
+      const nextSessionId = sessionId !== undefined ? sessionId : s.selectedSessionId
+      const nextHighlightedRowKey =
+        highlightedRowKey !== undefined ? highlightedRowKey : s.highlightedRowKey
+      // pathToSelected: explicit > reset-on-nodeId-change > preserve.
+      let nextPath: ReadonlySet<string> = s.pathToSelected
+      if (pathToSelected !== undefined) {
+        nextPath = pathToSelected
+      } else if (nodeId !== undefined) {
+        nextPath = new Set<string>()
+      }
+      return {
+        selectedNodeId: nextNodeId,
+        selectedSessionId: nextSessionId,
+        highlightedRowKey: nextHighlightedRowKey,
+        selectionSource: source,
+        pathToSelected: nextPath,
+      }
+    }),
+
+  // Single-shot `set({...})` so subscribers see the cleared snapshot once.
+  // Mirrors `clearLslSessionFilter` (line below) but extends to the entire
+  // selection slice + LSL filter — matches CONTEXT.md "Esc + click-background
+  // clears in all three panes".
+  clearSelection: () =>
+    set({
+      selectedNodeId: null,
+      selectedEdgeId: null,
+      selectionSource: null,
+      highlightedRowKey: null,
+      selectedSessionId: null,
+      pathToSelected: new Set<string>(),
+      lslSessionFilter: [],
+      lslFilterEntityIds: null,
+    }),
+
   setSearch: (q) => set({ searchQuery: q }),
 
   toggleLevel: (level) =>
@@ -233,12 +323,18 @@ export const useViewerStore = create<ViewerState>((set) => ({
 
   // IN-SYSTEM clear button. Does NOT reset visibleLevels (filter defaults
   // should persist) or theme (UI pref). Cross-system reset is the remount.
+  // Phase 56: also clears the three cross-pane selection fields so reset()
+  // round-trips through the full selection slice — see 56-PATTERNS.md
+  // "extend reset() too".
   reset: () =>
     set({
       selectedNodeId: null,
       selectedEdgeId: null,
       searchQuery: '',
       selectedClasses: new Set<string>(),
+      selectionSource: null,
+      highlightedRowKey: null,
+      selectedSessionId: null,
     }),
 
   // ---------- Phase 55 — VOKB filtersSlice parity ----------

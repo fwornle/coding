@@ -100,6 +100,23 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
     },
   })
 
+  // E2E hook — Phase 56 Playwright spec drives selection via
+  // window.__viewerStore.getState().setSelection({...}) / .clearSelection().
+  // Same code path the in-tree click handlers use; avoids the unreliable
+  // coordinate-based canvas hit-testing inside headless chromium when D3's
+  // force layout is still settling. SSR guard mirrors viewer-store.ts:180-188.
+  // Cleanup deletes the global on unmount so cross-system remounts don't
+  // leak a stale reference.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.__viewerStore = useViewerStore
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.__viewerStore
+      }
+    }
+  }, [])
+
   const { entities, relations, isLoading, error } = useGraphData(apiClient, system)
 
   // Phase 55 — Zustand mode slice.
