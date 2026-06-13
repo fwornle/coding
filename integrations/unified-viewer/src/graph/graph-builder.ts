@@ -458,7 +458,10 @@ export function computeNodeState(
   // `pathToSelected` is optional so existing test fixtures don't need
   // updating; the runtime check below tolerates `undefined`. (Path
   // highlight was added 2026-06-11 as a VKB-reference feature.)
-  store: Pick<ViewerState, 'selectedNodeId' | 'searchQuery' | 'visibleLevels' | 'selectedClasses'> & {
+  // 2026-06-13 (Phase 56.1 Plan 05): the deleted Phase 56 `selectedNodeId`
+  // is replaced by the derived `focalNodeId` singleton — the sigma node
+  // "selected" predicate keys on the focal entity.
+  store: Pick<ViewerState, 'focalNodeId' | 'searchQuery' | 'visibleLevels' | 'selectedClasses'> & {
     pathToSelected?: ReadonlySet<string>
     learningSource?: 'batch' | 'online' | 'combined'
     selectedTeams?: ReadonlySet<string>
@@ -475,7 +478,7 @@ export function computeNodeState(
   // every class present in the data on first load so the default
   // experience is "all visible".
 
-  if (store.selectedNodeId === nodeId) return 'selected'
+  if (store.focalNodeId === nodeId) return 'selected'
   if (hoveredNodeId === nodeId) return 'hover'
 
   // 2026-06-11: ancestry path highlight (VKB reference). When a node is

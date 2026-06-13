@@ -75,7 +75,9 @@ function renderPanel(system: 'coding' | 'okb') {
 
 describe('SidePanel (Phase 55 — RCA tab dropped)', () => {
   beforeEach(() => {
-    useViewerStore.setState({ selectedNodeId: null })
+    // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — use the
+    // imperative shim which routes through the multi-set + derived focal.
+    useViewerStore.getState().setSelectedNode(null)
     cleanup()
   })
 
@@ -150,7 +152,7 @@ describe('SidePanel (Phase 55 — RCA tab dropped)', () => {
 
   test('Phase 55 — width expands to w-[30rem] when entity has markdown_url + Markdown tab', () => {
     // Mount with a selected entity that carries markdown_url; click Markdown tab.
-    useViewerStore.setState({ selectedNodeId: 'mdurl' })
+    useViewerStore.getState().setSelectedNode('mdurl')
     const { container } = renderPanel('okb')
     // Switch to Markdown tab
     const trigger = screen.getByTestId('tab-markdown')
@@ -162,7 +164,7 @@ describe('SidePanel (Phase 55 — RCA tab dropped)', () => {
   })
 
   test('Phase 55 — width expands to w-[30rem] when entity.description.length > 800', () => {
-    useViewerStore.setState({ selectedNodeId: 'longdesc' })
+    useViewerStore.getState().setSelectedNode('longdesc')
     const { container } = renderPanel('coding')
     const aside = container.querySelector('[data-testid="viewer-side-panel"]')
     expect(aside!.className).toMatch(/w-\[30rem\]/)

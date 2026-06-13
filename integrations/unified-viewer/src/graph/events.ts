@@ -96,11 +96,22 @@ export function makeEventHandlers(deps: EventHandlerDeps): EventHandlers {
         path.add(parent)
         cursor = parent
       }
-      deps.setStore({ selectedNodeId: nodeId, pathToSelected: path })
+      // 2026-06-13 (Phase 56.1 Plan 05): the deleted Phase 56 single-selection
+      // `selectedNodeId` field is replaced by the multi-set `selectedNodeIds`
+      // + derived `focalNodeId`. Write both to keep the selection coherent.
+      deps.setStore({
+        selectedNodeIds: new Set<string>([nodeId]),
+        focalNodeId: nodeId,
+        pathToSelected: path,
+      })
     },
 
     handleClickStage() {
-      deps.setStore({ selectedNodeId: null, pathToSelected: new Set<string>() })
+      deps.setStore({
+        selectedNodeIds: new Set<string>(),
+        focalNodeId: null,
+        pathToSelected: new Set<string>(),
+      })
     },
 
     async handleDoubleClickNode(nodeId: string): Promise<number> {

@@ -102,8 +102,10 @@ const originalFetch = global.fetch
 describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   beforeEach(() => {
     cleanup()
+    // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set + focal.
     useViewerStore.setState({
-      selectedNodeId: null,
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
       selectedClasses: new Set<string>(),
@@ -134,7 +136,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('MarkdownPanel Test 2: description "# Hello\\n\\n**world**" renders <h1 id="hello">Hello</h1> + <strong>world</strong>', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     const { container } = renderPanel()
     const content = container.querySelector('[data-testid="markdown-content"]')
     expect(content).not.toBeNull()
@@ -148,7 +150,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('MarkdownPanel Test 3: TypeScript fenced code → <code> with language-ts marker class', () => {
-    useViewerStore.setState({ selectedNodeId: 'e2' })
+    useViewerStore.getState().setSelectedNode('e2')
     const { container } = renderPanel()
     // react-markdown + rehype-highlight emits
     //   <pre><code class="hljs language-ts">...syntax tokens...</code></pre>
@@ -162,7 +164,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('MarkdownPanel Test 4: Mermaid fenced block → placeholder div, NOT a Mermaid render', () => {
-    useViewerStore.setState({ selectedNodeId: 'e3' })
+    useViewerStore.getState().setSelectedNode('e3')
     renderPanel()
     const placeholder = screen.getByTestId('mermaid-placeholder')
     expect(placeholder).toBeInTheDocument()
@@ -172,7 +174,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('MarkdownPanel Test 5 (light theme): installs <link> to github.css', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1', theme: 'light' })
+    useViewerStore.getState().setSelectedNode('e1'); useViewerStore.setState({ theme: 'light' })
     renderPanel()
     const link = document.getElementById(
       'unified-viewer-highlightjs-theme',
@@ -183,7 +185,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('MarkdownPanel Test 5b (dark theme): installs <link> to github-dark.css', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1', theme: 'dark' })
+    useViewerStore.getState().setSelectedNode('e1'); useViewerStore.setState({ theme: 'dark' })
     renderPanel()
     const link = document.getElementById(
       'unified-viewer-highlightjs-theme',
@@ -193,7 +195,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('MarkdownPanel Test 6: external anchor has target=_blank + rel="noopener noreferrer" (T-45-04-02)', () => {
-    useViewerStore.setState({ selectedNodeId: 'e4' })
+    useViewerStore.getState().setSelectedNode('e4')
     const { container } = renderPanel()
     const content = within(
       container.querySelector('[data-testid="markdown-content"]') as HTMLElement,
@@ -206,7 +208,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('MarkdownPanel Test 7: .md cross-link click triggers pushHistory + filename changes', () => {
-    useViewerStore.setState({ selectedNodeId: 'e5' })
+    useViewerStore.getState().setSelectedNode('e5')
     renderPanel()
     // Initially, the filename header shows the entity name (no URL).
     expect(screen.getByTestId('markdown-filename').textContent).toBe(
@@ -234,7 +236,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
       ontologyClass: 'Observation',
       description: '<script>alert(1)</script>',
     })
-    useViewerStore.setState({ selectedNodeId: 'xss' })
+    useViewerStore.getState().setSelectedNode('xss')
     const { container } = renderPanel()
     expect(container.querySelectorAll('script').length).toBe(0)
     // Clean up the injected entity.
@@ -242,7 +244,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('MarkdownPanel Test 7c: after first cross-link push, back is still disabled (cursor at index 0)', () => {
-    useViewerStore.setState({ selectedNodeId: 'e5' })
+    useViewerStore.getState().setSelectedNode('e5')
     renderPanel()
     const crossLink = screen.getByTestId('md-cross-link')
     fireEvent.click(crossLink)
@@ -257,7 +259,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   // ===== Phase 55 additions (Plan 55-09 Task 3) =====
 
   test('Phase 55 — EntityIdentityHeader renders ABOVE the markdown body', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     const { container } = renderPanel()
     // Identity header is mounted by Task 1's shared component.
     const header = container.querySelector('[data-testid="entity-identity-header"]')
@@ -271,7 +273,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
   })
 
   test('Phase 55 — entity name appears in the identity header (parity with EntityDetailPanel)', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     // identity-name is rendered by EntityIdentityHeader (Task 1).
     expect(screen.getByTestId('identity-name').textContent).toBe('Hello Entity')
@@ -286,7 +288,7 @@ describe('MarkdownViewerPanel (Plan 45-04 Task 2)', () => {
       ontologyClass: 'Observation',
       description: '<script>alert(1)</script>',
     })
-    useViewerStore.setState({ selectedNodeId: 'xss-bc' })
+    useViewerStore.getState().setSelectedNode('xss-bc')
     const { container } = renderPanel()
     expect(container.querySelectorAll('script').length).toBe(0)
     mockEntities.pop()

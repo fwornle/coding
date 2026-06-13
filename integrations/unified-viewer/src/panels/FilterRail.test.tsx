@@ -77,7 +77,10 @@ function renderRail(
 describe('FilterRail', () => {
   beforeEach(() => {
     useViewerStore.setState({
-      selectedNodeId: null,
+      // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set
+      // + derived focal. setSelectedNode(null) clears both consistently.
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       selectedEdgeId: null,
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),

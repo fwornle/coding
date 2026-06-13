@@ -114,7 +114,9 @@ beforeEach(() => {
     etmObservations: [],
     etmStreamConnected: false,
     etmSheetOpen: false,
-    selectedNodeId: null,
+    // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set.
+    focalNodeId: null,
+    selectedNodeIds: new Set<string>(),
   })
 })
 
@@ -373,7 +375,7 @@ describe('EtmTailSheet', () => {
       act(() => {
         fireEvent.click(row)
       })
-      expect(useViewerStore.getState().selectedNodeId).toBe('entity-7')
+      expect(useViewerStore.getState().focalNodeId).toBe('entity-7')
     } finally {
       r.restore()
     }

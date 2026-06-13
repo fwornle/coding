@@ -82,10 +82,9 @@ function renderTrendingPanel({
 
 beforeEach(() => {
   // Reset store to known baseline.
-  useViewerStore.setState({
-    selectedNodeId: null,
-    mode: 'kg',
-  })
+  // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set + focal.
+  useViewerStore.getState().setSelectedNode(null)
+  useViewerStore.setState({ mode: 'kg' })
 })
 
 afterEach(() => {
@@ -170,7 +169,8 @@ describe('TrendingPanel', () => {
     const { restore } = renderTrendingPanel({ fetchImpl })
     try {
       // Pre-condition: simulate user in triage mode
-      useViewerStore.setState({ mode: 'triage', selectedNodeId: null })
+      useViewerStore.setState({ mode: 'triage' })
+      useViewerStore.getState().setSelectedNode(null)
 
       await waitFor(() => {
         expect(screen.getByText('High-temp throttle')).toBeInTheDocument()
@@ -178,7 +178,7 @@ describe('TrendingPanel', () => {
       const row = screen.getByTestId('trending-row-node-1')
       fireEvent.click(row)
 
-      expect(useViewerStore.getState().selectedNodeId).toBe('node-1')
+      expect(useViewerStore.getState().focalNodeId).toBe('node-1')
       expect(useViewerStore.getState().mode).toBe('kg')
     } finally {
       restore()
@@ -189,13 +189,14 @@ describe('TrendingPanel', () => {
     const fetchImpl = makeFetchResponse(TRENDING_FIXTURE)
     const { restore } = renderTrendingPanel({ fetchImpl })
     try {
-      useViewerStore.setState({ mode: 'kg', selectedNodeId: null })
+      useViewerStore.setState({ mode: 'kg' })
+      useViewerStore.getState().setSelectedNode(null)
       await waitFor(() => {
         expect(screen.getByText('OOM kill loop')).toBeInTheDocument()
       })
       const row = screen.getByTestId('trending-row-node-2')
       fireEvent.click(row)
-      expect(useViewerStore.getState().selectedNodeId).toBe('node-2')
+      expect(useViewerStore.getState().focalNodeId).toBe('node-2')
       expect(useViewerStore.getState().mode).toBe('kg')
     } finally {
       restore()

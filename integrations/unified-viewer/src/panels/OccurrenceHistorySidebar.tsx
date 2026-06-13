@@ -53,8 +53,9 @@ export function OccurrenceHistorySidebar(_: OccurrenceHistorySidebarProps) {
   void system
 
   const { entities } = useGraphData(apiClient, system)
-  const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
-  // Phase 56: cross-pane highlight signal. May differ from selectedNodeId
+  // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — use focalNodeId.
+  const selectedNodeId = useViewerStore((s) => s.focalNodeId)
+  // Phase 56: cross-pane highlight signal. May differ from focalNodeId
   // when an external pane (e.g. timeline tick cascade — Plan 04) sets the
   // highlight without flipping the graph selection.
   const highlightedRowKey = useViewerStore((s) => s.highlightedRowKey)
@@ -127,16 +128,20 @@ export function OccurrenceHistorySidebar(_: OccurrenceHistorySidebarProps) {
               // the user navigates via history, the LSL session-scope
               // selection MUST clear so the graph predicate doesn't keep
               // narrowing to an unrelated session.
+              // 2026-06-13 (Phase 56.1 Plan 05): migrate setSelection args
+              // to the multi-set shape — nodeId/sessionId/sessionStartAt
+              // are gone. nodeIds Set + bucketKeys Set + focal singleton
+              // override. Drill-collapse semantics: single nodeId Set
+              // membership, empty bucketKeys.
               useViewerStore.getState().setSelection({
-                nodeId: entity.id,
+                nodeIds: new Set<string>([entity.id]),
+                bucketKeys: new Set<string>(),
+                focal: { nodeId: entity.id, bucketKey: null },
                 pathToSelected: new Set<string>(),
                 highlightedRowKey: entity.id,
                 source: 'history',
-                // Explicitly clear the LSL session-filter scope and the
-                // sibling session-tick fields so a stale tick filter doesn't
-                // leak across panes (CR-01).
-                sessionId: null,
-                sessionStartAt: null,
+                // Explicitly clear the LSL session-filter scope so a stale
+                // tick filter doesn't leak across panes (CR-01 preserved).
                 lslSessionFilter: [],
                 lslFilterEntityIds: null,
               })

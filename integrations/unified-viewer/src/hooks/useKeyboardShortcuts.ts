@@ -176,10 +176,17 @@ export function useKeyboardShortcuts(
         // populated) also responds to Esc. The no-op-when-fully-cleared
         // semantic from Phase 45 is preserved: if every field is null/empty,
         // Esc does nothing (no preventDefault, no Logger spam).
+        // 2026-06-13 (Phase 56.1 Plan 05): the deleted Phase 56 single-
+        // selection fields are replaced by the multi-set + derived focal:
+        //   selectedNodeId → focalNodeId (or selectedNodeIds.size > 0)
+        //   selectedSessionId/selectedSessionStartAt → selectedBucketKeys
+        // The Esc handler now checks the new field names.
         const state = useViewerStore.getState()
         const hasSelection =
-          state.selectedNodeId !== null ||
-          state.selectedSessionId !== null ||
+          state.focalNodeId !== null ||
+          state.selectedNodeIds.size > 0 ||
+          state.focalBucketKey !== null ||
+          state.selectedBucketKeys.size > 0 ||
           state.selectedEdgeId !== null ||
           state.lslSessionFilter.length > 0 ||
           state.lslFilterEntityIds !== null
