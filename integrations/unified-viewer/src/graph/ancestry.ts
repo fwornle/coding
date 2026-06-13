@@ -47,30 +47,38 @@ export function computeAncestryPath(
     list.push(r.from)
     childToParents.set(r.to, list)
   }
+  // 2026-06-13 (Phase 56.1 WR-02 fix — diamond/multi-parent hierarchies).
+  //
+  // The previous implementation used a `parentOf: Map<string, string>` plus
+  // a linear walk along the first-parent chain only. That hid every
+  // secondary-parent edge from `edges` and every secondary-parent ancestor
+  // from `nodeDepths`. As a consequence, `resolveToVisibleAncestor` would
+  // return `null` when the only visible ancestor of a diamond child was
+  // reachable via the secondary parent edge. See:
+  //   - .planning/phases/56.1-.../56.1-PATTERNS.md §2 (WR-02 fix code)
+  //   - .planning/phases/56-.../56-REVIEW.md WR-02 (operator decision)
+  //
+  // The fix: record EVERY parent edge during the BFS, and depth-track every
+  // BFS-visited node. `resolveToVisibleAncestor` reads `nodeDepths.keys()`
+  // and so benefits transparently — no signature change, no callsite change.
   const visited = new Set<string>([selectedId])
   const queue: string[] = [selectedId]
-  const parentOf = new Map<string, string>()
+  nodeDepths.set(selectedId, 0)
   while (queue.length) {
     const cur = queue.shift() as string
+    const curDepth = nodeDepths.get(cur) as number
     const parents = childToParents.get(cur) ?? []
     for (const p of parents) {
+      // Record EVERY parent edge — not just the first one per child.
+      edges.add(`${p}||${cur}`)
+      edges.add(`${cur}||${p}`)
       if (visited.has(p)) continue
       visited.add(p)
-      if (!parentOf.has(cur)) parentOf.set(cur, p)
+      nodeDepths.set(p, curDepth + 1)
       queue.push(p)
     }
   }
-  let node = selectedId
-  let depth = 0
-  nodeDepths.set(node, depth)
-  while (parentOf.has(node)) {
-    const parent = parentOf.get(node) as string
-    edges.add(`${parent}||${node}`)
-    edges.add(`${node}||${parent}`)
-    depth++
-    nodeDepths.set(parent, depth)
-    node = parent
-  }
+  let pathLength = Math.max(0, ...Array.from(nodeDepths.values()))
   // 2026-06-12: when the selected node has NO ancestor chain via the
   // HIERARCHY_TYPES (orphan Detail / floating Insight), fall back to a
   // 1-hop neighborhood so the user still sees connected nodes/edges
@@ -80,7 +88,7 @@ export function computeAncestryPath(
   // forced opacity=1 for the selected node and 0.12 for everyone else,
   // so no "trace" was visible). Walks BOTH directions across ALL
   // relation types — this is purely a visual aid, not semantic ancestry.
-  if (depth === 0) {
+  if (pathLength === 0) {
     for (const r of relations) {
       if (r.from === selectedId) {
         edges.add(`${r.from}||${r.to}`)
@@ -92,9 +100,9 @@ export function computeAncestryPath(
         if (!nodeDepths.has(r.from)) nodeDepths.set(r.from, 1)
       }
     }
-    if (nodeDepths.size > 1) depth = 1
+    if (nodeDepths.size > 1) pathLength = 1
   }
-  return { edges, nodeDepths, pathLength: depth }
+  return { edges, nodeDepths, pathLength }
 }
 
 // 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution).
@@ -181,4 +189,43 @@ export function pickFirstResolvable(
     if (resolved !== null) return resolved
   }
   return null
+}
+
+/**
+ * Walk a bucket's `entityIds[]` and return the SET of resolved ids
+ * (each id resolved to its closest graph-visible ancestor).
+ *
+ *  - Mirrors `pickFirstResolvable` — same predicate, same ancestry walk —
+ *    but accumulates ALL resolutions instead of stopping at the first.
+ *  - Returns an EMPTY Set when no id in the bucket has any visible
+ *    ancestor (the sidebar-only / halo-empty mode the timeline strip uses
+ *    to render the bucket selection without a graph target).
+ *  - Dedup-safe: a Set is the right return type so duplicate resolutions
+ *    (two raw entity ids that resolve to the same ancestor) collapse.
+ *  - Order-independent in the membership sense: the returned Set's membership
+ *    is identical for any permutation of `entityIds`.
+ *
+ * Used by:
+ *   - `LslTimelineStrip.onTickClick` (Plan 05 forward direction — D-2):
+ *     writes the `selectedNodeIds` halo for the clicked bucket.
+ *   - `useNodeToBucketsIndex` (Plan 05 reverse direction — D-3): pre-builds
+ *     the reverse `nodeId -> Set<bucketKey>` map so node clicks reverse-look
+ *     up touching buckets in O(1).
+ *
+ * Locked under PATTERNS contract #7 (pre-index integrity) — the only legal
+ * non-test callsites are the two listed above. An on-demand call from
+ * inside another click handler is a smell (acceptance-grep gate in
+ * 56.1-PATTERNS.md §3).
+ */
+export function pickAllResolvable(
+  entityIds: readonly string[],
+  visibleIds: ReadonlySet<string>,
+  relations: readonly Relation[],
+): Set<string> {
+  const out = new Set<string>()
+  for (const id of entityIds) {
+    const resolved = resolveToVisibleAncestor(id, visibleIds, relations)
+    if (resolved !== null) out.add(resolved)
+  }
+  return out
 }
