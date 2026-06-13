@@ -739,6 +739,193 @@ describe('LslTimelineStrip', () => {
     }
   })
 
+  // ====================================================================
+  // Phase 56 Plan 04 continuation 3 — state-flow audit b29bdb34c regression
+  // locks. These RED-first tests are the audit-prescribed gates that
+  // identify the actual root causes of the operator's 3 round-3 issues.
+  // Mapping (per resume_instructions):
+  //   - T-A (Test 30): same-session two-tranche selection cleanliness (R1)
+  //   - T-B (Test 31): clear cascade does not leak the ring one render (R1)
+  //   - T-E (Test 32): 0-obs tick is greyed + pointer-events-none + unclickable
+  //                    (audit §5.4 option B; risk R6)
+  //
+  // Note: T-C lives in viewer-store.test.ts (reference equality on
+  // setLslFilterEntityIds — audit §4.4); T-D lives in D3GraphCanvas.test.ts
+  // (source-grep gate G12+G13 for store-read of pathToSelected — §6.4/§6.6
+  // — adapted from a viewport-stability runtime test because jsdom can't
+  // host the d3 SVG layout).
+  // ====================================================================
+
+  test('Test 30 [audit §6.5 R1 — T-A]: click tranche A then tranche A\' of SAME session id — only A\' rings, A does not (composite bucket key)', async () => {
+    // Two tranches of the SAME session id `sess-X` with distinct startAt.
+    // Click tranche-1, then tranche-2: only tranche-2 must ring. The
+    // local-state bug (deleted in Commit 3) caused a one-render flash where
+    // BOTH rang because clickedTickKey cleared one render late. The
+    // store-derived predicate fixes this — every render reads the same
+    // composite key.
+    mockEntities.length = 0
+    useViewerStore.setState({
+      selectedNodeId: null,
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+    })
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-X',
+          startAt: nowMinusHours(3),
+          endAt: nowMinusHours(2.5),
+          observationCount: 4,
+          entityIds: [],
+        },
+        {
+          id: 'sess-X',
+          startAt: nowMinusHours(1),
+          endAt: nowMinusHours(0.5),
+          observationCount: 3,
+          entityIds: [],
+        },
+      ],
+    })
+    try {
+      await waitFor(() => {
+        const ticks = screen.getAllByTestId('lsl-tick-sess-X')
+        expect(ticks.length).toBe(2)
+      })
+      const ticks0 = screen.getAllByTestId('lsl-tick-sess-X')
+      // Click tranche A (first)
+      act(() => {
+        fireEvent.click(ticks0[0])
+      })
+      await waitFor(() => {
+        const ticksNow = screen.getAllByTestId('lsl-tick-sess-X')
+        expect(ticksNow[0].className).toMatch(/ring-blue-500/)
+      })
+      // Click tranche A' (second)
+      const ticks1 = screen.getAllByTestId('lsl-tick-sess-X')
+      act(() => {
+        fireEvent.click(ticks1[1])
+      })
+      // After: tranche A' rings; tranche A does NOT.
+      await waitFor(() => {
+        const ticksAfter = screen.getAllByTestId('lsl-tick-sess-X')
+        expect(ticksAfter[1].className).toMatch(/ring-blue-500/)
+        expect(ticksAfter[0].className).not.toMatch(/ring-blue-500/)
+      })
+      // Defence-in-depth: only ONE element across the whole strip rings.
+      const allRinged = document.querySelectorAll(
+        '[data-testid^="lsl-tick-"].ring-blue-500',
+      )
+      expect(allRinged.length).toBe(1)
+    } finally {
+      r.restore()
+      useViewerStore.setState({
+        selectedNodeId: null,
+        selectedSessionId: null,
+        selectedSessionStartAt: null,
+      })
+    }
+  })
+
+  test('Test 31 [audit §6.5 R1 — T-B]: clearing the selection (id=null AND startAt=null) leaves NO tick ringed in the immediate next render (no one-render leak)', async () => {
+    // After clicking a tick, the store has selectedSessionId + startAt.
+    // Then someone (a graph node click, or Esc) writes selectedSessionId=null
+    // AND selectedSessionStartAt=null. The next render MUST show no ring on
+    // any tick — no one-render flash from local state lagging the store.
+    mockEntities.length = 0
+    useViewerStore.setState({
+      selectedNodeId: null,
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+    })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      const tickB = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+      // Click tick to ring it (mockEntities is empty so entityIds=['e3']
+      // resolves to selectedNodeId='e3' but nothing else cascades — that's
+      // fine for this test).
+      act(() => {
+        fireEvent.click(tickB)
+      })
+      await waitFor(() => {
+        expect(screen.getByTestId('lsl-tick-sess-bbbbbbbb').className).toMatch(/ring-blue-500/)
+      })
+      // Simulate clearSelection cascade — null BOTH session fields atomically
+      // (the contract Commit 1 locked: id + startAt are sibling cleared).
+      act(() => {
+        useViewerStore.setState({
+          selectedSessionId: null,
+          selectedSessionStartAt: null,
+          selectedNodeId: null,
+        })
+      })
+      // IMMEDIATE NEXT RENDER (no waitFor): no tick rings.
+      const allRinged = document.querySelectorAll(
+        '[data-testid^="lsl-tick-"].ring-blue-500',
+      )
+      expect(allRinged.length).toBe(0)
+    } finally {
+      r.restore()
+      useViewerStore.setState({
+        selectedNodeId: null,
+        selectedSessionId: null,
+        selectedSessionStartAt: null,
+      })
+    }
+  })
+
+  test('Test 32 [audit §5.4 option B R6 — T-E]: 0-obs ticks render greyed-out (opacity-40 + pointer-events-none) and clicks are no-op', async () => {
+    // 0-obs/0-entities ticks must still render (operator sees "I had a
+    // session at X o'clock") but cannot be clicked. The strip renders
+    // them with opacity-40 + pointer-events-none + aria-disabled.
+    mockEntities.length = 0
+    useViewerStore.setState({
+      selectedNodeId: null,
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+    })
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-zero',
+          startAt: nowMinusHours(2),
+          endAt: nowMinusHours(1.5),
+          observationCount: 0, // <-- key: 0-obs
+          entityIds: [],
+        },
+      ],
+    })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-zero'))
+      const tick = screen.getByTestId('lsl-tick-sess-zero')
+      // Visual gate — both classes present
+      expect(tick.className).toMatch(/opacity-40/)
+      expect(tick.className).toMatch(/pointer-events-none/)
+      // ARIA gate
+      expect(tick.getAttribute('aria-disabled')).toBe('true')
+      // Click MUST be a no-op — selectedSessionId stays null even after the
+      // click is dispatched.
+      act(() => {
+        fireEvent.click(tick)
+      })
+      // Settle pending state changes.
+      await waitFor(() => {
+        // Use a microtask boundary; nothing should have changed.
+        const s = useViewerStore.getState()
+        expect(s.selectedSessionId).toBeNull()
+        expect(s.selectionSource).toBeNull()
+      })
+    } finally {
+      r.restore()
+      useViewerStore.setState({
+        selectedNodeId: null,
+        selectedSessionId: null,
+        selectedSessionStartAt: null,
+      })
+    }
+  })
+
   test('Test 24 [Issue 3]: tick click computes pathToSelected when firstEntityId resolves to a graph node with relations', async () => {
     // REGRESSION: LslTimelineStrip.onTickClick writes pathToSelected:
     // new Set() (empty). The graph's path-to-central renderer never

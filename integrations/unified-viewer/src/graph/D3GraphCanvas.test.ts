@@ -138,4 +138,39 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
     // subscription), this gate fires.
     expect(src).not.toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectionSource\)/)
   })
+
+  // ====================================================================
+  // T-D [audit §6.4 / §6.6]: `pathToSelected` is the store's single source
+  // of truth for the ancestry trace. `applySelectionStyling` MUST read it
+  // from the store INSTEAD of re-running `computeAncestryPath` inline as
+  // its primary source. Source-grep adapt of the audit's runtime viewport-
+  // stability test (jsdom can't host the d3 SVG layout, per file header).
+  // The Commit-5 fix has the function read `pathToSelected` from the
+  // store with `computeAncestryPath` only as a fallback.
+  // ====================================================================
+  test('Phase 56 G12 [audit §6.4 / §6.6 — T-D]: applySelectionStyling reads pathToSelected from the store (not exclusively inline)', () => {
+    // After Commit 5: the file must contain a subscription/read of the
+    // store field. Match a Zustand read using either subscription idiom or
+    // `useViewerStore.getState().pathToSelected`.
+    const hasSubscription = /useViewerStore\(\(s\)\s*=>\s*s\.pathToSelected\)/.test(src)
+    const hasGetStateRead = /useViewerStore\.getState\(\)\.pathToSelected/.test(src)
+    expect(hasSubscription || hasGetStateRead).toBe(true)
+  })
+
+  test('Phase 56 G13 [audit §6.7 — T-D viewport stability]: main render effect dep list still does NOT include selectedNodeId NOR pathToSelected NOR selectedSessionId', () => {
+    // Viewport stability contract: a non-graph selection must NOT
+    // invalidate visibleEntities/visibleRelations and therefore must not
+    // restart the force simulation. The audit's §6.7 contract narrowed
+    // by the audit's §4.3 root cause: only `visibleEntities` and
+    // `visibleRelations` may invalidate the main effect; selection slice
+    // fields must NOT appear in the dep list.
+    const mainBlocks = src.match(/}, \[visibleEntities, visibleRelations[^\]]+\]\)/g)
+    expect(mainBlocks).not.toBeNull()
+    for (const block of mainBlocks!) {
+      expect(block).not.toMatch(/\bselectedNodeId\b/)
+      expect(block).not.toMatch(/\bpathToSelected\b/)
+      expect(block).not.toMatch(/\bselectedSessionId\b/)
+      expect(block).not.toMatch(/\bselectedSessionStartAt\b/)
+    }
+  })
 })

@@ -569,4 +569,50 @@ describe('useViewerStore — Phase 56 cross-pane selection sync', () => {
     )
     expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
   })
+
+  // ====================================================================
+  // T-C [audit §4.4 R3]: setLslFilterEntityIds must preserve REFERENCE
+  // equality when content does not change. The audit's diagnosis is:
+  //   - The D3GraphCanvas main render effect deps include `visibleEntities`
+  //   - `visibleEntities` is `useMemo([... lslFilterEntityIds])`
+  //   - If `setLslFilterEntityIds(newSetWithSameContent)` produces a fresh
+  //     `Set` reference, useMemo invalidates → SVG rebuilds + force restarts
+  //   - This IS the "zoom feel" Issue 1 root cause (audit §4.3)
+  // The fix lives in Commit 4. This test is RED at Commit 2.
+  // ====================================================================
+  test('T-C [audit §4.4 R3]: setLslFilterEntityIds with identical content preserves the existing Set reference (no spurious re-render)', () => {
+    const first = new Set<string>(['a', 'b', 'c'])
+    useViewerStore.getState().setLslFilterEntityIds(first)
+    const after1 = useViewerStore.getState().lslFilterEntityIds
+    expect(after1).toBe(first)
+    // Now write a NEW Set with the SAME content. The reference MUST be
+    // preserved (after2 === after1) so downstream useMemo deps don't
+    // invalidate.
+    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['c', 'a', 'b']))
+    const after2 = useViewerStore.getState().lslFilterEntityIds
+    expect(after2).toBe(after1)
+  })
+
+  test('T-C [audit §4.4 R3]: setLslFilterEntityIds with DIFFERENT content writes a fresh reference', () => {
+    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a', 'b']))
+    const ref1 = useViewerStore.getState().lslFilterEntityIds
+    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a', 'b', 'c']))
+    const ref2 = useViewerStore.getState().lslFilterEntityIds
+    expect(ref2).not.toBe(ref1)
+    // Content actually changed.
+    expect(ref2).toBeInstanceOf(Set)
+    expect((ref2 as Set<string>).has('c')).toBe(true)
+  })
+
+  test('T-C [audit §4.4 R3]: setLslFilterEntityIds(null) when current is null preserves null (no spurious write)', () => {
+    useViewerStore.getState().setLslFilterEntityIds(null)
+    useViewerStore.getState().setLslFilterEntityIds(null)
+    expect(useViewerStore.getState().lslFilterEntityIds).toBeNull()
+  })
+
+  test('T-C [audit §4.4 R3]: setLslFilterEntityIds(null) when current is a Set writes null', () => {
+    useViewerStore.getState().setLslFilterEntityIds(new Set<string>(['a']))
+    useViewerStore.getState().setLslFilterEntityIds(null)
+    expect(useViewerStore.getState().lslFilterEntityIds).toBeNull()
+  })
 })
