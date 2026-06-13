@@ -8,9 +8,14 @@
 // Logger-discipline gate), which is exactly what locks the Phase 56
 // invariants on D3GraphCanvas:
 //
-//   1. Node click writes the 5-field atomic Phase 56 payload (selectedNodeId,
-//      pathToSelected reset, highlightedRowKey, selectionSource: 'graph',
-//      selectedSessionId: null).
+//   1. Node click routes through `useViewerStore.getState().setSelection({...})`
+//      with `nodeId: d.id`, `pathToSelected: new Set(...)`,
+//      `highlightedRowKey: d.id`, `source: 'graph'`, `sessionId: null`.
+//      (CR-02 fix 2026-06-13: was an inline 5-field `setState({...})` that
+//      cleared `selectedSessionId` but silently left
+//      `selectedSessionStartAt` stale — sibling-clear invariant violation.
+//      Routing through `setSelection` puts the paired clear in the action
+//      body — see viewer-store.ts:330-335.)
 //   2. Background click goes through useViewerStore.getState().clearSelection()
 //      (single store action — no partial setState).
 //   3. 2026-06-13 (continuation 2 SPEC CHANGE): the AC #3 visual contract
@@ -23,34 +28,49 @@
 //      — listing it there would rebuild the SVG + restart the force simulation
 //      on every click (the comment-block invariant the file has carried since
 //      Phase 45).
+//   5. Audit contract #5 acceptance grep (CR-02 fix): zero inline
+//      `useViewerStore.setState({...})` call sites remain in this file —
+//      both the node onClick and the bg-click route through store actions.
 //
 // Logger discipline is also gate-tested (zero console.* in the source) per
 // PATTERNS.md "Phase 56 must add the same gate".
+//
+// The functional test at the bottom (G14) exercises the store-side sibling-
+// clear contract that `setSelection` enforces, mirroring what the node-click
+// handler triggers. We can't fire the actual d3 click in jsdom, so we drive
+// `setSelection` with the exact payload shape the handler produces — that's
+// the same store mutation the live handler invokes after this CR-02 fix.
 
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { useViewerStore } from '@/store/viewer-store'
 
 const SOURCE_PATH = resolve(process.cwd(), 'src/graph/D3GraphCanvas.tsx')
 const src = readFileSync(SOURCE_PATH, 'utf8')
 
 describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
-  test('Phase 56 G1: node click payload includes selectionSource: "graph"', () => {
-    // Single-quoted form is the in-tree convention (LslTimelineStrip.tsx
-    // writes selectionSource: 'timeline' in plain quotes).
-    expect(src).toMatch(/selectionSource:\s*'graph'/)
+  test('Phase 56 G1 [CR-02 update]: node click payload includes source: "graph" (via setSelection action)', () => {
+    // 2026-06-13 (CR-02 fix): the click handler now routes through
+    // `setSelection({...})` whose parameter is named `source`, not
+    // `selectionSource`. Single-quoted form is the in-tree convention.
+    expect(src).toMatch(/source:\s*'graph'/)
   })
 
   test('Phase 56 G2: node click payload includes highlightedRowKey: d.id', () => {
     expect(src).toMatch(/highlightedRowKey:\s*d\.id/)
   })
 
-  test('Phase 56 G3: node click payload includes selectedSessionId: null (graph click is not session-scoped)', () => {
-    // Match within the node onClick block (which writes selectedNodeId: d.id)
-    // — selectedSessionId: null elsewhere would not be a hit because the only
-    // other place null lands is clearSelection, and clearSelection is a store
-    // action (declared in viewer-store.ts, not D3GraphCanvas.tsx).
-    expect(src).toMatch(/selectedSessionId:\s*null/)
+  test('Phase 56 G3 [CR-02 update]: node click payload passes sessionId: null (sibling-clear handled by setSelection)', () => {
+    // 2026-06-13 (CR-02 fix): the previous inline `setState` wrote
+    // `selectedSessionId: null` directly but silently left
+    // `selectedSessionStartAt` stale (sibling-clear invariant violation —
+    // audit §7 R2). The click handler now passes `sessionId: null` to
+    // `setSelection`, which atomically also clears `selectedSessionStartAt`
+    // (viewer-store.ts:330-335: `else if (sessionId !== undefined) {
+    // nextSessionStartAt = null }`). The functional test G14 below proves
+    // the paired clear happens at runtime.
+    expect(src).toMatch(/sessionId:\s*null/)
   })
 
   test('Phase 56 G4: bg-click handler invokes useViewerStore.getState().clearSelection()', () => {
@@ -172,5 +192,86 @@ describe('D3GraphCanvas — Phase 56 source-grep gates', () => {
       expect(block).not.toMatch(/\bselectedSessionId\b/)
       expect(block).not.toMatch(/\bselectedSessionStartAt\b/)
     }
+  })
+
+  test('Phase 56 G15 [CR-02 fix — audit contract #5]: zero inline useViewerStore.setState({...}) call sites remain in D3GraphCanvas.tsx', () => {
+    // 2026-06-13 (CR-02 fix): the node-click handler previously used an
+    // inline `useViewerStore.setState({...})` 5-field payload. That site
+    // was the last inline `setState({...})` in this file (the bg-click was
+    // already converted to `clearSelection()` in an earlier Phase 56
+    // commit). After CR-02 it now routes through `setSelection({...})`,
+    // putting the sibling-clear invariant for `selectedSessionId` +
+    // `selectedSessionStartAt` in the store action body where it can't
+    // be forgotten. This gate locks the acceptance grep from audit
+    // contract #5 ("zero `useViewerStore.setState({...})` call sites in
+    // any consumer component that participates in selection") for this
+    // file. If a future plan re-introduces an inline payload, this gate
+    // fires immediately.
+    const matches = src.match(/useViewerStore\.setState\s*\(/g) ?? []
+    expect(matches.length).toBe(0)
+  })
+})
+
+// ======================================================================
+// G14 — functional sibling-clear test (CR-02 fix).
+//
+// This block is OUTSIDE the source-grep describe so it can carry its own
+// store-reset `beforeEach`. We can't fire the actual d3 click in jsdom
+// (per the file header), so we drive `useViewerStore.getState().setSelection(...)`
+// with the EXACT payload shape the node-click handler now passes (see
+// D3GraphCanvas.tsx around lines 537-545). That's the same store mutation
+// the live handler invokes — testing it proves the sibling-clear works at
+// runtime, complementing the source-grep gates above.
+// ======================================================================
+describe('D3GraphCanvas — Phase 56 node-click sibling-clear (CR-02 functional)', () => {
+  beforeEach(() => {
+    // Reset only the selection slice fields we touch in this block —
+    // other Phase 55/56 fields are unrelated to this test.
+    useViewerStore.setState({
+      selectedNodeId: null,
+      pathToSelected: new Set<string>(),
+      selectionSource: null,
+      highlightedRowKey: null,
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+      lslSessionFilter: [],
+      lslFilterEntityIds: null,
+    })
+  })
+
+  test('G14: simulating the node-click code path clears BOTH selectedSessionId AND selectedSessionStartAt (sibling-clear invariant — audit §7 R2)', () => {
+    // 1. Seed the store with both LSL session fields populated, as if a
+    //    timeline tick was the previous writer.
+    useViewerStore.setState({
+      selectedSessionId: 'sess-X',
+      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+    })
+    expect(useViewerStore.getState().selectedSessionId).toBe('sess-X')
+    expect(useViewerStore.getState().selectedSessionStartAt).toBe('2026-06-13T11:00:00Z')
+
+    // 2. Invoke the same store mutation the node-click handler now triggers.
+    //    Payload shape mirrors D3GraphCanvas.tsx node onClick body verbatim
+    //    (sans the actual `computeAncestryPath` call — we use a stub path
+    //    Set since the sibling-clear contract is independent of ancestry).
+    useViewerStore.getState().setSelection({
+      nodeId: 'node-Y',
+      pathToSelected: new Set<string>(['root', 'node-Y']),
+      highlightedRowKey: 'node-Y',
+      source: 'graph',
+      sessionId: null,
+    })
+
+    // 3. The CR-02 sibling-clear assertion: BOTH session fields are null.
+    //    Before the fix, `selectedSessionStartAt` would still be
+    //    '2026-06-13T11:00:00Z' here, leaving stale state for any future
+    //    consumer that reads it independently of `selectedSessionId`.
+    const s = useViewerStore.getState()
+    expect(s.selectedSessionId).toBeNull()
+    expect(s.selectedSessionStartAt).toBeNull()
+
+    // 4. Sanity: the new selectedNodeId write also happened atomically.
+    expect(s.selectedNodeId).toBe('node-Y')
+    expect(s.highlightedRowKey).toBe('node-Y')
+    expect(s.selectionSource).toBe('graph')
   })
 })
