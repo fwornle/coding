@@ -32,3 +32,39 @@ is unchanged from the baseline.
 Recommendation: update the test expectations to match the materialise-then-toggle
 behaviour, OR if the original empty-array contract is preferred, revert the toggleLayer
 body — but that would regress the UX bugs the inline comment block documents.
+
+## Pre-existing test failure in LslTimelineStrip.test.tsx Test 7 (Cmd/Ctrl+click)
+
+Discovered: Plan 56-03 Task 2 (during GREEN verification).
+
+Test 7 (`Cmd/Ctrl+click calls addLslSessionFilter (additive)`) was in the baseline
+failure list before Plan 03 started (Tests 2/6/7/9 all failed — the visible cause was
+`entities.find is not a function` in the strip's `selectedTs` memo because the test
+mocked `globalThis.fetch` with a sessions-shaped envelope that returned an object,
+not an Entity[], to `apiClient.listEntities()`).
+
+Plan 03's [Rule 3 blocking] mock of `useGraphData` neutralised the crash, surfacing
+the *true* underlying baseline issue:
+
+- The test seeds `lslSessionFilter: ['sess-aaaaaaaa']` BEFORE render
+- On first render with `selectedNodeId === null`, the strip's deselect effect at
+  lines 187-211 unconditionally clears `lslSessionFilter` to `[]`
+- The subsequent meta-click then writes `[sessionId]` (additive over empty)
+- Assertion `expect(filter).toContain('sess-aaaaaaaa')` fails because the deselect
+  effect already nuked it
+
+Root cause: the deselect effect's cleanup branch fires on EVERY mount where
+`selectedTs === null`, not just on a transition from selected → null. This is a
+latent bug in the strip's mount-time UX (it overrides user-set LSL filter state
+the moment the strip remounts with no node selected).
+
+Scope decision: pre-existing baseline failure; Plan 03's changes do NOT touch the
+deselect effect or the meta-click branch's `lslSessionFilter` write (only added
+three new fields alongside). Tracked here for the Phase 55 owner (this effect was
+introduced in Phase 55 plans 06/11 per the inline comment at lines 187-211).
+
+Recommendation: gate the deselect cleanup on a previous-selected ref (only clear
+if `selectedTs` was non-null on the previous render), OR update Test 7 to set
+`selectedNodeId` to a value that resolves through the mock entities so the
+deselect effect doesn't fire. The latter is the smaller fix and is consistent
+with Test 19's approach.

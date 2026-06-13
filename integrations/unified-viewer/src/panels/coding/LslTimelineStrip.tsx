@@ -131,6 +131,34 @@ function fmtLocalTs(iso: string | null | undefined): string {
     + `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+// 2026-06-13 [Phase 56-03 AC #1]: format a single major-tick label for
+// the timestamp scale row. Format adapts to the active window's duration
+// per CONTEXT.md D-05 ladder:
+//   - windowMs <= 60_000     -> HH:MM:SS
+//   - windowMs <= 86_400_000 -> HH:MM
+//   - else                   -> "Mon DD" via Intl.DateTimeFormat
+//
+// Hand-rolled in the existing fmtLocalTs `pad()` style to avoid
+// introducing a fresh d3-time-format dependency — see PATTERNS.md
+// "Available Libraries" + threat_model T-56-03-03.
+//
+// Exported so vitest can unit-test the format ladder without rendering
+// the whole strip.
+export function formatScaleLabel(ms: number, windowMs: number): string {
+  const d = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  if (windowMs <= 60_000) {
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  }
+  if (windowMs <= 86_400_000) {
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  // multi-day — use the runtime's Intl formatter (vetted locale string,
+  // not user-supplied content per threat_model T-56-03-03). The output
+  // shape is e.g. "Jun 13" / "Aug 3".
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 function formatTooltipText(s: LslSession): string {
   const idShort = s.id.slice(0, 8)
   const start = fmtLocalTs(s.startAt)
@@ -274,6 +302,40 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     return Number.isFinite(min) ? min : undefined
   }, [windowKey, sessions])
 
+  // 2026-06-13 [Phase 56-03 AC #1]: 7 evenly-spaced major-tick labels
+  // across the active strip span. 7 is the midpoint of the 5-8 target
+  // from CONTEXT.md D-05 — gives readable spacing at default viewport
+  // widths without overlapping.
+  //
+  // Span derivation mirrors pctOfWindow at lines 103-119:
+  //   - fixed windows (24h/7d/30d): span = [now - WINDOW_MS, now]
+  //   - 'all': span = [allOriginMs, now] (dynamic data-driven origin)
+  //
+  // For the 'all' window we also widen the ladder using the actual span
+  // duration so multi-day labels switch on once the data is wide enough.
+  // Until sessions are loaded (allOriginMs === undefined) the ladder
+  // falls back to the WINDOW_MS['all'] slot (365d) → "Mon DD" labels.
+  const scaleTicks = useMemo<Array<{ ms: number; pct: number; label: string }>>(() => {
+    const endMs = Date.now()
+    const isAll = windowKey === 'all'
+    const startMs = isAll
+      ? (allOriginMs ?? endMs - WINDOW_MS['all'])
+      : endMs - WINDOW_MS[windowKey]
+    const ladderWindowMs = endMs - startMs
+    const COUNT = 7
+    const result: Array<{ ms: number; pct: number; label: string }> = []
+    for (let i = 0; i < COUNT; i++) {
+      const ms = startMs + ((endMs - startMs) * i) / (COUNT - 1)
+      const pct = pctOfWindow(
+        new Date(ms).toISOString(),
+        WINDOW_MS[windowKey],
+        isAll ? allOriginMs : undefined,
+      )
+      result.push({ ms, pct, label: formatScaleLabel(ms, ladderWindowMs) })
+    }
+    return result
+  }, [windowKey, allOriginMs])
+
   function onWindowChange(next: string) {
     if (next === '24h' || next === '7d' || next === '30d' || next === 'all') {
       // Manual change drops the auto-slide memory: if the user explicitly
@@ -299,11 +361,19 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       const prev = useViewerStore.getState().lslFilterEntityIds
       const union = new Set<string>(prev ?? [])
       for (const id of ids) union.add(id)
+      // 2026-06-13 [Phase 56-03 AC #4 store side]: also write the three
+      // cross-pane sync fields atomically alongside the LSL filter so
+      // the history sidebar scrolls and the timeline can stay loop-safe
+      // via selectionSource. First-id of the union is the focal point
+      // (consistent with the plain-click branch below).
       useViewerStore.setState({
         lslSessionFilter: Array.from(
           new Set<string>([...useViewerStore.getState().lslSessionFilter, sessionId]),
         ),
         lslFilterEntityIds: union,
+        highlightedRowKey: ids[0] ?? null,
+        selectionSource: 'timeline',
+        selectedSessionId: sessionId,
       })
       Logger.info(
         Logger.Categories.PANELS,
@@ -317,11 +387,21 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // server sorts visible-first (Insight → other → Observation), so the
     // first id is the best click target.
     const firstEntityId = ids[0] ?? null
+    // 2026-06-13 [Phase 56-03 AC #4 store side]: 7-field atomic snapshot.
+    // The pre-existing 4 fields (selectedNodeId, pathToSelected,
+    // lslSessionFilter, lslFilterEntityIds) ship the graph + LSL filter
+    // cascade; the three new Phase 56 fields (highlightedRowKey,
+    // selectionSource, selectedSessionId) ship the history-sidebar
+    // scroll-target + the loop-safety tag + the aggregate-selection
+    // signal (AC #6 partial — selectedSessionId now populated).
     useViewerStore.setState({
       selectedNodeId: firstEntityId,
       pathToSelected: new Set<string>(),
       lslSessionFilter: [sessionId],
       lslFilterEntityIds: new Set<string>(ids),
+      highlightedRowKey: firstEntityId,
+      selectionSource: 'timeline',
+      selectedSessionId: sessionId,
     })
     Logger.info(
       Logger.Categories.PANELS,
@@ -377,7 +457,11 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
         data-testid="lsl-strip"
         tabIndex={-1}
         onKeyDown={onStripKeyDown}
-        className="h-8 border-t border-border bg-card flex items-center px-2 gap-2"
+        // 2026-06-13 [Phase 56-03 AC #1]: h-8 -> h-12 to fit the new
+        // timestamp scale row (h-4) above the existing tick row (h-6)
+        // with 2px breathing room. Phase 55 UI-SPEC §7 surface change —
+        // visual diff captured by Plan 04's Playwright spec.
+        className="h-12 border-t border-border bg-card flex items-center px-2 gap-2"
         role="region"
         aria-label="LSL session timeline"
       >
@@ -401,7 +485,26 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
             all
           </ToggleGroupItem>
         </ToggleGroup>
-        <div className="flex-1 relative h-6">
+        {/*
+          2026-06-13 [Phase 56-03 AC #1]: wrapper splits the strip into a
+          scale row (top, h-4) + tick row (bottom, h-6) stacked via
+          flex-col. The tick row keeps its h-6 + relative positioning so
+          pctOfWindow math stays correct verbatim.
+        */}
+        <div className="flex-1 flex flex-col">
+          <div className="relative h-4 text-[10px] text-muted-foreground">
+            {scaleTicks.map(({ pct, label }) => (
+              <span
+                key={`scale-${pct.toFixed(2)}`}
+                data-testid={`lsl-scale-label-${pct.toFixed(0)}`}
+                className="absolute -translate-x-1/2 whitespace-nowrap"
+                style={{ left: `${pct}%` }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+          <div className="relative h-6">
           {sessions.length === 0 ? (
             <div
               data-testid="lsl-empty-state"
@@ -459,6 +562,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
               )
             })
           )}
+          </div>
         </div>
       </div>
     </TooltipProvider>
