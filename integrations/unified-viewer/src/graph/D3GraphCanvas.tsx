@@ -42,6 +42,16 @@ import type { Entity, Relation } from './types'
 // See `docs(56-04): retract pan/zoom centering from AC #3 …` for the spec
 // audit trail.
 import { computeAncestryPath, type AncestryPathResult } from './ancestry'
+// 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution): the LSL
+// timeline strip needs the same visibility predicate D3GraphCanvas uses
+// so it can resolve bucket entity ids to graph-visible ancestors before
+// writing `selectedNodeId`. Extracting the predicate as a pure function
+// shared between D3GraphCanvas (here) and `useVisibleEntityIds` (the
+// strip's source-of-truth hook) closes the round-4 phantom-id bug
+// without forcing the strip to subscribe to all 10 store fields the
+// memo here depends on. Predicate is bit-identical to the prior inline
+// body — G1-G5 + G9-G13 source-grep gates continue to pass.
+import { isEntityVisible } from './visibility-predicate'
 
 // 2026-06-13 (state-flow audit `b29bdb34c` §6.4 / §6.6): when the store's
 // `pathToSelected` is non-empty, derive the `{ edges, nodeDepths,
@@ -241,99 +251,23 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // Apply the same filter pipeline the sigma reducer applied so the two
   // viewers honour the FilterRail consistently. Done client-side here
   // because d3's data binding wants pre-filtered arrays.
+  //
+  // 2026-06-13 (Phase 56-04 round 4): the predicate body is now in
+  // `visibility-predicate.ts` so the LSL strip's `useVisibleEntityIds`
+  // hook can share it. The memo's dep list is unchanged — viewport
+  // stability contract (G9 + G13 source-grep gates) preserved verbatim.
   const visibleEntities = useMemo<Entity[]>(() => {
     const q = searchQuery.trim().toLowerCase()
-    return entities.filter((e) => {
-      // 2026-06-12: hide `[Raw] 2 messages (...)` placeholder observations
-      // that the LLM summary pipeline emits on failure — they're not real
-      // knowledge, just transcript-stub rows.
-      if (typeof e.name === 'string' && e.name.startsWith('[Raw]')) return false
-      // 2026-06-12: the viewer is for SYNTHESISED knowledge (Insights +
-      // structural backbone). Raw stream rows — Observation, Digest —
-      // pollute the graph with one node per session exchange. Hide them.
-      // Note: this checks the canonical `entityType` (Observation/Digest)
-      // because the ontology classifier often re-labels these as
-      // ontologyClass=Detail, which would let them slip through.
-      const etype = (e as unknown as { entityType?: string }).entityType
-      if (etype === 'Observation' || etype === 'Digest') return false
-      const meta = (e.metadata as { team?: string; source?: string; layer?: string; doc?: boolean } | undefined) ?? {}
-
-      // Teams predicate. Structural backbone (System/Project/Component)
-      // is EXEMPT — same convention as the LearningSource filter. Without
-      // this, unchecking a team (e.g. Coding) hides the structural anchors
-      // and every cross-team child (e.g. General-team Insights tied to a
-      // Coding-team Component via `has_insight`) loses its parent and
-      // floats as a visible orphan.
-      if (selectedTeams.size > 0) {
-        if (selectedTeams.has('__none__')) return false
-        const ocls = e.ontologyClass
-        const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
-        if (!isStructural) {
-          const team = meta.team ?? 'coding'
-          if (!selectedTeams.has(team)) return false
-        }
-      }
-
-      // Learning Source predicate. Structural backbone (System/Project/
-      // Component) is exempt — same exception graph-builder applies.
-      if (learningSource && learningSource !== 'combined') {
-        const ocls = e.ontologyClass
-        const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
-        if (!isStructural) {
-          const isAuto = meta.source === 'auto' || meta.source === 'online'
-          if (learningSource === 'online' && !isAuto) return false
-          if (learningSource === 'batch' && isAuto) return false
-        }
-      }
-
-      // Layer predicate. Empty array = "all visible" sentinel; the special
-      // ['__none__'] entry means "none visible" — emitted by toggleLayer
-      // when the user empties the array, to keep the empty-array sentinel
-      // from collapsing back to "all visible".
-      if (selectedLayers.includes('__none__')) return false
-      if (selectedLayers.length > 0) {
-        const layer = (meta as { layer?: string }).layer
-          ?? ((e as unknown as { layer?: string }).layer)
-        // Fall back to ontology hint: Insight/Pattern → 'pattern', else 'evidence'.
-        const inferred = layer
-          ?? (e.ontologyClass === 'Insight' || e.ontologyClass === 'Pattern' ? 'pattern' : 'evidence')
-        if (!selectedLayers.includes(inferred)) return false
-      }
-
-      // Doc-nodes hide toggle.
-      if (hideDocNodes) {
-        const isDoc = (meta as { doc?: boolean }).doc === true
-          || e.ontologyClass === 'Documentation'
-        if (isDoc) return false
-      }
-
-      // Class predicate (empty Set = nothing visible — same convention).
-      const cls = e.ontologyClass as string | undefined
-      if (typeof cls !== 'string' || !selectedClasses.has(cls)) return false
-
-      // Level predicate.
-      const lvl = e.level as 0 | 1 | 2 | 3 | undefined
-      if (typeof lvl === 'number' && !visibleLevels.has(lvl)) return false
-
-      // Text filter — substring over name + description (case-insensitive).
-      if (q.length > 0) {
-        const name = (e.name ?? '').toLowerCase()
-        const desc = ((e as unknown as { description?: string }).description ?? '').toLowerCase()
-        if (!name.includes(q) && !desc.includes(q)) return false
-      }
-
-      // 2026-06-12: LSL timeline session filter — when the user clicks a
-      // tick we narrow the graph to entities created during that session.
-      // Structural backbone (System/Project/Component) is exempt so the
-      // session anchors aren't ripped out of context.
-      if (lslFilterEntityIds && lslFilterEntityIds.size > 0) {
-        const ocls = e.ontologyClass
-        const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
-        if (!isStructural && !lslFilterEntityIds.has(e.id)) return false
-      }
-
-      return true
-    })
+    return entities.filter((e) => isEntityVisible(e, {
+      searchQueryLowered: q,
+      selectedTeams,
+      learningSource,
+      selectedLayers,
+      hideDocNodes,
+      selectedClasses,
+      visibleLevels,
+      lslFilterEntityIds,
+    }))
   }, [entities, selectedTeams, selectedClasses, visibleLevels, searchQuery, learningSource, selectedLayers, hideDocNodes, lslFilterEntityIds])
 
   const visibleIds = useMemo(() => {

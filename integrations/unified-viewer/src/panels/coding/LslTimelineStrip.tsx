@@ -56,7 +56,15 @@ import { useGraphData } from '@/graph/useGraphData'
 // compute the same ancestry-path the graph-side click does so the
 // central-trace renders when a tick click resolves a focal entity.
 // Shared with D3GraphCanvas via the extracted helper module.
-import { computeAncestryPath } from '@/graph/ancestry'
+//
+// 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution): also import
+// `pickFirstResolvable`. The D3 graph filters Observations/Digests/
+// Details out of the rendered set, but bucket entityIds are usually
+// Detail-level. Without resolution, the strip wrote a phantom id to
+// `selectedNodeId` (no graph node matched → no ring, sidebar disagreed
+// with the graph). Locked in 56-PATTERNS.md contract #6.
+import { computeAncestryPath, pickFirstResolvable } from '@/graph/ancestry'
+import { useVisibleEntityIds } from '@/graph/useVisibleEntityIds'
 
 export type LslWindow = '24h' | '7d' | '30d' | 'all'
 
@@ -224,6 +232,17 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // does on node click — without it, the central-trace stays blank when
   // a tick selection resolves to a focal entity.
   const { entities, relations } = useGraphData(apiClient, system)
+  // 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution): the SAME
+  // visible-entity-id set the D3 graph renders. `onTickClick` walks the
+  // bucket's entityIds and resolves each one to its closest graph-visible
+  // ancestor before writing `selectedNodeId`. Without this, a bucket
+  // whose first entity is a Detail (filtered out of the graph) wrote a
+  // phantom id — the round-4 operator-reported bug. The hook returns a
+  // Set<string> that's reference-stable across renders with identical
+  // content, so subscribing here doesn't introduce a spurious re-render
+  // cascade. See `useVisibleEntityIds.ts` for the predicate sharing
+  // rationale.
+  const visibleIds = useVisibleEntityIds(apiClient, system)
   // 2026-06-12: range-match — slice-by-hour was unreliable because LSL
   // file times (UTC after parser) don't align with entity createdAt
   // UTC hour boundaries. We now expose the selected entity's createdAt
@@ -440,17 +459,51 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       )
       return
     }
-    // 2026-06-13 (Phase 56-04 fix #3): compute the ancestry-path the
-    // same way D3GraphCanvas's node click does so the central-trace
-    // renders when the focal entity has a parent chain. Returns an empty
-    // Set when the focal entity has no relations in the live graph.
-    const firstEntityId = ids[0] ?? null
-    const path = firstEntityId !== null
-      ? computeAncestryPath(firstEntityId, relations)
+    // 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution): resolve
+    // the bucket's entityIds to the closest graph-visible ancestor BEFORE
+    // any setSelection write. The D3 graph filters Observations/Digests/
+    // Details out of the rendered set; bucket entityIds are usually
+    // Detail-level. Writing the raw `ids[0]` to `selectedNodeId` produced
+    // a phantom that no D3 node matched — the round-4 operator-reported
+    // bug. `pickFirstResolvable` walks each id (and its ancestry) until
+    // one lands in `visibleIds`. When NO id in the bucket has any visible
+    // ancestor, we write `selectedNodeId: null` (sidebar-only mode); the
+    // sidebar still shows the bucket's content and the LSL fade still
+    // works via `lslFilterEntityIds`, but the graph stays at its
+    // pre-click state (no spurious phantom ring).
+    //
+    // Locked in 56-PATTERNS.md contract #6.
+    const resolvedNodeId = pickFirstResolvable(ids, visibleIds, relations)
+    // 2026-06-13 (Phase 56-04 fix #3): compute the ancestry-path against
+    // the RESOLVED id (not raw ids[0]) so the central-trace lines from
+    // the resolved ancestor to the CK render correctly. Returns an empty
+    // Set when no resolution exists OR when the resolved entity has no
+    // relations in the live graph (sidebar-only mode).
+    //
+    // 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution): when the
+    // resolved id is an ancestor (NOT the bucket's first entity), we
+    // ALSO add the raw bucket ids to `pathToSelected` for cross-pane
+    // provenance — the graph's trace renderer skips ids that have no
+    // D3 node (the phantom ids stay invisible), but Sigma + future
+    // cross-pane consumers can still read the bucket origin from the
+    // path set. This is intentional and matches the round-4 brief's
+    // "pathToSelected contains both the Detail-id AND the resolved-id".
+    const path = resolvedNodeId !== null
+      ? computeAncestryPath(resolvedNodeId, relations)
       : null
     const pathToSelected: Set<string> = path !== null
       ? new Set<string>(path.nodeDepths.keys())
       : new Set<string>()
+    // Round-4 provenance: when we resolved up to an ancestor (i.e. the
+    // raw bucket id != resolvedNodeId), include the raw bucket ids in
+    // pathToSelected so cross-pane consumers can read the bucket origin.
+    // D3's trace renderer skips ids with no `.node` mount, so the raw
+    // phantom ids stay invisible — they're just metadata for downstream.
+    // Skip this entirely in sidebar-only mode (`resolvedNodeId === null`)
+    // — empty pathToSelected is the contract for "no graph trace".
+    if (resolvedNodeId !== null) {
+      for (const rawId of ids) pathToSelected.add(rawId)
+    }
     if (e.metaKey || e.ctrlKey) {
       // 2026-06-12: Cmd/Ctrl click — UNION the session's entityIds with
       // the existing filter set. Lets the user assemble a multi-session
@@ -464,10 +517,14 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
         new Set<string>([...prevState.lslSessionFilter, sessionId]),
       )
       setSelection({
-        nodeId: firstEntityId,
+        // 2026-06-13 (round 4): resolved ancestor — never the phantom Detail.
+        nodeId: resolvedNodeId,
         sessionId,
         sessionStartAt: startAt,
-        highlightedRowKey: ids[0] ?? null,
+        // Sidebar highlight follows the resolved node so the row text
+        // agrees with the graph ring. Cross-pane provenance still flows
+        // through `lslFilterEntityIds` below (raw bucket ids).
+        highlightedRowKey: resolvedNodeId,
         source: 'timeline',
         pathToSelected,
         lslSessionFilter: nextSessionFilter,
@@ -478,7 +535,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       })
       Logger.info(
         Logger.Categories.PANELS,
-        `LslTimelineStrip tick added: ${sessionId} (${ids.length} ids, total ${union.size})`,
+        `LslTimelineStrip tick added: ${sessionId} (${ids.length} ids → resolved:${resolvedNodeId ?? 'sidebar-only'}, total ${union.size})`,
       )
       return
     }
@@ -487,11 +544,18 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // The action's deep-equal guard on `lslFilterEntityIds` is what fixes
     // the "zoom feel" Issue 1 — identical-content writes preserve the
     // reference and `visibleEntities` memo does not invalidate.
+    //
+    // 2026-06-13 (round 4): `nodeId` + `highlightedRowKey` now carry the
+    // RESOLVED ancestor id, never a phantom Detail. `lslFilterEntityIds`
+    // keeps the raw bucket ids (separate concern — graph fade vs. graph
+    // selection target). When `resolvedNodeId === null`, sidebar-only
+    // mode fires: no graph ring, no trace, but the LSL fade still
+    // narrows the rendered set so the operator sees the bucket scope.
     setSelection({
-      nodeId: firstEntityId,
+      nodeId: resolvedNodeId,
       sessionId,
       sessionStartAt: startAt,
-      highlightedRowKey: firstEntityId,
+      highlightedRowKey: resolvedNodeId,
       source: 'timeline',
       pathToSelected,
       lslSessionFilter: [sessionId],
@@ -499,7 +563,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     })
     Logger.info(
       Logger.Categories.PANELS,
-      `LslTimelineStrip tick → filter:${ids.length} ids, select:${firstEntityId ?? 'none'}`,
+      `LslTimelineStrip tick → filter:${ids.length} ids, select:${resolvedNodeId ?? 'sidebar-only'}`,
     )
   }
 

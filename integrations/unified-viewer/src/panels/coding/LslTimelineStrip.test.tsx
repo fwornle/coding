@@ -57,14 +57,31 @@ vi.mock('@/graph/useGraphData', () => ({
 // but the timeline's bucket entityIds are usually Detail-level. The
 // resolution helper walks bucket→ancestry→visible-set. Tests seed
 // `globalThis.__mockVisibleIds` to a Set<string> capturing exactly which
-// node ids the graph would render. Defaults to undefined → null Set
-// (sidebar-only mode for every tick — exercised by T-G).
+// node ids the graph would render.
+//
+// DEFAULT (when `__mockVisibleIds` is unset): return an "everything is
+// visible" Set-like proxy whose `.has()` always returns `true`. This
+// preserves the happy-path semantics of every PRE-round-4 test in this
+// file (Tests 18/19/24/26/28 — all assume the bucket's first entity is
+// directly visible in the graph), without dragging fixture updates into
+// 5+ unrelated tests. The round-4 tests (T-F/T-G/T-H) seed the global
+// explicitly to a real Set, so they exercise the round-4 contract.
+const ALL_VISIBLE: ReadonlySet<string> = {
+  has: () => true,
+  get size() { return Number.POSITIVE_INFINITY },
+  keys: () => [].values(),
+  values: () => [].values(),
+  entries: () => [].values(),
+  forEach: () => {},
+  [Symbol.iterator]: () => [].values(),
+} as unknown as ReadonlySet<string>
+
 vi.mock('@/graph/useVisibleEntityIds', () => ({
   useVisibleEntityIds: () => {
     const ids =
       (globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> })
         .__mockVisibleIds
-    return ids ?? new Set<string>()
+    return ids ?? ALL_VISIBLE
   },
 }))
 
@@ -1078,11 +1095,15 @@ describe('LslTimelineStrip', () => {
       selectedSessionId: null,
       selectedSessionStartAt: null,
     })
+    // Capture session startAt once so test assertion compares the exact
+    // same ISO string (nowMinusHours uses Date.now() — distinct calls
+    // produce ISOs that differ by a few ms, breaking strict toBe).
+    const sessionStartAt = nowMinusHours(2)
     const r = renderStrip({
       sessions: [
         {
           id: 'sess-phantom',
-          startAt: nowMinusHours(2),
+          startAt: sessionStartAt,
           endAt: nowMinusHours(1.5),
           observationCount: 5,
           entityIds: ['detail-1'],
@@ -1099,7 +1120,7 @@ describe('LslTimelineStrip', () => {
       // The fix: selectedNodeId is the resolved ancestor, NOT the phantom Detail.
       expect(s.selectedNodeId).toBe('component-1')
       // sessionStartAt is the bucket's startAt.
-      expect(s.selectedSessionStartAt).toBe(nowMinusHours(2))
+      expect(s.selectedSessionStartAt).toBe(sessionStartAt)
       // pathToSelected includes the resolved ancestor + its parent.
       expect(s.pathToSelected.has('component-1')).toBe(true)
       expect(s.pathToSelected.has('root-1')).toBe(true)
@@ -1149,11 +1170,12 @@ describe('LslTimelineStrip', () => {
       selectedSessionStartAt: null,
       lslFilterEntityIds: null,
     })
+    const sessionStartAt = nowMinusHours(2)
     const r = renderStrip({
       sessions: [
         {
           id: 'sess-orphan',
-          startAt: nowMinusHours(2),
+          startAt: sessionStartAt,
           endAt: nowMinusHours(1.5),
           observationCount: 1,
           entityIds: ['orphan-detail'],
@@ -1171,7 +1193,7 @@ describe('LslTimelineStrip', () => {
       expect(s.selectedNodeId).toBeNull()
       // Session bucket is still selected so the timeline tick rings.
       expect(s.selectedSessionId).toBe('sess-orphan')
-      expect(s.selectedSessionStartAt).toBe(nowMinusHours(2))
+      expect(s.selectedSessionStartAt).toBe(sessionStartAt)
       // LSL fade still works — bucket's raw entities populate the filter.
       expect(s.lslFilterEntityIds?.has('orphan-detail')).toBe(true)
       // No trace to render.
@@ -1215,11 +1237,12 @@ describe('LslTimelineStrip', () => {
       selectedSessionId: null,
       selectedSessionStartAt: null,
     })
+    const sessionStartAt = nowMinusHours(2)
     const r = renderStrip({
       sessions: [
         {
           id: 'sess-happy',
-          startAt: nowMinusHours(2),
+          startAt: sessionStartAt,
           endAt: nowMinusHours(1.5),
           observationCount: 3,
           entityIds: ['component-2'],
@@ -1235,7 +1258,7 @@ describe('LslTimelineStrip', () => {
       const s = useViewerStore.getState()
       // Identity: the bucket's first entity IS visible → write it as-is.
       expect(s.selectedNodeId).toBe('component-2')
-      expect(s.selectedSessionStartAt).toBe(nowMinusHours(2))
+      expect(s.selectedSessionStartAt).toBe(sessionStartAt)
       // Trace includes the visible ancestry.
       expect(s.pathToSelected.has('component-2')).toBe(true)
       expect(s.pathToSelected.has('root-2')).toBe(true)

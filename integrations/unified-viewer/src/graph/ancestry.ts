@@ -96,3 +96,89 @@ export function computeAncestryPath(
   }
   return { edges, nodeDepths, pathLength: depth }
 }
+
+// 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution).
+//
+// The D3 graph in the Coding tab deliberately filters
+// Observation/Digest/Detail-level entities out of the rendered set
+// (D3GraphCanvas.tsx `visibleEntities` useMemo). The LSL timeline strip
+// generates ticks whose `entityIds[]` are almost always Detail-level
+// (per `scripts/observations-api-server.mjs` TYPE_RANK sort), so the
+// strip's `onTickClick` would have written a `selectedNodeId` that does
+// not match any rendered D3 node — a phantom id. The cascade then:
+//
+//   1. applySelectionStyling found no `.node` with `.id === phantom` →
+//      no red ring rendered
+//   2. The trace LINE between the phantom Detail and its visible
+//      ancestor couldn't render because the Detail isn't a D3 node
+//   3. The sidebar showed the phantom Detail's text — disagreeing with
+//      the highlighted-via-pathToSelected node in the graph
+//
+// Operator decision (2026-06-13, post 4th smoke): resolve to the closest
+// graph-visible ancestor in `onTickClick`. The bucket's entities[] is
+// walked, and each entity's ancestry is walked, until a graph-visible
+// entity is found. That ancestor's id becomes `selectedNodeId`. Sidebar
+// shows the ancestor's text. Bucket's raw entities still feed
+// `lslFilterEntityIds` for the LSL fade (a separate concern from the
+// graph selection target).
+//
+// Locked in 56-PATTERNS.md contract #6. Predicate:
+//   visibleIds.has(resolvedId) MUST be true for any non-null
+//   selectedNodeId write originating outside D3GraphCanvas.
+
+/**
+ * Resolve an entity id to the closest graph-visible ancestor.
+ *
+ *  - If `entityId` is itself in `visibleIds`, return it unchanged.
+ *  - Otherwise walk the hierarchy (parents-of-entityId, parents-of-parents,
+ *    …) and return the FIRST ancestor encountered that is in `visibleIds`.
+ *    "First" here means closest-to-the-entity — `computeAncestryPath`'s
+ *    `nodeDepths` map iterates in BFS-insertion order, so the closer the
+ *    ancestor sits to the original entity, the earlier it appears.
+ *  - If no ancestor (and not the entity itself) is in `visibleIds`,
+ *    return `null`.
+ *
+ * Uses `computeAncestryPath` for the walk so the predicate of "what
+ * counts as an ancestor" stays identical to the trace-rendering code
+ * (HIERARCHY_TYPES edge subset).
+ */
+export function resolveToVisibleAncestor(
+  entityId: string,
+  visibleIds: ReadonlySet<string>,
+  relations: readonly Relation[],
+): string | null {
+  if (visibleIds.has(entityId)) return entityId
+  const path = computeAncestryPath(entityId, relations)
+  // `nodeDepths` is keyed by entity id. The selected entity is depth 0;
+  // its immediate parent is depth 1; grandparent is depth 2; and so on.
+  // BFS-insertion order keeps the iteration deepest-first-after-self,
+  // so the first id we hit (after skipping the entity itself) that is
+  // in the visible set is the closest visible ancestor.
+  for (const ancestorId of path.nodeDepths.keys()) {
+    if (ancestorId === entityId) continue
+    if (visibleIds.has(ancestorId)) return ancestorId
+  }
+  return null
+}
+
+/**
+ * Walk a bucket's `entityIds[]` and return the first id (or its closest
+ * visible ancestor) that lands in the graph's visible set.
+ *
+ *  - For each id in `entityIds`, calls `resolveToVisibleAncestor`.
+ *  - Returns the FIRST non-null resolution.
+ *  - Returns `null` when no id in the bucket has any visible ancestor —
+ *    the sidebar-only mode the timeline strip uses to render the bucket
+ *    selection without a graph target.
+ */
+export function pickFirstResolvable(
+  entityIds: readonly string[],
+  visibleIds: ReadonlySet<string>,
+  relations: readonly Relation[],
+): string | null {
+  for (const id of entityIds) {
+    const resolved = resolveToVisibleAncestor(id, visibleIds, relations)
+    if (resolved !== null) return resolved
+  }
+  return null
+}
