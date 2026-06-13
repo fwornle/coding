@@ -991,11 +991,11 @@ Plans:
 **Goal:** Replace Phase 56's one-to-one selection sync with a many-to-many model: a timeline tick lights up ALL insights it touched (graph multi-ring + sidebar History-style card list); a graph node lights up ALL ticks where it was touched (timeline multi-highlight); drilling into a bucket card or single touched node returns to single-entity detail. Requires multi-selection store fields (`selectedBucketEntityIds`, `selectedNodeTickKeys`), a "which ticks touched node X?" lookup (likely new server endpoint or client-side scan), multi-mode sidebar (single entity vs bucket-card list), and updated D3/Timeline highlight rendering for N-element selection. Also incorporates the 4 Warnings deferred from Phase 56 code-review (WR-01 data-dep test, WR-02 diamond hierarchy, WR-03 selectedClasses race, WR-04 reset() field coverage).
 **Requirements**: TBD
 **Depends on:** Phase 56
-**Plans:** 6 plans
+**Plans:** 2/6 plans executed
 
 Plans:
-- [ ] 56.1-01-PLAN.md — Wave 1: Store schema evolution (selectedNodeIds + focalNodeId + selectedBucketKeys + focalBucketKey) + WR-04 reset() coverage
-- [ ] 56.1-02-PLAN.md — Wave 1: ancestry.ts pickAllResolvable + computeAncestryPath WR-02 diamond-hierarchy BFS fix
+- [x] 56.1-01-PLAN.md — Wave 1: Store schema evolution (selectedNodeIds + focalNodeId + selectedBucketKeys + focalBucketKey) + WR-04 reset() coverage
+- [x] 56.1-02-PLAN.md — Wave 1: ancestry.ts pickAllResolvable + computeAncestryPath WR-02 diamond-hierarchy BFS fix
 - [ ] 56.1-03-PLAN.md — Wave 2: D3GraphCanvas two-tier ring rendering (focal red + halo lighter blue) + drill-collapse click handler + SidePanel close button compliance (Locked Contract #5)
 - [ ] 56.1-04-PLAN.md — Wave 2: BucketCardList NEW component + SidePanel three-way mode switch + HistorySidebar onClick migration to new setSelection arg shape
 - [ ] 56.1-05-PLAN.md — Wave 3: useNodeToBucketsIndex pre-index hook + LslTimelineStrip multi-state write + two-tier tick render + WR-03 selectedClasses race fix + D3GraphCanvas node-click reverse cascade (D-2 both directions)
