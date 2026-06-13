@@ -50,6 +50,24 @@ vi.mock('@/graph/useGraphData', () => ({
   },
 }))
 
+// 2026-06-13 [Phase 56-04 round 4 — Tests T-F/T-G/T-H]: Mock the new
+// `useVisibleEntityIds` hook so the strip's onTickClick handler can
+// resolve a tick's entityIds to the closest graph-visible ancestor. The
+// D3 graph filters Observations/Digests/Details out of the rendered set,
+// but the timeline's bucket entityIds are usually Detail-level. The
+// resolution helper walks bucket→ancestry→visible-set. Tests seed
+// `globalThis.__mockVisibleIds` to a Set<string> capturing exactly which
+// node ids the graph would render. Defaults to undefined → null Set
+// (sidebar-only mode for every tick — exercised by T-G).
+vi.mock('@/graph/useVisibleEntityIds', () => ({
+  useVisibleEntityIds: () => {
+    const ids =
+      (globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> })
+        .__mockVisibleIds
+    return ids ?? new Set<string>()
+  },
+}))
+
 import LslTimelineStrip, { formatScaleLabel } from './LslTimelineStrip'
 import { useViewerStore } from '@/store/viewer-store'
 import { ApiClient } from '@/api/ApiClient'
@@ -1003,5 +1021,250 @@ describe('LslTimelineStrip', () => {
       delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
       useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
     }
+  })
+
+  // ====================================================================
+  // Phase 56 Plan 04 continuation 4 — phantom-id resolution (round 4).
+  //
+  // Operator's 4th smoke (post state-flow audit refactor) surfaced a
+  // scope-level mismatch: the D3 graph deliberately filters Observations/
+  // Digests/Details out of the rendered set, but `LslTimelineStrip.
+  // onTickClick` writes `bucket.entities[0].id` to `selectedNodeId`
+  // unconditionally. When that id is not a rendered D3 node:
+  //   - applySelectionStyling finds no `.node` → no red ring
+  //   - pathToSelected resolves to a higher ancestor → those nodes
+  //     stay visible but disagree with the sidebar text
+  //   - the trace LINE between phantom-Intent and its visible ancestor
+  //     can't render because phantom-Intent isn't a D3 node
+  //
+  // Operator decision (locked): resolve to the closest graph-visible
+  // ancestor in onTickClick. The bucket's entities[] is walked, and each
+  // entity's ancestry is walked, until a graph-visible entity is found.
+  // That ancestor's id becomes `selectedNodeId`. Sidebar shows the
+  // ancestor's text. Bucket's raw entities still feed `lslFilterEntityIds`
+  // for the LSL fade.
+  //
+  // Tests T-F/T-G/T-H lock the contract: phantom-id ticks never write a
+  // non-graph-visible `selectedNodeId`. The new `useVisibleEntityIds`
+  // hook is mocked at module scope (line ~50); each test seeds
+  // `globalThis.__mockVisibleIds` to control which ids the graph would
+  // render.
+  // ====================================================================
+
+  test('Test 33 [T-F — phantom-id resolves to closest visible ancestor]: tick whose entities[0] is a Detail with a Component ancestor IN the visible set writes the component id (NOT the Detail id)', async () => {
+    // Fixture:
+    //   - bucket.entityIds === ['detail-1']
+    //   - ancestry chain: detail-1 ← component-1 ← root-1
+    //   - graph visible set: { component-1, root-1 } — Detail filtered out
+    //
+    // Expected post-click:
+    //   selectedNodeId === 'component-1'         (NOT 'detail-1')
+    //   selectedSessionStartAt === s.startAt
+    //   pathToSelected contains: detail-1 + component-1 + root-1
+    //                             (raw entity kept for cross-pane provenance,
+    //                              plus the resolved chain for trace render)
+    mockEntities.length = 0
+    mockEntities.push({ id: 'detail-1', createdAt: nowMinusHours(1.75) } as never)
+    ;(globalThis as unknown as { __mockRelations?: unknown }).__mockRelations = [
+      { from: 'component-1', to: 'detail-1', type: 'contains' },
+      { from: 'root-1', to: 'component-1', type: 'contains' },
+    ]
+    // Visible set EXCLUDES the Detail (the bug scenario)
+    ;(globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> }).__mockVisibleIds =
+      new Set<string>(['component-1', 'root-1'])
+    useViewerStore.setState({
+      selectedNodeId: null,
+      pathToSelected: new Set<string>(),
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+    })
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-phantom',
+          startAt: nowMinusHours(2),
+          endAt: nowMinusHours(1.5),
+          observationCount: 5,
+          entityIds: ['detail-1'],
+        },
+      ],
+    })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-phantom'))
+      const tick = screen.getByTestId('lsl-tick-sess-phantom')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      // The fix: selectedNodeId is the resolved ancestor, NOT the phantom Detail.
+      expect(s.selectedNodeId).toBe('component-1')
+      // sessionStartAt is the bucket's startAt.
+      expect(s.selectedSessionStartAt).toBe(nowMinusHours(2))
+      // pathToSelected includes the resolved ancestor + its parent.
+      expect(s.pathToSelected.has('component-1')).toBe(true)
+      expect(s.pathToSelected.has('root-1')).toBe(true)
+      // Bucket's raw entities still feed the LSL fade.
+      expect(s.lslFilterEntityIds?.has('detail-1')).toBe(true)
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
+      delete (globalThis as unknown as { __mockVisibleIds?: unknown }).__mockVisibleIds
+      useViewerStore.setState({
+        selectedNodeId: null,
+        pathToSelected: new Set(),
+        selectedSessionId: null,
+        selectedSessionStartAt: null,
+        lslFilterEntityIds: null,
+      })
+    }
+  })
+
+  test('Test 34 [T-G — no visible ancestor → sidebar-only mode]: tick whose entities have NO graph-visible ancestor writes selectedNodeId=null but still cascades session + LSL fade', async () => {
+    // Fixture:
+    //   - bucket.entityIds === ['orphan-detail']
+    //   - ancestry chain: orphan-detail has no edges
+    //   - graph visible set: { unrelated-1, unrelated-2 } — nothing in the
+    //     bucket's ancestry is visible
+    //
+    // Expected post-click:
+    //   selectedNodeId === null                     (sidebar-only mode)
+    //   selectedSessionId === s.id                  (LSL bucket still selected)
+    //   selectedSessionStartAt === s.startAt
+    //   lslFilterEntityIds has 'orphan-detail'      (fade still works)
+    //   pathToSelected === Set()                    (no trace to render)
+    mockEntities.length = 0
+    mockEntities.push({ id: 'orphan-detail', createdAt: nowMinusHours(1.75) } as never)
+    // Relations EXCLUDE the orphan — no ancestry to resolve.
+    ;(globalThis as unknown as { __mockRelations?: unknown }).__mockRelations = [
+      { from: 'unrelated-1', to: 'unrelated-2', type: 'contains' },
+    ]
+    // Visible set has unrelated nodes but nothing in bucket's tree.
+    ;(globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> }).__mockVisibleIds =
+      new Set<string>(['unrelated-1', 'unrelated-2'])
+    useViewerStore.setState({
+      selectedNodeId: null,
+      pathToSelected: new Set<string>(),
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+      lslFilterEntityIds: null,
+    })
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-orphan',
+          startAt: nowMinusHours(2),
+          endAt: nowMinusHours(1.5),
+          observationCount: 1,
+          entityIds: ['orphan-detail'],
+        },
+      ],
+    })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-orphan'))
+      const tick = screen.getByTestId('lsl-tick-sess-orphan')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      // Sidebar-only mode: no graph selection.
+      expect(s.selectedNodeId).toBeNull()
+      // Session bucket is still selected so the timeline tick rings.
+      expect(s.selectedSessionId).toBe('sess-orphan')
+      expect(s.selectedSessionStartAt).toBe(nowMinusHours(2))
+      // LSL fade still works — bucket's raw entities populate the filter.
+      expect(s.lslFilterEntityIds?.has('orphan-detail')).toBe(true)
+      // No trace to render.
+      expect(s.pathToSelected.size).toBe(0)
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
+      delete (globalThis as unknown as { __mockVisibleIds?: unknown }).__mockVisibleIds
+      useViewerStore.setState({
+        selectedNodeId: null,
+        pathToSelected: new Set(),
+        selectedSessionId: null,
+        selectedSessionStartAt: null,
+        lslFilterEntityIds: null,
+      })
+    }
+  })
+
+  test('Test 35 [T-H — visible entity passes through unchanged]: tick whose entities[0] IS already in the visible set writes that exact id (regression lock for happy path)', async () => {
+    // Fixture:
+    //   - bucket.entityIds === ['component-2']
+    //   - ancestry chain: component-2 ← root-2
+    //   - graph visible set: { component-2, root-2 } — component-2 IS rendered
+    //
+    // Expected post-click:
+    //   selectedNodeId === 'component-2'           (no change vs pre-fix)
+    //   selectedSessionStartAt === s.startAt
+    //   pathToSelected contains: component-2 + root-2
+    //                             (full cascade fires unchanged)
+    mockEntities.length = 0
+    mockEntities.push({ id: 'component-2', createdAt: nowMinusHours(1.75) } as never)
+    ;(globalThis as unknown as { __mockRelations?: unknown }).__mockRelations = [
+      { from: 'root-2', to: 'component-2', type: 'contains' },
+    ]
+    ;(globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> }).__mockVisibleIds =
+      new Set<string>(['component-2', 'root-2'])
+    useViewerStore.setState({
+      selectedNodeId: null,
+      pathToSelected: new Set<string>(),
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+    })
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-happy',
+          startAt: nowMinusHours(2),
+          endAt: nowMinusHours(1.5),
+          observationCount: 3,
+          entityIds: ['component-2'],
+        },
+      ],
+    })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-happy'))
+      const tick = screen.getByTestId('lsl-tick-sess-happy')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      // Identity: the bucket's first entity IS visible → write it as-is.
+      expect(s.selectedNodeId).toBe('component-2')
+      expect(s.selectedSessionStartAt).toBe(nowMinusHours(2))
+      // Trace includes the visible ancestry.
+      expect(s.pathToSelected.has('component-2')).toBe(true)
+      expect(s.pathToSelected.has('root-2')).toBe(true)
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
+      delete (globalThis as unknown as { __mockVisibleIds?: unknown }).__mockVisibleIds
+      useViewerStore.setState({
+        selectedNodeId: null,
+        pathToSelected: new Set(),
+        selectedSessionId: null,
+        selectedSessionStartAt: null,
+        lslFilterEntityIds: null,
+      })
+    }
+  })
+
+  test('Test 36 [round-4 acceptance grep]: LslTimelineStrip.tsx calls pickFirstResolvable from onTickClick', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/panels/coding/LslTimelineStrip.tsx'),
+      'utf8',
+    )
+    // The phantom-id fix routes the bucket's entityIds through the shared
+    // helper before any setSelection write. Source-grep gate locks the
+    // wiring at the file level even if a future refactor moves the call.
+    expect(src).toMatch(/pickFirstResolvable/)
+    // The helper module is the canonical home; the file imports it from
+    // @/graph/ancestry (audit §6.4 extraction site).
+    expect(src).toMatch(/from\s+['"]@\/graph\/ancestry['"]/)
   })
 })
