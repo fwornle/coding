@@ -555,7 +555,11 @@
       "Bash(/usr/bin/curl -s --max-time 5 \"http://localhost:12436/api/v1/entities?limit=10000\")",
       "Bash(/usr/bin/curl -s --max-time 3 \"http://localhost:12436/api/v1/trends?top=20\")",
       "Bash(gsd-browser console *)",
-      "Bash(gsd-browser network *)"
+      "Bash(gsd-browser network *)",
+      "Bash(ssh-keygen -R ssh.github.com)",
+      "Bash(ssh-keyscan -p 443 -T 5 ssh.github.com)",
+      "Bash(ssh -T -o ConnectTimeout=10 git@github.com)",
+      "Bash(ssh -v -o ConnectTimeout=5 -o BatchMode=yes git@github.com exit)"
     ],
     "deny": [],
     "ask": []

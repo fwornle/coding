@@ -2,8 +2,8 @@
   {
     "id": "019eb544-0ee7-7283-b559-e614ac9f180c",
     "topic": "KM-Core Foundation — v7.1 Architecture and Project Structure",
-    "summary": "## Purpose\nProvides the HTTP and SSE API layer for observations data, routing requests to the km-core `GraphKMStore` (LevelDB) rather than SQLite directly. The server is the primary REST and streaming entry point for typed entity views sourced from the graph store, supporting real-time observation delivery and in-process claim verification.\n\n## Architecture\n**obs-api startup initialization sequence:**\n- `RetrievalService` initializes with fastembed (embedding engine) and Qdrant (vector store) — required for semantic retrieval\n- `ObservationPruner` runs a full processing cycle over all observations before the service is considered healthy\n- km-core router mounts and exposes ontology class views and deduplication endpoints\n\n**Route structure:**\n- **`/api/v1`** — canonical km-core endpoint group; mounted via the km-core router\n- **`/api/v1/stream`** — SSE endpoint; streams live observation data to frontend consumers\n- **`/api/coding/*`** — typed-view endpoints backed by km-core; returns `503` until the LevelDB store is unlocked\n- **`/verify`** — in-process insight-claim verification with project-root resolution; avoids LevelDB lock contention; prefer over standalone CLI when obs-api is running; returns `null` for projects without on-disk checkouts (graceful skip, not a false negative)\n- **`/api/consolidation/status`** — consolidator health polling endpoint\n- **`POST /api/insights/<id>/resynthesize`** — per-insight resynthesis; handler logic lives in `ObservationConsolidator.js` (`resynthesizeInsight` async handler); entity lookup/routing corrected — previously returned NOT_FOUND prematurely\n- **Deleted routes**: `/api/km` (returns 404), legacy SQLite GET handlers (returns 404)\n\n**Entity-not-found semantics**: GET/PUT/DELETE return `200` with `null`/`false` — not `404`.\n\n**km-core entity schema — snake_case field names (recurring bug class):**\n- All km-core entity attributes use **snake_case** keys; `Digest` entities specifically: `observation_ids`, `files_touched`, `digest_ids`\n- Any consumer mapping km-core entity fields must use snake_case; camelCase variants silently resolve to `undefined`\n- **Confirmed affected surfaces:**\n  1. `ObservationExporter.js` field mapper — `observation_ids` required\n  2. Digest API digest-to-observation join — root cause of digest endpoints returning `0` observation entries; fix is a targeted field rename to `observation_ids`\n- Verify the live entity shape via `curl` or Node REPL before writing or updating any field mapper\n\n**LevelDB lock contention**: `/api/coding/*` returns `503` when obs-api holds the lock; use `/verify` in-process endpoint to avoid conflict; the standalone `verify-insight-claims.mjs` CLI requires obs-api to be stopped.\n\n**Critical architectural gap — SQLite→km-core sync:**\n- Phase 44 migration was a **one-shot** operation: `ObservationWriter` continues writing new observations to SQLite only; the dashboard reads exclusively from km-core, creating a growing visibility gap\n- **Workaround**: re-run `scripts/migrate-sqlite-to-kmcore.mjs --resume` for idempotent backfill via `legacyId` matching; restart obs-api afterward\n- **Plan 44-11** mandates a continuous sync path — not yet implemented\n\n**km-core subpath exports**: `./api`, `./api/contracts`, `./snapshots` added to `lib/km-core/package.json`.\n\n## Key Files\n- `scripts/observations-api-server.mjs` — primary server; all routes including SSE, `/verify` (with project-root resolution), `/api/consolidation/status`, and `POST /api/insights/<id>/resynthesize`\n- `src/live-logging/ObservationConsolidator.js` — `resynthesizeInsight` handler; synthesis engine; coverage tab rendering\n- `scripts/verify-insight-claims.mjs` — standalone offline CLI; requires obs-api to be stopped\n- `scripts/migrate-sqlite-to-kmcore.mjs` — migration/backfill; `--dry-run`, `--resume`, `--db`, `--store` flags\n- `src/live-logging/ObservationExporter.js` — exports observation data from km-core; snake_case field mapper\n- `lib/km-core/package.json` — `./api`, `./api/contracts`, `./snapshots` subpath exports\n- `.observations/observations.db` — legacy SQLite store\n\n## Usage\nStart obs-api via `launchctl`; verify health via `/api/coding/<entity-type>` (200 = ready, 503 = locked) and `/api/consolidation/status`. Use `POST /verify` for in-process claim verification while obs-api is running. For insight resynthesis, `POST /api/insights/<id>/resynthesize` routes to obs-api on port 12436 — not to the health dashboard API on port 3033. Backfill new observations from SQLite with `node scripts/migrate-sqlite-to-kmcore.mjs --resume` then restart obs-api. Before implementing any km-core entity field mapper, verify the live entity shape via `curl` or Node REPL to confirm current snake_case attribute names.\n\n## Troubleshooting\n- **`/api/coding/*` returns 503**: obs-api holds an exclusive LevelDB lock — use `/verify` instead of standalone CLI, or stop obs-api via `launchctl` to release\n- **Digest API returns 0 observation entries per digest**: snake_case/camelCase misalignment in the digest-to-observation join; apply field rename to `observation_ids` (not `observationIds`)\n- **Exported digests have undefined or missing fields in ObservationExporter**: field mapper is using camelCase — switch to `observation_ids`, `files_touched`, `digest_ids`\n- **Resynthesize request returns NOT_FOUND**: verify corrected entity lookup in `ObservationConsolidator.js`'s `resynthesizeInsight` handler; confirm client is routing to port 12436, not port 3033\n- **Dashboard shows stale observations not present in km-core**: new observations written to SQLite since Phase 44 migration are not in km-core — run `--resume` backfill and restart obs-api\n- **`@fwornle/km-core` import fails**: `node_modules/@fwornle/km-core` symlink absent — create pointing to `lib/km-core/`\n- **Consolidator health stuck**: poll `/api/consolidation/status` to confirm recent state transitions\n- **`/verify` returns `null` for a project**: project has no on-disk checkout — this is a graceful skip, not a false negative",
-    "confidence": 0.92,
+    "summary": "## Purpose\nProvides the HTTP and SSE API layer for observations data, routing requests to the km-core `GraphKMStore` (LevelDB) rather than SQLite directly. The server is the primary REST and streaming entry point for typed entity views sourced from the graph store, supporting real-time observation delivery, in-process claim verification, and project taxonomy coverage calculations.\n\n## Architecture\n**obs-api startup initialization sequence:**\n- `RetrievalService` initializes with fastembed (embedding engine) and Qdrant (vector store) — required for semantic retrieval\n- `ObservationPruner` runs a full processing cycle over all observations before the service is considered healthy\n- km-core router mounts and exposes ontology class views and deduplication endpoints\n\n**Route structure:**\n- **`/api/v1`** — canonical km-core endpoint group; mounted via the km-core router\n- **`/api/v1/stream`** — SSE endpoint; streams live observation data to frontend consumers\n- **`/api/coding/*`** — typed-view endpoints backed by km-core; returns `503` until the LevelDB store is unlocked\n- **`/verify`** — in-process insight-claim verification with project-root resolution; avoids LevelDB lock contention; prefer over standalone CLI when obs-api is running; returns `null` for projects without on-disk checkouts (graceful skip, not a false negative)\n- **`/api/consolidation/status`** — consolidator health polling endpoint\n- **`POST /api/insights/<id>/resynthesize`** — per-insight resynthesis; handler logic lives in `ObservationConsolidator.js` (`resynthesizeInsight` async handler); entity lookup/routing corrected — previously returned NOT_FOUND prematurely\n- **Deleted routes**: `/api/km` (returns 404), legacy SQLite GET handlers (returns 404)\n\n**Taxonomy coverage calculation:**\n- The server aggregates author taxonomy component coverage per project and surfaces a dashboard success indicator (\"✓ all taxonomy components mentioned\")\n- The aggregation logic **must guard against a zero denominator** — if no components are found, a missing guard causes a false-positive green checkmark with `0/0` metrics, masking missing data or misconfiguration\n- Success indicators must only render when actual, non-zero coverage data exists\n- Project taxonomy data (component lists, scope, author taxonomy) is managed via API-driven tool calls to the obs-api; after bulk reclassification or taxonomy changes, restart the service and re-verify each affected project\n\n**Entity-not-found semantics**: GET/PUT/DELETE return `200` with `null`/`false` — not `404`.\n\n**km-core entity schema — snake_case field names (recurring bug class):**\n- All km-core entity attributes use **snake_case** keys; `Digest` entities specifically: `observation_ids`, `files_touched`, `digest_ids`\n- Any consumer mapping km-core entity fields must use snake_case; camelCase variants silently resolve to `undefined`\n- Confirmed affected surfaces: `ObservationExporter.js` field mapper (`observation_ids` required); Digest API digest-to-observation join (returns `0` entries when camelCase used)\n- Verify the live entity shape via `curl` or Node REPL before writing or updating any field mapper\n\n**LevelDB lock contention**: `/api/coding/*` returns `503` when obs-api holds the lock; use `/verify` in-process endpoint to avoid conflict; the standalone `verify-insight-claims.mjs` CLI requires obs-api to be stopped.\n\n**Critical architectural gap — SQLite→km-core sync:**\n- Phase 44 migration was a **one-shot** operation: `ObservationWriter` continues writing new observations to SQLite only; the dashboard reads exclusively from km-core, creating a growing visibility gap\n- **Workaround**: re-run `scripts/migrate-sqlite-to-kmcore.mjs --resume` for idempotent backfill via `legacyId` matching; restart obs-api afterward\n- **Plan 44-11** mandates a continuous sync path — not yet implemented\n\n**km-core subpath exports**: `./api`, `./api/contracts`, `./snapshots` added to `lib/km-core/package.json`.\n\n## Key Files\n- `scripts/observations-api-server.mjs` — primary server; all routes including SSE, `/verify`, `/api/consolidation/status`, `POST /api/insights/<id>/resynthesize`, and taxonomy coverage aggregation logic\n- `src/live-logging/ObservationConsolidator.js` — `resynthesizeInsight` handler; synthesis engine; coverage tab rendering\n- `scripts/verify-insight-claims.mjs` — standalone offline CLI; requires obs-api to be stopped\n- `scripts/migrate-sqlite-to-kmcore.mjs` — migration/backfill; `--dry-run`, `--resume`, `--db`, `--store` flags\n- `src/live-logging/ObservationExporter.js` — exports observation data from km-core; snake_case field mapper\n- `lib/km-core/package.json` — `./api`, `./api/contracts`, `./snapshots` subpath exports\n- `.observations/observations.db` — legacy SQLite store\n\n## Usage\nStart obs-api via `launchctl`; verify health via `/api/coding/<entity-type>` (200 = ready, 503 = locked) and `/api/consolidation/status`. Use `POST /verify` for in-process claim verification while obs-api is running. For insight resynthesis, `POST /api/insights/<id>/resynthesize` routes to obs-api on port 12436 — not to the health dashboard API on port 3033. Backfill new observations from SQLite with `node scripts/migrate-sqlite-to-kmcore.mjs --resume` then restart obs-api. Before implementing any km-core entity field mapper, verify the live entity shape via `curl` or Node REPL to confirm current snake_case attribute names. After any bulk project reclassification, taxonomy changes, or scope trimming, restart obs-api and re-verify each affected project to confirm changes applied correctly.\n\n## Troubleshooting\n- **`/api/coding/*` returns 503**: obs-api holds an exclusive LevelDB lock — use `/verify` instead of standalone CLI, or stop obs-api via `launchctl` to release\n- **Digest API returns 0 observation entries per digest**: snake_case/camelCase misalignment in the digest-to-observation join; apply field rename to `observation_ids` (not `observationIds`)\n- **Exported digests have undefined or missing fields in ObservationExporter**: field mapper is using camelCase — switch to `observation_ids`, `files_touched`, `digest_ids`\n- **Resynthesize request returns NOT_FOUND**: verify corrected entity lookup in `ObservationConsolidator.js`'s `resynthesizeInsight` handler; confirm client is routing to port 12436, not port 3033\n- **Dashboard shows '✓ all taxonomy components mentioned' with 0/0 metrics**: false-positive caused by missing zero-denominator guard in taxonomy coverage aggregation; verify in `observations-api-server.mjs` that success indicators are gated on non-zero component counts; projects with no components should show no coverage indicator, not a green checkmark\n- **Dashboard shows stale observations not present in km-core**: new observations written to SQLite since Phase 44 migration are not in km-core — run `--resume` backfill and restart obs-api\n- **`@fwornle/km-core` import fails**: `node_modules/@fwornle/km-core` symlink absent — create pointing to `lib/km-core/`\n- **Consolidator health stuck**: poll `/api/consolidation/status` to confirm recent state transitions\n- **`/verify` returns `null` for a project**: project has no on-disk checkout — this is a graceful skip, not a false negative\n- **Reclassification changes not reflected after API calls**: restart obs-api after bulk taxonomy or scope changes; re-verify each affected project individually",
+    "confidence": 0.95,
     "digestIds": [
       "1daf4ef4-f196-42d2-84ef-512aaf6f99de",
       "68700dc0-5f15-4027-99cd-e5de009b1cd3",
@@ -313,14 +313,16 @@
       "9743515b-a613-44ad-a9fe-7bd30e2972cf",
       "5c413064-ccf9-4400-8a21-bcea362c28db",
       "ca3ba2c8-afa0-443d-a4b3-760555230cc9",
-      "a733b734-7f40-4fd4-826b-ca9ea0768ad4"
+      "a733b734-7f40-4fd4-826b-ca9ea0768ad4",
+      "f309a9e2-7e7b-4728-b469-82852ff71a94",
+      "247abae9-f238-4605-bfad-c48c24bdb999"
     ],
-    "lastUpdated": "2026-06-13T04:01:40.027Z",
+    "lastUpdated": "2026-06-13T05:32:49.288Z",
     "createdAt": "2026-05-19T10:16:50.041Z",
     "metadata": {
       "source": "auto",
       "topic": "KM-Core Foundation — v7.1 Architecture and Project Structure",
-      "confidence": 0.92,
+      "confidence": 0.95,
       "digestIds": [
         "1daf4ef4-f196-42d2-84ef-512aaf6f99de",
         "68700dc0-5f15-4027-99cd-e5de009b1cd3",
@@ -617,23 +619,20 @@
       "legacyId": "d7990863-3ad3-4415-a947-bf1f6f42cc7f",
       "restoredFrom": "observation-export-2026-06-05",
       "decayBreakdown": {
-        "baseConfidence": 0.92,
+        "baseConfidence": 0.95,
         "ageDrag": 0,
         "emergentDrag": 0,
         "truthfulnessDrag": 0,
         "totalDrag": 0,
-        "finalConfidence": 0.92,
+        "finalConfidence": 0.95,
         "weeksOld": 0,
-        "churnedSinceLastUpdate": true,
-        "latestChurnTs": "2026-06-13T05:03:02.000Z",
-        "churnedFilesSample": [
-          "scripts/observations-api-server.mjs",
-          "src/live-logging/ObservationConsolidator.js"
-        ],
+        "churnedSinceLastUpdate": false,
+        "latestChurnTs": null,
+        "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
-      "baseConfidence": 0.92,
+      "baseConfidence": 0.95,
       "staleDragApplied": null,
       "staleDragAt": null,
       "team": "general",
@@ -946,11 +945,13 @@
         "9743515b-a613-44ad-a9fe-7bd30e2972cf",
         "5c413064-ccf9-4400-8a21-bcea362c28db",
         "ca3ba2c8-afa0-443d-a4b3-760555230cc9",
-        "a733b734-7f40-4fd4-826b-ca9ea0768ad4"
+        "a733b734-7f40-4fd4-826b-ca9ea0768ad4",
+        "f309a9e2-7e7b-4728-b469-82852ff71a94",
+        "247abae9-f238-4605-bfad-c48c24bdb999"
       ],
-      "summary": "## Purpose\nProvides the HTTP and SSE API layer for observations data, routing requests to the km-core `GraphKMStore` (LevelDB) rather than SQLite directly. The server is the primary REST and streaming entry point for typed entity views sourced from the graph store, supporting real-time observation delivery and in-process claim verification.\n\n## Architecture\n**obs-api startup initialization sequence:**\n- `RetrievalService` initializes with fastembed (embedding engine) and Qdrant (vector store) — required for semantic retrieval\n- `ObservationPruner` runs a full processing cycle over all observations before the service is considered healthy\n- km-core router mounts and exposes ontology class views and deduplication endpoints\n\n**Route structure:**\n- **`/api/v1`** — canonical km-core endpoint group; mounted via the km-core router\n- **`/api/v1/stream`** — SSE endpoint; streams live observation data to frontend consumers\n- **`/api/coding/*`** — typed-view endpoints backed by km-core; returns `503` until the LevelDB store is unlocked\n- **`/verify`** — in-process insight-claim verification with project-root resolution; avoids LevelDB lock contention; prefer over standalone CLI when obs-api is running; returns `null` for projects without on-disk checkouts (graceful skip, not a false negative)\n- **`/api/consolidation/status`** — consolidator health polling endpoint\n- **`POST /api/insights/<id>/resynthesize`** — per-insight resynthesis; handler logic lives in `ObservationConsolidator.js` (`resynthesizeInsight` async handler); entity lookup/routing corrected — previously returned NOT_FOUND prematurely\n- **Deleted routes**: `/api/km` (returns 404), legacy SQLite GET handlers (returns 404)\n\n**Entity-not-found semantics**: GET/PUT/DELETE return `200` with `null`/`false` — not `404`.\n\n**km-core entity schema — snake_case field names (recurring bug class):**\n- All km-core entity attributes use **snake_case** keys; `Digest` entities specifically: `observation_ids`, `files_touched`, `digest_ids`\n- Any consumer mapping km-core entity fields must use snake_case; camelCase variants silently resolve to `undefined`\n- **Confirmed affected surfaces:**\n  1. `ObservationExporter.js` field mapper — `observation_ids` required\n  2. Digest API digest-to-observation join — root cause of digest endpoints returning `0` observation entries; fix is a targeted field rename to `observation_ids`\n- Verify the live entity shape via `curl` or Node REPL before writing or updating any field mapper\n\n**LevelDB lock contention**: `/api/coding/*` returns `503` when obs-api holds the lock; use `/verify` in-process endpoint to avoid conflict; the standalone `verify-insight-claims.mjs` CLI requires obs-api to be stopped.\n\n**Critical architectural gap — SQLite→km-core sync:**\n- Phase 44 migration was a **one-shot** operation: `ObservationWriter` continues writing new observations to SQLite only; the dashboard reads exclusively from km-core, creating a growing visibility gap\n- **Workaround**: re-run `scripts/migrate-sqlite-to-kmcore.mjs --resume` for idempotent backfill via `legacyId` matching; restart obs-api afterward\n- **Plan 44-11** mandates a continuous sync path — not yet implemented\n\n**km-core subpath exports**: `./api`, `./api/contracts`, `./snapshots` added to `lib/km-core/package.json`.\n\n## Key Files\n- `scripts/observations-api-server.mjs` — primary server; all routes including SSE, `/verify` (with project-root resolution), `/api/consolidation/status`, and `POST /api/insights/<id>/resynthesize`\n- `src/live-logging/ObservationConsolidator.js` — `resynthesizeInsight` handler; synthesis engine; coverage tab rendering\n- `scripts/verify-insight-claims.mjs` — standalone offline CLI; requires obs-api to be stopped\n- `scripts/migrate-sqlite-to-kmcore.mjs` — migration/backfill; `--dry-run`, `--resume`, `--db`, `--store` flags\n- `src/live-logging/ObservationExporter.js` — exports observation data from km-core; snake_case field mapper\n- `lib/km-core/package.json` — `./api`, `./api/contracts`, `./snapshots` subpath exports\n- `.observations/observations.db` — legacy SQLite store\n\n## Usage\nStart obs-api via `launchctl`; verify health via `/api/coding/<entity-type>` (200 = ready, 503 = locked) and `/api/consolidation/status`. Use `POST /verify` for in-process claim verification while obs-api is running. For insight resynthesis, `POST /api/insights/<id>/resynthesize` routes to obs-api on port 12436 — not to the health dashboard API on port 3033. Backfill new observations from SQLite with `node scripts/migrate-sqlite-to-kmcore.mjs --resume` then restart obs-api. Before implementing any km-core entity field mapper, verify the live entity shape via `curl` or Node REPL to confirm current snake_case attribute names.\n\n## Troubleshooting\n- **`/api/coding/*` returns 503**: obs-api holds an exclusive LevelDB lock — use `/verify` instead of standalone CLI, or stop obs-api via `launchctl` to release\n- **Digest API returns 0 observation entries per digest**: snake_case/camelCase misalignment in the digest-to-observation join; apply field rename to `observation_ids` (not `observationIds`)\n- **Exported digests have undefined or missing fields in ObservationExporter**: field mapper is using camelCase — switch to `observation_ids`, `files_touched`, `digest_ids`\n- **Resynthesize request returns NOT_FOUND**: verify corrected entity lookup in `ObservationConsolidator.js`'s `resynthesizeInsight` handler; confirm client is routing to port 12436, not port 3033\n- **Dashboard shows stale observations not present in km-core**: new observations written to SQLite since Phase 44 migration are not in km-core — run `--resume` backfill and restart obs-api\n- **`@fwornle/km-core` import fails**: `node_modules/@fwornle/km-core` symlink absent — create pointing to `lib/km-core/`\n- **Consolidator health stuck**: poll `/api/consolidation/status` to confirm recent state transitions\n- **`/verify` returns `null` for a project**: project has no on-disk checkout — this is a graceful skip, not a false negative",
-      "last_updated": "2026-06-13T04:01:40.027Z",
-      "scope": "The HTTP and SSE API layer (`observations-api-server.mjs`) that routes requests to the km-core GraphKMStore (LevelDB), including route structure, entity schema conventions, and migration status.",
+      "summary": "## Purpose\nProvides the HTTP and SSE API layer for observations data, routing requests to the km-core `GraphKMStore` (LevelDB) rather than SQLite directly. The server is the primary REST and streaming entry point for typed entity views sourced from the graph store, supporting real-time observation delivery, in-process claim verification, and project taxonomy coverage calculations.\n\n## Architecture\n**obs-api startup initialization sequence:**\n- `RetrievalService` initializes with fastembed (embedding engine) and Qdrant (vector store) — required for semantic retrieval\n- `ObservationPruner` runs a full processing cycle over all observations before the service is considered healthy\n- km-core router mounts and exposes ontology class views and deduplication endpoints\n\n**Route structure:**\n- **`/api/v1`** — canonical km-core endpoint group; mounted via the km-core router\n- **`/api/v1/stream`** — SSE endpoint; streams live observation data to frontend consumers\n- **`/api/coding/*`** — typed-view endpoints backed by km-core; returns `503` until the LevelDB store is unlocked\n- **`/verify`** — in-process insight-claim verification with project-root resolution; avoids LevelDB lock contention; prefer over standalone CLI when obs-api is running; returns `null` for projects without on-disk checkouts (graceful skip, not a false negative)\n- **`/api/consolidation/status`** — consolidator health polling endpoint\n- **`POST /api/insights/<id>/resynthesize`** — per-insight resynthesis; handler logic lives in `ObservationConsolidator.js` (`resynthesizeInsight` async handler); entity lookup/routing corrected — previously returned NOT_FOUND prematurely\n- **Deleted routes**: `/api/km` (returns 404), legacy SQLite GET handlers (returns 404)\n\n**Taxonomy coverage calculation:**\n- The server aggregates author taxonomy component coverage per project and surfaces a dashboard success indicator (\"✓ all taxonomy components mentioned\")\n- The aggregation logic **must guard against a zero denominator** — if no components are found, a missing guard causes a false-positive green checkmark with `0/0` metrics, masking missing data or misconfiguration\n- Success indicators must only render when actual, non-zero coverage data exists\n- Project taxonomy data (component lists, scope, author taxonomy) is managed via API-driven tool calls to the obs-api; after bulk reclassification or taxonomy changes, restart the service and re-verify each affected project\n\n**Entity-not-found semantics**: GET/PUT/DELETE return `200` with `null`/`false` — not `404`.\n\n**km-core entity schema — snake_case field names (recurring bug class):**\n- All km-core entity attributes use **snake_case** keys; `Digest` entities specifically: `observation_ids`, `files_touched`, `digest_ids`\n- Any consumer mapping km-core entity fields must use snake_case; camelCase variants silently resolve to `undefined`\n- Confirmed affected surfaces: `ObservationExporter.js` field mapper (`observation_ids` required); Digest API digest-to-observation join (returns `0` entries when camelCase used)\n- Verify the live entity shape via `curl` or Node REPL before writing or updating any field mapper\n\n**LevelDB lock contention**: `/api/coding/*` returns `503` when obs-api holds the lock; use `/verify` in-process endpoint to avoid conflict; the standalone `verify-insight-claims.mjs` CLI requires obs-api to be stopped.\n\n**Critical architectural gap — SQLite→km-core sync:**\n- Phase 44 migration was a **one-shot** operation: `ObservationWriter` continues writing new observations to SQLite only; the dashboard reads exclusively from km-core, creating a growing visibility gap\n- **Workaround**: re-run `scripts/migrate-sqlite-to-kmcore.mjs --resume` for idempotent backfill via `legacyId` matching; restart obs-api afterward\n- **Plan 44-11** mandates a continuous sync path — not yet implemented\n\n**km-core subpath exports**: `./api`, `./api/contracts`, `./snapshots` added to `lib/km-core/package.json`.\n\n## Key Files\n- `scripts/observations-api-server.mjs` — primary server; all routes including SSE, `/verify`, `/api/consolidation/status`, `POST /api/insights/<id>/resynthesize`, and taxonomy coverage aggregation logic\n- `src/live-logging/ObservationConsolidator.js` — `resynthesizeInsight` handler; synthesis engine; coverage tab rendering\n- `scripts/verify-insight-claims.mjs` — standalone offline CLI; requires obs-api to be stopped\n- `scripts/migrate-sqlite-to-kmcore.mjs` — migration/backfill; `--dry-run`, `--resume`, `--db`, `--store` flags\n- `src/live-logging/ObservationExporter.js` — exports observation data from km-core; snake_case field mapper\n- `lib/km-core/package.json` — `./api`, `./api/contracts`, `./snapshots` subpath exports\n- `.observations/observations.db` — legacy SQLite store\n\n## Usage\nStart obs-api via `launchctl`; verify health via `/api/coding/<entity-type>` (200 = ready, 503 = locked) and `/api/consolidation/status`. Use `POST /verify` for in-process claim verification while obs-api is running. For insight resynthesis, `POST /api/insights/<id>/resynthesize` routes to obs-api on port 12436 — not to the health dashboard API on port 3033. Backfill new observations from SQLite with `node scripts/migrate-sqlite-to-kmcore.mjs --resume` then restart obs-api. Before implementing any km-core entity field mapper, verify the live entity shape via `curl` or Node REPL to confirm current snake_case attribute names. After any bulk project reclassification, taxonomy changes, or scope trimming, restart obs-api and re-verify each affected project to confirm changes applied correctly.\n\n## Troubleshooting\n- **`/api/coding/*` returns 503**: obs-api holds an exclusive LevelDB lock — use `/verify` instead of standalone CLI, or stop obs-api via `launchctl` to release\n- **Digest API returns 0 observation entries per digest**: snake_case/camelCase misalignment in the digest-to-observation join; apply field rename to `observation_ids` (not `observationIds`)\n- **Exported digests have undefined or missing fields in ObservationExporter**: field mapper is using camelCase — switch to `observation_ids`, `files_touched`, `digest_ids`\n- **Resynthesize request returns NOT_FOUND**: verify corrected entity lookup in `ObservationConsolidator.js`'s `resynthesizeInsight` handler; confirm client is routing to port 12436, not port 3033\n- **Dashboard shows '✓ all taxonomy components mentioned' with 0/0 metrics**: false-positive caused by missing zero-denominator guard in taxonomy coverage aggregation; verify in `observations-api-server.mjs` that success indicators are gated on non-zero component counts; projects with no components should show no coverage indicator, not a green checkmark\n- **Dashboard shows stale observations not present in km-core**: new observations written to SQLite since Phase 44 migration are not in km-core — run `--resume` backfill and restart obs-api\n- **`@fwornle/km-core` import fails**: `node_modules/@fwornle/km-core` symlink absent — create pointing to `lib/km-core/`\n- **Consolidator health stuck**: poll `/api/consolidation/status` to confirm recent state transitions\n- **`/verify` returns `null` for a project**: project has no on-disk checkout — this is a graceful skip, not a false negative\n- **Reclassification changes not reflected after API calls**: restart obs-api after bulk taxonomy or scope changes; re-verify each affected project individually",
+      "last_updated": "2026-06-13T05:32:49.288Z",
+      "scope": "observations-api-server.mjs — HTTP/SSE API layer, route structure, entity schema, taxonomy coverage, and data management",
       "codeVerification": {
         "verifiedAt": "2026-06-13T05:07:27.201Z",
         "totalClaims": 18,
@@ -1422,7 +1423,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.92,
       "staleDragApplied": null,
@@ -1956,7 +1957,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": false,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.92,
       "staleDragApplied": null,
@@ -2786,7 +2787,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -3252,7 +3253,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -3434,7 +3435,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -3573,12 +3574,12 @@
         "finalConfidence": 0.9,
         "weeksOld": 0.1,
         "churnedSinceLastUpdate": true,
-        "latestChurnTs": "2026-06-13T05:03:02.000Z",
+        "latestChurnTs": "2026-06-13T05:24:44.000Z",
         "churnedFilesSample": [
           "scripts/observations-api-server.mjs"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -3733,7 +3734,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -3975,7 +3976,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -4174,7 +4175,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -4374,7 +4375,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -4488,12 +4489,12 @@
         "finalConfidence": 0.88,
         "weeksOld": 0,
         "churnedSinceLastUpdate": true,
-        "latestChurnTs": "2026-06-13T05:03:02.000Z",
+        "latestChurnTs": "2026-06-13T05:24:44.000Z",
         "churnedFilesSample": [
           "scripts/observations-api-server.mjs"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -4628,7 +4629,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.872,
       "staleDragApplied": null,
@@ -4718,6 +4719,297 @@
       }
     },
     "project": "rapid-automations"
+  },
+  {
+    "id": "019eb544-1006-7dd7-9cc9-bbac526a0e6d",
+    "topic": "Observation Pipeline — Cross-Project Contamination and Project Column",
+    "summary": "## Purpose\nPrevents observations from unrelated projects (`rapid-automations`, `onboarding-repro`) from polluting digests and insights generated for the `coding` project. Achieved through per-observation project attribution in the database schema, per-project root resolution in `ObservationConsolidator.js`, and reclassification/taxonomy management via `observations-api-server.mjs`.\n\n## Architecture\n- **Cross-contamination root cause**: 420 observations from `rapid-automations` and `onboarding-repro` were stored in the coding project's DB without project attribution\n- **Schema fix**: `migrate-add-project-column.js` adds a `project` column to the observations table with a dry-run mode to validate backfill logic before committing; backfill uses `isCodingRelated` logic from `enhanced-transcript-monitor.js` as a heuristic\n- **Null-project observations**: 21 observations with no inferrable project require manual review or explicit default attribution\n- **Per-project root resolution**: `ObservationConsolidator.js` extended with per-project root resolution logic, correctly mapping observations to their project roots in multi-project environments; filtering uses `WHERE project = 'coding'` at query time — schema change alone is insufficient\n- **Reclassification API**: `observations-api-server.mjs` supports reclassification operations across the data store; managed via `launchctl`; must be restarted after modification to take effect\n- **Taxonomy management**: projects carry taxonomy labels (e.g., `sketcher`) and scope attributes adjustable via the reclassification API; known follow-on work includes stripping the `sketcher` taxonomy and reducing the scope of `onboarding-repro` entries\n\n## Key Files\n- `scripts/migrate-add-project-column.js` — schema migration + backfill with dry-run mode\n- `enhanced-transcript-monitor.js` — contains `isCodingRelated` heuristic used for backfill inference\n- `~/Agentic/coding/src/live-logging/ObservationConsolidator.js` — per-project root resolution; filters observations by project during consolidation\n- `scripts/observations-api-server.mjs` — observations API server; supports reclassification and taxonomy operations; managed via `launchctl`\n- `server.js` — dashboard API server; updated alongside migration steps\n\n## Usage\nRun `migrate-add-project-column.js --dry-run` first to preview affected rows, then apply without `--dry-run`. After column population, `ObservationConsolidator` filters by project at query time. For reclassification or taxonomy operations, modify `observations-api-server.mjs` and restart via `launchctl`. Stash uncommitted data-only changes before making code commits to keep the working tree clean.\n\n## Troubleshooting\n- **Project column exists but values are all `null`**: migration/backfill may not have completed — check the log file for errors and re-run the script\n- **Cross-project observations still affecting digests**: confirm `ObservationConsolidator.js` issues a `WHERE project = 'coding'` filter; the column alone does not filter — the query must use it\n- **Observations from the correct project missing from digests**: verify per-project root resolution in `ObservationConsolidator.js` maps to the expected root; restart obs-api to deploy any changes\n- **`isCodingRelated` misclassifies observations**: review heuristic in `enhanced-transcript-monitor.js`; add project-specific path or keyword signals as needed\n- **Reclassification not taking effect after `observations-api-server.mjs` edit**: restart the service via `launchctl`; confirm the running process is using the updated file\n- **Data changes leaking into code commits**: use `git stash` to isolate data-only working tree changes before staging and committing code changes",
+    "confidence": 0.85,
+    "digestIds": [
+      "9d1945d7-d2f7-4f80-bac1-ae7f37a70af4",
+      "eacaf1bb-f9da-4cbc-bed9-55f184a3cb29",
+      "c724a186-dffb-4c8e-a44f-0bdfd221a206",
+      "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
+      "3f8c4090-1b03-437a-a38d-c7c02c8f8909",
+      "f4afcd6b-96a6-449f-a305-68eec3d88a44",
+      "b07e573a-8d3b-4f5a-9082-80153ecbb8a5",
+      "5534b0a7-3c1d-4010-bb12-3425c1884daf",
+      "ae19a126-b2ce-4bbb-b636-9995a3a320d2",
+      "f654cda4-baa6-45c7-8545-b03a8555b4e0",
+      "bfc9e1d0-01b0-44b3-8b63-d5421e7fd367",
+      "cac93b10-6b51-4751-972c-80463d101691",
+      "45026ea0-039b-4be6-8b6c-e4fbf31f0f67",
+      "6c22e305-0ccb-45e8-a400-c0ab46480deb",
+      "1a15e9b2-6c2b-4acf-8b31-e3d5be34d345",
+      "72832d12-b489-4c75-9645-56355a2e2544",
+      "3a61ca96-cb42-456a-bf97-2b49e873b6e1",
+      "89d76b0c-a64d-4a95-a205-8bf5f0f6242d",
+      "896b6565-f327-472f-8787-94622412de66",
+      "977799be-cac1-4fc6-b0b0-de7b0d5a1265",
+      "dd01877d-ed89-4339-a21e-ffd663f04028",
+      "03d58c72-b370-45ab-8974-ce6008230b4c",
+      "ed700f1b-b3f6-4068-9d38-d98cd142a6ba",
+      "e2c89b0d-7a9c-425c-9a1a-5b65fac1f88d",
+      "75d98280-a502-430d-bfa4-8d1b8ad4538f",
+      "cff0958b-ed5f-4a2a-834b-f0419e3c19cf",
+      "28bf7eb2-ae59-43ff-878b-5956c0220a17",
+      "9b80f82f-1464-4a54-bd98-6a46e7656b6d",
+      "bc22d040-44e6-4eb5-b976-3964fd9a2115",
+      "3c154fd3-a5db-4e54-adc2-a821b2f03a7c",
+      "a11a0733-07c6-4783-aac0-257c0c9830ff",
+      "3c03e312-3fa1-456e-8840-f182ce03a0e4",
+      "f309a9e2-7e7b-4728-b469-82852ff71a94",
+      "247abae9-f238-4605-bfad-c48c24bdb999",
+      "86d7fd1b-b038-4a46-8955-ce51a230a97c",
+      "a9e9ade4-c708-4549-adc7-dc0be5f1e56e"
+    ],
+    "lastUpdated": "2026-06-13T05:32:49.288Z",
+    "createdAt": "2026-05-14T15:27:35.876Z",
+    "metadata": {
+      "source": "auto",
+      "topic": "Observation Pipeline — Cross-Project Contamination and Project Column",
+      "confidence": 0.85,
+      "digestIds": [
+        "9d1945d7-d2f7-4f80-bac1-ae7f37a70af4",
+        "eacaf1bb-f9da-4cbc-bed9-55f184a3cb29",
+        "c724a186-dffb-4c8e-a44f-0bdfd221a206",
+        "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
+        "3f8c4090-1b03-437a-a38d-c7c02c8f8909",
+        "f4afcd6b-96a6-449f-a305-68eec3d88a44",
+        "b07e573a-8d3b-4f5a-9082-80153ecbb8a5",
+        "5534b0a7-3c1d-4010-bb12-3425c1884daf",
+        "ae19a126-b2ce-4bbb-b636-9995a3a320d2",
+        "f654cda4-baa6-45c7-8545-b03a8555b4e0",
+        "bfc9e1d0-01b0-44b3-8b63-d5421e7fd367",
+        "cac93b10-6b51-4751-972c-80463d101691",
+        "45026ea0-039b-4be6-8b6c-e4fbf31f0f67",
+        "6c22e305-0ccb-45e8-a400-c0ab46480deb",
+        "1a15e9b2-6c2b-4acf-8b31-e3d5be34d345",
+        "72832d12-b489-4c75-9645-56355a2e2544",
+        "3a61ca96-cb42-456a-bf97-2b49e873b6e1",
+        "89d76b0c-a64d-4a95-a205-8bf5f0f6242d",
+        "896b6565-f327-472f-8787-94622412de66",
+        "977799be-cac1-4fc6-b0b0-de7b0d5a1265",
+        "dd01877d-ed89-4339-a21e-ffd663f04028",
+        "03d58c72-b370-45ab-8974-ce6008230b4c",
+        "ed700f1b-b3f6-4068-9d38-d98cd142a6ba",
+        "e2c89b0d-7a9c-425c-9a1a-5b65fac1f88d",
+        "75d98280-a502-430d-bfa4-8d1b8ad4538f",
+        "cff0958b-ed5f-4a2a-834b-f0419e3c19cf",
+        "28bf7eb2-ae59-43ff-878b-5956c0220a17",
+        "9b80f82f-1464-4a54-bd98-6a46e7656b6d",
+        "bc22d040-44e6-4eb5-b976-3964fd9a2115",
+        "3c154fd3-a5db-4e54-adc2-a821b2f03a7c"
+      ],
+      "project": "coding",
+      "lastUpdated": "2026-05-14T15:27:35.876Z",
+      "legacyId": "4732a13e-a6bb-4078-aa14-ccfdab8751f7",
+      "restoredFrom": "observation-export-2026-06-05",
+      "decayBreakdown": {
+        "baseConfidence": 0.85,
+        "ageDrag": 0,
+        "emergentDrag": 0,
+        "truthfulnessDrag": 0,
+        "totalDrag": 0,
+        "finalConfidence": 0.85,
+        "weeksOld": 0,
+        "churnedSinceLastUpdate": false,
+        "latestChurnTs": null,
+        "churnedFilesSample": [],
+        "measurable": true,
+        "computedAt": "2026-06-13T05:32:49.649Z"
+      },
+      "baseConfidence": 0.85,
+      "staleDragApplied": null,
+      "staleDragAt": null,
+      "team": "general",
+      "digest_ids": [
+        "9d1945d7-d2f7-4f80-bac1-ae7f37a70af4",
+        "eacaf1bb-f9da-4cbc-bed9-55f184a3cb29",
+        "c724a186-dffb-4c8e-a44f-0bdfd221a206",
+        "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
+        "3f8c4090-1b03-437a-a38d-c7c02c8f8909",
+        "f4afcd6b-96a6-449f-a305-68eec3d88a44",
+        "b07e573a-8d3b-4f5a-9082-80153ecbb8a5",
+        "5534b0a7-3c1d-4010-bb12-3425c1884daf",
+        "ae19a126-b2ce-4bbb-b636-9995a3a320d2",
+        "f654cda4-baa6-45c7-8545-b03a8555b4e0",
+        "bfc9e1d0-01b0-44b3-8b63-d5421e7fd367",
+        "cac93b10-6b51-4751-972c-80463d101691",
+        "45026ea0-039b-4be6-8b6c-e4fbf31f0f67",
+        "6c22e305-0ccb-45e8-a400-c0ab46480deb",
+        "1a15e9b2-6c2b-4acf-8b31-e3d5be34d345",
+        "72832d12-b489-4c75-9645-56355a2e2544",
+        "3a61ca96-cb42-456a-bf97-2b49e873b6e1",
+        "89d76b0c-a64d-4a95-a205-8bf5f0f6242d",
+        "896b6565-f327-472f-8787-94622412de66",
+        "977799be-cac1-4fc6-b0b0-de7b0d5a1265",
+        "dd01877d-ed89-4339-a21e-ffd663f04028",
+        "03d58c72-b370-45ab-8974-ce6008230b4c",
+        "ed700f1b-b3f6-4068-9d38-d98cd142a6ba",
+        "e2c89b0d-7a9c-425c-9a1a-5b65fac1f88d",
+        "75d98280-a502-430d-bfa4-8d1b8ad4538f",
+        "cff0958b-ed5f-4a2a-834b-f0419e3c19cf",
+        "28bf7eb2-ae59-43ff-878b-5956c0220a17",
+        "9b80f82f-1464-4a54-bd98-6a46e7656b6d",
+        "bc22d040-44e6-4eb5-b976-3964fd9a2115",
+        "3c154fd3-a5db-4e54-adc2-a821b2f03a7c",
+        "a11a0733-07c6-4783-aac0-257c0c9830ff",
+        "3c03e312-3fa1-456e-8840-f182ce03a0e4",
+        "f309a9e2-7e7b-4728-b469-82852ff71a94",
+        "247abae9-f238-4605-bfad-c48c24bdb999",
+        "86d7fd1b-b038-4a46-8955-ce51a230a97c",
+        "a9e9ade4-c708-4549-adc7-dc0be5f1e56e"
+      ],
+      "codeVerification": {
+        "verifiedAt": "2026-06-13T05:09:07.903Z",
+        "totalClaims": 8,
+        "verifiedClaims": 8,
+        "verificationRatio": 1,
+        "staleClaims": [],
+        "referencedFiles": [
+          "ObservationConsolidator.js",
+          "migrate-add-project-column.js",
+          "enhanced-transcript-monitor.js",
+          "scripts/migrate-add-project-column.js",
+          "~/Agentic/coding/src/live-logging/ObservationConsolidator.js",
+          "server.js"
+        ],
+        "searchRoots": [
+          "/Users/Q284340/Agentic/coding",
+          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
+          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
+          "/Users/Q284340/Agentic/_work/awesome-copilot-bmw",
+          "/Users/Q284340/Agentic/_work/dyn-arch",
+          "/Users/Q284340/Agentic/_work/iso-9001",
+          "/Users/Q284340/Agentic/_work/onboarding-repro",
+          "/Users/Q284340/Agentic/_work/rapid-automations",
+          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
+          "/Users/Q284340/Agentic/_work/resi",
+          "/Users/Q284340/Agentic/_work/sketcher",
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/coding/lib/km-core",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
+        ],
+        "firstZeroAt": null
+      },
+      "summary": "## Purpose\nPrevents observations from unrelated projects (`rapid-automations`, `onboarding-repro`) from polluting digests and insights generated for the `coding` project. Achieved through per-observation project attribution in the database schema, per-project root resolution in `ObservationConsolidator.js`, and reclassification/taxonomy management via `observations-api-server.mjs`.\n\n## Architecture\n- **Cross-contamination root cause**: 420 observations from `rapid-automations` and `onboarding-repro` were stored in the coding project's DB without project attribution\n- **Schema fix**: `migrate-add-project-column.js` adds a `project` column to the observations table with a dry-run mode to validate backfill logic before committing; backfill uses `isCodingRelated` logic from `enhanced-transcript-monitor.js` as a heuristic\n- **Null-project observations**: 21 observations with no inferrable project require manual review or explicit default attribution\n- **Per-project root resolution**: `ObservationConsolidator.js` extended with per-project root resolution logic, correctly mapping observations to their project roots in multi-project environments; filtering uses `WHERE project = 'coding'` at query time — schema change alone is insufficient\n- **Reclassification API**: `observations-api-server.mjs` supports reclassification operations across the data store; managed via `launchctl`; must be restarted after modification to take effect\n- **Taxonomy management**: projects carry taxonomy labels (e.g., `sketcher`) and scope attributes adjustable via the reclassification API; known follow-on work includes stripping the `sketcher` taxonomy and reducing the scope of `onboarding-repro` entries\n\n## Key Files\n- `scripts/migrate-add-project-column.js` — schema migration + backfill with dry-run mode\n- `enhanced-transcript-monitor.js` — contains `isCodingRelated` heuristic used for backfill inference\n- `~/Agentic/coding/src/live-logging/ObservationConsolidator.js` — per-project root resolution; filters observations by project during consolidation\n- `scripts/observations-api-server.mjs` — observations API server; supports reclassification and taxonomy operations; managed via `launchctl`\n- `server.js` — dashboard API server; updated alongside migration steps\n\n## Usage\nRun `migrate-add-project-column.js --dry-run` first to preview affected rows, then apply without `--dry-run`. After column population, `ObservationConsolidator` filters by project at query time. For reclassification or taxonomy operations, modify `observations-api-server.mjs` and restart via `launchctl`. Stash uncommitted data-only changes before making code commits to keep the working tree clean.\n\n## Troubleshooting\n- **Project column exists but values are all `null`**: migration/backfill may not have completed — check the log file for errors and re-run the script\n- **Cross-project observations still affecting digests**: confirm `ObservationConsolidator.js` issues a `WHERE project = 'coding'` filter; the column alone does not filter — the query must use it\n- **Observations from the correct project missing from digests**: verify per-project root resolution in `ObservationConsolidator.js` maps to the expected root; restart obs-api to deploy any changes\n- **`isCodingRelated` misclassifies observations**: review heuristic in `enhanced-transcript-monitor.js`; add project-specific path or keyword signals as needed\n- **Reclassification not taking effect after `observations-api-server.mjs` edit**: restart the service via `launchctl`; confirm the running process is using the updated file\n- **Data changes leaking into code commits**: use `git stash` to isolate data-only working tree changes before staging and committing code changes",
+      "last_updated": "2026-06-13T05:32:49.288Z",
+      "scope": "Schema migration, per-project root resolution, and reclassification operations in the observations data store"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "019eb544-102b-7d6d-9633-3617dc67b04b",
+    "topic": "Git SSH Connectivity Through HTTP Proxy",
+    "summary": "## Purpose\nEnables `git push`/`pull` over SSH to GitHub when SSH port 22 is blocked by corporate firewalls or restricted networks. The canonical solution routes SSH traffic through GitHub's alternate endpoint `ssh.github.com:443`, requiring no local proxy service.\n\n## Architecture\n- **Primary solution**: `~/.ssh/config` `Host github.com` block configured with `HostName ssh.github.com` and `Port 443` — redirects all SSH git operations to GitHub's port-443 endpoint, which passes through virtually all firewalls\n- **Why port 443 works universally**: HTTPS port 443 is open on corporate LAN, VPN, public WiFi, and mobile hotspot; port 22 is frequently blocked. GitHub explicitly supports SSH-over-443 as a documented fallback\n- **No proxy dependency**: unlike the previous approach, this solution requires no local `proxydetox` service — it works identically on every network context\n- **Legacy approach (superseded)**: the prior config used `ProxyCommand nc -X connect -x 127.0.0.1:3128 %h %p` to route through the local `proxydetox` instance; this fails whenever the proxy is not running (public networks, hotspots) and has been replaced\n- **HTTPS remote fallback**: for one-off operations, switching a remote to `https://<CONNECTION_STRING_REDACTED> directly; success message confirms the endpoint and credentials are correct\n- **Old `ProxyCommand nc ...` entry still present**: remove it — it requires a running `proxydetox` instance and will silently fail on non-corporate networks\n- **Unknown host fingerprint prompt on first use**: run `ssh-keyscan -p 443 ssh.github.com >> ~/.ssh/known_hosts`; always verify the fingerprint against GitHub's published key list before trusting it\n- **HTTPS push prompts for credentials repeatedly**: store a personal access token in the macOS keychain via `git credential approve` or add it to `~/.netrc`",
+    "confidence": 0.85,
+    "digestIds": [
+      "696450b3-d93a-40d8-ba3f-d3d4c4b3685c",
+      "ae504d10-e3b5-4b5f-a55d-fec7ab039190",
+      "8c710897-cc82-4713-8fa9-ac2f865ca31b",
+      "2ce3124f-0821-495e-b0e7-a3dec5049ea7",
+      "598d2c3b-9c52-48bb-bab3-e9e642edf418",
+      "01046521-1973-4c37-9eab-b350d90862dc",
+      "6c0d5bb6-aca3-4c17-bda4-b4dd6dbe8301",
+      "86d7fd1b-b038-4a46-8955-ce51a230a97c",
+      "a9e9ade4-c708-4549-adc7-dc0be5f1e56e"
+    ],
+    "lastUpdated": "2026-06-13T05:32:49.288Z",
+    "createdAt": "2026-05-29T11:35:31.001Z",
+    "metadata": {
+      "source": "auto",
+      "topic": "Git SSH Connectivity Through HTTP Proxy",
+      "confidence": 0.85,
+      "digestIds": [
+        "696450b3-d93a-40d8-ba3f-d3d4c4b3685c",
+        "ae504d10-e3b5-4b5f-a55d-fec7ab039190",
+        "8c710897-cc82-4713-8fa9-ac2f865ca31b",
+        "2ce3124f-0821-495e-b0e7-a3dec5049ea7",
+        "598d2c3b-9c52-48bb-bab3-e9e642edf418",
+        "01046521-1973-4c37-9eab-b350d90862dc",
+        "6c0d5bb6-aca3-4c17-bda4-b4dd6dbe8301"
+      ],
+      "project": "coding",
+      "lastUpdated": "2026-05-29T11:35:31.001Z",
+      "legacyId": "071db218-21c2-4b75-a379-ea082471de22",
+      "restoredFrom": "observation-export-2026-06-05",
+      "decayBreakdown": {
+        "baseConfidence": 0.85,
+        "ageDrag": 0,
+        "emergentDrag": 0,
+        "truthfulnessDrag": 0,
+        "totalDrag": 0,
+        "finalConfidence": 0.85,
+        "weeksOld": 0,
+        "churnedSinceLastUpdate": false,
+        "latestChurnTs": null,
+        "churnedFilesSample": [],
+        "measurable": true,
+        "computedAt": "2026-06-13T05:32:49.649Z"
+      },
+      "baseConfidence": 0.85,
+      "staleDragApplied": null,
+      "staleDragAt": null,
+      "team": "general",
+      "digest_ids": [
+        "696450b3-d93a-40d8-ba3f-d3d4c4b3685c",
+        "ae504d10-e3b5-4b5f-a55d-fec7ab039190",
+        "8c710897-cc82-4713-8fa9-ac2f865ca31b",
+        "2ce3124f-0821-495e-b0e7-a3dec5049ea7",
+        "598d2c3b-9c52-48bb-bab3-e9e642edf418",
+        "01046521-1973-4c37-9eab-b350d90862dc",
+        "6c0d5bb6-aca3-4c17-bda4-b4dd6dbe8301",
+        "86d7fd1b-b038-4a46-8955-ce51a230a97c",
+        "a9e9ade4-c708-4549-adc7-dc0be5f1e56e"
+      ],
+      "codeVerification": {
+        "verifiedAt": "2026-06-13T05:09:22.062Z",
+        "totalClaims": 4,
+        "verifiedClaims": 4,
+        "verificationRatio": 1,
+        "staleClaims": [],
+        "referencedFiles": [
+          "~/.ssh/config",
+          "github.com"
+        ],
+        "searchRoots": [
+          "/Users/Q284340/Agentic/coding",
+          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
+          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
+          "/Users/Q284340/Agentic/_work/awesome-copilot-bmw",
+          "/Users/Q284340/Agentic/_work/dyn-arch",
+          "/Users/Q284340/Agentic/_work/iso-9001",
+          "/Users/Q284340/Agentic/_work/onboarding-repro",
+          "/Users/Q284340/Agentic/_work/rapid-automations",
+          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
+          "/Users/Q284340/Agentic/_work/resi",
+          "/Users/Q284340/Agentic/_work/sketcher",
+          "/Users/Q284340/Agentic/_work/ui-template",
+          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
+          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
+          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
+          "/Users/Q284340/Agentic/coding/lib/km-core",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
+          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
+        ],
+        "firstZeroAt": null
+      },
+      "summary": "## Purpose\nEnables `git push`/`pull` over SSH to GitHub when SSH port 22 is blocked by corporate firewalls or restricted networks. The canonical solution routes SSH traffic through GitHub's alternate endpoint `ssh.github.com:443`, requiring no local proxy service.\n\n## Architecture\n- **Primary solution**: `~/.ssh/config` `Host github.com` block configured with `HostName ssh.github.com` and `Port 443` — redirects all SSH git operations to GitHub's port-443 endpoint, which passes through virtually all firewalls\n- **Why port 443 works universally**: HTTPS port 443 is open on corporate LAN, VPN, public WiFi, and mobile hotspot; port 22 is frequently blocked. GitHub explicitly supports SSH-over-443 as a documented fallback\n- **No proxy dependency**: unlike the previous approach, this solution requires no local `proxydetox` service — it works identically on every network context\n- **Legacy approach (superseded)**: the prior config used `ProxyCommand nc -X connect -x 127.0.0.1:3128 %h %p` to route through the local `proxydetox` instance; this fails whenever the proxy is not running (public networks, hotspots) and has been replaced\n- **HTTPS remote fallback**: for one-off operations, switching a remote to `https://<CONNECTION_STRING_REDACTED> directly; success message confirms the endpoint and credentials are correct\n- **Old `ProxyCommand nc ...` entry still present**: remove it — it requires a running `proxydetox` instance and will silently fail on non-corporate networks\n- **Unknown host fingerprint prompt on first use**: run `ssh-keyscan -p 443 ssh.github.com >> ~/.ssh/known_hosts`; always verify the fingerprint against GitHub's published key list before trusting it\n- **HTTPS push prompts for credentials repeatedly**: store a personal access token in the macOS keychain via `git credential approve` or add it to `~/.netrc`",
+      "last_updated": "2026-06-13T05:32:49.288Z",
+      "scope": "~/.ssh/config configuration enabling SSH-based git operations to GitHub when port 22 is blocked"
+    },
+    "project": "coding"
   },
   {
     "id": "019eb544-0f5c-7afb-8e54-a0a7c8d980a5",
@@ -4824,7 +5116,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -5022,7 +5314,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -5193,7 +5485,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -5359,7 +5651,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -5492,7 +5784,7 @@
           "src/live-logging/ObservationConsolidator.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -5632,7 +5924,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -5809,7 +6101,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -5973,12 +6265,12 @@
         "truthfulnessDrag": 0,
         "totalDrag": 0,
         "finalConfidence": 0.85,
-        "weeksOld": 1.2,
+        "weeksOld": 1.3,
         "churnedSinceLastUpdate": false,
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -6161,7 +6453,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": false,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -6256,7 +6548,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -6361,7 +6653,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -6422,184 +6714,6 @@
     "project": "coding"
   },
   {
-    "id": "019eb544-1006-7dd7-9cc9-bbac526a0e6d",
-    "topic": "Observation Pipeline — Cross-Project Contamination and Project Column",
-    "summary": "## Purpose\nPrevents observations from unrelated projects (`rapid-automations`, `onboarding-repro`) from polluting digests and insights generated for the `coding` project. Achieved through two complementary mechanisms: per-observation project attribution in the database schema and per-project root resolution logic in `ObservationConsolidator.js`.\n\n## Architecture\n- **Problem**: 420 observations from `rapid-automations` and `onboarding-repro` were stored in the coding project's DB without project attribution, causing cross-contamination in digest and insight generation\n- **Schema change**: `migrate-add-project-column.js` adds a `project` column to the observations table; includes dry-run mode to validate backfill logic before committing\n- **Backfill**: uses `isCodingRelated` logic from `enhanced-transcript-monitor.js` as a foundation for inferring project attribution from existing rows\n- **Null-project observations**: 21 additional observations with no inferrable project require manual review or a default attribution\n- **Per-project root resolution**: `ObservationConsolidator.js` was extended with per-project root resolution logic, allowing consolidation to correctly map observations to their respective project roots across multi-project environments; deployed by restarting obs-api; confirmed working via full verification workflow across all remaining projects\n\n## Key Files\n- `scripts/migrate-add-project-column.js` — schema migration + backfill with dry-run mode\n- `enhanced-transcript-monitor.js` — contains `isCodingRelated` logic used as backfill heuristic\n- `~/Agentic/coding/src/live-logging/ObservationConsolidator.js` — per-project root resolution logic; maps observations to correct project roots during consolidation\n- `server.js` — dashboard API server; updated alongside migration steps\n\n## Usage\nRun `migrate-add-project-column.js --dry-run` first to preview the 420 cross-contaminating rows and 21 null-project rows, then run without `--dry-run` to apply. After column population, `ObservationConsolidator` filters by `project = 'coding'` when generating digests and insights; per-project root resolution ensures observations are attributed to the correct root. Restart obs-api after any `ObservationConsolidator.js` changes to deploy the fix.\n\n## Troubleshooting\n- **Project column exists but all values are `null`**: Background migration process may not have completed; check the redirected log file for errors; re-run the script\n- **420 cross-project observations still affecting digests**: Confirm the consolidator <USER_ID_REDACTED> include a `WHERE project = 'coding'` filter; schema alone does not filter — query logic must use the column\n- **Observations from correct project not appearing in digests**: Verify per-project root resolution logic in `ObservationConsolidator.js` is mapping observations to the correct root; restart obs-api to deploy any changes\n- **`isCodingRelated` misclassifies observations**: Review the heuristic in `enhanced-transcript-monitor.js` and add project-specific path or keyword signals as needed",
-    "confidence": 0.8,
-    "digestIds": [
-      "9d1945d7-d2f7-4f80-bac1-ae7f37a70af4",
-      "eacaf1bb-f9da-4cbc-bed9-55f184a3cb29",
-      "c724a186-dffb-4c8e-a44f-0bdfd221a206",
-      "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
-      "3f8c4090-1b03-437a-a38d-c7c02c8f8909",
-      "f4afcd6b-96a6-449f-a305-68eec3d88a44",
-      "b07e573a-8d3b-4f5a-9082-80153ecbb8a5",
-      "5534b0a7-3c1d-4010-bb12-3425c1884daf",
-      "ae19a126-b2ce-4bbb-b636-9995a3a320d2",
-      "f654cda4-baa6-45c7-8545-b03a8555b4e0",
-      "bfc9e1d0-01b0-44b3-8b63-d5421e7fd367",
-      "cac93b10-6b51-4751-972c-80463d101691",
-      "45026ea0-039b-4be6-8b6c-e4fbf31f0f67",
-      "6c22e305-0ccb-45e8-a400-c0ab46480deb",
-      "1a15e9b2-6c2b-4acf-8b31-e3d5be34d345",
-      "72832d12-b489-4c75-9645-56355a2e2544",
-      "3a61ca96-cb42-456a-bf97-2b49e873b6e1",
-      "89d76b0c-a64d-4a95-a205-8bf5f0f6242d",
-      "896b6565-f327-472f-8787-94622412de66",
-      "977799be-cac1-4fc6-b0b0-de7b0d5a1265",
-      "dd01877d-ed89-4339-a21e-ffd663f04028",
-      "03d58c72-b370-45ab-8974-ce6008230b4c",
-      "ed700f1b-b3f6-4068-9d38-d98cd142a6ba",
-      "e2c89b0d-7a9c-425c-9a1a-5b65fac1f88d",
-      "75d98280-a502-430d-bfa4-8d1b8ad4538f",
-      "cff0958b-ed5f-4a2a-834b-f0419e3c19cf",
-      "28bf7eb2-ae59-43ff-878b-5956c0220a17",
-      "9b80f82f-1464-4a54-bd98-6a46e7656b6d",
-      "bc22d040-44e6-4eb5-b976-3964fd9a2115",
-      "3c154fd3-a5db-4e54-adc2-a821b2f03a7c",
-      "a11a0733-07c6-4783-aac0-257c0c9830ff",
-      "3c03e312-3fa1-456e-8840-f182ce03a0e4"
-    ],
-    "lastUpdated": "2026-06-13T03:38:34.321Z",
-    "createdAt": "2026-05-14T15:27:35.876Z",
-    "metadata": {
-      "source": "auto",
-      "topic": "Observation Pipeline — Cross-Project Contamination and Project Column",
-      "confidence": 0.8,
-      "digestIds": [
-        "9d1945d7-d2f7-4f80-bac1-ae7f37a70af4",
-        "eacaf1bb-f9da-4cbc-bed9-55f184a3cb29",
-        "c724a186-dffb-4c8e-a44f-0bdfd221a206",
-        "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
-        "3f8c4090-1b03-437a-a38d-c7c02c8f8909",
-        "f4afcd6b-96a6-449f-a305-68eec3d88a44",
-        "b07e573a-8d3b-4f5a-9082-80153ecbb8a5",
-        "5534b0a7-3c1d-4010-bb12-3425c1884daf",
-        "ae19a126-b2ce-4bbb-b636-9995a3a320d2",
-        "f654cda4-baa6-45c7-8545-b03a8555b4e0",
-        "bfc9e1d0-01b0-44b3-8b63-d5421e7fd367",
-        "cac93b10-6b51-4751-972c-80463d101691",
-        "45026ea0-039b-4be6-8b6c-e4fbf31f0f67",
-        "6c22e305-0ccb-45e8-a400-c0ab46480deb",
-        "1a15e9b2-6c2b-4acf-8b31-e3d5be34d345",
-        "72832d12-b489-4c75-9645-56355a2e2544",
-        "3a61ca96-cb42-456a-bf97-2b49e873b6e1",
-        "89d76b0c-a64d-4a95-a205-8bf5f0f6242d",
-        "896b6565-f327-472f-8787-94622412de66",
-        "977799be-cac1-4fc6-b0b0-de7b0d5a1265",
-        "dd01877d-ed89-4339-a21e-ffd663f04028",
-        "03d58c72-b370-45ab-8974-ce6008230b4c",
-        "ed700f1b-b3f6-4068-9d38-d98cd142a6ba",
-        "e2c89b0d-7a9c-425c-9a1a-5b65fac1f88d",
-        "75d98280-a502-430d-bfa4-8d1b8ad4538f",
-        "cff0958b-ed5f-4a2a-834b-f0419e3c19cf",
-        "28bf7eb2-ae59-43ff-878b-5956c0220a17",
-        "9b80f82f-1464-4a54-bd98-6a46e7656b6d",
-        "bc22d040-44e6-4eb5-b976-3964fd9a2115",
-        "3c154fd3-a5db-4e54-adc2-a821b2f03a7c"
-      ],
-      "project": "coding",
-      "lastUpdated": "2026-05-14T15:27:35.876Z",
-      "legacyId": "4732a13e-a6bb-4078-aa14-ccfdab8751f7",
-      "restoredFrom": "observation-export-2026-06-05",
-      "decayBreakdown": {
-        "baseConfidence": 0.8,
-        "ageDrag": 0,
-        "emergentDrag": 0,
-        "truthfulnessDrag": 0,
-        "totalDrag": 0,
-        "finalConfidence": 0.8,
-        "weeksOld": 0,
-        "churnedSinceLastUpdate": false,
-        "latestChurnTs": null,
-        "churnedFilesSample": [],
-        "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
-      },
-      "baseConfidence": 0.8,
-      "staleDragApplied": null,
-      "staleDragAt": null,
-      "team": "general",
-      "digest_ids": [
-        "9d1945d7-d2f7-4f80-bac1-ae7f37a70af4",
-        "eacaf1bb-f9da-4cbc-bed9-55f184a3cb29",
-        "c724a186-dffb-4c8e-a44f-0bdfd221a206",
-        "62ed83b6-42d8-4886-874b-7e95a3d4cd64",
-        "3f8c4090-1b03-437a-a38d-c7c02c8f8909",
-        "f4afcd6b-96a6-449f-a305-68eec3d88a44",
-        "b07e573a-8d3b-4f5a-9082-80153ecbb8a5",
-        "5534b0a7-3c1d-4010-bb12-3425c1884daf",
-        "ae19a126-b2ce-4bbb-b636-9995a3a320d2",
-        "f654cda4-baa6-45c7-8545-b03a8555b4e0",
-        "bfc9e1d0-01b0-44b3-8b63-d5421e7fd367",
-        "cac93b10-6b51-4751-972c-80463d101691",
-        "45026ea0-039b-4be6-8b6c-e4fbf31f0f67",
-        "6c22e305-0ccb-45e8-a400-c0ab46480deb",
-        "1a15e9b2-6c2b-4acf-8b31-e3d5be34d345",
-        "72832d12-b489-4c75-9645-56355a2e2544",
-        "3a61ca96-cb42-456a-bf97-2b49e873b6e1",
-        "89d76b0c-a64d-4a95-a205-8bf5f0f6242d",
-        "896b6565-f327-472f-8787-94622412de66",
-        "977799be-cac1-4fc6-b0b0-de7b0d5a1265",
-        "dd01877d-ed89-4339-a21e-ffd663f04028",
-        "03d58c72-b370-45ab-8974-ce6008230b4c",
-        "ed700f1b-b3f6-4068-9d38-d98cd142a6ba",
-        "e2c89b0d-7a9c-425c-9a1a-5b65fac1f88d",
-        "75d98280-a502-430d-bfa4-8d1b8ad4538f",
-        "cff0958b-ed5f-4a2a-834b-f0419e3c19cf",
-        "28bf7eb2-ae59-43ff-878b-5956c0220a17",
-        "9b80f82f-1464-4a54-bd98-6a46e7656b6d",
-        "bc22d040-44e6-4eb5-b976-3964fd9a2115",
-        "3c154fd3-a5db-4e54-adc2-a821b2f03a7c",
-        "a11a0733-07c6-4783-aac0-257c0c9830ff",
-        "3c03e312-3fa1-456e-8840-f182ce03a0e4"
-      ],
-      "codeVerification": {
-        "verifiedAt": "2026-06-13T05:09:07.903Z",
-        "totalClaims": 8,
-        "verifiedClaims": 8,
-        "verificationRatio": 1,
-        "staleClaims": [],
-        "referencedFiles": [
-          "ObservationConsolidator.js",
-          "migrate-add-project-column.js",
-          "enhanced-transcript-monitor.js",
-          "scripts/migrate-add-project-column.js",
-          "~/Agentic/coding/src/live-logging/ObservationConsolidator.js",
-          "server.js"
-        ],
-        "searchRoots": [
-          "/Users/Q284340/Agentic/coding",
-          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
-          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
-          "/Users/Q284340/Agentic/_work/awesome-copilot-bmw",
-          "/Users/Q284340/Agentic/_work/dyn-arch",
-          "/Users/Q284340/Agentic/_work/iso-9001",
-          "/Users/Q284340/Agentic/_work/onboarding-repro",
-          "/Users/Q284340/Agentic/_work/rapid-automations",
-          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
-          "/Users/Q284340/Agentic/_work/resi",
-          "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template",
-          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
-          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
-          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
-          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
-          "/Users/Q284340/Agentic/coding/lib/km-core",
-          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
-          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
-          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
-          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
-        ],
-        "firstZeroAt": null
-      },
-      "summary": "## Purpose\nPrevents observations from unrelated projects (`rapid-automations`, `onboarding-repro`) from polluting digests and insights generated for the `coding` project. Achieved through two complementary mechanisms: per-observation project attribution in the database schema and per-project root resolution logic in `ObservationConsolidator.js`.\n\n## Architecture\n- **Problem**: 420 observations from `rapid-automations` and `onboarding-repro` were stored in the coding project's DB without project attribution, causing cross-contamination in digest and insight generation\n- **Schema change**: `migrate-add-project-column.js` adds a `project` column to the observations table; includes dry-run mode to validate backfill logic before committing\n- **Backfill**: uses `isCodingRelated` logic from `enhanced-transcript-monitor.js` as a foundation for inferring project attribution from existing rows\n- **Null-project observations**: 21 additional observations with no inferrable project require manual review or a default attribution\n- **Per-project root resolution**: `ObservationConsolidator.js` was extended with per-project root resolution logic, allowing consolidation to correctly map observations to their respective project roots across multi-project environments; deployed by restarting obs-api; confirmed working via full verification workflow across all remaining projects\n\n## Key Files\n- `scripts/migrate-add-project-column.js` — schema migration + backfill with dry-run mode\n- `enhanced-transcript-monitor.js` — contains `isCodingRelated` logic used as backfill heuristic\n- `~/Agentic/coding/src/live-logging/ObservationConsolidator.js` — per-project root resolution logic; maps observations to correct project roots during consolidation\n- `server.js` — dashboard API server; updated alongside migration steps\n\n## Usage\nRun `migrate-add-project-column.js --dry-run` first to preview the 420 cross-contaminating rows and 21 null-project rows, then run without `--dry-run` to apply. After column population, `ObservationConsolidator` filters by `project = 'coding'` when generating digests and insights; per-project root resolution ensures observations are attributed to the correct root. Restart obs-api after any `ObservationConsolidator.js` changes to deploy the fix.\n\n## Troubleshooting\n- **Project column exists but all values are `null`**: Background migration process may not have completed; check the redirected log file for errors; re-run the script\n- **420 cross-project observations still affecting digests**: Confirm the consolidator <USER_ID_REDACTED> include a `WHERE project = 'coding'` filter; schema alone does not filter — query logic must use the column\n- **Observations from correct project not appearing in digests**: Verify per-project root resolution logic in `ObservationConsolidator.js` is mapping observations to the correct root; restart obs-api to deploy any changes\n- **`isCodingRelated` misclassifies observations**: Review the heuristic in `enhanced-transcript-monitor.js` and add project-specific path or keyword signals as needed",
-      "last_updated": "2026-06-13T03:38:34.321Z",
-      "scope": "Per-observation project attribution in the database schema and per-project root resolution during consolidation, both preventing cross-project contamination of digests and insights."
-    },
-    "project": "coding"
-  },
-  {
     "id": "11078081-a80b-42ab-bc81-684155fd51b6",
     "topic": "Unified Viewer — Filter Infrastructure",
     "summary": "## Purpose\nManages user-controlled filter state for the unified viewer, enabling graph entities and the footer node count to be narrowed by multiple dimensions: Learning Source, Layer, Teams, and HideDocs. Provides a central store (`viewer-store.ts`), individual React filter components, and a `visibleCount` computation in the main route component that enforces all active dimensions simultaneously.\n\n## Architecture\n- **`viewer-store.ts`**: central state store for all viewer filter state; contains filter state fields and mutation functions per dimension; Learning Source (Online/Batch/Combined) and Teams filters are distinct state slices alongside Layer and HideDocs\n- **Filter components**: each dimension has a dedicated React component reading from and writing to the store\n  - `LearningSourceFilter.tsx`: Learning Source filter UI (Online/Batch/Combined)\n  - `TeamsFilter.tsx`: Teams filter UI; **known bug** — toggling produces incorrect filter state (toggle action does not flip to the expected value); targeted fix is queued but not yet applied\n- **`UnifiedViewer.tsx` — visibleCount**: the main route component (`integrations/unified-viewer/src/routes/UnifiedViewer.tsx`) contains the `visibleCount` computation that gates the footer node count and D3 graph visibility; it must respect **all** active filter dimensions — LearningSource, Layer, Teams, and HideDocs; omitting any dimension causes the footer and graph to appear unresponsive to that control\n- **Open issue — checkbox visual artifact**: Radix `CheckIcon` with class `size-3.5` produces a crossed/struck-through visual on checkboxes; root cause is ambiguous between a CSS sizing problem and an upstream Layer filter logic breakage causing corrupt render state; resolution pending\n- **Open issue — Layer filter logic**: a logic breakage in the Layer filter was flagged during the checkbox investigation; independent from or compounding the visual artifact — not yet resolved\n\n## Key Files\n- `integrations/unified-viewer/src/store/viewer-store.ts` (approx.) — all filter state fields and mutations; Learning Source and Teams state slices\n- `integrations/unified-viewer/src/routes/UnifiedViewer.tsx` — main route component; `visibleCount` must gate on LearningSource, Layer, Teams, and HideDocs\n- `integrations/unified-viewer/src/components/LearningSourceFilter.tsx` (approx.) — Learning Source filter UI\n- `integrations/unified-viewer/src/components/TeamsFilter.tsx` (approx.) — Teams filter UI; **known bug**: toggle produces incorrect state; fix queued\n\n## Usage\nFilter components are rendered in the unified viewer's filter panel. User interactions write to `viewer-store.ts`. The `visibleCount` in `UnifiedViewer.tsx` reads all filter dimensions and drives the footer count and D3 graph visibility. Adding a new filter requires: (1) a new state field + mutation in `viewer-store.ts`, (2) a corresponding filter component, and (3) adding the new dimension to `visibleCount` in `UnifiedViewer.tsx`.\n\n## Troubleshooting\n- **Footer count or D3 graph doesn't respond to LearningSource / Teams / HideDocs filter**: `visibleCount` in `UnifiedViewer.tsx` is not gating on that dimension — verify all four (LearningSource, Layer, Teams, HideDocs) are included in the count logic\n- **Teams filter toggle produces incorrect selection state**: confirmed bug in `TeamsFilter.tsx`; fix queued but not applied — results will not accurately reflect toggle until resolved\n- **Checkbox renders with crossed or struck-through appearance**: test with an alternate size class for Radix `CheckIcon`; also verify whether the Layer filter logic breakage causes compound corrupt render state\n- **Layer filter not applying to graph**: check the Layer state field/mutation in `viewer-store.ts` and confirm it gates entity inclusion downstream; diagnose independently from the visual artifact\n- **New filter selection not reflected in graph or footer**: verify the filter mutation output reaches both the graph data pipeline and the `visibleCount` gate in `UnifiedViewer.tsx`",
@@ -6647,7 +6761,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -6794,7 +6908,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -6961,7 +7075,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -7101,7 +7215,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -7215,7 +7329,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -7357,7 +7471,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.75,
       "staleDragApplied": null,
@@ -7487,7 +7601,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.75,
       "staleDragApplied": null,
@@ -7660,7 +7774,7 @@
           "integrations/system-health-dashboard/server.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.95,
       "staleDragApplied": null,
@@ -7860,7 +7974,7 @@
           "src/retrieval/retrieval-service.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.92,
       "staleDragApplied": null,
@@ -8282,7 +8396,7 @@
           "docs/puml/km-core-unified-architecture.puml"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.92,
       "staleDragApplied": null,
@@ -9158,7 +9272,7 @@
           "scripts/combined-status-line.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.92,
       "staleDragApplied": null,
@@ -9586,7 +9700,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -9751,7 +9865,7 @@
           "src/live-logging/ObservationWriter.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -9936,7 +10050,7 @@
           "integrations/system-health-dashboard/src/pages/token-usage.tsx"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -10058,7 +10172,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": false,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -10172,7 +10286,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -10344,7 +10458,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": false,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -10567,7 +10681,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -10710,7 +10824,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -10818,7 +10932,7 @@
           ".planning/phases/44-rest-api-git-snapshots/44-14-PLAN.md"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.75,
       "staleDragApplied": null,
@@ -11389,7 +11503,7 @@
           "src/pipeline/IngestPipeline.ts"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -11961,7 +12075,7 @@
           "scripts/status-line-fast.cjs"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -12315,7 +12429,7 @@
           ".planning/phases/44-rest-api-git-snapshots/44-10-SUMMARY.md"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.9,
       "staleDragApplied": null,
@@ -12491,7 +12605,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.68,
       "staleDragApplied": null,
@@ -13037,7 +13151,7 @@
           "docs/puml/network-scenario-hotspot.puml"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.88,
       "staleDragApplied": null,
@@ -13385,7 +13499,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.733,
       "staleDragApplied": null,
@@ -13483,7 +13597,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.65,
       "staleDragApplied": null,
@@ -13635,7 +13749,7 @@
           "src/live-logging/ObservationWriter.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -13830,7 +13944,7 @@
           "scripts/backfill-subagent-transcripts.mjs"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -14005,7 +14119,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -14464,7 +14578,7 @@
           "integrations/llm-cli-proxy.md"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -15221,7 +15335,7 @@
           "src/live-logging/SemanticAnalyzer.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.85,
       "staleDragApplied": null,
@@ -15702,7 +15816,7 @@
           "scripts/status-line-fast.cjs"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -15999,7 +16113,7 @@
           "src/intelligence/temporal.ts"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -16350,13 +16464,13 @@
         "finalConfidence": 0.6,
         "weeksOld": 4.2,
         "churnedSinceLastUpdate": true,
-        "latestChurnTs": "2026-06-13T05:03:02.000Z",
+        "latestChurnTs": "2026-06-13T05:24:44.000Z",
         "churnedFilesSample": [
           "scripts/observations-api-server.mjs",
           "docker/docker-compose.yml"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -16662,7 +16776,7 @@
           "docker/Dockerfile.coding-services"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -16889,7 +17003,7 @@
           "src/network-detect.ts"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.8,
       "staleDragApplied": null,
@@ -17092,7 +17206,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.6,
       "staleDragApplied": null,
@@ -17213,7 +17327,7 @@
           ".claude/commands/documentation-style.md"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.75,
       "staleDragApplied": null,
@@ -17433,7 +17547,7 @@
           "scripts/combined-status-line.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.75,
       "staleDragApplied": null,
@@ -17717,7 +17831,7 @@
           ".data/observation-export/observations.json"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.75,
       "staleDragApplied": null,
@@ -17835,6 +17949,47 @@
     "project": "coding"
   },
   {
+    "id": "5d47f612-b1b0-40fa-bedc-190b99fca08f",
+    "topic": "GSD Project Roadmap Structure",
+    "summary": "## Purpose\n`PROJECT.md` and `ROADMAP.md` serve as the canonical source of truth for the GSD project's current position, completed work, and upcoming phases. They are the first documents to consult when orienting to the project state.\n\n## Architecture\nThe project organises work into numbered **Plans** (granular implementation units) and **Milestones/Phases** (larger feature or subsystem deliverables). A `km-core` Git submodule exists as a dependency that must be updated in lockstep with host-repo changes. The current known backlog contains three major remaining areas:\n\n- **Phase 33** — Health Monitoring Consolidation\n- **Milestone 37** — km-core-foundation\n- **Milestone 38** — ontology-registry\n\n## Key Files\n- `PROJECT.md` — top-level project description and status overview\n- `ROADMAP.md` — milestone/phase tracking; authoritative list of completed and pending work\n- `km-core/` — Git submodule; changes here require coordinated commits in both the submodule and the parent repo\n\n## Usage\nConsult `ROADMAP.md` at the start of any work session to confirm the current phase and identify the next actionable item. When completing a Plan or Milestone, update both `ROADMAP.md` and any relevant submodule references before merging to `main`.\n\n## Troubleshooting\n- If the repo appears out of sync after a merge, run `git submodule update --init --recursive` to realign `km-core`.\n- If `ROADMAP.md` and commit history disagree on what has landed, treat the commit history on `main` as ground truth and update `ROADMAP.md` accordingly.\n- Unresolved phase ordering questions should be reconciled in `ROADMAP.md` before starting implementation, not during.",
+    "confidence": 0.5,
+    "digestIds": [
+      "9e75256c-c778-4163-8810-56fe4beeccf9"
+    ],
+    "lastUpdated": "2026-06-13T05:32:49.288Z",
+    "createdAt": "2026-06-13T05:32:49.288Z",
+    "metadata": {
+      "scope": "High-level project planning documents and the remaining milestone/phase backlog for the GSD (Get Stuff Done) project.",
+      "baseConfidence": 0.5,
+      "topic": "GSD Project Roadmap Structure",
+      "summary": "## Purpose\n`PROJECT.md` and `ROADMAP.md` serve as the canonical source of truth for the GSD project's current position, completed work, and upcoming phases. They are the first documents to consult when orienting to the project state.\n\n## Architecture\nThe project organises work into numbered **Plans** (granular implementation units) and **Milestones/Phases** (larger feature or subsystem deliverables). A `km-core` Git submodule exists as a dependency that must be updated in lockstep with host-repo changes. The current known backlog contains three major remaining areas:\n\n- **Phase 33** — Health Monitoring Consolidation\n- **Milestone 37** — km-core-foundation\n- **Milestone 38** — ontology-registry\n\n## Key Files\n- `PROJECT.md` — top-level project description and status overview\n- `ROADMAP.md` — milestone/phase tracking; authoritative list of completed and pending work\n- `km-core/` — Git submodule; changes here require coordinated commits in both the submodule and the parent repo\n\n## Usage\nConsult `ROADMAP.md` at the start of any work session to confirm the current phase and identify the next actionable item. When completing a Plan or Milestone, update both `ROADMAP.md` and any relevant submodule references before merging to `main`.\n\n## Troubleshooting\n- If the repo appears out of sync after a merge, run `git submodule update --init --recursive` to realign `km-core`.\n- If `ROADMAP.md` and commit history disagree on what has landed, treat the commit history on `main` as ground truth and update `ROADMAP.md` accordingly.\n- Unresolved phase ordering questions should be reconciled in `ROADMAP.md` before starting implementation, not during.",
+      "confidence": 0.5,
+      "digest_ids": [
+        "9e75256c-c778-4163-8810-56fe4beeccf9"
+      ],
+      "last_updated": "2026-06-13T05:32:49.288Z",
+      "project": "unknown",
+      "createdAt": "2026-06-13T05:32:49.288Z",
+      "decayBreakdown": {
+        "baseConfidence": 0.5,
+        "ageDrag": 0,
+        "emergentDrag": 0,
+        "truthfulnessDrag": 0,
+        "totalDrag": 0,
+        "finalConfidence": 0.5,
+        "weeksOld": 0,
+        "churnedSinceLastUpdate": false,
+        "latestChurnTs": null,
+        "churnedFilesSample": [],
+        "measurable": false,
+        "computedAt": "2026-06-13T05:32:49.649Z"
+      },
+      "staleDragApplied": null,
+      "staleDragAt": null
+    },
+    "project": "unknown"
+  },
+  {
     "id": "019eb544-102e-7f26-bc6c-a5905828a80d",
     "topic": "Online Learning System — Health Status and Monitoring",
     "summary": "## Purpose\nTracks the operational health of the online learning pipeline — covering code graph ingestion, batch analysis, and knowledge persistence — and surfaces a health badge in the tmux statusline. A yellow badge signals the pipeline is impaired but not fully down.\n\n## Architecture\n- **Code ingestion layer:** `integrations/code-graph-rag/` — extracts code entities via AST parsing; feeds the knowledge graph stored in LevelDB (graph) and Qdrant (vectors)\n- **Batch analysis pipeline:** processes git history commits in the background; coordinated by `BatchAnalysisPipeline` (exact entry-point paths under active investigation)\n- **Health signal path:** pipeline/database state → health coordinator → GSM statusline renderer → tmux badge\n- The badge reflects the result of probing database connectivity and pipeline liveness, not direct process inspection\n\n## Key Files\n- `integrations/code-graph-rag/` — core ingestion engine and graph query interface\n- Health coordinator (path shared with main coordinator, see *Health Coordinator / Tmux Statusline* insight) — aggregates sub-check results including the online learning check\n- Statusline renderer — reads aggregated health state and emits the badge character\n\n## Usage\nRuns continuously in the background as part of the coding project's knowledge management loop. The health badge is visible in every tmux session; a yellow state indicates the system is degraded but still partially operational. Downstream consumers (agents, knowledge <USER_ID_REDACTED>) may receive stale or incomplete graph data when the badge is yellow.\n\n## Troubleshooting\n- **Yellow badge (impaired state):** Investigate in this order:\n  1. Check LevelDB and Qdrant connectivity via PSM probe commands (same as other sub-checks)\n  2. Inspect batch analysis pipeline logs for stalled or errored jobs\n  3. Verify the health coordinator is correctly mapping pipeline state to the online learning sub-check key — false yellow is possible if mapping logic is misconfigured\n- **Badge does not reflect actual state:** Confirmed pattern — the statusline badge has been observed not to reflect true pipeline state. The health coordinator's sub-check mapping for this component should be validated\n- **Session crash during diagnosis:** Re-run diagnostic grep/bash commands against database state and coordinator logs to reconstruct context; the system does not persist mid-session diagnostic state\n- **Root cause of current yellow:** Under active investigation — no confirmed failure mode identified yet",
@@ -17867,7 +18022,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.5,
       "staleDragApplied": null,
@@ -17955,7 +18110,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -18039,7 +18194,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": false,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -18113,7 +18268,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": false,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -18184,7 +18339,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.5,
       "staleDragApplied": null,
@@ -18230,104 +18385,6 @@
       }
     },
     "project": "rapid-automations"
-  },
-  {
-    "id": "019eb544-102b-7d6d-9633-3617dc67b04b",
-    "topic": "Git SSH Connectivity Through HTTP Proxy",
-    "summary": "## Purpose\nEnables `git pull`/`push` over SSH to GitHub when the host machine operates behind an HTTP proxy (e.g., `proxydetox` on port 3128). SSH bypasses all `HTTP_PROXY` environment variables at the OS level, requiring explicit proxy routing in `~/.ssh/config`.\n\n## Architecture\n- SSH ignores `HTTP_PROXY`, `HTTPS_PROXY`, and related environment variables entirely — these only affect HTTP/HTTPS clients\n- The fix routes SSH connections to `github.com` through the local `proxydetox` proxy using `nc` (netcat) as a `ProxyCommand`\n- A conditional wrapper approach can limit the `ProxyCommand` to situations where port 3128 is actually reachable, making the config safe for use on non-proxied networks (e.g., home/hotspot)\n\n## Key Files\n- `~/.ssh/config` — must contain a `Host github.com` block with `ProxyCommand nc -X connect -x 127.0.0.1:3128 %h %p`\n\n## Usage\nApplied once to the developer workstation `~/.ssh/config`. Takes effect immediately for all subsequent SSH-based git operations. No project files are modified.\n\n## Troubleshooting\n- **`git pull` fails with DNS resolution error for `github.com`**: SSH is not routing through the proxy — verify the `ProxyCommand` entry exists in `~/.ssh/config` for `Host github.com`\n- **`git pull` hangs on non-proxied network after adding ProxyCommand**: Port 3128 is unreachable — use the conditional wrapper that checks port 3128 availability before applying the `ProxyCommand`; alternatively, comment out the `ProxyCommand` line when not on corporate network\n- **`nc` not found**: Install `netcat`; on macOS use `brew install netcat` or use the built-in `/usr/bin/nc`",
-    "confidence": 0.5,
-    "digestIds": [
-      "696450b3-d93a-40d8-ba3f-d3d4c4b3685c",
-      "ae504d10-e3b5-4b5f-a55d-fec7ab039190",
-      "8c710897-cc82-4713-8fa9-ac2f865ca31b",
-      "2ce3124f-0821-495e-b0e7-a3dec5049ea7",
-      "598d2c3b-9c52-48bb-bab3-e9e642edf418",
-      "01046521-1973-4c37-9eab-b350d90862dc",
-      "6c0d5bb6-aca3-4c17-bda4-b4dd6dbe8301"
-    ],
-    "lastUpdated": "2026-06-11T19:55:41.681Z",
-    "createdAt": "2026-05-29T11:35:31.001Z",
-    "metadata": {
-      "source": "auto",
-      "topic": "Git SSH Connectivity Through HTTP Proxy",
-      "confidence": 0.5,
-      "digestIds": [
-        "696450b3-d93a-40d8-ba3f-d3d4c4b3685c",
-        "ae504d10-e3b5-4b5f-a55d-fec7ab039190",
-        "8c710897-cc82-4713-8fa9-ac2f865ca31b",
-        "2ce3124f-0821-495e-b0e7-a3dec5049ea7",
-        "598d2c3b-9c52-48bb-bab3-e9e642edf418",
-        "01046521-1973-4c37-9eab-b350d90862dc",
-        "6c0d5bb6-aca3-4c17-bda4-b4dd6dbe8301"
-      ],
-      "project": "coding",
-      "lastUpdated": "2026-05-29T11:35:31.001Z",
-      "legacyId": "071db218-21c2-4b75-a379-ea082471de22",
-      "restoredFrom": "observation-export-2026-06-05",
-      "decayBreakdown": {
-        "baseConfidence": 0.5,
-        "ageDrag": 0,
-        "emergentDrag": 0,
-        "truthfulnessDrag": 0,
-        "totalDrag": 0,
-        "finalConfidence": 0.5,
-        "weeksOld": 2.1,
-        "churnedSinceLastUpdate": false,
-        "latestChurnTs": null,
-        "churnedFilesSample": [],
-        "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
-      },
-      "baseConfidence": 0.5,
-      "staleDragApplied": null,
-      "staleDragAt": null,
-      "team": "general",
-      "digest_ids": [
-        "696450b3-d93a-40d8-ba3f-d3d4c4b3685c",
-        "ae504d10-e3b5-4b5f-a55d-fec7ab039190",
-        "8c710897-cc82-4713-8fa9-ac2f865ca31b",
-        "2ce3124f-0821-495e-b0e7-a3dec5049ea7",
-        "598d2c3b-9c52-48bb-bab3-e9e642edf418",
-        "01046521-1973-4c37-9eab-b350d90862dc",
-        "6c0d5bb6-aca3-4c17-bda4-b4dd6dbe8301"
-      ],
-      "codeVerification": {
-        "verifiedAt": "2026-06-13T05:09:22.062Z",
-        "totalClaims": 4,
-        "verifiedClaims": 4,
-        "verificationRatio": 1,
-        "staleClaims": [],
-        "referencedFiles": [
-          "~/.ssh/config",
-          "github.com"
-        ],
-        "searchRoots": [
-          "/Users/Q284340/Agentic/coding",
-          "/Users/Q284340/Agentic/_work/adaptive-learning-path-generator",
-          "/Users/Q284340/Agentic/_work/ai-transformation-day-hackathon",
-          "/Users/Q284340/Agentic/_work/awesome-copilot-bmw",
-          "/Users/Q284340/Agentic/_work/dyn-arch",
-          "/Users/Q284340/Agentic/_work/iso-9001",
-          "/Users/Q284340/Agentic/_work/onboarding-repro",
-          "/Users/Q284340/Agentic/_work/rapid-automations",
-          "/Users/Q284340/Agentic/_work/rapid-llm-proxy",
-          "/Users/Q284340/Agentic/_work/resi",
-          "/Users/Q284340/Agentic/_work/sketcher",
-          "/Users/Q284340/Agentic/_work/ui-template",
-          "/Users/Q284340/Agentic/coding/integrations/code-graph-rag",
-          "/Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor",
-          "/Users/Q284340/Agentic/coding/integrations/mcp-server-semantic-analysis",
-          "/Users/Q284340/Agentic/coding/integrations/memory-visualizer",
-          "/Users/Q284340/Agentic/coding/lib/km-core",
-          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/operational-knowledge-management",
-          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-agentic-sandbox",
-          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapid-toolkit",
-          "/Users/Q284340/Agentic/_work/rapid-automations/integrations/rapidscribe-meeting"
-        ],
-        "firstZeroAt": null
-      }
-    },
-    "project": "coding"
   },
   {
     "id": "019eb544-0fbf-77f6-9d0c-4702ca8bd548",
@@ -18430,7 +18487,7 @@
           "integrations/system-health-dashboard/server.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -18618,7 +18675,7 @@
           "integrations/system-health-dashboard/src/components/workflow/trace-modal.tsx"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -18764,7 +18821,7 @@
           "integrations/mcp-server-semantic-analysis"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.7,
       "staleDragApplied": null,
@@ -18922,7 +18979,7 @@
           "scripts/agent-common-setup.sh"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.67,
       "staleDragApplied": null,
@@ -19098,7 +19155,7 @@
           "scripts/health-coordinator.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.65,
       "staleDragApplied": null,
@@ -19272,7 +19329,7 @@
           "scripts/combined-status-line.js"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.65,
       "staleDragApplied": null,
@@ -19456,7 +19513,7 @@
           "docker/Dockerfile.coding-services"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.65,
       "staleDragApplied": null,
@@ -19653,7 +19710,7 @@
           "scripts/configure-wave-analysis-routing.sh"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.62,
       "staleDragApplied": null,
@@ -19777,7 +19834,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "staleDragApplied": null,
       "staleDragAt": null,
@@ -19868,7 +19925,7 @@
           ".github/copilot-instructions.md"
         ],
         "measurable": true,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.55,
       "staleDragApplied": null,
@@ -19983,7 +20040,7 @@
         "latestChurnTs": null,
         "churnedFilesSample": [],
         "measurable": false,
-        "computedAt": "2026-06-13T05:10:17.258Z"
+        "computedAt": "2026-06-13T05:32:49.649Z"
       },
       "baseConfidence": 0.3,
       "staleDragApplied": null,
