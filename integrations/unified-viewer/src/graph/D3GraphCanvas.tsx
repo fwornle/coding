@@ -231,9 +231,10 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // effect retracted (operator second-smoke feedback), this subscription
   // is no longer needed AND would trigger spurious re-renders on every
   // `selectionSource` change — net slowdown for zero behavioural benefit.
-  // The literal `selectionSource: 'graph'` is still WRITTEN on node click
-  // (see the .on('click') handler below); writing it does not require us
-  // to subscribe to our own slice.
+  // The literal `source: 'graph'` is still WRITTEN on node click (via the
+  // `setSelection` action call in the .on('click') handler below — CR-02
+  // fix 2026-06-13); writing it does not require us to subscribe to our
+  // own slice.
   const selectedTeams = useViewerStore((s) => s.selectedTeams)
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
   const selectedClasses = useViewerStore((s) => s.selectedClasses)
@@ -516,20 +517,33 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       .call(makeDrag(simulation))
       .on('click', (event: MouseEvent, d) => {
         const path = computeAncestryPath(d.id, visibleRelations)
-        // 2026-06-13 (Phase 56): atomic 5-field write — node id, path, the
-        // history-sidebar highlight key, source = 'graph' (so the centering
-        // effect can short-circuit on self-originated selections), and
-        // selectedSessionId = null because a graph click is not session-scoped.
+        // 2026-06-13 (Phase 56 / CR-02 fix): route through the canonical
+        // `setSelection` store action instead of an inline `setState({...})`.
+        // Two reasons:
+        //   1. Audit contract #5 (single source of truth for selection
+        //      writes) — every cross-pane selection write should funnel
+        //      through `setSelection`/`clearSelection` so the LSL filter
+        //      cascade, sibling-field invariants, and reference-stability
+        //      guards live in ONE place (the store).
+        //   2. Audit §7 R2 sibling-clear invariant (selectedSessionId and
+        //      selectedSessionStartAt are ALWAYS written/cleared together).
+        //      The previous inline `setState` payload wrote
+        //      `selectedSessionId: null` but silently omitted
+        //      `selectedSessionStartAt`, leaving it stale from a prior
+        //      timeline-tick click. `setSelection` handles the paired clear
+        //      automatically: passing `sessionId: null` resets `sessionStartAt`
+        //      to null when no explicit `sessionStartAt` is supplied
+        //      (viewer-store.ts:330-335).
         // Subscribers (HistorySidebar, OccurrenceHistorySidebar,
-        // LslTimelineStrip) see a coherent snapshot in one set() — never a
-        // half-written state where selectedNodeId moved but highlightedRowKey
-        // is stale.
-        useViewerStore.setState({
-          selectedNodeId: d.id,
+        // LslTimelineStrip) still see a coherent snapshot in one set() —
+        // never a half-written state where selectedNodeId moved but
+        // highlightedRowKey / sibling session fields are stale.
+        useViewerStore.getState().setSelection({
+          nodeId: d.id,
           pathToSelected: new Set(path.nodeDepths.keys()),
           highlightedRowKey: d.id,
-          selectionSource: 'graph',
-          selectedSessionId: null,
+          source: 'graph',
+          sessionId: null,
         })
         event.stopPropagation()
       })
