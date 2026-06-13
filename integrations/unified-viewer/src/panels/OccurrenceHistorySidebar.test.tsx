@@ -15,6 +15,18 @@
 //      highlightedRowKey matches AND selectedNodeId === null (sidebar still
 //      visible per the line-70 null-guard; e.g. external timeline cascade).
 //   8. (Phase 56) Test 10 — Logger discipline: no raw console.* in source.
+//   9. (CR-01) Test 11 — clicking a row CLEARS the LSL session-filter scope +
+//      sibling session-tick fields that a prior timeline-tick click left
+//      behind. Pre-seed the store with non-empty LSL filter +
+//      selectedSessionId/StartAt BEFORE the click; assert ALL of them are
+//      cleared AFTER. Locks the audit-contract-#5 cascade-clear semantics
+//      for sidebars so a sidebar-row click after a tick click leaves the
+//      graph in a coherent "show everything visible" state — not the
+//      broken state where the D3 predicate stays narrowed to the previous
+//      session's entities.
+//  10. (CR-01) Test 12 — source-grep acceptance gate: OccurrenceHistorySidebar.tsx
+//      MUST have zero inline `useViewerStore.setState({...})` call sites —
+//      the only selection writer path is the canonical `setSelection` action.
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
@@ -62,12 +74,18 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
     // Phase 56: reset selection-sync slice baseline too — otherwise leaks
     // across tests (e.g. a stale highlightedRowKey from a previous Phase 56
     // test masks Test 9's assertion that no row is highlighted by default).
+    // 2026-06-13 (CR-01): also reset the LSL filter slice + the sibling
+    // selectedSessionStartAt so Test 11 starts from a clean slate and the
+    // pre-seeded LSL state it writes cannot leak from a prior test.
     useViewerStore.setState({
       selectedNodeId: null,
       theme: 'light',
       selectionSource: null,
       highlightedRowKey: null,
       selectedSessionId: null,
+      selectedSessionStartAt: null,
+      lslSessionFilter: [],
+      lslFilterEntityIds: null,
     })
     cleanup()
     // Pin Date.now() so relative-time formatting is deterministic.
@@ -196,5 +214,90 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
       'utf8',
     )
     expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
+  })
+
+  // ====================================================================
+  // CR-01 fix (2026-06-13): the OccurrenceHistorySidebar row-click handler
+  // used to call `useViewerStore.setState({...})` with a 4-field payload
+  // that did NOT clear the LSL session-filter scope or the sibling
+  // session-tick fields. After a timeline-tick click set
+  // `lslFilterEntityIds` + `lslSessionFilter` + `selectedSessionId/StartAt`,
+  // a sidebar-row click left those stale — the D3 graph stayed narrowed to
+  // the previous session's entities while the side panel had already
+  // swapped to a different entity's detail. Broken UX with no recovery
+  // path short of pressing Esc.
+  //
+  // The fix routes through the canonical `setSelection` store action
+  // with explicit nulls/empties for the LSL + session-tick fields, so
+  // subscribers see one coherent snapshot. The two tests below lock the
+  // contract: (Test 11) functional — pre-seed the stale state, click,
+  // assert cleared; (Test 12) source-grep — no inline setState remains.
+  //
+  // NOTE: this sidebar's line-70 null-guard means it ONLY renders when
+  // `selectedNodeId === null`. The pre-seed below intentionally writes
+  // `selectedNodeId: null` even though a tick click would normally set
+  // it to the first entity in the bucket — this models the "sidebar-only
+  // mode" (round 4 of the audit) where the tick's entities had no
+  // graph-visible ancestor and `pickFirstResolvable` resolved to null. In
+  // that mode the OccurrenceHistorySidebar IS visible and clickable, but
+  // the LSL filter is still active — which is exactly the scenario CR-01
+  // breaks in the un-patched code.
+  // ====================================================================
+
+  test('Test 11 (CR-01): clicking a row clears the stale LSL session-filter scope + sibling session-tick fields that a prior timeline-tick click left behind', () => {
+    // Pre-seed the store with the EXACT state a timeline-tick click leaves
+    // behind in sidebar-only mode: non-empty LSL filter (graph predicate
+    // narrowed to a session's entities) + sibling session-tick fields
+    // populated, with selectedNodeId still null because the bucket's
+    // entities had no graph-visible ancestor (round-4 sidebar-only path).
+    useViewerStore.setState({
+      selectedNodeId: null,
+      selectionSource: 'timeline',
+      highlightedRowKey: null,
+      selectedSessionId: 'sess-X',
+      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+      lslSessionFilter: ['sess-X'],
+      lslFilterEntityIds: new Set<string>(['orphan-1', 'orphan-2']),
+    })
+
+    renderPanel()
+    const row = screen.getByTestId('occurrence-row-e-min')
+    fireEvent.click(row)
+
+    // Single getState snapshot — every field must reflect the post-click
+    // contract. The sidebar-row click MUST replace the selection AND
+    // cascade-clear the LSL session-filter scope so the graph predicate
+    // stops narrowing to the previous session's entities.
+    const s = useViewerStore.getState()
+    // Selection moved to the clicked row.
+    expect(s.selectedNodeId).toBe('e-min')
+    expect(s.highlightedRowKey).toBe('e-min')
+    expect(s.selectionSource).toBe('history')
+    // Sibling session-tick fields MUST be cleared (audit §7 R2: they are
+    // always written/cleared together; the previous tick-set values are now
+    // stale because the user navigated to a different entity context).
+    expect(s.selectedSessionId).toBeNull()
+    expect(s.selectedSessionStartAt).toBeNull()
+    // LSL session-filter scope MUST be cleared so the D3 graph's
+    // `visibleEntities` predicate stops intersecting against the previous
+    // tick's entity set. This is the audit-contract-#5 cascade-clear
+    // semantics for sidebars: a sidebar-row click is a "fresh" selection
+    // scope that should not inherit the previous pane's filter.
+    expect(s.lslSessionFilter).toEqual([])
+    expect(s.lslFilterEntityIds).toBeNull()
+  })
+
+  test('Test 12 (CR-01): source-grep acceptance gate — OccurrenceHistorySidebar.tsx has zero inline useViewerStore.setState({...}) call sites', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/panels/OccurrenceHistorySidebar.tsx'),
+      'utf8',
+    )
+    // The CR-01 fix locked the contract: the only path to write selection
+    // from this file is `useViewerStore.getState().setSelection({...})`.
+    // Any future regression that re-introduces an inline `setState({...})`
+    // for selection writes would re-open CR-01.
+    expect(src).not.toMatch(/useViewerStore\.setState\s*\(/)
+    // Positive assertion: the canonical setSelection call IS present.
+    expect(src).toMatch(/useViewerStore\.getState\(\)\.setSelection\s*\(/)
   })
 })
