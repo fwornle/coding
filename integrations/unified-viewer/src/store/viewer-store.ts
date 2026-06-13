@@ -569,5 +569,19 @@ export const useViewerStore = create<ViewerState>((set) => ({
     }),
 
   clearLslSessionFilter: () => set({ lslSessionFilter: [], lslFilterEntityIds: null }),
-  setLslFilterEntityIds: (ids) => set({ lslFilterEntityIds: ids }),
+  // 2026-06-13 (audit §4.4 + §7 R3): deep-equal guard. The audit traced
+  // Issue 1's "zoom feel" to this writer producing a fresh `Set` reference
+  // on every tick click → invalidating D3GraphCanvas's `visibleEntities`
+  // useMemo (`lslFilterEntityIds` is in its dep list) → restarting the
+  // force simulation. Reference stability when content is unchanged is
+  // exactly what stops that cascade. `sameSetMembership` is the shared
+  // predicate also used by `setSelection({ lslFilterEntityIds })` for the
+  // same guarantee.
+  setLslFilterEntityIds: (ids) =>
+    set((s) => {
+      if (sameSetMembership(s.lslFilterEntityIds, ids)) {
+        return {} // no write — preserve the existing reference
+      }
+      return { lslFilterEntityIds: ids }
+    }),
 }))
