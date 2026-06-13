@@ -821,19 +821,13 @@ const PROJECT_COMPONENT_TAXONOMY = {
     { name: 'rapid-agentic-sandbox', aliases: ['rapid-agentic-sandbox', 'sandbox'] },
     { name: 'rapidscribe-meeting', aliases: ['rapidscribe', 'meeting'] },
   ],
-  sketcher: [
-    { name: 'RapidToolkit', aliases: ['rapid-toolkit', 'rapid toolkit'] },
-    { name: 'TeamsIntegration', aliases: ['teams channel', 'graph api', 'microsoft graph', 'teams'] },
-    { name: 'ReportGeneration', aliases: ['analysis report', 'markdown report', 'pdf conversion'] },
-    { name: 'TmuxStatusline', aliases: ['tmux', 'statusline', 'status line', 'proxy badge'] },
-    { name: 'OnlineLearning', aliases: ['online learning', 'code graph ingestion', 'batch analysis'] },
-  ],
+  // sketcher: React+VLM whiteboard-image analyzer (`_work/sketcher`).
+  // Taxonomy intentionally left undefined until real sketcher insights
+  // are synthesized — earlier draft included generic Teams/Tmux
+  // components from mislabeled insights that have since been
+  // reclassified to their correct projects.
   'onboarding-repro': [
-    { name: 'LiveSessionLogging', aliases: ['live session logging', 'lsl', 'specstory'] },
-    { name: 'OpenCodePlugin', aliases: ['opencode', 'compaction guard'] },
-    { name: 'BrandschutzAgent', aliases: ['brandschutz', 'articulate rise', 'fire safety'] },
-    { name: 'ObservationsDashboard', aliases: ['observations dashboard', 'observation dashboard', 'etm'] },
-    { name: 'MultiAgentSkills', aliases: ['multi-agent', 'skill', 'agent skill', 'command discovery'] },
+    { name: 'BrandschutzAgent', aliases: ['brandschutz', 'articulate rise', 'fire safety', 'brandschutz-agent'] },
   ],
   daFrankTeam: [
     { name: 'HackathonGame', aliases: ['kraken', 'browser game', 'hackathon', 'spa'] },
