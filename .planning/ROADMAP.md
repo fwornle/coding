@@ -974,12 +974,12 @@ See `.planning/phases/55-unified-viewer-feature-parity-with-vokb/55-CONTEXT.md` 
 **Mode:** mvp
 **Requirements**: TBD
 **Depends on:** Phase 55
-**Plans:** 1/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 - [x] 56-01-PLAN.md — Store selection-sync slice + Esc→clearSelection + RED Playwright spec (Wave 1 foundation)
-- [ ] 56-02-PLAN.md — History sidebar slice: atomic click write + data-history-id fix + highlight (Wave 2)
-- [ ] 56-03-PLAN.md — LSL timeline timestamp scale + tick→atomic Phase 56 fields (Wave 2)
+- [x] 56-02-PLAN.md — History sidebar slice: atomic click write + data-history-id fix + highlight (Wave 2)
+- [x] 56-03-PLAN.md — LSL timeline timestamp scale + tick→atomic Phase 56 fields (Wave 2)
 - [ ] 56-04-PLAN.md — D3 graph centering + bg-click→clearSelection + E2E suite GREEN + operator visual smoke (Wave 3)
 
 ---
