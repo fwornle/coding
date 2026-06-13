@@ -35,6 +35,11 @@
 // LOGGER DISCIPLINE: ZERO raw console.*
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+// 2026-06-13 (state-flow audit `b29bdb34c` §6.1 / §6.5 / §6.3 / §7 R4):
+// `useState` is retained ONLY for the legitimate UI-window toggle (Audit
+// §2.5 V1 was deleted in this round). Selection state is now read directly
+// from the store via subscriptions; the tick-ring predicate derives the
+// composite (sessionId, startAt) bucket key from the store.
 import { useQuery } from '@tanstack/react-query'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
@@ -196,38 +201,19 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // failure (Cmd/Ctrl+click prior-filter wipe) for the same reason.
   const prevSelectedTsRef = useRef<number | null>(null)
   const setLslSessionFilter = useViewerStore((s) => s.setLslSessionFilter)
-  const addLslSessionFilter = useViewerStore((s) => s.addLslSessionFilter)
   const clearLslSessionFilter = useViewerStore((s) => s.clearLslSessionFilter)
+  const setSelection = useViewerStore((s) => s.setSelection)
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
-  // 2026-06-13 (Phase 56-04 fix #2): subscribe to selectedSessionId so the
-  // strip can clear its local clicked-tick state when ANOTHER pane clears
-  // the selection (Esc / bg-click cascade). The ring predicate itself uses
-  // the local `clickedTickKey` state instead of `selectedSessionId === s.id`
-  // — see continuation-2 fix #D below.
+  // 2026-06-13 (state-flow audit `b29bdb34c` §6.1 + §6.5): subscribe to
+  // the canonical session-bucket pair so the tick-ring predicate is a pure
+  // function of the store snapshot. The previous round used a local
+  // `clickedTickKey` useState (violation V1 — audit §2.5) that lagged the
+  // store by one render and caused the multi-tick leak Issue 2 surfaces
+  // through. With both fields here, the predicate composes them into the
+  // `${id}|${startAt}` key and matches per-tranche cleanly.
   const selectedSessionId = useViewerStore((s) => s.selectedSessionId)
+  const selectedSessionStartAt = useViewerStore((s) => s.selectedSessionStartAt)
   const stripRef = useRef<HTMLDivElement | null>(null)
-  // 2026-06-13 (Phase 56-04 continuation 2 fix #D): track the SPECIFIC
-  // (sessionId, startAt) bucket the user clicked. The previous fix used
-  // `isSelectedSession = selectedSessionId === s.id` which fired on EVERY
-  // tranche of the same session id — in the live LSL data a session is
-  // sliced into many `LslSession` objects sharing `id` but distinct
-  // `startAt`, so every tranche rang blue on a single click. The local
-  // state below identifies the clicked bucket via the same composite key
-  // (`${id}|${startAt}`) the React render uses, so only the actually-
-  // clicked tick rings.
-  //
-  // Reset rule: a graph→timeline cascade (selectedNodeId changes due to a
-  // graph node click or a sidebar row click) clears the local bucket key
-  // so the direct-click highlight doesn't persist alongside the graph-
-  // driven `isSelectedBucket` (timestamp range) ring. clearSelection() in
-  // the store nulls `selectedSessionId`; the effect below resets local
-  // state whenever the store's session id transitions to null.
-  const [clickedTickKey, setClickedTickKey] = useState<string | null>(null)
-  useEffect(() => {
-    if (selectedSessionId === null) {
-      setClickedTickKey(null)
-    }
-  }, [selectedSessionId])
   // 2026-06-12: reverse mapping — when a node is selected anywhere
   // (graph click, HistorySidebar click, search), we light up the tick
   // for its createdAt hour-bucket. Look up the entity by id from the
@@ -282,16 +268,13 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       // 2026-06-12: deselect (ESC / bg click) ALSO clears the LSL
       // session filter the tick click installed. Without this, ESC
       // would leave the graph stuck filtered to the prior session's
-      // entities even though no node is selected anymore — that's
-      // the "timeline filter no longer working" UX failure (the
-      // filter never clears, so the user can't return to the full
-      // graph without manually unchecking something).
+      // entities even though no node is selected anymore.
+      // 2026-06-13 (audit §6.3 + §7 R4): route through the canonical
+      // `clearLslSessionFilter` action so the strip writes nothing via
+      // direct `setState` — the source-of-truth rule.
       const current = useViewerStore.getState()
       if (current.lslFilterEntityIds !== null || current.lslSessionFilter.length > 0) {
-        useViewerStore.setState({
-          lslFilterEntityIds: null,
-          lslSessionFilter: [],
-        })
+        clearLslSessionFilter()
       }
       if (restoreTo !== windowKey) {
         setWindowKey(restoreTo)
@@ -418,36 +401,38 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     session?: LslSession,
   ) {
     e.stopPropagation()
+    // 2026-06-13 (audit §5.4 option B): 0-obs ticks are visually greyed
+    // out with `pointer-events-none`, but synthetic React events
+    // (fireEvent.click in jsdom; programmatic .click() in real browsers)
+    // bypass CSS pointer-events. Belt-and-braces — early-exit the handler
+    // when the bucket has no observations to record a click against.
+    if (session && session.observationCount === 0) {
+      return
+    }
     const ids = session?.entityIds ?? []
-    // 2026-06-13 (Phase 56-04 continuation 2 fix #D): record the clicked
-    // bucket via the composite (id, startAt) key. The render predicate
-    // for `ring-blue-500` uses this local state to single out the actually-
-    // clicked tick (NOT every tranche of the same session id, which was
-    // the previous over-fired predicate).
-    const tickKey = session ? `${sessionId}|${session.startAt}` : sessionId
-    setClickedTickKey(tickKey)
-    // 2026-06-13 (Phase 56-04 continuation 2 fix #A): when the clicked
-    // session has NO entity ids (entityIds=[]), the broader store cascade
-    // (selectedNodeId / pathToSelected / lslFilterEntityIds) has nothing
-    // meaningful to write. The previous code unconditionally wrote a fresh
-    // `new Set()` for each of those fields on every click — stable content
-    // but new reference, which invalidated the D3 graph's `visibleEntities`
-    // useMemo and triggered a full SVG rebuild + force-simulation restart
-    // on every empty-tick click. Operator complaint: "selecting some
-    // timeline items doesn't do anything but redraw the D3 graph (why? is
-    // this necessary? annoying)". Early-exit with only the minimal
-    // session-scope fields so the ring still fires (via clickedTickKey)
-    // and the cross-pane state still reflects the click intent (the
-    // selectedSessionId + selectionSource pair the history sidebar's
-    // 56-02 contract expects).
+    const startAt = session?.startAt ?? null
+    // 2026-06-13 (state-flow audit `b29bdb34c` §6.1 + §6.3 + §7 R4): all
+    // selection writes now route through the `setSelection` action which
+    // accepts the LSL filter slice keys too (audit §6.3 — consolidate 4
+    // inline setState sites into 1 action call). The action handles the
+    // sibling-reset rule for the (sessionId, sessionStartAt) pair AND the
+    // reference-stability guard for `lslFilterEntityIds`. No direct
+    // store-state writes from the strip — that's the source-of-truth
+    // violation the audit caught. Acceptance grep R4: zero call sites of
+    // the inline-write pattern in this file.
     if (ids.length === 0) {
-      useViewerStore.setState({
-        selectedSessionId: sessionId,
-        selectionSource: 'timeline',
-        // selectedNodeId / pathToSelected / lslFilterEntityIds / highlightedRowKey
-        // are INTENTIONALLY untouched — the store's existing values are
-        // preserved by setState's merge semantics, so the D3 graph's
-        // useMemo deps remain reference-stable and no re-render fires.
+      // 2026-06-13 (audit §4.3 + §6.7 viewport-stability): when entityIds=[]
+      // the broader cascade has no meaningful payload. Preserve every other
+      // store field — only write the session-scope identity. The audit
+      // confirmed this is the empty-tick happy path (Issue 1 has multiple
+      // root causes; this is one branch of the fix).
+      setSelection({
+        sessionId,
+        sessionStartAt: startAt,
+        source: 'timeline',
+        // selectedNodeId / pathToSelected / lslFilterEntityIds /
+        // highlightedRowKey / lslSessionFilter intentionally OMITTED —
+        // `setSelection` preserves the existing values when args are absent.
       })
       Logger.info(
         Logger.Categories.PANELS,
@@ -456,13 +441,9 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       return
     }
     // 2026-06-13 (Phase 56-04 fix #3): compute the ancestry-path the
-    // same way D3GraphCanvas's node click does (lines 564, 573-579 in
-    // that file) so the central-trace renders when the focal entity
-    // has a parent chain. Without this, `pathToSelected: new Set()`
-    // was hardcoded and the trace stayed blank — the operator-reported
-    // AC #2 partial-success regression. Returns an empty Set when the
-    // focal entity has no relations in the live graph (which is fine —
-    // matches D3GraphCanvas's behaviour on an isolated node).
+    // same way D3GraphCanvas's node click does so the central-trace
+    // renders when the focal entity has a parent chain. Returns an empty
+    // Set when the focal entity has no relations in the live graph.
     const firstEntityId = ids[0] ?? null
     const path = firstEntityId !== null
       ? computeAncestryPath(firstEntityId, relations)
@@ -475,26 +456,25 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       // the existing filter set. Lets the user assemble a multi-session
       // view (e.g. "show everything from yesterday's three working
       // sessions").
-      const prev = useViewerStore.getState().lslFilterEntityIds
-      const union = new Set<string>(prev ?? [])
+      const prevState = useViewerStore.getState()
+      const prevSet = prevState.lslFilterEntityIds
+      const union = new Set<string>(prevSet ?? [])
       for (const id of ids) union.add(id)
-      // 2026-06-13 [Phase 56-03 AC #4 store side]: also write the three
-      // cross-pane sync fields atomically alongside the LSL filter so
-      // the history sidebar scrolls and the timeline can stay loop-safe
-      // via selectionSource. First-id of the union is the focal point
-      // (consistent with the plain-click branch below).
-      useViewerStore.setState({
-        lslSessionFilter: Array.from(
-          new Set<string>([...useViewerStore.getState().lslSessionFilter, sessionId]),
-        ),
-        lslFilterEntityIds: union,
+      const nextSessionFilter = Array.from(
+        new Set<string>([...prevState.lslSessionFilter, sessionId]),
+      )
+      setSelection({
+        nodeId: firstEntityId,
+        sessionId,
+        sessionStartAt: startAt,
         highlightedRowKey: ids[0] ?? null,
-        selectionSource: 'timeline',
-        selectedSessionId: sessionId,
-        // 2026-06-13 (Phase 56-04 fix #3): same pathToSelected write as
-        // the plain-click branch so a Cmd/Ctrl additive selection also
-        // gets the central-trace.
+        source: 'timeline',
         pathToSelected,
+        lslSessionFilter: nextSessionFilter,
+        // `setSelection` reference-guards this — if `union` has identical
+        // membership to prevSet, the existing reference is preserved and
+        // D3's `visibleEntities` useMemo does not invalidate.
+        lslFilterEntityIds: union,
       })
       Logger.info(
         Logger.Categories.PANELS,
@@ -503,27 +483,19 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       return
     }
     // Plain click — REPLACE the filter with this session's entity set.
-    // Also select the first entity as the focal point so the right panel
-    // shows its content and the graph's path-trace centers on it. The
-    // server sorts visible-first (Insight → other → Observation), so the
-    // first id is the best click target.
-    // 2026-06-13 [Phase 56-03 AC #4 store side]: 7-field atomic snapshot.
-    // The pre-existing 4 fields (selectedNodeId, pathToSelected,
-    // lslSessionFilter, lslFilterEntityIds) ship the graph + LSL filter
-    // cascade; the three new Phase 56 fields (highlightedRowKey,
-    // selectionSource, selectedSessionId) ship the history-sidebar
-    // scroll-target + the loop-safety tag + the aggregate-selection
-    // signal (AC #6 partial — selectedSessionId now populated).
-    useViewerStore.setState({
-      selectedNodeId: firstEntityId,
-      // 2026-06-13 (Phase 56-04 fix #3): real ancestry path instead of
-      // hardcoded new Set() so the central-trace renders.
+    // 2026-06-13 (audit §4.3 + §4.4 + §6.3): single `setSelection` call.
+    // The action's deep-equal guard on `lslFilterEntityIds` is what fixes
+    // the "zoom feel" Issue 1 — identical-content writes preserve the
+    // reference and `visibleEntities` memo does not invalidate.
+    setSelection({
+      nodeId: firstEntityId,
+      sessionId,
+      sessionStartAt: startAt,
+      highlightedRowKey: firstEntityId,
+      source: 'timeline',
       pathToSelected,
       lslSessionFilter: [sessionId],
       lslFilterEntityIds: new Set<string>(ids),
-      highlightedRowKey: firstEntityId,
-      selectionSource: 'timeline',
-      selectedSessionId: sessionId,
     })
     Logger.info(
       Logger.Categories.PANELS,
@@ -653,27 +625,42 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
                 && Number.isFinite(startMs)
                 && selectedTs >= startMs
                 && selectedTs < endMs
-              // 2026-06-13 (Phase 56-04 continuation 2 fix #D): the
-              // direct-click ring is keyed on the LOCAL `clickedTickKey`
-              // composite (id + startAt) — NOT on `selectedSessionId
-              // === s.id`. The previous predicate rang EVERY tranche of
-              // the same session id; the LSL data is sliced into many
-              // `LslSession` objects sharing `id` but distinct `startAt`,
-              // so a single click lit up every sibling tranche. With the
-              // composite key, only THE clicked bucket rings.
-              //
-              // Graph→timeline cascade (isSelectedBucket via timestamp
-              // range match) continues to handle the case where a node
-              // selection drives the ring without a direct tick click.
+              // 2026-06-13 (state-flow audit `b29bdb34c` §6.5): pure store-
+              // derived bucket key. `selectedBucketKey` composes the
+              // canonical (sessionId, startAt) pair from the store into
+              // the same `${id}|${startAt}` shape the React render uses.
+              // The local `clickedTickKey` useState the previous round
+              // had at this site (Audit §2.5 V1) is DELETED — single
+              // source of truth.
+              const selectedBucketKey: string | null =
+                selectedSessionId !== null && selectedSessionStartAt !== null
+                  ? `${selectedSessionId}|${selectedSessionStartAt}`
+                  : null
               const tickKey = `${s.id}|${s.startAt}`
-              const isClickedTick = clickedTickKey === tickKey
-              const isSelected = isSelectedBucket || isClickedTick
-              const ringClass = isSelected
-                ? 'ring-2 ring-blue-500'
-                : (isRunning && selectedTs === null && clickedTickKey === null)
-                  ? 'ring-2 ring-primary'
-                  : ''
+              const isDirectClickedBucket = selectedBucketKey !== null && selectedBucketKey === tickKey
+              const isSelected = isSelectedBucket || isDirectClickedBucket
+              // 2026-06-13 (audit §5.4 option B): 0-obs ticks render greyed
+              // out + pointer-events-none so the operator can still see "I
+              // had a session here" but cannot select an empty bucket. The
+              // disabled visual state ALSO suppresses the running-ring (a
+              // 0-obs running session is anomalous; the visual policy
+              // chooses clarity over signalling that edge case).
+              const isDisabled = s.observationCount === 0
+              const ringClass = isDisabled
+                ? ''
+                : isSelected
+                  ? 'ring-2 ring-blue-500'
+                  : (isRunning && selectedTs === null && selectedBucketKey === null)
+                    ? 'ring-2 ring-primary'
+                    : ''
               const fillClass = 'bg-pink-300 hover:bg-pink-400'
+              // 2026-06-13 (audit §5.4 option B): grey-out classes are
+              // additive — opacity-40 dims the pink fill + pointer-events-
+              // none kills click reactivity + cursor-default removes the
+              // hover affordance. ARIA hint provides keyboard parity.
+              const disabledClass = isDisabled
+                ? 'opacity-40 pointer-events-none cursor-default'
+                : ''
               return (
                 <Tooltip key={`${s.id}|${s.startAt}`}>
                   <TooltipTrigger asChild>
@@ -690,8 +677,9 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
                       // Use the same pink (#FFB6C1 → tailwind pink-300) the
                       // graph viewer uses for `metadata.source==='auto'`
                       // entities so the visual language is consistent.
-                      className={`absolute w-2 h-6 ${fillClass} rounded-sm ${ringClass}`}
-                      aria-label={`LSL session ${s.id.slice(0, 8)} ${s.endAt === null ? '(running)' : ''}`}
+                      className={`absolute w-2 h-6 ${fillClass} rounded-sm ${ringClass} ${disabledClass}`.trim()}
+                      aria-disabled={isDisabled || undefined}
+                      aria-label={`LSL session ${s.id.slice(0, 8)} ${s.endAt === null ? '(running)' : ''}${isDisabled ? ' (no observations)' : ''}`}
                     />
                   </TooltipTrigger>
                   <TooltipContent>{formatTooltipText(s)}</TooltipContent>

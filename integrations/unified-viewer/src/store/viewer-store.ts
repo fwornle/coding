@@ -88,14 +88,25 @@ export interface ViewerState {
   // HistorySidebar / OccurrenceHistorySidebar. `selectionSource` lets
   // consumers avoid feedback loops on their own clicks; `highlightedRowKey`
   // is the history-sidebar row to scroll/highlight (often === selectedNodeId
-  // but may differ for aggregate selections); `selectedSessionId` is the
-  // LSL session-tick aggregate selection per CONTEXT.md selection-scope
-  // decision. ALL three are written atomically via `setSelection({...})`
-  // (or via `useViewerStore.setState({...})` from in-tree consumers) so
-  // subscribers see a coherent snapshot — never a half-written state.
+  // but may differ for aggregate selections); `selectedSessionId` +
+  // `selectedSessionStartAt` together identify the LSL session-tick bucket
+  // (composite key — a single session id is sliced into many tranches that
+  // share `id` but differ in `startAt`). ALL of these are written atomically
+  // via `setSelection({...})` (or via `useViewerStore.setState({...})` from
+  // in-tree consumers) so subscribers see a coherent snapshot — never a
+  // half-written state.
+  //
+  // 2026-06-13 (state-flow audit `b29bdb34c5d54c09962c2724c1311825da412d8b`
+  // §6.2 — option A): `selectedSessionStartAt` is the additive companion to
+  // `selectedSessionId`. The tick-ring predicate in LslTimelineStrip now
+  // derives the selected-bucket key from the composite `${id}|${startAt}` so
+  // a click on one tranche of `sess-X` no longer rings every other tranche
+  // of the same session id. The two fields are ALWAYS written + cleared
+  // together — never one without the other (audit §7 R2).
   selectionSource: SelectionSource
   highlightedRowKey: string | null
   selectedSessionId: string | null
+  selectedSessionStartAt: string | null
 
   // 2026-06-11: VKB-style filter rail additions.
   //   - learningSource: 'batch' (manual/UKB) | 'online' (auto/ETM) | 'combined' (both)
@@ -149,9 +160,21 @@ export interface ViewerState {
   setSelection: (args: {
     nodeId?: string | null
     sessionId?: string | null
+    // 2026-06-13 (audit §6.2 — option A): pass the SESSION-bucket startAt
+    // alongside `sessionId` so the strip's tick-ring predicate can identify
+    // the SPECIFIC tranche. Atomically set/cleared together with sessionId.
+    sessionStartAt?: string | null
     highlightedRowKey?: string | null
     source: SelectionSource
     pathToSelected?: ReadonlySet<string>
+    // 2026-06-13 (audit §6.3 + §7 R4): LSL filter slice fields are part of
+    // the same atomic snapshot when a timeline tick is the writer — the
+    // alternative is letting the strip fall back to direct `setState`
+    // which is exactly the source-of-truth violation the audit calls out.
+    // These are optional so non-timeline writers (graph, history) can omit
+    // them and the action preserves the existing values.
+    lslSessionFilter?: string[]
+    lslFilterEntityIds?: ReadonlySet<string> | null
   }) => void
   clearSelection: () => void
 
@@ -209,6 +232,29 @@ export interface ViewerState {
   setLslFilterEntityIds: (ids: ReadonlySet<string> | null) => void
 }
 
+// 2026-06-13 (audit §4.4 + §7 R3): shared deep-equal helper for the LSL
+// filter slice. Two `ReadonlySet<string>` (or null) are considered equal
+// when one of:
+//   - both are null
+//   - both are non-null Sets with identical membership (size + every key)
+// This is the exact predicate that decides whether `setLslFilterEntityIds`
+// (and `setSelection({ lslFilterEntityIds })`) writes a fresh reference or
+// preserves the existing one. Reference stability is what stops the D3
+// graph's `visibleEntities` useMemo from invalidating on identical-content
+// LSL filter writes — Issue 1 root cause per audit §4.3.
+function sameSetMembership(
+  a: ReadonlySet<string> | null,
+  b: ReadonlySet<string> | null,
+): boolean {
+  if (a === b) return true
+  if (a === null || b === null) return false
+  if (a.size !== b.size) return false
+  for (const v of a) {
+    if (!b.has(v)) return false
+  }
+  return true
+}
+
 function readPersistedThemeForStore(): ThemePref {
   // Plan 04 round 3: respect the OS-level color scheme on every fresh
   // page load. Hard reload no longer reads localStorage — instead it
@@ -236,6 +282,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
   selectionSource: null,
   highlightedRowKey: null,
   selectedSessionId: null,
+  // 2026-06-13 (audit §6.2 — option A): paired with selectedSessionId.
+  selectedSessionStartAt: null,
   searchQuery: '',
   visibleLevels: new Set<Level>([0, 1, 2, 3]),
   selectedClasses: new Set<string>(),
@@ -259,10 +307,32 @@ export const useViewerStore = create<ViewerState>((set) => ({
   // origin; `pathToSelected` defaults to an empty Set when nodeId changes
   // (the graph recomputes ancestry on next render) but is preserved if the
   // caller didn't move the node (e.g. timeline-only writes).
-  setSelection: ({ nodeId, sessionId, highlightedRowKey, source, pathToSelected }) =>
+  setSelection: ({
+    nodeId,
+    sessionId,
+    sessionStartAt,
+    highlightedRowKey,
+    source,
+    pathToSelected,
+    lslSessionFilter,
+    lslFilterEntityIds,
+  }) =>
     set((s) => {
       const nextNodeId = nodeId !== undefined ? nodeId : s.selectedNodeId
       const nextSessionId = sessionId !== undefined ? sessionId : s.selectedSessionId
+      // 2026-06-13 (audit §6.2 + §7 R2): session id and startAt are SIBLING
+      // fields. When the caller passes `sessionId` we look at `sessionStartAt`
+      // too. If the caller passed sessionStartAt explicitly, use it; otherwise
+      // — when `sessionId` is in args at all — reset startAt to null so we
+      // never end up with a "session selected" snapshot where startAt is
+      // stale from an earlier tranche. If the caller didn't touch sessionId,
+      // preserve startAt as-is.
+      let nextSessionStartAt: string | null = s.selectedSessionStartAt
+      if (sessionStartAt !== undefined) {
+        nextSessionStartAt = sessionStartAt
+      } else if (sessionId !== undefined) {
+        nextSessionStartAt = null
+      }
       const nextHighlightedRowKey =
         highlightedRowKey !== undefined ? highlightedRowKey : s.highlightedRowKey
       // pathToSelected: explicit > reset-on-nodeId-change > preserve.
@@ -272,12 +342,27 @@ export const useViewerStore = create<ViewerState>((set) => ({
       } else if (nodeId !== undefined) {
         nextPath = new Set<string>()
       }
+      // 2026-06-13 (audit §6.3 + §7 R4): LSL filter slice writes piggy-
+      // back on the same atomic snapshot when the caller passes them.
+      // Reference-stability guard is shared with `setLslFilterEntityIds`
+      // (see Commit 4 deep-equal helper).
+      const nextLslSessionFilter =
+        lslSessionFilter !== undefined ? lslSessionFilter.slice() : s.lslSessionFilter
+      const nextLslFilterEntityIds =
+        lslFilterEntityIds !== undefined
+          ? sameSetMembership(s.lslFilterEntityIds, lslFilterEntityIds)
+            ? s.lslFilterEntityIds
+            : lslFilterEntityIds
+          : s.lslFilterEntityIds
       return {
         selectedNodeId: nextNodeId,
         selectedSessionId: nextSessionId,
+        selectedSessionStartAt: nextSessionStartAt,
         highlightedRowKey: nextHighlightedRowKey,
         selectionSource: source,
         pathToSelected: nextPath,
+        lslSessionFilter: nextLslSessionFilter,
+        lslFilterEntityIds: nextLslFilterEntityIds,
       }
     }),
 
@@ -292,6 +377,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
       selectionSource: null,
       highlightedRowKey: null,
       selectedSessionId: null,
+      // 2026-06-13 (audit §6.2 + §7 R2): paired clear with selectedSessionId.
+      selectedSessionStartAt: null,
       pathToSelected: new Set<string>(),
       lslSessionFilter: [],
       lslFilterEntityIds: null,
@@ -335,6 +422,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
       selectionSource: null,
       highlightedRowKey: null,
       selectedSessionId: null,
+      // 2026-06-13 (audit §6.2 + §7 R2): paired clear with selectedSessionId.
+      selectedSessionStartAt: null,
     }),
 
   // ---------- Phase 55 — VOKB filtersSlice parity ----------
@@ -480,5 +569,19 @@ export const useViewerStore = create<ViewerState>((set) => ({
     }),
 
   clearLslSessionFilter: () => set({ lslSessionFilter: [], lslFilterEntityIds: null }),
-  setLslFilterEntityIds: (ids) => set({ lslFilterEntityIds: ids }),
+  // 2026-06-13 (audit §4.4 + §7 R3): deep-equal guard. The audit traced
+  // Issue 1's "zoom feel" to this writer producing a fresh `Set` reference
+  // on every tick click → invalidating D3GraphCanvas's `visibleEntities`
+  // useMemo (`lslFilterEntityIds` is in its dep list) → restarting the
+  // force simulation. Reference stability when content is unchanged is
+  // exactly what stops that cascade. `sameSetMembership` is the shared
+  // predicate also used by `setSelection({ lslFilterEntityIds })` for the
+  // same guarantee.
+  setLslFilterEntityIds: (ids) =>
+    set((s) => {
+      if (sameSetMembership(s.lslFilterEntityIds, ids)) {
+        return {} // no write — preserve the existing reference
+      }
+      return { lslFilterEntityIds: ids }
+    }),
 }))

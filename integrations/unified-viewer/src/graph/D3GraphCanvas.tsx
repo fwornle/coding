@@ -41,7 +41,77 @@ import type { Entity, Relation } from './types'
 // x/y for centering), and the centering useEffect itself are all removed.
 // See `docs(56-04): retract pan/zoom centering from AC #3 …` for the spec
 // audit trail.
-import { computeAncestryPath } from './ancestry'
+import { computeAncestryPath, type AncestryPathResult } from './ancestry'
+
+// 2026-06-13 (state-flow audit `b29bdb34c` §6.4 / §6.6): when the store's
+// `pathToSelected` is non-empty, derive the `{ edges, nodeDepths,
+// pathLength }` triple `applySelectionStyling` needs FROM the store's
+// node-id set rather than re-running the BFS inline. This keeps the D3
+// path's membership in sync with the sigma path (which reads the same
+// store field) without losing the visual depth gradient (the inline BFS
+// is still the producer; we just constrain its output to the
+// authoritative node set the writer recorded).
+//
+// Implementation: run the same BFS as `computeAncestryPath`, then PRUNE
+// the result to the intersection of the BFS-derived set and the store's
+// `pathToSelected` membership. If a node is in the store's set but not
+// reachable in the current `visibleRelations` (e.g. a filter dropped
+// some intermediate ancestor between the writer's click and this
+// render), it still gets membership but no depth (depth = pathLength,
+// i.e. dimmest end of the visible gradient). This matches the audit's
+// "single source of truth" intent — the writer's word stands — without
+// breaking the gradient when filters change mid-flight.
+function deriveAncestryFromStorePath(
+  selectedId: string,
+  storePath: ReadonlySet<string>,
+  relations: readonly { from: string; to: string; type: string }[],
+): AncestryPathResult {
+  const inline = computeAncestryPath(selectedId, relations)
+  // Fast path: the inline BFS already agrees with the store. No work.
+  if (inline.nodeDepths.size === storePath.size) {
+    let allMatch = true
+    for (const id of inline.nodeDepths.keys()) {
+      if (!storePath.has(id)) {
+        allMatch = false
+        break
+      }
+    }
+    if (allMatch) return inline
+  }
+  // Slow path: prune the inline BFS's result to the store's authoritative
+  // membership. Nodes the store says are "in path" but the inline BFS
+  // didn't reach get a max-depth slot so they still render dimly in the
+  // trace gradient. Nodes the inline BFS reached but the store DIDN'T
+  // tag are dropped — the writer's intent wins.
+  const prunedNodeDepths = new Map<string, number>()
+  let maxDepth = inline.pathLength
+  for (const id of storePath) {
+    const d = inline.nodeDepths.get(id)
+    if (d !== undefined) {
+      prunedNodeDepths.set(id, d)
+      if (d > maxDepth) maxDepth = d
+    } else {
+      // The writer included this node but it's not in the inline BFS
+      // (filters may have changed). Mark it at the dimmest end so it
+      // still renders within the trace but doesn't dominate.
+      prunedNodeDepths.set(id, maxDepth)
+    }
+  }
+  // Edges: keep only the inline-derived edges whose endpoints are both
+  // in the store's set.
+  const prunedEdges = new Set<string>()
+  for (const e of inline.edges) {
+    const [a, b] = e.split('||')
+    if (storePath.has(a) && storePath.has(b)) {
+      prunedEdges.add(e)
+    }
+  }
+  return {
+    edges: prunedEdges,
+    nodeDepths: prunedNodeDepths,
+    pathLength: maxDepth,
+  }
+}
 
 interface D3Node {
   id: string
@@ -133,6 +203,18 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   const { entities, relations, isLoading } = useGraphData(apiClient, system)
   const theme = useViewerStore((s) => s.theme)
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  // 2026-06-13 (state-flow audit `b29bdb34c` §6.4 / §6.6): `pathToSelected`
+  // is the store's canonical ancestry trace. Every writer of
+  // `selectedNodeId` (graph click, history click, timeline tick) also
+  // writes the trace into the store. The D3 path previously RE-COMPUTED
+  // `computeAncestryPath` inline at every `applySelectionStyling` call
+  // (audit finding S3 — duplicated source-of-truth). With the store-side
+  // trace read here, the D3 render path agrees with the sigma path that
+  // also reads from the store (graph-builder.ts:461,487). When the store
+  // trace is empty but a node is selected (e.g. first paint before any
+  // writer attaches one), fall back to inline computation so the legacy
+  // mount-time render still produces a visible trace — audit §6.6.
+  const pathToSelected = useViewerStore((s) => s.pathToSelected)
   // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the previous
   // `selectionSource` subscription was added in 989c04558 to re-run the
   // centering useEffect on non-graph selection sources. With the centering
@@ -304,7 +386,20 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
         .filter((d) => d.id === selectedNodeId)
         .select<SVGCircleElement>('.selection-ring')
         .attr('opacity', 1)
-      const ancestry = computeAncestryPath(selectedNodeId, visibleRelations)
+      // 2026-06-13 (audit §6.4 / §6.6): prefer the store-provided trace.
+      // The writer that selected this node (graph click, history click,
+      // timeline tick) already computed the ancestry and wrote it to
+      // `pathToSelected`. Re-computing here would duplicate the work AND
+      // bind ancestry trace correctness to the local `visibleRelations`
+      // memo — which is per-render-effect-pass and may not reflect the
+      // writer's intent if filters changed between the click and this
+      // render. Inline computation is the FALLBACK for the edge case
+      // where the store trace is empty (e.g. the mount-time first paint
+      // before any writer attaches one).
+      const ancestry =
+        pathToSelected.size > 0
+          ? deriveAncestryFromStorePath(selectedNodeId, pathToSelected, visibleRelations)
+          : computeAncestryPath(selectedNodeId, visibleRelations)
       const { edges: pathEdges, nodeDepths, pathLength } = ancestry
       const pathNodeOpacity = (id: string): number => {
         const d = nodeDepths.get(id)
@@ -325,7 +420,12 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
         .attr('stroke-opacity', (d) => isPathEdge(d) ? 1 : 0.08)
         .attr('stroke-width', (d) => isPathEdge(d) ? 3 : 1)
     },
-    [selectedNodeId, visibleRelations, theme],
+    // 2026-06-13 (audit §6.4 / §6.6): pathToSelected is now read inside
+    // this callback, so it must appear in the dep list. The lightweight
+    // selection useEffect below depends on `applySelectionStyling`, so it
+    // will fire when the store path changes — same response as a
+    // `selectedNodeId` change, the existing intent.
+    [selectedNodeId, pathToSelected, visibleRelations, theme],
   )
 
   // Lightweight selection effect — runs when selection changes without
