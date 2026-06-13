@@ -980,7 +980,30 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
   const consolidator = new ObservationConsolidator({ kmStore: kmStoreForResynth });
   try {
     await consolidator.init();
-    const updated = await consolidator.resynthesizeInsight(id);
+    // Phase 44 Plan 14 — the dashboard projects `id: entity.legacyId?.id
+    // ?? entity.id`. For insights created without a legacyId stamp, that
+    // falls back to the km-core entity UUID. resynthesizeInsight() looks
+    // up by `findByLegacyId({system:'A', id})`, so a km-core UUID lands
+    // as a NOT_FOUND. Normalize by resolving the incoming id against
+    // both indexes and rewriting it to the legacy id before delegating.
+    let resolvedId = id;
+    try {
+      const store = await ensureKMStore();
+      if (store) {
+        const byLegacy = await store.findByLegacyId({ system: 'A', id });
+        if (!byLegacy) {
+          const byEntity = await store.getEntity(id);
+          if (byEntity && byEntity.legacyId?.id) {
+            resolvedId = byEntity.legacyId.id;
+          } else if (byEntity) {
+            // Entity exists but has no legacyId stamp — fall through and
+            // let resynthesizeInsight raise NOT_FOUND so the caller sees a
+            // clean error with the requested id, not a silent mismatch.
+          }
+        }
+      }
+    } catch { /* best-effort; resynthesizeInsight will surface NOT_FOUND */ }
+    const updated = await consolidator.resynthesizeInsight(resolvedId);
 
     // Phase 44 Plan 14 Task 2(g) — mirror the resynthesized fields into
     // the km-core entity via findByLegacyId + putEntity replay. The
@@ -994,7 +1017,8 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
     try {
       const store = await ensureKMStore();
       if (store) {
-        const entity = await store.findByLegacyId({ system: 'A', id });
+        const entity = await store.findByLegacyId({ system: 'A', id: resolvedId })
+          ?? await store.getEntity(resolvedId);
         if (entity) {
           // Mutate ONLY the resynthesized fields. createdBy.runId carries
           // the resynthesis-identifying stamp so downstream provenance
@@ -1048,6 +1072,64 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
   } finally {
     try { consolidator.close(); } catch { /* best-effort */ }
     _resynthesizeInflight = false;
+  }
+});
+
+/**
+ * POST /api/insights/verify
+ *
+ * Runs the code-claim verifier across every active insight in `project`
+ * (defaults to "coding") and persists `metadata.codeVerification` on each
+ * entity. Same code path the cadence-guarded pass inside `consolidator.run()`
+ * uses, but exposed so the dashboard's Project Coverage tab can be
+ * re-populated on demand after the data has been wiped or never
+ * back-filled post-migration.
+ *
+ * Body: { project?: string, force?: boolean }
+ *   - project: project slug (default "coding")
+ *   - force:   ignored — this endpoint always runs (the cadence guard is
+ *              the consolidator's, not the verifier's).
+ *
+ * Response: { scanned, freshCount, staleCount, unverifiableCount,
+ *             avgRatio, durationMs }
+ */
+app.post('/api/insights/verify', async (req, res) => {
+  if (_consolidationPromise) {
+    return res.status(409).json({ error: 'Bulk consolidation in progress; try again when it completes' });
+  }
+  const project = (req.body && typeof req.body.project === 'string' && req.body.project) || 'coding';
+  const startedAt = Date.now();
+  const kmStore = await ensureKMStore();
+  if (!kmStore) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+  // Plan 44-18 Task 5 — `dbPath` arg omitted; ObservationConsolidator
+  // defaults to `.observations/observations.db` (now archived) only to
+  // derive `projectRoot`. The file is never opened. We need init() so the
+  // PII redactor is wired (verifyInsight calls _redact on staleClaims).
+  const consolidator = new ObservationConsolidator({ kmStore });
+  try {
+    await consolidator.init();
+    const result = await consolidator.verifyInsights({ project, persist: true });
+    // Mark the cadence sentinel as done so the next consolidation pass
+    // doesn't immediately re-run verification on top of what we just did.
+    try { consolidator._markCadenceDone('last-verification', project); } catch { /* non-fatal */ }
+    const durationMs = Date.now() - startedAt;
+    process.stderr.write(
+      `[obs-api] /insights/verify ${project}: ${result.scanned} scanned, ${result.freshCount} fresh, ${result.staleCount} stale, avg ratio ${result.avgRatio}, ${durationMs}ms\n`
+    );
+    res.json({
+      project,
+      scanned: result.scanned,
+      freshCount: result.freshCount,
+      staleCount: result.staleCount,
+      unverifiableCount: result.unverifiableCount,
+      avgRatio: result.avgRatio,
+      durationMs,
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /insights/verify error: ${err.message}\n`);
+    res.status(500).json({ error: `Verification failed: ${err.message}` });
+  } finally {
+    try { consolidator.close(); } catch { /* best-effort */ }
   }
 });
 
@@ -1726,7 +1808,17 @@ app.get('/api/coding/digests', async (_req, res) => {
       date: r.date,
       theme: typeof r.theme === 'string' ? r.theme : '',
       summary: typeof r.summary === 'string' ? r.summary : '',
-      observationIds: Array.isArray(r.observation_ids) ? r.observation_ids : (Array.isArray(r.observationIds) ? r.observationIds : []),
+      // Prefer the first NON-EMPTY array among the three legal carriers.
+      // Pre-fix-7ab1f9cd8 exports stored only the nested `metadata.observation_ids`;
+      // those rows are now ghosts in digests.json whose top-level field is
+      // [] but whose metadata still has the original link list. Falling
+      // back to metadata.observation_ids prevents the dashboard from
+      // rendering them as "0 obs" while the eviction script catches up.
+      observationIds: (
+        (Array.isArray(r.observation_ids) && r.observation_ids.length > 0 ? r.observation_ids : null)
+        ?? (Array.isArray(r.observationIds) && r.observationIds.length > 0 ? r.observationIds : null)
+        ?? (r.metadata && Array.isArray(r.metadata.observation_ids) ? r.metadata.observation_ids : [])
+      ),
       agents: Array.isArray(r.agents) ? r.agents : [],
       filesTouched: Array.isArray(r.files_touched) ? r.files_touched : (Array.isArray(r.filesTouched) ? r.filesTouched : []),
       quality: typeof r.quality === 'string' ? r.quality : 'normal',

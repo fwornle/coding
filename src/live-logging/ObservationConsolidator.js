@@ -2797,6 +2797,37 @@ export class ObservationConsolidator {
    *     even though the parent repo's `git ls-files` only shows the
    *     submodule pointer, not its contents)
    */
+  /**
+   * Resolve a project slug to its primary on-disk root, if any.
+   *
+   * Used by verifyInsights() to decide whether to actually grep for an
+   * insight's code claims or mark the insight unverifiable. When the
+   * project has no on-disk source (e.g. `daFrankTeam` insights synthesized
+   * from session logs about a hackathon that lives elsewhere, or `unknown`
+   * project insights that pre-date the project-stamping fix), the verifier
+   * would otherwise paint every tile "stale" red against an empty grep —
+   * misleadingly worse than the actual situation.
+   *
+   * Returns `null` when no known root is on disk. Returns a path string
+   * when one is found. Callers that need a full search-root set should
+   * still call `_defaultSearchRoots()` (which includes cross-project
+   * lookup for claims that legitimately reference sibling repos).
+   *
+   * @param {string} project  project slug from `metadata.project`
+   * @returns {string|null}
+   */
+  _resolveProjectRoot(project) {
+    if (!project || project === 'unknown') return null;
+    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+    if (project === 'coding') return projectRoot;
+    const workParent = path.resolve(projectRoot, '..', '_work');
+    const candidate = path.join(workParent, project);
+    try {
+      if (fs.existsSync(path.join(candidate, '.git'))) return candidate;
+    } catch { /* unreadable — fall through */ }
+    return null;
+  }
+
   _defaultSearchRoots() {
     const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
     const roots = [projectRoot];
@@ -2972,6 +3003,54 @@ export class ObservationConsolidator {
     if (insights.length === 0) {
       return { scanned: 0, freshCount: 0, staleCount: 0, unverifiableCount: 0, archivedCount: 0, avgRatio: 1, results: [] };
     }
+
+    // Defensive: if this project has no on-disk root, the default-roots
+    // grep would falsely mark every claim "stale" (red) instead of
+    // "unverifiable" (gray). Persist a null-ratio codeVerification on
+    // each insight and skip the grep entirely. This keeps the dashboard
+    // honest about what we can vs. can't measure.
+    if (this._resolveProjectRoot(project) === null) {
+      const verification = {
+        verifiedAt: new Date().toISOString(),
+        totalClaims: 0,
+        verifiedClaims: 0,
+        verificationRatio: null,
+        staleClaims: [],
+        referencedFiles: [],
+        searchRoots: [],
+        unverifiableReason: 'project source not on disk',
+      };
+      const results = [];
+      if (persist) {
+        for (const ins of insights) {
+          try {
+            const entity = ins._entity;
+            if (entity) {
+              const prev = entity.metadata ?? {};
+              await kmStore.mergeAttributes(entity.id, {
+                metadata: { ...prev, codeVerification: verification },
+              });
+            }
+          } catch (err) {
+            process.stderr.write(`[verifier] Persist failed for ${ins.id}: ${err.message}\n`);
+          }
+          results.push({ topic: ins.topic, id: ins.id, ...verification });
+        }
+      } else {
+        for (const ins of insights) results.push({ topic: ins.topic, id: ins.id, ...verification });
+      }
+      process.stderr.write(`[verifier] ${project}: no on-disk root — marked ${insights.length} insight(s) unverifiable\n`);
+      return {
+        scanned: insights.length,
+        freshCount: 0,
+        staleCount: 0,
+        unverifiableCount: insights.length,
+        archivedCount: 0,
+        avgRatio: 1,
+        results,
+      };
+    }
+
     const roots = this._defaultSearchRoots();
     process.stderr.write(`[verifier] Verifying ${insights.length} insights against ${roots.length} root(s)\n`);
     const results = [];
@@ -3072,12 +3151,32 @@ export class ObservationConsolidator {
     const kmStore = this._kmStore;
     // Phase 44 Plan 17: load via km-core findByLegacyId. The insight is
     // identified by its legacy SQLite id (preserved in legacyId.id).
-    const insightEntity = await kmStore.findByLegacyId({ system: 'A', id: insightId });
+    // Post-migration fallback: some Insight entities were created without
+    // a legacyId stamp (the writer path skipped it for entities the
+    // consolidator inserted post-44-17). When the caller passes an id
+    // that doesn't resolve as a legacy id, also try it as the km-core
+    // entity id so the dashboard's `legacyId?.id ?? entity.id`
+    // projection always round-trips.
+    let insightEntity = await kmStore.findByLegacyId({ system: 'A', id: insightId });
+    if (!insightEntity) {
+      insightEntity = await kmStore.getEntity(insightId);
+    }
     if (!insightEntity) {
       const err = new Error(`Insight not found: ${insightId}`);
       err.code = 'NOT_FOUND';
       throw err;
     }
+    // From here on the consolidator threads the legacy id through digest
+    // lookups, the kg-mirror write, etc. If the entity has no legacy
+    // stamp, fall back to the km-core entity id — every callee defends
+    // against null/undefined and would otherwise propagate the original
+    // not-found error from this method, so widening the id source here
+    // is correct.
+    if (!insightEntity.legacyId) {
+      insightEntity = { ...insightEntity, legacyId: { system: 'A', id: insightEntity.id } };
+    }
+    const resolvedLegacyId = insightEntity.legacyId.id;
+    insightId = resolvedLegacyId;
     const insight = { ...this._toLegacyInsightRow(insightEntity), _entity: insightEntity };
 
     let digestIds = [];
