@@ -319,25 +319,39 @@ describe('useKeyboardShortcuts', () => {
     expect(s.selectedSessionId).toBeNull()
   })
 
-  test('Test 13 (Phase 56): Esc with no selection: clearSelection() NOT called (guard preserved)', () => {
-    // The Phase 45 guard `if (selectedNodeId !== null)` must remain so Esc
-    // on an already-cleared state is a no-op (event.preventDefault not
-    // called, no Logger spam). We verify the guard by checking that an LSL
-    // filter set BEFORE Esc survives — clearSelection() would also empty
-    // it, so its survival proves the guard skipped the call.
+  test('Test 13 (Phase 56, CR-03 review fix): Esc with no selection at all: clearSelection() NOT called (guard preserved)', () => {
+    // The "Esc on already-cleared state is a no-op" semantic (no Logger
+    // spam, no preventDefault) must survive the CR-03 widening. After CR-03
+    // the guard checks selectedNodeId / selectedSessionId / selectedEdgeId /
+    // lslSessionFilter / lslFilterEntityIds — Esc only fires clearSelection()
+    // when AT LEAST ONE of these is non-null/non-empty. With everything
+    // cleared, clearSelection() must not fire. We verify by inspecting that
+    // the dispatched Escape event was NOT defaultPrevented (the handler's
+    // `event.preventDefault()` lives inside the `if (hasSelection)` arm).
     useViewerStore.setState({
       selectedNodeId: null,
-      lslSessionFilter: ['preserve-me'],
+      selectedEdgeId: null,
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+      lslSessionFilter: [],
+      lslFilterEntityIds: null,
     })
     render(<Harness />)
-    act(() => {
-      document.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
-      )
+    const event = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
     })
-    // selectedNodeId stays null (was already), and the LSL filter is NOT
-    // wiped because clearSelection() never fired.
-    expect(useViewerStore.getState().lslSessionFilter).toEqual(['preserve-me'])
+    act(() => {
+      document.dispatchEvent(event)
+    })
+    // Guard skipped the clear, so preventDefault was never called.
+    expect(event.defaultPrevented).toBe(false)
+    // Sanity: state still fully empty (clearSelection did not fire).
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBeNull()
+    expect(s.lslSessionFilter).toEqual([])
+    expect(s.lslFilterEntityIds).toBeNull()
   })
 
   test('Test 14 (Phase 56): Esc inside focused search input: clears focus first, does NOT clear selection (BC preserved)', () => {
@@ -358,5 +372,44 @@ describe('useKeyboardShortcuts', () => {
     // Selection slice + LSL filter unchanged on first Esc
     expect(useViewerStore.getState().selectedNodeId).toBe('node-99')
     expect(useViewerStore.getState().lslSessionFilter).toEqual(['preserve-me'])
+  })
+
+  // ---- CR-03 review fix: sidebar-only mode (Phase 56-04 round 4) ----
+  //
+  // When a user clicks a timeline tick whose entities have NO graph-visible
+  // ancestor, the strip writes selectedSessionId / selectedSessionStartAt /
+  // lslFilterEntityIds / lslSessionFilter but leaves `selectedNodeId === null`
+  // (no graph node to focus). Pre-CR-03 the Esc handler guarded only on
+  // `selectedNodeId !== null` so Esc was a no-op in this mode — the user was
+  // stuck in the filtered state with no keyboard escape. The widened guard
+  // now also checks selectedSessionId / selectedEdgeId / lslSessionFilter /
+  // lslFilterEntityIds; Esc must clear every field via clearSelection().
+
+  test('Test 15 (CR-03 review fix): Esc in sidebar-only mode (selectedNodeId=null, session+LSL fields set) clears EVERYTHING', () => {
+    useViewerStore.setState({
+      selectedNodeId: null,
+      selectedSessionId: 'sess-X',
+      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+      lslFilterEntityIds: new Set<string>(['e1', 'e2']),
+      lslSessionFilter: ['sess-X'],
+    })
+    render(<Harness />)
+    const event = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    act(() => {
+      document.dispatchEvent(event)
+    })
+    // Esc fired the clear path even though selectedNodeId was already null.
+    expect(event.defaultPrevented).toBe(true)
+    const s = useViewerStore.getState()
+    // clearSelection() empties every field per viewer-store.ts:373-385.
+    expect(s.selectedNodeId).toBeNull()
+    expect(s.selectedSessionId).toBeNull()
+    expect(s.selectedSessionStartAt).toBeNull()
+    expect(s.lslSessionFilter).toEqual([])
+    expect(s.lslFilterEntityIds).toBeNull()
   })
 })

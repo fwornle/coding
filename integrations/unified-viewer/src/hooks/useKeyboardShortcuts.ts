@@ -168,12 +168,23 @@ export function useKeyboardShortcuts(
         // route through the store-level `clearSelection()` so the LSL
         // session filter + the cross-pane selection slice (selectionSource,
         // highlightedRowKey, selectedSessionId) all clear in one atomic
-        // snapshot. The `selectedNodeId !== null` guard stays so Esc on an
-        // already-cleared state is a no-op (no Logger spam, no
-        // preventDefault), preserving the Phase 45 semantic.
-        const { selectedNodeId, clearSelection } = useViewerStore.getState()
-        if (selectedNodeId !== null) {
-          clearSelection()
+        // snapshot. CR-03 (review fix): the guard must cover ANY active
+        // selection field — not just `selectedNodeId` — so the Phase 56-04
+        // round-4 "sidebar-only mode" (a tick whose entities have no
+        // graph-visible ancestor, leaving `selectedNodeId === null` but
+        // `selectedSessionId` / `lslFilterEntityIds` / `lslSessionFilter`
+        // populated) also responds to Esc. The no-op-when-fully-cleared
+        // semantic from Phase 45 is preserved: if every field is null/empty,
+        // Esc does nothing (no preventDefault, no Logger spam).
+        const state = useViewerStore.getState()
+        const hasSelection =
+          state.selectedNodeId !== null ||
+          state.selectedSessionId !== null ||
+          state.selectedEdgeId !== null ||
+          state.lslSessionFilter.length > 0 ||
+          state.lslFilterEntityIds !== null
+        if (hasSelection) {
+          state.clearSelection()
           event.preventDefault()
           Logger.debug(Logger.Categories.STORE, 'Esc: cleared selection (all panes)')
         }
