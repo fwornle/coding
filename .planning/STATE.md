@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
-status: ready_to_plan
-stopped_at: Phase 56 complete (4/4) — ready to discuss Phase 999.1
-last_updated: 2026-06-13T15:39:18.290Z
-last_activity: 2026-06-13 -- Phase 56 execution started
+status: planning
+stopped_at: Phase 55 UI-SPEC approved (7 PASS + 1 FLAG resolved)
+last_updated: "2026-06-13T15:44:13.432Z"
+last_activity: 2026-06-13
 progress:
-  total_phases: 25
-  completed_phases: 19
+  total_phases: 26
+  completed_phases: 20
   total_plans: 135
   completed_plans: 137
-  percent: 76
+  percent: 77
 ---
 
 # Project State
@@ -201,6 +201,7 @@ Phase 45 Plan 04 outcome (2026-06-07, 2 implementation tasks complete + checkpoi
 - Phase 42.2 inserted after Phase 42: Retire deferred 42-07 work: legacy persistence trio + atomic LevelDB dir-swap + canonical-emit gaps (URGENT)
 - 2026-06-01 docs commit (b99ac49ca, out-of-band — no phase wrapper): cross-system km-core centralization narrative landed in MkDocs + new keystone PUML `docs/puml/km-core-unified-architecture.puml` showing the 3-layer (entrypoints → kernel → storage) topology across Systems A (online learning / observations API on port 12436), B (UKB / semantic-analysis on port 3848), C (OKB / OKM on ports 8090 + 3002). MkDocs `--strict` build green. Overlaps Phase 46 scope — when 46 opens, absorb the existing diagram + page edits and focus the phase on per-system runbooks, onboarding, and the things the freeform commit did NOT cover (e.g., agent-side READMEs in the submodules, OKM's docs cross-link back into coding, retired-API redirects).
 - Phase 56 added 2026-06-13: Unified Viewer — Bidirectional Selection & Timeline Scale. Follow-on to Phase 55 parity work. Surfaced during a real exploration session at `localhost:5173/viewer/coding`: (1) `LslTimelineStrip` renders ticks without a readable timestamp scale for the active range; (2) selection is one-way — graph→side-panel works via `selectedNodeId`, but timeline ticks and history-sidebar rows don't drive back into the graph, and graph selection doesn't highlight timeline/history. Files in scope: `integrations/unified-viewer/src/store/viewer-store.ts`, `panels/SidePanel.tsx`, `panels/coding/LslTimelineStrip.tsx`, `panels/HistorySidebar.tsx`, `panels/OccurrenceHistorySidebar.tsx`, `App.tsx`, `graph/D3GraphCanvas.tsx`. Frontend-only — no km-core API changes. Goal/Mode to be set by `/gsd-mvp-phase 56`.
+- Phase 56.1 inserted after Phase 56: Many-to-many temporal-knowledge bridge (operator-requested redesign after Phase 56 close) (URGENT)
 
 ### Decisions
 

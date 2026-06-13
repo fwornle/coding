@@ -986,6 +986,16 @@ Plans:
 
 ## Backlog
 
+### Phase 56.1: Unified Viewer — Many-to-Many Temporal-Knowledge Bridge (INSERTED)
+
+**Goal:** Replace Phase 56's one-to-one selection sync with a many-to-many model: a timeline tick lights up ALL insights it touched (graph multi-ring + sidebar History-style card list); a graph node lights up ALL ticks where it was touched (timeline multi-highlight); drilling into a bucket card or single touched node returns to single-entity detail. Requires multi-selection store fields (`selectedBucketEntityIds`, `selectedNodeTickKeys`), a "which ticks touched node X?" lookup (likely new server endpoint or client-side scan), multi-mode sidebar (single entity vs bucket-card list), and updated D3/Timeline highlight rendering for N-element selection. Also incorporates the 4 Warnings deferred from Phase 56 code-review (WR-01 data-dep test, WR-02 diamond hierarchy, WR-03 selectedClasses race, WR-04 reset() field coverage).
+**Requirements**: TBD
+**Depends on:** Phase 56
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 56.1 to break down)
+
 ### Phase 999.1: Extract Shared LLM Adapter Library (BACKLOG)
 
 **Goal:** Extract `lib/llm/` to a shared submodule used by coding and rapid-automations/OKB. Add direct HTTP path for Claude Max (OAuth token from keychain -> Anthropic API, no CLI spawn) to eliminate 12-15s latency. Copilot provider already does direct HTTP (~2-5s) -- same pattern for claude-code.
