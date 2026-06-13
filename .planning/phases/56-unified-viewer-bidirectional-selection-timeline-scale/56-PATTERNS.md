@@ -999,3 +999,112 @@ is the matching consumer pattern for "graph→timeline" — already wired.
 Phase 56 is mostly **add the symmetric pattern for HistorySidebar +
 OccurrenceHistorySidebar + the missing `data-history-id` attribute**, then
 **add a hand-rolled timestamp scale row above the existing tick layer**.
+
+---
+
+## Locked design contracts (after state-flow audit `b29bdb34c`)
+
+The 2026-06-13 state-flow audit (`b29bdb34c` —
+`.planning/phases/56-unified-viewer-bidirectional-selection-timeline-scale/56-STATE-FLOW.md`)
+diagnosed that the first three rounds of Plan 56-04 patches chased
+symptoms (visual surfaces) rather than the underlying state-model
+violations. The locks below freeze the audit-prescribed contracts so
+future plans don't re-litigate them. Each lock cites the audit section
+the operator approved on 2026-06-13.
+
+### 1. Tick-ring predicate (audit §6.5 verbatim)
+
+> **The tick ring SHOWS on bucket X iff:**
+> `selectedBucketKey === ${X.id}|${X.startAt}` OR
+> `(selectedTs !== null && selectedTs >= X.startMs && selectedTs < X.endMs)`
+>
+> where `selectedBucketKey` is derived from store as
+> `${selectedSessionId}|${selectedSessionStartAt}`.
+
+**Implementation:** `LslTimelineStrip.tsx` render block, no local state.
+The store carries the composite (sessionId, startAt) pair via the
+`selectedSessionStartAt` field added in Commit 1 of this round. Any
+local `useState` that shadows a selection-related store field is a
+violation of the audit's V1 finding (§2.5).
+
+### 2. Graph-side selection contract (audit §6.6 verbatim)
+
+> **The graph node ring + ancestry trace SHOWS on node X iff:**
+> `selectedNodeId === X.id`
+>
+> The ancestry trace prefers the store's `pathToSelected` field; the
+> inline `computeAncestryPath` is the FALLBACK when the store path is
+> empty (mount-time first paint before any writer attaches a trace).
+
+**Implementation:** `D3GraphCanvas.tsx`'s `applySelectionStyling` calls
+`deriveAncestryFromStorePath(selectedNodeId, pathToSelected,
+visibleRelations)` when `pathToSelected.size > 0`, else falls back to
+`computeAncestryPath(selectedNodeId, visibleRelations)`. The sigma path
+(`graph-builder.ts:461,487`) was already store-driven; D3 now agrees.
+
+### 3. Viewport stability contract (audit §6.7 verbatim)
+
+> **The graph viewport DOES NOT animate / re-fit / re-layout on
+> non-graph selection.**
+>
+> Mechanism: the D3GraphCanvas main render effect dep list MUST be
+> `[visibleEntities, visibleRelations, theme, isLoading]` ONLY —
+> never `selectedNodeId`, `pathToSelected`, `selectedSessionId`, or
+> `selectedSessionStartAt`. `visibleEntities` itself MUST NOT
+> invalidate on tick clicks — `lslFilterEntityIds` writes use the
+> deep-equal guard in `setLslFilterEntityIds` so identical-content
+> writes preserve the existing Set reference.
+
+**Implementation:** `D3GraphCanvas.tsx:706-707` dep list + `viewer-store.ts`
+`setLslFilterEntityIds` action (+ `setSelection` when it carries
+`lslFilterEntityIds`). Both use the shared `sameSetMembership` helper.
+Source-grep gates G9 + G13 in `D3GraphCanvas.test.ts` lock the dep list.
+
+### 4. 0-obs tick policy (audit §5.4 option B)
+
+> **Sessions whose `observationCount === 0` render greyed-out
+> (`opacity-40 pointer-events-none cursor-default`), carry
+> `aria-disabled="true"`, and are NOT selectable.** The click handler
+> in `onTickClick` early-exits before any store write, because
+> synthetic React events bypass CSS `pointer-events-none`.
+
+The tick STILL renders so the operator sees "I had a session at X
+o'clock" — this is the diagnostic-value half of the audit's option B.
+Selection is the other half: a bucket with no observations cannot be
+a meaningful selection target.
+
+This supersedes the prior round's Test 23 + Test 25 contracts, which
+asserted "tick always rings on its own click, even when the entity
+cascade can't fire" — that policy is exactly the multi-tick leak Issue
+2 surfaced. Both tests have been updated to assert the inverted contract.
+
+### 5. Single-source-of-truth rule for selection (audit §6.3 + §7 R4)
+
+> **NO local React state may shadow a selection-related store field.
+> All cross-pane selection writes route through `setSelection` /
+> `clearSelection` (or the matching LSL filter actions). Acceptance
+> grep: zero `useViewerStore.setState({...})` call sites in any
+> consumer component that participates in selection (LslTimelineStrip,
+> D3GraphCanvas, HistorySidebar, OccurrenceHistorySidebar, SidePanel,
+> graph/events.ts).**
+
+**Implementation status (after Commit 3 of this round):**
+- `LslTimelineStrip.tsx`: 0 inline `setState({...})` call sites ✓
+- `D3GraphCanvas.tsx`: 1 inline `setState({...})` site remains (node
+  onClick, line ~493) — out of audit-prescribed scope this round;
+  refactor to `setSelection({...})` action call deferred to a future
+  follow-up so the AC #2 / G1-G5 source-grep gates stay green.
+- `HistorySidebar.tsx`, `OccurrenceHistorySidebar.tsx`, `SidePanel.tsx`,
+  `graph/events.ts`: still have inline `setState({...})` sites —
+  audit §8 out-of-scope notes, deferred.
+
+Future plans extending this rule should bring those remaining sites
+into the action regime and add the matching acceptance greps.
+
+---
+
+These contracts are intended to be DURABLE — any future plan that
+relaxes them must justify the relaxation in its own SUMMARY against
+the audit's specific finding. The audit itself (`56-STATE-FLOW.md`)
+is the canonical reference for the diagnoses that produced these
+contracts.
