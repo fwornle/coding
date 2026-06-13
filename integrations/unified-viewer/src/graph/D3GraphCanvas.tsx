@@ -212,7 +212,15 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
 
   const { entities, relations, isLoading } = useGraphData(apiClient, system)
   const theme = useViewerStore((s) => s.theme)
-  const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  // 2026-06-13 (Phase 56.1 D-1 + D-4): single-selection `selectedNodeId` is
+  // GONE — promoted to a multi-set `selectedNodeIds` + derived `focalNodeId`
+  // singleton (see viewer-store.ts after Plan 01). `applySelectionStyling`
+  // below renders two-tier rings: red focal on `focalNodeId`, lighter-blue
+  // halo on every other member of `selectedNodeIds`. The ancestry trace is
+  // drawn from `focalNodeId` only (D-4 + discretion #2 — drawing it from
+  // every halo node would be O(N×depth) visual lines, chaotic at N≥5).
+  const selectedNodeIds = useViewerStore((s) => s.selectedNodeIds)
+  const focalNodeId = useViewerStore((s) => s.focalNodeId)
   // 2026-06-13 (state-flow audit `b29bdb34c` §6.4 / §6.6): `pathToSelected`
   // is the store's canonical ancestry trace. Every writer of
   // `selectedNodeId` (graph click, history click, timeline tick) also
@@ -307,35 +315,79 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // the path-trace looked broken.
   const applySelectionStyling = useCallback(
     (svg: d3.Selection<SVGSVGElement, unknown, null, undefined>) => {
+      // 2026-06-13 (Phase 56.1 D-4): two-tier ring rendering. Halo ring
+      // (selectedNodeIds members other than focal) uses `#60a5fa` at 60%
+      // opacity, narrower stroke. Focal ring (focalNodeId) keeps the
+      // Phase 56 red treatment (`#ff0000`, opacity 1, stroke-width 4).
+      // Reset every ring first so .each() below can paint the per-node
+      // tier without leaking state from a prior render.
       svg.selectAll<SVGCircleElement, D3Node>('.selection-ring').attr('opacity', 0)
-      if (!selectedNodeId) {
+      // 2026-06-13 (Phase 56.1 D-1): the "no selection" branch fires when
+      // BOTH the multi-set and the focal singleton are empty/null. With
+      // the store guaranteeing focalNodeId === null iff selectedNodeIds is
+      // empty (deriveFocal invariant), checking both is belt-and-braces.
+      if (focalNodeId === null && selectedNodeIds.size === 0) {
         svg.selectAll<SVGPathElement, D3Link>('.graph-link')
           .attr('stroke', theme === 'dark' ? '#475569' : '#999')
           .attr('stroke-opacity', theme === 'dark' ? 0.4 : 0.6)
           .attr('stroke-width', 1)
-        svg.selectAll<SVGGElement, D3Node>('.node').attr('opacity', 1)
+        svg.selectAll<SVGGElement, D3Node>('.node')
+          .attr('opacity', 1)
+          .attr('data-focal', null)
+          .attr('data-halo', null)
         svg.selectAll<SVGTextElement, D3Node>('.node-label').attr('opacity', 1)
         return
       }
-      svg.selectAll<SVGGElement, D3Node>('.node')
-        .filter((d) => d.id === selectedNodeId)
-        .select<SVGCircleElement>('.selection-ring')
-        .attr('opacity', 1)
-      // 2026-06-13 (audit §6.4 / §6.6): prefer the store-provided trace.
-      // The writer that selected this node (graph click, history click,
-      // timeline tick) already computed the ancestry and wrote it to
-      // `pathToSelected`. Re-computing here would duplicate the work AND
-      // bind ancestry trace correctness to the local `visibleRelations`
-      // memo — which is per-render-effect-pass and may not reflect the
-      // writer's intent if filters changed between the click and this
-      // render. Inline computation is the FALLBACK for the edge case
-      // where the store trace is empty (e.g. the mount-time first paint
-      // before any writer attaches one).
-      const ancestry =
-        pathToSelected.size > 0
-          ? deriveAncestryFromStorePath(selectedNodeId, pathToSelected, visibleRelations)
-          : computeAncestryPath(selectedNodeId, visibleRelations)
-      const { edges: pathEdges, nodeDepths, pathLength } = ancestry
+      // 2026-06-13 (Phase 56.1 D-4): two-tier per-node selection. ONE
+      // `.selection-ring` circle per node (initialised once at lines
+      // ~559-565 — DO NOT add a sibling circle; that would break the d3
+      // data-bind). The stroke + opacity + stroke-width vary by predicate.
+      // data-focal / data-halo attrs on the parent .node <g> are the
+      // observable markers the E2E spec (Plan 06) asserts against.
+      svg.selectAll<SVGGElement, D3Node>('.node').each(function (d) {
+        const nodeSel = d3.select(this)
+        const ring = nodeSel.select<SVGCircleElement>('.selection-ring')
+        if (d.id === focalNodeId) {
+          ring.attr('stroke', '#ff0000').attr('opacity', 1).attr('stroke-width', 4)
+          nodeSel.attr('data-focal', 'true').attr('data-halo', null)
+        } else if (selectedNodeIds.has(d.id)) {
+          ring.attr('stroke', '#60a5fa').attr('opacity', 0.6).attr('stroke-width', 2)
+          nodeSel.attr('data-halo', 'true').attr('data-focal', null)
+        } else {
+          ring.attr('opacity', 0)
+          nodeSel.attr('data-focal', null).attr('data-halo', null)
+        }
+      })
+      // 2026-06-13 (audit §6.4 / §6.6 + Phase 56.1 D-4): prefer the
+      // store-provided trace. The writer that selected this node (graph
+      // click, history click, timeline tick) already computed the ancestry
+      // and wrote it to `pathToSelected`. Re-computing here would duplicate
+      // the work AND bind ancestry trace correctness to the local
+      // `visibleRelations` memo — which is per-render-effect-pass and may
+      // not reflect the writer's intent if filters changed between the
+      // click and this render. Inline computation is the FALLBACK for the
+      // edge case where the store trace is empty (e.g. the mount-time
+      // first paint before any writer attaches one).
+      //
+      // Phase 56.1 D-4: the trace is keyed on `focalNodeId` ONLY (not
+      // every halo node in `selectedNodeIds`). When no focal exists, the
+      // trace is empty — halo-only state (rare; usually paired with focal).
+      let pathEdges: ReadonlySet<string>
+      let nodeDepths: ReadonlyMap<string, number>
+      let pathLength: number
+      if (focalNodeId !== null) {
+        const ancestry =
+          pathToSelected.size > 0
+            ? deriveAncestryFromStorePath(focalNodeId, pathToSelected, visibleRelations)
+            : computeAncestryPath(focalNodeId, visibleRelations)
+        pathEdges = ancestry.edges
+        nodeDepths = ancestry.nodeDepths
+        pathLength = ancestry.pathLength
+      } else {
+        pathEdges = new Set<string>()
+        nodeDepths = new Map<string, number>()
+        pathLength = 0
+      }
       const pathNodeOpacity = (id: string): number => {
         const d = nodeDepths.get(id)
         if (d === undefined) return 0.12
@@ -355,12 +407,13 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
         .attr('stroke-opacity', (d) => isPathEdge(d) ? 1 : 0.08)
         .attr('stroke-width', (d) => isPathEdge(d) ? 3 : 1)
     },
-    // 2026-06-13 (audit §6.4 / §6.6): pathToSelected is now read inside
-    // this callback, so it must appear in the dep list. The lightweight
-    // selection useEffect below depends on `applySelectionStyling`, so it
-    // will fire when the store path changes — same response as a
-    // `selectedNodeId` change, the existing intent.
-    [selectedNodeId, pathToSelected, visibleRelations, theme],
+    // 2026-06-13 (audit §6.4 / §6.6 + Phase 56.1 D-1): selectedNodeIds and
+    // focalNodeId are now read inside this callback, so they must appear
+    // in the dep list (renames Phase 56's `selectedNodeId` entry). The
+    // lightweight selection useEffect below depends on
+    // `applySelectionStyling`, so it will fire when the store fields
+    // change — same response cadence as Phase 56.
+    [selectedNodeIds, focalNodeId, pathToSelected, visibleRelations, theme],
   )
 
   // Lightweight selection effect — runs when selection changes without
@@ -517,44 +570,51 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       .call(makeDrag(simulation))
       .on('click', (event: MouseEvent, d) => {
         const path = computeAncestryPath(d.id, visibleRelations)
-        // 2026-06-13 (Phase 56 / CR-02 fix): route through the canonical
-        // `setSelection` store action instead of an inline `setState({...})`.
-        // Two reasons:
-        //   1. Audit contract #5 (single source of truth for selection
-        //      writes) — every cross-pane selection write should funnel
-        //      through `setSelection`/`clearSelection` so the LSL filter
-        //      cascade, sibling-field invariants, and reference-stability
-        //      guards live in ONE place (the store).
-        //   2. Audit §7 R2 sibling-clear invariant (selectedSessionId and
-        //      selectedSessionStartAt are ALWAYS written/cleared together).
-        //      The previous inline `setState` payload wrote
-        //      `selectedSessionId: null` but silently omitted
-        //      `selectedSessionStartAt`, leaving it stale from a prior
-        //      timeline-tick click. `setSelection` handles the paired clear
-        //      automatically: passing `sessionId: null` resets `sessionStartAt`
-        //      to null when no explicit `sessionStartAt` is supplied
-        //      (viewer-store.ts:330-335).
-        // Subscribers (HistorySidebar, OccurrenceHistorySidebar,
-        // LslTimelineStrip) still see a coherent snapshot in one set() —
-        // never a half-written state where selectedNodeId moved but
-        // highlightedRowKey / sibling session fields are stale.
+        // 2026-06-13 (Phase 56.1 D-5 — drill collapse): a graph click
+        // ALWAYS collapses to single-focal mode regardless of whether the
+        // clicked node was already part of a halo selection:
+        //   - selectedNodeIds becomes `new Set([d.id])` (any prior halo is dropped)
+        //   - selectedBucketKeys becomes empty (clears the timeline halo)
+        //   - focalNodeId = d.id (explicit focal override)
+        //   - selectionSource = 'graph'
+        //
+        // Routing through the canonical `setSelection` action (NOT inline
+        // `setState`) preserves:
+        //   - Audit contract #5 (single source of truth for selection writes)
+        //   - Phase 56.1 D-1 + invariant #4: sibling-field clears live in
+        //     the action body where they can't be forgotten
+        //   - The `sameSetMembership` reference-stability guard for
+        //     selectedNodeIds + selectedBucketKeys + lslFilterEntityIds
+        //     (audit-locked viewport-stability invariant carries forward)
         useViewerStore.getState().setSelection({
-          nodeId: d.id,
-          pathToSelected: new Set(path.nodeDepths.keys()),
+          nodeIds: new Set<string>([d.id]),
+          bucketKeys: new Set<string>(),
+          focal: { nodeId: d.id, bucketKey: null },
+          pathToSelected: new Set<string>(path.nodeDepths.keys()),
           highlightedRowKey: d.id,
           source: 'graph',
-          sessionId: null,
         })
+        // event.stopPropagation() is CRITICAL — without it the SVG
+        // background click handler below fires next and immediately
+        // clears the selection we just wrote.
         event.stopPropagation()
       })
 
+    // 2026-06-13 (Phase 56.1 D-4): the .selection-ring circle starts with
+    // opacity 0 + the default red stroke. `applySelectionStyling` (called
+    // immediately after the d3 mount, just below) paints the correct tier
+    // (red focal, lighter-blue halo, or invisible) per node based on the
+    // CURRENT store snapshot. We don't try to compute the per-node tier
+    // here at mount time because applySelectionStyling has the canonical
+    // logic (deciding focal vs halo from `focalNodeId` + `selectedNodeIds`
+    // closure capture) — duplicating it would risk drift.
     node.append('circle')
       .attr('class', 'selection-ring')
       .attr('r', 18)
       .attr('fill', 'none')
       .attr('stroke', '#ff0000')
       .attr('stroke-width', 4)
-      .attr('opacity', (d) => (selectedNodeId === d.id ? 1 : 0))
+      .attr('opacity', 0)
 
     node.append('circle')
       .attr('class', 'node-circle')
@@ -645,13 +705,19 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     return () => {
       simulation.stop()
     }
-    // CRITICAL: the dep list intentionally OMITS `selectedNodeId`. Listing
-    // it here makes every click rebuild the entire SVG + restart the force
-    // simulation + clobber whatever the selection useEffect just painted.
-    // The initial selection-ring visibility is set once at mount-time from
-    // the current `selectedNodeId` value (closure capture); subsequent
-    // selection changes are handled exclusively by the selection useEffect
-    // above, which mutates ring + path styling in place on the LIVE DOM.
+    // CRITICAL: the dep list intentionally OMITS every selection field —
+    // Phase 56.1 evolution: `selectedNodeIds`, `focalNodeId`,
+    // `selectedBucketKeys`, `focalBucketKey` (and the carried-forward
+    // Phase 56 `pathToSelected`). Listing any of them here makes every
+    // click rebuild the entire SVG + restart the force simulation + clobber
+    // whatever `applySelectionStyling` just painted. This is the load-bearing
+    // viewport-stability invariant (Phase 56-PATTERNS Locked Contract #3 /
+    // Phase 45 G9). The initial selection-ring opacity is 0 at mount-time;
+    // `applySelectionStyling(svg)` is called at the TAIL of this effect
+    // (just above) which paints the correct per-node tier from the current
+    // store snapshot. Subsequent selection changes are handled exclusively
+    // by the lightweight selection useEffect above, which mutates ring +
+    // path styling in place on the LIVE DOM without an SVG rebuild.
   }, [visibleEntities, visibleRelations, theme, isLoading])
 
   return (
