@@ -52,6 +52,14 @@ import { computeAncestryPath, type AncestryPathResult } from './ancestry'
 // memo here depends on. Predicate is bit-identical to the prior inline
 // body — G1-G5 + G9-G13 source-grep gates continue to pass.
 import { isEntityVisible } from './visibility-predicate'
+// 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction): graph node
+// click reads the pre-built reverse-lookup index to populate the
+// `selectedBucketKeys` halo atomically with the node selection. The hook
+// returns a ReadonlyMap<nodeId, ReadonlySet<bucketKey>> rebuilt only when
+// sessions / visibleIds / relations change (Contract #7 pre-index
+// integrity). No per-click bucket scan — O(1) lookup inside the click
+// handler. Same shape as `useVisibleEntityIds` the canvas already consumes.
+import { useNodeToBucketsIndex } from './useNodeToBucketsIndex'
 
 // 2026-06-13 (state-flow audit `b29bdb34c` §6.4 / §6.6): when the store's
 // `pathToSelected` is non-empty, derive the `{ edges, nodeDepths,
@@ -256,6 +264,15 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // graph dims to only those entities (plus 1-hop neighbors so the
   // session's anchor still shows context). null = no filter.
   const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
+
+  // 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction): pre-built
+  // `nodeId → Set<bucketKey>` reverse lookup map. The graph click handler
+  // reads `nodeToBuckets.get(d.id)` to populate `selectedBucketKeys` halo
+  // atomically with the node selection (PATTERNS.md §5 Option A). Hook is
+  // memoised on [sessions, visibleIds, relations] — rebuilds rare in
+  // practice. Same subscription shape as `useVisibleEntityIds` we already
+  // consume; adding this does not alter the existing dep lists.
+  const nodeToBuckets = useNodeToBucketsIndex(apiClient, system)
 
   // Apply the same filter pipeline the sigma reducer applied so the two
   // viewers honour the FilterRail consistently. Done client-side here
@@ -586,9 +603,19 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
         //   - The `sameSetMembership` reference-stability guard for
         //     selectedNodeIds + selectedBucketKeys + lslFilterEntityIds
         //     (audit-locked viewport-stability invariant carries forward)
+        // 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction):
+        // populate `selectedBucketKeys` from the pre-built reverse index
+        // (nodeToBuckets.get(d.id)) so every bucket where d.id was touched
+        // gets a halo ring on the timeline strip. Empty Set when the node
+        // has no touching buckets (the index is sparse — only nodes with
+        // at least one resolved bucket get an entry). `focal.bucketKey`
+        // stays null on graph click — the graph nominates a node focal,
+        // not a bucket focal; the timeline strip's render predicate keys
+        // halo on `selectedBucketKeys.has(...) && !focalBucket`.
+        const touchedBuckets = nodeToBuckets.get(d.id) ?? new Set<string>()
         useViewerStore.getState().setSelection({
           nodeIds: new Set<string>([d.id]),
-          bucketKeys: new Set<string>(),
+          bucketKeys: touchedBuckets,
           focal: { nodeId: d.id, bucketKey: null },
           pathToSelected: new Set<string>(path.nodeDepths.keys()),
           highlightedRowKey: d.id,

@@ -70,13 +70,21 @@ describe('D3GraphCanvas — Phase 56.1 source-grep gates', () => {
     expect(src).toMatch(/highlightedRowKey:\s*d\.id/)
   })
 
-  test('Phase 56.1 G3 [D-5 drill collapse]: node click writes nodeIds: new Set([d.id]) AND bucketKeys: new Set()', () => {
-    // Phase 56.1 D-5: a graph click ALWAYS collapses to single-focal mode,
-    // even when the clicked node was already part of a halo selection.
-    // The payload must therefore write BOTH a single-element nodeIds Set
-    // AND an empty bucketKeys Set so the timeline halo is dropped.
+  test('Phase 56.1 G3 [D-2 reverse direction + D-5 drill collapse]: node click writes nodeIds: new Set([d.id]) AND bucketKeys from the nodeToBuckets pre-index', () => {
+    // Phase 56.1 D-5: a graph click collapses the GRAPH halo to single-focal
+    // mode (nodeIds = new Set([d.id]) — any prior multi-node halo is dropped).
+    // Phase 56.1 D-2 reverse direction (Plan 05): the SAME click ALSO writes
+    // bucketKeys = nodeToBuckets.get(d.id) — every bucket that touched d.id
+    // now lights up on the timeline strip (halo rings). The previous Plan 03
+    // payload of `bucketKeys: new Set<string>()` (always-empty) regressed
+    // the reverse cascade; Plan 05's `nodeToBuckets.get(d.id) ?? new Set()`
+    // is the correct atomic write per PATTERNS.md §5 Option A.
     expect(src).toMatch(/nodeIds:\s*new Set<string>\(\[d\.id\]\)/)
-    expect(src).toMatch(/bucketKeys:\s*new Set<string>\(\)/)
+    // bucketKeys is now sourced from the pre-index — either the .get() result
+    // or an empty Set fallback when the node has no touching buckets.
+    expect(src).toMatch(/bucketKeys:\s*touchedBuckets|bucketKeys:\s*nodeToBuckets\.get\(d\.id\)/)
+    // The pre-index hook must be consumed in this file at component scope.
+    expect(src).toMatch(/useNodeToBucketsIndex\s*\(\s*apiClient\s*,\s*system\s*\)/)
   })
 
   test('Phase 56.1 G4: bg-click handler invokes useViewerStore.getState().clearSelection()', () => {
