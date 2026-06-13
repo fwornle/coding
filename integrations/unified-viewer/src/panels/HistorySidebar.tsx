@@ -19,6 +19,7 @@ import { useGraphData } from '@/graph/useGraphData'
 import { useViewerStore } from '@/store/viewer-store'
 import { ApiClient } from '@/api/ApiClient'
 import { System } from '@/config/system-endpoints'
+import { Logger } from '@/lib/logging'
 
 interface HistorySidebarProps {
   apiClient: ApiClient
@@ -91,14 +92,28 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
     return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }, [entities])
 
+  // Phase 56: atomic 4-field write (selectedNodeId + pathToSelected reset +
+  // highlightedRowKey + selectionSource). Subscribers see one consistent
+  // snapshot — the LslTimelineStrip selectedTs memo + OccurrenceHistorySidebar
+  // highlightedRowKey read both depend on this being a single setState.
   const onClick = (id: string) => {
-    useViewerStore.setState({ selectedNodeId: id })
+    useViewerStore.setState({
+      selectedNodeId: id,
+      pathToSelected: new Set<string>(),
+      highlightedRowKey: id,
+      selectionSource: 'history',
+    })
+    Logger.info(Logger.Categories.PANELS, `HistorySidebar → ${id}`)
   }
 
   // 2026-06-12: highlight + auto-scroll the active item when the
   // selection changes (e.g. user clicked a node in the graph or a
   // timeline tick).
+  // 2026-06-13 (Phase 56): also subscribe to `highlightedRowKey` so a
+  // tick-click cascade or other-pane signal can light this sidebar up
+  // without flipping `selectedNodeId`.
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  const highlightedRowKey = useViewerStore((s) => s.highlightedRowKey)
   const listRef = useRef<HTMLUListElement | null>(null)
   useEffect(() => {
     if (!selectedNodeId || !listRef.current) return
@@ -125,13 +140,26 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
           No insights, digests, or observations to show.
         </div>
       ) : (
-        <ul className="space-y-1.5">
-          {items.map((item) => (
+        <ul ref={listRef} className="space-y-1.5">
+          {items.map((item) => {
+            // Phase 56: highlight when EITHER the graph-side selection or the
+            // cross-pane highlightedRowKey signal targets this row. Border tint
+            // makes the highlight visually distinct from the existing
+            // `hover:bg-accent` interaction.
+            const isHighlighted =
+              item.id === selectedNodeId || item.id === highlightedRowKey
+            const baseClass =
+              'w-full text-left px-2.5 py-2 rounded border transition-colors'
+            const highlightClass = isHighlighted
+              ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700'
+              : 'border-border bg-card hover:bg-accent'
+            return (
             <li key={item.id}>
               <button
                 type="button"
+                data-history-id={item.id}
                 onClick={() => onClick(item.id)}
-                className="w-full text-left px-2.5 py-2 rounded border border-border bg-card hover:bg-accent transition-colors"
+                className={`${baseClass} ${highlightClass}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <span
@@ -158,7 +186,8 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
                 </div>
               </button>
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
     </div>

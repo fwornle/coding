@@ -54,7 +54,10 @@ export function OccurrenceHistorySidebar(_: OccurrenceHistorySidebarProps) {
 
   const { entities } = useGraphData(apiClient, system)
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
-  const setSelectedNode = useViewerStore((s) => s.setSelectedNode)
+  // Phase 56: cross-pane highlight signal. May differ from selectedNodeId
+  // when an external pane (e.g. timeline tick cascade — Plan 04) sets the
+  // highlight without flipping the graph selection.
+  const highlightedRowKey = useViewerStore((s) => s.highlightedRowKey)
 
   const historyItems = useMemo(() => {
     return [...entities]
@@ -84,15 +87,35 @@ export function OccurrenceHistorySidebar(_: OccurrenceHistorySidebarProps) {
           LAYER_BADGE_CLASS[layer] ??
           'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
         const ts = (entity.updatedAt as string | undefined) ?? (entity.createdAt as string | undefined)
+        // Phase 56: highlight when the cross-pane signal targets this row.
+        // The sidebar is only visible when selectedNodeId === null (line-70
+        // guard above), so highlightedRowKey is the only signal that fires
+        // here in practice. Border-tint mirrors the HistorySidebar pattern.
+        const isHighlighted = entity.id === highlightedRowKey
+        const baseClass =
+          'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring'
+        const highlightClass = isHighlighted
+          ? 'bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700'
+          : 'hover:bg-muted'
         return (
           <button
             key={entity.id}
             type="button"
             role="listitem"
             data-testid={`occurrence-row-${entity.id}`}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            className={`${baseClass} ${highlightClass}`}
             onClick={() => {
-              setSelectedNode(entity.id)
+              // Phase 56 atomic 4-field write — replaces the single-field
+              // `setSelectedNode(entity.id)` call so consumers see one
+              // consistent snapshot (selectedNodeId + highlightedRowKey +
+              // selectionSource + pathToSelected reset) instead of a
+              // setState window where any subset is visible.
+              useViewerStore.setState({
+                selectedNodeId: entity.id,
+                pathToSelected: new Set<string>(),
+                highlightedRowKey: entity.id,
+                selectionSource: 'history',
+              })
               Logger.info(
                 Logger.Categories.PANELS,
                 `OccurrenceHistorySidebar → ${entity.id}`,

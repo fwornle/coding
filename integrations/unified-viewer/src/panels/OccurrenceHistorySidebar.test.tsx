@@ -1,16 +1,25 @@
 // PATTERN SOURCE: 55-09-PLAN.md Task 1 <behavior> (Sidebar)
+//                 + 56-02-PLAN.md Task 2 (Phase 56 atomic-write + highlight)
 // CONTRACT: 55-PATTERNS.md § OccurrenceHistorySidebar.tsx
 //           UI-SPEC §7 row 11 hybrid: render only when selectedNodeId === null
+//           56-PATTERNS.md § OccurrenceHistorySidebar.tsx — keep null-guard;
+//           click → atomic 4-field write; highlight via highlightedRowKey.
 //
 // Tests:
-//   1. renders only when selectedNodeId === null (guard)
-//   2. renders up to 50 items, sorted by updatedAt || createdAt descending
-//   3. relative timestamp formatting: Just now / Xm ago / Xh ago / Xd ago / absolute
-//   4. clicking a row calls setSelectedNode(entity.id)
-//   5. layer badge classes are sourced from LAYER_BADGE_CLASS in vokb-palette
+//   1-5. (Phase 55 baseline) null-guard, sort, relative-time, click-routes-to-store,
+//        layer-badge palette
+//   6. (Phase 56) Test 8 — click writes atomic 4-field selection per Phase 56
+//      contract (single getState snapshot proves selectedNodeId +
+//      highlightedRowKey + selectionSource land together).
+//   7. (Phase 56) Test 9 — highlight class lights up the row when
+//      highlightedRowKey matches AND selectedNodeId === null (sidebar still
+//      visible per the line-70 null-guard; e.g. external timeline cascade).
+//   8. (Phase 56) Test 10 — Logger discipline: no raw console.* in source.
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { useViewerStore } from '@/store/viewer-store'
 import type { Entity } from '@/graph/types'
 
@@ -50,7 +59,16 @@ function renderPanel() {
 
 describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
   beforeEach(() => {
-    useViewerStore.setState({ selectedNodeId: null, theme: 'light' })
+    // Phase 56: reset selection-sync slice baseline too — otherwise leaks
+    // across tests (e.g. a stale highlightedRowKey from a previous Phase 56
+    // test masks Test 9's assertion that no row is highlighted by default).
+    useViewerStore.setState({
+      selectedNodeId: null,
+      theme: 'light',
+      selectionSource: null,
+      highlightedRowKey: null,
+      selectedSessionId: null,
+    })
     cleanup()
     // Pin Date.now() so relative-time formatting is deterministic.
     vi.useFakeTimers()
@@ -136,5 +154,47 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
     const patternRow = screen.getByTestId('occurrence-row-e-min')
     const patternBadge = patternRow.querySelector('[data-testid="occurrence-layer-badge"]')
     expect(patternBadge!.className).toMatch(/\bbg-amber-100\b/)
+  })
+
+  // ---------- Phase 56 — Plan 56-02 Task 2 ----------
+
+  test('Test 8: clicking a row writes selection atomically (Phase 56 4-field contract)', () => {
+    renderPanel()
+    const row = screen.getByTestId('occurrence-row-e-min')
+    fireEvent.click(row)
+    // Single getState snapshot — proves Phase 56 atomic write replaced the
+    // single-field setSelectedNode call: selectedNodeId + highlightedRowKey +
+    // selectionSource all land together with pathToSelected reset.
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeId).toBe('e-min')
+    expect(s.highlightedRowKey).toBe('e-min')
+    expect(s.selectionSource).toBe('history')
+  })
+
+  test('Test 9: highlight class is applied when highlightedRowKey matches a row (sidebar visible because selectedNodeId === null)', () => {
+    // External signal (e.g. timeline tick cascade in Plan 04) sets
+    // highlightedRowKey but leaves selectedNodeId null — sidebar IS visible
+    // per the line-70 null-guard, and the row should still light up.
+    useViewerStore.setState({
+      selectedNodeId: null,
+      highlightedRowKey: 'e-min',
+      selectionSource: 'timeline',
+    })
+    renderPanel()
+    const row = screen.getByTestId('occurrence-row-e-min')
+    expect(row.className).toMatch(/\bbg-blue-100\b/)
+    // A non-matching row must NOT carry the highlight token (avoid false-positives
+    // from inherited Tailwind utility tokens that might already include bg-blue-100
+    // elsewhere on the button).
+    const otherRow = screen.getByTestId('occurrence-row-e-just-now')
+    expect(otherRow.className).not.toMatch(/\bbg-blue-100\b/)
+  })
+
+  test('Test 10: Logger discipline — no raw console.* in OccurrenceHistorySidebar.tsx source', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/panels/OccurrenceHistorySidebar.tsx'),
+      'utf8',
+    )
+    expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
   })
 })
