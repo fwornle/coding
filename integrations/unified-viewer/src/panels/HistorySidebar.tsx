@@ -115,16 +115,21 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
   // `setSelection` carries each field passed in `args`; we pass the explicit
   // nulls/empties so subscribers see one coherent snapshot.
   const onClick = (id: string) => {
+    // Phase 56.1: setSelection signature migrated to multi-set shape
+    // (Plan 01 deleted the scalar nodeId/sessionId/sessionStartAt args).
+    //   - nodeIds: new Set([id])     — D-5 single-focal collapse
+    //   - bucketKeys: new Set()      — explicit empty (clears timeline halo)
+    //   - focal: { nodeId: id, bucketKey: null } — explicit focal override
+    //   - LSL slice cleared (audit-contract-#5 cascade-clear preserved)
+    // The CR-01 contract (cascade-clear of LSL scope on history-row click)
+    // is preserved verbatim — only the multi-set field rename changes.
     useViewerStore.getState().setSelection({
-      nodeId: id,
+      nodeIds: new Set<string>([id]),
+      bucketKeys: new Set<string>(),
+      focal: { nodeId: id, bucketKey: null },
       pathToSelected: new Set<string>(),
       highlightedRowKey: id,
       source: 'history',
-      // Explicitly clear the LSL session-filter scope and the sibling
-      // session-tick fields so a stale tick filter doesn't leak across panes
-      // (CR-01).
-      sessionId: null,
-      sessionStartAt: null,
       lslSessionFilter: [],
       lslFilterEntityIds: null,
     })
@@ -137,16 +142,21 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
   // 2026-06-13 (Phase 56): also subscribe to `highlightedRowKey` so a
   // tick-click cascade or other-pane signal can light this sidebar up
   // without flipping `selectedNodeId`.
-  const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  // 2026-06-13 (Phase 56.1): subscription migrated to focalNodeId — the
+  // derived "currently in detail" id from the multi-set selection slice.
+  // The auto-scroll target is the focal (which IS the mounted entity in
+  // single-focal mode; in multi-mode the sidebar is BucketCardList, not
+  // this component, so the scroll behaviour is unchanged).
+  const focalNodeId = useViewerStore((s) => s.focalNodeId)
   const highlightedRowKey = useViewerStore((s) => s.highlightedRowKey)
   const listRef = useRef<HTMLUListElement | null>(null)
   useEffect(() => {
-    if (!selectedNodeId || !listRef.current) return
+    if (!focalNodeId || !listRef.current) return
     const el = listRef.current.querySelector<HTMLElement>(
-      `[data-history-id="${CSS.escape(selectedNodeId)}"]`,
+      `[data-history-id="${CSS.escape(focalNodeId)}"]`,
     )
     if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [selectedNodeId])
+  }, [focalNodeId])
 
   return (
     <div
@@ -172,7 +182,7 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
             // makes the highlight visually distinct from the existing
             // `hover:bg-accent` interaction.
             const isHighlighted =
-              item.id === selectedNodeId || item.id === highlightedRowKey
+              item.id === focalNodeId || item.id === highlightedRowKey
             const baseClass =
               'w-full text-left px-2.5 py-2 rounded border transition-colors'
             const highlightClass = isHighlighted

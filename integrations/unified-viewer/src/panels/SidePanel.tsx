@@ -27,6 +27,7 @@ import type { System } from '@/config/system-endpoints'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useGraphData } from '@/graph/useGraphData'
 import { useViewerStore } from '@/store/viewer-store'
+import { BucketCardList } from './BucketCardList'
 import { EntityDetailPanel } from './EntityDetailPanel'
 import { HistorySidebar } from './HistorySidebar'
 import { MarkdownViewerPanel } from './MarkdownViewerPanel'
@@ -42,14 +43,30 @@ type TabValue = 'entity' | 'markdown'
 export function SidePanel({ apiClient, system }: SidePanelProps) {
   const [tab, setTab] = useState<TabValue>('entity')
   const { entities } = useGraphData(apiClient, system)
-  const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  // Phase 56.1: subscription migrated from selectedNodeId → focalNodeId
+  // (Plan 01 deleted the scalar field; focal is the derived "currently in
+  // detail" id). Multi-mode subscriptions added for the three-way
+  // mode-switch predicate below.
+  const focalNodeId = useViewerStore((s) => s.focalNodeId)
+  const selectedNodeIds = useViewerStore((s) => s.selectedNodeIds)
+  const selectedBucketKeys = useViewerStore((s) => s.selectedBucketKeys)
 
   const showMarkdown = system === 'okb'
 
   const entity = useMemo(() => {
-    if (!selectedNodeId) return null
-    return entities.find((e) => e.id === selectedNodeId) ?? null
-  }, [entities, selectedNodeId])
+    if (!focalNodeId) return null
+    return entities.find((e) => e.id === focalNodeId) ?? null
+  }, [entities, focalNodeId])
+
+  // Phase 56.1 mode-switch predicate (CONTEXT.md <specifics> + D-4):
+  //   - isMultiMode: timeline-driven multi-bucket OR graph-driven >1 nodes
+  //                  → BucketCardList renders cards for the active set
+  //   - isSingleFocalMode: exactly one node selected with no bucket halo
+  //                  → EntityDetailPanel renders the focal entity
+  //   - Otherwise (no selection): HistorySidebar default
+  const isMultiMode = selectedBucketKeys.size > 0 || selectedNodeIds.size > 1
+  const isSingleFocalMode =
+    selectedNodeIds.size === 1 && selectedBucketKeys.size === 0
 
   // Width predicate per UI-SPEC §11 (verbatim from 55-09-PLAN <interfaces>).
   const widthClass = useMemo(() => {
@@ -108,12 +125,21 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
           </TabsList>
           {/* 2026-06-11: close button — VKB has one + ESC. ESC alone isn't
               discoverable. Clicking clears selection AND ancestry path so
-              the dim-overlay drops too. */}
+              the dim-overlay drops too.
+              2026-06-13 (Phase 56.1 §D-4 / 56-audit §8 opportunistic
+              closure): routes through the canonical clearSelection()
+              action instead of inline setState. clearSelection covers ALL
+              4 multi-set fields (selectedNodeIds, focalNodeId,
+              selectedBucketKeys, focalBucketKey) + selectedEdgeId +
+              selectionSource + highlightedRowKey + pathToSelected + LSL
+              slice — the full Phase 56.1 selection scope. This closes the
+              Phase 56 audit §8 opportunistic compliance site (Locked
+              Contract #5: no inline store setState outside the store). */}
           {entity && (
             <button
               type="button"
               onClick={() => {
-                useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
+                useViewerStore.getState().clearSelection()
               }}
               className="h-7 w-7 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
               aria-label="Close details panel"
@@ -125,11 +151,19 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
         </div>
 
         <TabsContent value="entity" className="px-4 pb-4">
-          {/* 2026-06-11: when no node is selected the SidePanel shows the
-              VKB-style History feed instead of EntityDetailPanel's empty
-              state. Mirrors integrations/memory-visualizer's
-              HistorySidebar contract. */}
-          {entity ? (
+          {/* Phase 56.1 D-4 three-way mode-switch (CONTEXT.md <specifics>):
+              - isMultiMode (selectedBucketKeys>0 OR selectedNodeIds>1):
+                BucketCardList shows the card list for the active
+                selection set (timeline-bucket entities OR multi-selected
+                graph nodes — bucket-driven content branch wired by
+                Plan 05's useNodeToBucketsIndex when that hook ships).
+              - isSingleFocalMode (single node, no buckets): the existing
+                EntityDetailPanel renders the focal entity's detail view.
+              - Otherwise (no selection): HistorySidebar default —
+                preserves the 2026-06-11 VKB-style empty-state feed. */}
+          {isMultiMode ? (
+            <BucketCardList apiClient={apiClient} system={system} />
+          ) : isSingleFocalMode && entity ? (
             <EntityDetailPanel apiClient={apiClient} system={system} />
           ) : (
             <HistorySidebar apiClient={apiClient} system={system} />
