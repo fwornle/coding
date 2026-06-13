@@ -79,43 +79,42 @@ also reference the deleted Phase 56 fields and are tsc-compile-broken since
 Plan 01 closed. These are addressed by Plans 03/05/06 in their respective
 Wave scopes — out of scope for Plan 04.
 
-## Stale Phase-56-Field References in 13 Additional Test Files (Plan 05)
+## ~~Stale Phase-56-Field References in 13 Additional Test Files (Plan 05)~~ — CLOSED 2026-06-13 by Plan 05
 
-Plan 05 closed the **active source** chain: `events.ts`, `graph-builder.ts`,
-`reducers.ts`, `useKeyboardShortcuts.ts`, `graph-builder.test.ts` (the only
-test that paired with a runtime source migration) were migrated to
-`focalNodeId` + the multi-set fields opportunistically (Rule 3 closure for
-the runtime path that Plan 05's E2E surface needs).
+Originally documented as deferred, but the volume (~157 mechanical
+occurrences across 13 test files) was blocking the project-wide tsc
+gate stated in Plan 05's verify block. Closed inline by Plan 05 as a
+Rule-3 (auto-fix blocking issues) batch sweep alongside the active-source
+migration. Recipe used:
 
-The remaining 13 test files reference the deleted Phase 56 fields and remain
-tsc-compile-broken. They are NOT in Plan 05's `<files_modified>` and migrating
-them would balloon Plan 05 well beyond its forward-direction integration scope.
-Same mechanical sweep applies as the Plan 04 deferred items: replace
-`selectedNodeId` → `focalNodeId`; replace `setState({ selectedNodeId: id })`
-with `useViewerStore.getState().setSelectedNode(id)`; replace
-`selectedSessionId` / `selectedSessionStartAt` reads with
-`focalBucketKey` / `selectedBucketKeys.has(\`${id}|${startAt}\`)`.
+- `setState({ selectedNodeId: id })` → `getState().setSelectedNode(id)`
+- `getState().selectedNodeId` → `getState().focalNodeId`
+- `setState({ selectedSessionId: id, selectedSessionStartAt: startAt })` →
+  `setState({ selectedBucketKeys: new Set([\`${id}|${startAt}\`]), focalBucketKey: \`${id}|${startAt}\` })`
+- `setState({ selectedNodeId: null, ... })` blocks with extra keys → split into
+  `getState().setSelectedNode(null)` + `setState({ ...other keys })`.
 
-### Affected test files (all out-of-scope for Plan 05):
+Production sources also closed in the same sweep: `EntityDetailPanel.tsx`,
+`MarkdownViewerPanel.tsx`, `OccurrenceHistorySidebar.tsx`.
 
-- `src/graph/SigmaCanvas.test.tsx` (5 refs)
-- `src/hooks/useKeyboardShortcuts.test.tsx` (33 refs — largest)
-- `src/panels/EntityDetailPanel.test.tsx` (30 refs)
-- `src/panels/FilterRail.test.tsx` (1 ref)
-- `src/panels/HistorySidebar.test.tsx` (26 refs — overlaps with Plan 04 deferred)
-- `src/panels/MarkdownViewerPanel.test.tsx` (15 refs)
-- `src/panels/OccurrenceHistorySidebar.test.tsx` (27 refs)
-- `src/panels/SidePanel.test.tsx` (4 refs — overlaps with Plan 04 deferred)
-- `src/panels/TrendingPanel.test.tsx` (5 refs)
-- `src/panels/coding/EtmTailSheet.test.tsx` (2 refs)
-- `src/panels/coding/HierarchyNavigator.test.tsx` (1 ref)
-- `src/panels/coding/WorkflowStatusPanel.test.tsx` (3 refs)
-- `src/routes/IssueTriageView.test.tsx` (5 refs)
+Files closed (all 13 test files + 4 production files):
+- src/graph/SigmaCanvas.test.tsx, events.test.ts, graph-builder.test.ts
+- src/hooks/useKeyboardShortcuts.test.tsx
+- src/panels/EntityDetailPanel.test.tsx + .tsx
+- src/panels/FilterRail.test.tsx
+- src/panels/HistorySidebar.test.tsx
+- src/panels/MarkdownViewerPanel.test.tsx + .tsx
+- src/panels/OccurrenceHistorySidebar.test.tsx + .tsx
+- src/panels/SidePanel.test.tsx
+- src/panels/TrendingPanel.test.tsx
+- src/panels/coding/EtmTailSheet.test.tsx
+- src/panels/coding/HierarchyNavigator.test.tsx
+- src/panels/coding/WorkflowStatusPanel.test.tsx
+- src/routes/IssueTriageView.test.tsx
 
-**Total:** ~157 mechanical field-rename occurrences across 13 test files.
-
-**Fix path:** A dedicated Wave-3 cleanup plan (proposed: Plan 06 task or a
-fresh 56.1-07-PLAN.md) can execute the mechanical replace in a single pass.
-No semantic decisions remain — every site is a 1:1 rename per the recipe
-above. Plans 03 + 04 + 05 closed every PRODUCTION reference; this is purely
-test-fixture cleanup that does not affect runtime behaviour.
+**Post-sweep state (2026-06-13):** project-wide tsc 0 errors. vitest 619/637
+pass; the remaining 18 failures all reproduce on main repo without any
+Phase 56.1 changes (toggleLayer / LayerFilter / OntologyFilter / NavBar /
+UnifiedViewer / color-fallback / system-endpoints / node-renderer /
+SigmaCanvas makeEdgeReducer-default-opacity) and are out-of-scope
+pre-existing failures unrelated to the multi-set selection refactor.
