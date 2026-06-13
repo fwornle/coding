@@ -423,11 +423,19 @@ describe('LslTimelineStrip', () => {
     expect(src).toMatch(/toLocaleDateString/)
     // scale row test-ids present
     expect(src).toMatch(/lsl-scale-label-/)
-    // Phase 56 selectionSource literal — both branches (plain + modifier)
-    const sourceMatches = src.match(/selectionSource:\s*['"]timeline['"]/g) ?? []
+    // Phase 56 timeline-source literal — written via `setSelection({ source: 'timeline' })`
+    // after the audit refactor (was `selectionSource: 'timeline'` via direct
+    // setState pre-audit). Match either form so the gate is robust to that
+    // refactor. >=2 branches: plain + modifier (Cmd/Ctrl additive). Note:
+    // after Commit 3 (state-flow audit `b29bdb34c`) the empty-tick branch
+    // ALSO writes `source: 'timeline'`, so we now expect >=3.
+    const sourceMatches = src.match(/(?:selectionSource|source):\s*['"]timeline['"]/g) ?? []
     expect(sourceMatches.length).toBeGreaterThanOrEqual(2)
-    // selectedSessionId written in at least the write + the type import
-    expect(src).toMatch(/selectedSessionId/)
+    // selectedSessionId still referenced — written via sessionId arg to
+    // `setSelection` (canonical action) after the audit refactor; the
+    // literal `selectedSessionId` no longer appears as a setState key from
+    // the strip (audit §6.3). Use a fallback regex to catch either form.
+    expect(src).toMatch(/\b(selectedSessionId|sessionId)\b/)
     // Container height bumped past h-8
     expect(src).toMatch(/h-1[24]/)
   })
@@ -504,14 +512,24 @@ describe('LslTimelineStrip', () => {
     }
   })
 
-  test('Test 23 [Issue 2]: tick click rings its own tick AND sets selectedSessionId even when entityIds[] is empty', async () => {
-    // REGRESSION: when a session has entityIds=[] (no live graph nodes
-    // mapped to it), the tick click writes selectedNodeId: null and
-    // the tick ring keyed on selectedTs→isSelectedBucket never fires.
-    // The fix: re-key the tick ring on (isSelectedBucket || selectedSessionId === s.id)
-    // so the tick always rings on its own click, even when the entity
-    // cascade can't fire.
-    useViewerStore.setState({ selectedNodeId: null, selectedSessionId: null })
+  test('Test 23 [Issue 2 — SUPERSEDED by audit §5.4 option B]: 0-obs ticks are NOT selectable (the previous "always ring on own click" contract is retracted)', async () => {
+    // SPEC CHANGE: 2026-06-13 state-flow audit `b29bdb34c` §5.4 option B
+    // locks the new policy: 0-obs ticks render greyed-out + pointer-events-
+    // none AND are early-exited at the click handler. They still RENDER so
+    // the operator sees "I had a session" but cannot be selected. The prior
+    // contract — "tick always rings on its own click, even when the entity
+    // cascade can't fire" — is retracted because that mode is exactly the
+    // multi-tick leak Issue 2 surfaced through. Buckets with no
+    // observations cannot be a meaningful selection target.
+    //
+    // This test now asserts the inverted contract: a 0-obs tick click is
+    // a no-op AND the tick is visually greyed-out + aria-disabled.
+    useViewerStore.setState({
+      selectedNodeId: null,
+      selectedSessionId: null,
+      selectedSessionStartAt: null,
+      selectionSource: null,
+    })
     const r = renderStrip({
       sessions: [
         {
@@ -519,25 +537,26 @@ describe('LslTimelineStrip', () => {
           startAt: nowMinusHours(2),
           endAt: nowMinusHours(1.5),
           observationCount: 0,
-          entityIds: [], // EMPTY — no entities to cascade to
+          entityIds: [],
         },
       ],
     })
     try {
       await waitFor(() => screen.getByTestId('lsl-tick-sess-empty'))
       const tick = screen.getByTestId('lsl-tick-sess-empty')
+      // Visual + ARIA gate.
+      expect(tick.className).toMatch(/opacity-40/)
+      expect(tick.className).toMatch(/pointer-events-none/)
+      expect(tick.getAttribute('aria-disabled')).toBe('true')
+      // Click is a no-op — store stays at the pre-click snapshot.
       act(() => {
         fireEvent.click(tick)
       })
-      // Even with empty entityIds, the store must record the tick click
       const s = useViewerStore.getState()
-      expect(s.selectedSessionId).toBe('sess-empty')
-      expect(s.selectionSource).toBe('timeline')
-      // And the tick must ring (selectedSessionId === s.id key fires).
-      await waitFor(() => {
-        const t = screen.getByTestId('lsl-tick-sess-empty')
-        expect(t.className).toMatch(/ring-blue-500/)
-      })
+      expect(s.selectedSessionId).toBeNull()
+      expect(s.selectionSource).toBeNull()
+      // No ring on the tick.
+      expect(tick.className).not.toMatch(/ring-blue-500/)
     } finally {
       r.restore()
     }
@@ -571,8 +590,17 @@ describe('LslTimelineStrip', () => {
    //          continues to handle the graph→timeline cascade.
    // ====================================================================
 
-  test('Test 25 [Issue A]: clicking a tick with empty entityIds does NOT touch lslFilterEntityIds/selectedNodeId/pathToSelected (avoids spurious D3 re-render)', async () => {
-    // Pre-seed the three fields the strip MUST NOT change for an empty tick.
+  test('Test 25 [Issue A — SUPERSEDED by audit §5.4 option B]: 0-obs tick is unclickable so pre-existing store fields are PRESERVED (the click handler early-exits before any write)', async () => {
+    // SPEC CHANGE: 2026-06-13 state-flow audit `b29bdb34c` §5.4 option B —
+    // 0-obs ticks render greyed-out + pointer-events-none + early-exit at
+    // the handler. The contract is no longer "minimal selectedSessionId
+    // write"; it's "no write at all". The pre-existing store fields stay
+    // intact (the audit's intent — Issue A's reference-stability concern
+    // is moot when nothing is written).
+    //
+    // For tick-clicks with NON-empty entityIds (the live case after the
+    // audit), reference stability is guaranteed by Commit 4's deep-equal
+    // guard on `setLslFilterEntityIds`.
     const preSeededPath = new Set<string>(['pre-seeded'])
     const preSeededLslIds = new Set<string>(['pre-seeded-1', 'pre-seeded-2'])
     useViewerStore.setState({
@@ -580,6 +608,7 @@ describe('LslTimelineStrip', () => {
       pathToSelected: preSeededPath,
       lslFilterEntityIds: preSeededLslIds,
       selectedSessionId: null,
+      selectedSessionStartAt: null,
       selectionSource: null,
     })
     const r = renderStrip({
@@ -600,11 +629,10 @@ describe('LslTimelineStrip', () => {
         fireEvent.click(tick)
       })
       const s = useViewerStore.getState()
-      // Only the minimal session-scope fields are mutated.
-      expect(s.selectedSessionId).toBe('sess-empty')
-      expect(s.selectionSource).toBe('timeline')
-      // CRITICAL: pre-seeded fields are PRESERVED — same reference, not
-      // a fresh empty Set (which would trigger a D3 re-render).
+      // No write — selectedSessionId stays null (early-exit).
+      expect(s.selectedSessionId).toBeNull()
+      expect(s.selectionSource).toBeNull()
+      // CRITICAL: pre-existing fields are PRESERVED — same reference.
       expect(s.selectedNodeId).toBe('pre-existing-node')
       expect(s.pathToSelected).toBe(preSeededPath)
       expect(s.lslFilterEntityIds).toBe(preSeededLslIds)
@@ -615,6 +643,7 @@ describe('LslTimelineStrip', () => {
         pathToSelected: new Set(),
         lslFilterEntityIds: null,
         selectedSessionId: null,
+        selectedSessionStartAt: null,
         selectionSource: null,
       })
     }
@@ -884,6 +913,12 @@ describe('LslTimelineStrip', () => {
       selectedNodeId: null,
       selectedSessionId: null,
       selectedSessionStartAt: null,
+      // 2026-06-13: explicitly reset selectionSource — prior tests in this
+      // file may leave 'timeline' lingering and the no-op assertion below
+      // checks for null. The global beforeEach() does not include this
+      // field (it pre-dates Phase 56).
+      selectionSource: null,
+      highlightedRowKey: null,
     })
     const r = renderStrip({
       sessions: [

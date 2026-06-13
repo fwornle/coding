@@ -167,6 +167,14 @@ export interface ViewerState {
     highlightedRowKey?: string | null
     source: SelectionSource
     pathToSelected?: ReadonlySet<string>
+    // 2026-06-13 (audit §6.3 + §7 R4): LSL filter slice fields are part of
+    // the same atomic snapshot when a timeline tick is the writer — the
+    // alternative is letting the strip fall back to direct `setState`
+    // which is exactly the source-of-truth violation the audit calls out.
+    // These are optional so non-timeline writers (graph, history) can omit
+    // them and the action preserves the existing values.
+    lslSessionFilter?: string[]
+    lslFilterEntityIds?: ReadonlySet<string> | null
   }) => void
   clearSelection: () => void
 
@@ -224,6 +232,29 @@ export interface ViewerState {
   setLslFilterEntityIds: (ids: ReadonlySet<string> | null) => void
 }
 
+// 2026-06-13 (audit §4.4 + §7 R3): shared deep-equal helper for the LSL
+// filter slice. Two `ReadonlySet<string>` (or null) are considered equal
+// when one of:
+//   - both are null
+//   - both are non-null Sets with identical membership (size + every key)
+// This is the exact predicate that decides whether `setLslFilterEntityIds`
+// (and `setSelection({ lslFilterEntityIds })`) writes a fresh reference or
+// preserves the existing one. Reference stability is what stops the D3
+// graph's `visibleEntities` useMemo from invalidating on identical-content
+// LSL filter writes — Issue 1 root cause per audit §4.3.
+function sameSetMembership(
+  a: ReadonlySet<string> | null,
+  b: ReadonlySet<string> | null,
+): boolean {
+  if (a === b) return true
+  if (a === null || b === null) return false
+  if (a.size !== b.size) return false
+  for (const v of a) {
+    if (!b.has(v)) return false
+  }
+  return true
+}
+
 function readPersistedThemeForStore(): ThemePref {
   // Plan 04 round 3: respect the OS-level color scheme on every fresh
   // page load. Hard reload no longer reads localStorage — instead it
@@ -276,7 +307,16 @@ export const useViewerStore = create<ViewerState>((set) => ({
   // origin; `pathToSelected` defaults to an empty Set when nodeId changes
   // (the graph recomputes ancestry on next render) but is preserved if the
   // caller didn't move the node (e.g. timeline-only writes).
-  setSelection: ({ nodeId, sessionId, sessionStartAt, highlightedRowKey, source, pathToSelected }) =>
+  setSelection: ({
+    nodeId,
+    sessionId,
+    sessionStartAt,
+    highlightedRowKey,
+    source,
+    pathToSelected,
+    lslSessionFilter,
+    lslFilterEntityIds,
+  }) =>
     set((s) => {
       const nextNodeId = nodeId !== undefined ? nodeId : s.selectedNodeId
       const nextSessionId = sessionId !== undefined ? sessionId : s.selectedSessionId
@@ -302,6 +342,18 @@ export const useViewerStore = create<ViewerState>((set) => ({
       } else if (nodeId !== undefined) {
         nextPath = new Set<string>()
       }
+      // 2026-06-13 (audit §6.3 + §7 R4): LSL filter slice writes piggy-
+      // back on the same atomic snapshot when the caller passes them.
+      // Reference-stability guard is shared with `setLslFilterEntityIds`
+      // (see Commit 4 deep-equal helper).
+      const nextLslSessionFilter =
+        lslSessionFilter !== undefined ? lslSessionFilter.slice() : s.lslSessionFilter
+      const nextLslFilterEntityIds =
+        lslFilterEntityIds !== undefined
+          ? sameSetMembership(s.lslFilterEntityIds, lslFilterEntityIds)
+            ? s.lslFilterEntityIds
+            : lslFilterEntityIds
+          : s.lslFilterEntityIds
       return {
         selectedNodeId: nextNodeId,
         selectedSessionId: nextSessionId,
@@ -309,6 +361,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
         highlightedRowKey: nextHighlightedRowKey,
         selectionSource: source,
         pathToSelected: nextPath,
+        lslSessionFilter: nextLslSessionFilter,
+        lslFilterEntityIds: nextLslFilterEntityIds,
       }
     }),
 
