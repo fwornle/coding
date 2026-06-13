@@ -20,7 +20,29 @@ import { render, screen, fireEvent, act, cleanup, waitFor } from '@testing-libra
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import LslTimelineStrip from './LslTimelineStrip'
+
+// 2026-06-13 [Phase 56-03]: Mock `useGraphData` so the strip's
+// `selectedTs` memo (lines 167-175) can resolve entity.createdAt without
+// hitting the real /api/v1/entities endpoint. The baseline test mock
+// returns `{sessions:[...]}` for ALL fetches — that envelope makes
+// `apiClient.listEntities()` return an object (not Entity[]), tripping
+// `entities.find` in the strip. Mocking the hook here lets us assert the
+// graph→tick highlight cascade (Test 19 — AC #2 timeline side) AND
+// neutralises 4 pre-existing baseline failures that crashed on the same
+// path. See PATTERNS.md § OccurrenceHistorySidebar.test.tsx for the
+// `vi.mock('@/graph/useGraphData')` idiom.
+const mockEntities: Array<{ id: string; createdAt: string }> = []
+vi.mock('@/graph/useGraphData', () => ({
+  useGraphData: () => ({
+    entities: mockEntities,
+    relations: [],
+    ontology: [],
+    isLoading: false,
+    error: null,
+  }),
+}))
+
+import LslTimelineStrip, { formatScaleLabel } from './LslTimelineStrip'
 import { useViewerStore } from '@/store/viewer-store'
 import { ApiClient } from '@/api/ApiClient'
 
@@ -294,5 +316,111 @@ describe('LslTimelineStrip', () => {
     )
     const matches = src.match(/export default/g) ?? []
     expect(matches.length).toBe(1)
+  })
+
+  // ====================================================================
+  // Phase 56 Plan 03 — timestamp scale + bidirectional selection
+  // ====================================================================
+
+  test('Test 14: renders 5-8 scale labels by default window (7d)', async () => {
+    const r = renderStrip()
+    try {
+      await waitFor(() => {
+        const labels = screen.getAllByTestId(/^lsl-scale-label-/)
+        expect(labels.length).toBeGreaterThanOrEqual(5)
+        expect(labels.length).toBeLessThanOrEqual(8)
+      })
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 15: formatScaleLabel — HH:MM:SS format when windowMs ≤ 60_000', () => {
+    // sub-minute window — expect HH:MM:SS
+    const out = formatScaleLabel(Date.now(), 60_000)
+    expect(out).toMatch(/^\d{2}:\d{2}:\d{2}$/)
+  })
+
+  test('Test 16: formatScaleLabel — HH:MM format when 60_000 < windowMs ≤ 86_400_000', () => {
+    // sub-day window — expect HH:MM
+    const out = formatScaleLabel(Date.now(), 3_600_000) // 1h
+    expect(out).toMatch(/^\d{2}:\d{2}$/)
+  })
+
+  test('Test 17: formatScaleLabel — multi-day window uses "Mon DD" abbreviation', () => {
+    // multi-day window — expect e.g. "Jun 13"
+    const out = formatScaleLabel(Date.now(), 7 * 86_400_000)
+    expect(out).toMatch(/^[A-Z][a-z]{2,} \d{1,2}$/)
+  })
+
+  test('Test 18: tick click writes Phase 56 fields atomically (selectionSource/selectedSessionId/highlightedRowKey)', async () => {
+    useViewerStore.setState({
+      selectionSource: null,
+      selectedSessionId: null,
+      highlightedRowKey: null,
+    })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      const tick = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      // single getState() snapshot — assert all three new fields together
+      expect(s.selectionSource).toBe('timeline')
+      expect(s.selectedSessionId).toBe('sess-bbbbbbbb')
+      // sess-bbbbbbbb has entityIds=['e3'] in makeSessions(), so first id is 'e3'
+      expect(s.highlightedRowKey).toBe('e3')
+      // pre-existing fields still coherent
+      expect(s.selectedNodeId).toBe('e3')
+      expect(s.lslSessionFilter).toEqual(['sess-bbbbbbbb'])
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 19: graph selection lights up the matching tick (selection→tick cascade lock)', async () => {
+    // Populate mock entities so the strip's selectedTs memo resolves a
+    // createdAt that falls inside sess-bbbbbbbb's [startAt, endAt) range.
+    // sess-bbbbbbbb spans [nowMinusHours(2), nowMinusHours(1.5)] — pick a
+    // ts in that window for e3.
+    mockEntities.length = 0
+    mockEntities.push({
+      id: 'e3',
+      createdAt: nowMinusHours(1.75), // strictly inside sess-bbbbbbbb
+    })
+    useViewerStore.setState({ selectedNodeId: 'e3' })
+    const r = renderStrip()
+    try {
+      await waitFor(() => {
+        const tick = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+        expect(tick.className).toMatch(/ring-blue-500/)
+      })
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      useViewerStore.setState({ selectedNodeId: null })
+    }
+  })
+
+  test('Test 20: source-grep gate — Phase 56 scale renderer + selectionSource literal wired', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/panels/coding/LslTimelineStrip.tsx'),
+      'utf8',
+    )
+    // formatScaleLabel helper present
+    expect(src).toMatch(/formatScaleLabel/)
+    // multi-day branch uses Intl via toLocaleDateString
+    expect(src).toMatch(/toLocaleDateString/)
+    // scale row test-ids present
+    expect(src).toMatch(/lsl-scale-label-/)
+    // Phase 56 selectionSource literal — both branches (plain + modifier)
+    const sourceMatches = src.match(/selectionSource:\s*['"]timeline['"]/g) ?? []
+    expect(sourceMatches.length).toBeGreaterThanOrEqual(2)
+    // selectedSessionId written in at least the write + the type import
+    expect(src).toMatch(/selectedSessionId/)
+    // Container height bumped past h-8
+    expect(src).toMatch(/h-1[24]/)
   })
 })
