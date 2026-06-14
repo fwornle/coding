@@ -1381,6 +1381,99 @@ describe('LslTimelineStrip', () => {
     expect(src).toMatch(/from\s+['"]@\/graph\/ancestry['"]/)
   })
 
+  test('Test 37 [Plan 06 gap-closure — Bug 1 regression]: tick click writes lslFilterEntityIds containing BOTH the raw bucket entityIds AND the resolved halo ancestors (so the visibility predicate keeps halo nodes mounted)', async () => {
+    // 2026-06-14 (Plan 06 gap-closure — Bug 1 fix regression gate):
+    //
+    // Operator visual smoke caught a regression where `onTickClick` wrote
+    // `lslFilterEntityIds: new Set<string>(ids)` (raw bucket entityIds
+    // only, typically all Observation/Digest entityType). The visibility
+    // predicate (visibility-predicate.ts:113-117) then culled every
+    // non-structural halo ancestor (Insights, SubComponents, Details)
+    // because they were neither structural nor in the filter set →
+    // halo nodes disappeared from `visibleEntities` → D3 never mounted
+    // .node elements for them → applySelectionStyling's
+    // `selectedNodeIds.has(d.id)` branch ran against DOM that no longer
+    // contained any halo node → no halo rings rendered.
+    //
+    // Operator observation: only the focal Component (LiveLoggingSystem)
+    // + 1 path edge to Project (Coding) rendered; every Insight /
+    // SubComponent / Detail halo node was missing.
+    //
+    // Fix: union resolvedNodeIds INTO lslFilterEntityIds on BOTH the
+    // plain-click branch AND the Cmd/Ctrl additive branch so the halo
+    // ancestors stay visible alongside the structural backbone.
+    //
+    // This unit test re-uses the Test 33 fixture (Detail bucket entity
+    // resolving via `contains` to component-1) and asserts BOTH
+    // 'detail-1' (raw) AND 'component-1' (resolved ancestor) are in
+    // lslFilterEntityIds post-click. Pre-fix: only 'detail-1' would be
+    // present. Post-fix: both.
+    mockEntities.length = 0
+    mockEntities.push({ id: 'detail-1', createdAt: nowMinusHours(1.75) } as never)
+    ;(globalThis as unknown as { __mockRelations?: unknown }).__mockRelations = [
+      { from: 'component-1', to: 'detail-1', type: 'contains' },
+      { from: 'root-1', to: 'component-1', type: 'contains' },
+    ]
+    ;(globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> }).__mockVisibleIds =
+      new Set<string>(['component-1', 'root-1'])
+    useViewerStore.setState({
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      pathToSelected: new Set<string>(),
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
+      lslFilterEntityIds: null,
+    })
+    const sessionStartAt = nowMinusHours(2)
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-bug1',
+          startAt: sessionStartAt,
+          endAt: nowMinusHours(1.5),
+          observationCount: 5,
+          entityIds: ['detail-1'],
+        },
+      ],
+    })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bug1'))
+      const tick = screen.getByTestId('lsl-tick-sess-bug1')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      // Pre-fix assertion (preserved — phantom-id resolution still works):
+      expect(s.focalNodeId).toBe('component-1')
+      expect(s.selectedNodeIds.has('component-1')).toBe(true)
+      expect(s.lslFilterEntityIds?.has('detail-1')).toBe(true)
+      // Post-fix assertion (Plan 06 gap-closure — Bug 1):
+      // the RESOLVED ancestor must also be in the filter so the
+      // visibility predicate keeps the halo node mounted in D3.
+      expect(
+        s.lslFilterEntityIds?.has('component-1'),
+        'lslFilterEntityIds must include the resolved halo ancestor (component-1) — otherwise the visibility predicate culls the halo node from the D3 graph and the halo ring never renders (Plan 06 gap-closure Bug 1 regression).',
+      ).toBe(true)
+      // Strict size check: filter must contain raw (detail-1) + resolved (component-1) = 2.
+      // Plus: root-1 is NOT in the union (it's in pathToSelected but not in
+      // selectedNodeIds / lslFilterEntityIds — the trace render uses it
+      // separately).
+      expect(s.lslFilterEntityIds?.size).toBe(2)
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
+      delete (globalThis as unknown as { __mockVisibleIds?: unknown }).__mockVisibleIds
+      useViewerStore.getState().setSelectedNode(null)
+      useViewerStore.setState({
+        pathToSelected: new Set(),
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
+        lslFilterEntityIds: null,
+      })
+    }
+  })
+
   // ====================================================================
   // Phase 56.1 Plan 05 — NEW tests for the WR-03 race-window closure +
   // two-tier bucket render (focal + halo).

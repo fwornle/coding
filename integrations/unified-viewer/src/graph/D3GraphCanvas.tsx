@@ -274,6 +274,31 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // consume; adding this does not alter the existing dep lists.
   const nodeToBuckets = useNodeToBucketsIndex(apiClient, system)
 
+  // 2026-06-14 (Plan 06 gap-closure — Bug 2 fix): the d3 `.on('click', ...)`
+  // handler is registered INSIDE the main render `useEffect` whose dep list
+  // is locked to `[visibleEntities, visibleRelations, theme, isLoading]`
+  // (Locked Contract #3 — viewport stability). The handler captures
+  // `nodeToBuckets` via JS closure at the time the effect runs. When
+  // `nodeToBuckets` rebuilds LATER (sessions data arrives after first paint,
+  // or `visibleIds` changes), the click handler is NOT re-registered — so it
+  // keeps the STALE map.
+  //
+  // Operator visual smoke (2026-06-14) showed every graph node click
+  // producing `bucketKeys: empty Set` (no halo / focal styling on any
+  // tick — AC #2 failure). Root cause: the initial main render captured
+  // an empty `new Map()` because `useLslSessions` was still pending; that
+  // empty map remained the click handler's value forever.
+  //
+  // Fix: track the latest `nodeToBuckets` in a ref + sync it on every
+  // render. The click handler reads `nodeToBucketsRef.current` so it
+  // always sees the freshest reverse-index. Adding `nodeToBuckets` to the
+  // main render dep list would force an SVG rebuild on every sessions
+  // refetch, violating Locked Contract #3 (viewport stability).
+  const nodeToBucketsRef = useRef<ReadonlyMap<string, ReadonlySet<string>>>(nodeToBuckets)
+  useEffect(() => {
+    nodeToBucketsRef.current = nodeToBuckets
+  }, [nodeToBuckets])
+
   // Apply the same filter pipeline the sigma reducer applied so the two
   // viewers honour the FilterRail consistently. Done client-side here
   // because d3's data binding wants pre-filtered arrays.
@@ -612,7 +637,16 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
         // stays null on graph click — the graph nominates a node focal,
         // not a bucket focal; the timeline strip's render predicate keys
         // halo on `selectedBucketKeys.has(...) && !focalBucket`.
-        const touchedBuckets = nodeToBuckets.get(d.id) ?? new Set<string>()
+        //
+        // 2026-06-14 (Plan 06 gap-closure — Bug 2 fix): read from
+        // `nodeToBucketsRef.current` (synced via useEffect above), NOT the
+        // closure-captured `nodeToBuckets`. The main render effect's dep
+        // list omits `nodeToBuckets` (Locked Contract #3 — viewport
+        // stability), so the click handler's JS closure froze on whatever
+        // value `nodeToBuckets` had at first mount — typically empty
+        // because sessions data hadn't arrived. The ref hop sees the
+        // CURRENT value at click time without re-registering the handler.
+        const touchedBuckets = nodeToBucketsRef.current.get(d.id) ?? new Set<string>()
         useViewerStore.getState().setSelection({
           nodeIds: new Set<string>([d.id]),
           bucketKeys: touchedBuckets,
