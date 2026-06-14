@@ -181,6 +181,14 @@ export function useKeyboardShortcuts(
         //   selectedNodeId → focalNodeId (or selectedNodeIds.size > 0)
         //   selectedSessionId/selectedSessionStartAt → selectedBucketKeys
         // The Esc handler now checks the new field names.
+        // 2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history stack):
+        // Esc is a one-step-back action. From Layer 2 (drill / single-focal
+        // EntityDetailPanel) it pops to Layer 1 (pre-drill multi-set —
+        // halo nodes + bucket card list / tick halos restored). From
+        // Layer 1 (no drill happened yet, `selectionHistory === null`)
+        // it falls through to `clearSelection()` so Esc still reaches
+        // Layer 0 in two presses total. `popSelection()` returns true when
+        // a snapshot was restored, false when it fell through to clearSelection.
         const state = useViewerStore.getState()
         const hasSelection =
           state.focalNodeId !== null ||
@@ -189,11 +197,17 @@ export function useKeyboardShortcuts(
           state.selectedBucketKeys.size > 0 ||
           state.selectedEdgeId !== null ||
           state.lslSessionFilter.length > 0 ||
-          state.lslFilterEntityIds !== null
+          state.lslFilterEntityIds !== null ||
+          state.selectionHistory !== null
         if (hasSelection) {
-          state.clearSelection()
+          const popped = state.popSelection()
           event.preventDefault()
-          Logger.debug(Logger.Categories.STORE, 'Esc: cleared selection (all panes)')
+          Logger.debug(
+            Logger.Categories.STORE,
+            popped
+              ? 'Esc: popped selection (Layer 2 → Layer 1)'
+              : 'Esc: cleared selection (Layer 1 → Layer 0, no history)',
+          )
         }
         return
       }
