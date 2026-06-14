@@ -200,6 +200,7 @@ Last activity: 2026-06-14
 - [Phase ?]: Phase 46 SC-4 cross-reference audit complete: 12/12 inbound links PASS; D-46-05 sweep caught + fixed 3 residual B labels in AGENTS.md inline
 - [Phase 57-01]: Project type registry (PROJECTS / Project / isProject) lands in km-core; root + types barrel re-exports wired; 17 unit tests; 334→352 net+18 tests; zero regressions. MetadataWithProject helper SKIPPED per PATTERNS.md. km-core local persistence.js patch absent from source under VCS (pre-existing host-only patch per CLAUDE.md) — operator follow-up.
 - [Phase ?]: [Phase 57-02]: coding.lower.json ships with 10 L2 classes (6 Component + 3 Detail + 1 SubComponent). meta.extends=coding-ontology chains through coding-ontology → upper so per-class Component/SubComponent/Detail references resolve. Fixture-driven integration test in lib/km-core/tests/integration/ locks the data shape against OntologyRegistry; 358/358 km-core suite GREEN (was 352; +6 net). LOWERONTO-01 realized in static data form; Plan 04 (classifier injection) can now load via registry.getClass(L2-name).
+- [Phase 57-06]: LOWERONTO-02 upper-ontology growth deferred at v7.2 discuss-time (D-12). Phase 57 ships LOWERONTO-01 (lower-ontology + 10 L2 classes) and LOWERONTO-04 (project tag everywhere); upper-ontology growth (operator-suggested `Diagnosis` and `Interface` classes) is tracked for a follow-up phase. Reopen during v7.2 retro. Provenance: .planning/phases/57-lower-ontology-project-tagging-foundation/57-CONTEXT.md §D-12/D-13.
 
 ### Blockers/Concerns
 
@@ -224,6 +225,7 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | verification | Phase 30.1 (30.1-VERIFICATION.md) | human_needed |
 | todo | llm-based-semantic-deduplication | pending |
 | todo | replace-console-log-with-proper-logging | pending |
+| requirement | LOWERONTO-02 — upper-ontology growth (Diagnosis, Interface) | deferred at Phase 57; reopen v7.2 retro |
 | Phase 36 P07 | 32 | 1 tasks | 1 files |
 | Phase 37 P02 | 14min | 2 tasks | 8 files |
 | Phase 37 P03 | 10 | 2 tasks | 2 files |
