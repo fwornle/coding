@@ -4,6 +4,8 @@ title: Online learning pipeline emits Insights with only `capturedBy → LiveLog
 area: live-logging / observation consolidator / vkb ingest / unified-viewer timeline
 relates_to_phase: 56.1 (surfaced during 56.1 visual smoke — out of scope of 56.1 bidirectional bridge)
 scope_hint: This is a multi-phase milestone, not a single TODO. Recommend promoting via `/gsd-review-backlog` when triaged.
+resolves_phase: 58
+resolves_phase_secondary: 61 (timeline bi-source coloring portion is closed by LSLTIME-03 in Phase 61)
 related_todos:
   - 2026-06-14-online-filter-hides-ck-truncates-trace.md
   - 2026-06-14-vkb-evidence-pattern-filter-asymmetry-and-ontology.md

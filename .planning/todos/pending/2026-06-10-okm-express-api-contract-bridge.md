@@ -3,6 +3,7 @@ created: 2026-06-10T17:10:00.000Z
 title: OKM Express ↔ unified-viewer API contract mismatch (/api/entities vs /api/v1/entities)
 area: cross-system / km-core
 relates_to_phase: 55 (SC-1 follow-up — explicitly out-of-scope of Phase 55 per ROADMAP "Out of scope")
+resolves_phase: 61
 files:
   - integrations/unified-viewer/src/api/ApiClient.ts
   - integrations/unified-viewer/src/lib/system-endpoints.ts

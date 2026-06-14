@@ -3,6 +3,7 @@ created: 2026-06-14T07:10:00.000Z
 title: VKB sidebar LEGEND is static and mixes OKB-domain entries — should be derived from rendered graph
 area: unified-viewer / sidebar legend rendering
 relates_to_phase: 56.1 (surfaced during 56.1 visual smoke — out of scope of 56.1 bidirectional bridge)
+resolves_phase: 60
 related_todos:
   - 2026-06-14-vkb-evidence-pattern-filter-asymmetry-and-ontology.md
   - 2026-06-14-vkb-shows-observations-digests-architecture-bleed.md

@@ -3,6 +3,7 @@ created: 2026-06-14T07:00:00.000Z
 title: VKB graph displays Observation + Digest entities — architecture bleed from observations pipeline
 area: knowledge-graph / VKB ingest pipeline / unified-viewer entity-type filter
 relates_to_phase: 56.1 (surfaced during 56.1 visual smoke — out of scope of 56.1 bidirectional bridge)
+resolves_phase: 60
 relates_to_prior_work: 2026-06-11 digest "Prune km-core Graph and Fix VKB Source Labeling" — surgically removed 4066 Observation + 1343 Digest entities from km-core, preserved 82 Insights. If counts are now back, that cleanup was incomplete or a re-ingest path is re-adding them.
 files:
   - integrations/unified-viewer/src/store/viewer-store.ts (the entity-type filter checkboxes — Observations/Insights/Digests)

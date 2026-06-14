@@ -3,6 +3,7 @@ created: 2026-06-14T07:05:00.000Z
 title: Ontology rework — clarify upper/lower split, build out lower ontology, group by project in VKB viewer
 area: ontology / semantic-analysis / unified-viewer grouping
 relates_to_phase: 56.1 (surfaced during 56.1 visual smoke — milestone-scale architectural item, not a 56.1 bugfix)
+resolves_phase: 57
 scope_hint: This is a multi-phase rework, not a TODO. Recommend promoting to a milestone (or a parent phase with sub-phases) when triaged. Review with `/gsd-review-backlog`.
 files:
   - integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts (current classification logic)

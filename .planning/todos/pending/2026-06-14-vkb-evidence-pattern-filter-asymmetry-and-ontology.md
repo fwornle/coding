@@ -3,6 +3,7 @@ created: 2026-06-14T06:55:00.000Z
 title: VKB Evidence/Pattern filter asymmetry + ontology cross-domain bleed
 area: unified-viewer / Layer filter + ontology
 relates_to_phase: 56.1 (surfaced during 56.1 visual smoke — out of scope of 56.1 bidirectional bridge)
+resolves_phase: 60
 files:
   - integrations/unified-viewer/src/store/viewer-store.ts (Layer filter — Evidence / Pattern checkboxes)
   - integrations/unified-viewer/src/panels/coding/* (the VKB-specific code path)

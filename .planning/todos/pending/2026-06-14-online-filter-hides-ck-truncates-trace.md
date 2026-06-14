@@ -3,6 +3,7 @@ created: 2026-06-14T06:50:00.000Z
 title: Online learning-source filter hides CollectiveKnowledge, truncating ancestry traces at project level
 area: unified-viewer / filter + hierarchy visibility
 relates_to_phase: 56.1 (surfaced during 56.1 visual smoke — out of scope of 56.1 bidirectional bridge)
+resolves_phase: 60
 files:
   - integrations/unified-viewer/src/store/viewer-store.ts (learningSource filter logic)
   - integrations/unified-viewer/src/graph/ancestry.ts (resolveToVisibleAncestor / computeAncestryPath)

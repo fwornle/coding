@@ -3,6 +3,7 @@ created: 2026-06-14T13:45:00.000Z
 title: LSL timeline strip silently truncates history — 200-record cap + "all" window is only 365 days
 area: unified-viewer / LSL timeline strip / dashboard backend endpoint
 relates_to_phase: 56.1 (surfaced 2026-06-14 — out of scope of 56.1 bidirectional bridge)
+resolves_phase: 61
 files:
   - integrations/unified-viewer/src/panels/coding/useLslSessions.ts (WINDOW_MS at line 29-34, limit=200 in fetchSessions at line 49)
   - integrations/system-health-dashboard/server.js (or wherever GET /api/coding/lsl/sessions is implemented — needs verification)
