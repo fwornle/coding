@@ -465,6 +465,22 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     // lightweight selection useEffect below depends on
     // `applySelectionStyling`, so it will fire when the store fields
     // change — same response cadence as Phase 56.
+    //
+    // 2026-06-14 (WR-03 fix — 56.1-REVIEW): `selectedBucketKeys` and
+    // `focalBucketKey` are INTENTIONALLY OMITTED from this dep list.
+    // This callback paints NODE-side state only (graph rings + ancestry
+    // trace edges). Bucket-side render (timeline tick rings, BucketCardList
+    // highlights) is the strip's / side-panel's responsibility — those
+    // components subscribe to the bucket fields independently. Adding the
+    // bucket fields here would cause the graph DOM to repaint on pure
+    // bucket-side selection changes (e.g. additive Cmd-click adding a halo
+    // bucket without changing selectedNodeIds), which is wasted work AND
+    // a cross-pane invariant smell (the graph would react to events it
+    // shouldn't care about). The callback body does NOT read either bucket
+    // field, so react-hooks/exhaustive-deps stays happy; this comment
+    // exists so a future programmer adding bucket-side render logic here
+    // explicitly chooses whether to widen the dep list rather than
+    // discovering the missing subscription by surprise.
     [selectedNodeIds, focalNodeId, pathToSelected, visibleRelations, theme],
   )
 
