@@ -151,6 +151,23 @@ export function BucketCardList({ apiClient, system }: BucketCardListProps) {
   // setSelection action (Locked Contract #5) so all selection invariants
   // (focal derivation, sameSetMembership reference-stability guard, LSL
   // cascade-clear) live in ONE place (the store).
+  //
+  // 2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history stack):
+  // pass `pushHistory: true` so the pre-drill Layer 1 state (the bucket
+  // halo + card list the user was browsing) is captured. Esc / X then
+  // restores it via popSelection() instead of dropping straight to Layer 0.
+  //
+  // 2026-06-14 (Plan 06 gap-closure — Decision 3 viewport preservation):
+  // DO NOT write `lslFilterEntityIds: null` or `lslSessionFilter: []` on
+  // drill. The pre-fix code cleared both, which broadened `visibleEntities`
+  // from the bucket-filtered subset (~14 nodes) back to the full set
+  // (~808 nodes) → main render fires (visibleEntities ref changed) → SVG
+  // rebuild + force-simulation restart + auto-fit ⇒ "zoom all the way
+  // out, fade everything, focal lost in the dim sea." Preserving the LSL
+  // filter slice keeps visibleEntities reference-stable so the drill is
+  // purely a selection-slice mutation: applySelectionStyling repaints
+  // (focal red, halos fade out of selectedNodeIds, pathToSelected stays
+  // bright) but the SVG / force simulation / viewport all stay put.
   const onCardClick = (id: string) => {
     useViewerStore.getState().setSelection({
       nodeIds: new Set<string>([id]),
@@ -159,8 +176,9 @@ export function BucketCardList({ apiClient, system }: BucketCardListProps) {
       pathToSelected: new Set<string>(),
       highlightedRowKey: id,
       source: 'history',
-      lslSessionFilter: [],
-      lslFilterEntityIds: null,
+      // lslSessionFilter / lslFilterEntityIds INTENTIONALLY OMITTED —
+      // setSelection preserves them at the current value (Decision 3).
+      pushHistory: true,
     })
     Logger.info(Logger.Categories.PANELS, `BucketCardList drill → ${id}`)
   }
