@@ -162,7 +162,7 @@ Plans:
 - [x] 34-01-PLAN.md — Update llm_cli_proxy rule in config/health-verification-rules.json: flip auto_heal=true + add cooldown 3/5min (D-06 + D-07 kill-switch via existing POST /health/refresh)
 - [x] 34-02-PLAN.md — Add state.proxy slice + pollProxySemantic (60s, D-01 payload, D-02 four-mode classification) + pollProxyMode (every tick) to scripts/health-coordinator.js — observation only, no FSM
 - [x] 34-04-PLAN.md — ETM strip (D-08 Plan A): delete ~80 LoC of dead online-learning paths from scripts/enhanced-transcript-monitor.js + checkpoint cross-project ETM smoke verify (D-09 + D-10) — cherry-picked clean from `worktree-agent-a2ca353f2ad671350`; auto-merge resolved both 34-04's strip and this session's per-exchange tranche routing + lock fix; structural grep gates pass; live ETM smoke (D-09/D-10 hard-restart with prompt-flow check) deferred to operator window since the plan is `autonomous: false`
-- [x] 34-06-PLAN.md — Phase 33 leftover closure: AC #6 detection-latency P95 ≤ 10s + AC #11 destructive kill -9 respawn ≤ 30s + plist dead-key cleanup (D-15 + D-16 + D-17) — Option B applied; bootout/bootstrap re-applied plist (uptime 4326s → 3s); AC #6 PASS (50 trials, both assertions green); AC #11 PASS (1s respawn vs 30s threshold); Phase 33 re-run halts on pre-existing two-session-agreement test-side bug from `8f304038e` compound-key migration — NOT a 34-06 regression; D-14 24h soak gate PENDING by design (post-merge)
+- [x] 34-06-PLAN.md — Phase 33 leftover closure: AC #6 detection-latency P95 ≤ 10s + AC #11 destructive kill -9 respawn ≤ 30s + plist dead-key cleanup (D-15 + D-16 + D-17) — Option B applied; bootout/bootstrap re-applied plist (uptime 4326s → 3s); AC #6 PASS (50 trials, both assertions green); AC #11 PASS (1s respawn vs 30s threshold); Phase 33 re-run halts on pre-existing two-session-agreement test-side bug from `8f304038e` compound-key migration — NOT a 34-06 regression; **D-14 24h soak gate CLOSED 2026-06-14** — soak window (originally targeted to expire 2026-05-13T04:26Z) elapsed >30 days ago; the proxy supervision FSM has run continuously since without operator-reported runaway kickstarts. R3 + R4 already closed 2026-05-12 via code review (R3) + production telemetry (R4) per MEMORY entry [project_phase34_close_gates.md]. Phase 34 is now fully closed.
 
 **Wave 2** *(depends on Wave 1 — Plan 34-03 reads RULES from 34-01 + adds FSM on top of 34-02; Plan 34-05 deletes files orphaned by 34-04 + surfaces state.proxy from 34-02)*
 
@@ -740,16 +740,17 @@ Plans:
 | 45. Unified Web Viewer | 6/6 | Complete    | 2026-06-08 |
 | 46. Per-System Documentation & Onboarding | 6/6 | Complete    | 2026-06-09 |
 
-### Phase 47: ObservationWriter: preserve prompt text when image attachments are present
+### Phase 47: ObservationWriter: preserve prompt text when image attachments are present — CLOSED (subsumed by Phase 50)
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Preserve user-prompt text when image attachments are present (originally surfaced via `9a3e700c-…` row that required manual hand-write recovery). See `.planning/phases/47-…/47-CONTEXT.md` for the full bug write-up.
+**Status:** ✓ Closed 2026-06-14 — subsumed by Phase 50 (LSL-grounded async observation resolver). Phase 50's `_buildPriorContext` migration to the 3-prompt LSL window + the LSL-grounded resolver CLI together backfill these image-only rows from verbatim session logs; no separate phase needed. Recorded in STATE.md line 43 ("Phase 47: ObservationWriter drops user-prompt text when image attachment present (subsumed by Phase 50 `Could` recovery item)") and in 50-CONTEXT.md ("Subsumes Phase 47's `Could` recovery item").
+**Requirements**: N/A (closed without planning)
 **Depends on:** Phase 46
-**Plans:** 0 plans
+**Plans:** 0 plans (closed without planning)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 47 to break down)
+- [x] N/A — closed without planning; bug-class is fixed by Phase 50's resolver, not by a Phase 47 patch
 
 ### Phase 48: VKB graph viewer: System-type nodes vanish when their owning team is unchecked
 
@@ -886,11 +887,11 @@ Plans:
 - [ ] 54-02-PLAN.md — top-level try/finally around `enhanced-transcript-monitor.js:4085-4135`; force-reset watchdog if `isProcessing` true > 60s with `[POLL] isProcessing forced-reset after Ns` line; periodic stall self-check (`[STALL-DETECT]` if pollCount advanced but no obs write in 5min and Claude jsonl is fresh)
 - [ ] 54-03-PLAN.md — `bin/coding --claude` switches ETM startup to `launchctl kickstart`; collision handling for orphan manually-launched ETM; CLAUDE.md "Startup & Services" updated
 
-Could-have (defer): extend health-coordinator with ETM heartbeat surface; migrate ETM polling to fsevents-based file watcher.
+Could-have (defer): extend health-coordinator with ETM heartbeat surface; migrate ETM polling to fsevents-based file watcher; **LSL rotation co-design with prompt-set-block remover** — periodic compactor as launchd job (`com.coding.lsl-compactor`, every 30 min, slots older than 1 hour, approach #3 from `.planning/todos/pending/lsl-rotation-removal-codesign.md`) to fix the 2026-05-27 size-aware rotation regression (commit `590c37432` reverted the picker change; the original "single-fat-slice → bloated file" pattern is back but file counts stay sane). Workaround until fixed: `scripts/backfill-lsl-rotation.mjs --apply` compacts oversized slots manually.
 
-See `.planning/phases/54-etm-hardening-launchd-and-isprocessing-audit/54-CONTEXT.md`.
+See `.planning/phases/54-etm-hardening-launchd-and-isprocessing-audit/54-CONTEXT.md` and `.planning/todos/pending/lsl-rotation-removal-codesign.md`.
 
-### Phase 55: Unified Viewer Feature Parity with VOKB (BACKLOG)
+### Phase 55: Unified Viewer Feature Parity with VOKB
 
 **Trigger:** 2026-06-09. Operator visual comparison of unified viewer (`localhost:5173/viewer/{coding,okb,cap}`) against the legacy VOKB at `localhost:3002` revealed that the unified viewer is functionally a regression for VOKB users. Phase 45 shipped the routing layer + a minimal viewer shell; the actual UI is ~15% of VOKB's surface area. "MVP shipped with VKB+VOKB as fallback" was a premature framing — the verifier was never run, and a side-by-side screenshot comparison would have caught the depth gap immediately.
 

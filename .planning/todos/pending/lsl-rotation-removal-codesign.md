@@ -5,6 +5,7 @@ status: pending
 priority: medium
 tags: [lsl, etm, rotation, regression-followup]
 discovered_in: 2026-05-27 LSL rotation regression repair attempt
+folded_into: Phase 54 ETM Hardening — listed as Could-have (com.coding.lsl-compactor launchd job, approach #3 from this todo's "The real fix" section). Todo remains open until either the Could-have is promoted into Phase 54's scope or the compactor lands as a separate phase.
 ---
 
 # Co-design LSL rotation picker with prompt-set-block remover
