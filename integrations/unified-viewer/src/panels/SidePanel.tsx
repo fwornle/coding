@@ -141,21 +141,22 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
             )}
           </TabsList>
           {/* 2026-06-11: close button — VKB has one + ESC. ESC alone isn't
-              discoverable. Routes through the canonical store action
-              (Locked Contract #5: no inline store setState outside the store).
-              2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history
-              stack): X is a one-step-back action (mirrors Esc). From Layer 2
-              (drill / EntityDetailPanel mounted via this branch when
-              `entity` resolves) it pops to Layer 1 — the pre-drill
-              multi-set (halo nodes + bucket card list) is restored. From
-              Layer 1 (no drill, `selectionHistory === null`) it falls
-              through to `clearSelection()` so X still reaches Layer 0 in
-              one extra click. */}
+              discoverable. Clicking clears selection AND ancestry path so
+              the dim-overlay drops too.
+              2026-06-13 (Phase 56.1 §D-4 / 56-audit §8 opportunistic
+              closure): routes through the canonical clearSelection()
+              action instead of inline setState. clearSelection covers ALL
+              4 multi-set fields (selectedNodeIds, focalNodeId,
+              selectedBucketKeys, focalBucketKey) + selectedEdgeId +
+              selectionSource + highlightedRowKey + pathToSelected + LSL
+              slice — the full Phase 56.1 selection scope. This closes the
+              Phase 56 audit §8 opportunistic compliance site (Locked
+              Contract #5: no inline store setState outside the store). */}
           {entity && (
             <button
               type="button"
               onClick={() => {
-                useViewerStore.getState().popSelection()
+                useViewerStore.getState().clearSelection()
               }}
               className="h-7 w-7 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
               aria-label="Close details panel"

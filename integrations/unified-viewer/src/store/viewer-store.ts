@@ -52,31 +52,6 @@ export type ViewerMode = 'kg' | 'triage'
 // of valid sources is unchanged.
 export type SelectionSource = 'graph' | 'timeline' | 'history' | null
 
-// 2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history stack):
-// snapshot of the selection slice + LSL slice + path slice captured BEFORE
-// a drill (Layer 1 → Layer 2 transition). One-slot only — the operator
-// explicitly scoped this to a single back-step, NOT a full history stack
-// (browser-back-button-style ambiguity avoided). `popSelection()` restores
-// this exact shape, clearing `selectionHistory` to null in the same write.
-//
-// Field coverage MUST mirror `clearSelection()` (viewer-store.ts:496-508)
-// EXACTLY — anything `clearSelection()` clears must be restorable by
-// `popSelection()`, or the pop produces a partial restore that's worse
-// than full clear. The 9 fields below match clearSelection()'s payload
-// 1:1 except for `selectedEdgeId` which is preserved separately (edge
-// selection is orthogonal to node-selection drill).
-export interface SelectionSnapshot {
-  selectionSource: SelectionSource
-  highlightedRowKey: string | null
-  selectedNodeIds: ReadonlySet<string>
-  focalNodeId: string | null
-  selectedBucketKeys: ReadonlySet<string>
-  focalBucketKey: string | null
-  pathToSelected: ReadonlySet<string>
-  lslSessionFilter: string[]
-  lslFilterEntityIds: ReadonlySet<string> | null
-}
-
 // Inline shape per 55-PATTERNS.md TrendingPanel section / okbClient.ts:68-78.
 // A shared type module can pull this out in 55-06 if the StatsBar / trends
 // endpoint introduces a wider surface; for now keep co-located with the
@@ -160,14 +135,6 @@ export interface ViewerState {
   focalNodeId: string | null
   selectedBucketKeys: ReadonlySet<string>
   focalBucketKey: string | null
-  // 2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history stack):
-  // null when no drill has happened. Populated by `setSelection({...,
-  // pushHistory: true})` immediately BEFORE the new selection takes effect.
-  // `popSelection()` restores this snapshot and clears the slot to null.
-  // `clearSelection()` clears this slot too (full clear = no history).
-  // The Layer 1 ↔ Layer 2 stack is intentionally one-deep — see
-  // SelectionSnapshot's docstring above for rationale.
-  selectionHistory: SelectionSnapshot | null
 
   // 2026-06-11: VKB-style filter rail additions.
   //   - learningSource: 'batch' (manual/UKB) | 'online' (auto/ETM) | 'combined' (both)
@@ -250,24 +217,8 @@ export interface ViewerState {
     // them and the action preserves the existing values.
     lslSessionFilter?: string[]
     lslFilterEntityIds?: ReadonlySet<string> | null
-    // 2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history stack):
-    // when `true`, the current selection state is captured into
-    // `selectionHistory` BEFORE this write applies. The drill writers
-    // (BucketCardList.onCardClick, D3GraphCanvas halo-node click) pass
-    // `pushHistory: true` so Esc/X can pop back one layer to the pre-drill
-    // multi-set. All other writers (Layer 0 → Layer 1 entry, programmatic
-    // navigation) pass false / omit — Layer 0 is the natural floor and
-    // `selectionHistory` stays null between drills.
-    pushHistory?: boolean
   }) => void
   clearSelection: () => void
-  // 2026-06-14 (Plan 06 gap-closure — Decision 1): one-step-back action.
-  // If `selectionHistory !== null`, restores the captured snapshot AND
-  // clears the history slot (only one layer back, no deeper history per
-  // operator decision). Otherwise calls `clearSelection()` so Esc-from-
-  // Layer-1 (no drill yet) still resets to Layer 0. Returns true when a
-  // pop happened (caller uses this to decide whether to preventDefault).
-  popSelection: () => boolean
 
   // ---------- Phase 55 — VOKB filtersSlice parity ----------
   selectedLayers: string[] // empty = "all visible" (UI-SPEC §10)
@@ -400,7 +351,7 @@ function readPersistedThemeForStore(): ThemePref {
   }
 }
 
-export const useViewerStore = create<ViewerState>((set, get) => ({
+export const useViewerStore = create<ViewerState>((set) => ({
   // ---------- Phase 45 baseline ----------
   selectedEdgeId: null,
   pathToSelected: new Set<string>(),
@@ -411,9 +362,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   focalNodeId: null,
   selectedBucketKeys: new Set<string>(),
   focalBucketKey: null,
-  // 2026-06-14 (Plan 06 gap-closure — Decision 1): one-slot history for
-  // drill-back. Null at fresh mount; only the drill writers push.
-  selectionHistory: null,
   searchQuery: '',
   visibleLevels: new Set<Level>([0, 1, 2, 3]),
   selectedClasses: new Set<string>(),
@@ -461,7 +409,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     pathToSelected,
     lslSessionFilter,
     lslFilterEntityIds,
-    pushHistory,
   }) =>
     set((s) => {
       const nodeIdsArg = asSet(nodeIds)
@@ -522,37 +469,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
             : lslFilterEntityIds
           : s.lslFilterEntityIds
 
-      // 2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history stack):
-      // capture the PRE-write snapshot before the new selection takes
-      // effect. Only the drill writers (BucketCardList.onCardClick,
-      // D3GraphCanvas halo-node click) set `pushHistory: true`; all other
-      // callers leave history alone (Layer 0 → Layer 1 entry, programmatic
-      // re-selection from search, etc.). The snapshot mirrors
-      // SelectionSnapshot field-for-field — DO NOT drift this without
-      // updating the type + popSelection's restore site below.
-      //
-      // Only push if there's actually a meaningful selection to remember:
-      // pushing an empty snapshot (Layer 0 state) into history would let
-      // Esc-from-Layer-2 land back at the same Layer 0 the user could have
-      // reached by `clearSelection()` — a useless one-step-back. Guard on
-      // `selectedNodeIds.size > 0 || selectedBucketKeys.size > 0`.
-      const shouldPush =
-        pushHistory === true
-        && (s.selectedNodeIds.size > 0 || s.selectedBucketKeys.size > 0)
-      const nextSelectionHistory: SelectionSnapshot | null = shouldPush
-        ? {
-            selectionSource: s.selectionSource,
-            highlightedRowKey: s.highlightedRowKey,
-            selectedNodeIds: s.selectedNodeIds,
-            focalNodeId: s.focalNodeId,
-            selectedBucketKeys: s.selectedBucketKeys,
-            focalBucketKey: s.focalBucketKey,
-            pathToSelected: s.pathToSelected,
-            lslSessionFilter: s.lslSessionFilter.slice(),
-            lslFilterEntityIds: s.lslFilterEntityIds,
-          }
-        : s.selectionHistory
-
       return {
         selectedNodeIds: nextSelectedNodeIds,
         focalNodeId: nextFocalNodeId,
@@ -563,7 +479,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         pathToSelected: nextPath,
         lslSessionFilter: nextLslSessionFilter,
         lslFilterEntityIds: nextLslFilterEntityIds,
-        selectionHistory: nextSelectionHistory,
       }
     }),
 
@@ -590,54 +505,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       pathToSelected: new Set<string>(),
       lslSessionFilter: [],
       lslFilterEntityIds: null,
-      // 2026-06-14 (Plan 06 gap-closure — Decision 1): full clear discards
-      // history too. Background-click on SVG / explicit reset semantics:
-      // "done entirely" — no Layer 1 to come back to.
-      selectionHistory: null,
     }),
-
-  // 2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history stack):
-  // one-step-back pop. If `selectionHistory !== null`, restore the captured
-  // snapshot AND clear the history slot (single-deep stack — no chain).
-  // Otherwise fall through to `clearSelection()` so Esc-from-Layer-1 (no
-  // drill yet) still reaches Layer 0. Returns true when a pop happened so
-  // the caller (Esc handler, X button) can decide whether to preventDefault.
-  //
-  // Layer model recap:
-  //   Layer 0: no selection. selectionHistory always null here.
-  //   Layer 1: multi-set (tick click halo OR graph node click). On entry,
-  //            selectionHistory captured = null (Layer 0 has no meaningful
-  //            selection to remember — see shouldPush guard in setSelection).
-  //   Layer 2: drill (card click OR halo-node click). On entry, the drill
-  //            writer passed pushHistory: true so selectionHistory holds
-  //            the pre-drill Layer 1 state.
-  // popSelection from L2 → restores L1; from L1 → falls through to clear → L0.
-  popSelection: () => {
-    const snap = get().selectionHistory
-    if (snap === null) {
-      get().clearSelection()
-      // false = nothing was popped per se; the caller might still want to
-      // preventDefault on Esc because clearSelection() did fire (the L1 → L0
-      // path). The Esc handler decides that via its pre-existing hasSelection
-      // check; this return value just tells the caller "was there a history
-      // entry to pop." useKeyboardShortcuts already handles the clear case.
-      return false
-    }
-    set({
-      selectionSource: snap.selectionSource,
-      highlightedRowKey: snap.highlightedRowKey,
-      selectedNodeIds: snap.selectedNodeIds,
-      focalNodeId: snap.focalNodeId,
-      selectedBucketKeys: snap.selectedBucketKeys,
-      focalBucketKey: snap.focalBucketKey,
-      pathToSelected: snap.pathToSelected,
-      lslSessionFilter: snap.lslSessionFilter,
-      lslFilterEntityIds: snap.lslFilterEntityIds,
-      // Stack is one-deep: clear history after pop.
-      selectionHistory: null,
-    })
-    return true
-  },
 
   setSearch: (q) => set({ searchQuery: q }),
 
@@ -688,10 +556,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       lslSessionFilter: [],
       lslFilterEntityIds: null,
       pathToSelected: new Set<string>(),
-      // 2026-06-14 (Plan 06 gap-closure — Decision 1): mirror clearSelection
-      // field coverage. WR-04 invariant: reset() and clearSelection() always
-      // touch the same selection-slice fields.
-      selectionHistory: null,
     }),
 
   // ---------- Phase 55 — VOKB filtersSlice parity ----------

@@ -647,14 +647,6 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
         // because sessions data hadn't arrived. The ref hop sees the
         // CURRENT value at click time without re-registering the handler.
         const touchedBuckets = nodeToBucketsRef.current.get(d.id) ?? new Set<string>()
-        // 2026-06-14 (Plan 06 gap-closure — Decision 1 selection-history stack):
-        // pass `pushHistory: true` on every graph click. The store's
-        // setSelection guard (`shouldPush = pushHistory && (size > 0 || size > 0)`)
-        // only captures a snapshot when there's actually a pre-click
-        // selection to remember — Layer 0 → Layer 1 entry clicks pass
-        // through without polluting the history slot, while halo-node-click
-        // drills (Layer 1 → Layer 2) push the multi-set so Esc/X restores
-        // the halo state instead of dropping to Layer 0.
         useViewerStore.getState().setSelection({
           nodeIds: new Set<string>([d.id]),
           bucketKeys: touchedBuckets,
@@ -662,7 +654,6 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
           pathToSelected: new Set<string>(path.nodeDepths.keys()),
           highlightedRowKey: d.id,
           source: 'graph',
-          pushHistory: true,
         })
         // event.stopPropagation() is CRITICAL — without it the SVG
         // background click handler below fires next and immediately
