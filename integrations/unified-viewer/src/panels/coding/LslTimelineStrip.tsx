@@ -195,6 +195,18 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // promoted them to the composite-key multi-set.
   const selectedBucketKeys = useViewerStore((s) => s.selectedBucketKeys)
   const focalBucketKey = useViewerStore((s) => s.focalBucketKey)
+  // 2026-06-14 (Plan 06 gap-closure — scale-selector regression, part 2):
+  // subscribe to `selectionSource` so the auto-slide useEffect (lines
+  // ~296-364) can skip the slide when the selection came from the
+  // timeline itself. The Decision C auto-drill writes
+  // `selectionSource = 'history'` with `focalNodeId` collapsed to a
+  // long-lived ancestor (LiveLoggingSystem) whose `createdAt` is
+  // days/weeks old → `selectedTs` is OLD and the original auto-slide
+  // would jump straight to 'all' even though the user is looking at a
+  // bucket that's clearly inside the current window. When the
+  // originator IS the timeline, the user already SAW the tick they
+  // clicked — sliding away from it makes the UX worse, not better.
+  const selectionSource = useViewerStore((s) => s.selectionSource)
   // 2026-06-13 (Phase 56.1 Plan 05 — WR-03 fix): subscribe to
   // `selectedClasses` so `onTickClick` can gate on `.size > 0`. The 1-render
   // race window between data load and the auto-seed of `selectedClasses`
@@ -351,6 +363,22 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // Remember the active selection for the next deselect transition.
     prevSelectedTsRef.current = selectedTs
     if (!isNewSelection) return
+    // 2026-06-14 (Plan 06 gap-closure — scale-selector regression, part 2):
+    // when the selection originated from the timeline itself, the user
+    // is already looking at the tick they clicked. Auto-sliding the
+    // window away from it (to 'all') because the focal happens to be an
+    // old long-lived ancestor (LiveLoggingSystem under Decision C
+    // auto-drill) makes the UX worse — the operator's bucket vanishes
+    // from view. Skip the slide for timeline-originated selections.
+    // 'history' is also a timeline-originated mode here: the Decision C
+    // auto-drill in onTickClick (lines ~649-666) writes the Layer 2
+    // payload with `source: 'history'`. Both 'timeline' and 'history'
+    // selections from the strip mean "user clicked a visible tick".
+    // Graph-side and HistorySidebar selections still trigger the slide
+    // (they have no current-tick context to preserve).
+    if (selectionSource === 'timeline' || selectionSource === 'history') {
+      return
+    }
     const ageMs = Date.now() - selectedTs
     if (ageMs <= WINDOW_MS[windowKey]) return
     const next: LslWindow | null =
@@ -369,7 +397,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
         `LslTimelineStrip auto-slide window → ${next} for selection`,
       )
     }
-  }, [selectedTs, windowKey])
+  }, [selectedTs, windowKey, selectionSource])
 
   // 2026-06-13 (Phase 56.1 Plan 05): the inline useQuery is extracted to
   // `useLslSessions` so the reverse-lookup pre-index hook can share the
