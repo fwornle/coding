@@ -1063,7 +1063,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 57-04-PLAN.md — Classifier L2 emission (load coding.lower.json via OntologyRegistry, inject refinement prompt) + sample-of-20 emission-rate smoke gate
+- [~] 57-04-PLAN.md — Classifier L2 emission. Tasks 1-2 complete 2026-06-14: `OntologyClassificationAgent.l2Classes` loads 10 classes from `coding.lower.json` at init (`loadL2Classes` filters L1 carriers); REFINEMENT STEP prompt addendum injected into `buildClassificationInput`; `scripts/check-l2-emission-rate.mjs` codifies SC#3 (`--sample 20 --min 18`). Task 3 PAUSED at HUMAN-UAT (autonomous=false) — operator runs `ukb full` + smoke gate; resume signal `approved` if exit 0. Baseline `l2_emitted=0/20 FAIL` because most-recent online entities pre-date the cutover (latest 2026-05-23). Commits: submodule 33a8960+1250d1f; outer 548ceb691+6ac7d4f97+0cd90fd2e. 5 tests added (5/5 PASS); 4 neighbouring suites 33/33 PASS.
 
 **UI hint:** yes
 

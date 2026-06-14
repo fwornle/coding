@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v7.2
 milestone_name: VKB & Online-Learning Quality
 status: paused
-stopped_at: Phase 57-05 closed (live backfill verified, SC#1 PASS); ready for Phase 57 Plan 04 (classifier L2 emission)
-last_updated: "2026-06-14T20:30:00.000Z"
+stopped_at: Phase 57 Plan 04 PAUSED at Task 3 HUMAN-UAT (autonomous=false); classifier loads 10 L2 classes from coding.lower.json + refinement prompt injected + smoke gate ships; awaiting operator-triggered wave-analysis + SC#3 smoke (>=18/20)
+last_updated: "2026-06-14T21:05:00.000Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 5
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 57 (lower-ontology-project-tagging-foundation) — EXECUTING
-Plan: 5 of 6 closed (Plan 05 Tasks 1+2+3 complete; live backfill verified — see decisions below)
-Status: Plan 05 closed 2026-06-14T20:30Z. Operator (via orchestrator) executed the live backfill at 20:13Z; 743 entities migrated, 100% metadata.project coverage, 0 errors, SC#1 PASS. Next plan: 57-04 (classifier L2 emission). See `.planning/phases/57-lower-ontology-project-tagging-foundation/57-05-SUMMARY.md` for full results and operator runbook.
+Phase: 57 (lower-ontology-project-tagging-foundation) — EXECUTING (paused-at-uat)
+Plan: 5 of 6 closed; Plan 04 PAUSED at Task 3 HUMAN-UAT
+Status: Plan 04 Tasks 1+2 complete (submodule TS+test 33a8960 + 1250d1f; outer ptr-bumps 548ceb691 + 6ac7d4f97; SC#3 smoke script 0cd90fd2e). The OntologyClassificationAgent now loads the 10 L2 classes from `.data/ontologies/coding.lower.json` via OntologyRegistry at initialize() (+stderr-warn fallback when file absent) and appends a REFINEMENT STEP instruction with one-line descriptions to every classification input. `scripts/check-l2-emission-rate.mjs` codifies SC#3 (`--sample 20 --min 18`, exit 0 PASS / exit 1 FAIL); baseline reading is sample=20 / l2_emitted=0 / status=FAIL because the 20 most-recent online entities pre-date the cutover (latest 2026-05-23). Task 3 PAUSED awaiting operator to run wave-analysis and the smoke gate. See `.planning/phases/57-lower-ontology-project-tagging-foundation/57-04-SUMMARY.md`.
 Last activity: 2026-06-14
 
 ## Performance Metrics
