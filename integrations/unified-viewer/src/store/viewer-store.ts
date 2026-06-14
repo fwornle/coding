@@ -269,6 +269,30 @@ export interface ViewerState {
   // pop happened (caller uses this to decide whether to preventDefault).
   popSelection: () => boolean
 
+  // 2026-06-14 (WR-04 fix — 56.1-REVIEW): atomic additive variant of
+  // setSelection. Performs the UNION of the supplied ids with the current
+  // selection state INSIDE the `set(s => {...})` callback, so the union is
+  // computed against the freshest state — closing the read-modify-write
+  // race the Cmd-click additive path in LslTimelineStrip.onTickClick had.
+  //
+  // Behavior: every supplied Set is UNIONED with its corresponding store
+  // field (selectedNodeIds, selectedBucketKeys, lslFilterEntityIds,
+  // lslSessionFilter[]). Reference-stability guard fires when the union
+  // result has identical membership to the current value (no-op writes
+  // preserve refs). Focal derivation follows the same rules as setSelection
+  // (explicit focal wins, else CR-01-fixed deriveFocal).
+  addToSelection: (args: {
+    nodeIds?: ReadonlySet<string> | string[]
+    bucketKeys?: ReadonlySet<string> | string[]
+    focal?: { nodeId?: string | null; bucketKey?: string | null }
+    highlightedRowKey?: string | null
+    source: SelectionSource
+    pathToSelected?: ReadonlySet<string>
+    lslSessionFilter?: string[]
+    lslFilterEntityIds?: ReadonlySet<string>
+    pushHistory?: boolean
+  }) => void
+
   // ---------- Phase 55 — VOKB filtersSlice parity ----------
   selectedLayers: string[] // empty = "all visible" (UI-SPEC §10)
   selectedDomains: string[]
@@ -653,6 +677,136 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     })
     return true
   },
+
+  // 2026-06-14 (WR-04 fix — 56.1-REVIEW): atomic additive write.
+  //
+  // Performs the UNION inside the `set(s => {...})` callback so the
+  // union is computed against the freshest store state. Closes the
+  // read-modify-write race that the Cmd-click additive path in
+  // LslTimelineStrip.onTickClick had: previously it captured prevState
+  // via `useViewerStore.getState()`, computed the union outside the
+  // store action, then wrote with `setSelection(...)` — between the
+  // get and the set, a concurrent third-pane mutation could silently
+  // be clobbered.
+  //
+  // Semantics mirror setSelection, but instead of REPLACING each axis
+  // the new ids are UNIONED with the existing axis. lslSessionFilter
+  // (an array, not a Set) is deduped via Set conversion. Reference
+  // stability is preserved when the union produces an identical-membership
+  // result (sameSetMembership guard), so the viewport-stability invariant
+  // (PATTERNS-LOCK Contract #3 Part A) survives.
+  addToSelection: ({
+    nodeIds,
+    bucketKeys,
+    focal,
+    highlightedRowKey,
+    source,
+    pathToSelected,
+    lslSessionFilter,
+    lslFilterEntityIds,
+    pushHistory,
+  }) =>
+    set((s) => {
+      const nodeIdsArg = asSet(nodeIds)
+      const bucketKeysArg = asSet(bucketKeys)
+
+      // Union the per-axis sets (if supplied) with the current state.
+      // When no ids are supplied for an axis, preserve the current Set.
+      const unionedNodeIds: ReadonlySet<string> =
+        nodeIdsArg !== undefined
+          ? (() => {
+              const u = new Set<string>(s.selectedNodeIds)
+              for (const id of nodeIdsArg) u.add(id)
+              return u
+            })()
+          : s.selectedNodeIds
+      const nextSelectedNodeIds: ReadonlySet<string> =
+        nodeIdsArg !== undefined && sameSetMembership(s.selectedNodeIds, unionedNodeIds)
+          ? s.selectedNodeIds
+          : unionedNodeIds
+
+      const nextFocalNodeId: string | null =
+        focal?.nodeId !== undefined
+          ? focal.nodeId
+          : nodeIdsArg !== undefined && nextSelectedNodeIds !== s.selectedNodeIds
+            ? deriveFocal(s.selectedNodeIds, nextSelectedNodeIds, undefined)
+            : s.focalNodeId
+
+      const unionedBucketKeys: ReadonlySet<string> =
+        bucketKeysArg !== undefined
+          ? (() => {
+              const u = new Set<string>(s.selectedBucketKeys)
+              for (const k of bucketKeysArg) u.add(k)
+              return u
+            })()
+          : s.selectedBucketKeys
+      const nextSelectedBucketKeys: ReadonlySet<string> =
+        bucketKeysArg !== undefined && sameSetMembership(s.selectedBucketKeys, unionedBucketKeys)
+          ? s.selectedBucketKeys
+          : unionedBucketKeys
+
+      const nextFocalBucketKey: string | null =
+        focal?.bucketKey !== undefined
+          ? focal.bucketKey
+          : bucketKeysArg !== undefined && nextSelectedBucketKeys !== s.selectedBucketKeys
+            ? deriveFocal(s.selectedBucketKeys, nextSelectedBucketKeys, undefined)
+            : s.focalBucketKey
+
+      const nextHighlightedRowKey =
+        highlightedRowKey !== undefined ? highlightedRowKey : s.highlightedRowKey
+
+      const nextPath: ReadonlySet<string> = pathToSelected !== undefined
+        ? pathToSelected
+        : s.pathToSelected
+
+      const nextLslSessionFilter = lslSessionFilter !== undefined
+        ? Array.from(new Set<string>([...s.lslSessionFilter, ...lslSessionFilter]))
+        : s.lslSessionFilter
+
+      const unionedLslFilterEntityIds: ReadonlySet<string> | null =
+        lslFilterEntityIds !== undefined
+          ? (() => {
+              const u = new Set<string>(s.lslFilterEntityIds ?? [])
+              for (const id of lslFilterEntityIds) u.add(id)
+              return u
+            })()
+          : s.lslFilterEntityIds
+      const nextLslFilterEntityIds: ReadonlySet<string> | null =
+        lslFilterEntityIds !== undefined
+          && sameSetMembership(s.lslFilterEntityIds, unionedLslFilterEntityIds as ReadonlySet<string> | null)
+          ? s.lslFilterEntityIds
+          : unionedLslFilterEntityIds
+
+      const shouldPush =
+        pushHistory === true
+        && (s.selectedNodeIds.size > 0 || s.selectedBucketKeys.size > 0)
+      const nextSelectionHistory: SelectionSnapshot | null = shouldPush
+        ? {
+            selectionSource: s.selectionSource,
+            highlightedRowKey: s.highlightedRowKey,
+            selectedNodeIds: s.selectedNodeIds,
+            focalNodeId: s.focalNodeId,
+            selectedBucketKeys: s.selectedBucketKeys,
+            focalBucketKey: s.focalBucketKey,
+            pathToSelected: s.pathToSelected,
+            lslSessionFilter: s.lslSessionFilter.slice(),
+            lslFilterEntityIds: s.lslFilterEntityIds,
+          }
+        : s.selectionHistory
+
+      return {
+        selectedNodeIds: nextSelectedNodeIds,
+        focalNodeId: nextFocalNodeId,
+        selectedBucketKeys: nextSelectedBucketKeys,
+        focalBucketKey: nextFocalBucketKey,
+        highlightedRowKey: nextHighlightedRowKey,
+        selectionSource: source,
+        pathToSelected: nextPath,
+        lslSessionFilter: nextLslSessionFilter,
+        lslFilterEntityIds: nextLslFilterEntityIds,
+        selectionHistory: nextSelectionHistory,
+      }
+    }),
 
   setSearch: (q) => set({ searchQuery: q }),
 

@@ -589,6 +589,75 @@ describe('useViewerStore — Phase 56.1 multi-selection', () => {
     expect(s.focalBucketKey).toBe(prevFocalBucket)
   })
 
+  // ------ WR-04 regression: addToSelection atomic additive write ------
+
+  test('WR-04: addToSelection unions nodeIds with the existing selectedNodeIds', () => {
+    useViewerStore.getState().setSelection({ nodeIds: ['a', 'b'], source: 'graph' })
+    useViewerStore.getState().addToSelection({ nodeIds: ['c', 'd'], source: 'timeline' })
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeIds.size).toBe(4)
+    expect(s.selectedNodeIds.has('a')).toBe(true)
+    expect(s.selectedNodeIds.has('b')).toBe(true)
+    expect(s.selectedNodeIds.has('c')).toBe(true)
+    expect(s.selectedNodeIds.has('d')).toBe(true)
+    expect(s.selectionSource).toBe('timeline')
+  })
+
+  test('WR-04: addToSelection unions bucketKeys with the existing selectedBucketKeys', () => {
+    useViewerStore.getState().setSelection({ bucketKeys: ['k1'], source: 'timeline' })
+    useViewerStore.getState().addToSelection({ bucketKeys: ['k2'], source: 'timeline' })
+    const s = useViewerStore.getState()
+    expect(s.selectedBucketKeys.size).toBe(2)
+    expect(s.selectedBucketKeys.has('k1')).toBe(true)
+    expect(s.selectedBucketKeys.has('k2')).toBe(true)
+  })
+
+  test('WR-04: addToSelection unions lslFilterEntityIds with current set (treating null as empty)', () => {
+    // Seed lslFilterEntityIds via setSelection.
+    useViewerStore.getState().setSelection({
+      source: 'timeline',
+      lslFilterEntityIds: new Set<string>(['e1', 'e2']),
+    })
+    useViewerStore.getState().addToSelection({
+      source: 'timeline',
+      lslFilterEntityIds: new Set<string>(['e2', 'e3']),
+    })
+    const s = useViewerStore.getState()
+    expect(s.lslFilterEntityIds).not.toBeNull()
+    expect(s.lslFilterEntityIds!.size).toBe(3)
+    expect(s.lslFilterEntityIds!.has('e1')).toBe(true)
+    expect(s.lslFilterEntityIds!.has('e3')).toBe(true)
+  })
+
+  test('WR-04: addToSelection preserves selectedNodeIds reference when union has identical membership (no-op write)', () => {
+    useViewerStore.getState().setSelection({ nodeIds: ['a', 'b', 'c'], source: 'graph' })
+    const ref1 = useViewerStore.getState().selectedNodeIds
+    // Re-add a subset — union is identical to current => reference preserved.
+    useViewerStore.getState().addToSelection({ nodeIds: ['a', 'b'], source: 'graph' })
+    const ref2 = useViewerStore.getState().selectedNodeIds
+    expect(ref2).toBe(ref1)
+  })
+
+  test('WR-04: addToSelection({ nodeIds }) without explicit focal preserves focalNodeId on no-op union', () => {
+    useViewerStore.getState().setSelection({
+      nodeIds: ['a', 'b'],
+      focal: { nodeId: 'a' },
+      source: 'graph',
+    })
+    useViewerStore.getState().addToSelection({ nodeIds: ['a'], source: 'graph' })
+    expect(useViewerStore.getState().focalNodeId).toBe('a')
+  })
+
+  test('WR-04: addToSelection({ lslSessionFilter }) dedups when appending an already-present session id', () => {
+    useViewerStore.setState({ lslSessionFilter: ['sess-1'] })
+    useViewerStore.getState().addToSelection({
+      source: 'timeline',
+      lslSessionFilter: ['sess-1', 'sess-2'],
+    })
+    const s = useViewerStore.getState()
+    expect(s.lslSessionFilter).toEqual(['sess-1', 'sess-2'])
+  })
+
   test('setSelection accepts both Set<string> and string[] for nodeIds (normalises to Set internally)', () => {
     useViewerStore.getState().setSelection({ nodeIds: new Set(['x', 'y']), source: 'graph' })
     const s1 = useViewerStore.getState()

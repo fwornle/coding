@@ -183,6 +183,11 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   const setLslSessionFilter = useViewerStore((s) => s.setLslSessionFilter)
   const clearLslSessionFilter = useViewerStore((s) => s.clearLslSessionFilter)
   const setSelection = useViewerStore((s) => s.setSelection)
+  // 2026-06-14 (WR-04 fix — 56.1-REVIEW): atomic additive write for the
+  // Cmd-click path. Performs the union inside the store action so the
+  // computation reads the freshest state — closes the read-modify-write
+  // race the previous `useViewerStore.getState()` + manual-union pattern had.
+  const addToSelection = useViewerStore((s) => s.addToSelection)
   // 2026-06-13 (Phase 56.1 Plan 05): the strip drives the FOCAL entity via
   // `focalNodeId` (Phase 56's `selectedNodeId` is gone — Plan 01 removed it).
   // `focalNodeId` is the entity the `selectedTs` memo maps back to a tick
@@ -619,30 +624,24 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       // assemble multi-session selections (e.g. "show everything from
       // yesterday's three working sessions"). Phase 56 additive behavior
       // preserved verbatim, extended to the new multi-set fields.
-      const prevState = useViewerStore.getState()
-      const prevSet = prevState.lslFilterEntityIds
-      const union = new Set<string>(prevSet ?? [])
-      for (const id of ids) union.add(id)
-      // 2026-06-14 (Plan 06 gap-closure — Bug 1 fix):
-      // ALSO include `resolvedNodeIds` (the halo ancestor set) in
-      // `lslFilterEntityIds`. Without this, the visibility predicate
-      // (visibility-predicate.ts lines 113-117) culls every non-structural
-      // halo ancestor — Insights / SubComponents / Details whose ids are
-      // NOT in the bucket's raw entityIds get hidden from `visibleEntities`,
-      // so D3 never mounts a `.node` for them and the halo rings disappear.
-      // Adding the resolved ancestors keeps them visible alongside the
-      // structural backbone, so the multi-tier halo render path works.
-      for (const id of resolvedNodeIds) union.add(id)
-      const nextSessionFilter = Array.from(
-        new Set<string>([...prevState.lslSessionFilter, sessionId]),
-      )
-      const nextNodeIds = new Set<string>(prevState.selectedNodeIds)
-      for (const id of resolvedNodeIds) nextNodeIds.add(id)
-      const nextBucketKeys = new Set<string>(prevState.selectedBucketKeys)
-      if (bucketKey !== null) nextBucketKeys.add(bucketKey)
-      setSelection({
-        nodeIds: nextNodeIds,
-        bucketKeys: nextBucketKeys,
+      //
+      // 2026-06-14 (WR-04 fix — 56.1-REVIEW): route through `addToSelection`
+      // so the per-axis unions are computed INSIDE the store's `set(s =>
+      // {...})` callback against the freshest state. The previous pattern
+      // (`useViewerStore.getState()` snapshot + manual union outside the
+      // store) had a read-modify-write race where a concurrent third-pane
+      // mutation between the get and the set silently clobbered the write.
+      //
+      // Plan 06 Bug 1 fix preserved: `lslFilterEntityIds` carries BOTH the
+      // raw bucket entityIds AND the halo ancestor ids — without the halo
+      // ancestors the visibility predicate (visibility-predicate.ts lines
+      // 113-117) culls non-structural halo ancestors and the rings disappear.
+      const lslFilterUnion = new Set<string>()
+      for (const id of ids) lslFilterUnion.add(id)
+      for (const id of resolvedNodeIds) lslFilterUnion.add(id)
+      addToSelection({
+        nodeIds: resolvedNodeIds,
+        bucketKeys: bucketKey !== null ? new Set<string>([bucketKey]) : new Set<string>(),
         focal: { nodeId: focalNodeIdNext, bucketKey },
         // Sidebar highlight follows the focal so the row text agrees with
         // the graph red ring. Cross-pane provenance flows through
@@ -650,15 +649,16 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
         highlightedRowKey: focalNodeIdNext,
         source: 'timeline',
         pathToSelected,
-        lslSessionFilter: nextSessionFilter,
-        // `setSelection` reference-guards this — if `union` has identical
-        // membership to prevSet, the existing reference is preserved and
-        // D3's `visibleEntities` useMemo does not invalidate.
-        lslFilterEntityIds: union,
+        lslSessionFilter: [sessionId],
+        // `addToSelection` reference-guards this — if `lslFilterUnion` has
+        // identical membership to the current value (post-union), the
+        // existing reference is preserved and D3's `visibleEntities`
+        // useMemo does not invalidate.
+        lslFilterEntityIds: lslFilterUnion,
       })
       Logger.info(
         Logger.Categories.PANELS,
-        `LslTimelineStrip tick added: ${sessionId} (halo:${resolvedNodeIds.size}, total:${nextNodeIds.size}, buckets:${nextBucketKeys.size}, bucketKey:${bucketKey ?? 'null'})`,
+        `LslTimelineStrip tick added (atomic): ${sessionId} (halo:${resolvedNodeIds.size}, bucketKey:${bucketKey ?? 'null'})`,
       )
       return
     }
