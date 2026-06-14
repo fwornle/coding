@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.2
 milestone_name: VKB & Online-Learning Quality
-status: executing
-stopped_at: Phase 57-03 closed (Task 4 UAT deferred as verification-debt); ready for Phase 57 Plans 04 + 05
-last_updated: "2026-06-14T17:00:00.000Z"
+status: paused
+stopped_at: Phase 57-03 closed (Task 4 deferred as verification-debt); ready for Phase 57 Plans 04 + 05
+last_updated: "2026-06-14T15:11:20.908Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -54,8 +54,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 57 (lower-ontology-project-tagging-foundation) — EXECUTING
-Plan: 4 of 6
-Status: Plan 03 closed (Task 4 deferred as verification-debt); ready to execute Plans 04 + 05 in parallel
+Plan: 5 of 6 (Plan 05 Tasks 1+2 complete; Task 3 HUMAN-UAT checkpoint pending operator)
+Status: Plan 05 paused at Task 3 (checkpoint:human-verify) — operator must run live backfill against `.data/knowledge-graph/` and verify SC#1 jq distribution. See `.planning/phases/57-lower-ontology-project-tagging-foundation/57-05-SUMMARY.md` § "Awaiting Operator" for the recipe.
 Last activity: 2026-06-14
 
 ## Performance Metrics
@@ -203,6 +203,7 @@ Last activity: 2026-06-14
 - [Phase 57-06]: LOWERONTO-02 upper-ontology growth deferred at v7.2 discuss-time (D-12). Phase 57 ships LOWERONTO-01 (lower-ontology + 10 L2 classes) and LOWERONTO-04 (project tag everywhere); upper-ontology growth (operator-suggested `Diagnosis` and `Interface` classes) is tracked for a follow-up phase. Reopen during v7.2 retro. Provenance: .planning/phases/57-lower-ontology-project-tagging-foundation/57-CONTEXT.md §D-12/D-13.
 - [Phase 57-03]: Writer-path metadata.project stamping landed at canonical-mapper (primary) + km-core-adapter (defence-in-depth dual stamp); wave1/2/3 thread project: this.team via augmentWithCanonical. Existing metadata.team byte-untouched (D-02). persistence-agent verify-only no-op (TS source retired Phase 42.2-04). code-graph-rag has zero putEntity sites (PATTERNS correction #4 anti-regression guard). Symlinked submodule node_modules/@fwornle/km-core to lib/km-core (Rule 3 — was stale clone lacking Plan 01 project module). tsc + npm build clean; container restarted (image rebuild blocked by pre-existing Dockerfile uv: not found).
 - [Phase 57-03 close]: Container km-core resolution fixed via docker-compose.yml re-mount (commit 862336b84) — Option 1 selected at orchestrator checkpoint; container now resolves `import('@fwornle/km-core')` against `${CODING_REPO}/lib/km-core` and `isProject('coding') === true` verified live. Task 4 (HUMAN-UAT) DEFERRED to next scheduled `ukb full` as verification-debt per operator decision; runtime smoke recorded in 57-03-SUMMARY.md Verification Debt section so it surfaces in /gsd-progress and /gsd-audit-uat. Plan 03 closed.
+- [Phase 57-05 partial]: Tasks 1+2 complete. scripts/backfill-project-tag.mjs (441 LoC, 11 it() blocks GREEN, 5% error budget, --dry-run idempotent) + scripts/backfill-project-tag.test.mjs (361 LoC) land via TDD (RED commit 17fefd1a1, GREEN commit b60de5195). graph-builder.ts transitional read `metadata.project ?? metadata.team` lands as commit 8e0fcfc80; D-11 narrow scope honored (memory-visualizer untouched; selectedTeams NOT renamed — 4 live refs at lines 467/517/518/525 byte-stable). Closed-set isProject() typeguard added at step 2 of deriveProject (Rule 2 deviation — protects against silent `metadata.project='bmw'` drift). Dry-run intentionally does NOT open LevelDB (Rule 3 deviation — avoids LOCK contention with coding-services). Task 3 is checkpoint:human-verify: operator must stop coding-services, run `node scripts/backfill-project-tag.mjs`, verify SC#1 jq distribution shows {coding, okm, cap} only, then resume.
 
 ### Blockers/Concerns
 
@@ -229,6 +230,7 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | todo | llm-based-semantic-deduplication | pending |
 | todo | replace-console-log-with-proper-logging | pending |
 | requirement | LOWERONTO-02 — upper-ontology growth (Diagnosis, Interface) | deferred at Phase 57; reopen v7.2 retro |
+| Phase 60 / LOWERONTO-03 | 5 legacy-VKB read sites in `integrations/memory-visualizer/` that read `metadata.team` directly — owed by Phase 57-05 D-11 narrow scope. Specifically: `src/components/KnowledgeGraph/HistorySidebar.tsx:305`, `src/components/KnowledgeGraph/NodeDetails.tsx:448-451`, `src/store/slices/graphSlice.ts:137,172,256` (three teamCounts aggregations). Apply the same `metadata.project ?? metadata.team` fallback when Phase 60 reworks the filter UI + renames `selectedTeams → selectedProjects`. | pending Phase 60 |
 | Phase 36 P07 | 32 | 1 tasks | 1 files |
 | Phase 37 P02 | 14min | 2 tasks | 8 files |
 | Phase 37 P03 | 10 | 2 tasks | 2 files |
