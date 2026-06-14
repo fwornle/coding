@@ -59,14 +59,31 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
   }, [entities, focalNodeId])
 
   // Phase 56.1 mode-switch predicate (CONTEXT.md <specifics> + D-4):
-  //   - isMultiMode: timeline-driven multi-bucket OR graph-driven >1 nodes
-  //                  → BucketCardList renders cards for the active set
-  //   - isSingleFocalMode: exactly one node selected with no bucket halo
-  //                  → EntityDetailPanel renders the focal entity
+  //   - isSingleFocalMode: EXACTLY one node resolves from the current
+  //                  selection (whether timeline-driven or graph-driven) →
+  //                  EntityDetailPanel renders the focal entity directly.
+  //                  This is the Plan 06 follow-up UX shortcut: a timeline
+  //                  tick whose `pickAllResolvable` cascade yields a single
+  //                  node should NOT detour through the BucketCardList step
+  //                  (which would require the operator to click the lone
+  //                  card to drill in). `selectedNodeIds.size === 1`
+  //                  subsumes the original `&& selectedBucketKeys.size === 0`
+  //                  clause — single-node provenance from a tick still
+  //                  populates `selectedBucketKeys` (preserves the focal
+  //                  bucket-ring + timeline halo via Locked Contract #1),
+  //                  but the sidebar treats it as single-focal.
+  //   - isMultiMode: more than one node selected OR a multi-bucket halo
+  //                  WITHOUT a single-node resolution → BucketCardList
+  //                  renders cards for the active set. `selectedNodeIds.size
+  //                  === 0` covers the sidebar-only timeline branch (a tick
+  //                  whose entities all fail `pickAllResolvable` — list of
+  //                  raw bucket ids); `selectedNodeIds.size > 1` covers the
+  //                  multi-resolution case (operator drills the card list).
   //   - Otherwise (no selection): HistorySidebar default
-  const isMultiMode = selectedBucketKeys.size > 0 || selectedNodeIds.size > 1
-  const isSingleFocalMode =
-    selectedNodeIds.size === 1 && selectedBucketKeys.size === 0
+  const isSingleFocalMode = selectedNodeIds.size === 1
+  const isMultiMode =
+    !isSingleFocalMode
+    && (selectedBucketKeys.size > 0 || selectedNodeIds.size > 1)
 
   // Width predicate per UI-SPEC §11 (verbatim from 55-09-PLAN <interfaces>).
   const widthClass = useMemo(() => {
