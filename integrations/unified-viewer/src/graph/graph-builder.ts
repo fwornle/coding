@@ -516,8 +516,12 @@ export function computeNodeState(
   // visible" — emitted by the TeamsFilter "None" button.
   if (store.selectedTeams && store.selectedTeams.size > 0) {
     if (store.selectedTeams.has('__none__')) return 'filter-hidden'
-    const meta = attrs.metadata as { team?: string } | undefined
-    const team = meta?.team ?? 'coding'
+    const meta = attrs.metadata as { team?: string; project?: string } | undefined
+    // Phase 57 D-11 transitional read — prefer metadata.project (new writers,
+    // Plan 03 onwards) over metadata.team (legacy). selectedTeams (the Set
+    // name) is INTENTIONALLY NOT renamed in this phase; Phase 60 owns the
+    // rename + filter-UI rework per LOWERONTO-03.
+    const team = meta?.project ?? meta?.team ?? 'coding'
     if (!store.selectedTeams.has(team)) return 'filter-hidden'
   }
 
