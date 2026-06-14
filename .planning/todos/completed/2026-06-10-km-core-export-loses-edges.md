@@ -1,8 +1,32 @@
 ---
 created: 2026-06-10T21:30:00.000Z
+resolved: 2026-06-14
+status: resolved
 title: km-core export has 1174 nodes / 0 edges; unified /viewer/coding renders shotgun-blast of orphans
 area: km-core / wave-analysis / graph export
 relates_to_phase: 55 (surfaces the bug) + cross-cuts Phase 10 ("Embeddings not reaching GraphDB" — likely same root cause class)
+resolution: |
+  Bug closed itself between 2026-06-10 (filed) and 2026-06-14 (verified). Path 2a
+  (backfill from legacy export with name resolution) ran on 2026-06-10 — confirmed
+  via sample edge metadata `{backfilledFrom: "legacy-pre-phase44", backfilledAt: "2026-06-10"}`.
+  Wave-analysis lock contention (Path 1.5 blocker) presumably also addressed since
+  current edge count (1592) exceeds the legacy backfill source (1124), proving new
+  edges have been added since the backfill.
+
+  Verified 2026-06-14:
+    - .data/knowledge-graph/exports/general.json: 1262 nodes / 1592 edges
+    - /api/v1/stats: nodeCount=1262, edgeCount=1592, connectivity=88%, orphanCount=157
+    - 10 distinct edge types: contains(849), capturedBy(441), related_to(202), has_insight(67),
+      parent-child(11), implemented_in(2+9), contributes_to(1+9), originally developed in(1)
+    - Qdrant collections live: observations=5509, digests=1601, insights=225, kg_entities=675
+    - Recent commits on the repair pipeline: bc5fe8012 (km-core anchor stream nodes + learning-source filter),
+      a283c9be1 (obs-export rewired to km-core + auto-debounce), 7ab1f9cd8 (snake_case relationship fields +
+      Insight→Digest links), 939f8d506 (viewer LSL timeline + dynamic 'all' window + orphan path-trace)
+
+  Remaining 12% orphan rate (157 nodes) is a downstream cosmetic issue — captured in
+  the 2026-06-14 todo cluster (online-pipeline-semantic-edges, online-filter-hides-ck,
+  ontology-rework). Those address the LONG TAIL of edge coverage, not the foundational
+  bug that this todo described.
 files:
   - .data/knowledge-graph/exports/general.json   (the canonical export; 0 edges)
   - integrations/mcp-server-semantic-analysis/src/wave-controller.ts   (wave persist path)
