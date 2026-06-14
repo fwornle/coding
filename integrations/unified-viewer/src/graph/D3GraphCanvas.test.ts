@@ -129,16 +129,32 @@ describe('D3GraphCanvas — Phase 56.1 source-grep gates', () => {
     expect(src).not.toMatch(/selectionSource\s*===\s*'graph'/)
   })
 
-  test('Phase 56 G8 [retracted — spec change 2026-06-13]: only ONE transition().duration(500) site remains (fitToScreen)', () => {
+  test('Phase 56 G8 [amended 2026-06-14 — Plan 06 Decision 2 multi-set fit]: TWO transition().duration(500) sites — original force-simulation auto-fit + new multi-set Layer 0 → Layer 1 fit-to-bounds', () => {
     // 2026-06-13 (continuation 2 SPEC CHANGE): the original G8 asserted
     // ≥2 matches because the centering effect duplicated the fitToScreen
-    // idiom. With the centering effect removed, exactly ONE site uses
-    // `transition().duration(500)` — the one-shot auto-fit at the end of
-    // the force simulation. If a future plan re-adds a viewport-pan call
-    // on selection change (the retracted behaviour), this count drifts
-    // above 1 and the gate fires.
+    // idiom. The centering effect was retracted → G8 was tightened to
+    // exactly ONE site (the force-simulation auto-fit).
+    //
+    // 2026-06-14 (Plan 06 gap-closure — Decision 2): a NEW callsite is
+    // ADDED — the multi-set fit-to-bounds useEffect fires once when the
+    // user enters Layer 1 (selectionSource transitions null → non-null)
+    // and animates the zoom transform to fit `selectedNodeIds ∪
+    // pathToSelected`. This is the operator-requested UX: halo nodes are
+    // useless if they're off-screen. Distinct from the retracted
+    // centering effect (which fired on EVERY selection change with no
+    // multi-set predicate); the new effect fires ONCE per Layer 0 →
+    // Layer 1 transition.
+    //
+    // Gate now asserts === 2:
+    //   1. force-simulation auto-fit (line ~720 fitToScreen)
+    //   2. multi-set fit on Layer 0 → Layer 1 transition (new useEffect)
+    //
+    // If a future plan re-adds a viewport-pan on every selection change
+    // (the retracted behaviour), this count drifts to ≥3 and the gate
+    // fires. The Layer 0 → Layer 1 ONLY guard is enforced separately by
+    // G22 (new — see below).
     const matches = src.match(/transition\(\)\.duration\(500\)/g) ?? []
-    expect(matches.length).toBe(1)
+    expect(matches.length).toBe(2)
   })
 
   test('Phase 56.1 G9 [audit-locked viewport stability]: MAIN useEffect dep list OMITS every selection field (selectedNodeIds, focalNodeId, selectedBucketKeys, focalBucketKey, pathToSelected) AND the obsolete selectedNodeId / selectedSessionId / selectedSessionStartAt', () => {
@@ -175,17 +191,19 @@ describe('D3GraphCanvas — Phase 56.1 source-grep gates', () => {
     expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
   })
 
-  test('Phase 56 G11 [retracted — spec change 2026-06-13]: selectionSource subscription no longer required', () => {
+  test('Phase 56 G11 [amended 2026-06-14 — Plan 06 Decision 2 multi-set fit]: selectionSource subscription IS now required for the multi-set fit-to-bounds transition detector', () => {
     // 2026-06-13 (continuation 2 SPEC CHANGE): the original G11 locked the
-    // selectionSource subscription that re-ran the centering effect. With
-    // the centering effect removed, the subscription is unused. The
-    // selectionSource LITERAL is still WRITTEN on node click (G1) — that
-    // payload doesn't require the file to subscribe to its own slice.
-    // Keeping a dead subscription would add a spurious re-render on every
-    // selectionSource transition, so we assert ABSENCE. If a future plan
-    // re-introduces the centering effect (and therefore re-adds the
-    // subscription), this gate fires.
-    expect(src).not.toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectionSource\)/)
+    // selectionSource subscription that re-ran the retracted centering
+    // effect. With the centering effect removed, the subscription was
+    // unused → gate asserted ABSENCE.
+    //
+    // 2026-06-14 (Plan 06 gap-closure — Decision 2): the new multi-set
+    // fit-to-bounds useEffect needs `selectionSource` in its dep list to
+    // detect Layer 0 → Layer 1 transitions (null → non-null). The
+    // subscription is RESTORED for this narrow purpose. Inverted assertion:
+    // the subscription IS present. The dep list of the new useEffect is
+    // verified by G22 below.
+    expect(src).toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectionSource\)/)
   })
 
   test('Phase 56 G12 [audit §6.4 / §6.6]: applySelectionStyling reads pathToSelected from the store (not exclusively inline)', () => {
@@ -341,5 +359,39 @@ describe('D3GraphCanvas — Phase 56.1 source-grep gates', () => {
       stale.length,
       'D3 click handler must read from nodeToBucketsRef.current.get(d.id), not nodeToBuckets.get(d.id) — the latter captures a stale closure (Plan 06 gap-closure Bug 2 regression).',
     ).toBe(0)
+  })
+
+  test('Phase 56.1 G22 [Plan 06 Decision 2 — multi-set fit-to-bounds]: a separate useEffect detects Layer 0 → Layer 1 transitions (prev selectionSource null → non-null AND selectedNodeIds.size >= 1) and fits the zoom transform via the existing zoomBehaviorRef primitive', () => {
+    // 2026-06-14 (Plan 06 Decision 2): the new multi-set fit-to-bounds
+    // useEffect is bounded by THREE invariants this gate locks:
+    //
+    //   1. It tracks the PREVIOUS selectionSource via a useRef
+    //      (`prevSelectionSourceRef`) so the transition predicate
+    //      (null → non-null) can fire ONCE per Layer 0 → Layer 1 entry.
+    //      Without the ref, the effect would either re-fit on every
+    //      `selectedNodeIds` change (annoying) or fit only on first
+    //      mount (broken across multiple selections).
+    //
+    //   2. The effect's dep list is `[selectionSource, selectedNodeIds,
+    //      pathToSelected]` — NOT the main render's dep list. The main
+    //      render still locks to `[visibleEntities, visibleRelations,
+    //      theme, isLoading]` (G9 unchanged), preserving Locked Contract #3
+    //      against SVG rebuilds / force-simulation restarts on every click.
+    //
+    //   3. The effect reads node positions from `d3NodesRef.current` to
+    //      compute bounds — the same ref the (now-restored) main render
+    //      assigns at the top of its body. d3's force simulation mutates
+    //      `d3Nodes[i].x` / `.y` in place, so the ref always points at
+    //      live coordinates.
+    expect(src).toMatch(/const prevSelectionSourceRef\s*=\s*useRef<SelectionSource>/)
+    // Transition predicate present (the load-bearing one-shot guard).
+    expect(src).toMatch(/prevSource\s*===\s*null/)
+    expect(src).toMatch(/selectionSource\s*!==\s*null/)
+    expect(src).toMatch(/selectedNodeIds\.size\s*>=\s*1/)
+    // d3NodesRef restored (the future-plan note in the file said this).
+    expect(src).toMatch(/const d3NodesRef\s*=\s*useRef</)
+    expect(src).toMatch(/d3NodesRef\.current\s*=\s*d3Nodes/)
+    // Dep list of the new effect must include all three reactive inputs.
+    expect(src).toMatch(/\}, \[selectionSource, selectedNodeIds, pathToSelected\]\)/)
   })
 })
