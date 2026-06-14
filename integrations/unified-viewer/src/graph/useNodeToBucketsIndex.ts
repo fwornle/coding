@@ -40,14 +40,48 @@ import { useLslSessions } from '@/panels/coding/useLslSessions'
  * A bucket "touches" a node iff `pickAllResolvable(bucket.entityIds, visibleIds,
  * relations)` includes the node id (i.e. at least one of the bucket's raw
  * entities resolves up the hierarchy to the node).
+ *
+ * 2026-06-14 (Plan 06 gap-closure — Decision C / Q3 LLS-suppression
+ * consistency): the reverse index applies the SAME LLS-suppression rule as
+ * `LslTimelineStrip.onTickClick`. Operator decision Q3 explicitly: "I also
+ * want to see the noisy selection on the timeline (consistency between
+ * graph selection and timeline ticks)" — but the consistency runs THROUGH
+ * the suppression rule, not around it. After suppression: LLS-only buckets
+ * (~49 of 75 in the seed) STILL resolve to {LLS} because suppression only
+ * fires when size >= 2 (preserves the focal). Multi-resolution buckets
+ * drop LLS from the reverse index, so graph-click on LLS lights up ONLY
+ * the ticks where LLS was the SOLE resolution (still ~49 buckets). Ticks
+ * where LLS was incidental noise alongside e.g. an Insight stop lighting
+ * up — preventing LLS-on-graph-click from highlighting the ENTIRE timeline.
+ *
+ * The strip computes its `noiseAncestors` Set via name lookup against
+ * `entities` (Decision Q2 — name-based for robustness across seed
+ * regenerations). This hook needs the same Set to keep the suppression
+ * predicate identical. Rather than recomputing it here (which would
+ * duplicate the LLS-id derivation and risk drift), we accept it via the
+ * existing `useGraphData` entities — name lookup stays local.
  */
 export function useNodeToBucketsIndex(
   apiClient: ApiClient,
   system: System,
 ): ReadonlyMap<string, ReadonlySet<string>> {
   const visibleIds = useVisibleEntityIds(apiClient, system)
-  const { relations } = useGraphData(apiClient, system)
+  const { entities, relations } = useGraphData(apiClient, system)
   const { data: sessions } = useLslSessions(apiClient)
+
+  // Memoised LLS-id Set — name-based (Q2). Identical derivation idiom to
+  // `LslTimelineStrip.tsx noiseAncestors` so the two callsites of
+  // pickAllResolvable see the same suppression set. Re-deriving here
+  // rather than passing through props keeps the contract local to each
+  // pickAllResolvable callsite per PATTERNS Contract #7 (no cross-callsite
+  // coupling).
+  const noiseAncestors = useMemo<ReadonlySet<string>>(() => {
+    const out = new Set<string>()
+    for (const e of entities) {
+      if (e.name === 'LiveLoggingSystem') out.add(e.id)
+    }
+    return out
+  }, [entities])
 
   // PATTERNS Locked Contract #7: this useMemo body is the ONLY callsite of
   // pickAllResolvable inside this hook. The forward-direction click handler
@@ -60,7 +94,12 @@ export function useNodeToBucketsIndex(
     for (const bucket of list) {
       if (typeof bucket.startAt !== 'string') continue
       const bucketKey = `${bucket.id}|${bucket.startAt}`
-      const touched = pickAllResolvable(bucket.entityIds ?? [], visibleIds, relations)
+      const touched = pickAllResolvable(
+        bucket.entityIds ?? [],
+        visibleIds,
+        relations,
+        noiseAncestors,
+      )
       for (const nodeId of touched) {
         let existing = map.get(nodeId)
         if (!existing) {
@@ -71,5 +110,5 @@ export function useNodeToBucketsIndex(
       }
     }
     return map
-  }, [sessions, visibleIds, relations])
+  }, [sessions, visibleIds, relations, noiseAncestors])
 }

@@ -177,16 +177,49 @@ describe('SidePanel (Phase 55 — RCA tab dropped)', () => {
   // operator to click the lone card to drill in). Multi-node tick clicks
   // still go to BucketCardList unchanged.
   //
-  // Predicate under test (SidePanel.tsx mode-switch block):
+  // Predicate under test (SidePanel.tsx mode-switch block, restored to the
+  // original Phase 56.1 D-4 form after 2026-06-14 operator decision):
   //   - isSingleFocalMode: selectedNodeIds.size === 1
-  //                        (bucket halo provenance preserved in the store)
+  //                        AND selectedBucketKeys.size === 0
+  //                        (drilled state — Layer 2, either via auto-drill
+  //                        from a single-resolution tick or card-click drill
+  //                        from Layer 1)
   //   - isMultiMode: !isSingleFocalMode && (selectedBucketKeys.size > 0
   //                                          || selectedNodeIds.size > 1)
 
-  test('Phase 56.1-06 — single-node tick shortcut: 1 resolved node + bucket halo → EntityDetailPanel (NOT BucketCardList)', () => {
-    // Simulate a timeline tick whose pickAllResolvable cascade returned a
-    // single visible node. The store carries the bucket halo (focal bucket
-    // ring + Locked Contract #1 cascade) AND the single resolved node.
+  test('Phase 56.1-06 [amended 2026-06-14] — auto-drill from single-resolution tick produces Layer 2 payload (size===1 + bucketKeys empty + source=history) → EntityDetailPanel', () => {
+    // After the 2026-06-14 operator decision (single-focal UX shortcut
+    // REVERTED, replaced with auto-drill in LslTimelineStrip.onTickClick),
+    // the writer itself produces a Layer 2 payload for single-resolution
+    // ticks: source='history', bucketKeys EMPTY, selectionHistory NOT
+    // pushed (Esc → Layer 0). The Layer 2 store shape mirrors what
+    // BucketCardList.onCardClick produces, so isSingleFocalMode fires and
+    // EntityDetailPanel renders — same end-state, different writer.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['mdurl']),
+      bucketKeys: new Set<string>(),
+      focal: { nodeId: 'mdurl', bucketKey: 'session-A|1718360000000' },
+      highlightedRowKey: 'mdurl',
+      source: 'history',
+      pathToSelected: new Set<string>(),
+      lslSessionFilter: ['session-A'],
+      lslFilterEntityIds: new Set<string>(['mdurl']),
+    })
+    const { queryByTestId } = renderPanel('coding')
+    expect(queryByTestId('entity-detail-panel')).not.toBeNull()
+    expect(queryByTestId('bucket-card-list')).toBeNull()
+  })
+
+  test('Phase 56.1-06 [amended 2026-06-14] — single node + bucket halo (multi-resolution tick where SidePanel still in Layer 1 mode) → BucketCardList renders (Layer 1)', () => {
+    // The reverted UX shortcut would have rendered EntityDetailPanel for
+    // this store shape (size===1 + bucketKeys populated). After the
+    // amendment, Layer 1 wins whenever bucketKeys.size > 0 — the operator
+    // sees the card list of size 1 (which would itself trigger auto-drill
+    // in BucketCardList if we had that). For now, the predicate produces
+    // BucketCardList. Note: this exact store shape no longer occurs in
+    // production because LslTimelineStrip.onTickClick branches BEFORE
+    // writing (size===1 → auto-drill payload above; size>=2 → Layer 1
+    // payload). The test isolates the SidePanel predicate behaviour.
     useViewerStore.getState().setSelection({
       nodeIds: new Set<string>(['mdurl']),
       bucketKeys: new Set<string>(['session-A|1718360000000']),
@@ -198,9 +231,8 @@ describe('SidePanel (Phase 55 — RCA tab dropped)', () => {
       lslFilterEntityIds: new Set<string>(['mdurl']),
     })
     const { queryByTestId } = renderPanel('coding')
-    // The UX shortcut: EntityDetailPanel renders directly, no card list.
-    expect(queryByTestId('entity-detail-panel')).not.toBeNull()
-    expect(queryByTestId('bucket-card-list')).toBeNull()
+    expect(queryByTestId('bucket-card-list')).not.toBeNull()
+    expect(queryByTestId('entity-detail-panel')).toBeNull()
   })
 
   test('Phase 56.1-06 — regression guard: 2+ resolved nodes + bucket halo → BucketCardList (multi-mode preserved)', () => {
