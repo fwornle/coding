@@ -1059,7 +1059,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 57-03-PLAN.md — Writer-path metadata.project stamping in semantic-analysis agents (canonical-mapper + dual-stamp at km-core-adapter); Tasks 1-3 complete; Task 4 HUMAN-UAT deferred as verification-debt per operator (runtime jq check against next `ukb full`). Container km-core resolution unified on lib/km-core via docker-compose.yml re-mount (commit 862336b84) — eliminates the two-clone drift pattern.
-- [x] 57-05-PLAN.md — Backfill script `scripts/backfill-project-tag.mjs` + transitional viewer read in graph-builder.ts (metadata.project ?? metadata.team)
+- [x] 57-05-PLAN.md — Backfill script `scripts/backfill-project-tag.mjs` + transitional viewer read in graph-builder.ts (metadata.project ?? metadata.team). Live operator-supervised backfill executed 2026-06-14T20:13Z: 743 entities migrated, 100% metadata.project coverage on live general.json, 0 errors, SC#1 PASS. LOWERONTO-04 runtime evidence satisfied; verifier should tick at phase close.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
