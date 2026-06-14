@@ -20,6 +20,7 @@ import * as d3 from 'd3'
 import type { ApiClient } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
 import { useViewerStore } from '@/store/viewer-store'
+import type { SelectionSource } from '@/store/viewer-store'
 import { useGraphData } from './useGraphData'
 import type { Entity, Relation } from './types'
 // 2026-06-13 (Phase 56-04): computeAncestryPath extracted to a shared
@@ -208,15 +209,18 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity)
   const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null)
-  // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): `d3NodesRef`
-  // was previously held to feed mutated x/y into the centering effect.
-  // The centering effect is removed (operator second-smoke feedback —
-  // see `docs(56-04): retract pan/zoom centering from AC #3 …`); the
-  // ref had no other consumer, so it's dropped too. If a future plan
-  // needs to read the simulation's mutated positions, restore this ref
-  // and assign it at the top of the main render effect — but DO NOT
-  // bring back the centering useEffect with it; the AC #3 contract is
-  // ring + ancestry trace + EntityDetailPanel, NOT viewport pan.
+  // 2026-06-14 (Plan 06 gap-closure — Decision 2 multi-set fit-to-bounds):
+  // RESTORED. The previous-plan note from Phase 56-04 continuation 2 said
+  // "if a future plan needs to read the simulation's mutated positions,
+  // restore this ref" — Decision 2 IS that plan. The fit-to-bounds
+  // useEffect reads node positions from this ref to compute the bounding
+  // box over `selectedNodeIds ∪ pathToSelected` for a one-shot zoom
+  // transform on Layer 0 → Layer 1 transitions. The OLD centering
+  // useEffect that used this ref is NOT restored — its retraction stands;
+  // viewport panning on a single-node history/timeline click remains
+  // forbidden. Decision 2 fits ONLY at the multi-set entry transition,
+  // never on drill (Layer 1 → Layer 2) or pop (Layer 2 → Layer 1).
+  const d3NodesRef = useRef<D3Node[] | null>(null)
 
   const { entities, relations, isLoading } = useGraphData(apiClient, system)
   const theme = useViewerStore((s) => s.theme)
@@ -241,16 +245,21 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // writer attaches one), fall back to inline computation so the legacy
   // mount-time render still produces a visible trace — audit §6.6.
   const pathToSelected = useViewerStore((s) => s.pathToSelected)
-  // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the previous
-  // `selectionSource` subscription was added in 989c04558 to re-run the
-  // centering useEffect on non-graph selection sources. With the centering
-  // effect retracted (operator second-smoke feedback), this subscription
-  // is no longer needed AND would trigger spurious re-renders on every
-  // `selectionSource` change — net slowdown for zero behavioural benefit.
-  // The literal `source: 'graph'` is still WRITTEN on node click (via the
-  // `setSelection` action call in the .on('click') handler below — CR-02
-  // fix 2026-06-13); writing it does not require us to subscribe to our
-  // own slice.
+  // 2026-06-14 (Plan 06 gap-closure — Decision 2 multi-set fit-to-bounds):
+  // we re-introduce the `selectionSource` subscription that was retracted
+  // in Phase 56-04 continuation 2 — but ONLY for the narrow purpose of
+  // detecting Layer 0 → Layer 1 transitions (null → non-null) so the
+  // multi-set fit-to-bounds useEffect (defined below) can run a one-shot
+  // zoom transform fitting `selectedNodeIds ∪ pathToSelected` into view.
+  //
+  // The audit-locked dep-list invariant (Locked Contract #3) is NOT
+  // violated: this subscription does NOT enter the main render useEffect's
+  // dep list (lines ~767-790 below) — it only feeds the new fit-to-bounds
+  // useEffect. The main render still rebuilds ONLY on visibleEntities /
+  // visibleRelations / theme / isLoading changes; clicks do not rebuild
+  // the SVG or restart the force simulation. See PATTERNS-LOCK.md
+  // Contract #3 amendment shipped alongside this change.
+  const selectionSource = useViewerStore((s) => s.selectionSource)
   const selectedTeams = useViewerStore((s) => s.selectedTeams)
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
   const selectedClasses = useViewerStore((s) => s.selectedClasses)
@@ -466,17 +475,86 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     applySelectionStyling(d3.select(svgRef.current))
   }, [applySelectionStyling])
 
-  // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the
-  // history/timeline-driven centering useEffect that lived here
-  // (originally committed in 989c04558 as the AC #3 implementation) is
-  // REMOVED per operator second-smoke feedback. AC #3 is now fulfilled
-  // by the existing `applySelectionStyling` (ring + ancestry trace) that
-  // runs via the lightweight selection useEffect above + the
-  // EntityDetailPanel mount that fires on `selectedNodeId !== null`. The
-  // viewport is intentionally untouched on non-graph selection. See
-  // `docs(56-04): retract pan/zoom centering from AC #3 …` for the spec
-  // audit trail; source-grep gates G6/G7/G8/G11 in D3GraphCanvas.test.ts
-  // lock the retraction in place.
+  // 2026-06-14 (Plan 06 gap-closure — Decision 2 multi-set fit-to-bounds):
+  //
+  // CONTRACT EVOLUTION — see PATTERNS-LOCK.md Contract #3 amendment.
+  //
+  // The original audit-locked Contract #3 said "viewport never animates on
+  // non-graph selection." That contract was earned when selection was
+  // single-focal (Phase 56) — lighting one ring doesn't justify moving the
+  // viewport. The Phase 56.1 multi-set case is genuinely different: if 5
+  // halo nodes land off-screen the multi-set rendering is useless.
+  //
+  // The amendment: viewport MAY animate ONCE on the Layer 0 → Layer 1
+  // transition (selectionSource null → non-null AND selectedNodeIds.size
+  // >= 1), to fit `selectedNodeIds ∪ pathToSelected` into the viewport.
+  // The transition is a one-shot zoom transform via the EXISTING
+  // zoomBehaviorRef primitive `fitToScreen` already uses — NOT an SVG
+  // rebuild, NOT a force-simulation restart. The main render dep list
+  // STAYS verbatim `[visibleEntities, visibleRelations, theme, isLoading]`.
+  //
+  // Transitions that do NOT trigger this:
+  //   - Layer 1 → Layer 2 drill (selectionSource non-null on both sides
+  //     of the transition; the multi-set is collapsing, not entering).
+  //   - Layer 2 → Layer 1 pop (same predicate — Esc/X restores from
+  //     selectionHistory; selectionSource transitions between non-null
+  //     values, never crosses the null threshold).
+  //   - Layer 1 → Layer 1 re-selection (e.g. additive Cmd-click adding
+  //     to selectedBucketKeys; selectionSource stays === current value).
+  //
+  // Per-transition fit ensures the user sees the halo set as soon as they
+  // pick a tick or graph node, and drill behaviour (Decision 3) preserves
+  // the fitted viewport so the focal + path-trace render legibly without
+  // a viewport reset.
+  const prevSelectionSourceRef = useRef<SelectionSource>(null)
+  useEffect(() => {
+    const prevSource = prevSelectionSourceRef.current
+    const enteredLayer1 =
+      prevSource === null
+      && selectionSource !== null
+      && selectedNodeIds.size >= 1
+    prevSelectionSourceRef.current = selectionSource
+    if (!enteredLayer1) return
+
+    const svgEl = svgRef.current
+    const containerEl = containerRef.current
+    const zoom = zoomBehaviorRef.current
+    const d3Nodes = d3NodesRef.current
+    if (!svgEl || !containerEl || !zoom || !d3Nodes) return
+
+    // Bounds over `selectedNodeIds ∪ pathToSelected`. We include
+    // pathToSelected so the central-trace ancestor chain stays in the
+    // viewport too — fitting ONLY to selectedNodeIds would let the trace
+    // dangle off-screen on long chains.
+    const targetIds = new Set<string>()
+    for (const id of selectedNodeIds) targetIds.add(id)
+    for (const id of pathToSelected) targetIds.add(id)
+    const targetNodes = d3Nodes.filter(
+      (n) => targetIds.has(n.id)
+        && typeof n.x === 'number'
+        && typeof n.y === 'number',
+    )
+    if (targetNodes.length === 0) return
+
+    const bounds = calculateGraphBounds(targetNodes)
+    if (!bounds) return
+
+    const { width, height } = containerEl.getBoundingClientRect()
+    if (width <= 0 || height <= 0) return
+
+    // Pad the bounds a touch so halo nodes don't sit right at the viewport
+    // edge — feels cramped otherwise. 80px padding (vs the default 50px
+    // calculateCenterTransform uses) gives nodes breathing room AND keeps
+    // their labels readable.
+    const { x, y, scale } = calculateCenterTransform(
+      bounds,
+      { width, height },
+      80,
+    )
+    const transform = d3.zoomIdentity.translate(x, y).scale(scale)
+    const svg = d3.select(svgEl)
+    svg.transition().duration(500).call(zoom.transform, transform)
+  }, [selectionSource, selectedNodeIds, pathToSelected])
 
   // Main render — rebuild on filtered data or theme change.
   useEffect(() => {
@@ -511,13 +589,14 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       fx: null,
       fy: null,
     }))
-    // 2026-06-13 (Phase 56-04 continuation 2 SPEC CHANGE): the previous
-    // `d3NodesRef.current = d3Nodes` assignment fed the (now-removed)
-    // centering useEffect — dropped along with the ref. If a future plan
-    // needs to read the simulation's mutated x/y from outside this
-    // effect, restore the ref + the assignment, but do NOT restore the
-    // centering effect with it (the AC #3 contract is selection ring +
-    // ancestry trace + EntityDetailPanel, NOT viewport pan).
+    // 2026-06-14 (Plan 06 gap-closure — Decision 2 multi-set fit-to-bounds):
+    // RESTORED. The fit-to-bounds useEffect (defined below) reads the
+    // mutated x/y coordinates from this ref to compute a bounding box
+    // over the selected node set on Layer 0 → Layer 1 transitions. d3
+    // mutates `d3Nodes[i].x` / `.y` in place during the force simulation,
+    // so the ref always points at the same array the simulation is
+    // updating — no extra bookkeeping needed.
+    d3NodesRef.current = d3Nodes
     const d3Links: D3Link[] = visibleRelations.map((r) => ({
       source: r.from,
       target: r.to,
