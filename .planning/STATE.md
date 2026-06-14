@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v7.2
 milestone_name: VKB & Online-Learning Quality
-status: planning
-last_updated: "2026-06-14T11:28:20.786Z"
-last_activity: 2026-06-14
+status: Defining requirements
+stopped_at: Phase 57 context gathered
+last_updated: "2026-06-14T13:10:57.363Z"
+last_activity: 2026-06-14 — Milestone v7.2 started
 progress:
   total_phases: 5
   completed_phases: 0
@@ -259,8 +260,8 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-06-13T16:07:51.182Z
-Stopped at: Phase 56.1 context gathered (4 areas, 7 decisions, 6 discretion items)
+Last session: 2026-06-14T13:10:57.354Z
+Stopped at: Phase 57 context gathered
 Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
