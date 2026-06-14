@@ -265,18 +265,7 @@ describe('LslTimelineStrip', () => {
     }
   })
 
-  test('Test 6 [amended 2026-06-14 — auto-drill]: click a tick whose pickAllResolvable returns size===1 writes Layer 2 (drill) payload — source=history, bucketKeys empty, focalBucketKey set via explicit focal override', async () => {
-    // 2026-06-14 (Plan 06 gap-closure — auto-drill on single-resolution):
-    // sess-bbbbbbbb has entityIds=['e3'] and ALL_VISIBLE mock returns true
-    // for everything, so pickAllResolvable resolves to {e3} (size 1) →
-    // the writer takes the auto-drill branch:
-    //   - source: 'history' (NOT 'timeline' — matches BucketCardList drill)
-    //   - bucketKeys: empty Set (drill semantics, no timeline halo)
-    //   - focal.bucketKey explicit so focalBucketKey is set (focal-tick
-    //     ring still renders via Locked Contract #1)
-    //   - selectionHistory NOT pushed (Layer 0 → Layer 2 with no Layer 1
-    //     to remember; Esc → Layer 0)
-    // Locked LSL slice still updated since the strip is still the writer.
+  test('Test 6: click a tick sets multi-set selection atomically (lslSessionFilter + selectedBucketKeys + focalBucketKey)', async () => {
     useViewerStore.setState({ lslSessionFilter: ['stale'] })
     const r = renderStrip()
     try {
@@ -288,20 +277,21 @@ describe('LslTimelineStrip', () => {
       const s = useViewerStore.getState()
       // Phase 56 LSL slice still updated.
       expect(s.lslSessionFilter).toEqual(['sess-bbbbbbbb'])
-      // Auto-drill contract: source=history, bucketKeys empty.
-      expect(s.selectionSource).toBe('history')
+      // Phase 56.1 D-2 + D-4: bucketKey composite written via setSelection.
+      // sess-bbbbbbbb is the second fixture session; capture its real startAt
+      // by reading the rendered tick's data-session-id attribute and the
+      // shared makeSessions() fixture (the fixture's startAt is a fresh
+      // nowMinusHours each render, so we derive the expected key from the
+      // store state itself rather than recomputing the timestamp here).
       expect(s.selectedBucketKeys).toBeInstanceOf(Set)
-      expect(s.selectedBucketKeys.size).toBe(0)
-      // focalBucketKey set via explicit focal.bucketKey override so the
-      // focal-tick ring (Locked Contract #1) still renders.
-      expect(s.focalBucketKey).not.toBeNull()
-      expect(s.focalBucketKey?.startsWith('sess-bbbbbbbb|')).toBe(true)
-      // selectedNodeIds = {e3} singleton, focal = e3.
+      expect(s.selectedBucketKeys.size).toBe(1)
+      // focal must match the bucketKey written into the set (insertion order).
+      const onlyKey = Array.from(s.selectedBucketKeys)[0]
+      expect(s.focalBucketKey).toBe(onlyKey)
+      // selectedNodeIds is a Set (may be empty if pickAllResolvable returned
+      // nothing in this fixture — ALL_VISIBLE proxy makes 'e3' resolve so
+      // size === 1 here; the assertion just checks the type contract).
       expect(s.selectedNodeIds).toBeInstanceOf(Set)
-      expect(s.selectedNodeIds.size).toBe(1)
-      expect(s.focalNodeId).toBe('e3')
-      // Layer 0 → Layer 2 auto-drill: no history pushed (Esc → Layer 0).
-      expect(s.selectionHistory).toBeNull()
     } finally {
       r.restore()
     }
@@ -435,12 +425,7 @@ describe('LslTimelineStrip', () => {
     expect(out).toMatch(/^[A-Z][a-z]{2,} \d{1,2}$/)
   })
 
-  test('Test 18 [amended 2026-06-14 — auto-drill]: tick click on single-resolution bucket writes Layer 2 payload (source=history, bucketKeys empty, focalBucketKey set explicitly, history not pushed)', async () => {
-    // 2026-06-14 (Plan 06 gap-closure — auto-drill on single-resolution):
-    // sess-bbbbbbbb has entityIds=['e3'] → ALL_VISIBLE mock makes
-    // pickAllResolvable return {e3} (size 1) → writer takes auto-drill
-    // branch. Layer 2 contract: source=history, bucketKeys empty,
-    // selectionHistory unchanged (was already null).
+  test('Test 18: tick click writes Phase 56.1 multi-set fields atomically (selectionSource/selectedBucketKeys/focalBucketKey/focalNodeId/highlightedRowKey)', async () => {
     useViewerStore.setState({
       selectionSource: null,
       selectedBucketKeys: new Set<string>(),
@@ -448,7 +433,6 @@ describe('LslTimelineStrip', () => {
       highlightedRowKey: null,
       selectedNodeIds: new Set<string>(),
       focalNodeId: null,
-      selectionHistory: null,
       // selectedClasses seeded by global beforeEach (WR-03 race gate).
     })
     const r = renderStrip()
@@ -459,22 +443,20 @@ describe('LslTimelineStrip', () => {
         fireEvent.click(tick)
       })
       const s = useViewerStore.getState()
-      // Auto-drill Layer 2 contract.
-      expect(s.selectionSource).toBe('history')
-      expect(s.selectedBucketKeys.size).toBe(0)
-      // focalBucketKey set via explicit focal.bucketKey override (Locked
-      // Contract #1 — focal-tick ring renders from focalBucketKey, even
-      // when selectedBucketKeys is empty in the drill state).
-      expect(s.focalBucketKey).not.toBeNull()
-      expect(s.focalBucketKey?.startsWith('sess-bbbbbbbb|')).toBe(true)
+      // single getState() snapshot — assert all new multi-set fields together
+      expect(s.selectionSource).toBe('timeline')
+      // Phase 56.1 D-2 / D-4: bucket key composite written via setSelection
+      // (Phase 56's scalar selectedSessionId / selectedSessionStartAt are gone).
+      expect(s.selectedBucketKeys.size).toBe(1)
+      const bucketKey = Array.from(s.selectedBucketKeys)[0]
+      expect(bucketKey.startsWith('sess-bbbbbbbb|')).toBe(true)
+      expect(s.focalBucketKey).toBe(bucketKey)
       // sess-bbbbbbbb has entityIds=['e3'] — ALL_VISIBLE proxy resolves it
       // so the halo + focal both get 'e3'.
       expect(s.highlightedRowKey).toBe('e3')
       expect(s.focalNodeId).toBe('e3')
       expect(s.selectedNodeIds.has('e3')).toBe(true)
       expect(s.lslSessionFilter).toEqual(['sess-bbbbbbbb'])
-      // Auto-drill does NOT push history (Layer 0 → Layer 2 directly).
-      expect(s.selectionHistory).toBeNull()
     } finally {
       r.restore()
     }

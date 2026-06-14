@@ -59,31 +59,28 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
   }, [entities, focalNodeId])
 
   // Phase 56.1 mode-switch predicate (CONTEXT.md <specifics> + D-4):
-  //   - isSingleFocalMode: exactly one node selected AND no timeline-bucket
-  //                  halo → EntityDetailPanel for the focal entity. Held
-  //                  by: card-click drill from Layer 1 (BucketCardList.
-  //                  onCardClick clears bucketKeys), halo-node-click drill
-  //                  (D3GraphCanvas writes single-id nodeIds + empty bucketKeys),
-  //                  AND auto-drill from a single-resolution tick (Plan 06
-  //                  gap-closure 2026-06-14 — LslTimelineStrip.onTickClick
-  //                  writes `source: 'history' + bucketKeys: empty` when
-  //                  `resolvedNodeIds.size === 1` post-LLS-suppression).
-  //                  This restores the original predicate `size === 1 &&
-  //                  bucketKeys.size === 0` that the (now-removed) UX
-  //                  shortcut over-broadened. Operator decision 2026-06-14:
-  //                  "I want the list of selections in the sidebar (so...
-  //                  revert!), but if there is only one card in the
-  //                  selection, then go straight to the content."
-  //   - isMultiMode: more than one node selected OR a multi-bucket halo →
-  //                  BucketCardList renders cards for the active set.
-  //                  Covers multi-resolution timeline ticks (source=
-  //                  'timeline', bucketKeys populated, size>=2) AND
-  //                  multi-node graph selection. Sidebar-only buckets
-  //                  (size===0 resolutions) also flow here so the operator
-  //                  sees SOMETHING for the bucket-only selection.
-  //   - Otherwise (no selection): HistorySidebar default.
-  const isSingleFocalMode =
-    selectedNodeIds.size === 1 && selectedBucketKeys.size === 0
+  //   - isSingleFocalMode: EXACTLY one node resolves from the current
+  //                  selection (whether timeline-driven or graph-driven) →
+  //                  EntityDetailPanel renders the focal entity directly.
+  //                  This is the Plan 06 follow-up UX shortcut: a timeline
+  //                  tick whose `pickAllResolvable` cascade yields a single
+  //                  node should NOT detour through the BucketCardList step
+  //                  (which would require the operator to click the lone
+  //                  card to drill in). `selectedNodeIds.size === 1`
+  //                  subsumes the original `&& selectedBucketKeys.size === 0`
+  //                  clause — single-node provenance from a tick still
+  //                  populates `selectedBucketKeys` (preserves the focal
+  //                  bucket-ring + timeline halo via Locked Contract #1),
+  //                  but the sidebar treats it as single-focal.
+  //   - isMultiMode: more than one node selected OR a multi-bucket halo
+  //                  WITHOUT a single-node resolution → BucketCardList
+  //                  renders cards for the active set. `selectedNodeIds.size
+  //                  === 0` covers the sidebar-only timeline branch (a tick
+  //                  whose entities all fail `pickAllResolvable` — list of
+  //                  raw bucket ids); `selectedNodeIds.size > 1` covers the
+  //                  multi-resolution case (operator drills the card list).
+  //   - Otherwise (no selection): HistorySidebar default
+  const isSingleFocalMode = selectedNodeIds.size === 1
   const isMultiMode =
     !isSingleFocalMode
     && (selectedBucketKeys.size > 0 || selectedNodeIds.size > 1)

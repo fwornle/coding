@@ -205,21 +205,6 @@ export function pickFirstResolvable(
  *  - Order-independent in the membership sense: the returned Set's membership
  *    is identical for any permutation of `entityIds`.
  *
- * 2026-06-14 (Plan 06 gap-closure — operator feedback "Decision C"):
- * `noiseAncestors` is an OPTIONAL caller-supplied Set of ids that should
- * be SUPPRESSED from the result iff the unsuppressed result would have
- * size ≥ 2 (i.e. there's at least one other ancestor to fall back on).
- * This handles the `LiveLoggingSystem` case where every Observation/Digest
- * resolves to LLS via the `capturedBy` 1-hop fallback — LLS appears in
- * 65%+ of buckets as a halo member that's noise relative to the real
- * semantic ancestor (an Insight via `has_insight`, a SubComponent via
- * `contains`, etc.). Suppression preserves LLS-only buckets as-is so
- * those ticks still produce a visible focal (option iii from the design
- * discussion: "suppress only when there's something better"). When
- * suppression fires, callers can Logger.warn the dropped ids for
- * observability — the helper itself stays Logger-agnostic since it lives
- * below the panel/Logger layer.
- *
  * Used by:
  *   - `LslTimelineStrip.onTickClick` (Plan 05 forward direction — D-2):
  *     writes the `selectedNodeIds` halo for the clicked bucket.
@@ -236,31 +221,11 @@ export function pickAllResolvable(
   entityIds: readonly string[],
   visibleIds: ReadonlySet<string>,
   relations: readonly Relation[],
-  noiseAncestors?: ReadonlySet<string>,
 ): Set<string> {
   const out = new Set<string>()
   for (const id of entityIds) {
     const resolved = resolveToVisibleAncestor(id, visibleIds, relations)
     if (resolved !== null) out.add(resolved)
-  }
-  // LLS-suppression (operator feedback 2026-06-14 — Q1/Q3 from gap-closure
-  // discussion). Only suppress when there's at least one OTHER ancestor —
-  // otherwise the bucket would resolve to an empty Set and the tick would
-  // produce no graph focal at all, which loses observability into the
-  // 49+ LLS-only buckets in the seed (option iii preserved). Q3 carry-over:
-  // applied here so BOTH forward (strip) and reverse (useNodeToBucketsIndex)
-  // directions stay consistent — graph-click on LLS still lights up its
-  // 48 touching buckets because we never suppress in the size===1 case.
-  if (noiseAncestors !== undefined && noiseAncestors.size > 0 && out.size >= 2) {
-    for (const id of noiseAncestors) {
-      // Tentative delete: only commit if the post-delete set is still >= 1.
-      // (Belt-and-braces — if every ancestor in the result was in the noise
-      // set, we'd end with empty; the >= 2 guard above already prevents
-      // that for the single-noise case but multi-noise would still risk it.)
-      if (out.has(id) && out.size >= 2) {
-        out.delete(id)
-      }
-    }
   }
   return out
 }
