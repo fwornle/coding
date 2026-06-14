@@ -1001,12 +1001,13 @@ Plans:
 - [x] 56.1-05-PLAN.md — Wave 3: useNodeToBucketsIndex pre-index hook + LslTimelineStrip multi-state write + two-tier tick render + WR-03 selectedClasses race fix + D3GraphCanvas node-click reverse cascade (D-2 both directions)
 - [x] 56.1-06-PLAN.md — Wave 3 (autonomous: false, has human-verify): E2E WR-01 fix + 56.1-many-to-many.spec.ts (AC#1-9) + 56.1-PATTERNS-LOCK.md + operator visual smoke at localhost:5173/viewer/coding
 
-### Phase 999.1: Extract Shared LLM Adapter Library (BACKLOG)
+### Phase 999.1: Extract Shared LLM Adapter Library — CLOSED (already-shipped)
 
 **Goal:** Extract `lib/llm/` to a shared submodule used by coding and rapid-automations/OKB. Add direct HTTP path for Claude Max (OAuth token from keychain -> Anthropic API, no CLI spawn) to eliminate 12-15s latency. Copilot provider already does direct HTTP (~2-5s) -- same pattern for claude-code.
-**Requirements:** TBD
+**Status:** ✓ Closed 2026-06-14 — both goals shipped out-of-band via the standalone `@rapid/llm-proxy` package, not as `lib/llm/`. Direct HTTP for Claude Max landed at rapid-llm-proxy commit `c043362` (2026-05-19, ~8x faster). Shared library lives at `~/Agentic/_work/rapid-llm-proxy/` and is consumed by coding (`src/llm-proxy/`, `lib/km-core/`, semantic-analysis agents) and OKM (`@rapid/llm-proxy` imports). No planning cycle required. See `.planning/phases/999.1-extract-shared-llm-adapter-library/999.1-CONTEXT.md` for closure rationale + audit trail.
+**Requirements:** N/A (closed without planning)
 **Plans:** 0 plans
 
 Plans:
 
-- [ ] TBD (promote with /gsd-review-backlog when ready)
+- [x] N/A — closed without planning; both goals shipped out-of-band via `@rapid/llm-proxy`

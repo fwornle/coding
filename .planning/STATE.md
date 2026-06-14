@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v7.1
 milestone_name: Knowledge Management Unification -- Phases 37-46
 status: ready_to_plan
-stopped_at: Phase 56.1 complete (6/6) — ready to discuss Phase 999.1
-last_updated: 2026-06-14T10:43:33.723Z
-last_activity: 2026-06-13 -- Phase 56.1 execution started
+stopped_at: Phase 999.1 closed as already-shipped (no planning needed)
+last_updated: 2026-06-14
+last_activity: 2026-06-14 -- Phase 999.1 closed via /gsd-discuss-phase (closure-only CONTEXT)
 progress:
   total_phases: 26
   completed_phases: 20
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 999.1 — extract shared llm adapter library
+**Current focus:** None — Phase 999.1 closed 2026-06-14 as already-shipped (both goals delivered out-of-band via `@rapid/llm-proxy`). Awaiting next milestone or backlog promotion.
 
 **v7.1 milestone status (KM-Core unification — 7 of 10 phases done):**
 
@@ -54,8 +54,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 999.1
-Plan: Not started
-Status: Ready to plan
+Plan: N/A
+Status: ✓ Closed 2026-06-14 as already-shipped (both goals delivered out-of-band via `@rapid/llm-proxy`). See `.planning/phases/999.1-extract-shared-llm-adapter-library/999.1-CONTEXT.md` for the closure rationale. No subsequent phase currently in flight.
 
 Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
 
