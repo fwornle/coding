@@ -1047,7 +1047,7 @@ Plans:
   3. Sampling 20 recent online-learned entities, at least 18 carry an `ontologyClass` value drawn from the new lower-ontology class set (not generic `Component` / `Detail` only).
   4. If the operator confirms upper-ontology growth in the discuss-phase (soft gate per LOWERONTO-02), the upper ontology declares ≥2 additional generic programming-aspect classes (e.g., `Diagnosis`, `Interface`); otherwise LOWERONTO-02 is honestly deferred without blocking the phase.
 
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed (Task 4 of 57-03 deferred as verification-debt — runtime UAT against next `ukb full`)
 
 Plans:
 **Wave 1**
@@ -1058,7 +1058,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 57-03-PLAN.md — Writer-path metadata.project stamping in semantic-analysis agents (canonical-mapper + dual-stamp at km-core-adapter) + Docker rebuild
+- [x] 57-03-PLAN.md — Writer-path metadata.project stamping in semantic-analysis agents (canonical-mapper + dual-stamp at km-core-adapter); Tasks 1-3 complete; Task 4 HUMAN-UAT deferred as verification-debt per operator (runtime jq check against next `ukb full`). Container km-core resolution unified on lib/km-core via docker-compose.yml re-mount (commit 862336b84) — eliminates the two-clone drift pattern.
 - [ ] 57-05-PLAN.md — Backfill script `scripts/backfill-project-tag.mjs` + transitional viewer read in graph-builder.ts (metadata.project ?? metadata.team)
 
 **Wave 3** *(blocked on Wave 2 completion)*

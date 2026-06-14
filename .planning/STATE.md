@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v7.2
 milestone_name: VKB & Online-Learning Quality
 status: executing
-stopped_at: Phase 57-03 Task 4 checkpoint — awaiting operator decision on container km-core resolution
-last_updated: "2026-06-14T14:44:16.010Z"
+stopped_at: Phase 57-03 closed (Task 4 UAT deferred as verification-debt); ready for Phase 57 Plans 04 + 05
+last_updated: "2026-06-14T17:00:00.000Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 5
@@ -54,8 +54,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 57 (lower-ontology-project-tagging-foundation) — EXECUTING
-Plan: 3 of 6
-Status: Ready to execute
+Plan: 4 of 6
+Status: Plan 03 closed (Task 4 deferred as verification-debt); ready to execute Plans 04 + 05 in parallel
 Last activity: 2026-06-14
 
 ## Performance Metrics
@@ -201,7 +201,8 @@ Last activity: 2026-06-14
 - [Phase 57-01]: Project type registry (PROJECTS / Project / isProject) lands in km-core; root + types barrel re-exports wired; 17 unit tests; 334→352 net+18 tests; zero regressions. MetadataWithProject helper SKIPPED per PATTERNS.md. km-core local persistence.js patch absent from source under VCS (pre-existing host-only patch per CLAUDE.md) — operator follow-up.
 - [Phase ?]: [Phase 57-02]: coding.lower.json ships with 10 L2 classes (6 Component + 3 Detail + 1 SubComponent). meta.extends=coding-ontology chains through coding-ontology → upper so per-class Component/SubComponent/Detail references resolve. Fixture-driven integration test in lib/km-core/tests/integration/ locks the data shape against OntologyRegistry; 358/358 km-core suite GREEN (was 352; +6 net). LOWERONTO-01 realized in static data form; Plan 04 (classifier injection) can now load via registry.getClass(L2-name).
 - [Phase 57-06]: LOWERONTO-02 upper-ontology growth deferred at v7.2 discuss-time (D-12). Phase 57 ships LOWERONTO-01 (lower-ontology + 10 L2 classes) and LOWERONTO-04 (project tag everywhere); upper-ontology growth (operator-suggested `Diagnosis` and `Interface` classes) is tracked for a follow-up phase. Reopen during v7.2 retro. Provenance: .planning/phases/57-lower-ontology-project-tagging-foundation/57-CONTEXT.md §D-12/D-13.
-- [Phase 57-03]: Writer-path metadata.project stamping landed at canonical-mapper (primary) + km-core-adapter (defence-in-depth dual stamp); wave1/2/3 thread project: this.team via augmentWithCanonical. Existing metadata.team byte-untouched (D-02). persistence-agent verify-only no-op (TS source retired Phase 42.2-04). code-graph-rag has zero putEntity sites (PATTERNS correction #4 anti-regression guard). Symlinked submodule node_modules/@fwornle/km-core to lib/km-core (Rule 3 — was stale clone lacking Plan 01 project module). tsc + npm build clean; container restarted (image rebuild blocked by pre-existing Dockerfile uv: not found). Task 4 PAUSED: container km-core mount points at ~/Agentic/km-core (10 days stale), isProject undefined at runtime — operator chooses sync vs mount-change vs back-out before verification.
+- [Phase 57-03]: Writer-path metadata.project stamping landed at canonical-mapper (primary) + km-core-adapter (defence-in-depth dual stamp); wave1/2/3 thread project: this.team via augmentWithCanonical. Existing metadata.team byte-untouched (D-02). persistence-agent verify-only no-op (TS source retired Phase 42.2-04). code-graph-rag has zero putEntity sites (PATTERNS correction #4 anti-regression guard). Symlinked submodule node_modules/@fwornle/km-core to lib/km-core (Rule 3 — was stale clone lacking Plan 01 project module). tsc + npm build clean; container restarted (image rebuild blocked by pre-existing Dockerfile uv: not found).
+- [Phase 57-03 close]: Container km-core resolution fixed via docker-compose.yml re-mount (commit 862336b84) — Option 1 selected at orchestrator checkpoint; container now resolves `import('@fwornle/km-core')` against `${CODING_REPO}/lib/km-core` and `isProject('coding') === true` verified live. Task 4 (HUMAN-UAT) DEFERRED to next scheduled `ukb full` as verification-debt per operator decision; runtime smoke recorded in 57-03-SUMMARY.md Verification Debt section so it surfaces in /gsd-progress and /gsd-audit-uat. Plan 03 closed.
 
 ### Blockers/Concerns
 
@@ -211,7 +212,7 @@ Last activity: 2026-06-14
 - [v7.1 Phase 43]: OKM cross-repo packaging strategy (submodule vs published npm vs vendored) — must be decided in INT-03's discuss phase
 - [v7.1 Phase 45]: D3 (VOKB) vs sigma.js (VKB) viewer choice — open question, research seed leans D3
 - [Phase 42.1 SC#6 — layer 2 of the cascade — NEW 2026-05-24]: After Phase 42.1.1 plan 01 closed (loader layer 1 unblocked, 18/18 node:test pass), `ensureProjectAnchor('Coding')` will still raise `Unknown ontology class: Project` at runtime because the `Project` class is not declared in any on-disk `.data/ontologies/*.json`. `/gsd-verify-phase 42.1` will not pass until a follow-up phase adds `Project` to `.data/ontologies/upper.json` (or `coding-ontology.json`) with a minimal schema sufficient for the post-sweep anchor pass. Recommended title: "Phase 42.1.2 — register Project ontology class for ensureProjectAnchor". See `.planning/phases/42.1.1-…/42.1.1-01-SUMMARY.md` § Known Residuals.
-- Phase 57-03 Task 4: Docker container resolves @fwornle/km-core via ~/Agentic/km-core bind-mount which is 10 days behind lib/km-core. Plan 01 isProject export missing in container. The next wave-analysis production run will throw TypeError until operator chooses: (1) sync ~/Agentic/km-core (git pull + npm build), (2) change docker-compose.yml km-core mount to lib/km-core, or (3) back out Plan 01 import.
+- ~~Phase 57-03 Task 4: Docker container resolves @fwornle/km-core via ~/Agentic/km-core bind-mount~~ — RESOLVED 2026-06-14 via commit 862336b84 (orchestrator selected Option 2: re-mount lib/km-core directly). Container km-core resolution verified live (`isProject('coding') === true`). The deferred Task 4 runtime UAT is tracked as verification-debt in 57-03-SUMMARY.md, not as a blocker.
 
 ## Deferred Items
 
@@ -265,12 +266,13 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 46 P06 | 6min | 2 tasks | 2 files |
 | Phase 57 P01 | 6min | 2 tasks | 4 files |
 | Phase 57 P02 | 14min | 2 tasks | 2 files |
+| Phase 57 P03 | ~12min (Tasks 1-3 in initial session; Task 4 deferred as verification-debt at orchestrator checkpoint, closed after orchestrator unblock commit 862336b84) | 4 tasks (3 executed + 1 deferred) | 6 files modified (5 submodule TS + docker-compose.yml via orchestrator) |
 
 ## Session Continuity
 
-Last session: 2026-06-14T14:44:16.004Z
-Stopped at: Phase 57-03 Task 4 checkpoint — awaiting operator decision on container km-core resolution
-Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
+Last session: 2026-06-14T17:00:00.000Z
+Stopped at: Phase 57-03 closed (Task 4 deferred as verification-debt); ready for Phase 57 Plans 04 + 05
+Resume with: `/gsd-execute-phase 57` to drive Plans 04 (classifier injection) + 05 (backfill + transitional viewer read). Plan 04 is independent of writer-stamping; Plan 05 depends on Plan 03 (now closed). When Phase 57 closes, the chain continues with the remaining v7.2 phases (58-61). The 57-03 HUMAN-UAT (runtime jq check of `metadata.project='coding'` on new ukb-emitted entities) is verification-debt — discharge after the next scheduled `ukb full` per the runbook in 57-03-SUMMARY.md § Verification Debt. Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
 
