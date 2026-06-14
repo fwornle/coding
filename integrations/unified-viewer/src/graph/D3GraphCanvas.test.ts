@@ -293,4 +293,53 @@ describe('D3GraphCanvas — Phase 56.1 source-grep gates', () => {
       /\[selectedNodeId,\s*pathToSelected,\s*visibleRelations,\s*theme\]/,
     )
   })
+
+  test('Phase 56.1 G21 [Plan 06 gap-closure — Bug 2 regression]: d3 click handler reads from nodeToBucketsRef.current (NOT the closure-captured nodeToBuckets), and a separate useEffect syncs the ref on every nodeToBuckets change', () => {
+    // 2026-06-14 (Plan 06 gap-closure — Bug 2 fix regression gate):
+    //
+    // Operator visual smoke caught a stale-closure regression: the d3
+    // `.on('click', ...)` handler is registered INSIDE the main render
+    // `useEffect` whose dep list is locked to `[visibleEntities,
+    // visibleRelations, theme, isLoading]` (Locked Contract #3 — viewport
+    // stability). When `nodeToBuckets` rebuilt AFTER first paint (sessions
+    // loaded asynchronously, or visibleIds changed via filter toggle), the
+    // d3 click handler kept the STALE `nodeToBuckets` value its closure
+    // captured at registration time — typically an empty Map.
+    //
+    // Every node click then wrote `bucketKeys: empty Set` → no halo ticks.
+    //
+    // Fix: introduce `nodeToBucketsRef` synced from a lightweight
+    // `useEffect([nodeToBuckets])` and have the click handler read
+    // `nodeToBucketsRef.current` so it always sees the freshest reverse
+    // index. Adding `nodeToBuckets` to the main render dep list would
+    // violate Locked Contract #3.
+    //
+    // This gate locks the two-part fix at the source level:
+    //   1. The click handler reads `nodeToBucketsRef.current.get(d.id)`,
+    //      NOT the closure-captured `nodeToBuckets.get(d.id)`.
+    //   2. A useRef + a separate useEffect that syncs the ref on
+    //      `[nodeToBuckets]` change live in the component body.
+    //   3. The closure-captured form (`nodeToBuckets.get(d.id)`) must
+    //      NOT re-appear in the click handler.
+    //
+    // If any future refactor drops the ref hop and goes back to reading
+    // the closure-captured value, this gate fires immediately.
+    expect(src).toMatch(/const nodeToBucketsRef = useRef/)
+    expect(src).toMatch(/nodeToBucketsRef\.current\s*=\s*nodeToBuckets/)
+    expect(src).toMatch(/nodeToBucketsRef\.current\.get\(d\.id\)/)
+    // Negative: the click handler must NOT use the closure-captured form
+    // in EXECUTABLE code. Strip comment lines first (the .get(d.id)
+    // reference text appears in two comment blocks describing the
+    // pre-index hook + the D-2 reverse-direction wiring — those are
+    // documentation, not callsites).
+    const stripped = src
+      .split('\n')
+      .filter((ln) => !ln.trim().startsWith('//') && !ln.trim().startsWith('*'))
+      .join('\n')
+    const stale = stripped.match(/\bnodeToBuckets\.get\(d\.id\)/g) ?? []
+    expect(
+      stale.length,
+      'D3 click handler must read from nodeToBucketsRef.current.get(d.id), not nodeToBuckets.get(d.id) — the latter captures a stale closure (Plan 06 gap-closure Bug 2 regression).',
+    ).toBe(0)
+  })
 })
