@@ -198,7 +198,21 @@ test.describe('Unified Viewer — Phase 56 bidirectional selection', () => {
     }).toPass({ timeout: 5_000 })
 
     // Timeline tick ringed once the matching session shows highlight.
-    await expect(page.locator('.ring-blue-500')).toHaveCount(1, { timeout: 5_000 })
+    //
+    // Phase 56.1 WR-01 fix (56-REVIEW.md WR-01 — closed via
+    // .planning/phases/56.1-unified-viewer-many-to-many-bridge/56.1-06-PLAN.md):
+    // the prior strict `count === 1` assertion was data-dependent — it held
+    // only when the seeded entity's createdAt landed in exactly one bucket's
+    // [startMs, endMs) window. With the live obs-api the chosen Insight may
+    // touch 1+ overlapping buckets across sessions, so the strict count
+    // assertion would flap. The replacement is range-based: at least one ring
+    // must appear (proving the cascade fired) AND fewer than 10 (sanity
+    // upper bound — anything beyond is a UI bug).
+    const tickRings = page.locator('[data-testid^="lsl-tick-"].ring-blue-500')
+    await expect(tickRings).not.toHaveCount(0, { timeout: 5_000 })
+    const ringCount = await tickRings.count()
+    expect(ringCount).toBeGreaterThanOrEqual(1)
+    expect(ringCount).toBeLessThan(10)
   })
 
   test('Spec 3 — clicking a timeline tick drives graph + history (AC #4)', async ({
