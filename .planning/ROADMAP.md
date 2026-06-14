@@ -1047,7 +1047,7 @@ Plans:
   3. Sampling 20 recent online-learned entities, at least 18 carry an `ontologyClass` value drawn from the new lower-ontology class set (not generic `Component` / `Detail` only).
   4. If the operator confirms upper-ontology growth in the discuss-phase (soft gate per LOWERONTO-02), the upper ontology declares ≥2 additional generic programming-aspect classes (e.g., `Diagnosis`, `Interface`); otherwise LOWERONTO-02 is honestly deferred without blocking the phase.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans executed
 
 Plans:
 **Wave 1**
@@ -1063,7 +1063,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [~] 57-04-PLAN.md — Classifier L2 emission. Tasks 1-2 complete 2026-06-14: `OntologyClassificationAgent.l2Classes` loads 10 classes from `coding.lower.json` at init (`loadL2Classes` filters L1 carriers); REFINEMENT STEP prompt addendum injected into `buildClassificationInput`; `scripts/check-l2-emission-rate.mjs` codifies SC#3 (`--sample 20 --min 18`). Task 3 PAUSED at HUMAN-UAT (autonomous=false) — operator runs `ukb full` + smoke gate; resume signal `approved` if exit 0. Baseline `l2_emitted=0/20 FAIL` because most-recent online entities pre-date the cutover (latest 2026-05-23). Commits: submodule 33a8960+1250d1f; outer 548ceb691+6ac7d4f97+0cd90fd2e. 5 tests added (5/5 PASS); 4 neighbouring suites 33/33 PASS.
+- [x] 57-04-PLAN.md — Classifier L2 emission. Tasks 1-2 complete 2026-06-14: `OntologyClassificationAgent.l2Classes` loads 10 classes from `coding.lower.json` at init (`loadL2Classes` filters L1 carriers); REFINEMENT STEP prompt addendum injected into `buildClassificationInput` (verified live in container — `docker exec coding-services grep -c "REFINEMENT STEP" ... → 2`); `scripts/check-l2-emission-rate.mjs` codifies SC#3 (`--sample 20 --min 18`). **Task 3 (HUMAN-UAT) DEFERRED as verification-debt** per operator at orchestrator checkpoint — same pattern as Plan 57-03 Task 4. Pre-cutover baseline returns `l2_emitted=0/20 FAIL` because most-recent online entities pre-date the cutover (latest 2026-05-23); discharge the debt at the next scheduled wave-analysis run per 57-04-SUMMARY.md § Verification Debt. Commits: submodule 33a8960+1250d1f; outer 548ceb691+6ac7d4f97+0cd90fd2e. 5 tests added (5/5 PASS); 4 neighbouring suites 33/33 PASS.
 
 **UI hint:** yes
 
