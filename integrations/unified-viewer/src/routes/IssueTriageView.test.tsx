@@ -77,10 +77,9 @@ const SAMPLE_RELATIONS: Relation[] = [
 ]
 
 beforeEach(() => {
-  useViewerStore.setState({
-    selectedNodeId: null,
-    mode: 'triage',
-  })
+  // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set + focal.
+  useViewerStore.getState().setSelectedNode(null)
+  useViewerStore.setState({ mode: 'triage' })
 })
 
 afterEach(() => {
@@ -174,19 +173,20 @@ describe('IssueTriageView', () => {
     fireEvent.click(screen.getByTestId('triage-incident-inc-1'))
     const chainItem = screen.getByTestId('rca-chain-item-sym-1')
     fireEvent.click(chainItem)
-    expect(useViewerStore.getState().selectedNodeId).toBe('sym-1')
+    expect(useViewerStore.getState().focalNodeId).toBe('sym-1')
   })
 
   test('Test 7: "View in Graph" CTA → setMode("kg") and preserves selection', () => {
-    useViewerStore.setState({ mode: 'triage', selectedNodeId: 'sym-1' })
+    useViewerStore.setState({ mode: 'triage' })
+    useViewerStore.getState().setSelectedNode('sym-1')
     render(<IssueTriageView entities={SAMPLE_ENTITIES} relations={SAMPLE_RELATIONS} />)
     fireEvent.click(screen.getByTestId('triage-incident-inc-1'))
     const cta = screen.getByTestId('view-in-graph')
     fireEvent.click(cta)
     expect(useViewerStore.getState().mode).toBe('kg')
-    // selectedNodeId is set on chain-item click; the CTA itself just flips
+    // focalNodeId is set on chain-item click; the CTA itself just flips
     // the mode (per the plan's <action> block).
-    expect(useViewerStore.getState().selectedNodeId).toBe('inc-1')
+    expect(useViewerStore.getState().focalNodeId).toBe('inc-1')
   })
 
   test('Test 8: Sources & Evidence imports from @/lib-domain/evidence-types (source-grep)', async () => {

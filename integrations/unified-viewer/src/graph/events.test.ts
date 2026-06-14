@@ -39,28 +39,44 @@ function makeDeps(extra?: { neighborsResponse?: { entity: Entity; neighbors: Ent
 }
 
 describe('event handlers', () => {
-  test('handleClickNode sets selectedNodeId', () => {
+  test('handleClickNode sets focalNodeId + selectedNodeIds (Phase 56.1 multi-set)', () => {
     const d = makeDeps()
     const h = makeEventHandlers(d)
     h.handleClickNode('a')
-    expect(d.spies.setStoreSpy).toHaveBeenCalledWith({ selectedNodeId: 'a' })
+    expect(d.spies.setStoreSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        focalNodeId: 'a',
+        selectedNodeIds: expect.any(Set),
+      }),
+    )
+    const call = d.spies.setStoreSpy.mock.calls[0][0] as { selectedNodeIds: Set<string> }
+    expect(call.selectedNodeIds.has('a')).toBe(true)
   })
 
-  test('handleClickStage clears selectedNodeId', () => {
+  test('handleClickStage clears focalNodeId + selectedNodeIds (Phase 56.1 multi-set)', () => {
     const d = makeDeps()
     const h = makeEventHandlers(d)
     h.handleClickStage()
-    expect(d.spies.setStoreSpy).toHaveBeenCalledWith({ selectedNodeId: null })
+    expect(d.spies.setStoreSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        focalNodeId: null,
+        selectedNodeIds: expect.any(Set),
+      }),
+    )
+    const call = d.spies.setStoreSpy.mock.calls[0][0] as { selectedNodeIds: Set<string> }
+    expect(call.selectedNodeIds.size).toBe(0)
   })
 
-  test('clicking the same node twice keeps selectedNodeId set', () => {
+  test('clicking the same node twice keeps focalNodeId set', () => {
     const d = makeDeps()
     const h = makeEventHandlers(d)
     h.handleClickNode('a')
     h.handleClickNode('a')
-    expect(d.spies.setStoreSpy).toHaveBeenNthCalledWith(1, { selectedNodeId: 'a' })
-    expect(d.spies.setStoreSpy).toHaveBeenNthCalledWith(2, { selectedNodeId: 'a' })
     expect(d.spies.setStoreSpy).toHaveBeenCalledTimes(2)
+    const c1 = d.spies.setStoreSpy.mock.calls[0][0] as { focalNodeId: string }
+    const c2 = d.spies.setStoreSpy.mock.calls[1][0] as { focalNodeId: string }
+    expect(c1.focalNodeId).toBe('a')
+    expect(c2.focalNodeId).toBe('a')
   })
 
   test('handleDoubleClickNode calls apiClient.getNeighbors(node, 1) exactly once', async () => {

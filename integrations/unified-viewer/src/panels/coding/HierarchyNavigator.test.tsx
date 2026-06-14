@@ -70,7 +70,9 @@ beforeEach(() => {
   // Reset store (cast: `entities` is not on ViewerState — store is driven via
   // the prop in production; in tests we drive via setState as the harness).
   useViewerStore.setState({
-    selectedNodeId: null,
+    // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set.
+    focalNodeId: null,
+    selectedNodeIds: new Set<string>(),
     selectedEdgeId: null,
     searchQuery: '',
     visibleLevels: new Set([0, 1, 2, 3]),
@@ -79,7 +81,7 @@ beforeEach(() => {
     filterRailCollapsed: false,
     hierarchySubtreeFilter: null,
     ...({ entities: makeEntities() } as Record<string, unknown>),
-  } as Parameters<typeof useViewerStore.setState>[0])
+  } as unknown as Parameters<typeof useViewerStore.setState>[0])
 })
 
 afterEach(() => {

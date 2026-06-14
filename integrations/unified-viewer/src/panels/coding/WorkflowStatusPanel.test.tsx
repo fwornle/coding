@@ -77,7 +77,8 @@ function renderPanel({ system = 'coding', initial = { status: 'idle' } }: Render
 }
 
 beforeEach(() => {
-  useViewerStore.setState({ selectedNodeId: null })
+  // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set + focal.
+  useViewerStore.getState().setSelectedNode(null)
 })
 
 afterEach(() => {
@@ -235,7 +236,7 @@ describe('WorkflowStatusPanel', () => {
       act(() => {
         fireEvent.click(row)
       })
-      expect(useViewerStore.getState().selectedNodeId).toBe('ent-77')
+      expect(useViewerStore.getState().focalNodeId).toBe('ent-77')
     } finally {
       r.restore()
     }

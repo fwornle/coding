@@ -78,3 +78,43 @@ Several other consumers (`OccurrenceHistorySidebar.tsx`, `D3GraphCanvas.tsx`,
 also reference the deleted Phase 56 fields and are tsc-compile-broken since
 Plan 01 closed. These are addressed by Plans 03/05/06 in their respective
 Wave scopes — out of scope for Plan 04.
+
+## ~~Stale Phase-56-Field References in 13 Additional Test Files (Plan 05)~~ — CLOSED 2026-06-13 by Plan 05
+
+Originally documented as deferred, but the volume (~157 mechanical
+occurrences across 13 test files) was blocking the project-wide tsc
+gate stated in Plan 05's verify block. Closed inline by Plan 05 as a
+Rule-3 (auto-fix blocking issues) batch sweep alongside the active-source
+migration. Recipe used:
+
+- `setState({ selectedNodeId: id })` → `getState().setSelectedNode(id)`
+- `getState().selectedNodeId` → `getState().focalNodeId`
+- `setState({ selectedSessionId: id, selectedSessionStartAt: startAt })` →
+  `setState({ selectedBucketKeys: new Set([\`${id}|${startAt}\`]), focalBucketKey: \`${id}|${startAt}\` })`
+- `setState({ selectedNodeId: null, ... })` blocks with extra keys → split into
+  `getState().setSelectedNode(null)` + `setState({ ...other keys })`.
+
+Production sources also closed in the same sweep: `EntityDetailPanel.tsx`,
+`MarkdownViewerPanel.tsx`, `OccurrenceHistorySidebar.tsx`.
+
+Files closed (all 13 test files + 4 production files):
+- src/graph/SigmaCanvas.test.tsx, events.test.ts, graph-builder.test.ts
+- src/hooks/useKeyboardShortcuts.test.tsx
+- src/panels/EntityDetailPanel.test.tsx + .tsx
+- src/panels/FilterRail.test.tsx
+- src/panels/HistorySidebar.test.tsx
+- src/panels/MarkdownViewerPanel.test.tsx + .tsx
+- src/panels/OccurrenceHistorySidebar.test.tsx + .tsx
+- src/panels/SidePanel.test.tsx
+- src/panels/TrendingPanel.test.tsx
+- src/panels/coding/EtmTailSheet.test.tsx
+- src/panels/coding/HierarchyNavigator.test.tsx
+- src/panels/coding/WorkflowStatusPanel.test.tsx
+- src/routes/IssueTriageView.test.tsx
+
+**Post-sweep state (2026-06-13):** project-wide tsc 0 errors. vitest 619/637
+pass; the remaining 18 failures all reproduce on main repo without any
+Phase 56.1 changes (toggleLayer / LayerFilter / OntologyFilter / NavBar /
+UnifiedViewer / color-fallback / system-endpoints / node-renderer /
+SigmaCanvas makeEdgeReducer-default-opacity) and are out-of-scope
+pre-existing failures unrelated to the multi-set selection refactor.

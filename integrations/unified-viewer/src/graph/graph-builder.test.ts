@@ -188,7 +188,9 @@ describe('computeNodeState — Plan 03 checkpoint round 2 semantics', () => {
   // baseStore seeds selectedClasses with the canonical test class so the
   // default tests assert the "visible by default" path.
   const baseStore = {
-    selectedNodeId: null,
+    // 2026-06-13 (Phase 56.1 Plan 05): computeNodeState now keys on
+    // `focalNodeId` (the derived singleton from the multi-set slice).
+    focalNodeId: null,
     searchQuery: '',
     visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
     selectedClasses: new Set<string>(['Observation']),
@@ -199,8 +201,8 @@ describe('computeNodeState — Plan 03 checkpoint round 2 semantics', () => {
     expect(s).toBe('default')
   })
 
-  test('selected when id matches selectedNodeId', () => {
-    const s = computeNodeState('a', { name: 'Alpha' }, { ...baseStore, selectedNodeId: 'a' })
+  test('selected when id matches focalNodeId', () => {
+    const s = computeNodeState('a', { name: 'Alpha' }, { ...baseStore, focalNodeId: 'a' })
     expect(s).toBe('selected')
   })
 

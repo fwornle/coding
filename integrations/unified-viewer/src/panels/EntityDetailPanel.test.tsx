@@ -132,8 +132,10 @@ function renderPanel(apiClient?: ApiClient) {
 
 describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs', () => {
   beforeEach(() => {
+    // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set + focal.
     useViewerStore.setState({
-      selectedNodeId: null,
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
       selectedClasses: new Set<string>(),
@@ -152,7 +154,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 2: with a selected entity, shows name + class badge with borderColor (via EntityIdentityHeader)', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     // Phase 55 — EntityIdentityHeader is the new source of identity rendering
     expect(screen.getByTestId('identity-name').textContent).toBe('Selected Entity')
@@ -162,14 +164,14 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 3: Description section escapes <script> via markdown-text renderer (T-45-03-01)', () => {
-    useViewerStore.setState({ selectedNodeId: 'xss' })
+    useViewerStore.getState().setSelectedNode('xss')
     const { container } = renderPanel()
     expect(container.querySelectorAll('script').length).toBe(0)
     expect(container.textContent).toContain('<script>alert(1)</script>')
   })
 
   test('Test 4: Provenance reads camelCase fields; pre-Phase-39 entities render `—`', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     const prov = screen.getByTestId('entity-section-provenance')
     expect(prov.textContent).toContain('agent-coordinator')
@@ -179,7 +181,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 4b: Pre-Phase-39 entity → all four provenance rows show `—`', () => {
-    useViewerStore.setState({ selectedNodeId: 'legacy' })
+    useViewerStore.getState().setSelectedNode('legacy')
     renderPanel()
     const prov = screen.getByTestId('entity-section-provenance')
     const matches = prov.textContent?.match(/—/g) ?? []
@@ -187,29 +189,29 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 5: clicking a neighbor calls setSelectedNode(neighborId)', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     // Phase 55 — Neighbors are inside Relationships breakdown; expand the
     // DERIVED_FROM group first (which contains e2 + e3 outgoing).
     fireEvent.click(screen.getByTestId('relationship-group-header-DERIVED_FROM'))
     const neighbor = screen.getByTestId('neighbor-e2')
     fireEvent.click(neighbor)
-    expect(useViewerStore.getState().selectedNodeId).toBe('e2')
+    expect(useViewerStore.getState().focalNodeId).toBe('e2')
   })
 
   test('Test 5b: incoming relations also list — clicking the source neighbor selects it', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     // Phase 55 — Incoming relations land in their own group (CAUSED_BY) which
     // we must expand to reach neighbor-e3.
     fireEvent.click(screen.getByTestId('relationship-group-header-CAUSED_BY'))
     const incoming = screen.getByTestId('neighbor-e3')
     fireEvent.click(incoming)
-    expect(useViewerStore.getState().selectedNodeId).toBe('e3')
+    expect(useViewerStore.getState().focalNodeId).toBe('e3')
   })
 
   test('Test 6: Raw section is collapsed by default — JSON not in DOM until toggle', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     const toggle = screen.getByTestId('entity-raw-toggle')
     expect(toggle).toBeInTheDocument()
@@ -222,7 +224,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   // ===== Phase 55 sub-tabs =====
 
   test('Test 7a: pill bar — Default always present; Evolution/Timeline hidden for plain entity (e1)', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     expect(screen.getByTestId('subtab-default')).toBeInTheDocument()
     // e1 has no descriptionSegments / occurrences / confirmationCount metadata,
@@ -234,7 +236,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 7b: pill bar — Evolution + Timeline visible when predicate matches (evo entity)', () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     renderPanel()
     expect(screen.getByTestId('subtab-default')).toBeInTheDocument()
     expect(screen.getByTestId('subtab-evolution')).toBeInTheDocument()
@@ -243,7 +245,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 8: Default sub-tab shows Phase 45 sections', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     expect(screen.getByTestId('entity-section-description')).toBeInTheDocument()
     expect(screen.getByTestId('entity-section-identity')).toBeInTheDocument()
@@ -252,7 +254,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 9: Evolution sub-tab renders descriptionSegments with RUN_COLORS', () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     renderPanel()
     fireEvent.click(screen.getByTestId('subtab-evolution'))
     const evo = screen.getByTestId('subtab-content-evolution')
@@ -267,7 +269,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 9b: Evolution sub-tab shows merge banner when confirmationCount > 0', () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     renderPanel()
     fireEvent.click(screen.getByTestId('subtab-evolution'))
     const banner = screen.queryByTestId('evolution-merge-banner')
@@ -275,7 +277,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 10: Confidence sub-tab — on 200, renders fetched bands; on 404, client heuristic', async () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     const apiClient = {
       base: 'http://test.local',
       getEntityConfidence: vi.fn().mockResolvedValue({
@@ -295,7 +297,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 10b: Confidence 404 falls back to client heuristic — never throws', async () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     const apiClient = {
       base: 'http://test.local',
       getEntityConfidence: vi.fn().mockRejectedValue(new Error('HTTP 404')),
@@ -310,7 +312,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 11: Timeline sub-tab renders chronological event list', () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     renderPanel()
     fireEvent.click(screen.getByTestId('subtab-timeline'))
     const tl = screen.getByTestId('subtab-content-timeline')
@@ -320,7 +322,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 12: Relationships breakdown — grouped by edge type with count badges', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     const rel = screen.getByTestId('entity-section-relationships')
     expect(rel).toBeInTheDocument()
@@ -335,17 +337,17 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 12b: Relationships group expands to neighbor list; clicking neighbor → setSelectedNode', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     const derivedHeader = screen.getByTestId('relationship-group-header-DERIVED_FROM')
     fireEvent.click(derivedHeader)
     const neighbor = screen.getByTestId('neighbor-e2')
     fireEvent.click(neighbor)
-    expect(useViewerStore.getState().selectedNodeId).toBe('e2')
+    expect(useViewerStore.getState().focalNodeId).toBe('e2')
   })
 
   test('Test 13: Sources & Evidence — sourceRefs grouped, link has noopener noreferrer', () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     renderPanel()
     const src = screen.getByTestId('entity-section-sources')
     expect(src).toBeInTheDocument()
@@ -359,7 +361,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 14: Occurrence History section under Entity tab lists occurrences', () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     renderPanel()
     const occ = screen.getByTestId('entity-section-occurrences')
     expect(occ).toBeInTheDocument()
@@ -369,13 +371,13 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 15: selecting a different entity resets descViewMode to default', () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     const { rerender } = renderPanel()
     fireEvent.click(screen.getByTestId('subtab-evolution'))
     // Active sub-tab is evolution
     expect(screen.getByTestId('subtab-evolution').getAttribute('aria-selected')).toBe('true')
     // Now select a different entity — switching to plain e1 must reset.
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     rerender(
       <QueryClientProvider client={new QueryClient()}>
         <EntityDetailPanel apiClient={{ base: 'http://test.local' } as ApiClient} system="coding" />
@@ -386,7 +388,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 16: Keyboard 1/2/3/4 cycles to default/evolution/confidence/timeline (only when visible)', () => {
-    useViewerStore.setState({ selectedNodeId: 'evo' })
+    useViewerStore.getState().setSelectedNode('evo')
     renderPanel()
     // Press 2 → Evolution
     fireEvent.keyDown(document.body, { key: '2' })
@@ -403,7 +405,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 16b: Keyboard 2/4 are NO-OP when Evolution/Timeline are hidden (plain e1)', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     // Pressing 2 when Evolution is hidden should not change the active sub-tab.
     fireEvent.keyDown(document.body, { key: '2' })
@@ -411,7 +413,7 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
   })
 
   test('Test 17: EntityDetailPanel imports EntityIdentityHeader (refactor)', () => {
-    useViewerStore.setState({ selectedNodeId: 'e1' })
+    useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     // The identity header carries its own test-id (rendered by EntityIdentityHeader).
     expect(screen.getByTestId('entity-identity-header')).toBeInTheDocument()

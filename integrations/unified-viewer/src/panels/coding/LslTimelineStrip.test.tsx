@@ -169,8 +169,15 @@ function renderStrip({
 }
 
 beforeEach(() => {
+  // 2026-06-13 (Phase 56.1 Plan 05): seed selectedClasses so the WR-03
+  // race-window guard (onTickClick early-exit on selectedClasses.size === 0)
+  // does not no-op every click in tests. The production code auto-seeds
+  // this from the ontology fetch; tests that need the click handler to
+  // actually fire must seed the class set explicitly. Tests that exercise
+  // the WR-03 race exception explicitly clear it back to an empty Set.
   useViewerStore.setState({
     lslSessionFilter: [],
+    selectedClasses: new Set<string>(['__test__']),
   })
 })
 
@@ -258,7 +265,7 @@ describe('LslTimelineStrip', () => {
     }
   })
 
-  test('Test 6: click a tick sets setLslSessionFilter([id]) (replaces selection)', async () => {
+  test('Test 6: click a tick sets multi-set selection atomically (lslSessionFilter + selectedBucketKeys + focalBucketKey)', async () => {
     useViewerStore.setState({ lslSessionFilter: ['stale'] })
     const r = renderStrip()
     try {
@@ -267,13 +274,30 @@ describe('LslTimelineStrip', () => {
       act(() => {
         fireEvent.click(tick)
       })
-      expect(useViewerStore.getState().lslSessionFilter).toEqual(['sess-bbbbbbbb'])
+      const s = useViewerStore.getState()
+      // Phase 56 LSL slice still updated.
+      expect(s.lslSessionFilter).toEqual(['sess-bbbbbbbb'])
+      // Phase 56.1 D-2 + D-4: bucketKey composite written via setSelection.
+      // sess-bbbbbbbb is the second fixture session; capture its real startAt
+      // by reading the rendered tick's data-session-id attribute and the
+      // shared makeSessions() fixture (the fixture's startAt is a fresh
+      // nowMinusHours each render, so we derive the expected key from the
+      // store state itself rather than recomputing the timestamp here).
+      expect(s.selectedBucketKeys).toBeInstanceOf(Set)
+      expect(s.selectedBucketKeys.size).toBe(1)
+      // focal must match the bucketKey written into the set (insertion order).
+      const onlyKey = Array.from(s.selectedBucketKeys)[0]
+      expect(s.focalBucketKey).toBe(onlyKey)
+      // selectedNodeIds is a Set (may be empty if pickAllResolvable returned
+      // nothing in this fixture — ALL_VISIBLE proxy makes 'e3' resolve so
+      // size === 1 here; the assertion just checks the type contract).
+      expect(s.selectedNodeIds).toBeInstanceOf(Set)
     } finally {
       r.restore()
     }
   })
 
-  test('Test 7: Cmd/Ctrl+click calls addLslSessionFilter (additive)', async () => {
+  test('Test 7: Cmd/Ctrl+click UNIONs into lslSessionFilter AND extends selectedBucketKeys (Phase 56.1 additive multi-set)', async () => {
     useViewerStore.setState({ lslSessionFilter: ['sess-aaaaaaaa'] })
     const r = renderStrip()
     try {
@@ -282,9 +306,14 @@ describe('LslTimelineStrip', () => {
       act(() => {
         fireEvent.click(tick, { metaKey: true })
       })
-      const filter = useViewerStore.getState().lslSessionFilter
-      expect(filter).toContain('sess-aaaaaaaa')
-      expect(filter).toContain('sess-bbbbbbbb')
+      const s = useViewerStore.getState()
+      // LSL slice union — Phase 56 additive behaviour preserved.
+      expect(s.lslSessionFilter).toContain('sess-aaaaaaaa')
+      expect(s.lslSessionFilter).toContain('sess-bbbbbbbb')
+      // Phase 56.1 extension — bucketKey union as well (single bucket here
+      // because the prior fixture only set lslSessionFilter, not bucketKeys).
+      expect(s.selectedBucketKeys.size).toBeGreaterThanOrEqual(1)
+      expect(s.focalBucketKey).not.toBeNull()
     } finally {
       r.restore()
     }
@@ -396,11 +425,15 @@ describe('LslTimelineStrip', () => {
     expect(out).toMatch(/^[A-Z][a-z]{2,} \d{1,2}$/)
   })
 
-  test('Test 18: tick click writes Phase 56 fields atomically (selectionSource/selectedSessionId/highlightedRowKey)', async () => {
+  test('Test 18: tick click writes Phase 56.1 multi-set fields atomically (selectionSource/selectedBucketKeys/focalBucketKey/focalNodeId/highlightedRowKey)', async () => {
     useViewerStore.setState({
       selectionSource: null,
-      selectedSessionId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       highlightedRowKey: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      // selectedClasses seeded by global beforeEach (WR-03 race gate).
     })
     const r = renderStrip()
     try {
@@ -410,13 +443,19 @@ describe('LslTimelineStrip', () => {
         fireEvent.click(tick)
       })
       const s = useViewerStore.getState()
-      // single getState() snapshot — assert all three new fields together
+      // single getState() snapshot — assert all new multi-set fields together
       expect(s.selectionSource).toBe('timeline')
-      expect(s.selectedSessionId).toBe('sess-bbbbbbbb')
-      // sess-bbbbbbbb has entityIds=['e3'] in makeSessions(), so first id is 'e3'
+      // Phase 56.1 D-2 / D-4: bucket key composite written via setSelection
+      // (Phase 56's scalar selectedSessionId / selectedSessionStartAt are gone).
+      expect(s.selectedBucketKeys.size).toBe(1)
+      const bucketKey = Array.from(s.selectedBucketKeys)[0]
+      expect(bucketKey.startsWith('sess-bbbbbbbb|')).toBe(true)
+      expect(s.focalBucketKey).toBe(bucketKey)
+      // sess-bbbbbbbb has entityIds=['e3'] — ALL_VISIBLE proxy resolves it
+      // so the halo + focal both get 'e3'.
       expect(s.highlightedRowKey).toBe('e3')
-      // pre-existing fields still coherent
-      expect(s.selectedNodeId).toBe('e3')
+      expect(s.focalNodeId).toBe('e3')
+      expect(s.selectedNodeIds.has('e3')).toBe(true)
       expect(s.lslSessionFilter).toEqual(['sess-bbbbbbbb'])
     } finally {
       r.restore()
@@ -433,7 +472,10 @@ describe('LslTimelineStrip', () => {
       id: 'e3',
       createdAt: nowMinusHours(1.75), // strictly inside sess-bbbbbbbb
     })
-    useViewerStore.setState({ selectedNodeId: 'e3' })
+    // Phase 56.1: route through the multi-set imperative shim so focalNodeId
+    // is set (the strip's selectedTs memo keys on focalNodeId now, not the
+    // deleted Phase 56 selectedNodeId field).
+    useViewerStore.getState().setSelectedNode('e3')
     const r = renderStrip()
     try {
       await waitFor(() => {
@@ -443,11 +485,11 @@ describe('LslTimelineStrip', () => {
     } finally {
       r.restore()
       mockEntities.length = 0
-      useViewerStore.setState({ selectedNodeId: null })
+      useViewerStore.getState().setSelectedNode(null)
     }
   })
 
-  test('Test 20: source-grep gate — Phase 56 scale renderer + selectionSource literal wired', () => {
+  test('Test 20: source-grep gate — Phase 56.1 multi-set fields + WR-03 + Locked Contract #4 + Contract #7', () => {
     const src = readFileSync(
       path.resolve(process.cwd(), 'src/panels/coding/LslTimelineStrip.tsx'),
       'utf8',
@@ -458,19 +500,31 @@ describe('LslTimelineStrip', () => {
     expect(src).toMatch(/toLocaleDateString/)
     // scale row test-ids present
     expect(src).toMatch(/lsl-scale-label-/)
-    // Phase 56 timeline-source literal — written via `setSelection({ source: 'timeline' })`
-    // after the audit refactor (was `selectionSource: 'timeline'` via direct
-    // setState pre-audit). Match either form so the gate is robust to that
-    // refactor. >=2 branches: plain + modifier (Cmd/Ctrl additive). Note:
-    // after Commit 3 (state-flow audit `b29bdb34c`) the empty-tick branch
-    // ALSO writes `source: 'timeline'`, so we now expect >=3.
-    const sourceMatches = src.match(/(?:selectionSource|source):\s*['"]timeline['"]/g) ?? []
+    // Phase 56.1: timeline-source literal — written via `setSelection({ source: 'timeline' })`.
+    // >=2 branches: plain + modifier (Cmd/Ctrl additive) + empty-tick.
+    const sourceMatches = src.match(/source:\s*['"]timeline['"]/g) ?? []
     expect(sourceMatches.length).toBeGreaterThanOrEqual(2)
-    // selectedSessionId still referenced — written via sessionId arg to
-    // `setSelection` (canonical action) after the audit refactor; the
-    // literal `selectedSessionId` no longer appears as a setState key from
-    // the strip (audit §6.3). Use a fallback regex to catch either form.
-    expect(src).toMatch(/\b(selectedSessionId|sessionId)\b/)
+    // Phase 56.1 D-2 forward direction — pickAllResolvable IS called from
+    // the strip's onTickClick (the only allowed exception per Contract #7).
+    expect(src).toMatch(/pickAllResolvable/)
+    // Phase 56.1 D-4 — store subscriptions for two-tier render.
+    expect(src).toMatch(/selectedBucketKeys/)
+    expect(src).toMatch(/focalBucketKey/)
+    // Phase 56.1 WR-03 closure — gate on selectedClasses empty.
+    expect(src).toMatch(/selectedClasses\.size\s*===\s*0/)
+    // Phase 56.1 D-7 contract-4 / Locked Contract #4 — 0-obs grey-out
+    // classes preserved verbatim in tick render block.
+    expect(src).toMatch(/opacity-40[^']*pointer-events-none/)
+    // Phase 56.1 Plan 05 extraction — useLslSessions import.
+    expect(src).toMatch(/useLslSessions/)
+    // Phase 56.1: the deleted Phase 56 single-selection fields must not
+    // appear as STORE SUBSCRIPTIONS anywhere in this file. Allow the
+    // strings as comment references (header migration notes) but not as
+    // active `useViewerStore((s) => s.<field>)` reads. Use a negative gate
+    // on the subscription pattern.
+    expect(src).not.toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectedSessionId/)
+    expect(src).not.toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectedSessionStartAt/)
+    expect(src).not.toMatch(/useViewerStore\(\(s\)\s*=>\s*s\.selectedNodeId\b(?!s)/)
     // Container height bumped past h-8
     expect(src).toMatch(/h-1[24]/)
   })
@@ -500,7 +554,9 @@ describe('LslTimelineStrip', () => {
     // group binds `value={windowKey}` so if windowKey snaps back to 7d,
     // the 24h button will show data-state="off" and the 7d button
     // data-state="on".
-    useViewerStore.setState({ selectedNodeId: null })
+    // Phase 56.1: clear via the imperative shim (single-selection setter
+    // wraps the multi-set fields). selectedNodeId field is gone.
+    useViewerStore.getState().setSelectedNode(null)
     const r = renderStrip()
     try {
       await waitFor(() => screen.getByLabelText('24 hours'))
@@ -531,8 +587,8 @@ describe('LslTimelineStrip', () => {
     // memory.
     useViewerStore.setState({
       lslSessionFilter: ['sess-aaaaaaaa'],
-      selectedNodeId: null,
     })
+    useViewerStore.getState().setSelectedNode(null)
     const r = renderStrip()
     try {
       // Wait one tick — the deselect-effect would fire here in the
@@ -560,9 +616,10 @@ describe('LslTimelineStrip', () => {
     // This test now asserts the inverted contract: a 0-obs tick click is
     // a no-op AND the tick is visually greyed-out + aria-disabled.
     useViewerStore.setState({
-      selectedNodeId: null,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
       selectionSource: null,
     })
     const r = renderStrip({
@@ -579,7 +636,7 @@ describe('LslTimelineStrip', () => {
     try {
       await waitFor(() => screen.getByTestId('lsl-tick-sess-empty'))
       const tick = screen.getByTestId('lsl-tick-sess-empty')
-      // Visual + ARIA gate.
+      // Visual + ARIA gate (D-7 contract-4 / Locked Contract #4 preserved).
       expect(tick.className).toMatch(/opacity-40/)
       expect(tick.className).toMatch(/pointer-events-none/)
       expect(tick.getAttribute('aria-disabled')).toBe('true')
@@ -588,7 +645,9 @@ describe('LslTimelineStrip', () => {
         fireEvent.click(tick)
       })
       const s = useViewerStore.getState()
-      expect(s.selectedSessionId).toBeNull()
+      // Phase 56.1 multi-set: bucket-set + selectionSource stay empty/null.
+      expect(s.selectedBucketKeys.size).toBe(0)
+      expect(s.focalBucketKey).toBeNull()
       expect(s.selectionSource).toBeNull()
       // No ring on the tick.
       expect(tick.className).not.toMatch(/ring-blue-500/)
@@ -639,12 +698,19 @@ describe('LslTimelineStrip', () => {
     const preSeededPath = new Set<string>(['pre-seeded'])
     const preSeededLslIds = new Set<string>(['pre-seeded-1', 'pre-seeded-2'])
     useViewerStore.setState({
-      selectedNodeId: 'pre-existing-node',
       pathToSelected: preSeededPath,
       lslFilterEntityIds: preSeededLslIds,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       selectionSource: null,
+    })
+    useViewerStore.getState().setSelectedNode('pre-existing-node')
+    // setSelectedNode wipes pathToSelected via the multi-set semantics —
+    // re-seed it AFTER the setSelectedNode call so the regression assertion
+    // below (path preservation across the 0-obs no-op) is meaningful.
+    useViewerStore.setState({
+      pathToSelected: preSeededPath,
+      lslFilterEntityIds: preSeededLslIds,
     })
     const r = renderStrip({
       sessions: [
@@ -664,33 +730,35 @@ describe('LslTimelineStrip', () => {
         fireEvent.click(tick)
       })
       const s = useViewerStore.getState()
-      // No write — selectedSessionId stays null (early-exit).
-      expect(s.selectedSessionId).toBeNull()
+      // No write — bucket-set stays empty (early-exit).
+      expect(s.selectedBucketKeys.size).toBe(0)
+      expect(s.focalBucketKey).toBeNull()
       expect(s.selectionSource).toBeNull()
       // CRITICAL: pre-existing fields are PRESERVED — same reference.
-      expect(s.selectedNodeId).toBe('pre-existing-node')
+      expect(s.focalNodeId).toBe('pre-existing-node')
       expect(s.pathToSelected).toBe(preSeededPath)
       expect(s.lslFilterEntityIds).toBe(preSeededLslIds)
     } finally {
       r.restore()
+      useViewerStore.getState().setSelectedNode(null)
       useViewerStore.setState({
-        selectedNodeId: null,
         pathToSelected: new Set(),
         lslFilterEntityIds: null,
-        selectedSessionId: null,
-        selectedSessionStartAt: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
         selectionSource: null,
       })
     }
   })
 
-  test('Test 26 [Issue B]: tick click with non-empty entityIds writes selectedNodeId as the bare entity id the graph expects', async () => {
+  test('Test 26 [Issue B]: tick click with non-empty entityIds writes focalNodeId as the bare entity id the graph expects', async () => {
     // The graph's d3Nodes are keyed off `e.id` directly (D3GraphCanvas.tsx
-    // line 380) and applySelectionStyling filters on `.id === selectedNodeId`
-    // (lines 281-283). The strip MUST write the BARE entity id (no prefix,
+    // line 380) and applySelectionStyling filters on `.id === focalNodeId`
+    // (Phase 56.1 D-4). The strip MUST write the BARE entity id (no prefix,
     // no envelope) so the graph's selection styling fires.
     useViewerStore.setState({
-      selectedNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
       pathToSelected: new Set(),
       highlightedRowKey: null,
     })
@@ -702,14 +770,16 @@ describe('LslTimelineStrip', () => {
         fireEvent.click(tick)
       })
       const s = useViewerStore.getState()
-      // sess-bbbbbbbb.entityIds === ['e3'] — bare id, no prefix
-      expect(s.selectedNodeId).toBe('e3')
+      // sess-bbbbbbbb.entityIds === ['e3'] — bare id, no prefix.
+      expect(s.focalNodeId).toBe('e3')
+      expect(s.selectedNodeIds.has('e3')).toBe(true)
       // highlightedRowKey must also be bare id — the HistorySidebar
       // matches on `data-history-id={entity.id}` directly.
       expect(s.highlightedRowKey).toBe('e3')
     } finally {
       r.restore()
-      useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
+      useViewerStore.getState().setSelectedNode(null)
+      useViewerStore.setState({ pathToSelected: new Set() })
     }
   })
 
@@ -733,8 +803,10 @@ describe('LslTimelineStrip', () => {
     // tranche-1 must NOT ring tranche-2.
     mockEntities.length = 0
     useViewerStore.setState({
-      selectedNodeId: null,
-      selectedSessionId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
     })
     const r = renderStrip({
       sessions: [
@@ -799,7 +871,11 @@ describe('LslTimelineStrip', () => {
     } finally {
       r.restore()
       mockEntities.length = 0
-      useViewerStore.setState({ selectedNodeId: null, selectedSessionId: null })
+      useViewerStore.getState().setSelectedNode(null)
+      useViewerStore.setState({
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
+      })
     }
   })
 
@@ -829,9 +905,10 @@ describe('LslTimelineStrip', () => {
     // composite key.
     mockEntities.length = 0
     useViewerStore.setState({
-      selectedNodeId: null,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
     })
     const r = renderStrip({
       sessions: [
@@ -883,24 +960,25 @@ describe('LslTimelineStrip', () => {
       expect(allRinged.length).toBe(1)
     } finally {
       r.restore()
+      useViewerStore.getState().setSelectedNode(null)
       useViewerStore.setState({
-        selectedNodeId: null,
-        selectedSessionId: null,
-        selectedSessionStartAt: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
       })
     }
   })
 
-  test('Test 31 [audit §6.5 R1 — T-B]: clearing the selection (id=null AND startAt=null) leaves NO tick ringed in the immediate next render (no one-render leak)', async () => {
-    // After clicking a tick, the store has selectedSessionId + startAt.
-    // Then someone (a graph node click, or Esc) writes selectedSessionId=null
-    // AND selectedSessionStartAt=null. The next render MUST show no ring on
-    // any tick — no one-render flash from local state lagging the store.
+  test('Test 31 [audit §6.5 R1 — T-B]: clearing the selection (Phase 56.1 multi-set cleared) leaves NO tick ringed in the immediate next render (no one-render leak)', async () => {
+    // After clicking a tick, the store has selectedBucketKeys + focalBucketKey.
+    // Then someone (a graph node click, or Esc) writes both back to empty/null.
+    // The next render MUST show no ring on any tick — no one-render flash
+    // from local state lagging the store.
     mockEntities.length = 0
     useViewerStore.setState({
-      selectedNodeId: null,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
     })
     const r = renderStrip()
     try {
@@ -915,13 +993,13 @@ describe('LslTimelineStrip', () => {
       await waitFor(() => {
         expect(screen.getByTestId('lsl-tick-sess-bbbbbbbb').className).toMatch(/ring-blue-500/)
       })
-      // Simulate clearSelection cascade — null BOTH session fields atomically
-      // (the contract Commit 1 locked: id + startAt are sibling cleared).
+      // Simulate clearSelection cascade — Phase 56.1 multi-set cleared atomically.
       act(() => {
         useViewerStore.setState({
-          selectedSessionId: null,
-          selectedSessionStartAt: null,
-          selectedNodeId: null,
+          selectedBucketKeys: new Set<string>(),
+          focalBucketKey: null,
+          selectedNodeIds: new Set<string>(),
+          focalNodeId: null,
         })
       })
       // IMMEDIATE NEXT RENDER (no waitFor): no tick rings.
@@ -932,26 +1010,24 @@ describe('LslTimelineStrip', () => {
     } finally {
       r.restore()
       useViewerStore.setState({
-        selectedNodeId: null,
-        selectedSessionId: null,
-        selectedSessionStartAt: null,
+        selectedNodeIds: new Set<string>(),
+        focalNodeId: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
       })
     }
   })
 
-  test('Test 32 [audit §5.4 option B R6 — T-E]: 0-obs ticks render greyed-out (opacity-40 + pointer-events-none) and clicks are no-op', async () => {
+  test('Test 32 [audit §5.4 option B R6 — T-E / D-7 contract-4]: 0-obs ticks render greyed-out (opacity-40 + pointer-events-none) and clicks are no-op', async () => {
     // 0-obs/0-entities ticks must still render (operator sees "I had a
     // session at X o'clock") but cannot be clicked. The strip renders
     // them with opacity-40 + pointer-events-none + aria-disabled.
     mockEntities.length = 0
     useViewerStore.setState({
-      selectedNodeId: null,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
-      // 2026-06-13: explicitly reset selectionSource — prior tests in this
-      // file may leave 'timeline' lingering and the no-op assertion below
-      // checks for null. The global beforeEach() does not include this
-      // field (it pre-dates Phase 56).
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       selectionSource: null,
       highlightedRowKey: null,
     })
@@ -983,15 +1059,17 @@ describe('LslTimelineStrip', () => {
       await waitFor(() => {
         // Use a microtask boundary; nothing should have changed.
         const s = useViewerStore.getState()
-        expect(s.selectedSessionId).toBeNull()
+        expect(s.selectedBucketKeys.size).toBe(0)
+        expect(s.focalBucketKey).toBeNull()
         expect(s.selectionSource).toBeNull()
       })
     } finally {
       r.restore()
       useViewerStore.setState({
-        selectedNodeId: null,
-        selectedSessionId: null,
-        selectedSessionStartAt: null,
+        selectedNodeIds: new Set<string>(),
+        focalNodeId: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
       })
     }
   })
@@ -1015,7 +1093,8 @@ describe('LslTimelineStrip', () => {
       { from: 'root', to: 'parent-1', type: 'contains' },
     ]
     useViewerStore.setState({
-      selectedNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
       pathToSelected: new Set<string>(),
     })
     const r = renderStrip()
@@ -1026,17 +1105,18 @@ describe('LslTimelineStrip', () => {
         fireEvent.click(tick)
       })
       const s = useViewerStore.getState()
-      expect(s.selectedNodeId).toBe('e3')
+      // Phase 56.1: focal entity is 'e3' (bucket's first resolvable id).
+      expect(s.focalNodeId).toBe('e3')
+      expect(s.selectedNodeIds.has('e3')).toBe(true)
       // pathToSelected must contain at least 'e3' and its ancestors.
-      // Strict: size > 0 (empty means the ancestry path was never built).
       expect(s.pathToSelected.size).toBeGreaterThan(0)
-      // Must include the node itself.
       expect(s.pathToSelected.has('e3')).toBe(true)
     } finally {
       r.restore()
       mockEntities.length = 0
       delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
-      useViewerStore.setState({ selectedNodeId: null, pathToSelected: new Set() })
+      useViewerStore.getState().setSelectedNode(null)
+      useViewerStore.setState({ pathToSelected: new Set() })
     }
   })
 
@@ -1090,10 +1170,11 @@ describe('LslTimelineStrip', () => {
     ;(globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> }).__mockVisibleIds =
       new Set<string>(['component-1', 'root-1'])
     useViewerStore.setState({
-      selectedNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
       pathToSelected: new Set<string>(),
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
     })
     // Capture session startAt once so test assertion compares the exact
     // same ISO string (nowMinusHours uses Date.now() — distinct calls
@@ -1117,10 +1198,11 @@ describe('LslTimelineStrip', () => {
         fireEvent.click(tick)
       })
       const s = useViewerStore.getState()
-      // The fix: selectedNodeId is the resolved ancestor, NOT the phantom Detail.
-      expect(s.selectedNodeId).toBe('component-1')
-      // sessionStartAt is the bucket's startAt.
-      expect(s.selectedSessionStartAt).toBe(sessionStartAt)
+      // The fix: focal is the resolved ancestor, NOT the phantom Detail.
+      expect(s.focalNodeId).toBe('component-1')
+      expect(s.selectedNodeIds.has('component-1')).toBe(true)
+      // Phase 56.1: bucketKey composite encodes the bucket's startAt.
+      expect(s.focalBucketKey).toBe(`sess-phantom|${sessionStartAt}`)
       // pathToSelected includes the resolved ancestor + its parent.
       expect(s.pathToSelected.has('component-1')).toBe(true)
       expect(s.pathToSelected.has('root-1')).toBe(true)
@@ -1131,17 +1213,17 @@ describe('LslTimelineStrip', () => {
       mockEntities.length = 0
       delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
       delete (globalThis as unknown as { __mockVisibleIds?: unknown }).__mockVisibleIds
+      useViewerStore.getState().setSelectedNode(null)
       useViewerStore.setState({
-        selectedNodeId: null,
         pathToSelected: new Set(),
-        selectedSessionId: null,
-        selectedSessionStartAt: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
         lslFilterEntityIds: null,
       })
     }
   })
 
-  test('Test 34 [T-G — no visible ancestor → sidebar-only mode]: tick whose entities have NO graph-visible ancestor writes selectedNodeId=null but still cascades session + LSL fade', async () => {
+  test('Test 34 [T-G — no visible ancestor → sidebar-only mode]: tick whose entities have NO graph-visible ancestor writes focalNodeId=null but still cascades bucket + LSL fade', async () => {
     // Fixture:
     //   - bucket.entityIds === ['orphan-detail']
     //   - ancestry chain: orphan-detail has no edges
@@ -1164,10 +1246,11 @@ describe('LslTimelineStrip', () => {
     ;(globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> }).__mockVisibleIds =
       new Set<string>(['unrelated-1', 'unrelated-2'])
     useViewerStore.setState({
-      selectedNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
       pathToSelected: new Set<string>(),
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       lslFilterEntityIds: null,
     })
     const sessionStartAt = nowMinusHours(2)
@@ -1190,10 +1273,11 @@ describe('LslTimelineStrip', () => {
       })
       const s = useViewerStore.getState()
       // Sidebar-only mode: no graph selection.
-      expect(s.selectedNodeId).toBeNull()
-      // Session bucket is still selected so the timeline tick rings.
-      expect(s.selectedSessionId).toBe('sess-orphan')
-      expect(s.selectedSessionStartAt).toBe(sessionStartAt)
+      expect(s.focalNodeId).toBeNull()
+      expect(s.selectedNodeIds.size).toBe(0)
+      // Bucket key is still selected so the timeline tick rings.
+      expect(s.focalBucketKey).toBe(`sess-orphan|${sessionStartAt}`)
+      expect(s.selectedBucketKeys.has(`sess-orphan|${sessionStartAt}`)).toBe(true)
       // LSL fade still works — bucket's raw entities populate the filter.
       expect(s.lslFilterEntityIds?.has('orphan-detail')).toBe(true)
       // No trace to render.
@@ -1203,11 +1287,11 @@ describe('LslTimelineStrip', () => {
       mockEntities.length = 0
       delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
       delete (globalThis as unknown as { __mockVisibleIds?: unknown }).__mockVisibleIds
+      useViewerStore.getState().setSelectedNode(null)
       useViewerStore.setState({
-        selectedNodeId: null,
         pathToSelected: new Set(),
-        selectedSessionId: null,
-        selectedSessionStartAt: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
         lslFilterEntityIds: null,
       })
     }
@@ -1232,10 +1316,11 @@ describe('LslTimelineStrip', () => {
     ;(globalThis as unknown as { __mockVisibleIds?: ReadonlySet<string> }).__mockVisibleIds =
       new Set<string>(['component-2', 'root-2'])
     useViewerStore.setState({
-      selectedNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
       pathToSelected: new Set<string>(),
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
     })
     const sessionStartAt = nowMinusHours(2)
     const r = renderStrip({
@@ -1257,8 +1342,9 @@ describe('LslTimelineStrip', () => {
       })
       const s = useViewerStore.getState()
       // Identity: the bucket's first entity IS visible → write it as-is.
-      expect(s.selectedNodeId).toBe('component-2')
-      expect(s.selectedSessionStartAt).toBe(sessionStartAt)
+      expect(s.focalNodeId).toBe('component-2')
+      expect(s.selectedNodeIds.has('component-2')).toBe(true)
+      expect(s.focalBucketKey).toBe(`sess-happy|${sessionStartAt}`)
       // Trace includes the visible ancestry.
       expect(s.pathToSelected.has('component-2')).toBe(true)
       expect(s.pathToSelected.has('root-2')).toBe(true)
@@ -1267,17 +1353,17 @@ describe('LslTimelineStrip', () => {
       mockEntities.length = 0
       delete (globalThis as unknown as { __mockRelations?: unknown }).__mockRelations
       delete (globalThis as unknown as { __mockVisibleIds?: unknown }).__mockVisibleIds
+      useViewerStore.getState().setSelectedNode(null)
       useViewerStore.setState({
-        selectedNodeId: null,
         pathToSelected: new Set(),
-        selectedSessionId: null,
-        selectedSessionStartAt: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
         lslFilterEntityIds: null,
       })
     }
   })
 
-  test('Test 36 [round-4 acceptance grep]: LslTimelineStrip.tsx calls pickFirstResolvable from onTickClick', () => {
+  test('Test 36 [Phase 56.1 acceptance grep]: LslTimelineStrip.tsx calls pickAllResolvable + pickFirstResolvable from onTickClick', () => {
     const src = readFileSync(
       path.resolve(process.cwd(), 'src/panels/coding/LslTimelineStrip.tsx'),
       'utf8',
@@ -1286,8 +1372,144 @@ describe('LslTimelineStrip', () => {
     // helper before any setSelection write. Source-grep gate locks the
     // wiring at the file level even if a future refactor moves the call.
     expect(src).toMatch(/pickFirstResolvable/)
+    // Phase 56.1 D-2 forward direction — the strip's onTickClick computes
+    // the FULL halo via pickAllResolvable. Contract #7 lets the strip be
+    // the ONLY non-pre-index callsite of this function.
+    expect(src).toMatch(/pickAllResolvable/)
     // The helper module is the canonical home; the file imports it from
     // @/graph/ancestry (audit §6.4 extraction site).
     expect(src).toMatch(/from\s+['"]@\/graph\/ancestry['"]/)
+  })
+
+  // ====================================================================
+  // Phase 56.1 Plan 05 — NEW tests for the WR-03 race-window closure +
+  // two-tier bucket render (focal + halo).
+  // ====================================================================
+
+  test('Test WR-03: tick click no-ops when selectedClasses is empty (race-window close)', async () => {
+    // The strip's onTickClick early-exits with a Logger.warn when the
+    // ontology class set hasn't been seeded yet (1-render race after data
+    // load). Without the gate, a click during that window enters
+    // sidebar-only mode with an empty class filter — wrong contract.
+    useViewerStore.setState({
+      selectedClasses: new Set<string>(), // EMPTY — overrides global beforeEach.
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
+    })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      const tick = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      const s = useViewerStore.getState()
+      // No mutation — bucket-set + node-set stayed empty.
+      expect(s.selectedNodeIds.size).toBe(0)
+      expect(s.selectedBucketKeys.size).toBe(0)
+      expect(s.focalNodeId).toBeNull()
+      expect(s.focalBucketKey).toBeNull()
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 56.1-T1: focal bucket renders with ring-blue-500', async () => {
+    // Set the multi-set so the rendered tick for sess-bbbbbbbb is the
+    // focal — predicate `focalBucketKey === tickKey`. Use a deferred
+    // setState so the strip renders AFTER the sessions arrive and we know
+    // the real startAt of the rendered tick. We then read it from the
+    // DOM and seed the store before reading the className.
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      // Find the actual startAt by reading the strip's rendered tick. The
+      // makeSessions() fixture re-computes `nowMinusHours(2)` each call;
+      // we capture the bucket key by parsing the DOM's data attrs.
+      // Simpler: click the tick to populate focalBucketKey, then assert
+      // the style. (This exercises the write→render flow end-to-end.)
+      const tick = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      await waitFor(() => {
+        const refreshed = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+        expect(refreshed.className).toMatch(/ring-blue-500/)
+      })
+    } finally {
+      r.restore()
+      useViewerStore.setState({
+        selectedNodeIds: new Set<string>(),
+        focalNodeId: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
+      })
+    }
+  })
+
+  test('Test 56.1-T2: halo bucket (in selectedBucketKeys, not focal) renders with ring-blue-300/60 + bg-blue-200/40', async () => {
+    // Render two ticks of the same session id with distinct startAts.
+    // Click one (focal); seed the OTHER's bucket key into selectedBucketKeys
+    // without setting it as focal; assert it gets the halo classes.
+    mockEntities.length = 0
+    useViewerStore.setState({
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
+    })
+    const tickAStartAt = nowMinusHours(3)
+    const tickBStartAt = nowMinusHours(1)
+    const r = renderStrip({
+      sessions: [
+        {
+          id: 'sess-halo',
+          startAt: tickAStartAt,
+          endAt: nowMinusHours(2.5),
+          observationCount: 4,
+          entityIds: [],
+        },
+        {
+          id: 'sess-halo',
+          startAt: tickBStartAt,
+          endAt: nowMinusHours(0.5),
+          observationCount: 3,
+          entityIds: [],
+        },
+      ],
+    })
+    try {
+      await waitFor(() => {
+        expect(screen.getAllByTestId('lsl-tick-sess-halo').length).toBe(2)
+      })
+      // Manually inject the store snapshot — focal on tick A, halo includes
+      // tick B (so tick B is in the set but NOT focal).
+      const tickAKey = `sess-halo|${tickAStartAt}`
+      const tickBKey = `sess-halo|${tickBStartAt}`
+      act(() => {
+        useViewerStore.setState({
+          selectedBucketKeys: new Set<string>([tickAKey, tickBKey]),
+          focalBucketKey: tickAKey,
+        })
+      })
+      await waitFor(() => {
+        const ticks = screen.getAllByTestId('lsl-tick-sess-halo')
+        // The two render order depends on sort by startAt — tickA (3h ago)
+        // is OLDER, so it renders first in the sorted array (left in time).
+        const tickAEl = ticks[0]
+        const tickBEl = ticks[1]
+        expect(tickAEl.className).toMatch(/ring-blue-500/)
+        expect(tickBEl.className).toMatch(/ring-blue-300\/60/)
+        expect(tickBEl.className).toMatch(/bg-blue-200\/40/)
+      })
+    } finally {
+      r.restore()
+      useViewerStore.setState({
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
+      })
+    }
   })
 })

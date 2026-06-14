@@ -77,13 +77,16 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
     // 2026-06-13 (CR-01): also reset the LSL filter slice + the sibling
     // selectedSessionStartAt so Test 11 starts from a clean slate and the
     // pre-seeded LSL state it writes cannot leak from a prior test.
+    // 2026-06-13 (Phase 56.1 Plan 05): single-selection fields are gone —
+    // multi-set + derived focal. Bucket-set replaces (sessionId, startAt).
     useViewerStore.setState({
-      selectedNodeId: null,
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       theme: 'light',
       selectionSource: null,
       highlightedRowKey: null,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       lslSessionFilter: [],
       lslFilterEntityIds: null,
     })
@@ -94,7 +97,7 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
   })
 
   test('Test 1: renders only when selectedNodeId === null — null guard', () => {
-    useViewerStore.setState({ selectedNodeId: 'some-id' })
+    useViewerStore.getState().setSelectedNode('some-id')
     const { container } = renderPanel()
     // Sidebar root absent when selection is non-null.
     expect(container.querySelector('[data-testid="occurrence-history-sidebar"]')).toBeNull()
@@ -157,7 +160,7 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
     renderPanel()
     const row = screen.getByTestId('occurrence-row-e-min')
     fireEvent.click(row)
-    expect(useViewerStore.getState().selectedNodeId).toBe('e-min')
+    expect(useViewerStore.getState().focalNodeId).toBe('e-min')
   })
 
   test('Test 5: layer badge classes are sourced from LAYER_BADGE_CLASS (vokb-palette)', () => {
@@ -184,7 +187,7 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
     // single-field setSelectedNode call: selectedNodeId + highlightedRowKey +
     // selectionSource all land together with pathToSelected reset.
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBe('e-min')
+    expect(s.focalNodeId).toBe('e-min')
     expect(s.highlightedRowKey).toBe('e-min')
     expect(s.selectionSource).toBe('history')
   })
@@ -193,8 +196,9 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
     // External signal (e.g. timeline tick cascade in Plan 04) sets
     // highlightedRowKey but leaves selectedNodeId null — sidebar IS visible
     // per the line-70 null-guard, and the row should still light up.
+    // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set + focal.
+    useViewerStore.getState().setSelectedNode(null)
     useViewerStore.setState({
-      selectedNodeId: null,
       highlightedRowKey: 'e-min',
       selectionSource: 'timeline',
     })
@@ -250,12 +254,14 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
     // narrowed to a session's entities) + sibling session-tick fields
     // populated, with selectedNodeId still null because the bucket's
     // entities had no graph-visible ancestor (round-4 sidebar-only path).
+    // 2026-06-13 (Phase 56.1 Plan 05): Phase 56 single-selection fields are
+    // gone. Seed via multi-set + bucketKey composite (which encodes startAt).
+    useViewerStore.getState().setSelectedNode(null)
     useViewerStore.setState({
-      selectedNodeId: null,
       selectionSource: 'timeline',
       highlightedRowKey: null,
-      selectedSessionId: 'sess-X',
-      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+      selectedBucketKeys: new Set<string>(['sess-X|2026-06-13T11:00:00Z']),
+      focalBucketKey: 'sess-X|2026-06-13T11:00:00Z',
       lslSessionFilter: ['sess-X'],
       lslFilterEntityIds: new Set<string>(['orphan-1', 'orphan-2']),
     })
@@ -270,14 +276,14 @@ describe('OccurrenceHistorySidebar (Plan 55-09 Task 1)', () => {
     // stops narrowing to the previous session's entities.
     const s = useViewerStore.getState()
     // Selection moved to the clicked row.
-    expect(s.selectedNodeId).toBe('e-min')
+    expect(s.focalNodeId).toBe('e-min')
     expect(s.highlightedRowKey).toBe('e-min')
     expect(s.selectionSource).toBe('history')
     // Sibling session-tick fields MUST be cleared (audit §7 R2: they are
     // always written/cleared together; the previous tick-set values are now
     // stale because the user navigated to a different entity context).
-    expect(s.selectedSessionId).toBeNull()
-    expect(s.selectedSessionStartAt).toBeNull()
+    expect(s.focalBucketKey).toBeNull()
+    expect(s.focalBucketKey).toBeNull()
     // LSL session-filter scope MUST be cleared so the D3 graph's
     // `visibleEntities` predicate stops intersecting against the previous
     // tick's entity set. This is the audit-contract-#5 cascade-clear

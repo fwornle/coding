@@ -14,7 +14,9 @@ describe('makeNodeReducer — sigma per-frame state translation', () => {
     // selectedClasses = nothing visible, so seed with 'Observation' so
     // tests of the default-render path see a visible node.
     useViewerStore.setState({
-      selectedNodeId: null,
+      // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId → focalNodeId.
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
       selectedClasses: new Set(['Observation']),
@@ -38,7 +40,7 @@ describe('makeNodeReducer — sigma per-frame state translation', () => {
   })
 
   test('selected state — 3px blue-500 stroke + glow', () => {
-    useViewerStore.setState({ selectedNodeId: 'a' })
+    useViewerStore.getState().setSelectedNode('a')
     const reducer = makeNodeReducer(null)
     const result = reducer('a', { name: 'Alpha', label: 'Alpha', color: '#ff0000', size: 8, ontologyClass: 'Observation', level: 3 })
     expect((result as { borderColor?: string }).borderColor).toBe('#3b82f6')
@@ -102,10 +104,16 @@ describe('makeNodeReducer — sigma per-frame state translation', () => {
 describe('makeEdgeReducer', () => {
   beforeEach(() => {
     useViewerStore.setState({
-      selectedNodeId: null,
+      // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId → focalNodeId.
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
       selectedClasses: new Set(),
+      // Clear pathToSelected so the edge reducer's "store path active" branch
+      // doesn't leak from prior tests in the file (pre-existing latent bug
+      // surfaced now that the reducer reads pathToSelected from the store).
+      pathToSelected: new Set<string>(),
     })
   })
 
@@ -117,7 +125,7 @@ describe('makeEdgeReducer', () => {
   })
 
   test('incident on selected — primary blue #3b82f6 at opacity 1.0', () => {
-    useViewerStore.setState({ selectedNodeId: 'a' })
+    useViewerStore.getState().setSelectedNode('a')
     const reducer = makeEdgeReducer()
     const result = reducer('e1', { source: 'a', target: 'b', color: '#000', size: 1 })
     expect((result as { color?: string }).color).toBe('#3b82f6')
@@ -153,7 +161,9 @@ describe('SHAPE_NODE_PROGRAMS — Plan 55-05 (sigma nodeProgramClasses)', () => 
 describe('makeNodeReducer — Plan 55-05 borderStyle + pulse halo threading', () => {
   beforeEach(() => {
     useViewerStore.setState({
-      selectedNodeId: null,
+      // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId → focalNodeId.
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
       selectedClasses: new Set(['Observation']),

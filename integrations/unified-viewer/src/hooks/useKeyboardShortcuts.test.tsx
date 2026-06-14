@@ -62,8 +62,10 @@ function Harness({
 describe('useKeyboardShortcuts', () => {
   beforeEach(() => {
     _resetSequenceRegistryForTests()
+    // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set.
     useViewerStore.setState({
-      selectedNodeId: null,
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       selectedEdgeId: null,
       searchQuery: '',
       visibleLevels: new Set([0, 1, 2, 3]),
@@ -102,18 +104,18 @@ describe('useKeyboardShortcuts', () => {
   })
 
   test('Test 3: Esc with no dialog open and no search focus clears selectedNodeId', () => {
-    useViewerStore.setState({ selectedNodeId: 'node-42' })
+    useViewerStore.getState().setSelectedNode('node-42')
     render(<Harness />)
-    expect(useViewerStore.getState().selectedNodeId).toBe('node-42')
+    expect(useViewerStore.getState().focalNodeId).toBe('node-42')
     const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
     act(() => {
       document.dispatchEvent(event)
     })
-    expect(useViewerStore.getState().selectedNodeId).toBeNull()
+    expect(useViewerStore.getState().focalNodeId).toBeNull()
   })
 
   test('Test 3b: Esc consults onCloseHelpDialog FIRST (before deselecting)', () => {
-    useViewerStore.setState({ selectedNodeId: 'node-42' })
+    useViewerStore.getState().setSelectedNode('node-42')
     const onCloseHelpDialog = vi.fn(() => true)
     render(<Harness onCloseHelpDialog={onCloseHelpDialog} />)
     const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
@@ -122,7 +124,7 @@ describe('useKeyboardShortcuts', () => {
     })
     expect(onCloseHelpDialog).toHaveBeenCalled()
     // selected node UNCHANGED because the dialog claim was made first
-    expect(useViewerStore.getState().selectedNodeId).toBe('node-42')
+    expect(useViewerStore.getState().focalNodeId).toBe('node-42')
   })
 
   test('Test 4: `?` opens KeyboardHelpDialog (binding called) with preventDefault', () => {
@@ -161,7 +163,7 @@ describe('useKeyboardShortcuts', () => {
   })
 
   test('Test 6: Esc blurs focused search input (does NOT clear node selection on first press)', () => {
-    useViewerStore.setState({ selectedNodeId: 'node-99' })
+    useViewerStore.getState().setSelectedNode('node-99')
     const { getByTestId } = render(<Harness inputFocused />)
     const input = getByTestId('search-input') as HTMLInputElement
     expect(document.activeElement).toBe(input)
@@ -170,7 +172,7 @@ describe('useKeyboardShortcuts', () => {
     })
     expect(document.activeElement).not.toBe(input)
     // selected node NOT cleared on this first Esc — only on the next one
-    expect(useViewerStore.getState().selectedNodeId).toBe('node-99')
+    expect(useViewerStore.getState().focalNodeId).toBe('node-99')
   })
 
   // ---- Phase 55-11 Task 1: registerSequence two-key sequence support ----
@@ -296,13 +298,15 @@ describe('useKeyboardShortcuts', () => {
   // selection slice + LSL filter clear together.
 
   test('Test 12 (Phase 56): Esc with selectedNodeId + lslSessionFilter set → BOTH cleared (cascade through clearSelection)', () => {
+    // 2026-06-13 (Phase 56.1 Plan 05): single-selection fields are gone.
+    useViewerStore.getState().setSelectedNode('node-42')
     useViewerStore.setState({
-      selectedNodeId: 'node-42',
       lslSessionFilter: ['sess-keep'],
       lslFilterEntityIds: new Set<string>(['x', 'y']),
       selectionSource: 'graph',
       highlightedRowKey: 'row-42',
-      selectedSessionId: 'sess-42',
+      selectedBucketKeys: new Set<string>(['sess-42|2026-06-13T11:00:00Z']),
+      focalBucketKey: 'sess-42|2026-06-13T11:00:00Z',
     })
     render(<Harness />)
     act(() => {
@@ -311,12 +315,12 @@ describe('useKeyboardShortcuts', () => {
       )
     })
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBeNull()
+    expect(s.focalNodeId).toBeNull()
     expect(s.lslSessionFilter).toEqual([])
     expect(s.lslFilterEntityIds).toBeNull()
     expect(s.selectionSource).toBeNull()
     expect(s.highlightedRowKey).toBeNull()
-    expect(s.selectedSessionId).toBeNull()
+    expect(s.focalBucketKey).toBeNull()
   })
 
   test('Test 13 (Phase 56, CR-03 review fix): Esc with no selection at all: clearSelection() NOT called (guard preserved)', () => {
@@ -328,11 +332,12 @@ describe('useKeyboardShortcuts', () => {
     // cleared, clearSelection() must not fire. We verify by inspecting that
     // the dispatched Escape event was NOT defaultPrevented (the handler's
     // `event.preventDefault()` lives inside the `if (hasSelection)` arm).
+    // 2026-06-13 (Phase 56.1 Plan 05): single-selection fields are gone.
+    useViewerStore.getState().setSelectedNode(null)
     useViewerStore.setState({
-      selectedNodeId: null,
       selectedEdgeId: null,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       lslSessionFilter: [],
       lslFilterEntityIds: null,
     })
@@ -349,14 +354,15 @@ describe('useKeyboardShortcuts', () => {
     expect(event.defaultPrevented).toBe(false)
     // Sanity: state still fully empty (clearSelection did not fire).
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBeNull()
+    expect(s.focalNodeId).toBeNull()
     expect(s.lslSessionFilter).toEqual([])
     expect(s.lslFilterEntityIds).toBeNull()
   })
 
   test('Test 14 (Phase 56): Esc inside focused search input: clears focus first, does NOT clear selection (BC preserved)', () => {
+    // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — multi-set.
+    useViewerStore.getState().setSelectedNode('node-99')
     useViewerStore.setState({
-      selectedNodeId: 'node-99',
       lslSessionFilter: ['preserve-me'],
     })
     const { getByTestId } = render(<Harness inputFocused />)
@@ -370,7 +376,7 @@ describe('useKeyboardShortcuts', () => {
     // Input blurred (Phase 55 behaviour)
     expect(document.activeElement).not.toBe(input)
     // Selection slice + LSL filter unchanged on first Esc
-    expect(useViewerStore.getState().selectedNodeId).toBe('node-99')
+    expect(useViewerStore.getState().focalNodeId).toBe('node-99')
     expect(useViewerStore.getState().lslSessionFilter).toEqual(['preserve-me'])
   })
 
@@ -386,10 +392,12 @@ describe('useKeyboardShortcuts', () => {
   // lslFilterEntityIds; Esc must clear every field via clearSelection().
 
   test('Test 15 (CR-03 review fix): Esc in sidebar-only mode (selectedNodeId=null, session+LSL fields set) clears EVERYTHING', () => {
+    // 2026-06-13 (Phase 56.1 Plan 05): single-selection fields are gone.
+    // Seed the bucketKey composite to model the sidebar-only mode.
+    useViewerStore.getState().setSelectedNode(null)
     useViewerStore.setState({
-      selectedNodeId: null,
-      selectedSessionId: 'sess-X',
-      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+      selectedBucketKeys: new Set<string>(['sess-X|2026-06-13T11:00:00Z']),
+      focalBucketKey: 'sess-X|2026-06-13T11:00:00Z',
       lslFilterEntityIds: new Set<string>(['e1', 'e2']),
       lslSessionFilter: ['sess-X'],
     })
@@ -406,9 +414,9 @@ describe('useKeyboardShortcuts', () => {
     expect(event.defaultPrevented).toBe(true)
     const s = useViewerStore.getState()
     // clearSelection() empties every field per viewer-store.ts:373-385.
-    expect(s.selectedNodeId).toBeNull()
-    expect(s.selectedSessionId).toBeNull()
-    expect(s.selectedSessionStartAt).toBeNull()
+    expect(s.focalNodeId).toBeNull()
+    expect(s.focalBucketKey).toBeNull()
+    expect(s.focalBucketKey).toBeNull()
     expect(s.lslSessionFilter).toEqual([])
     expect(s.lslFilterEntityIds).toBeNull()
   })

@@ -151,7 +151,8 @@ const MERMAID_PLACEHOLDER_COPY =
 
 export function MarkdownViewerPanel({ apiClient, system }: MarkdownViewerPanelProps) {
   const { entities } = useGraphData(apiClient, system)
-  const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — use focalNodeId.
+  const selectedNodeId = useViewerStore((s) => s.focalNodeId)
   const theme = useViewerStore((s) => s.theme)
   const contentRef = useRef<HTMLDivElement>(null)
   const history = useMarkdownHistory()

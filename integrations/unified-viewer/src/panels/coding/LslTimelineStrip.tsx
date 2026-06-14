@@ -40,7 +40,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 // §2.5 V1 was deleted in this round). Selection state is now read directly
 // from the store via subscriptions; the tick-ring predicate derives the
 // composite (sessionId, startAt) bucket key from the store.
-import { useQuery } from '@tanstack/react-query'
+//
+// 2026-06-13 (Phase 56.1 Plan 05): the inline TanStack Query for LSL
+// sessions is extracted to `./useLslSessions`. Both the strip AND the
+// reverse-lookup pre-index hook (`useNodeToBucketsIndex`) consume the
+// extracted module, so any future query-shape change lives in one place.
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   Tooltip,
@@ -57,65 +61,32 @@ import { useGraphData } from '@/graph/useGraphData'
 // central-trace renders when a tick click resolves a focal entity.
 // Shared with D3GraphCanvas via the extracted helper module.
 //
-// 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution): also import
-// `pickFirstResolvable`. The D3 graph filters Observations/Digests/
-// Details out of the rendered set, but bucket entityIds are usually
-// Detail-level. Without resolution, the strip wrote a phantom id to
-// `selectedNodeId` (no graph node matched → no ring, sidebar disagreed
-// with the graph). Locked in 56-PATTERNS.md contract #6.
-import { computeAncestryPath, pickFirstResolvable } from '@/graph/ancestry'
+// 2026-06-13 (Phase 56.1 Plan 05 — D-2 forward direction): `pickAllResolvable`
+// computes the FULL set of resolved ancestors for the clicked bucket — the
+// multi-set selection halo. `pickFirstResolvable` still picks the focal node
+// id (insertion-order "first" matches Phase 56 single-selection behavior).
+// Locked in 56.1-PATTERNS.md Contract #7 — the canonical forward-direction
+// callsite of `pickAllResolvable`.
+import {
+  computeAncestryPath,
+  pickAllResolvable,
+  pickFirstResolvable,
+} from '@/graph/ancestry'
 import { useVisibleEntityIds } from '@/graph/useVisibleEntityIds'
+import { useLslSessions, WINDOW_MS, type LslSession, type LslWindow } from './useLslSessions'
 
-export type LslWindow = '24h' | '7d' | '30d' | 'all'
-
-// 2026-06-12: 'all' = 365d cap. Sessions older than that are extremely
-// rare in practice and the backing API already enforces `limit=200`, so
-// a huge effective window doesn't blow up the strip. The fetched `since`
-// is computed from this — the backend returns whatever falls in range.
-const WINDOW_MS: Record<LslWindow, number> = {
-  '24h': 24 * 3600_000,
-  '7d': 7 * 24 * 3600_000,
-  '30d': 30 * 24 * 3600_000,
-  'all': 365 * 24 * 3600_000,
-}
+// Re-export the extracted types so callers/tests that imported them from
+// this file continue to compile without code change.
+export type { LslSession, LslWindow } from './useLslSessions'
 
 // 2026-06-12: ESC reset fallback — 7d gives a useful spread of sessions
 // without being so zoomed-in that only the running tick is visible.
 // (Initial UX used '24h' but the user reported it felt "majorly zoomed".)
 const LATEST_WINDOW: LslWindow = '7d'
 
-export interface LslSession {
-  id: string
-  startAt: string // ISO
-  endAt: string | null
-  observationCount: number
-  entityIds: string[]
-}
-
 interface LslTimelineStripProps {
   system: 'coding' | 'okb'
   apiClient: ApiClient
-}
-
-async function fetchSessions(
-  apiClient: ApiClient,
-  windowMs: number,
-): Promise<LslSession[]> {
-  const since = new Date(Date.now() - windowMs).toISOString()
-  const url = `${apiClient.base}/api/coding/lsl/sessions?since=${encodeURIComponent(since)}&limit=200`
-  const res = await fetch(url, { headers: { Accept: 'application/json' } })
-  if (!res.ok) {
-    throw new Error(`${url} → HTTP ${res.status}`)
-  }
-  const body = (await res.json()) as
-    | { success: true; data: { sessions: LslSession[] } | LslSession[] }
-    | { success: false; error: string }
-  if (!body.success) {
-    throw new Error(body.error || 'malformed /api/coding/lsl/sessions response')
-  }
-  const data = body.data
-  if (Array.isArray(data)) return data
-  return data?.sessions ?? []
 }
 
 function pctOfWindow(iso: string, windowMs: number, originMs?: number): number {
@@ -211,16 +182,26 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   const setLslSessionFilter = useViewerStore((s) => s.setLslSessionFilter)
   const clearLslSessionFilter = useViewerStore((s) => s.clearLslSessionFilter)
   const setSelection = useViewerStore((s) => s.setSelection)
-  const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
-  // 2026-06-13 (state-flow audit `b29bdb34c` §6.1 + §6.5): subscribe to
-  // the canonical session-bucket pair so the tick-ring predicate is a pure
-  // function of the store snapshot. The previous round used a local
-  // `clickedTickKey` useState (violation V1 — audit §2.5) that lagged the
-  // store by one render and caused the multi-tick leak Issue 2 surfaces
-  // through. With both fields here, the predicate composes them into the
-  // `${id}|${startAt}` key and matches per-tranche cleanly.
-  const selectedSessionId = useViewerStore((s) => s.selectedSessionId)
-  const selectedSessionStartAt = useViewerStore((s) => s.selectedSessionStartAt)
+  // 2026-06-13 (Phase 56.1 Plan 05): the strip drives the FOCAL entity via
+  // `focalNodeId` (Phase 56's `selectedNodeId` is gone — Plan 01 removed it).
+  // `focalNodeId` is the entity the `selectedTs` memo maps back to a tick
+  // range so the graph→tick highlight cascade still works.
+  const focalNodeId = useViewerStore((s) => s.focalNodeId)
+  // 2026-06-13 (Phase 56.1 Plan 05 — D-4 timeline two-tier): subscribe to the
+  // multi-set bucket fields. `selectedBucketKeys` drives the halo (lighter
+  // blue) on every NON-focal tick in the set; `focalBucketKey` drives the
+  // focal ring (existing ring-blue-500). The Phase 56 single-selection
+  // (selectedSessionId, selectedSessionStartAt) fields are GONE — Plan 01
+  // promoted them to the composite-key multi-set.
+  const selectedBucketKeys = useViewerStore((s) => s.selectedBucketKeys)
+  const focalBucketKey = useViewerStore((s) => s.focalBucketKey)
+  // 2026-06-13 (Phase 56.1 Plan 05 — WR-03 fix): subscribe to
+  // `selectedClasses` so `onTickClick` can gate on `.size > 0`. The 1-render
+  // race window between data load and the auto-seed of `selectedClasses`
+  // (Phase 56 WR-03) used to let tick clicks enter sidebar-only mode with
+  // an empty class filter; the gate closes the race by no-op'ing the click
+  // until the class set is seeded.
+  const selectedClasses = useViewerStore((s) => s.selectedClasses)
   const stripRef = useRef<HTMLDivElement | null>(null)
   // 2026-06-12: reverse mapping — when a node is selected anywhere
   // (graph click, HistorySidebar click, search), we light up the tick
@@ -249,14 +230,18 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // as a numeric timestamp; the tick render compares each session's
   // [startAt, endAt) range to it.
   const selectedTs = useMemo<number | null>(() => {
-    if (!selectedNodeId) return null
-    const ent = entities.find((e) => e.id === selectedNodeId)
+    // 2026-06-13 (Phase 56.1 Plan 05): map the FOCAL entity (Phase 56's
+    // single-selection `selectedNodeId` is gone — Plan 01 promoted it to
+    // multi-set with a derived focal). The graph→tick highlight cascade
+    // is semantically tied to the focal entity, not every halo member.
+    if (!focalNodeId) return null
+    const ent = entities.find((e) => e.id === focalNodeId)
     const created = (ent?.createdAt as string | undefined)
       ?? ((ent?.metadata as { createdAt?: string } | undefined)?.createdAt)
     if (typeof created !== 'string') return null
     const t = Date.parse(created)
     return Number.isFinite(t) ? t : null
-  }, [selectedNodeId, entities])
+  }, [focalNodeId, entities])
 
   // 2026-06-12: auto-slide the window if the selected node's bucket
   // falls OUTSIDE the current window. e.g. user picks an 18-day-old
@@ -326,12 +311,10 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     }
   }, [selectedTs, windowKey])
 
-  const { data } = useQuery({
-    queryKey: ['lsl-sessions', apiClient.base, windowKey],
-    queryFn: () => fetchSessions(apiClient, WINDOW_MS[windowKey]),
-    refetchOnWindowFocus: false,
-    staleTime: 30_000,
-  })
+  // 2026-06-13 (Phase 56.1 Plan 05): the inline useQuery is extracted to
+  // `useLslSessions` so the reverse-lookup pre-index hook can share the
+  // cache entry without duplicating the queryKey/queryFn surface.
+  const { data } = useLslSessions(apiClient, windowKey)
 
   const sessions: LslSession[] = useMemo(() => {
     const arr = data ?? []
@@ -420,95 +403,97 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     session?: LslSession,
   ) {
     e.stopPropagation()
-    // 2026-06-13 (audit §5.4 option B): 0-obs ticks are visually greyed
-    // out with `pointer-events-none`, but synthetic React events
-    // (fireEvent.click in jsdom; programmatic .click() in real browsers)
-    // bypass CSS pointer-events. Belt-and-braces — early-exit the handler
-    // when the bucket has no observations to record a click against.
+    // 2026-06-13 (Phase 56.1 Plan 05 — WR-03 closure): selectedClasses is
+    // auto-seeded by an upstream effect on first data load. There is a
+    // 1-render race window where a tick click before the seed lands enters
+    // sidebar-only mode with no class filter, mis-classifying the bucket.
+    // Early-exit the handler with a Logger.warn until the seed fires — the
+    // user's click is effectively ignored, but the alternative (incorrect
+    // selection state) is worse. CONTEXT.md prior_decisions WR-03.
+    if (selectedClasses.size === 0) {
+      Logger.warn(
+        Logger.Categories.PANELS,
+        'LslTimelineStrip tick click blocked: selectedClasses not yet seeded (WR-03 race)',
+      )
+      return
+    }
+    // 2026-06-13 (audit §5.4 option B / D-7 contract-4 preserved verbatim):
+    // 0-obs ticks are visually greyed out with `pointer-events-none`, but
+    // synthetic React events (fireEvent.click in jsdom; programmatic
+    // .click() in real browsers) bypass CSS pointer-events. Belt-and-
+    // braces — early-exit the handler when the bucket has no observations
+    // to record a click against. Phase 56 Locked Contract #4 carries
+    // forward unchanged into Phase 56.1.
     if (session && session.observationCount === 0) {
       return
     }
     const ids = session?.entityIds ?? []
     const startAt = session?.startAt ?? null
-    // 2026-06-13 (state-flow audit `b29bdb34c` §6.1 + §6.3 + §7 R4): all
-    // selection writes now route through the `setSelection` action which
-    // accepts the LSL filter slice keys too (audit §6.3 — consolidate 4
-    // inline setState sites into 1 action call). The action handles the
-    // sibling-reset rule for the (sessionId, sessionStartAt) pair AND the
-    // reference-stability guard for `lslFilterEntityIds`. No direct
-    // store-state writes from the strip — that's the source-of-truth
-    // violation the audit caught. Acceptance grep R4: zero call sites of
-    // the inline-write pattern in this file.
+    // 2026-06-13 (Phase 56.1 Plan 05 — D-2 forward direction + D-4 timeline):
+    // every tick-click selection write routes through `setSelection`
+    // (audit Locked Contract #5 carries forward — single source of truth).
+    // The new multi-set arg shape:
+    //   nodeIds:    Set of pickAllResolvable(...) — the halo
+    //   bucketKeys: Set containing the clicked bucket's composite key
+    //   focal:      { nodeId: pickFirstResolvable(...), bucketKey }
+    // The reference-stability guard for `lslFilterEntityIds` (and now also
+    // `selectedNodeIds`/`selectedBucketKeys`) lives inside the action body —
+    // identical-content writes preserve the existing Set reference so D3's
+    // `visibleEntities` useMemo does not invalidate (audit-locked contract).
     if (ids.length === 0) {
       // 2026-06-13 (audit §4.3 + §6.7 viewport-stability): when entityIds=[]
-      // the broader cascade has no meaningful payload. Preserve every other
-      // store field — only write the session-scope identity. The audit
-      // confirmed this is the empty-tick happy path (Issue 1 has multiple
-      // root causes; this is one branch of the fix).
+      // the broader cascade has no meaningful payload. Write only the
+      // session-scope identity (the bucket key + focal bucket), preserve
+      // every other store field. `setSelection` preserves omitted args.
+      const bucketKey = startAt !== null ? `${sessionId}|${startAt}` : null
       setSelection({
-        sessionId,
-        sessionStartAt: startAt,
+        bucketKeys: bucketKey !== null ? new Set<string>([bucketKey]) : new Set<string>(),
+        focal: { bucketKey },
         source: 'timeline',
-        // selectedNodeId / pathToSelected / lslFilterEntityIds /
-        // highlightedRowKey / lslSessionFilter intentionally OMITTED —
-        // `setSelection` preserves the existing values when args are absent.
+        // nodeIds / pathToSelected / lslFilterEntityIds / highlightedRowKey /
+        // lslSessionFilter intentionally OMITTED — `setSelection` preserves
+        // the existing values when args are absent.
       })
       Logger.info(
         Logger.Categories.PANELS,
-        `LslTimelineStrip tick (empty session) → ${sessionId} (minimal write — no D3 re-render)`,
+        `LslTimelineStrip tick (empty session) → ${sessionId} (bucketKey only — no D3 re-render)`,
       )
       return
     }
-    // 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution): resolve
-    // the bucket's entityIds to the closest graph-visible ancestor BEFORE
-    // any setSelection write. The D3 graph filters Observations/Digests/
-    // Details out of the rendered set; bucket entityIds are usually
-    // Detail-level. Writing the raw `ids[0]` to `selectedNodeId` produced
-    // a phantom that no D3 node matched — the round-4 operator-reported
-    // bug. `pickFirstResolvable` walks each id (and its ancestry) until
-    // one lands in `visibleIds`. When NO id in the bucket has any visible
-    // ancestor, we write `selectedNodeId: null` (sidebar-only mode); the
-    // sidebar still shows the bucket's content and the LSL fade still
-    // works via `lslFilterEntityIds`, but the graph stays at its
-    // pre-click state (no spurious phantom ring).
-    //
-    // Locked in 56-PATTERNS.md contract #6.
-    const resolvedNodeId = pickFirstResolvable(ids, visibleIds, relations)
-    // 2026-06-13 (Phase 56-04 fix #3): compute the ancestry-path against
-    // the RESOLVED id (not raw ids[0]) so the central-trace lines from
-    // the resolved ancestor to the CK render correctly. Returns an empty
-    // Set when no resolution exists OR when the resolved entity has no
-    // relations in the live graph (sidebar-only mode).
-    //
-    // 2026-06-13 (Phase 56-04 round 4 — phantom-id resolution): when the
-    // resolved id is an ancestor (NOT the bucket's first entity), we
-    // ALSO add the raw bucket ids to `pathToSelected` for cross-pane
-    // provenance — the graph's trace renderer skips ids that have no
-    // D3 node (the phantom ids stay invisible), but Sigma + future
-    // cross-pane consumers can still read the bucket origin from the
-    // path set. This is intentional and matches the round-4 brief's
-    // "pathToSelected contains both the Detail-id AND the resolved-id".
-    const path = resolvedNodeId !== null
-      ? computeAncestryPath(resolvedNodeId, relations)
+    // 2026-06-13 (Phase 56.1 Plan 05 — D-2 forward direction): pre-resolve
+    // the bucket's entityIds to the FULL Set of graph-visible ancestors
+    // (the halo). `pickAllResolvable` is one of the two canonical callsites
+    // (the other is `useNodeToBucketsIndex` reverse pre-index) per Locked
+    // Contract #7. The focal is the FIRST resolvable id — keeps Phase 56
+    // single-selection behavior intact when only one entity resolves; for
+    // a fresh write this is also the "last added" element of resolvedNodeIds
+    // (insertion order matches iteration order). Sidebar-only mode fires
+    // when no id resolves (resolvedNodeIds.size === 0 → focal = null).
+    const resolvedNodeIds = pickAllResolvable(ids, visibleIds, relations)
+    const focalNodeIdNext = pickFirstResolvable(ids, visibleIds, relations)
+    const bucketKey = startAt !== null ? `${sessionId}|${startAt}` : null
+    // 2026-06-13 (Phase 56-04 fix #3 + round 4 — provenance preserved):
+    // compute the ancestry-path against the FOCAL id so the central-trace
+    // line renders. Add the raw bucket ids to pathToSelected for cross-pane
+    // provenance (sigma's trace renderer reads this; D3 skips ids with no
+    // `.node` mount). Empty path in sidebar-only mode.
+    const path = focalNodeIdNext !== null
+      ? computeAncestryPath(focalNodeIdNext, relations)
       : null
     const pathToSelected: Set<string> = path !== null
       ? new Set<string>(path.nodeDepths.keys())
       : new Set<string>()
-    // Round-4 provenance: when we resolved up to an ancestor (i.e. the
-    // raw bucket id != resolvedNodeId), include the raw bucket ids in
-    // pathToSelected so cross-pane consumers can read the bucket origin.
-    // D3's trace renderer skips ids with no `.node` mount, so the raw
-    // phantom ids stay invisible — they're just metadata for downstream.
-    // Skip this entirely in sidebar-only mode (`resolvedNodeId === null`)
-    // — empty pathToSelected is the contract for "no graph trace".
-    if (resolvedNodeId !== null) {
+    if (focalNodeIdNext !== null) {
       for (const rawId of ids) pathToSelected.add(rawId)
     }
     if (e.metaKey || e.ctrlKey) {
-      // 2026-06-12: Cmd/Ctrl click — UNION the session's entityIds with
-      // the existing filter set. Lets the user assemble a multi-session
-      // view (e.g. "show everything from yesterday's three working
-      // sessions").
+      // 2026-06-12 + 2026-06-13 (Phase 56.1 Plan 05 — additive multi-set):
+      // Cmd/Ctrl click UNIONs the bucket's entityIds with the existing LSL
+      // filter set AND UNIONs the bucket key into selectedBucketKeys AND
+      // UNIONs the resolved ancestors into selectedNodeIds. Lets the user
+      // assemble multi-session selections (e.g. "show everything from
+      // yesterday's three working sessions"). Phase 56 additive behavior
+      // preserved verbatim, extended to the new multi-set fields.
       const prevState = useViewerStore.getState()
       const prevSet = prevState.lslFilterEntityIds
       const union = new Set<string>(prevSet ?? [])
@@ -516,15 +501,18 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       const nextSessionFilter = Array.from(
         new Set<string>([...prevState.lslSessionFilter, sessionId]),
       )
+      const nextNodeIds = new Set<string>(prevState.selectedNodeIds)
+      for (const id of resolvedNodeIds) nextNodeIds.add(id)
+      const nextBucketKeys = new Set<string>(prevState.selectedBucketKeys)
+      if (bucketKey !== null) nextBucketKeys.add(bucketKey)
       setSelection({
-        // 2026-06-13 (round 4): resolved ancestor — never the phantom Detail.
-        nodeId: resolvedNodeId,
-        sessionId,
-        sessionStartAt: startAt,
-        // Sidebar highlight follows the resolved node so the row text
-        // agrees with the graph ring. Cross-pane provenance still flows
-        // through `lslFilterEntityIds` below (raw bucket ids).
-        highlightedRowKey: resolvedNodeId,
+        nodeIds: nextNodeIds,
+        bucketKeys: nextBucketKeys,
+        focal: { nodeId: focalNodeIdNext, bucketKey },
+        // Sidebar highlight follows the focal so the row text agrees with
+        // the graph red ring. Cross-pane provenance flows through
+        // `lslFilterEntityIds` (raw bucket ids).
+        highlightedRowKey: focalNodeIdNext,
         source: 'timeline',
         pathToSelected,
         lslSessionFilter: nextSessionFilter,
@@ -535,27 +523,20 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       })
       Logger.info(
         Logger.Categories.PANELS,
-        `LslTimelineStrip tick added: ${sessionId} (${ids.length} ids → resolved:${resolvedNodeId ?? 'sidebar-only'}, total ${union.size})`,
+        `LslTimelineStrip tick added: ${sessionId} (halo:${resolvedNodeIds.size}, total:${nextNodeIds.size}, buckets:${nextBucketKeys.size}, bucketKey:${bucketKey ?? 'null'})`,
       )
       return
     }
-    // Plain click — REPLACE the filter with this session's entity set.
-    // 2026-06-13 (audit §4.3 + §4.4 + §6.3): single `setSelection` call.
-    // The action's deep-equal guard on `lslFilterEntityIds` is what fixes
-    // the "zoom feel" Issue 1 — identical-content writes preserve the
-    // reference and `visibleEntities` memo does not invalidate.
-    //
-    // 2026-06-13 (round 4): `nodeId` + `highlightedRowKey` now carry the
-    // RESOLVED ancestor id, never a phantom Detail. `lslFilterEntityIds`
-    // keeps the raw bucket ids (separate concern — graph fade vs. graph
-    // selection target). When `resolvedNodeId === null`, sidebar-only
-    // mode fires: no graph ring, no trace, but the LSL fade still
-    // narrows the rendered set so the operator sees the bucket scope.
+    // Plain click — REPLACE both selections (halo + bucket halo) with this
+    // session's resolved set + single bucket key. The audit-locked deep-
+    // equal guards inside `setSelection` preserve Set references on
+    // identical-content writes — viewport-stability invariant preserved
+    // through the multi-set evolution.
     setSelection({
-      nodeId: resolvedNodeId,
-      sessionId,
-      sessionStartAt: startAt,
-      highlightedRowKey: resolvedNodeId,
+      nodeIds: resolvedNodeIds,
+      bucketKeys: bucketKey !== null ? new Set<string>([bucketKey]) : new Set<string>(),
+      focal: { nodeId: focalNodeIdNext, bucketKey },
+      highlightedRowKey: focalNodeIdNext,
       source: 'timeline',
       pathToSelected,
       lslSessionFilter: [sessionId],
@@ -563,7 +544,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     })
     Logger.info(
       Logger.Categories.PANELS,
-      `LslTimelineStrip tick → filter:${ids.length} ids, select:${resolvedNodeId ?? 'sidebar-only'}`,
+      `LslTimelineStrip tick → halo:${resolvedNodeIds.size} ids, focal:${focalNodeIdNext ?? 'sidebar-only'}, bucketKey:${bucketKey ?? 'null'}`,
     )
   }
 
@@ -689,35 +670,43 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
                 && Number.isFinite(startMs)
                 && selectedTs >= startMs
                 && selectedTs < endMs
-              // 2026-06-13 (state-flow audit `b29bdb34c` §6.5): pure store-
-              // derived bucket key. `selectedBucketKey` composes the
-              // canonical (sessionId, startAt) pair from the store into
-              // the same `${id}|${startAt}` shape the React render uses.
-              // The local `clickedTickKey` useState the previous round
-              // had at this site (Audit §2.5 V1) is DELETED — single
-              // source of truth.
-              const selectedBucketKey: string | null =
-                selectedSessionId !== null && selectedSessionStartAt !== null
-                  ? `${selectedSessionId}|${selectedSessionStartAt}`
-                  : null
+              // 2026-06-13 (Phase 56.1 Plan 05 — D-4 two-tier timeline):
+              // pure store-derived bucket render predicate from the multi-set
+              // selectedBucketKeys + focal singleton focalBucketKey. The
+              // Phase 56 single-selection (selectedSessionId,
+              // selectedSessionStartAt) is gone — Plan 01 deleted both fields.
+              //   - isFocalBucket: focalBucketKey === tickKey   → ring-blue-500 (existing focal)
+              //   - isHaloBucket:  selectedBucketKeys.has(tickKey) && !isFocalBucket
+              //                                                  → ring-blue-300/60 + bg-blue-200/40
+              // The `isSelectedBucket` fallback (entity.createdAt range over
+              // bucket [startAt, endAt)) is preserved — it's the reverse
+              // cascade (graph node selected → tick rings via timestamp range).
               const tickKey = `${s.id}|${s.startAt}`
-              const isDirectClickedBucket = selectedBucketKey !== null && selectedBucketKey === tickKey
-              const isSelected = isSelectedBucket || isDirectClickedBucket
-              // 2026-06-13 (audit §5.4 option B): 0-obs ticks render greyed
-              // out + pointer-events-none so the operator can still see "I
-              // had a session here" but cannot select an empty bucket. The
-              // disabled visual state ALSO suppresses the running-ring (a
-              // 0-obs running session is anomalous; the visual policy
-              // chooses clarity over signalling that edge case).
+              const isFocalBucket = focalBucketKey === tickKey
+              const isHaloBucket = selectedBucketKeys.has(tickKey) && !isFocalBucket
+              const isSelected = isFocalBucket || isSelectedBucket
+              // 2026-06-13 (audit §5.4 option B / D-7 contract-4): 0-obs
+              // ticks render greyed out + pointer-events-none so the operator
+              // can still see "I had a session here" but cannot select an
+              // empty bucket. The disabled visual state ALSO suppresses the
+              // running-ring (a 0-obs running session is anomalous; the
+              // visual policy chooses clarity over signalling that edge
+              // case). Phase 56 Locked Contract #4 carries forward verbatim.
               const isDisabled = s.observationCount === 0
               const ringClass = isDisabled
                 ? ''
-                : isSelected
+                : isFocalBucket
                   ? 'ring-2 ring-blue-500'
-                  : (isRunning && selectedTs === null && selectedBucketKey === null)
-                    ? 'ring-2 ring-primary'
-                    : ''
-              const fillClass = 'bg-pink-300 hover:bg-pink-400'
+                  : isHaloBucket
+                    ? 'ring-2 ring-blue-300/60'
+                    : isSelected
+                      ? 'ring-2 ring-blue-500'
+                      : (isRunning && selectedTs === null && focalBucketKey === null && selectedBucketKeys.size === 0)
+                        ? 'ring-2 ring-primary'
+                        : ''
+              const fillClass = isHaloBucket
+                ? 'bg-blue-200/40 hover:bg-blue-300/50'
+                : 'bg-pink-300 hover:bg-pink-400'
               // 2026-06-13 (audit §5.4 option B): grey-out classes are
               // additive — opacity-40 dims the pink fill + pointer-events-
               // none kills click reactivity + cursor-default removes the

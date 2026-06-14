@@ -244,7 +244,11 @@ export function makeEdgeReducer() {
       // Edges outside the path get dimmed to match the dimmed nodes.
       return { ...data, color: dimBase, opacity: 0.08 }
     }
-    const style = edgeStateForRelation({ from, to }, store.selectedNodeId, undefined, theme)
+    // 2026-06-13 (Phase 56.1 Plan 05): `selectedNodeId` is gone — read
+    // `focalNodeId` instead. The edge primary-incident highlight keys on
+    // the focal entity (single-selection semantics carried forward via
+    // the multi-set's derived focal).
+    const style = edgeStateForRelation({ from, to }, store.focalNodeId, undefined, theme)
     return {
       ...data,
       color: style.color,

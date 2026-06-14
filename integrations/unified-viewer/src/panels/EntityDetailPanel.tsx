@@ -524,7 +524,11 @@ function TimelineContent({ entity }: { entity: Record<string, unknown> }) {
 
 export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps) {
   const { entities, relations } = useGraphData(apiClient, system)
-  const selectedNodeId = useViewerStore((s) => s.selectedNodeId)
+  // 2026-06-13 (Phase 56.1 Plan 05): selectedNodeId is gone — use focalNodeId
+  // (the derived singleton from the multi-set slice). EntityDetailPanel mounts
+  // in single-focal mode (selectedNodeIds.size === 1 && selectedBucketKeys.size === 0),
+  // so the focal entity is the one to render.
+  const selectedNodeId = useViewerStore((s) => s.focalNodeId)
   const setSelectedNode = useViewerStore((s) => s.setSelectedNode)
   const theme = useViewerStore((s) => s.theme)
   const [descViewMode, setDescViewMode] = useState<SubTab>('default')

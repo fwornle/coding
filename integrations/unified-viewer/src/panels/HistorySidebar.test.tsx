@@ -96,14 +96,17 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
     // 2026-06-13 (CR-01): also reset the LSL filter slice + the sibling
     // selectedSessionStartAt so Test 8 starts from a clean slate and the
     // pre-seeded LSL state it writes cannot leak from a prior test.
+    // 2026-06-13 (Phase 56.1 Plan 05): single-selection fields are gone —
+    // multi-set + derived focal. Bucket-set replaces (sessionId, startAt).
     useViewerStore.setState({
-      selectedNodeId: null,
+      focalNodeId: null,
+      selectedNodeIds: new Set<string>(),
       selectedEdgeId: null,
       pathToSelected: new Set<string>(),
       selectionSource: null,
       highlightedRowKey: null,
-      selectedSessionId: null,
-      selectedSessionStartAt: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
       lslSessionFilter: [],
       lslFilterEntityIds: null,
     })
@@ -134,7 +137,7 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
     fireEvent.click(row)
     // Single getState snapshot proves all 4 fields land in one setState.
     const s = useViewerStore.getState()
-    expect(s.selectedNodeId).toBe('i-min')
+    expect(s.focalNodeId).toBe('i-min')
     expect(s.highlightedRowKey).toBe('i-min')
     expect(s.selectionSource).toBe('history')
     expect(s.pathToSelected.size).toBe(0)
@@ -142,7 +145,7 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
 
   test('Test 3: selected row has bg-blue-100 highlight class when selectedNodeId matches', () => {
     // Pre-set selection BEFORE render so the conditional className renders correctly.
-    useViewerStore.setState({ selectedNodeId: 'i-min', highlightedRowKey: 'i-min', selectionSource: 'graph' })
+    useViewerStore.getState().setSelectedNode('i-min'); useViewerStore.setState({ highlightedRowKey: 'i-min', selectionSource: 'graph' })
     renderPanel()
     const row = document.querySelector('[data-history-id="i-min"]') as HTMLElement
     expect(row).not.toBeNull()
@@ -154,7 +157,7 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
     // selectedNodeId stays null OR points elsewhere — the row should
     // still carry the highlight class so the user sees the cross-pane
     // breadcrumb.
-    useViewerStore.setState({ selectedNodeId: null, highlightedRowKey: 'i-hr', selectionSource: 'timeline' })
+    useViewerStore.getState().setSelectedNode(null); useViewerStore.setState({ highlightedRowKey: 'i-hr', selectionSource: 'timeline' })
     renderPanel()
     const row = document.querySelector('[data-history-id="i-hr"]') as HTMLElement
     expect(row).not.toBeNull()
@@ -173,7 +176,7 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
       renderPanel()
       // Now flip selectedNodeId; the effect should fire and call scrollIntoView.
       act(() => {
-        useViewerStore.setState({ selectedNodeId: 'i-just-now' })
+        useViewerStore.getState().setSelectedNode('i-just-now')
       })
       expect(scrollSpy).toHaveBeenCalled()
       // Verify the exact arg shape per HistorySidebar.tsx:108.
@@ -227,12 +230,15 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
     // behind: non-empty LSL filter (graph predicate narrowed to a session's
     // entities) + sibling session-tick fields populated. This is the state
     // the user lands in after clicking a tick on the LslTimelineStrip.
+    // 2026-06-13 (Phase 56.1 Plan 05): Phase 56 single-selection fields are
+    // gone. Seed via the imperative shim + the multi-set bucketKey composite
+    // so the post-click cascade-clear assertions still pin the contract.
+    useViewerStore.getState().setSelectedNode('prev-entity')
     useViewerStore.setState({
-      selectedNodeId: 'prev-entity',
       selectionSource: 'timeline',
       highlightedRowKey: 'prev-entity',
-      selectedSessionId: 'sess-X',
-      selectedSessionStartAt: '2026-06-13T11:00:00Z',
+      selectedBucketKeys: new Set<string>(['sess-X|2026-06-13T11:00:00Z']),
+      focalBucketKey: 'sess-X|2026-06-13T11:00:00Z',
       lslSessionFilter: ['sess-X'],
       lslFilterEntityIds: new Set<string>(['e1', 'e2', 'prev-entity']),
     })
@@ -248,15 +254,15 @@ describe('HistorySidebar (Plan 56-02 Task 1)', () => {
     // stops narrowing to the previous session's entities.
     const s = useViewerStore.getState()
     // Selection moved to the clicked row.
-    expect(s.selectedNodeId).toBe('i-min')
+    expect(s.focalNodeId).toBe('i-min')
     expect(s.highlightedRowKey).toBe('i-min')
     expect(s.selectionSource).toBe('history')
     expect(s.pathToSelected.size).toBe(0)
     // Sibling session-tick fields MUST be cleared (audit §7 R2: they are
     // always written/cleared together; the previous tick-set values are now
     // stale because the user navigated to a different entity context).
-    expect(s.selectedSessionId).toBeNull()
-    expect(s.selectedSessionStartAt).toBeNull()
+    expect(s.focalBucketKey).toBeNull()
+    expect(s.focalBucketKey).toBeNull()
     // LSL session-filter scope MUST be cleared so the D3 graph's
     // `visibleEntities` predicate stops intersecting against the previous
     // tick's entity set. This is the audit-contract-#5 cascade-clear
