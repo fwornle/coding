@@ -1,8 +1,111 @@
-# Milestone v7.1 Requirements — Knowledge Management Unification
+# Project Requirements
 
-**Goal:** Extract a shared KM-Core from three knowledge-management systems (A: Online Learning, B: Offline UKB, C: OKM) so each application uses a common codebase parameterized by per-system configuration.
+This file tracks the active milestone's requirements at the top, with previous milestones' requirements retained below for traceability.
+
+---
+
+# Milestone v7.2 Requirements — VKB & Online-Learning Quality (ACTIVE)
+
+**Goal:** Bring the online learning pipeline → km-core → unified viewer surface to production data quality, so operators rely on the graph view for navigation and triage instead of working around known-broken rendering.
+
+**Scope seed:** 9-todo cluster surfaced during Phase 56.1 visual smoke (2026-06-13/14) — see `.planning/MILESTONES.md` § v7.2.
+
+---
+
+## v7.2 Requirements
+
+### Online pipeline semantic edges (EDGE)
+
+- [ ] **EDGE-01:** Online-generated Insight entities carry at least one semantic-content relation type (`mentions`, `dependsOn`, `isRelatedTo`, `instanceOf`, or equivalent — exact set decided in discuss-phase) beyond the existing `capturedBy → LiveLoggingSystem` provenance edge. Verified by sampling 20 random recent Insights; ≥18 carry such an edge.
+- [ ] **EDGE-02:** `ObservationConsolidator` writes the new Insight node and its semantic-content relations atomically — no orphan-Insight intermediate state observable from a concurrent `/api/v1/entities` reader.
+
+### Lower ontology + project grouping (LOWERONTO)
+
+- [ ] **LOWERONTO-01:** Lower ontology declares coding-project-specific L2 classes for at least: `LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`. Loaded via `OntologyRegistry` from `.data/ontologies/coding.lower.json` (or equivalent project-scoped file).
+- [ ] **LOWERONTO-02:** Upper ontology extended with ≥2 additional generic programming-aspect classes (e.g., `Diagnosis`, `Interface`) **IF** the operator confirms during the discuss-phase that the upper-ontology surface should grow. (Soft gate — may be deferred without blocking the milestone.)
+- [ ] **LOWERONTO-03:** Unified viewer Ontology Class filter renders L2 lower-ontology classes as expandable groups under their L1 upper-ontology parent, with a per-class count badge.
+- [ ] **LOWERONTO-04:** Every KG entity carries a `project` tag (e.g., `coding`, `okm`, `cap`); unified viewer exposes a project-grouping mode in the filter sidebar that visually clusters or filters nodes by project.
+
+### VKB rendering UX integrity (VKBUI)
+
+- [ ] **VKBUI-01:** Layer filter checkboxes are symmetric — toggling Evidence OFF (Pattern ON) renders only Pattern-tagged nodes; toggling Pattern OFF (Evidence ON) renders only Evidence-tagged nodes. Both have the same observable effect-direction (currently one is a no-op).
+- [ ] **VKBUI-02:** Sidebar Legend (DOMAINS / LAYERS / SOURCE / RELATIONSHIPS sections) is computed from the currently-rendered graph — no static OKB-domain entries (e.g., `RuntimeDiagnostics`) appear when they have zero rendered instances.
+- [ ] **VKBUI-03:** `Observation` and `Digest` entity types are filtered out of the VKB graph render by default (architecture bleed from the observations pipeline). An operator-visible toggle re-enables them for debugging. Per the 2026-06-11 cleanup digest, those entity types should never appear in the production VKB view.
+- [ ] **VKBUI-04:** When the Online learning-source filter is active, `CollectiveKnowledge` remains visible in the rendered graph (or its path-trace anchor is preserved) so focal-ancestry traces from leaf entities reach the system root — not truncated at the project level.
+
+### LSL timeline scale honesty (LSLTIME)
+
+- [ ] **LSLTIME-01:** LSL timeline strip removes the silent 200-record hard cap in `useLslSessions.ts` `fetchSessions`. Either expose the cap via a user-visible "showing N of M total" label OR remove the cap entirely and stream all sessions in the selected window.
+- [ ] **LSLTIME-02:** The "all" window option in the LSL timeline shows ALL ingested session history (currently `WINDOW_MS` caps it at 365 days). Either remove the cap or rename the option honestly (e.g., "1 year").
+- [ ] **LSLTIME-03:** LSL timeline tick coloring distinguishes manual-source (Batch/Manual) sessions from online-source (Auto) sessions via two visually distinct colors (currently single-color).
+
+### OKB data routing (OKBROUTE)
+
+- [ ] **OKBROUTE-01:** `/viewer/okb` ApiClient detects the OKM Express server's legacy `/api/entities`-shape contract on `:8090` and routes correctly to it WITHOUT requiring km-core's `/api/v1/entities` shape. Adapter logic in `lib/system-endpoints.ts` or `ApiClient.ts`.
+- [ ] **OKBROUTE-02:** When `/viewer/okb` successfully loads, it renders real RaaS / KPI-FW / business entities from OKM Express — NOT coding-KG mirror entities (e.g., `CodeAnalyzer`, `PersistenceAgent`).
+
+### Long-tail orphan fixes (ORPHAN)
+
+- [ ] **ORPHAN-01:** Server-side fix to `integrations/memory-visualizer/src/api/databaseClient.ts:262`: per-team `queryEntities` no longer strips `entity_type='System'` nodes when their owning team is unchecked. (Closes the legacy Phase 48 scope.)
+- [ ] **ORPHAN-02:** Online-learned `Detail` and `SubComponent` entities receive parent-hierarchy edges at insert time; a one-shot migration repairs the existing 122 such orphan instances. (Closes part of the legacy Phase 49 scope.)
+- [ ] **ORPHAN-03:** Per-team Project anchor nodes (non-coding teams) receive the `CollectiveKnowledge --includes-->` edge that currently exists only for `Coding`. Writer-path fix + seed-script fix. (Closes part of the legacy Phase 49 scope.)
+- [ ] **ORPHAN-04:** Total orphan count on the live km-core graph drops from baseline 157 (≈12% of 1262 nodes on 2026-06-14) to ≤30 (≤3% of node count at milestone close). Measured via `/api/v1/stats` `orphanCount`.
+
+---
+
+## Future Requirements (deferred)
+
+- Bi-directional Insight ↔ Domain entity reasoning (graph queries that walk both `capturedBy` provenance edges AND semantic-content edges) — defer until EDGE-01/02 ship and we know what semantic edges actually look like in practice.
+- Re-running existing online-learning batches to backfill semantic edges on historic Insights — defer to a separate maintenance phase once EDGE-01 stabilizes.
+- Cross-viewer (VKB ↔ VOKB ↔ unified) feature reconciliation — defer until v7.2 ships and VKB at `:8080` is honestly retired or relabeled as legacy.
+- Ontology versioning (semver-style upper/lower ontology versions with migration policy) — defer until LOWERONTO-01..04 prove stable in practice.
+
+## Out of Scope
+
+- LLM proxy worker pool performance work — queued as v7.3.
+- Cross-agent performance measurement system — queued as v7.4.
+- Phase 51 follow-up todos (`opencode-schema-migration-update.md`, `sweep-llm-proxy-probe-fix.md`, `json-export-missing-source-field.md`, sub-agent dashboard observability gap) — agent-capture concerns, not graph data quality.
+- Phase 54 ETM hardening — runs in parallel as a separate backlog phase.
+- Phase 35-04/05 retention pruner + cold-store reader wiring — runs in parallel.
+- Phase 46 ONBOARDING.md operator UAT — v7.1 close-out, runs in parallel.
+- Migrating `.observations/observations.db` to km-core entirely — Plan 44-18 closed that loop; no further consolidation.
+- Replacing Graphology / LevelDB / JSON export — KM-Core wraps these, doesn't replace them (constraint preserved from v7.1).
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| EDGE-01 | TBD (Phase 57+) | Not started |
+| EDGE-02 | TBD (Phase 57+) | Not started |
+| LOWERONTO-01 | TBD (Phase 57+) | Not started |
+| LOWERONTO-02 | TBD (Phase 57+) | Not started |
+| LOWERONTO-03 | TBD (Phase 57+) | Not started |
+| LOWERONTO-04 | TBD (Phase 57+) | Not started |
+| VKBUI-01 | TBD (Phase 57+) | Not started |
+| VKBUI-02 | TBD (Phase 57+) | Not started |
+| VKBUI-03 | TBD (Phase 57+) | Not started |
+| VKBUI-04 | TBD (Phase 57+) | Not started |
+| LSLTIME-01 | TBD (Phase 57+) | Not started |
+| LSLTIME-02 | TBD (Phase 57+) | Not started |
+| LSLTIME-03 | TBD (Phase 57+) | Not started |
+| OKBROUTE-01 | TBD (Phase 57+) | Not started |
+| OKBROUTE-02 | TBD (Phase 57+) | Not started |
+| ORPHAN-01 | TBD (Phase 57+) | Not started |
+| ORPHAN-02 | TBD (Phase 57+) | Not started |
+| ORPHAN-03 | TBD (Phase 57+) | Not started |
+| ORPHAN-04 | TBD (Phase 57+) | Not started |
+
+**Coverage:** 19 requirements — will be mapped to phases by `gsd-roadmapper`.
+
+---
+
+# Milestone v7.1 Requirements — Knowledge Management Unification (SHIPPED — archived for traceability)
+
+**Goal (v7.1):** Extract a shared KM-Core from three knowledge-management systems (A: Online Learning, B: Offline UKB, C: OKM) so each application uses a common codebase parameterized by per-system configuration.
 
 **Research seed:** `.planning/research/v7.1-km-unification.md`
+
+**Status:** 10 of 10 numbered phases done (37-46); one Phase 46 ONBOARDING.md operator UAT remains pending. v7.1 will be formally archived once that UAT lands.
 
 ---
 
@@ -10,86 +113,86 @@
 
 ### Core types & storage (CORE)
 
-- [ ] **CORE-01:** KM-Core package exports canonical entity and relation TypeScript types consumed by all three systems.
-- [ ] **CORE-02:** GraphKMStore adapter (Graphology in-memory + LevelDB durable + git-tracked JSON export) is consumed by B and C without code duplication.
-- [ ] **CORE-03:** All cross-system entity references use a stable UUID-keyed identifier scheme.
+- [x] **CORE-01:** KM-Core package exports canonical entity and relation TypeScript types consumed by all three systems.
+- [x] **CORE-02:** GraphKMStore adapter (Graphology in-memory + LevelDB durable + git-tracked JSON export) is consumed by B and C without code duplication.
+- [x] **CORE-03:** All cross-system entity references use a stable UUID-keyed identifier scheme.
 
 ### Ontology system (ONTO)
 
-- [ ] **ONTO-01:** OntologyRegistry auto-discovers upper + lower ontologies from a configured directory (`ontology/*.json`).
-- [ ] **ONTO-02:** Lower ontologies extend upper ontologies via an `extends` field with property merging.
+- [x] **ONTO-01:** OntologyRegistry auto-discovers upper + lower ontologies from a configured directory (`ontology/*.json`).
+- [x] **ONTO-02:** Lower ontologies extend upper ontologies via an `extends` field with property merging.
 
 ### Consolidation framework (PIPE)
 
-- [ ] **PIPE-01:** 4-stage ingest-time consolidation pipeline (extract → dedup → store → synthesize) is defined in KM-Core; A's daily-digest/weekly-insight roll-up and B's wave-agents both implement against it.
-- [ ] **PIPE-02:** Post-hoc entity resolution is exposed as a KM-Core maintenance operation that scans the existing graph by `ontologyClass` and runs LLM semantic matching across the whole class (not just the current batch). All three systems gain this via the shared API; pattern lifted from OKM `pipeline.resolveEntities()` + `POST /api/cleanup/resolve-entities`.
+- [x] **PIPE-01:** 4-stage ingest-time consolidation pipeline (extract → dedup → store → synthesize) is defined in KM-Core; A's daily-digest/weekly-insight roll-up and B's wave-agents both implement against it.
+- [x] **PIPE-02:** Post-hoc entity resolution is exposed as a KM-Core maintenance operation that scans the existing graph by `ontologyClass` and runs LLM semantic matching across the whole class.
 
 ### Deduplication (DEDUP)
 
-- [ ] **DEDUP-01:** Layered dedup pipeline (exact name → embedding cosine → LLM semantic) defined in KM-Core; A, B, and C each plug system-specific implementations into the shared stages.
+- [x] **DEDUP-01:** Layered dedup pipeline (exact name → embedding cosine → LLM semantic) defined in KM-Core; A, B, and C each plug system-specific implementations into the shared stages.
 
 ### Entity data model (DATA)
 
-- [ ] **DATA-01:** All entities carry `validFrom`, `validUntil`, and `supersedes` fields.
-- [ ] **DATA-02:** Structured provenance fields (`createdBy`, `lastConfirmedBy`, `confirmationCount`, per-segment provenance) are present on every entity.
+- [x] **DATA-01:** All entities carry `validFrom`, `validUntil`, and `supersedes` fields.
+- [x] **DATA-02:** Structured provenance fields (`createdBy`, `lastConfirmedBy`, `confirmationCount`, per-segment provenance) are present on every entity.
 
 ### Query API & snapshots (API)
 
-- [ ] **API-01:** Common REST contract (entity CRUD, search, clusters, snapshots, ontology metadata) is exposed by all three systems.
-- [ ] **API-02:** Git snapshot + restore on `.data/exports/` works identically in all three systems.
+- [x] **API-01:** Common REST contract (entity CRUD, search, clusters, snapshots, ontology metadata) is exposed by all three systems.
+- [x] **API-02:** Git snapshot + restore on `.data/exports/` works identically in all three systems.
 
 ### Unified viewer (UI)
 
-- [x] **UI-01:** A single web viewer renders any KM-Core graph parameterized by ontology config; both VKB (B) and VOKB (C) users migrate to it without functional regression. *(Phase 45 MVP — 2026-06-08; routing layer + minimal viewer shell. UI-02 closes the surface-area gap.)*
-- [ ] **UI-02:** Unified viewer reaches ≥90% feature parity with VOKB (the richer of the two legacy viewers) plus four coding-specific surfaces (hierarchy navigator, LSL timeline, ETM live tail, workflow status) so VKB+VOKB users can migrate without losing functionality. Surfaces: stats bar, legend, node-shape/border/pulse encoding, layer/domain/ontology filters with per-class counts + cluster toggles, entity-detail sub-tabs (Default/Evolution/Confidence/Timeline) with relationships breakdown + sources & evidence + occurrence history, harmonized markdown/entity panel widths, trending sparklines, issue triage mode, plus the four coding-only additions. *(NEW — Phase 45 retrospective added 2026-06-09 after operator visual review revealed unified viewer shipped at ~15% of VOKB's surface.)*
+- [x] **UI-01:** A single web viewer renders any KM-Core graph parameterized by ontology config; both VKB (B) and VOKB (C) users migrate to it without functional regression. *(Phase 45 MVP — 2026-06-08; routing layer + minimal viewer shell.)*
+- [x] **UI-02:** Unified viewer reaches ≥90% feature parity with VOKB plus four coding-specific surfaces. *(Phase 55 — 13/13 plans complete; 55-VERIFICATION.md present.)*
 
 ### Per-system integration (INT)
 
-- [ ] **INT-01:** A (Online Learning) keeps its SQLite hot path; a thin KM-Core adapter exposes observations/digests/insights as KM-Core entities.
-- [ ] **INT-02:** B (Offline UKB) migrated to KM-Core; the Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition are fixed during migration.
-- [ ] **INT-03:** C (OKM in `~/Agentic/_work/rapid-automations`) migrated to KM-Core via cross-repo refactor; rapid-automations CI remains green.
+- [x] **INT-01:** A (Online Learning) keeps its SQLite hot path; a thin KM-Core adapter exposes observations/digests/insights as KM-Core entities.
+- [x] **INT-02:** B (Offline UKB) migrated to KM-Core; the Phase 10 embeddings-not-reaching-GraphDB issue and the `workflow-runner.ts:469–530` wave-analysis race condition are fixed during migration.
+- [x] **INT-03:** C (OKM in `~/Agentic/_work/rapid-automations`) migrated to KM-Core via cross-repo refactor; rapid-automations CI remains green.
 
 ### Documentation (DOC)
 
-- [ ] **DOC-01:** Each system has a README documenting which configurations it owns (ontology files, LLM provider config, ingest adapter config, domain eval logic); KM-Core has an architecture diagram + onboarding guide.
+- [x] **DOC-01:** Each system has a README documenting which configurations it owns; KM-Core has an architecture diagram + onboarding guide. *(One Phase 46 operator HUMAN-UAT pending: ONBOARDING.md dry-run.)*
 
 ---
 
-## Future Requirements (deferred)
+## v7.1 Future Requirements (deferred at milestone close)
 
 - Migrate A's SQLite hot path to the graph model — defer until KM-Core has proven hot-write performance under ETM load.
 - Real-time bidirectional sync between systems via event bus — premature until each system is on KM-Core and the event shape is stable.
-- Embedding/vector-store unification (Qdrant) — keep as optional sidecar in v7.1; converge in a later milestone if A/B/C diverge meaningfully on retrieval semantics.
+- Embedding/vector-store unification (Qdrant) — keep as optional sidecar; converge in a later milestone if A/B/C diverge meaningfully on retrieval semantics.
 
-## Out of Scope
+## v7.1 Out of Scope (locked at milestone close)
 
 - Rewriting the MCP server interface for B — `ukb full` invocation contract stays.
 - Replacing Graphology, LevelDB, or the existing JSON export format — KM-Core wraps these, doesn't replace them.
-- Breaking changes to existing `.data/observation-export/*.json` and `.data/knowledge-export/coding.json` paths — established commit hygiene (OKB-baseline guard, two-commit pattern) is preserved.
-- Cross-repo dependency injection between coding/ and rapid-automations/ via private npm — out for v7.1; OKM consumes KM-Core via the agreed packaging strategy (decided in INT-03's discuss phase).
-- New ingest adapters for A/B/C — each system keeps its existing source set; adding new sources is a follow-on milestone.
+- Breaking changes to existing `.data/observation-export/*.json` and `.data/knowledge-export/coding.json` paths.
+- Cross-repo dependency injection between coding/ and rapid-automations/ via private npm — out for v7.1; OKM consumes KM-Core via the agreed packaging strategy.
+- New ingest adapters for A/B/C — each system keeps its existing source set.
 
-## Traceability
+## v7.1 Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CORE-01 | Phase 37 | Complete |
 | CORE-02 | Phase 37 | Complete |
 | CORE-03 | Phase 37 | Complete |
-| ONTO-01 | Phase 38 | Pending |
-| ONTO-02 | Phase 38 | Pending |
+| ONTO-01 | Phase 38 | Complete |
+| ONTO-02 | Phase 38 | Complete |
 | DATA-01 | Phase 39 | Complete |
 | DATA-02 | Phase 39 | Complete |
 | PIPE-01 | Phase 40 | Complete |
 | DEDUP-01 | Phase 40 | Complete |
 | INT-01 | Phase 41 | Complete |
 | PIPE-02 | Phase 41 | Complete |
-| INT-02 | Phase 42 | Complete |
-| INT-03 | Phase 43 | Pending |
+| INT-02 | Phase 42 | Complete (via 42.1/42.1.1/42.1.2/42.2 chain) |
+| INT-03 | Phase 43 | Complete (OKM PR #4 merged 2026-06-02) |
 | API-01 | Phase 44 | Complete |
 | API-02 | Phase 44 | Complete |
-| UI-01 | Phase 45 | Complete (6/6 plans executed, MVP shipped 2026-06-08) |
-| UI-02 | Phase 55 | Ready for planning (2026-06-09) |
-| DOC-01 | Phase 46 | Complete |
+| UI-01 | Phase 45 | Complete (Phase 45 MVP) |
+| UI-02 | Phase 55 | Complete (13/13 plans; VERIFICATION present) |
+| DOC-01 | Phase 46 | Complete (one operator HUMAN-UAT pending — ONBOARDING.md dry-run) |
 
-**Coverage:** 18/18 requirements mapped (17 v7.1 + UI-02 added post-v7.1 from Phase 45 retrospective), no orphans.
+**Coverage:** 18/18 v7.1 requirements mapped, all phases complete (Phase 46 has one outstanding operator-side UAT).
