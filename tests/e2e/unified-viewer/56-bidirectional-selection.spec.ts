@@ -3,6 +3,15 @@
 //                 cascade or on the visual highlight surfaces flips this
 //                 suite RED.
 //
+// 2026-06-14 (WR-08 fix — 56.1-REVIEW): migrated to the Phase 56.1 multi-set
+// store interface. Phase 56's single-selection fields (`selectedNodeId`,
+// `selectedSessionId`, `selectedSessionStartAt`) were DELETED by Plan 01;
+// they are now `selectedNodeIds: Set<string>`, `focalNodeId: string | null`,
+// `selectedBucketKeys: Set<string>`, `focalBucketKey: string | null`. The
+// `setSelection` action signature also changed — see viewer-store.ts. This
+// spec was untouched from Phase 56 and would have been silently green (or
+// red and skipped); the migration recovers the AC coverage the file claims.
+//
 // Spec 1 covers AC #2 (graph → others highlight).
 // Spec 2 covers AC #3 (history sidebar → graph + timeline). 2026-06-13
 //        SPEC CHANGE (continuation 2): the original AC #3 wording was
@@ -29,7 +38,9 @@
 //
 // References:
 // - 56-CONTEXT.md ACs #2/#3/#4/#7
-// - 56-PATTERNS.md § tests/e2e/unified-viewer/56-bidirectional-selection.spec.ts (NEW)
+// - 56.1-PATTERNS-LOCK.md (multi-set store contracts)
+// - tests/e2e/unified-viewer/56.1-many-to-many.spec.ts (analog — multi-set
+//   click-driven patterns; WR-08 used this as the migration template)
 // - tests/e2e/unified-viewer/entity-detail.spec.ts (analog — "drive selection
 //   via store, assert panel reacts" pattern)
 //
@@ -40,21 +51,30 @@
 
 import { test, expect } from '@playwright/test'
 
+// Phase 56.1 multi-set store shape. Matches the production
+// `setSelection` signature in `viewer-store.ts` — see WR-08 fix in
+// 56.1-REVIEW.md for the migration rationale.
 interface WindowWithViewerStore {
   __viewerStore?: {
     getState(): {
-      selectedNodeId: string | null
       selectionSource: string | null
       lslSessionFilter: string[]
       lslFilterEntityIds: ReadonlySet<string> | null
       highlightedRowKey: string | null
-      selectedSessionId: string | null
+      // Phase 56.1 multi-set fields (Plan 01).
+      selectedNodeIds: ReadonlySet<string>
+      focalNodeId: string | null
+      selectedBucketKeys: ReadonlySet<string>
+      focalBucketKey: string | null
       setSelection(args: {
-        nodeId?: string | null
-        sessionId?: string | null
+        nodeIds?: ReadonlySet<string> | string[]
+        bucketKeys?: ReadonlySet<string> | string[]
+        focal?: { nodeId?: string | null; bucketKey?: string | null }
         highlightedRowKey?: string | null
         source: string | null
-        pathToSelected?: Set<string>
+        pathToSelected?: ReadonlySet<string>
+        lslSessionFilter?: string[]
+        lslFilterEntityIds?: ReadonlySet<string> | null
       }): void
       clearSelection(): void
     }
@@ -90,11 +110,11 @@ test.describe('Unified Viewer — Phase 56 bidirectional selection', () => {
     //
     // STORE-SIDE CASCADE — locked here at E2E level.
     // VISUAL — see notes below; SidePanel intentionally swaps HistorySidebar
-    //         for EntityDetailPanel when selectedNodeId !== null (UI-SPEC §7
-    //         row 11 + SidePanel.tsx:132-136). The HistorySidebar highlight
-    //         is therefore unit-tested in HistorySidebar.test.tsx Test 3/4
-    //         under the "no graph selection but highlightedRowKey set"
-    //         path that the LSL timeline tick cascade actually triggers
+    //         for EntityDetailPanel when focalNodeId !== null (UI-SPEC §7
+    //         row 11 + SidePanel.tsx mode-switch). The HistorySidebar
+    //         highlight is therefore unit-tested in HistorySidebar.test.tsx
+    //         Test 3/4 under the "no graph selection but highlightedRowKey
+    //         set" path that the LSL timeline tick cascade actually triggers
     //         (Spec 3 below). Asserting `[data-history-id]` visibility
     //         inside Spec 1 is a Phase 55 contract violation — we don't.
     //
@@ -118,45 +138,48 @@ test.describe('Unified Viewer — Phase 56 bidirectional selection', () => {
     await page.evaluate((id) => {
       const w = window as unknown as WindowWithViewerStore
       w.__viewerStore!.getState().setSelection({
-        nodeId: id,
+        nodeIds: new Set<string>([id as string]),
+        focal: { nodeId: id as string },
         source: 'graph',
-        highlightedRowKey: id,
-        sessionId: null,
+        highlightedRowKey: id as string,
         pathToSelected: new Set([id as string]),
       })
     }, firstNodeId)
 
-    // STORE-SIDE assertion: the 5-field atomic cascade (the canonical reality
-    // every subscriber reads). Plan 04 Task 1 wired this on the graph side;
-    // here we assert it via the store hook to lock the contract.
+    // STORE-SIDE assertion: the multi-set atomic cascade (Phase 56.1 D-1).
+    // Plan 04 Task 1 wired this on the graph side; here we assert via the
+    // store hook to lock the contract.
     await expect(async () => {
       const s = await page.evaluate(() => {
         const w = window as unknown as WindowWithViewerStore
         const st = w.__viewerStore!.getState()
         return {
-          id: st.selectedNodeId,
+          focal: st.focalNodeId,
+          nodeIdsCount: st.selectedNodeIds.size,
           src: st.selectionSource,
           hl: st.highlightedRowKey,
-          sess: st.selectedSessionId,
+          bucketKeysCount: st.selectedBucketKeys.size,
         }
       })
-      expect(s.id).toBe(firstNodeId)
+      expect(s.focal).toBe(firstNodeId)
+      expect(s.nodeIdsCount).toBeGreaterThanOrEqual(1)
       expect(s.src).toBe('graph')
       expect(s.hl).toBe(firstNodeId)
-      expect(s.sess).toBeNull()
+      // Pure graph selection should not have populated bucket-side fields.
+      expect(s.bucketKeysCount).toBe(0)
     }).toPass({ timeout: 5_000 })
 
     // VISUAL assertion: the LSL timeline tick ring. LslTimelineStrip's
-    // `selectedTs` memo (lines 161-175) resolves the selectedNodeId to a
-    // createdAt timestamp, isSelectedBucket adds `ring-blue-500` to the
+    // `selectedTs` memo resolves the focalNodeId to a createdAt
+    // timestamp; the reverse-cascade fallback adds `ring-blue-500` to the
     // matching tick. This is the ONLY pane that visually reflects a graph
     // selection without the §7 row 11 swap; HistorySidebar is intentionally
-    // hidden by SidePanel when an entity is selected (the row highlight
-    // path is exercised via Spec 3's timeline→history cascade where
-    // selectedNodeId is set but the LSL filter signal is the driver). 0 or
-    // >0 ticks may match depending on whether the picked Insight has a
-    // captured-at metadata in an LSL session window — tolerate both via
-    // >= 0; the store-side assertion above is the actual lock.
+    // hidden by SidePanel when an entity is focal (the row highlight path
+    // is exercised via Spec 3's timeline→history cascade where focalNodeId
+    // is set but the LSL filter signal is the driver). 0 or >0 ticks may
+    // match depending on whether the picked Insight has a captured-at
+    // metadata in an LSL session window — tolerate both via >= 0; the
+    // store-side assertion above is the actual lock.
     const ringedTicks = await page
       .locator('[data-testid^="lsl-tick-"].ring-blue-500')
       .count()
@@ -183,17 +206,18 @@ test.describe('Unified Viewer — Phase 56 bidirectional selection', () => {
 
     await firstRow.click()
 
-    // Store reflects the click — RED until Plan 02 routes the click
-    // through setSelection({ source: 'history' }) instead of bare setState.
+    // Store reflects the click — focalNodeId === clicked row id; source
+    // is 'history' per HistorySidebar.tsx onClick (Plan 04).
     await expect(async () => {
       const s = await page.evaluate(() => {
         const w = window as unknown as WindowWithViewerStore
+        const st = w.__viewerStore!.getState()
         return {
-          id: w.__viewerStore!.getState().selectedNodeId,
-          src: w.__viewerStore!.getState().selectionSource,
+          focal: st.focalNodeId,
+          src: st.selectionSource,
         }
       })
-      expect(s.id).toBe(rowId)
+      expect(s.focal).toBe(rowId)
       expect(s.src).toBe('history')
     }).toPass({ timeout: 5_000 })
 
@@ -220,51 +244,58 @@ test.describe('Unified Viewer — Phase 56 bidirectional selection', () => {
   }) => {
     // AC #4: Clicking a timeline tick or session-segment selects the
     // corresponding node(s) in the graph AND scrolls/highlights the
-    // matching history sidebar row. Today's LslTimelineStrip already
-    // writes selectedNodeId on click (lines 287-330); Plan 03 extends to
-    // setSelection({ source: 'timeline', highlightedRowKey, selectedSessionId }).
+    // matching history sidebar row. The Phase 56.1 LslTimelineStrip
+    // writes the multi-set selection atomically via setSelection({
+    //   nodeIds: pickAllResolvable(...),
+    //   bucketKeys: Set([bucketKey]),
+    //   focal: { nodeId, bucketKey },
+    //   source: 'timeline',
+    //   ...
+    // }) (Plan 05). selectionSource is 'timeline' (or 'history' under
+    // Decision C auto-drill — see LslTimelineStrip.onTickClick:704).
 
     // 2026-06-13 (Plan 56-04 lock): live session ids are NOT prefixed with
     // 'sess-' — that prefix was a test-fixture convention from the unit
     // tests. The rendered data-testid is `lsl-tick-${session.id}` where
     // `session.id` is the obs-api's short hex (e.g. `lsl-tick-c197ef`). We
-    // match all lsl-tick-* nodes and pick the first one.
-    const firstTick = page.locator('[data-testid^="lsl-tick-"]').first()
+    // match all lsl-tick-* nodes (filtering out the disabled 0-obs ones via
+    // aria-disabled, mirroring 56.1-many-to-many.spec.ts) and pick the first.
+    const firstTick = page
+      .locator('[data-testid^="lsl-tick-"]:not([aria-disabled="true"])')
+      .first()
     await expect(firstTick).toBeVisible({ timeout: 10_000 })
     await firstTick.click()
 
-    // Store reflects the tick click. selectedNodeId is non-null because the
-    // tick exposes its session's entityIds; selectionSource is 'timeline'
-    // (RED until Plan 03's atomic-write extension).
+    // Store reflects the tick click. focalNodeId is non-null because the
+    // tick exposes its session's entityIds → pickAllResolvable yields >=1
+    // ancestor → focal lands on the first. selectionSource is 'timeline'
+    // for the multi-set case OR 'history' for the auto-drill single-
+    // resolution case (LslTimelineStrip.onTickClick:704-720) — accept both.
     await expect(async () => {
       const s = await page.evaluate(() => {
         const w = window as unknown as WindowWithViewerStore
+        const st = w.__viewerStore!.getState()
         return {
-          id: w.__viewerStore!.getState().selectedNodeId,
-          src: w.__viewerStore!.getState().selectionSource,
+          focal: st.focalNodeId,
+          src: st.selectionSource,
         }
       })
-      expect(s.id).not.toBeNull()
-      expect(s.src).toBe('timeline')
+      expect(s.focal).not.toBeNull()
+      expect(['timeline', 'history']).toContain(s.src)
     }).toPass({ timeout: 5_000 })
 
-    // VISIBLE CASCADE: SidePanel.tsx:132-136 swaps HistorySidebar for the
-    // EntityDetailPanel whenever `selectedNodeId !== null`. After a tick
-    // click the store reads selectedNodeId === <first entity in session>,
-    // so the right visible assertion for "history sidebar reacts" is that
-    // SidePanel has switched into the entity-detail mode (UI-SPEC §7 row
-    // 11 hybrid contract — the row-level highlight inside HistorySidebar
-    // is unit-tested in HistorySidebar.test.tsx Test 4; this E2E suite
-    // locks the visible CASCADE through SidePanel, which is the only
-    // surface that can reflect a graph/timeline selection visually).
+    // VISIBLE CASCADE: SidePanel mode-switch (Phase 56.1 D-4) opens a
+    // surface (BucketCardList / EntityDetailPanel) whenever there's a
+    // non-null focalNodeId — the close button is the canonical proxy
+    // for "panel switched into a focal/multi-set mode."
     await expect(
       page.getByTestId('side-panel-close'),
     ).toBeVisible({ timeout: 5_000 })
 
-    // Highlighted row key in the store also flips on the tick click — Plan
-    // 03's atomic 7-field write includes it (selectedSessionId + entityIds
-    // resolution). Lock at the store level since the visual surface for
-    // it is HistorySidebar.tsx Test 4, not this E2E run.
+    // Highlighted row key in the store also flips on the tick click — the
+    // atomic write in LslTimelineStrip.onTickClick includes it (the row
+    // key follows the focal). Lock at the store level since the visual
+    // surface for it is HistorySidebar.tsx Test 4, not this E2E run.
     const hl = await page.evaluate(() => {
       const w = window as unknown as WindowWithViewerStore
       return w.__viewerStore!.getState().highlightedRowKey
@@ -280,13 +311,20 @@ test.describe('Unified Viewer — Phase 56 bidirectional selection', () => {
     // `.ring-blue-500` and `[data-history-id].bg-blue` go GREEN once
     // Plans 02 + 03 wire the highlight classes (they're already absent
     // today simply because the highlights haven't been added yet).
+    //
+    // 2026-06-14 (WR-08 fix — 56.1-REVIEW): Esc behaviour evolved during
+    // Phase 56.1 to a two-step pop-then-clear (Plan 06 Decision 1
+    // selection-history stack — WR-05 fix lands the gate in the caller).
+    // For a single-step selection (no drill — selectionHistory === null),
+    // Esc goes straight to clearSelection so this spec's single press is
+    // still sufficient to land at Layer 0.
 
     const firstNodeId = await page.evaluate(async () => {
       // 2026-06-13 (Plan 56-04 lock): the canonical km-core REST shape is
       // /api/v1/entities (Phase 44 contract — see ApiClient.ts line 4 +
       // ApiClient.test.ts line 28). The /api/coding/entities path the spec
       // was authored against (Plan 56-01 task 3) does not exist on the
-      // obs-api at :12436. HistorySidebar.tsx:59 also restricts the feed to
+      // obs-api at :12436. HistorySidebar.tsx restricts the feed to
       // `entityType === 'Insight'`, so we filter to the first Insight to
       // guarantee a `[data-history-id]` row exists for it.
       // limit=5000 because the live corpus has ~1100 entities and only ~84
@@ -301,34 +339,45 @@ test.describe('Unified Viewer — Phase 56 bidirectional selection', () => {
     })
     expect(firstNodeId).not.toBeNull()
 
-    // Drive a multi-pane selection: graph node + LSL session filter +
-    // history row highlight. All set atomically via the store hook.
+    // Drive a multi-pane selection: graph node halo (single member) +
+    // bucket halo + LSL filter. All set atomically via the store hook.
     await page.evaluate((id) => {
       const w = window as unknown as WindowWithViewerStore
       const store = w.__viewerStore!.getState()
       store.setSelection({
-        nodeId: id,
-        highlightedRowKey: id,
-        sessionId: 'sess-test',
+        nodeIds: new Set<string>([id as string]),
+        focal: { nodeId: id as string },
+        bucketKeys: new Set<string>(['sess-test|2026-06-14T00:00:00Z']),
+        highlightedRowKey: id as string,
         source: 'graph',
         pathToSelected: new Set([id as string]),
+        lslSessionFilter: ['sess-test'],
       })
     }, firstNodeId)
 
     await page.keyboard.press('Escape')
 
-    // Store-side cascade — passes after Plan 01 Task 2.
+    // Store-side cascade — clearSelection nulls every selection field +
+    // empties the LSL slice (clearSelection action — viewer-store.ts).
+    // Note: with WR-05 fix Esc goes pop → fallback clearSelection; with
+    // no history (single-step selection here) the pop is a no-op and the
+    // explicit clearSelection() in useKeyboardShortcuts handles the
+    // L1 → L0 transition.
     await expect(async () => {
       const s = await page.evaluate(() => {
         const w = window as unknown as WindowWithViewerStore
         const st = w.__viewerStore!.getState()
         return {
-          id: st.selectedNodeId,
+          focal: st.focalNodeId,
+          nodeIdsCount: st.selectedNodeIds.size,
+          bucketKeysCount: st.selectedBucketKeys.size,
           src: st.selectionSource,
           lsl: st.lslSessionFilter.length,
         }
       })
-      expect(s.id).toBeNull()
+      expect(s.focal).toBeNull()
+      expect(s.nodeIdsCount).toBe(0)
+      expect(s.bucketKeysCount).toBe(0)
       expect(s.src).toBeNull()
       expect(s.lsl).toBe(0)
     }).toPass({ timeout: 5_000 })
