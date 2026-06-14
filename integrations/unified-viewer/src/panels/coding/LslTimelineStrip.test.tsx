@@ -1623,4 +1623,216 @@ describe('LslTimelineStrip', () => {
       })
     }
   })
+
+  // Plan 06 gap-closure (2026-06-14) — timeline scale-selector regression.
+  // Operator visual smoke surfaced two coupled symptoms after Decision C
+  // (f3c0de774) auto-drill collapsed the focal to LiveLoggingSystem (LLS):
+  //   1. Clicking a recent tick auto-snapped the window selector to 'all'
+  //      because LLS's createdAt is days/weeks old → ageMs > WINDOW_MS[7d]
+  //      → auto-slide jumps to 'all'.
+  //   2. After the auto-snap, clicking 24h / 7d / 30d had no effect because
+  //      the auto-slide useEffect dep list includes windowKey: each manual
+  //      setWindowKey re-fired the effect, which re-ran the same ageMs
+  //      check against the still-old selectedTs and re-applied 'all'.
+  // Root cause: a single effect (LslTimelineStrip.tsx ~line 296-346) where
+  // the selection-active branch fired on every windowKey change, not only
+  // on selectedTs changes. Fix gates the branch on a real selectedTs
+  // transition (prevSelectedTsRef.current !== selectedTs).
+
+  test('Test 38 [Plan 06 — scale stability]: tick click does NOT auto-switch the window when focal is recent (within 7d default)', async () => {
+    // Baseline happy path: tick → focal with a RECENT createdAt → no
+    // auto-slide. Default windowKey='7d' must stick.
+    mockEntities.length = 0
+    mockEntities.push({
+      id: 'e3',
+      createdAt: nowMinusHours(1.75), // very recent → ageMs << WINDOW_MS[7d]
+    })
+    useViewerStore.setState({
+      selectionSource: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectionHistory: null,
+    })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      // Default window=7d → 7d button is selected pre-click.
+      const btn7dBefore = screen.getByLabelText('7 days')
+      expect(btn7dBefore.getAttribute('data-state')).toBe('on')
+      const tick = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      // Wait for the click cascade to settle (focal write triggers a re-render).
+      await waitFor(() => {
+        expect(useViewerStore.getState().focalNodeId).toBe('e3')
+      })
+      // CRITICAL: window must NOT auto-slide. 7d stays selected.
+      const btn7d = screen.getByLabelText('7 days')
+      const btnAll = screen.getByLabelText('All time')
+      expect(btn7d.getAttribute('data-state')).toBe('on')
+      expect(btnAll.getAttribute('data-state')).not.toBe('on')
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      useViewerStore.setState({
+        selectedNodeIds: new Set<string>(),
+        focalNodeId: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
+      })
+    }
+  })
+
+  test('Test 39 [Plan 06 — scale stability]: tick click whose focal resolves to an OLD entity (Decision C auto-drill to LLS) does NOT auto-slide the window — source is timeline/history so the slide is skipped', async () => {
+    // Symptom 1 from the 2026-06-14 visual smoke. Decision C auto-drill
+    // collapses the focal to a long-lived ancestor (LiveLoggingSystem)
+    // whose createdAt is days/weeks old. Pre-fix, the auto-slide effect
+    // read selectedTs = LLS.createdAt and jumped the window to 'all',
+    // even though the user clicked a tick that's clearly inside the
+    // current window (the user wouldn't have been able to click an
+    // off-window tick — the strip only renders tick-buttons for
+    // sessions inside the active window).
+    //
+    // Fix: when selectionSource is 'timeline' or 'history', the
+    // auto-slide branch returns early. Both sources cover tick-
+    // originated clicks (auto-drill writes 'history'; multi-resolve
+    // writes 'timeline').
+    mockEntities.length = 0
+    mockEntities.push({
+      id: 'e3',
+      // 400 days ago — would land on 'all' under the bug.
+      createdAt: new Date(Date.now() - 400 * 24 * 3600_000).toISOString(),
+    })
+    useViewerStore.setState({
+      selectionSource: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectionHistory: null,
+    })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      // Default window = 7d.
+      const btn7dPre = screen.getByLabelText('7 days')
+      expect(btn7dPre.getAttribute('data-state')).toBe('on')
+      const tick = screen.getByTestId('lsl-tick-sess-bbbbbbbb')
+      act(() => {
+        fireEvent.click(tick)
+      })
+      // Wait for the click cascade (selectionSource set + focalNodeId set).
+      await waitFor(() => {
+        const s = useViewerStore.getState()
+        expect(s.focalNodeId).toBe('e3')
+        // sess-bbbbbbbb has entityIds=['e3'] → Decision C auto-drill
+        // writes selectionSource = 'history' (Layer 2 payload).
+        expect(s.selectionSource).toBe('history')
+      })
+      // CRITICAL: window must NOT auto-slide to 'all'. 7d stays selected.
+      const btn7d = screen.getByLabelText('7 days')
+      const btnAll = screen.getByLabelText('All time')
+      expect(btn7d.getAttribute('data-state')).toBe('on')
+      expect(btnAll.getAttribute('data-state')).not.toBe('on')
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      useViewerStore.setState({
+        selectedNodeIds: new Set<string>(),
+        focalNodeId: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
+        selectionSource: null,
+      })
+    }
+  })
+
+  test('Test 40 [Plan 06 — scale stability]: after a graph-originated auto-slide to "all", the user can manually pick 24h / 30d / 7d and the choice STICKS (selectedTs-change gate, not just selectionSource)', async () => {
+    // Coverage for the dep-list re-trigger bug independent of the
+    // source-skip guard. Simulate a graph-side selection of an old
+    // entity (selectionSource='graph') — the auto-slide fires on the
+    // FIRST render because focal is genuinely off-window. The user
+    // then manually picks 24h: the auto-slide effect re-runs because
+    // windowKey is in its dep list, but the isNewSelection gate
+    // (prevSelectedTsRef.current === selectedTs) short-circuits before
+    // the ageMs comparison and the manual choice sticks.
+    //
+    // This is the symptom-2 regression probe; graph-side selection
+    // exercises the path that's still allowed to auto-slide.
+    mockEntities.length = 0
+    mockEntities.push({
+      id: 'e3',
+      createdAt: new Date(Date.now() - 400 * 24 * 3600_000).toISOString(),
+    })
+    useViewerStore.setState({
+      selectionSource: null,
+      selectedBucketKeys: new Set<string>(),
+      focalBucketKey: null,
+      selectedNodeIds: new Set<string>(),
+      focalNodeId: null,
+      selectionHistory: null,
+    })
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-bbbbbbbb'))
+      // Simulate a graph-side click: set focal directly via setSelection
+      // with source='graph' so the auto-slide takes the slide branch.
+      act(() => {
+        useViewerStore.getState().setSelection({
+          nodeIds: new Set<string>(['e3']),
+          bucketKeys: new Set<string>(),
+          focal: { nodeId: 'e3', bucketKey: null },
+          source: 'graph',
+        })
+      })
+      // Auto-slide fires for graph-source selection with old focal.
+      await waitFor(() => {
+        const btnAll = screen.getByLabelText('All time')
+        expect(btnAll.getAttribute('data-state')).toBe('on')
+      })
+      // Symptom 2 probe: manually click 24h. Pre-fix, the auto-slide
+      // re-fires (windowKey is in the dep list) and snaps back to 'all'
+      // because selectedTs is still the old e3 ts. Post-fix, the
+      // isNewSelection gate returns before the ageMs check.
+      const btn24h = screen.getByLabelText('24 hours')
+      act(() => {
+        fireEvent.click(btn24h)
+      })
+      await waitFor(() => {
+        expect(screen.getByLabelText('24 hours').getAttribute('data-state')).toBe('on')
+      })
+      expect(screen.getByLabelText('All time').getAttribute('data-state')).not.toBe('on')
+      // 30d also works.
+      const btn30d = screen.getByLabelText('30 days')
+      act(() => {
+        fireEvent.click(btn30d)
+      })
+      await waitFor(() => {
+        expect(screen.getByLabelText('30 days').getAttribute('data-state')).toBe('on')
+      })
+      expect(screen.getByLabelText('All time').getAttribute('data-state')).not.toBe('on')
+      // 7d also works.
+      const btn7d = screen.getByLabelText('7 days')
+      act(() => {
+        fireEvent.click(btn7d)
+      })
+      await waitFor(() => {
+        expect(screen.getByLabelText('7 days').getAttribute('data-state')).toBe('on')
+      })
+      expect(screen.getByLabelText('All time').getAttribute('data-state')).not.toBe('on')
+    } finally {
+      r.restore()
+      mockEntities.length = 0
+      useViewerStore.setState({
+        selectedNodeIds: new Set<string>(),
+        focalNodeId: null,
+        selectedBucketKeys: new Set<string>(),
+        focalBucketKey: null,
+        selectionSource: null,
+      })
+    }
+  })
 })
