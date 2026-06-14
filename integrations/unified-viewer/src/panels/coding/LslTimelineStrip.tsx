@@ -803,6 +803,18 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
         className="h-12 border-t border-border bg-card flex items-center px-2 gap-2"
         role="region"
         aria-label="LSL session timeline"
+        // 2026-06-14 (WR-06 fix — 56.1-REVIEW): aria-busy advertises the
+        // "filters not yet seeded" race window (WR-03 race) so assistive
+        // tech announces it AND so the next click is gated on a visible
+        // signal rather than dropping silently. Also informs visual users
+        // via the `title` tooltip below (browsers render aria-busy=true
+        // as a "wait" cursor on most platforms).
+        aria-busy={selectedClasses.size === 0 || undefined}
+        title={
+          selectedClasses.size === 0
+            ? 'Loading filters — tick clicks will be ignored momentarily'
+            : undefined
+        }
       >
         <ToggleGroup
           type="single"
