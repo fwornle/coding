@@ -144,11 +144,30 @@ describe('BucketCardList (Plan 56.1-04 Task 1)', () => {
     expect(document.querySelector('[data-testid="bucket-card-e3"]')).not.toBeNull()
   })
 
-  test('Test 4: card click drills via setSelection (nodeIds=Set([id]) + bucketKeys empty + focal=id + source=history)', () => {
+  test('Test 4: card click drills via setSelection (nodeIds=Set([id]) + bucketKeys empty + focal=id + source=history + LSL slice preserved + pre-drill snapshot pushed to selectionHistory)', () => {
+    // 2026-06-14 (Plan 06 gap-closure — Decision 1 + Decision 3): drill
+    // semantics evolved:
+    //   - Decision 1: drill writers pass pushHistory: true so the pre-drill
+    //                 Layer 1 state is captured into `selectionHistory` for
+    //                 Esc/X to restore.
+    //   - Decision 3: drill PRESERVES `lslFilterEntityIds` and
+    //                 `lslSessionFilter` to keep `visibleEntities`
+    //                 reference-stable so the D3 main render does NOT
+    //                 rebuild + auto-fit (the "zoom all the way out, fade
+    //                 everything" regression the operator caught).
+    // Both invariants asserted below.
+    const preBucketKeys = new Set<string>(['sess-X|2026-06-13T11:00:00Z'])
+    const preLslIds = new Set<string>(['e1', 'e2'])
+    const preLslSessionFilter = ['sess-X']
     useViewerStore.setState({
       selectionSource: 'timeline',
-      selectedBucketKeys: new Set<string>(['sess-X|2026-06-13T11:00:00Z']),
-      lslFilterEntityIds: new Set<string>(['e1', 'e2']),
+      selectedBucketKeys: preBucketKeys,
+      focalBucketKey: 'sess-X|2026-06-13T11:00:00Z',
+      lslFilterEntityIds: preLslIds,
+      lslSessionFilter: preLslSessionFilter,
+      // Layer 1 state must have at least one set populated for shouldPush
+      // to fire; selectedBucketKeys above satisfies that.
+      selectionHistory: null,
     })
     renderPanel()
     const card = document.querySelector('[data-testid="bucket-card-e1"]') as HTMLElement
@@ -168,13 +187,61 @@ describe('BucketCardList (Plan 56.1-04 Task 1)', () => {
     expect(s.focalBucketKey).toBeNull()
     // source = 'history'
     expect(s.selectionSource).toBe('history')
-    // LSL slice fully cleared (drill is a fresh selection scope)
-    expect(s.lslSessionFilter).toEqual([])
-    expect(s.lslFilterEntityIds).toBeNull()
-    // pathToSelected reset
+    // Decision 3: LSL slice PRESERVED at pre-drill values (NOT cleared).
+    // This is the key contract change from Phase 56.1 Plan 04 — the drill
+    // is purely a selection-slice mutation; the visibility-narrowing LSL
+    // filter stays so the D3 graph does not rebuild / re-auto-fit.
+    expect(s.lslSessionFilter).toEqual(preLslSessionFilter)
+    expect(s.lslFilterEntityIds).toBe(preLslIds)
+    // pathToSelected reset (selection changed, ancestry recomputes)
     expect(s.pathToSelected.size).toBe(0)
     // highlightedRowKey = e1
     expect(s.highlightedRowKey).toBe('e1')
+    // Decision 1: pre-drill snapshot pushed to selectionHistory so Esc/X
+    // can pop back to Layer 1.
+    expect(s.selectionHistory).not.toBeNull()
+    expect(s.selectionHistory?.selectionSource).toBe('timeline')
+    expect(s.selectionHistory?.selectedBucketKeys).toBe(preBucketKeys)
+    expect(s.selectionHistory?.lslFilterEntityIds).toBe(preLslIds)
+  })
+
+  test('Test 4b [Plan 06 Decision 1 selection-history stack — drill is reversible via popSelection]: after card-click drill, popSelection() restores the exact pre-drill multi-set state and clears selectionHistory', () => {
+    // Acceptance gate for the one-step-back contract end-to-end through
+    // BucketCardList: seed Layer 1 → drill via card → popSelection()
+    // restores Layer 1. The store-level popSelection test in
+    // viewer-store.test.ts covers the action in isolation; this test
+    // proves the BucketCardList integration emits the right setSelection
+    // payload (pushHistory: true) so the pop works in the live UI path.
+    const preBucketKeys = new Set<string>(['sess-X|2026-06-13T11:00:00Z'])
+    const preLslIds = new Set<string>(['e1', 'e2'])
+    useViewerStore.setState({
+      selectionSource: 'timeline',
+      selectedBucketKeys: preBucketKeys,
+      focalBucketKey: 'sess-X|2026-06-13T11:00:00Z',
+      lslFilterEntityIds: preLslIds,
+      lslSessionFilter: ['sess-X'],
+      selectionHistory: null,
+    })
+    renderPanel()
+    const card = document.querySelector('[data-testid="bucket-card-e1"]') as HTMLElement
+    fireEvent.click(card)
+
+    // Post-drill: history populated.
+    expect(useViewerStore.getState().selectionHistory).not.toBeNull()
+    expect(useViewerStore.getState().selectionSource).toBe('history')
+
+    // Pop: restore Layer 1.
+    const popped = useViewerStore.getState().popSelection()
+    expect(popped).toBe(true)
+
+    const s = useViewerStore.getState()
+    // Restored exactly to Layer 1.
+    expect(s.selectionSource).toBe('timeline')
+    expect(s.selectedBucketKeys).toBe(preBucketKeys)
+    expect(s.focalBucketKey).toBe('sess-X|2026-06-13T11:00:00Z')
+    expect(s.lslFilterEntityIds).toBe(preLslIds)
+    // Stack drained to one-deep: history slot cleared after pop.
+    expect(s.selectionHistory).toBeNull()
   })
 
   test('Test 5: Logger discipline — no raw console.* in BucketCardList.tsx source', () => {

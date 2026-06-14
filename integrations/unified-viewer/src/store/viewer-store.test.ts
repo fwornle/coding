@@ -740,3 +740,193 @@ describe('useViewerStore — Phase 56.1 multi-selection', () => {
     expect(src).not.toMatch(/console\.(log|warn|error|info|debug|trace)/)
   })
 })
+
+// 2026-06-14 — Plan 06 gap-closure Decision 1: selection-history stack.
+// Operator UX contract: Esc / X is a one-step-back action (Layer 2 → Layer 1)
+// when a drill happened; otherwise falls through to clearSelection (Layer 1 → Layer 0).
+// The stack is one-deep only — no chain — to avoid browser-back-button-style
+// ambiguity on a graph viewer.
+describe('useViewerStore — Plan 06 Decision 1 selection-history stack', () => {
+  beforeEach(() => {
+    useViewerStore.getState().clearSelection()
+  })
+
+  test('initial state: selectionHistory is null at fresh mount', () => {
+    expect(useViewerStore.getState().selectionHistory).toBeNull()
+  })
+
+  test('setSelection without pushHistory does NOT touch selectionHistory', () => {
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n1']),
+      source: 'timeline',
+    })
+    expect(useViewerStore.getState().selectionHistory).toBeNull()
+  })
+
+  test('setSelection with pushHistory: true on empty selection (Layer 0 → Layer 1) does NOT push — nothing meaningful to remember', () => {
+    // shouldPush guard: pushHistory && (selectedNodeIds.size > 0 || selectedBucketKeys.size > 0).
+    // Both pre-write sets are empty here so the guard rejects the push.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n1']),
+      source: 'graph',
+      pushHistory: true,
+    })
+    expect(useViewerStore.getState().selectionHistory).toBeNull()
+  })
+
+  test('setSelection with pushHistory: true on Layer 1 (selection populated) captures pre-write snapshot', () => {
+    // Establish Layer 1 first (without push).
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n1', 'n2']),
+      bucketKeys: new Set<string>(['b1|2026-06-14T00:00:00Z']),
+      focal: { nodeId: 'n1', bucketKey: 'b1|2026-06-14T00:00:00Z' },
+      source: 'timeline',
+    })
+    expect(useViewerStore.getState().selectionHistory).toBeNull()
+    // Drill: Layer 1 → Layer 2.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n3']),
+      bucketKeys: new Set<string>(),
+      focal: { nodeId: 'n3', bucketKey: null },
+      source: 'history',
+      pushHistory: true,
+    })
+    const s = useViewerStore.getState()
+    expect(s.selectionHistory).not.toBeNull()
+    expect(s.selectionHistory?.selectedNodeIds.has('n1')).toBe(true)
+    expect(s.selectionHistory?.selectedNodeIds.has('n2')).toBe(true)
+    expect(s.selectionHistory?.focalNodeId).toBe('n1')
+    expect(s.selectionHistory?.selectedBucketKeys.has('b1|2026-06-14T00:00:00Z')).toBe(true)
+    expect(s.selectionHistory?.selectionSource).toBe('timeline')
+    // Post-drill state.
+    expect(s.focalNodeId).toBe('n3')
+    expect(s.selectionSource).toBe('history')
+  })
+
+  test('popSelection on Layer 2 restores Layer 1 EXACTLY and clears history (one-deep stack)', () => {
+    // Layer 1 setup.
+    const l1NodeIds = new Set<string>(['n1', 'n2'])
+    const l1BucketKeys = new Set<string>(['b1|t1'])
+    const l1LslIds = new Set<string>(['raw-1', 'raw-2'])
+    useViewerStore.getState().setSelection({
+      nodeIds: l1NodeIds,
+      bucketKeys: l1BucketKeys,
+      focal: { nodeId: 'n1', bucketKey: 'b1|t1' },
+      source: 'timeline',
+      lslSessionFilter: ['b1'],
+      lslFilterEntityIds: l1LslIds,
+    })
+    // Drill to Layer 2.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n3']),
+      bucketKeys: new Set<string>(),
+      focal: { nodeId: 'n3', bucketKey: null },
+      source: 'history',
+      pushHistory: true,
+    })
+    // Pop.
+    const popped = useViewerStore.getState().popSelection()
+    expect(popped).toBe(true)
+    const s = useViewerStore.getState()
+    // Layer 1 restored EXACTLY — same Set references (reference-stable
+    // restore matters for downstream useMemo deps).
+    expect(s.selectedNodeIds).toBe(l1NodeIds)
+    expect(s.selectedBucketKeys).toBe(l1BucketKeys)
+    expect(s.lslFilterEntityIds).toBe(l1LslIds)
+    expect(s.focalNodeId).toBe('n1')
+    expect(s.focalBucketKey).toBe('b1|t1')
+    expect(s.selectionSource).toBe('timeline')
+    expect(s.lslSessionFilter).toEqual(['b1'])
+    // Stack drained: history cleared.
+    expect(s.selectionHistory).toBeNull()
+  })
+
+  test('popSelection on Layer 1 (no history) falls through to clearSelection and returns false', () => {
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n1']),
+      source: 'graph',
+    })
+    expect(useViewerStore.getState().selectionHistory).toBeNull()
+    const popped = useViewerStore.getState().popSelection()
+    expect(popped).toBe(false)
+    const s = useViewerStore.getState()
+    expect(s.selectedNodeIds.size).toBe(0)
+    expect(s.focalNodeId).toBeNull()
+    expect(s.selectionSource).toBeNull()
+  })
+
+  test('popSelection on Layer 0 (already clear) is a safe no-op', () => {
+    // No selection, no history.
+    expect(useViewerStore.getState().selectionHistory).toBeNull()
+    expect(useViewerStore.getState().focalNodeId).toBeNull()
+    const popped = useViewerStore.getState().popSelection()
+    expect(popped).toBe(false)
+    // Still cleared, no error thrown.
+    expect(useViewerStore.getState().focalNodeId).toBeNull()
+  })
+
+  test('clearSelection() always drains selectionHistory too (full-clear semantic)', () => {
+    // Layer 1 → Layer 2 drill, then full clear.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n1']),
+      source: 'timeline',
+    })
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n2']),
+      source: 'history',
+      pushHistory: true,
+    })
+    expect(useViewerStore.getState().selectionHistory).not.toBeNull()
+    useViewerStore.getState().clearSelection()
+    expect(useViewerStore.getState().selectionHistory).toBeNull()
+  })
+
+  test('reset() drains selectionHistory too (mirrors clearSelection coverage — WR-04 invariant)', () => {
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n1']),
+      source: 'timeline',
+    })
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n2']),
+      source: 'history',
+      pushHistory: true,
+    })
+    expect(useViewerStore.getState().selectionHistory).not.toBeNull()
+    useViewerStore.getState().reset()
+    expect(useViewerStore.getState().selectionHistory).toBeNull()
+  })
+
+  test('stack is one-deep: drilling twice in a row does NOT chain — second drill captures the FIRST drill state (overwriting any prior history)', () => {
+    // Layer 1.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n1']),
+      bucketKeys: new Set<string>(['b1|t1']),
+      source: 'timeline',
+    })
+    // First drill.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n2']),
+      source: 'history',
+      pushHistory: true,
+    })
+    const firstHistory = useViewerStore.getState().selectionHistory
+    expect(firstHistory?.selectedNodeIds.has('n1')).toBe(true)
+    // Second drill (e.g., user clicks another card directly from the drill view).
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['n3']),
+      source: 'history',
+      pushHistory: true,
+    })
+    const secondHistory = useViewerStore.getState().selectionHistory
+    // History was overwritten with the FIRST drill's state, NOT chained
+    // beneath the original Layer 1. One-deep semantic.
+    expect(secondHistory).not.toBe(firstHistory)
+    expect(secondHistory?.selectedNodeIds.has('n2')).toBe(true)
+    expect(secondHistory?.selectedNodeIds.has('n1')).toBe(false)
+    // Pop → restores the SECOND drill's source, not Layer 1.
+    useViewerStore.getState().popSelection()
+    const s = useViewerStore.getState()
+    expect(s.focalNodeId).toBe('n2')
+    expect(s.selectionHistory).toBeNull()
+  })
+})
