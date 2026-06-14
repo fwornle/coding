@@ -527,6 +527,48 @@ describe('useViewerStore — Phase 56.1 multi-selection', () => {
     expect(ref2.has('c')).toBe(true)
   })
 
+  // ------ CR-01 regression (56.1-REVIEW): deriveFocal must not clobber on no-op writes ------
+
+  test('CR-01: setSelection({ nodeIds: SAME_SET, source }) without explicit focal preserves focalNodeId (no stale-prev clobber)', () => {
+    // Seed multi-set with focal === 'b' (explicit). Use array form so the
+    // store builds the Set internally — that way the second write's array
+    // input is content-equal but reference-different at the asSet() seam.
+    useViewerStore
+      .getState()
+      .setSelection({ nodeIds: ['a', 'b', 'c'], focal: { nodeId: 'b' }, source: 'graph' })
+    const seeded = useViewerStore.getState()
+    expect(seeded.focalNodeId).toBe('b')
+    expect(seeded.selectedNodeIds.size).toBe(3)
+    // Second write — identical content, NO explicit focal. Pre-CR-01-fix
+    // this called deriveFocal(prevRef, prevRef, undefined) which short-
+    // circuited to the last iteration-order element ('c') and silently
+    // clobbered the user-meaningful focal.
+    useViewerStore.getState().setSelection({ nodeIds: ['a', 'b', 'c'], source: 'graph' })
+    expect(useViewerStore.getState().focalNodeId).toBe('b')
+  })
+
+  test('CR-01: setSelection({ bucketKeys: SAME_SET, source }) without explicit focal preserves focalBucketKey', () => {
+    useViewerStore.getState().setSelection({
+      bucketKeys: ['k1', 'k2', 'k3'],
+      focal: { bucketKey: 'k1' },
+      source: 'timeline',
+    })
+    expect(useViewerStore.getState().focalBucketKey).toBe('k1')
+    useViewerStore
+      .getState()
+      .setSelection({ bucketKeys: ['k1', 'k2', 'k3'], source: 'timeline' })
+    expect(useViewerStore.getState().focalBucketKey).toBe('k1')
+  })
+
+  test('CR-01: explicit focal: { nodeId: null } still wins (override-with-null path still works)', () => {
+    useViewerStore.getState().setSelection({ nodeIds: ['a', 'b'], source: 'graph' })
+    expect(useViewerStore.getState().focalNodeId).toBe('b')
+    useViewerStore
+      .getState()
+      .setSelection({ nodeIds: ['a', 'b'], focal: { nodeId: null }, source: 'graph' })
+    expect(useViewerStore.getState().focalNodeId).toBeNull()
+  })
+
   // ------ Preserve-on-omit semantics ------
 
   test('setSelection({ source: "graph" }) — no node/bucket args — preserves prior state (referential equality on both Sets)', () => {

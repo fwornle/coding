@@ -481,10 +481,21 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       // Focal derivation: explicit override (incl. null) > insertion-order
       // last-added > last iteration-order element. When neither nodeIds
       // nor explicit focal was passed, preserve the current focal.
+      //
+      // 2026-06-14 (CR-01 fix — 56.1-REVIEW): if `nextSelectedNodeIds`
+      // reference-equals `s.selectedNodeIds` (deep-equal write via the
+      // `sameSetMembership` guard above), `deriveFocal(prev, prev, undefined)`
+      // would find zero new additions and fall back to the last iteration-
+      // order element — silently clobbering the user-meaningful focal.
+      // Preserve the current focal in that case unless the caller passed
+      // an explicit override. Explicit override (including explicit null)
+      // still wins.
       const nextFocalNodeId: string | null =
-        nodeIdsArg !== undefined || focal?.nodeId !== undefined
-          ? deriveFocal(s.selectedNodeIds, nextSelectedNodeIds, focal?.nodeId)
-          : s.focalNodeId
+        focal?.nodeId !== undefined
+          ? focal.nodeId
+          : nodeIdsArg !== undefined && nextSelectedNodeIds !== s.selectedNodeIds
+            ? deriveFocal(s.selectedNodeIds, nextSelectedNodeIds, undefined)
+            : s.focalNodeId
 
       const nextSelectedBucketKeys: ReadonlySet<string> =
         bucketKeysArg !== undefined
@@ -493,10 +504,14 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
             : bucketKeysArg
           : s.selectedBucketKeys
 
+      // 2026-06-14 (CR-01 fix — 56.1-REVIEW): symmetric guard for bucket
+      // focal — see nodeFocal note above.
       const nextFocalBucketKey: string | null =
-        bucketKeysArg !== undefined || focal?.bucketKey !== undefined
-          ? deriveFocal(s.selectedBucketKeys, nextSelectedBucketKeys, focal?.bucketKey)
-          : s.focalBucketKey
+        focal?.bucketKey !== undefined
+          ? focal.bucketKey
+          : bucketKeysArg !== undefined && nextSelectedBucketKeys !== s.selectedBucketKeys
+            ? deriveFocal(s.selectedBucketKeys, nextSelectedBucketKeys, undefined)
+            : s.focalBucketKey
 
       const nextHighlightedRowKey =
         highlightedRowKey !== undefined ? highlightedRowKey : s.highlightedRowKey
