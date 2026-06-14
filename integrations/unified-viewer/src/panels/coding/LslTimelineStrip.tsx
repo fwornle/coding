@@ -224,6 +224,40 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // cascade. See `useVisibleEntityIds.ts` for the predicate sharing
   // rationale.
   const visibleIds = useVisibleEntityIds(apiClient, system)
+  // 2026-06-14 (Plan 06 gap-closure — Decision C: LLS-suppression).
+  //
+  // `LiveLoggingSystem` resolves on essentially every bucket via the
+  // `capturedBy` 1-hop fallback in `resolveToVisibleAncestor`: every
+  // Observation/Digest entity has exactly one HIERARCHY_TYPES edge
+  // (`-[capturedBy]-> LLS`), which the BFS-up walk reads in the wrong
+  // direction (LLS becomes the child of the Observation in
+  // `childToParents`). BFS fails, fallback fires, LLS returned. Result:
+  // 49 of 75 live-window buckets in the seed resolve to ONLY LLS, and
+  // 26 of the remaining multi-resolution buckets carry LLS as a halo
+  // member that's noise relative to the real semantic ancestor.
+  //
+  // Operator feedback (2026-06-14): "LiveSessionLogging... appears to be
+  // part of EVERY set --> pointless." → suppress LLS from
+  // `pickAllResolvable` results IFF the unsuppressed result has size ≥ 2
+  // (preserves LLS-only buckets per Q1 option iii so those ticks still
+  // produce a visible focal). Logger.warn fires per onTickClick when
+  // suppression happens so the noise rate is observable.
+  //
+  // Name-based lookup (Q2 operator decision) — robust to id changes
+  // across seed regenerations. Memoised on `entities` so the lookup
+  // happens once per data-load, not per click.
+  const noiseAncestors = useMemo<ReadonlySet<string>>(() => {
+    const out = new Set<string>()
+    for (const e of entities) {
+      if (e.name === 'LiveLoggingSystem') {
+        out.add(e.id)
+        // Don't break — defensive against duplicate-name entities
+        // (the LSL pipeline writes one Component per system but the
+        // sweep ignores nothing). Each one gets suppressed individually.
+      }
+    }
+    return out
+  }, [entities])
   // 2026-06-12: range-match — slice-by-hour was unreliable because LSL
   // file times (UTC after parser) don't align with entity createdAt
   // UTC hour boundaries. We now expose the selected entity's createdAt
@@ -469,8 +503,32 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // a fresh write this is also the "last added" element of resolvedNodeIds
     // (insertion order matches iteration order). Sidebar-only mode fires
     // when no id resolves (resolvedNodeIds.size === 0 → focal = null).
-    const resolvedNodeIds = pickAllResolvable(ids, visibleIds, relations)
-    const focalNodeIdNext = pickFirstResolvable(ids, visibleIds, relations)
+    //
+    // 2026-06-14 (Plan 06 gap-closure — Decision C: LLS-suppression):
+    // pass `noiseAncestors` (memoised LLS-id set above) so LLS is dropped
+    // from the result when other ancestors exist. Compute the unsuppressed
+    // result FIRST so we can Logger.warn when suppression actually fires —
+    // observability of the noise rate matters for ongoing ontology work.
+    const unsuppressedResolved = pickAllResolvable(ids, visibleIds, relations)
+    const resolvedNodeIds = pickAllResolvable(ids, visibleIds, relations, noiseAncestors)
+    if (unsuppressedResolved.size !== resolvedNodeIds.size) {
+      const dropped: string[] = []
+      for (const id of unsuppressedResolved) {
+        if (!resolvedNodeIds.has(id)) dropped.push(id)
+      }
+      Logger.warn(
+        Logger.Categories.PANELS,
+        `LslTimelineStrip onTickClick suppressed noise ancestors from halo: [${dropped.join(', ')}] (bucket ${sessionId})`,
+      )
+    }
+    // Focal: prefer the FIRST element of the post-suppression set so the
+    // focal can't be a suppressed noise ancestor. `pickFirstResolvable`
+    // doesn't accept noiseAncestors (Phase 56 single-id contract preserved
+    // for backward compat) — derive the focal here instead.
+    const focalNodeIdNext: string | null =
+      resolvedNodeIds.size > 0
+        ? (resolvedNodeIds.values().next().value ?? null)
+        : pickFirstResolvable(ids, visibleIds, relations)
     const bucketKey = startAt !== null ? `${sessionId}|${startAt}` : null
     // 2026-06-13 (Phase 56-04 fix #3 + round 4 — provenance preserved):
     // compute the ancestry-path against the FOCAL id so the central-trace
@@ -557,6 +615,56 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // actually paint a halo ring on them.
     const filterIds = new Set<string>(ids)
     for (const id of resolvedNodeIds) filterIds.add(id)
+    // 2026-06-14 (Plan 06 gap-closure — auto-drill on single-resolution).
+    //
+    // Operator UX feedback: "if a timeline selection has produced a single
+    // target and, consequently, opened this target directly, pressing ESC
+    // gets me completely out." → when the bucket resolves to EXACTLY one
+    // graph node (post-LLS-suppression), skip Layer 1 (card list of one
+    // item) entirely and write a Layer 2 (drill) payload directly. The
+    // user lands on EntityDetailPanel for the focal, and Esc clears to
+    // Layer 0 (no selectionHistory pushed — there's no Layer 1 to come
+    // back to).
+    //
+    // Layer 2 payload differs from Layer 1 in two ways:
+    //   - `source: 'history'` (matches BucketCardList.onCardClick) so
+    //     SidePanel's mode-switch renders EntityDetailPanel rather than
+    //     BucketCardList.
+    //   - `bucketKeys: empty Set` (drill semantics — no timeline halo).
+    //     The focal-tick ring still renders via `focalBucketKey ===
+    //     bucketKey` (Locked Contract #1), explicitly threaded via
+    //     `focal: { ..., bucketKey }`.
+    //   - `pushHistory` is NOT set (default false) so selectionHistory
+    //     stays null. Esc-from-Layer-2-reached-via-auto-drill falls
+    //     through popSelection → clearSelection → Layer 0.
+    //
+    // Multi-resolution (size >= 2) flows through the original Layer 1
+    // entry payload below: source='timeline', bucketKeys populated,
+    // card list visible. Card-click drill from THAT state pushes history
+    // and gets the Esc-back-one-step behaviour.
+    //
+    // Size 0 (sidebar-only mode — every entity unresolvable) also flows
+    // through the Layer 1 entry path so the operator sees the bucket
+    // selection in some form even when no graph focal landed.
+    if (resolvedNodeIds.size === 1 && focalNodeIdNext !== null) {
+      setSelection({
+        nodeIds: resolvedNodeIds,
+        bucketKeys: new Set<string>(),
+        focal: { nodeId: focalNodeIdNext, bucketKey },
+        highlightedRowKey: focalNodeIdNext,
+        source: 'history',
+        pathToSelected,
+        lslSessionFilter: [sessionId],
+        lslFilterEntityIds: filterIds,
+        // pushHistory intentionally omitted — auto-drill from Layer 0,
+        // no Layer 1 to remember for Esc-pop.
+      })
+      Logger.info(
+        Logger.Categories.PANELS,
+        `LslTimelineStrip tick auto-drill (single resolution → ${focalNodeIdNext}, bucket ${sessionId})`,
+      )
+      return
+    }
     setSelection({
       nodeIds: resolvedNodeIds,
       bucketKeys: bucketKey !== null ? new Set<string>([bucketKey]) : new Set<string>(),
