@@ -498,6 +498,16 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       const prevSet = prevState.lslFilterEntityIds
       const union = new Set<string>(prevSet ?? [])
       for (const id of ids) union.add(id)
+      // 2026-06-14 (Plan 06 gap-closure — Bug 1 fix):
+      // ALSO include `resolvedNodeIds` (the halo ancestor set) in
+      // `lslFilterEntityIds`. Without this, the visibility predicate
+      // (visibility-predicate.ts lines 113-117) culls every non-structural
+      // halo ancestor — Insights / SubComponents / Details whose ids are
+      // NOT in the bucket's raw entityIds get hidden from `visibleEntities`,
+      // so D3 never mounts a `.node` for them and the halo rings disappear.
+      // Adding the resolved ancestors keeps them visible alongside the
+      // structural backbone, so the multi-tier halo render path works.
+      for (const id of resolvedNodeIds) union.add(id)
       const nextSessionFilter = Array.from(
         new Set<string>([...prevState.lslSessionFilter, sessionId]),
       )
@@ -532,6 +542,21 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // equal guards inside `setSelection` preserve Set references on
     // identical-content writes — viewport-stability invariant preserved
     // through the multi-set evolution.
+    //
+    // 2026-06-14 (Plan 06 gap-closure — Bug 1 fix): the LSL filter set
+    // must contain BOTH the raw bucket entityIds AND the halo ancestor
+    // ids. Writing `new Set(ids)` (raw bucket ids only) made the
+    // visibility predicate (visibility-predicate.ts lines 113-117) cull
+    // every non-structural halo ancestor — operator visual smoke showed
+    // ONLY the focal Component (LiveLoggingSystem) surviving with a path
+    // edge to the Project node (Coding); every Insight / SubComponent /
+    // Detail halo node disappeared because their ids were NOT in
+    // `lslFilterEntityIds` and they are not structural. Unioning the
+    // resolved ancestors into the filter set keeps them mounted in D3 so
+    // `applySelectionStyling`'s `selectedNodeIds.has(d.id)` branch can
+    // actually paint a halo ring on them.
+    const filterIds = new Set<string>(ids)
+    for (const id of resolvedNodeIds) filterIds.add(id)
     setSelection({
       nodeIds: resolvedNodeIds,
       bucketKeys: bucketKey !== null ? new Set<string>([bucketKey]) : new Set<string>(),
@@ -540,7 +565,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
       source: 'timeline',
       pathToSelected,
       lslSessionFilter: [sessionId],
-      lslFilterEntityIds: new Set<string>(ids),
+      lslFilterEntityIds: filterIds,
     })
     Logger.info(
       Logger.Categories.PANELS,
