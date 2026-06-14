@@ -33,6 +33,37 @@ export const HIERARCHY_TYPES: ReadonlySet<string> = new Set([
   'contains', 'includes', 'parent-child', 'has_insight', 'capturedBy',
 ])
 
+/**
+ * 2026-06-14 (WR-02 fix — 56.1-REVIEW): centralized set of entity NAMES that
+ * should be treated as "noise ancestors" for the purposes of
+ * `pickAllResolvable` LLS-suppression (Plan 06 Decision C).
+ *
+ * Why name-based (not id-based): names survive seed regenerations that
+ * recompute hashes; ids do not. Name-based lookup is the operator's Q2
+ * decision.
+ *
+ * Why centralized: this set is consumed by BOTH
+ * `useNodeToBucketsIndex` (reverse pre-index) and
+ * `LslTimelineStrip.onTickClick` (forward direction). Pre-WR-02-fix each
+ * site duplicated the literal `'LiveLoggingSystem'` — meaning a future
+ * ontology rename to e.g. `'Live Logging System'` or
+ * `'LiveLoggingSystem (Component)'` would silently break suppression in
+ * one or both sites without any compile-time signal.
+ *
+ * Maintenance contract: when adding/renaming a noise-ancestor entity in
+ * the ontology, update this set. Both consumers import it — no other
+ * code path is allowed to assemble its own noise-ancestor name list.
+ *
+ * Observability gate: callers should `Logger.warn` once per session when
+ * the derived `noiseAncestors` Set comes out empty (the name lookup
+ * matched nothing) — that's the canary for an ontology rename having
+ * broken this constant. See `useNodeToBucketsIndex.ts` for the canonical
+ * derivation pattern.
+ */
+export const NOISE_ANCESTOR_NAMES: ReadonlySet<string> = new Set([
+  'LiveLoggingSystem',
+])
+
 /** ID-only ancestry walk (no name aliasing — IDs are canonical in km-core). */
 export function computeAncestryPath(
   selectedId: string,

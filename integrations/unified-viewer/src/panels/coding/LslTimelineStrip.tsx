@@ -68,6 +68,7 @@ import { useGraphData } from '@/graph/useGraphData'
 // Locked in 56.1-PATTERNS.md Contract #7 — the canonical forward-direction
 // callsite of `pickAllResolvable`.
 import {
+  NOISE_ANCESTOR_NAMES,
   computeAncestryPath,
   pickAllResolvable,
   pickFirstResolvable,
@@ -258,15 +259,27 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // Name-based lookup (Q2 operator decision) — robust to id changes
   // across seed regenerations. Memoised on `entities` so the lookup
   // happens once per data-load, not per click.
+  //
+  // 2026-06-14 (WR-02 fix — 56.1-REVIEW): name list imported from the
+  // centralized `NOISE_ANCESTOR_NAMES` set in `ancestry.ts` so the
+  // strip + `useNodeToBucketsIndex` reverse pre-index can never drift
+  // out of lock-step. A future ontology rename updates one place; if it
+  // doesn't, the empty-set Logger.warn fires and surfaces the regression.
   const noiseAncestors = useMemo<ReadonlySet<string>>(() => {
     const out = new Set<string>()
     for (const e of entities) {
-      if (e.name === 'LiveLoggingSystem') {
+      if (NOISE_ANCESTOR_NAMES.has(e.name)) {
         out.add(e.id)
         // Don't break — defensive against duplicate-name entities
         // (the LSL pipeline writes one Component per system but the
         // sweep ignores nothing). Each one gets suppressed individually.
       }
+    }
+    if (entities.length > 0 && out.size === 0) {
+      Logger.warn(
+        Logger.Categories.PANELS,
+        `LslTimelineStrip: noiseAncestors empty — NOISE_ANCESTOR_NAMES did not match any entity (entities.length=${entities.length}). Suspect an ontology rename.`,
+      )
     }
     return out
   }, [entities])

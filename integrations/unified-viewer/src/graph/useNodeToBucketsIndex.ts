@@ -30,8 +30,9 @@ import type { ApiClient } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
 import { useGraphData } from './useGraphData'
 import { useVisibleEntityIds } from './useVisibleEntityIds'
-import { pickAllResolvable } from './ancestry'
+import { NOISE_ANCESTOR_NAMES, pickAllResolvable } from './ancestry'
 import { useLslSessions } from '@/panels/coding/useLslSessions'
+import { Logger } from '@/lib/logging'
 
 /**
  * Reverse-lookup map: graph node id → Set of `${bucket.id}|${bucket.startAt}`
@@ -75,10 +76,23 @@ export function useNodeToBucketsIndex(
   // rather than passing through props keeps the contract local to each
   // pickAllResolvable callsite per PATTERNS Contract #7 (no cross-callsite
   // coupling).
+  //
+  // 2026-06-14 (WR-02 fix — 56.1-REVIEW): the name list is imported from
+  // `NOISE_ANCESTOR_NAMES` (a single source of truth) so an ontology
+  // rename can't silently leave this site in lock-step with the strip's
+  // (formerly literal) `'LiveLoggingSystem'` check. Observability: if the
+  // derived set comes out empty when `entities.length > 0`, emit a
+  // Logger.warn — that's the canary for "name lookup matched nothing".
   const noiseAncestors = useMemo<ReadonlySet<string>>(() => {
     const out = new Set<string>()
     for (const e of entities) {
-      if (e.name === 'LiveLoggingSystem') out.add(e.id)
+      if (NOISE_ANCESTOR_NAMES.has(e.name)) out.add(e.id)
+    }
+    if (entities.length > 0 && out.size === 0) {
+      Logger.warn(
+        Logger.Categories.PANELS,
+        `useNodeToBucketsIndex: noiseAncestors empty — NOISE_ANCESTOR_NAMES did not match any entity (entities.length=${entities.length}). Suspect an ontology rename.`,
+      )
     }
     return out
   }, [entities])
