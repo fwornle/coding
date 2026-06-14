@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.2
 milestone_name: VKB & Online-Learning Quality
 status: executing
-stopped_at: Phase 57 context gathered
-last_updated: "2026-06-14T14:24:13.540Z"
+stopped_at: Phase 57-03 Task 4 checkpoint — awaiting operator decision on container km-core resolution
+last_updated: "2026-06-14T14:44:16.010Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 2
+  completed_plans: 4
   percent: 0
 ---
 
@@ -201,6 +201,7 @@ Last activity: 2026-06-14
 - [Phase 57-01]: Project type registry (PROJECTS / Project / isProject) lands in km-core; root + types barrel re-exports wired; 17 unit tests; 334→352 net+18 tests; zero regressions. MetadataWithProject helper SKIPPED per PATTERNS.md. km-core local persistence.js patch absent from source under VCS (pre-existing host-only patch per CLAUDE.md) — operator follow-up.
 - [Phase ?]: [Phase 57-02]: coding.lower.json ships with 10 L2 classes (6 Component + 3 Detail + 1 SubComponent). meta.extends=coding-ontology chains through coding-ontology → upper so per-class Component/SubComponent/Detail references resolve. Fixture-driven integration test in lib/km-core/tests/integration/ locks the data shape against OntologyRegistry; 358/358 km-core suite GREEN (was 352; +6 net). LOWERONTO-01 realized in static data form; Plan 04 (classifier injection) can now load via registry.getClass(L2-name).
 - [Phase 57-06]: LOWERONTO-02 upper-ontology growth deferred at v7.2 discuss-time (D-12). Phase 57 ships LOWERONTO-01 (lower-ontology + 10 L2 classes) and LOWERONTO-04 (project tag everywhere); upper-ontology growth (operator-suggested `Diagnosis` and `Interface` classes) is tracked for a follow-up phase. Reopen during v7.2 retro. Provenance: .planning/phases/57-lower-ontology-project-tagging-foundation/57-CONTEXT.md §D-12/D-13.
+- [Phase 57-03]: Writer-path metadata.project stamping landed at canonical-mapper (primary) + km-core-adapter (defence-in-depth dual stamp); wave1/2/3 thread project: this.team via augmentWithCanonical. Existing metadata.team byte-untouched (D-02). persistence-agent verify-only no-op (TS source retired Phase 42.2-04). code-graph-rag has zero putEntity sites (PATTERNS correction #4 anti-regression guard). Symlinked submodule node_modules/@fwornle/km-core to lib/km-core (Rule 3 — was stale clone lacking Plan 01 project module). tsc + npm build clean; container restarted (image rebuild blocked by pre-existing Dockerfile uv: not found). Task 4 PAUSED: container km-core mount points at ~/Agentic/km-core (10 days stale), isProject undefined at runtime — operator chooses sync vs mount-change vs back-out before verification.
 
 ### Blockers/Concerns
 
@@ -210,6 +211,7 @@ Last activity: 2026-06-14
 - [v7.1 Phase 43]: OKM cross-repo packaging strategy (submodule vs published npm vs vendored) — must be decided in INT-03's discuss phase
 - [v7.1 Phase 45]: D3 (VOKB) vs sigma.js (VKB) viewer choice — open question, research seed leans D3
 - [Phase 42.1 SC#6 — layer 2 of the cascade — NEW 2026-05-24]: After Phase 42.1.1 plan 01 closed (loader layer 1 unblocked, 18/18 node:test pass), `ensureProjectAnchor('Coding')` will still raise `Unknown ontology class: Project` at runtime because the `Project` class is not declared in any on-disk `.data/ontologies/*.json`. `/gsd-verify-phase 42.1` will not pass until a follow-up phase adds `Project` to `.data/ontologies/upper.json` (or `coding-ontology.json`) with a minimal schema sufficient for the post-sweep anchor pass. Recommended title: "Phase 42.1.2 — register Project ontology class for ensureProjectAnchor". See `.planning/phases/42.1.1-…/42.1.1-01-SUMMARY.md` § Known Residuals.
+- Phase 57-03 Task 4: Docker container resolves @fwornle/km-core via ~/Agentic/km-core bind-mount which is 10 days behind lib/km-core. Plan 01 isProject export missing in container. The next wave-analysis production run will throw TypeError until operator chooses: (1) sync ~/Agentic/km-core (git pull + npm build), (2) change docker-compose.yml km-core mount to lib/km-core, or (3) back out Plan 01 import.
 
 ## Deferred Items
 
@@ -266,8 +268,8 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-06-14T14:24:06.013Z
-Stopped at: Phase 57 context gathered
+Last session: 2026-06-14T14:44:16.004Z
+Stopped at: Phase 57-03 Task 4 checkpoint — awaiting operator decision on container km-core resolution
 Resume with: `/gsd-execute-phase 43` to drive 43-10 → 43-11. After Phase 43 closes, the chain continues with 44 (REST API & Git Snapshots), 45 (Unified Web Viewer), 46 (Per-System Docs — partially seeded by b99ac49ca). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
