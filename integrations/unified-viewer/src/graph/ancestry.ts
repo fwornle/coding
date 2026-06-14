@@ -251,16 +251,29 @@ export function pickAllResolvable(
   // applied here so BOTH forward (strip) and reverse (useNodeToBucketsIndex)
   // directions stay consistent — graph-click on LLS still lights up its
   // 48 touching buckets because we never suppress in the size===1 case.
+  //
+  // 2026-06-14 (WR-01 fix — 56.1-REVIEW): precompute-then-delete pattern.
+  // The original loop deleted from `out` mid-iteration over `noiseAncestors`
+  // and re-checked `out.size >= 2` per element. For single-noise (LLS) this
+  // collapses to "delete iff at least one other ancestor exists" — correct.
+  // For multi-noise it became iteration-order-dependent: deleting the first
+  // noise dropped `out.size` to N-1, the next delete dropped it to N-2, and
+  // so on — whichever noise id was processed LAST could survive (or be
+  // dropped) based purely on Set iteration order. The semantic intent is
+  // "drop every noise ancestor PROVIDED at least one non-noise survives" —
+  // a single batch decision, not a per-element one. Compute candidates first,
+  // commit only if leaving >=1 non-noise survivor.
   if (noiseAncestors !== undefined && noiseAncestors.size > 0 && out.size >= 2) {
-    for (const id of noiseAncestors) {
-      // Tentative delete: only commit if the post-delete set is still >= 1.
-      // (Belt-and-braces — if every ancestor in the result was in the noise
-      // set, we'd end with empty; the >= 2 guard above already prevents
-      // that for the single-noise case but multi-noise would still risk it.)
-      if (out.has(id) && out.size >= 2) {
-        out.delete(id)
-      }
+    const noiseInOut: string[] = []
+    for (const id of out) {
+      if (noiseAncestors.has(id)) noiseInOut.push(id)
     }
+    const survivors = out.size - noiseInOut.length
+    if (survivors >= 1) {
+      for (const id of noiseInOut) out.delete(id)
+    }
+    // else: every ancestor IS noise — preserve as-is per option iii so the
+    // bucket still has a focal to render (LLS-only buckets stay LLS-only).
   }
   return out
 }

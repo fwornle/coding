@@ -240,10 +240,14 @@ describe('pickAllResolvable (Phase 56.1 D-2)', () => {
       expect(result.has('insight-1')).toBe(true)
     })
 
-    test('does NOT drop all members when every result id is in noiseAncestors (belt-and-braces guard)', () => {
+    test('does NOT drop all members when every result id is in noiseAncestors (option iii preserved)', () => {
       // Hypothetical: every resolved ancestor is in the noise set.
-      // The inner `out.size >= 2` re-check inside the loop prevents the
-      // result from collapsing to empty. At minimum one id survives.
+      // Per option iii (LLS-only buckets stay LLS-only so the tick still
+      // produces a focal), suppression MUST refuse to fire if there's no
+      // non-noise survivor. Pre-WR-01-fix this returned size === 1 by
+      // accident (mid-iteration delete + per-element size re-check left
+      // whichever id was processed last). Post-WR-01-fix: precompute the
+      // delete set, refuse the batch if survivors < 1, preserve as-is.
       const relations: Relation[] = [
         makeRel('lls-a', 'obs-1', 'capturedBy'),
         makeRel('lls-b', 'obs-2', 'capturedBy'),
@@ -251,9 +255,36 @@ describe('pickAllResolvable (Phase 56.1 D-2)', () => {
       const visible = new Set<string>(['lls-a', 'lls-b'])
       const noise = new Set<string>(['lls-a', 'lls-b'])
       const result = pickAllResolvable(['obs-1', 'obs-2'], visible, relations, noise)
-      // First-iter suppression drops one (size goes 2→1); inner guard
-      // refuses the second drop. Survives with exactly 1 element.
+      // Post-WR-01-fix: ALL noise members preserved when no non-noise
+      // survivor exists. Both lls-a and lls-b are present.
+      expect(result.size).toBe(2)
+      expect(result.has('lls-a')).toBe(true)
+      expect(result.has('lls-b')).toBe(true)
+    })
+
+    test('WR-01: multi-noise with a non-noise survivor drops ALL noise members deterministically', () => {
+      // Setup: 3 resolutions — 2 noise (lls-a, lls-b) + 1 real (insight-c).
+      // Pre-WR-01-fix the iteration-order-dependent delete loop could leave
+      // either lls-a or lls-b in the result depending on Set iteration order
+      // (whichever was processed LAST under the size-shrinking guard).
+      // Post-WR-01-fix: BOTH noise members removed, only insight-c survives.
+      const relations: Relation[] = [
+        makeRel('lls-a', 'obs-1', 'capturedBy'),
+        makeRel('lls-b', 'obs-2', 'capturedBy'),
+        makeRel('insight-c', 'obs-3', 'has_insight'),
+      ]
+      const visible = new Set<string>(['lls-a', 'lls-b', 'insight-c'])
+      const noise = new Set<string>(['lls-a', 'lls-b'])
+      const result = pickAllResolvable(
+        ['obs-1', 'obs-2', 'obs-3'],
+        visible,
+        relations,
+        noise,
+      )
       expect(result.size).toBe(1)
+      expect(result.has('insight-c')).toBe(true)
+      expect(result.has('lls-a')).toBe(false)
+      expect(result.has('lls-b')).toBe(false)
     })
   })
 })
