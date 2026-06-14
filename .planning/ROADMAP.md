@@ -1047,13 +1047,13 @@ Plans:
   3. Sampling 20 recent online-learned entities, at least 18 carry an `ontologyClass` value drawn from the new lower-ontology class set (not generic `Component` / `Detail` only).
   4. If the operator confirms upper-ontology growth in the discuss-phase (soft gate per LOWERONTO-02), the upper ontology declares ≥2 additional generic programming-aspect classes (e.g., `Diagnosis`, `Interface`); otherwise LOWERONTO-02 is honestly deferred without blocking the phase.
 
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 57-01-PLAN.md — km-core Project type registry (PROJECTS const + isProject typeguard + barrel re-exports)
-- [ ] 57-02-PLAN.md — `.data/ontologies/coding.lower.json` with 10 L2 classes + fixture-driven integration test
+- [x] 57-02-PLAN.md — `.data/ontologies/coding.lower.json` with 10 L2 classes + fixture-driven integration test
 - [ ] 57-06-PLAN.md — LOWERONTO-02 deferral marker in REQUIREMENTS.md + STATE.md (documentation-only)
 
 **Wave 2** *(blocked on Wave 1 completion)*
