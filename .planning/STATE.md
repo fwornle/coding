@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.1
-milestone_name: Knowledge Management Unification -- Phases 37-46
-status: ready_to_plan
-stopped_at: Phase 999.1 closed as already-shipped (no planning needed)
-last_updated: 2026-06-14
-last_activity: 2026-06-14 -- Phase 999.1 closed via /gsd-discuss-phase (closure-only CONTEXT)
+milestone: v7.2
+milestone_name: VKB & Online-Learning Quality
+status: planning
+last_updated: "2026-06-14T11:28:20.786Z"
+last_activity: 2026-06-14
 progress:
-  total_phases: 26
-  completed_phases: 20
-  total_plans: 141
-  completed_plans: 143
-  percent: 77
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,9 +20,9 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** None — Phase 999.1 closed 2026-06-14 as already-shipped (both goals delivered out-of-band via `@rapid/llm-proxy`). Awaiting next milestone or backlog promotion.
+**Current focus:** v7.2 VKB & Online-Learning Quality — defining requirements. Phase numbering starts at 57. See `.planning/MILESTONES.md` for full scope.
 
-**v7.1 milestone status (KM-Core unification — 7 of 10 phases done):**
+**v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
 | # | Title | System | Status |
 |---|-------|--------|--------|
@@ -53,124 +52,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 999.1
-Plan: N/A
-Status: ✓ Closed 2026-06-14 as already-shipped (both goals delivered out-of-band via `@rapid/llm-proxy`). See `.planning/phases/999.1-extract-shared-llm-adapter-library/999.1-CONTEXT.md` for the closure rationale. No subsequent phase currently in flight.
-
-Wave 5.5 outcome (`/gsd-execute-phase 44 --wave 5.5` on 2026-06-04):
-
-  - Plan 44-12 Tasks 1+2 LANDED on main (commits `ef340013f`, `c2582c7ef`, submodule `0a6ac57`)
-  - Plan 44-12 Task 3 SOFT-EXECUTED: launchctl restart done (recovered IOError 5 with `launchctl enable`); obs-api pid 73924 on :12436; SQLite archive NOT EXECUTED
-  - Plan 44-12 declared SOFT-CLOSED — must_haves "fully unused observations.db" was over-scoped; ~14 other consumers (writer dedup, legacy /api/*, consolidator, dashboard counts) still read+write the file
-  - Operator chose "Full hard cutover via follow-up sub-plan"
-  - Plan 44-12 docs commit: `62eb10a5a docs(44-12): soft-close — write-path cut, deep cutover deferred to sub-plan`
-
-Wave 5.6 outcome (`/gsd-execute-phase 44 --wave 5.6` on 2026-06-04):
-
-  - **Plan 44-14 LANDED + LIVE-VERIFIED.** 6 commits on main: km-core submodule `184f4a5` + outer pointer `05b6ffa29`, artifacts-patch util `93589d09e`, 10-endpoint cutover `16360d48c`, integration test `df2bfb589`, partial SUMMARY `bbd75e8dd`, fix-forward consolidator cache `cc830ab38`, final SUMMARY `<this commit>`
-  - 10 obs-api legacy `/api/*` endpoints cut to km-core (patch-artifacts/recent + /historical, observations/digests/insights/projects, /api/projects, /api/projects/:project/coverage, insights/:id/resynthesize, consolidation/status COUNTs + staleness)
-  - 2 new km-core query helpers: `countByOntologyClass` + `lastModifiedByClass` (plus a refactored `findByLegacyId`)
-  - 1 new shared util: `scripts/lib/artifacts-patch-util.mjs` (also used by Plan 44-13's writer cutover)
-  - 12-test integration suite at `tests/integration/obs-api.legacy-endpoints.km-core.test.js` (490 lines, all GREEN; perf test passes at 1000 obs in ~150ms)
-  - `getDb()` / `invalidateDb()` / `isCorruptionError()` infrastructure REMOVED
-  - Mid-task fix-forward `cc830ab38`: cached `_pipelineStatsConsolidator` at module scope (eliminates ~360 init-log-lines/hour from dashboard polling)
-  - Live verification on pid 55095: 5 sampled endpoints HTTP 200, dashboard at :3032 renders 939/391/81 counters with 60+ clean refresh cycles, real-time ETM smoke proven by this very session's "Diagnose whether observations database is down" appearing at the top of the list
-  - Plan 44-12 § "Deferred — Deep-Cutover Scope" items 4 + 6 annotated CLOSED
-
-Wave 5.7 outcome (`/gsd-execute-phase 44 --wave 5.7` on 2026-06-04):
-
-  - **Plan 44-13 LANDED.** 5 commits on main: km-core submodule `0ec0c93` (findByContentHash + findRecentByAgent), outer pointer `a062a7926`, writer cutover `b58616713` (drop this.db; route 3 helpers via km-core; obs-api-owned _legacyDb for pruner+retrieval), 381-line integration suite `7d97d3c6d` with T-44-13-01 perf gate (0.074ms avg — 27x under budget), SUMMARY `0a4385103`
-  - 2 dedup tests skipped since 2026-06-04 now GREEN; ObservationWriter unit suite 110/110
-  - Plan 44-12 § "Deferred — Deep-Cutover Scope" items 1 + 2 + 3 CLOSED
-
-Wave 6 outcome (`/gsd-execute-phase 44 --wave 6` — Plan 44-11 verification gate on 2026-06-04):
-
-  - **Pre-flight fix `244dbc418`:** `ensureKMStore` race in `scripts/observations-api-server.mjs` — concurrent callers from `ensureWriter` + listen handler raced; second caller hit `if (_kmStore) return null` early-return, so `mountKMRoutes` never ran and A's `/api/v1/*` 404'd post-restart. Patch caches the in-flight init promise; both callers await one open(). Verified `[obs-api] km-core /api/v1 routes mounted` now logs.
-  - **Plan 44-11 Task 1 LANDED** (commit `1d8ce72ce`): 464-line SUMMARY with per-SC evidence. 8 Wave 0 stubs run: 4 km-core GREEN, okb-guard GREEN, typed-views 2/4 (snake/camel divergence on digests + insights), cross-system-parity 2/6 (A+B PASS, C HTML fallback), dashboard e2e 3/3 timeout (data-testid missing).
-  - **Plan 44-11 Task 2** operator signal `issues` (commit `24f6d8b6c`): SC#1 PARTIAL PASS (C still SPA), SC#2 BLOCKED on all 3 legs (A gitignore, B container readonly, C no mount), SC#3 PARTIAL PASS (typed-view shape divergence), SC#4 PASS.
-  - **Phase 44 close-out HALTED.** Sub-plans queued: 44-15 (snapshot-dir routing fix) + 44-16 (typed-view shape lock).
-
-Wave 6.1 outcome (`/gsd-execute-phase 44 --wave 6.1` — Plan 44-15 on 2026-06-04):
-
-  - **Plan 44-15 LANDED.** 4 commits on main: plan draft `b50d313ae`, A-leg gitignore `ac8e86b12`, snapshot tag `144f7ec92` (158,591-line baseline of .data/knowledge-graph/exports/), docker mount `e2eef82e7` (.git:ro → .git:rw), CONTEXT amendment + SUMMARY `<this commit>`
-  - A leg SC#2: **PASS** end-to-end (snapshot create + mutate + restore + launchctl kickstart + bit-for-bit restore verified)
-  - B leg SC#2 (after 2026-06-05 reopen): **PASS.** Three root causes fixed: (1) Dockerfile now `npm pack`s km-core before integration install + removes `|| true` swallower (commit `f5509ac95`); (2) SnapshotManager.execGit pins `cwd: env.workTree` so it's robust to caller-cwd-inside-submodule (km-core submodule commit `b5e2048` + outer bump `f5509ac95`); (3) Dockerfile adds `git config --system` for safe.directory + Snapshot Bot identity. B snapshot/restore round-trip now end-to-end clean: nodes 2213→2214→2213, VerifyStub wiped. Dockerfile fixes not rebuilt in session — durable validation deferred to next operator rebuild.
-  - C leg SC#2: **BLOCKED:awaiting-OKM-PR-5** (Mode B per plan's dual-mode contract). All `/api/v1/*` probes return VOKB SPA HTML; PR #5 unmerged + C not restarted.
-  - 44-CONTEXT-amendment-3.md written: ratifies `.data/knowledge-graph/exports/` as canonical S-1 snapshot dir (original CONTEXT said `.data/exports/`; drift from Phase 41 km-core landing). Migration note documents the 7 touch sites a future re-route would need.
-
-Phase 44 close-out remains gated on:
-
-  1. **B infra fix (separate session):** restore `mcp-server-semantic-analysis` node_modules; re-run B-leg snapshot/restore round-trip
-  2. **Plan 44-16 (typed-view shape lock) — ✓ COMPLETE 2026-06-07.** camelCase ratified for `/api/coding/{digests,insights}`. 4/4 tasks done; operator gate cleared "approved" 2026-06-07. See § "Plan 44-16 cutover outcome" below.
-  3. **Operator OKM PR #5 merge + C restart** (out-of-band on bmw.ghe.com)
-  4. **Plan 44-11 re-run** as the Phase 44 close-out gate
-
-Suggested next steps:
-
-  1. Operator restores B's node_modules (Dockerfile change recommended) and operator-merges OKM PR #5 + restarts C
-  2. `/gsd-execute-phase 44 --wave 6` re-run after B+C are up → Phase 44 close-out (Plan 44-11 final re-run)
-
-Last activity: 2026-06-14
-
-Session 2026-06-05 outcome (context-clear handoff):
-
-  - Plan 44-15 SC#2.B reopened + closed end-to-end (commits b5e2048 submodule + f5509ac95 outer Dockerfile + 5b5d33b68 docs)
-  - ETM observation routing fixed (`ab72e0d5b`): always uses ObservationApiClient → obs-api; eliminated pre-44-13 direct-writer fallback that was silently dedup-skipping every new exchange via stale SQLite hash
-  - 16h observation gap recovered (`df4622b87`): 44 new obs in km-core via `convert-transcripts.js claude <jsonl>` after routing fix to ObservationApiClient
-  - LSL tranche parser auto-detects ETM format (`6aad3a47b`)
-  - Bridge script `scripts/bridge-obs-from-kmcore.mjs` mirrored 135 km-core obs into SQLite so the still-SQLite-based ObservationConsolidator can see them
-  - Plan 44-17 drafted (`10004ebf7`): ObservationConsolidator → km-core cutover, 5 tasks, deletes bridge script + archives `.observations/observations.db` at Task 5
-
-OPEN at handoff:
-
-  - LLM proxy override consumption for consolidator routing: `processOverrides[consolidator-digest]` is set to copilot but proxy log shows auto-select to claude-code (CLI) which times out at 15s. Override branch at `~/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:1473-1478` not firing. Resume by probing `/api/complete` directly with `process:consolidator-digest` and watching for `process-override [...]` log line. See [[session_handoff_phase44_closeout]] for the full diagnostic.
-
-Phase 44 close-out gates remaining:
-
-  1. Resolve proxy routing → enables consolidator (RESOLVED 2026-06-05: live consolidation succeeded with 7 created + 25 updated insights via copilot+haiku route at commit 038eff0b1)
-  2. **Plan 44-16 (typed-view shape lock) — ✓ COMPLETE 2026-06-07** (commits 8e18edeba draft + 68402a8dd audit + 518a8bbb6 test + km-core `33a3c57` + outer 87e460c39 amendment + 94af0c9b0 SUMMARY). Operator gate cleared "approved" 2026-06-07 — camelCase ratified for `/api/coding/{digests,insights}`. typed-views.test.js advances 2/4 → 4/4 GREEN.
-  3. Execute Plan 44-17 (consolidator cutover) — **COMPLETE 2026-06-05** at all 5 tasks (commits 13876e204 audit + f3701499f cutover + e74444aba tests + 398060586 chore + 10d713ed3 docs + Task 5 operator-gate close). Task 5 operator gate cleared 2026-06-05 with resolution "approved (keep)" — `.observations/observations.db` retained read-only for pruner + retrieval FTS5; final archive scheduled for Plan 44-18.
-  4. Operator: merge OKM PR #5 + restart C
-  5. Plan 44-11 re-run as close-out gate
-
-Plan 44-17 cutover outcome (2026-06-05):
-
-  - All 45 consolidator SQLite call sites + 22 FROM/INSERT statements migrated to km-core (commit f3701499f).
-  - Bridge script `scripts/bridge-obs-from-kmcore.mjs` DELETED — single source of truth restored, no more SQLite/km-core divergence.
-  - Idempotency: Option A chosen — `metadata.digested_at` on Observation entities (mirrors the legacy SQLite column 1:1).
-  - Integration suite (6 tests, 590 lines) GREEN — perf gate T-44-17-01: 462ms over 1000 obs (budget 500ms dev).
-  - Writer + obs-api suites stay GREEN (16/16).
-  - `.observations/observations.db` SQLite archivability: NOT YET — two remaining consumers identified in obs-api `_legacyDb` audit:
-      1. `ObservationPruner` (scripts/observations-api-server.mjs:165) — DELETEs old rows for retention. Pre-Plan-44-13 design; deferred to 44-18.
-      2. `RetrievalService` keyword-search FTS5 (scripts/observations-api-server.mjs:142) — reads via `dbGetter`. Deferred to 44-18.
-    Both consumers were intentionally deferred by Plan 44-13 per its source comment at lines 35-39. Task 5 operator gate authorizes the archive ONLY when the operator agrees to lose the pruner + FTS5 keyword search (or accepts that 44-18 will cut them over before archive).
-
-  - Task 5 operator gate **CLEARED 2026-06-05** with resolution **"approved (keep)"** — `.observations/observations.db` retained in place as read-only for `ObservationPruner` + `RetrievalService` FTS5 until Plan 44-18 cuts both consumers over. Operator runbook addendum: do NOT delete/archive/move the file before 44-18 lands; the two consumers will 500 on retention sweeps + keyword searches if it disappears. After 44-18 cuts over pruner + retrieval, the file is archivable in one shot (move to `.observations/archive/`, remove `dbGetter` wiring).
-
-Plan 44-18 cutover outcome (2026-06-05, Tasks 1-4):
-
-  - Task 1 audit (`cf6c8da45`): documented the 4 SQLite call sites + km-core replacement map. Critical finding D-44-18-01 — pruner cutoff must use top-level `entity.createdAt` (NOT `metadata.created_at` snake_case, which doesn't exist on post-legacy-ingest entities).
-  - Task 2 (`955ce3caa`): ObservationPruner cut to km-core. Constructor signature `{ kmStore, retentionDays }`. `prune()` now async; deletes via 100-id `Promise.all` chunks. ObservationPruner.test.js rewritten (4 tests GREEN).
-  - Task 3 (`4a85e1597`): RetrievalService freshness-rerank cut to km-core. New `kmStoreGetter` lazy option; `_applyFreshnessRerank` async + km-core `findByLegacyId`. New tests/integration/retrieval-service.freshness-rerank.km-core.test.js (239 lines, 4 GREEN, perf gate 20-id ≤ 50ms / measured <1ms).
-  - Task 4 (`c837dc421`): obs-api drops `_legacyDb` / `ensureLegacyDb` / `openLegacyDb` import / shutdown handler. New tests/integration/observation-pruner.km-core.test.js (238 lines, 5 GREEN, perf gate 1000-obs ≤ 1s / measured 48ms).
-  - Production verification (obs-api pid 36727 post-restart): 0 legacy SQLite handle opens; first km-core prune correctly removed 517 obs + 131 digests from the live store; `/api/retrieve` returns 48 results for "docker timeout" probe.
-  - Known deviation: KeywordSearch silently degrades to [] (the `_keywordSearch` helper short-circuits on missing db). Semantic search via Qdrant dominates the /api/retrieve response. Recorded as a Phase 45+ follow-up item in 44-18-SUMMARY.md "Known Deferred Items".
-  - **Task 5 (SQLite archive) — CLEARED 2026-06-05** with resolution **"approved (archive)"**. Rename target: `.observations/observations.db` → `.observations/observations.db.archived.2026-06-05` (sidecars `-shm`/`-wal` renamed alongside). obs-api script cleanup: `DB_PATH` constant dropped, `dbPath`/`dbExists` removed from `/health` payload, `dbPath` arg dropped from ObservationWriter + ObservationConsolidator construction (defaults still derive correct `projectRoot` from launchd cwd). `.gitignore` extended with `.observations/*.db.archived*`. Docs (`docs/observations/README.md`, `docs-content/core-systems/observational-memory.md`, `docs-content/release-notes.md`, `docs-content/architecture/data-flow.md`, `docs-content/architecture/health-monitoring.md`, `docs-content/integrations/index.md`, `docs-content/guides/status-line.md`, `docs-content/core-systems/ukb-vkb.md`, `docs/agent-integration-guide.md`, `docs-content/guides/agent-integration.md`) updated with archive notes. obs-api kickstarted post-cutover; `/health` returns `{"status":"ok"}` without any `dbPath`/`dbExists` field. 1-hour soak in progress at 2026-06-05T20:40Z; operator verifies launchd state at 2026-06-05T21:40Z (commands recorded in 44-18-SUMMARY.md). The deferred Plan 44-12 § "fully unused observations.db" promise — carried through 44-13, 44-14, 44-17 — is now finally honored.
-
-Plan 44-16 cutover outcome (2026-06-07, all 4 tasks):
-
-  - Task 1 audit (`68402a8dd`): documented the wire-shape divergence — `/api/coding/digests` + `/api/coding/insights` emit camelCase (`observationIds, filesTouched, digestIds, lastUpdated`), Wave 0 RED stub asserted snake_case. Four pieces of evidence converged on camelCase: pre-cutover SQLite SQL-alias contract, 17 dashboard reader sites, post-Plan-44-05 adapter shape, Wave 0 mis-spec. Zero snake_case readers in dashboard production code (one comment-only mention at `insights.tsx:173` — conceptual prose, not a field access).
-  - Task 2 (`518a8bbb6`): rewrote `tests/integration/typed-views.test.js` REQUIRED_DIGEST_KEYS + REQUIRED_INSIGHT_KEYS + per-test expectations to camelCase. Observations test + server-side filter test unchanged (already conformed). Header JSDoc replaced "EXPECTED FAILURE MODE (RED today)" with "WIRE-SHAPE LOCK (Plan 44-16)" + four-bullet rationale + pointer to 44-CONTEXT-amendment-4.md.
-  - Task 3 (km-core submodule `33a3c57` + outer `87e460c39`): load-bearing `LOCKED contract — Pitfall 2 wire-shape lock` comment block above `digestToLegacy` + `insightToLegacy` in `lib/km-core/src/adapters/observation-view.ts`. Comment-only change; km-core test suite stays GREEN (304/304). Wrote `.planning/phases/44-rest-api-git-snapshots/44-CONTEXT-amendment-4.md` (92 lines) — ratifies camelCase as canonical wire shape, rejects dual-emit (10% bytes-on-wire growth + decision deferral + no concrete Python consumer today), amends Pitfall 2 wording, provides future-planner guidance for Phase 45 viewer.
-  - Task 4 (`94af0c9b0`): live verification — `npx jest tests/integration/typed-views.test.js` 4/4 GREEN (advances Plan 44-11 SC#3 from 2/4 PARTIAL PASS to 4/4 PASS). Wire-curl key sets match the test verbatim. Dashboard at :3032 renders `/digests` + `/insights` with camelCase reader paths proven live via gsd-browser screenshots: `digest.observationIds.length` → "3 obs"/"1 obs" badges; `insight.digestIds.length` → "289 source digests"; `new Date(insight.lastUpdated)` → "Updated 1d ago". Screenshots at `/tmp/44-16-smoke/{digests,insights}.png`.
-  - Three independent ratification sites pin the contract: `tests/integration/typed-views.test.js` + `observation-view.ts` LOCKED-contract block + `44-CONTEXT-amendment-4.md`. A wire-shape change requires editing all three simultaneously.
-  - **Task 4 operator gate CLEARED 2026-06-07** with resolution **"approved"** — camelCase ratified; Phase 44 close-out gate #2 closed. Remaining Phase 44 gates: OKM PR #5 merge + C restart (operator out-of-band on bmw.ghe.com), then Plan 44-11 re-run as final close-out gate.
-
-Phase 45 Plan 04 outcome (2026-06-07, 2 implementation tasks complete + checkpoint:human-verify pending):
-
-  - Task 1 (submodule `b7194cc` + outer `4b0286d`): km-core `/api/v1/ontology/classes` extended with `?withDisplay=true` gated branch. Strict-equal `"true"` check preserves the OKM `rest-contract.test.ts:257` BC string-array shape when absent (T-45-04-03). Enriched branch returns `Array<{name, level?, parent?, display?}>` with display sourced from `.data/ontologies/{system}.display.json` via new `loadDisplayOverlay(ontologyDir, system)` helper. Helper throws on empty `ontologyDir` per CLAUDE.md Phase-41 invariant (T-45-04-06). Seed `.data/ontologies/coding.display.json` ships 10 class display hints. Rule 1 fix: `OntologyRegistry` auto-discovery now skips `*.display.json` files. 317/317 km-core tests pass (+13 new).
-  - Task 2 (`9c75609`): MarkdownViewerPanel — B-system signature panel for `/viewer/okb`. react-markdown@10 + remark-gfm + rehype-highlight; VERBATIM port of VKB's 6-step sanitizer (XSS layer 1 — no `rehype-raw`, T-45-04-01). Component overrides for h1-h6 (anchor IDs), img (`..` escape rejection per T-45-04-05), pre (Mermaid → UI-SPEC placeholder per D-45-04), code (preserve `language-*` for rehype-highlight CSS — fixed v10 className shape `"hljs language-X"`), a (anchor smooth-scroll, .md cross-link via `useMarkdownHistory`, external links get `target="_blank" rel="noopener noreferrer"` per T-45-04-02). Theme-gated highlight.js CSS via dynamic `<link>` element. History nav IconButtons with aria-labels `"Previous viewed entity"` / `"Next viewed entity"` — closes the 7th of 7 UI-SPEC § Icon-only controls. 171/171 viewer tests pass (+34 new).
-  - Task 3 (checkpoint:human-verify) pending operator: restart obs-api / coding-services to pick up the new handler, then run the 12 verification steps in 45-04-PLAN.md including curl shape probes, /viewer/coding seeded-color check, /viewer/okb Markdown panel smoke (Mermaid placeholder + GFM rendering + theme swap + cross-link history nav + XSS-clean console).
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-14 — Milestone v7.2 started
 
 ## Performance Metrics
 

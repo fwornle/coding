@@ -1,32 +1,71 @@
 # Milestones
 
-## v7.2 LLM Proxy Performance — Claude CLI Worker Pool (QUEUED, not active)
+## v7.2 VKB & Online-Learning Quality — Graph Data Quality, Ontology Rework, Viewer UX Integrity (ACTIVE)
+
+**Why:** Phase 56.1 visual smoke (2026-06-13/14) surfaced a cluster of seven inter-related quality issues across the unified viewer + online learning pipeline + ontology layer. The foundational pipeline is healthy (km-core export at 1262 nodes / 1592 edges / 88% connectivity after the 2026-06-10 backfill + repair commits), but the long tail of data quality issues makes operators work around the graph view instead of relying on it. Two of the surfaced todos carry operator-set `scope_hint: This is a multi-phase milestone, not a single TODO`.
+
+**Goal:** Bring the online learning pipeline → km-core → unified viewer surface to production data quality, so operators rely on the graph view for navigation and triage instead of working around known-broken rendering.
+
+**Target features (6):**
+1. Online pipeline emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on Insights — not just `capturedBy → LiveLoggingSystem`.
+2. Ontology rework — clarify upper/lower split, build out lower ontology for coding-specific concepts (LSL, ConstraintMonitor, Online-Observation/Digest/Insight tiers), per-project grouping in viewer.
+3. VKB rendering UX integrity — Evidence/Pattern filter symmetry, Legend derived from rendered graph, eliminate Observations/Digests architecture bleed, restore CollectiveKnowledge visibility under Online filter.
+4. LSL timeline scale honesty — remove 200-record silent cap, honest "all" window name, bi-source coloring (manual vs online) on ticks.
+5. OKB data routing fix — resolve `/api/entities` vs `/api/v1/entities` contract mismatch so `/viewer/okb` reaches OKM Express on :8090.
+6. Long-tail orphan fixes — close Phase 48 (System-type vanish), Phase 49 (orphan project-anchor relations); reduce 157-orphan baseline materially.
+
+**Scope seed (cluster of 9 todos):**
+- `.planning/todos/pending/2026-06-14-online-pipeline-semantic-edges-and-timeline-bi-source.md` *(operator-flagged multi-phase milestone)*
+- `.planning/todos/pending/2026-06-14-ontology-rework-lower-ontology-and-project-grouping.md` *(operator-flagged multi-phase milestone)*
+- `.planning/todos/pending/2026-06-14-online-filter-hides-ck-truncates-trace.md`
+- `.planning/todos/pending/2026-06-14-vkb-evidence-pattern-filter-asymmetry-and-ontology.md`
+- `.planning/todos/pending/2026-06-14-vkb-legend-static-cross-domain-bleed.md`
+- `.planning/todos/pending/2026-06-14-vkb-shows-observations-digests-architecture-bleed.md`
+- `.planning/todos/pending/2026-06-14-lsl-timeline-200-cap-and-all-window-misnaming.md`
+- `.planning/todos/pending/2026-06-10-okm-express-api-contract-bridge.md`
+- ROADMAP entries Phase 48 (System-type vanish) + Phase 49 (project-anchor orphans) — placeholders folded into v7.2 phase scoping
+
+**Out of scope:**
+- LLM proxy worker pool perf (now queued as v7.3 — see below)
+- Cross-agent performance measurement system (now queued as v7.4)
+- Phase 51 follow-up todos (`opencode-schema-migration-update`, `sweep-llm-proxy-probe-fix`, `json-export-missing-source-field`, sub-agent dashboard observability gap) — agent-capture concerns, not graph data quality
+- Phase 54 ETM hardening — operationally adjacent but already its own backlog phase with 3 plans pre-drafted (runs in parallel)
+- Phase 35-04/05 retention wiring — runs in parallel
+- Phase 46 ONBOARDING.md operator UAT — v7.1 close-out, runs in parallel
+
+**Phase numbering:** Continues from current state. Phase 56.1 was last; new milestone phases start at **Phase 57**.
+
+**Status:** ACTIVE 2026-06-14. Started while v7.1 still has one Phase 46 HUMAN-UAT pending (ONBOARDING.md operator dry-run). v7.1 will be formally archived once that UAT lands.
+
+---
+
+## v7.3 LLM Proxy Performance — Claude CLI Worker Pool (QUEUED, not active — renumbered from v7.2 on 2026-06-14)
 
 **Why:** The `claude-code` direct OAuth path (~0.9s, real token counts) handles haiku perfectly, but Anthropic rate-limits the bearer endpoint per-model. Sonnet/opus on Max-OAuth hit HTTP 429, and the proxy now falls back to the `claude` CLI subprocess — which works against the same Max subscription via a different rate-limit bucket but costs ~10-14s per call due to per-request CLI spawn + the ~16-22K cache_creation system prompt the CLI auto-injects.
 
 **Goal:** Maintain a small persistent pool of warm `claude` CLI workers communicating over stream-JSON stdin/stdout, eliminating the per-call spawn (~3-5s) and keeping Anthropic's prompt-cache warm for the auto-injected system prompt (~2-3× cheaper + faster on cache hits). Expected: 7-15s → ~2-3s per CLI-fallback call.
 
-**Research seed:** `.planning/research/v7.2-llm-proxy-perf-worker-pool.md`
+**Research seed:** `.planning/research/v7.2-llm-proxy-perf-worker-pool.md` *(filename retains the v7.2 origin — content unchanged; new milestone slot is v7.3)*
 
-**Status:** Queued. Do NOT activate while v7.1 (KM Unification) is in progress. Plan-phase work to begin after v7.1 ships.
+**Status:** Queued. Do NOT activate while v7.2 (VKB & Online-Learning Quality) is in progress. Plan-phase work to begin after v7.2 ships.
 
 ---
 
-## v7.3 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution (QUEUED, not active)
+## v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution (QUEUED, not active — renumbered from v7.3 on 2026-06-14)
 
 **Why:** Today we have no quantitative basis for recommending agent / model / framework / spec-level choices to dev teams. The proxy's `/api/token-usage` Evolution chart covers background services (wave-analysis, observation-writer, health-coordinator), but the agent-side spend — user ↔ CA conversations, sub-agents, per-tool-call breakdowns — is invisible. Without per-task attribution across both sides, "approach X cost Y for task type Z" is anecdote, not evidence.
 
 **Goal:** Build a measurement rig that quantifies, per task, the full cost across all four supported agents (Claude Code, Copilot CLI, OpenCode, Mastra) AND the proxy-routed background services that run during the task. Attribution at the best granularity each agent surfaces (Claude per-turn + per-reasoning-step for extended thinking, Copilot per-session-aggregate or per-turn pending verification, OpenCode per-llm-call via proxy, Mastra TBD). Time-series on one timeline via the existing `.observations/token-usage.db` extended with `agent`, `task_id`, `tool_call_id`, `parent_call_id`, `granularity_tier`, `reasoning_tokens`. Full snapshot/restore for reproducibility (git + KB + `.planning/` + routing config + MCP inventory + external HTTP fixtures). New km-core KB of `Experiment / Run / Route / Step / Decision / Outcome / Report` entities and a "Performance" dashboard tab (slotted after Tokens).
 
 **Scoping artifacts:**
-- `.planning/notes/v73-perf-measurement-exploration.md` — 7 architectural decisions + 9-phase shape sketch with Phase 3 flagged FOUNDATIONAL
+- `.planning/notes/v73-perf-measurement-exploration.md` — 7 architectural decisions + 9-phase shape sketch with Phase 3 flagged FOUNDATIONAL *(filename retains v73 origin; new slot is v7.4)*
 - `.planning/notes/v73-token-attribution-contract.md` — storage / measurement-span / per-agent adapter contracts
 - `.planning/spikes/copilot-proxy-interception.md` — completed spike (4-approach verdict table + recommendation)
 - `~/.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_perf_measurement_requirements.md` — hard requirements
 
-**Out of scope:** VS Code Copilot Chat (state.vscdb opaque); policy automation / auto-routing (queued as v7.4); currency conversion (v7.4).
+**Out of scope:** VS Code Copilot Chat (state.vscdb opaque); policy automation / auto-routing (queued as v7.5); currency conversion (v7.5).
 
-**Status:** Queued. Do NOT activate while v7.1 (KM Unification) is in progress. The full `/gsd-new-milestone` workflow (requirements + roadmap) runs after v7.1 ships and v7.2 is sequenced. Todo: `.planning/todos/pending/start-v73-milestone.md`.
+**Status:** Queued. Do NOT activate while v7.2 (VKB & Online-Learning Quality) or v7.3 (LLM Proxy Worker Pool) is in progress. The full `/gsd-new-milestone` workflow (requirements + roadmap) runs after both ship. Todo: `.planning/todos/pending/start-v73-milestone.md` *(filename retains v73 origin; the todo body refers to the same scope, now slotted as v7.4)*.
 
 ---
 

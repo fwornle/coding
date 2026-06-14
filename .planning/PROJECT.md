@@ -48,28 +48,38 @@ Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), liv
 
 ### Active
 
-## Current Milestone: v7.1 Knowledge Management Unification
+## Current Milestone: v7.2 VKB & Online-Learning Quality
 
-**Goal:** Extract a shared KM-Core from the three knowledge-management systems (Online Learning, Offline UKB, OKM) so each application uses a common codebase parameterized by per-system configuration (ontologies, ingest adapters, eval logic).
+**Goal:** Bring the online learning pipeline → km-core → unified viewer surface to production data quality, so operators rely on the graph view for navigation and triage instead of working around known-broken rendering.
 
 **Target features:**
-- Shared KM-Core types + GraphKMStore (Graphology + LevelDB + JSON exports)
-- Uniform entity shape — kills the KGEntity/SharedMemoryEntity (`type`/`entityType`) split
-- OntologyRegistry with dynamic upper + lower ontology discovery
-- 4-stage consolidation framework (extract → dedup → store → synthesize)
-- Layered dedup pipeline (exact-name → embedding cosine → LLM semantic)
-- Provenance + temporal validity (`validFrom`/`validUntil`/`supersedes`)
-- Common REST query API + git-snapshot/restore pattern
-- Unified web viewer parameterized by ontology config
-- Online-learning SQLite integration via thin KM-Core adapter
-- Per-system documentation + onboarding (which configs each system owns)
+- Online pipeline emits semantic-content edges on Insights (mentions / dependsOn / isRelatedTo / instanceOf), not just `capturedBy → LiveLoggingSystem`
+- Ontology rework — clarify upper/lower split, build lower ontology for coding-specific concepts (LSL, ConstraintMonitor, Online-Observation/Digest/Insight tiers), per-project grouping in viewer
+- VKB rendering UX integrity — Evidence/Pattern filter symmetry, Legend derived from rendered graph, eliminate Observations/Digests architecture bleed, restore CollectiveKnowledge visibility under Online filter
+- LSL timeline scale honesty — remove 200-record silent cap, honest "all" window name, bi-source coloring (manual vs online) on ticks
+- OKB data routing fix — resolve `/api/entities` vs `/api/v1/entities` contract mismatch so `/viewer/okb` reaches OKM Express on :8090
+- Long-tail orphan fixes — close Phase 48 (System-type vanish), Phase 49 (orphan project-anchor relations); reduce 157-orphan baseline materially
 
 **Key context:**
-- Source-of-truth comparison: `.planning/research/v7.1-km-unification.md`
-- A (Online Learning) — SQLite hot path stays as-is; expose content via KM-Core entity adapter
-- B (Offline UKB) — full migration; folds in Phase 10 embeddings issue + wave-analysis race condition
-- C (OKM) lives in `~/Agentic/_work/rapid-automations/integrations/operational-knowledge-management` — cross-repo refactor
-- Open decisions: repo layout (monorepo vs shared pkg), viewer (D3 vs sigma.js), backwards-compat for `.data/*.json` export paths, migration cutover order
+- Foundation is healthy: km-core export at 1262 nodes / 1592 edges / 88% connectivity / 10 relation types after the 2026-06-10 backfill + repair commits trail (`bc5fe8012`, `a283c9be1`, `7ab1f9cd8`, `939f8d506`). Qdrant collections live: observations=5509, digests=1601, insights=225, kg_entities=675. This milestone is about the LONG TAIL of data quality, not foundational repair.
+- Scope seeds: the 9-todo cluster surfaced during Phase 56.1 visual smoke (2026-06-13/14), listed in `.planning/MILESTONES.md` under the v7.2 entry. Two carry operator-set `scope_hint: This is a multi-phase milestone, not a single TODO`.
+- Phase 48 + Phase 49 (legacy ROADMAP TBD placeholders) fold into v7.2 phase numbering — close the old slots as superseded.
+- Phase numbering continues from Phase 56.1 → new phases start at **Phase 57**.
+- v7.1 (KM Unification — Phases 37-46) was functionally shipped before this milestone opened; one Phase 46 HUMAN-UAT (ONBOARDING.md operator dry-run) remains pending. v7.1 will be archived once that UAT lands; it runs in parallel.
+- Out of scope: LLM proxy worker pool (v7.3), cross-agent perf measurement (v7.4), Phase 51 follow-ups, Phase 54 ETM hardening, Phase 35-04/05 retention wiring — all run in parallel as backlog phases.
+
+### v7.1 Shipped (Knowledge Management Unification — Phases 37-46)
+
+- ✓ Shared KM-Core types + GraphKMStore (Graphology + LevelDB + JSON exports) — Phase 37
+- ✓ OntologyRegistry with dynamic upper + lower ontology discovery — Phase 38
+- ✓ Uniform entity shape (kills KGEntity/SharedMemoryEntity split) + temporal validity fields — Phase 39
+- ✓ 4-stage consolidation framework + layered dedup pipeline — Phase 40
+- ✓ Online-learning adapter + post-hoc resolution (System A) — Phase 41
+- ✓ Offline UKB migration (System B) — Phase 42 + 42.1/42.1.1/42.1.2/42.2
+- ✓ OKM cross-repo migration (System C) — Phase 43
+- ✓ Common REST query API + git-snapshot/restore — Phase 44
+- ✓ Unified viewer routing layer + UI feature parity with VOKB — Phase 45 + 55
+- ⏳ Per-system documentation + onboarding — Phase 46 (one operator HUMAN-UAT pending: ONBOARDING.md dry-run)
 
 ### Shipped in v4.0
 
