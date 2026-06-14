@@ -1012,3 +1012,88 @@ Plans:
 Plans:
 
 - [x] N/A — closed without planning; both goals shipped out-of-band via `@rapid/llm-proxy`
+
+
+---
+
+## Milestone v7.2: VKB & Online-Learning Quality (ACTIVE — started 2026-06-14)
+
+**Goal:** Bring the online learning pipeline → km-core → unified viewer surface to production data quality, so operators rely on the graph view for navigation and triage instead of working around known-broken rendering.
+
+**Phase numbering:** Continues from Phase 56.1. New phases are **57–61** (5 phases).
+
+**Coverage:** 19 v7.2 requirements (EDGE-01..02, LOWERONTO-01..04, VKBUI-01..04, LSLTIME-01..03, OKBROUTE-01..02, ORPHAN-01..04) mapped to 5 phases. See `.planning/REQUIREMENTS.md` § v7.2 Traceability for the per-REQ-ID table.
+
+### Phases
+
+- [ ] **Phase 57: Lower Ontology & Project Tagging Foundation** — declare coding-specific L2 classes (`LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`); optional upper-ontology growth; stamp `project` tag on every km-core entity.
+- [ ] **Phase 58: Online Pipeline Semantic Edges on Insights** — `ObservationConsolidator` emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on online Insights, atomically with the Insight node, beyond the existing `capturedBy → LiveLoggingSystem` provenance.
+- [ ] **Phase 59: Long-Tail Orphan Fixes & Baseline Reduction** — server-side System-type filter fix (legacy Phase 48); parent-hierarchy edges for online-learned Detail/SubComponent + one-shot migration (legacy Phase 49); per-team `CollectiveKnowledge --includes--> Project` writer + seed fix; drive `orphanCount` from 157 → ≤30.
+- [ ] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges.
+- [ ] **Phase 61: LSL Timeline & OKB Routing Honesty** — remove silent 200-record cap (`useLslSessions.ts`) with visible "N of M" label or honest streaming; honest "all" window (no silent 365-day cap); bi-source tick coloring (manual vs online); `/viewer/okb` ApiClient detects OKM Express `:8090` legacy `/api/entities` shape and routes correctly, showing real OKM business entities not coding-KG mirrors.
+
+### v7.2 Phase Details
+
+### Phase 57: Lower Ontology & Project Tagging Foundation
+
+**Goal:** Knowledge graph nodes carry a coding-specific ontology vocabulary and a per-project tag, so downstream consumers (viewer, migrations, orphan repair) can group, filter, and reason about entities by project AND by coding-domain class — not just by generic upper-ontology Component/SubComponent/Detail.
+**Depends on:** Nothing (foundational ontology + data-shape work; runs first so Phases 58–61 stamp + consume the new fields)
+**Requirements:** LOWERONTO-01, LOWERONTO-02, LOWERONTO-04
+**Success Criteria** (what must be TRUE):
+  1. An operator inspecting any recent km-core entity sees a `project` tag (`coding`, `okm`, `cap`, etc.) populated on the entity — the writer path stamps it at insert time, not as a one-shot backfill.
+  2. The OntologyRegistry loads a lower-ontology file (`.data/ontologies/coding.lower.json` or equivalent project-scoped file) declaring at minimum `LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement` as L2 classes extending their upper-ontology parents.
+  3. Sampling 20 recent online-learned entities, at least 18 carry an `ontologyClass` value drawn from the new lower-ontology class set (not generic `Component` / `Detail` only).
+  4. If the operator confirms upper-ontology growth in the discuss-phase (soft gate per LOWERONTO-02), the upper ontology declares ≥2 additional generic programming-aspect classes (e.g., `Diagnosis`, `Interface`); otherwise LOWERONTO-02 is honestly deferred without blocking the phase.
+**Plans:** TBD
+**UI hint:** yes
+
+### Phase 58: Online Pipeline Semantic Edges on Insights
+
+**Goal:** Online-generated Insight entities carry semantic-content edges to the domain entities they discuss — not just provenance edges back to `LiveLoggingSystem` — so a reader landing on an Insight can traverse to the Components / SubComponents / Details it talks about, and the graph view shows online learning as a connected sub-graph instead of a star of orphan-leaves around LSL.
+**Depends on:** Phase 57 (lower-ontology classes for OnlineInsight + project tag; both surface on the new edges)
+**Requirements:** EDGE-01, EDGE-02
+**Success Criteria** (what must be TRUE):
+  1. Sampling 20 random recent online-learned Insights, at least 18 carry at least one semantic-content relation type beyond `capturedBy → LiveLoggingSystem` — drawn from the discuss-phase-decided set (e.g., `mentions`, `dependsOn`, `isRelatedTo`, `instanceOf`).
+  2. A concurrent `/api/v1/entities` reader running while `ObservationConsolidator` writes a new Insight never observes the Insight node without its semantic-content edges (no orphan-Insight intermediate state).
+  3. Unified viewer rendered with the Online learning-source filter shows online Insights connected by semantic-content edges to domain entities, not as isolated nodes hanging off LiveLoggingSystem only.
+**Plans:** TBD
+
+### Phase 59: Long-Tail Orphan Fixes & Baseline Reduction
+
+**Goal:** Drive the live km-core graph's orphan ratio from ~12 % (157 of 1262 nodes on 2026-06-14) down to ≤3 %, by closing the three known orphan-producing paths — server-side System-type stripping, online-learned Detail/SubComponent without parent edges, and per-team Project anchors missing the `CollectiveKnowledge --includes-->` edge — at both the writer path AND via a one-shot repair migration for the existing instances.
+**Depends on:** Phase 57 (per-team `project` tag enables per-team Project-anchor edge writes and viewer-side per-project grouping)
+**Requirements:** ORPHAN-01, ORPHAN-02, ORPHAN-03, ORPHAN-04
+**Success Criteria** (what must be TRUE):
+  1. An operator opening the VKB graph with one team's checkbox unchecked sees `entity_type='System'` nodes still rendered — they are no longer stripped by the per-team `queryEntities` path in `integrations/memory-visualizer/src/api/databaseClient.ts:262`. (Legacy Phase 48 scope closed.)
+  2. Every online-learned `Detail` and `SubComponent` entity inserted after this phase ships carries a parent-hierarchy edge at insert time; the existing ~122 orphan instances are repaired via a one-shot migration that the operator runs once and which is idempotent on re-invocation. (Legacy Phase 49 scope partially closed.)
+  3. Every per-team Project anchor node (non-coding teams included) carries a `CollectiveKnowledge --includes--> Project` edge, both for new inserts (writer path) and for the existing instances (seed-script repair). (Legacy Phase 49 scope partially closed.)
+  4. `/api/v1/stats` reports `orphanCount ≤ 30` (≤ 3 % of node count) at milestone close, measured against the live km-core graph that the unified viewer reads — not against a side snapshot.
+**Plans:** TBD
+
+### Phase 60: Unified Viewer Rendering UX Integrity
+
+**Goal:** The unified viewer at `localhost:5173/viewer/coding` becomes truthful — every filter checkbox has a symmetric, observable effect; the Legend reflects what is actually on screen; architecture-bleed entity types (`Observation`, `Digest`) are hidden by default; CollectiveKnowledge stays visible under the Online filter so focal-ancestry traces from leaf entities reach the system root; and the L2 lower-ontology classes from Phase 57 surface as expandable groups under their L1 parent in the ontology-class filter.
+**Depends on:** Phase 57 (lower-ontology classes drive ontology-filter grouping + Legend computation)
+**Requirements:** VKBUI-01, VKBUI-02, VKBUI-03, VKBUI-04, LOWERONTO-03
+**Success Criteria** (what must be TRUE):
+  1. Toggling the Layer filter Evidence checkbox OFF (Pattern ON) renders only Pattern-tagged nodes; toggling Pattern OFF (Evidence ON) renders only Evidence-tagged nodes. Both toggles produce the same direction of observable effect — neither is a silent no-op.
+  2. The sidebar Legend (DOMAINS / LAYERS / SOURCE / RELATIONSHIPS sections) is computed from the currently-rendered graph; static OKB-domain entries such as `RuntimeDiagnostics` are NOT present when zero such nodes are rendered.
+  3. `Observation` and `Digest` entity types do not appear in the production VKB graph render by default; an operator-visible debug toggle in the filter sidebar re-enables them for inspection without requiring a code change or query-string flag.
+  4. With the Online learning-source filter active, `CollectiveKnowledge` remains visible in the rendered graph (or its path-trace anchor is preserved) so focal-ancestry traces from leaf entities still reach the system root — not truncated at the project level.
+  5. The Ontology Class filter sidebar renders Phase 57's L2 lower-ontology classes as expandable groups under their L1 upper-ontology parent, each L2 row carries a per-class count badge, and the operator can collapse the group to filter all members at once.
+**Plans:** TBD
+**UI hint:** yes
+
+### Phase 61: LSL Timeline & OKB Routing Honesty
+
+**Goal:** The LSL timeline strip stops lying about how much data it shows (no silent 200-record cap, no silent 365-day "all" window, no single tick color for two distinct session sources), and the unified viewer's OKB tab actually reaches the OKM Express server on `:8090` so operators see real RaaS / KPI-FW / business entities — not the coding-KG mirror they currently see.
+**Depends on:** Nothing (independent UI + routing surgery on the unified viewer; can run in parallel with Phase 60 if operator wishes)
+**Requirements:** LSLTIME-01, LSLTIME-02, LSLTIME-03, OKBROUTE-01, OKBROUTE-02
+**Success Criteria** (what must be TRUE):
+  1. The LSL timeline strip either streams every session in the selected window with no silent truncation, OR surfaces a visible "showing N of M total" label whenever the in-strip count is below the underlying total — the operator can never be silently fooled by the legacy 200-record `fetchSessions` cap.
+  2. The "all" window option shows every ingested session in the LSL history, OR is renamed to honestly reflect what it actually shows (e.g., "1 year"). The current silent 365-day `WINDOW_MS` cap is no longer hidden behind an "all" label.
+  3. LSL timeline ticks for manual-source sessions (Batch / Manual) and online-source sessions (Auto) render in two visually distinct colors; an operator scanning the strip can tell the two sources apart at a glance without hovering.
+  4. Visiting `/viewer/okb` while the OKM Express server is running on `:8090` renders real RaaS / KPI-FW / business entities from OKM Express — the ApiClient detects the legacy `/api/entities` contract shape and routes correctly without forcing the km-core `/api/v1/entities` shape.
+  5. The OKB tab never shows coding-KG mirror entities (e.g., `CodeAnalyzer`, `PersistenceAgent`); if the OKM Express server is unreachable, the tab surfaces a truthful "OKM Express unreachable on :8090" message rather than silently rendering the wrong data source.
+**Plans:** TBD
+**UI hint:** yes

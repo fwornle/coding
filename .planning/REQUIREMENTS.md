@@ -75,25 +75,25 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EDGE-01 | TBD (Phase 57+) | Not started |
-| EDGE-02 | TBD (Phase 57+) | Not started |
-| LOWERONTO-01 | TBD (Phase 57+) | Not started |
-| LOWERONTO-02 | TBD (Phase 57+) | Not started |
-| LOWERONTO-03 | TBD (Phase 57+) | Not started |
-| LOWERONTO-04 | TBD (Phase 57+) | Not started |
-| VKBUI-01 | TBD (Phase 57+) | Not started |
-| VKBUI-02 | TBD (Phase 57+) | Not started |
-| VKBUI-03 | TBD (Phase 57+) | Not started |
-| VKBUI-04 | TBD (Phase 57+) | Not started |
-| LSLTIME-01 | TBD (Phase 57+) | Not started |
-| LSLTIME-02 | TBD (Phase 57+) | Not started |
-| LSLTIME-03 | TBD (Phase 57+) | Not started |
-| OKBROUTE-01 | TBD (Phase 57+) | Not started |
-| OKBROUTE-02 | TBD (Phase 57+) | Not started |
-| ORPHAN-01 | TBD (Phase 57+) | Not started |
-| ORPHAN-02 | TBD (Phase 57+) | Not started |
-| ORPHAN-03 | TBD (Phase 57+) | Not started |
-| ORPHAN-04 | TBD (Phase 57+) | Not started |
+| EDGE-01 | Phase 58 | Not started |
+| EDGE-02 | Phase 58 | Not started |
+| LOWERONTO-01 | Phase 57 | Not started |
+| LOWERONTO-02 | Phase 57 | Not started |
+| LOWERONTO-03 | Phase 60 | Not started |
+| LOWERONTO-04 | Phase 57 | Not started |
+| VKBUI-01 | Phase 60 | Not started |
+| VKBUI-02 | Phase 60 | Not started |
+| VKBUI-03 | Phase 60 | Not started |
+| VKBUI-04 | Phase 60 | Not started |
+| LSLTIME-01 | Phase 61 | Not started |
+| LSLTIME-02 | Phase 61 | Not started |
+| LSLTIME-03 | Phase 61 | Not started |
+| OKBROUTE-01 | Phase 61 | Not started |
+| OKBROUTE-02 | Phase 61 | Not started |
+| ORPHAN-01 | Phase 59 | Not started |
+| ORPHAN-02 | Phase 59 | Not started |
+| ORPHAN-03 | Phase 59 | Not started |
+| ORPHAN-04 | Phase 59 | Not started |
 
 **Coverage:** 19 requirements — will be mapped to phases by `gsd-roadmapper`.
 
