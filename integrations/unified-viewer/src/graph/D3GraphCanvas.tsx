@@ -21,6 +21,7 @@ import type { ApiClient } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
 import { useViewerStore } from '@/store/viewer-store'
 import type { SelectionSource } from '@/store/viewer-store'
+import { Logger } from '@/lib/logging'
 import { useGraphData } from './useGraphData'
 import type { Entity, Relation } from './types'
 // 2026-06-13 (Phase 56-04): computeAncestryPath extracted to a shared
@@ -507,25 +508,42 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // the fitted viewport so the focal + path-trace render legibly without
   // a viewport reset.
   const prevSelectionSourceRef = useRef<SelectionSource>(null)
-  useEffect(() => {
-    const prevSource = prevSelectionSourceRef.current
-    const enteredLayer1 =
-      prevSource === null
-      && selectionSource !== null
-      && selectedNodeIds.size >= 1
-    prevSelectionSourceRef.current = selectionSource
-    if (!enteredLayer1) return
-
+  // 2026-06-14 (CR-02 fix — 56.1-REVIEW): sticky "fit pending" flag.
+  //
+  // The fit-to-bounds effect can race the main render effect on the Layer 0 →
+  // Layer 1 transition. React runs effects in DECLARATION order, so this
+  // fit effect (declared first) runs BEFORE the main render effect rebuilds
+  // `d3NodesRef.current`. On a tick-click cascade that also flips
+  // `visibleEntities` (LSL filter cascade), the main render rebuilds `d3Nodes`
+  // with `x: undefined / y: undefined` for every node — and the fit effect
+  // then either reads the STALE prior-render array (with previous-layout x/y
+  // that no longer match where the simulation is now placing nodes) or, after
+  // the main render swap, reads the FRESH array with no coordinates yet.
+  // Either way `targetNodes.filter(...)` returns empty and the fit becomes a
+  // silent no-op.
+  //
+  // Fix: when the fit cannot run because coordinates are missing, set a
+  // sticky pending flag. The simulation's `on('tick')` handler (registered
+  // in the main render effect below) consumes the flag once the first batch
+  // of coordinates is laid down and re-attempts the fit. The flag is
+  // cleared either after a successful fit OR when the selection transitions
+  // back to Layer 0 (so a stale pending request doesn't fire across an
+  // unrelated future Layer 1 entry). This deliberately does NOT add
+  // `d3NodesRef` to the main render dep list — PATTERNS-LOCK Contract #3
+  // Part A keeps it `[visibleEntities, visibleRelations, theme, isLoading]`.
+  const pendingFitRef = useRef<boolean>(false)
+  const runFitToBoundsRef = useRef<(() => boolean) | null>(null)
+  // Build the actual fit routine as a stable ref-stored callback so the
+  // simulation tick (registered in the main render effect) can invoke it
+  // without depending on the effect's closure. The routine returns true
+  // when the fit fired and false when it deferred (still pending).
+  runFitToBoundsRef.current = () => {
     const svgEl = svgRef.current
     const containerEl = containerRef.current
     const zoom = zoomBehaviorRef.current
     const d3Nodes = d3NodesRef.current
-    if (!svgEl || !containerEl || !zoom || !d3Nodes) return
+    if (!svgEl || !containerEl || !zoom || !d3Nodes) return false
 
-    // Bounds over `selectedNodeIds ∪ pathToSelected`. We include
-    // pathToSelected so the central-trace ancestor chain stays in the
-    // viewport too — fitting ONLY to selectedNodeIds would let the trace
-    // dangle off-screen on long chains.
     const targetIds = new Set<string>()
     for (const id of selectedNodeIds) targetIds.add(id)
     for (const id of pathToSelected) targetIds.add(id)
@@ -534,13 +552,22 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
         && typeof n.x === 'number'
         && typeof n.y === 'number',
     )
-    if (targetNodes.length === 0) return
+    if (targetNodes.length === 0) {
+      // CR-02: surface the silent-noop. Without this, a fit that fires
+      // before the simulation has laid down coordinates silently does
+      // nothing and the user sees no zoom.
+      Logger.warn(
+        Logger.Categories.PANELS,
+        `D3GraphCanvas fit-to-bounds deferred: 0 of ${targetIds.size} target ids have laid-out coordinates yet`,
+      )
+      return false
+    }
 
     const bounds = calculateGraphBounds(targetNodes)
-    if (!bounds) return
+    if (!bounds) return false
 
     const { width, height } = containerEl.getBoundingClientRect()
-    if (width <= 0 || height <= 0) return
+    if (width <= 0 || height <= 0) return false
 
     // Pad the bounds a touch so halo nodes don't sit right at the viewport
     // edge — feels cramped otherwise. 80px padding (vs the default 50px
@@ -554,6 +581,34 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     const transform = d3.zoomIdentity.translate(x, y).scale(scale)
     const svg = d3.select(svgEl)
     svg.transition().duration(500).call(zoom.transform, transform)
+    return true
+  }
+  useEffect(() => {
+    const prevSource = prevSelectionSourceRef.current
+    const enteredLayer1 =
+      prevSource === null
+      && selectionSource !== null
+      && selectedNodeIds.size >= 1
+    // CRITICAL ORDERING (WR-07): bookkeeping MUST be before the early
+    // return so re-runs of this effect (selectedNodeIds / pathToSelected
+    // changes during a multi-set transition) don't accidentally reset
+    // the comparison baseline. See PATTERNS-LOCK Contract #3 Part B.
+    prevSelectionSourceRef.current = selectionSource
+    // 2026-06-14 (CR-02): also clear a stale pending fit if the selection
+    // collapsed back to Layer 0 — otherwise a future, unrelated Layer 1
+    // entry could trip the leftover flag and fit-to-wrong-targets.
+    if (selectionSource === null) pendingFitRef.current = false
+    if (!enteredLayer1) return
+
+    // Try the fit now; if coordinates aren't laid out yet (e.g. the main
+    // render effect just rebuilt d3Nodes with undefined x/y), set the
+    // sticky pending flag so the next simulation tick consumes it.
+    const fitFn = runFitToBoundsRef.current
+    if (fitFn === null) return
+    const fired = fitFn()
+    if (!fired) {
+      pendingFitRef.current = true
+    }
   }, [selectionSource, selectedNodeIds, pathToSelected])
 
   // Main render — rebuild on filtered data or theme change.
@@ -841,6 +896,19 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       node.attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
       tickCount++
       if (tickCount === 120) fitToScreen()
+      // 2026-06-14 (CR-02 fix — 56.1-REVIEW): consume the sticky
+      // pending-fit flag once coordinates are laid out. The fit-to-bounds
+      // effect (registered before this main render effect) may have
+      // wanted to run BEFORE the simulation had a chance to mutate any
+      // node.x / node.y — when that happened, it set `pendingFitRef.current`
+      // instead of silently no-op'ing. We re-attempt here on every tick.
+      // The fit routine itself returns true on success; we only clear the
+      // flag in that case (a still-empty target set re-defers without
+      // looping forever — the next tick will retry).
+      if (pendingFitRef.current && runFitToBoundsRef.current !== null) {
+        const fired = runFitToBoundsRef.current()
+        if (fired) pendingFitRef.current = false
+      }
     })
     simulation.on('end', fitToScreen)
 
