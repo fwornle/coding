@@ -952,7 +952,10 @@ describe('useViewerStore — Plan 06 Decision 1 selection-history stack', () => 
     expect(s.selectionHistory).toBeNull()
   })
 
-  test('popSelection on Layer 1 (no history) falls through to clearSelection and returns false', () => {
+  test('WR-05: popSelection on Layer 1 (no history) returns false WITHOUT mutating state — caller calls clearSelection', () => {
+    // 2026-06-14 (WR-05 fix — 56.1-REVIEW): popSelection now only pops.
+    // The caller (Esc handler / X-button) gates on the return value and
+    // calls clearSelection() itself when popSelection returns false.
     useViewerStore.getState().setSelection({
       nodeIds: new Set<string>(['n1']),
       source: 'graph',
@@ -960,13 +963,15 @@ describe('useViewerStore — Plan 06 Decision 1 selection-history stack', () => 
     expect(useViewerStore.getState().selectionHistory).toBeNull()
     const popped = useViewerStore.getState().popSelection()
     expect(popped).toBe(false)
+    // State PRESERVED — pop was a no-op. The Esc/X handler is responsible
+    // for the L1 → L0 transition via an explicit clearSelection() call.
     const s = useViewerStore.getState()
-    expect(s.selectedNodeIds.size).toBe(0)
-    expect(s.focalNodeId).toBeNull()
-    expect(s.selectionSource).toBeNull()
+    expect(s.selectedNodeIds.size).toBe(1)
+    expect(s.focalNodeId).toBe('n1')
+    expect(s.selectionSource).toBe('graph')
   })
 
-  test('popSelection on Layer 0 (already clear) is a safe no-op', () => {
+  test('WR-05: popSelection on Layer 0 (already clear) returns false and is a safe no-op', () => {
     // No selection, no history.
     expect(useViewerStore.getState().selectionHistory).toBeNull()
     expect(useViewerStore.getState().focalNodeId).toBeNull()

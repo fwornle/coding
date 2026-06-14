@@ -200,7 +200,14 @@ export function useKeyboardShortcuts(
           state.lslFilterEntityIds !== null ||
           state.selectionHistory !== null
         if (hasSelection) {
+          // 2026-06-14 (WR-05 fix — 56.1-REVIEW): popSelection now ONLY
+          // pops (no internal side-effect to clearSelection). Gate the
+          // clearSelection fallback here so control flow is explicit.
+          // preventDefault is unconditional because we ARE consuming the
+          // Esc keystroke either way (the user's intent was "back out one
+          // step" and one of pop / clear actioned that intent).
           const popped = state.popSelection()
+          if (!popped) state.clearSelection()
           event.preventDefault()
           Logger.debug(
             Logger.Categories.STORE,

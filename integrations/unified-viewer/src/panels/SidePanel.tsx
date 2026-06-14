@@ -158,7 +158,13 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
             <button
               type="button"
               onClick={() => {
-                useViewerStore.getState().popSelection()
+                // 2026-06-14 (WR-05 fix — 56.1-REVIEW): popSelection now
+                // ONLY pops (no internal fallthrough to clearSelection).
+                // Gate the clearSelection fallback here so the X button
+                // still reaches Layer 0 from the no-history case.
+                const store = useViewerStore.getState()
+                const popped = store.popSelection()
+                if (!popped) store.clearSelection()
               }}
               className="h-7 w-7 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
               aria-label="Close details panel"

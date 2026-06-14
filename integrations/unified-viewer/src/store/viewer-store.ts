@@ -654,12 +654,14 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   popSelection: () => {
     const snap = get().selectionHistory
     if (snap === null) {
-      get().clearSelection()
-      // false = nothing was popped per se; the caller might still want to
-      // preventDefault on Esc because clearSelection() did fire (the L1 → L0
-      // path). The Esc handler decides that via its pre-existing hasSelection
-      // check; this return value just tells the caller "was there a history
-      // entry to pop." useKeyboardShortcuts already handles the clear case.
+      // 2026-06-14 (WR-05 fix — 56.1-REVIEW): popSelection now ONLY pops.
+      // It no longer side-effects a clearSelection() call when there's no
+      // snapshot — that conflated two responsibilities (read the stack +
+      // mutate state) and made callers reason about a single boolean
+      // return that meant different things depending on the path. Callers
+      // (Esc handler in useKeyboardShortcuts, X-button in SidePanel) are
+      // updated to gate on the return value and call clearSelection()
+      // themselves when popSelection returns false.
       return false
     }
     set({
