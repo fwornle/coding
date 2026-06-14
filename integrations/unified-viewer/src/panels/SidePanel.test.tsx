@@ -169,4 +169,77 @@ describe('SidePanel (Phase 55 — RCA tab dropped)', () => {
     const aside = container.querySelector('[data-testid="viewer-side-panel"]')
     expect(aside!.className).toMatch(/w-\[30rem\]/)
   })
+
+  // ===== Phase 56.1 Plan 06 follow-up — single-node tick UX shortcut =====
+  // CONTEXT: when a timeline tick's `pickAllResolvable` resolves to EXACTLY
+  // one visible node, the sidebar should jump straight to EntityDetailPanel
+  // instead of detouring through BucketCardList (which would require the
+  // operator to click the lone card to drill in). Multi-node tick clicks
+  // still go to BucketCardList unchanged.
+  //
+  // Predicate under test (SidePanel.tsx mode-switch block):
+  //   - isSingleFocalMode: selectedNodeIds.size === 1
+  //                        (bucket halo provenance preserved in the store)
+  //   - isMultiMode: !isSingleFocalMode && (selectedBucketKeys.size > 0
+  //                                          || selectedNodeIds.size > 1)
+
+  test('Phase 56.1-06 — single-node tick shortcut: 1 resolved node + bucket halo → EntityDetailPanel (NOT BucketCardList)', () => {
+    // Simulate a timeline tick whose pickAllResolvable cascade returned a
+    // single visible node. The store carries the bucket halo (focal bucket
+    // ring + Locked Contract #1 cascade) AND the single resolved node.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['mdurl']),
+      bucketKeys: new Set<string>(['session-A|1718360000000']),
+      focal: { nodeId: 'mdurl', bucketKey: 'session-A|1718360000000' },
+      highlightedRowKey: 'mdurl',
+      source: 'timeline',
+      pathToSelected: new Set<string>(),
+      lslSessionFilter: ['session-A'],
+      lslFilterEntityIds: new Set<string>(['mdurl']),
+    })
+    const { queryByTestId } = renderPanel('coding')
+    // The UX shortcut: EntityDetailPanel renders directly, no card list.
+    expect(queryByTestId('entity-detail-panel')).not.toBeNull()
+    expect(queryByTestId('bucket-card-list')).toBeNull()
+  })
+
+  test('Phase 56.1-06 — regression guard: 2+ resolved nodes + bucket halo → BucketCardList (multi-mode preserved)', () => {
+    // Same provenance as above but the cascade resolved 2 nodes — the
+    // operator needs the card list to pick which node to drill into.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['mdurl', 'longdesc']),
+      bucketKeys: new Set<string>(['session-A|1718360000000']),
+      focal: { nodeId: 'mdurl', bucketKey: 'session-A|1718360000000' },
+      highlightedRowKey: 'mdurl',
+      source: 'timeline',
+      pathToSelected: new Set<string>(),
+      lslSessionFilter: ['session-A'],
+      lslFilterEntityIds: new Set<string>(['mdurl', 'longdesc']),
+    })
+    const { queryByTestId } = renderPanel('coding')
+    // Multi-mode: card list renders, EntityDetailPanel does NOT.
+    expect(queryByTestId('bucket-card-list')).not.toBeNull()
+    expect(queryByTestId('entity-detail-panel')).toBeNull()
+  })
+
+  test('Phase 56.1-06 — sidebar-only branch preserved: 0 resolved nodes + bucket halo → BucketCardList (no shortcut, no EntityDetailPanel)', () => {
+    // A bucket click whose entities all failed pickAllResolvable (e.g. all
+    // entityIds are non-visible orphans). selectedNodeIds is empty but
+    // selectedBucketKeys is populated — must NOT collapse to EntityDetailPanel
+    // (there is no focal entity to render).
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(),
+      bucketKeys: new Set<string>(['session-A|1718360000000']),
+      focal: { nodeId: null, bucketKey: 'session-A|1718360000000' },
+      highlightedRowKey: null,
+      source: 'timeline',
+      pathToSelected: new Set<string>(),
+      lslSessionFilter: ['session-A'],
+      lslFilterEntityIds: new Set<string>(['raw-1', 'raw-2']),
+    })
+    const { queryByTestId } = renderPanel('coding')
+    // Sidebar-only timeline branch — card list still wins.
+    expect(queryByTestId('bucket-card-list')).not.toBeNull()
+    expect(queryByTestId('entity-detail-panel')).toBeNull()
+  })
 })
