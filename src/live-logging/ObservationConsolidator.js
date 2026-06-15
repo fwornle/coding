@@ -43,6 +43,15 @@ import {
   legacyInsightToEntity,
 } from '@fwornle/km-core/adapters/legacy-ingest';
 
+// Phase 58 Plan 02 (D-06 writer-path unification) — the consolidator's
+// _pushInsightToKG routes through ObservationWriter.writeInsight rather
+// than inlining VKB HTTP PUT or direct kmStore.putEntity. A single owner
+// of the Insight-write surface eliminates drift between writer + bridge
+// + consolidator paths (D-06.2). Plan 58-01 ships the mentions classifier
+// that produces the targetIds passed into writeInsight options.
+import { ObservationWriter } from './ObservationWriter.js';
+import { loadMentionCandidates, classifyMentions } from './MentionsClassifier.js';
+
 /**
  * Cosine threshold for treating a new insight as a near-duplicate of an
  * existing one. MiniLM-L6-v2 cosines for any two project documents floor
@@ -130,9 +139,57 @@ export class ObservationConsolidator {
      *  Digest/Insight entity stamped by this consolidator instance. */
     this._runId = options.runId || 'obs-consolidator-' + Date.now() + '-' +
       Math.random().toString(36).slice(2, 8);
+    // Phase 58 Plan 02 (D-06) — single-owner writer pattern. The
+    // consolidator routes Insight writes through ObservationWriter.writeInsight
+    // so the writer-path is the only km-core-native writer for Insights
+    // (`capturedBy → LiveLoggingSystem` anchoring is inherited for free
+    // from writeInsight's internal _anchorEntity call; mentions edges land
+    // in the same atomic try-block per Plan 02 Task 1). Tests inject a
+    // mock writer via `options.observationWriter`; production callers leave
+    // this null and `_ensureObservationWriter` lazy-constructs one against
+    // the shared `this._kmStore`.
+    this._observationWriter = options.observationWriter || null;
     /** @type {import('ioredis').default|null} Redis publisher for embedding events (lazy-init, fire-and-forget) */
     this._redisPub = null;
     this._redisInitAttempted = false;
+  }
+
+  /**
+   * Phase 58 Plan 02 (D-06) — return the ObservationWriter handle the
+   * consolidator routes Insight writes through. When `options.observationWriter`
+   * was supplied at construction (test path or external injection), return
+   * it as-is; otherwise lazy-construct one against the shared `this._kmStore`.
+   *
+   * The lazy path uses the writer's `options.kmStore` constructor surface
+   * (Plan 44-12 wiring), so the writer skips its own lazy-construction and
+   * the two surfaces share one canonical km-core store. The writer's
+   * `init()` is intentionally NOT called here — it's a no-op when
+   * `options.kmStore` is supplied (the store is already opened by obs-api
+   * before the consolidator is constructed), and skipping it avoids the
+   * redactor-init side effect which isn't needed for writeInsight.
+   *
+   * Throws when called without a kmStore — same fail-fast convention as
+   * the rest of this file's km-core checks (Phase 44 Plan 17 Task 2 gate 5).
+   *
+   * @returns {ObservationWriter}
+   */
+  _ensureObservationWriter() {
+    if (this._observationWriter) return this._observationWriter;
+    if (!this._kmStore) {
+      throw new Error(
+        '[ObservationConsolidator] cannot construct ObservationWriter — kmStore not configured (pass options.kmStore or options.observationWriter)'
+      );
+    }
+    this._observationWriter = new ObservationWriter({
+      kmStore: this._kmStore,
+      // Use the consolidator's runId so provenance stamps trace back to
+      // the originating consolidation cycle.
+      configPath: this.configPath || undefined,
+    });
+    // Override the writer's auto-generated runId so the writer-side provenance
+    // stamp matches the consolidator's run (single-owner provenance per cycle).
+    if (this._runId) this._observationWriter._runId = this._runId;
+    return this._observationWriter;
   }
 
   /**
@@ -519,22 +576,71 @@ export class ObservationConsolidator {
    */
   async _pushInsightToKG(entry) {
     if (!entry?.topic) return;
+    // Phase 58 Plan 02 (D-06) fail-fast — kmStore is required for both the
+    // route-through writeInsight call AND the has_insight addRelation that
+    // follows. The call-site at line 1691 swallows exceptions so a single
+    // Insight failure doesn't abort the batch (PATTERNS Landmine 5).
+    if (!this._kmStore) {
+      throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    }
     const vkbUrl = process.env.VKB_API_URL || 'http://localhost:8080';
     const project = entry.project || 'coding';
     const { entityClass, confidence: classConf } = this._classifyInsightByOntology(entry.topic, entry.summary || '');
 
     // Ensure a Project anchor exists for this team. Without it, the
     // online insights float disconnected from the rest of the graph
-    // because no other entity references them.
+    // because no other entity references them. (Out of scope for D-06.1
+    // to refactor _ensureProjectAnchor; it still hits VKB internally
+    // until a future plan migrates it. We just consume its return value.)
     const projectName = await this._ensureProjectAnchor(vkbUrl, project);
 
-    const body = {
+    // Phase 58 Plan 02 (D-04 step 2) — run the mentions classifier BEFORE
+    // the writeInsight call. Per D-04.1 fail-fast: when the classifier
+    // throws (LLM proxy down, hallucinated all names → empty array is
+    // benign; throw is the fail-fast signal), the Insight is NOT written
+    // and the next consolidation cycle re-tries naturally.
+    let mentionsTargetIds = [];
+    try {
+      const candidates = await loadMentionCandidates(this._kmStore);
+      mentionsTargetIds = await classifyMentions(entry.summary || entry.topic, candidates);
+    } catch (err) {
+      process.stderr.write(`[Consolidator→KG] mentions classifier failed for ${entry.topic}: ${err.message}\n`);
+      return; // D-04.1 — do NOT write a half-Insight
+    }
+
+    // Phase 58 Plan 02 (D-06) — route the Insight write through
+    // ObservationWriter.writeInsight. The writer's try-block emits
+    // putEntity → N mentions edges → capturedBy anchor inside the same
+    // km-core JSON-export tick (EDGE-02 atomicity). The has_insight
+    // project-anchor edge is emitted by the consolidator AFTER writeInsight
+    // returns the minted id (the has_insight edge is consolidator-specific;
+    // writeInsight emits capturedBy, not has_insight).
+    const writer = this._ensureObservationWriter();
+    const row = {
+      // The mapper's name field reads from row.topic||row.summary; the
+      // mapper mints a fresh id (legacyId.id captures row.id as the
+      // SQLite-id surrogate). Pass entry.topic as both topic AND id so
+      // the legacy-id round-trips as the consolidator's stable key.
+      id: entry.topic,
+      topic: entry.topic,
+      summary: entry.summary || entry.topic,
+      // entityType/ontologyClass on the row are aspirational — the mapper
+      // currently hardcodes 'Insight' for both. The Task 1 guard preserves
+      // 'Insight' (not the old 'Detail' clobber); the L2 classification
+      // (entityClass) is recorded in metadata.ontology for audit.
       entityType: entityClass,
-      observations: [entry.summary || entry.topic],
-      significance: Math.round(((entry.confidence ?? 0.6) * 10)),
+      ontologyClass: entityClass,
       team: project,
       source: 'online',
+      confidence: entry.confidence,
+      created_at: new Date().toISOString(),
       metadata: {
+        // Mapper preserves these on metadata; we stamp project (D-02
+        // from Phase 57), the consolidator's source label, and the
+        // ontology audit trail.
+        source: 'online',
+        team: project,
+        project,
         confidence: entry.confidence,
         digest_ids: entry._digestIds || [],
         ontology: {
@@ -544,43 +650,58 @@ export class ObservationConsolidator {
         },
       },
     };
-    try {
-      const res = await fetch(
-        `${vkbUrl}/api/entities/${encodeURIComponent(entry.topic)}`,
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-      );
-      if (!res.ok) {
-        const txt = await res.text();
-        process.stderr.write(`[Consolidator→KG] PUT ${entry.topic} failed ${res.status}: ${txt.slice(0, 200)}\n`);
-        return;
-      }
-      if (this._kgPushDebug) {
-        process.stderr.write(`[Consolidator→KG] ${entry.topic} → ${entityClass} (${classConf.toFixed(2)}) team=${project}\n`);
-      }
 
-      // Link the insight back to the project anchor so the viewer
-      // shows it inside the project's cluster instead of floating.
-      // The relation is idempotent on the server side (POST returns
-      // success even if it already exists), so re-synthesis is safe.
-      if (projectName) {
-        try {
-          await fetch(`${vkbUrl}/api/relations`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              from: projectName,
-              to: entry.topic,
-              type: 'has_insight',
-              team: project,
-              confidence: 1.0,
-            }),
-          });
-        } catch (err) {
-          process.stderr.write(`[Consolidator→KG] relation ${projectName} → ${entry.topic} failed: ${err.message}\n`);
-        }
-      }
+    let mintedId;
+    try {
+      // writeInsight returns row.id (the legacyId.id), NOT the freshly
+      // minted km-core id. For the has_insight edge we need the minted
+      // km-core id — look it up via the legacyId after the write returns.
+      await writer.writeInsight(row, { mentionsTargetIds });
+      const persisted = await this._kmStore.findByLegacyId({ system: 'A', id: entry.topic });
+      mintedId = persisted?.id || null;
     } catch (err) {
-      process.stderr.write(`[Consolidator→KG] PUT ${entry.topic} failed: ${err.message}\n`);
+      process.stderr.write(`[Consolidator→KG] writeInsight failed for ${entry.topic}: ${err.message}\n`);
+      return;
+    }
+
+    if (this._kgPushDebug) {
+      process.stderr.write(
+        `[Consolidator→KG] ${entry.topic} → ${entityClass} (${classConf.toFixed(2)}) team=${project} mintedId=${mintedId} mentions=${mentionsTargetIds.length}\n`
+      );
+    }
+
+    // Phase 58 Plan 02 (D-06 preserve) — emit the has_insight project-
+    // anchor edge via kmStore.addRelation. Lands within the same exporter
+    // debounce window as writeInsight's emissions, so the JSON export tick
+    // captures node + capturedBy + mentions + has_insight together. Dedup
+    // probe before write because km-core addRelation is NOT idempotent on
+    // the (from, to, type) triple (Shared Pattern A from PATTERNS).
+    if (projectName && mintedId) {
+      try {
+        const projects = await this._kmStore.findByOntologyClass('Project');
+        const projectId = projects.find((p) => p.name === projectName)?.id;
+        if (projectId) {
+          const existingHasInsight = await this._kmStore.findRelations({
+            from: projectId,
+            to: mintedId,
+            type: 'has_insight',
+          });
+          if (!Array.isArray(existingHasInsight) || existingHasInsight.length === 0) {
+            await this._kmStore.addRelation({
+              from: projectId,
+              to: mintedId,
+              type: 'has_insight',
+              metadata: {
+                source: 'observation-consolidator',
+                team: project,
+                confidence: 1.0,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        process.stderr.write(`[Consolidator→KG] has_insight ${projectName} → ${entry.topic} failed: ${err.message}\n`);
+      }
     }
   }
 
