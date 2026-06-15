@@ -245,6 +245,11 @@ src/**/*.d.ts
 !src/**/*.spec.js
 !src/retrieval/**/*.js
 !src/hooks/**/*.js
+# src/live-logging/ is hand-written JS (ObservationConsolidator, ObservationWriter,
+# MentionsClassifier, etc.) — not compiled TS output. Phase 58 Plan 01 adds
+# MentionsClassifier.js as a host-side module shared by writer-path + backfill;
+# the rest of the directory is already tracked.
+!src/live-logging/**/*.js
 
 # Editor and IDE files (.vscode/ already ignored above with explicit exception
 # for settings.json so the workspace SCM ignore-list ships with the repo)
