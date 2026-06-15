@@ -1,0 +1,1052 @@
+{
+  "startedAt": "2026-06-15T18:38:11.366Z",
+  "finishedAt": "2026-06-15T18:41:35.517Z",
+  "durationMs": 204150,
+  "source": "/Users/Q284340/Agentic/coding/.data/knowledge-graph/exports/general.json",
+  "dryRun": false,
+  "totalInsights": 96,
+  "alreadyMentioned": 0,
+  "skipped": 0,
+  "classified": 96,
+  "edgesWritten": 303,
+  "errors": 0,
+  "errorRatio": 0,
+  "perInsight": [
+    {
+      "insightId": "019eb544-0ee7-7283-b559-e614ac9f180c",
+      "name": "KM-Core Foundation — v7.1 Architecture and Project Structure",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0eea-702a-8a52-7d34c67b3f4e",
+      "name": "System Health Dashboard — server.js API Backend",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69dd-7097-a191-c83cfaf14d7d"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0eee-757a-92ab-31d77b52811f",
+      "name": "System Health Dashboard — Frontend Pages and Service Architecture",
+      "mentionsAdded": 8,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-aeac281216e7",
+        "019e5559-69d0-7411-8ed5-aead250581cb",
+        "019e5559-69d0-7411-8ed5-aeab1357b088",
+        "019e5559-69d0-7411-8ed5-aeaab0b0a136",
+        "019e5559-69d4-7754-bd17-01850395db42",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d4-7754-bd17-018248bda9bd"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0ef3-7961-a9d1-77058aa2994d",
+      "name": "Health Coordinator — Phase 33 Consolidated Health Monitoring",
+      "mentionsAdded": 10,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d0-7411-8ed5-aede98cd5e1c",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d0-7411-8ed5-aead250581cb",
+        "019e5559-69d0-7411-8ed5-aeac281216e7",
+        "019e5559-69d0-7411-8ed5-aeae5e2b0e36",
+        "019e5559-69d0-7411-8ed5-aea4f7639dd9",
+        "019e5559-69d4-7754-bd17-019fcdc8561c",
+        "019e5559-69d1-7457-8c05-d33994517351"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0efa-7be8-9960-aa15ec3a1ae3",
+      "name": "MkDocs Documentation — Directory Layout and Screenshot Placement",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f05-75ba-a64b-7ae8e00dd0fd",
+      "name": "Knowledge Context Injection — Hook and Agent Adapters",
+      "mentionsAdded": 10,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-ae9b33f3ae4b",
+        "019e5559-69d1-7457-8c05-d3318b0659e8",
+        "019e5559-69d1-7457-8c05-d338e5f5515e",
+        "019e5559-69d4-7754-bd17-0193a4fe25d8",
+        "019e5559-69d8-7dfb-b906-f645deac5121",
+        "019e5559-69d1-7457-8c05-d32e49d439c1",
+        "019e5559-69d0-7411-8ed5-aee6b5162a40",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d4-7754-bd17-015e1e133225",
+        "019e5559-69d0-7411-8ed5-aec747b84a17"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f09-74b3-a01c-a1c1c3aeba4d",
+      "name": "Knowledge Context Injection — Retrieval Relevance and Deduplication",
+      "mentionsAdded": 3,
+      "classifierTargets": [
+        "019eb544-0f09-74b3-a01c-a1c1c3aeba4d",
+        "019eb544-0f72-785c-a3ae-5e55e5c2faf2",
+        "019eb544-0eee-757a-92ab-31d77b52811f",
+        "019eb544-0f8d-79f8-a36d-53e23f8fbd04"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f0c-75fc-96ac-3a9321c9fd28",
+      "name": "MCP Server Configuration",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69fb-75a1-8307-29a1674f9895"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f10-78d0-8575-e584c3af35df",
+      "name": "Observation and Digest Retention — SQLite Pruning and JSON Cold-Store",
+      "mentionsAdded": 7,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d0-7411-8ed5-aee59f1e4392",
+        "019e5559-69d4-7754-bd17-01b463ae1cff",
+        "019e5559-69d4-7754-bd17-01b62aa755e6",
+        "019e5559-69d4-7754-bd17-01634d8263c9",
+        "019e5559-69d8-7dfb-b906-f6026ca17d03",
+        "019e5559-69d4-7754-bd17-0172e9110509"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f14-7ffd-8a6d-8355a5887c1e",
+      "name": "Combined Status Line — tmux Session Health Display",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f19-7c57-be7d-c9edf21d30a8",
+      "name": "Observation Pipeline — ObservationWriter and Deduplication",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f1d-77d1-941e-7230c5fffad8",
+      "name": "OKB Viewer — Issue Triage RCA Chain and Evidence Collection",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69d4-7754-bd17-01b62aa755e6",
+        "019e5559-69d4-7754-bd17-018af11540f9",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d0-7411-8ed5-aec4b0512ebf",
+        "019e5559-69d0-7411-8ed5-aeb4622a35da"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f22-7a2b-ba99-53f04047a96c",
+      "name": "Startup Script and Container Health Check",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-ae9cc49add23",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d4-7754-bd17-0181014e55e5",
+        "019e5559-69d4-7754-bd17-017f8928dcbe",
+        "019e5559-69f0-7e61-be0b-ff0fa3c99da8"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f26-776d-abbe-4d54d9ab0b8b",
+      "name": "rapid-automations Git Repository — SSH Auth and Submodule Configuration",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f2b-7330-b273-23d1987d0a4e",
+      "name": "LLM CLI Proxy — VPN/Corporate Network Detection",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f2f-722d-b224-7034c959d2a2",
+      "name": "OKB Viewer — Graph Visualization and Tour Feature",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f35-76d0-a37c-ae3e9ccdbc2e",
+      "name": "Enhanced Transcript Monitor (ETM)",
+      "mentionsAdded": 18,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-ae9d69c6dfd0",
+        "019e5559-69d0-7411-8ed5-aed64ec944b2",
+        "019e5559-69d0-7411-8ed5-aeac281216e7",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69dd-7097-a191-c7fa12e65c62",
+        "019e5559-69d4-7754-bd17-0198eb922e58",
+        "019e5559-69d8-7dfb-b906-f603e49cf83b",
+        "019e5559-69d8-7dfb-b906-f609b3b0dfb5",
+        "019e5559-69d4-7754-bd17-018248bda9bd",
+        "019e5559-69f0-7e61-be0b-ff2aaca947b4",
+        "019e5559-69d0-7411-8ed5-aecbff1c526b",
+        "019e5559-69dd-7097-a191-c81728477048",
+        "019e5559-69dd-7097-a191-c80f97540d01",
+        "019e5559-69f0-7e61-be0b-ff2bb5ccabea",
+        "019e5559-69f0-7e61-be0b-fef056076009",
+        "019e5559-69f0-7e61-be0b-ff3856f5d229",
+        "019e5559-69d8-7dfb-b906-f5fac84e1a80"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f3a-7f83-9e0c-e97429b48bee",
+      "name": "Rapid-LLM-Proxy (RLP) Architecture and CLI Subprocess Behavior",
+      "mentionsAdded": 8,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aea09041ca93",
+        "019e5559-69d0-7411-8ed5-aea4f7639dd9",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d0-7411-8ed5-aeae5e2b0e36",
+        "019e5559-69d4-7754-bd17-015e1e133225",
+        "019e5559-69d1-7457-8c05-d33994517351",
+        "019e5559-69d4-7754-bd17-017f8928dcbe",
+        "019eb544-0f63-7681-88ac-059962043263"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f3e-72a9-85ed-952468feff08",
+      "name": "ObservationConsolidator — Two-Tier Memory Aggregation",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aee6b5162a40",
+        "019e5559-69dd-7097-a191-c84429ed7b47",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d8-7dfb-b906-f62b2ad5d7bf"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f42-7b95-9f4b-4d3b33073592",
+      "name": "LLM Token Usage Tracking — Proxy Instrumentation and Dashboard",
+      "mentionsAdded": 9,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-ae9b33f3ae4b",
+        "019e5559-69d0-7411-8ed5-aec747b84a17",
+        "019e5559-69d0-7411-8ed5-aedd4f7fed2d",
+        "019e5559-69d0-7411-8ed5-aec83b4c7bc4",
+        "019e5559-69d0-7411-8ed5-aed8aeaba391",
+        "019e5559-69d0-7411-8ed5-ae9a594591b8",
+        "019e5559-69dd-7097-a191-c80d273e38cf",
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-ae9d69c6dfd0"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f46-737a-a5bf-1033c5495e2b",
+      "name": "Tmux Statusline Project Slots",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f4a-700a-9bf8-707157626b39",
+      "name": "ObservationWriter Retry Budget",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69e5-7b55-bc13-aa1ffc9f715c",
+        "019e5559-69d4-7754-bd17-018f8b4d7fad"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f4e-71eb-bd54-7285f6448451",
+      "name": "Multi-Agent Skill Architecture — Skill Discovery and Distribution",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69d1-7457-8c05-d3318b0659e8",
+        "019e5559-69d0-7411-8ed5-aec747b84a17",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d0-7411-8ed5-aedf87b2518f",
+        "019e5559-69d0-7411-8ed5-aee03e85c080"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f52-762d-ab12-6e54f37d2cd7",
+      "name": "VS Code SCM Workspace Configuration — Multi-Repo Visibility",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-ae9cc49add23"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f59-7a40-bacb-5dab7cf05012",
+      "name": "LSL (Live Session Logging) Infrastructure",
+      "mentionsAdded": 12,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d4-7754-bd17-0198eb922e58",
+        "019e5559-69d8-7dfb-b906-f603e49cf83b",
+        "019e5559-69d0-7411-8ed5-aeac281216e7",
+        "019e5559-69d0-7411-8ed5-ae9d69c6dfd0",
+        "019e5559-69dd-7097-a191-c7fa12e65c62",
+        "019e5559-69d8-7dfb-b906-f5feae526d59",
+        "019e5559-69d4-7754-bd17-01b0e5b6dbee",
+        "019e5559-69d0-7411-8ed5-aed64ec944b2",
+        "019e5559-69d4-7754-bd17-017b15286a67",
+        "019e5559-69d4-7754-bd17-019fcdc8561c"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f5c-7afb-8e54-a0a7c8d980a5",
+      "name": "OpenCode Compaction Guard Plugin",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f5f-7ee5-ab8b-71709c2a42e8",
+      "name": "MCP Constraint Monitor Dashboard — Port 3030 and Service Configuration",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aeab1357b088"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f63-7681-88ac-059962043263",
+      "name": "Health Coordinator",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d8-7dfb-b906-f603e49cf83b",
+        "019e5559-69d0-7411-8ed5-aeac281216e7",
+        "019e5559-69d0-7411-8ed5-aed64ec944b2",
+        "019e5559-69d4-7754-bd17-01b463ae1cff"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f67-793e-91f0-b315028985c4",
+      "name": "Observations Database and Backfill Pipeline",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f6b-737b-a85f-d0142d5aa7a8",
+      "name": "Vite Frontend Inventory",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f72-785c-a3ae-5e55e5c2faf2",
+      "name": "rapid-llm-proxy Standalone Package",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f76-7e3f-be8b-ca9b4ddebd94",
+      "name": "Knowledge Context Injection — Embedding Pipeline",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f7d-70b8-b95c-d8a6f34ab762",
+      "name": "Observations API Server — Host-API Pattern",
+      "mentionsAdded": 19,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-aeac281216e7",
+        "019e5559-69d0-7411-8ed5-aee6b5162a40",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d4-7754-bd17-017f8928dcbe",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d0-7411-8ed5-aead250581cb",
+        "019e5559-69d0-7411-8ed5-aeaab0b0a136",
+        "019e5559-69d0-7411-8ed5-aeab1357b088",
+        "019e5559-69d0-7411-8ed5-aeae5e2b0e36",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d0-7411-8ed5-aee59f1e4392",
+        "019e5559-69d4-7754-bd17-01b79aa2328a",
+        "019e5559-69d4-7754-bd17-01bab304eb6e",
+        "019e5559-69d4-7754-bd17-01b8ce6680d4",
+        "019e5559-69d4-7754-bd17-01b9fdefe16d",
+        "019e5559-69d4-7754-bd17-01a4e734508a",
+        "019e5559-69d4-7754-bd17-01a64859faee",
+        "019e5559-69d8-7dfb-b906-f603e49cf83b"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f81-75f5-af9a-7363339f4ead",
+      "name": "Operational Knowledge Base (OKB) — Core Architecture",
+      "mentionsAdded": 10,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d0-7411-8ed5-aee59f1e4392",
+        "019e5559-69d0-7411-8ed5-aee6b5162a40",
+        "019e5559-69d4-7754-bd17-01b62aa755e6",
+        "019e5559-69d0-7411-8ed5-aeb50f44b54d",
+        "019e5559-69d4-7754-bd17-01a4e734508a",
+        "019e5559-69d4-7754-bd17-01634d8263c9",
+        "019e5559-69d8-7dfb-b906-f6026ca17d03",
+        "019e5559-69d4-7754-bd17-0172e9110509",
+        "019e5559-69d8-7dfb-b906-f6076cf88335"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f84-7826-bdc7-0d3f68eb3e47",
+      "name": "Rapid-Toolkit Repository",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f87-7650-9164-dc0c3ff6446e",
+      "name": "Teams Channel Message Extraction via Graph API",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f8a-793e-99e7-9a3992d9fa6d",
+      "name": "Session Log (LSL) File Management",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-ae9d69c6dfd0",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d0-7411-8ed5-aeb3707beb7a"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f8d-79f8-a36d-53e23f8fbd04",
+      "name": "Knowledge Graph API and Working Memory Service",
+      "mentionsAdded": 2,
+      "classifierTargets": [
+        "019e5559-69dd-7097-a191-c83cfaf14d7d",
+        "019e5559-69d4-7754-bd17-018af11540f9"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f91-7ad5-a80e-94dbdb35516a",
+      "name": "OKB Ingestion Skill (SKILL.md)",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be2e772ec50",
+        "019e5559-69d1-7457-8c05-d330b52e407a",
+        "019e5559-69fb-75a1-8307-2985b9d3d5ec",
+        "019e5559-69d8-7dfb-b906-f613bc8adbd1",
+        "019e5559-69d0-7411-8ed5-aec747b84a17"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f94-7ae7-9733-1c98c3e1c0e9",
+      "name": "GSM Health Warning and Statusline Rendering",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aed58cbba484",
+        "019e5559-69d0-7411-8ed5-aead250581cb",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d4-7754-bd17-019fcdc8561c"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f9a-7560-baea-199e5a69786c",
+      "name": "v7.2 Performance Measurement System — Architecture and Scoping",
+      "mentionsAdded": 10,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aedd4f7fed2d",
+        "019e5559-69d0-7411-8ed5-aede98cd5e1c",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d1-7457-8c05-d33994517351",
+        "019e5559-69d4-7754-bd17-018af11540f9",
+        "019e5559-69d4-7754-bd17-01b463ae1cff",
+        "019e5559-69d4-7754-bd17-01b62aa755e6",
+        "019e5559-69d4-7754-bd17-01b584c1e90a",
+        "019e5559-69d4-7754-bd17-019e328ca61b",
+        "019e5559-69dd-7097-a191-c8230cfa0aac"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0f9e-728b-88d6-37d91de7f623",
+      "name": "Knowledge Graph Viewers — VOKB and VKB",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d8-7dfb-b906-f645deac5121"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fa2-796f-8afb-ce9634ab2038",
+      "name": "System Health Dashboard — Frontend Build, Deployment, and Visualization Componen",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fa5-7221-a0b9-88142b2e0d88",
+      "name": "PlantUML File Location Constraints and Documentation Style Skill",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be4790d4c7d",
+        "019e5559-69d0-7411-8ed5-ae9a594591b8",
+        "019e5559-69cf-75e2-9e01-2be3ec615b1b",
+        "019e5559-69d4-7754-bd17-0167777f2aa5"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fa9-7c92-8f64-c4897dae1587",
+      "name": "Git Security — OAuth Token Scrubbing and Redaction Patterns",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fac-745a-91d8-ef5c8a8ce54e",
+      "name": "Observations Database — Corruption Recovery and Self-Healing",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d4-7754-bd17-01b463ae1cff",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d0-7411-8ed5-aebfb248017d",
+        "019e5559-69f0-7e61-be0b-feed100fdff7"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fb0-7e8d-b4a1-1ab96928de52",
+      "name": "Brandschutz Agent (Multi-Agent Fire Safety Training Automation)",
+      "mentionsAdded": 9,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aed8aeaba391",
+        "019e5559-69d0-7411-8ed5-aec747b84a17",
+        "019e5559-69d0-7411-8ed5-ae9b33f3ae4b",
+        "019e5559-69d1-7457-8c05-d3318b0659e8",
+        "019e5559-69d4-7754-bd17-0193a4fe25d8",
+        "019e5559-69d4-7754-bd17-01609ae67005",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d0-7411-8ed5-ae9cc49add23",
+        "019e5559-69d0-7411-8ed5-ae9a594591b8"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fb4-7eb1-9564-f43c4b30c770",
+      "name": "Health Coordinator / Tmux Statusline — ETM Spawning and Project Detection",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aede98cd5e1c"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fb7-7007-a7c0-8355682d978a",
+      "name": "Teams Channel Analysis Report Generation and Formatting",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fbf-77f6-9d0c-4702ca8bd548",
+      "name": "Observations Dashboard",
+      "mentionsAdded": 14,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-ae9d69c6dfd0",
+        "019e5559-69d0-7411-8ed5-aeac281216e7",
+        "019e5559-69d0-7411-8ed5-aead250581cb",
+        "019e5559-69d0-7411-8ed5-aeaab0b0a136",
+        "019e5559-69d0-7411-8ed5-aeab1357b088",
+        "019e5559-69d0-7411-8ed5-aea73de47a8a",
+        "019e5559-69d8-7dfb-b906-f64faf639906",
+        "019e5559-69d0-7411-8ed5-aec4b0512ebf",
+        "019e5559-69d0-7411-8ed5-aec635e04e23",
+        "019e5559-69d8-7dfb-b906-f603e49cf83b",
+        "019e5559-69d0-7411-8ed5-aee6b5162a40",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d4-7754-bd17-019fcdc8561c"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fc5-733d-82d8-e8bcce1c8180",
+      "name": "VKB Graph Viewer Known Issues",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fcb-77f4-98f6-d5c1badc66ff",
+      "name": "Combined Status Line Script",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fdc-7dd8-bed9-6729fbeaf557",
+      "name": "GitHub Submodule Push — SSH vs HTTPS Authentication",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fdf-71ca-8c01-256fac76acbd",
+      "name": "Coding-Services Container — Idle CPU Optimisation",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-ae9cc49add23",
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d4-7754-bd17-015e1e133225",
+        "019e5559-69d0-7411-8ed5-aede98cd5e1c"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fe6-7bf8-9b5b-c92d7cade557",
+      "name": "rapid-toolkit Python Tool Packaging — uv.lock Convention",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fe9-7a3c-9717-40470690a3af",
+      "name": "Pre-Commit Hook — KB File Handling",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fec-7dce-8969-5ffbb41cd377",
+      "name": "GSD Statusline — Context Window Display",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aec747b84a17"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0fef-7c3f-9809-1f8049870b7f",
+      "name": "Health Monitor Log Rotation and Stale File Cleanup",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69d4-7754-bd17-019fcdc8561c",
+        "019e5559-69d8-7dfb-b906-f5feae526d59",
+        "019e5559-69d8-7dfb-b906-f6291778e7c7",
+        "019e5559-69e5-7b55-bc13-aa0e0dc49874",
+        "019e5559-69d1-7457-8c05-d332a190b26a"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0ff2-7b6a-b164-0027cfcb1abd",
+      "name": "daFrankTeam Hackathon Game — AI Kraken Browser Game",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0ff5-7547-b125-c766b173e88a",
+      "name": "Private History Repo — Bootstrap and Migration",
+      "mentionsAdded": 3,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d4-7754-bd17-015ffbd5e93c"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0ff8-7db6-9b98-11b0a88ba618",
+      "name": "GSD Workflow Conventions — Command Naming and Skill Invocation",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0ffb-783e-956d-49e444ffcb44",
+      "name": "Tmux Proxy Badge Detection",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-0ffe-78ff-8ed2-40e5fe810bff",
+      "name": "Constraint Dashboard — Docker vs Host Placement",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-1006-7dd7-9cc9-bbac526a0e6d",
+      "name": "Observation Pipeline — Cross-Project Contamination and Project Column",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aeb978a64a79"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-100a-7078-b028-b4c730174e0d",
+      "name": "System Health Dashboard — Consolidation Progress UI",
+      "mentionsAdded": 3,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aead250581cb",
+        "019e5559-69d0-7411-8ed5-aeab1357b088",
+        "019e5559-69d0-7411-8ed5-aee6b5162a40"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-100d-71ba-a65a-987a43294eb0",
+      "name": "Docker-Only Architecture — Native Mode Removal",
+      "mentionsAdded": 9,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-ae9cc49add23",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69e5-7b55-bc13-aa1c29846382",
+        "019e5559-69f0-7e61-be0b-ff0fa3c99da8",
+        "019e5559-69fb-75a1-8307-29a41977a3ec",
+        "019e5559-69d0-7411-8ed5-aec83b4c7bc4",
+        "019e5559-69d1-7457-8c05-d33994517351",
+        "019e5559-69d0-7411-8ed5-aede98cd5e1c",
+        "019e5559-69d4-7754-bd17-017f8928dcbe"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-1010-72d2-9817-83e1e3bdc0f9",
+      "name": "Health Verification Rules — Bind Mount Freshness and Container Stability",
+      "mentionsAdded": 5,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be4790d4c7d",
+        "019e5559-69d0-7411-8ed5-aea4f7639dd9",
+        "019e5559-69d0-7411-8ed5-aead250581cb",
+        "019e5559-69d4-7754-bd17-019fcdc8561c",
+        "019e5559-69d0-7411-8ed5-ae9cc49add23"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-1013-7efb-a9b2-9590d20997aa",
+      "name": "LSL Log Path Layout — Migration to .specstory/history/logs/",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-1016-7f2d-94d1-a874e68978e4",
+      "name": "Service Orchestrator — start-services-robust.js",
+      "mentionsAdded": 6,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d4-7754-bd17-017f8928dcbe",
+        "019e5559-69d4-7754-bd17-015e1e133225",
+        "019e5559-69dd-7097-a191-c8221aa3364e",
+        "019e5559-69dd-7097-a191-c7fa12e65c62",
+        "019e5559-69d8-7dfb-b906-f5feae526d59"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-1019-7ede-b695-57f30fe39b98",
+      "name": "Multi-Agent Skill and Command Discovery Architecture",
+      "mentionsAdded": 2,
+      "classifierTargets": [
+        "019e5559-69d4-7754-bd17-0171ebe05336",
+        "019eb544-0f4e-71eb-bd54-7285f6448451",
+        "019eb544-1019-7ede-b695-57f30fe39b98"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-102b-7d6d-9633-3617dc67b04b",
+      "name": "Git SSH Connectivity Through HTTP Proxy",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69d1-7457-8c05-d330b52e407a",
+        "019e5559-69d0-7411-8ed5-aeae5e2b0e36",
+        "019e5559-69d0-7411-8ed5-aeb280abbce8",
+        "019e5559-69d4-7754-bd17-017f8928dcbe"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-102e-7f26-bc6c-a5905828a80d",
+      "name": "Online Learning System — Health Status and Monitoring",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69d8-7dfb-b906-f60b3b468c53",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d4-7754-bd17-0172e9110509",
+        "019e5559-69d0-7411-8ed5-aeb4622a35da"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-1031-78c4-88f2-04555c37eb54",
+      "name": "Nav Bar Layout — Token Usage Tab Clipping",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb544-1034-7066-9b45-a601c1ea5035",
+      "name": "AI Kraken SPA",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019eb7cc-945a-7211-b31e-8f7fb56cb5d8",
+      "name": "Unified Viewer Graph Layout",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019ebb82-5026-7790-8c97-d18adf88ebce",
+      "name": "LslTimelineStrip — Timeline Selection and Bucket Matching",
+      "mentionsAdded": 3,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d8-7dfb-b906-f603e49cf83b",
+        "019e5559-69d0-7411-8ed5-ae9d69c6dfd0"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ebd8e-0048-71c4-8eb1-1cc5279ea3a8",
+      "name": "Unified Viewer — Filter Infrastructure",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019ebd8e-004a-722a-907c-73f462feeeb8",
+      "name": "ObservationExporter — km-core Data Sourcing",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69d4-7754-bd17-01b62aa755e6",
+        "019e5559-69d4-7754-bd17-018af11540f9",
+        "019e5559-69d4-7754-bd17-01b463ae1cff",
+        "019e5559-69d8-7dfb-b906-f6026ca17d03"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ebd8e-004b-7163-b7de-1859870fdc07",
+      "name": "ObservationConsolidator — Synthesis Pipeline and LLM Token Budget",
+      "mentionsAdded": 8,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aec747b84a17",
+        "019e5559-69d0-7411-8ed5-aedaadaab2bf",
+        "019e5559-69d0-7411-8ed5-aea4f7639dd9",
+        "019e5559-69d0-7411-8ed5-aea5c539ba19",
+        "019e5559-69d0-7411-8ed5-aedca78a8bf7",
+        "019e5559-69d0-7411-8ed5-aedd4f7fed2d",
+        "019e5559-69d1-7457-8c05-d33994517351",
+        "019e5559-69d0-7411-8ed5-aee6b5162a40"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ebdb2-e918-7f3d-9090-0bb8af1d62e0",
+      "name": "`/loop` Skill — Self-Paced Event-Driven Scheduling",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019ebdb2-e91d-7fa4-9bea-5ce126982e2b",
+      "name": "Truthfulness Verifier — Insight Claim Verification",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019ebdb2-e920-7208-b787-59435ffe248a",
+      "name": "Insight Claim Verification — Dual-Mode Design",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aeb978a64a79"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ebdb2-e922-737f-858c-4ac643aa2d23",
+      "name": "/loop Command — Lifecycle and Parser",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019ebf77-f23c-780a-948c-58afdae2b701",
+      "name": "GSD Project Roadmap Structure",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019ec080-5e40-7b6c-bd78-16e89475b3bc",
+      "name": "D3GraphCanvas — Unified Viewer Graph Interaction Component",
+      "mentionsAdded": 2,
+      "classifierTargets": [
+        "019e5559-69d1-7457-8c05-d32d94859f18",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec080-5e41-780d-9a5c-b1e242e96ae6",
+      "name": "D3GraphCanvas — Bidirectional Graph Selection Component",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019ec1ab-8dba-75c7-bd54-5d2d4a5379d8",
+      "name": "Unified Viewer Keyboard Shortcuts",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d1-7457-8c05-d32d94859f18"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec2a4-3ed3-7a09-a103-f50cf083ebba",
+      "name": "Discuss-Phase Planning Workflow",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-ae9a594591b8",
+        "019e5559-69d0-7411-8ed5-aec28d84e231",
+        "019e5559-69d0-7411-8ed5-aedf87b2518f",
+        "019e5559-69d0-7411-8ed5-aee03e85c080"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec4b5-5a3e-758e-854e-a5038adca1df",
+      "name": "VKB Graph Viewer — Ontology Bleed and Entity Integrity",
+      "mentionsAdded": 7,
+      "classifierTargets": [
+        "019e5559-69dd-7097-a191-c80a68c51dca",
+        "019e5559-69d4-7754-bd17-0172e9110509",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69dd-7097-a191-c7ef4cde830b",
+        "019e5559-69d0-7411-8ed5-aee435f8de3f",
+        "019e5559-69d0-7411-8ed5-aee6b5162a40",
+        "019e5559-69d4-7754-bd17-016c9720ffe1"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec4b5-5a3f-7164-87ec-d50e2e6cc517",
+      "name": "VKB Ontology — Two-Tier Architecture",
+      "mentionsAdded": 8,
+      "classifierTargets": [
+        "019e5559-69d4-7754-bd17-0172e9110509",
+        "019e5559-69d0-7411-8ed5-aec3147117ff",
+        "019e5559-69d4-7754-bd17-01a5d604544f",
+        "019e5559-69dd-7097-a191-c7ef4cde830b",
+        "019e5559-69e5-7b55-bc13-a9ca63593021",
+        "019e5559-69e5-7b55-bc13-aa29f1019fdd",
+        "019e5559-69d8-7dfb-b906-f604b4a94895",
+        "019e5559-69d0-7411-8ed5-ae9a594591b8"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec565-bd9f-7ee1-be21-c2d3bf61b8ed",
+      "name": "Concurrent Agent Session Management — Phantom Commits and Inter-Session Communic",
+      "mentionsAdded": 0,
+      "classifierTargets": [],
+      "errors": []
+    },
+    {
+      "insightId": "019ec585-637c-72de-88c4-f242786a8be0",
+      "name": "Knowledge Graph Ancestry — capturedBy BFS Traversal",
+      "mentionsAdded": 2,
+      "classifierTargets": [
+        "019e5559-69d4-7754-bd17-0172e9110509",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec5ad-91ee-7056-a99d-12cdb9d9bfe9",
+      "name": "Knowledge Graph Semantic Edges — Online Ingest Pipeline",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec5ad-91ef-79bd-86c5-8f8a6211e07e",
+      "name": "Phase Code Review Workflow",
+      "mentionsAdded": 2,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aec747b84a17",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec5db-2c97-76ca-9178-a3d6a79f2176",
+      "name": "LLS Suppression — Bucket Resolution Strategy",
+      "mentionsAdded": 4,
+      "classifierTargets": [
+        "019e5559-69cf-75e2-9e01-2be12a451c35",
+        "019e5559-69d0-7411-8ed5-ae9a594591b8",
+        "019e5559-69d0-7411-8ed5-aeb978a64a79",
+        "019e5559-69d4-7754-bd17-0172e9110509"
+      ],
+      "errors": []
+    },
+    {
+      "insightId": "019ec5db-2c9e-7d68-8cf0-86afc1fa8213",
+      "name": "Shared LLM Adapter Library Extraction",
+      "mentionsAdded": 1,
+      "classifierTargets": [
+        "019e5559-69d0-7411-8ed5-aec747b84a17"
+      ],
+      "errors": []
+    }
+  ]
+}
