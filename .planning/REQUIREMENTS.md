@@ -44,12 +44,25 @@ This file tracks the active milestone's requirements at the top, with previous m
 - [ ] **OKBROUTE-01:** `/viewer/okb` ApiClient detects the OKM Express server's legacy `/api/entities`-shape contract on `:8090` and routes correctly to it WITHOUT requiring km-core's `/api/v1/entities` shape. Adapter logic in `lib/system-endpoints.ts` or `ApiClient.ts`.
 - [ ] **OKBROUTE-02:** When `/viewer/okb` successfully loads, it renders real RaaS / KPI-FW / business entities from OKM Express — NOT coding-KG mirror entities (e.g., `CodeAnalyzer`, `PersistenceAgent`).
 
-### Long-tail orphan fixes (ORPHAN)
+### Long-tail orphan fixes (ORPHAN) — superseded 2026-06-15 (see DOWNSCOPED below)
 
-- [ ] **ORPHAN-01:** Server-side fix to `integrations/memory-visualizer/src/api/databaseClient.ts:262`: per-team `queryEntities` no longer strips `entity_type='System'` nodes when their owning team is unchecked. (Closes the legacy Phase 48 scope.)
-- [ ] **ORPHAN-02:** Online-learned `Detail` and `SubComponent` entities receive parent-hierarchy edges at insert time; a one-shot migration repairs the existing 122 such orphan instances. (Closes part of the legacy Phase 49 scope.)
-- [ ] **ORPHAN-03:** Per-team Project anchor nodes (non-coding teams) receive the `CollectiveKnowledge --includes-->` edge that currently exists only for `Coding`. Writer-path fix + seed-script fix. (Closes part of the legacy Phase 49 scope.)
-- [ ] **ORPHAN-04:** Total orphan count on the live km-core graph drops from baseline 157 (≈12% of 1262 nodes on 2026-06-14) to ≤30 (≤3% of node count at milestone close). Measured via `/api/v1/stats` `orphanCount`.
+ORPHAN-01..04 are **closed by upstream work** (Phase 57 regression-recovery on 2026-06-15 06:24 + viewer migration from `memory-visualizer` to `unified-viewer`/km-core REST). Evidence captured during the Phase 59 pre-discuss reality check on 2026-06-15 21:46:
+- `/api/v1/stats` reports `nodes=840, edges=1675, orphanCount=7 (~0.83%), connectivity=98.5%` — `orphanCount ≤ 30` (ORPHAN-04) **met by 4× margin**.
+- 326 `SubComponent` + 312 `Detail` entities exist in the live graph; **zero** are in the orphan list — ORPHAN-02's 122-orphan instance set is gone.
+- `CollectiveKnowledge` carries `parent-child` edges to all 4 Project anchors (`Coding`, `Normalisa`, `Timeline`, `DynArch`) — ORPHAN-03 functionally met (edge type is `parent-child`, not `--includes-->` as written, but structurally equivalent).
+- Only 1 `System` entity exists (`CollectiveKnowledge`) and it has 16 edges; the operator-facing viewer is `unified-viewer @ :5173` (no System-strip) — `memory-visualizer/databaseClient.ts:262` is the wrong target (line has been refactored to `loadKnowledgeGraph()`). ORPHAN-01 no longer operative.
+
+- [x] **ORPHAN-01:** Closed-upstream (2026-06-15). Memory-visualizer no longer the operator surface; unified-viewer reads km-core `/api/v1/*` with no System-strip.
+- [x] **ORPHAN-02:** Closed-upstream (2026-06-15). 0 SubComponent/Detail orphans in live km-core graph.
+- [x] **ORPHAN-03:** Closed-upstream (2026-06-15). All 4 Project anchors carry `parent-child` from `CollectiveKnowledge`.
+- [x] **ORPHAN-04:** Met-upstream (2026-06-15). `orphanCount=7 ≤ 30`. Restated as ORPHAN-FLOOR below with a tighter floor.
+
+### Digest/Insight writer-edge repair (ORPHAN-DIG / ORPHAN-INS / ORPHAN-FLOOR) — downscoped Phase 59 (2026-06-15)
+
+- [ ] **ORPHAN-DIG-01:** `ObservationConsolidator._executeDigestStage` (`src/live-logging/ObservationConsolidator.js:1293-1296`) follows every `kmStore.putEntity(legacyDigestToEntity(row, ...))` call with `kmStore.addRelation` calls materializing one `Digest -[derivedFrom]-> Observation` edge per id in `row.observation_ids` (probe-before-write for idempotency, mirroring the `has_insight` pattern at OC.js:684-690). New Digest inserts after this phase ships are NEVER zero-degree.
+- [ ] **ORPHAN-DIG-02:** One-shot repair script walks the existing orphan Digests + Insights at phase-start, reads `metadata.observation_ids` and `metadata.digest_ids`, emits the missing `derivedFrom` / `synthesizedFrom` / `has_insight` edges. Idempotent on re-invocation. Reduces baseline 7 orphans to 0.
+- [ ] **ORPHAN-INS-01:** The consolidator-side `has_insight` follower at `src/live-logging/ObservationConsolidator.js:677-694` is hardened so a freshly-minted `Insight` entity is never persisted without its project-anchor `has_insight` edge — either by wrapping entity+edge in a single km-core transaction or by failing the Insight insert when `addRelation` throws (current code skips silently per Landmine 5). The "1 orphan Insight in 100" rate observed on 2026-06-15 is closed.
+- [ ] **ORPHAN-FLOOR:** `/api/v1/stats` `orphanCount ≤ 10` sustained across 24h of online-learning activity (NOT a snapshot reading) at milestone close. Stricter floor than the closed-upstream ORPHAN-04 target.
 
 ---
 
@@ -90,12 +103,16 @@ This file tracks the active milestone's requirements at the top, with previous m
 | LSLTIME-03 | Phase 61 | Not started |
 | OKBROUTE-01 | Phase 61 | Not started |
 | OKBROUTE-02 | Phase 61 | Not started |
-| ORPHAN-01 | Phase 59 | Not started |
-| ORPHAN-02 | Phase 59 | Not started |
-| ORPHAN-03 | Phase 59 | Not started |
-| ORPHAN-04 | Phase 59 | Not started |
+| ORPHAN-01 | Phase 59 | Closed-upstream (2026-06-15) |
+| ORPHAN-02 | Phase 59 | Closed-upstream (2026-06-15) |
+| ORPHAN-03 | Phase 59 | Closed-upstream (2026-06-15) |
+| ORPHAN-04 | Phase 59 | Met-upstream (2026-06-15) — restated as ORPHAN-FLOOR |
+| ORPHAN-DIG-01 | Phase 59 | Not started |
+| ORPHAN-DIG-02 | Phase 59 | Not started |
+| ORPHAN-INS-01 | Phase 59 | Not started |
+| ORPHAN-FLOOR | Phase 59 | Not started |
 
-**Coverage:** 19 requirements — will be mapped to phases by `gsd-roadmapper`.
+**Coverage:** 23 requirements — will be mapped to phases by `gsd-roadmapper`.
 
 ---
 
