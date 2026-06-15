@@ -1027,7 +1027,7 @@ Plans:
 
 ### Phases
 
-- [ ] **Phase 57: Lower Ontology & Project Tagging Foundation** — declare coding-specific L2 classes (`LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`); optional upper-ontology growth; stamp `project` tag on every km-core entity.
+- [x] **Phase 57: Lower Ontology & Project Tagging Foundation** — declare coding-specific L2 classes (`LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`); optional upper-ontology growth; stamp `project` tag on every km-core entity. (completed 2026-06-15)
 - [ ] **Phase 58: Online Pipeline Semantic Edges on Insights** — `ObservationConsolidator` emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on online Insights, atomically with the Insight node, beyond the existing `capturedBy → LiveLoggingSystem` provenance.
 - [ ] **Phase 59: Long-Tail Orphan Fixes & Baseline Reduction** — server-side System-type filter fix (legacy Phase 48); parent-hierarchy edges for online-learned Detail/SubComponent + one-shot migration (legacy Phase 49); per-team `CollectiveKnowledge --includes--> Project` writer + seed fix; drive `orphanCount` from 157 → ≤30.
 - [ ] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges.
@@ -1047,7 +1047,7 @@ Plans:
   3. Sampling 20 recent online-learned entities, at least 18 carry an `ontologyClass` value drawn from the new lower-ontology class set (not generic `Component` / `Detail` only).
   4. If the operator confirms upper-ontology growth in the discuss-phase (soft gate per LOWERONTO-02), the upper ontology declares ≥2 additional generic programming-aspect classes (e.g., `Diagnosis`, `Interface`); otherwise LOWERONTO-02 is honestly deferred without blocking the phase.
 
-**Plans:** 6/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 **Wave 1**
