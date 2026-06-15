@@ -60,12 +60,15 @@ blocked: 0
 ## Gaps
 
 ### 4. SC#1 threshold over-specified for data (added 2026-06-15 post live-run)
+
 status: failed
 expected: covered ≥ 86 / 96
 observed: covered = 59 / 96 (61%)
 cause: closed-set hallucination guard correctly returns empty mentions for Insight summaries that don't name a Component/SubComponent/Detail by token-boundary match — 37 of 96 such Insights exist in the live data
 not_a_bug: writer-path, backfill, and bridge all correctly emit mentions when LLM identifies candidates; mechanism verified by 35/35 tests
+
 remediation_options:
-  - relax SC#1 to 59 (data-supported floor)
-  - upstream: improve Insight summary generation to name components explicitly
-  - NOT recommended: relax D-02.1 closed-set guard (allows hallucinated edges)
+
+- relax SC#1 to 59 (data-supported floor)
+- upstream: improve Insight summary generation to name components explicitly
+- NOT recommended: relax D-02.1 closed-set guard (allows hallucinated edges)
