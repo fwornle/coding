@@ -16,8 +16,8 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ### Online pipeline semantic edges (EDGE)
 
-- [ ] **EDGE-01:** Online-generated Insight entities carry at least one semantic-content relation type (`mentions`, `dependsOn`, `isRelatedTo`, `instanceOf`, or equivalent — exact set decided in discuss-phase) beyond the existing `capturedBy → LiveLoggingSystem` provenance edge. Verified by sampling 20 random recent Insights; ≥18 carry such an edge.
-- [ ] **EDGE-02:** `ObservationConsolidator` writes the new Insight node and its semantic-content relations atomically — no orphan-Insight intermediate state observable from a concurrent `/api/v1/entities` reader.
+- [x] **EDGE-01:** Online-generated Insight entities carry at least one semantic-content relation type (`mentions`, `dependsOn`, `isRelatedTo`, `instanceOf`, or equivalent — exact set decided in discuss-phase) beyond the existing `capturedBy → LiveLoggingSystem` provenance edge. Verified by sampling 20 random recent Insights; ≥18 carry such an edge. **Delivered Phase 58 (2026-06-15): `mentions` edge type only (D-01); SC#1 gate `--sample 20 --min 18` = PASS.**
+- [x] **EDGE-02:** `ObservationConsolidator` writes the new Insight node and its semantic-content relations atomically — no orphan-Insight intermediate state observable from a concurrent `/api/v1/entities` reader. **Delivered Phase 58 (2026-06-15): atomic emission inside `ObservationWriter.writeInsight` try-block; integration tests #2/#3/#6 lock the ordering and fail-fast contracts.**
 
 ### Lower ontology + project grouping (LOWERONTO)
 
@@ -75,8 +75,8 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EDGE-01 | Phase 58 | Not started |
-| EDGE-02 | Phase 58 | Not started |
+| EDGE-01 | Phase 58 | Complete (2026-06-15) |
+| EDGE-02 | Phase 58 | Complete (2026-06-15) |
 | LOWERONTO-01 | Phase 57 | Not started |
 | LOWERONTO-02 | Phase 57 | Deferred (D-12) |
 | LOWERONTO-03 | Phase 60 | Not started |

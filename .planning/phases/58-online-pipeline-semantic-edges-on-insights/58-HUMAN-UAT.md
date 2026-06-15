@@ -1,14 +1,14 @@
 ---
-status: partial
+status: complete
 phase: 58-online-pipeline-semantic-edges-on-insights
 source: [58-VERIFICATION.md]
 started: 2026-06-15T18:06:42Z
-updated: 2026-06-15T19:32:00Z
+updated: 2026-06-15T19:38:00Z
 ---
 
 ## Current Test
 
-[awaiting human testing on item 3 only]
+[all items complete]
 
 ## Tests
 
@@ -58,27 +58,47 @@ result: **PASS — verified by screenshot evidence 2026-06-15T19:28Z**
 
 expected: Either (a) `_relinkOrphanOnlineInsights` is patched to use `entityType='Insight'` filter, OR (b) operator documents acceptance that the one-shot backfill covers the 74 historical orphans and the bridge's 22-Insight scope is sufficient for steady-state
 
-context: 74 of 100 Insights have `ontologyClass='Detail'` (pre-Phase-58 data condition). The new writer-path correctly sets `ontologyClass='Insight'` on new writes. The 2026-06-15 entityType-drift fix (`fix(58): GREEN — strict entityType filter in loadMentionCandidates`) prevents NEW Insight→Insight noise edges but does not patch the historical 74 ontologyClass='Detail' records.
+result: **PASS — CR-01 invalidated 2026-06-15T19:35Z; no code change needed**
 
-result: [pending — operator decision]
+**Re-investigation:** The reviewer's "22 entities" measurement was based on the assumption that `findByOntologyClass(cls)` is a strict ontologyClass filter. It is not — see `lib/km-core/src/store/GraphKMStore.ts:578`:
+
+```ts
+if (entity.entityType !== cls && entity.ontologyClass !== cls) continue;
+```
+
+That's an OR-gate (matches when `entityType === cls` OR `ontologyClass === cls`). On the live graph (verified 2026-06-15T19:33Z), 100 of 100 entities with `entityType === 'Insight'` pass:
+
+```
+entityType=Insight ontologyClass=Detail:  74  ← the "missing" set the reviewer feared
+entityType=Insight ontologyClass=Insight: 26  ← the only set the reviewer thought the bridge saw
+                                         total: 100
+```
+
+All 100 also carry `validUntil === undefined`, so they pass the `isActive` BC short-circuit (`GraphKMStore.ts:566-567`). The bridge `_relinkOrphanOnlineInsights` therefore iterates all 100 Insights every cycle — it does NOT miss the 74 ontologyClass='Detail' historical records.
+
+The 25 Insights that still lack mentions edges after the live backfill are not bridge-scope misses; they're cases where the closed-set classifier correctly returned an empty array (no Component/SubComponent/Detail token-boundary match in the Insight summary — intentional D-02.1 hallucination guard, not a bridge defect).
+
+**Companion fix shipped this session:** the entityType-drift fix in `loadMentionCandidates` (commit `c0459015`) — also discovered while validating CR-01 — does the inverse: it prevents 74 Insights whose ontologyClass got stamped 'Detail' from drifting into the candidate set and being emitted as targets of `mentions` edges. So the FROM side (bridge iteration) was already fine and the TO side (candidate set) is now also strict.
 
 ### 5. REQUIREMENTS.md traceability update
 
 expected: `grep '| EDGE-01 | Phase 58 | Not started |' .planning/REQUIREMENTS.md` returns 0 hits; both EDGE-01 and EDGE-02 marked complete
 
-why_human: Requirements table was not updated as part of any Phase 58 plan or commit. Operator must decide whether to update REQUIREMENTS.md or accept that tracking is done in ROADMAP.md only.
+result: **PASS — updated 2026-06-15T19:36Z**
 
-result: [pending]
+- `EDGE-01` and `EDGE-02` checkboxes flipped from `[ ]` to `[x]` with delivery-date stamp
+- Traceability table rows updated: `Phase 58 | Not started` → `Phase 58 | Complete (2026-06-15)`
+- Acceptance evidence inline on each requirement bullet
 
 ## Summary
 
 total: 5
-passed: 3
+passed: 5
 issues: 0
-pending: 2
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-None blocking — Phase 58's three success criteria (SC#1, SC#2, SC#3) all PASS per the ROADMAP-literal acceptance tests. Outstanding items (4, 5) are operator-decision items, not code defects.
+None — Phase 58 closed cleanly. SC#1/SC#2/SC#3 all PASS by ROADMAP-literal acceptance; CR-01 invalidated by re-investigation; REQUIREMENTS.md traceability current.
