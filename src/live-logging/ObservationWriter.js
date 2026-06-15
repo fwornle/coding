@@ -372,15 +372,18 @@ export class ObservationWriter {
    * Without this anchor every new node lands as an orphan and the unified
    * viewer renders the outer-ring dot-art the user has objected to (2026-06-11).
    *
-   * Scans nodes once via Components ontology class and matches by name. Result
-   * cached on the instance — restart re-resolves. Returns null if the anchor
-   * does not exist (a fresh km-core with no project hierarchy yet); callers
-   * MUST treat null as "skip anchoring" rather than failing the write.
+   * Scans nodes via Components ontology class and matches by name. Result
+   * cached on the instance once resolved. RETRIES on each call until success —
+   * the original "give-up-after-first-failure" semantics produced silent
+   * orphan-drift on the coding project (2026-06-15: 22 Insights orphaned
+   * because the first lookup raced an obs-api boot before LiveLoggingSystem
+   * was hydrated, then every subsequent Insight write skipped anchoring
+   * permanently). Returns null when the anchor genuinely does not exist
+   * (a fresh km-core with no project hierarchy yet); callers MUST treat
+   * null as "skip anchoring" rather than failing the write.
    */
   async _resolveAnchorId(kmStore) {
     if (this._anchorId) return this._anchorId;
-    if (this._anchorResolveAttempted) return null;
-    this._anchorResolveAttempted = true;
     try {
       const components = await kmStore.findByOntologyClass('Component');
       const lsl = components.find((e) => e && e.name === 'LiveLoggingSystem');
@@ -391,14 +394,24 @@ export class ObservationWriter {
         );
         return lsl.id;
       }
-      process.stderr.write(
-        `[ObservationWriter] anchor lookup: LiveLoggingSystem Component not found — writes will be orphan-prone\n`
-      );
+      // Anchor genuinely missing this attempt — log once per `(process lifetime, missing)`
+      // transition so steady-state writes don't spam stderr while preserving signal
+      // when the anchor first goes missing.
+      if (!this._anchorAbsenceLogged) {
+        this._anchorAbsenceLogged = true;
+        process.stderr.write(
+          `[ObservationWriter] anchor lookup: LiveLoggingSystem Component not found yet — will retry on next write (writes meanwhile land as orphans)\n`
+        );
+      }
       return null;
     } catch (err) {
-      process.stderr.write(
-        `[ObservationWriter] anchor resolve failed (continuing without anchor): ${err.message}\n`
-      );
+      // Same one-shot logging for transient errors; next call retries.
+      if (!this._anchorErrorLogged) {
+        this._anchorErrorLogged = true;
+        process.stderr.write(
+          `[ObservationWriter] anchor resolve failed (will retry on next write): ${err.message}\n`
+        );
+      }
       return null;
     }
   }
