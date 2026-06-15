@@ -45,10 +45,13 @@ const CANDIDATES = [
 // ---------------------------------------------------------------------------
 
 function buildStubKmStore(spy) {
+  // entityType is mandatory on every fixture — production km-core entities
+  // always carry one, and loadMentionCandidates (Phase 58 entityType-drift
+  // fix) now requires strict {Component, SubComponent, Detail} entityType.
   const fixturesByClass = {
-    Component: [{ id: 'c1', name: 'LiveLoggingSystem', description: 'desc-lsl' }],
-    SubComponent: [{ id: 's1', name: 'EtmDaemon', description: 'desc-etm' }],
-    Detail: [{ id: 'd1', name: 'AnchorEdgeWriter', description: 'desc-anchor' }],
+    Component:    [{ id: 'c1', entityType: 'Component',    ontologyClass: 'Component',    name: 'LiveLoggingSystem', description: 'desc-lsl' }],
+    SubComponent: [{ id: 's1', entityType: 'SubComponent', ontologyClass: 'SubComponent', name: 'EtmDaemon',         description: 'desc-etm' }],
+    Detail:       [{ id: 'd1', entityType: 'Detail',       ontologyClass: 'Detail',       name: 'AnchorEdgeWriter',  description: 'desc-anchor' }],
   };
   return {
     findByOntologyClass: async (cls) => {

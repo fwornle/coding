@@ -95,6 +95,7 @@ function createMockKmStore(overrides = {}) {
   entities.set(anchorId, {
     id: anchorId,
     name: 'LiveLoggingSystem',
+    entityType: 'Component',
     ontologyClass: 'Component',
   });
 
@@ -170,9 +171,11 @@ function createMockKmStore(overrides = {}) {
 function seedCandidates(kmStore) {
   // The pre-seeded anchor doubles as e2 (LiveLoggingSystem). We add e1, e3,
   // and the Project anchor.
-  kmStore._entities.set('e1', { id: 'e1', name: 'EtmDaemon', ontologyClass: 'Component' });
-  kmStore._entities.set('e3', { id: 'e3', name: 'MentionsClassifier', ontologyClass: 'Component' });
-  kmStore._entities.set('p-coding', { id: 'p-coding', name: 'Coding', ontologyClass: 'Project' });
+  // entityType set explicitly — Phase 58 entityType-drift fix requires
+  // strict {Component, SubComponent, Detail} entityType on candidates.
+  kmStore._entities.set('e1', { id: 'e1', name: 'EtmDaemon',          entityType: 'Component', ontologyClass: 'Component' });
+  kmStore._entities.set('e3', { id: 'e3', name: 'MentionsClassifier', entityType: 'Component', ontologyClass: 'Component' });
+  kmStore._entities.set('p-coding', { id: 'p-coding', name: 'Coding', entityType: 'Project',   ontologyClass: 'Project' });
   return { e1Id: 'e1', e2Id: 'anchor-lsl-1', e3Id: 'e3', projectId: 'p-coding' };
 }
 

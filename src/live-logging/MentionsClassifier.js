@@ -210,11 +210,24 @@ export async function loadMentionCandidates(kmStore) {
     kmStore.findByOntologyClass('Detail'),
   ]);
 
-  const flat = [...components, ...subComponents, ...details].map((e) => ({
-    id: e.id,
-    name: e.name,
-    description: deriveDescription(e),
-  }));
+  // `findByOntologyClass` is an OR-gate by design (matches when
+  // `entityType === cls` OR `ontologyClass === cls`) for BC with the
+  // Phase 37/38 era when class fields drifted. Production data has 74
+  // Insights / 16 Processes / 11 Containers / 15 Observations whose
+  // `entityType` is non-architectural but whose `ontologyClass` got
+  // stamped as 'Detail', so the OR-gate pulls them into the 'Detail'
+  // bucket. Enforce the D-03 contract — strict entityType — so the
+  // candidate set stays at the documented "L1+L2+L3 vertical only" and
+  // mention edges cannot target Insights / Processes / Containers /
+  // Observations even when the LLM picks a drift-y name.
+  const STRICT_TYPES = new Set(['Component', 'SubComponent', 'Detail']);
+  const flat = [...components, ...subComponents, ...details]
+    .filter((e) => STRICT_TYPES.has(e.entityType))
+    .map((e) => ({
+      id: e.id,
+      name: e.name,
+      description: deriveDescription(e),
+    }));
 
   _candidateCache.set(kmStore, flat);
   return flat;

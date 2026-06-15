@@ -398,8 +398,10 @@ describe('ObservationConsolidator._pushInsightToKG — route-through (Test 7)', 
     // Pre-seed two candidate entities so loadMentionCandidates' Promise.all
     // returns a sensible catalog; also stub fetch so classifyMentions'
     // proxy call gets a deterministic ['e1','e2'] payload.
-    kmStore._entities.set('e1', { id: 'e1', name: 'EtmDaemon', ontologyClass: 'Component' });
-    kmStore._entities.set('e2', { id: 'e2', name: 'LiveLoggingSystem', ontologyClass: 'Component' });
+    // entityType set explicitly — Phase 58 entityType-drift fix requires
+    // strict {Component, SubComponent, Detail} entityType on candidates.
+    kmStore._entities.set('e1', { id: 'e1', name: 'EtmDaemon',        entityType: 'Component', ontologyClass: 'Component' });
+    kmStore._entities.set('e2', { id: 'e2', name: 'LiveLoggingSystem', entityType: 'Component', ontologyClass: 'Component' });
 
     // Mock writer — record every writeInsight call so we can assert the
     // options.mentionsTargetIds plumbing.
@@ -509,7 +511,7 @@ describe('ObservationConsolidator._pushInsightToKG — fail-fast on classifier e
     const kmStore = createMockKmStore();
     // Pre-seed candidates so loadMentionCandidates succeeds (the failure
     // we want to test is classifyMentions, not load).
-    kmStore._entities.set('e1', { id: 'e1', name: 'EtmDaemon', ontologyClass: 'Component' });
+    kmStore._entities.set('e1', { id: 'e1', name: 'EtmDaemon', entityType: 'Component', ontologyClass: 'Component' });
 
     const writeInsightCalls = [];
     const mockWriter = {
