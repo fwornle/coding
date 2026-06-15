@@ -1078,7 +1078,11 @@ Plans:
   2. A concurrent `/api/v1/entities` reader running while `ObservationConsolidator` writes a new Insight never observes the Insight node without its semantic-content edges (no orphan-Insight intermediate state).
   3. Unified viewer rendered with the Online learning-source filter shows online Insights connected by semantic-content edges to domain entities, not as isolated nodes hanging off LiveLoggingSystem only.
 
-**Plans:** TBD
+**Plans:** 4 plans
+- [ ] 58-01-PLAN.md — MentionsClassifier module (pure helpers + rapid-llm-proxy client + unit tests)
+- [ ] 58-02-PLAN.md — Writer-path unification + atomicity (kmStore-native _pushInsightToKG, writeInsight extended with mentionsTargetIds)
+- [ ] 58-03-PLAN.md — Backfill script + bridge extension (scripts/backfill-insight-mentions.mjs, _relinkOrphanOnlineInsights extends to mentions)
+- [ ] 58-04-PLAN.md — Verification surface (integration test for atomicity + scripts/check-insight-mentions-coverage.mjs codifying SC#1)
 
 ### Phase 59: Long-Tail Orphan Fixes & Baseline Reduction
 
