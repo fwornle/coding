@@ -91,7 +91,7 @@ const PROCESS_LABEL = 'consolidator-mentions';
  * store across multiple calls in one consolidation cycle and a fresh
  * store (or calling __resetCacheForTests) when the next cycle begins.
  */
-const _candidateCache = new WeakMap();
+let _candidateCache = new WeakMap();
 
 // ---------------------------------------------------------------------------
 // Internal: proxy URL resolution
@@ -415,12 +415,8 @@ export async function classifyMentions(insightSummary, candidates) {
  * counter assertion (Test 8) is reliable.
  */
 export function __resetCacheForTests() {
-  // WeakMap has no .clear() in some Node versions — rebuild.
-  for (const key of [..._candidateCache.keys?.() ?? []]) {
-    _candidateCache.delete(key);
-  }
-  // Belt-and-braces: even if the iteration above is a no-op (WeakMap is
-  // not iterable by spec), the next `_candidateCache.set(...)` on a
-  // store instance simply overwrites — test stores live one-per-test so
-  // there's no cross-test leak.
+  // WeakMap is not iterable by spec — we cannot enumerate keys to delete.
+  // Swap the reference for a fresh WeakMap so subsequent loadMentionCandidates
+  // calls miss the cache and re-invoke kmStore.findByOntologyClass.
+  _candidateCache = new WeakMap();
 }
