@@ -443,6 +443,85 @@ export class ObservationWriter {
   }
 
   /**
+   * Phase 58 Plan 02 — emit N `mentions` edges from a just-written entity
+   * to the target entity ids the classifier produced.
+   *
+   * N-edge generalization of `_anchorEntity` (which is the 1-edge analog).
+   * Lives in the same try-block as the writeInsight putEntity call so the
+   * km-core JSON exporter's 5s debounce sees putEntity + every addRelation
+   * in the same export tick (EDGE-02 atomicity contract per D-04). The
+   * exporter-debounce envelope IS the atomicity unit; await between
+   * iterations is fine because the debounce window is wall-clock seconds
+   * while the loop runs in microseconds.
+   *
+   * Per-edge guards mirror Shared Pattern A from the phase PATTERNS.md:
+   *   1. Skip self-loops (`toId === fromId`) defensively.
+   *   2. Dedup via `kmStore.findRelations({from, to, type: 'mentions'})`
+   *      before write — km-core `addRelation` is NOT idempotent on the
+   *      (from, to, type) triple per `reprojectFromOnlineStore.ts:441-456`
+   *      precedent, so re-runs would multiply edges otherwise (D-04 + D-05
+   *      idempotency requirement).
+   *   3. Wrap each addRelation in its own try/catch — Source/Target-not-found
+   *      can race with putEntity in-flight; treat as benign with a one-line
+   *      stderr log (same convention as `_anchorEntity` above).
+   *
+   * Metadata stamp `source: 'observation-writer'` distinguishes writer-path
+   * edges from `'backfill-insight-mentions'` (Plan 03 backfill script) and
+   * `'consolidator-bridge'` (Plan 03 bridge extension) — every edge is
+   * traceable to its emitter (threat T-58-02-04 mitigation).
+   *
+   * @param {object} kmStore     — the km-core GraphKMStore (already opened)
+   * @param {string} fromId      — the just-written entity id (output of putEntity)
+   * @param {string[]} targetIds — entity ids the Insight `mentions`
+   * @returns {Promise<void>}
+   */
+  async _emitMentionsEdges(kmStore, fromId, targetIds) {
+    if (!fromId) return;
+    if (!Array.isArray(targetIds) || targetIds.length === 0) return;
+    for (const toId of targetIds) {
+      // Self-loop guard — defensive; the classifier shouldn't produce
+      // self-references but a hallucination could match the insight's own
+      // id if it ever appeared in the candidate catalog.
+      if (!toId || toId === fromId) continue;
+
+      // Idempotency check — see Shared Pattern A. Skip on failure so we
+      // never block a write because the dedup probe choked.
+      try {
+        const existing = await kmStore.findRelations({
+          from: fromId,
+          to: toId,
+          type: 'mentions',
+        });
+        if (Array.isArray(existing) && existing.length > 0) continue;
+      } catch (err) {
+        process.stderr.write(
+          `[ObservationWriter] mentions dedup probe ${fromId}->${toId} failed (non-fatal): ${err.message}\n`
+        );
+        // Fall through — better to risk a duplicate edge than to drop the write.
+      }
+
+      try {
+        await kmStore.addRelation({
+          from: fromId,
+          to: toId,
+          type: 'mentions',
+          metadata: {
+            source: 'observation-writer',
+            classifiedAt: new Date().toISOString(),
+            classifier: 'llm-haiku',
+          },
+        });
+      } catch (err) {
+        // Source/Target-not-found can race with a putEntity in-flight;
+        // treat as benign per `_anchorEntity` precedent.
+        process.stderr.write(
+          `[ObservationWriter] mentions edge ${fromId}->${toId} failed (non-fatal): ${err.message}\n`
+        );
+      }
+    }
+  }
+
+  /**
    * Redact PII/secrets from text using the same rules as the LSL system.
    * Falls back to identity if redactor is not initialized.
    * @param {string} text
@@ -1169,27 +1248,69 @@ export class ObservationWriter {
    * km-core ontology registry which doesn't ship the Insight class (same
    * precedent as the migration script).
    *
+   * Phase 58 Plan 02 (D-04 + D-06) — extended to accept an optional
+   * pre-computed list of `mentions` target entity ids. When supplied,
+   * the writer emits one `mentions` edge per id between `putEntity` and
+   * `_anchorEntity` IN THE SAME try-block so the km-core JSON exporter's
+   * 5s debounce window sees the node + every edge in the same export
+   * tick. This is the atomicity envelope EDGE-02 demands (no orphan-
+   * Insight visible to a concurrent reader of `/api/v1/entities`).
+   *
+   * The post-Phase-58 ordering inside the try-block is:
+   *   1. legacyInsightToEntity(row, ...)
+   *   2. preserve mapper-supplied ontologyClass (Phase 58 — was 'Detail'
+   *      clobber pre-58; the mapper sets 'Insight' which is the correct
+   *      label, so don't overwrite when present)
+   *   3. kmStore.putEntity(entity, {skipOntologyCheck:true})
+   *   4. _emitMentionsEdges(kmStore, mintedId, mentionsTargetIds)  ← NEW
+   *   5. _anchorEntity(kmStore, mintedId)  ← capturedBy → LiveLoggingSystem;
+   *      preserved by construction so the orphan-Insight fix from commit
+   *      955617a1a propagates to every writeInsight consumer (the D-06
+   *      consolidator route-through inherits this for free).
+   *
    * @param {Object} row  Insight row matching `LegacyInsightRow` (see
    *   lib/km-core/src/adapters/legacy-ingest.ts). At minimum:
    *   `{id, topic, summary, confidence, digest_ids[], last_updated,
    *   created_at, project}`.
+   * @param {Object} [options]  Phase 58 Plan 02 extension.
+   * @param {string[]} [options.mentionsTargetIds]  Pre-computed entity ids
+   *   the Insight `mentions`. When supplied, N `mentions` edges are emitted
+   *   inside the same atomic try-block as `putEntity`. Each edge is
+   *   dedup-checked via `kmStore.findRelations` before write (D-04 + D-05
+   *   idempotency contract). Empty array / undefined / non-array silently
+   *   skips the mentions loop.
    * @returns {Promise<string>} The persisted entity's legacyId.id (= row.id).
    */
-  async writeInsight(row) {
+  async writeInsight(row, options = {}) {
     if (!row || typeof row !== 'object') {
       throw new Error('[ObservationWriter] writeInsight: row required');
     }
     if (!row.id) {
       throw new Error('[ObservationWriter] writeInsight: row.id required');
     }
+    const mentionsTargetIds = Array.isArray(options?.mentionsTargetIds)
+      ? options.mentionsTargetIds
+      : [];
     const kmStore = await this._ensureKmStore();
     const ts = row.created_at || new Date().toISOString();
     try {
       const entity = legacyInsightToEntity(row, this._runId, ts);
-      // See writeObservation for the rationale.
-      entity.ontologyClass = 'Detail';
-      entity.metadata = { ...entity.metadata, source: 'auto' };
+      // Phase 58 Plan 02 — preserve the mapper-supplied ontologyClass
+      // (the mapper sets 'Insight' for Insight rows; pre-58 we clobbered
+      // it to 'Detail'). The guard also lets a future caller pass an
+      // explicit row.ontologyClass-derived value through without it being
+      // lost. Metadata.source: only stamp 'auto' when the mapper / caller
+      // didn't already set one (e.g. consolidator passes source: 'online').
+      if (!entity.ontologyClass) entity.ontologyClass = 'Detail';
+      entity.metadata = {
+        ...entity.metadata,
+        source: entity.metadata?.source ?? 'auto',
+      };
       const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      // Phase 58 Plan 02 — emit N mentions edges synchronously inside the
+      // same try-block as putEntity. The km-core JSON exporter debounce
+      // (5s) batches putEntity + every addRelation into one export tick.
+      await this._emitMentionsEdges(kmStore, mintedId, mentionsTargetIds);
       await this._anchorEntity(kmStore, mintedId);
       return row.id;
     } catch (err) {
