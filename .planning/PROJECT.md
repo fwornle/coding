@@ -53,7 +53,7 @@ Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), liv
 **Goal:** Bring the online learning pipeline → km-core → unified viewer surface to production data quality, so operators rely on the graph view for navigation and triage instead of working around known-broken rendering.
 
 **Target features:**
-- Online pipeline emits semantic-content edges on Insights (mentions / dependsOn / isRelatedTo / instanceOf), not just `capturedBy → LiveLoggingSystem`
+- ✓ **Online pipeline emits semantic-content edges on Insights** — Phase 58 shipped 2026-06-15: `mentions` edge type emitted atomically in `ObservationWriter.writeInsight` (EDGE-01 + EDGE-02 complete); one-shot live backfill covered 96 historical Insights; verified by SC#1 `--sample 20 --min 18 = PASS`, SC#2 atomicity integration tests, SC#3 unified-viewer screenshot
 - Ontology rework — clarify upper/lower split, build lower ontology for coding-specific concepts (LSL, ConstraintMonitor, Online-Observation/Digest/Insight tiers), per-project grouping in viewer
 - VKB rendering UX integrity — Evidence/Pattern filter symmetry, Legend derived from rendered graph, eliminate Observations/Digests architecture bleed, restore CollectiveKnowledge visibility under Online filter
 - LSL timeline scale honesty — remove 200-record silent cap, honest "all" window name, bi-source coloring (manual vs online) on ticks
@@ -147,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-09 — Phase 46 complete (Per-System Documentation & Onboarding: canonical 6-section README template + per-system READMEs for `coding`, `mcp-server-semantic-analysis`, `operational-knowledge-management` + KM-Core architecture diagrams + verifiable ONBOARDING.md with LslHeartbeatRotator exercise; DOC-01 satisfied; one human-UAT item outstanding: operator dry-run of ONBOARDING.md). v7.1 Phases 37–46 all shipped — milestone (Knowledge Management Unification) ready for /gsd-complete-milestone audit.*
+*Last updated: 2026-06-15 — Phase 58 complete (Online Pipeline Semantic Edges on Insights: `MentionsClassifier` host-side module, atomic emission via extended `ObservationWriter.writeInsight`, one-shot backfill + bridge extension, SC#1/SC#2/SC#3 all PASS, EDGE-01 + EDGE-02 marked complete in REQUIREMENTS.md). v7.2 milestone in progress.*
