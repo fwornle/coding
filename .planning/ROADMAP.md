@@ -1028,7 +1028,7 @@ Plans:
 ### Phases
 
 - [x] **Phase 57: Lower Ontology & Project Tagging Foundation** — declare coding-specific L2 classes (`LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`); optional upper-ontology growth; stamp `project` tag on every km-core entity. (completed 2026-06-15)
-- [ ] **Phase 58: Online Pipeline Semantic Edges on Insights** — `ObservationConsolidator` emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on online Insights, atomically with the Insight node, beyond the existing `capturedBy → LiveLoggingSystem` provenance.
+- [x] **Phase 58: Online Pipeline Semantic Edges on Insights** — `ObservationConsolidator` emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on online Insights, atomically with the Insight node, beyond the existing `capturedBy → LiveLoggingSystem` provenance. (completed 2026-06-15)
 - [ ] **Phase 59: Long-Tail Orphan Fixes & Baseline Reduction** — server-side System-type filter fix (legacy Phase 48); parent-hierarchy edges for online-learned Detail/SubComponent + one-shot migration (legacy Phase 49); per-team `CollectiveKnowledge --includes--> Project` writer + seed fix; drive `orphanCount` from 157 → ≤30.
 - [ ] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges.
 - [ ] **Phase 61: LSL Timeline & OKB Routing Honesty** — remove silent 200-record cap (`useLslSessions.ts`) with visible "N of M" label or honest streaming; honest "all" window (no silent 365-day cap); bi-source tick coloring (manual vs online); `/viewer/okb` ApiClient detects OKM Express `:8090` legacy `/api/entities` shape and routes correctly, showing real OKM business entities not coding-KG mirrors.
@@ -1078,11 +1078,11 @@ Plans:
   2. A concurrent `/api/v1/entities` reader running while `ObservationConsolidator` writes a new Insight never observes the Insight node without its semantic-content edges (no orphan-Insight intermediate state).
   3. Unified viewer rendered with the Online learning-source filter shows online Insights connected by semantic-content edges to domain entities, not as isolated nodes hanging off LiveLoggingSystem only.
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 - [x] 58-01-PLAN.md — MentionsClassifier module (pure helpers + rapid-llm-proxy client + unit tests)
 - [x] 58-02-PLAN.md — Writer-path unification + atomicity (kmStore-native _pushInsightToKG, writeInsight extended with mentionsTargetIds)
 - [x] 58-03-PLAN.md — Backfill script + bridge extension (scripts/backfill-insight-mentions.mjs, _relinkOrphanOnlineInsights extends to mentions)
-- [ ] 58-04-PLAN.md — Verification surface (integration test for atomicity + scripts/check-insight-mentions-coverage.mjs codifying SC#1)
+- [x] 58-04-PLAN.md — Verification surface (integration test for atomicity + scripts/check-insight-mentions-coverage.mjs codifying SC#1)
 
 ### Phase 59: Long-Tail Orphan Fixes & Baseline Reduction
 
