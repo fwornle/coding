@@ -1,0 +1,22 @@
+{
+  "startedAt": "2026-06-14T20:14:36.263Z",
+  "finishedAt": "2026-06-14T20:14:36.506Z",
+  "durationMs": 242,
+  "source": "/Users/Q284340/Agentic/coding/.data/knowledge-graph/exports/general.json",
+  "dryRun": false,
+  "totalEntities": 2271,
+  "skipped": 2219,
+  "migrated": 52,
+  "errors": 0,
+  "errorRatio": 0,
+  "byPrecedenceStep": {
+    "team": 0,
+    "legacyId-C": 0,
+    "legacyId-B": 0,
+    "legacyId-A": 52,
+    "default-ambiguous": 0
+  },
+  "ambiguousDefaultIds": [],
+  "ambiguousDefaultCount": 0,
+  "errorSamples": []
+}
