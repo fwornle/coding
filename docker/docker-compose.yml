@@ -97,6 +97,17 @@ services:
       # two-clone pattern that left the stale ~/Agentic/km-core clone behind
       # Plan 57-01's isProject deliverable (see Phase 57-03 SUMMARY).
       - ${CODING_REPO:-.}/lib/km-core:/coding/node_modules/@fwornle/km-core:ro
+      # Phase 58 (2026-06-15): also mount over semantic-analysis's *inner*
+      # node_modules copy. The Dockerfile's `npm install` step (line 72)
+      # bakes a separate @fwornle/km-core into the inner node_modules tree;
+      # node resolution prefers the closest copy, so it shadows the outer
+      # mount above and surfaces a stale build that's missing newer exports
+      # (isProject added Phase 57 — see Phase 57-01). Without this second
+      # mount, the dashboard reports `mcp-servers:semantic-analysis` FATAL
+      # with `does not provide an export named 'isProject'` after any image
+      # rebuild. Mount over the inner path so both resolution targets see
+      # the live host km-core (Phase 57 single-source-of-truth principle).
+      - ${CODING_REPO:-.}/lib/km-core:/coding/integrations/mcp-server-semantic-analysis/node_modules/@fwornle/km-core:ro
       # Config files (live-mounted to avoid staleness)
       - ${CODING_REPO:-.}/.env:/coding/.env:ro
       - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:rw
