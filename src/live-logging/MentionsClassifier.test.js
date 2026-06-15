@@ -175,6 +175,54 @@ describe('MentionsClassifier — loadMentionCandidates', () => {
     await loadMentionCandidates(kmStore);
     assert.equal(spy.count, 6, 'after __resetCacheForTests, third call re-invokes 3 more times');
   });
+
+  it('Test 11: filters out non-architectural candidates that drift in via kmStore OR-gate', async () => {
+    // GraphKMStore.findByOntologyClass is an OR-gate (entityType === cls
+    // OR ontologyClass === cls). In production this means entities whose
+    // entityType is Insight / Process / Container / Observation but whose
+    // ontologyClass got stamped as 'Detail' slip into the 'Detail' bucket.
+    // loadMentionCandidates must enforce the documented contract (D-03):
+    // strict entityType in {Component, SubComponent, Detail}; NO Insight /
+    // File / Process / Container / Observation targets.
+    const spy = { count: 0 };
+    const driftyStore = {
+      findByOntologyClass: async (cls) => {
+        spy.count += 1;
+        if (cls === 'Component') {
+          return [
+            { id: 'c1', entityType: 'Component', ontologyClass: 'Component', name: 'LiveLoggingSystem', description: 'real L1' },
+          ];
+        }
+        if (cls === 'SubComponent') {
+          return [
+            { id: 's1', entityType: 'SubComponent', ontologyClass: 'SubComponent', name: 'EtmDaemon', description: 'real L2' },
+          ];
+        }
+        if (cls === 'Detail') {
+          return [
+            { id: 'd1', entityType: 'Detail', ontologyClass: 'Detail', name: 'AnchorEdgeWriter', description: 'real L3' },
+            // OR-gate drift: these have ontologyClass='Detail' but entityType is NOT a real architectural type.
+            { id: 'ins-drift-1', entityType: 'Insight', ontologyClass: 'Detail', name: 'Some Insight Topic — Reference Article', description: 'drift' },
+            { id: 'proc-drift-1', entityType: 'Process', ontologyClass: 'Detail', name: 'health-coordinator', description: 'drift' },
+            { id: 'cont-drift-1', entityType: 'Container', ontologyClass: 'Detail', name: 'coding-services', description: 'drift' },
+            { id: 'obs-drift-1', entityType: 'Observation', ontologyClass: 'Detail', name: 'OBS-9999', description: 'drift' },
+          ];
+        }
+        return [];
+      },
+    };
+
+    const candidates = await loadMentionCandidates(driftyStore);
+    const names = candidates.map((c) => c.name).sort();
+
+    // Only the three real architectural entities survive.
+    assert.deepEqual(names, ['AnchorEdgeWriter', 'EtmDaemon', 'LiveLoggingSystem']);
+    // Specifically: no Insight, Process, Container, or Observation drifted in.
+    assert.ok(!candidates.some((c) => c.id === 'ins-drift-1'),  'Insight drift filtered');
+    assert.ok(!candidates.some((c) => c.id === 'proc-drift-1'), 'Process drift filtered');
+    assert.ok(!candidates.some((c) => c.id === 'cont-drift-1'), 'Container drift filtered');
+    assert.ok(!candidates.some((c) => c.id === 'obs-drift-1'),  'Observation drift filtered');
+  });
 });
 
 describe('MentionsClassifier — classifyMentions (orchestrator)', () => {
