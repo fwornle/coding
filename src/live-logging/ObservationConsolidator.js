@@ -2019,61 +2019,203 @@ export class ObservationConsolidator {
   }
 
   /**
-   * Find every source='online' entity in the KG that has no incoming
-   * has_insight edge, resolve its project anchor, and POST the missing
-   * relation. The relation API is idempotent so re-runs are safe.
+   * Find every Insight entity in the KG that lacks (a) an incoming
+   * has_insight edge from its Project anchor, OR (b) any outgoing
+   * `mentions` edge, and emit the missing edge(s) via kmStore.addRelation.
    *
-   * Returns the number of relations actually created.
+   * Phase 58 D-06 / D-06.2 — two-pass kmStore-native bridge:
+   *   1. has_insight relink — kmStore-native migration of the prior
+   *      fetch(GET /api/entities) + fetch(GET /api/relations) +
+   *      fetch(POST /api/relations) shape. The Project anchor still
+   *      resolves through `_ensureProjectAnchor` (which targets the
+   *      VKB HTTP PUT path — D-06.1 keeps that surface live for
+   *      non-consolidator callers; in-process we only need the
+   *      kmStore Project entity id).
+   *   2. mentions relink — for each Insight with no `mentions` edges,
+   *      run `classifyMentions` via the same MentionsClassifier helpers
+   *      as the writer path and the one-shot backfill (single source of
+   *      truth — D-06.2). The idempotency gate (`existing.length > 0
+   *      continue`) is structural: it prevents the bridge from burning
+   *      an LLM call per Insight per consolidation cycle (threat T-58-03-02).
+   *
+   * Returns the total number of relations actually created across both
+   * passes — preserves the scalar-count contract of the call-site at
+   * line ~2003 (`const relinked = await this._relinkOrphanOnlineInsights()`).
    */
   async _relinkOrphanOnlineInsights() {
-    const vkbUrl = process.env.VKB_API_URL || 'http://localhost:8080';
+    if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    const kmStore = this._kmStore;
+    let created = 0;
 
-    // Fetch all online entities and all relations once. Per-team scoping
-    // happens inside the loop via each entity's own `team` field, so we
-    // don't have to enumerate teams upfront.
-    let entitiesRes, relsRes;
+    // ───────────────────────────────────────────────────────────────────────
+    // Pass 1 — has_insight relink (kmStore-native; D-06 carryover).
+    // ───────────────────────────────────────────────────────────────────────
+
+    const vkbUrl = process.env.VKB_API_URL || 'http://localhost:8080';
+    let insightEntities;
     try {
-      [entitiesRes, relsRes] = await Promise.all([
-        fetch(`${vkbUrl}/api/entities?source=online&limit=10000`),
-        fetch(`${vkbUrl}/api/relations?limit=100000`),
-      ]);
+      insightEntities = await kmStore.findByOntologyClass('Insight');
     } catch (err) {
-      process.stderr.write(`[Consolidator] Relink: VKB unreachable (${err.message})\n`);
+      process.stderr.write(`[Consolidator] Relink: kmStore.findByOntologyClass(Insight) failed (${err.message})\n`);
       return 0;
     }
-    if (!entitiesRes.ok || !relsRes.ok) return 0;
-    const { entities = [] } = await entitiesRes.json();
-    const { relations = [] } = await relsRes.json();
 
-    const linked = new Set();
-    for (const r of relations) {
-      if (r.relation_type === 'has_insight' && r.to_name) linked.add(r.to_name);
-    }
+    for (const insight of insightEntities) {
+      // Skip insights that already have a has_insight edge pointing at them.
+      let incoming;
+      try {
+        incoming = await kmStore.findRelations({ to: insight.id, type: 'has_insight' });
+      } catch (err) {
+        process.stderr.write(
+          `[Consolidator] Relink: findRelations(to=${insight.id.slice(0, 8)},has_insight) failed (non-fatal): ${err.message}\n`,
+        );
+        continue;
+      }
+      if (Array.isArray(incoming) && incoming.length > 0) continue;
 
-    let created = 0;
-    for (const e of entities) {
-      if (e.source !== 'online') continue;            // System fall-throughs
-      if (linked.has(e.entity_name)) continue;        // already linked
-      const team = e.team;
+      // Resolve the Project anchor — still flows through VKB PUT per D-06.1.
+      const team = insight?.metadata?.team || insight?.metadata?.project || null;
       if (!team) continue;
       const projectName = await this._ensureProjectAnchor(vkbUrl, team);
       if (!projectName) continue;
+
+      // Look up the Project entity id in kmStore (the VKB PUT created or
+      // refreshed it; we need its kmStore id for the addRelation source).
+      let projects;
       try {
-        const res = await fetch(`${vkbUrl}/api/relations`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: projectName,
-            to: e.entity_name,
-            type: 'has_insight',
+        projects = await kmStore.findByOntologyClass('Project');
+      } catch (err) {
+        process.stderr.write(`[Consolidator] Relink: findByOntologyClass(Project) failed: ${err.message}\n`);
+        continue;
+      }
+      const projectId = projects.find((p) => p && p.name === projectName)?.id;
+      if (!projectId) continue;
+
+      try {
+        await kmStore.addRelation({
+          from: projectId,
+          to: insight.id,
+          type: 'has_insight',
+          metadata: {
+            source: 'consolidator-bridge',
             team,
             confidence: 1.0,
-          }),
+            anchoredAt: new Date().toISOString(),
+          },
         });
-        if (res.ok) created++;
-      } catch { /* swallow per-entity errors; sweep is best-effort */ }
+        created++;
+      } catch (err) {
+        // Source/Target-not-found races are benign — sweep is best-effort.
+        process.stderr.write(
+          `[Consolidator] bridge: has_insight edge ${projectId.slice(0, 8)}->${insight.id.slice(0, 8)} `
+          + `failed (non-fatal): ${err.message}\n`,
+        );
+      }
     }
-    return created;
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Pass 2 — mentions relink (D-06.2 — single source of truth via
+    // MentionsClassifier; same edge shape as writer-path + one-shot backfill).
+    //
+    // Landmine: skip Insights that already carry ≥1 mentions edge so the
+    // bridge does NOT burn an LLM call per Insight per consolidation cycle
+    // (threat T-58-03-02). The idempotency gate `existing.length > 0` is
+    // structural — the difference between O(1) bridge cost at steady state
+    // and O(N) per cycle.
+    // ───────────────────────────────────────────────────────────────────────
+
+    let mentionsRelinked = 0;
+    // Re-fetch insight list in case the has_insight pass added anchors that
+    // make new candidates eligible — typically the list is unchanged but
+    // refreshing is cheap and avoids stale-data bugs.
+    let insightEntities2;
+    try {
+      insightEntities2 = await kmStore.findByOntologyClass('Insight');
+    } catch (err) {
+      process.stderr.write(`[Consolidator] Relink Pass 2: findByOntologyClass(Insight) failed (${err.message})\n`);
+      return created;
+    }
+
+    // Preload candidate catalog once for the whole pass — same per-run cache
+    // semantics as the writer path uses (PATTERNS landmine 8).
+    let candidates = [];
+    let candidatesLoaded = false;
+
+    for (const insight of insightEntities2) {
+      // Idempotency gate — bail out fast on Insights with existing mentions.
+      let existing;
+      try {
+        existing = await kmStore.findRelations({ from: insight.id, type: 'mentions' });
+      } catch (err) {
+        process.stderr.write(
+          `[Consolidator] bridge: findRelations(from=${insight.id.slice(0, 8)},mentions) failed (non-fatal): ${err.message}\n`,
+        );
+        continue;
+      }
+      if (Array.isArray(existing) && existing.length > 0) continue;
+
+      // Lazy-load candidates only when we have an Insight that actually needs
+      // classification — avoids paying the load cost when steady-state
+      // (all Insights have mentions).
+      if (!candidatesLoaded) {
+        try {
+          candidates = await loadMentionCandidates(kmStore);
+          candidatesLoaded = true;
+        } catch (err) {
+          process.stderr.write(`[Consolidator] bridge: loadMentionCandidates failed: ${err.message}\n`);
+          return created + mentionsRelinked;
+        }
+      }
+
+      const summary = (insight.descriptionSegments?.[0]?.text) ?? insight.description ?? insight.name;
+      let mentionIds = [];
+      try {
+        mentionIds = await classifyMentions(summary, candidates);
+      } catch (err) {
+        process.stderr.write(
+          `[Consolidator] bridge: mentions classify for ${insight.id.slice(0, 8)} failed: ${err.message}\n`,
+        );
+        continue;
+      }
+
+      for (const targetId of mentionIds) {
+        if (!targetId || targetId === insight.id) continue; // self-loop guard
+        // Per-target dedup probe — the upper-level existing-check looked at
+        // the from-side; this checks the precise (from,to,type) triple in
+        // case a parallel writer just wrote one.
+        let dup;
+        try {
+          dup = await kmStore.findRelations({ from: insight.id, to: targetId, type: 'mentions' });
+        } catch (err) {
+          process.stderr.write(
+            `[Consolidator] bridge: dedup probe ${insight.id.slice(0, 8)}->${targetId.slice(0, 8)} failed (non-fatal): ${err.message}\n`,
+          );
+          continue;
+        }
+        if (Array.isArray(dup) && dup.length > 0) continue;
+
+        try {
+          await kmStore.addRelation({
+            from: insight.id,
+            to: targetId,
+            type: 'mentions',
+            metadata: {
+              source: 'consolidator-bridge',
+              classifiedAt: new Date().toISOString(),
+              classifier: 'llm-haiku',
+            },
+          });
+          mentionsRelinked++;
+        } catch (err) {
+          process.stderr.write(
+            `[Consolidator] bridge: mentions edge ${insight.id.slice(0, 8)}->${targetId.slice(0, 8)} `
+            + `failed (non-fatal): ${err.message}\n`,
+          );
+        }
+      }
+    }
+
+    return created + mentionsRelinked;
   }
 
   /**
