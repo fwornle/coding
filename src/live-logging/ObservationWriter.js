@@ -1279,7 +1279,11 @@ export class ObservationWriter {
    *   dedup-checked via `kmStore.findRelations` before write (D-04 + D-05
    *   idempotency contract). Empty array / undefined / non-array silently
    *   skips the mentions loop.
-   * @returns {Promise<string>} The persisted entity's legacyId.id (= row.id).
+   * @returns {Promise<{legacyId: string, mintedId: string}>} legacyId is the
+   *   stable system='A' surrogate (= row.id); mintedId is the freshly-minted
+   *   km-core entity id (= return of internal kmStore.putEntity). The mintedId
+   *   eliminates the post-write findByLegacyId race that pre-D-03 callers paid
+   *   (Phase 59 D-03).
    */
   async writeInsight(row, options = {}) {
     if (!row || typeof row !== 'object') {
@@ -1312,7 +1316,7 @@ export class ObservationWriter {
       // (5s) batches putEntity + every addRelation into one export tick.
       await this._emitMentionsEdges(kmStore, mintedId, mentionsTargetIds);
       await this._anchorEntity(kmStore, mintedId);
-      return row.id;
+      return { legacyId: row.id, mintedId };
     } catch (err) {
       process.stderr.write(
         `[ObservationWriter] km-core putEntity (insight ${row.id}) failed: ${err.message}\n`
