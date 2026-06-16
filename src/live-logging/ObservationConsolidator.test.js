@@ -174,6 +174,12 @@ function createConsolidator(kmStore) {
   consolidator._redact = (s) => s;
   consolidator._redactPaths = (s) => s;
 
+  // No Redis publish — _publishEmbeddingEvent lazy-inits an ioredis client
+  // whose lazyConnect socket keeps the event loop alive past the test body
+  // and causes `node --test` to exit 124 (timeout). Stub it out — Redis
+  // publication is fire-and-forget and orthogonal to the D-02 contract.
+  consolidator._publishEmbeddingEvent = () => {};
+
   return consolidator;
 }
 
