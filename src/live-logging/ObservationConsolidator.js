@@ -1291,7 +1291,51 @@ export class ObservationConsolidator {
         project: d.project || 'unknown',
       };
       const entity = legacyDigestToEntity(row, this._runId, now);
-      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      const digestMintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      // ORPHAN-DIG-01 (Phase 59 D-02) — emit one `derivedFrom` edge per
+      // observation_id referenced by this Digest, in the SAME try-block as
+      // putEntity. The km-core JSON exporter's 5s debounce captures
+      // putEntity + every addRelation in one export tick (Phase 58 D-04
+      // atomicity envelope, applied verbatim to Digests).
+      //
+      // No probe-before-write per D-02.1 — `_buildDigestMergePlan` (above)
+      // dedupes upstream, so the plain-insert branch only runs for
+      // genuinely new Digests. The repair script (Plan 59-04 Layer 1) is
+      // the idempotent re-run path that DOES probe.
+      //
+      // D-02.2 — unresolved observation_ids (findByLegacyId returns null)
+      // are skipped non-fatally; the Digest still lands with its remaining
+      // edges, and the missing edge is picked up by the next repair-script
+      // run.
+      const obsIds = Array.isArray(d.observationIds) ? d.observationIds : [];
+      for (const obsId of obsIds) {
+        if (!obsId) continue;
+        let obsEntity;
+        try {
+          obsEntity = await kmStore.findByLegacyId({ system: 'A', id: obsId });
+        } catch (err) {
+          process.stderr.write(`[Consolidator] derivedFrom: findByLegacyId ${obsId.slice(0, 8)} failed (non-fatal): ${err.message}\n`);
+          continue;
+        }
+        if (!obsEntity) {
+          process.stderr.write(`[Consolidator] derivedFrom: observation ${obsId.slice(0, 8)} not yet persisted, skipping edge\n`);
+          continue;
+        }
+        try {
+          await kmStore.addRelation({
+            from: digestMintedId,
+            to: obsEntity.id,
+            type: 'derivedFrom',
+            metadata: {
+              source: 'observation-consolidator',
+              confidence: 1.0,
+              addedAt: new Date().toISOString(),
+            },
+          });
+        } catch (err) {
+          process.stderr.write(`[Consolidator] derivedFrom edge ${digestMintedId}->${obsEntity.id} failed (non-fatal): ${err.message}\n`);
+        }
+      }
       createdCount++;
       for (const obsId of d.observationIds) digestedObsIds.add(obsId);
     }
