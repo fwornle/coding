@@ -485,6 +485,123 @@ describe('ObservationConsolidator._pushInsightToKG — route-through (Test 7)', 
 });
 
 // ---------------------------------------------------------------------------
+// Phase 59 Plan 01 — writeInsight returns {legacyId, mintedId} (D-03)
+// ---------------------------------------------------------------------------
+//
+// D-03 contract: writeInsight returns {legacyId, mintedId}; mintedId closes
+// the OC.js:660-661 findByLegacyId race observed 2026-06-15. legacyId is the
+// stable system='A' surrogate (= row.id); mintedId is the freshly-minted
+// km-core entity id (= return of internal kmStore.putEntity).
+
+describe('ObservationWriter.writeInsight — D-03 return shape (Test 9)', () => {
+  it('resolves to {legacyId, mintedId} with both fields as non-empty strings', async () => {
+    // D-03 contract: writeInsight returns {legacyId, mintedId}; mintedId
+    // closes the OC.js:660-661 findByLegacyId race observed 2026-06-15.
+    const kmStore = createMockKmStore();
+    // Override putEntity to return a deterministic minted id so the
+    // assertion can compare against a known value.
+    kmStore.putEntity = async (entity, opts) => {
+      const id = 'minted-km-001';
+      kmStore.callLog.push({ op: 'putEntity', id, entity, opts });
+      kmStore._entities.set(id, { ...entity, id });
+      return id;
+    };
+    const writer = createWriter(kmStore);
+
+    const result = await writer.writeInsight({
+      id: 'insight-1',
+      topic: 'Topic',
+      summary: 'A summary describing the test insight.',
+      confidence: 0.85,
+      created_at: '2026-06-16T00:00:00.000Z',
+    });
+
+    // Exact two own string-typed properties: legacyId, mintedId.
+    assert.equal(typeof result, 'object', 'result is an object');
+    assert.notEqual(result, null, 'result is non-null');
+    const ownKeys = Object.keys(result).sort();
+    assert.deepEqual(ownKeys, ['legacyId', 'mintedId'], 'exactly two own keys: legacyId, mintedId');
+    assert.equal(typeof result.legacyId, 'string', 'legacyId is a string');
+    assert.equal(typeof result.mintedId, 'string', 'mintedId is a string');
+    assert.ok(result.legacyId.length > 0, 'legacyId is non-empty');
+    assert.ok(result.mintedId.length > 0, 'mintedId is non-empty');
+
+    // Field-level equality.
+    assert.equal(result.legacyId, 'insight-1', 'legacyId === row.id');
+    assert.equal(result.mintedId, 'minted-km-001', 'mintedId === mock putEntity return');
+  });
+});
+
+describe('ObservationWriter.writeInsight — D-03 mintedId propagation (Test 10)', () => {
+  it('propagates putEntity return verbatim across multiple calls (no re-derive)', async () => {
+    // D-03 contract: writeInsight returns {legacyId, mintedId}; mintedId
+    // closes the OC.js:660-661 findByLegacyId race observed 2026-06-15.
+    // This test proves the writer propagates putEntity's return verbatim
+    // rather than re-deriving the mintedId via a downstream lookup.
+    const kmStore = createMockKmStore();
+    let nextSeq = 0;
+    const returnedIds = [];
+    // Override putEntity to return a computed-at-call-time id; capture each
+    // value in returnedIds so the assertion can compare against the values
+    // the mock actually returned (not against a hardcoded constant).
+    kmStore.putEntity = async (entity, opts) => {
+      nextSeq += 1;
+      const id = `mock-${nextSeq}`;
+      returnedIds.push(id);
+      kmStore.callLog.push({ op: 'putEntity', id, entity, opts });
+      kmStore._entities.set(id, { ...entity, id });
+      return id;
+    };
+    const writer = createWriter(kmStore);
+
+    const r1 = await writer.writeInsight({ id: 'insight-A', topic: 'A', summary: 's', created_at: '2026-06-16T00:00:00.000Z' });
+    const r2 = await writer.writeInsight({ id: 'insight-B', topic: 'B', summary: 's', created_at: '2026-06-16T00:00:01.000Z' });
+    const r3 = await writer.writeInsight({ id: 'insight-C', topic: 'C', summary: 's', created_at: '2026-06-16T00:00:02.000Z' });
+
+    // The mock returned three distinct ids (mock-1, mock-2, mock-3) — those
+    // are the canonical mintedIds. The writer's resolved mintedId for each
+    // call MUST equal the captured value.
+    assert.equal(returnedIds.length, 3, 'putEntity was called exactly 3 times');
+    assert.equal(r1.mintedId, returnedIds[0], 'call 1 mintedId === putEntity return 1');
+    assert.equal(r2.mintedId, returnedIds[1], 'call 2 mintedId === putEntity return 2');
+    assert.equal(r3.mintedId, returnedIds[2], 'call 3 mintedId === putEntity return 3');
+
+    // legacyId is independent — it tracks row.id, not putEntity.
+    assert.equal(r1.legacyId, 'insight-A');
+    assert.equal(r2.legacyId, 'insight-B');
+    assert.equal(r3.legacyId, 'insight-C');
+  });
+});
+
+describe('ObservationWriter.writeInsight — D-03 legacyId mirrors row.id verbatim (Test 11)', () => {
+  it('legacyId === row.id by construction, even when row.id is uuid-shaped', async () => {
+    // D-03 contract: writeInsight returns {legacyId, mintedId}; mintedId
+    // closes the OC.js:660-661 findByLegacyId race observed 2026-06-15.
+    // This test pins the legacyId field to row.id verbatim — no derivation,
+    // no normalization — so callers can rely on round-trip identity with
+    // whatever surrogate id they passed in.
+    const kmStore = createMockKmStore();
+    const writer = createWriter(kmStore);
+
+    const uuidLikeId = 'd2c1f6c8-1234-4abc-9def-abcdef012345';
+    const result = await writer.writeInsight({
+      id: uuidLikeId,
+      topic: 'UuidShaped',
+      summary: 's',
+      created_at: '2026-06-16T00:00:00.000Z',
+    });
+
+    assert.equal(result.legacyId, uuidLikeId, 'legacyId is the input row.id verbatim');
+    // mintedId is the mock's default minted value — assert it is a non-empty
+    // string distinct from the legacyId (legacyId vs mintedId are
+    // independently sourced).
+    assert.equal(typeof result.mintedId, 'string');
+    assert.ok(result.mintedId.length > 0);
+    assert.notEqual(result.mintedId, result.legacyId, 'mintedId is the km-core id, not the legacyId');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Test 8 — Consolidator fail-fast on classifier error (D-04.1)
 // ---------------------------------------------------------------------------
 
