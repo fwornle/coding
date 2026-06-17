@@ -1087,14 +1087,27 @@ describe('useViewerStore — Phase 60-03 showDebugEntityTypes (D-09..D-11)', () 
 
   test('Store test 3 (D-11 no persistence): source has no persist/partialize wiring for the new field', () => {
     // Source-grep assertion — viewer-store.ts must NOT wrap showDebugEntityTypes
-    // in any persist/partialize/localStorage middleware. The grep below is
-    // intentionally narrow to avoid false-positives from unrelated UI flags.
-    const file = readFileSync(path.join(__dirname, 'viewer-store.ts'), 'utf8')
-    expect(file.match(/persist[\s\S]*showDebugEntityTypes/)).toBeNull()
-    expect(file.match(/showDebugEntityTypes[\s\S]*partialize/)).toBeNull()
-    expect(file.match(/partialize[\s\S]*showDebugEntityTypes/)).toBeNull()
-    expect(file.match(/localStorage[\s\S]*showDebugEntityTypes/)).toBeNull()
-    expect(file.match(/showDebugEntityTypes[\s\S]*localStorage/)).toBeNull()
+    // in any persist/partialize/localStorage middleware. Strip comments first
+    // so the explanatory prose in JSDoc / `// ...` doesn't match (the comments
+    // themselves mention "persist" and "localStorage" because they explain
+    // WHY the field is non-persistent).
+    const raw = readFileSync(path.join(__dirname, 'viewer-store.ts'), 'utf8')
+    const code = raw
+      // strip block comments /* ... */
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      // strip line comments // ...
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/\/\/.*$/gm, '')
+    // The Zustand persist middleware is invoked as `persist(...)`; partialize
+    // appears as a property in the persist options object. localStorage either
+    // appears directly or via `createJSONStorage(() => localStorage)`.
+    expect(code.match(/\bpersist\s*\(/)).toBeNull()
+    expect(code.match(/\bpartialize\b/)).toBeNull()
+    expect(code.match(/\blocalStorage\b/)).toBeNull()
+    // Defence-in-depth: even if a future persist() lands for some OTHER field,
+    // showDebugEntityTypes must not appear in a partialize predicate.
+    expect(code.match(/partialize[\s\S]{0,300}showDebugEntityTypes/)).toBeNull()
+    expect(code.match(/showDebugEntityTypes[\s\S]{0,300}partialize/)).toBeNull()
   })
 
   test('Store test 4 (Phase 56.1 D-1 invariant): selectedNodeIds / focalNodeId / selectedBucketKeys untouched, additive only', () => {

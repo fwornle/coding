@@ -302,6 +302,11 @@ export interface ViewerState {
   showRelationLabels: boolean
   showMergedOnly: boolean
   hideDocNodes: boolean
+  // Phase 60 Plan 03 (G3) — D-09..D-11: when true, the visibility predicate
+  // skips the Observation/Digest hard-exclusion branch so operators can debug
+  // those types. Default false (architecture-bleed shield ON). Non-persistent
+  // (D-11): no localStorage / persist middleware — resets every page load.
+  showDebugEntityTypes: boolean
 
   toggleLayer: (layer: string) => void
   toggleDomain: (domain: string) => void
@@ -312,6 +317,8 @@ export interface ViewerState {
   toggleShowRelationLabels: () => void
   toggleShowMergedOnly: () => void
   toggleHideDocNodes: () => void
+  // Phase 60 Plan 03 (G3) — D-09..D-11: flips showDebugEntityTypes.
+  toggleShowDebugEntityTypes: () => void
 
   // ---------- Phase 55 — mode slice ----------
   mode: ViewerMode
@@ -877,6 +884,9 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   showRelationLabels: false,
   showMergedOnly: false,
   hideDocNodes: false,
+  // Phase 60 Plan 03 (G3) — D-11: NOT persisted (no localStorage). Resets every
+  // page load so operators must consciously re-enable Observation/Digest debug.
+  showDebugEntityTypes: false,
 
   toggleLayer: (layer) =>
     set((s) => {
@@ -962,6 +972,9 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   toggleShowRelationLabels: () => set((s) => ({ showRelationLabels: !s.showRelationLabels })),
   toggleShowMergedOnly: () => set((s) => ({ showMergedOnly: !s.showMergedOnly })),
   toggleHideDocNodes: () => set((s) => ({ hideDocNodes: !s.hideDocNodes })),
+  // Phase 60 Plan 03 (G3) — D-09..D-11: toggle the showDebugEntityTypes flag.
+  toggleShowDebugEntityTypes: () =>
+    set((s) => ({ showDebugEntityTypes: !s.showDebugEntityTypes })),
 
   // ---------- Phase 55 — mode slice ----------
   mode: 'kg',

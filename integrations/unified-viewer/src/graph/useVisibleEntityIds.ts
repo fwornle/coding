@@ -49,6 +49,10 @@ export function useVisibleEntityIds(apiClient: ApiClient, system: System): Reado
   const selectedLayers = useViewerStore((s) => s.selectedLayers)
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
   const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
+  // Phase 60 Plan 03 (G3 — D-09..D-11): when ON, the predicate skips the
+  // Observation/Digest hard-exclusion branch so those types re-appear in
+  // the graph. Default OFF (architecture-bleed shield).
+  const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
 
   return useMemo<ReadonlySet<string>>(() => {
     const ids = new Set<string>()
@@ -63,6 +67,7 @@ export function useVisibleEntityIds(apiClient: ApiClient, system: System): Reado
         selectedClasses,
         visibleLevels,
         lslFilterEntityIds,
+        showDebugEntityTypes,
       })) {
         ids.add(e.id)
       }
@@ -78,5 +83,6 @@ export function useVisibleEntityIds(apiClient: ApiClient, system: System): Reado
     selectedLayers,
     hideDocNodes,
     lslFilterEntityIds,
+    showDebugEntityTypes,
   ])
 }
