@@ -105,7 +105,11 @@ export function _classHue(className: string): number {
 
 export type ShapeKind = 'circle' | 'diamond' | 'square' | 'triangle' | 'hexagon'
 
-const SHAPE_PALETTE: Readonly<Record<string, ShapeKind>> = {
+// Exported (Plan 60-02 G2) so LegendPanel.tsx can derive the registered-class
+// set without re-listing every class name (which would re-introduce literal
+// OKB seeds like 'RuntimeDiagnostics' the legend rewrite is meant to drop).
+// shapeFallback() is the runtime accessor; SHAPE_PALETTE is the lookup table.
+export const SHAPE_PALETTE: Readonly<Record<string, ShapeKind>> = {
   // Hierarchy
   Project: 'hexagon',
   Component: 'square',
