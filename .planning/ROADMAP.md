@@ -1125,13 +1125,13 @@ Plans:
 **Wave 1 (parallel — disjoint file surfaces)**
 
 - [ ] 60-01-PLAN.md — G1: Layer filter data contract — ship `integrations/unified-viewer/src/graph/layer.ts` `deriveLayer(entity, registry)` helper; wire into LayerFilter count badges + visibility-predicate (VKBUI-01)
-- [ ] 60-03-PLAN.md — G3: Observation/Digest debug toggle — `showDebugEntityTypes: boolean` store field + GraphToggles row + predicate gate (VKBUI-03)
 - [ ] 60-04-PLAN.md — G4: CollectiveKnowledge repair + writer-side hard-root guard — new `lib/km-core/src/types/hierarchy-roots.ts` HIERARCHY_ROOTS constant + `scripts/repair-ck-ontology-class.mjs` one-shot + ontology-classification-agent.ts guard (autonomous: false, has operator checkpoint for live repair-script execution) (VKBUI-04)
 - [ ] 60-05-PLAN.md — G5: L2 lower-ontology classes in OntologyFilter — drop hardcoded CODING_SCHEMA + Typed Views; build L1/L2 groups dynamically from `GET /api/v1/ontology/classes?withDisplay=true` (LOWERONTO-03)
 
-**Wave 2** *(depends on 60-01 — Legend's LAYERS section calls deriveLayer)*
+**Wave 2** *(depends on 60-01 — Legend's LAYERS section + visibility-predicate VisibilityFilters interface both reach into the layer.ts module + visibility-predicate.ts)*
 
 - [ ] 60-02-PLAN.md — G2: Dynamic Legend — full rewrite of LegendPanel.tsx to receive entities + relations props and derive DOMAINS / LAYERS / SOURCE / RELATIONSHIPS from rendered set (VKBUI-02)
+- [ ] 60-03-PLAN.md — G3: Observation/Digest debug toggle — `showDebugEntityTypes: boolean` store field + GraphToggles row + predicate gate (VKBUI-03) — moved to Wave 2 because both 60-01 and 60-03 mutate the `VisibilityFilters` interface in `visibility-predicate.ts`; sequencing fixes the disjoint-file-surface invariant
 
 **Wave 3** *(depends on all behavior plans landing)*
 
