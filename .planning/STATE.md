@@ -4,13 +4,13 @@ milestone: v7.2
 milestone_name: VKB & Online-Learning Quality
 status: executing
 stopped_at: Phase 60 context gathered
-last_updated: "2026-06-17T12:46:04.718Z"
-last_activity: 2026-06-17 -- Phase 60 planning complete
+last_updated: "2026-06-17T13:09:06.175Z"
+last_activity: 2026-06-17
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 21
-  completed_plans: 15
+  completed_plans: 16
   percent: 60
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 60 — unified viewer rendering ux integrity
+**Current focus:** Phase 60 — unified-viewer-rendering-ux-integrity
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 60
-Plan: Not started
+Phase: 60 (unified-viewer-rendering-ux-integrity) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-06-17 -- Phase 60 planning complete
+Last activity: 2026-06-17
 
 ## Performance Metrics
 
@@ -206,6 +206,7 @@ Last activity: 2026-06-17 -- Phase 60 planning complete
 - [Phase 57-05 partial]: Tasks 1+2 complete. scripts/backfill-project-tag.mjs (441 LoC, 11 it() blocks GREEN, 5% error budget, --dry-run idempotent) + scripts/backfill-project-tag.test.mjs (361 LoC) land via TDD (RED commit 17fefd1a1, GREEN commit b60de5195). graph-builder.ts transitional read `metadata.project ?? metadata.team` lands as commit 8e0fcfc80; D-11 narrow scope honored (memory-visualizer untouched; selectedTeams NOT renamed — 4 live refs at lines 467/517/518/525 byte-stable). Closed-set isProject() typeguard added at step 2 of deriveProject (Rule 2 deviation — protects against silent `metadata.project='bmw'` drift). Dry-run intentionally does NOT open LevelDB (Rule 3 deviation — avoids LOCK contention with coding-services). Task 3 is checkpoint:human-verify: operator must stop coding-services, run `node scripts/backfill-project-tag.mjs`, verify SC#1 jq distribution shows {coding, okm, cap} only, then resume.
 - [Phase 57-04 closed]: Classifier L2 emission landed: `OntologyClassificationAgent.l2Classes` loads 10 classes from `coding.lower.json` at `initialize()` (`loadL2Classes` filters L1 carriers — Component/SubComponent/Detail self-exclusion); REFINEMENT STEP prompt addendum (10 named L2 classes + one-line descriptions sourced from `cls.description` at render-time) appended via `buildClassificationInput`; graceful degrade when file missing (empty array → empty prompt → byte-identical pre-Phase-57 behaviour). `scripts/check-l2-emission-rate.mjs` codifies SC#3 (`--sample 20 --min 18`, exit 0 PASS / exit 1 FAIL; reads L2 vocab dynamically from `coding.lower.json`). Container verified live (`docker exec coding-services grep -c "REFINEMENT STEP" /coding/.../ontology-classification-agent.js → 2`). Commits: submodule `33a8960` (RED) + `1250d1f` (GREEN); outer `548ceb691` + `6ac7d4f97` (pointer bumps) + `0cd90fd2e` (smoke script) + `b14eff420` (partial SUMMARY, superseded) + close-commit. 5 unit tests added (5/5 PASS); 4 neighbouring suites 33/33 PASS (zero regressions). **Task 3 (HUMAN-UAT) DEFERRED as verification-debt per operator decision at orchestrator checkpoint — same pattern as Plan 57-03 Task 4.** Static evidence (Tasks 1+2 AC matrix all green; dist grep matches host; container bind-mount picked up; refinement reaches LLM) is conclusive that the L2 refinement surface is wired end-to-end. Pre-cutover baseline returns `l2_emitted=0/20 FAIL` because the 20 most-recent online entities pre-date the classifier cutover (latest 2026-05-23) — real evaluation requires fresh post-cutover classifications. Discharge the debt after the next wave-analysis run per the runbook in 57-04-SUMMARY.md § Verification Debt.
 - [Phase 57-05 closed]: Live backfill executed by orchestrator (operator-supervised) 2026-06-14T20:13Z against `.data/knowledge-graph/exports/general.json` (1270 entities). Result: 743 migrated, 527 skipped (already had metadata.project), 0 errors, 528ms wall-clock. Distribution: 705 entities via step-2 team carry-forward, 2 via step-3 legacyId-A, 36 via step-4 default-ambiguous (all in 019eb544/019eb7c3 UUID namespace with non-Project metadata.team values — defaulted to 'coding' per CLAUDE.md container mapping). SC#1 PASS: jq distribution on post-backfill general.json shows only `coding` (922 of 922 nodes carry metadata.project — 100% coverage). LOWERONTO-04 runtime evidence satisfied. **Operational discovery (Rule 3 deviation)**: PLAN.md Task 3 recipe was incomplete — the live LevelDB LOCK is held by BOTH the coding-services container AND the host-side `com.coding.obs-api` launchd daemon (PID 51066 at execution time). Required sequence: docker-compose stop coding-services → `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.coding.obs-api.plist` → run backfill → `launchctl bootstrap ...` to restore. Locked into 57-05-SUMMARY.md § Operator Runbook for future re-execution. Snapshot-restore quirk (CLAUDE.md known issue — km-core persistGraph debounces only on close()) caused idempotency re-runs to see flux source files but the data-level idempotency invariant held (byPrecedenceStep.team == 0 on re-runs, confirming step-1 skip works). Defensive snapshot preserved at `.data/knowledge-graph/exports/general.json.pre-57-05` (9,282,951 bytes).
+- [Phase 60]: Phase 60-04: HIERARCHY_ROOTS closed-set vocabulary in lib/km-core/src/types/hierarchy-roots.ts (5 names: CK + 4 project anchors); writer-side hard-root guard in ontology-classification-agent.classifySingleObservation with classificationMethod='hard-root-guard' literal; idempotent repair script scripts/repair-ck-ontology-class.mjs via km-core trusted-path putEntity. Docker rebuild skipped (pre-existing proxy issue); bind-mount of dist/ makes Docker rebuild unnecessary for this submodule.
 
 ### Blockers/Concerns
 
@@ -273,10 +274,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 57 P03 | ~12min (Tasks 1-3 in initial session; Task 4 deferred as verification-debt at orchestrator checkpoint, closed after orchestrator unblock commit 862336b84) | 4 tasks (3 executed + 1 deferred) | 6 files modified (5 submodule TS + docker-compose.yml via orchestrator) |
 | Phase 57 P04 | ~28min (Tasks 1+2 in initial executor session via TDD RED→GREEN + dist build + container restart + smoke script + partial SUMMARY; close-out by continuation executor with Task 3 deferred as verification-debt at orchestrator checkpoint) | 3 tasks (2 executed + 1 deferred) | 3 files created/modified (ontology-classification-agent.ts +159 LoC, ontology-classification-agent.test.ts new 230 LoC, scripts/check-l2-emission-rate.mjs new 229 LoC) + 5 new unit tests (5/5 PASS) |
 | Phase 57 P05 | ~14min (Tasks 1+2 in initial executor session ~8min; Task 3 live backfill via orchestrator + close-out by continuation executor ~6min) | 3 tasks | 3 files created/modified (scripts/backfill-project-tag.mjs new 441 LoC + scripts/backfill-project-tag.test.mjs new 361 LoC + integrations/unified-viewer/src/graph/graph-builder.ts ±8 lines) + 1 defensive snapshot + 4 backfill summary JSONs |
+| Phase 60 P04 | 13 | 3 tasks | 7 files |
 
 ## Session Continuity
 
-Last session: 2026-06-17T12:02:19.836Z
+Last session: 2026-06-17T13:07:55.900Z
 Stopped at: Phase 60 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
