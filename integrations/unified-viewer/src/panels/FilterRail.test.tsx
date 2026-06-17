@@ -11,7 +11,10 @@
 //   - Lazy mounts for TrendingPanel (always) + HierarchyNavigator (coding only)
 //     are pinned here by Plan 55-08; downstream plans 55-10/55-11 OVERWRITE the
 //     placeholder modules but do NOT edit FilterRail.tsx
-//   - On system === 'coding', OntologyFilter is mounted with CODING_SCHEMA
+//   - On system === 'coding', OntologyFilter takes the API-driven L1->L2 path
+//     (Phase 60 60-05: no groupingSchema prop; was CODING_SCHEMA pre-60)
+//   - On system === 'okb', OntologyFilter is pinned to VOKB_SCHEMA (legacy
+//     hardcoded path preserved per W-1)
 //   - On system === 'okb', the HierarchyNavigator slot is absent (negative)
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
@@ -170,9 +173,12 @@ describe('FilterRail', () => {
     expect(screen.getByText('Domain')).toBeInTheDocument()
   })
 
-  test('Phase 55-08: mounts OntologyFilter (group header Ontology Class visible)', () => {
+  test('Phase 55-08: mounts OntologyFilter (group header Ontology Class visible)', async () => {
+    // Phase 60 (60-05): coding tab takes the API-driven path. The "Ontology
+    // Class" group header only renders after the fetch resolves and the
+    // available-class intersection is non-empty. Wait for the fetch.
     renderRail(makeApiClient())
-    expect(screen.getByText('Ontology Class')).toBeInTheDocument()
+    expect(await screen.findByText('Ontology Class')).toBeInTheDocument()
   })
 
   test('Phase 55-08: mounts GraphToggles (4 toggle labels visible)', () => {
@@ -192,19 +198,20 @@ describe('FilterRail', () => {
     expect(screen.queryByTestId('filter-class-list')).toBeNull()
   })
 
-  test('Phase 55-08: on system === "coding", OntologyFilter uses CODING_SCHEMA (Hierarchy + Typed Views)', () => {
+  test('Phase 60 (60-05): on system === "coding", OntologyFilter takes API-driven path (no Typed Views; legacy CODING_SCHEMA dropped)', async () => {
     const entities: Entity[] = [
       { id: 'a', name: 'A', ontologyClass: 'Project' } as Entity,
       { id: 'b', name: 'B', ontologyClass: 'Observation' } as Entity,
     ]
-    renderRail(makeApiClient(), vi.fn(), [], 'coding', entities)
-    // 55-11 added a HierarchyNavigator under the lazy slot whose section
-    // header is also "Hierarchy". When the Suspense resolves quickly under
-    // jsdom this test would see two matches; use getAllByText to accept
-    // either situation. The CODING_SCHEMA group named "Hierarchy" MUST be
-    // present (count ≥ 1); the Typed Views group is unique.
-    expect(screen.getAllByText('Hierarchy').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('Typed Views')).toBeInTheDocument()
+    // listOntologyClasses is called on the coding tab (API-driven path).
+    const apiClient = makeApiClient()
+    renderRail(apiClient, vi.fn(), [], 'coding', entities)
+    await waitFor(() => {
+      expect(apiClient.listOntologyClasses).toHaveBeenCalled()
+    })
+    // Legacy CODING_SCHEMA group headers MUST be gone (D-16).
+    expect(screen.queryByText('Typed Views')).toBeNull()
+    expect(screen.queryByText('LSL Pipeline')).toBeNull()
   })
 
   test('Phase 55-08: on system === "okb", OntologyFilter uses VOKB_SCHEMA (Upper + Lower)', () => {

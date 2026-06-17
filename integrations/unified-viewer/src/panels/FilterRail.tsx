@@ -33,7 +33,7 @@ import { TeamsFilter } from '@/panels/filters/TeamsFilter'
 import { DomainFilter } from '@/panels/filters/DomainFilter'
 import {
   OntologyFilter,
-  CODING_SCHEMA,
+  VOKB_SCHEMA,
 } from '@/panels/filters/OntologyFilter'
 import { GraphToggles } from '@/panels/filters/GraphToggles'
 
@@ -121,9 +121,12 @@ export function FilterRail({
     )
   }
 
-  // OntologyFilter schema is driven by system. Coding uses Hierarchy +
-  // Typed Views; OKB uses the default VOKB Upper/Lower layout.
-  const ontologySchema = system === 'coding' ? CODING_SCHEMA : undefined
+  // Phase 60 (60-05): OntologyFilter schema choice flipped. Coding tab now
+  // omits the prop entirely so OntologyFilter takes its API-driven path
+  // (L1->L2 groups from /api/v1/ontology/classes?withDisplay=true). OKB tab
+  // keeps the legacy hardcoded path via VOKB_SCHEMA — W-1 regression
+  // preservation (VOKB schema migration is explicitly out of Phase 60 scope).
+  const legacyGroupingSchema = system === 'okb' ? VOKB_SCHEMA : undefined
 
   return (
     <aside
@@ -219,8 +222,15 @@ export function FilterRail({
       {/* Domain (NEW) */}
       <DomainFilter entities={entities} />
 
-      {/* Ontology Class — grouped tree (NEW; REPLACES Phase 45 flat ClassList) */}
-      <OntologyFilter entities={entities} groupingSchema={ontologySchema} />
+      {/* Ontology Class — grouped tree (NEW; REPLACES Phase 45 flat ClassList).
+          Phase 60 (60-05): coding tab now uses the API-driven L1->L2 path
+          (no prop); OKB tab pins legacyGroupingSchema={VOKB_SCHEMA} to keep
+          its Upper/Lower groups (W-1 regression preservation). */}
+      <OntologyFilter
+        entities={entities}
+        apiClient={apiClient}
+        groupingSchema={legacyGroupingSchema}
+      />
 
       {/* Graph Toggles (NEW; ported from VOKB LegendPanel toggle block) */}
       <GraphToggles />
