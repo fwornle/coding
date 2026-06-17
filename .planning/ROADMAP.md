@@ -1118,7 +1118,7 @@ Plans:
   4. With the Online learning-source filter active, `CollectiveKnowledge` remains visible in the rendered graph (or its path-trace anchor is preserved) so focal-ancestry traces from leaf entities still reach the system root — not truncated at the project level.
   5. The Ontology Class filter sidebar renders Phase 57's L2 lower-ontology classes as expandable groups under their L1 upper-ontology parent, each L2 row carries a per-class count badge, and the operator can collapse the group to filter all members at once.
 
-**Plans:** 3/6 plans executed
+**Plans:** 5/6 plans executed
 
 Plans:
 
@@ -1130,8 +1130,8 @@ Plans:
 
 **Wave 2** *(depends on 60-01 — Legend's LAYERS section + visibility-predicate VisibilityFilters interface both reach into the layer.ts module + visibility-predicate.ts)*
 
-- [ ] 60-02-PLAN.md — G2: Dynamic Legend — full rewrite of LegendPanel.tsx to receive entities + relations props and derive DOMAINS / LAYERS / SOURCE / RELATIONSHIPS from rendered set (VKBUI-02)
-- [ ] 60-03-PLAN.md — G3: Observation/Digest debug toggle — `showDebugEntityTypes: boolean` store field + GraphToggles row + predicate gate (VKBUI-03) — moved to Wave 2 because both 60-01 and 60-03 mutate the `VisibilityFilters` interface in `visibility-predicate.ts`; sequencing fixes the disjoint-file-surface invariant
+- [x] 60-02-PLAN.md — G2: Dynamic Legend — full rewrite of LegendPanel.tsx to receive entities + relations props and derive DOMAINS / LAYERS / SOURCE / RELATIONSHIPS from rendered set (VKBUI-02)
+- [x] 60-03-PLAN.md — G3: Observation/Digest debug toggle — `showDebugEntityTypes: boolean` store field + GraphToggles row + predicate gate (VKBUI-03) — moved to Wave 2 because both 60-01 and 60-03 mutate the `VisibilityFilters` interface in `visibility-predicate.ts`; sequencing fixes the disjoint-file-surface invariant
 
 **Wave 3** *(depends on all behavior plans landing)*
 
