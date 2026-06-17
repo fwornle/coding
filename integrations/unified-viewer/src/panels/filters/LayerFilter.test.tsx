@@ -160,6 +160,9 @@ describe('LayerFilter', () => {
       visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
       lslFilterEntityIds: null,
       ontologyRegistry: registry,
+      // Phase 60 Plan 03 (G3): VisibilityFilters now requires this flag.
+      // Default false keeps the architecture-bleed shield ON.
+      showDebugEntityTypes: false,
     })
     // Cast through unknown — the two Entity types diverge in `level`
     // (ApiClient: number; graph/types: 0|1|2|3). The fixtures above omit
