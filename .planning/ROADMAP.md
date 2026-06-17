@@ -1029,7 +1029,7 @@ Plans:
 
 - [x] **Phase 57: Lower Ontology & Project Tagging Foundation** — declare coding-specific L2 classes (`LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`); optional upper-ontology growth; stamp `project` tag on every km-core entity. (completed 2026-06-15)
 - [x] **Phase 58: Online Pipeline Semantic Edges on Insights** — `ObservationConsolidator` emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on online Insights, atomically with the Insight node, beyond the existing `capturedBy → LiveLoggingSystem` provenance. (completed 2026-06-15)
-- [ ] **Phase 59: Long-Tail Orphan Fixes & Baseline Reduction** — server-side System-type filter fix (legacy Phase 48); parent-hierarchy edges for online-learned Detail/SubComponent + one-shot migration (legacy Phase 49); per-team `CollectiveKnowledge --includes--> Project` writer + seed fix; drive `orphanCount` from 157 → ≤30.
+- [x] **Phase 59: Long-Tail Orphan Fixes & Baseline Reduction** — server-side System-type filter fix (legacy Phase 48); parent-hierarchy edges for online-learned Detail/SubComponent + one-shot migration (legacy Phase 49); per-team `CollectiveKnowledge --includes--> Project` writer + seed fix; drive `orphanCount` from 157 → ≤30. (completed 2026-06-17)
 - [ ] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges.
 - [ ] **Phase 61: LSL Timeline & OKB Routing Honesty** — remove silent 200-record cap (`useLslSessions.ts`) with visible "N of M" label or honest streaming; honest "all" window (no silent 365-day cap); bi-source tick coloring (manual vs online); `/viewer/okb` ApiClient detects OKM Express `:8090` legacy `/api/entities` shape and routes correctly, showing real OKM business entities not coding-KG mirrors.
 
@@ -1098,12 +1098,12 @@ Plans:
   3. The consolidator-side `has_insight` follower at `src/live-logging/ObservationConsolidator.js:677-694` is hardened so a freshly-minted `Insight` is never persisted without its project-anchor edge — either by wrapping `writeInsight` + `addRelation('has_insight')` in a single try-block whose failure rolls back the Insight (km-core delete) OR by tightening the probe so a transient `findRelations` mis-read can't false-negative the addRelation skip. The "1 orphan Insight per ~100 inserts" rate observed on 2026-06-15 is closed (acceptance: zero orphan Insights minted by a deliberate-failure-injection test).
   4. `/api/v1/stats` reports `orphanCount ≤ 10` at milestone close, sustained across 24h of online-learning activity (sampled hourly via a polling harness, not a snapshot reading). The measurement reads the live km-core graph that `unified-viewer @ :5173` reads — same `/api/v1/stats` endpoint cited by the pre-discuss reality check.
 
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 - [x] 59-01-PLAN.md — Refactor ObservationWriter.writeInsight to return {legacyId, mintedId} + unit tests (ORPHAN-INS-01 prerequisite)
 - [x] 59-02-PLAN.md — Digest writer-fix: add derivedFrom loop after putEntity in consolidateDay plain-insert branch + unit tests (ORPHAN-DIG-01)
 - [x] 59-03-PLAN.md — Update _pushInsightToKG to consume writeInsight's new {legacyId, mintedId} return shape; remove findByLegacyId race lookup (ORPHAN-INS-01)
 - [x] 59-04-PLAN.md — Two-layer one-shot repair script: km-core graph orphan edges + cold-store digests.json dangling-ref scrub (ORPHAN-DIG-02; folds 2026-05-23 todo)
-- [ ] 59-05-PLAN.md — 24h orphan-floor soak harness + operator runbook (ORPHAN-FLOOR)
+- [x] 59-05-PLAN.md — 24h orphan-floor soak harness + operator runbook (ORPHAN-FLOOR)
 
 ### Phase 60: Unified Viewer Rendering UX Integrity
 
