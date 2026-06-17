@@ -4,8 +4,8 @@ milestone: v7.2
 milestone_name: VKB & Online-Learning Quality
 status: executing
 stopped_at: Phase 59 context gathered (downscoped to Digest/Insight writer-edge repair)
-last_updated: "2026-06-16T05:37:52.816Z"
-last_activity: 2026-06-16 -- Phase 59 planning complete
+last_updated: "2026-06-16T16:33:44.025Z"
+last_activity: 2026-06-16 -- Phase 59 execution started
 progress:
   total_phases: 5
   completed_phases: 2
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 59 — long tail orphan fixes & baseline reduction
+**Current focus:** Phase 59 — digest-insight-writer-edge-repair
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 59
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-16 -- Phase 59 planning complete
+Phase: 59 (digest-insight-writer-edge-repair) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 59
+Last activity: 2026-06-16 -- Phase 59 execution started
 
 ## Performance Metrics
 
