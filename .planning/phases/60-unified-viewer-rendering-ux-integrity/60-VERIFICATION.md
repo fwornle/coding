@@ -2,13 +2,16 @@
 phase: 60-unified-viewer-rendering-ux-integrity
 status: gaps_found
 verified_on: 2026-06-17T21:30:00Z
+re_verified_on: 2026-06-17T22:30:00Z
 verifier: claude (orchestrator-driven gsd-browser smoke)
 viewer_url: http://localhost:5173/viewer/coding
-api_url: http://localhost:3848/api/v1/ontology/classes?withDisplay=true
+api_url: http://localhost:12436/api/v1/ontology/classes?withDisplay=true
 sc_passed: 4
 sc_partial: 1
 sc_inconclusive: 1
 gaps_open: 2
+followup_todos:
+  - .planning/todos/pending/2026-06-17-ontologyfilter-runtime-routing-gap.md
 ---
 
 # Phase 60 Verification
@@ -115,6 +118,23 @@ Folds in Plan 60-04 Task 4: CK ontologyClass repair is reflected in the live sna
 Plan 60-05's `OntologyFilter.tsx` correctly fetches `withDisplay=true` and tries to build L1→L2 groups (`OntologyFilter.tsx:452, 482-484`), but with no `level`/`parent` metadata in the response, every class falls into the flat-row path. The viewer-side code is doing what the plan specified; the data-side hand-off from Phase 57's `.data/ontologies/coding.lower.json` to the served API response is broken.
 
 **Triage:** upstream API surface needs to honor `withDisplay=true` and return `{name, level, parent, display}` for L0/L1/L2 classes. The local `coding.lower.json` has the L2 list — the gap is between km-core's ontology handler and the configured lower-ontology source.
+
+### 60-07 Update (2026-06-17 re-smoke)
+
+Plan 60-07 shipped the data + handler correctness (16/16 new tests + 401/401 km-core full suite green):
+
+- `.data/ontologies/coding-ontology.json` Component/SubComponent/Detail carry top-level `level: 1`
+- `.data/ontologies/coding.lower.json` 10 Phase-57 L2 classes carry `level: 2` + explicit `parent`
+- `lib/km-core/src/api/handlers/ontology.ts` now synthesizes L0 anchors from `HIERARCHY_ROOTS` and derives `parent` from `extends` fallback
+- Live API confirms L0: `curl -s http://localhost:12436/api/v1/ontology/classes?withDisplay=true | jq '[.data[] | select(.level == 0)] | map(.name)'` → `["System", "Project"]`
+
+But TWO runtime sourcing gaps remain (documented in `.planning/todos/pending/2026-06-17-ontologyfilter-runtime-routing-gap.md`):
+
+- **Gap A:** obs-api's `GraphKMStore` is constructed from `defaultOntologyDir()` → `lib/km-core/ontology/` (bundled, 4 classes only). Host `.data/ontologies/` is never reached, so L1/L2 classes don't enter the registry. Swapping the one-liner at `scripts/observations-api-server.mjs:1336` would break the obs-api writer because the bundled `learning-artifacts.json` is the source of truth for `LearningArtifact`/`Observation`/`Digest`/`Insight` classes the writer depends on — needs careful follow-up design (operator-decided 2026-06-17 to accept partial-PASS rather than risk inline swap).
+
+- **Gap B:** Vite dev server doesn't proxy `/api/v1/*` to `http://localhost:12436`. From inside the viewer, `fetch("/api/v1/ontology/classes?withDisplay=true")` returns `Content-Type: text/html` (SPA fall-through). Even with Gap A fixed, the dev viewer would still render an empty filter until the proxy entry lands in `integrations/unified-viewer/vite.config.ts` (or the prod path is used for verification).
+
+**Outcome update:** SC#5 stays PARTIAL but with materially different cause: handler-side contract is complete (L0 synthesis live in API response); runtime routing for L1/L2 + the dev-mode proxy is the remaining gap. Both follow-ups consolidated in the linked todo for a Phase 60.1 / next-milestone scope.
 
 ## VOKB W-1 regression (Plan 60-05 dual-mode contract)
 
