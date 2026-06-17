@@ -1118,7 +1118,7 @@ Plans:
   4. With the Online learning-source filter active, `CollectiveKnowledge` remains visible in the rendered graph (or its path-trace anchor is preserved) so focal-ancestry traces from leaf entities still reach the system root — not truncated at the project level.
   5. The Ontology Class filter sidebar renders Phase 57's L2 lower-ontology classes as expandable groups under their L1 upper-ontology parent, each L2 row carries a per-class count badge, and the operator can collapse the group to filter all members at once.
 
-**Plans:** 6/6 plans complete
+**Plans:** 7/7 plans complete
 
 Plans:
 
