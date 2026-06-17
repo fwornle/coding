@@ -147,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-15 — Phase 58 complete (Online Pipeline Semantic Edges on Insights: `MentionsClassifier` host-side module, atomic emission via extended `ObservationWriter.writeInsight`, one-shot backfill + bridge extension, SC#1/SC#2/SC#3 all PASS, EDGE-01 + EDGE-02 marked complete in REQUIREMENTS.md). v7.2 milestone in progress.*
+*Last updated: 2026-06-17 — Phase 59 complete (Digest/Insight Writer-Edge Repair: `ObservationWriter.writeInsight` returns `{legacyId, mintedId}` closing D-03 race, `consolidateDay` plain-insert emits `derivedFrom` per observation_id closing ORPHAN-DIG-01, `_pushInsightToKG` consumes the new return shape and drops the racy `findByLegacyId` post-write lookup closing ORPHAN-INS-01, two-layer host-side repair script ships, 24h orphan-floor soak harness + operator runbook ship for ORPHAN-FLOOR baseline measurement; VERIFICATION passed 4/4). v7.2 milestone in progress.*
