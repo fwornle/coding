@@ -1,69 +1,228 @@
-// PATTERN SOURCE: 55-07-PLAN.md Task 1 <behavior>
-//   + 55-PATTERNS.md § LegendPanel.tsx
+// PATTERN SOURCE: 60-02-PLAN.md Task 1 <behavior>
+//   + 60-CONTEXT.md § D-05..D-08
 //
-// Behavior:
-//   Test 1: renders inside a <details> element (collapsed by default); 4 sections
-//           — Domains, Layers, Source, Relationships.
-//   Test 2: swatch colors come from vokb-palette.ts exports — assert at least 3
-//           Tailwind classes from LAYER_BADGE_CLASS/EDGE_STYLES appear in DOM.
-//   Test 3: shape swatches rendered as inline SVG (per 55-05 v1 note in
-//           summary — renderer ships circles for all 5 shapes; LegendPanel must
-//           render true SVG shapes so users see the encoded distinction).
+// Plan 60-02 rewrites LegendPanel.tsx so every section is derived from the
+// currently-rendered (post-filter) entities + relations. These 11 behaviors
+// cover D-05 (props-driven), D-06 (per-section rules), D-07 (empty hidden),
+// D-08 (section order), plus the negative-assertion suite that proves the
+// static OKB strings (RuntimeDiagnostics / Official doc / Automated RCA /
+// Team knowledge / User input / CORRELATED_WITH / RELATES_TO) no longer
+// bleed into the VKB tab when the rendered set is "Component-only".
 
 import { describe, test, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { LegendPanel } from './LegendPanel'
-import { LAYER_BADGE_CLASS, EDGE_STYLES } from '@/graph/vokb-palette'
+import type { Entity, Relation } from '@/api/ApiClient'
 
 afterEach(() => cleanup())
 
-describe('LegendPanel', () => {
-  test('Test 1: renders inside a <details> element (collapsed by default) with 4 sections', () => {
-    const { container } = render(<LegendPanel />)
-    const details = container.querySelector('details')
-    expect(details).not.toBeNull()
-    // <details> is collapsed by default — open attribute absent unless author sets it
-    expect(details?.hasAttribute('open')).toBe(false)
-    // Summary text
+// Helper — build a minimal Entity with whatever overrides the test wants.
+// The ApiClient.Entity shape requires id/name/ontologyClass; everything else
+// is optional via the `[k: string]: unknown` index signature.
+function makeEntity(over: Partial<Entity> & { ontologyClass: string }): Entity {
+  return {
+    id: over.id ?? `e-${Math.random().toString(36).slice(2, 8)}`,
+    name: over.name ?? 'fixture',
+    ...over,
+  }
+}
+
+function makeRelation(type: string, idx = 0): Relation {
+  return { from: `a-${idx}`, to: `b-${idx}`, type }
+}
+
+describe('LegendPanel — DOMAINS derivation (D-06)', () => {
+  test('Test 1: DOMAINS lists exactly the ontologyClass values in the rendered set (no RuntimeDiagnostics bleed)', () => {
+    const entities: Entity[] = [
+      makeEntity({ ontologyClass: 'Component' }),
+      makeEntity({ ontologyClass: 'Component' }),
+      makeEntity({ ontologyClass: 'Component' }),
+      makeEntity({ ontologyClass: 'Service' }),
+      makeEntity({ ontologyClass: 'Service' }),
+      makeEntity({ ontologyClass: 'Pattern' }),
+    ]
+    const { container } = render(<LegendPanel entities={entities} relations={[]} />)
+
+    // 3 distinct DOMAINS rows
+    expect(container.querySelector('[data-testid="legend-domain-Component"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="legend-domain-Service"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="legend-domain-Pattern"]')).not.toBeNull()
+
+    // No RuntimeDiagnostics row — that was the static OKB seed.
+    expect(container.querySelector('[data-testid="legend-domain-RuntimeDiagnostics"]')).toBeNull()
+    expect(screen.queryByText('RuntimeDiagnostics')).toBeNull()
+  })
+
+  test('Test 2: unknown ontologyClass falls back to gray circle with explanatory tooltip', () => {
+    const entities: Entity[] = [makeEntity({ ontologyClass: 'NovelClass2099' })]
+    const { container } = render(<LegendPanel entities={entities} relations={[]} />)
+
+    const row = container.querySelector('[data-testid="legend-domain-NovelClass2099"]')
+    expect(row).not.toBeNull()
+    // Fallback rows carry an explanatory title attribute somewhere on the row
+    // (D-22 — keep operators informed when a class lacks a registered shape).
+    expect(row?.getAttribute('title') || row?.querySelector('[title]')?.getAttribute('title'))
+      .toMatch(/class without registered shape/i)
+  })
+})
+
+describe('LegendPanel — LAYERS derivation (D-06)', () => {
+  test('Test 3: LAYERS renders both evidence + pattern when both are derivable from entities', () => {
+    // Two Component (→ evidence via deriveLayer) + one Pattern (→ pattern).
+    const entities: Entity[] = [
+      makeEntity({ ontologyClass: 'Component' }),
+      makeEntity({ ontologyClass: 'Component' }),
+      makeEntity({ ontologyClass: 'Pattern' }),
+    ]
+    const { container } = render(<LegendPanel entities={entities} relations={[]} />)
+
+    expect(container.querySelector('[data-testid="legend-layer-evidence"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="legend-layer-pattern"]')).not.toBeNull()
+  })
+
+  test('Test 4: LAYERS hides "pattern" row when no pattern-derived entities are present', () => {
+    const entities: Entity[] = [
+      makeEntity({ ontologyClass: 'Component' }),
+      makeEntity({ ontologyClass: 'Service' }),
+    ]
+    const { container } = render(<LegendPanel entities={entities} relations={[]} />)
+
+    expect(container.querySelector('[data-testid="legend-layer-evidence"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="legend-layer-pattern"]')).toBeNull()
+  })
+})
+
+describe('LegendPanel — SOURCE derivation (D-06)', () => {
+  test('Test 5: SOURCE lists only distinct metadata.source values present (no Official doc / Automated RCA / etc.)', () => {
+    const entities: Entity[] = [
+      makeEntity({ ontologyClass: 'Component', metadata: { source: 'manual' } }),
+      makeEntity({ ontologyClass: 'Component', metadata: { source: 'auto' } }),
+      makeEntity({ ontologyClass: 'Component', metadata: { source: 'auto' } }),
+      makeEntity({ ontologyClass: 'Component', metadata: { source: 'online' } }),
+    ]
+    const { container } = render(<LegendPanel entities={entities} relations={[]} />)
+
+    expect(container.querySelector('[data-testid="legend-source-manual"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="legend-source-auto"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="legend-source-online"]')).not.toBeNull()
+
+    // No static OKB rows
+    expect(screen.queryByText(/Official doc/i)).toBeNull()
+    expect(screen.queryByText(/Automated RCA/i)).toBeNull()
+    expect(screen.queryByText(/Team knowledge/i)).toBeNull()
+    expect(screen.queryByText(/User input/i)).toBeNull()
+  })
+
+  test('Test 6: SOURCE section is hidden entirely when no entity carries metadata.source (D-07)', () => {
+    const entities: Entity[] = [
+      makeEntity({ ontologyClass: 'Component' }),
+      makeEntity({ ontologyClass: 'Service' }),
+    ]
+    const { container } = render(<LegendPanel entities={entities} relations={[]} />)
+
+    // No SOURCE section heading
+    expect(screen.queryByText(/^Source$/i)).toBeNull()
+    // No SOURCE rows
+    expect(container.querySelectorAll('[data-testid^="legend-source-"]').length).toBe(0)
+  })
+})
+
+describe('LegendPanel — RELATIONSHIPS derivation (D-06)', () => {
+  test('Test 7: RELATIONSHIPS lists only relation.type values in the rendered set (no CORRELATED_WITH / RELATES_TO bleed)', () => {
+    const relations: Relation[] = [
+      makeRelation('PART_OF', 0),
+      makeRelation('PART_OF', 1),
+      makeRelation('CAUSED_BY', 2),
+    ]
+    const entities: Entity[] = [makeEntity({ ontologyClass: 'Component' })]
+    const { container } = render(<LegendPanel entities={entities} relations={relations} />)
+
+    expect(container.querySelector('[data-testid="legend-rel-PART_OF"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="legend-rel-CAUSED_BY"]')).not.toBeNull()
+
+    // No static OKB types
+    expect(container.querySelector('[data-testid="legend-rel-CORRELATED_WITH"]')).toBeNull()
+    expect(container.querySelector('[data-testid="legend-rel-RELATES_TO"]')).toBeNull()
+    expect(container.querySelector('[data-testid="legend-rel-INDICATES"]')).toBeNull()
+  })
+
+  test('Test 8: unknown relation.type still renders with gray fallback line (#d1d5db)', () => {
+    const entities: Entity[] = [makeEntity({ ontologyClass: 'Component' })]
+    const relations: Relation[] = [makeRelation('NOVEL_REL', 0)]
+    const { container } = render(<LegendPanel entities={entities} relations={relations} />)
+
+    const row = container.querySelector('[data-testid="legend-rel-NOVEL_REL"]')
+    expect(row).not.toBeNull()
+    const line = row?.querySelector('line')
+    expect(line).not.toBeNull()
+    expect(line?.getAttribute('stroke')).toBe('#d1d5db')
+  })
+})
+
+describe('LegendPanel — Empty sections + ordering', () => {
+  test('Test 9: empty entities + empty relations → no Section components rendered (D-07); Legend summary still visible', () => {
+    const { container } = render(<LegendPanel entities={[]} relations={[]} />)
+
+    // Summary still rendered
     expect(screen.getByText(/^Legend$/i)).toBeInTheDocument()
-    // 4 section headings
-    expect(screen.getByText(/^Domains$/i)).toBeInTheDocument()
-    expect(screen.getByText(/^Layers$/i)).toBeInTheDocument()
-    expect(screen.getByText(/^Source$/i)).toBeInTheDocument()
-    expect(screen.getByText(/^Relationships$/i)).toBeInTheDocument()
+
+    // No section headings (Domains/Layers/Source/Relationships)
+    expect(screen.queryByText(/^Domains$/i)).toBeNull()
+    expect(screen.queryByText(/^Layers$/i)).toBeNull()
+    expect(screen.queryByText(/^Source$/i)).toBeNull()
+    expect(screen.queryByText(/^Relationships$/i)).toBeNull()
+
+    // No rows
+    expect(container.querySelectorAll('[data-testid^="legend-domain-"]').length).toBe(0)
+    expect(container.querySelectorAll('[data-testid^="legend-layer-"]').length).toBe(0)
+    expect(container.querySelectorAll('[data-testid^="legend-source-"]').length).toBe(0)
+    expect(container.querySelectorAll('[data-testid^="legend-rel-"]').length).toBe(0)
   })
 
-  test('Test 2: swatches use vokb-palette tokens — ≥3 LAYER_BADGE_CLASS/EDGE_STYLES tokens appear in markup', () => {
-    const { container } = render(<LegendPanel />)
-    const html = container.innerHTML
-    // Layer badge classes — these are the Tailwind className strings
-    let layerHits = 0
-    for (const cls of Object.values(LAYER_BADGE_CLASS)) {
-      // Take the first token of each compound class string for the assertion;
-      // e.g. "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      // → "bg-blue-100" must appear somewhere in the legend.
-      const firstToken = cls.split(' ')[0]
-      if (html.includes(firstToken)) layerHits += 1
-    }
-    // Edge colors — the EDGE_STYLES values are raw hex (#xxxxxx) used inside SVG
-    let edgeHits = 0
-    for (const { color } of Object.values(EDGE_STYLES)) {
-      if (html.includes(color)) edgeHits += 1
-    }
-    // Combined evidence of palette usage. Plan's <done> grep gate requires ≥3
-    // Tailwind classes from LAYER_BADGE_CLASS/EDGE_STYLES.
-    expect(layerHits + edgeHits).toBeGreaterThanOrEqual(3)
-  })
+  test('Test 10: section order is DOMAINS → LAYERS → SOURCE → RELATIONSHIPS when all four populated (D-08)', () => {
+    const entities: Entity[] = [
+      makeEntity({ ontologyClass: 'Component', metadata: { source: 'manual' } }),
+      makeEntity({ ontologyClass: 'Pattern', metadata: { source: 'auto' } }),
+    ]
+    const relations: Relation[] = [makeRelation('PART_OF', 0)]
+    render(<LegendPanel entities={entities} relations={relations} />)
 
-  test('Test 3: shape swatches rendered as inline SVG (55-05 renderer stub workaround)', () => {
-    const { container } = render(<LegendPanel />)
-    // Open the <details> so children become visible in the DOM (jsdom still
-    // renders inner content regardless of open state, but assertion is more
-    // explicit when we walk the SVGs.)
-    const svgs = container.querySelectorAll('svg')
-    // At minimum we expect: shape swatches (>=5), source-authority stroke
-    // samples (>=3), relationship line samples (>=10). Tally ≥10 SVGs total.
-    expect(svgs.length).toBeGreaterThanOrEqual(10)
+    const headings = ['Domains', 'Layers', 'Source', 'Relationships'].map((t) => screen.getByText(new RegExp(`^${t}$`, 'i')))
+
+    // Verify all four exist
+    for (const h of headings) expect(h).toBeInTheDocument()
+
+    // Verify DOM order — earlier in document should come first.
+    function position(node: HTMLElement) {
+      let n: Node | null = node
+      let i = 0
+      // Walk to root counting tree-order via documentPosition
+      // Use compareDocumentPosition for direct ordering.
+      return n
+        ? Array.from(document.querySelectorAll('*')).indexOf(node)
+        : -1
+    }
+    const positions = headings.map((h) => position(h as HTMLElement))
+    expect(positions[0]).toBeLessThan(positions[1])
+    expect(positions[1]).toBeLessThan(positions[2])
+    expect(positions[2]).toBeLessThan(positions[3])
+  })
+})
+
+describe('LegendPanel — Negative assertions (no static OKB content bleeds in)', () => {
+  test('Test 11: with only a Component entity and zero relations, no static OKB labels appear anywhere', () => {
+    const entities: Entity[] = [makeEntity({ ontologyClass: 'Component' })]
+    render(<LegendPanel entities={entities} relations={[]} />)
+
+    // These strings used to be hardcoded in the previous LegendPanel; they
+    // must NEVER appear when the rendered set lacks them.
+    expect(screen.queryByText(/RuntimeDiagnostics/i)).toBeNull()
+    expect(screen.queryByText(/Official doc/i)).toBeNull()
+    expect(screen.queryByText(/Automated RCA/i)).toBeNull()
+    expect(screen.queryByText(/Team knowledge/i)).toBeNull()
+    expect(screen.queryByText(/User input/i)).toBeNull()
+    expect(screen.queryByText(/CORRELATED_WITH/i)).toBeNull()
+    expect(screen.queryByText(/RELATES_TO/i)).toBeNull()
   })
 })
 
