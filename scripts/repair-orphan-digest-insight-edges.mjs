@@ -512,17 +512,21 @@ async function processColdStoreLayer({ dryRun }) {
 
   let totalDropped = 0;
   let digestsAffected = 0;
+  const fieldNameUsage = { observationIds: 0, obs_ids: 0, observation_ids: 0 };
 
   const newDigests = digAll.map((d) => {
     // Field name tolerance — writer side has used obs_ids, observation_ids,
     // AND observationIds at various times. Detect and preserve whichever
-    // shape the entry actually carries.
+    // shape the entry actually carries. The current cold-store writer uses
+    // `observationIds` (camelCase, observed 2026-06-17); older entries may
+    // still carry `obs_ids` or `observation_ids` (snake_case).
     let refsField = null;
     if (Array.isArray(d.observationIds)) refsField = 'observationIds';
     else if (Array.isArray(d.obs_ids)) refsField = 'obs_ids';
     else if (Array.isArray(d.observation_ids)) refsField = 'observation_ids';
 
     if (!refsField) return d;
+    fieldNameUsage[refsField]++;
 
     const before = d[refsField];
     const after = before.filter((id) => knownObsIds.has(id));
@@ -542,6 +546,9 @@ async function processColdStoreLayer({ dryRun }) {
     return { ...d, [refsField]: after };
   });
 
+  log(
+    `field-name usage in digests.json: observationIds=${fieldNameUsage.observationIds} obs_ids=${fieldNameUsage.obs_ids} observation_ids=${fieldNameUsage.observation_ids}`,
+  );
   log(`scrub summary: ${totalDropped} dangling refs across ${digestsAffected} digests`);
 
   // Persist session log so the cold-store records are flushed
