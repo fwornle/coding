@@ -93,4 +93,85 @@ describe('LayerFilter', () => {
     expect(screen.getByTestId('filter-layer-count-evidence').textContent).toBe('1')
     expect(screen.getByTestId('filter-layer-count-pattern').textContent).toBe('1')
   })
+
+  // ---- Phase 60 Plan 01 (G1) — deriveLayer-driven count badges ----
+
+  test('count badges use deriveLayer with registry — Phase 57 L2 OnlineInsight counts as pattern', () => {
+    const entities = [
+      { id: 'a', name: 'A', ontologyClass: 'Component' },
+      { id: 'b', name: 'B', ontologyClass: 'Pattern' },
+      { id: 'c', name: 'C', ontologyClass: 'OnlineInsight' },
+    ] as unknown as Entity[]
+    const registry = [
+      { name: 'OnlineInsight', parent: 'Insight' },
+      { name: 'Insight', parent: null },
+      { name: 'Pattern', parent: null },
+      { name: 'Component', parent: null },
+    ]
+    render(<LayerFilter entities={entities} ontologyRegistry={registry} />)
+    expect(screen.getByTestId('filter-layer-count-evidence').textContent).toBe('1')
+    expect(screen.getByTestId('filter-layer-count-pattern').textContent).toBe('2')
+  })
+
+  test('explicit metadata.layer overrides ontologyClass inference (D-03)', () => {
+    const entities = [
+      // Pattern by class, but writer stamped layer=evidence — must count as evidence
+      { id: 'a', name: 'A', ontologyClass: 'Pattern', metadata: { layer: 'evidence' } },
+      { id: 'b', name: 'B', ontologyClass: 'Pattern' },
+    ] as unknown as Entity[]
+    render(<LayerFilter entities={entities} />)
+    expect(screen.getByTestId('filter-layer-count-evidence').textContent).toBe('1')
+    expect(screen.getByTestId('filter-layer-count-pattern').textContent).toBe('1')
+  })
+
+  test('LayerFilter count badges agree with visibility-predicate output (Evidence-OFF symmetry, VKBUI-01 regression)', async () => {
+    // The badge and the predicate share deriveLayer — both should classify
+    // these three entities the same way under registry-aware inference.
+    const { deriveLayer } = await import('@/graph/layer')
+    const { isEntityVisible } = await import('@/graph/visibility-predicate')
+    const registry = [
+      { name: 'OnlineInsight', parent: 'Insight' },
+      { name: 'Insight', parent: null },
+      { name: 'Pattern', parent: null },
+      { name: 'Component', parent: null },
+    ]
+    const entities = [
+      { id: 'a', name: 'A', ontologyClass: 'Component' },
+      { id: 'b', name: 'B', ontologyClass: 'Pattern' },
+      { id: 'c', name: 'C', ontologyClass: 'OnlineInsight' },
+    ] as unknown as Entity[]
+    // Render LayerFilter so the count badges run through deriveLayer.
+    render(<LayerFilter entities={entities} ontologyRegistry={registry} />)
+    const evCount = Number(screen.getByTestId('filter-layer-count-evidence').textContent)
+    const paCount = Number(screen.getByTestId('filter-layer-count-pattern').textContent)
+    // Independently classify via deriveLayer (badge source of truth).
+    const evBadge = entities.filter((e) => deriveLayer(e as object, registry) === 'evidence').length
+    const paBadge = entities.filter((e) => deriveLayer(e as object, registry) === 'pattern').length
+    expect(evCount).toBe(evBadge)
+    expect(paCount).toBe(paBadge)
+    // Independently classify via the predicate (rendered-graph source of truth).
+    const predicateFilters = (layer: 'evidence' | 'pattern') => ({
+      searchQueryLowered: '',
+      selectedTeams: new Set<string>(),
+      learningSource: 'combined' as const,
+      selectedLayers: [layer],
+      hideDocNodes: false,
+      selectedClasses: new Set<string>(['Component', 'Pattern', 'OnlineInsight']),
+      visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
+      lslFilterEntityIds: null,
+      ontologyRegistry: registry,
+    })
+    // Cast through unknown — the two Entity types diverge in `level`
+    // (ApiClient: number; graph/types: 0|1|2|3). The fixtures above omit
+    // `level` so both are structurally compatible at runtime.
+    const evPredicate = entities.filter((e) =>
+      isEntityVisible(e as unknown as import('@/graph/types').Entity, predicateFilters('evidence')),
+    ).length
+    const paPredicate = entities.filter((e) =>
+      isEntityVisible(e as unknown as import('@/graph/types').Entity, predicateFilters('pattern')),
+    ).length
+    // The promise of VKBUI-01: badge counts === predicate-visible counts.
+    expect(evPredicate).toBe(evBadge)
+    expect(paPredicate).toBe(paBadge)
+  })
 })
