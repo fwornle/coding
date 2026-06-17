@@ -19,6 +19,10 @@ export function GraphToggles() {
   const showClusters = useViewerStore((s) => s.showClusters)
   const showMergedOnly = useViewerStore((s) => s.showMergedOnly)
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
+  // Phase 60 Plan 03 (G3) — D-09..D-11: runtime toggle that lets operators
+  // re-enable Observation/Digest visibility in the graph for debugging.
+  // Default OFF (architecture-bleed shield).
+  const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
   const toggleShowEdges = useViewerStore((s) => s.toggleShowEdges)
   const toggleShowRelationLabels = useViewerStore(
     (s) => s.toggleShowRelationLabels,
@@ -26,6 +30,9 @@ export function GraphToggles() {
   const toggleShowClusters = useViewerStore((s) => s.toggleShowClusters)
   const toggleShowMergedOnly = useViewerStore((s) => s.toggleShowMergedOnly)
   const toggleHideDocNodes = useViewerStore((s) => s.toggleHideDocNodes)
+  const toggleShowDebugEntityTypes = useViewerStore(
+    (s) => s.toggleShowDebugEntityTypes,
+  )
 
   return (
     <div className="space-y-1" data-testid="filter-graph-toggles-section">
@@ -141,6 +148,41 @@ export function GraphToggles() {
           data-testid="graph-toggle-hide-doc-hint"
         >
           Hides green business/doc nodes (Decision, Requirement, DocumentSource, etc.)
+        </p>
+      )}
+
+      {/*
+        Phase 60 Plan 03 (G3) — D-09..D-11: runtime toggle that lets operators
+        re-enable Observation/Digest visibility for debugging. Default OFF —
+        the architecture-bleed shield. Italic hint copy (Architecture-bleed
+        shield...) is verbatim per 60-CONTEXT.md §D-10 / Debug toggle copy.
+        Non-persistent (D-11): no localStorage wiring — resets every page
+        load. Tailwind tokens match the surrounding rows (D-21 — no new
+        design tokens).
+      */}
+      <label
+        className="flex items-center gap-2 text-xs cursor-pointer"
+        data-testid="graph-toggle-debug-entity-types"
+      >
+        <Checkbox
+          checked={showDebugEntityTypes}
+          onCheckedChange={() => {
+            toggleShowDebugEntityTypes()
+            Logger.info(
+              Logger.Categories.FILTERS,
+              `GraphToggles: showDebugEntityTypes → ${!showDebugEntityTypes}`,
+            )
+          }}
+          aria-label="Show debug entity types"
+        />
+        Show debug entity types (Observation, Digest)
+      </label>
+      {showDebugEntityTypes && (
+        <p
+          className="text-[10px] ml-6 leading-tight italic text-muted-foreground"
+          data-testid="graph-toggle-debug-hint"
+        >
+          Architecture-bleed shield: these types should not appear in production VKB. Toggle ON only for debugging.
         </p>
       )}
     </div>

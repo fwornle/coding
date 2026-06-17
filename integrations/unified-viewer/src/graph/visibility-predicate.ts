@@ -36,6 +36,21 @@ export interface VisibilityFilters {
    * pre-Phase-60 inline rule.
    */
   ontologyRegistry?: readonly { name: string; parent?: string | null }[]
+  /**
+   * Phase 60 Plan 03 (G3) — D-09..D-11: when `true`, the predicate skips the
+   * Observation/Digest hard-exclusion branch so operators can debug those
+   * types in the rendered graph. Default `false` (architecture-bleed shield
+   * ON). Required field (no `?`) per checker W-2: forces every call site to
+   * pass the flag explicitly so the project-wide `tsc --noEmit` gate surfaces
+   * any half-deployed site that could otherwise leak Observation/Digest.
+   *
+   * The predicate body reads `filters.showDebugEntityTypes !== true` (not a
+   * direct boolean check). That intentional `!== true` means a runtime
+   * `undefined` (e.g., a partial mock in a test, or a transient store-init
+   * race) still causes the exclusion to fire — the safer default for a
+   * security-shaped shield.
+   */
+  showDebugEntityTypes: boolean
 }
 
 /**
@@ -45,17 +60,33 @@ export interface VisibilityFilters {
  * Mirror of `D3GraphCanvas.tsx:244-337` — see comments there for the
  * rationale of each filter step (structural-exemption rules for teams /
  * learningSource / LSL filter, the `[Raw]` stub exclusion, the
- * Observation/Digest hard exclusion, layer inference fallback, etc.).
+ * Observation/Digest hard exclusion gated by `filters.showDebugEntityTypes`
+ * — Phase 60 Plan 03 — layer inference fallback, etc.).
+ *
+ * Phase 60 Plan 03 (G3 — D-09..D-11): the Observation/Digest hard-exclusion
+ * is the default architecture-bleed shield. Operators can flip
+ * `filters.showDebugEntityTypes = true` (wired via `GraphToggles`) to
+ * unhide those types. The flag is read defensively (`!== true`) so an
+ * undefined runtime value behaves identically to false.
  */
 export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean {
   // Hide raw-stub placeholders (LLM-failure transcript rows).
   if (typeof e.name === 'string' && e.name.startsWith('[Raw]')) return false
 
-  // Hide raw stream rows (Observation / Digest). The classifier may have
-  // re-labeled them as ontologyClass=Detail, so we check the canonical
-  // `entityType` field here.
-  const etype = (e as unknown as { entityType?: string }).entityType
-  if (etype === 'Observation' || etype === 'Digest') return false
+  // Phase 60 Plan 03 (G3 — D-09..D-11): Hide raw stream rows
+  // (Observation / Digest) UNLESS the operator has flipped the
+  // showDebugEntityTypes shield. The classifier may have re-labeled the
+  // entity as ontologyClass=Detail, so we check the canonical `entityType`
+  // field here.
+  //
+  // Defensive `!== true` comparison (per checker W-2): even though the
+  // field is typed as required, a runtime `undefined` (partial mock in a
+  // test, transient store-init race) must still cause the exclusion to
+  // fire — the safer default for a security-shaped shield.
+  if (filters.showDebugEntityTypes !== true) {
+    const etype = (e as unknown as { entityType?: string }).entityType
+    if (etype === 'Observation' || etype === 'Digest') return false
+  }
 
   const meta = (e.metadata as {
     team?: string

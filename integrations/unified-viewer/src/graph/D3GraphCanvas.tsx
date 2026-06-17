@@ -270,6 +270,10 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   const learningSource = useViewerStore((s) => s.learningSource)
   const selectedLayers = useViewerStore((s) => s.selectedLayers)
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
+  // Phase 60 Plan 03 (G3 — D-09..D-11): when ON, the visibility predicate
+  // skips the Observation/Digest hard-exclusion branch so those types
+  // re-appear in the rendered graph. Default OFF (architecture-bleed shield).
+  const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
   // 2026-06-12: LSL timeline tick produces this — when non-null, the
   // graph dims to only those entities (plus 1-hop neighbors so the
   // session's anchor still shows context). null = no filter.
@@ -328,8 +332,9 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       selectedClasses,
       visibleLevels,
       lslFilterEntityIds,
+      showDebugEntityTypes,
     }))
-  }, [entities, selectedTeams, selectedClasses, visibleLevels, searchQuery, learningSource, selectedLayers, hideDocNodes, lslFilterEntityIds])
+  }, [entities, selectedTeams, selectedClasses, visibleLevels, searchQuery, learningSource, selectedLayers, hideDocNodes, lslFilterEntityIds, showDebugEntityTypes])
 
   const visibleIds = useMemo(() => {
     const s = new Set<string>()

@@ -1046,3 +1046,80 @@ describe('useViewerStore — Plan 06 Decision 1 selection-history stack', () => 
     expect(s.selectionHistory).toBeNull()
   })
 })
+
+// ----------------------------------------------------------------------------
+// Phase 60 Plan 03 (G3) — showDebugEntityTypes toggle for Observation/Digest
+// re-enable.
+//
+// PATTERN SOURCE: 60-03-PLAN.md Task 1 <behavior>
+//
+// Decisions:
+//   - D-09: visibility-predicate.ts:46-47 hard-exclusion stays as default.
+//           Predicate gates on filters.showDebugEntityTypes !== true.
+//   - D-10: GraphToggles surfaces a "Show debug entity types" row.
+//   - D-11: Non-persistent — resets to false every page load (no localStorage).
+//
+// Phase 56.1 D-1 invariant: selectedNodeIds / focalNodeId / selectedBucketKeys
+// remain untouched — the new field is additive only.
+// ----------------------------------------------------------------------------
+
+describe('useViewerStore — Phase 60-03 showDebugEntityTypes (D-09..D-11)', () => {
+  const initial = () =>
+    (useViewerStore as unknown as { getInitialState: () => ViewerStateAny }).getInitialState()
+
+  beforeEach(() => {
+    useViewerStore.setState({
+      showDebugEntityTypes: false,
+    } as unknown as Partial<ViewerState>)
+  })
+
+  test('Store test 1 (D-11 default): showDebugEntityTypes === false on fresh init', () => {
+    expect(initial().showDebugEntityTypes).toBe(false)
+  })
+
+  test('Store test 2: toggleShowDebugEntityTypes flips false → true → false', () => {
+    expect(useViewerStore.getState().showDebugEntityTypes).toBe(false)
+    useViewerStore.getState().toggleShowDebugEntityTypes()
+    expect(useViewerStore.getState().showDebugEntityTypes).toBe(true)
+    useViewerStore.getState().toggleShowDebugEntityTypes()
+    expect(useViewerStore.getState().showDebugEntityTypes).toBe(false)
+  })
+
+  test('Store test 3 (D-11 no persistence): source has no persist/partialize wiring for the new field', () => {
+    // Source-grep assertion — viewer-store.ts must NOT wrap showDebugEntityTypes
+    // in any persist/partialize/localStorage middleware. Strip comments first
+    // so the explanatory prose in JSDoc / `// ...` doesn't match (the comments
+    // themselves mention "persist" and "localStorage" because they explain
+    // WHY the field is non-persistent).
+    const raw = readFileSync(path.join(__dirname, 'viewer-store.ts'), 'utf8')
+    const code = raw
+      // strip block comments /* ... */
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      // strip line comments // ...
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/\/\/.*$/gm, '')
+    // The Zustand persist middleware is invoked as `persist(...)`; partialize
+    // appears as a property in the persist options object. localStorage either
+    // appears directly or via `createJSONStorage(() => localStorage)`.
+    expect(code.match(/\bpersist\s*\(/)).toBeNull()
+    expect(code.match(/\bpartialize\b/)).toBeNull()
+    expect(code.match(/\blocalStorage\b/)).toBeNull()
+    // Defence-in-depth: even if a future persist() lands for some OTHER field,
+    // showDebugEntityTypes must not appear in a partialize predicate.
+    expect(code.match(/partialize[\s\S]{0,300}showDebugEntityTypes/)).toBeNull()
+    expect(code.match(/showDebugEntityTypes[\s\S]{0,300}partialize/)).toBeNull()
+  })
+
+  test('Store test 4 (Phase 56.1 D-1 invariant): selectedNodeIds / focalNodeId / selectedBucketKeys untouched, additive only', () => {
+    const s = initial()
+    // Phase 56.1 multi-set shape still present.
+    expect(s.selectedNodeIds).toBeInstanceOf(Set)
+    expect(s.selectedNodeIds.size).toBe(0)
+    expect(s.focalNodeId).toBeNull()
+    expect(s.selectedBucketKeys).toBeInstanceOf(Set)
+    expect(s.selectedBucketKeys.size).toBe(0)
+    // New field is purely additive.
+    expect(s.showDebugEntityTypes).toBe(false)
+    expect(typeof s.toggleShowDebugEntityTypes).toBe('function')
+  })
+})
