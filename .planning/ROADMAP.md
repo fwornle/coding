@@ -1098,11 +1098,11 @@ Plans:
   3. The consolidator-side `has_insight` follower at `src/live-logging/ObservationConsolidator.js:677-694` is hardened so a freshly-minted `Insight` is never persisted without its project-anchor edge — either by wrapping `writeInsight` + `addRelation('has_insight')` in a single try-block whose failure rolls back the Insight (km-core delete) OR by tightening the probe so a transient `findRelations` mis-read can't false-negative the addRelation skip. The "1 orphan Insight per ~100 inserts" rate observed on 2026-06-15 is closed (acceptance: zero orphan Insights minted by a deliberate-failure-injection test).
   4. `/api/v1/stats` reports `orphanCount ≤ 10` at milestone close, sustained across 24h of online-learning activity (sampled hourly via a polling harness, not a snapshot reading). The measurement reads the live km-core graph that `unified-viewer @ :5173` reads — same `/api/v1/stats` endpoint cited by the pre-discuss reality check.
 
-**Plans:** 2/5 plans executed
+**Plans:** 4/5 plans executed
 - [x] 59-01-PLAN.md — Refactor ObservationWriter.writeInsight to return {legacyId, mintedId} + unit tests (ORPHAN-INS-01 prerequisite)
 - [x] 59-02-PLAN.md — Digest writer-fix: add derivedFrom loop after putEntity in consolidateDay plain-insert branch + unit tests (ORPHAN-DIG-01)
-- [ ] 59-03-PLAN.md — Update _pushInsightToKG to consume writeInsight's new {legacyId, mintedId} return shape; remove findByLegacyId race lookup (ORPHAN-INS-01)
-- [ ] 59-04-PLAN.md — Two-layer one-shot repair script: km-core graph orphan edges + cold-store digests.json dangling-ref scrub (ORPHAN-DIG-02; folds 2026-05-23 todo)
+- [x] 59-03-PLAN.md — Update _pushInsightToKG to consume writeInsight's new {legacyId, mintedId} return shape; remove findByLegacyId race lookup (ORPHAN-INS-01)
+- [x] 59-04-PLAN.md — Two-layer one-shot repair script: km-core graph orphan edges + cold-store digests.json dangling-ref scrub (ORPHAN-DIG-02; folds 2026-05-23 todo)
 - [ ] 59-05-PLAN.md — 24h orphan-floor soak harness + operator runbook (ORPHAN-FLOOR)
 
 ### Phase 60: Unified Viewer Rendering UX Integrity
