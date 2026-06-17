@@ -20,7 +20,13 @@ import { useMemo } from 'react'
 import { EDGE_STYLES, LAYER_BADGE_CLASS } from '@/graph/vokb-palette'
 import { SHAPE_PALETTE, shapeFallback, classColor, type ShapeKind } from '@/graph/color-fallback'
 import { deriveLayer, type Layer, type OntologyRegistryClass } from '@/graph/layer'
-import type { Entity, Relation } from '@/api/ApiClient'
+// `graph/types` is the canvas-pipeline shape returned by useGraphData; the
+// LegendPanel receives the same post-filter set that paints the canvas
+// (D-05 same-predicate contract), so it MUST consume the graph/types flavor
+// rather than ApiClient.Relation (which still carries the wire-protocol
+// index signature). The two are structurally compatible for this panel's
+// reads — id/name/ontologyClass/metadata on Entity, from/to/type on Relation.
+import type { Entity, Relation } from '@/graph/types'
 
 // Detect "is this class registered with a shape in SHAPE_PALETTE?" so the
 // DOMAINS row can carry a tooltip when a class is unknown to the palette.

@@ -12,7 +12,11 @@
 import { describe, test, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { LegendPanel } from './LegendPanel'
-import type { Entity, Relation } from '@/api/ApiClient'
+// Use the graph/types flavor — same shape useGraphData feeds the canvas + the
+// new prop-driven LegendPanel (D-05 contract). ApiClient.Relation has an
+// optional `type` and a wire-protocol index signature; graph/types.Relation
+// is the canvas-facing shape.
+import type { Entity, Relation } from '@/graph/types'
 
 afterEach(() => cleanup())
 
