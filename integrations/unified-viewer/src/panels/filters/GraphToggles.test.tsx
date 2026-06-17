@@ -116,3 +116,73 @@ describe('GraphToggles', () => {
     expect(hint.textContent).toMatch(/business\/doc nodes/)
   })
 })
+
+// ----------------------------------------------------------------------------
+// Phase 60 Plan 03 (G3) — "Show debug entity types" row.
+//
+// PATTERN SOURCE: 60-03-PLAN.md Task 2 <behavior>
+//
+// Decisions:
+//   - D-09: visibility-predicate keeps Observation/Digest excluded by default.
+//           Operator flips this toggle to re-enable for debugging.
+//   - D-10: Row label `Show debug entity types (Observation, Digest)` with
+//           italic hint copy `Architecture-bleed shield: these types should
+//           not appear in production VKB. Toggle ON only for debugging.`
+//   - D-11: NOT persisted (resets every page load).
+//   - D-21: micro-type (text-[10px] / ml-6 / italic) preserved verbatim.
+// ----------------------------------------------------------------------------
+
+describe('GraphToggles — Phase 60-03 Show debug entity types row', () => {
+  beforeEach(() => {
+    useViewerStore.setState({
+      showEdges: false,
+      showRelationLabels: false,
+      showClusters: false,
+      showMergedOnly: false,
+      hideDocNodes: false,
+      showDebugEntityTypes: false,
+    } as unknown as Partial<Parameters<typeof useViewerStore.setState>[0]>)
+    cleanup()
+  })
+
+  test('Test 1: default render shows "Show debug entity types (Observation, Digest)" with unchecked checkbox', () => {
+    render(<GraphToggles />)
+    const wrapper = screen.getByTestId('graph-toggle-debug-entity-types')
+    expect(wrapper).toBeInTheDocument()
+    expect(wrapper.textContent).toContain('Show debug entity types (Observation, Digest)')
+    const cb = wrapper.querySelector('button[role="checkbox"]') as HTMLElement
+    expect(cb.getAttribute('aria-checked') === 'true').toBe(false)
+  })
+
+  test('Test 2: clicking the checkbox flips showDebugEntityTypes false → true', () => {
+    render(<GraphToggles />)
+    expect(useViewerStore.getState().showDebugEntityTypes).toBe(false)
+    const wrapper = screen.getByTestId('graph-toggle-debug-entity-types')
+    const cb = wrapper.querySelector('button[role="checkbox"]') as HTMLElement
+    fireEvent.click(cb)
+    expect(useViewerStore.getState().showDebugEntityTypes).toBe(true)
+  })
+
+  test('Test 3 (D-10 tooltip): hint paragraph appears when ON with verbatim Architecture-bleed copy', () => {
+    useViewerStore.setState({ showDebugEntityTypes: true } as unknown as Partial<Parameters<typeof useViewerStore.setState>[0]>)
+    render(<GraphToggles />)
+    const hint = screen.getByTestId('graph-toggle-debug-hint')
+    expect(hint.textContent).toBe(
+      'Architecture-bleed shield: these types should not appear in production VKB. Toggle ON only for debugging.',
+    )
+    // D-21 micro-type — text-[10px] / ml-6 / italic preserved verbatim.
+    expect(hint.className).toMatch(/text-\[10px\]/)
+    expect(hint.className).toMatch(/ml-6/)
+    expect(hint.className).toMatch(/leading-tight/)
+    expect(hint.className).toMatch(/italic/)
+  })
+
+  test('Test 4 (D-11 no persistence — surface proxy): rendered DOM carries no data-persist attribute', () => {
+    useViewerStore.setState({ showDebugEntityTypes: true } as unknown as Partial<Parameters<typeof useViewerStore.setState>[0]>)
+    render(<GraphToggles />)
+    const wrapper = screen.getByTestId('graph-toggle-debug-entity-types')
+    // No localStorage wiring should leak into the rendered DOM.
+    expect(wrapper.getAttribute('data-persist')).toBeNull()
+    expect(wrapper.outerHTML).not.toMatch(/localStorage/i)
+  })
+})
