@@ -285,7 +285,7 @@ function makeMockWriter(kmStore, anchorId = 'anchor-lsl-1') {
       kmStore.callLog.push({ op: 'addRelation', from: capturedRel.from, to: capturedRel.to, type: capturedRel.type, metadata: capturedRel.metadata });
       kmStore._relations.push(capturedRel);
 
-      return row.id;
+      return { legacyId: row.id, mintedId };
     },
   };
 }
@@ -601,7 +601,7 @@ describe('Phase 58 integration — idempotency (writer path) (Test 4)', () => {
           kmStore.callLog.push({ op: 'addRelation', from: rel.from, to: rel.to, type: rel.type, metadata: rel.metadata });
           kmStore._relations.push(rel);
         }
-        return row.id;
+        return { legacyId: row.id, mintedId };
       },
     };
 
