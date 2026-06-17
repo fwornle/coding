@@ -1030,7 +1030,7 @@ Plans:
 - [x] **Phase 57: Lower Ontology & Project Tagging Foundation** — declare coding-specific L2 classes (`LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`); optional upper-ontology growth; stamp `project` tag on every km-core entity. (completed 2026-06-15)
 - [x] **Phase 58: Online Pipeline Semantic Edges on Insights** — `ObservationConsolidator` emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on online Insights, atomically with the Insight node, beyond the existing `capturedBy → LiveLoggingSystem` provenance. (completed 2026-06-15)
 - [x] **Phase 59: Long-Tail Orphan Fixes & Baseline Reduction** — server-side System-type filter fix (legacy Phase 48); parent-hierarchy edges for online-learned Detail/SubComponent + one-shot migration (legacy Phase 49); per-team `CollectiveKnowledge --includes--> Project` writer + seed fix; drive `orphanCount` from 157 → ≤30. (completed 2026-06-17)
-- [ ] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges.
+- [x] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges. (completed 2026-06-17)
 - [ ] **Phase 61: LSL Timeline & OKB Routing Honesty** — remove silent 200-record cap (`useLslSessions.ts`) with visible "N of M" label or honest streaming; honest "all" window (no silent 365-day cap); bi-source tick coloring (manual vs online); `/viewer/okb` ApiClient detects OKM Express `:8090` legacy `/api/entities` shape and routes correctly, showing real OKM business entities not coding-KG mirrors.
 
 ### v7.2 Phase Details
@@ -1118,7 +1118,7 @@ Plans:
   4. With the Online learning-source filter active, `CollectiveKnowledge` remains visible in the rendered graph (or its path-trace anchor is preserved) so focal-ancestry traces from leaf entities still reach the system root — not truncated at the project level.
   5. The Ontology Class filter sidebar renders Phase 57's L2 lower-ontology classes as expandable groups under their L1 upper-ontology parent, each L2 row carries a per-class count badge, and the operator can collapse the group to filter all members at once.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -1135,7 +1135,7 @@ Plans:
 
 **Wave 3** *(depends on all behavior plans landing)*
 
-- [ ] 60-06-PLAN.md — Cross-cutting verification — gsd-browser visual smoke against `localhost:5173/viewer/coding` for SC#1..SC#5 + Phase 56 viewport-stability + Phase 56.1 multi-selection invariants; produces 60-VERIFICATION.md (autonomous: false, operator checkpoint)
+- [x] 60-06-PLAN.md — Cross-cutting verification — gsd-browser visual smoke against `localhost:5173/viewer/coding` for SC#1..SC#5 + Phase 56 viewport-stability + Phase 56.1 multi-selection invariants; produces 60-VERIFICATION.md (autonomous: false, operator checkpoint)
 **UI hint:** yes
 
 ### Phase 61: LSL Timeline & OKB Routing Honesty
