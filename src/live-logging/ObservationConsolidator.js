@@ -653,12 +653,10 @@ export class ObservationConsolidator {
 
     let mintedId;
     try {
-      // writeInsight returns row.id (the legacyId.id), NOT the freshly
-      // minted km-core id. For the has_insight edge we need the minted
-      // km-core id — look it up via the legacyId after the write returns.
-      await writer.writeInsight(row, { mentionsTargetIds });
-      const persisted = await this._kmStore.findByLegacyId({ system: 'A', id: entry.topic });
-      mintedId = persisted?.id || null;
+      // D-03 — writeInsight now returns {legacyId, mintedId} directly; no post-write
+      // findByLegacyId race lookup needed. The Phase 59 root-cause closure for ORPHAN-INS-01.
+      const result = await writer.writeInsight(row, { mentionsTargetIds });
+      mintedId = result.mintedId;
     } catch (err) {
       process.stderr.write(`[Consolidator→KG] writeInsight failed for ${entry.topic}: ${err.message}\n`);
       return;

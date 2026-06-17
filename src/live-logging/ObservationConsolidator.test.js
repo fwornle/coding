@@ -378,3 +378,263 @@ describe('ObservationConsolidator.consolidateDay — D-02 non-fatal addRelation 
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 59 Plan 03 — _pushInsightToKG consumes writeInsight {legacyId, mintedId} (D-03)
+// ---------------------------------------------------------------------------
+//
+// D-03 contract: _pushInsightToKG reads mintedId from writer.writeInsight()'s
+// {legacyId, mintedId} return directly — the post-write findByLegacyId race
+// lookup at OC.js:660-661 is REMOVED. The has_insight follower block at
+// OC.js:679-705 stays as-is (D-03.2 — role shifts from race-safe lookup to
+// idempotent re-write protection).
+//
+// The three tests below mirror Plan 59-01's writer-side tests on the consumer
+// side: Test 5 locks the direct-read happy path, Test 6 locks the null-mintedId
+// short-circuit, Test 7 locks the writer-throws catch path.
+
+/**
+ * Build a mock ObservationWriter whose writeInsight is configurable per test.
+ * - `writeInsightReturn` overrides the return value (default: `{legacyId: row.id, mintedId: 'auto-mock-' + row.id}`)
+ * - `writeInsightThrows` makes writeInsight throw the supplied Error
+ */
+function createMockWriter({ writeInsightReturn, writeInsightThrows } = {}) {
+  return {
+    async writeInsight(row, _options) {
+      if (writeInsightThrows) throw writeInsightThrows;
+      return writeInsightReturn || { legacyId: row.id, mintedId: 'auto-mock-' + row.id };
+    },
+  };
+}
+
+/**
+ * Test-only helper: install a `globalThis.fetch` stub that satisfies:
+ *   (a) `_ensureProjectAnchor`'s PUT to `${vkbUrl}/api/entities/<name>` + POST to /api/relations.
+ *   (b) `classifyMentions`'s POST to the LLM proxy `/api/complete`.
+ * Returns the original fetch so tests can restore it in finally{}.
+ */
+function installFetchStub({ mentionsResponse = '[]' } = {}) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, _init) => {
+    const u = String(url);
+    if (u.includes('/api/complete')) {
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({ content: mentionsResponse, provider: 'mock', model: 'mock-haiku' }),
+        text: async () => '',
+      };
+    }
+    // _ensureProjectAnchor PUT / POST path — return 200 OK.
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({}),
+      text: async () => '',
+    };
+  };
+  return originalFetch;
+}
+
+/**
+ * Pre-seed a project anchor entity in the mock kmStore so the has_insight
+ * follower (OC.js:680-682) can resolve `projectId` via
+ * `findByOntologyClass('Project') → find by name`.
+ */
+function seedProjectAnchor(kmStore, projectId = 'project-coding-1', name = 'Coding') {
+  kmStore._entities.set(projectId, {
+    id: projectId,
+    name,
+    ontologyClass: 'Project',
+    entityType: 'Project',
+  });
+  return { projectId, name };
+}
+
+// ---------------------------------------------------------------------------
+// Test 5 — D-03 happy path: mintedId from writer return drives has_insight emission.
+// ---------------------------------------------------------------------------
+
+describe('ObservationConsolidator._pushInsightToKG — D-03 direct mintedId read (Test 5)', () => {
+  it('reads mintedId from writeInsight return and emits has_insight with it (NOT via findByLegacyId)', async () => {
+    // D-03 contract: the consolidator's _pushInsightToKG no longer calls
+    // findByLegacyId({system:'A', id: entry.topic}) after writeInsight to
+    // re-derive the mintedId. Instead, it reads result.mintedId from the
+    // writer's return shape ({legacyId, mintedId}) — closing the 1-in-100
+    // race window observed 2026-06-15. The has_insight edge then targets
+    // exactly that mintedId.
+    const kmStore = createMockKmStore();
+    seedProjectAnchor(kmStore);
+    const mockWriter = createMockWriter({
+      writeInsightReturn: { legacyId: 'insight-topic-1', mintedId: 'mock-km-id-42' },
+    });
+    const originalFetch = installFetchStub();
+
+    const consolidator = new ObservationConsolidator({
+      kmStore,
+      observationWriter: mockWriter,
+      runId: 'test-run-59-03-t5',
+    });
+
+    // Clear the callLog right before the unit under test so the assertion
+    // below scopes narrowly to this _pushInsightToKG invocation.
+    kmStore.callLog.length = 0;
+
+    try {
+      await consolidator._pushInsightToKG({
+        topic: 'insight-topic-1',
+        summary: 'A test insight that should land with mintedId from writer return',
+        project: 'coding',
+        confidence: 0.9,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    // D-03 core invariant: no findByLegacyId({system:'A', id:'insight-topic-1'})
+    // call during _pushInsightToKG. The race lookup is REMOVED.
+    const raceLookupCalls = kmStore.callLog.filter(
+      (c) =>
+        c.op === 'findByLegacyId' &&
+        c.legacyId &&
+        c.legacyId.system === 'A' &&
+        c.legacyId.id === 'insight-topic-1',
+    );
+    assert.equal(raceLookupCalls.length, 0, 'no findByLegacyId race lookup during _pushInsightToKG');
+
+    // mintedId from the writer return flows into the has_insight emission.
+    const hasInsightEdges = kmStore._relations.filter((r) => r.type === 'has_insight');
+    assert.equal(hasInsightEdges.length, 1, 'one has_insight edge emitted');
+    assert.equal(hasInsightEdges[0].from, 'project-coding-1', 'from = project id');
+    assert.equal(hasInsightEdges[0].to, 'mock-km-id-42', 'to = mintedId from writer return');
+    assert.equal(hasInsightEdges[0].metadata.source, 'observation-consolidator');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 6 — D-03 null mintedId short-circuits has_insight cleanly.
+// ---------------------------------------------------------------------------
+
+describe('ObservationConsolidator._pushInsightToKG — D-03 null mintedId short-circuit (Test 6)', () => {
+  it('skips has_insight emission cleanly when writer returns {legacyId, mintedId: null}', async () => {
+    // D-03.2: if the writer returns a null mintedId (e.g., putEntity inside
+    // the writer never reached the return statement for whatever reason),
+    // the existing `if (projectName && mintedId)` guard at OC.js:679 must
+    // still short-circuit cleanly — no exception, no half-Insight has_insight
+    // edge. The kgPushDebug log at :667-671 still fires but is non-fatal.
+    const kmStore = createMockKmStore();
+    seedProjectAnchor(kmStore);
+    const mockWriter = createMockWriter({
+      writeInsightReturn: { legacyId: 'insight-topic-2', mintedId: null },
+    });
+    const originalFetch = installFetchStub();
+
+    const consolidator = new ObservationConsolidator({
+      kmStore,
+      observationWriter: mockWriter,
+      runId: 'test-run-59-03-t6',
+    });
+
+    kmStore.callLog.length = 0;
+
+    let threwError = null;
+    try {
+      try {
+        await consolidator._pushInsightToKG({
+          topic: 'insight-topic-2',
+          summary: 'A test insight whose writer returns null mintedId',
+          project: 'coding',
+          confidence: 0.9,
+        });
+      } catch (err) {
+        threwError = err;
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    // No exception leaks out — the guard is robust.
+    assert.equal(threwError, null, '_pushInsightToKG does not throw on null mintedId');
+
+    // has_insight addRelation was never called — the guard short-circuits.
+    const hasInsightEdges = kmStore._relations.filter((r) => r.type === 'has_insight');
+    assert.equal(hasInsightEdges.length, 0, 'no has_insight edge when mintedId is null');
+
+    // Confirm via callLog: no addRelation with type='has_insight' was attempted.
+    const hasInsightAddCalls = kmStore.callLog.filter(
+      (c) => c.op === 'addRelation' && c.type === 'has_insight',
+    );
+    assert.equal(hasInsightAddCalls.length, 0, 'addRelation never called with type=has_insight');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 7 — D-03 writer-throws path: catch block fires, no has_insight attempt.
+// ---------------------------------------------------------------------------
+
+describe('ObservationConsolidator._pushInsightToKG — D-03 writer-throws catch (Test 7)', () => {
+  it('catches writer.writeInsight throw, logs to stderr, returns without attempting has_insight', async () => {
+    // D-03 catch-block contract: the catch at OC.js:662-664 is byte-identical
+    // post-edit. When the writer throws (km-core down, fail-fast on classifier,
+    // etc.), the stderr log fires verbatim and the method returns early — the
+    // has_insight follower at OC.js:679-705 is NEVER reached.
+    const kmStore = createMockKmStore();
+    seedProjectAnchor(kmStore);
+    const mockWriter = createMockWriter({
+      writeInsightThrows: new Error('km-core down'),
+    });
+    const originalFetch = installFetchStub();
+
+    const consolidator = new ObservationConsolidator({
+      kmStore,
+      observationWriter: mockWriter,
+      runId: 'test-run-59-03-t7',
+    });
+
+    // Capture stderr to verify the locked log line.
+    const stderrChunks = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    };
+
+    let threwError = null;
+    try {
+      try {
+        await consolidator._pushInsightToKG({
+          topic: 'insight-topic-3',
+          summary: 'A test insight whose writer call throws',
+          project: 'coding',
+          confidence: 0.9,
+        });
+      } catch (err) {
+        threwError = err;
+      }
+    } finally {
+      process.stderr.write = originalWrite;
+      globalThis.fetch = originalFetch;
+    }
+
+    // The catch block swallows the throw and returns — caller sees no error.
+    assert.equal(threwError, null, '_pushInsightToKG catches writer throw and returns');
+
+    // stderr carries the locked phrase from the catch block at OC.js:663.
+    const stderrAll = stderrChunks.join('');
+    assert.match(
+      stderrAll,
+      /\[Consolidator→KG\] writeInsight failed for insight-topic-3: km-core down/,
+      'stderr captures the writer-throws log line',
+    );
+
+    // has_insight emission must NOT have been attempted (early-return).
+    const hasInsightEdges = kmStore._relations.filter((r) => r.type === 'has_insight');
+    assert.equal(hasInsightEdges.length, 0, 'no has_insight edge when writer throws');
+    const hasInsightAddCalls = kmStore.callLog.filter(
+      (c) => c.op === 'addRelation' && c.type === 'has_insight',
+    );
+    assert.equal(hasInsightAddCalls.length, 0, 'addRelation never called with type=has_insight after throw');
+  });
+});

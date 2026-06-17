@@ -404,13 +404,18 @@ describe('ObservationConsolidator._pushInsightToKG — route-through (Test 7)', 
     kmStore._entities.set('e2', { id: 'e2', name: 'LiveLoggingSystem', entityType: 'Component', ontologyClass: 'Component' });
 
     // Mock writer — record every writeInsight call so we can assert the
-    // options.mentionsTargetIds plumbing.
+    // options.mentionsTargetIds plumbing. Updated post Phase 59 Plan 03 (D-03)
+    // — the writer now returns {legacyId, mintedId} directly (per Plan 59-01),
+    // and the consumer (_pushInsightToKG) reads result.mintedId straight from
+    // the return instead of paying the findByLegacyId race lookup.
     const writeInsightCalls = [];
     const mockWriter = {
       writeInsight: async (row, options) => {
         writeInsightCalls.push({ row, options });
-        // Mock writer must populate kmStore so findByLegacyId resolves the
-        // minted id for the has_insight follow-up.
+        // Populate kmStore for any downstream lookups (back-compat — the
+        // has_insight follower at OC.js:679-705 no longer needs the legacyId
+        // round-trip, but pre-existing tests in this file may rely on the
+        // store-state side effect).
         const mintedId = 'minted-insight-1';
         kmStore._entities.set(mintedId, {
           id: mintedId,
@@ -418,7 +423,7 @@ describe('ObservationConsolidator._pushInsightToKG — route-through (Test 7)', 
           ontologyClass: 'Insight',
           legacyId: { system: 'A', id: row.id },
         });
-        return row.id;
+        return { legacyId: row.id, mintedId };
       },
     };
 
