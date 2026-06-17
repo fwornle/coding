@@ -686,6 +686,7 @@
     },
     "Component": {
       "description": "A top-level architectural component (L1) of the Coding project hierarchy, grouping related knowledge entities under a named subsystem",
+      "level": 1,
       "relationships": {},
       "properties": {
         "componentName": {
@@ -709,7 +710,8 @@
       }
     },
     "SubComponent": {
-      "description": "A named subsystem (L2) nested within a Component, grouping related Detail entities under a focused concern",
+      "description": "A named subsystem (L1 grouping anchor for sub-system L2 leaves) nested within the Component hierarchy, grouping related Detail entities under a focused concern. Phase 60 D-17: rendered as an L1 group header in OntologyFilter; its L2 children (EtmDaemon etc.) extend it via the `extends` field.",
+      "level": 1,
       "relationships": {},
       "properties": {
         "componentName": {
@@ -727,8 +729,9 @@
       }
     },
     "Detail": {
-      "description": "A leaf-level detail entity (4-level hierarchy: Project → Component → SubComponent → Detail).",
+      "description": "A leaf-level detail entity (4-level hierarchy: Project → Component → SubComponent → Detail). Phase 60 D-17: rendered as an L1 group header in OntologyFilter; its L2 children (OnlineObservation, OnlineDigest, OnlineInsight) extend it via the `extends` field.",
       "extends": "SubComponent",
+      "level": 1,
       "relationships": {}
     }
   },

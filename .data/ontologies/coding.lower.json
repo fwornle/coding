@@ -8,51 +8,71 @@
   "classes": {
     "LiveLoggingSystem": {
       "extends": "Component",
+      "level": 2,
+      "parent": "Component",
       "description": "Live Session Logging subsystem capturing time-windowed transcripts under .specstory/history/, including the ETM daemon and LSL resolver",
       "relationships": {}
     },
     "ConstraintMonitor": {
       "extends": "Component",
+      "level": 2,
+      "parent": "Component",
       "description": "Constraint monitor service on port 3030 that enforces project-level constraints (no-console-log, documentation-filename-format) and exposes a dashboard",
       "relationships": {}
     },
     "OnlineObservation": {
       "extends": "Detail",
+      "level": 2,
+      "parent": "Detail",
       "description": "Leaf-level observation artifact written by the online learning pipeline from a single prompt/response exchange",
       "relationships": {}
     },
     "OnlineDigest": {
       "extends": "Detail",
+      "level": 2,
+      "parent": "Detail",
       "description": "Daily roll-up of online observations into a digest artifact",
       "relationships": {}
     },
     "OnlineInsight": {
       "extends": "Detail",
+      "level": 2,
+      "parent": "Detail",
       "description": "Weekly synthesized insight artifact derived from online digests",
       "relationships": {}
     },
     "KnowledgeManagement": {
       "extends": "Component",
+      "level": 2,
+      "parent": "Component",
       "description": "Top-level knowledge subsystem comprising km-core, observations DB, JSON exports, and the Qdrant embedding sidecar",
       "relationships": {}
     },
     "BatchSemanticAnalysis": {
       "extends": "Component",
+      "level": 2,
+      "parent": "Component",
       "description": "Manual UKB wave-analysis pipeline (wave1/wave2/wave3 agents, persistence-agent, coordinator) — invoked via 'ukb full'",
       "relationships": {}
     },
     "RapidLlmProxy": {
       "extends": "Component",
+      "level": 2,
+      "parent": "Component",
       "description": "LLM routing surface on port 12435 with model-canonicalization, token-usage tracking, and per-process routing overrides",
       "relationships": {}
     },
     "DockerizedServices": {
       "extends": "Component",
+      "level": 2,
+      "parent": "Component",
       "description": "Docker-compose-managed services container (coding-services) hosting the dashboard, obs-api, lsl-resolver, semantic-analysis MCP server",
       "relationships": {}
     },
     "EtmDaemon": {
       "extends": "SubComponent",
+      "level": 2,
+      "parent": "SubComponent",
       "description": "Enhanced Transcript Monitor — launchd-managed com.coding.etm daemon under LiveLoggingSystem that watches transcripts and emits observations",
       "relationships": {}
     }
