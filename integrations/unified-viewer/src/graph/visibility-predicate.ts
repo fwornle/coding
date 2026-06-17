@@ -14,6 +14,7 @@
 //     calls this predicate.
 
 import type { Entity } from './types'
+import { deriveLayer } from './layer'
 
 export interface VisibilityFilters {
   /** Already-lowercased search query for case-insensitive substring match. */
@@ -25,6 +26,16 @@ export interface VisibilityFilters {
   selectedClasses: ReadonlySet<string>
   visibleLevels: ReadonlySet<0 | 1 | 2 | 3>
   lslFilterEntityIds: ReadonlySet<string> | null
+  /**
+   * Phase 60 Plan 01 (G1): ontology registry (subset shape — `name` +
+   * extends-chain `parent`) consumed by `deriveLayer` for L2 inference.
+   * Optional so existing call sites compile until the registry is threaded
+   * through (`useVisibleEntityIds`, `D3GraphCanvas.visibleEntities`,
+   * `LayerFilter`). When undefined, `deriveLayer` falls back to the
+   * direct-class rule (Pattern/Insight → pattern) — same behaviour as the
+   * pre-Phase-60 inline rule.
+   */
+  ontologyRegistry?: readonly { name: string; parent?: string | null }[]
 }
 
 /**
@@ -78,10 +89,14 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
   // Layer predicate — empty array = "all visible", `__none__` = "none visible".
   if (filters.selectedLayers.includes('__none__')) return false
   if (filters.selectedLayers.length > 0) {
-    const layer = (meta as { layer?: string }).layer
-      ?? ((e as unknown as { layer?: string }).layer)
-    const inferred = layer
-      ?? (e.ontologyClass === 'Insight' || e.ontologyClass === 'Pattern' ? 'pattern' : 'evidence')
+    // Phase 60 Plan 01 (G1): single source of truth — `deriveLayer` resolves
+    // the layer literal via the D-03 → D-02 precedence chain (explicit
+    // metadata wins, else ontology extends-walk, else evidence). The
+    // pre-Phase-60 inline rule lived here; see `layer.ts` for the helper.
+    const inferred = deriveLayer(
+      e as unknown as { ontologyClass?: string; metadata?: { layer?: string }; layer?: string },
+      filters.ontologyRegistry,
+    )
     if (!filters.selectedLayers.includes(inferred)) return false
   }
 

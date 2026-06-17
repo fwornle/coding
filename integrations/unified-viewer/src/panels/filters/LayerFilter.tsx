@@ -9,6 +9,7 @@ import { useState, useMemo } from 'react'
 import { useViewerStore } from '@/store/viewer-store'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Logger } from '@/lib/logging'
+import { deriveLayer } from '@/graph/layer'
 import type { Entity } from '@/api/ApiClient'
 
 const LAYERS = [
@@ -18,23 +19,36 @@ const LAYERS = [
 
 export interface LayerFilterProps {
   entities: readonly Entity[]
+  /**
+   * Phase 60 Plan 01 (G1): ontology registry threaded into `deriveLayer` so
+   * count badges match the visibility-predicate's Layer rule (single source
+   * of truth — closes VKBUI-01 asymmetry). Optional: when undefined,
+   * `deriveLayer` falls back to direct-class match (Pattern/Insight →
+   * pattern), preserving today's L1 behaviour while the call sites are
+   * updated to pass the registry.
+   */
+  ontologyRegistry?: readonly { name: string; parent?: string | null }[]
 }
 
-export function LayerFilter({ entities }: LayerFilterProps) {
+export function LayerFilter({ entities, ontologyRegistry }: LayerFilterProps) {
   const selectedLayers = useViewerStore((s) => s.selectedLayers)
   const toggleLayer = useViewerStore((s) => s.toggleLayer)
   const [collapsed, setCollapsed] = useState(false)
 
-  // Per-layer counts derived from the entities prop (VOKB convention:
-  // entities without explicit .layer default to 'evidence').
+  // Per-layer counts derived from the entities prop. Uses the shared
+  // `deriveLayer` helper so badges agree with the visibility-predicate's
+  // Layer rule (Phase 60 Plan 01 G1 — VKBUI-01 fix).
   const counts = useMemo(() => {
     const map: Record<string, number> = {}
     for (const e of entities) {
-      const layer = (e as { layer?: string }).layer || 'evidence'
+      const layer = deriveLayer(
+        e as unknown as { ontologyClass?: string; metadata?: { layer?: string }; layer?: string },
+        ontologyRegistry,
+      )
       map[layer] = (map[layer] || 0) + 1
     }
     return map
-  }, [entities])
+  }, [entities, ontologyRegistry])
 
   // Empty selection = "all visible" (UI-SPEC §10 filter composition rules)
   const isSelected = (layer: string) =>
