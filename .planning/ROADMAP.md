@@ -1118,7 +1118,24 @@ Plans:
   4. With the Online learning-source filter active, `CollectiveKnowledge` remains visible in the rendered graph (or its path-trace anchor is preserved) so focal-ancestry traces from leaf entities still reach the system root — not truncated at the project level.
   5. The Ontology Class filter sidebar renders Phase 57's L2 lower-ontology classes as expandable groups under their L1 upper-ontology parent, each L2 row carries a per-class count badge, and the operator can collapse the group to filter all members at once.
 
-**Plans:** TBD
+**Plans:** 6 plans
+
+Plans:
+
+**Wave 1 (parallel — disjoint file surfaces)**
+
+- [ ] 60-01-PLAN.md — G1: Layer filter data contract — ship `integrations/unified-viewer/src/graph/layer.ts` `deriveLayer(entity, registry)` helper; wire into LayerFilter count badges + visibility-predicate (VKBUI-01)
+- [ ] 60-03-PLAN.md — G3: Observation/Digest debug toggle — `showDebugEntityTypes: boolean` store field + GraphToggles row + predicate gate (VKBUI-03)
+- [ ] 60-04-PLAN.md — G4: CollectiveKnowledge repair + writer-side hard-root guard — new `lib/km-core/src/types/hierarchy-roots.ts` HIERARCHY_ROOTS constant + `scripts/repair-ck-ontology-class.mjs` one-shot + ontology-classification-agent.ts guard (autonomous: false, has operator checkpoint for live repair-script execution) (VKBUI-04)
+- [ ] 60-05-PLAN.md — G5: L2 lower-ontology classes in OntologyFilter — drop hardcoded CODING_SCHEMA + Typed Views; build L1/L2 groups dynamically from `GET /api/v1/ontology/classes?withDisplay=true` (LOWERONTO-03)
+
+**Wave 2** *(depends on 60-01 — Legend's LAYERS section calls deriveLayer)*
+
+- [ ] 60-02-PLAN.md — G2: Dynamic Legend — full rewrite of LegendPanel.tsx to receive entities + relations props and derive DOMAINS / LAYERS / SOURCE / RELATIONSHIPS from rendered set (VKBUI-02)
+
+**Wave 3** *(depends on all behavior plans landing)*
+
+- [ ] 60-06-PLAN.md — Cross-cutting verification — gsd-browser visual smoke against `localhost:5173/viewer/coding` for SC#1..SC#5 + Phase 56 viewport-stability + Phase 56.1 multi-selection invariants; produces 60-VERIFICATION.md (autonomous: false, operator checkpoint)
 **UI hint:** yes
 
 ### Phase 61: LSL Timeline & OKB Routing Honesty
