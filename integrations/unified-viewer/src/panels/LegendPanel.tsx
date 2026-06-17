@@ -1,76 +1,53 @@
-// PATTERN SOURCE: 55-PATTERNS.md § LegendPanel.tsx
-//   + 55-07-PLAN.md Task 1
+// PATTERN SOURCE: 60-02-PLAN.md Task 1 <action>
+//   + 60-CONTEXT.md § D-05..D-08
 //   + 55-UI-SPEC.md § 7 row 12 (Legend, collapsed by default at bottom of FilterRail)
 //   + 55-UI-SPEC.md § 14 (Encoding mapping reference)
 //
-// All swatch colors source from `@/graph/vokb-palette` (Plan 55-03). All
-// shape data sources from the SHAPE_PALETTE in `@/graph/color-fallback`
-// (Plan 55-05).
+// Plan 60-02 (D-05): LegendPanel is now fully prop-driven. Every section is
+// derived from the currently-rendered (post-filter) `entities` + `relations`.
+// Color/shape lookups still source from `@/graph/vokb-palette` (EDGE_STYLES +
+// LAYER_BADGE_CLASS) and `@/graph/color-fallback` (SHAPE_PALETTE/shapeFallback)
+// — palette stays the source of truth for visual encoding; the Legend just
+// selects from it.
 //
-// IMPORTANT — 55-05 renderer v1 stub note:
-//   The Sigma renderer ships v1 with all 5 shape keys mapped to
-//   NodeCircleProgram (see 55-05-SUMMARY.md "Known Stubs"). That means
-//   the canvas itself renders every node as a circle today; the shape
-//   attribute IS stamped on every node and the program map IS registered,
-//   awaiting a follow-up GLSL plan. Until then the LegendPanel renders
-//   shape swatches as inline SVG so users see the encoded distinction
-//   even when the canvas falls back to circles.
+// The previous (pre-60-02) revision shipped static seed arrays for shape
+// swatches, source-authority samples, and relationship samples. Those were
+// the OKB-only seeds that bled labels like the static run-diagnostic /
+// doc-authority / RCA samples into the VKB tab regardless of what was
+// actually on screen — fully removed in this rewrite.
 
+import { useMemo } from 'react'
 import { EDGE_STYLES, LAYER_BADGE_CLASS } from '@/graph/vokb-palette'
+import { SHAPE_PALETTE, shapeFallback, classColor, type ShapeKind } from '@/graph/color-fallback'
+import { deriveLayer, type Layer, type OntologyRegistryClass } from '@/graph/layer'
+// `graph/types` is the canvas-pipeline shape returned by useGraphData; the
+// LegendPanel receives the same post-filter set that paints the canvas
+// (D-05 same-predicate contract), so it MUST consume the graph/types flavor
+// rather than ApiClient.Relation (which still carries the wire-protocol
+// index signature). The two are structurally compatible for this panel's
+// reads — id/name/ontologyClass/metadata on Entity, from/to/type on Relation.
+import type { Entity, Relation } from '@/graph/types'
 
-// Shape swatch metadata — picks 5 representative ontology classes covering
-// every shape primitive. Color is the canvas fill from UI-SPEC §14 table.
-interface ShapeSwatch {
+// Detect "is this class registered with a shape in SHAPE_PALETTE?" so the
+// DOMAINS row can carry a tooltip when a class is unknown to the palette.
+// Reads the palette directly so adding a new class to color-fallback.ts
+// auto-extends the legend's known set — no second list to keep in sync.
+function isRegisteredClass(cls: string): boolean {
+  return Object.prototype.hasOwnProperty.call(SHAPE_PALETTE, cls)
+}
+
+interface DomainRow {
   className: string
-  shape: 'circle' | 'diamond' | 'square' | 'triangle' | 'hexagon'
+  shape: ShapeKind
   color: string
+  isFallback: boolean
 }
-
-const SHAPE_SWATCHES: ReadonlyArray<ShapeSwatch> = [
-  { className: 'Project',            shape: 'hexagon',  color: '#0ea5e9' }, // sky-500
-  { className: 'Component',          shape: 'square',   color: '#3b82f6' }, // blue-500
-  { className: 'Detail',             shape: 'circle',   color: '#93c5fd' }, // blue-300
-  { className: 'Digest',             shape: 'diamond',  color: '#f59e0b' }, // amber-500
-  { className: 'RuntimeDiagnostics', shape: 'triangle', color: '#ef4444' }, // red-500
-]
-
-// Source-authority stroke samples — verbatim VOKB encoding from
-// vokb-palette nodeStroke + nodeStrokeWidth + nodeStrokeDasharray.
-interface SourceSample {
-  label: string
-  stroke: string
-  strokeWidth: number
-  dasharray: string
-}
-
-const SOURCE_SAMPLES: ReadonlyArray<SourceSample> = [
-  { label: 'Official doc',   stroke: '#10b981', strokeWidth: 3,   dasharray: '' },     // emerald-500 width 3
-  { label: 'Team knowledge', stroke: '#14b8a6', strokeWidth: 2.5, dasharray: '' },     // teal-500 width 2.5
-  { label: 'User input',     stroke: '#a78bfa', strokeWidth: 2.5, dasharray: '4,2' },  // violet-400 dashed
-  { label: 'Automated RCA',  stroke: '#4b5563', strokeWidth: 2,   dasharray: '' },     // gray-600 (default)
-]
-
-// Pick a subset of EDGE_STYLES to keep the relationship section legible
-// (28+ edge types would overflow the panel). One sample per semantic group
-// per the vokb-palette §VOKB Edge style table.
-const RELATIONSHIP_SAMPLES: ReadonlyArray<{ type: string; label: string }> = [
-  { type: 'PART_OF',         label: 'Structural (PART_OF)' },
-  { type: 'CAUSED_BY',       label: 'Causal (CAUSED_BY)' },
-  { type: 'INDICATES',       label: 'Causal dashed (INDICATES)' },
-  { type: 'OBSERVED_IN',     label: 'Operational (OBSERVED_IN)' },
-  { type: 'MANAGED_BY',      label: 'Operational dashed (MANAGED_BY)' },
-  { type: 'READS',           label: 'Data flow (READS)' },
-  { type: 'USES',            label: 'Data flow dashed (USES)' },
-  { type: 'RESOLVES',        label: 'Resolution (RESOLVES)' },
-  { type: 'MATCHES',         label: 'Resolution dashed (MATCHES)' },
-  { type: 'CORRELATED_WITH', label: 'Association (CORRELATED_WITH)' },
-  { type: 'RELATES_TO',      label: 'Default (RELATES_TO)' },
-]
 
 interface SectionProps {
   title: string
   children: React.ReactNode
 }
+
 function Section({ title, children }: SectionProps) {
   return (
     <div className="space-y-1.5">
@@ -83,9 +60,10 @@ function Section({ title, children }: SectionProps) {
 }
 
 interface ShapeIconProps {
-  shape: ShapeSwatch['shape']
+  shape: ShapeKind
   color: string
 }
+
 function ShapeIcon({ shape, color }: ShapeIconProps) {
   // 14x14 viewBox so each shape sits visually balanced at 14px swatch size.
   const stroke = '#000'
@@ -125,11 +103,88 @@ function ShapeIcon({ shape, color }: ShapeIconProps) {
 }
 
 export interface LegendPanelProps {
-  /** Optional className passthrough so the parent (FilterRail) can tweak margins. */
+  /** Rendered entities — the SAME post-filter set the canvas paints. D-05 contract. */
+  entities: readonly Entity[]
+  /** Rendered relations — the SAME post-filter set the canvas paints. D-05 contract. */
+  relations: readonly Relation[]
+  /** Optional ontology registry — when supplied, deriveLayer walks the extends-chain.
+   *  When omitted, deriveLayer falls back to a direct-class match (Pattern/Insight). */
+  ontologyRegistry?: readonly OntologyRegistryClass[]
+  /** Optional className passthrough so the parent (FilterRail bottomSlot) can tweak margins. */
   className?: string
 }
 
-export function LegendPanel({ className }: LegendPanelProps = {}) {
+export function LegendPanel({
+  entities,
+  relations,
+  ontologyRegistry,
+  className,
+}: LegendPanelProps) {
+  // DOMAINS: distinct entity.ontologyClass values in render order.
+  const domains = useMemo<readonly DomainRow[]>(() => {
+    const seen = new Set<string>()
+    const out: DomainRow[] = []
+    for (const e of entities) {
+      const cls = typeof e.ontologyClass === 'string' ? e.ontologyClass : ''
+      if (!cls || seen.has(cls)) continue
+      seen.add(cls)
+      const isFallback = !isRegisteredClass(cls)
+      const shape: ShapeKind = isFallback ? 'circle' : shapeFallback(cls)
+      // Color resolution: registered classes use classColor (theme-independent
+      // hex from color-fallback's hierarchy palette); fallback rows use neutral gray.
+      const color = isFallback ? '#9ca3af' : classColor(cls, 'light')
+      out.push({ className: cls, shape, color, isFallback })
+    }
+    return out
+  }, [entities])
+
+  // LAYERS: distinct deriveLayer() values across entities, preserved in
+  // insertion order so a (evidence-first) set keeps evidence on top.
+  const layers = useMemo<readonly Layer[]>(() => {
+    const seen = new Set<Layer>()
+    const out: Layer[] = []
+    for (const e of entities) {
+      const l = deriveLayer(
+        e as { ontologyClass?: string; metadata?: { layer?: string }; layer?: string },
+        ontologyRegistry,
+      )
+      if (!seen.has(l)) {
+        seen.add(l)
+        out.push(l)
+      }
+    }
+    return out
+  }, [entities, ontologyRegistry])
+
+  // SOURCE: distinct truthy entity.metadata?.source values.
+  const sources = useMemo<readonly string[]>(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const e of entities) {
+      const meta = (e as { metadata?: { source?: unknown } }).metadata
+      const src = meta?.source
+      if (typeof src === 'string' && src.length > 0 && !seen.has(src)) {
+        seen.add(src)
+        out.push(src)
+      }
+    }
+    return out
+  }, [entities])
+
+  // RELATIONSHIPS: distinct truthy relation.type values.
+  const relTypes = useMemo<readonly string[]>(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const r of relations) {
+      const t = typeof r.type === 'string' ? r.type : ''
+      if (t && !seen.has(t)) {
+        seen.add(t)
+        out.push(t)
+      }
+    }
+    return out
+  }, [relations])
+
   return (
     <details
       data-testid="viewer-legend-panel"
@@ -139,91 +194,93 @@ export function LegendPanel({ className }: LegendPanelProps = {}) {
         Legend
       </summary>
       <div className="mt-1.5 space-y-3">
-        <Section title="Domains">
-          {/* 5 representative classes covering every shape primitive. v1 note:
-              Sigma renderer falls back to circle for non-circle shapes; this
-              SVG legend is the source of truth for the encoded shape mapping
-              until the custom GLSL programs ship. */}
-          {SHAPE_SWATCHES.map((sw) => (
-            <div
-              key={sw.className}
-              className="flex items-center gap-2 text-[11px] text-foreground/80"
-              data-testid={`legend-domain-${sw.className}`}
-            >
-              <ShapeIcon shape={sw.shape} color={sw.color} />
-              <span>{sw.className}</span>
-              <span className="text-muted-foreground">({sw.shape})</span>
-            </div>
-          ))}
-        </Section>
+        {/* D-08 ordering: DOMAINS → LAYERS → SOURCE → RELATIONSHIPS.
+            D-07: skip rendering a Section when its derived array is empty. */}
 
-        <Section title="Layers">
-          {/* Layer color chips sourced from LAYER_BADGE_CLASS (vokb-palette). */}
-          {Object.entries(LAYER_BADGE_CLASS).map(([layer, badgeClass]) => (
-            <div
-              key={layer}
-              className="flex items-center gap-2 text-[11px] text-foreground/80"
-              data-testid={`legend-layer-${layer}`}
-            >
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeClass}`}>
-                {layer}
-              </span>
-            </div>
-          ))}
-        </Section>
+        {domains.length > 0 && (
+          <Section title="Domains">
+            {domains.map((d) => {
+              const row = (
+                <div
+                  key={d.className}
+                  className="flex items-center gap-2 text-[11px] text-foreground/80"
+                  data-testid={`legend-domain-${d.className}`}
+                  title={d.isFallback ? 'class without registered shape' : undefined}
+                >
+                  <ShapeIcon shape={d.shape} color={d.color} />
+                  <span>{d.className}</span>
+                  <span className="text-muted-foreground">({d.shape})</span>
+                </div>
+              )
+              return row
+            })}
+          </Section>
+        )}
 
-        <Section title="Source">
-          {SOURCE_SAMPLES.map((sample) => (
-            <div
-              key={sample.label}
-              className="flex items-center gap-2 text-[11px] text-foreground/80"
-              data-testid={`legend-source-${sample.label.toLowerCase().replace(/\s+/g, '-')}`}
-            >
-              <svg width="24" height="14" viewBox="0 0 24 14" aria-hidden>
-                <circle
-                  cx="12"
-                  cy="7"
-                  r="5"
-                  fill="#fff"
-                  stroke={sample.stroke}
-                  strokeWidth={sample.strokeWidth}
-                  strokeDasharray={sample.dasharray || undefined}
-                />
-              </svg>
-              <span>{sample.label}</span>
-            </div>
-          ))}
-        </Section>
+        {layers.length > 0 && (
+          <Section title="Layers">
+            {layers.map((layer) => {
+              const badgeClass = LAYER_BADGE_CLASS[layer]
+              return (
+                <div
+                  key={layer}
+                  className="flex items-center gap-2 text-[11px] text-foreground/80"
+                  data-testid={`legend-layer-${layer}`}
+                >
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeClass}`}>
+                    {layer}
+                  </span>
+                </div>
+              )
+            })}
+          </Section>
+        )}
 
-        <Section title="Relationships">
-          {RELATIONSHIP_SAMPLES.map(({ type, label }) => {
-            const style = EDGE_STYLES[type]
-            // Defensive: if a planner-picked edge type leaves EDGE_STYLES,
-            // fall back to a gray line so the legend still renders cleanly.
-            const color = style?.color ?? '#d1d5db'
-            const dasharray = style?.dasharray ?? ''
-            return (
+        {sources.length > 0 && (
+          <Section title="Source">
+            {sources.map((src) => (
               <div
-                key={type}
+                key={src}
                 className="flex items-center gap-2 text-[11px] text-foreground/80"
-                data-testid={`legend-rel-${type}`}
+                data-testid={`legend-source-${src}`}
               >
-                <svg width="32" height="10" viewBox="0 0 32 10" aria-hidden>
-                  <line
-                    x1="1"
-                    y1="5"
-                    x2="31"
-                    y2="5"
-                    stroke={color}
-                    strokeWidth={2}
-                    strokeDasharray={dasharray || undefined}
-                  />
-                </svg>
-                <span>{label}</span>
+                <span>{src}</span>
               </div>
-            )
-          })}
-        </Section>
+            ))}
+          </Section>
+        )}
+
+        {relTypes.length > 0 && (
+          <Section title="Relationships">
+            {relTypes.map((type) => {
+              const style = EDGE_STYLES[type]
+              // Defensive: unknown relation types fall back to gray so the
+              // legend stays clean instead of throwing.
+              const color = style?.color ?? '#d1d5db'
+              const dasharray = style?.dasharray ?? ''
+              return (
+                <div
+                  key={type}
+                  className="flex items-center gap-2 text-[11px] text-foreground/80"
+                  data-testid={`legend-rel-${type}`}
+                >
+                  <svg width="32" height="10" viewBox="0 0 32 10" aria-hidden>
+                    <line
+                      x1="1"
+                      y1="5"
+                      x2="31"
+                      y2="5"
+                      stroke={color}
+                      strokeWidth={2}
+                      strokeDasharray={dasharray || undefined}
+                    />
+                  </svg>
+                  <span>{type}</span>
+                </div>
+              )
+            })}
+          </Section>
+        )}
       </div>
     </details>
   )
