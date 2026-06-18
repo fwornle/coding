@@ -81,3 +81,46 @@ Trivial fix. May already work in production (when the unified-viewer dist is ser
 ## Recommended next phase scope
 
 Phase 60.1 (or next-milestone phase if Phase 60 is closing for v7.2 ship): "obs-api ontology source consolidation + Vite proxy wire-up — bring L1/L2 hierarchy through to /viewer/coding OntologyFilter". Scoped to the two gaps above; uses the obs-api writer-smoke pattern from Phase 44 / Phase 51 to confirm Observation/Digest/Insight writes still classify correctly post-swap.
+
+## Additional UX-integrity gaps discovered during Phase 60 visual smoke (2026-06-18)
+
+These were surfaced operator-side after the 60-VERIFICATION.md was written. All same family — UI elements describing data the rendered graph doesn't actually reflect.
+
+### Gap C — Legend shapes vs. D3 renderer disagreement (SC#2 follow-up)
+
+`LegendPanel.tsx` (post-60-02) renders the canonical shape from `SHAPE_PALETTE` for each ontology class: `Project`/`System` → hexagon, `Component`/`SubComponent` → square, `Detail` → circle, `Insight`/`Digest` → diamond.
+
+But `integrations/unified-viewer/src/graph/D3GraphCanvas.tsx` (mounted for `/viewer/coding` per `UnifiedViewer.tsx:372`) only ever does `node.append('circle')` (lines 836, 844-845). No `path`/`polygon` shape variation — every node is a circle regardless of `ontologyClass`. `SigmaCanvas` (mounted for `/viewer/okb`) may render shapes correctly; coding tab does not.
+
+The Legend declares shapes the D3 renderer can't draw — directly contradicting Phase 60 SC#2's "stop lying about what's on screen" mandate.
+
+**Fix paths:**
+- (preferred) Make `D3GraphCanvas` read `SHAPE_PALETTE[entity.ontologyClass]` and append a matching SVG `<path>` for hexagon/square/diamond instead of `<circle>` for every node. Real shapes on canvas; Legend stays accurate.
+- (fallback) Hardcode `(circle)` in the LegendPanel DOMAINS section when the active renderer is `D3GraphCanvas`, hide the shape glyph when it can't be drawn.
+
+### Gap D — Selection sidebar count vs. visible halo count (SC#3 follow-up)
+
+When a timeline tick is selected (e.g., `c197ef · 2026-06-15 21:00 → 22:00 · 27 obs · 27 entities`), the Entity sidebar lists all 27 items but the canvas only halos ~10 of them. The remaining 17 are `Observation` entityType nodes that `visibility-predicate.ts:46-47` filters out by default (Plan 60-03's hard-exclusion shield, gated on the `showDebugEntityTypes` toggle).
+
+By-design behavior, but the UI gives zero signal that filtering is why counts don't match. Operator sees "27 selected" but can only act on the 10 visible halos.
+
+**Fix path:** change the sidebar's `27 items` header to a breakdown, e.g.
+
+```
+Selected
+27 items · 10 visible · 17 hidden by "Show debug entity types"
+```
+
+Toggling the debug switch ON should bring the canvas count up to 27 halos and the sidebar header to `27 items · 27 visible · 0 hidden`. Implementation: SidePanel reads `selectedNodeIds` + the same `useVisibleEntityIds` predicate the canvas uses, computes intersection, renders the breakdown.
+
+### Gap E — Bidirectional hover (sidebar ↔ graph)
+
+Currently selection is bidirectional (timeline tick → sidebar list + graph halo set) but hover is not. Operator hovering a graph node gets no signal in the sidebar; hovering a sidebar row gives no signal on the canvas.
+
+**Fix path:**
+- Add `hoveredNodeId: string | null` to `viewer-store.ts` (Phase 56.1 multi-selection store contract preserved — write through a dedicated `setHoveredNodeId` action).
+- `D3GraphCanvas`: on node `mouseenter`/`mouseleave`, call `setHoveredNodeId`. CSS keyframe pulse on `.node-circle[data-node-id="${hoveredNodeId}"]` when the store value matches.
+- `SidePanel`: on row `mouseenter`/`mouseleave`, call `setHoveredNodeId`. Row gets a highlight class when its ID matches the store value.
+- Visual indicator on a sidebar row whose `hoveredNodeId` is in the filtered-out set ("hidden — toggle Show debug entity types to reveal") so users learn why their hover signal isn't reciprocated on canvas.
+
+Gaps A–E together make a coherent Phase 60.1 scope. All five are about Phase 60's "stop lying / stop hiding what's on screen" mandate, just at different surfaces (filter rail / canvas shapes / selection sidebar / hover affordance / API surface).
