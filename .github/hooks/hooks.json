@@ -1,34 +1,49 @@
 {
-  "_comment": "Copilot CLI native hooks configuration - bridges to unified hook system",
+  "version": 1,
+  "_comment": "GitHub Copilot CLI native hooks (schema v1: requires top-level 'version' + 'hooks' object; entries use 'bash'/'type', NOT 'command'/'args'). Bridges every event to the unified hook system via copilot-bridge.sh. cwd defaults to '.', which is the coding repo root when copilot is launched here, so the relative bridge path resolves and the script self-locates CODING_REPO from its own path. Do NOT use $CODING_REPO in 'cwd' — Copilot does not expand env vars there and a literal path yields 'spawn bash ENOENT' under fail-closed preToolUse, bricking the CLI.",
   "_documentation": "See https://docs.github.com/en/copilot/how-tos/copilot-cli/use-hooks",
-
-  "sessionStart": {
-    "command": "./lib/agent-api/hooks/copilot-bridge.sh",
-    "args": ["sessionStart"]
-  },
-
-  "sessionEnd": {
-    "command": "./lib/agent-api/hooks/copilot-bridge.sh",
-    "args": ["sessionEnd"]
-  },
-
-  "preToolUse": {
-    "command": "./lib/agent-api/hooks/copilot-bridge.sh",
-    "args": ["preToolUse"]
-  },
-
-  "postToolUse": {
-    "command": "./lib/agent-api/hooks/copilot-bridge.sh",
-    "args": ["postToolUse"]
-  },
-
-  "userPromptSubmitted": {
-    "command": "./lib/agent-api/hooks/copilot-bridge.sh",
-    "args": ["userPromptSubmitted"]
-  },
-
-  "errorOccurred": {
-    "command": "./lib/agent-api/hooks/copilot-bridge.sh",
-    "args": ["errorOccurred"]
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "./lib/agent-api/hooks/copilot-bridge.sh sessionStart",
+        "timeoutSec": 10
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "./lib/agent-api/hooks/copilot-bridge.sh userPromptSubmitted",
+        "timeoutSec": 5
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "./lib/agent-api/hooks/copilot-bridge.sh preToolUse",
+        "timeoutSec": 15
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "./lib/agent-api/hooks/copilot-bridge.sh postToolUse",
+        "timeoutSec": 5
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "./lib/agent-api/hooks/copilot-bridge.sh sessionEnd",
+        "timeoutSec": 10
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "./lib/agent-api/hooks/copilot-bridge.sh errorOccurred",
+        "timeoutSec": 5
+      }
+    ]
   }
 }
