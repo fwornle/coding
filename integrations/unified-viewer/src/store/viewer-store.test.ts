@@ -133,12 +133,8 @@ describe('useViewerStore — Phase 55 initial state (Task 1)', () => {
     expect(initial().selectedOntologyClasses).toEqual([])
   })
 
-  test('initial state: show* booleans all false', () => {
+  test('initial state: hideDocNodes false', () => {
     const s = initial()
-    expect(s.showEdges).toBe(false)
-    expect(s.showClusters).toBe(false)
-    expect(s.showRelationLabels).toBe(false)
-    expect(s.showMergedOnly).toBe(false)
     expect(s.hideDocNodes).toBe(false)
   })
 
@@ -212,10 +208,6 @@ describe('useViewerStore — Phase 55 action setters (Task 2)', () => {
       selectedLayers: [],
       selectedDomains: [],
       selectedOntologyClasses: [],
-      showEdges: false,
-      showClusters: false,
-      showRelationLabels: false,
-      showMergedOnly: false,
       hideDocNodes: false,
       mode: 'kg',
       trendingPatterns: [],
@@ -264,25 +256,12 @@ describe('useViewerStore — Phase 55 action setters (Task 2)', () => {
     expect(useViewerStore.getState().selectedOntologyClasses).toEqual(['Service', 'File'])
   })
 
-  test('toggleShowEdges flips boolean', () => {
-    expect(useViewerStore.getState().showEdges).toBe(false)
-    useViewerStore.getState().toggleShowEdges()
-    expect(useViewerStore.getState().showEdges).toBe(true)
-    useViewerStore.getState().toggleShowEdges()
-    expect(useViewerStore.getState().showEdges).toBe(false)
-  })
-
-  test('toggleShowClusters / toggleShowRelationLabels / toggleShowMergedOnly / toggleHideDocNodes flip', () => {
-    const s = useViewerStore.getState()
-    s.toggleShowClusters()
-    s.toggleShowRelationLabels()
-    s.toggleShowMergedOnly()
-    s.toggleHideDocNodes()
-    const after = useViewerStore.getState()
-    expect(after.showClusters).toBe(true)
-    expect(after.showRelationLabels).toBe(true)
-    expect(after.showMergedOnly).toBe(true)
-    expect(after.hideDocNodes).toBe(true)
+  test('toggleHideDocNodes flips boolean', () => {
+    expect(useViewerStore.getState().hideDocNodes).toBe(false)
+    useViewerStore.getState().toggleHideDocNodes()
+    expect(useViewerStore.getState().hideDocNodes).toBe(true)
+    useViewerStore.getState().toggleHideDocNodes()
+    expect(useViewerStore.getState().hideDocNodes).toBe(false)
   })
 
   test("setMode('triage') updates mode; setMode('kg') reverts", () => {

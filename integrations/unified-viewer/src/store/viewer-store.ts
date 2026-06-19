@@ -297,10 +297,6 @@ export interface ViewerState {
   selectedLayers: string[] // empty = "all visible" (UI-SPEC §10)
   selectedDomains: string[]
   selectedOntologyClasses: string[] // NEW canonical, replaces selectedClasses
-  showEdges: boolean
-  showClusters: boolean
-  showRelationLabels: boolean
-  showMergedOnly: boolean
   hideDocNodes: boolean
   // Phase 60 Plan 03 (G3) — D-09..D-11: when true, the visibility predicate
   // skips the Observation/Digest hard-exclusion branch so operators can debug
@@ -334,10 +330,6 @@ export interface ViewerState {
   toggleDomain: (domain: string) => void
   toggleOntologyClass: (cls: string) => void
   setSelectedOntologyClasses: (classes: string[]) => void
-  toggleShowEdges: () => void
-  toggleShowClusters: () => void
-  toggleShowRelationLabels: () => void
-  toggleShowMergedOnly: () => void
   toggleHideDocNodes: () => void
   // Phase 60 Plan 03 (G3) — D-09..D-11: flips showDebugEntityTypes.
   toggleShowDebugEntityTypes: () => void
@@ -901,10 +893,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selectedLayers: [],
   selectedDomains: [],
   selectedOntologyClasses: [],
-  showEdges: false,
-  showClusters: false,
-  showRelationLabels: false,
-  showMergedOnly: false,
   hideDocNodes: false,
   // Phase 60 Plan 03 (G3) — D-11: NOT persisted (no localStorage). Resets every
   // page load so operators must consciously re-enable Observation/Digest debug.
@@ -1018,10 +1006,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   setHiddenRelationTypes: (types) => set({ hiddenRelationTypes: new Set(types) }),
   setHiddenNodeTypes: (types) => set({ hiddenNodeTypes: new Set(types) }),
 
-  toggleShowEdges: () => set((s) => ({ showEdges: !s.showEdges })),
-  toggleShowClusters: () => set((s) => ({ showClusters: !s.showClusters })),
-  toggleShowRelationLabels: () => set((s) => ({ showRelationLabels: !s.showRelationLabels })),
-  toggleShowMergedOnly: () => set((s) => ({ showMergedOnly: !s.showMergedOnly })),
   toggleHideDocNodes: () => set((s) => ({ hideDocNodes: !s.hideDocNodes })),
   // Phase 60 Plan 03 (G3) — D-09..D-11: toggle the showDebugEntityTypes flag.
   toggleShowDebugEntityTypes: () =>

@@ -91,10 +91,6 @@ describe('FilterRail', () => {
       selectedLayers: [],
       selectedDomains: [],
       selectedOntologyClasses: [],
-      showEdges: false,
-      showClusters: false,
-      showRelationLabels: false,
-      showMergedOnly: false,
       hideDocNodes: false,
       theme: 'light',
       filterRailCollapsed: false,
@@ -162,8 +158,16 @@ describe('FilterRail', () => {
   // Phase 55-08 NEW contracts
   // ------------------------------------------------------------------
 
-  test('Phase 55-08: mounts LayerFilter (Evidence + Pattern visible)', () => {
-    renderRail(makeApiClient())
+  // 2026-06-19: the Layer (Evidence/Pattern) filter is the OKB/km-core
+  // LearningArtifact axis — hidden in the VKB (coding) tab, kept for OKB.
+  test('LayerFilter is HIDDEN in the coding (VKB) tab', () => {
+    renderRail(makeApiClient(), undefined, undefined, 'coding')
+    expect(screen.queryByText('Evidence')).toBeNull()
+    expect(screen.queryByText('Pattern')).toBeNull()
+  })
+
+  test('LayerFilter (Evidence + Pattern) is visible in the okb tab', () => {
+    renderRail(makeApiClient(), undefined, undefined, 'okb')
     expect(screen.getByText('Evidence')).toBeInTheDocument()
     expect(screen.getByText('Pattern')).toBeInTheDocument()
   })
@@ -181,12 +185,13 @@ describe('FilterRail', () => {
     expect(await screen.findByText('Ontology Class')).toBeInTheDocument()
   })
 
-  test('Phase 55-08: mounts GraphToggles (4 toggle labels visible)', () => {
+  test('Phase 55-08: mounts GraphToggles (functional toggles visible; dead no-ops removed)', () => {
     renderRail(makeApiClient())
-    expect(screen.getByLabelText('Show All Relations')).toBeInTheDocument()
-    expect(screen.getByLabelText('Show Clusters')).toBeInTheDocument()
-    expect(screen.getByLabelText('Merged Only')).toBeInTheDocument()
     expect(screen.getByLabelText('Hide Documentation')).toBeInTheDocument()
+    expect(screen.getByLabelText('Show debug entity types')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Show All Relations')).toBeNull()
+    expect(screen.queryByLabelText('Show Clusters')).toBeNull()
+    expect(screen.queryByLabelText('Merged Only')).toBeNull()
   })
 
   test('Phase 55-08: Phase 45 flat ClassList section is REMOVED', () => {

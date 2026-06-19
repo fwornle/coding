@@ -153,6 +153,10 @@ export interface LegendPanelProps {
   /** Optional ontology registry — when supplied, deriveLayer walks the extends-chain.
    *  When omitted, deriveLayer falls back to a direct-class match (Pattern/Insight). */
   ontologyRegistry?: readonly OntologyRegistryClass[]
+  /** Hide the LAYERS (Evidence/Pattern) section — it's the OKB/km-core
+   *  LearningArtifact `defaultLayer` axis, not native to the coding KG. Set true
+   *  for the VKB tab (operator 2026-06-19). */
+  hideLayers?: boolean
   /** Optional className passthrough so the parent (FilterRail bottomSlot) can tweak margins. */
   className?: string
 }
@@ -161,6 +165,7 @@ export function LegendPanel({
   entities,
   relations,
   ontologyRegistry,
+  hideLayers,
   className,
 }: LegendPanelProps) {
   // Legend click-to-toggle (operator request 2026-06-19): clicking a DOMAINS
@@ -292,7 +297,7 @@ export function LegendPanel({
           </Section>
         )}
 
-        {layers.length > 0 && (
+        {!hideLayers && layers.length > 0 && (
           <Section title="Layers">
             {layers.map((layer) => {
               const badgeClass = LAYER_BADGE_CLASS[layer]

@@ -389,7 +389,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             registerSearchInputRef={registerSearchInputRef}
             system={system}
             entities={entities}
-            bottomSlot={<LegendPanel className="pt-2" entities={entities} relations={relations} />}
+            bottomSlot={<LegendPanel className="pt-2" entities={entities} relations={relations} hideLayers={system === 'coding'} />}
           />
           <main
             className="flex-1 bg-background overflow-hidden relative"

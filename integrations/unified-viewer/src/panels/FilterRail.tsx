@@ -216,8 +216,11 @@ export function FilterRail({
 
       {/* ---- Phase 55 NEW filter components (UI-SPEC §6 order) ---- */}
 
-      {/* Layer (NEW) */}
-      <LayerFilter entities={entities} />
+      {/* Layer (Evidence/Pattern) — this is the OKB/km-core LearningArtifact
+          `defaultLayer` axis, NOT a coding-KG-native concept (in VKB it just
+          means Insight=pattern, everything else=evidence). Hidden in the VKB
+          tab per operator 2026-06-19; kept for OKB/VOKB where it's native. */}
+      {system !== 'coding' && <LayerFilter entities={entities} />}
 
       {/* Domain (NEW) */}
       <DomainFilter entities={entities} />
