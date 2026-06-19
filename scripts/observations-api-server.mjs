@@ -1525,56 +1525,39 @@ kmRouter.get('/stats', async (_req, res) => {
 
 // ── Phase 55 Plan 06: /api/v1/trends?top=N ────────────────────────────────
 //
-// Wire-shape per okbClient.ts:62-78 (TrendingPattern). Walks Pattern-class
-// entities, scores by occurrenceCount * exp(-ageHours / TRENDS_HALFLIFE_H).
-// occurrenceCount is read from `entity.metadata.occurrences.length` when
-// the writer maintains an occurrences[] array; otherwise the Phase 39
-// confirmationCount is the fallback (every confirmation == one occurrence).
-//
-// Returns sorted desc by trendScore, sliced to top (default 20, max 100 —
-// upper cap per Plan-spec to bound the response shape).
+// 2026-06-19 REDEFINITION (operator): the original "Trending Patterns" ranked
+// `Pattern`-class entities by occurrence-decay, but the coding KG only carried
+// 2 stale 2025 Pattern stubs with no occurrence tracking, so every score
+// decayed to ~0 and all buckets read 0/0/0 — a dead panel. Repurposed to a
+// LIVE signal: the most RECENTLY-ACTIVE Insights (the synthesised knowledge the
+// online pipeline emits continuously). Score = recency of `updatedAt` (newest
+// ≈ 1.0, 30-day half-life); buckets = whether the insight was touched within
+// the 7/30/90-day window. Wire-shape (TrendingPattern: {nodeId, entity,
+// trendScore, trends}) is preserved so the frontend needs no contract change.
 const TRENDS_DEFAULT_TOP = 20;
 const TRENDS_MAX_TOP = 100;
 const TRENDS_HALFLIFE_HOURS = 720; // 30 days — exposed as a constant for tunability.
+const TRENDS_SOURCE_CLASS = 'Insight';
+
+function entityActivityMs(entity, nowMs) {
+  return Date.parse(entity.updatedAt || entity.createdAt || '') || nowMs;
+}
 
 function computeTrendScore(entity, nowMs) {
-  const meta = entity.metadata || {};
-  const occurrences = Array.isArray(meta.occurrences) ? meta.occurrences : null;
-  const occurrenceCount = occurrences
-    ? occurrences.length
-    : (meta.provenance?.confirmationCount ?? 1);
-  // Age decay anchored at `createdAt`. The shorter half-life weights very
-  // recent patterns higher; the 30-day default matches the OKB convention.
-  const createdAtMs = Date.parse(entity.createdAt || '') || nowMs;
-  const ageHours = Math.max(0, (nowMs - createdAtMs) / 3_600_000);
-  const decay = Math.exp(-ageHours / TRENDS_HALFLIFE_HOURS);
-  return occurrenceCount * decay;
+  // Recency score: 1.0 = just updated, decaying with the 30-day half-life so
+  // the freshest knowledge floats to the top.
+  const ageHours = Math.max(0, (nowMs - entityActivityMs(entity, nowMs)) / 3_600_000);
+  return Math.exp(-ageHours / TRENDS_HALFLIFE_HOURS);
 }
 
 function computeTrendBuckets(entity, nowMs) {
-  // Phase 55 D-55-06 default — bucket counts read from
-  // `entity.metadata.trends` when the writer maintains it; otherwise
-  // collapse to a single "all entries land in the active window" stub
-  // (occurrenceCount in last7Days; 0/0 for the longer windows). Frontend
-  // already treats absent fields as 0 per okbClient.ts:62-78.
-  const meta = entity.metadata || {};
-  if (meta.trends && typeof meta.trends === 'object') {
-    const t = meta.trends;
-    return {
-      last7Days: Number(t.last7Days ?? 0),
-      last30Days: Number(t.last30Days ?? 0),
-      last90Days: Number(t.last90Days ?? 0),
-    };
-  }
-  const createdAtMs = Date.parse(entity.createdAt || '') || nowMs;
-  const ageDays = (nowMs - createdAtMs) / 86_400_000;
-  const occurrenceCount = Array.isArray(meta.occurrences)
-    ? meta.occurrences.length
-    : (meta.provenance?.confirmationCount ?? 1);
+  // Recency indicator per window — 1 if the entity was active inside it. A
+  // fresh insight lights all three (1/1/1); older ones taper (0/1/1 → 0/0/1).
+  const ageDays = (nowMs - entityActivityMs(entity, nowMs)) / 86_400_000;
   return {
-    last7Days: ageDays <= 7 ? occurrenceCount : 0,
-    last30Days: ageDays <= 30 ? occurrenceCount : 0,
-    last90Days: ageDays <= 90 ? occurrenceCount : 0,
+    last7Days: ageDays <= 7 ? 1 : 0,
+    last30Days: ageDays <= 30 ? 1 : 0,
+    last90Days: ageDays <= 90 ? 1 : 0,
   };
 }
 
@@ -1585,7 +1568,7 @@ kmRouter.get('/trends', async (req, res) => {
       Math.max(Number.isFinite(rawTop) && rawTop > 0 ? rawTop : TRENDS_DEFAULT_TOP, 1),
       TRENDS_MAX_TOP,
     );
-    const entities = await _kmStore.findByOntologyClass('Pattern');
+    const entities = await _kmStore.findByOntologyClass(TRENDS_SOURCE_CLASS);
     const nowMs = Date.now();
     const scored = entities.map((entity) => {
       const trendScore = computeTrendScore(entity, nowMs);

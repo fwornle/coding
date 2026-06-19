@@ -158,10 +158,10 @@ export default function TrendingPanel({ apiClient }: TrendingPanelProps) {
         <button
           type="button"
           className="w-full flex items-center justify-between text-xs font-medium text-muted-foreground hover:text-foreground"
-          aria-label="Toggle Trending Patterns section"
+          aria-label="Toggle Trending Insights section"
         >
           <span className="flex items-center gap-1">
-            <span>Trending Patterns</span>
+            <span>Trending Insights</span>
             {patterns.length > 0 && (
               <span
                 className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 tabular-nums"
