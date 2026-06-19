@@ -1,0 +1,53 @@
+{
+  "meta": {
+    "name": "learning-artifacts",
+    "version": "1.0.0",
+    "extends": "upper",
+    "description": "Online-learning lower ontology — Observation/Digest/Insight tiers extending LearningArtifact (Phase 41 D-48)."
+  },
+  "classes": {
+    "Observation": {
+      "extends": "LearningArtifact",
+      "defaultLayer": "evidence",
+      "description": "A single ETM-captured intent/approach/artifacts/result observation from a coding session.",
+      "relationships": {},
+      "properties": {
+        "agent": { "type": "string" },
+        "summary": { "type": "string", "required": true },
+        "modifiedFiles": { "type": "array" },
+        "digestedAt": { "type": "string" },
+        "llm": { "type": "string" }
+      }
+    },
+    "Digest": {
+      "extends": "LearningArtifact",
+      "defaultLayer": "evidence",
+      "description": "A daily roll-up of observations summarising one project/session-window theme.",
+      "relationships": {
+        "aggregates": ["Observation"]
+      },
+      "properties": {
+        "date": { "type": "string", "required": true },
+        "theme": { "type": "string" },
+        "summary": { "type": "string" },
+        "observationIds": { "type": "array" },
+        "agents": { "type": "array" },
+        "filesTouched": { "type": "array" }
+      }
+    },
+    "Insight": {
+      "extends": "LearningArtifact",
+      "defaultLayer": "pattern",
+      "description": "A weekly synthesised insight derived from digests; long-term retained for prompt injection.",
+      "relationships": {
+        "aggregates": ["Digest"]
+      },
+      "properties": {
+        "topic": { "type": "string", "required": true },
+        "summary": { "type": "string" },
+        "confidence": { "type": "number" },
+        "digestIds": { "type": "array" }
+      }
+    }
+  }
+}

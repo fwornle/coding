@@ -1312,6 +1312,22 @@ app.get('/api/consolidation/status', async (_req, res) => {
 const KG_DB_PATH = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'leveldb');
 const KG_EXPORT_DIR = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'exports');
 
+// Gap A (2026-06-19): the bundled defaultOntologyDir() carries ONLY the
+// LearningArtifact axis (LearningArtifact + Observation/Digest/Insight), so the
+// coding L1 (Component/SubComponent/Detail) and Phase-57 L2 classes never reach
+// the registry — /api/v1/ontology/classes returned 6 entries and the viewer's
+// OntologyFilter could not render the L1→L2 hierarchy. The curated dir
+// `.data/ontologies/obs-api/` is a strict SUPERSET of the bundled writer
+// ontology (upper.json = host upper + LearningArtifact, + the bundled
+// learning-artifacts.json, + coding-ontology.json (L1) + coding.lower.json
+// (L2)), so the writer keeps EVERY class it had AND the viewer gains L1/L2.
+// Pre-flighted through OntologyRegistry (49 classes, all parent chains resolve).
+// Falls back to the bundled dir when the curated dir is absent (fresh checkout/CI).
+const KG_ONTOLOGY_DIR = (() => {
+  const curated = path.join(REPO_ROOT, '.data', 'ontologies', 'obs-api');
+  return fs.existsSync(path.join(curated, 'upper.json')) ? curated : defaultOntologyDir();
+})();
+
 let _kmStore = null;
 let _kmStoreReady = false;
 // Cached in-flight init promise — concurrent ensureKMStore() callers share
@@ -1336,7 +1352,7 @@ async function ensureKMStore() {
       _kmStore = new GraphKMStore({
         dbPath: KG_DB_PATH,
         exportDir: KG_EXPORT_DIR,
-        ontologyDir: defaultOntologyDir(),
+        ontologyDir: KG_ONTOLOGY_DIR,
       });
       await _kmStore.open();
       _kmStoreReady = true;
