@@ -23,6 +23,7 @@ import { useViewerStore } from '@/store/viewer-store'
 import type { SelectionSource } from '@/store/viewer-store'
 import { Logger } from '@/lib/logging'
 import { renderNodeShape } from './node-shapes'
+import { EDGE_STYLES } from './vokb-palette'
 import { useGraphData } from './useGraphData'
 import type { Entity, Relation } from './types'
 // 2026-06-13 (Phase 56-04): computeAncestryPath extracted to a shared
@@ -386,7 +387,11 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       // empty (deriveFocal invariant), checking both is belt-and-braces.
       if (focalNodeId === null && selectedNodeIds.size === 0) {
         svg.selectAll<SVGPathElement, D3Link>('.graph-link')
-          .attr('stroke', theme === 'dark' ? '#475569' : '#999')
+          // Restore per-relation-type color + dash (EDGE_STYLES) on the
+          // no-selection reset — was uniform gray, which collapsed the edge
+          // differentiation the Legend advertises (operator request 2026-06-19).
+          .attr('stroke', (d) => EDGE_STYLES[d.type]?.color ?? (theme === 'dark' ? '#475569' : '#999'))
+          .attr('stroke-dasharray', (d) => EDGE_STYLES[d.type]?.dasharray ?? '')
           .attr('stroke-opacity', theme === 'dark' ? 0.4 : 0.6)
           .attr('stroke-width', 1)
         svg.selectAll<SVGGElement, D3Node>('.node')
@@ -461,7 +466,13 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
         return pathEdges.has(`${sId}||${tId}`)
       }
       svg.selectAll<SVGPathElement, D3Link>('.graph-link')
-        .attr('stroke', (d) => isPathEdge(d) ? '#0d47a1' : (theme === 'dark' ? '#475569' : '#999'))
+        // Path edges: solid blue highlight. Non-path edges keep their
+        // per-type color (EDGE_STYLES) but dim — so the type styling persists
+        // under a focal trace instead of collapsing back to uniform gray.
+        .attr('stroke', (d) => isPathEdge(d)
+          ? '#0d47a1'
+          : (EDGE_STYLES[d.type]?.color ?? (theme === 'dark' ? '#475569' : '#999')))
+        .attr('stroke-dasharray', (d) => isPathEdge(d) ? '' : (EDGE_STYLES[d.type]?.dasharray ?? ''))
         .attr('stroke-opacity', (d) => isPathEdge(d) ? 1 : 0.08)
         .attr('stroke-width', (d) => isPathEdge(d) ? 3 : 1)
     },
@@ -745,7 +756,11 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       .data(d3Links)
       .join('path')
       .attr('class', 'graph-link')
-      .attr('stroke', linkBaseStroke)
+      // Per-relation-type color + dash from EDGE_STYLES so the rendered edges
+      // match the Legend RELATIONSHIPS swatches (operator request 2026-06-19).
+      // Unknown types fall back to the neutral base stroke.
+      .attr('stroke', (d) => EDGE_STYLES[d.type]?.color ?? linkBaseStroke)
+      .attr('stroke-dasharray', (d) => EDGE_STYLES[d.type]?.dasharray ?? '')
       .attr('stroke-opacity', linkBaseOpacity)
       .attr('stroke-width', 1)
       .attr('fill', 'none')

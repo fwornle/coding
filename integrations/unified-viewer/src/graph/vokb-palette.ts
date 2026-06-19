@@ -160,6 +160,26 @@ export const EDGE_STYLES: Record<string, { color: string; dasharray: string }> =
   CORRELATED_WITH:  { color: '#a855f7', dasharray: '5,5' },
   DEPENDS_ON:       { color: '#8b5cf6', dasharray: '' },
   AFFECTS:          { color: '#c084fc', dasharray: '' },
+  // ── VKB (coding KG) relation types ──────────────────────────────────────
+  // The OKB/RCA keys above are UPPER_SNAKE, but the coding online-learning
+  // pipeline emits lowercase/camelCase types (contains, capturedBy, …). With
+  // no matching key every VKB edge fell through to the gray RELATES_TO default
+  // — so the Legend RELATIONSHIPS section rendered every relationship as the
+  // SAME gray solid line and the canvas drew uniform gray edges (operator
+  // request 2026-06-19: "use the different styles in the graph, or drop them
+  // from the legend"). Distinct color+dash per type, grouped by meaning:
+  //   hierarchy=gray · provenance=blue · derivation=green · insight=amber ·
+  //   code/semantic=teal · association=purple · mention=faint.
+  contains:                  { color: '#6b7280', dasharray: '' },
+  'parent-child':            { color: '#4b5563', dasharray: '' },
+  derivedFrom:               { color: '#22c55e', dasharray: '' },
+  has_insight:               { color: '#f59e0b', dasharray: '' },
+  capturedBy:                { color: '#60a5fa', dasharray: '4,3' },
+  related_to:                { color: '#a855f7', dasharray: '5,5' },
+  implemented_in:            { color: '#14b8a6', dasharray: '' },
+  contributes_to:            { color: '#5eead4', dasharray: '5,3' },
+  originally_developed_in:   { color: '#f97316', dasharray: '5,3' },
+  mentions:                  { color: '#cbd5e1', dasharray: '2,2' },
   // Default fallback
   RELATES_TO:       { color: '#d1d5db', dasharray: '' },
 }
