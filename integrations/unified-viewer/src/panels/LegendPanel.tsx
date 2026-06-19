@@ -46,17 +46,59 @@ interface DomainRow {
 
 interface SectionProps {
   title: string
+  /** Optional right-aligned header control (e.g. the all/none toggle). */
+  action?: React.ReactNode
   children: React.ReactNode
 }
 
-function Section({ title, children }: SectionProps) {
+function Section({ title, action, children }: SectionProps) {
   return (
     <div className="space-y-1.5">
-      <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-        {title}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+          {title}
+        </div>
+        {action}
       </div>
       <div className="space-y-1">{children}</div>
     </div>
+  )
+}
+
+/** Compact "all · none" header control. `allVisible` bolds the active side. */
+function AllNoneControl({
+  allVisible,
+  noneVisible,
+  onAll,
+  onNone,
+  testidPrefix,
+}: {
+  allVisible: boolean
+  noneVisible: boolean
+  onAll: () => void
+  onNone: () => void
+  testidPrefix: string
+}) {
+  return (
+    <span className="text-[9px] text-muted-foreground tracking-normal normal-case">
+      <button
+        type="button"
+        onClick={onAll}
+        data-testid={`${testidPrefix}-all`}
+        className={`hover:text-foreground ${allVisible ? 'font-semibold text-foreground' : ''}`}
+      >
+        all
+      </button>
+      <span className="px-0.5">·</span>
+      <button
+        type="button"
+        onClick={onNone}
+        data-testid={`${testidPrefix}-none`}
+        className={`hover:text-foreground ${noneVisible ? 'font-semibold text-foreground' : ''}`}
+      >
+        none
+      </button>
+    </span>
   )
 }
 
@@ -129,6 +171,8 @@ export function LegendPanel({
   const hiddenRelationTypes = useViewerStore((s) => s.hiddenRelationTypes)
   const toggleNodeType = useViewerStore((s) => s.toggleNodeType)
   const toggleRelationType = useViewerStore((s) => s.toggleRelationType)
+  const setHiddenNodeTypes = useViewerStore((s) => s.setHiddenNodeTypes)
+  const setHiddenRelationTypes = useViewerStore((s) => s.setHiddenRelationTypes)
 
   // DOMAINS: distinct entity.ontologyClass values in render order.
   const domains = useMemo<readonly DomainRow[]>(() => {
@@ -208,7 +252,18 @@ export function LegendPanel({
             D-07: skip rendering a Section when its derived array is empty. */}
 
         {domains.length > 0 && (
-          <Section title="Domains">
+          <Section
+            title="Domains"
+            action={
+              <AllNoneControl
+                testidPrefix="legend-domains"
+                allVisible={hiddenNodeTypes.size === 0}
+                noneVisible={domains.length > 0 && hiddenNodeTypes.size >= domains.length}
+                onAll={() => setHiddenNodeTypes([])}
+                onNone={() => setHiddenNodeTypes(domains.map((d) => d.className))}
+              />
+            }
+          >
             {domains.map((d) => {
               const hidden = hiddenNodeTypes.has(d.className)
               return (
@@ -271,7 +326,18 @@ export function LegendPanel({
         )}
 
         {relTypes.length > 0 && (
-          <Section title="Relationships">
+          <Section
+            title="Relationships"
+            action={
+              <AllNoneControl
+                testidPrefix="legend-rels"
+                allVisible={hiddenRelationTypes.size === 0}
+                noneVisible={relTypes.length > 0 && hiddenRelationTypes.size >= relTypes.length}
+                onAll={() => setHiddenRelationTypes([])}
+                onNone={() => setHiddenRelationTypes(relTypes)}
+              />
+            }
+          >
             {relTypes.map((type) => {
               const style = EDGE_STYLES[type]
               // Defensive: unknown relation types fall back to gray so the

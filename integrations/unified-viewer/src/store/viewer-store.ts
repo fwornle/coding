@@ -326,6 +326,9 @@ export interface ViewerState {
   hiddenNodeTypes: ReadonlySet<string>
   toggleRelationType: (type: string) => void
   toggleNodeType: (type: string) => void
+  // Legend select all/none — bulk replace (empty = all visible, full list = none).
+  setHiddenRelationTypes: (types: Iterable<string>) => void
+  setHiddenNodeTypes: (types: Iterable<string>) => void
 
   toggleLayer: (layer: string) => void
   toggleDomain: (domain: string) => void
@@ -1009,6 +1012,11 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       else next.add(type)
       return { hiddenNodeTypes: next }
     }),
+
+  // Legend select all/none — bulk replace the hidden set. "all visible" passes
+  // an empty set; "none visible" passes a set of every type in the section.
+  setHiddenRelationTypes: (types) => set({ hiddenRelationTypes: new Set(types) }),
+  setHiddenNodeTypes: (types) => set({ hiddenNodeTypes: new Set(types) }),
 
   toggleShowEdges: () => set((s) => ({ showEdges: !s.showEdges })),
   toggleShowClusters: () => set((s) => ({ showClusters: !s.showClusters })),

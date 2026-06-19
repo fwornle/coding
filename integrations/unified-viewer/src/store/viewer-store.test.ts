@@ -1189,3 +1189,27 @@ describe('useViewerStore — legend click-to-toggle (2026-06-19)', () => {
     expect(useViewerStore.getState().hiddenNodeTypes.has('related_to')).toBe(false)
   })
 })
+
+describe('useViewerStore — legend select all/none (2026-06-19)', () => {
+  beforeEach(() => {
+    useViewerStore.setState({ hiddenRelationTypes: new Set(['x']), hiddenNodeTypes: new Set(['y']) })
+  })
+  it('setHiddenRelationTypes([]) shows all; full list hides all', () => {
+    useViewerStore.getState().setHiddenRelationTypes([])
+    expect(useViewerStore.getState().hiddenRelationTypes.size).toBe(0)
+    useViewerStore.getState().setHiddenRelationTypes(['contains', 'mentions'])
+    expect([...useViewerStore.getState().hiddenRelationTypes].sort()).toEqual(['contains', 'mentions'])
+  })
+  it('setHiddenNodeTypes([]) shows all; full list hides all', () => {
+    useViewerStore.getState().setHiddenNodeTypes([])
+    expect(useViewerStore.getState().hiddenNodeTypes.size).toBe(0)
+    useViewerStore.getState().setHiddenNodeTypes(['Component', 'Detail'])
+    expect(useViewerStore.getState().hiddenNodeTypes.size).toBe(2)
+  })
+  it('copies the input into a fresh Set (caller mutation does not leak)', () => {
+    const src = ['a', 'b']
+    useViewerStore.getState().setHiddenRelationTypes(src)
+    src.push('c')
+    expect(useViewerStore.getState().hiddenRelationTypes.has('c')).toBe(false)
+  })
+})
