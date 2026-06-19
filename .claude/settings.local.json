@@ -258,8 +258,6 @@
       "Bash(cp docs/images/observation-viewer-item.png docs-content/images/observation-viewer-item.png)",
       "Skill(gsd-browser)",
       "Bash(GSD_BROWSER_DEBUG=1 gsd-browser navigate http://localhost:3032)",
-      "mcp__plugin_context7_context7__resolve-library-id",
-      "mcp__plugin_context7_context7__query-docs",
       "Bash(docker-compose -f docker/docker-compose.yml build --no-cache coding-services)",
       "Bash(docker-compose:*)",
       "Bash(npm init:*)",
@@ -559,7 +557,17 @@
       "Bash(ssh-keygen -R ssh.github.com)",
       "Bash(ssh-keyscan -p 443 -T 5 ssh.github.com)",
       "Bash(ssh -T -o ConnectTimeout=10 git@github.com)",
-      "Bash(ssh -v -o ConnectTimeout=5 -o BatchMode=yes git@github.com exit)"
+      "Bash(ssh -v -o ConnectTimeout=5 -o BatchMode=yes git@github.com exit)",
+      "Skill(gsd-mvp-phase)",
+      "Skill(gsd-review-backlog)",
+      "Bash(wait)",
+      "Bash(copilot --version)",
+      "Bash(copilot --help)",
+      "Bash(rm -f coding-ontology.json coding.lower.json coding.display.json)",
+      "Bash(ln -s ../coding-ontology.json coding-ontology.json)",
+      "Bash(ln -s ../coding.lower.json coding.lower.json)",
+      "Bash(ln -s ../coding.display.json coding.display.json)",
+      "Bash(cat)"
     ],
     "deny": [],
     "ask": []
