@@ -56,6 +56,15 @@ ls -t .data/orphan-floor-soak-*.json | head -1                          # find t
 cat $(ls -t .data/orphan-floor-soak-*.json | head -1) | jq '.samples[-1]'
 ```
 
+Query the live orphan count / orphan list directly (the canonical routes):
+```bash
+curl -s http://localhost:3848/api/v1/stats        | jq '.data.orphanCount'        # scalar count
+curl -s http://localhost:3848/api/v1/graph/orphans | jq '.data | length'          # list length
+curl -s http://localhost:3848/api/v1/graph/orphans | jq -r '.data[] | "\(.entityType)\t\(.name)"'  # who is orphaned
+```
+
+> **Endpoint discipline.** The orphan list route is **`/api/v1/graph/orphans`** — there is NO `/api/v1/health/orphans`. Hitting a non-existent `/api/v1/*` path returns a JSON 404 (`{"success":false,"error":"Not Found",...}`), so `jq` parses it cleanly and you get a `null`/error field rather than the HTML-parse failure that an earlier diagnostic typo produced (sse-server JSON-404 fallback, Phase 60 follow-up).
+
 ### Aborting cleanly (if needed)
 
 ```bash
