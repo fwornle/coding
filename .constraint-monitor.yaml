@@ -266,6 +266,8 @@ constraints:
     file in docs/puml/ 3. Generate PNG with plantuml 4. Reference image in markdown
   whitelist:
   - '**/.claude/plans/*.md'
+  - '**/.planning/*.md'
+  - '**/.planning/**/*.md'
 - id: documentation-style-skill-required
   group: documentation
   pattern: (?:```(?:plantuml|puml|mermaid)|@startuml|flowchart|sequenceDiagram)
