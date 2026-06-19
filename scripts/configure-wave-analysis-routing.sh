@@ -97,6 +97,13 @@ WAVE_OVERRIDES = {
     # wave-analysis-* tags above, not the generic observation-writer route.
     'health-coordinator':                      CHEAP,
     'observation-writer':                      CHEAP,
+    # LSL observation resolver (src/live-logging/LslObservationResolver.js —
+    # the 30-min in-process obs-api sweep). Small prompt (a vague summary + a
+    # 3-prompt LSL window) and small response (4-line template + a confidence
+    # line), so haiku is the right tier. Pinned to copilot (HTTP) because the
+    # default claude-code (CLI subprocess) path hit the resolver's 60s per-row
+    # timeout and dropped rows to `failed`.
+    'observation-resolution':                  CHEAP,
     # Consolidator (src/live-logging/ObservationConsolidator.js _callLLM tags).
     # User-triggered batch synthesis, not continuous, so the cost vs. ~30x
     # latency tradeoff favors copilot. -digest / -insight are full synthesis
