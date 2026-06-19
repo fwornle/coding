@@ -20,6 +20,7 @@ import type Graph from 'graphology'
 import type { ApiClient } from '@/api/ApiClient'
 import type { Entity, OntologyClass, Relation } from './types'
 import type { ViewerState } from '@/store/viewer-store'
+import { canonicalizeRelationType } from './relation-types'
 import { mergeIntoGraph } from './graph-builder'
 
 export interface EventHandlerDeps {
@@ -131,7 +132,7 @@ export function makeEventHandlers(deps: EventHandlerDeps): EventHandlers {
       const relations: Relation[] = (payload.relations ?? []).map((r) => ({
         from: r.from,
         to: r.to,
-        type: r.type ?? 'related',
+        type: canonicalizeRelationType(r.type ?? 'related'),
       }))
       const added = mergeIntoGraph(
         deps.graph,

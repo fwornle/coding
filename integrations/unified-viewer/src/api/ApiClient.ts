@@ -12,6 +12,7 @@
 // 02 sees a uniform shape regardless of which side ships first.
 
 import type { Digest, Insight, Observation } from './schemas'
+import { canonicalizeRelationType } from '@/graph/relation-types'
 
 interface ApiSuccess<T> { success: true; data: T }
 interface ApiError { success: false; error: string }
@@ -131,7 +132,7 @@ export class ApiClient {
     return raw.map((r) => ({
       from: r.source ?? r.from ?? '',
       to: r.target ?? r.to ?? '',
-      type: r.attributes?.type ?? r.type,
+      type: canonicalizeRelationType(r.attributes?.type ?? r.type),
     }))
   }
 
