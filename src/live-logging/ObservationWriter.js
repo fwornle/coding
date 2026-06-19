@@ -922,7 +922,19 @@ export class ObservationWriter {
       .filter(m => m.role === 'assistant')
       .map(m => typeof m.content === 'string' ? m.content.slice(0, 500) : '')
       .join('|');
-    const sessionId = metadata.session_id || '';
+    // 2026-06-19: the dedup hash is INTENDED to be session-scoped (sessionId is
+    // part of the md5 input) so the same content in a different session is NOT
+    // treated as already-observed. But every caller sets `metadata.sessionId`
+    // (camelCase) — ETM's fire path (enhanced-transcript-monitor.js) and the
+    // write path (writeObservation line ~1132 `session_id: metadata.sessionId`)
+    // — while this read used `metadata.session_id` (snake_case), which is never
+    // set. Result: sessionId was ALWAYS '' → the hash collapsed to
+    // `|userContent|assistantContent`, making dedup cross-session. Symptom: a
+    // user pasting a prior session's (already-observed) summary block as a new
+    // prompt produced ZERO observations for the whole follow-up exchange — the
+    // paste collided with the earlier session's row. Prefer camelCase (the field
+    // callers actually set); keep snake_case as a defensive fallback.
+    const sessionId = metadata.sessionId || metadata.session_id || '';
     return crypto.createHash('md5')
       .update(`${sessionId}|${userContent}|${assistantContent}`)
       .digest('hex');
