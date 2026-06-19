@@ -38370,5 +38370,703 @@
       "createdAt": "2026-06-19T05:07:28.867Z"
     },
     "project": "coding"
+  },
+  {
+    "id": "04933ceb-333a-46cd-8453-82b333cc791f",
+    "date": "2026-06-19",
+    "theme": "Session Context Initialization via LSL File Loading",
+    "summary": "The session opened with a structured context-continuity protocol to load and summarize recent Live Session Log (LSL) files from the coding project.\n\n- **Goal:** Establish continuity by discovering and reading prior LSL history before beginning substantive work.\n- **Protocol:** Multi-step tiered approach — locate `.specstory/history`, load the most recent LSL file, conditionally load older files if content fell below 50 KB / 500 lines, optionally cross-reference other project LSL files, then synthesize a summary covering time range, projects, tasks, current state, and next steps.\n- **Artifacts:** None produced yet; Bash tool invocations were initiated to list and locate LSL files.\n- **Result:** File discovery was underway; the full continuity summary was pending completion of file reads. No blocking issues encountered.",
+    "observationIds": [
+      "c78d6305-44af-4e32-b71e-42ddcc0f85bb"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-06-19T11:33:35.842Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-06-19",
+      "theme": "Session Context Initialization via LSL File Loading",
+      "summary": "The session opened with a structured context-continuity protocol to load and summarize recent Live Session Log (LSL) files from the coding project.\n\n- **Goal:** Establish continuity by discovering and reading prior LSL history before beginning substantive work.\n- **Protocol:** Multi-step tiered approach — locate `.specstory/history`, load the most recent LSL file, conditionally load older files if content fell below 50 KB / 500 lines, optionally cross-reference other project LSL files, then synthesize a summary covering time range, projects, tasks, current state, and next steps.\n- **Artifacts:** None produced yet; Bash tool invocations were initiated to list and locate LSL files.\n- **Result:** File discovery was underway; the full continuity summary was pending completion of file reads. No blocking issues encountered.",
+      "observation_ids": [
+        "c78d6305-44af-4e32-b71e-42ddcc0f85bb"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-06-19T11:33:35.842Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "5e31cc7e-532b-483d-8020-0287c327a0b4",
+    "date": "2026-06-19",
+    "theme": "LLM Fallback Chain Deployed; VKB Graph Task Queue Ready",
+    "summary": "Four near-simultaneous observations (all at 11:19) document the same logical milestone: confirmation that the rapid-llm-proxy prefer-with-fallback provider chain is live, and a request to resume the four remaining Phase 60 VKB/graph integrity tasks.\n\n**LLM Proxy work (commit `d2a2351`):**\n- Implemented a copilot-first ordered fallback chain in `rapid-llm-proxy` routing `/api/complete`; Claude subscription auto-activates on quota, rate-limit, auth, 5xx, timeout, or network errors.\n- Health-probe semantics fixed as a side effect — `semantic_ok` now reflects real provider availability via fallback, flipping the dashboard from **Degraded → green/success**.\n- A network-detection gotcha (corporate proxy misconfiguration) was encountered and resolved by restarting after coordinator availability was confirmed; tagged in logs as `fallbackFrom: copilot`.\n\n**VKB graph task queue (Phase 60, unified-viewer rendering):**\n- Prior completed item: orphan-edges fix (task 60-08).\n- Remaining queued tasks to resume (task state requires reconstruction from planning docs):\n  - **#6** — ontologyfilter-routing-gap A/B\n  - **#7** — duplicate relation types\n  - **#8** — edge legend–canvas mismatch\n  - **#9** — evidence/pattern layer bleed\n- Developer confirmed readiness to proceed with all four in queue order pending approval.",
+    "observationIds": [
+      "85bb399d-85f6-44a7-a92e-59d17dd87366",
+      "86d735ea-fb64-4d97-9241-e905398c9e0d",
+      "460751de-100f-4902-86a0-886661185aaf",
+      "466d05de-34fe-4889-a2c7-c11fcd9d7d0a"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-06-19T11:33:35.842Z",
+    "metadata": {
+      "sourceCount": 4,
+      "date": "2026-06-19",
+      "theme": "LLM Fallback Chain Deployed; VKB Graph Task Queue Ready",
+      "summary": "Four near-simultaneous observations (all at 11:19) document the same logical milestone: confirmation that the rapid-llm-proxy prefer-with-fallback provider chain is live, and a request to resume the four remaining Phase 60 VKB/graph integrity tasks.\n\n**LLM Proxy work (commit `d2a2351`):**\n- Implemented a copilot-first ordered fallback chain in `rapid-llm-proxy` routing `/api/complete`; Claude subscription auto-activates on quota, rate-limit, auth, 5xx, timeout, or network errors.\n- Health-probe semantics fixed as a side effect — `semantic_ok` now reflects real provider availability via fallback, flipping the dashboard from **Degraded → green/success**.\n- A network-detection gotcha (corporate proxy misconfiguration) was encountered and resolved by restarting after coordinator availability was confirmed; tagged in logs as `fallbackFrom: copilot`.\n\n**VKB graph task queue (Phase 60, unified-viewer rendering):**\n- Prior completed item: orphan-edges fix (task 60-08).\n- Remaining queued tasks to resume (task state requires reconstruction from planning docs):\n  - **#6** — ontologyfilter-routing-gap A/B\n  - **#7** — duplicate relation types\n  - **#8** — edge legend–canvas mismatch\n  - **#9** — evidence/pattern layer bleed\n- Developer confirmed readiness to proceed with all four in queue order pending approval.",
+      "observation_ids": [
+        "85bb399d-85f6-44a7-a92e-59d17dd87366",
+        "86d735ea-fb64-4d97-9241-e905398c9e0d",
+        "460751de-100f-4902-86a0-886661185aaf",
+        "466d05de-34fe-4889-a2c7-c11fcd9d7d0a"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T11:33:35.842Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3ebff12f-65c0-41f1-9c98-019589f3833d",
+    "date": "2026-06-19",
+    "theme": "Fixing Viewer Node Cap and Planning km-core Store Consolidation",
+    "summary": "The goal was to diagnose why isolated node \"islands\" were still rendering in the unified viewer after data repairs, and to determine whether parallel km-core database instances (`:12436` and `:3848`) were the underlying cause.\n\n- Root cause of rendering artifact: a silent 1000-node fetch cap in `listEntities()` inside `ApiClient.ts`, not data corruption — fixed by requesting the full node set.\n- Deeper durability hazard uncovered: multiple km-core instances (obs-api, sse-server, workflow processes) all hydrating from and writing back to a shared `general.json` export via a bind-mounted `.data` directory inside Docker, causing race-condition clobbering.\n- A scoped six-step consolidation plan was written to `2026-06-19-km-core-store-consolidation.md`, targeting obs-api (`:12436`) as the single authoritative store, elimination of vestigial in-container `GraphKMStore` instances, and routing all workflow persistence through REST rather than direct file I/O.",
+    "observationIds": [
+      "e7e0fabf-6e42-481a-a258-362bd4974f2c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/api/ApiClient.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/2026-06-19-km-core-store-consolidation.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T15:26:52.880Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-06-19",
+      "theme": "Fixing Viewer Node Cap and Planning km-core Store Consolidation",
+      "summary": "The goal was to diagnose why isolated node \"islands\" were still rendering in the unified viewer after data repairs, and to determine whether parallel km-core database instances (`:12436` and `:3848`) were the underlying cause.\n\n- Root cause of rendering artifact: a silent 1000-node fetch cap in `listEntities()` inside `ApiClient.ts`, not data corruption — fixed by requesting the full node set.\n- Deeper durability hazard uncovered: multiple km-core instances (obs-api, sse-server, workflow processes) all hydrating from and writing back to a shared `general.json` export via a bind-mounted `.data` directory inside Docker, causing race-condition clobbering.\n- A scoped six-step consolidation plan was written to `2026-06-19-km-core-store-consolidation.md`, targeting obs-api (`:12436`) as the single authoritative store, elimination of vestigial in-container `GraphKMStore` instances, and routing all workflow persistence through REST rather than direct file I/O.",
+      "observation_ids": [
+        "e7e0fabf-6e42-481a-a258-362bd4974f2c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/api/ApiClient.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/todos/pending/2026-06-19-km-core-store-consolidation.md"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T15:26:52.880Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "35501d0e-954b-4227-aa0d-128a6dea1b36",
+    "date": "2026-06-19",
+    "theme": "Diagnosing and Fixing Broken Observation Write Pipeline",
+    "summary": "The goal was to understand why new observations stopped flowing after 13:19 UTC despite infrastructure appearing healthy, then unblock the write path.\n\n- Three layered failure causes were identified: a legitimate LLM-proxy outage (copilot 429 + corporate proxy mis-detection) causing a 06:27–13:01 UTC gap; a session-parsing artifact from slash-command-driven turns with no clean prompt boundaries; and a surgical bug in the dedup hash.\n- The critical fix: `ObservationWriter.js` was reading `metadata.session_id` (snake_case) while callers (ETM and the writer itself) populate `sessionId` (camelCase) — this caused cross-session hash collisions that silently suppressed writes.\n- Fix applied: `ObservationWriter.js` updated to read camelCase `sessionId` with a snake_case fallback, restoring session-scoped deduplication.\n- The ~6.5-hour morning gap (06:27–13:01 UTC) was identified as a backfill target; safe path is `--reprocess` against the closed transcript after stopping the live daemon.",
+    "observationIds": [
+      "70b891a7-8d39-477e-9b49-0a0a1cce9452"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T15:26:52.880Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-06-19",
+      "theme": "Diagnosing and Fixing Broken Observation Write Pipeline",
+      "summary": "The goal was to understand why new observations stopped flowing after 13:19 UTC despite infrastructure appearing healthy, then unblock the write path.\n\n- Three layered failure causes were identified: a legitimate LLM-proxy outage (copilot 429 + corporate proxy mis-detection) causing a 06:27–13:01 UTC gap; a session-parsing artifact from slash-command-driven turns with no clean prompt boundaries; and a surgical bug in the dedup hash.\n- The critical fix: `ObservationWriter.js` was reading `metadata.session_id` (snake_case) while callers (ETM and the writer itself) populate `sessionId` (camelCase) — this caused cross-session hash collisions that silently suppressed writes.\n- Fix applied: `ObservationWriter.js` updated to read camelCase `sessionId` with a snake_case fallback, restoring session-scoped deduplication.\n- The ~6.5-hour morning gap (06:27–13:01 UTC) was identified as a backfill target; safe path is `--reprocess` against the closed transcript after stopping the live daemon.",
+      "observation_ids": [
+        "70b891a7-8d39-477e-9b49-0a0a1cce9452"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T15:26:52.880Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "298a5a30-8e11-47ff-9900-d65d0ca7d005",
+    "date": "2026-06-19",
+    "theme": "Safe Targeted Backfill of Morning Gap Window Observations",
+    "summary": "The goal was to backfill 5 unobserved prompt exchanges from the gap window (04:27:48Z–11:01:36Z in transcript `32749378`) without introducing duplicate rows for the 4,484 existing observations.\n\n- The session-hash fix from observation [2] introduced a collision risk: bulk reprocessing would generate fresh `sessionId`-keyed hashes for already-stored rows, producing duplicates.\n- Strategy: constrain backfill exclusively to the empty gap window where no rows exist, verified via a read-only diagnostic scan before any writes.\n- The 5 missing exchanges cover morning proxy-debugging work (07:53–10:13 CEST) and were extracted from transcript `32749378`.\n- `backfill-gap-observations.mjs` was built and dry-run-validated; it posts via the `/api/observations/messages` endpoint, preserves original timestamps, and uses the new session-aware hash function to guarantee dedup safety against the existing corpus.\n- All three observations (3, 4, 5) represent progressive refinement of the same backfill execution plan, converging on the final script implementation.",
+    "observationIds": [
+      "ebd3e06b-f207-42af-9273-42dae8065479",
+      "b47d1103-1647-49b3-99fd-b2effe13ff99",
+      "7df32980-39d0-4e56-ab4a-eeacbcccf8be"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-gap-observations.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T15:26:52.880Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-06-19",
+      "theme": "Safe Targeted Backfill of Morning Gap Window Observations",
+      "summary": "The goal was to backfill 5 unobserved prompt exchanges from the gap window (04:27:48Z–11:01:36Z in transcript `32749378`) without introducing duplicate rows for the 4,484 existing observations.\n\n- The session-hash fix from observation [2] introduced a collision risk: bulk reprocessing would generate fresh `sessionId`-keyed hashes for already-stored rows, producing duplicates.\n- Strategy: constrain backfill exclusively to the empty gap window where no rows exist, verified via a read-only diagnostic scan before any writes.\n- The 5 missing exchanges cover morning proxy-debugging work (07:53–10:13 CEST) and were extracted from transcript `32749378`.\n- `backfill-gap-observations.mjs` was built and dry-run-validated; it posts via the `/api/observations/messages` endpoint, preserves original timestamps, and uses the new session-aware hash function to guarantee dedup safety against the existing corpus.\n- All three observations (3, 4, 5) represent progressive refinement of the same backfill execution plan, converging on the final script implementation.",
+      "observation_ids": [
+        "ebd3e06b-f207-42af-9273-42dae8065479",
+        "b47d1103-1647-49b3-99fd-b2effe13ff99",
+        "7df32980-39d0-4e56-ab4a-eeacbcccf8be"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-gap-observations.mjs"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T15:26:52.880Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "36e0a5af-38b7-446b-8db2-37fdf3f890f0",
+    "date": "2026-06-19",
+    "theme": "Repository Cleanup, Commit Consolidation, and Gitignore Updates",
+    "summary": "The goal was to land the prior session's accumulated repairs as clean, scoped commits and eliminate run-artifact pollution from the repository.\n\n- Four commits were landed: submodule fix (SSE server JSON-404 fallback), parent repo code repairs (orphan-digest `legacyId`, island Trajectory materialization, obs-api JSON-404, viewer node-cap) with submodule pointer bump, planning docs, and cleanup\n- `/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore` was updated to exclude backfill/repair/soak run-artifact patterns while preserving the `exports` negation rule\n- 13 untracked run-logs and a `phase59` dry-runs directory were deleted; 4 previously-committed ephemeral backfill logs were removed via `git rm`\n- Commit SHAs: `25a4f1d46`, `c0408ae5c`, `08865aa22` (parent); `d6ea65f` (submodule)\n- Deliberate deferral: tracked `.data` KB exports (`general.json`, `observation-export`) were left in place pending a broader consolidation design decision about live-state churn",
+    "observationIds": [
+      "2dea040e-9cf6-44a8-96bc-63e203e65cbf"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T17:55:43.655Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-06-19",
+      "theme": "Repository Cleanup, Commit Consolidation, and Gitignore Updates",
+      "summary": "The goal was to land the prior session's accumulated repairs as clean, scoped commits and eliminate run-artifact pollution from the repository.\n\n- Four commits were landed: submodule fix (SSE server JSON-404 fallback), parent repo code repairs (orphan-digest `legacyId`, island Trajectory materialization, obs-api JSON-404, viewer node-cap) with submodule pointer bump, planning docs, and cleanup\n- `/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore` was updated to exclude backfill/repair/soak run-artifact patterns while preserving the `exports` negation rule\n- 13 untracked run-logs and a `phase59` dry-runs directory were deleted; 4 previously-committed ephemeral backfill logs were removed via `git rm`\n- Commit SHAs: `25a4f1d46`, `c0408ae5c`, `08865aa22` (parent); `d6ea65f` (submodule)\n- Deliberate deferral: tracked `.data` KB exports (`general.json`, `observation-export`) were left in place pending a broader consolidation design decision about live-state churn",
+      "observation_ids": [
+        "2dea040e-9cf6-44a8-96bc-63e203e65cbf"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/.gitignore"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T17:55:43.655Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "1d0c7a53-6554-4c42-a095-d2348d015dd2",
+    "date": "2026-06-19",
+    "theme": "Unified Viewer Graph Rendering, Sidebar, and Legend Enhancements",
+    "summary": "The goal across both sessions was to complete the 60-08 milestone for the unified viewer and then extend the Legend component with bulk selection controls.\n\n**60-08 completion (06:50):**\n- `node-shapes.ts` / `node-shapes.test.ts` — nodes now render distinct shapes per ontology class\n- `D3GraphCanvas.tsx` / `D3GraphCanvas.hover.test.tsx` — bidirectional hover with pulse effect implemented\n- `BucketCardList.tsx` / `BucketCardList.test.tsx` — visible/hidden item breakdown added to the sidebar\n- `SidePanel.tsx` / `SidePanel.test.tsx` / `viewer-store.ts` — Gap F mode-switching bug fixed; ~40 new tests passing, `tsc` clean\n- Three follow-up issues scoped: duplicate relation-type normalization (`contributes_to` vs `contributes to`, `implemented_in` vs `implemented in`), edge rendering lacking the per-type visual encoding the legend implies, and `evidence`/`pattern` layer filters identified as OKB vocabulary bleeding into VKB\n\n**Legend bulk selection (17:54):**\n- Bulk setter actions added to the store for DOMAINS and RELATIONSHIPS sections\n- \"all · none\" toggle links wired to Legend section headers, replacing the need for individual checkbox toggling\n- No additional files were committed in this pass (store and Legend component modified in place)",
+    "observationIds": [
+      "cdabb023-673f-43d1-9f68-b1d9cd08d5ab",
+      "e6282426-006e-4309-9f73-cc2434a6ca9d"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/node-shapes.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/node-shapes.test.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/D3GraphCanvas.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/BucketCardList.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/BucketCardList.test.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/store/viewer-store.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/SidePanel.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/SidePanel.test.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/D3GraphCanvas.hover.test.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T17:55:43.655Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-19",
+      "theme": "Unified Viewer Graph Rendering, Sidebar, and Legend Enhancements",
+      "summary": "The goal across both sessions was to complete the 60-08 milestone for the unified viewer and then extend the Legend component with bulk selection controls.\n\n**60-08 completion (06:50):**\n- `node-shapes.ts` / `node-shapes.test.ts` — nodes now render distinct shapes per ontology class\n- `D3GraphCanvas.tsx` / `D3GraphCanvas.hover.test.tsx` — bidirectional hover with pulse effect implemented\n- `BucketCardList.tsx` / `BucketCardList.test.tsx` — visible/hidden item breakdown added to the sidebar\n- `SidePanel.tsx` / `SidePanel.test.tsx` / `viewer-store.ts` — Gap F mode-switching bug fixed; ~40 new tests passing, `tsc` clean\n- Three follow-up issues scoped: duplicate relation-type normalization (`contributes_to` vs `contributes to`, `implemented_in` vs `implemented in`), edge rendering lacking the per-type visual encoding the legend implies, and `evidence`/`pattern` layer filters identified as OKB vocabulary bleeding into VKB\n\n**Legend bulk selection (17:54):**\n- Bulk setter actions added to the store for DOMAINS and RELATIONSHIPS sections\n- \"all · none\" toggle links wired to Legend section headers, replacing the need for individual checkbox toggling\n- No additional files were committed in this pass (store and Legend component modified in place)",
+      "observation_ids": [
+        "cdabb023-673f-43d1-9f68-b1d9cd08d5ab",
+        "e6282426-006e-4309-9f73-cc2434a6ca9d"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/node-shapes.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/node-shapes.test.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/D3GraphCanvas.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/BucketCardList.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/BucketCardList.test.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/store/viewer-store.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/SidePanel.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/SidePanel.test.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/D3GraphCanvas.hover.test.tsx"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T17:55:43.655Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7d97152e-6a97-46d0-9cec-553d5b36b419",
+    "date": "2026-06-19",
+    "theme": "LLM Proxy Fallback Chain Diagnosis and Restoration",
+    "summary": "The goal was to understand why Copilot quota exhaustion caused a full pipeline stall rather than a graceful cascade to Claude, then fix it.\n\n**Root cause (07:58):** `processOverrides` in the external server layer was pinning every process (health-coordinator, observation-writer, consolidator-*, wave-analysis-*) to a single-element `[copilot]` chain. Although `llm-service.ts` correctly implements `QUOTA_EXHAUSTED → continue` cascading and `provider-registry.ts` supports multi-provider chains, the single-element pin meant there was no second provider to cascade to on a 429.\n\n**Fix (08:13):**\n- `rapid-llm-proxy/proxy-bridge/server.mjs` — override selection logic rewritten to build an ordered `copilot → claude-code → network-aware tail` chain; override semantics shifted from *pin* to *prefer*\n- `memory/reference_llm_proxy_override_fallback.md` — architectural decision and a secondary network mis-detection issue (dead corporate proxy set during restart) documented for future reference\n- **Outcome:** health-coordinator probe now returns 200 via claude-code with `fallbackFrom: copilot` when Copilot fails; dashboard recovered from Degraded to success; full LLM pipeline (observation-writer, consolidator, wave-analysis) now cascades on any transient error (429, 5xx, timeout, network failure)",
+    "observationIds": [
+      "b8d5c72d-d67b-47be-98ff-d46f301efa6c",
+      "109fa8b4-0d0a-4516-a254-f60ff5cf94d1"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_llm_proxy_override_fallback.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T17:55:43.655Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-19",
+      "theme": "LLM Proxy Fallback Chain Diagnosis and Restoration",
+      "summary": "The goal was to understand why Copilot quota exhaustion caused a full pipeline stall rather than a graceful cascade to Claude, then fix it.\n\n**Root cause (07:58):** `processOverrides` in the external server layer was pinning every process (health-coordinator, observation-writer, consolidator-*, wave-analysis-*) to a single-element `[copilot]` chain. Although `llm-service.ts` correctly implements `QUOTA_EXHAUSTED → continue` cascading and `provider-registry.ts` supports multi-provider chains, the single-element pin meant there was no second provider to cascade to on a 429.\n\n**Fix (08:13):**\n- `rapid-llm-proxy/proxy-bridge/server.mjs` — override selection logic rewritten to build an ordered `copilot → claude-code → network-aware tail` chain; override semantics shifted from *pin* to *prefer*\n- `memory/reference_llm_proxy_override_fallback.md` — architectural decision and a secondary network mis-detection issue (dead corporate proxy set during restart) documented for future reference\n- **Outcome:** health-coordinator probe now returns 200 via claude-code with `fallbackFrom: copilot` when Copilot fails; dashboard recovered from Degraded to success; full LLM pipeline (observation-writer, consolidator, wave-analysis) now cascades on any transient error (429, 5xx, timeout, network failure)",
+      "observation_ids": [
+        "b8d5c72d-d67b-47be-98ff-d46f301efa6c",
+        "109fa8b4-0d0a-4516-a254-f60ff5cf94d1"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs",
+        "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_llm_proxy_override_fallback.md"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T17:55:43.655Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "00d4f6bc-5b0c-4d79-9e48-bb16b811fac9",
+    "date": "2026-06-19",
+    "theme": "Fix Session-Scoped Dedup Bug in Observation Pipeline",
+    "summary": "`ObservationWriter._computeContentHash` was reading `metadata.session_id` (snake_case) instead of `metadata.sessionId` (camelCase), causing `sessionId` to always resolve as empty and producing cross-session hash collisions that silently dropped observations. Fixed by reading camelCase first with a snake_case fallback.\n\n- `obs-api` restarted to load the fix; successful write confirmed (row count 4483 → 4484)\n- ETM restarted to clear a re-fire loop wedge\n- Morning gap (06:27–13:01) separately attributed to LLM-proxy outage (copilot 429 + `proxy.muc:8080` misdetect), already resolved prior to this session and identified as backfillable\n- File edited: `src/live-logging/ObservationWriter.js`",
+    "observationIds": [
+      "fd7ed0fe-2b71-40c8-b6e2-3f10a9d5834e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T19:15:57.682Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-06-19",
+      "theme": "Fix Session-Scoped Dedup Bug in Observation Pipeline",
+      "summary": "`ObservationWriter._computeContentHash` was reading `metadata.session_id` (snake_case) instead of `metadata.sessionId` (camelCase), causing `sessionId` to always resolve as empty and producing cross-session hash collisions that silently dropped observations. Fixed by reading camelCase first with a snake_case fallback.\n\n- `obs-api` restarted to load the fix; successful write confirmed (row count 4483 → 4484)\n- ETM restarted to clear a re-fire loop wedge\n- Morning gap (06:27–13:01) separately attributed to LLM-proxy outage (copilot 429 + `proxy.muc:8080` misdetect), already resolved prior to this session and identified as backfillable\n- File edited: `src/live-logging/ObservationWriter.js`",
+      "observation_ids": [
+        "fd7ed0fe-2b71-40c8-b6e2-3f10a9d5834e"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/src/live-logging/ObservationWriter.js"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T19:15:57.682Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ca57e4e8-e2fd-45cd-b979-5c907a0c8ccc",
+    "date": "2026-06-19",
+    "theme": "VKB Relation-Type Canonicalization and Edge Color Rendering Fix",
+    "summary": "Two sequential sessions resolved VKB graph <USER_ID_REDACTED> issues. Obs 2 began by running a backfill script to restore 5 missing morning prompt-sets with historical timestamps (pipeline count 4484 → 4486), then addressed VKB task **#7**: a viewer-side canonicalizer was added to collapse duplicate relation-type variants (`implemented in`/`implemented_in`, `contributes to`/`contributes_to`) while preserving legitimate camelCase types. Tasks #8/#9 were initially assessed as already resolved, but obs 3 identified a remaining rendering bug for #8: `EDGE_STYLES` palette keys were in UPPER_SNAKE format while actual VKB types are lowercase/camelCase, causing all edge lookups to miss and fall through to default grey. Nine distinct colors and dash patterns were added and wired into both legend rendering and per-edge canvas styling, including fixing a \"no active path\" reset branch that was clobbering per-type colors. Committed as `ff2549bfe`.\n\nFiles changed:\n- `scripts/backfill-gap-observations.mjs`\n- `integrations/unified-viewer/src/graph/relation-types.ts` and `relation-types.test.ts`\n- `integrations/unified-viewer/src/api/ApiClient.ts`\n- `integrations/unified-viewer/src/graph/events.ts`\n- `integrations/unified-viewer/src/graph/vokb-palette.ts`\n- `integrations/unified-viewer/src/graph/D3GraphCanvas.tsx`",
+    "observationIds": [
+      "3ff9741f-9633-4496-9f21-f5fb59c2a889",
+      "7be399c6-8713-4f52-b65d-303d62b9f1bd"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-gap-observations.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/relation-types.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/relation-types.test.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/api/ApiClient.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/events.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/vokb-palette.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/D3GraphCanvas.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T19:15:57.682Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-19",
+      "theme": "VKB Relation-Type Canonicalization and Edge Color Rendering Fix",
+      "summary": "Two sequential sessions resolved VKB graph <USER_ID_REDACTED> issues. Obs 2 began by running a backfill script to restore 5 missing morning prompt-sets with historical timestamps (pipeline count 4484 → 4486), then addressed VKB task **#7**: a viewer-side canonicalizer was added to collapse duplicate relation-type variants (`implemented in`/`implemented_in`, `contributes to`/`contributes_to`) while preserving legitimate camelCase types. Tasks #8/#9 were initially assessed as already resolved, but obs 3 identified a remaining rendering bug for #8: `EDGE_STYLES` palette keys were in UPPER_SNAKE format while actual VKB types are lowercase/camelCase, causing all edge lookups to miss and fall through to default grey. Nine distinct colors and dash patterns were added and wired into both legend rendering and per-edge canvas styling, including fixing a \"no active path\" reset branch that was clobbering per-type colors. Committed as `ff2549bfe`.\n\nFiles changed:\n- `scripts/backfill-gap-observations.mjs`\n- `integrations/unified-viewer/src/graph/relation-types.ts` and `relation-types.test.ts`\n- `integrations/unified-viewer/src/api/ApiClient.ts`\n- `integrations/unified-viewer/src/graph/events.ts`\n- `integrations/unified-viewer/src/graph/vokb-palette.ts`\n- `integrations/unified-viewer/src/graph/D3GraphCanvas.tsx`",
+      "observation_ids": [
+        "3ff9741f-9633-4496-9f21-f5fb59c2a889",
+        "7be399c6-8713-4f52-b65d-303d62b9f1bd"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/backfill-gap-observations.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/relation-types.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/relation-types.test.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/api/ApiClient.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/events.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/vokb-palette.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/D3GraphCanvas.tsx"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T19:15:57.682Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9a408e43-dd45-4782-a77d-b612c277c1bd",
+    "date": "2026-06-19",
+    "theme": "Phase 60 Commit: UI Cleanup and Trending Panel Repurpose",
+    "summary": "Three closely-timed observations (all 18:02) completed the Phase 60 commit cycle. Obs 4 established the baseline via `git status`; obs 5 confirmed `integrations/unified-viewer` is a regular tracked subdirectory (not a submodule) and staged the verification planning doc update to close Gaps A/B; obs 6 executed the full cleanup and commit. Gap A (Layer filter / Evidence-Pattern bleed) was resolved by gating the Layer filter to non-coding systems only. Four defunct UI toggles — Show All Relations, Labels, Show Clusters, Merged Only — were removed from store, components, and all associated tests. The Trending Patterns panel was repurposed into a live **Trending Insights** panel ranked by recency (~20 rows with real 0–1 scores, replacing 2 stale entries showing 0.0). Phase 60 verification status marked → **passed**.\n\nFiles changed:\n- `.planning/phases/60-unified-viewer-rendering-ux-integrity/60-VERIFICATION.md`\n- `integrations/unified-viewer/src/panels/filters/GraphToggles.tsx` and `GraphToggles.test.tsx`\n- `integrations/unified-viewer/src/store/viewer-store.ts` and `viewer-store.test.ts`\n- `integrations/unified-viewer/src/panels/FilterRail.tsx` and `FilterRail.test.tsx`\n- `integrations/unified-viewer/src/panels/LegendPanel.tsx`\n- `integrations/unified-viewer/src/routes/UnifiedViewer.tsx`\n- `integrations/unified-viewer/src/panels/TrendingPanel.tsx`\n- `scripts/observations-api-server.mjs`",
+    "observationIds": [
+      "528086de-af45-45d5-98e4-95db838a3a7c",
+      "6cbbecd6-1403-4f76-837b-6ec797610279",
+      "d8dc83b0-eaa2-430c-bb40-d3e4ddbe4050"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/60-unified-viewer-rendering-ux-integrity/60-VERIFICATION.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/GraphToggles.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/store/viewer-store.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/FilterRail.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/LegendPanel.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/routes/UnifiedViewer.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/GraphToggles.test.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/FilterRail.test.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/store/viewer-store.test.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/TrendingPanel.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T19:15:57.682Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-06-19",
+      "theme": "Phase 60 Commit: UI Cleanup and Trending Panel Repurpose",
+      "summary": "Three closely-timed observations (all 18:02) completed the Phase 60 commit cycle. Obs 4 established the baseline via `git status`; obs 5 confirmed `integrations/unified-viewer` is a regular tracked subdirectory (not a submodule) and staged the verification planning doc update to close Gaps A/B; obs 6 executed the full cleanup and commit. Gap A (Layer filter / Evidence-Pattern bleed) was resolved by gating the Layer filter to non-coding systems only. Four defunct UI toggles — Show All Relations, Labels, Show Clusters, Merged Only — were removed from store, components, and all associated tests. The Trending Patterns panel was repurposed into a live **Trending Insights** panel ranked by recency (~20 rows with real 0–1 scores, replacing 2 stale entries showing 0.0). Phase 60 verification status marked → **passed**.\n\nFiles changed:\n- `.planning/phases/60-unified-viewer-rendering-ux-integrity/60-VERIFICATION.md`\n- `integrations/unified-viewer/src/panels/filters/GraphToggles.tsx` and `GraphToggles.test.tsx`\n- `integrations/unified-viewer/src/store/viewer-store.ts` and `viewer-store.test.ts`\n- `integrations/unified-viewer/src/panels/FilterRail.tsx` and `FilterRail.test.tsx`\n- `integrations/unified-viewer/src/panels/LegendPanel.tsx`\n- `integrations/unified-viewer/src/routes/UnifiedViewer.tsx`\n- `integrations/unified-viewer/src/panels/TrendingPanel.tsx`\n- `scripts/observations-api-server.mjs`",
+      "observation_ids": [
+        "528086de-af45-45d5-98e4-95db838a3a7c",
+        "6cbbecd6-1403-4f76-837b-6ec797610279",
+        "d8dc83b0-eaa2-430c-bb40-d3e4ddbe4050"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/.planning/phases/60-unified-viewer-rendering-ux-integrity/60-VERIFICATION.md",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/GraphToggles.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/store/viewer-store.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/FilterRail.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/LegendPanel.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/routes/UnifiedViewer.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/GraphToggles.test.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/FilterRail.test.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/store/viewer-store.test.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/TrendingPanel.tsx"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T19:15:57.682Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2eba4dc8-bc22-4263-a568-b681537162d9",
+    "date": "2026-06-19",
+    "theme": "Ontology API Integration and Legend Click-to-Toggle",
+    "summary": "Goal was to close Gap A: merge writer/viewer ontology classes into obs-api and add interactive legend filtering to the unified viewer.\n\n- Built a curated ontology directory at `.data/ontologies/obs-api/` with a merged `upper.json` (host classes + LearningArtifact) plus writer and viewer L1/L2 files; validated with a standalone pre-flight load\n- Wired the directory into `scripts/observations-api-server.mjs` with fallback logic; API now serves 50 classes including L1 Component/SubComponent/Detail and 10 L2 Phase-57 classes\n- Added `hiddenRelationTypes` / `hiddenNodeTypes` store slices to `integrations/unified-viewer/src/store/viewer-store.ts` and folded filter logic into canvas memos in `D3GraphCanvas.tsx`, preserving the G9 viewport-stability gate\n- Made RELATIONSHIPS and DOMAINS rows in `LegendPanel.tsx` clickable toggle buttons; hidden entries render dimmed and struck-through but remain visible so they can be re-enabled\n- All five original VKB tasks plus two follow-up requests verified working in the browser via writer smoke-test and viewer hierarchy render",
+    "observationIds": [
+      "7262dbb4-6162-4f90-92cd-59a6a928e8a3"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/store/viewer-store.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/D3GraphCanvas.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/LegendPanel.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T19:25:31.014Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-06-19",
+      "theme": "Ontology API Integration and Legend Click-to-Toggle",
+      "summary": "Goal was to close Gap A: merge writer/viewer ontology classes into obs-api and add interactive legend filtering to the unified viewer.\n\n- Built a curated ontology directory at `.data/ontologies/obs-api/` with a merged `upper.json` (host classes + LearningArtifact) plus writer and viewer L1/L2 files; validated with a standalone pre-flight load\n- Wired the directory into `scripts/observations-api-server.mjs` with fallback logic; API now serves 50 classes including L1 Component/SubComponent/Detail and 10 L2 Phase-57 classes\n- Added `hiddenRelationTypes` / `hiddenNodeTypes` store slices to `integrations/unified-viewer/src/store/viewer-store.ts` and folded filter logic into canvas memos in `D3GraphCanvas.tsx`, preserving the G9 viewport-stability gate\n- Made RELATIONSHIPS and DOMAINS rows in `LegendPanel.tsx` clickable toggle buttons; hidden entries render dimmed and struck-through but remain visible so they can be re-enabled\n- All five original VKB tasks plus two follow-up requests verified working in the browser via writer smoke-test and viewer hierarchy render",
+      "observation_ids": [
+        "7262dbb4-6162-4f90-92cd-59a6a928e8a3"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/store/viewer-store.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/D3GraphCanvas.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/LegendPanel.tsx"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T19:25:31.014Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d720f741-528b-4320-adf6-861a78cca76d",
+    "date": "2026-06-19",
+    "theme": "Removing context7 Across Plugin and MCP Config Layers",
+    "summary": "Multi-stage remediation of context7 references that survived an earlier cleanup and were causing `/mcp` reconnection errors.\n\n**Plugin layer (obs 2):** Removed context7 from all five Claude Code plugin configuration layers:\n- `~/.claude/plugins/installed_plugins.json` (install record)\n- `~/.claude/settings.json` (enabled flags)\n- `~/.claude.json` (usage tracking)\n- `~/.claude/plugins/cache/.../context7/` (plugin cache, deleted)\n- `.claude/settings.local.json` (project allowlist); timestamped backups created\n\n**MCP config layer (obs 3, 4):** Systematic grep across project files and global config revealed active references still present in `scripts/generate-docker-mcp-config.sh` and `claude-code-mcp-docker.json`, tracing persistence through the `bin/coding` startup path; `generate-docker-mcp-config.sh` and `claude-code-mcp-docker.json` edited to remove entries\n\n**Commit (obs 6):** Removal from `scripts/generate-docker-mcp-config.sh` staged and committed with a descriptive audit-trail message\n\nStandalone context7 CLI and marketplace catalog were left untouched throughout; a Claude Code restart is required for full effect.",
+    "observationIds": [
+      "c6ce6f45-3d18-4565-a628-d4bf14fdee71",
+      "e7a3e4d2-200c-48a8-b568-171723c0feb2",
+      "d460b59f-e7d6-46aa-9e46-1311f9dd2cff",
+      "405e39dd-ecea-4884-af82-c7743927295e"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "~/.claude/plugins/installed_plugins.json",
+      "~/.claude/settings.json",
+      "~/.claude.json",
+      "~/.claude/plugins/cache/.../context7/",
+      ".claude/settings.local.json",
+      "backups with timestamp suffix .1781896551",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/generate-docker-mcp-config.sh",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/claude-code-mcp-docker.json"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T19:25:31.014Z",
+    "metadata": {
+      "sourceCount": 4,
+      "date": "2026-06-19",
+      "theme": "Removing context7 Across Plugin and MCP Config Layers",
+      "summary": "Multi-stage remediation of context7 references that survived an earlier cleanup and were causing `/mcp` reconnection errors.\n\n**Plugin layer (obs 2):** Removed context7 from all five Claude Code plugin configuration layers:\n- `~/.claude/plugins/installed_plugins.json` (install record)\n- `~/.claude/settings.json` (enabled flags)\n- `~/.claude.json` (usage tracking)\n- `~/.claude/plugins/cache/.../context7/` (plugin cache, deleted)\n- `.claude/settings.local.json` (project allowlist); timestamped backups created\n\n**MCP config layer (obs 3, 4):** Systematic grep across project files and global config revealed active references still present in `scripts/generate-docker-mcp-config.sh` and `claude-code-mcp-docker.json`, tracing persistence through the `bin/coding` startup path; `generate-docker-mcp-config.sh` and `claude-code-mcp-docker.json` edited to remove entries\n\n**Commit (obs 6):** Removal from `scripts/generate-docker-mcp-config.sh` staged and committed with a descriptive audit-trail message\n\nStandalone context7 CLI and marketplace catalog were left untouched throughout; a Claude Code restart is required for full effect.",
+      "observation_ids": [
+        "c6ce6f45-3d18-4565-a628-d4bf14fdee71",
+        "e7a3e4d2-200c-48a8-b568-171723c0feb2",
+        "d460b59f-e7d6-46aa-9e46-1311f9dd2cff",
+        "405e39dd-ecea-4884-af82-c7743927295e"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "~/.claude/plugins/installed_plugins.json",
+        "~/.claude/settings.json",
+        "~/.claude.json",
+        "~/.claude/plugins/cache/.../context7/",
+        ".claude/settings.local.json",
+        "backups with timestamp suffix .1781896551",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/generate-docker-mcp-config.sh",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/claude-code-mcp-docker.json"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T19:25:31.014Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "504ae587-ebf9-4aa6-867f-ab61d10be026",
+    "date": "2026-06-19",
+    "theme": "Session Continuity Load from Live Session Logs",
+    "summary": "Routine session continuity operation to reconstruct context from prior work.\n\n- Located the most recent LSL file at `/Users/<USER_ID_REDACTED>/Agentic/coding/.specstory/history/2026/06/2026-06-19_2100-2200_c197ef.md`\n- File was identified as short (~707 lines), flagged as insufficient for full context reconstruction\n- Triggered loading of 1–2 additional prior LSL files to fill the gap; cross-project check was skipped since the active project is already `coding`\n- Session continuity summary was initiated but not fully completed within the exchange",
+    "observationIds": [
+      "feaf25bd-b24b-43a3-a518-33f6cd14e301"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-06-19T19:25:31.014Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-06-19",
+      "theme": "Session Continuity Load from Live Session Logs",
+      "summary": "Routine session continuity operation to reconstruct context from prior work.\n\n- Located the most recent LSL file at `/Users/<USER_ID_REDACTED>/Agentic/coding/.specstory/history/2026/06/2026-06-19_2100-2200_c197ef.md`\n- File was identified as short (~707 lines), flagged as insufficient for full context reconstruction\n- Triggered loading of 1–2 additional prior LSL files to fill the gap; cross-project check was skipped since the active project is already `coding`\n- Session continuity summary was initiated but not fully completed within the exchange",
+      "observation_ids": [
+        "feaf25bd-b24b-43a3-a518-33f6cd14e301"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-06-19T19:25:31.014Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6f47903c-5e60-4438-b8a2-e2ab7dcf25f6",
+    "date": "2026-06-19",
+    "theme": "Diagnosing Stalled Observations Pipeline After 20:02 UTC",
+    "summary": "Investigation into why the observations pipeline had produced no new entries since approximately 20:02 UTC (~13 hours prior at time of investigation).\n\n- Confirmed git state was clean following the context7 removal commit (obs 7 began with that commit before pivoting to pipeline diagnosis)\n- Verified the ETM daemon is healthy and actively writing LSL files, ruling out the event-capture layer as the failure point\n- Checked launchd daemon status and current time to establish a precise gap\n- Examined ETM and obs-api service log tails to isolate the breakpoint\n- Conclusion: the stall is **downstream of log collection**, localized to the obs-api or observations database layer rather than event capture; further inspection of those two components is the identified next step",
+    "observationIds": [
+      "8b749cf1-8069-474b-9b39-fbe1433e0e16",
+      "46dd9fec-93a7-4792-982a-8921fc82c804"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "scripts/generate-docker-mcp-config.sh"
+    ],
+    "quality": "high",
+    "createdAt": "2026-06-19T19:25:31.014Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-19",
+      "theme": "Diagnosing Stalled Observations Pipeline After 20:02 UTC",
+      "summary": "Investigation into why the observations pipeline had produced no new entries since approximately 20:02 UTC (~13 hours prior at time of investigation).\n\n- Confirmed git state was clean following the context7 removal commit (obs 7 began with that commit before pivoting to pipeline diagnosis)\n- Verified the ETM daemon is healthy and actively writing LSL files, ruling out the event-capture layer as the failure point\n- Checked launchd daemon status and current time to establish a precise gap\n- Examined ETM and obs-api service log tails to isolate the breakpoint\n- Conclusion: the stall is **downstream of log collection**, localized to the obs-api or observations database layer rather than event capture; further inspection of those two components is the identified next step",
+      "observation_ids": [
+        "8b749cf1-8069-474b-9b39-fbe1433e0e16",
+        "46dd9fec-93a7-4792-982a-8921fc82c804"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "scripts/generate-docker-mcp-config.sh"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-06-19T19:25:31.014Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "0e477387-6f27-4ed4-8e45-6cdff36a3c85",
+    "date": "2026-06-19",
+    "theme": "LSL Resolver Failure Diagnosed as km-core Migration Gap",
+    "summary": "The `com.coding.lsl-resolver` launchd job was failing repeatedly and was restarted via `launchctl kickstart` to investigate. Examination of logs revealed the resolver exits with code 1 due to a `\"no such table: observations\"` SQLite error.\n\nRoot cause traced through progressive investigation:\n- The resolver opens `.observations/observations.db`, a legacy 4 KB empty stub file\n- `obs-api` and `ObservationWriter` have already migrated to `GraphKMStore` (km-core), making the SQLite file obsolete\n- The resolver was never updated to match, causing it to silently fail **449+ times since early June** on a 30-minute schedule\n\nIdentified two immediate remediation paths:\n- Port `resolve-observations-from-lsl.mjs` to use `GraphKMStore` or the `obs-api` HTTP interface\n- Unload the launchd job to stop noisy recurring failures until migration is complete",
+    "observationIds": [
+      "eeef4a8d-14a7-47de-8db1-0849676b98b8",
+      "ae1d313d-21fb-4fb0-bcad-59c34a6c420f",
+      "dd25b356-d096-447b-bcc1-5acc5b72ed51"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-06-19T19:44:52.337Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-06-19",
+      "theme": "LSL Resolver Failure Diagnosed as km-core Migration Gap",
+      "summary": "The `com.coding.lsl-resolver` launchd job was failing repeatedly and was restarted via `launchctl kickstart` to investigate. Examination of logs revealed the resolver exits with code 1 due to a `\"no such table: observations\"` SQLite error.\n\nRoot cause traced through progressive investigation:\n- The resolver opens `.observations/observations.db`, a legacy 4 KB empty stub file\n- `obs-api` and `ObservationWriter` have already migrated to `GraphKMStore` (km-core), making the SQLite file obsolete\n- The resolver was never updated to match, causing it to silently fail **449+ times since early June** on a 30-minute schedule\n\nIdentified two immediate remediation paths:\n- Port `resolve-observations-from-lsl.mjs` to use `GraphKMStore` or the `obs-api` HTTP interface\n- Unload the launchd job to stop noisy recurring failures until migration is complete",
+      "observation_ids": [
+        "eeef4a8d-14a7-47de-8db1-0849676b98b8",
+        "ae1d313d-21fb-4fb0-bcad-59c34a6c420f",
+        "dd25b356-d096-447b-bcc1-5acc5b72ed51"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-06-19T19:44:52.337Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3914d89d-1b6a-42a0-91c1-8615e51dda0b",
+    "date": "2026-06-19",
+    "theme": "LSL Resolver Migration to km-core Strategy Defined",
+    "summary": "Following diagnosis, work began on migrating `resolve-observations-from-lsl.mjs` to km-core, following patterns already established in `ObservationExporter` and `ObservationWriter`.\n\nThe resolver's three core operations were mapped to km-core equivalents:\n- **Read**: observations are Graphology nodes with `entityType === 'Observation'`; lookup via `findByLegacyId({system:'A', id})`\n- **Rewrite**: LLM-updated summary targets `attrs.description`; metadata (including raw messages for detector C's image-only path) targets `attrs.metadata`\n- **Persist**: fetch-modify-put pattern using `putEntity(patched, {skipOntologyCheck:true})`\n\nKey architectural references studied: `legacy-ingest.ts` and live-logging modules. A regression test is planned to instantiate `GraphKMStore` with the standard config (`dbPath`, `exportDir`, `ontologyDir`) and assert that summary rewrites and metadata mutations round-trip correctly. No code was written yet — the migration strategy is defined but implementation is pending.",
+    "observationIds": [
+      "d631c287-3580-47c0-88ec-031fe0fa2412",
+      "f064b433-5b67-46fc-851d-31e643961d2c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-06-19T19:44:52.337Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-06-19",
+      "theme": "LSL Resolver Migration to km-core Strategy Defined",
+      "summary": "Following diagnosis, work began on migrating `resolve-observations-from-lsl.mjs` to km-core, following patterns already established in `ObservationExporter` and `ObservationWriter`.\n\nThe resolver's three core operations were mapped to km-core equivalents:\n- **Read**: observations are Graphology nodes with `entityType === 'Observation'`; lookup via `findByLegacyId({system:'A', id})`\n- **Rewrite**: LLM-updated summary targets `attrs.description`; metadata (including raw messages for detector C's image-only path) targets `attrs.metadata`\n- **Persist**: fetch-modify-put pattern using `putEntity(patched, {skipOntologyCheck:true})`\n\nKey architectural references studied: `legacy-ingest.ts` and live-logging modules. A regression test is planned to instantiate `GraphKMStore` with the standard config (`dbPath`, `exportDir`, `ontologyDir`) and assert that summary rewrites and metadata mutations round-trip correctly. No code was written yet — the migration strategy is defined but implementation is pending.",
+      "observation_ids": [
+        "d631c287-3580-47c0-88ec-031fe0fa2412",
+        "f064b433-5b67-46fc-851d-31e643961d2c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-06-19T19:44:52.337Z"
+    },
+    "project": "coding"
   }
 ]
