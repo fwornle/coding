@@ -316,6 +316,17 @@ export interface ViewerState {
   hoveredNodeId: string | null
   setHoveredNodeId: (id: string | null) => void
 
+  // Legend click-to-toggle (operator request 2026-06-19): clicking a
+  // RELATIONSHIPS or DOMAINS row in the LegendPanel hides that edge type /
+  // node (ontologyClass) type from the canvas. The Legend derives from the
+  // FULL graph set (UnifiedViewer passes useGraphData's entities/relations),
+  // so hidden rows still render (dimmed) and can be toggled back. Non-persistent
+  // (mirrors showDebugEntityTypes / D-11): resets on page load.
+  hiddenRelationTypes: ReadonlySet<string>
+  hiddenNodeTypes: ReadonlySet<string>
+  toggleRelationType: (type: string) => void
+  toggleNodeType: (type: string) => void
+
   toggleLayer: (layer: string) => void
   toggleDomain: (domain: string) => void
   toggleOntologyClass: (cls: string) => void
@@ -896,6 +907,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   // page load so operators must consciously re-enable Observation/Digest debug.
   showDebugEntityTypes: false,
   hoveredNodeId: null,
+  hiddenRelationTypes: new Set<string>(),
+  hiddenNodeTypes: new Set<string>(),
 
   toggleLayer: (layer) =>
     set((s) => {
@@ -979,6 +992,23 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   // Plan 60-08 Gap E — hover slice setter. Writes ONLY hoveredNodeId; never
   // touches the multi-selection slice (Phase 56.1 D-1 invariant).
   setHoveredNodeId: (id) => set({ hoveredNodeId: id }),
+
+  // Legend click-to-toggle — flip membership in the hidden-type set (new Set
+  // each call so React/Zustand sees a fresh reference and re-renders consumers).
+  toggleRelationType: (type) =>
+    set((s) => {
+      const next = new Set(s.hiddenRelationTypes)
+      if (next.has(type)) next.delete(type)
+      else next.add(type)
+      return { hiddenRelationTypes: next }
+    }),
+  toggleNodeType: (type) =>
+    set((s) => {
+      const next = new Set(s.hiddenNodeTypes)
+      if (next.has(type)) next.delete(type)
+      else next.add(type)
+      return { hiddenNodeTypes: next }
+    }),
 
   toggleShowEdges: () => set((s) => ({ showEdges: !s.showEdges })),
   toggleShowClusters: () => set((s) => ({ showClusters: !s.showClusters })),

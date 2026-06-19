@@ -1159,3 +1159,33 @@ describe('useViewerStore — hoveredNodeId slice (Plan 60-08 Gap E)', () => {
     expect(s.selectedBucketKeys.has('bucket-1')).toBe(true)
   })
 })
+
+describe('useViewerStore — legend click-to-toggle (2026-06-19)', () => {
+  beforeEach(() => {
+    useViewerStore.setState({ hiddenRelationTypes: new Set(), hiddenNodeTypes: new Set() })
+  })
+  it('toggleRelationType adds then removes a type', () => {
+    useViewerStore.getState().toggleRelationType('contains')
+    expect(useViewerStore.getState().hiddenRelationTypes.has('contains')).toBe(true)
+    useViewerStore.getState().toggleRelationType('contains')
+    expect(useViewerStore.getState().hiddenRelationTypes.has('contains')).toBe(false)
+  })
+  it('toggleNodeType adds then removes a type', () => {
+    useViewerStore.getState().toggleNodeType('Component')
+    expect(useViewerStore.getState().hiddenNodeTypes.has('Component')).toBe(true)
+    useViewerStore.getState().toggleNodeType('Component')
+    expect(useViewerStore.getState().hiddenNodeTypes.has('Component')).toBe(false)
+  })
+  it('emits a fresh Set reference each toggle (so memo consumers re-render)', () => {
+    const before = useViewerStore.getState().hiddenRelationTypes
+    useViewerStore.getState().toggleRelationType('mentions')
+    expect(useViewerStore.getState().hiddenRelationTypes).not.toBe(before)
+  })
+  it('node-type and relation-type hidden sets are independent', () => {
+    useViewerStore.getState().toggleNodeType('Detail')
+    useViewerStore.getState().toggleRelationType('related_to')
+    expect(useViewerStore.getState().hiddenNodeTypes.has('Detail')).toBe(true)
+    expect(useViewerStore.getState().hiddenRelationTypes.has('related_to')).toBe(true)
+    expect(useViewerStore.getState().hiddenNodeTypes.has('related_to')).toBe(false)
+  })
+})

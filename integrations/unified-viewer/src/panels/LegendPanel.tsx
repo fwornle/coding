@@ -17,6 +17,7 @@
 // actually on screen — fully removed in this rewrite.
 
 import { useMemo } from 'react'
+import { useViewerStore } from '@/store/viewer-store'
 import { EDGE_STYLES, LAYER_BADGE_CLASS } from '@/graph/vokb-palette'
 import { SHAPE_PALETTE, shapeFallback, classColor, type ShapeKind } from '@/graph/color-fallback'
 import { deriveLayer, type Layer, type OntologyRegistryClass } from '@/graph/layer'
@@ -120,6 +121,15 @@ export function LegendPanel({
   ontologyRegistry,
   className,
 }: LegendPanelProps) {
+  // Legend click-to-toggle (operator request 2026-06-19): clicking a DOMAINS
+  // (node type) or RELATIONSHIPS (edge type) row hides that type from the
+  // canvas. The Legend derives from the FULL graph set, so hidden rows stay
+  // listed (dimmed + struck-through) and toggle back on a second click.
+  const hiddenNodeTypes = useViewerStore((s) => s.hiddenNodeTypes)
+  const hiddenRelationTypes = useViewerStore((s) => s.hiddenRelationTypes)
+  const toggleNodeType = useViewerStore((s) => s.toggleNodeType)
+  const toggleRelationType = useViewerStore((s) => s.toggleRelationType)
+
   // DOMAINS: distinct entity.ontologyClass values in render order.
   const domains = useMemo<readonly DomainRow[]>(() => {
     const seen = new Set<string>()
@@ -200,19 +210,29 @@ export function LegendPanel({
         {domains.length > 0 && (
           <Section title="Domains">
             {domains.map((d) => {
-              const row = (
-                <div
+              const hidden = hiddenNodeTypes.has(d.className)
+              return (
+                <button
+                  type="button"
                   key={d.className}
-                  className="flex items-center gap-2 text-[11px] text-foreground/80"
+                  onClick={() => toggleNodeType(d.className)}
+                  className={`w-full flex items-center gap-2 text-[11px] text-left rounded px-0.5 hover:bg-accent ${hidden ? 'opacity-40 line-through' : 'text-foreground/80'}`}
                   data-testid={`legend-domain-${d.className}`}
-                  title={d.isFallback ? 'class without registered shape' : undefined}
+                  data-hidden={hidden ? 'true' : undefined}
+                  aria-pressed={hidden}
+                  title={
+                    hidden
+                      ? 'hidden — click to show this node type'
+                      : d.isFallback
+                        ? 'class without registered shape — click to hide this node type'
+                        : 'click to hide this node type'
+                  }
                 >
                   <ShapeIcon shape={d.shape} color={d.color} />
                   <span>{d.className}</span>
                   <span className="text-muted-foreground">({d.shape})</span>
-                </div>
+                </button>
               )
-              return row
             })}
           </Section>
         )}
@@ -258,11 +278,17 @@ export function LegendPanel({
               // legend stays clean instead of throwing.
               const color = style?.color ?? '#d1d5db'
               const dasharray = style?.dasharray ?? ''
+              const hidden = hiddenRelationTypes.has(type)
               return (
-                <div
+                <button
+                  type="button"
                   key={type}
-                  className="flex items-center gap-2 text-[11px] text-foreground/80"
+                  onClick={() => toggleRelationType(type)}
+                  className={`w-full flex items-center gap-2 text-[11px] text-left rounded px-0.5 hover:bg-accent ${hidden ? 'opacity-40 line-through' : 'text-foreground/80'}`}
                   data-testid={`legend-rel-${type}`}
+                  data-hidden={hidden ? 'true' : undefined}
+                  aria-pressed={hidden}
+                  title={hidden ? 'hidden — click to show this relationship' : 'click to hide this relationship'}
                 >
                   <svg width="32" height="10" viewBox="0 0 32 10" aria-hidden>
                     <line
@@ -276,7 +302,7 @@ export function LegendPanel({
                     />
                   </svg>
                   <span>{type}</span>
-                </div>
+                </button>
               )
             })}
           </Section>

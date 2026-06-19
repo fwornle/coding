@@ -276,6 +276,12 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // skips the Observation/Digest hard-exclusion branch so those types
   // re-appear in the rendered graph. Default OFF (architecture-bleed shield).
   const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
+  // Legend click-to-toggle (operator request 2026-06-19): hide an edge type /
+  // node (ontologyClass) type clicked off in the LegendPanel. Folded into the
+  // visibleEntities / visibleRelations memos below (NOT the main-effect dep
+  // list, which the G9 viewport-stability gate locks verbatim).
+  const hiddenRelationTypes = useViewerStore((s) => s.hiddenRelationTypes)
+  const hiddenNodeTypes = useViewerStore((s) => s.hiddenNodeTypes)
   // 2026-06-12: LSL timeline tick produces this — when non-null, the
   // graph dims to only those entities (plus 1-hop neighbors so the
   // session's anchor still shows context). null = no filter.
@@ -335,8 +341,8 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       visibleLevels,
       lslFilterEntityIds,
       showDebugEntityTypes,
-    }))
-  }, [entities, selectedTeams, selectedClasses, visibleLevels, searchQuery, learningSource, selectedLayers, hideDocNodes, lslFilterEntityIds, showDebugEntityTypes])
+    }) && !hiddenNodeTypes.has(e.ontologyClass))
+  }, [entities, selectedTeams, selectedClasses, visibleLevels, searchQuery, learningSource, selectedLayers, hideDocNodes, lslFilterEntityIds, showDebugEntityTypes, hiddenNodeTypes])
 
   const visibleIds = useMemo(() => {
     const s = new Set<string>()
@@ -345,8 +351,9 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   }, [visibleEntities])
 
   const visibleRelations = useMemo<Relation[]>(() => {
-    return relations.filter((r) => visibleIds.has(r.from) && visibleIds.has(r.to))
-  }, [relations, visibleIds])
+    return relations.filter((r) =>
+      visibleIds.has(r.from) && visibleIds.has(r.to) && !hiddenRelationTypes.has(r.type))
+  }, [relations, visibleIds, hiddenRelationTypes])
 
   // Dimensions — watch the container, no Redux involvement.
   useLayoutEffect(() => {
