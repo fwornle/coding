@@ -9,6 +9,12 @@ context:
   - .planning/phases/60-unified-viewer-rendering-ux-integrity/60-VERIFICATION.md
 ---
 
+> **RESOLVED 2026-06-19.** All gaps A–E closed.
+> - Gaps C/D/E: 60-08 (commit `10e5ef12f`).
+> - Gap A: obs-api curated ontology dir `.data/ontologies/obs-api/` + `KG_ONTOLOGY_DIR` (commit `e5d34a67d`) — `/api/v1/ontology/classes` now serves L1 [Component,SubComponent,Detail] + 10 L2; writer smoke-test passed; OntologyFilter renders L1→L2.
+> - Gap B: moot — viewer uses a direct baseUrl (`VITE_BACKEND_CODING_URL ?? :12436`), not relative `/api/v1`.
+> See `.planning/phases/60-unified-viewer-rendering-ux-integrity/60-VERIFICATION.md` § 60-08 + Gap-closure Update.
+
 # OntologyFilter L1→L2 hierarchy — two runtime routing gaps
 
 Phase 60-07 shipped the data + handler correctness for the OntologyFilter L1→L2 hierarchy:

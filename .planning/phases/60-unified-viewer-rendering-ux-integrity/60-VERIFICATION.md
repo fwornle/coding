@@ -1,17 +1,17 @@
 ---
 phase: 60-unified-viewer-rendering-ux-integrity
-status: gaps_found
+status: passed
 verified_on: 2026-06-17T21:30:00Z
-re_verified_on: 2026-06-17T22:30:00Z
+re_verified_on: 2026-06-19T19:40:00Z
 verifier: claude (orchestrator-driven gsd-browser smoke)
 viewer_url: http://localhost:5173/viewer/coding
 api_url: http://localhost:12436/api/v1/ontology/classes?withDisplay=true
-sc_passed: 4
-sc_partial: 1
-sc_inconclusive: 1
-gaps_open: 2
+sc_passed: 5
+sc_partial: 0
+sc_inconclusive: 0
+gaps_open: 0
 followup_todos:
-  - .planning/todos/pending/2026-06-17-ontologyfilter-runtime-routing-gap.md
+  - .planning/todos/completed/2026-06-17-ontologyfilter-runtime-routing-gap.md
 ---
 
 # Phase 60 Verification
@@ -171,5 +171,45 @@ Phase 60 shipped its viewer-side code correctly across all five plans. SC#1, SC#
 **Recommended next steps:**
 
 1. **Gap-closure plan (Phase 60.1 or follow-up):** fix the ontology API so `GET /api/v1/ontology/classes?withDisplay=true` returns `{name, level, parent, display}` for the L0/L1/L2 hierarchy on the coding system. Source: `.data/ontologies/coding.lower.json` (already exists with the 10 L2 classes per Phase 57 D-09). Surface: `lib/km-core/src/api/handlers/ontology.ts` (per the discuss-phase context — the Phase 45 Plan 04 extension is the canonical handler).
+
+---
+
+## 60-08 + Gap-closure Update (2026-06-19) — all gaps closed, status → passed
+
+Follow-up session closed every remaining gap and shipped two operator-requested
+legend features. Phase 60 is now `status: passed`, `gaps_open: 0`.
+
+**Gaps C/D/E (60-08, committed `10e5ef12f`)** — shape-variant rendering, sidebar
+visible/hidden selection breakdown, bidirectional hover. (Verified in 60-08.)
+
+**Gap A — obs-api now serves the coding L1/L2 ontology (`e5d34a67d`).** obs-api's
+`GraphKMStore` loaded only the bundled `defaultOntologyDir()` (LearningArtifact +
+Observation/Digest/Insight). Fix: a curated `.data/ontologies/obs-api/` dir that
+is a strict SUPERSET of the bundled writer ontology (`upper.json` = host upper +
+LearningArtifact; bundled `learning-artifacts.json`; symlinks to
+`coding-ontology.json` (L1) + `coding.lower.json` (L2)), wired via `KG_ONTOLOGY_DIR`.
+Verified: OntologyRegistry pre-flight (49 classes, parent chains resolve); a live
+**writer smoke-test** (`POST /api/observations/messages` → `{observations:1,errors:0}`)
+confirms Observation classification still works; `GET /api/v1/ontology/classes`
+now returns **L1 [Component, SubComponent, Detail] + 10 L2** classes;
+`/viewer/coding` OntologyFilter renders the L1→L2 hierarchy. **SC#5 → PASS.**
+
+**Gap B — moot.** The viewer reaches obs-api via a direct `baseUrl`
+(`VITE_BACKEND_CODING_URL ?? http://localhost:12436`), not a relative `/api/v1`
+path, so no Vite dev proxy is needed.
+
+**Related fixes shipped same session (unified-viewer):**
+- `#7` duplicate relation types (`9cc030567`) — `canonicalizeRelationType()` folds
+  LLM free-text edge phrases ("implemented in") into their snake_case twins.
+- `#8` distinct per-type edge styles (`ff2549bfe`) — EDGE_STYLES gained the actual
+  VKB relation types; D3GraphCanvas strokes each edge by type (color+dash) so the
+  Legend RELATIONSHIPS swatches and the canvas finally agree (was all-gray).
+- Legend **click-to-toggle** per type (`c216c8e6d`) + **all/none** per section
+  (`84adcb806`) — operator-requested visibility controls; G9 viewport-stability
+  gate preserved (filter folded into the visibleEntities/visibleRelations memos).
+
+Screenshots: `screenshots/sc-7-relation-types-canonical.png`,
+`sc-8-edge-styles-canvas.png`, `sc-gapA-ontology-l1l2.png`,
+`sc-legend-toggle.png`, `sc-legend-all-none.png`.
 
 2. **OKB data warmth (separate concern):** re-run the VOKB W-1 regression once `/viewer/okb` has populated data. Not Phase 60's scope.
