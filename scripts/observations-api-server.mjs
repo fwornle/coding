@@ -34,6 +34,7 @@ import { RetrievalService } from '../src/retrieval/retrieval-service.js';
 import { ObservationPruner } from '../src/live-logging/ObservationPruner.js';
 import { ColdStoreReader } from '../src/live-logging/ColdStoreReader.js';
 import { ObservationExporter } from '../src/live-logging/ObservationExporter.js';
+import { LslObservationResolver } from '../src/live-logging/LslObservationResolver.js';
 // Plan 44-18 — the legacy SQLite handle is gone. ObservationPruner cut to
 // km-core in Plan 44-18 Task 2 (no more direct SQLite reads). RetrievalService
 // freshness-rerank cut to km-core in Plan 44-18 Task 3. KeywordSearch (FTS5
@@ -87,6 +88,14 @@ let _writerInit = null; // pending init promise
 let _pruner = null;
 let _pruneInterval = null;
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
+// LSL observation resolver — runs IN-PROCESS on the single-owner km-core store
+// (the standalone launchd job was retired: km-core's LevelDB is single-owner,
+// so a separate resolver process can't open it). Cadence matches the old
+// com.coding.lsl-resolver StartInterval (30 min).
+let _lslResolver = null;
+let _lslResolverInterval = null;
+const LSL_RESOLVE_INTERVAL_MS = 30 * 60 * 1000;  // 30 minutes
+const HARD_CAP_LSL = 50;  // rows per sweep (matches LslObservationResolver.HARD_CAP)
 let _coldStore = null;
 
 // Plan 44-18 Task 5 — the legacy SQLite file `.observations/observations.db`
@@ -190,6 +199,52 @@ async function ensurePruner() {
   }, PRUNE_INTERVAL_MS);
   _pruneInterval.unref?.();
   return _pruner;
+}
+
+/**
+ * Run one LSL-resolution sweep on the shared km-core store. Best-effort: the
+ * LLM proxy may be down (resolver swallows per-row proxy errors and reports
+ * them in `failed`), so a sweep never throws into the timer. When any row was
+ * updated, the cold-store export + staleness clock are refreshed so the
+ * dashboard surfaces the rewritten summaries.
+ */
+async function runLslResolveSweep(opts = {}) {
+  const kmStore = await ensureKMStore();
+  if (!kmStore) return { candidates: 0, processed: 0, updated: 0, skipped: 0, failed: 0 };
+  if (!_lslResolver) {
+    _lslResolver = new LslObservationResolver({ kmStore, project: 'coding' });
+  }
+  const result = await _lslResolver.resolve(opts);
+  if (result.updated > 0 || result.skipped > 0) {
+    // Stamped/rewritten rows changed km-core — refresh the cold store + clock.
+    scheduleExport();
+    _stalenessCache.invalidate();
+  }
+  return result;
+}
+
+/**
+ * Lazy-init the in-process LSL resolver sweep. Mirrors ensurePruner(): run one
+ * pass on boot (recovering whatever accumulated while obs-api was down), then
+ * a 30-min interval. unref()'d so it never holds the event loop open.
+ */
+async function ensureLslResolver() {
+  const kmStore = await ensureKMStore();
+  if (!kmStore) return null;
+  if (_lslResolverInterval) return _lslResolver;
+  try {
+    const r = await runLslResolveSweep({ limit: HARD_CAP_LSL });
+    process.stderr.write(`[obs-api] initial LSL resolve: ${JSON.stringify(r)}\n`);
+  } catch (err) {
+    process.stderr.write(`[obs-api] initial LSL resolve failed: ${err.message}\n`);
+  }
+  _lslResolverInterval = setInterval(() => {
+    runLslResolveSweep({ limit: HARD_CAP_LSL }).catch((err) => {
+      process.stderr.write(`[obs-api] periodic LSL resolve failed: ${err.message}\n`);
+    });
+  }, LSL_RESOLVE_INTERVAL_MS);
+  _lslResolverInterval.unref?.();
+  return _lslResolver;
 }
 
 // Phase 35 plan 35-04 - cold-store reader factory. Defaults to .data/observation-export
@@ -662,6 +717,34 @@ app.post('/api/observations/patch-artifacts/historical', async (_req, res) => {
   } catch (err) {
     process.stderr.write(`[obs-api] /patch-artifacts/historical error: ${err.message}\n`);
     res.status(500).json({ error: err.message || 'Failed to patch historical artifacts' });
+  }
+});
+
+/**
+ * POST /api/observations/resolve-lsl — manually trigger one LSL-resolution
+ * sweep on the shared km-core store (the periodic sweep runs every 30 min;
+ * this is for ops + the `scripts/resolve-observations-from-lsl.mjs` CLI).
+ *
+ * Body (all optional): { mode, since, onlyId, limit, force, dryRun }.
+ * Returns the sweep stats { candidates, processed, updated, skipped, failed }.
+ */
+app.post('/api/observations/resolve-lsl', async (req, res) => {
+  try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    const { mode, since, onlyId, limit, force, dryRun } = req.body || {};
+    const result = await runLslResolveSweep({
+      mode: mode || 'all',
+      since: since || null,
+      onlyId: onlyId || null,
+      limit: Number.isFinite(limit) ? limit : HARD_CAP_LSL,
+      force: force === true,
+      dryRun: dryRun === true,
+    });
+    res.json(result);
+  } catch (err) {
+    process.stderr.write(`[obs-api] /observations/resolve-lsl error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Failed to run LSL resolution' });
   }
 });
 
@@ -2251,7 +2334,7 @@ const server = _autostart
       // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
       // doesn't pay a multi-second cold start.
       ensureWriter()
-        .then(() => { ensureRetrieval(); ensurePruner(); })
+        .then(() => { ensureRetrieval(); ensurePruner(); ensureLslResolver(); })
         .catch((err) => {
           process.stderr.write(`[obs-api] startup init failed: ${err.message}\n`);
         });
@@ -2340,6 +2423,7 @@ async function shutdown(signal) {
     }
   }
   if (_pruneInterval) { clearInterval(_pruneInterval); _pruneInterval = null; }
+  if (_lslResolverInterval) { clearInterval(_lslResolverInterval); _lslResolverInterval = null; }
   _clearHeartbeat();
   if (!server) {
     // No autostart (integration-test path) — nothing to close.

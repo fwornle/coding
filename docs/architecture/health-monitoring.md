@@ -96,8 +96,11 @@ All critical services are managed by launchd with auto-respawn:
 | `com.coding.health-coordinator` | Health Coordinator | `.logs/health-coordinator.log` |
 | `com.coding.obs-api` | Observation API | `.logs/obs-api.log` |
 | `com.coding.llm-cli-proxy` | LLM CLI Proxy | `.logs/llm-cli-proxy.log` |
-| `com.coding.lsl-resolver` | LSL Resolver | `.logs/lsl-resolver.log` |
 | `com.coding.etm` | Event-Trace Monitor | `.logs/etm.log` |
+
+> **Note:** The former `com.coding.lsl-resolver` launchd job was retired. LSL observation
+> resolution now runs in-process inside obs-api (30-min sweep; manual trigger via
+> `POST /api/observations/resolve-lsl`), because km-core's LevelDB is single-owner.
 
 ### Common Commands
 
