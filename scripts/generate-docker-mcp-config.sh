@@ -53,11 +53,6 @@ cat > "$OUTPUT_FILE" << EOF
       "env": {
         "CODE_GRAPH_RAG_SSE_URL": "http://localhost:$CODE_GRAPH_RAG_PORT"
       }
-    },
-    "context7": {
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/context7-mcp@latest"],
-      "env": {}
     }
   }
 }
