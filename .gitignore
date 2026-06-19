@@ -153,6 +153,14 @@ integrations/mcp-server-browserbase/
 .data/ukb-trace-reports/
 .data/step-timing-statistics.json
 
+# One-shot repair / backfill / soak session logs — timestamped, disposable run
+# artifacts written by scripts/{repair-*,backfill-*,poll-orphan-floor-soak}.mjs.
+# Kept on disk for the run, never needed in git.
+.data/backfill-*.json
+.data/repair-*.json
+.data/orphan-floor-soak-*.json
+.data/*-dry-runs/
+
 # Phase 51 sub-agent live-tier runtime state (heartbeats rewritten every 30s
 # by the live-{claude,copilot,opencode} daemons; slot-state is the slot
 # allocator's persistent mapping but is regenerable from .specstory/history/
@@ -208,6 +216,10 @@ integrations/browser-access/logs/
 !.data/knowledge-graph/insights/images/
 !.data/knowledge-graph/exports/
 !.data/knowledge-graph/exports/**
+# ...but never the timestamped backups repair/migration scripts drop there
+# (the exports/** re-include above otherwise overrides the global *.bak rule).
+.data/knowledge-graph/exports/*.bak
+.data/knowledge-graph/exports/*.bak-*
 .data/knowledge-graph-migrated/
 .data/knowledge.db
 .data/knowledge.db-shm
