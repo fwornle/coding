@@ -50,6 +50,13 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
   const focalNodeId = useViewerStore((s) => s.focalNodeId)
   const selectedNodeIds = useViewerStore((s) => s.selectedNodeIds)
   const selectedBucketKeys = useViewerStore((s) => s.selectedBucketKeys)
+  // 2026-06-19 (Gap F): the mode predicate must agree with BucketCardList's
+  // OWN candidate-resolution conditions, which key off selectionSource +
+  // lslFilterEntityIds — otherwise a single graph-drilled node (which carries
+  // a non-empty selectedBucketKeys as a *timeline halo*, not a card selection)
+  // lands in BucketCardList with zero resolvable candidates → "0 items".
+  const selectionSource = useViewerStore((s) => s.selectionSource)
+  const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
 
   const showMarkdown = system === 'okb'
 
@@ -82,11 +89,22 @@ export function SidePanel({ apiClient, system }: SidePanelProps) {
   //                  (size===0 resolutions) also flow here so the operator
   //                  sees SOMETHING for the bucket-only selection.
   //   - Otherwise (no selection): HistorySidebar default.
-  const isSingleFocalMode =
-    selectedNodeIds.size === 1 && selectedBucketKeys.size === 0
+  // 2026-06-19 (Gap F fix): isMultiMode must match the EXACT conditions
+  // BucketCardList uses to build its card items (BucketCardList.tsx:100-108):
+  //   - timeline source with a populated lslFilterEntityIds set, OR
+  //   - graph source with MORE THAN ONE selected node.
+  // Keying off `selectedBucketKeys.size > 0` (the old rule) wrongly routed a
+  // single graph-drilled node — which carries a non-empty selectedBucketKeys as
+  // a timeline halo — into an empty BucketCardList ("0 items / No cards to
+  // show"). The node is focal, so it must render its EntityDetailPanel instead.
   const isMultiMode =
-    !isSingleFocalMode
-    && (selectedBucketKeys.size > 0 || selectedNodeIds.size > 1)
+    (selectionSource === 'timeline'
+      && selectedBucketKeys.size > 0
+      && lslFilterEntityIds !== null
+      && lslFilterEntityIds.size > 0)
+    || (selectionSource === 'graph' && selectedNodeIds.size > 1)
+  const isSingleFocalMode =
+    !isMultiMode && (selectedNodeIds.size === 1 || focalNodeId !== null)
 
   // Width predicate per UI-SPEC §11 (verbatim from 55-09-PLAN <interfaces>).
   const widthClass = useMemo(() => {

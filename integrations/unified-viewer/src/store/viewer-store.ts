@@ -308,6 +308,14 @@ export interface ViewerState {
   // (D-11): no localStorage / persist middleware — resets every page load.
   showDebugEntityTypes: boolean
 
+  // Plan 60-08 Gap E — bidirectional hover. The id of the node/row the operator
+  // is currently hovering (graph → sidebar OR sidebar → graph). Its own slice,
+  // strictly additive to the Phase 56.1 D-1 multi-selection contract
+  // (selectedNodeIds / focalNodeId / selectedBucketKeys are NOT touched).
+  // Non-persistent (mirrors showDebugEntityTypes / D-11): resets on page load.
+  hoveredNodeId: string | null
+  setHoveredNodeId: (id: string | null) => void
+
   toggleLayer: (layer: string) => void
   toggleDomain: (domain: string) => void
   toggleOntologyClass: (cls: string) => void
@@ -887,6 +895,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   // Phase 60 Plan 03 (G3) — D-11: NOT persisted (no localStorage). Resets every
   // page load so operators must consciously re-enable Observation/Digest debug.
   showDebugEntityTypes: false,
+  hoveredNodeId: null,
 
   toggleLayer: (layer) =>
     set((s) => {
@@ -966,6 +975,10 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         selectedClasses: nextLegacy,
       }
     }),
+
+  // Plan 60-08 Gap E — hover slice setter. Writes ONLY hoveredNodeId; never
+  // touches the multi-selection slice (Phase 56.1 D-1 invariant).
+  setHoveredNodeId: (id) => set({ hoveredNodeId: id }),
 
   toggleShowEdges: () => set((s) => ({ showEdges: !s.showEdges })),
   toggleShowClusters: () => set((s) => ({ showClusters: !s.showClusters })),

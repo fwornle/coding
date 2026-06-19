@@ -83,3 +83,19 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Plan 60-08 Gap E — bidirectional hover affordance.
+   A graph node whose data-node-id matches the store's hoveredNodeId gets the
+   .is-hovered class (applied by D3GraphCanvas's hover effect); CSS pulses it.
+   transform-box/transform-origin keep the scale centred on the SVG shape
+   regardless of its position. Pure CSS animation — no canvas relayout, so the
+   Phase 56 viewport-stability invariant holds. */
+@keyframes node-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.35); }
+}
+.node-shape.is-hovered {
+  animation: node-pulse 0.7s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}

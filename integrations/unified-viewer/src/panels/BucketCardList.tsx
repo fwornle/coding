@@ -38,6 +38,7 @@ import type { ApiClient } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
 import { useViewerStore } from '@/store/viewer-store'
 import { useGraphData } from '@/graph/useGraphData'
+import { useVisibleEntityIds } from '@/graph/useVisibleEntityIds'
 import { Logger } from '@/lib/logging'
 
 export interface BucketCardListProps {
@@ -70,19 +71,19 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function BucketCardList({ apiClient, system }: BucketCardListProps) {
-  // apiClient + system are kept on the props surface for parity with
-  // HistorySidebar / EntityDetailPanel — Plan 05 may consume them for the
-  // useNodeToBucketsIndex hook (currently the entities source via
-  // useGraphData below is enough for Wave 2's coherent display).
-  void apiClient
-  void system
-
+  // apiClient + system feed both useGraphData (the entities source) and
+  // useVisibleEntityIds (the Gap-D visible/hidden split below).
   const { entities } = useGraphData(apiClient, system)
 
   const selectedNodeIds = useViewerStore((s) => s.selectedNodeIds)
   const selectedBucketKeys = useViewerStore((s) => s.selectedBucketKeys)
   const selectionSource = useViewerStore((s) => s.selectionSource)
   const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
+  // Plan 60-08 Gap E — bidirectional hover. Row hover publishes to the store
+  // (sidebar → graph pulse); a row whose id matches the store value gets a
+  // highlight + (if the entity is filtered off-canvas) an inline hint.
+  const hoveredNodeId = useViewerStore((s) => s.hoveredNodeId)
+  const setHoveredNodeId = useViewerStore((s) => s.setHoveredNodeId)
   // focalNodeId is subscribed for future "buckets touching focal" wiring
   // (Plan 05 via useNodeToBucketsIndex). Subscribing now keeps the hook
   // dep list stable so a Wave-3 refactor doesn't add a new subscription
@@ -147,6 +148,17 @@ export function BucketCardList({ apiClient, system }: BucketCardListProps) {
     lslFilterEntityIds,
   ])
 
+  // Plan 60-08 Gap D — visible-vs-hidden split for the Selected header.
+  // Reuses the SAME predicate the canvas uses (useVisibleEntityIds) so the
+  // "visible" count matches the halo count exactly. The difference is what the
+  // showDebugEntityTypes shield (Observation/Digest hard-exclusion) suppresses.
+  const visibleIds = useVisibleEntityIds(apiClient, system)
+  const visibleSelectedCount = useMemo(
+    () => items.reduce((n, i) => n + (visibleIds.has(i.id) ? 1 : 0), 0),
+    [items, visibleIds],
+  )
+  const hiddenSelectedCount = items.length - visibleSelectedCount
+
   // D-5 drill-collapse card click handler. Routes through the canonical
   // setSelection action (Locked Contract #5) so all selection invariants
   // (focal derivation, sameSetMembership reference-stability guard, LSL
@@ -190,8 +202,20 @@ export function BucketCardList({ apiClient, system }: BucketCardListProps) {
     >
       <div className="mb-2">
         <h2 className="text-base font-semibold text-foreground">Selected</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="text-xs text-muted-foreground mt-0.5" data-testid="selected-count">
           {items.length} item{items.length === 1 ? '' : 's'}
+          {/* Plan 60-08 Gap D: when the canvas filters some selected entities
+              out of the rendered set (Observation/Digest hidden by the
+              showDebugEntityTypes shield), surface the split so the operator
+              knows WHY the halo count is lower than the selected count.
+              Suppressed when nothing is hidden (no noise on the clean path). */}
+          {hiddenSelectedCount > 0 && (
+            <>
+              {' · '}{visibleSelectedCount} visible{' · '}
+              {hiddenSelectedCount} hidden by{' '}
+              <span className="font-medium">&quot;Show debug entity types&quot;</span>
+            </>
+          )}
         </p>
       </div>
 
@@ -206,8 +230,15 @@ export function BucketCardList({ apiClient, system }: BucketCardListProps) {
               <button
                 type="button"
                 data-testid={`bucket-card-${item.id}`}
+                data-hovered={hoveredNodeId === item.id ? 'true' : undefined}
                 onClick={() => onCardClick(item.id)}
-                className="w-full text-left px-2.5 py-2 rounded border border-border bg-card hover:bg-accent transition-colors"
+                onMouseEnter={() => setHoveredNodeId(item.id)}
+                onMouseLeave={() => setHoveredNodeId(null)}
+                className={`w-full text-left px-2.5 py-2 rounded border bg-card transition-colors ${
+                  hoveredNodeId === item.id
+                    ? 'border-primary bg-accent'
+                    : 'border-border hover:bg-accent'
+                }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <span
@@ -232,6 +263,17 @@ export function BucketCardList({ apiClient, system }: BucketCardListProps) {
                     {formatRelativeTime(item.createdAt)} · {item.team}
                   </span>
                 </div>
+                {/* Plan 60-08 Gap E: when the operator hovers a row whose entity
+                    is filtered OFF the canvas, the graph can't reciprocate the
+                    pulse — tell them why instead of leaving a dead hover. */}
+                {hoveredNodeId === item.id && !visibleIds.has(item.id) && (
+                  <div
+                    data-testid={`bucket-card-hidden-hint-${item.id}`}
+                    className="mt-1 text-[10px] text-amber-600 dark:text-amber-400"
+                  >
+                    hidden — toggle Show debug entity types to reveal
+                  </div>
+                )}
               </button>
             </li>
           ))}

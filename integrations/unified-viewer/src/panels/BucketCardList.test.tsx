@@ -275,4 +275,136 @@ describe('BucketCardList (Plan 56.1-04 Task 1)', () => {
     // Per-card marker (template literal form `bucket-card-${...}`).
     expect(src).toMatch(/data-testid=\{`bucket-card-\$\{/)
   })
+
+  // ── Plan 60-08 Gap D — Selected-header visible/hidden breakdown ──────────
+  // mockEntities: e1=Insight (visible), e2=Observation + e3=Digest (hidden by
+  // the showDebugEntityTypes shield when OFF). Timeline mode selects via
+  // lslFilterEntityIds. selectedClasses must be populated for the visibility
+  // predicate to count anything visible (empty Set = nothing visible).
+  function selectTimeline(ids: string[]) {
+    useViewerStore.setState({
+      selectionSource: 'timeline',
+      selectedBucketKeys: new Set<string>(['sess-X|2026-06-13T11:00:00Z']),
+      lslFilterEntityIds: new Set<string>(ids),
+      selectedClasses: new Set<string>(['Insight', 'Observation', 'Digest']),
+    })
+  }
+
+  function selectedCountText(): string {
+    return document.querySelector('[data-testid="selected-count"]')?.textContent ?? ''
+  }
+
+  test('Gap D Test 1: breakdown when some selected are hidden (3 → 1 visible, 2 hidden)', () => {
+    useViewerStore.setState({ showDebugEntityTypes: false })
+    selectTimeline(['e1', 'e2', 'e3'])
+    renderPanel()
+    const txt = selectedCountText().replace(/\s+/g, ' ')
+    expect(txt).toContain('3 items')
+    expect(txt).toContain('1 visible')
+    expect(txt).toContain('2 hidden by')
+    expect(txt).toContain('Show debug entity types')
+  })
+
+  test('Gap D Test 2: no breakdown when all visible (debug toggle ON)', () => {
+    useViewerStore.setState({ showDebugEntityTypes: true })
+    selectTimeline(['e1', 'e2', 'e3'])
+    renderPanel()
+    const txt = selectedCountText().replace(/\s+/g, ' ').trim()
+    expect(txt).toBe('3 items')
+    expect(txt).not.toContain('hidden by')
+  })
+
+  test('Gap D Test 3: single visible item → "1 item", no breakdown', () => {
+    useViewerStore.setState({ showDebugEntityTypes: false })
+    selectTimeline(['e1'])
+    renderPanel()
+    const txt = selectedCountText().replace(/\s+/g, ' ').trim()
+    expect(txt).toBe('1 item')
+  })
+
+  test('Gap D Test 4: all hidden → "0 visible · N hidden" AND all rows still render', () => {
+    useViewerStore.setState({ showDebugEntityTypes: false })
+    selectTimeline(['e2', 'e3']) // both Observation/Digest → hidden by shield
+    renderPanel()
+    const txt = selectedCountText().replace(/\s+/g, ' ')
+    expect(txt).toContain('2 items')
+    expect(txt).toContain('0 visible')
+    expect(txt).toContain('2 hidden by')
+    // We do NOT drop hidden rows — operator still needs to see them.
+    expect(document.querySelector('[data-testid="bucket-card-e2"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="bucket-card-e3"]')).not.toBeNull()
+  })
+
+  test('Gap D Test 5: split recomputes when showDebugEntityTypes flips', () => {
+    useViewerStore.setState({ showDebugEntityTypes: false })
+    selectTimeline(['e1', 'e2', 'e3'])
+    const { rerender } = renderPanel()
+    expect(selectedCountText().replace(/\s+/g, ' ')).toContain('1 visible')
+    useViewerStore.setState({ showDebugEntityTypes: true })
+    const apiClient = { base: 'http://test.local' } as ApiClient
+    rerender(<BucketCardList apiClient={apiClient} system="coding" />)
+    expect(selectedCountText().replace(/\s+/g, ' ').trim()).toBe('3 items')
+  })
+
+  test('Gap D Test 6: source uses shared useVisibleEntityIds selector', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/panels/BucketCardList.tsx'),
+      'utf8',
+    )
+    expect(src).toMatch(/useVisibleEntityIds/)
+    expect(src).toMatch(/hidden by/)
+  })
+
+  // ── Plan 60-08 Gap E — row hover (sidebar → graph reciprocation) ─────────
+  test('Gap E Test 1: row mouseenter sets hoveredNodeId; mouseleave clears it', () => {
+    useViewerStore.setState({ showDebugEntityTypes: true })
+    selectTimeline(['e1', 'e2', 'e3'])
+    renderPanel()
+    const row = document.querySelector('[data-testid="bucket-card-e1"]') as HTMLElement
+    expect(row).not.toBeNull()
+    fireEvent.mouseEnter(row)
+    expect(useViewerStore.getState().hoveredNodeId).toBe('e1')
+    fireEvent.mouseLeave(row)
+    expect(useViewerStore.getState().hoveredNodeId).toBeNull()
+  })
+
+  test('Gap E Test 2: hovered row carries data-hovered="true"', () => {
+    useViewerStore.setState({ showDebugEntityTypes: true, hoveredNodeId: 'e1' })
+    selectTimeline(['e1', 'e2', 'e3'])
+    renderPanel()
+    const row = document.querySelector('[data-testid="bucket-card-e1"]') as HTMLElement
+    expect(row.getAttribute('data-hovered')).toBe('true')
+    // A non-hovered row has no data-hovered.
+    const other = document.querySelector('[data-testid="bucket-card-e2"]') as HTMLElement
+    expect(other.getAttribute('data-hovered')).toBeNull()
+  })
+
+  test('Gap E Test 3: hovering a row whose entity is hidden shows the inline hint', () => {
+    // e2 = Observation → hidden by the shield when showDebugEntityTypes=false.
+    useViewerStore.setState({ showDebugEntityTypes: false, hoveredNodeId: 'e2' })
+    selectTimeline(['e1', 'e2', 'e3'])
+    renderPanel()
+    const hint = document.querySelector('[data-testid="bucket-card-hidden-hint-e2"]')
+    expect(hint).not.toBeNull()
+    expect(hint!.textContent).toMatch(/hidden — toggle Show debug entity types/)
+  })
+
+  test('Gap E Test 4: hovering a VISIBLE row shows NO hidden hint', () => {
+    // e1 = Insight → visible. No hint even when hovered.
+    useViewerStore.setState({ showDebugEntityTypes: false, hoveredNodeId: 'e1' })
+    selectTimeline(['e1', 'e2', 'e3'])
+    renderPanel()
+    expect(document.querySelector('[data-testid="bucket-card-hidden-hint-e1"]')).toBeNull()
+  })
+
+  test('Gap E Test 5: row hover writes ONLY hoveredNodeId, leaves selection intact', () => {
+    useViewerStore.setState({ showDebugEntityTypes: true })
+    selectTimeline(['e1', 'e2', 'e3'])
+    const preSelected = useViewerStore.getState().selectedNodeIds
+    renderPanel()
+    const row = document.querySelector('[data-testid="bucket-card-e1"]') as HTMLElement
+    fireEvent.mouseEnter(row)
+    // selection slice untouched (56.1 D-1).
+    expect(useViewerStore.getState().selectedNodeIds).toBe(preSelected)
+  })
 })

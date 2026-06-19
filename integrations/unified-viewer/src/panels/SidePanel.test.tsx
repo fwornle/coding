@@ -274,4 +274,26 @@ describe('SidePanel (Phase 55 — RCA tab dropped)', () => {
     expect(queryByTestId('bucket-card-list')).not.toBeNull()
     expect(queryByTestId('entity-detail-panel')).toBeNull()
   })
+
+  test('Gap F (2026-06-19) — single GRAPH-drilled node + timeline-halo bucketKeys → EntityDetailPanel, NOT empty BucketCardList', () => {
+    // Repro of the operator-reported "Selected / 0 items / No cards to show"
+    // bug: a graph node click writes selectedNodeIds={id} (size 1) AND
+    // selectedBucketKeys=touchedBuckets (non-empty timeline halo) with
+    // source='graph'. The OLD predicate keyed isMultiMode on bucketKeys.size>0
+    // and routed this into BucketCardList — but BucketCardList only resolves
+    // graph-source candidates when size>1, so it rendered an empty card list
+    // while the node was visibly focal. The node must show its detail panel.
+    useViewerStore.getState().setSelection({
+      nodeIds: new Set<string>(['mdurl']),
+      bucketKeys: new Set<string>(['session-A|1718360000000']),
+      focal: { nodeId: 'mdurl', bucketKey: null },
+      highlightedRowKey: 'mdurl',
+      source: 'graph',
+      pathToSelected: new Set<string>(),
+      lslFilterEntityIds: new Set<string>(['mdurl']),
+    })
+    const { queryByTestId } = renderPanel('coding')
+    expect(queryByTestId('entity-detail-panel')).not.toBeNull()
+    expect(queryByTestId('bucket-card-list')).toBeNull()
+  })
 })

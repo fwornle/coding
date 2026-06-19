@@ -1123,3 +1123,39 @@ describe('useViewerStore — Phase 60-03 showDebugEntityTypes (D-09..D-11)', () 
     expect(typeof s.toggleShowDebugEntityTypes).toBe('function')
   })
 })
+
+// ----------------------------------------------------------------------------
+// Plan 60-08 Gap E — hoveredNodeId slice (bidirectional hover).
+// Strictly additive; must NOT touch the Phase 56.1 D-1 multi-selection slice.
+// ----------------------------------------------------------------------------
+describe('useViewerStore — hoveredNodeId slice (Plan 60-08 Gap E)', () => {
+  beforeEach(() => {
+    useViewerStore.setState({ hoveredNodeId: null })
+  })
+
+  test('Test 1: default hoveredNodeId is null', () => {
+    useViewerStore.getState().setHoveredNodeId(null)
+    expect(useViewerStore.getState().hoveredNodeId).toBeNull()
+  })
+
+  test('Test 2: setHoveredNodeId sets then clears', () => {
+    useViewerStore.getState().setHoveredNodeId('abc')
+    expect(useViewerStore.getState().hoveredNodeId).toBe('abc')
+    useViewerStore.getState().setHoveredNodeId(null)
+    expect(useViewerStore.getState().hoveredNodeId).toBeNull()
+  })
+
+  test('Test 3: setHoveredNodeId does NOT touch the multi-selection slice (56.1 D-1)', () => {
+    useViewerStore.setState({
+      selectedNodeIds: new Set<string>(['keep']),
+      focalNodeId: 'keep',
+      selectedBucketKeys: new Set<string>(['bucket-1']),
+    })
+    useViewerStore.getState().setHoveredNodeId('hover-id')
+    const s = useViewerStore.getState()
+    expect(s.hoveredNodeId).toBe('hover-id')
+    expect(s.selectedNodeIds.has('keep')).toBe(true)
+    expect(s.focalNodeId).toBe('keep')
+    expect(s.selectedBucketKeys.has('bucket-1')).toBe(true)
+  })
+})

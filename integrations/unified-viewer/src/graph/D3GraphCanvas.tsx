@@ -22,6 +22,7 @@ import type { System } from '@/config/system-endpoints'
 import { useViewerStore } from '@/store/viewer-store'
 import type { SelectionSource } from '@/store/viewer-store'
 import { Logger } from '@/lib/logging'
+import { renderNodeShape } from './node-shapes'
 import { useGraphData } from './useGraphData'
 import type { Entity, Relation } from './types'
 // 2026-06-13 (Phase 56-04): computeAncestryPath extracted to a shared
@@ -497,6 +498,25 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     applySelectionStyling(d3.select(svgRef.current))
   }, [applySelectionStyling])
 
+  // Plan 60-08 Gap E — sidebar → graph hover reciprocation. Toggle the
+  // `.is-hovered` class (CSS pulse, index.css) on the shape whose datum id
+  // matches the store's hoveredNodeId. Keyed ONLY on hoveredNodeId so it never
+  // triggers a data rebuild / relayout / zoom — Phase 56 viewport-stability
+  // invariant holds (no pan/zoom on hover).
+  const hoveredNodeId = useViewerStore((s) => s.hoveredNodeId)
+  useEffect(() => {
+    if (!svgRef.current) return
+    const svg = d3.select(svgRef.current)
+    svg.selectAll<SVGElement, unknown>('.node-shape').classed('is-hovered', false)
+    if (hoveredNodeId) {
+      svg
+        .selectAll<SVGGElement, D3Node>('.node')
+        .filter((d) => d.id === hoveredNodeId)
+        .select('.node-shape')
+        .classed('is-hovered', true)
+    }
+  }, [hoveredNodeId])
+
   // 2026-06-14 (Plan 06 gap-closure — Decision 2 multi-set fit-to-bounds):
   //
   // CONTRACT EVOLUTION — see PATTERNS-LOCK.md Contract #3 amendment.
@@ -764,6 +784,17 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       .data(d3Nodes)
       .join('g')
       .attr('class', 'node')
+      // Plan 60-08 Gap E: stable hover hook for CSS + DOM queries, and
+      // mouseenter/mouseleave publish the hovered id to the store (graph →
+      // sidebar reciprocation). getState() (not a subscription) keeps the
+      // handler closure cheap; hover writes only the hoveredNodeId slice.
+      .attr('data-node-id', (d) => d.id)
+      .on('mouseenter', (_event: MouseEvent, d) => {
+        useViewerStore.getState().setHoveredNodeId(d.id)
+      })
+      .on('mouseleave', () => {
+        useViewerStore.getState().setHoveredNodeId(null)
+      })
       .call(makeDrag(simulation))
       .on('click', (event: MouseEvent, d) => {
         const path = computeAncestryPath(d.id, visibleRelations)
@@ -841,32 +872,40 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       .attr('stroke-width', 4)
       .attr('opacity', 0)
 
-    node.append('circle')
-      .attr('class', 'node-circle')
-      .attr('r', 10)
-      .attr('fill', (d) => {
-        if (d.entityType === 'System') return '#3cb371'
-        const source = (d.metadata as { source?: string } | undefined)?.source
-        if (source === 'online' || source === 'auto') return '#FFB6C1'
-        // Hierarchy gradient — matches VKB's NodeDetails palette exactly.
-        if (d.entityType === 'Project') return '#00897b'
-        if (d.entityType === 'Component') return '#1565c0'
-        if (d.entityType === 'SubComponent') return '#42a5f5'
-        return '#90caf9'
-      })
-      .attr('stroke', (d) => {
-        // Insight-doc border: same predicate as InsightDocumentModal.
-        const name = d.name ?? ''
-        const hasInsightDoc =
-          name.length > 0 && name.length <= 60 && !/[\s:()/?#]/.test(name)
-        return hasInsightDoc ? '#1565c0' : (theme === 'dark' ? '#0f172a' : '#fff')
-      })
-      .attr('stroke-width', (d) => {
-        const name = d.name ?? ''
-        const hasInsightDoc =
-          name.length > 0 && name.length <= 60 && !/[\s:()/?#]/.test(name)
-        return hasInsightDoc ? 3 : 2
-      })
+    // Plan 60-08 Gap C: render the class-appropriate shape (hexagon / square /
+    // diamond / triangle / circle) per SHAPE_PALETTE instead of an
+    // unconditional circle, so the canvas matches what LegendPanel declares.
+    // The styling chain (fill / stroke / stroke-width) is applied to the shape
+    // sub-selection renderNodeShape returns — identical to the legacy circle.
+    // `.selection-ring` above stays a circle (D-08.2: hit-target affordance,
+    // not a class-identity affordance).
+    node.each(function (d) {
+      const shape = renderNodeShape(d, d3.select(this), 10)
+      shape
+        .attr('fill', () => {
+          if (d.entityType === 'System') return '#3cb371'
+          const source = (d.metadata as { source?: string } | undefined)?.source
+          if (source === 'online' || source === 'auto') return '#FFB6C1'
+          // Hierarchy gradient — matches VKB's NodeDetails palette exactly.
+          if (d.entityType === 'Project') return '#00897b'
+          if (d.entityType === 'Component') return '#1565c0'
+          if (d.entityType === 'SubComponent') return '#42a5f5'
+          return '#90caf9'
+        })
+        .attr('stroke', () => {
+          // Insight-doc border: same predicate as InsightDocumentModal.
+          const name = d.name ?? ''
+          const hasInsightDoc =
+            name.length > 0 && name.length <= 60 && !/[\s:()/?#]/.test(name)
+          return hasInsightDoc ? '#1565c0' : (theme === 'dark' ? '#0f172a' : '#fff')
+        })
+        .attr('stroke-width', () => {
+          const name = d.name ?? ''
+          const hasInsightDoc =
+            name.length > 0 && name.length <= 60 && !/[\s:()/?#]/.test(name)
+          return hasInsightDoc ? 3 : 2
+        })
+    })
 
     node.append('text')
       .attr('class', 'node-label')
