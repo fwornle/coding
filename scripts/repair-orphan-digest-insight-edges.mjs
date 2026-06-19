@@ -74,6 +74,11 @@ const ROOT = path.resolve(__dirname, '..');
 const DIGESTS_TARGET = path.join(ROOT, '.data', 'observation-export', 'digests.json');
 const OBSERVATIONS_REF = path.join(ROOT, '.data', 'observation-export', 'observations.json');
 
+// Graph export — the ONLY source that still carries `legacyId` for each node.
+// The km-core REST wire serializer strips `legacyId` (see resolveLegacyId note
+// below), so the legacy→minted reverse map is built from this snapshot instead.
+const GRAPH_EXPORT = path.join(ROOT, '.data', 'knowledge-graph', 'exports', 'general.json');
+
 // ────────────────────────────────────────────────────────────────────────────
 // Logging — per CLAUDE.md `no-console-log`, only process.stderr.write
 // ────────────────────────────────────────────────────────────────────────────
@@ -230,22 +235,62 @@ async function addRelation({ from, to, type, metadata, dryRun }) {
 }
 
 /**
- * Resolve a legacy id (system='A') to a minted km-core id.
+ * Lazy-built reverse map: legacyId.id (v4 source uuid, system='A') → minted
+ * km-core node id (v7). Built ONCE from the graph export snapshot.
  *
- * IMPORTANT: The km-core REST surface strips `legacyId` on the wire
- * (lib/km-core/src/adapters/wire-serializers.ts — `entityToWire` only
- * exposes id/name/entityType/layer/description/metadata/ontologyClass).
- * No `/api/v1/entities/legacy/A/<id>` endpoint exists.
+ * Background: digest `metadata.observation_ids` and insight
+ * `metadata.digest_ids` carry the ORIGINAL v4 source uuids, while the graph
+ * is keyed by v7 minted ids. The writer (ObservationConsolidator) resolves
+ * v4→v7 in-process via the kmStore legacyId index, but the km-core REST
+ * surface STRIPS `legacyId` on the wire (entityToWire exposes only
+ * id/name/entityType/layer/description/metadata/ontologyClass) and offers no
+ * `?legacyId=` filter — so an out-of-process repair CANNOT resolve legacy ids
+ * over REST. The graph export (`.data/knowledge-graph/exports/general.json`)
+ * is the one persisted artifact that still records each node's `legacyId`,
+ * so we build the reverse index from it.
+ */
+let _legacyIdMap = null;
+
+function buildLegacyIdMap() {
+  if (_legacyIdMap) return _legacyIdMap;
+  const map = new Map();
+  try {
+    const raw = fs.readFileSync(GRAPH_EXPORT, 'utf8');
+    const g = JSON.parse(raw);
+    const nodes = Array.isArray(g.nodes) ? g.nodes : [];
+    for (const n of nodes) {
+      const a = n.attributes || {};
+      const lid = a.legacyId;
+      if (lid && typeof lid === 'object' && lid.id) {
+        // node key IS the minted id in the graphology export
+        map.set(lid.id, n.key);
+      }
+    }
+    log(`legacyId map: ${map.size} entries from ${path.relative(ROOT, GRAPH_EXPORT)} (${nodes.length} nodes)`);
+  } catch (err) {
+    log(`legacyId map build failed (${err.message}) — falling back to REST-only resolution`);
+  }
+  _legacyIdMap = map;
+  return map;
+}
+
+/**
+ * Resolve a legacy id (system='A' v4 uuid) to a minted km-core entity.
  *
- * Strategy: try direct fetch by minted id first — if the legacy id IS
- * the minted id (rare but possible for entities ingested without the
- * legacyId distinction), GET /entities/:id returns the entity. Otherwise
- * the wire surface cannot resolve legacy ids — return null (per D-02.2
- * skip-and-log; the writer-path emission inside ObservationConsolidator
- * is the canonical resolver for newly-minted entities).
+ * Strategy:
+ *   1. Reverse-map lookup against the graph export (the canonical path for
+ *      v4 source uuids — see buildLegacyIdMap above). Returns `{ id: minted }`.
+ *   2. Fallback: direct REST fetch by the given id — covers the rare case
+ *      where the id passed IS already the minted v7 id.
+ *
+ * Returns null when neither resolves (per D-02.2 skip-and-log).
  */
 async function resolveLegacyId(legacyId) {
   if (!legacyId) return null;
+
+  const mintedId = buildLegacyIdMap().get(legacyId);
+  if (mintedId) return { id: mintedId };
+
   try {
     const res = await fetch(`${KMCORE_REST_BASE}/api/v1/entities/${encodeURIComponent(legacyId)}`);
     if (!res.ok) return null;

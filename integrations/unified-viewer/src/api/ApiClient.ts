@@ -99,7 +99,16 @@ export class ApiClient {
   }
 
   listEntities(): Promise<Entity[]> {
-    return this.get<Entity[]>('/api/v1/entities')
+    // Opt out of km-core's default 1000-entity clip (entities.js:64 — "clip to
+    // 1000 if no caller limit AND large"). Without it, a graph with >1000 nodes
+    // silently drops the overflow; any node beyond the cap (e.g. a freshly-
+    // created hierarchy parent) and its edges vanish from the render, re-
+    // surfacing as a phantom "island". The graph viewer needs the full set.
+    //
+    // NOTE: the handler's documented `limit=0` opt-out is broken — it computes
+    // `hasCallerLimit = callerLimit > 0`, so 0 falls through to the default
+    // clip. We pass an explicit large cap instead until km-core honors 0.
+    return this.get<Entity[]>('/api/v1/entities?limit=1000000')
   }
 
   async listRelations(): Promise<Relation[]> {
