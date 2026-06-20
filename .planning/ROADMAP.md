@@ -1136,6 +1136,14 @@ Plans:
 **Wave 3** *(depends on all behavior plans landing)*
 
 - [x] 60-06-PLAN.md — Cross-cutting verification — gsd-browser visual smoke against `localhost:5173/viewer/coding` for SC#1..SC#5 + Phase 56 viewport-stability + Phase 56.1 multi-selection invariants; produces 60-VERIFICATION.md (autonomous: false, operator checkpoint)
+
+**Wave 4 — Gap closure (SC#5 follow-up)**
+
+- [~] 60-07-PLAN.md — SC#5 gap closure: HIERARCHY_ROOTS-backed L0 synthesis + extends-derived parent fallback + L1/L2 data annotation in the ontology API. Tasks 1+2 complete (9/9 vitest); Task 3 is a blocking `human-verify` operator checkpoint (L0 anchors render; L1/L2 absent pending Deviation-3 obs-api registry-sourcing follow-up). (autonomous: false)
+
+**Wave 5 — Gap closure (UX integrity, SC#2/SC#3 follow-up)**
+
+- [x] 60-08-PLAN.md — Gaps C/D/E (+F): node-shape rendering per ontology class (legend↔canvas parity), selection breakdown header (`N items · X visible · Y hidden`), bidirectional hover (`hoveredNodeId` slice + CSS pulse), and a focal-node empty-panel fix. Implemented in `10e5ef12f` (2026-06-19); SUMMARY closed out 2026-06-20 after tests/tsc/build/browser re-verification. (VKBUI-02, VKBUI-03; autonomous: false)
 **UI hint:** yes
 
 ### Phase 61: LSL Timeline & OKB Routing Honesty
