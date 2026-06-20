@@ -18,6 +18,28 @@ entity in the detail panel, regardless of which session/time bucket was clicked.
 The selection is therefore rarely useful — the operator cannot drill into the
 specific entities a given session actually produced.
 
+## Root cause (CONFIRMED with live data 2026-06-20)
+
+Empirical check of live session `c197ef` (6 entityIds): the session content was
+**4 Observations (ontologyClass Detail) + 2 Digests** — and nothing else. This is
+representative: LSL sessions are made of the raw LSL-pipeline outputs.
+
+The chain that forces every such tick to LiveLoggingSystem:
+1. A session's `entityIds` are overwhelmingly **Observation / Digest** entities.
+2. Those entityTypes are **hidden from the graph by default**
+   (`UnifiedViewer.tsx:277-278` drops `entityType === 'Observation' | 'Digest'`
+   from `visibleCount`; the D3 render hides them too). So the session's OWN
+   entities are not visible graph nodes.
+3. `onTickClick` → `pickAllResolvable` → `resolveToVisibleAncestor`
+   (`ancestry.ts`) walks UP the hierarchy from each id to the nearest
+   *graph-visible* ancestor.
+4. All LSL outputs hang under the single **LiveLoggingSystem** component, which IS
+   visible → every id resolves up to LLS.
+5. LLS-suppression (`pickAllResolvable`, `NOISE_ANCESTOR_NAMES`) only drops LLS
+   when ANOTHER visible ancestor co-resolves. For these sessions LLS is the SOLE
+   visible ancestor (`out.size === 1`), so suppression is intentionally skipped
+   (option iii — avoid an empty focal) → focal = LiveLoggingSystem.
+
 ## Root cause (preliminary)
 
 A tick is a time-bucket of observations. `onTickClick` resolves the bucket's
