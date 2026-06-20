@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 60 (unified-viewer-rendering-ux-integrity) — EXECUTING (all 8 plans complete)
-Plan: 8 of 8 (60-08 closed out 2026-06-20)
-Status: Awaiting 60-07 Task 3 operator human-verify checkpoint, then /gsd-verify-phase 60
+Phase: 60 (unified-viewer-rendering-ux-integrity) — EXECUTING (SC#5 reopened)
+Plan: 60-09 PLANNED 2026-06-20 (gap closure — L2 entity classification; passed plan-checker after 1 revision)
+Status: 60-09-PLAN.md ready to execute (autonomous:false, 7 tasks, 2 operator checkpoints). SC#5 PARTIAL until 60-09 lands. 60-07 Task 3 checkpoint subsumed by 60-09 Task 7 re-verify.
 Last activity: 2026-06-20
 
 ## Performance Metrics

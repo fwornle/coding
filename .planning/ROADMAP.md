@@ -1149,7 +1149,7 @@ Plans:
 
 **Wave 6 — Gap closure (SC#5 L2 classification — the real fix)**
 
-- [ ] 60-09-PLAN.md — SC#5 gap closure (LOWERONTO-03): classify entities at L2 so the OntologyFilter renders the real L0->L1->L2 tree. Deterministic name+description keyword classifier (`l2-subsystem-classifier.ts`) over the closed 10-class vocabulary (no LLM); going-forward writer wiring + Docker rebuild; one-shot `backfill-l2-subsystem-class.mjs` migration (operator-checkpointed); `Project` level:0 in the ontology data; OntologyFilter renders level-None classes entities carry (Insight/Digest) + Project L0; operator visual re-verify flips 60-VERIFICATION SC#5 PARTIAL->PASS. (LOWERONTO-03; autonomous: false)
+- [ ] 60-09-PLAN.md — SC#5 gap closure (LOWERONTO-03): classify entities at L2 so the OntologyFilter renders the real L0->L1->L2 tree. Deterministic name+description keyword classifier (`l2-subsystem-classifier.ts`) over the closed 10-class vocabulary (no LLM); going-forward writer wiring + submodule build/process-restart (dist is bind-mounted, no image rebuild); one-shot `backfill-l2-subsystem-class.mjs` migration (operator-checkpointed); `Project` level:0 in the ontology data; OntologyFilter renders level-None classes entities carry (Insight/Digest) + Project L0; operator visual re-verify flips 60-VERIFICATION SC#5 PARTIAL->PASS. (LOWERONTO-03; autonomous: false)
 
 ### Phase 61: LSL Timeline & OKB Routing Honesty
 
