@@ -9,6 +9,14 @@ context:
   - .planning/phases/61-lsl-timeline-okb-routing-honesty/61-VERIFICATION.md
 ---
 
+> **RESOLVED 2026-06-20** (commit `da7e8e03d`). Fixed via Option A (operator choice):
+> when a tick's SOLE resolution is a noise ancestor (LiveLoggingSystem), `onTickClick`
+> no longer auto-drills to it — it falls through to the timeline/card-list path so
+> SidePanel renders `BucketCardList` with the session's OWN entities (its Insights,
+> Digests, Observations). Non-noise single resolutions still auto-drill (Test 6/18
+> unchanged); regression covered by Test 6b. Verified live: LLS-only ticks now show
+> "Selected — N items" card lists (e.g. 24 items) instead of the generic LLS detail.
+
 # LSL tick → entity selection collapses to LiveLoggingSystem for nearly every session
 
 ## Symptom (operator-reported, Phase 61 visual verification, 2026-06-20)
