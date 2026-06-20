@@ -366,19 +366,21 @@ This is a UI/contract phase, not a rename/migration, but the source-bucketing to
 | A4 | The "mirror entities" symptom is a stale pre-Phase-55 build, not live behavior | Unknown 4 / D-13 | Medium — premise of D-13 reframed; if operator reproduces it live, re-investigate a stale `dist/` |
 | A5 | Raising client `limit` to 500 (backend max) is the cap-raise (D-03) | Unknown 1 | Low — discretionary; planner may raise `LSL_MAX_LIMIT` too |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **okb relation render scale (18,958 edges)**
+All three open questions were resolved by the planner as delegated micro-decisions in plan 61-02 (Claude's discretion, consistent with the phase's "honesty about caps" theme).
+
+1. **okb relation render scale (18,958 edges)** — RESOLVED: 61-02 Task 1 caps rendered okb relations at `OKB_RELATION_CAP = 2000`, dropping `CORRELATED_WITH` (13.7k) first, and surfaces a visible "showing N of M relations" indicator (same honesty principle as the LSL badge).
    - What we know: OKM serves ~19k relations, 13.7k of which are `CORRELATED_WITH`; viewer is tuned for ~1-2k.
    - What's unclear: whether to cap/filter, and how, for the okb view.
    - Recommendation: planner raises a micro-decision (cap or drop `CORRELATED_WITH`); NOT a locked decision, so confirm before E2E loads the full graph.
 
-2. **okb node-expand (`getNeighbors` 404)**
+2. **okb node-expand (`getNeighbors` 404)** — RESOLVED: 61-02 Tasks 1–2 compute 1-hop expansion client-side from already-loaded relations, branched on `ApiClient.supportsServerNeighbors()` (never a silent no-op on click).
    - What we know: OKM has no neighbors endpoint.
    - What's unclear: whether the okb graph view exercises node-expand.
    - Recommendation: compute 1-hop client-side from loaded relations, or document okb expand as unsupported.
 
-3. **`?limit=1000000` on OKM `/api/entities`**
+3. **`?limit=1000000` on OKM `/api/entities`** — RESOLVED: 61-02 Task 1 drops the `?limit=1000000` param on the legacy (okb) branch (probe-during-implementation; keep it only on the v1 branch).
    - What we know: viewer appends it to defeat km-core's 1000-clip.
    - What's unclear: whether OKM 400s on the unknown param.
    - Recommendation: probe with the param during implementation; drop it from the okb branch if it errors.
