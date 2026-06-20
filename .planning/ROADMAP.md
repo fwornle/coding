@@ -1031,7 +1031,7 @@ Plans:
 - [x] **Phase 58: Online Pipeline Semantic Edges on Insights** — `ObservationConsolidator` emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on online Insights, atomically with the Insight node, beyond the existing `capturedBy → LiveLoggingSystem` provenance. (completed 2026-06-15)
 - [x] **Phase 59: Long-Tail Orphan Fixes & Baseline Reduction** — server-side System-type filter fix (legacy Phase 48); parent-hierarchy edges for online-learned Detail/SubComponent + one-shot migration (legacy Phase 49); per-team `CollectiveKnowledge --includes--> Project` writer + seed fix; drive `orphanCount` from 157 → ≤30. (completed 2026-06-17)
 - [x] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges. (5/5 SCs PASS as of 2026-06-20. SC#5 closed by Plan 60-09: entities now carry L2 sub-classes [87 backfilled], OntologyFilter renders the real L0→L1→L2 tree with non-zero per-L2 counts + working L2 selection, Project as L0, level-None Insight/Digest rows. EtmDaemon is a valid-but-unpopulated L2 per the no-forced-L2 invariant — operator-approved PASS. See 60-VERIFICATION.md sc5_closure.)
-- [ ] **Phase 61: LSL Timeline & OKB Routing Honesty** — remove silent 200-record cap (`useLslSessions.ts`) with visible "N of M" label or honest streaming; honest "all" window (no silent 365-day cap); bi-source tick coloring (manual vs online); `/viewer/okb` ApiClient detects OKM Express `:8090` legacy `/api/entities` shape and routes correctly, showing real OKM business entities not coding-KG mirrors.
+- [x] **Phase 61: LSL Timeline & OKB Routing Honesty** — remove silent 200-record cap (`useLslSessions.ts`) with visible "N of M" label or honest streaming; honest "all" window (no silent 365-day cap); bi-source tick coloring (manual vs online); `/viewer/okb` ApiClient detects OKM Express `:8090` legacy `/api/entities` shape and routes correctly, showing real OKM business entities not coding-KG mirrors. (completed 2026-06-20)
 
 ### v7.2 Phase Details
 
@@ -1164,7 +1164,7 @@ Plans:
   4. Visiting `/viewer/okb` while the OKM Express server is running on `:8090` renders real RaaS / KPI-FW / business entities from OKM Express — the ApiClient detects the legacy `/api/entities` contract shape and routes correctly without forcing the km-core `/api/v1/entities` shape.
   5. The OKB tab never shows coding-KG mirror entities (e.g., `CodeAnalyzer`, `PersistenceAgent`); if the OKM Express server is unreachable, the tab surfaces a truthful "OKM Express unreachable on :8090" message rather than silently rendering the wrong data source.
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 
@@ -1175,5 +1175,5 @@ Plans:
 
 **Wave 2** *(depends on 61-01 for the backend total+source fields)*
 
-- [ ] 61-03-PLAN.md — strip frontend: "showing N of M" badge, `'all'`→`'1y'` rename (6 sites + toggle), amber/pink bi-source ticks, raise client cap to 500 + human-verify visual checkpoint (LSLTIME-01, LSLTIME-02, LSLTIME-03)
+- [x] 61-03-PLAN.md — strip frontend: "showing N of M" badge, `'all'`→`'1y'` rename (6 sites + toggle), amber/pink bi-source ticks, raise client cap to 500 + human-verify visual checkpoint (LSLTIME-01, LSLTIME-02, LSLTIME-03)
 **UI hint:** yes
