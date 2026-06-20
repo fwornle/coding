@@ -2,7 +2,7 @@
 phase: 60-unified-viewer-rendering-ux-integrity
 status: passed
 verified_on: 2026-06-17T21:30:00Z
-re_verified_on: 2026-06-19T19:40:00Z
+re_verified_on: 2026-06-20T15:00:00Z
 verifier: claude (orchestrator-driven gsd-browser smoke)
 viewer_url: http://localhost:5173/viewer/coding
 api_url: http://localhost:12436/api/v1/ontology/classes?withDisplay=true
@@ -11,7 +11,42 @@ sc_partial: 0
 sc_inconclusive: 0
 gaps_open: 0
 followup_todos:
-  - .planning/todos/completed/2026-06-17-ontologyfilter-runtime-routing-gap.md
+  - .planning/todos/pending/2026-06-17-ontologyfilter-runtime-routing-gap.md
+status_correction:
+  date: 2026-06-20
+  was: passed (sc_passed=5, sc_partial=0) as of the 2026-06-19T19:40 re-verify
+  why: >
+    The 2026-06-19 frontmatter flip to "passed" contradicted this file's OWN
+    SC#5 body ("Outcome: PARTIAL", "stays PARTIAL") and the live viewer. The
+    2026-06-20 operator-checkpoint walkthrough (60-07 Task 3) confirmed SC#5
+    still renders 4 flat rows, no L1->L2 tree. Corrected back to gaps_found.
+  superseded_root_cause: >
+    The body's SC#5 "Gap A/B" (obs-api API not serving L1/L2 + Vite proxy) is
+    NOW RESOLVED — the API serves the full L0/L1/L2 hierarchy and the viewer
+    fetches it. The true remaining cause is that NO entity is classified at L2
+    (entities carry only L1: Component/SubComponent/Detail), so OntologyFilter's
+    availSet guard wipes every L2 child. See 60-09-CONTEXT.md. Fix = Plan 60-09.
+sc5_closure:
+  date: 2026-06-20
+  plan: 60-09
+  outcome: PASS (operator-approved)
+  what_fixed: >
+    Plan 60-09 shipped the deterministic L2 classifier (classifyL2), wired it into
+    the writer agent (going-forward L2), backfilled 87 existing entities to carry a
+    parent-consistent L2 class, made Project level:0 in the ontology API, and taught
+    OntologyFilter to render level-None classes (Insight/Digest). Live gsd-browser
+    re-smoke: real L0->L1->L2 tree, L0={System,Project}, 9/10 L2 classes render with
+    real non-zero counts, level-None rows render, "Typed Views" absent, L2 selection
+    filters the graph (838->825 nodes on toggle).
+  etmdaemon_note: >
+    EtmDaemon (the 10th L2) has 0 member entities — CORRECT per the no-forced-L2 /
+    parent-consistency invariant (Phase 57 D-10). EtmDaemon's parent is SubComponent,
+    but no SubComponent-level entity IS the ETM daemon; only Detail-level observation/
+    intent records mention it, which legitimately stay Detail. So labelCount=14 (target
+    ~15), 2 L1 triangles (Component, Detail; SubComponent flat), and 9/10 L2 rows. The
+    operator accepted this as PASS (2026-06-20): SC#5 intent — a navigable tree with
+    non-zero per-L2 counts and working L2 selection — is genuinely met; forcing a 10th
+    populated class would violate the invariant the phase itself established.
 ---
 
 # Phase 60 Verification
@@ -95,7 +130,7 @@ Folds in Plan 60-04 Task 4: CK ontologyClass repair is reflected in the live sna
 
 ## SC#5 — L2 lower-ontology classes in OntologyFilter (LOWERONTO-03)
 
-**Outcome:** PARTIAL (Plan 60-05 viewer code correct; upstream API gap)
+**Outcome:** PASS (closed by Plan 60-09, 2026-06-20 — operator-approved). The PARTIAL history below is retained for the audit trail; see the **60-09 Closure** subsection at the end of this section for the final verdict.
 
 **Evidence:**
 - ![ontology filter](screenshots/sc5-ontology-filter.png)
@@ -136,6 +171,32 @@ But TWO runtime sourcing gaps remain (documented in `.planning/todos/pending/202
 
 **Outcome update:** SC#5 stays PARTIAL but with materially different cause: handler-side contract is complete (L0 synthesis live in API response); runtime routing for L1/L2 + the dev-mode proxy is the remaining gap. Both follow-ups consolidated in the linked todo for a Phase 60.1 / next-milestone scope.
 
+### 60-09 Closure (2026-06-20 — FINAL: PASS, operator-approved)
+
+The remaining root cause ("NO entity is classified at L2") is now fixed. Plan 60-09 shipped, in order:
+
+1. **Deterministic L2 classifier** (`l2-subsystem-classifier.ts`, `classifyL2`) — pure name+description → closed-vocabulary L2 mapper, parent-consistent, returns null on no confident match (no-forced-L2). 10 unit tests.
+2. **Writer wiring** (`ontology-classification-agent.ts`) — `classifySingleObservation` applies `classifyL2` to refinable L1 carriers; semantic-analysis process restarted (going-forward L2).
+3. **Project level:0** in both `.data/ontologies/{,obs-api/}upper.json`; obs-api reloaded → API now serves `[Project, System]` at level 0.
+4. **Backfill migration** (`scripts/backfill-l2-subsystem-class.mjs`) — live run: **87 entities** gained a parent-consistent L2 class, 0 errors; obs-api restarted (hydrated from the updated JSON export).
+5. **OntologyFilter** renders level-None classes entities carry (Insight/Digest) as flat rows; 19 tests green.
+
+**Live gsd-browser re-smoke of the 7 SC#5 checks** (`screenshots/sc5-l1l2-tree-2026-06-20.png`, `screenshots/sc5-ontology-section-2026-06-20.png`):
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | labelCount ≥ ~15 | 14 |
+| 2 | L0 anchors {System, Project} | PASS |
+| 3 | 3 L1 disclosure triangles | 2 (Component, Detail) |
+| 4 | 10 L2 children, counts > 0 | 9/10 (all 9 non-zero) |
+| 5 | Insight + Digest flat rows | PASS |
+| 6 | "Typed Views" absent | PASS |
+| 7 | L2 selection filters graph | PASS (838→825 nodes on toggle) |
+
+Served per-L2 counts: LiveLoggingSystem 2, ConstraintMonitor 1, KnowledgeManagement 1, BatchSemanticAnalysis 1, RapidLlmProxy 1, DockerizedServices 1, OnlineObservation 30, OnlineDigest 39, OnlineInsight 11, **EtmDaemon 0**.
+
+**Why checks 1/3/4 fall marginally short — and why it's still PASS:** the sole cause is `EtmDaemon` having **0 member entities**. EtmDaemon's parent is `SubComponent`, but no SubComponent-level entity *is* the ETM daemon — only Detail-level observation/intent records *mention* it, which legitimately stay `Detail`. Assigning any to EtmDaemon would violate parent-consistency / force a wrong L2 (no-forced-L2, Phase 57 D-10). So SubComponent renders flat (no triangle) and EtmDaemon doesn't render. The **operator accepted this as PASS (2026-06-20)**: the SC#5 intent — a navigable L0→L1→L2 tree with non-zero per-L2 counts and working L2 selection — is genuinely met; EtmDaemon is a valid-but-currently-unpopulated class, not a defect.
+
 ## VOKB W-1 regression (Plan 60-05 dual-mode contract)
 
 **Outcome:** INCONCLUSIVE
@@ -164,9 +225,9 @@ Toggled Layer Evidence/Pattern off, Online filter on, debug entity-types on, Ont
 
 ## Overall
 
-**Verdict:** 4 of 5 SCs PASS · 1 PARTIAL (upstream API gap) · 1 INCONCLUSIVE (pre-existing okb empty state)
+**Verdict (2026-06-20, FINAL):** 5 of 5 SCs PASS · 1 VOKB regression INCONCLUSIVE (pre-existing okb empty state, not introduced by Phase 60).
 
-Phase 60 shipped its viewer-side code correctly across all five plans. SC#1, SC#2, SC#3, SC#4 are fully verified. SC#5 ships the stopgap removal but its L1→L2 grouping cannot light up until the ontology API serves `{level, parent}` metadata for the coding-system classes.
+Phase 60 shipped its viewer-side code correctly across all five plans. SC#1–SC#4 verified at the 2026-06-17 smoke. SC#5 was closed by Plan 60-09 (2026-06-20): entities now carry L2 sub-classes, the OntologyFilter renders the full L0→L1→L2 tree with real per-L2 counts and working L2 selection, Project surfaces as an L0 anchor, and level-None classes (Insight/Digest) render. EtmDaemon is a valid-but-unpopulated L2 (no-forced-L2 invariant); operator-approved as PASS. Phase 60 is complete.
 
 **Recommended next steps:**
 
@@ -176,8 +237,17 @@ Phase 60 shipped its viewer-side code correctly across all five plans. SC#1, SC#
 
 ## 60-08 + Gap-closure Update (2026-06-19) — all gaps closed, status → passed
 
+> ⚠️ **CORRECTION 2026-06-20:** the "all gaps closed / SC#5 → PASS" claim below
+> was WRONG for SC#5. The 06-19 session correctly fixed Gap A (the API now serves
+> L1/L2 — verified), but the "OntologyFilter renders the L1→L2 hierarchy" claim
+> was asserted from the API change WITHOUT checking the viewer DOM. The 06-20
+> operator-checkpoint walkthrough found the OntologyFilter still renders 4 FLAT
+> rows (no L1→L2 tree) because no entity is classified at L2 — OntologyFilter's
+> `availSet` guard then wipes every L2 child. SC#5 is PARTIAL, not PASS. Frontmatter
+> reverted to `gaps_found`. Fix tracked as Plan 60-09 (see 60-09-CONTEXT.md).
+
 Follow-up session closed every remaining gap and shipped two operator-requested
-legend features. Phase 60 is now `status: passed`, `gaps_open: 0`.
+legend features. ~~Phase 60 is now `status: passed`, `gaps_open: 0`.~~ (corrected — see above)
 
 **Gaps C/D/E (60-08, committed `10e5ef12f`)** — shape-variant rendering, sidebar
 visible/hidden selection breakdown, bidirectional hover. (Verified in 60-08.)
@@ -192,7 +262,9 @@ Verified: OntologyRegistry pre-flight (49 classes, parent chains resolve); a liv
 **writer smoke-test** (`POST /api/observations/messages` → `{observations:1,errors:0}`)
 confirms Observation classification still works; `GET /api/v1/ontology/classes`
 now returns **L1 [Component, SubComponent, Detail] + 10 L2** classes;
-`/viewer/coding` OntologyFilter renders the L1→L2 hierarchy. **SC#5 → PASS.**
+~~`/viewer/coding` OntologyFilter renders the L1→L2 hierarchy. **SC#5 → PASS.**~~
+**[CORRECTED 2026-06-20: API change real & verified; the viewer-renders claim was
+NOT DOM-verified and is false — viewer shows 4 flat rows. SC#5 stays PARTIAL.]**
 
 **Gap B — moot.** The viewer reaches obs-api via a direct `baseUrl`
 (`VITE_BACKEND_CODING_URL ?? http://localhost:12436`), not a relative `/api/v1`

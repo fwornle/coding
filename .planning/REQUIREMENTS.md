@@ -23,7 +23,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 - [ ] **LOWERONTO-01:** Lower ontology declares coding-project-specific L2 classes for at least: `LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`. Loaded via `OntologyRegistry` from `.data/ontologies/coding.lower.json` (or equivalent project-scoped file).
 - [ ] **LOWERONTO-02:** Upper ontology extended with ≥2 additional generic programming-aspect classes (e.g., `Diagnosis`, `Interface`) **IF** the operator confirms during the discuss-phase that the upper-ontology surface should grow. (Soft gate — may be deferred without blocking the milestone.) **[deferred — Phase 57 D-12]** Operator deferred upper-ontology growth at v7.2 phase 57 discuss-time; tracked in STATE.md for v7.2 retro reopening.
-- [ ] **LOWERONTO-03:** Unified viewer Ontology Class filter renders L2 lower-ontology classes as expandable groups under their L1 upper-ontology parent, with a per-class count badge.
+- [x] **LOWERONTO-03:** Unified viewer Ontology Class filter renders L2 lower-ontology classes as expandable groups under their L1 upper-ontology parent, with a per-class count badge. (Closed Phase 60 / Plan 60-09, 2026-06-20 — 9/10 L2 classes populated; EtmDaemon valid-but-unpopulated per no-forced-L2.)
 - [ ] **LOWERONTO-04:** Every KG entity carries a `project` tag (e.g., `coding`, `okm`, `cap`); unified viewer exposes a project-grouping mode in the filter sidebar that visually clusters or filters nodes by project.
 
 ### VKB rendering UX integrity (VKBUI)
@@ -92,7 +92,7 @@ ORPHAN-01..04 are **closed by upstream work** (Phase 57 regression-recovery on 2
 | EDGE-02 | Phase 58 | Complete (2026-06-15) |
 | LOWERONTO-01 | Phase 57 | Not started |
 | LOWERONTO-02 | Phase 57 | Deferred (D-12) |
-| LOWERONTO-03 | Phase 60 | Not started |
+| LOWERONTO-03 | Phase 60 | Done (2026-06-20) |
 | LOWERONTO-04 | Phase 57 | Not started |
 | VKBUI-01 | Phase 60 | Not started |
 | VKBUI-02 | Phase 60 | Not started |
