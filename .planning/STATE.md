@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.2
 milestone_name: VKB & Online-Learning Quality
-status: executing
-stopped_at: Phase 60 — all plans (60-01…60-08) complete; awaiting 60-07 Task 3 operator checkpoint + /gsd-verify-phase 60
-last_updated: "2026-06-20T11:40:00.000Z"
-last_activity: 2026-06-20
+status: completed
+stopped_at: Phase 60 complete (60-09 closed SC#5 / LOWERONTO-03, operator-approved 2026-06-20)
+last_updated: "2026-06-20T13:07:41.961Z"
+last_activity: 2026-06-20 -- Phase 60 marked complete
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 23
-  completed_plans: 23
-  percent: 80
+  total_phases: 33
+  completed_phases: 24
+  total_plans: 166
+  completed_plans: 167
+  percent: 73
 ---
 
 # Project State
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 60 (unified-viewer-rendering-ux-integrity) — EXECUTING (SC#5 reopened)
-Plan: 60-09 PLANNED 2026-06-20 (gap closure — L2 entity classification; passed plan-checker after 1 revision)
-Status: 60-09-PLAN.md ready to execute (autonomous:false, 7 tasks, 2 operator checkpoints). SC#5 PARTIAL until 60-09 lands. 60-07 Task 3 checkpoint subsumed by 60-09 Task 7 re-verify.
-Last activity: 2026-06-20
+Phase: 60 — COMPLETE
+Plan: 1 of 9
+Status: Phase 60 complete
+Last activity: 2026-06-20 -- Phase 60 marked complete
 
 ## Performance Metrics
 
