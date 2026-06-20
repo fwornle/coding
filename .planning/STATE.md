@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
-status: verifying
-stopped_at: Completed 62-01-PLAN.md
-last_updated: "2026-06-20T21:04:49.930Z"
+status: ready_to_plan
+stopped_at: Phase 62 complete (3/3) — ready to discuss Phase 63
+last_updated: 2026-06-20T21:29:25.800Z
 last_activity: 2026-06-20
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 3
-  completed_plans: 3
+  completed_plans: 173
   percent: 20
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 62 — worker-pool-core-stream-json-transport
+**Current focus:** Phase 63 — worker lifecycle — lazy spawn, idle eviction, crash recovery & cancellation
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,16 +53,16 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 62 (worker-pool-core-stream-json-transport) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 63
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-20
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 107 (v6.0)
+- Total plans completed: 110 (v6.0)
 - Average duration: 3 min
 - Total execution time: 0.05 hours
 

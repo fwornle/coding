@@ -14,7 +14,11 @@ findings:
   warning: 6
   info: 4
   total: 12
-status: issues_found
+critical_resolved: 2
+status: issues_resolved
+resolution:
+  commit: 3c68f54
+  note: "CR-01 (per-request timeout) and CR-02 (empty-pool-array LRU corruption) fixed with 8 regression tests; unit suite 21/21 pass. WR-06 (busy-worker eviction) closed as a side effect. WR-01..05 + info items deferred to Phase 63/64 follow-up."
 ---
 
 # Phase 62: Code Review Report
