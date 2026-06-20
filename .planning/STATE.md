@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
-status: planning
-last_updated: "2026-06-20T18:30:02.470Z"
+status: roadmapped
+last_updated: "2026-06-20T20:45:00.000Z"
 last_activity: 2026-06-20
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,7 +20,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 61 — lsl-timeline-okb-routing-honesty
+**Current focus:** Phase 62 — worker-pool-core-and-stream-json-transport (v7.3)
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -52,10 +52,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap created — first phase is 62)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-20 — Milestone v7.3 started
+Status: Roadmapped (62–66 defined; awaiting /gsd:plan-phase 62)
+Last activity: 2026-06-20 — Milestone v7.3 roadmap created (5 phases 62–66; 14/14 reqs mapped)
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Last activity: 2026-06-20 — Milestone v7.3 started
 ## Accumulated Context
 
 ### Roadmap Evolution
+- v7.3 roadmap created 2026-06-20: 5 phases (62-66) for the LLM Proxy Claude CLI Worker Pool. Dependency order: Phase 62 (worker-pool core + stream-JSON transport + GUARD-01 escape hatch wired first) -> Phase 63 (lifecycle: lazy spawn / idle-evict / crash-recovery RETRYABLE / cancellation) -> Phase 64 (hygiene: CLI version-drift recycle + stderr throttle) -> Phase 65 (acceptance: warm-worker sonnet <=3s steady-state, survives a worker SIGKILL, idle-evict observable via ps, escape hatch reverts cleanly) -> Phase 66 (dashboard claude-code/sonnet median ~14s -> <=3s within 24h). 14/14 reqs mapped (POOL-01..04+GUARD-01 -> 62; WLIFE-01..04 -> 63; GUARD-02,03 -> 64; PERF-01,02 -> 65; PERF-03 -> 66). Code surface: _work/rapid-llm-proxy/proxy-bridge/server.mjs claude-code two-tier dispatch; seed .planning/research/v7.2-llm-proxy-perf-worker-pool.md (v7.2 filename, v7.3 content). Out of scope: cross-provider fallback, general work queue, other-provider worker pools.
 
 - Phase 30.1 inserted after Phase 30: Cross-Project Agent-Agnostic Knowledge Injection (URGENT) — make injection work across all projects and agents with focused relevance
 - Phase 36 added: token-usage per-user hourly exports (mirror LSL conventions for git-trackable JSON)

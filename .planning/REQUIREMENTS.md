@@ -52,7 +52,24 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ## v7.3 Traceability
 
-_(Filled by roadmapper — maps each REQ-ID to its phase.)_
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| POOL-01 | Phase 62 | Not started |
+| POOL-02 | Phase 62 | Not started |
+| POOL-03 | Phase 62 | Not started |
+| POOL-04 | Phase 62 | Not started |
+| GUARD-01 | Phase 62 | Not started |
+| WLIFE-01 | Phase 63 | Not started |
+| WLIFE-02 | Phase 63 | Not started |
+| WLIFE-03 | Phase 63 | Not started |
+| WLIFE-04 | Phase 63 | Not started |
+| GUARD-02 | Phase 64 | Not started |
+| GUARD-03 | Phase 64 | Not started |
+| PERF-01 | Phase 65 | Not started |
+| PERF-02 | Phase 65 | Not started |
+| PERF-03 | Phase 66 | Not started |
+
+**Coverage:** 14/14 v7.3 requirements mapped to 5 phases (62–66). No orphans, no duplicates.
 
 ---
 

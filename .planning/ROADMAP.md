@@ -1177,3 +1177,80 @@ Plans:
 
 - [x] 61-03-PLAN.md — strip frontend: "showing N of M" badge, `'all'`→`'1y'` rename (6 sites + toggle), amber/pink bi-source ticks, raise client cap to 500 + human-verify visual checkpoint (LSLTIME-01, LSLTIME-02, LSLTIME-03)
 **UI hint:** yes
+
+## Milestone v7.3: LLM Proxy Performance — Claude CLI Worker Pool (ACTIVE — started 2026-06-20)
+
+**Goal:** Replace the per-call `claude` CLI `execFile` spawn on the claude-code fallback path with a small pool of warm, persistent stream-JSON workers — cutting sonnet/opus fallback latency from ~10–14s to ~2–3s steady-state and keeping Anthropic's prompt-cache warm. The direct OAuth bearer path stays primary for haiku (~0.9s) and is behaviorally unchanged; the pool serves ONLY the CLI-fallback path (sonnet/opus on HTTP 429, transient 401).
+
+**Phase numbering:** Continues from Phase 61 (v7.2). New phases are **62–66** (5 phases). Does NOT reset to 1.
+
+**Coverage:** 14 v7.3 requirements (POOL-01..04, WLIFE-01..04, GUARD-01..03, PERF-01..03) mapped to 5 phases. See `.planning/REQUIREMENTS.md` § v7.3 Traceability for the per-REQ-ID table.
+
+**Code under change:** `_work/rapid-llm-proxy/proxy-bridge/server.mjs` — the `claude-code` provider's two-tier dispatch (direct OAuth bearer → CLI `execFile` fallback on HTTP 429). **Research seed:** `.planning/research/v7.2-llm-proxy-perf-worker-pool.md` (filename retains v7.2 origin; content is the v7.3 seed — measured latency breakdown, design constraints, acceptance criteria).
+
+**Dependency order:** Worker-pool core + stream-JSON transport (Phase 62) must land first, with the `LLM_PROXY_DISABLE_WORKER_POOL=1` escape hatch (GUARD-01) wired in the same phase so every subsequent phase can fall back safely. Lifecycle / crash-recovery / cancellation (Phase 63) and long-lived-worker hygiene (Phase 64) build on the pool. The steady-state latency + crash-survival acceptance probe (Phase 65) and dashboard observability (Phase 66) close the milestone once behavior is in place.
+
+**Out of scope:** Cross-provider fallback (claude-code → copilot — deliberately excluded; pinning to claude-code expresses user intent); general-purpose work queue / scheduler; worker pools for other CLI-based providers (claude-code is the only one where CLI spawn dominates latency).
+
+### Phases
+
+- [ ] **Phase 62: Worker Pool Core & stream-JSON Transport** — persistent `claude -p --input-format stream-json --output-format stream-json` workers, per-model pinned, concurrency-1, serving ONLY the CLI-fallback path; `LLM_PROXY_DISABLE_WORKER_POOL=1` escape hatch wired first.
+- [ ] **Phase 63: Worker Lifecycle — Lazy Spawn, Idle Eviction, Crash Recovery & Cancellation** — lazy spawn on first fallback, idle-evict after configurable timeout (default 30 min), crash → RETRYABLE + lazy respawn (no spin-loop), client-disconnect aborts the in-flight stream-JSON request.
+- [ ] **Phase 64: Worker Hygiene — CLI Version Pinning & stderr Throttling** — record `claude --version` at boot, recycle worker on version drift to keep prompt-cache assumptions valid; drain + throttle worker stderr to once-per-minute-per-worker so persistent-worker CLI warnings don't flood logs.
+- [ ] **Phase 65: Steady-State Latency & Crash-Survival Acceptance** — warm-worker sonnet `say OK` probe completes ≤3s steady-state (cold first-spawn may still be ~10s); pool survives a worker SIGKILL without dropping subsequent same-model requests; idle-eviction observable via `ps`; escape hatch reverts cleanly.
+- [ ] **Phase 66: Dashboard Latency Observability** — the dashboard's claude-code/sonnet median latency column shows the ~14s → ≤3s drop within 24h of rollout.
+
+### v7.3 Phase Details
+
+### Phase 62: Worker Pool Core & stream-JSON Transport
+**Goal:** The proxy can serve a claude-code CLI-fallback request through a warm, persistent `claude` CLI worker over stream-JSON stdio instead of spawning `execFile` per call — and an operator can disable the whole mechanism with a single env var to fall back to today's behavior unchanged.
+**Depends on:** Nothing (first phase of the milestone; introduces the worker abstraction every later phase builds on)
+**Requirements:** POOL-01, POOL-02, POOL-03, POOL-04, GUARD-01
+**Success Criteria** (what must be TRUE):
+  1. A claude-code CLI-fallback request for sonnet is served by a long-lived `claude -p --input-format stream-json --output-format stream-json` worker that booted once (auth + auto-injected system prompt loaded) and serves the request without spawning a fresh subprocess; a second sequential sonnet request reuses the same worker (verified by a stable worker PID across the two calls in `ps`).
+  2. A request for model M is served only by a worker booted with `--model M` — a sonnet request never lands on a haiku-booted worker, and each model's pool stays cold (zero subprocesses) until that model's first fallback request.
+  3. Two concurrent same-model fallback requests are never interleaved on a single worker's stdio — each worker serves at most one in-flight request; the second request either queues for that worker or dispatches to a sibling worker (2–3 per model).
+  4. The direct OAuth bearer path remains the primary route for haiku at ~0.9s and is behaviorally unchanged — the worker pool is engaged ONLY on the CLI-fallback path (sonnet/opus HTTP 429, transient 401), verified by a haiku probe that never spawns a worker.
+  5. Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts the claude-code provider to the current per-call `execFile` path with no behavioral change vs. today (no workers spawn; latency and response shape match the pre-milestone baseline).
+**Plans:** TBD
+
+### Phase 63: Worker Lifecycle — Lazy Spawn, Idle Eviction, Crash Recovery & Cancellation
+**Goal:** Worker subprocesses come and go correctly under real traffic — they spawn only when needed, free their RAM when idle, survive individual crashes without spin-looping, and never get pinned by a dead client — so a concurrency-1 pool stays healthy across busy and idle periods.
+**Depends on:** Phase 62 (the worker abstraction + per-model pool the lifecycle logic manages)
+**Requirements:** WLIFE-01, WLIFE-02, WLIFE-03, WLIFE-04
+**Success Criteria** (what must be TRUE):
+  1. No workers spawn at proxy boot; the first claude-code fallback request for a model is what lazily spawns that model's first worker (verified by `ps` showing zero `claude -p` workers immediately after proxy start, then one appearing on first fallback).
+  2. A worker that has been idle past the configurable idle timeout (default 30 min) exits and frees its RAM (observable via `ps` — the subprocess is gone), and a subsequent request for that model lazily respawns a fresh worker.
+  3. A worker that exits unexpectedly is marked dead, its in-flight request is surfaced to the caller as RETRYABLE (not a hard error), and it respawns lazily only on the next request — never auto-restarted in a tight loop (verified by killing a worker mid-request and confirming no respawn-storm in logs).
+  4. Client disconnect / request abort propagates to the worker so the in-flight stream-JSON request is cancelled (protocol cancel if supported, else SIGTERM + respawn) — a dead client never leaves a concurrency-1 worker pinned to a zombie request.
+**Plans:** TBD
+
+### Phase 64: Worker Hygiene — CLI Version Pinning & stderr Throttling
+**Goal:** Long-lived workers stay correct and quiet across CLI upgrades and noisy CLI warnings — prompt-cache assumptions don't silently rot when the `claude` binary changes under a running worker, and persistent-worker stderr doesn't flood the logs.
+**Depends on:** Phase 62 (worker boot + recycle hooks); benefits from Phase 63 lifecycle (recycle reuses the respawn path)
+**Requirements:** GUARD-02, GUARD-03
+**Success Criteria** (what must be TRUE):
+  1. Each worker records the `claude` CLI version at boot; when `claude --version` drifts from a worker's boot version, that worker is recycled (drained + respawned) before serving the next request, keeping prompt-cache assumptions valid across CLI upgrades (verified by simulating a version change and observing the worker recycle).
+  2. Worker stderr is drained continuously (so the pipe never blocks the subprocess) and throttled to at most one log line per minute per worker — persistent-worker CLI warnings (e.g. "no stdin data received") do not appear once-per-line in the proxy logs.
+**Plans:** TBD
+
+### Phase 65: Steady-State Latency & Crash-Survival Acceptance
+**Goal:** Prove the milestone's headline performance and resilience claims against the live proxy — the warm-pool fallback path is fast, survives a worker crash, evicts idle workers, and the escape hatch reverts cleanly — so the speedup is demonstrated, not assumed.
+**Depends on:** Phase 62 (pool core), Phase 63 (lifecycle: crash recovery + idle eviction the probes exercise), Phase 64 (hygiene so steady-state runs don't degrade)
+**Requirements:** PERF-01, PERF-02
+**Success Criteria** (what must be TRUE):
+  1. A sonnet `say OK` probe routed through the claude-code provider via a warm worker (cache hit) completes in ≤3s steady-state, repeatably (the cold first-spawn call may still take ~10s; the acceptance measurement is the warm steady-state path).
+  2. SIGKILL-ing one worker PID for a model does not drop the subsequent fallback requests for that model — the next request is served (after a lazy respawn) and returns a valid completion, demonstrating the pool survives at least one worker crash.
+  3. Idle eviction is observable end-to-end: after the configured idle timeout the worker exits (gone from `ps`), and a fresh request spawns a new one within the expected bound — confirming the idle-evict ↔ lazy-respawn cycle holds under the acceptance probe.
+  4. Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` and re-running the probe reverts cleanly to the per-call `execFile` path (no workers in `ps`, baseline latency restored) — the escape hatch is a safe rollback at acceptance time.
+**Plans:** TBD
+
+### Phase 66: Dashboard Latency Observability
+**Goal:** Operators can see the speedup land in production — the dashboard's claude-code latency column reflects the warm-pool steady-state, so the ~14s → ≤3s improvement is visible and trackable within a day of rollout rather than only provable by an ad-hoc probe.
+**Depends on:** Phase 62 (pool emitting the fast-path latencies), Phase 65 (acceptance probe establishes the ≤3s steady-state the dashboard should reflect)
+**Requirements:** PERF-03
+**Success Criteria** (what must be TRUE):
+  1. The dashboard's claude-code latency column surfaces median claude-code/sonnet latency, and within 24h of worker-pool rollout that median drops from ~14s to ≤3s — the operator reads the speedup off the dashboard, not off a manual probe.
+  2. The latency figure the dashboard shows for claude-code/sonnet is sourced from the same fallback-path traffic the pool serves (token-usage / latency telemetry), so a regression (e.g. pool disabled via escape hatch, or workers thrashing) would be visible as the median climbing back toward the ~14s baseline.
+**Plans:** TBD
+**UI hint:** yes
