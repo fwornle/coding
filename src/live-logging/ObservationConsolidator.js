@@ -3179,22 +3179,77 @@ export class ObservationConsolidator {
    * Requires at least 2 path segments in the claim — single-segment matches
    * are too generic ("index.css" alone would verify everywhere).
    */
-  _gitFileSuffixExists(root, pathClaim) {
-    const claim = String(pathClaim || '').replace(/\/+$/, '');
-    if (!claim) return false;
-    const segments = claim.split('/').filter(Boolean);
-    if (segments.length < 2) return false;
+  /**
+   * Cached `git ls-files` for a repo root. The verifier calls
+   * `_gitFileSuffixExists` once PER CLAIM — re-running `git ls-files` (which
+   * dumps the entire tracked-file list) hundreds of times per pass was the
+   * dominant cost (a 95-insight verify ran past 120s and, being execFileSync,
+   * blocked the obs-api event loop / froze the dashboard the whole time). Read
+   * the list ONCE per (root, process) and reuse it.
+   */
+  _gitTrackedFiles(root) {
+    if (!this._lsFilesCache) this._lsFilesCache = new Map();
+    if (this._lsFilesCache.has(root)) return this._lsFilesCache.get(root);
+    let files = null;
     try {
       const out = execFileSync(
         'git', ['-C', root, 'ls-files'],
         { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024 * 1024 }
       );
-      for (const line of out.split('\n')) {
-        if (line === claim) return true;
-        if (line.endsWith('/' + claim)) return true;
-      }
-    } catch { /* not a repo or too big */ }
+      files = out.split('\n');
+    } catch { files = null; }
+    this._lsFilesCache.set(root, files);
+    return files;
+  }
+
+  _gitFileSuffixExists(root, pathClaim) {
+    const claim = String(pathClaim || '').replace(/\/+$/, '');
+    if (!claim) return false;
+    const segments = claim.split('/').filter(Boolean);
+    if (segments.length < 2) return false;
+    const files = this._gitTrackedFiles(root);
+    if (!files) return false;
+    for (const line of files) {
+      if (line === claim) return true;
+      if (line.endsWith('/' + claim)) return true;
+    }
     return false;
+  }
+
+  /**
+   * Did a path claim EVER exist anywhere in git history? Used to tell a
+   * "historical" insight (names code that was real but has since been
+   * removed/renamed) apart from a "hallucinated" one (names a path that never
+   * existed). `_gitFileSuffixExists` only sees the current tree; this scans all
+   * refs. Pathspec `*<claim>` matches any path ending in the claim (git `*`
+   * spans directories), so both full paths and bare basenames resolve. `-1`
+   * stops at the first matching commit, keeping it cheap.
+   */
+  _gitPathEverExisted(root, pathClaim) {
+    const claim = String(pathClaim || '').replace(/\/+$/, '');
+    if (!claim || claim.split('/').filter(Boolean).length < 1) return false;
+    // Memoize per (root, claim): `git log --all` over full history is the
+    // single most expensive call in the verifier (it scans every ref, and is
+    // SLOWEST exactly for non-existent paths — the hallucination case — because
+    // it finds nothing and walks everything). execFileSync blocks the obs-api
+    // event loop, so an unmemoized per-claim sweep froze the dashboard. Cache
+    // is per-process (git history is stable within a run).
+    if (!this._everExistedCache) this._everExistedCache = new Map();
+    const key = root + ' ' + claim;
+    if (this._everExistedCache.has(key)) return this._everExistedCache.get(key);
+    let result = false;
+    try {
+      // HEAD history only (not --all): scanning every ref is far slower, and
+      // "was this path ever on the main line" is the distinction that matters
+      // for historical-vs-hallucinated. `-1` stops at the first match.
+      const out = execFileSync(
+        'git', ['-C', root, 'log', '--oneline', '-1', '--', `*${claim}`],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 6000, maxBuffer: 4 * 1024 * 1024 }
+      );
+      result = out.trim().length > 0;
+    } catch { result = false; }
+    this._everExistedCache.set(key, result);
+    return result;
   }
 
   /**
@@ -3213,9 +3268,39 @@ export class ObservationConsolidator {
     const claims = this._extractCodeClaims(insight.summary || '');
     const results = this._verifyCodeClaims(claims, searchRoots);
     const verifiedClaims = results.filter((r) => r.verified).length;
-    const staleClaims = results
-      .filter((r) => !r.verified)
-      .map((r) => ({ raw: r.raw, type: r.type }));
+    // Classify failed claims as 'historical' (the path existed in git history →
+    // code was removed/renamed) or 'ghost' (never in history → hallucinated).
+    // The git-history check is expensive and blocks the event loop, so it runs
+    // ONLY for genuinely STALE insights (ratio < 0.5 — "the ones you can't find
+    // in the repo"), not for a fresh insight's stray failed claim. Memoized in
+    // _gitPathEverExisted; hard-capped per insight. Fresh/partial insights and
+    // symbol-only failures get origin=null (unclassified).
+    const ratioForScope = results.length === 0 ? null : verifiedClaims / results.length;
+    const classifyProvenance = ratioForScope !== null && ratioForScope < 0.5;
+    const failed = results.filter((r) => !r.verified);
+    const primaryRoot = searchRoots[0];
+    let gitChecks = 0;
+    const staleClaims = failed.map((r) => {
+      let origin = null;
+      if (classifyProvenance && primaryRoot
+          && (r.type === 'PATH' || r.type === 'FILE_BASENAME') && gitChecks < 12) {
+        gitChecks++;
+        origin = this._gitPathEverExisted(primaryRoot, r.raw) ? 'historical' : 'ghost';
+      }
+      return { raw: r.raw, type: r.type, origin };
+    });
+    // Insight-level provenance summary across the path-type failures:
+    //   'historical'   — every failed path once existed (insight is stale but
+    //                    describes code that was real; archive, don't delete).
+    //   'hallucinated' — no failed path ever existed (the insight invented
+    //                    files; a removal candidate).
+    //   'mixed'        — both. null when there are no git-checkable failures.
+    const origins = staleClaims.map((s) => s.origin).filter(Boolean);
+    const provenance = origins.length === 0
+      ? null
+      : (origins.every((o) => o === 'historical') ? 'historical'
+        : origins.every((o) => o === 'ghost') ? 'hallucinated'
+        : 'mixed');
     // Deduped list of PATH-type claims that verified — this is the input to
     // per-project coverage aggregation ("which files does any insight in
     // this project reference"). Only verified PATHs and FILE_BASENAMEs go in;
@@ -3259,6 +3344,7 @@ export class ObservationConsolidator {
       verifiedClaims,
       verificationRatio: ratio === null ? null : Number(ratio.toFixed(3)),
       staleClaims,
+      provenance,
       referencedFiles,
       searchRoots,
       ...(zeroTracking || {}),
@@ -3881,21 +3967,22 @@ Respond with EXACTLY this structure:
     const MAX_RETRIES = 3;
     const BACKOFF_MS = [2000, 5000, 10000];
     // maxTokens budget. The proxy accepts either camelCase (`maxTokens`) or
-    // snake_case.
+    // snake_case. This is HEADROOM, not a target — the model emits what it
+    // needs (insight chunks typically ~2-4k output) and stops. The cap only
+    // bites on truncation, and copilot returns EMPTY content (total loss) when
+    // it truncates, so the budget must stay generous enough that real insight
+    // output finishes naturally below it. 16384 was the proven-good value
+    // (2026-06-12); at 8192 some chunks truncated to empty.
     //
-    // 2026-06-19: copilot's NON-STREAMING path could not deliver large insight
-    // outputs — the upstream gateway holds the connection open while the whole
-    // response is generated, and generations past ~120s came back as HTTP 500
-    // (empty). The root fix is in the proxy (rapid-llm-proxy
-    // proxy-bridge/server.mjs): copilot now STREAMS when maxTokens > 4096, so
-    // tokens flow incrementally and the gateway never idles. Verified: a
-    // streamed 8192-token request completes in ~160s with full content (vs
-    // 500/240s before). consolidator-insight keeps 8192 — proven to finish
-    // well within this call's 300s proxy timeout (PROXY_TIMEOUT_MS) and ample
-    // for the 1-3 insights a 2-digest chunk yields without truncation. The
-    // other processes (digest/compaction/resynthesize) emit short output, so
-    // they keep the larger 16384 budget.
-    const MAX_TOKENS = processName === 'consolidator-insight' ? 8192 : 16384;
+    // What actually broke 16384 on 2026-06-19 was NOT the cap but a TIMEOUT:
+    // copilot's non-streaming path holds the connection open until the whole
+    // response is generated, and large generations past ~120-240s came back as
+    // HTTP 500 (empty). Fixed in the proxy (rapid-llm-proxy
+    // proxy-bridge/server.mjs) — copilot now STREAMS when maxTokens > 4096, so
+    // the gateway never idles. With streaming, 16384 finishes well within this
+    // call's 300s proxy timeout (PROXY_TIMEOUT_MS) because real output is far
+    // below the cap.
+    const MAX_TOKENS = 16384;
     const requestBody = {
       process: processName,
       ...(this.provider ? { provider: this.provider } : {}),

@@ -679,15 +679,17 @@ describe('ObservationConsolidator._callLLM — maxTokens budget + empty-content 
     text: async () => JSON.stringify(obj),
   });
 
-  it('Test A: consolidator-insight requests maxTokens=8192; other processes 16384', async () => {
+  it('Test A: insight + digest both request the full 16384 headroom budget', async () => {
     const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
     await withFetchStub(
       () => jsonResponse({ content: 'ok', tokens: { input: 100, output: 50 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
       async (calls) => {
         await c._callLLM(PROMPT, 'consolidator-insight');
         await c._callLLM(PROMPT, 'consolidator-digest');
-        assert.equal(calls[0].maxTokens, 8192, 'insight call budget is 8192 (streams via proxy, finishes < 300s timeout)');
-        assert.equal(calls[1].maxTokens, 16384, 'digest call keeps the 16384 budget');
+        // 16384 is headroom, not a target — real output is far below it. The
+        // proxy streams when maxTokens > 4096 so the connection never times out.
+        assert.equal(calls[0].maxTokens, 16384, 'insight call budget is 16384 (streams via proxy)');
+        assert.equal(calls[1].maxTokens, 16384, 'digest call budget is 16384');
       },
     );
   });
@@ -695,8 +697,8 @@ describe('ObservationConsolidator._callLLM — maxTokens budget + empty-content 
   it('Test B: empty content with output near the cap → NO retry (deterministic truncation)', async () => {
     const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
     await withFetchStub(
-      // 8192 cap, output 7400 (within 10%) — the truncation-to-empty shape.
-      () => jsonResponse({ content: '', tokens: { input: 20000, output: 7400 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
+      // 16384 cap, output 15000 (within 10%) — the truncation-to-empty shape.
+      () => jsonResponse({ content: '', tokens: { input: 20000, output: 15000 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
       async (calls) => {
         const result = await c._callLLM(PROMPT, 'consolidator-insight');
         assert.equal(result, null, 'returns null on deterministic empty truncation');

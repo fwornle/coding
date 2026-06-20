@@ -1052,7 +1052,7 @@ app.get('/api/projects/:project/coverage', async (req, res) => {
 
     const perInsight = [];
     const allReferencedFiles = new Set();
-    let fresh = 0, partial = 0, stale = 0, unverified = 0;
+    let fresh = 0, partial = 0, stale = 0, unverified = 0, pending = 0, unverifiable = 0;
     let ratioSum = 0, ratioCount = 0;
 
     for (const r of rows) {
@@ -1062,6 +1062,8 @@ app.get('/api/projects/:project/coverage', async (req, res) => {
 
       if (ratio === null) {
         unverified++;
+        // Split the gray bucket: never-run vs ran-but-no-claims.
+        if (!cv) pending++; else unverifiable++;
       } else {
         ratioSum += ratio;
         ratioCount++;
@@ -1073,15 +1075,34 @@ app.get('/api/projects/:project/coverage', async (req, res) => {
       const referencedFiles = Array.isArray(cv?.referencedFiles) ? cv.referencedFiles : [];
       for (const f of referencedFiles) allReferencedFiles.add(f);
 
+      // Disambiguate the gray "not yet verified" tile into three states so the
+      // UI (and operator) can tell them apart:
+      //   'pending'      — the verifier has NOT run on this insight yet
+      //                    (no codeVerification block). Actionable: re-verify.
+      //   'unverifiable' — verifier ran but the insight makes ZERO repo-file
+      //                    claims (totalClaims === 0). Stays gray forever by
+      //                    design; nothing to check against the codebase.
+      //   'verified'     — has a ratio (fresh/partial/stale band below).
+      // 'provenance' (set by the verifier when ratio is low) further splits an
+      // insight whose claims DON'T resolve into 'historical' (the paths exist
+      // in git history → code was removed) vs 'hallucinated' (paths never in
+      // history → invented) vs 'mixed'.
+      const verificationState = !cv
+        ? 'pending'
+        : (cv.totalClaims === 0 ? 'unverifiable' : 'verified');
+
       perInsight.push({
         id: r.id,
         topic: r.topic,
         confidence: r.confidence,
         ratio,
+        verificationState,
+        provenance: cv?.provenance ?? null,
         totalClaims: cv?.totalClaims ?? null,
         verifiedClaims: cv?.verifiedClaims ?? null,
         staleClaimCount: Array.isArray(cv?.staleClaims) ? cv.staleClaims.length : 0,
         verifiedAt: cv?.verifiedAt ?? null,
+        archivedAt: metadata.archivedAt ?? null,
         lastUpdated: r.lastUpdated,
         parentTopic: metadata.parentTopic ?? null,
         relatedInsightIds: Array.isArray(metadata.relatedInsightIds) ? metadata.relatedInsightIds : [],
@@ -1116,6 +1137,8 @@ app.get('/api/projects/:project/coverage', async (req, res) => {
         partial,
         stale,
         unverified,
+        pending,
+        unverifiable,
         avgRatio: ratioCount > 0 ? Number((ratioSum / ratioCount).toFixed(3)) : 1,
       },
       coverage: {
@@ -1244,8 +1267,31 @@ app.post('/api/insights/:id/resynthesize', async (req, res) => {
       process.stderr.write(`[obs-api] /insights/${id}/resynthesize km-core mirror failed: ${mirrorErr.message}\n`);
     }
 
+    // (a) Re-verify the just-resynthesized insight so the Coverage tab reflects
+    // the new content immediately instead of keeping a stale (or absent)
+    // codeVerification until the next scheduled verify pass. The new summary
+    // may have added/removed code claims, changing fresh/stale/unverifiable.
+    // Non-fatal: a verify failure must not fail the resynthesis.
+    let reVerification = null;
+    try {
+      const store = await ensureKMStore();
+      const entity = store
+        ? (await store.findByLegacyId({ system: 'A', id: resolvedId }) ?? await store.getEntity(resolvedId))
+        : null;
+      if (entity) {
+        const verdict = await consolidator.verifyInsight(
+          { id: resolvedId, summary: updated.summary, metadata: entity.metadata, _entity: entity },
+          { persist: true },
+        );
+        reVerification = verdict;
+        _stalenessCache.invalidate();
+      }
+    } catch (verErr) {
+      process.stderr.write(`[obs-api] /insights/${id}/resynthesize re-verify failed (non-fatal): ${verErr.message}\n`);
+    }
+
     const durationMs = Date.now() - startedAt;
-    res.json({ ...updated, durationMs });
+    res.json({ ...updated, reVerification, durationMs });
   } catch (err) {
     process.stderr.write(`[obs-api] /insights/${id}/resynthesize error: ${err.message}\n`);
     if (err.code === 'NOT_FOUND') return res.status(404).json({ error: err.message });

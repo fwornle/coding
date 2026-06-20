@@ -8,15 +8,21 @@ import { Button } from '@/components/ui/button'
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
 
+type VerificationState = 'pending' | 'unverifiable' | 'verified'
+type Provenance = 'historical' | 'hallucinated' | 'mixed' | null
+
 interface PerInsightSummary {
   id: string
   topic: string
   confidence: number
   ratio: number | null
+  verificationState?: VerificationState
+  provenance?: Provenance
   totalClaims: number | null
   verifiedClaims: number | null
   staleClaimCount: number
   verifiedAt: string | null
+  archivedAt?: string | null
   lastUpdated: string
   parentTopic: string | null
   relatedInsightIds: string[]
@@ -32,6 +38,8 @@ interface CoverageResponse {
     partial: number
     stale: number
     unverified: number
+    pending?: number
+    unverifiable?: number
     avgRatio: number
   }
   coverage: {
@@ -42,14 +50,26 @@ interface CoverageResponse {
   perInsight: PerInsightSummary[]
 }
 
-function tileColor(ratio: number | null): string {
+function tileColor(t: PerInsightSummary): string {
   // Single text colour (white) across all bands; vary saturation/opacity of
   // the background to encode the band. The earlier pastel-on-pastel scheme
-  // (text-emerald-100 on bg-emerald-500/40, text-emerald-50 on /70 etc.)
   // produced unreadable tiles in the 70–89% and 50–69% ranges. Each
-  // background here is opaque enough that white text reaches WCAG AA on
-  // the dark dashboard surface AND on lighter system themes.
-  if (ratio === null) return 'bg-slate-500/80 border-slate-400/60 text-white'
+  // background here is opaque enough that white text reaches WCAG AA.
+  const ratio = t.ratio
+  // Hallucinated (claims that never existed in git history) — flag with a
+  // purple warning regardless of how few claims, so genuine fabrication is
+  // visible rather than hiding in the gray "unverified" bucket.
+  if (t.provenance === 'hallucinated') return 'bg-purple-700/80 border-purple-400/70 text-white'
+  if (ratio === null) {
+    // Split the gray: 'unverifiable' (verifier ran, no repo claims to check) is
+    // distinguished by a DASHED border, not by a translucent fill — the bg must
+    // stay opaque enough for white text to stay readable (WCAG AA). 'pending'
+    // (never verified) is the same slate with a solid border.
+    if (t.verificationState === 'unverifiable') {
+      return 'bg-slate-600/80 border-2 border-dashed border-slate-300/70 text-white'
+    }
+    return 'bg-slate-500/80 border-slate-400/60 text-white'
+  }
   if (ratio >= 0.9) return 'bg-emerald-700/80 border-emerald-500/60 text-white'
   if (ratio >= 0.7) return 'bg-emerald-600/75 border-emerald-500/50 text-white'
   if (ratio >= 0.5) return 'bg-amber-600/80 border-amber-500/50 text-white'
@@ -57,7 +77,10 @@ function tileColor(ratio: number | null): string {
 }
 
 function tileLabel(p: PerInsightSummary): string {
-  if (p.ratio === null) return 'N/A'
+  if (p.provenance === 'hallucinated') return 'ghost'
+  if (p.ratio === null) {
+    return p.verificationState === 'unverifiable' ? 'no claims' : 'pending'
+  }
   return `${Math.round(p.ratio * 100)}%`
 }
 
@@ -106,9 +129,14 @@ function ProjectCoverageCard({ data }: { data: CoverageResponse }) {
                 {i.stale} stale
               </Badge>
             )}
-            {i.unverified > 0 && (
+            {(i.pending ?? i.unverified) > 0 && (
               <Badge variant="outline" className="bg-slate-500/30 text-slate-100 border-slate-400/40">
-                {i.unverified} unverified
+                {i.pending ?? i.unverified} pending
+              </Badge>
+            )}
+            {(i.unverifiable ?? 0) > 0 && (
+              <Badge variant="outline" className="bg-slate-600/20 text-slate-300 border-dashed border-slate-400/40">
+                {i.unverifiable} unverifiable
               </Badge>
             )}
             <span className="text-muted-foreground ml-2">
@@ -124,17 +152,29 @@ function ProjectCoverageCard({ data }: { data: CoverageResponse }) {
             <Link
               key={t.id}
               to={`/insights#insight-${t.id}`}
-              className={`group relative h-16 rounded border ${tileColor(t.ratio)} px-2 py-1 flex flex-col justify-between text-left transition hover:brightness-110 hover:scale-[1.02]`}
+              className={`group relative h-16 rounded border ${tileColor(t)} px-2 py-1 flex flex-col justify-between text-left transition hover:brightness-110 hover:scale-[1.02]`}
               title={
                 `${t.topic}\n\n` +
-                `Truthfulness: ${t.ratio === null ? 'not yet verified' : `${Math.round(t.ratio * 100)}% — ${t.verifiedClaims ?? 0} of ${t.totalClaims ?? 0} code claims still exist in the repo`}` +
+                `Truthfulness: ${
+                  t.ratio !== null
+                    ? `${Math.round(t.ratio * 100)}% — ${t.verifiedClaims ?? 0} of ${t.totalClaims ?? 0} code claims still exist in the repo`
+                    : t.verificationState === 'unverifiable'
+                      ? 'unverifiable — this insight makes no checkable claims about files in this repo'
+                      : 'pending — the verifier has not run on this insight yet'
+                }` +
                 `${t.staleClaimCount > 0 ? ` (${t.staleClaimCount} stale)` : ''}\n` +
+                `${t.provenance === 'hallucinated' ? 'Provenance: HALLUCINATED — names file(s) that never existed in git history\n' : ''}` +
+                `${t.provenance === 'historical' ? 'Provenance: historical — names code that existed but was removed/renamed\n' : ''}` +
+                `${t.provenance === 'mixed' ? 'Provenance: mixed — some removed code, some never-existed paths\n' : ''}` +
+                `${t.archivedAt ? `Archived: ${t.archivedAt.slice(0, 10)} (stuck at 0% for 30+ days)\n` : ''}` +
                 `Confidence: ${Math.round(t.confidence * 100)}% (LLM synthesis support, decayed by age + truthfulness)\n\n` +
-                `Tile color = truthfulness band:\n` +
+                `Tile color:\n` +
                 `  green   ≥ 70% (FRESH)\n` +
                 `  amber 50–70% (PARTIAL)\n` +
                 `  rose   < 50% (STALE)\n` +
-                `  gray   not yet verified\n\n` +
+                `  purple  HALLUCINATED (invented files)\n` +
+                `  slate   pending (verifier not run)\n` +
+                `  dashed  unverifiable (no repo claims)\n\n` +
                 `Click to jump to the full insight.`
               }
             >
@@ -274,6 +314,16 @@ export function CoveragePage() {
           <p className="text-sm text-muted-foreground mt-1">
             How well each project is represented by its insights — and how truthful those insights still are against the codebase. Hover the <Info className="w-3 h-3 inline" /> for methodology.
           </p>
+          {/* Tile colour legend — each tile is one insight; colour encodes how
+              its code claims hold up against the repo. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-600/80" /> fresh ≥70%</span>
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-600/80" /> partial 50–70%</span>
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-rose-600/80" /> stale &lt;50%</span>
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-purple-700/80" /> hallucinated (names files never in git)</span>
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-500/80" /> pending (not yet verified)</span>
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-600/80 border-2 border-dashed border-slate-300/70" /> no claims (nothing to verify)</span>
+          </div>
         </div>
         <Button size="sm" variant="outline" onClick={loadAll} disabled={loading}>
           <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
