@@ -217,8 +217,10 @@ describe('ObservationWriter → km-core round-trip (Phase 44 Plan 12)', () => {
       created_at: '2026-06-04T12:00:00Z',
       project: 'coding',
     };
-    const returnedId = await writer.writeInsight(insightRow);
-    expect(returnedId).toBe('insight-uuid-1');
+    const returned = await writer.writeInsight(insightRow);
+    // Phase 59 D-03: writeInsight returns { legacyId, mintedId } (was a bare
+    // string pre-D-03; this assertion was never updated).
+    expect(returned.legacyId).toBe('insight-uuid-1');
 
     const matches = await kmStore.findByOntologyClass('Insight');
     expect(matches.length).toBe(1);
@@ -239,5 +241,36 @@ describe('ObservationWriter → km-core round-trip (Phase 44 Plan 12)', () => {
     expect(entity.metadata.project).toBe('coding');
     // updatedAt prefers last_updated when present
     expect(entity.updatedAt).toBe('2026-06-04T12:30:00Z');
+  });
+
+  test('writeInsight UPSERTs by legacyId — re-writing the same id updates in place, no duplicate', async () => {
+    // Regression for the 2026-06 duplicate-insight bug: _pushInsightToKG passes
+    // row.id = entry.topic (a stable key) every consolidation run, expecting an
+    // update. A blind putEntity minted a fresh topic-keyed Insight each run
+    // (74 orphan dups across 38 topics). The upsert must collapse them to one.
+    const topicKey = 'DuplicatePronenessTopic';
+    const before = (await kmStore.findByOntologyClass('Insight')).length;
+
+    const r1 = await writer.writeInsight({
+      id: topicKey, topic: topicKey, summary: 'first synthesis',
+      confidence: 0.8, digest_ids: ['d1'], last_updated: '2026-06-20T01:00:00Z',
+      created_at: '2026-06-20T01:00:00Z', project: 'coding',
+    });
+    const r2 = await writer.writeInsight({
+      id: topicKey, topic: topicKey, summary: 'second synthesis (re-run)',
+      confidence: 0.9, digest_ids: ['d1', 'd2'], last_updated: '2026-06-20T02:00:00Z',
+      created_at: '2026-06-20T02:00:00Z', project: 'coding',
+    });
+
+    // Exactly ONE entity for this legacyId across both writes.
+    const all = await kmStore.findByOntologyClass('Insight');
+    const forTopic = all.filter((e) => e.legacyId?.id === topicKey);
+    expect(forTopic.length).toBe(1);
+    expect(all.length).toBe(before + 1); // net +1, not +2
+
+    // Second write updated in place: same minted id, refreshed content.
+    expect(r2.mintedId).toBe(r1.mintedId);
+    expect(forTopic[0].description).toContain('second synthesis');
+    expect(forTopic[0].metadata.confidence).toBe(0.9);
   });
 });

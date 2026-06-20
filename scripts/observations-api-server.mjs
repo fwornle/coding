@@ -748,6 +748,91 @@ app.post('/api/observations/resolve-lsl', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/insights/dedup — one-shot cleanup of duplicate Insight entities.
+ *
+ * Collapses Insight entities that share a normalized topic down to a single
+ * canonical entity, deleting the rest. Root cause was `ObservationWriter.
+ * writeInsight` doing a blind putEntity (now fixed to upsert by legacyId), so
+ * `_pushInsightToKG` minted a fresh topic-keyed, digest-less Insight every
+ * consolidation run. This sweeps up the copies those runs already left behind.
+ *
+ * Canonical selection per topic group: the entity with the MOST digest_ids
+ * (real provenance), tie-broken by a UUID legacyId and oldest createdAt. Only
+ * NON-canonical members are deleted, and — for safety — only when they carry
+ * zero digest_ids (empty re-syntheses). A duplicate that unexpectedly has its
+ * own digest provenance is preserved and reported under `keptWithProvenance`.
+ *
+ * Body (optional): { project='coding', dryRun=true }.
+ */
+app.post('/api/insights/dedup', async (req, res) => {
+  try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    const project = (req.body && req.body.project) || 'coding';
+    const dryRun = !(req.body && req.body.dryRun === false); // default DRY-RUN
+
+    const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const digestCount = (e) => {
+      const d = e.metadata?.digest_ids ?? e.metadata?.digestIds;
+      return Array.isArray(d) ? d.length : 0;
+    };
+    const isUuid = (e) => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(String(e.legacyId?.id ?? ''));
+
+    const all = (await store.findByOntologyClass('Insight'))
+      .filter((e) => ((e.metadata?.project) ?? 'unknown') === project);
+
+    const groups = new Map();
+    for (const e of all) {
+      const k = norm(e.metadata?.topic ?? e.name);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(e);
+    }
+
+    const toDelete = [];
+    const keptWithProvenance = [];
+    let groupsWithDups = 0;
+    for (const [, members] of groups) {
+      if (members.length < 2) continue;
+      groupsWithDups++;
+      // Canonical = most digests, then UUID legacyId, then oldest.
+      members.sort((a, b) =>
+        digestCount(b) - digestCount(a) ||
+        (isUuid(b) - isUuid(a)) ||
+        String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')));
+      const [, ...rest] = members;
+      for (const dup of rest) {
+        if (digestCount(dup) === 0) toDelete.push(dup);
+        else keptWithProvenance.push({ id: dup.id, topic: dup.metadata?.topic, digests: digestCount(dup) });
+      }
+    }
+
+    let deleted = 0;
+    if (!dryRun) {
+      for (const e of toDelete) {
+        try { if (await store.deleteEntity(e.id)) deleted++; }
+        catch (err) { process.stderr.write(`[obs-api] insight dedup: delete ${e.id} failed: ${err.message}\n`); }
+      }
+      if (deleted > 0) { scheduleExport(); _stalenessCache.invalidate(); }
+    }
+
+    res.json({
+      project,
+      dryRun,
+      totalInsights: all.length,
+      distinctTopics: groups.size,
+      groupsWithDuplicates: groupsWithDups,
+      duplicatesToDelete: toDelete.length,
+      deleted,
+      keptWithProvenance,
+      finalCountAfter: all.length - (dryRun ? toDelete.length : deleted),
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /insights/dedup error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Failed to dedup insights' });
+  }
+});
+
 // Phase 44 plan 07 (R-4 hard cutover): the legacy SQLite-backed GET
 // /api/observations was REPLACED by /api/coding/observations (mounted
 // later in this file). There is no legacy URL fallback per CONTEXT R-4 —

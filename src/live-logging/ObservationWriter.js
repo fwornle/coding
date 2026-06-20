@@ -1322,7 +1322,30 @@ export class ObservationWriter {
         ...entity.metadata,
         source: entity.metadata?.source ?? 'auto',
       };
-      const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      // UPSERT by legacyId. `putEntity` always mints a NEW km-core id, so a
+      // blind create here duplicated every Insight whose row.id is a stable
+      // key re-used across runs. _pushInsightToKG passes `row.id = entry.topic`
+      // precisely so re-synthesis updates the same topic-keyed entity — but
+      // without this lookup each consolidation run minted another topic-keyed,
+      // digest-less Insight (the 2026-06 duplicate-insight bug: 74 orphan
+      // copies, 38 topics, some 7×). Find the existing legacyId surrogate
+      // first; when present, mergeAttributes in place (preserving its minted
+      // id + createdAt + provenance) instead of creating a sibling.
+      let mintedId;
+      const existing = await kmStore.findByLegacyId({ system: 'A', id: row.id });
+      if (existing && existing.id) {
+        await kmStore.mergeAttributes(existing.id, {
+          name: entity.name,
+          description: entity.description,
+          ontologyClass: entity.ontologyClass,
+          entityType: entity.entityType,
+          updatedAt: ts,
+          metadata: { ...(existing.metadata || {}), ...entity.metadata },
+        });
+        mintedId = existing.id;
+      } else {
+        mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      }
       // Phase 58 Plan 02 — emit N mentions edges synchronously inside the
       // same try-block as putEntity. The km-core JSON exporter debounce
       // (5s) batches putEntity + every addRelation into one export tick.
