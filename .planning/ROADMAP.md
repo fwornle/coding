@@ -1030,7 +1030,7 @@ Plans:
 - [x] **Phase 57: Lower Ontology & Project Tagging Foundation** — declare coding-specific L2 classes (`LiveLoggingSystem`, `ConstraintMonitor`, `OnlineObservation`, `OnlineDigest`, `OnlineInsight`, `KnowledgeManagement`); optional upper-ontology growth; stamp `project` tag on every km-core entity. (completed 2026-06-15)
 - [x] **Phase 58: Online Pipeline Semantic Edges on Insights** — `ObservationConsolidator` emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on online Insights, atomically with the Insight node, beyond the existing `capturedBy → LiveLoggingSystem` provenance. (completed 2026-06-15)
 - [x] **Phase 59: Long-Tail Orphan Fixes & Baseline Reduction** — server-side System-type filter fix (legacy Phase 48); parent-hierarchy edges for online-learned Detail/SubComponent + one-shot migration (legacy Phase 49); per-team `CollectiveKnowledge --includes--> Project` writer + seed fix; drive `orphanCount` from 157 → ≤30. (completed 2026-06-17)
-- [x] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges. (completed 2026-06-17)
+- [~] **Phase 60: Unified Viewer Rendering UX Integrity** — Evidence/Pattern filter symmetry; Legend derived from rendered graph (no static OKB bleed); Observation/Digest filtered out by default with debug toggle; CollectiveKnowledge visibility under Online filter; ontology-class filter renders L2 lower-ontology classes as expandable groups under their L1 parent with per-class count badges. (4/5 SCs PASS; **SC#5 reopened 2026-06-20** — viewer still renders flat ontology rows, no L1→L2 tree, because no entity is classified at L2; fix = Plan 60-09. Earlier "completed 2026-06-17 / passed 2026-06-19" was a verification miss — see 60-VERIFICATION.md status_correction.)
 - [ ] **Phase 61: LSL Timeline & OKB Routing Honesty** — remove silent 200-record cap (`useLslSessions.ts`) with visible "N of M" label or honest streaming; honest "all" window (no silent 365-day cap); bi-source tick coloring (manual vs online); `/viewer/okb` ApiClient detects OKM Express `:8090` legacy `/api/entities` shape and routes correctly, showing real OKM business entities not coding-KG mirrors.
 
 ### v7.2 Phase Details
@@ -1145,6 +1145,11 @@ Plans:
 
 - [x] 60-08-PLAN.md — Gaps C/D/E (+F): node-shape rendering per ontology class (legend↔canvas parity), selection breakdown header (`N items · X visible · Y hidden`), bidirectional hover (`hoveredNodeId` slice + CSS pulse), and a focal-node empty-panel fix. Implemented in `10e5ef12f` (2026-06-19); SUMMARY closed out 2026-06-20 after tests/tsc/build/browser re-verification. (VKBUI-02, VKBUI-03; autonomous: false)
 **UI hint:** yes
+
+
+**Wave 6 — Gap closure (SC#5 L2 classification — the real fix)**
+
+- [ ] 60-09-PLAN.md — SC#5 gap closure (LOWERONTO-03): classify entities at L2 so the OntologyFilter renders the real L0->L1->L2 tree. Deterministic name+description keyword classifier (`l2-subsystem-classifier.ts`) over the closed 10-class vocabulary (no LLM); going-forward writer wiring + Docker rebuild; one-shot `backfill-l2-subsystem-class.mjs` migration (operator-checkpointed); `Project` level:0 in the ontology data; OntologyFilter renders level-None classes entities carry (Insight/Digest) + Project L0; operator visual re-verify flips 60-VERIFICATION SC#5 PARTIAL->PASS. (LOWERONTO-03; autonomous: false)
 
 ### Phase 61: LSL Timeline & OKB Routing Honesty
 
