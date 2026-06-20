@@ -936,17 +936,23 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
                         ? 'ring-2 ring-primary'
                         : ''
               // Phase 61 Plan 03 (LSLTIME-03/D-08): bi-source tick color.
-              // Halo (blue) wins; otherwise split on session provenance —
-              // manual/batch (wave-analysis) renders AMBER, online/auto (or
-              // absent source) keeps the existing pink. Amber chosen over
-              // slate (RESEARCH Unknown 2): slate reads too close to the
-              // opacity-40 disabled dim. The disabled (opacity-40) and
+              // Halo (pale translucent blue) wins; otherwise split on session
+              // provenance to match the GRAPH's established convention
+              // (color-fallback.ts, set per operator request): batch / manual
+              // learning renders in solid BLUE (graph BATCH_PALETTE
+              // Component #1565c0 ≈ blue-700), online/auto keeps the existing
+              // light-pink (graph ONLINE light-pink #ffb6c1 ≈ pink-300). The
+              // earlier amber choice contradicted this convention and was
+              // corrected at the 61-03 human-verify checkpoint. blue-700 is
+              // deliberately darker than the blue-500/blue-300 selection/halo
+              // RINGS, so a selected batch tick reads as a dark-blue body with
+              // a brighter blue ring outline. The disabled (opacity-40) and
               // selection/halo (ring-blue-*) classes compose ON TOP unchanged
               // at the className below — do not fold them into fillClass.
               const fillClass = isHaloBucket
                 ? 'bg-blue-200/40 hover:bg-blue-300/50'
                 : s.source === 'batch'
-                  ? 'bg-amber-300 hover:bg-amber-400'
+                  ? 'bg-blue-700 hover:bg-blue-800'
                   : 'bg-pink-300 hover:bg-pink-400'
               // 2026-06-13 (audit §5.4 option B): grey-out classes are
               // additive — opacity-40 dims the pink fill + pointer-events-

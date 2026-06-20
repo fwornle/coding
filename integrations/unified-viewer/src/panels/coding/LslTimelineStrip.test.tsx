@@ -95,7 +95,7 @@ interface LslSession {
   endAt: string | null
   observationCount: number
   entityIds: string[]
-  // Phase 61 Plan 03: provenance discriminator (amber=batch, pink=online).
+  // Phase 61 Plan 03: provenance discriminator (blue=batch, pink=online).
   source?: 'online' | 'batch'
 }
 
@@ -1919,7 +1919,7 @@ describe('LslTimelineStrip', () => {
     }
   })
 
-  test('Test 45 [Plan 03 — LSLTIME-03]: a batch session tick is amber while an online session tick is pink', async () => {
+  test('Test 45 [Plan 03 — LSLTIME-03]: a batch session tick is blue while an online session tick is pink', async () => {
     // Two sessions, one per provenance class. Halo/selection is inactive
     // (no selection), so fillClass falls through to the source branch.
     const sessions: LslSession[] = [
@@ -1945,11 +1945,11 @@ describe('LslTimelineStrip', () => {
       await waitFor(() => screen.getByTestId('lsl-tick-sess-batch01'))
       const batchTick = screen.getByTestId('lsl-tick-sess-batch01')
       const onlineTick = screen.getByTestId('lsl-tick-sess-online1')
-      // batch → amber; online → pink. Distinguishable at a glance.
-      expect(batchTick.className).toMatch(/bg-amber-300/)
+      // batch → blue (graph BATCH convention); online → pink. Distinguishable at a glance.
+      expect(batchTick.className).toMatch(/bg-blue-700/)
       expect(batchTick.className).not.toMatch(/bg-pink-300/)
       expect(onlineTick.className).toMatch(/bg-pink-300/)
-      expect(onlineTick.className).not.toMatch(/bg-amber-300/)
+      expect(onlineTick.className).not.toMatch(/bg-blue-700/)
     } finally {
       r.restore()
     }
@@ -1971,7 +1971,7 @@ describe('LslTimelineStrip', () => {
       await waitFor(() => screen.getByTestId('lsl-tick-sess-nosrc01'))
       const tick = screen.getByTestId('lsl-tick-sess-nosrc01')
       expect(tick.className).toMatch(/bg-pink-300/)
-      expect(tick.className).not.toMatch(/bg-amber-300/)
+      expect(tick.className).not.toMatch(/bg-blue-700/)
     } finally {
       r.restore()
     }
