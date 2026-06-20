@@ -98,11 +98,11 @@ ORPHAN-01..04 are **closed by upstream work** (Phase 57 regression-recovery on 2
 | VKBUI-02 | Phase 60 | Not started |
 | VKBUI-03 | Phase 60 | Not started |
 | VKBUI-04 | Phase 60 | Not started |
-| LSLTIME-01 | Phase 61 | Not started |
-| LSLTIME-02 | Phase 61 | Not started |
-| LSLTIME-03 | Phase 61 | Not started |
-| OKBROUTE-01 | Phase 61 | Not started |
-| OKBROUTE-02 | Phase 61 | Not started |
+| LSLTIME-01 | Phase 61 | Planned |
+| LSLTIME-02 | Phase 61 | Planned |
+| LSLTIME-03 | Phase 61 | Planned |
+| OKBROUTE-01 | Phase 61 | Planned |
+| OKBROUTE-02 | Phase 61 | Planned |
 | ORPHAN-01 | Phase 59 | Closed-upstream (2026-06-15) |
 | ORPHAN-02 | Phase 59 | Closed-upstream (2026-06-15) |
 | ORPHAN-03 | Phase 59 | Closed-upstream (2026-06-15) |

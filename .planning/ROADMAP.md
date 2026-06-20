@@ -1164,5 +1164,16 @@ Plans:
   4. Visiting `/viewer/okb` while the OKM Express server is running on `:8090` renders real RaaS / KPI-FW / business entities from OKM Express — the ApiClient detects the legacy `/api/entities` contract shape and routes correctly without forcing the km-core `/api/v1/entities` shape.
   5. The OKB tab never shows coding-KG mirror entities (e.g., `CodeAnalyzer`, `PersistenceAgent`); if the OKM Express server is unreachable, the tab surfaces a truthful "OKM Express unreachable on :8090" message rather than silently rendering the wrong data source.
 
-**Plans:** TBD
+**Plans:** 3 plans across 2 waves
+
+Plans:
+
+**Wave 1 (parallel — disjoint files)**
+
+- [ ] 61-01-PLAN.md — obs-api `/api/coding/lsl/sessions` adds additive `total` (true M) + per-session `source` ('online'|'batch', any-`manual`→`batch` rule) + extends `obs-api.coding-lsl-sessions.test.js` (LSLTIME-01, LSLTIME-03 backend dependency)
+- [ ] 61-02-PLAN.md — okb-scoped ApiClient path-rewrite (`/api/v1/`→`/api/` for `:8090` OKM Express) + relation cap 2000 / drop `CORRELATED_WITH` + visible "N of M relations" indicator + client-side 1-hop node-expand + E2E (no-mirror, truthful `:8090` unreachable) (OKBROUTE-01, OKBROUTE-02)
+
+**Wave 2** *(depends on 61-01 for the backend total+source fields)*
+
+- [ ] 61-03-PLAN.md — strip frontend: "showing N of M" badge, `'all'`→`'1y'` rename (6 sites + toggle), amber/pink bi-source ticks, raise client cap to 500 + human-verify visual checkpoint (LSLTIME-01, LSLTIME-02, LSLTIME-03)
 **UI hint:** yes
