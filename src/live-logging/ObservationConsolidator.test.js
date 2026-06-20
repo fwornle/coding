@@ -638,3 +638,88 @@ describe('ObservationConsolidator._pushInsightToKG — D-03 writer-throws catch 
     assert.equal(hasInsightAddCalls.length, 0, 'addRelation never called with type=has_insight after throw');
   });
 });
+
+// ---------------------------------------------------------------------------
+// _callLLM maxTokens budget + empty-content retry guard (2026-06-19 regression).
+//
+// Background: copilot/sonnet's gateway regressed and now TIMES OUT (HTTP 500
+// after ~240s, empty body) on output requests above ~4096 tokens. With the old
+// MAX_TOKENS=16384, `consolidator-insight` prompts (which drive large insight
+// articles) returned HTTP 200 + empty content + `output:16000` in the
+// consolidator's longer-timeout path. The empty-content retry guard only
+// suppressed retries when `output >= MAX_TOKENS - 1` (16383), so 16000 was
+// misread as transient and burned 3 more identical ~250s sonnet calls per
+// chunk — stalling the whole synthesis stage.
+//
+// Fixes locked here:
+//   1. consolidator-insight requests maxTokens=4096 (the only size copilot
+//      reliably returns); other processes keep 16384.
+//   2. empty-content + output within 10% of the cap → no retry (deterministic
+//      truncation), so the bleed is one call, not four.
+// ---------------------------------------------------------------------------
+describe('ObservationConsolidator._callLLM — maxTokens budget + empty-content retry guard', () => {
+  const PROMPT = { system: 'sys', user: 'usr' };
+
+  function withFetchStub(handler, fn) {
+    const original = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+      const body = JSON.parse(init.body);
+      calls.push(body);
+      return handler(calls.length, body);
+    };
+    return Promise.resolve(fn(calls)).finally(() => {
+      globalThis.fetch = original;
+    });
+  }
+
+  const jsonResponse = (obj) => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify(obj),
+  });
+
+  it('Test A: consolidator-insight requests maxTokens=4096; other processes 16384', async () => {
+    const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
+    await withFetchStub(
+      () => jsonResponse({ content: 'ok', tokens: { input: 100, output: 50 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
+      async (calls) => {
+        await c._callLLM(PROMPT, 'consolidator-insight');
+        await c._callLLM(PROMPT, 'consolidator-digest');
+        assert.equal(calls[0].maxTokens, 4096, 'insight call caps output at 4096');
+        assert.equal(calls[1].maxTokens, 16384, 'digest call keeps the 16384 budget');
+      },
+    );
+  });
+
+  it('Test B: empty content with output near the cap → NO retry (deterministic truncation)', async () => {
+    const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
+    await withFetchStub(
+      // 4096 cap, output 4000 (within 10%) — the regressed copilot truncation shape.
+      () => jsonResponse({ content: '', tokens: { input: 20000, output: 4000 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
+      async (calls) => {
+        const result = await c._callLLM(PROMPT, 'consolidator-insight');
+        assert.equal(result, null, 'returns null on deterministic empty truncation');
+        assert.equal(calls.length, 1, 'does NOT retry — exactly one upstream call (was 4 before the fix)');
+      },
+    );
+  });
+
+  it('Test C: empty content with LOW output → still retries (genuine transient hiccup)', async () => {
+    const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
+    await withFetchStub(
+      // First call: empty + output 50, far below the 4096 cap → NOT a truncation
+      // → treated as a transient hiccup and retried. Second call succeeds, so
+      // the test exercises one real retry (~2s backoff) without waiting through
+      // the full schedule.
+      (n) => n === 1
+        ? jsonResponse({ content: '', tokens: { input: 100, output: 50 }, provider: 'copilot', model: 'claude-sonnet-4.6' })
+        : jsonResponse({ content: 'recovered', tokens: { input: 100, output: 40 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
+      async (calls) => {
+        const result = await c._callLLM(PROMPT, 'consolidator-insight');
+        assert.equal(result, 'recovered', 'low-output empty content is retried and recovers');
+        assert.equal(calls.length, 2, 'retried exactly once before succeeding');
+      },
+    );
+  });
+});

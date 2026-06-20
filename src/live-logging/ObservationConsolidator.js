@@ -3880,14 +3880,24 @@ Respond with EXACTLY this structure:
     // chunk deadline.
     const MAX_RETRIES = 3;
     const BACKOFF_MS = [2000, 5000, 10000];
-    // 2026-06-12: bump `maxTokens` past the proxy's 4096 default. Sonnet
-    // routinely needed every token of the 4096 cap to synthesize a single
-    // chunk of 2 digests, returning `content: ""` when it hit max_out
-    // (proxy-bridge server.mjs:585 — the default 4096 is for cheap probes,
-    // not real consolidation work). With 16384 the typical chunk completes
-    // in ~30-50s with non-empty content. The proxy accepts either camelCase
-    // (`maxTokens`) or snake_case key.
-    const MAX_TOKENS = 16384;
+    // maxTokens budget. The proxy accepts either camelCase (`maxTokens`) or
+    // snake_case. History: the 2026-06-12 fix bumped this to 16384 because
+    // sonnet hit the proxy's old 4096 default and returned `content: ""`.
+    //
+    // 2026-06-19: copilot/sonnet's gateway regressed — it now TIMES OUT
+    // (HTTP 500 after ~240s, empty body) on output requests above ~4096
+    // tokens. Probed directly against /api/complete with process
+    // `consolidator-insight`: 16384 → 500/240s empty, 8192 → 500/240s empty,
+    // 4096 → 200/80s with full 14k-char content. `consolidator-insight`
+    // prompts drive the model to emit large insight articles, so a 16384
+    // request never returns — it degrades to 200-with-empty (`output:16000`)
+    // in the consolidator's longer-timeout path and the whole synthesis
+    // stage stalls on 4x wasted ~250s retries per chunk. Cap insight output
+    // at 4096 (ample for the 1-3 insights a 2-digest chunk yields, and the
+    // only size copilot reliably returns). The other processes
+    // (digest/compaction/resynthesize) emit short output well under the
+    // ceiling, so they keep the larger budget.
+    const MAX_TOKENS = processName === 'consolidator-insight' ? 4096 : 16384;
     const requestBody = {
       process: processName,
       ...(this.provider ? { provider: this.provider } : {}),
@@ -3970,8 +3980,15 @@ Respond with EXACTLY this structure:
         try { parsed = JSON.parse(bodyText); } catch { parsed = null; }
         const content = parsed?.content;
         const outTokens = parsed?.tokens?.output;
+        // Copilot's gateway reports the output count a few hundred tokens
+        // shy of the requested cap (e.g. `output:16000` for a 16384 request)
+        // when it truncates and returns empty content. The old `>= MAX_TOKENS
+        // - 1` check missed that gap, so a deterministic truncation was
+        // misread as a transient hiccup and burned 3 more identical ~250s
+        // retries. Treat "empty + output within 10% of the cap" as the
+        // deterministic truncation case (no retry).
         const hitMaxTokens = typeof outTokens === 'number'
-          && outTokens >= MAX_TOKENS - 1;
+          && outTokens >= MAX_TOKENS * 0.9;
         if (!content) {
           if (hitMaxTokens) {
             log.error('LLM hit max_tokens — content empty, no retry (deterministic)', {
