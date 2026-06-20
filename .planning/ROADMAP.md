@@ -1194,7 +1194,7 @@ Plans:
 
 ### Phases
 
-- [ ] **Phase 62: Worker Pool Core & stream-JSON Transport** — persistent `claude -p --input-format stream-json --output-format stream-json` workers, per-model pinned, concurrency-1, serving ONLY the CLI-fallback path; `LLM_PROXY_DISABLE_WORKER_POOL=1` escape hatch wired first.
+- [x] **Phase 62: Worker Pool Core & stream-JSON Transport** — persistent `claude -p --input-format stream-json --output-format stream-json` workers, per-model pinned, concurrency-1, serving ONLY the CLI-fallback path; `LLM_PROXY_DISABLE_WORKER_POOL=1` escape hatch wired first. (completed 2026-06-20)
 - [ ] **Phase 63: Worker Lifecycle — Lazy Spawn, Idle Eviction, Crash Recovery & Cancellation** — lazy spawn on first fallback, idle-evict after configurable timeout (default 30 min), crash → RETRYABLE + lazy respawn (no spin-loop), client-disconnect aborts the in-flight stream-JSON request.
 - [ ] **Phase 64: Worker Hygiene — CLI Version Pinning & stderr Throttling** — record `claude --version` at boot, recycle worker on version drift to keep prompt-cache assumptions valid; drain + throttle worker stderr to once-per-minute-per-worker so persistent-worker CLI warnings don't flood logs.
 - [ ] **Phase 65: Steady-State Latency & Crash-Survival Acceptance** — warm-worker sonnet `say OK` probe completes ≤3s steady-state (cold first-spawn may still be ~10s); pool survives a worker SIGKILL without dropping subsequent same-model requests; idle-eviction observable via `ps`; escape hatch reverts cleanly.
@@ -1212,7 +1212,7 @@ Plans:
   3. Two concurrent same-model fallback requests are never interleaved on a single worker's stdio — each worker serves at most one in-flight request; the second request either queues for that worker or dispatches to a sibling worker (2–3 per model).
   4. The direct OAuth bearer path remains the primary route for haiku at ~0.9s and is behaviorally unchanged — the worker pool is engaged ONLY on the CLI-fallback path (sonnet/opus HTTP 429, transient 401), verified by a haiku probe that never spawns a worker.
   5. Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts the claude-code provider to the current per-call `execFile` path with no behavioral change vs. today (no workers spawn; latency and response shape match the pre-milestone baseline).
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1 (test scaffolding — foundation)**
@@ -1222,7 +1222,7 @@ Plans:
 - [x] 62-02-PLAN.md — `ClaudeWorker` class in NEW `proxy-bridge/worker-pool.mjs`: persistent `claude -p` stream-JSON spawn (verbatim strip flags, prompt-over-stdin), JSON-Lines framing (partial-line safe, stderr drained), one-promise-per-request, `{content,model,tokens}` extraction, `cancel()` interrupt seam (worker survives — Q3), threshold-driven recycle bounding cross-call context leakage (mandatory hazard control), reap-on-exit. (POOL-01)
 
 **Wave 3** *(depends on 62-02 — both touch worker-pool.mjs)*
-- [ ] 62-03-PLAN.md — `WorkerPool` router (key=model×prompt-hash D-01, concurrency-1 + sibling dispatch POOL-03, overflow→execFile D-06, LRU prompt-pool cap D-02, lazy/no-allowlist D-07) + `completeClaudeCode()` dispatcher edit: `viaCliPath` helper gated by `LLM_PROXY_DISABLE_WORKER_POOL` (GUARD-01) orthogonal to `DISABLE_CLAUDE_DIRECT` (D-08); direct path + `completeClaudeCodeViaCLI` untouched (POOL-04). (POOL-02, POOL-03, POOL-04, GUARD-01)
+- [x] 62-03-PLAN.md — `WorkerPool` router (key=model×prompt-hash D-01, concurrency-1 + sibling dispatch POOL-03, overflow→execFile D-06, LRU prompt-pool cap D-02, lazy/no-allowlist D-07) + `completeClaudeCode()` dispatcher edit: `viaCliPath` helper gated by `LLM_PROXY_DISABLE_WORKER_POOL` (GUARD-01) orthogonal to `DISABLE_CLAUDE_DIRECT` (D-08); direct path + `completeClaudeCodeViaCLI` untouched (POOL-04). (POOL-02, POOL-03, POOL-04, GUARD-01)
 
 ### Phase 63: Worker Lifecycle — Lazy Spawn, Idle Eviction, Crash Recovery & Cancellation
 **Goal:** Worker subprocesses come and go correctly under real traffic — they spawn only when needed, free their RAM when idle, survive individual crashes without spin-looping, and never get pinned by a dead client — so a concurrency-1 pool stays healthy across busy and idle periods.

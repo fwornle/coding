@@ -18,10 +18,10 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ### Worker Pool Core (POOL)
 
-- [ ] **POOL-01:** The proxy maintains persistent `claude` CLI workers communicating over `--input-format stream-json --output-format stream-json`; each worker boots once (auth + auto-injected system prompt loaded) and serves multiple sequential requests without re-spawning.
-- [ ] **POOL-02:** Workers are pinned per-model (haiku/sonnet/opus) — a request for model M routes only to a worker booted with `--model M`. Pool size is 2–3 workers per model, lazily spawned (a model's pool stays cold until its first fallback request).
-- [ ] **POOL-03:** Each worker serves at most one in-flight request at a time (concurrency 1); concurrent same-model requests queue or dispatch to a sibling worker — never interleaved on one worker's stdio.
-- [ ] **POOL-04:** The worker pool serves ONLY the claude-code CLI-fallback path (sonnet/opus on HTTP 429, transient 401). The direct OAuth bearer path remains the primary route for haiku (~0.9s) and is behaviorally unchanged.
+- [x] **POOL-01:** The proxy maintains persistent `claude` CLI workers communicating over `--input-format stream-json --output-format stream-json`; each worker boots once (auth + auto-injected system prompt loaded) and serves multiple sequential requests without re-spawning.
+- [x] **POOL-02:** Workers are pinned per-model (haiku/sonnet/opus) — a request for model M routes only to a worker booted with `--model M`. Pool size is 2–3 workers per model, lazily spawned (a model's pool stays cold until its first fallback request).
+- [x] **POOL-03:** Each worker serves at most one in-flight request at a time (concurrency 1); concurrent same-model requests queue or dispatch to a sibling worker — never interleaved on one worker's stdio.
+- [x] **POOL-04:** The worker pool serves ONLY the claude-code CLI-fallback path (sonnet/opus on HTTP 429, transient 401). The direct OAuth bearer path remains the primary route for haiku (~0.9s) and is behaviorally unchanged.
 
 ### Worker Lifecycle (WLIFE)
 
@@ -32,7 +32,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ### Safety & Compatibility (GUARD)
 
-- [ ] **GUARD-01:** Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts the claude-code provider to the current per-call `execFile` path with no behavioral change vs. today.
+- [x] **GUARD-01:** Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts the claude-code provider to the current per-call `execFile` path with no behavioral change vs. today.
 - [ ] **GUARD-02:** The pool records the `claude` CLI version at worker boot and recycles a worker when `claude --version` drifts from its boot version, keeping prompt-cache assumptions valid across CLI upgrades.
 - [ ] **GUARD-03:** Worker stderr is drained and throttled (logged at most once per minute per worker, not once per line) so persistent-worker CLI warnings (e.g. "no stdin data received") do not flood logs.
 
@@ -54,11 +54,11 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| POOL-01 | Phase 62 | Not started |
-| POOL-02 | Phase 62 | Not started |
-| POOL-03 | Phase 62 | Not started |
-| POOL-04 | Phase 62 | Not started |
-| GUARD-01 | Phase 62 | Not started |
+| POOL-01 | Phase 62 | Complete |
+| POOL-02 | Phase 62 | Complete |
+| POOL-03 | Phase 62 | Complete |
+| POOL-04 | Phase 62 | Complete |
+| GUARD-01 | Phase 62 | Complete |
 | WLIFE-01 | Phase 63 | Not started |
 | WLIFE-02 | Phase 63 | Not started |
 | WLIFE-03 | Phase 63 | Not started |
