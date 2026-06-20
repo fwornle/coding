@@ -93,9 +93,9 @@ interface LslTimelineStripProps {
 function pctOfWindow(iso: string, windowMs: number, originMs?: number): number {
   const ts = new Date(iso).getTime()
   if (Number.isNaN(ts)) return 0
-  // 2026-06-12: with an explicit `originMs` (used by the 'all' window),
+  // 2026-06-12: with an explicit `originMs` (used by the '1y' window),
   // position is measured against [originMs, now] instead of [now-windowMs, now].
-  // This is what stops the 'all' view from squashing every recent tick
+  // This is what stops the '1y' view from squashing every recent tick
   // into the rightmost 2% of the strip when there's only 30d of data
   // but the window slot says 365d.
   if (typeof originMs === 'number') {
@@ -208,7 +208,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // `selectionSource = 'history'` with `focalNodeId` collapsed to a
   // long-lived ancestor (LiveLoggingSystem) whose `createdAt` is
   // days/weeks old → `selectedTs` is OLD and the original auto-slide
-  // would jump straight to 'all' even though the user is looking at a
+  // would jump straight to '1y' even though the user is looking at a
   // bucket that's clearly inside the current window. When the
   // originator IS the timeline, the user already SAW the tick they
   // clicked — sliding away from it makes the UX worse, not better.
@@ -332,8 +332,8 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // active. Under Decision C auto-drill the focal collapses to LLS
   // (LiveLoggingSystem) whose `createdAt` is days/weeks old, so
   // `ageMs > WINDOW_MS['24h']` (and frequently > WINDOW_MS['30d']) and
-  // the branch re-applies `setWindowKey('all')` on every render —
-  // overriding the user's manual change AND auto-sliding to 'all' the
+  // the branch re-applies `setWindowKey('1y')` on every render —
+  // overriding the user's manual change AND auto-sliding to '1y' the
   // first time the operator clicks any recent-bucket tick whose focal
   // resolves to LLS. The fix gates the auto-slide branch on
   // `selectedTs` having ACTUALLY CHANGED since last render
@@ -384,7 +384,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // 2026-06-14 (Plan 06 gap-closure — scale-selector regression, part 2):
     // when the selection originated from the timeline itself, the user
     // is already looking at the tick they clicked. Auto-sliding the
-    // window away from it (to 'all') because the focal happens to be an
+    // window away from it (to '1y') because the focal happens to be an
     // old long-lived ancestor (LiveLoggingSystem under Decision C
     // auto-drill) makes the UX worse — the operator's bucket vanishes
     // from view. Skip the slide for timeline-originated selections.
@@ -402,7 +402,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     const next: LslWindow | null =
       ageMs <= WINDOW_MS['7d'] ? '7d'
       : ageMs <= WINDOW_MS['30d'] ? '30d'
-      : 'all'
+      : '1y'
     if (next && next !== windowKey) {
       // Remember the prior window only once per selection — subsequent
       // auto-slides within the same selection chain shouldn't overwrite.
@@ -420,10 +420,14 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   // 2026-06-13 (Phase 56.1 Plan 05): the inline useQuery is extracted to
   // `useLslSessions` so the reverse-lookup pre-index hook can share the
   // cache entry without duplicating the queryKey/queryFn surface.
+  // Phase 61 Plan 03: the hook now returns { sessions, total } (the N-of-M
+  // honesty widen). `total` (M) is the full pre-slice backend count; the
+  // deduped `sessions` length below is N (what's actually rendered as ticks).
   const { data } = useLslSessions(apiClient, windowKey)
+  const total = data?.total
 
   const sessions: LslSession[] = useMemo(() => {
-    const arr = data ?? []
+    const arr = data?.sessions ?? []
     // 2026-06-12: dedup by (id + startAt) — NOT id alone. The API
     // returns one entry per LSL tranche file (`2026-06-10_2200-2300_
     // c197ef.md` etc.), and every tranche from the SAME session shares
@@ -443,13 +447,13 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     return deduped.sort((a, b) => a.startAt.localeCompare(b.startAt))
   }, [data])
 
-  // 2026-06-12: dynamic origin for the 'all' window — span from the
-  // EARLIEST session's startAt to now. Without this, 'all' (= 365d slot)
+  // 2026-06-12: dynamic origin for the '1y' window — span from the
+  // EARLIEST session's startAt to now. Without this, '1y' (= 365d slot)
   // pushed every real session into the rightmost few percent of the
   // strip (the "squashed to the right" symptom). With the data-driven
   // origin, all ticks distribute evenly across the full strip width.
   const allOriginMs = useMemo<number | undefined>(() => {
-    if (windowKey !== 'all') return undefined
+    if (windowKey !== '1y') return undefined
     if (sessions.length === 0) return undefined
     let min = Infinity
     for (const s of sessions) {
@@ -466,17 +470,17 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   //
   // Span derivation mirrors pctOfWindow at lines 103-119:
   //   - fixed windows (24h/7d/30d): span = [now - WINDOW_MS, now]
-  //   - 'all': span = [allOriginMs, now] (dynamic data-driven origin)
+  //   - '1y': span = [allOriginMs, now] (dynamic data-driven origin)
   //
-  // For the 'all' window we also widen the ladder using the actual span
+  // For the '1y' window we also widen the ladder using the actual span
   // duration so multi-day labels switch on once the data is wide enough.
   // Until sessions are loaded (allOriginMs === undefined) the ladder
-  // falls back to the WINDOW_MS['all'] slot (365d) → "Mon DD" labels.
+  // falls back to the WINDOW_MS['1y'] slot (365d) → "Mon DD" labels.
   const scaleTicks = useMemo<Array<{ ms: number; pct: number; label: string }>>(() => {
     const endMs = Date.now()
-    const isAll = windowKey === 'all'
+    const isAll = windowKey === '1y'
     const startMs = isAll
-      ? (allOriginMs ?? endMs - WINDOW_MS['all'])
+      ? (allOriginMs ?? endMs - WINDOW_MS['1y'])
       : endMs - WINDOW_MS[windowKey]
     const ladderWindowMs = endMs - startMs
     const COUNT = 7
@@ -494,7 +498,7 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
   }, [windowKey, allOriginMs])
 
   function onWindowChange(next: string) {
-    if (next === '24h' || next === '7d' || next === '30d' || next === 'all') {
+    if (next === '24h' || next === '7d' || next === '30d' || next === '1y') {
       // Manual change drops the auto-slide memory: if the user explicitly
       // picks a window they want it to STICK across the next deselect.
       preSlideWindowRef.current = null
@@ -832,10 +836,25 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
           <ToggleGroupItem value="30d" aria-label="30 days" className="text-[10px] h-6 px-1.5">
             30d
           </ToggleGroupItem>
-          <ToggleGroupItem value="all" aria-label="All time" className="text-[10px] h-6 px-1.5">
-            all
+          <ToggleGroupItem value="1y" aria-label="1 year" className="text-[10px] h-6 px-1.5">
+            1y
           </ToggleGroupItem>
         </ToggleGroup>
+        {/*
+          Phase 61 Plan 03 (LSLTIME-01/D-01/D-02): N-of-M honesty badge.
+          The fetch is bounded at limit=500; when the backend's pre-slice
+          count (M = `total`) exceeds the rendered tick count (N =
+          deduped sessions.length), surface it so the operator is never
+          silently truncated. Hidden when N >= M (nothing hidden).
+        */}
+        {typeof total === 'number' && total > sessions.length && (
+          <span
+            data-testid="lsl-nofm-badge"
+            className="text-[10px] text-muted-foreground px-1.5"
+          >
+            showing {sessions.length} of {total}
+          </span>
+        )}
         {/*
           2026-06-13 [Phase 56-03 AC #1]: wrapper splits the strip into a
           scale row (top, h-4) + tick row (bottom, h-6) stacked via
@@ -916,9 +935,19 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
                       : (isRunning && selectedTs === null && focalBucketKey === null && selectedBucketKeys.size === 0)
                         ? 'ring-2 ring-primary'
                         : ''
+              // Phase 61 Plan 03 (LSLTIME-03/D-08): bi-source tick color.
+              // Halo (blue) wins; otherwise split on session provenance —
+              // manual/batch (wave-analysis) renders AMBER, online/auto (or
+              // absent source) keeps the existing pink. Amber chosen over
+              // slate (RESEARCH Unknown 2): slate reads too close to the
+              // opacity-40 disabled dim. The disabled (opacity-40) and
+              // selection/halo (ring-blue-*) classes compose ON TOP unchanged
+              // at the className below — do not fold them into fillClass.
               const fillClass = isHaloBucket
                 ? 'bg-blue-200/40 hover:bg-blue-300/50'
-                : 'bg-pink-300 hover:bg-pink-400'
+                : s.source === 'batch'
+                  ? 'bg-amber-300 hover:bg-amber-400'
+                  : 'bg-pink-300 hover:bg-pink-400'
               // 2026-06-13 (audit §5.4 option B): grey-out classes are
               // additive — opacity-40 dims the pink fill + pointer-events-
               // none kills click reactivity + cursor-default removes the

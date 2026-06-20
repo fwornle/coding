@@ -95,6 +95,8 @@ interface LslSession {
   endAt: string | null
   observationCount: number
   entityIds: string[]
+  // Phase 61 Plan 03: provenance discriminator (amber=batch, pink=online).
+  source?: 'online' | 'batch'
 }
 
 function nowMinusHours(hours: number): string {
@@ -199,14 +201,15 @@ describe('LslTimelineStrip', () => {
     }
   })
 
-  test('Test 2: default window is 7d; fetches /api/coding/lsl/sessions?since=now-7d&limit=200', async () => {
+  test('Test 2: default window is 7d; fetches /api/coding/lsl/sessions?since=now-7d&limit=500', async () => {
     const r = renderStrip()
     try {
       await waitFor(() => {
         expect(r.fetchImpl).toHaveBeenCalled()
       })
       const url = (r.fetchImpl as unknown as { mock: { calls: [string][] } }).mock.calls[0][0]
-      expect(url).toMatch(/\/api\/coding\/lsl\/sessions\?since=.+&limit=200/)
+      // Phase 61 Plan 03 (D-03): client cap raised 200 -> 500 (backend LSL_MAX_LIMIT).
+      expect(url).toMatch(/\/api\/coding\/lsl\/sessions\?since=.+&limit=500/)
     } finally {
       r.restore()
     }
@@ -1671,7 +1674,7 @@ describe('LslTimelineStrip', () => {
       })
       // CRITICAL: window must NOT auto-slide. 7d stays selected.
       const btn7d = screen.getByLabelText('7 days')
-      const btnAll = screen.getByLabelText('All time')
+      const btnAll = screen.getByLabelText('1 year')
       expect(btn7d.getAttribute('data-state')).toBe('on')
       expect(btnAll.getAttribute('data-state')).not.toBe('on')
     } finally {
@@ -1734,7 +1737,7 @@ describe('LslTimelineStrip', () => {
       })
       // CRITICAL: window must NOT auto-slide to 'all'. 7d stays selected.
       const btn7d = screen.getByLabelText('7 days')
-      const btnAll = screen.getByLabelText('All time')
+      const btnAll = screen.getByLabelText('1 year')
       expect(btn7d.getAttribute('data-state')).toBe('on')
       expect(btnAll.getAttribute('data-state')).not.toBe('on')
     } finally {
@@ -1790,7 +1793,7 @@ describe('LslTimelineStrip', () => {
       })
       // Auto-slide fires for graph-source selection with old focal.
       await waitFor(() => {
-        const btnAll = screen.getByLabelText('All time')
+        const btnAll = screen.getByLabelText('1 year')
         expect(btnAll.getAttribute('data-state')).toBe('on')
       })
       // Symptom 2 probe: manually click 24h. Pre-fix, the auto-slide
@@ -1804,7 +1807,7 @@ describe('LslTimelineStrip', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('24 hours').getAttribute('data-state')).toBe('on')
       })
-      expect(screen.getByLabelText('All time').getAttribute('data-state')).not.toBe('on')
+      expect(screen.getByLabelText('1 year').getAttribute('data-state')).not.toBe('on')
       // 30d also works.
       const btn30d = screen.getByLabelText('30 days')
       act(() => {
@@ -1813,7 +1816,7 @@ describe('LslTimelineStrip', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('30 days').getAttribute('data-state')).toBe('on')
       })
-      expect(screen.getByLabelText('All time').getAttribute('data-state')).not.toBe('on')
+      expect(screen.getByLabelText('1 year').getAttribute('data-state')).not.toBe('on')
       // 7d also works.
       const btn7d = screen.getByLabelText('7 days')
       act(() => {
@@ -1822,7 +1825,7 @@ describe('LslTimelineStrip', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('7 days').getAttribute('data-state')).toBe('on')
       })
-      expect(screen.getByLabelText('All time').getAttribute('data-state')).not.toBe('on')
+      expect(screen.getByLabelText('1 year').getAttribute('data-state')).not.toBe('on')
     } finally {
       r.restore()
       mockEntities.length = 0
@@ -1833,6 +1836,144 @@ describe('LslTimelineStrip', () => {
         focalBucketKey: null,
         selectionSource: null,
       })
+    }
+  })
+
+  // ---------------------------------------------------------------------
+  // Phase 61 Plan 03 (LSLTIME-01/02/03): N-of-M honesty badge, 1y ladder,
+  // bi-source tick color. Local render helper so we can inject a custom
+  // envelope payload ({ sessions, total }) — the shared renderStrip only
+  // wires { sessions } with no `total`.
+  // ---------------------------------------------------------------------
+
+  function renderStripWithPayload(payload: {
+    sessions: LslSession[]
+    total?: number
+  }) {
+    const originalFetch = globalThis.fetch
+    const fetchImpl = makeFetchResponse(payload)
+    globalThis.fetch = fetchImpl
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
+    })
+    const apiClient = new ApiClient('http://localhost:12436')
+    const result = render(
+      <QueryClientProvider client={client}>
+        <LslTimelineStrip system="coding" apiClient={apiClient} />
+      </QueryClientProvider>,
+    )
+    return {
+      ...result,
+      restore: () => {
+        globalThis.fetch = originalFetch
+      },
+    }
+  }
+
+  test('Test 41 [Plan 03 — LSLTIME-02]: window ladder renders a 1y item and NO "all" / "All time" item', async () => {
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getByLabelText('1 year'))
+      // The honest 1y label is present.
+      expect(screen.getByLabelText('1 year')).toBeTruthy()
+      expect(screen.getByText('1y')).toBeTruthy()
+      // The deceptive 'all' / 'All time' label is gone.
+      expect(screen.queryByLabelText('All time')).toBeNull()
+      expect(screen.queryByText('all')).toBeNull()
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 42 [Plan 03 — LSLTIME-01]: N-of-M badge renders when total > rendered ticks, with the honest "showing N of M" text', async () => {
+    // 3 sessions rendered, backend reports 7 total → badge "showing 3 of 7".
+    const r = renderStripWithPayload({ sessions: makeSessions(), total: 7 })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-nofm-badge'))
+      const badge = screen.getByTestId('lsl-nofm-badge')
+      expect(badge.textContent).toMatch(/showing\s+3\s+of\s+7/)
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 43 [Plan 03 — LSLTIME-01]: N-of-M badge is ABSENT when total === rendered ticks (nothing hidden)', async () => {
+    const r = renderStripWithPayload({ sessions: makeSessions(), total: 3 })
+    try {
+      await waitFor(() => screen.getAllByTestId(/^lsl-tick-/))
+      expect(screen.queryByTestId('lsl-nofm-badge')).toBeNull()
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 44 [Plan 03 — LSLTIME-01]: N-of-M badge is ABSENT when the backend omits total (no honesty claim possible)', async () => {
+    // The shared renderStrip wires { sessions } with NO total — badge must
+    // not render (typeof total !== 'number').
+    const r = renderStrip()
+    try {
+      await waitFor(() => screen.getAllByTestId(/^lsl-tick-/))
+      expect(screen.queryByTestId('lsl-nofm-badge')).toBeNull()
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 45 [Plan 03 — LSLTIME-03]: a batch session tick is amber while an online session tick is pink', async () => {
+    // Two sessions, one per provenance class. Halo/selection is inactive
+    // (no selection), so fillClass falls through to the source branch.
+    const sessions: LslSession[] = [
+      {
+        id: 'sess-batch01',
+        startAt: nowMinusHours(1),
+        endAt: nowMinusHours(0.5),
+        observationCount: 4,
+        entityIds: ['eb'],
+        source: 'batch',
+      },
+      {
+        id: 'sess-online1',
+        startAt: nowMinusHours(2),
+        endAt: nowMinusHours(1.5),
+        observationCount: 6,
+        entityIds: ['eo'],
+        source: 'online',
+      },
+    ]
+    const r = renderStripWithPayload({ sessions })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-batch01'))
+      const batchTick = screen.getByTestId('lsl-tick-sess-batch01')
+      const onlineTick = screen.getByTestId('lsl-tick-sess-online1')
+      // batch → amber; online → pink. Distinguishable at a glance.
+      expect(batchTick.className).toMatch(/bg-amber-300/)
+      expect(batchTick.className).not.toMatch(/bg-pink-300/)
+      expect(onlineTick.className).toMatch(/bg-pink-300/)
+      expect(onlineTick.className).not.toMatch(/bg-amber-300/)
+    } finally {
+      r.restore()
+    }
+  })
+
+  test('Test 46 [Plan 03 — LSLTIME-03]: a session with no source defaults to pink (online convention)', async () => {
+    const sessions: LslSession[] = [
+      {
+        id: 'sess-nosrc01',
+        startAt: nowMinusHours(1),
+        endAt: nowMinusHours(0.5),
+        observationCount: 3,
+        entityIds: ['en'],
+        // source omitted
+      },
+    ]
+    const r = renderStripWithPayload({ sessions })
+    try {
+      await waitFor(() => screen.getByTestId('lsl-tick-sess-nosrc01'))
+      const tick = screen.getByTestId('lsl-tick-sess-nosrc01')
+      expect(tick.className).toMatch(/bg-pink-300/)
+      expect(tick.className).not.toMatch(/bg-amber-300/)
+    } finally {
+      r.restore()
     }
   })
 })
