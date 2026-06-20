@@ -1212,7 +1212,17 @@ Plans:
   3. Two concurrent same-model fallback requests are never interleaved on a single worker's stdio — each worker serves at most one in-flight request; the second request either queues for that worker or dispatches to a sibling worker (2–3 per model).
   4. The direct OAuth bearer path remains the primary route for haiku at ~0.9s and is behaviorally unchanged — the worker pool is engaged ONLY on the CLI-fallback path (sonnet/opus HTTP 429, transient 401), verified by a haiku probe that never spawns a worker.
   5. Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts the claude-code provider to the current per-call `execFile` path with no behavioral change vs. today (no workers spawn; latency and response shape match the pre-milestone baseline).
-**Plans:** TBD
+**Plans:** 3 plans across 3 waves
+
+Plans:
+**Wave 1 (test scaffolding — foundation)**
+- [ ] 62-01-PLAN.md — Wave-0 test scaffolding: shared mock-claude-stdio helper + RED unit suite (POOL-01 parsing, POOL-02 keying, POOL-03 concurrency-1 + D-06 overflow) + argv-gated `--live` integration suite (POOL-01 PID reuse, POOL-04 no-spawn-on-direct, GUARD-01, cancel seam). Encodes the 5 success criteria as named tests.
+
+**Wave 2** *(depends on 62-01 — implements against the test contracts)*
+- [ ] 62-02-PLAN.md — `ClaudeWorker` class in NEW `proxy-bridge/worker-pool.mjs`: persistent `claude -p` stream-JSON spawn (verbatim strip flags, prompt-over-stdin), JSON-Lines framing (partial-line safe, stderr drained), one-promise-per-request, `{content,model,tokens}` extraction, `cancel()` interrupt seam (worker survives — Q3), threshold-driven recycle bounding cross-call context leakage (mandatory hazard control), reap-on-exit. (POOL-01)
+
+**Wave 3** *(depends on 62-02 — both touch worker-pool.mjs)*
+- [ ] 62-03-PLAN.md — `WorkerPool` router (key=model×prompt-hash D-01, concurrency-1 + sibling dispatch POOL-03, overflow→execFile D-06, LRU prompt-pool cap D-02, lazy/no-allowlist D-07) + `completeClaudeCode()` dispatcher edit: `viaCliPath` helper gated by `LLM_PROXY_DISABLE_WORKER_POOL` (GUARD-01) orthogonal to `DISABLE_CLAUDE_DIRECT` (D-08); direct path + `completeClaudeCodeViaCLI` untouched (POOL-04). (POOL-02, POOL-03, POOL-04, GUARD-01)
 
 ### Phase 63: Worker Lifecycle — Lazy Spawn, Idle Eviction, Crash Recovery & Cancellation
 **Goal:** Worker subprocesses come and go correctly under real traffic — they spawn only when needed, free their RAM when idle, survive individual crashes without spin-looping, and never get pinned by a dead client — so a concurrency-1 pool stays healthy across busy and idle periods.
