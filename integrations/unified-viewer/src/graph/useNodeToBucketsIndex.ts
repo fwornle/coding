@@ -68,7 +68,11 @@ export function useNodeToBucketsIndex(
 ): ReadonlyMap<string, ReadonlySet<string>> {
   const visibleIds = useVisibleEntityIds(apiClient, system)
   const { entities, relations } = useGraphData(apiClient, system)
-  const { data: sessions } = useLslSessions(apiClient)
+  // Phase 61 Plan 03: useLslSessions now returns { sessions, total } (the
+  // N-of-M honesty widen). Read `data.sessions` for the array — destructuring
+  // `data` directly would make `sessions` the whole object and break .map below.
+  const { data } = useLslSessions(apiClient)
+  const sessions = data?.sessions
 
   // Memoised LLS-id Set — name-based (Q2). Identical derivation idiom to
   // `LslTimelineStrip.tsx noiseAncestors` so the two callsites of
