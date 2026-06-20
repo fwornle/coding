@@ -161,7 +161,8 @@
           "description": "Absolute filesystem path to the project's root directory (matches scout-codebase + findBestParent heuristics)",
           "facet": "structure"
         }
-      }
+      },
+      "level": 0
     },
     "Contract": {
       "description": "A specification of what a component promises to do — the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",

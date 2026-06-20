@@ -2,11 +2,11 @@
   "meta": {
     "name": "upper",
     "version": "1.0.0",
-    "description": "obs-api curated upper: host upper + LearningArtifact (Gap A \u2014 L1/L2 + writer classes in one registry)"
+    "description": "obs-api curated upper: host upper + LearningArtifact (Gap A — L1/L2 + writer classes in one registry)"
   },
   "classes": {
     "File": {
-      "description": "A single source file \u2014 the atomic unit of the code hierarchy",
+      "description": "A single source file — the atomic unit of the code hierarchy",
       "relationships": {},
       "properties": {
         "path": {
@@ -147,12 +147,12 @@
       }
     },
     "Project": {
-      "description": "Top-level anchor for a team's wave-analysis emissions \u2014 every entity ultimately roots back to a Project. Minted by ensureProjectAnchor when the registry first sees a team's wave-analysis run.",
+      "description": "Top-level anchor for a team's wave-analysis emissions — every entity ultimately roots back to a Project. Minted by ensureProjectAnchor when the registry first sees a team's wave-analysis run.",
       "relationships": {},
       "properties": {
         "name": {
           "type": "string",
-          "description": "Project name (PascalCase or single-word \u2014 e.g. 'Coding', 'RaaS', 'Agentic')",
+          "description": "Project name (PascalCase or single-word — e.g. 'Coding', 'RaaS', 'Agentic')",
           "required": true,
           "facet": "structure"
         },
@@ -161,10 +161,11 @@
           "description": "Absolute filesystem path to the project's root directory (matches scout-codebase + findBestParent heuristics)",
           "facet": "structure"
         }
-      }
+      },
+      "level": 0
     },
     "Contract": {
-      "description": "A specification of what a component promises to do \u2014 the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",
+      "description": "A specification of what a component promises to do — the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",
       "relationships": {},
       "properties": {
         "contractName": {
@@ -529,10 +530,10 @@
       "evolution"
     ],
     "entities": {
-      "_comment_structure": "=== FACET 1: STRUCTURE \u2014 What it IS ===",
+      "_comment_structure": "=== FACET 1: STRUCTURE — What it IS ===",
       "File": {
         "facet": "structure",
-        "description": "A single source file \u2014 the atomic unit of the code hierarchy",
+        "description": "A single source file — the atomic unit of the code hierarchy",
         "properties": {
           "path": {
             "type": "string",
@@ -695,10 +696,10 @@
           "Continuous Learning Pipeline (prototype)"
         ]
       },
-      "_comment_behavior": "=== FACET 2: BEHAVIOR \u2014 What it DOES ===",
+      "_comment_behavior": "=== FACET 2: BEHAVIOR — What it DOES ===",
       "Contract": {
         "facet": "behavior",
-        "description": "A specification of what a component promises to do \u2014 the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",
+        "description": "A specification of what a component promises to do — the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",
         "properties": {
           "contractName": {
             "type": "string",
@@ -747,7 +748,7 @@
           "Knowledge graph query: accepts Cypher-like query string, returns array of matching entities"
         ]
       },
-      "_comment_operations": "=== FACET 3: OPERATIONS \u2014 How it RUNS ===",
+      "_comment_operations": "=== FACET 3: OPERATIONS — How it RUNS ===",
       "RuntimeDiagnostics": {
         "facet": "operations",
         "description": "Observable diagnostic output available while the system runs",
@@ -858,8 +859,8 @@
           "portNumber"
         ],
         "examples": [
-          "3848 (sse, localhost) \u2014 semantic-analysis",
-          "8080 (http, localhost) \u2014 VKB server"
+          "3848 (sse, localhost) — semantic-analysis",
+          "8080 (http, localhost) — VKB server"
         ]
       },
       "Config": {
@@ -954,7 +955,7 @@
           "python -m codebase_rag.mcp.stdio_proxy (stdio)"
         ]
       },
-      "_comment_resilience": "=== FACET 4: RESILIENCE \u2014 What goes WRONG ===",
+      "_comment_resilience": "=== FACET 4: RESILIENCE — What goes WRONG ===",
       "Fault": {
         "facet": "resilience",
         "description": "A known failure mode with symptoms and resolution",
@@ -1044,8 +1045,8 @@
           "no-auth-on-health: Health endpoint has no authentication (missing-feature, low)"
         ]
       },
-      "_comment_quality": "=== FACET 5: QUALITY \u2014 How GOOD it is (no new nodes, properties on File/Service/Feature) ===",
-      "_comment_evolution": "=== FACET 6: EVOLUTION \u2014 How it CHANGED ===",
+      "_comment_quality": "=== FACET 5: QUALITY — How GOOD it is (no new nodes, properties on File/Service/Feature) ===",
+      "_comment_evolution": "=== FACET 6: EVOLUTION — How it CHANGED ===",
       "Revision": {
         "facet": "evolution",
         "description": "A significant change milestone in the codebase. Not every git commit, but a meaningful event that altered structure or behavior. The lower ontology may link to specific commit ranges.",
@@ -1105,7 +1106,7 @@
       "_comment_structure_rels": "=== STRUCTURE RELATIONS ===",
       "part_of": {
         "facet": "structure",
-        "description": "Composition hierarchy: File \u2192 Service \u2192 Feature",
+        "description": "Composition hierarchy: File → Service → Feature",
         "sourceEntityClass": [
           "File",
           "Service"
