@@ -4,8 +4,12 @@
  * Phase 55 Plan 06 Task 3 — integration coverage for GET /api/coding/lsl/sessions.
  *
  * Wire shape per UI-SPEC §18 + plan <interfaces>:
- *   { id: string, startAt: ISO, endAt: ISO|null, observationCount: number, entityIds: string[] }
- * Envelope per Phase 44 contract: `{ success: true, data: { sessions: LslSession[] } }`.
+ *   { id: string, startAt: ISO, endAt: ISO|null, observationCount: number,
+ *     entityIds: string[], source: 'online'|'batch' }
+ * Envelope per Phase 44 contract + Phase 61 Plan 01 (D-02):
+ *   `{ success: true, data: { sessions: LslSession[], total: number, limit: number } }`
+ *   where `total` is the full pre-slice session count (M) and the array is
+ *   capped at `limit` (N) — the N-of-M honesty badge reads both.
  *
  * The handler walks the directory pointed at by env var OBSERVATIONS_LSL_HISTORY_DIR
  * (or `.specstory/history` when the env var is unset), parsing the Phase 51
@@ -72,6 +76,37 @@ describe('GET /api/coding/lsl/sessions — LslSession[] envelope (Phase 55 Plan 
     });
     await kmStore.open();
 
+    // Phase 61 Plan 01 (D-07/D-09): seed km-core entities to exercise the
+    // per-session `source` derivation. Source is read by the handler from
+    // `attrs.metadata.source ?? attrs.source` and the session bucket is
+    // 'batch' iff ANY matched entity is metadata.source==='manual'.
+    //
+    // The handler parses the LSL filename HHMM-HHMM range as LOCAL time then
+    // toISOString(), and matches entities whose top-level `createdAt` falls
+    // in [startAt, endAt). We build each entity's createdAt the SAME way
+    // (local Date -> toISOString) so the comparison is host-TZ-independent.
+    const localIso = (s) => new Date(s).toISOString();
+    // skipOntologyCheck:true bypasses ontology validation AND the strict-path
+    // provenance requirement — the trusted bulk-import path used by tests.
+    await kmStore.putEntity(
+      {
+        name: 'Phase61 manual-tagged entity (2026-06-09 batch window)',
+        entityType: 'Insight',
+        createdAt: localIso('2026-06-09T16:30:00'), // inside [16:00,17:00) local
+        metadata: { source: 'manual' },
+      },
+      { skipOntologyCheck: true },
+    );
+    await kmStore.putEntity(
+      {
+        name: 'Phase61 auto-tagged entity (2026-06-08 online window)',
+        entityType: 'Insight',
+        createdAt: localIso('2026-06-08T09:30:00'), // inside [09:00,10:00) local
+        metadata: { source: 'auto' },
+      },
+      { skipOntologyCheck: true },
+    );
+
     const obsApi = await import('../../scripts/observations-api-server.mjs');
     testHooks = obsApi._testHooks;
     testHooks.setKMStoreForTest(kmStore);
@@ -108,6 +143,8 @@ describe('GET /api/coding/lsl/sessions — LslSession[] envelope (Phase 55 Plan 
       expect(s.endAt === null || typeof s.endAt === 'string').toBe(true);
       expect(typeof s.observationCount).toBe('number');
       expect(Array.isArray(s.entityIds)).toBe(true);
+      // Phase 61 Plan 01 (D-07): every session carries a 2-value source enum.
+      expect(['online', 'batch']).toContain(s.source);
     }
   });
 
@@ -137,6 +174,29 @@ describe('GET /api/coding/lsl/sessions — LslSession[] envelope (Phase 55 Plan 
   test('?limit=2 caps the result count', async () => {
     const { body } = await httpGet('/api/coding/lsl/sessions?since=2026-05-01T00:00:00Z&limit=2');
     expect(body.data.sessions.length).toBe(2);
+  });
+
+  test('returns total = full pre-slice count even when limit caps the array (N<M)', async () => {
+    // Phase 61 Plan 01 (D-02): 4 seeded sessions, capped at limit=2 ->
+    // sessions.length===2 but total===4. This N<M case drives the badge.
+    const { body } = await httpGet('/api/coding/lsl/sessions?since=2026-05-01T00:00:00Z&limit=2');
+    expect(body.data.sessions.length).toBe(2);
+    expect(body.data.total).toBe(4);
+    expect(body.data.limit).toBe(2);
+  });
+
+  test('any-batch->batch rule: manual-tagged entity in window yields source=batch; online-only yields source=online', async () => {
+    // Phase 61 Plan 01 (D-09): the 2026-06-09 16-17 session window contains a
+    // seeded metadata.source==='manual' entity -> source==='batch'. The
+    // 2026-06-08 09-10 session window contains only an 'auto'-source entity
+    // -> source==='online'.
+    const { body } = await httpGet('/api/coding/lsl/sessions?since=2026-05-01T00:00:00Z&limit=200');
+    const batchSession = body.data.sessions.find((s) => s.startAt.startsWith('2026-06-09'));
+    const onlineSession = body.data.sessions.find((s) => s.startAt.startsWith('2026-06-08'));
+    expect(batchSession).toBeDefined();
+    expect(batchSession.source).toBe('batch');
+    expect(onlineSession).toBeDefined();
+    expect(onlineSession.source).toBe('online');
   });
 
   test('?since=<far future> returns sessions: []', async () => {
