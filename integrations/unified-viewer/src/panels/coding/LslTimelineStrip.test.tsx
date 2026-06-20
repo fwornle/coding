@@ -310,6 +310,56 @@ describe('LslTimelineStrip', () => {
     }
   })
 
+  test('Test 6b [2026-06-20 — operator feedback]: a tick whose SOLE resolution is a noise ancestor (LiveLoggingSystem) does NOT auto-drill — it writes the timeline payload so SidePanel renders the session card list, not the generic LLS detail', async () => {
+    // Nearly every LSL session is made of Observation/Digest entities that are
+    // graph-hidden, so resolveToVisibleAncestor collapses them all up to the
+    // single visible ancestor LiveLoggingSystem. Pre-fix, `resolvedNodeIds ===
+    // {LLS}` (size 1) took the auto-drill branch → opened the generic
+    // LiveLoggingSystem EntityDetailPanel for almost every tick (useless).
+    // Fix: when the sole resolution is a noise ancestor, fall through to the
+    // Layer-1 timeline path (source='timeline', bucketKeys populated,
+    // lslFilterEntityIds carries the raw session ids) so SidePanel.isMultiMode
+    // routes to BucketCardList — the session's OWN entities.
+    mockEntities.push({
+      id: 'lls-noise',
+      name: 'LiveLoggingSystem',
+      createdAt: nowMinusHours(100),
+    } as unknown as { id: string; createdAt: string })
+    try {
+      const r = renderStrip({
+        sessions: [
+          {
+            id: 'sess-llsonly',
+            startAt: nowMinusHours(2),
+            endAt: nowMinusHours(1.5),
+            observationCount: 4,
+            entityIds: ['lls-noise'],
+          },
+        ],
+      })
+      try {
+        await waitFor(() => screen.getByTestId('lsl-tick-sess-llsonly'))
+        act(() => {
+          fireEvent.click(screen.getByTestId('lsl-tick-sess-llsonly'))
+        })
+        const s = useViewerStore.getState()
+        // NOT the auto-drill branch (that sets source='history' + empty
+        // bucketKeys). Must be the timeline/card-list path.
+        expect(s.selectionSource).toBe('timeline')
+        expect(s.selectedBucketKeys.size).toBeGreaterThan(0)
+        expect(s.lslSessionFilter).toEqual(['sess-llsonly'])
+        // lslFilterEntityIds carries the raw session id so BucketCardList can
+        // build the session's entity cards.
+        expect(s.lslFilterEntityIds?.has('lls-noise')).toBe(true)
+      } finally {
+        r.restore()
+      }
+    } finally {
+      const i = mockEntities.findIndex((e) => e.id === 'lls-noise')
+      if (i >= 0) mockEntities.splice(i, 1)
+    }
+  })
+
   test('Test 7: Cmd/Ctrl+click UNIONs into lslSessionFilter AND extends selectedBucketKeys (Phase 56.1 additive multi-set)', async () => {
     useViewerStore.setState({ lslSessionFilter: ['sess-aaaaaaaa'] })
     const r = renderStrip()

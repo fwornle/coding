@@ -717,7 +717,20 @@ export default function LslTimelineStrip({ system, apiClient }: LslTimelineStrip
     // Size 0 (sidebar-only mode — every entity unresolvable) also flows
     // through the Layer 1 entry path so the operator sees the bucket
     // selection in some form even when no graph focal landed.
-    if (resolvedNodeIds.size === 1 && focalNodeIdNext !== null) {
+    // 2026-06-20 (operator feedback): do NOT auto-drill when the single
+    // resolution is a NOISE ancestor (LiveLoggingSystem). Almost every LSL
+    // session is made of Observation/Digest entities that are graph-hidden,
+    // so `resolveToVisibleAncestor` collapses them all up to the one visible
+    // ancestor — LiveLoggingSystem — making `resolvedNodeIds === {LLS}` the
+    // common case. Auto-drilling there opened the generic LiveLoggingSystem
+    // detail for nearly every tick (useless). When the sole resolution is a
+    // noise ancestor, fall through to the Layer-1 timeline path below so
+    // SidePanel renders BucketCardList — a card list of the session's OWN
+    // entities (the raw Observation/Digest ids carried in `filterIds` /
+    // `lslFilterEntityIds`), which is what the operator actually wants to see.
+    const focalIsNoiseAncestor =
+      focalNodeIdNext !== null && noiseAncestors.has(focalNodeIdNext)
+    if (resolvedNodeIds.size === 1 && focalNodeIdNext !== null && !focalIsNoiseAncestor) {
       setSelection({
         nodeIds: resolvedNodeIds,
         bucketKeys: new Set<string>(),
