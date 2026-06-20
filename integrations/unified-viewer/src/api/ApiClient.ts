@@ -35,6 +35,29 @@ export interface Relation {
   [k: string]: unknown
 }
 
+/**
+ * Phase 61-02 — uniform listRelations return shape on BOTH apiVersion branches.
+ * `relations` is the (possibly capped) edge array the canvas renders; `total`
+ * is the pre-cap relation count (on the okb/legacy branch this is the count
+ * AFTER the CORRELATED_WITH drop but BEFORE the OKB_RELATION_CAP slice, so a
+ * "showing N of M relations" honesty indicator can render). On the v1/coding
+ * branch `total` always equals `relations.length` (no drop, no cap).
+ */
+export interface RelationsResult {
+  relations: Relation[]
+  total: number
+}
+
+/**
+ * Phase 61-02 — OKB relation ceiling. OKM Express `/api/relations` returns
+ * 18,958 edges (13,737 of them CORRELATED_WITH). Rendering all of them would
+ * blow past the viewer's tuned canvas edge ceiling (T-61-02-03 DoS). We drop
+ * CORRELATED_WITH first (the bulk + lowest signal), then cap the remainder at
+ * this constant, surfacing the pre-cap count via RelationsResult.total so the
+ * operator is never deceived into thinking they see the full graph.
+ */
+export const OKB_RELATION_CAP = 2000
+
 /** Ontology class — pre-Plan-04 returns `string[]`, post-Plan-04 returns objects. */
 export interface OntologyClass {
   name: string
@@ -79,11 +102,41 @@ export interface TypedViewEnvelope<T> {
 }
 
 export class ApiClient {
-  constructor(private readonly baseUrl: string) {}
+  // Phase 61-02 — `apiVersion` defaults to 'v1' so coding/VKB and every
+  // existing call site stay byte-identical (D-11). Only the okb tab passes
+  // 'legacy' (wired at construction in UnifiedViewer.tsx) to retarget the
+  // OKM Express `/api/*` routes on :8090, which never mounted the `/api/v1/`
+  // namespace.
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiVersion: 'v1' | 'legacy' = 'v1',
+  ) {}
 
   /** Expose baseUrl for diagnostics + error-banner copy. */
   get base(): string {
     return this.baseUrl
+  }
+
+  /**
+   * Phase 61-02 — rewrite a canonical `/api/v1/...` path to the OKM Express
+   * legacy `/api/...` shape when this client is the okb (legacy) variant.
+   * On the v1 branch the canonical path is returned unchanged.
+   * Public so the contract is unit-testable.
+   */
+  apiPath(canonical: string): string {
+    return this.apiVersion === 'legacy'
+      ? canonical.replace('/api/v1/', '/api/')
+      : canonical
+  }
+
+  /**
+   * Phase 61-02 — OKM Express exposes NO neighbors endpoint (404 on every
+   * variant). Callers branch on this to decide between the server-side
+   * getNeighbors fetch (coding/v1) and a client-side 1-hop computation from
+   * the already-loaded relation set (okb/legacy). True only for v1.
+   */
+  supportsServerNeighbors(): boolean {
+    return this.apiVersion === 'v1'
   }
 
   private async get<T>(path: string): Promise<T> {
@@ -109,10 +162,17 @@ export class ApiClient {
     // NOTE: the handler's documented `limit=0` opt-out is broken — it computes
     // `hasCallerLimit = callerLimit > 0`, so 0 falls through to the default
     // clip. We pass an explicit large cap instead until km-core honors 0.
+    //
+    // Phase 61-02: the `?limit=1000000` clip opt-out is a km-core handler
+    // affordance; OKM Express does not know that param and may 400 on it
+    // (Open Question 3). On the legacy branch request plain `/api/entities`.
+    if (this.apiVersion === 'legacy') {
+      return this.get<Entity[]>(this.apiPath('/api/v1/entities'))
+    }
     return this.get<Entity[]>('/api/v1/entities?limit=1000000')
   }
 
-  async listRelations(): Promise<Relation[]> {
+  async listRelations(): Promise<RelationsResult> {
     // Phase 44 wire shape is the graphology edge envelope:
     //   { key, source, target, attributes: { type, metadata, createdAt } }
     // (km-core/api/handlers/relations.js emits via relationToWire per
@@ -128,12 +188,38 @@ export class ApiClient {
       to?: string
       type?: string
       attributes?: { type?: string; metadata?: unknown; createdAt?: string }
-    }>>('/api/v1/relations')
-    return raw.map((r) => ({
+    }>>(this.apiPath('/api/v1/relations'))
+    // Normalizer body UNCHANGED — OKM `/api/relations` returns the byte-
+    // identical graphology edge shape km-core does, so the from/to/type map
+    // is shared across both branches.
+    const mapped: Relation[] = raw.map((r) => ({
       from: r.source ?? r.from ?? '',
       to: r.target ?? r.to ?? '',
       type: canonicalizeRelationType(r.attributes?.type ?? r.type),
     }))
+
+    if (this.apiVersion !== 'legacy') {
+      // v1/coding branch: no drop, no cap. `total` always equals
+      // relations.length; the coding/VKB consumer ignores `total`.
+      return { relations: mapped, total: mapped.length }
+    }
+
+    // okb/legacy branch (Phase 61-02, delegated micro-decision resolved):
+    // OKM Express returns 18,958 edges, 13,737 of them CORRELATED_WITH.
+    // (1) Drop CORRELATED_WITH first (bulk + lowest signal). `total` is the
+    //     post-drop, pre-cap count — the honesty indicator's "M".
+    // (2) Cap the remainder at OKB_RELATION_CAP, keeping the first N. The
+    //     rendered count is the indicator's "N". NEVER silently render 19k
+    //     edges and NEVER silently truncate without surfacing `total`.
+    // canonicalizeRelationType only folds space-containing phrases, so
+    // `CORRELATED_WITH` / `correlated_with` both survive unchanged — compare
+    // case-insensitively to catch every casing OKM emits.
+    const afterDrop = mapped.filter(
+      (r) => (r.type ?? '').toUpperCase() !== 'CORRELATED_WITH',
+    )
+    const total = afterDrop.length
+    const relations = afterDrop.slice(0, OKB_RELATION_CAP)
+    return { relations, total }
   }
 
   /**
@@ -142,7 +228,7 @@ export class ApiClient {
    * shape), map to `[{name: s}]` so callers see a uniform OntologyClass[].
    */
   async listOntologyClasses(): Promise<OntologyClass[]> {
-    const raw = await this.get<unknown>('/api/v1/ontology/classes?withDisplay=true')
+    const raw = await this.get<unknown>(this.apiPath('/api/v1/ontology/classes?withDisplay=true'))
     if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') {
       // Pre-Plan-04 shape — wrap so consumers can rely on `.name`.
       return (raw as string[]).map((name) => ({ name }))
@@ -152,13 +238,13 @@ export class ApiClient {
 
   /** Back-compat path — explicit pre-Plan-04 shape (array of class-name strings). */
   listOntologyClassesNoDisplay(): Promise<string[]> {
-    return this.get<string[]>('/api/v1/ontology/classes')
+    return this.get<string[]>(this.apiPath('/api/v1/ontology/classes'))
   }
 
   getNeighbors(id: string, depth = 1): Promise<NeighborhoodPayload> {
     const safeId = encodeURIComponent(id)
     return this.get<NeighborhoodPayload>(
-      `/api/v1/entities/${safeId}/neighbors?depth=${depth}`,
+      this.apiPath(`/api/v1/entities/${safeId}/neighbors?depth=${depth}`),
     )
   }
 

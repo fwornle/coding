@@ -26,16 +26,23 @@ vi.mock('@/graph/SigmaCanvas', () => ({
 }))
 
 // Mock useGraphData to avoid touching the network — we don't care about
-// data shape here, just the routing chrome.
-vi.mock('@/graph/useGraphData', () => ({
-  useGraphData: () => ({
-    entities: [],
-    relations: [],
-    ontology: [],
-    isLoading: false,
-    error: null,
-  }),
-}))
+// data shape here, just the routing chrome. Phase 61-02: ViewerCore now also
+// imports the RELATIONS_KEY cache-key constant (for the okb relation-cap
+// honesty indicator's cache read), so re-export the real module's exports and
+// override only the hook.
+vi.mock('@/graph/useGraphData', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/graph/useGraphData')>()
+  return {
+    ...actual,
+    useGraphData: () => ({
+      entities: [],
+      relations: [],
+      ontology: [],
+      isLoading: false,
+      error: null,
+    }),
+  }
+})
 
 import { UnifiedViewer } from './UnifiedViewer'
 import { UnknownSystem } from './UnknownSystem'

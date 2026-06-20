@@ -32,7 +32,8 @@ import {
 import { ApiClient } from '@/api/ApiClient'
 import { SigmaCanvas } from '@/graph/SigmaCanvas'
 import { D3GraphCanvas } from '@/graph/D3GraphCanvas'
-import { useGraphData } from '@/graph/useGraphData'
+import { useGraphData, RELATIONS_KEY } from '@/graph/useGraphData'
+import { useQuery } from '@tanstack/react-query'
 import { deriveLevel } from '@/graph/graph-builder'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useViewerStore } from '@/store/viewer-store'
@@ -118,6 +119,23 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   }, [])
 
   const { entities, relations, isLoading, error } = useGraphData(apiClient, system)
+
+  // Phase 61-02 — okb relation-cap honesty indicator. Read the pre-cap relation
+  // `total` off the SAME cached `[RELATIONS_KEY, system]` query useGraphData
+  // populated (identical queryKey ⇒ shared cache entry, NO second fetch). We do
+  // NOT thread `total` through useGraphData's public return (it stays shape-
+  // compatible for coding); the indicator reads it from its own query path.
+  // Only enabled for okb — coding never caps, so `total === relations.length`.
+  const relationsTotalQ = useQuery({
+    queryKey: [RELATIONS_KEY, system],
+    queryFn: () => apiClient.listRelations(),
+    staleTime: 30_000,
+    // Only okb caps relations, so the indicator is okb-only. Shares the exact
+    // [RELATIONS_KEY, system] cache entry useGraphData already populated, so no
+    // extra network round-trip — this just subscribes to read `.total`.
+    enabled: system === 'okb',
+  })
+  const relationTotal = relationsTotalQ.data?.total ?? relations.length
 
   // Phase 55 — Zustand mode slice.
   const mode = useViewerStore((s) => s.mode)
@@ -402,7 +420,12 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
         {/* Phase 55-11: LslTimelineStrip (Surface #14) — coding-only.
             Mounted between the main content row and the Footer per UI-SPEC §6. */}
         {system === 'coding' && <LslTimelineStrip system={system} apiClient={apiClient} />}
-        <Footer total={entities.length} visible={visibleCount} edges={relations.length} />
+        <Footer
+          total={entities.length}
+          visible={visibleCount}
+          edges={relations.length}
+          relationTotal={relationTotal}
+        />
         {/* Phase 55-12: WorkflowStatusPanel (Surface #16) — coding-only.
             Mounted BELOW the Footer per UI-SPEC §13.4. */}
         {system === 'coding' && <WorkflowStatusPanel system={system} />}
@@ -418,7 +441,12 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
 export function UnifiedViewer() {
   const { system } = useParams<{ system: string }>()
   const apiClient = useMemo(
-    () => (isValidSystem(system) ? new ApiClient(SYSTEM_ENDPOINTS[system]) : null),
+    () =>
+      isValidSystem(system)
+        ? // Phase 61-02 (D-11): okb routes to OKM Express :8090 which only mounts
+          // the legacy /api/* namespace (no /api/v1/). coding stays on 'v1'.
+          new ApiClient(SYSTEM_ENDPOINTS[system], system === 'okb' ? 'legacy' : 'v1')
+        : null,
     [system],
   )
   if (!isValidSystem(system) || !apiClient) {

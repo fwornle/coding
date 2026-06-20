@@ -157,6 +157,10 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
       graph,
       getOntology: () => ontology,
       getTheme: () => theme,
+      // Phase 61-02: the okb (legacy) double-click path computes a 1-hop
+      // neighborhood client-side from the loaded relation set (OKM has no
+      // neighbors endpoint). coding/v1 ignores this and uses getNeighbors.
+      getLoadedRelations: () => relations,
       setStore: useViewerStore.setState,
       setHoveredNode,
     })
