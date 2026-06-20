@@ -525,6 +525,14 @@ export function InsightsPage() {
       const qs = new URLSearchParams()
       if (q) qs.set('q', q)
       if (project) qs.set('project', project)
+      // The obs-api defaults to limit=50, but this page renders the full list
+      // (no client pagination) and Coverage-tab tiles deep-link via
+      // /insights#insight-<id> to ANY insight. With the default cap, a tile
+      // pointing at an insight ranked below the top 50 found no matching card
+      // in the DOM, so getElementById returned null and the deep-link silently
+      // landed the user on the first (highest-confidence) insight. Fetch the
+      // whole set so every deep-link resolves.
+      qs.set('limit', '1000')
       const queryStr = qs.toString()
       const res = await fetch(`${API_BASE_URL}/api/insights${queryStr ? `?${queryStr}` : ''}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
