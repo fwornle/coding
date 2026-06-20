@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.2
-milestone_name: VKB & Online-Learning Quality
-status: completed
-stopped_at: Phase 61 context gathered
-last_updated: "2026-06-20T18:06:04.467Z"
-last_activity: 2026-06-20 -- Phase 61 marked complete
+milestone: v7.3
+milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
+status: planning
+last_updated: "2026-06-20T18:30:02.470Z"
+last_activity: 2026-06-20
 progress:
-  total_phases: 33
-  completed_phases: 25
-  total_plans: 169
-  completed_plans: 170
-  percent: 76
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -53,10 +52,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 61 — COMPLETE
-Plan: 1 of 3
-Status: Phase 61 complete
-Last activity: 2026-06-20 -- Phase 61 marked complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-20 — Milestone v7.3 started
 
 ## Performance Metrics
 

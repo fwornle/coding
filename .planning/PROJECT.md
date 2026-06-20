@@ -10,7 +10,7 @@ A self-learning coding environment that captures every session, builds knowledge
 
 ## Current State
 
-**v6.0 shipped.** Knowledge context injection is live across all four coding agents. Every `coding` session automatically receives relevant knowledge from the accumulated observation/digest/insight/KG database via Qdrant semantic search, with per-agent scoring profiles and cross-agent session continuity. Working memory provides a 300-token project state prefix on every retrieval response.
+**v7.2 shipped.** The online-learning → km-core → unified viewer surface reached production data quality: online pipeline emits semantic-content edges on Insights, ontology upper/lower split clarified, VKB rendering UX integrity restored, LSL timeline honesty fixed, OKB data routing corrected, and the long-tail orphan baseline reduced. Builds on v6.0's knowledge context injection (live across all four coding agents via Qdrant semantic search, per-agent scoring, cross-agent continuity, 300-token working-memory prefix).
 
 Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), live ETM observations, Qdrant vector search, hybrid retrieval (semantic + keyword + recency), Redis pub/sub for write-time embedding, per-agent adapters, session state handoff.
 
@@ -48,7 +48,25 @@ Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), liv
 
 ### Active
 
-## Current Milestone: v7.2 VKB & Online-Learning Quality
+## Current Milestone: v7.3 LLM Proxy Performance — Claude CLI Worker Pool
+
+**Goal:** Replace the per-call `claude` CLI `execFile` spawn on the claude-code fallback path with a small pool of warm, persistent stream-JSON workers — cutting sonnet/opus fallback latency from ~10–14s to ~2–3s steady-state and keeping Anthropic's prompt-cache warm.
+
+**Target features:**
+- Persistent worker pool — 2–3 lazily-spawned, long-lived `claude -p --input-format stream-json --output-format stream-json` workers, pinned per-model, concurrency 1 each, idle-evict after N min (default 30)
+- Crash recovery — individual worker crash → in-flight call marked RETRYABLE, lazy respawn (no spin-loop auto-restart)
+- Cancellation propagation — client-disconnect aborts the in-flight stream-JSON request
+- Escape hatch — `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts to the current per-call `execFile` path
+- stderr drain + schema-drift detection — pin CLI version, invalidate worker on `claude --version` drift, throttle CLI stderr noise
+- Dashboard observability — claude-code/sonnet median latency column shows the ~14s → ≤3s drop within 24h of rollout
+
+**Key context:**
+- Code lives in `_work/rapid-llm-proxy/proxy-bridge/server.mjs` — the `claude-code` provider's two-tier dispatch (direct OAuth bearer → CLI fallback on HTTP 429). Direct path stays primary for haiku (0.9s); pool kicks in only for sonnet/opus (rate-limited bearer) or transient 401s.
+- Research already complete: `.planning/research/v7.2-llm-proxy-perf-worker-pool.md` (filename retains v7.2 origin; content is the v7.3 seed). Acceptance criteria drafted there for plan-phase to refine.
+- Phase numbering continues from Phase 61 (v7.2) → v7.3 starts at **Phase 62**.
+- Out of scope: cross-provider fallback (claude-code→copilot — deliberate, expresses user intent), general work queue/scheduler, worker pools for other CLI-based providers (claude-code is the only one where CLI spawn dominates latency).
+
+## v7.2 Shipped (VKB & Online-Learning Quality)
 
 **Goal:** Bring the online learning pipeline → km-core → unified viewer surface to production data quality, so operators rely on the graph view for navigation and triage instead of working around known-broken rendering.
 
@@ -147,4 +165,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-17 — Phase 59 complete (Digest/Insight Writer-Edge Repair: `ObservationWriter.writeInsight` returns `{legacyId, mintedId}` closing D-03 race, `consolidateDay` plain-insert emits `derivedFrom` per observation_id closing ORPHAN-DIG-01, `_pushInsightToKG` consumes the new return shape and drops the racy `findByLegacyId` post-write lookup closing ORPHAN-INS-01, two-layer host-side repair script ships, 24h orphan-floor soak harness + operator runbook ship for ORPHAN-FLOOR baseline measurement; VERIFICATION passed 4/4). v7.2 milestone in progress.*
+*Last updated: 2026-06-20 — v7.3 milestone started (LLM Proxy Performance — Claude CLI Worker Pool; phases continue from Phase 61 → start at Phase 62). v7.2 (VKB & Online-Learning Quality) shipped. Historical: Phase 59 complete (Digest/Insight Writer-Edge Repair: `ObservationWriter.writeInsight` returns `{legacyId, mintedId}` closing D-03 race, `consolidateDay` plain-insert emits `derivedFrom` per observation_id closing ORPHAN-DIG-01, `_pushInsightToKG` consumes the new return shape and drops the racy `findByLegacyId` post-write lookup closing ORPHAN-INS-01, two-layer host-side repair script ships, 24h orphan-floor soak harness + operator runbook ship for ORPHAN-FLOOR baseline measurement; VERIFICATION passed 4/4). v7.2 milestone in progress.*
