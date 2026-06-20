@@ -358,7 +358,10 @@ export class ObservationExporter {
         // in @fwornle/km-core reads m.digest_ids; do likewise here so the
         // ColdStore JSON matches the dashboard's km-core-backed view.
         return {
-          id: (attrs.legacyId && attrs.legacyId.id) || id,
+          // id = km-core UUID key (NOT legacyId.id, which can be a topic-string
+          // or null for online insights) so deep-links resolve. Matches the
+          // obs-api /api/coding/insights override.
+          id,
           topic: m.topic || attrs.name || '',
           summary: m.summary || attrs.description || '',
           confidence: typeof m.confidence === 'number' ? m.confidence : 0,

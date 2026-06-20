@@ -1322,17 +1322,31 @@ export class ObservationWriter {
         ...entity.metadata,
         source: entity.metadata?.source ?? 'auto',
       };
-      // UPSERT by legacyId. `putEntity` always mints a NEW km-core id, so a
-      // blind create here duplicated every Insight whose row.id is a stable
-      // key re-used across runs. _pushInsightToKG passes `row.id = entry.topic`
-      // precisely so re-synthesis updates the same topic-keyed entity — but
-      // without this lookup each consolidation run minted another topic-keyed,
-      // digest-less Insight (the 2026-06 duplicate-insight bug: 74 orphan
-      // copies, 38 topics, some 7×). Find the existing legacyId surrogate
-      // first; when present, mergeAttributes in place (preserving its minted
-      // id + createdAt + provenance) instead of creating a sibling.
+      // UPSERT — `putEntity` always mints a NEW km-core id, so a blind create
+      // duplicated every Insight whose row.id is a stable key re-used across
+      // runs (the 2026-06 duplicate-insight bug: 74 orphan copies, 38 topics,
+      // some 7×). Resolve an existing entity by TWO keys:
+      //   1. legacyId surrogate (row.id) — the migration-era key.
+      //   2. topic + project — the REAL identity of an Insight.
+      // The topic key is primary-in-spirit: the consolidator keeps a "main"
+      // entity (UUID legacyId, carries digest_ids) AND _pushInsightToKG writes
+      // a topic-keyed mirror. Without the topic match, a mirror write
+      // (row.id = topic) misses the UUID-keyed canonical via findByLegacyId and
+      // spawns a fresh sibling every run. Matching on topic+project collapses
+      // both write paths onto ONE entity. (legacyId is a SQLite→km-core
+      // migration bridge — entity.ts:147 — not the right live identity key;
+      // we no longer rely on it for display either, see insightToLegacy
+      // override in observations-api-server.mjs.)
       let mintedId;
-      const existing = await kmStore.findByLegacyId({ system: 'A', id: row.id });
+      let existing = await kmStore.findByLegacyId({ system: 'A', id: row.id });
+      if (!existing && row.topic) {
+        const topic = String(row.topic);
+        const proj = entity.metadata?.project ?? row.project ?? null;
+        existing = (await kmStore.findByOntologyClass('Insight')).find((e) => {
+          const m = e.metadata ?? {};
+          return m.topic === topic && (proj == null || (m.project ?? null) === proj);
+        }) || null;
+      }
       if (existing && existing.id) {
         await kmStore.mergeAttributes(existing.id, {
           name: entity.name,

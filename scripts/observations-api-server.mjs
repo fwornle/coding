@@ -769,10 +769,15 @@ app.post('/api/insights/dedup', async (req, res) => {
   try {
     const store = await ensureKMStore();
     if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
-    const project = (req.body && req.body.project) || 'coding';
+    // project omitted / 'all' / '*' → dedup EVERY project (group key includes
+    // the project so a shared topic across projects is never cross-merged).
+    const reqProject = req.body && req.body.project;
+    const allProjects = !reqProject || reqProject === 'all' || reqProject === '*';
+    const project = allProjects ? null : reqProject;
     const dryRun = !(req.body && req.body.dryRun === false); // default DRY-RUN
 
     const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const projOf = (e) => (e.metadata?.project) ?? 'unknown';
     const digestCount = (e) => {
       const d = e.metadata?.digest_ids ?? e.metadata?.digestIds;
       return Array.isArray(d) ? d.length : 0;
@@ -780,11 +785,11 @@ app.post('/api/insights/dedup', async (req, res) => {
     const isUuid = (e) => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(String(e.legacyId?.id ?? ''));
 
     const all = (await store.findByOntologyClass('Insight'))
-      .filter((e) => ((e.metadata?.project) ?? 'unknown') === project);
+      .filter((e) => allProjects || projOf(e) === project);
 
     const groups = new Map();
     for (const e of all) {
-      const k = norm(e.metadata?.topic ?? e.name);
+      const k = projOf(e) + ' ' + norm(e.metadata?.topic ?? e.name);
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(e);
     }
@@ -817,7 +822,7 @@ app.post('/api/insights/dedup', async (req, res) => {
     }
 
     res.json({
-      project,
+      project: allProjects ? 'all' : project,
       dryRun,
       totalInsights: all.length,
       distinctTopics: groups.size,
@@ -1030,8 +1035,11 @@ app.get('/api/projects/:project/coverage', async (req, res) => {
         return String(bl).localeCompare(String(al));
       })
       // Project to the legacy row shape the downstream computation expects.
+      // id = km-core UUID key (NOT legacyId?.id, which can be a topic-string or
+      // null) so the coverage tile's `/insights#insight-<id>` deep-link matches
+      // the insights-list card id and resolves to the right insight.
       .map((e) => ({
-        id: e.legacyId?.id ?? e.id,
+        id: e.id,
         topic: e.metadata?.topic ?? e.name,
         confidence: typeof e.metadata?.confidence === 'number' ? e.metadata.confidence : 0.8,
         summary: e.metadata?.summary ?? e.description ?? '',
@@ -2074,6 +2082,13 @@ app.get('/api/coding/insights', async (_req, res) => {
     // entities and zip the archive flag onto each row before filtering.
     const reshaped = entities.map((entity) => {
       const legacy = insightToLegacy(entity);
+      // Use the km-core UUID key as the public id (insightToLegacy defaults to
+      // `legacyId?.id ?? id`, which surfaces topic-strings or null for online
+      // insights — breaking the dashboard deep-link `#insight-<id>`). Every
+      // km-core key IS a UUID, so this gives a stable, anchor-safe id for all
+      // insights. resynthesize already resolves a km-core-key id via its
+      // getEntity fallback. legacyId stays intact for cross-ref/migration use.
+      legacy.id = entity.id;
       const m = (entity.metadata ?? {});
       return { legacy, archivedAt: m.archivedAt ?? null };
     });
