@@ -41,6 +41,7 @@ import {
   fireEvent,
   cleanup,
   waitFor,
+  within,
 } from '@testing-library/react'
 import { useViewerStore } from '@/store/viewer-store'
 import type { Entity, ApiClient, OntologyClass } from '@/api/ApiClient'
@@ -354,6 +355,98 @@ describe('OntologyFilter', () => {
       expect(
         await screen.findByTestId('filter-ontology-row-EntityClassB'),
       ).toBeInTheDocument()
+    })
+  })
+
+  describe('Test 11 (60-09 SC#5): level-None classes entities carry render as flat rows', () => {
+    test('Insight + Digest (level: null) render as selectable flat rows with counts, not dropped', async () => {
+      const apiClient = makeApiClient([
+        { name: 'Component', level: 1, parent: null },
+        { name: 'Insight', level: null, parent: null },
+        { name: 'Digest', level: null, parent: null },
+      ])
+      const entities = [
+        makeEntity('a', 'Component'),
+        makeEntity('b', 'Insight'),
+        makeEntity('c', 'Insight'),
+        makeEntity('d', 'Digest'),
+      ]
+      render(<OntologyFilter entities={entities} apiClient={apiClient} />)
+      await waitFor(() => {
+        expect(apiClient.listOntologyClasses).toHaveBeenCalled()
+      })
+      // Both level-None rows render (previously silently dropped).
+      const insightRow = await screen.findByTestId('filter-ontology-row-Insight')
+      const digestRow = await screen.findByTestId('filter-ontology-row-Digest')
+      expect(insightRow).toBeInTheDocument()
+      expect(digestRow).toBeInTheDocument()
+      // Real per-class counts.
+      expect(screen.getByTestId('filter-ontology-count-Insight')).toHaveTextContent('2')
+      expect(screen.getByTestId('filter-ontology-count-Digest')).toHaveTextContent('1')
+      // They live in the dedicated level-None section.
+      expect(
+        screen.getByTestId('filter-ontology-level-none-flat'),
+      ).toBeInTheDocument()
+    })
+
+    test('selecting a level-None flat row toggles selectedOntologyClasses', async () => {
+      const apiClient = makeApiClient([
+        { name: 'Component', level: 1, parent: null },
+        { name: 'Insight', level: null, parent: null },
+      ])
+      const entities = [makeEntity('a', 'Component'), makeEntity('b', 'Insight')]
+      render(<OntologyFilter entities={entities} apiClient={apiClient} />)
+      const insightRow = await screen.findByTestId('filter-ontology-row-Insight')
+      fireEvent.click(within(insightRow).getByRole('checkbox'))
+      // Materialised the available set then toggled Insight OFF -> remaining = ['Component'].
+      expect(useViewerStore.getState().selectedOntologyClasses).toContain('Component')
+      expect(useViewerStore.getState().selectedOntologyClasses).not.toContain('Insight')
+    })
+  })
+
+  describe('Test 12 (60-09 SC#5): Project at level:0 renders as an L0 anchor', () => {
+    test('Project (level:0) appears in the L0 anchors section alongside System', async () => {
+      const apiClient = makeApiClient([
+        { name: 'System', level: 0, parent: null },
+        { name: 'Project', level: 0, parent: null },
+        { name: 'Component', level: 1, parent: null },
+      ])
+      const entities = [
+        makeEntity('a', 'System'),
+        makeEntity('b', 'Project'),
+        makeEntity('c', 'Component'),
+      ]
+      render(<OntologyFilter entities={entities} apiClient={apiClient} />)
+      const anchors = await screen.findByTestId('filter-ontology-l0-anchors')
+      expect(within(anchors).getByTestId('filter-ontology-row-System')).toBeInTheDocument()
+      expect(within(anchors).getByTestId('filter-ontology-row-Project')).toBeInTheDocument()
+    })
+  })
+
+  describe('Test 13 (60-09 SC#5): L2 group renders with non-zero count badges', () => {
+    test('L2 children under Component show real per-class counts > 0', async () => {
+      const apiClient = makeApiClient([
+        { name: 'Component', level: 1, parent: null },
+        { name: 'LiveLoggingSystem', level: 2, parent: 'Component' },
+        { name: 'OnlineObservation', level: 2, parent: 'Detail' },
+        { name: 'Detail', level: 1, parent: null },
+      ])
+      const entities = [
+        makeEntity('a', 'LiveLoggingSystem'),
+        makeEntity('b', 'LiveLoggingSystem'),
+        makeEntity('c', 'OnlineObservation'),
+        makeEntity('d', 'OnlineObservation'),
+        makeEntity('e', 'OnlineObservation'),
+      ]
+      render(<OntologyFilter entities={entities} apiClient={apiClient} />)
+      await waitFor(() => {
+        expect(apiClient.listOntologyClasses).toHaveBeenCalled()
+      })
+      expect(
+        await screen.findByTestId('filter-ontology-row-LiveLoggingSystem'),
+      ).toBeInTheDocument()
+      expect(screen.getByTestId('filter-ontology-count-LiveLoggingSystem')).toHaveTextContent('2')
+      expect(screen.getByTestId('filter-ontology-count-OnlineObservation')).toHaveTextContent('3')
     })
   })
 

@@ -439,6 +439,11 @@ export function OntologyFilter({
   let l0Classes: string[] = []
   let l1WithChildren: Array<{ name: string; children: string[] }> = []
   let l1Flat: string[] = []
+  // Phase 60 Plan 09 (SC#5): level-None classes that entities actually carry
+  // (e.g. Insight, Digest with `level: null` in the API response). Previously
+  // these matched no numeric-level bucket and were silently dropped despite
+  // having entities. Rendered as flat selectable rows in their own section.
+  let levelNoneFlat: string[] = []
 
   if (fetchError) {
     l1Flat = availableClasses.slice()
@@ -479,6 +484,14 @@ export function OntologyFilter({
     l1WithChildren.sort((a, b) => a.name.localeCompare(b.name))
     l1Flat.sort()
 
+    // Level-None classes entities carry (e.g. Insight/Digest). They have no
+    // numeric `level`, so they can never collide with the L0/L1/L2 buckets
+    // above — render them as their own flat section instead of dropping them.
+    levelNoneFlat = ontologyClasses
+      .filter((c) => typeof c.level !== 'number' && availSet.has(c.name))
+      .map((c) => c.name)
+      .sort()
+
     // Discard L1 group headers whose name itself isn't on screen AND none of
     // whose children are on screen (avoid empty groups). We retain a group
     // even if the L1 header class is not in availSet, as long as ≥1 child is.
@@ -489,7 +502,8 @@ export function OntologyFilter({
   if (
     l0Classes.length === 0 &&
     l1WithChildren.length === 0 &&
-    l1Flat.length === 0
+    l1Flat.length === 0 &&
+    levelNoneFlat.length === 0
   ) {
     return null
   }
@@ -603,6 +617,23 @@ export function OntologyFilter({
               data-testid="filter-ontology-l1-flat"
             >
               {l1Flat.map(renderClassCheckbox)}
+            </div>
+          )}
+
+          {/* Level-None flat rows (classes entities carry with no numeric level,
+              e.g. Insight/Digest) — Phase 60 Plan 09 (SC#5) */}
+          {levelNoneFlat.length > 0 && (
+            <div
+              className={
+                l0Classes.length > 0 ||
+                l1WithChildren.length > 0 ||
+                l1Flat.length > 0
+                  ? 'border-t border-border pt-1 mt-1'
+                  : ''
+              }
+              data-testid="filter-ontology-level-none-flat"
+            >
+              {levelNoneFlat.map(renderClassCheckbox)}
             </div>
           )}
         </div>
