@@ -24,10 +24,18 @@ import { canonicalizeRelationType } from './relation-types'
 import { mergeIntoGraph } from './graph-builder'
 
 export interface EventHandlerDeps {
-  apiClient: Pick<ApiClient, 'getNeighbors'>
+  apiClient: Pick<ApiClient, 'getNeighbors' | 'supportsServerNeighbors'>
   graph: Graph
   /** Returns the ontology list (kept as a getter so it can be fresh after queries refetch). */
   getOntology: () => ReadonlyArray<OntologyClass>
+  /**
+   * Phase 61-02 — returns the currently-loaded relation set. Used ONLY by the
+   * okb (legacy) double-click path to compute a 1-hop neighborhood client-side,
+   * because OKM Express has no neighbors endpoint (404). Optional so existing
+   * v1/coding callers (which use the server getNeighbors path) need not thread
+   * it. A getter so it stays fresh after query refetches.
+   */
+  getLoadedRelations?: () => ReadonlyArray<Relation>
   /** Returns the current theme (light|dark) — read at fire time, not bound at construction. */
   getTheme: () => 'light' | 'dark'
   /** Zustand store mutator — usually `useViewerStore.setState`. */
@@ -48,6 +56,44 @@ export interface EventHandlers {
 
 function isValidLevel(n: number | undefined): n is 0 | 1 | 2 | 3 {
   return n === 0 || n === 1 || n === 2 || n === 3
+}
+
+/**
+ * Phase 61-02 — okb (legacy) client-side 1-hop expand. OKM Express has no
+ * neighbors endpoint, but the full capped relation set is ALREADY loaded into
+ * the graph. So "expand" here means: gather every loaded relation incident to
+ * `nodeId`, collect the opposite endpoints as the 1-hop neighborhood, and drive
+ * the same selection/highlight the server payload would (focal node + its
+ * neighbors pinned as the selected set). This is a VISIBLE expansion of the
+ * selection — never a silent no-op. When the loaded set has no incident edge
+ * for the node, we still select the node alone so the click registers visibly.
+ *
+ * Returns the neighbor count (0 when the node has no neighbors in the loaded
+ * set) so the caller's contract (Promise<number>) is preserved.
+ */
+function expandFromLoadedRelations(
+  deps: EventHandlerDeps,
+  nodeId: string,
+): number {
+  const loaded = deps.getLoadedRelations?.() ?? []
+  const neighborIds = new Set<string>()
+  for (const r of loaded) {
+    if (r.from === nodeId) neighborIds.add(r.to)
+    else if (r.to === nodeId) neighborIds.add(r.from)
+  }
+  // Only keep neighbors that actually exist as nodes in the loaded graph.
+  const present = new Set<string>([nodeId])
+  for (const id of neighborIds) {
+    if (deps.graph.hasNode(id)) present.add(id)
+  }
+  deps.setStore({
+    selectedNodeIds: present,
+    focalNodeId: nodeId,
+    pathToSelected: present,
+  })
+  const added = present.size - 1 // exclude the focal node itself
+  if (added > 0) deps.onGraphMutated?.(added)
+  return added
 }
 
 /**
@@ -118,6 +164,16 @@ export function makeEventHandlers(deps: EventHandlerDeps): EventHandlers {
     async handleDoubleClickNode(nodeId: string): Promise<number> {
       // Pitfall T-45-02-04: re-clicking the same node must be idempotent.
       // mergeIntoGraph uses Graphology's merge ops — no-ops on existing ids.
+
+      // Phase 61-02 (delegated micro-decision resolved): OKM Express has NO
+      // neighbors endpoint (404 on every variant). On the okb/legacy branch
+      // compute the 1-hop neighborhood CLIENT-SIDE from the already-loaded
+      // relations — NEVER a silent no-op on click. coding/v1 keeps the
+      // server-side getNeighbors fetch unchanged.
+      if (!deps.apiClient.supportsServerNeighbors()) {
+        return expandFromLoadedRelations(deps, nodeId)
+      }
+
       const payload = await deps.apiClient.getNeighbors(nodeId, 1)
       // Coerce ApiClient.Entity (where `level?: number`) into graph-domain
       // Entity (where `level?: 0|1|2|3`). Only values 0..3 carry meaning;
