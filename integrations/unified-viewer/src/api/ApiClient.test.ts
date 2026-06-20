@@ -33,7 +33,9 @@ describe('ApiClient', () => {
     expect(result).toEqual([])
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('http://localhost:12436/api/v1/entities')
+    // The v1 branch carries the `?limit=1000000` clip opt-out (entities.js:64
+    // default 1000-clip workaround — see listEntities doc comment).
+    expect(url).toBe('http://localhost:12436/api/v1/entities?limit=1000000')
     expect((init.headers as Record<string, string>).Accept).toBe('application/json')
   })
 
@@ -111,5 +113,115 @@ describe('ApiClient', () => {
     await client.getNeighbors('a/b', 2)
     const [url] = fetchSpy.mock.calls[0] as [string]
     expect(url).toBe('http://localhost:12436/api/v1/entities/a%2Fb/neighbors?depth=2')
+  })
+
+  // ── Phase 61-02 — okb-scoped apiVersion path-rewrite + relation cap ──
+
+  test('apiVersion defaults to v1 — apiPath leaves /api/v1/ paths unchanged', () => {
+    const client = new ApiClient('http://localhost:12436')
+    expect(client.apiPath('/api/v1/entities')).toBe('/api/v1/entities')
+  })
+
+  test('legacy apiVersion rewrites /api/v1/ → /api/', () => {
+    const client = new ApiClient('http://localhost:8090', 'legacy')
+    expect(client.apiPath('/api/v1/entities')).toBe('/api/entities')
+    expect(client.apiPath('/api/v1/relations')).toBe('/api/relations')
+    expect(client.apiPath('/api/v1/ontology/classes?withDisplay=true')).toBe(
+      '/api/ontology/classes?withDisplay=true',
+    )
+  })
+
+  test('v1 listEntities keeps the ?limit=1000000 clip opt-out', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, data: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const client = new ApiClient('http://localhost:12436', 'v1')
+    await client.listEntities()
+    const [url] = fetchSpy.mock.calls[0] as [string]
+    expect(url).toBe('http://localhost:12436/api/v1/entities?limit=1000000')
+  })
+
+  test('legacy listEntities requests plain /api/entities (no ?limit param)', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, data: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const client = new ApiClient('http://localhost:8090', 'legacy')
+    await client.listEntities()
+    const [url] = fetchSpy.mock.calls[0] as [string]
+    expect(url).toBe('http://localhost:8090/api/entities')
+  })
+
+  test('v1 listRelations returns { relations, total } with NO drop and NO cap', async () => {
+    const edges = [
+      { source: 'a', target: 'b', attributes: { type: 'derives_from' } },
+      { source: 'b', target: 'c', attributes: { type: 'correlated_with' } },
+      { source: 'c', target: 'd', attributes: { type: 'related' } },
+    ]
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, data: edges }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const client = new ApiClient('http://localhost:12436', 'v1')
+    const { relations, total } = await client.listRelations()
+    expect(relations).toHaveLength(3)
+    expect(total).toBe(3) // total always equals relations.length on v1
+    const [url] = fetchSpy.mock.calls[0] as [string]
+    expect(url).toBe('http://localhost:12436/api/v1/relations')
+  })
+
+  test('legacy listRelations drops CORRELATED_WITH then caps at 2000, total = post-drop pre-cap count', async () => {
+    // 3 real edges + 2 CORRELATED_WITH edges. After drop: 3 relations, total=3.
+    const edges = [
+      { source: 'a', target: 'b', attributes: { type: 'derives_from' } },
+      { source: 'b', target: 'c', attributes: { type: 'CORRELATED_WITH' } },
+      { source: 'c', target: 'd', attributes: { type: 'related' } },
+      { source: 'd', target: 'e', attributes: { type: 'correlated_with' } },
+      { source: 'e', target: 'f', attributes: { type: 'depends_on' } },
+    ]
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, data: edges }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const client = new ApiClient('http://localhost:8090', 'legacy')
+    const { relations, total } = await client.listRelations()
+    expect(total).toBe(3) // CORRELATED_WITH (both casings) dropped first
+    expect(relations).toHaveLength(3)
+    expect(relations.some((r) => r.type === 'CORRELATED_WITH')).toBe(false)
+    const [url] = fetchSpy.mock.calls[0] as [string]
+    expect(url).toBe('http://localhost:8090/api/relations')
+  })
+
+  test('legacy listRelations caps relations at OKB_RELATION_CAP (2000) while total keeps the pre-cap count', async () => {
+    const edges = Array.from({ length: 2500 }, (_, i) => ({
+      source: `n${i}`,
+      target: `n${i + 1}`,
+      attributes: { type: 'related' },
+    }))
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, data: edges }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const client = new ApiClient('http://localhost:8090', 'legacy')
+    const { relations, total } = await client.listRelations()
+    expect(relations).toHaveLength(2000) // capped
+    expect(total).toBe(2500) // pre-cap (post-drop) count preserved for the honesty indicator
+  })
+
+  test('supportsServerNeighbors is true for v1, false for legacy', () => {
+    expect(new ApiClient('http://localhost:12436').supportsServerNeighbors()).toBe(true)
+    expect(new ApiClient('http://localhost:12436', 'v1').supportsServerNeighbors()).toBe(true)
+    expect(new ApiClient('http://localhost:8090', 'legacy').supportsServerNeighbors()).toBe(false)
   })
 })

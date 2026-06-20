@@ -60,9 +60,17 @@ export function useGraphData(apiClient: ApiClient, system: System): GraphDataRes
     () => (entitiesQ.data ?? []) as Entity[],
     [entitiesQ.data],
   )
+  // Phase 61-02: listRelations now returns the uniform object shape
+  // `{ relations, total }` on BOTH apiVersion branches (TypeScript cannot
+  // branch a return type on a runtime flag). Unwrap `.relations` here; the
+  // coding/VKB graph build stays byte-identical (same {from,to,type}[], just
+  // one level deeper). `total` is the okb relation-cap pre-cap count read
+  // separately by the honesty indicator (Task 2) — it is intentionally NOT
+  // threaded through this hook's public return, and for coding `total` simply
+  // equals relations.length and is unused.
   const relations = useMemo(
     () =>
-      ((relationsQ.data ?? []) as ApiRelation[]).map(
+      ((relationsQ.data?.relations ?? []) as ApiRelation[]).map(
         (r) => ({ from: r.from, to: r.to, type: r.type ?? 'related' }) as Relation,
       ),
     [relationsQ.data],
