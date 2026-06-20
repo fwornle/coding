@@ -15,6 +15,7 @@
 
 import type { Entity } from './types'
 import { deriveLayer } from './layer'
+import { deriveLevel } from './graph-builder'
 
 export interface VisibilityFilters {
   /** Already-lowercased search query for case-insensitive substring match. */
@@ -143,8 +144,14 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
   if (typeof cls !== 'string' || !filters.selectedClasses.has(cls)) return false
 
   // Level predicate.
-  const lvl = e.level as 0 | 1 | 2 | 3 | undefined
-  if (typeof lvl === 'number' && !filters.visibleLevels.has(lvl)) return false
+  // Backend /api/v1/entities entities carry `ontologyClass` but NOT a numeric
+  // `level`, so the old `typeof lvl === 'number'` guard made the Level filter a
+  // no-op for the D3 render (and useVisibleEntityIds) — the counter changed
+  // (UnifiedViewer.visibleCount + graph-builder both already apply deriveLevel)
+  // but the rendered graph never filtered. Derive the level from ontologyClass
+  // exactly as graph-builder.ts:188 does so all three predicates agree.
+  const lvl = (e.level ?? deriveLevel(e.ontologyClass)) as 0 | 1 | 2 | 3
+  if (!filters.visibleLevels.has(lvl)) return false
 
   // Text filter (substring over name + description, lower-cased).
   if (filters.searchQueryLowered.length > 0) {

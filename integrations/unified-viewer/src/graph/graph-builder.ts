@@ -38,6 +38,7 @@ export function deriveLevel(ontologyClass: string | undefined): Level {
     case 'Feature':
     case 'File':
     case 'Observation':
+    case 'OnlineObservation':
       return 2
     case 'Detail':
     case 'Port':
@@ -45,6 +46,8 @@ export function deriveLevel(ontologyClass: string | undefined): Level {
     case 'Digest':
     case 'Insight':
     case 'LearningArtifact':
+    case 'OnlineDigest':
+    case 'OnlineInsight':
       return 3
     // 'System' / 'Project' + every unknown class → L0
     default:
