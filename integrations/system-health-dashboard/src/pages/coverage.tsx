@@ -61,12 +61,14 @@ function tileColor(t: PerInsightSummary): string {
   // visible rather than hiding in the gray "unverified" bucket.
   if (t.provenance === 'hallucinated') return 'bg-purple-700/80 border-purple-400/70 text-white'
   if (ratio === null) {
-    // Split the gray: 'unverifiable' (verifier ran, no repo claims to check) is
-    // distinguished by a DASHED border, not by a translucent fill — the bg must
-    // stay opaque enough for white text to stay readable (WCAG AA). 'pending'
-    // (never verified) is the same slate with a solid border.
+    // Two distinct neutral states, NOT both gray:
+    //  - 'unverifiable' (verifier ran, insight makes no repo-file claims — e.g.
+    //    an insight about a Claude Code harness skill) → a warm BEIGE/tan tile,
+    //    visually separate from the cold gray "not yet checked" state. Dark text
+    //    on beige for WCAG AA. Dashed border keeps it readable to colour-blind.
+    //  - 'pending' (verifier never ran) → cold slate gray, solid border.
     if (t.verificationState === 'unverifiable') {
-      return 'bg-slate-600/80 border-2 border-dashed border-slate-300/70 text-white'
+      return 'bg-[#cdbd91] border border-dashed border-[#9c8b5a] text-stone-900'
     }
     return 'bg-slate-500/80 border-slate-400/60 text-white'
   }
@@ -135,8 +137,8 @@ function ProjectCoverageCard({ data }: { data: CoverageResponse }) {
               </Badge>
             )}
             {(i.unverifiable ?? 0) > 0 && (
-              <Badge variant="outline" className="bg-slate-600/20 text-slate-300 border-dashed border-slate-400/40">
-                {i.unverifiable} unverifiable
+              <Badge variant="outline" className="bg-[#cdbd91]/30 text-[#6b5d2f] dark:text-[#cdbd91] border-dashed border-[#9c8b5a]/60">
+                {i.unverifiable} no claims
               </Badge>
             )}
             <span className="text-muted-foreground ml-2">
@@ -174,7 +176,7 @@ function ProjectCoverageCard({ data }: { data: CoverageResponse }) {
                 `  rose   < 50% (STALE)\n` +
                 `  purple  HALLUCINATED (invented files)\n` +
                 `  slate   pending (verifier not run)\n` +
-                `  dashed  unverifiable (no repo claims)\n\n` +
+                `  beige   no repo claims (not code-verifiable)\n\n` +
                 `Click to jump to the full insight.`
               }
             >
@@ -316,13 +318,13 @@ export function CoveragePage() {
           </p>
           {/* Tile colour legend — each tile is one insight; colour encodes how
               its code claims hold up against the repo. */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs font-medium text-slate-700 dark:text-slate-300">
             <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-600/80" /> fresh ≥70%</span>
             <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-600/80" /> partial 50–70%</span>
             <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-rose-600/80" /> stale &lt;50%</span>
             <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-purple-700/80" /> hallucinated (names files never in git)</span>
             <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-500/80" /> pending (not yet verified)</span>
-            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-600/80 border-2 border-dashed border-slate-300/70" /> no claims (nothing to verify)</span>
+            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-[#cdbd91] border border-dashed border-[#9c8b5a]" /> no repo claims (not code-verifiable)</span>
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={loadAll} disabled={loading}>
