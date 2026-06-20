@@ -4,7 +4,59 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ---
 
-# Milestone v7.2 Requirements — VKB & Online-Learning Quality (ACTIVE)
+# Milestone v7.3 Requirements — LLM Proxy Performance: Claude CLI Worker Pool (ACTIVE)
+
+**Goal:** Replace the per-call `claude` CLI `execFile` spawn on the claude-code fallback path with a small pool of warm, persistent stream-JSON workers — cutting sonnet/opus fallback latency from ~10–14s to ~2–3s steady-state and keeping Anthropic's prompt-cache warm.
+
+**Research seed:** `.planning/research/v7.2-llm-proxy-perf-worker-pool.md` (filename retains v7.2 origin; content is the v7.3 seed — measured latency breakdown, design constraints, acceptance criteria). Code: `_work/rapid-llm-proxy/proxy-bridge/server.mjs`.
+
+**Phase numbering:** Continues from Phase 61 (v7.2) → v7.3 phases start at **Phase 62**.
+
+---
+
+## v7.3 Requirements
+
+### Worker Pool Core (POOL)
+
+- [ ] **POOL-01:** The proxy maintains persistent `claude` CLI workers communicating over `--input-format stream-json --output-format stream-json`; each worker boots once (auth + auto-injected system prompt loaded) and serves multiple sequential requests without re-spawning.
+- [ ] **POOL-02:** Workers are pinned per-model (haiku/sonnet/opus) — a request for model M routes only to a worker booted with `--model M`. Pool size is 2–3 workers per model, lazily spawned (a model's pool stays cold until its first fallback request).
+- [ ] **POOL-03:** Each worker serves at most one in-flight request at a time (concurrency 1); concurrent same-model requests queue or dispatch to a sibling worker — never interleaved on one worker's stdio.
+- [ ] **POOL-04:** The worker pool serves ONLY the claude-code CLI-fallback path (sonnet/opus on HTTP 429, transient 401). The direct OAuth bearer path remains the primary route for haiku (~0.9s) and is behaviorally unchanged.
+
+### Worker Lifecycle (WLIFE)
+
+- [ ] **WLIFE-01:** Workers spawn lazily on the first claude-code fallback request for their model — no workers spawn at proxy boot.
+- [ ] **WLIFE-02:** An idle worker is evicted (subprocess exits, RAM freed) after a configurable idle timeout (default 30 min); a subsequent request lazily respawns it.
+- [ ] **WLIFE-03:** A worker that exits unexpectedly is marked dead, its in-flight request is surfaced as RETRYABLE (not a hard error), and it respawns lazily on the next request — never auto-restarted in a tight loop.
+- [ ] **WLIFE-04:** Client disconnect / request abort propagates to the worker — the in-flight stream-JSON request is cancelled (protocol cancel if supported, else SIGTERM + respawn) so a dead client never pins a concurrency-1 worker.
+
+### Safety & Compatibility (GUARD)
+
+- [ ] **GUARD-01:** Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts the claude-code provider to the current per-call `execFile` path with no behavioral change vs. today.
+- [ ] **GUARD-02:** The pool records the `claude` CLI version at worker boot and recycles a worker when `claude --version` drifts from its boot version, keeping prompt-cache assumptions valid across CLI upgrades.
+- [ ] **GUARD-03:** Worker stderr is drained and throttled (logged at most once per minute per worker, not once per line) so persistent-worker CLI warnings (e.g. "no stdin data received") do not flood logs.
+
+### Performance & Observability (PERF)
+
+- [ ] **PERF-01:** A sonnet `say OK` probe routed through the claude-code provider via a warm worker (cache hit) completes in ≤ 3s steady-state. (Cold first-spawn call may still take ~10s.)
+- [ ] **PERF-02:** The pool survives at least one worker crash (e.g. SIGKILL a worker PID) without dropping subsequent requests for that model.
+- [ ] **PERF-03:** The dashboard's claude-code latency column shows the speedup — median claude-code/sonnet latency drops from ~14s to ≤3s within 24h of rollout.
+
+---
+
+## Future Requirements (deferred from v7.3)
+
+- Cross-provider fallback on 429 (claude-code → copilot) — deliberately excluded; pinning to claude-code expresses user intent, not "anything that works".
+- General-purpose work queue / scheduler — the use case (2–3 concurrent fallback calls) is served by a fixed pool.
+- Worker pools for other CLI-based providers — claude-code is the only provider where CLI spawn dominates latency.
+
+## v7.3 Traceability
+
+_(Filled by roadmapper — maps each REQ-ID to its phase.)_
+
+---
+
+# Milestone v7.2 Requirements — VKB & Online-Learning Quality (SHIPPED)
 
 **Goal:** Bring the online learning pipeline → km-core → unified viewer surface to production data quality, so operators rely on the graph view for navigation and triage instead of working around known-broken rendering.
 
