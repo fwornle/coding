@@ -2404,6 +2404,10 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
             hidden: HIDDEN_FROM_VIEWER.has(attrs.entityType)
               || (typeof attrs.name === 'string' && attrs.name.startsWith('[Raw]')),
             createdMs,
+            // Phase 61 Plan 01 (D-07): provenance bucket for bi-source tick
+            // coloring. Source location varies (Pitfall 3) — prefer the
+            // nested metadata.source, fall back to a top-level attrs.source.
+            source: (attrs.metadata && attrs.metadata.source) ?? attrs.source,
           });
         }
       }
@@ -2428,6 +2432,10 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       return {
         entityIds: matches.map((x) => x.id),
         totalCount: matches.length,
+        // Phase 61 Plan 01 (D-09): any matched entity tagged 'manual' marks
+        // the whole session 'batch'; pure online/auto/null windows (incl.
+        // empty) default to 'online'. Order-independent, no tie-break.
+        source: matches.some((m) => m.source === 'manual') ? 'batch' : 'online',
       };
     };
 
@@ -2444,10 +2452,10 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       // [startAt, endAt) (or [startAt, now) when still running).
       const startMs = Date.parse(parsed.startAt);
       const endMs = endAt ? Date.parse(endAt) : Date.now() + 1;
-      const { entityIds, totalCount } =
+      const { entityIds, totalCount, source } =
         (Number.isFinite(startMs) && Number.isFinite(endMs))
           ? aggregateForRange(startMs, endMs)
-          : { entityIds: [], totalCount: 0 };
+          : { entityIds: [], totalCount: 0, source: 'online' };
       // Persist for the client side (debug / future per-session API).
       entitiesBySessionStart.set(parsed.startAt, entityIds);
       sessions.push({
@@ -2456,11 +2464,18 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
         endAt,
         observationCount: totalCount,
         entityIds,
+        // Phase 61 Plan 01 (D-07/D-09): 'online' | 'batch' provenance bucket.
+        source,
       });
     }
     sessions.sort((a, b) => (b.startAt > a.startAt ? 1 : b.startAt < a.startAt ? -1 : 0));
     const sliced = sessions.slice(0, limit);
-    res.json({ success: true, data: { sessions: sliced } });
+    // Phase 61 Plan 01 (D-02): `total` is the full pre-slice session count
+    // (M) so the unified-viewer strip can render an honest "N of M" badge
+    // when the array is capped at `limit` (N). `limit` echoes the applied
+    // cap so the client need not hard-code it. No second query/count walk —
+    // sessions.length reuses the existing O(files) directory walk.
+    res.json({ success: true, data: { sessions: sliced, total: sessions.length, limit } });
   } catch (err) {
     process.stderr.write(`[obs-api] /api/coding/lsl/sessions error: ${err.message}\n`);
     res.status(500).json({ success: false, error: 'Failed to list LSL sessions' });
