@@ -3881,23 +3881,21 @@ Respond with EXACTLY this structure:
     const MAX_RETRIES = 3;
     const BACKOFF_MS = [2000, 5000, 10000];
     // maxTokens budget. The proxy accepts either camelCase (`maxTokens`) or
-    // snake_case. History: the 2026-06-12 fix bumped this to 16384 because
-    // sonnet hit the proxy's old 4096 default and returned `content: ""`.
+    // snake_case.
     //
-    // 2026-06-19: copilot/sonnet's gateway regressed — it now TIMES OUT
-    // (HTTP 500 after ~240s, empty body) on output requests above ~4096
-    // tokens. Probed directly against /api/complete with process
-    // `consolidator-insight`: 16384 → 500/240s empty, 8192 → 500/240s empty,
-    // 4096 → 200/80s with full 14k-char content. `consolidator-insight`
-    // prompts drive the model to emit large insight articles, so a 16384
-    // request never returns — it degrades to 200-with-empty (`output:16000`)
-    // in the consolidator's longer-timeout path and the whole synthesis
-    // stage stalls on 4x wasted ~250s retries per chunk. Cap insight output
-    // at 4096 (ample for the 1-3 insights a 2-digest chunk yields, and the
-    // only size copilot reliably returns). The other processes
-    // (digest/compaction/resynthesize) emit short output well under the
-    // ceiling, so they keep the larger budget.
-    const MAX_TOKENS = processName === 'consolidator-insight' ? 4096 : 16384;
+    // 2026-06-19: copilot's NON-STREAMING path could not deliver large insight
+    // outputs — the upstream gateway holds the connection open while the whole
+    // response is generated, and generations past ~120s came back as HTTP 500
+    // (empty). The root fix is in the proxy (rapid-llm-proxy
+    // proxy-bridge/server.mjs): copilot now STREAMS when maxTokens > 4096, so
+    // tokens flow incrementally and the gateway never idles. Verified: a
+    // streamed 8192-token request completes in ~160s with full content (vs
+    // 500/240s before). consolidator-insight keeps 8192 — proven to finish
+    // well within this call's 300s proxy timeout (PROXY_TIMEOUT_MS) and ample
+    // for the 1-3 insights a 2-digest chunk yields without truncation. The
+    // other processes (digest/compaction/resynthesize) emit short output, so
+    // they keep the larger 16384 budget.
+    const MAX_TOKENS = processName === 'consolidator-insight' ? 8192 : 16384;
     const requestBody = {
       process: processName,
       ...(this.provider ? { provider: this.provider } : {}),

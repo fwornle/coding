@@ -679,14 +679,14 @@ describe('ObservationConsolidator._callLLM — maxTokens budget + empty-content 
     text: async () => JSON.stringify(obj),
   });
 
-  it('Test A: consolidator-insight requests maxTokens=4096; other processes 16384', async () => {
+  it('Test A: consolidator-insight requests maxTokens=8192; other processes 16384', async () => {
     const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
     await withFetchStub(
       () => jsonResponse({ content: 'ok', tokens: { input: 100, output: 50 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
       async (calls) => {
         await c._callLLM(PROMPT, 'consolidator-insight');
         await c._callLLM(PROMPT, 'consolidator-digest');
-        assert.equal(calls[0].maxTokens, 4096, 'insight call caps output at 4096');
+        assert.equal(calls[0].maxTokens, 8192, 'insight call budget is 8192 (streams via proxy, finishes < 300s timeout)');
         assert.equal(calls[1].maxTokens, 16384, 'digest call keeps the 16384 budget');
       },
     );
@@ -695,8 +695,8 @@ describe('ObservationConsolidator._callLLM — maxTokens budget + empty-content 
   it('Test B: empty content with output near the cap → NO retry (deterministic truncation)', async () => {
     const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
     await withFetchStub(
-      // 4096 cap, output 4000 (within 10%) — the regressed copilot truncation shape.
-      () => jsonResponse({ content: '', tokens: { input: 20000, output: 4000 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
+      // 8192 cap, output 7400 (within 10%) — the truncation-to-empty shape.
+      () => jsonResponse({ content: '', tokens: { input: 20000, output: 7400 }, provider: 'copilot', model: 'claude-sonnet-4.6' }),
       async (calls) => {
         const result = await c._callLLM(PROMPT, 'consolidator-insight');
         assert.equal(result, null, 'returns null on deterministic empty truncation');
