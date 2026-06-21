@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
 status: executing
-stopped_at: Completed 66-03-PLAN.md
-last_updated: "2026-06-21T17:23:58.919Z"
+stopped_at: Completed 66-04-PLAN.md (SC-1 live-green confirmed; SC-2 red deferred — not reachable on this host)
+last_updated: "2026-06-21T18:05:00.000Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -305,11 +305,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 64 P02 | 1 commit / single wave | 4 tasks | 3 files |
 | Phase 66 P01 | 9 | 2 tasks | 4 files |
 | Phase 66 P03 | 6 min | 3 tasks | 5 files |
+| Phase 66 P04 | ~45 min | 3 tasks (T1-2 prior executor; T3 disruptive UAT this run) | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-06-21T17:23:58.777Z
-Stopped at: Completed 66-03-PLAN.md
+Last session: 2026-06-21T18:05:00.000Z
+Stopped at: Completed 66-04-PLAN.md (SC-1 live-green confirmed; SC-2 pool-disabled-red deferred — overhead < 5s red threshold on this host; see 66 deferred-items.md)
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
