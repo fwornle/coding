@@ -10,6 +10,8 @@ A self-learning coding environment that captures every session, builds knowledge
 
 ## Current State
 
+**v7.3 — LLM Proxy Performance (Claude CLI Worker Pool) — final phase complete.** Phase 66 (dashboard latency observability, PERF-03) surfaced the per-model median (p50) claude-code latency on both the `:3032` system-health LLM-latency tile and the Token Usage drill-down table, sourced from the proxy's fallback-path token-usage telemetry — so the worker-pool's ~14s→≤3s speedup (and any regression) is readable off the dashboard rather than only via an ad-hoc probe. The headline tile derives its median + trend sparkline from the last ~50 calls per model and always keeps sonnet/opus/haiku rows (quiet models show "no recent calls"). Two time-dependent observability confirmations remain tracked in 66-HUMAN-UAT.md.
+
 **v7.2 shipped.** The online-learning → km-core → unified viewer surface reached production data quality: online pipeline emits semantic-content edges on Insights, ontology upper/lower split clarified, VKB rendering UX integrity restored, LSL timeline honesty fixed, OKB data routing corrected, and the long-tail orphan baseline reduced. Builds on v6.0's knowledge context injection (live across all four coding agents via Qdrant semantic search, per-agent scoring, cross-agent continuity, 300-token working-memory prefix).
 
 Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), live ETM observations, Qdrant vector search, hybrid retrieval (semantic + keyword + recency), Redis pub/sub for write-time embedding, per-agent adapters, session state handoff.
