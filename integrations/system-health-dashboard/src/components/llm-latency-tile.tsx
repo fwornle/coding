@@ -33,6 +33,14 @@ import HealthStatusCard from './health-status-card'
 //      calls renders a muted "no recent calls" placeholder instead of vanishing.
 // Threshold + reference semantics (D-03/D-04) are unchanged: sonnet/opus green
 // ≤3s / amber 3–5s / red >5s; haiku is the no-threshold direct-path reference.
+//
+// 66-04 RE-POINT (PERF-03 UAT gap closure): the graded VALUE is swapped from
+// total end-to-end `latency_ms` to the worker-pool SPAWN/QUEUE `overhead_ms`
+// that Plan 66-03 added to the /recent feed. Total sonnet latency (~123s,
+// generation-dominated) could never go green and hid pool regressions; the
+// overhead component (warm reuse ≈ 0; cold spawn ~10–14s) is exactly what the
+// pool affects, so the proven ≤3s/amber/red envelope, sparkline, and
+// always-keep-rows UX are UNCHANGED — only the value the tile grades changed.
 
 const REFRESH_INTERVAL = 30_000
 // How many most-recent calls per model the median + sparkline ride on.
@@ -54,6 +62,13 @@ interface RecentCall {
   timestamp: string
   model: string
   latency_ms: number
+  // Phase 66-04: per-call worker-pool SPAWN/QUEUE overhead (ms). 66-03 added
+  // this on the /recent feed: numeric for claude-code pool calls (dispatch-start
+  // → first-stdout, EXCLUDES generation), null for the direct-OAuth path (haiku),
+  // execFile-overflow calls, and pre-66-03 legacy rows. The tile now GRADES this
+  // component — not total latency_ms — because it is what the worker pool actually
+  // affects (warm reuse ≈ 0; cold spawn climbing toward the ~14s baseline).
+  overhead_ms: number | null
 }
 
 interface RecentShape {
@@ -68,8 +83,9 @@ interface TileItem {
   description: string
   tooltip?: string
   badgeLabel?: string
-  // Per-call latency (ms) over the last ~50 calls for this family, oldest→newest.
-  // Drives the inline trend sparkline. Empty/short arrays degrade to the number.
+  // Per-call worker-pool overhead (ms) over the last ~50 calls for this family,
+  // oldest→newest. Drives the inline trend sparkline. Empty/short arrays degrade
+  // to the number.
   spark?: number[]
   // True when the family had NO recent calls — render a muted placeholder row
   // (no badge, no sparkline) instead of dropping it.
@@ -83,8 +99,10 @@ function formatLatency(ms: number): string {
 }
 
 // D-03 regression threshold envelope for claude-code fallback models
-// (sonnet, opus): green ≤3000ms (PERF-01 warm bar) → amber 3000<x≤5000 → red
-// >5000ms (median climbing toward the ~14000ms pre-worker-pool baseline).
+// (sonnet, opus). Phase 66-04: this now grades the worker-pool SPAWN OVERHEAD,
+// which makes the bar MEANINGFUL — green ≤3000ms (warm pool reuse, near-zero
+// overhead) → amber 3000<x≤5000 → red >5000ms (overhead climbing toward the
+// ~14000ms cold-spawn baseline). Generation time is excluded from the metric.
 function latencyStatus(ms: number): ItemStatus {
   if (ms <= 3000) return 'operational'
   if (ms <= 5000) return 'warning'
@@ -117,19 +135,23 @@ function median(values: number[]): number {
   return sorted[Math.floor((sorted.length - 1) / 2)]
 }
 
-// The most-recent SAMPLE_SIZE calls for one family, NEWEST-FIRST. The /recent
-// feed is already ordered newest-first, but sort defensively so a feed ordering
-// change can't silently skew the "last N" slice.
+// The most-recent SAMPLE_SIZE calls for one family that carry a NON-NULL
+// worker-pool overhead, NEWEST-FIRST. Phase 66-04: the graded sample is now the
+// overhead component, so rows with a NULL overhead_ms (direct/haiku calls,
+// execFile-overflow, or pre-66-03 legacy rows) are EXCLUDED — they have no pool
+// overhead to grade and would otherwise poison the median or render NaN
+// (T-66-04-02). The /recent feed is already ordered newest-first, but sort
+// defensively so a feed ordering change can't silently skew the "last N" slice.
 function recentSamplesForFamily(calls: RecentCall[], family: string): RecentCall[] {
   return calls
-    .filter((c) => new RegExp(family, 'i').test(c.model) && Number.isFinite(c.latency_ms))
+    .filter((c) => new RegExp(family, 'i').test(c.model) && Number.isFinite(c.overhead_ms))
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
     .slice(0, SAMPLE_SIZE)
 }
 
 // Tiny inline SVG sparkline (no recharts dependency — keeps the tile cheap and
 // avoids the recharts typing cluster noted in deferred-items.md). Renders the
-// per-call latency trend left→right (oldest→newest). Rising = regressing.
+// per-call overhead trend left→right (oldest→newest). Rising = pool regressing.
 function Sparkline({ points, color }: { points: number[]; color: string }) {
   if (points.length < 2) return null
   const W = 88
@@ -201,39 +223,48 @@ export default function LlmLatencyTile() {
           const name = samples.length > 0 ? samples[0].model : label
 
           if (samples.length === 0) {
+            // Phase 66-04: zero non-null overhead samples. For haiku this is the
+            // STEADY state — it rides the direct OAuth path with no worker-pool
+            // overhead (D-04 spirit), so it renders as an explicit reference row.
+            // For a graded family (sonnet/opus) it means no recent POOL calls in
+            // the feed (all warm-direct/overflow/quiet) — render the muted
+            // "no recent pool calls" placeholder instead of dropping the row.
             return {
               name,
               // Neutral — no pass/fail. A quiet model is not a fault.
               status: 'reference' as ItemStatus,
-              description: 'no recent calls',
-              badgeLabel: '—',
+              description: reference
+                ? 'direct path — no pool overhead'
+                : 'no recent pool calls',
+              badgeLabel: reference ? 'reference' : '—',
               tooltip: reference
-                ? 'Direct-path OAuth baseline — not pool-graded (reference only).'
-                : 'No recent calls for this model in the latency feed.',
+                ? 'Direct-path OAuth — no worker-pool overhead (reference only).'
+                : 'No recent worker-pool calls for this model in the overhead feed.',
               empty: true,
             }
           }
 
-          const p50 = median(samples.map((c) => c.latency_ms))
-          // Sparkline rides the SAME samples, oldest→newest so headline + trend agree.
-          const spark = samples.map((c) => c.latency_ms).reverse()
+          // Median over the per-call OVERHEAD samples (filtered non-null above).
+          const p50 = median(samples.map((c) => c.overhead_ms as number))
+          // Sparkline rides the SAME overhead samples, oldest→newest so headline
+          // + trend agree.
+          const spark = samples.map((c) => c.overhead_ms as number).reverse()
           const status: ItemStatus = reference ? 'reference' : latencyStatus(p50)
           return {
             name,
-            // Haiku → neutral 'reference' status (muted "reference" label, no
-            // pass/fail badge) so it reads as the direct-path baseline, NOT a
-            // down/error state (D-04). sonnet/opus → green/amber/red threshold.
+            // Haiku → neutral 'reference' status (no pool overhead — direct path,
+            // D-04). sonnet/opus → green/amber/red threshold against OVERHEAD.
             status,
             description: reference
-              ? `${formatLatency(p50)} median (reference) · last ~${samples.length} calls`
-              : `${formatLatency(p50)} median · last ~${samples.length} calls`,
-            // Latency-specific badge text (OK/Elevated/Regressed) so the red
-            // state reads as a latency regression, not a service fault (D-03).
+              ? `${formatLatency(p50)} overhead median (reference) · last ~${samples.length} calls`
+              : `${formatLatency(p50)} overhead median · last ~${samples.length} calls`,
+            // Overhead-specific badge text (OK/Elevated/Regressed) so the red
+            // state reads as a pool-overhead regression, not a service fault (D-03).
             badgeLabel: reference ? 'reference' : latencyBadgeLabel(status),
             // Hover tooltips explain the assessment (sample basis + threshold band).
             tooltip: reference
-              ? 'Direct-path OAuth baseline — not pool-graded (reference only).'
-              : 'Median of the last ~50 calls. Warm target ≤3s; amber 3–5s; red >5s.',
+              ? 'Direct-path OAuth — no worker-pool overhead (reference only).'
+              : 'Median spawn/queue overhead over the last ~50 calls. Warm reuse near 0; amber 3–5s; red >5s climbing toward the ~14s cold-spawn baseline. Excludes model generation time.',
             spark,
           }
         })
@@ -244,7 +275,7 @@ export default function LlmLatencyTile() {
           setItems([{
             name: 'LLM proxy',
             status: 'error' as ItemStatus,
-            description: 'Median unavailable (proxy unreachable)',
+            description: 'Overhead median unavailable (proxy unreachable)',
           }])
         }
       }
@@ -266,16 +297,16 @@ export default function LlmLatencyTile() {
   return (
     <div className="relative">
       <HealthStatusCard
-        title="LLM Latency"
+        title="LLM Pool Overhead"
         icon={<Zap className="h-5 w-5 text-amber-500" />}
         items={cardItems}
       />
-      {/* Subtitle/legend + per-model trend sparklines overlaid under the card
-          header. Kept muted/small, consistent with the card style. The legend
+      {/* Subtitle/legend + per-model overhead trend sparklines overlaid under the
+          card header. Kept muted/small, consistent with the card style. The legend
           makes the threshold (≤3s) and basis (last ~50 calls) visible at a glance. */}
       <div className="px-6 -mt-3 pb-3 space-y-1.5">
         <div className="text-[10px] text-muted-foreground">
-          Per-model median · warm target ≤3s · last ~50 calls
+          Per-model spawn overhead · warm target ≤3s · last ~50 calls
         </div>
         {items.some((i) => i.spark && i.spark.length >= 2) && (
           <div className="space-y-1 pt-1">
