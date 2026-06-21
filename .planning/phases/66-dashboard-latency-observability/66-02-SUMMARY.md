@@ -83,6 +83,14 @@ Observed live medians (read off the rendered table): haiku 1.3s (avg 1.7s); sonn
 
 None — the three source changes landed as written.
 
+### User-directed deviation (v3 enhancement, recorded per plan instruction)
+
+**[Tile-scoped deviation from D-05] Headline tile uses a 1h rolling window, not rolling-24h**
+- **D-05 locked** a rolling-24h window for the median surfaces. The headline LlmLatencyTile now fetches `summary?hours=1` instead of `hours=24`.
+- **Scope:** ONLY the headline tile. The Token Usage drill-down TABLE (`token-usage.tsx`) **stays 24h** — unchanged.
+- **Rationale (user decision):** a 24h median is dominated by stale pre-worker-pool history and reads red even when warm calls are ≤3s; a 1h window reflects current warm-pool health and goes green as history ages out. The drill-down table retains the full 24h honest median for forensic context.
+- **Authorized by:** the human reviewer at the blocking checkpoint (second review), explicitly directing the tile-only window change.
+
 ### Out-of-scope (deferred, NOT fixed — per SCOPE BOUNDARY)
 
 Logged to `66-dashboard-latency-observability/deferred-items.md`. All confirmed PRE-EXISTING via a `git stash` baseline comparison before any 66-02 edit:
@@ -104,13 +112,28 @@ Also auto-fixed (Rule 1, latent bug my grid edit surfaced): added `'unknown'` to
 
 **Visual re-confirmation** (`/tmp/66-02-tile-fix.png`): haiku shows a muted "reference" label (no Offline/fault badge); sonnet (4.6s median) shows the red badge with "Regressed" text; the LLM Latency tile sits inline as the 6th tile in the grid row.
 
+## Checkpoint-Enhancement Iteration v3 (2026-06-21, second human review)
+
+The human APPROVED the v2 badge/placement fixes but asked the tile to **explain its assessment** and use a **fresher window**. Four enhancements were applied to `llm-latency-tile.tsx` ONLY (no other file touched), the frontend was rebuilt + restarted, and fresh gsd-browser screenshots were captured. The checkpoint remains **blocking and NOT self-approved**.
+
+1. **Headline tile switched to a 1h rolling window** (`fetch('/api/token-usage/summary?hours=1')`, was `hours=24`). **DEVIATION from D-05** (which locked rolling-24h) — see the dedicated deviation entry below. Both rows now read "· last 1h".
+2. **Subtitle/legend added** under the card: muted `Per-model median · warm target ≤3s · last 1h`, so the threshold + window are visible at a glance.
+3. **Per-model hover tooltips added** (via the existing `StatusItem.tooltip` field rendered by HealthStatusCard): sonnet/opus → "Median latency over last 1h. Warm target ≤3s; amber 3–5s; red >5s climbing toward the ~14s pre-pool baseline."; haiku → "Direct-path OAuth baseline — not pool-graded (reference only)." (DOM-verified present.)
+4. **Per-model latency TREND sparkline added** — a tiny inline SVG polyline per model row, drawn from the per-bucket median latency over the last 1h (12 buckets, lower-mid median per bucket, empty buckets dropped). Stroke color matches the status (green/amber/red). Lets an operator SEE the assessment arising — a rising sonnet line = regressing, falling = recovering — rather than trusting one number. Degrades to the number alone when <2 in-window buckets exist.
+
+**Sparkline data source (cheapest, option 4a — NO proxy change):** the existing same-origin `/api/token-usage/recent?limit=500` feed already returns per-call rows carrying `timestamp` + `model` + `latency_ms`. The tile fetches it alongside the summary, filters to the last 1h, buckets per-model client-side, and computes the per-bucket median. The proxy `token-usage.ts` was **NOT** touched (no new endpoint, no parameterized time-series query needed); the recent endpoint is already clamped to 500 rows server-side. recharts was deliberately avoided (it carries the deferred-items typing cluster) in favor of a hand-rolled inline SVG `<polyline>` to keep the tile cheap and tsc-clean.
+
+**Visual re-confirmation v3** (`/tmp/66-02-tile-v3-full.png` full page; `/tmp/66-02-tile-v3-crop.png` tile crop): both rows read "last 1h"; the subtitle legend renders muted under the rows; 4 tooltips are present in the DOM with the exact specified wording; two sparklines render — sonnet a red rising trend (matching the "Regressed" badge), haiku a grey reference trend. sonnet still reads red (~90.8s) because this hour's history is sonnet-fallback-heavy, but the rising sparkline now makes the assessment self-explanatory.
+
+**Files touched in this iteration:** `integrations/system-health-dashboard/src/components/llm-latency-tile.tsx` (only).
+
 ## Checkpoint Status
 
-**Task 4 (`checkpoint:human-verify`, gate="blocking") is NOT self-approved.** The gsd-browser visual evidence has been captured (paths above). Control is being returned to the orchestrator for explicit human confirmation that both surfaces render the per-model median with the green ≤3s treatment (when warm) and the haiku reference row. The plan is NOT marked fully complete.
+**Task 4 (`checkpoint:human-verify`, gate="blocking") is NOT self-approved.** The v3 enhancements (1h window, subtitle/legend, per-model tooltips, trend sparkline) have been applied and the gsd-browser visual evidence re-captured (`/tmp/66-02-tile-v3-full.png`, `/tmp/66-02-tile-v3-crop.png`). Control is being returned to the orchestrator for explicit human re-confirmation. The plan is NOT marked fully complete.
 
 **Resume signal (from the plan):** Type "approved" if both surfaces show the per-model median with the green ≤3s treatment and haiku reference row; otherwise describe what renders wrong.
 
-> Note on the live data: with the 24h window still dominated by pre-worker-pool sonnet calls, the sonnet median reads ~176s and the badge is RED — this is the *honest* median (SC-1 surfaces the number; the green ≤3s state appears as warm traffic ages in). The threshold machinery is proven correct: haiku ≤3s renders plain (reference), sonnet >5s renders red. The operator may wish to confirm the green state once the window is warm, OR approve on the basis that the threshold logic and both surfaces are demonstrably wired (green ≤3000 / amber / red >5000 envelope is in code and the badge already flips red on the >5s sonnet median).
+> Note on the live data (v3, 1h tile window): the sonnet median now reads ~90.8s over the last 1h (fresher than the 24h ~176s) and the badge is RED — this hour's history is still sonnet-fallback-heavy. The per-model **trend sparkline** now makes the assessment self-explanatory: a rising sonnet line = the median climbing (regressing), a falling line = recovering toward the ≤3s warm bar. The threshold machinery is proven: haiku ≤3s renders plain (reference, ~1.1s); sonnet >5s renders red with the "Regressed" label. The 1h window will flip the badge green as warm-pool traffic dominates the hour. The operator may confirm the green state once warm, OR approve on the basis that the 1h window + subtitle + tooltips + trend sparkline are demonstrably wired and the threshold envelope (green ≤3000 / amber / red >5000) flips correctly.
 
 ## Self-Check: PASSED
 
