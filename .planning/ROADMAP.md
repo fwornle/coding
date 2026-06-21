@@ -1283,7 +1283,10 @@ Plans:
   2. SIGKILL-ing one worker PID for a model does not drop the subsequent fallback requests for that model — the next request is served (after a lazy respawn) and returns a valid completion, demonstrating the pool survives at least one worker crash.
   3. Idle eviction is observable end-to-end: after the configured idle timeout the worker exits (gone from `ps`), and a fresh request spawns a new one within the expected bound — confirming the idle-evict ↔ lazy-respawn cycle holds under the acceptance probe.
   4. Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` and re-running the probe reverts cleanly to the per-call `execFile` path (no workers in `ps`, baseline latency restored) — the escape hatch is a safe rollback at acceptance time.
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 65-01-PLAN.md — Formal acceptance gate (verify-only, autonomous:false): extend worker-pool-live.test.mjs with PERF-01 steady-state warm-latency probe (median of N>=5 warm `say OK` <=3s, hard gate + cache-presence floor), PERF-02 crash-survival (SIGKILL pid -> next request returns a valid completion from a NEW pid), SC-3 bounded idle respawn, SC-4 escape-hatch zero-ps + restored baseline latency; operator live-run records results in 65-HUMAN-UAT.md (discharges PERF-01/PERF-02; PERF-01 left blocked on a miss, no bar relaxation).
 
 ### Phase 66: Dashboard Latency Observability
 **Goal:** Operators can see the speedup land in production — the dashboard's claude-code latency column reflects the warm-pool steady-state, so the ~14s → ≤3s improvement is visible and trackable within a day of rollout rather than only provable by an ad-hoc probe.
