@@ -1525,6 +1525,17 @@ export class ObservationConsolidator {
         tokens: this._tokenize(`${i.topic} ${i.summary}`),
       }));
       const RELEVANT_K = 10;
+      // The topical filter caps the COUNT of existing insights per chunk, but each
+      // insight summary is itself large (commonly 5-13KB), so 10 relevant insights
+      // still peg the prompt at ~26-32k input tokens — the model then generates
+      // output that hits the 16384 cap and copilot returns EMPTY content (total
+      // loss), and oversized prompts also stall copilot's gateway into multi-minute
+      // `fetch failed` hangs. The existing-insight context only needs to be a GIST
+      // (so the LLM can recognise overlap and merge rather than restate), not the
+      // full document — so bound each existing summary to a gist length. This keeps
+      // the per-chunk input small enough that real insight output finishes well
+      // below the cap. (2026-06-21 fix for the stuck insight-synthesis runs.)
+      const EXISTING_SUMMARY_MAX_CHARS = 1000;
 
       const digestChunks = [];
       for (let i = 0; i < projDigests.length; i += DIGEST_CHUNK_SIZE) {
@@ -1556,15 +1567,25 @@ export class ObservationConsolidator {
         const chunkTokens = this._tokenize(
           chunk.map(d => `${d.theme} ${d.summary}`).join(' ')
         );
+        // Bound each existing-insight summary to a gist so the merge context
+        // stays small (see EXISTING_SUMMARY_MAX_CHARS). Applies to both the
+        // topically-relevant prior-run insights AND this run's accumulated
+        // snapshot — either can carry multi-KB summaries.
+        const gist = (s) => {
+          const str = String(s || '');
+          return str.length > EXISTING_SUMMARY_MAX_CHARS
+            ? str.slice(0, EXISTING_SUMMARY_MAX_CHARS) + '\n…(truncated to gist for merge/dedup)'
+            : str;
+        };
         const relevantExisting = existingTokens
           .map(e => ({ entry: e.ref, score: this._jaccard(chunkTokens, e.tokens) }))
           .filter(e => e.score > 0)
           .sort((a, b) => b.score - a.score)
           .slice(0, RELEVANT_K)
-          .map(e => ({ topic: e.entry.topic, summary: e.entry.summary }));
+          .map(e => ({ topic: e.entry.topic, summary: gist(e.entry.summary) }));
         const currentInsights = [
           ...relevantExisting,
-          ...snapshot,
+          ...snapshot.map(i => ({ topic: i.topic, summary: gist(i.summary) })),
         ];
         const existingBlock = currentInsights.length > 0
           ? currentInsights.map(i => `## ${i.topic}\n${i.summary}`).join('\n\n')
