@@ -261,7 +261,19 @@ constraints:
     instead. You MUST invoke documentation-style skill FIRST'
   severity: error
   enabled: true
-  file_pattern: \.md$
+  # Only apply to file writes — without this, Bash command strings and
+  # AskUserQuestion previews have no filePath, so file_pattern/whitelist are
+  # bypassed and the rule mis-fires on non-document tool input. This is meant
+  # for docs/mkdocs markdown only, never tool commands or planning docs.
+  tool_filter:
+  - Edit
+  - Write
+  - MultiEdit
+  # Scope to documentation/mkdocs markdown only (under a docs/ dir). Planning
+  # docs (.planning/, .claude/), READMEs, and other markdown are exempt — the
+  # previous `\.md$` matched ALL markdown and the `**/.planning/**` whitelist
+  # never fired because matchesPath needs a leading slash before `.planning`.
+  file_pattern: '(^|/)docs/.*\.md$'
   suggestion: 1. Invoke Skill tool with skill='documentation-style' 2. Create .puml
     file in docs/puml/ 3. Generate PNG with plantuml 4. Reference image in markdown
   whitelist:
