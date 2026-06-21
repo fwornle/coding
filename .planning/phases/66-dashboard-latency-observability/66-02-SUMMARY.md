@@ -3,7 +3,7 @@ phase: 66-dashboard-latency-observability
 plan: 02
 subsystem: system-health-dashboard (LLM latency observability)
 tags: [perf, observability, dashboard, react, median, latency, PERF-03]
-status: awaiting-checkpoint
+status: complete
 requires:
   - "66-01: getSummary().by_model[].p50_latency_ms (proxy SQL median)"
 provides:
@@ -178,7 +178,7 @@ renders wrong.
 
 ## Checkpoint Status
 
-**Task 4 (`checkpoint:human-verify`, gate="blocking") — REOPENED on 2026-06-21 for the last-N-calls redesign (v4); awaiting operator re-approval. NOT self-approved.** Prior v3 history below for context.
+**Task 4 (`checkpoint:human-verify`, gate="blocking") — APPROVED by the operator on 2026-06-21 after the v4 last-N-calls redesign.** The operator confirmed the tile stays useful both busy and quiet: sonnet/opus/haiku always render as fixed rows (quiet models show "no recent calls" rather than vanishing), and the median + sparkline both ride the last ~50 calls from the `/recent` feed. Plan 66-02 is COMPLETE. Prior v3/v4 history below for context.
 
 **Earlier (v3) — APPROVED by the human reviewer on 2026-06-21.** Approval came after the v3 enhancements (1h window, subtitle/legend, per-model tooltips, trend sparkline), with the gsd-browser visual evidence re-captured (`/tmp/66-02-tile-v3-full.png`, `/tmp/66-02-tile-v3-crop.png`). The operator confirmed the tile now explains its assessment (why "Regressed", what "reference") over the fresher 1h window. Plan 66-02 is COMPLETE.
 
