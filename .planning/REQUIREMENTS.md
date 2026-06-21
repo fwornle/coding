@@ -34,7 +34,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 - [x] **GUARD-01:** Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts the claude-code provider to the current per-call `execFile` path with no behavioral change vs. today.
 - [x] **GUARD-02:** The pool records the `claude` CLI version at worker boot and recycles a worker when `claude --version` drifts from its boot version, keeping prompt-cache assumptions valid across CLI upgrades.
-- [ ] **GUARD-03:** Worker stderr is drained and throttled (logged at most once per minute per worker, not once per line) so persistent-worker CLI warnings (e.g. "no stdin data received") do not flood logs.
+- [x] **GUARD-03:** Worker stderr is drained and throttled (logged at most once per minute per worker, not once per line) so persistent-worker CLI warnings (e.g. "no stdin data received") do not flood logs.
 
 ### Performance & Observability (PERF)
 
@@ -64,7 +64,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | WLIFE-03 | Phase 63 | Complete (63-02 EPIPE-as-crash fold-in; 63-03 crash-cooldown respawn-storm guard; live-confirmed 2026-06-21 — 63-05 SC-3 crash PASS) |
 | WLIFE-04 | Phase 63 | Complete (63-02 stray-result generation guard + 63-04 D-01/D-03 SIGTERM+dispose+drop in-flight / dequeue queued; commits 959f6d3/a33629b; live-confirmed 2026-06-21 — 63-05 SC-4 cancel PASS) |
 | GUARD-02 | Phase 64 | Complete (64-01: _bootVersion capture via deps.readVersion + pool _currentVersion snapshot + drift-flag-at-reuse through _reapStale; proxy commit cc4a0b6; unit-proven via simulated version change, 53 tests pass) |
-| GUARD-03 | Phase 64 | Not started |
+| GUARD-03 | Phase 64 | Complete (64-02: drain-and-throttle stderr handler — every chunk drained, <=200-char sample logged <=1/min/worker via injected logErr + injectable clock; WR-02 fold-in cache-inclusive recycle ceiling; proxy commit 8fbc8d2; unit-proven via fake-clock throttle + summed-token ceiling, 58 tests pass) |
 | PERF-01 | Phase 65 | Not started |
 | PERF-02 | Phase 65 | Not started |
 | PERF-03 | Phase 66 | Not started |

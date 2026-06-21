@@ -1196,7 +1196,7 @@ Plans:
 
 - [x] **Phase 62: Worker Pool Core & stream-JSON Transport** — persistent `claude -p --input-format stream-json --output-format stream-json` workers, per-model pinned, concurrency-1, serving ONLY the CLI-fallback path; `LLM_PROXY_DISABLE_WORKER_POOL=1` escape hatch wired first. (completed 2026-06-20)
 - [x] **Phase 63: Worker Lifecycle — Lazy Spawn, Idle Eviction, Crash Recovery & Cancellation** — lazy spawn on first fallback, idle-evict after configurable timeout (default 30 min), crash → RETRYABLE + lazy respawn (no spin-loop), client-disconnect aborts the in-flight stream-JSON request. (all 5 plans landed 2026-06-21; mechanisms UNIT-proven in Plans 01-04 and confirmed by the `--live` SC-1..SC-4 verification suite in Plan 05. **WLIFE-01..04 ROADMAP-discharged 2026-06-21** by the operator `LLM_PROXY_LIVE=1` run — 9/9 tests PASS, exit 0, zero orphaned workers; SC-1..SC-4 all PASS. See 63-05-SUMMARY § Operator Live-Run — PASSED.)
-- [ ] **Phase 64: Worker Hygiene — CLI Version Pinning & stderr Throttling** — record `claude --version` at boot, recycle worker on version drift to keep prompt-cache assumptions valid; drain + throttle worker stderr to once-per-minute-per-worker so persistent-worker CLI warnings don't flood logs.
+- [x] **Phase 64: Worker Hygiene — CLI Version Pinning & stderr Throttling** — record `claude --version` at boot, recycle worker on version drift to keep prompt-cache assumptions valid; drain + throttle worker stderr to once-per-minute-per-worker so persistent-worker CLI warnings don't flood logs. (completed 2026-06-21)
 - [ ] **Phase 65: Steady-State Latency & Crash-Survival Acceptance** — warm-worker sonnet `say OK` probe completes ≤3s steady-state (cold first-spawn may still be ~10s); pool survives a worker SIGKILL without dropping subsequent same-model requests; idle-eviction observable via `ps`; escape hatch reverts cleanly.
 - [ ] **Phase 66: Dashboard Latency Observability** — the dashboard's claude-code/sonnet median latency column shows the ~14s → ≤3s drop within 24h of rollout.
 
@@ -1264,7 +1264,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Each worker records the `claude` CLI version at boot; when `claude --version` drifts from a worker's boot version, that worker is recycled (drained + respawned) before serving the next request, keeping prompt-cache assumptions valid across CLI upgrades (verified by simulating a version change and observing the worker recycle).
   2. Worker stderr is drained continuously (so the pipe never blocks the subprocess) and throttled to at most one log line per minute per worker — persistent-worker CLI warnings (e.g. "no stdin data received") do not appear once-per-line in the proxy logs.
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 **Wave 1**
 
@@ -1272,7 +1272,7 @@ Plans:
 
 **Wave 2** *(depends on 64-01 — shared worker-pool.mjs/test file)*
 
-- [ ] 64-02-PLAN.md — GUARD-03 stderr drain+throttle (per-worker <=1/min, <=200-char, deps logger+clock) + WR-02 fold-in (cache-inclusive recycle-ceiling token sum) (unit: fake clock + summed-token payload)
+- [x] 64-02-PLAN.md — GUARD-03 stderr drain+throttle (per-worker <=1/min, <=200-char, deps logger+clock) + WR-02 fold-in (cache-inclusive recycle-ceiling token sum) (unit: fake clock + summed-token payload)
 
 ### Phase 65: Steady-State Latency & Crash-Survival Acceptance
 **Goal:** Prove the milestone's headline performance and resilience claims against the live proxy — the warm-pool fallback path is fast, survives a worker crash, evicts idle workers, and the escape hatch reverts cleanly — so the speedup is demonstrated, not assumed.
