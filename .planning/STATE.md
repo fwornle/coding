@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
 status: executing
-stopped_at: Phase 63 context gathered
-last_updated: "2026-06-21T06:55:19.754Z"
-last_activity: 2026-06-21 -- Phase 63 planning complete
+stopped_at: Completed 63-01-PLAN.md
+last_updated: "2026-06-21T07:18:00.000Z"
+last_activity: 2026-06-21 -- Phase 63 Plan 01 complete (D-08 dispose-drop + D-04 idle timer)
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 3
+  completed_plans: 4
   percent: 20
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 63 — worker lifecycle — lazy spawn, idle eviction, crash recovery & cancellation
+**Current focus:** Phase 63 — worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 63
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-21 -- Phase 63 planning complete
+Phase: 63 (worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can) — EXECUTING
+Plan: 2 of 5 (Plan 01 complete)
+Status: Executing Phase 63
+Last activity: 2026-06-21 -- Phase 63 Plan 01 complete (WLIFE-02); D-08 synchronous dispose-drop + D-04 idle timer landed in rapid-llm-proxy (27/27 unit green)
 
 ## Performance Metrics
 
@@ -93,6 +93,8 @@ Last activity: 2026-06-21 -- Phase 63 planning complete
 
 ### Decisions
 
+- [63-01]: `WorkerPool._disposeAndDrop(key, worker)` is the canonical synchronous dispose+splice+prune lifecycle-disposal path (D-08), closing the acquire-after-SIGTERM race; `complete()`'s post-request recycle finally delegates to it, and Plans 03 (crash-cooldown) + 04 (cancellation) will reuse it. The async `'exit'`->`_dropWorker` reaper stays as the idempotent backstop (`indexOf===-1` guard makes double-drop safe).
+- [63-01]: Idle-eviction timer (D-04 / WLIFE-02) lives on `ClaudeWorker` (not armed by the pool), `unref()`'d, default 30 min via `LLM_PROXY_WORKER_IDLE_MS` (Phase-62 `LLM_PROXY_WORKER_*` house style); armed in constructor, cleared on dispatch, re-armed on settle, cleared in `dispose()` AND `_onExit` so shutdown/crash leaves no dangling timer. On fire it disposes through the existing reap path — no central sweep loop.
 - [v6.0 start]: Agent-agnostic architecture -- retrieval service is standalone HTTP API, each coding agent has its own adapter
 - [v6.0 start]: Use existing Qdrant instance for vector storage (not LibSQL vector)
 - [v6.0 start]: All four knowledge tiers as sources (observations, digests, insights, KG entities)

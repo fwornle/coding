@@ -1233,13 +1233,13 @@ Plans:
   2. A worker that has been idle past the configurable idle timeout (default 30 min) exits and frees its RAM (observable via `ps` — the subprocess is gone), and a subsequent request for that model lazily respawns a fresh worker.
   3. A worker that exits unexpectedly is marked dead, its in-flight request is surfaced to the caller as RETRYABLE (not a hard error), and it respawns lazily only on the next request — never auto-restarted in a tight loop (verified by killing a worker mid-request and confirming no respawn-storm in logs).
   4. Client disconnect / request abort propagates to the worker so the in-flight stream-JSON request is cancelled (protocol cancel if supported, else SIGTERM + respawn) — a dead client never leaves a concurrency-1 worker pinned to a zombie request.
-**Plans:** 5 plans
+**Plans:** 1/5 plans executed
 
 Plans:
 
 **Wave 1**
 
-- [ ] 63-01-PLAN.md — D-08 synchronous dispose+drop helper + D-04/WLIFE-02 per-worker unref'd idle timer (unit)
+- [x] 63-01-PLAN.md — D-08 synchronous dispose+drop helper + D-04/WLIFE-02 per-worker unref'd idle timer (unit)
 
 **Wave 2** *(depends on 63-01)*
 

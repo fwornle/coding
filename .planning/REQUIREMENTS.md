@@ -26,7 +26,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 ### Worker Lifecycle (WLIFE)
 
 - [ ] **WLIFE-01:** Workers spawn lazily on the first claude-code fallback request for their model — no workers spawn at proxy boot.
-- [ ] **WLIFE-02:** An idle worker is evicted (subprocess exits, RAM freed) after a configurable idle timeout (default 30 min); a subsequent request lazily respawns it.
+- [x] **WLIFE-02:** An idle worker is evicted (subprocess exits, RAM freed) after a configurable idle timeout (default 30 min); a subsequent request lazily respawns it.
 - [ ] **WLIFE-03:** A worker that exits unexpectedly is marked dead, its in-flight request is surfaced as RETRYABLE (not a hard error), and it respawns lazily on the next request — never auto-restarted in a tight loop.
 - [ ] **WLIFE-04:** Client disconnect / request abort propagates to the worker — the in-flight stream-JSON request is cancelled (protocol cancel if supported, else SIGTERM + respawn) so a dead client never pins a concurrency-1 worker.
 
@@ -60,7 +60,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | POOL-04 | Phase 62 | Complete |
 | GUARD-01 | Phase 62 | Complete |
 | WLIFE-01 | Phase 63 | Not started |
-| WLIFE-02 | Phase 63 | Not started |
+| WLIFE-02 | Phase 63 | Complete |
 | WLIFE-03 | Phase 63 | Not started |
 | WLIFE-04 | Phase 63 | Not started |
 | GUARD-02 | Phase 64 | Not started |
