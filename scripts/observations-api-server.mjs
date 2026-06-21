@@ -1666,83 +1666,142 @@ function mountKMRoutes(store) {
 //
 // Registered on kmRouter so the existing hydration gate (line ~1236)
 // applies — 503 until the GraphKMStore has finished opening.
+// Shared ViewerStats composition — single source of truth for BOTH the
+// /api/v1/stats JSON endpoint and the /api/v1/stream SSE endpoint. Reused so
+// the live-streamed payload is byte-for-byte the same shape the poll returns
+// (StatsBar tolerates either, but emitting the real evidence/pattern/component
+// counts means the chip shows correct numbers the instant SSE connects rather
+// than zeros from a stubbed stream — see Plan 55-06 / the /api/v1/stream fix).
+async function composeViewerStats(store) {
+  const graph = store.graph;
+  const nodeCount = graph.order;
+  const edgeCount = graph.size;
+
+  const [evidenceCount, patternCount, componentCount] = await Promise.all([
+    store.countByOntologyClass('Observation'),
+    store.countByOntologyClass('Pattern'),
+    store.countByOntologyClass('Component'),
+  ]);
+
+  // Orphan walk (mirrors /api/v1/graph/orphans handler logic but counts only).
+  let orphanCount = 0;
+  graph.forEachNode((id) => {
+    if (graph.degree(id) === 0) orphanCount += 1;
+  });
+  // Connectivity is the inverse density of orphans against the node
+  // population — 1.0 means every node touches at least one edge.
+  const connectivity = nodeCount > 0
+    ? 1 - (orphanCount / nodeCount)
+    : 1;
+
+  // lastUpdated: maximum createdAt across all known ontology classes.
+  // Falls back to "now" on a completely empty store so the
+  // unified-viewer StatsBar never renders a missing-field state.
+  const observedClasses = ['Observation', 'Digest', 'Insight', 'Pattern', 'Component'];
+  const lastUpdatedCandidates = await Promise.all(
+    observedClasses.map((cls) => store.lastModifiedByClass(cls).catch(() => null)),
+  );
+  let lastUpdated = null;
+  for (const ts of lastUpdatedCandidates) {
+    if (typeof ts === 'string' && (lastUpdated === null || ts > lastUpdated)) {
+      lastUpdated = ts;
+    }
+  }
+  if (lastUpdated === null) lastUpdated = new Date().toISOString();
+
+  // Active snapshot: newest entry from SnapshotManager.listSnapshots().
+  // Returns null when no snapshot tags are present OR when the listing
+  // throws (no git repo, etc.) — the unified-viewer StatsBar renders
+  // "no snapshot" affordances in that case rather than a hard error.
+  let activeSnapshot = null;
+  try {
+    const sm = new SnapshotManager({ exportDir: KG_EXPORT_DIR });
+    const snapshots = await sm.listSnapshots();
+    if (Array.isArray(snapshots) && snapshots.length > 0) {
+      const head = snapshots[0];
+      activeSnapshot = {
+        hash: head.commit_sha,
+        message: head.message,
+        date: head.timestamp,
+      };
+    }
+  } catch {
+    // Fall through — activeSnapshot stays null.
+  }
+
+  return {
+    nodeCount,
+    edgeCount,
+    evidenceCount,
+    patternCount,
+    orphanCount,
+    componentCount,
+    connectivity,
+    lastUpdated,
+    activeSnapshot,
+  };
+}
+
 kmRouter.get('/stats', async (_req, res) => {
   try {
-    const store = _kmStore;
-    const graph = store.graph;
-    const nodeCount = graph.order;
-    const edgeCount = graph.size;
-
-    const [evidenceCount, patternCount, componentCount] = await Promise.all([
-      store.countByOntologyClass('Observation'),
-      store.countByOntologyClass('Pattern'),
-      store.countByOntologyClass('Component'),
-    ]);
-
-    // Orphan walk (mirrors /api/v1/graph/orphans handler logic but counts only).
-    let orphanCount = 0;
-    graph.forEachNode((id) => {
-      if (graph.degree(id) === 0) orphanCount += 1;
-    });
-    // Connectivity is the inverse density of orphans against the node
-    // population — 1.0 means every node touches at least one edge.
-    const connectivity = nodeCount > 0
-      ? 1 - (orphanCount / nodeCount)
-      : 1;
-
-    // lastUpdated: maximum createdAt across all known ontology classes.
-    // Falls back to "now" on a completely empty store so the
-    // unified-viewer StatsBar never renders a missing-field state.
-    const observedClasses = ['Observation', 'Digest', 'Insight', 'Pattern', 'Component'];
-    const lastUpdatedCandidates = await Promise.all(
-      observedClasses.map((cls) => store.lastModifiedByClass(cls).catch(() => null)),
-    );
-    let lastUpdated = null;
-    for (const ts of lastUpdatedCandidates) {
-      if (typeof ts === 'string' && (lastUpdated === null || ts > lastUpdated)) {
-        lastUpdated = ts;
-      }
-    }
-    if (lastUpdated === null) lastUpdated = new Date().toISOString();
-
-    // Active snapshot: newest entry from SnapshotManager.listSnapshots().
-    // Returns null when no snapshot tags are present OR when the listing
-    // throws (no git repo, etc.) — the unified-viewer StatsBar renders
-    // "no snapshot" affordances in that case rather than a hard error.
-    let activeSnapshot = null;
-    try {
-      const sm = new SnapshotManager({ exportDir: KG_EXPORT_DIR });
-      const snapshots = await sm.listSnapshots();
-      if (Array.isArray(snapshots) && snapshots.length > 0) {
-        const head = snapshots[0];
-        activeSnapshot = {
-          hash: head.commit_sha,
-          message: head.message,
-          date: head.timestamp,
-        };
-      }
-    } catch {
-      // Fall through — activeSnapshot stays null.
-    }
-
-    res.json({
-      success: true,
-      data: {
-        nodeCount,
-        edgeCount,
-        evidenceCount,
-        patternCount,
-        orphanCount,
-        componentCount,
-        connectivity,
-        lastUpdated,
-        activeSnapshot,
-      },
-    });
+    const data = await composeViewerStats(_kmStore);
+    res.json({ success: true, data });
   } catch (err) {
     process.stderr.write(`[obs-api] /api/v1/stats error: ${err.message}\n`);
     res.status(500).json({ success: false, error: 'Failed to compute viewer stats' });
   }
+});
+
+// ── /api/v1/stream — SSE live stats for the unified-viewer StatsBar ────────
+//
+// The StatsBar (integrations/unified-viewer/src/panels/StatsBar.tsx:133) opens
+// `new EventSource(`${apiClient.base}/api/v1/stream`)` and parses unnamed
+// `data:` frames as either the bare ViewerStats shape OR the {success,data}
+// envelope (StatsBar.tsx:144-156). Until this fix the endpoint returned 404 —
+// NOT because no handler existed, but because the JSON-404 catch-all
+// `app.use('/api/v1', …)` (registered right after this router) shadowed the
+// later `app.get('/api/v1/stream')` registration. Mounting the SSE route HERE,
+// on kmRouter and BEFORE the catch-all, is what actually makes it reachable.
+// The earlier `app.get('/api/v1/stream')` block is now dead and removed.
+//
+// Cadence: emit one stats frame immediately on connect (chip flips
+// connecting→live without waiting), then every 10s. A `:keepalive` comment
+// heartbeat is interleaved so proxies/Chrome keep the connection open even
+// when stats composition transiently throws. `req.on('close')` clears both
+// timers so nothing leaks. Stats composition is wrapped in try/catch — a
+// km-core hiccup never tears down the stream.
+kmRouter.get('/stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const emit = async () => {
+    try {
+      const data = await composeViewerStats(_kmStore);
+      res.write(`data: ${JSON.stringify({ success: true, data })}\n\n`);
+    } catch (err) {
+      // Keep the connection alive on a transient compose failure — the next
+      // tick retries. Emit a comment so the socket isn't idle-closed.
+      process.stderr.write(`[obs-api] /api/v1/stream emit failed (non-fatal): ${err.message}\n`);
+      try { res.write(`:error ${err.message}\n\n`); } catch { /* socket gone */ }
+    }
+  };
+
+  // Immediate first frame so the StatsBar chip transitions to LIVE at once.
+  await emit();
+  const statsInterval = setInterval(emit, 10_000);
+  // Lightweight comment heartbeat between stats frames keeps the connection
+  // warm through intermediaries (mirrors the keep-alive intent of the other
+  // SSE stream's flushed headers).
+  const heartbeat = setInterval(() => {
+    try { res.write(': keepalive\n\n'); } catch { /* socket gone */ }
+  }, 15_000);
+
+  req.on('close', () => {
+    clearInterval(statsInterval);
+    clearInterval(heartbeat);
+  });
 });
 
 // ── Phase 55 Plan 06: /api/v1/trends?top=N ────────────────────────────────
@@ -2173,60 +2232,6 @@ app.get('/api/coding/insights', async (_req, res) => {
     process.stderr.write(`[obs-api] /api/coding/insights error: ${err.message}\n`);
     res.status(500).json({ error: 'Failed to query insights' });
   }
-});
-
-// ── 2026-06-11: SSE /api/v1/stream ────────────────────────────────────────
-//
-// The unified-viewer's StatsBar opens an EventSource against
-// `${apiClient.base}/api/v1/stream` to receive live km-core stats. Until
-// today the endpoint didn't exist on obs-api, so the viewer's console
-// spammed `GET /api/v1/stream 404 (Not Found)` + `[API] [WARN] StatsBar
-// SSE connection dropped (attempt #N)` once per backoff retry forever.
-//
-// Lightweight implementation: every 10s we emit a `data: <stats>\n\n`
-// frame computed from km-core via the same `/api/v1/stats` handler.
-// `req.on('close')` clears the interval so we don't leak.
-app.get('/api/v1/stream', async (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  const emit = async () => {
-    try {
-      if (!_kmStoreReady || !_kmStore) return;
-      // Reuse the same shape that /api/v1/stats returns so StatsBar's
-      // parser (which tolerates both `{success,data}` envelope and the
-      // bare ViewerStats shape) works without a second adapter.
-      const graph = _kmStore.graph;
-      const nodeCount = graph.order;
-      const edgeCount = graph.size;
-      let orphans = 0;
-      for (const id of graph.nodes()) {
-        if (graph.degree(id) === 0) orphans++;
-      }
-      const connectivity = nodeCount > 0 ? (nodeCount - orphans) / nodeCount : 0;
-      const stats = {
-        nodeCount,
-        edgeCount,
-        evidenceCount: 0,
-        patternCount: 0,
-        orphanCount: orphans,
-        componentCount: 0,
-        connectivity,
-        lastUpdated: new Date().toISOString(),
-      };
-      res.write(`data: ${JSON.stringify({ success: true, data: stats })}\n\n`);
-    } catch (err) {
-      process.stderr.write(`[obs-api] /api/v1/stream emit failed (non-fatal): ${err.message}\n`);
-    }
-  };
-
-  // Send one immediately so the client transitions from connecting → live
-  // without waiting 10s.
-  await emit();
-  const interval = setInterval(emit, 10_000);
-  req.on('close', () => clearInterval(interval));
 });
 
 // ── Phase 55 Plan 06 Task 3: SSE /api/coding/observations/stream ──────────
