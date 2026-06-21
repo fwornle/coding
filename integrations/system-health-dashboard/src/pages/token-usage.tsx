@@ -123,6 +123,9 @@ interface TokenSummary {
     calls: number
     total_tokens: number
     avg_latency?: number
+    // Phase 66-01 piggyback: per-model median latency over the rolling 24h
+    // window. Rides on the existing `summary` response — no new fetch needed.
+    p50_latency_ms?: number
   }>
   by_subscription: Array<{
     subscription: string
@@ -182,6 +185,26 @@ function stripPromptPreview(s: string): string {
 function formatLatency(ms: number): string {
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`
   return `${Math.round(ms)}ms`
+}
+
+// Phase 66-02 (D-04): haiku is served on the direct OAuth path, NOT the worker
+// pool, so it is a reference baseline — never a pool-health pass/fail signal.
+// The by_model rows are model-keyed (no provider on the row), so distinguish
+// haiku by canonical model name.
+function isHaikuModel(model: string): boolean {
+  return /haiku/i.test(model)
+}
+
+// Phase 66-02 (D-03): regression threshold envelope for the claude-code fallback
+// models (sonnet, opus). Green ≤3000ms (meets the PERF-01 warm bar from Phase 65);
+// amber in the 3000<x≤5000 discretion band; red >5000ms (median climbing toward
+// the ~14000ms pre-worker-pool baseline). Mirrors health-status-card's
+// operational/warning/error idiom.
+type LatencyStatus = 'operational' | 'warning' | 'error'
+function latencyThresholdStatus(ms: number): LatencyStatus {
+  if (ms <= 3000) return 'operational'
+  if (ms <= 5000) return 'warning'
+  return 'error'
 }
 
 // Canonical map first, then hash-based fallback into SAFE_EVOLUTION_PALETTE.
@@ -707,14 +730,15 @@ export function TokenUsagePage() {
                   // calls + avg_latency; by_model carries calls only; tokens
                   // mode (input/output) has no per-series metadata so those
                   // cells render as em-dash.
-                  const meta = new Map<string, { calls?: number; avg_latency?: number }>()
+                  const meta = new Map<string, { calls?: number; avg_latency?: number; p50_latency_ms?: number }>()
                   if (evoGroupBy === 'process') {
                     for (const p of (summary.by_process || [])) {
                       meta.set(p.process, { calls: p.calls, avg_latency: p.avg_latency })
                     }
                   } else if (evoGroupBy === 'model') {
                     for (const m of (summary.by_model || [])) {
-                      meta.set(m.model, { calls: m.calls, avg_latency: m.avg_latency })
+                      // Phase 66-01 piggyback: median (p50) rides on the by_model row.
+                      meta.set(m.model, { calls: m.calls, avg_latency: m.avg_latency, p50_latency_ms: m.p50_latency_ms })
                     }
                   }
                   return (
@@ -725,6 +749,7 @@ export function TokenUsagePage() {
                       <TableHead className="text-right">Calls</TableHead>
                       <TableHead className="text-right">Total Tokens</TableHead>
                       <TableHead className="text-right">Avg Latency</TableHead>
+                      <TableHead className="text-right">Median Latency</TableHead>
                       <TableHead className="w-[240px]">Share</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -753,6 +778,32 @@ export function TokenUsagePage() {
                             <TableCell className="text-right font-mono font-semibold">{formatTokens(total)}</TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">
                               {m?.avg_latency != null ? formatLatency(m.avg_latency) : <span>—</span>}
+                            </TableCell>
+                            {/* Phase 66-02 (D-03/D-04): per-model median with green ≤3s /
+                                amber / red threshold badge for claude-code fallback models
+                                (sonnet, opus); haiku renders plain (direct-path reference). */}
+                            <TableCell className="text-right font-mono">
+                              {m?.p50_latency_ms != null ? (
+                                evoGroupBy === 'model' && !isHaikuModel(key) ? (
+                                  (() => {
+                                    const status = latencyThresholdStatus(m.p50_latency_ms)
+                                    const cls = status === 'operational'
+                                      ? 'bg-green-50 text-green-700 border-green-200'
+                                      : status === 'warning'
+                                        ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                        : 'bg-red-50 text-red-700 border-red-200'
+                                    return (
+                                      <Badge variant="outline" className={cls}>
+                                        {formatLatency(m.p50_latency_ms)}
+                                      </Badge>
+                                    )
+                                  })()
+                                ) : (
+                                  <span className="text-muted-foreground">{formatLatency(m.p50_latency_ms)}</span>
+                                )
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
