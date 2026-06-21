@@ -1195,7 +1195,7 @@ Plans:
 ### Phases
 
 - [x] **Phase 62: Worker Pool Core & stream-JSON Transport** — persistent `claude -p --input-format stream-json --output-format stream-json` workers, per-model pinned, concurrency-1, serving ONLY the CLI-fallback path; `LLM_PROXY_DISABLE_WORKER_POOL=1` escape hatch wired first. (completed 2026-06-20)
-- [ ] **Phase 63: Worker Lifecycle — Lazy Spawn, Idle Eviction, Crash Recovery & Cancellation** — lazy spawn on first fallback, idle-evict after configurable timeout (default 30 min), crash → RETRYABLE + lazy respawn (no spin-loop), client-disconnect aborts the in-flight stream-JSON request.
+- [x] **Phase 63: Worker Lifecycle — Lazy Spawn, Idle Eviction, Crash Recovery & Cancellation** — lazy spawn on first fallback, idle-evict after configurable timeout (default 30 min), crash → RETRYABLE + lazy respawn (no spin-loop), client-disconnect aborts the in-flight stream-JSON request. (all 5 plans landed 2026-06-21; mechanisms UNIT-proven in Plans 01-04 and the `--live` SC-1..SC-4 verification suite authored + mock-green in Plan 05. **SC-1..SC-4 ROADMAP live discharge for WLIFE-01..04 is PENDING the operator `LLM_PROXY_LIVE=1` run** — Plan 05 is `autonomous: false`; see 63-05-SUMMARY § Operator Live-Run — PENDING. WLIFE-01 stays live-pending.)
 - [ ] **Phase 64: Worker Hygiene — CLI Version Pinning & stderr Throttling** — record `claude --version` at boot, recycle worker on version drift to keep prompt-cache assumptions valid; drain + throttle worker stderr to once-per-minute-per-worker so persistent-worker CLI warnings don't flood logs.
 - [ ] **Phase 65: Steady-State Latency & Crash-Survival Acceptance** — warm-worker sonnet `say OK` probe completes ≤3s steady-state (cold first-spawn may still be ~10s); pool survives a worker SIGKILL without dropping subsequent same-model requests; idle-eviction observable via `ps`; escape hatch reverts cleanly.
 - [ ] **Phase 66: Dashboard Latency Observability** — the dashboard's claude-code/sonnet median latency column shows the ~14s → ≤3s drop within 24h of rollout.
@@ -1233,7 +1233,7 @@ Plans:
   2. A worker that has been idle past the configurable idle timeout (default 30 min) exits and frees its RAM (observable via `ps` — the subprocess is gone), and a subsequent request for that model lazily respawns a fresh worker.
   3. A worker that exits unexpectedly is marked dead, its in-flight request is surfaced to the caller as RETRYABLE (not a hard error), and it respawns lazily only on the next request — never auto-restarted in a tight loop (verified by killing a worker mid-request and confirming no respawn-storm in logs).
   4. Client disconnect / request abort propagates to the worker so the in-flight stream-JSON request is cancelled (protocol cancel if supported, else SIGTERM + respawn) — a dead client never leaves a concurrency-1 worker pinned to a zombie request.
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 
 Plans:
 
@@ -1255,7 +1255,7 @@ Plans:
 
 **Wave 5** *(depends on 63-01..04; autonomous:false — live OAuth)*
 
-- [ ] 63-05-PLAN.md — `--live` lifecycle verification suite: ps-based cold-start (WLIFE-01/SC-1), idle-evict (SC-2), crash (SC-3), cancel (SC-4 — Phase-62 hang now passes)
+- [x] 63-05-PLAN.md — `--live` lifecycle verification suite: ps-based cold-start (WLIFE-01/SC-1), idle-evict (SC-2), crash (SC-3), cancel (SC-4 — Phase-62 hang now passes)
 
 ### Phase 64: Worker Hygiene — CLI Version Pinning & stderr Throttling
 **Goal:** Long-lived workers stay correct and quiet across CLI upgrades and noisy CLI warnings — prompt-cache assumptions don't silently rot when the `claude` binary changes under a running worker, and persistent-worker stderr doesn't flood the logs.

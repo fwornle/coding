@@ -59,7 +59,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | POOL-03 | Phase 62 | Complete |
 | POOL-04 | Phase 62 | Complete |
 | GUARD-01 | Phase 62 | Complete |
-| WLIFE-01 | Phase 63 | Not started |
+| WLIFE-01 | Phase 63 | Live-pending (63-05 `--live` SC-1 cold-start case authored + mock-green; ROADMAP discharge gated on the operator `LLM_PROXY_LIVE=1` run — 63-05-SUMMARY § Operator Live-Run) |
 | WLIFE-02 | Phase 63 | Complete |
 | WLIFE-03 | Phase 63 | Complete (63-02 EPIPE-as-crash fold-in; 63-03 crash-cooldown respawn-storm guard) |
 | WLIFE-04 | Phase 63 | Complete (63-02 stray-result generation guard + 63-04 D-01/D-03 SIGTERM+dispose+drop in-flight / dequeue queued; commits 959f6d3/a33629b) |
