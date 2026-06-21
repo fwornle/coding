@@ -78,6 +78,26 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| _(to be filled by gsd-roadmapper)_ | | |
+| REPRO-01 | Phase 67 | Pending |
+| REPRO-02 | Phase 67 | Pending |
+| TELEM-01 | Phase 68 | Pending |
+| TELEM-02 | Phase 68 | Pending |
+| TELEM-03 | Phase 68 | Pending |
+| ADAPT-01 | Phase 69 | Pending |
+| ADAPT-02 | Phase 69 | Pending |
+| ADAPT-03 | Phase 70 | Pending |
+| ADAPT-04 | Phase 70 | Pending |
+| KB-01 | Phase 71 | Pending |
+| KB-02 | Phase 71 | Pending |
+| KB-03 | Phase 71 | Pending |
+| ROUTE-01 | Phase 72 | Pending |
+| ROUTE-02 | Phase 72 | Pending |
+| ROUTE-03 | Phase 73 | Pending |
+| SCORE-01 | Phase 73 | Pending |
+| SCORE-02 | Phase 73 | Pending |
+| KB-04 | Phase 74 | Pending |
+| DASH-01 | Phase 74 | Pending |
+| DASH-02 | Phase 74 | Pending |
+| DASH-03 | Phase 74 | Pending |
 
-**Coverage:** 21 requirements across 7 categories — to be mapped to phases (starting Phase 67) by the roadmapper.
+**Coverage:** 21/21 requirements mapped across 8 phases (67–74). No orphans, no duplicates.

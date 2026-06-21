@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
-status: planning
-last_updated: "2026-06-21T20:37:17.893Z"
+status: in_progress
+last_updated: "2026-06-21T21:00:00.000Z"
 last_activity: 2026-06-21
 progress:
-  total_phases: 0
+  total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,7 +20,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Planning next milestone (v7.3 shipped 2026-06-21) — run `/gsd-new-milestone`
+**Current focus:** v7.4 Performance Measurement System — roadmap created (Phases 67–74). Next: `/gsd:plan-phase 67`
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -52,10 +52,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-06-21 — Milestone v7.4 started
+Phase: 67 — Reproducibility & Replay Rig (first v7.4 phase)
+Plan: — (not yet planned)
+Status: Roadmap created — 8 phases (67–74), 21/21 requirements mapped. Ready for `/gsd:plan-phase 67`
+Last activity: 2026-06-21 — v7.4 roadmap created (Phases 67–74). FOUNDATIONAL anchor: Phase 68 (TELEM) gates the per-agent adapter phases 69–70.
 
 ## Deferred Items
 
@@ -94,6 +94,8 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+- v7.4 roadmap created 2026-06-21: 8 phases (67-74) for the Performance Measurement System (cross-agent token + route + outcome attribution across all four agents). 21/21 reqs mapped, no orphans. Dependency order: Phase 67 (Reproducibility/Replay rig - REPRO-01/02; non-blocking infra, independent of TELEM) -> **Phase 68 [FOUNDATIONAL] Token Attribution Storage (TELEM-01/02/03)** - the dependency anchor: token_usage additive schema migration + .data/active-measurement.json span contract + getActiveMeasurement() reader + attachTokenLogger task_id stamping; MUST land+verify before any adapter work -> Phase 69 (Claude per-turn+per-reasoning-step JSONL + Copilot events.jsonl with Phase-1 event-vocabulary check - ADAPT-01/02, gated on 68) -> Phase 70 (OpenCode proxy-route per-llm-call + Mastra instrumentation-surface read+adapter - ADAPT-03/04, gated on 68) -> Phase 71 (km-core Experiment/Run/Route/Step/Decision/Outcome/Report ontology + Run-write path + enforced task-taxonomy v0 - KB-01/02/03) -> Phase 72 (goal_sentence capture + deterministic syntactic route heuristics - ROUTE-01/02) -> Phase 73 (LLM-judge goal_aligned_ratio + 5-dim rubric + user override - ROUTE-03, SCORE-01/02) -> Phase 74 (Performance dashboard tab: query-builder, reasoning-step sub-bands + tier badges, Report entity + saved-query workflow + Report views - DASH-01/02/03, KB-04). Granularity=standard. The 4-agent ADAPT work split across two phases (69 Claude+Copilot / 70 OpenCode+Mastra) per operator-confirmed all-four reach. Seeds: .planning/notes/v73-perf-measurement-exploration.md (Phase 3 sketch = our Phase 68 FOUNDATIONAL) + v73-token-attribution-contract.md (row shape + measurement-span + per-agent identifier conventions). Out of scope: policy/auto-routing (v7.5), VS Code Copilot Chat (opaque state.vscdb), currency conversion.
 
 - v7.3 roadmap created 2026-06-20: 5 phases (62-66) for the LLM Proxy Claude CLI Worker Pool. Dependency order: Phase 62 (worker-pool core + stream-JSON transport + GUARD-01 escape hatch wired first) -> Phase 63 (lifecycle: lazy spawn / idle-evict / crash-recovery RETRYABLE / cancellation) -> Phase 64 (hygiene: CLI version-drift recycle + stderr throttle) -> Phase 65 (acceptance: warm-worker sonnet <=3s steady-state, survives a worker SIGKILL, idle-evict observable via ps, escape hatch reverts cleanly) -> Phase 66 (dashboard claude-code/sonnet median ~14s -> <=3s within 24h). 14/14 reqs mapped (POOL-01..04+GUARD-01 -> 62; WLIFE-01..04 -> 63; GUARD-02,03 -> 64; PERF-01,02 -> 65; PERF-03 -> 66). Code surface: _work/rapid-llm-proxy/proxy-bridge/server.mjs claude-code two-tier dispatch; seed .planning/research/v7.2-llm-proxy-perf-worker-pool.md (v7.2 filename, v7.3 content). Out of scope: cross-provider fallback, general work queue, other-provider worker pools.
 
