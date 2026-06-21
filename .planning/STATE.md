@@ -4,13 +4,13 @@ milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
 status: executing
 stopped_at: Phase 63 context gathered
-last_updated: "2026-06-21T07:34:34.343Z"
+last_updated: "2026-06-21T07:48:22.905Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 20
 ---
 
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 63 (worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can) — EXECUTING
-Plan: 4 of 5 (Plans 01, 02, 03 complete)
+Plan: 5 of 5 (Plans 01, 02, 03 complete)
 Status: Ready to execute
 Last activity: 2026-06-21
 
@@ -98,6 +98,7 @@ Last activity: 2026-06-21
 - [63-02]: EPIPE-as-crash (D-07 / WLIFE-03) — `ClaudeWorker._writeGuarded(payload)` is THE write path (both `_dispatch` and `cancel()` route through it); it wraps `stdin.write` in a try/catch AND a write callback so a synchronous EPIPE throw OR an async write-callback `err` both funnel into `_onExit(null, 'EPIPE')` (the existing RETRYABLE reap), recovering the queued-job rejection the raw throw used to lose. No new error path invented.
 - [63-02]: Stray-result generation guard (D-02 / WLIFE-04) — per-worker monotonic `_generation` integer bumped each `_dispatch`, stamped on `_pending.generation`, echoed on the outgoing `_gen` envelope field; `_onEvent` drops a result whose `_gen` mismatches the live `_pending.generation`. `_pending===null` stays the primary defense (operative on the live CLI path, which never echoes `_gen`); the generation echo closes the narrow in-flight window and is exercised deterministically by the unit suite without adding request-id correlation to the protocol (Pattern 1: concurrency-1 needs none). Belt-and-suspenders behind Plan 04's dispose-on-cancel.
 - [63-03]: Crash-cooldown respawn-storm guard (D-06 / WLIFE-03) — per-key crash-frequency `_crashesByKey` Map<key, number[]> + `_recordCrash(key)` (push `Date.now()` + prune to window) wired into the `_spawnWorker` `once('exit')` handler so EVERY exit on a freshly-spawned worker is a crash candidate; a cooldown gate at the TOP of `complete()` (after GUARD-01, before lazy-spawn) routes a key with >= `LLM_PROXY_WORKER_CRASH_THRESHOLD` (default 3) crashes within `LLM_PROXY_WORKER_CRASH_WINDOW_MS` (default 60s) straight to the execFile overflow (`overflowFn(body, abortSignal)` — same shape as the all-busy path), then lazily spawns again after the window (`_isInCooldown` prune-to-window lifts the gate). EARLY-EXIT HEURISTIC: record every exit, no per-worker served-ok flag — the window+threshold (not exit-site classification) filters healthy spaced churn from a broken key's burst. Suite 39/39 green (33 baseline + 6 new). Reuses the SAME `completeClaudeCodeViaCLI` route the milestone already uses for overflow, not a new degraded path.
+- [63-04]: Client-disconnect cancellation (D-01/D-03/WLIFE-04) — the `complete()` abort handler now SIGTERM+disposes+synchronously-drops the IN-FLIGHT worker via `_disposeAndDrop` (D-08 reuse) and rejects it RETRYABLE (next same-key request cold-respawns), and dequeues+rejects ONLY a QUEUED job via new `ClaudeWorker.abortQueuedJob(job)` (worker + in-flight `_pending` untouched, FIFO preserved). Discrimination mechanism: `ClaudeWorker.writeTracked(content,timeoutMs) -> { promise, job }` exposes the job handle; the handler tests `abortQueuedJob(job)` (true iff `_queue.includes(job)`) then falls through to `_disposeAndDrop`. The dead Phase-62 `worker.cancel()` protocol interrupt (live-HANGS, 62-HUMAN-UAT test 6) is NEVER invoked on the disconnect path (only in comments). `write()` delegates to `writeTracked`; the pool falls back to `write()` for workers lacking it (existing fakes unaffected). server.mjs VERIFY-ONLY: `reqAbort.signal` already threads to `complete` (:1237-1238, :1639) — no change. Suite 46/46 green (39 baseline + 7 new). Commits 959f6d3 (RED) / a33629b (GREEN) on external main, not pushed.
 - [v6.0 start]: Agent-agnostic architecture -- retrieval service is standalone HTTP API, each coding agent has its own adapter
 - [v6.0 start]: Use existing Qdrant instance for vector storage (not LibSQL vector)
 - [v6.0 start]: All four knowledge tiers as sources (observations, digests, insights, KG entities)
@@ -297,8 +298,8 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-06-21T07:26:15Z — Completed 63-02-PLAN.md (D-07 EPIPE-as-crash + D-02 stray-result generation guard; 33/33 unit cases green in rapid-llm-proxy; commits b318d13/d71d791/cb723a0/987d094 on external main, not pushed). Next: 63-03 (crash cooldown).
-Stopped at: Phase 63 context gathered
+Last session: 2026-06-21 — Completed 63-04-PLAN.md (D-01/D-03 client-disconnect cancellation: in-flight abort = SIGTERM+dispose+synchronous-drop+cold-respawn via _disposeAndDrop; queued abort = dequeue-only via ClaudeWorker.abortQueuedJob; never the hanging worker.cancel(); 46/46 unit cases green in rapid-llm-proxy; commits 959f6d3/a33629b on external main, not pushed). WLIFE-04 complete. Next: 63-05 (--live lifecycle verification suite).
+Stopped at: Completed 63-04-PLAN.md
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
