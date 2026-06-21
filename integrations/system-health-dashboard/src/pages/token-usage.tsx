@@ -126,6 +126,12 @@ interface TokenSummary {
     // Phase 66-01 piggyback: per-model median latency over the rolling 24h
     // window. Rides on the existing `summary` response — no new fetch needed.
     p50_latency_ms?: number
+    // Phase 66-04: per-model median worker-pool SPAWN/QUEUE overhead (66-03).
+    // Numeric for claude-code pool models (sonnet/opus); ABSENT for a model with
+    // no non-null overhead rows (haiku direct path, or no recent pool calls).
+    // This is the pool-health component PERF-03 grades; p50_latency_ms is kept
+    // as total-latency forensic context.
+    p50_overhead_ms?: number
   }>
   by_subscription: Array<{
     subscription: string
@@ -730,7 +736,7 @@ export function TokenUsagePage() {
                   // calls + avg_latency; by_model carries calls only; tokens
                   // mode (input/output) has no per-series metadata so those
                   // cells render as em-dash.
-                  const meta = new Map<string, { calls?: number; avg_latency?: number; p50_latency_ms?: number }>()
+                  const meta = new Map<string, { calls?: number; avg_latency?: number; p50_latency_ms?: number; p50_overhead_ms?: number }>()
                   if (evoGroupBy === 'process') {
                     for (const p of (summary.by_process || [])) {
                       meta.set(p.process, { calls: p.calls, avg_latency: p.avg_latency })
@@ -738,7 +744,8 @@ export function TokenUsagePage() {
                   } else if (evoGroupBy === 'model') {
                     for (const m of (summary.by_model || [])) {
                       // Phase 66-01 piggyback: median (p50) rides on the by_model row.
-                      meta.set(m.model, { calls: m.calls, avg_latency: m.avg_latency, p50_latency_ms: m.p50_latency_ms })
+                      // Phase 66-04: p50_overhead_ms (pool spawn overhead) rides alongside.
+                      meta.set(m.model, { calls: m.calls, avg_latency: m.avg_latency, p50_latency_ms: m.p50_latency_ms, p50_overhead_ms: m.p50_overhead_ms })
                     }
                   }
                   return (
@@ -749,7 +756,9 @@ export function TokenUsagePage() {
                       <TableHead className="text-right">Calls</TableHead>
                       <TableHead className="text-right">Total Tokens</TableHead>
                       <TableHead className="text-right">Avg Latency</TableHead>
-                      <TableHead className="text-right">Median Latency</TableHead>
+                      <TableHead className="text-right" title="Total end-to-end median latency (generation-dominated) — forensic context, NOT the worker-pool overhead the threshold grades. See Spawn Overhead.">Median Latency</TableHead>
+                      {/* Phase 66-04: the threshold-graded pool-health column. */}
+                      <TableHead className="text-right" title="Median worker-pool spawn/queue overhead (66-03): dispatch → first output, excludes generation. Warm reuse ≈ 0 (green ≤3s); cold-spawn regression climbs toward ~14s (red).">Spawn Overhead</TableHead>
                       <TableHead className="w-[240px]">Share</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -779,14 +788,28 @@ export function TokenUsagePage() {
                             <TableCell className="text-right font-mono text-muted-foreground">
                               {m?.avg_latency != null ? formatLatency(m.avg_latency) : <span>—</span>}
                             </TableCell>
-                            {/* Phase 66-02 (D-03/D-04): per-model median with green ≤3s /
-                                amber / red threshold badge for claude-code fallback models
-                                (sonnet, opus); haiku renders plain (direct-path reference). */}
+                            {/* Phase 66-04: total-latency median RETAINED as forensic
+                                context (gap note) but the threshold BADGE moved to the
+                                Spawn Overhead column — total latency is generation-dominated
+                                and should NOT be graded against the ≤3s pool bar, so it now
+                                renders muted/plain. */}
                             <TableCell className="text-right font-mono">
                               {m?.p50_latency_ms != null ? (
+                                <span className="text-muted-foreground">{formatLatency(m.p50_latency_ms)}</span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            {/* Phase 66-04 (D-03/D-04): per-model worker-pool spawn overhead
+                                with green ≤3s / amber / red threshold badge for claude-code
+                                fallback models (sonnet, opus); haiku renders plain (direct
+                                path — no pool overhead); absent overhead → muted dash. This
+                                is the pool-health metric PERF-03 grades. */}
+                            <TableCell className="text-right font-mono">
+                              {m?.p50_overhead_ms != null ? (
                                 evoGroupBy === 'model' && !isHaikuModel(key) ? (
                                   (() => {
-                                    const status = latencyThresholdStatus(m.p50_latency_ms)
+                                    const status = latencyThresholdStatus(m.p50_overhead_ms)
                                     const cls = status === 'operational'
                                       ? 'bg-green-50 text-green-700 border-green-200'
                                       : status === 'warning'
@@ -794,12 +817,12 @@ export function TokenUsagePage() {
                                         : 'bg-red-50 text-red-700 border-red-200'
                                     return (
                                       <Badge variant="outline" className={cls}>
-                                        {formatLatency(m.p50_latency_ms)}
+                                        {formatLatency(m.p50_overhead_ms)}
                                       </Badge>
                                     )
                                   })()
                                 ) : (
-                                  <span className="text-muted-foreground">{formatLatency(m.p50_latency_ms)}</span>
+                                  <span className="text-muted-foreground">{formatLatency(m.p50_overhead_ms)}</span>
                                 )
                               ) : (
                                 <span className="text-muted-foreground">—</span>
