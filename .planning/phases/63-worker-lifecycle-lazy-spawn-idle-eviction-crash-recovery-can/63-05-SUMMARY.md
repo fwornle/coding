@@ -41,7 +41,7 @@ key-decisions:
   - "Replaced (not duplicated) the Phase-62 cancel-seam SAME-pid case with SC-4 — the D-01 SIGTERM+respawn behaviour inverts the old same-pid-survives expectation to a NEW-pid expectation."
   - "Routed POOL-01 + warm-sanity cleanup through the module-level teardown handle (dispose()/SIGTERM) instead of the non-terminating cancel(), so the zero-orphan teardown assertion holds for the pre-existing cases too."
 
-requirements-completed: []   # WLIFE-01..04 are live-pending: ROADMAP discharge gated on the operator live run below
+requirements-completed: [WLIFE-01, WLIFE-02, WLIFE-03, WLIFE-04]   # discharged 2026-06-21 by the operator LLM_PROXY_LIVE=1 run (9/9 exit 0, zero orphans) — see Operator Live-Run below
 
 # Metrics
 duration: 12min
@@ -50,11 +50,11 @@ completed: 2026-06-21
 
 # Phase 63 Plan 05: `--live` Lifecycle Verification Suite (SC-1..SC-4) Summary
 
-**Authored the four `--live` lifecycle cases (cold-start / idle-evict / crash / cancel) that prove ROADMAP Phase-63 SC-1..SC-4 against a real `claude -p` worker subprocess via a `ps`-based `countClaudeWorkers()` helper and an `afterEach` zero-orphan teardown — including the dedicated SC-1 cold-start probe (the Phase-62 PARTIAL, D-09) and the SC-4 cancel case that is the live inverse of the Phase-62 cancel HANG (62-HUMAN-UAT test 6). All AUTO work is done and mock-green; the LIVE run itself is an OPERATOR checkpoint (`autonomous: false`) — see "Operator Live-Run — PENDING" below.**
+**Authored the four `--live` lifecycle cases (cold-start / idle-evict / crash / cancel) that prove ROADMAP Phase-63 SC-1..SC-4 against a real `claude -p` worker subprocess via a `ps`-based `countClaudeWorkers()` helper and an `afterEach` zero-orphan teardown — including the dedicated SC-1 cold-start probe (the Phase-62 PARTIAL, D-09) and the SC-4 cancel case that is the live inverse of the Phase-62 cancel HANG (62-HUMAN-UAT test 6). The operator ran the live suite on 2026-06-21 with `LLM_PROXY_LIVE=1`: 9/9 tests PASS, exit 0, ~35.2s, zero orphaned `claude -p` workers after the run — SC-1..SC-4 all PASS. WLIFE-01..04 are now ROADMAP-discharged. See "Operator Live-Run — PASSED (2026-06-21)" below.**
 
 ## Autonomy boundary (why this plan is `autonomous: false`)
 
-This SUMMARY records ONLY the AUTO portion (suite authored, mock gate green, acceptance greps passing, test file committed). The `--live` execution spawns real `claude -p` subprocesses and makes real billed Anthropic API calls; it requires the operator's Max OAuth keychain + network and CANNOT run unattended. **WLIFE-01..04 ROADMAP discharge is gated on the operator live run** documented at the end of this file. Until that run passes, WLIFE-01 stays "Not started → live-pending" and WLIFE-02/03/04 keep their existing UNIT-proven status (Complete at the unit level from Plans 63-01..04) but their live-suite confirmation remains pending.
+The AUTO portion (suite authored, mock gate green, acceptance greps passing, test file committed) was completed first because the `--live` execution spawns real `claude -p` subprocesses and makes real billed Anthropic API calls; it requires the operator's Max OAuth keychain + network and CANNOT run unattended. **WLIFE-01..04 ROADMAP discharge was gated on the operator live run** documented at the end of this file. That run was performed on 2026-06-21 (9/9 PASS, exit 0, zero orphans) — **WLIFE-01 is now live-proven Complete, and WLIFE-02/03/04 are live-confirmed Complete** (UNIT-proven from Plans 63-01..04, now with live-suite confirmation).
 
 ## Performance
 
@@ -69,7 +69,7 @@ This SUMMARY records ONLY the AUTO portion (suite authored, mock gate green, acc
 - **Task 3 — SC-4 cancel (the Phase-62 HANG inverse):** **replaced** the Phase-62 cancel-seam SAME-pid case with a case that drives a REAL `controller.abort()` through `pool.complete(body, controller.signal, overflowFn)` (Plan 04 D-01 path — never `worker.cancel()`), asserts (a) the aborted promise settles within a bounded `Promise.race` timeout (a regression to the Phase-62 hang FAILS the case, not the suite), (b) the worker is SIGTERMed and gone from `ps` and dropped from the key, and (c) the next same-key request cold-respawns a NEW pid.
 - **Mock gate green + zero regression:** `node --test tests/integration/worker-pool-live.test.mjs` exits 0 with the live block SKIPPED (CI without Max OAuth stays green). The existing `--live` gate (lines ~57-68) was reused verbatim; no second gate, no new file.
 
-## MOCK-mode verification result (the only test run performed)
+## MOCK-mode verification result (AUTO-portion gate)
 
 ```
 cd /Users/Q284340/Agentic/_work/rapid-llm-proxy && node --test tests/integration/worker-pool-live.test.mjs
@@ -77,7 +77,7 @@ cd /Users/Q284340/Agentic/_work/rapid-llm-proxy && node --test tests/integration
 - **Result: PASS** — `tests 1 / pass 1 / fail 0`, the live describe block SKIPPED (only the `is skipped in default mode` placeholder runs), **exit 0**.
 - `node --check tests/integration/worker-pool-live.test.mjs` → SYNTAX_OK.
 
-> The `LLM_PROXY_LIVE=1` live run was deliberately NOT performed here — it is the operator checkpoint below.
+> The `LLM_PROXY_LIVE=1` live run was the operator checkpoint below — performed 2026-06-21, 9/9 PASS, exit 0.
 
 ## Acceptance-grep results (all passing)
 
@@ -152,9 +152,9 @@ No new network endpoints, auth paths, file access, or schema changes. The plan's
 
 ---
 
-## Operator Live-Run — PENDING
+## Operator Live-Run — PASSED (2026-06-21)
 
-> **This is a `human-action` checkpoint.** The AUTO work (suite authored, mock-green, committed) is DONE. The four SC-1..SC-4 cases below have NOT been run against a real `claude -p` subprocess — that spawns real billed Anthropic API calls and requires the operator's Max OAuth keychain + network, so it cannot run unattended. **WLIFE-01..04 ROADMAP discharge is gated on this run passing.** Mirror the style of `62-HUMAN-UAT.md`.
+> **This `human-action` checkpoint is DISCHARGED.** The operator ran the live suite on 2026-06-21 with `LLM_PROXY_LIVE=1`: **9 tests, 9 pass, 0 fail, 0 skipped, exit 0, ~35.2s, zero orphaned `claude -p` workers** after the run (`pgrep` count 0). SC-1..SC-4 all PASS. **WLIFE-01..04 are ROADMAP-discharged.**
 
 ### Prerequisites (operator host)
 
@@ -177,22 +177,26 @@ cd /Users/Q284340/Agentic/_work/rapid-llm-proxy && LLM_PROXY_LIVE=1 node --test 
 - **SC-4 (WLIFE-04) cancel** — `controller.abort()` SIGTERMs+disposes the worker (**gone from `ps`**, dropped from the key); the aborted `complete()` **settles within the bounded timeout (does NOT hang)** — this is the Phase-62 cancel HANG (62-HUMAN-UAT test 6) now PASSING; the next same-key request spawns a **NEW pid**.
 - **Teardown** — after every case `countClaudeWorkers()` is **0** (no orphaned `claude -p` worker survives). The suite exits **0**.
 
-### Operator results table (fill in)
+### Operator results table (2026-06-21 run)
 
-| Case | Requirement | Result (PASS/FAIL) | Observed pid(s) / notes |
-|------|-------------|--------------------|--------------------------|
-| SC-1 | WLIFE-01 cold-start lazy spawn | _____ | |
-| SC-2 | WLIFE-02 idle-evict + fresh respawn | _____ | |
-| SC-3 | WLIFE-03 crash → RETRYABLE, no storm | _____ | |
-| SC-4 | WLIFE-04 cancel → SIGTERM, new pid, no hang | _____ | |
-| — | Teardown: zero orphaned workers after each case | _____ | |
-| — | Suite exit code (expect 0) | _____ | |
+| Case | Requirement | Result (PASS/FAIL) | Observed notes |
+|------|-------------|--------------------|----------------|
+| SC-1 | WLIFE-01 cold-start lazy spawn | **PASS** (5.0s) | zero workers at start; exactly one after first sonnet fallback |
+| SC-2 | WLIFE-02 idle-evict + fresh respawn | **PASS** (7.8s) | worker gone from `ps` after idle window; respawns with a fresh new pid |
+| SC-3 | WLIFE-03 crash → RETRYABLE, no storm | **PASS** (5.6s) | kill mid-request → RETRYABLE; no respawn-storm; lazy respawn |
+| SC-4 | WLIFE-04 cancel → SIGTERM, new pid, no hang | **PASS** (7.2s) | abort in-flight → worker SIGTERMed + gone; next request NEW pid; no hang (Phase-62 hang closed) |
+| — | Teardown: zero orphaned workers after each case | **PASS** | `pgrep -f 'claude -p'` count 0 after the run |
+| — | Suite exit code (expect 0) | **PASS** | exit 0 — 9 tests, 9 pass, 0 fail, 0 skipped, ~35.2s |
 
-### After the run
+Pre-existing live cases all PASS in the same run: module-load, POOL-01 stable-PID (3.2s), POOL-04 no-spawn-on-direct (0.8s), GUARD-01 escape hatch (0.8s), warm sanity <3s (3.9s).
 
-- If all four PASS and the suite exits 0: update `REQUIREMENTS.md` to mark **WLIFE-01** Complete (live-proven) and annotate WLIFE-02/03/04 as live-confirmed, then update the ROADMAP Phase-63 SC discharge. This is the WLIFE-01..04 ROADMAP discharge.
-- If any case FAILs or hangs: capture the failing case + `ps`/log output and re-open the corresponding Plan (63-01 idle / 63-02/03 crash / 63-04 cancel) — the live suite is doing its job of catching a regression the unit suite cannot.
+### After the run — DISCHARGED (2026-06-21)
+
+All four cases PASSED and the suite exited 0. Actions taken:
+- `REQUIREMENTS.md` updated: **WLIFE-01** marked Complete (live-proven); WLIFE-02/03/04 annotated live-confirmed (2026-06-21 `--live` run).
+- `ROADMAP.md` Phase-63 line updated: the "live-pending / operator-gated" qualifier removed — the SC-1..SC-4 live discharge for WLIFE-01..04 is done.
+- This SUMMARY's status changed PENDING → PASSED/COMPLETE; `requirements-completed` frontmatter populated with WLIFE-01..04.
 
 ---
 *Phase: 63-worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can*
-*Completed (AUTO portion): 2026-06-21 — live run PENDING (operator)*
+*Status: COMPLETE — AUTO portion + operator live run both done 2026-06-21 (9/9 PASS, exit 0, zero orphans)*

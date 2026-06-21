@@ -25,7 +25,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ### Worker Lifecycle (WLIFE)
 
-- [ ] **WLIFE-01:** Workers spawn lazily on the first claude-code fallback request for their model — no workers spawn at proxy boot.
+- [x] **WLIFE-01:** Workers spawn lazily on the first claude-code fallback request for their model — no workers spawn at proxy boot.
 - [x] **WLIFE-02:** An idle worker is evicted (subprocess exits, RAM freed) after a configurable idle timeout (default 30 min); a subsequent request lazily respawns it.
 - [x] **WLIFE-03:** A worker that exits unexpectedly is marked dead, its in-flight request is surfaced as RETRYABLE (not a hard error), and it respawns lazily on the next request — never auto-restarted in a tight loop.
 - [x] **WLIFE-04:** Client disconnect / request abort propagates to the worker — the in-flight stream-JSON request is cancelled (protocol cancel if supported, else SIGTERM + respawn) so a dead client never pins a concurrency-1 worker.
@@ -59,10 +59,10 @@ This file tracks the active milestone's requirements at the top, with previous m
 | POOL-03 | Phase 62 | Complete |
 | POOL-04 | Phase 62 | Complete |
 | GUARD-01 | Phase 62 | Complete |
-| WLIFE-01 | Phase 63 | Live-pending (63-05 `--live` SC-1 cold-start case authored + mock-green; ROADMAP discharge gated on the operator `LLM_PROXY_LIVE=1` run — 63-05-SUMMARY § Operator Live-Run) |
-| WLIFE-02 | Phase 63 | Complete |
-| WLIFE-03 | Phase 63 | Complete (63-02 EPIPE-as-crash fold-in; 63-03 crash-cooldown respawn-storm guard) |
-| WLIFE-04 | Phase 63 | Complete (63-02 stray-result generation guard + 63-04 D-01/D-03 SIGTERM+dispose+drop in-flight / dequeue queued; commits 959f6d3/a33629b) |
+| WLIFE-01 | Phase 63 | Complete (live-proven 2026-06-21 — 63-05 `--live` SC-1 cold-start PASS in the operator `LLM_PROXY_LIVE=1` run; 9/9 exit 0, zero orphans) |
+| WLIFE-02 | Phase 63 | Complete (live-confirmed 2026-06-21 — 63-05 SC-2 idle-evict PASS) |
+| WLIFE-03 | Phase 63 | Complete (63-02 EPIPE-as-crash fold-in; 63-03 crash-cooldown respawn-storm guard; live-confirmed 2026-06-21 — 63-05 SC-3 crash PASS) |
+| WLIFE-04 | Phase 63 | Complete (63-02 stray-result generation guard + 63-04 D-01/D-03 SIGTERM+dispose+drop in-flight / dequeue queued; commits 959f6d3/a33629b; live-confirmed 2026-06-21 — 63-05 SC-4 cancel PASS) |
 | GUARD-02 | Phase 64 | Not started |
 | GUARD-03 | Phase 64 | Not started |
 | PERF-01 | Phase 65 | Not started |

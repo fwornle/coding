@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
 status: executing
-stopped_at: Phase 63 context gathered
-last_updated: "2026-06-21T07:48:22.905Z"
+stopped_at: Phase 63 complete (5/5 plans; WLIFE-01..04 live-discharged)
+last_updated: "2026-06-21T08:30:00.000Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 7
-  percent: 20
+  completed_plans: 8
+  percent: 40
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 63 — worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can
+**Current focus:** Phase 63 COMPLETE (5/5 plans, WLIFE-01..04 live-discharged 2026-06-21) → next: Phase 64 (worker hygiene)
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 63 (worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can) — EXECUTING
-Plan: 5 of 5 (Plans 01, 02, 03, 04 complete; 05 AUTO complete — live run PENDING operator)
-Status: Plan 63-05 AUTO portion done (suite authored, mock-green, committed b40bc23 in rapid-llm-proxy). `autonomous: false` — WLIFE-01..04 ROADMAP live discharge gated on the operator `LLM_PROXY_LIVE=1` run (see 63-05-SUMMARY § Operator Live-Run — PENDING).
+Phase: 63 (worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can) — COMPLETE (5/5 plans)
+Plan: 5 of 5 (all complete; 63-05 live-discharged)
+Status: Phase 63 done. Plan 63-05 live suite run by the operator 2026-06-21 with `LLM_PROXY_LIVE=1` — 9/9 tests PASS, exit 0, ~35.2s, zero orphaned `claude -p` workers; SC-1..SC-4 all PASS. WLIFE-01..04 ROADMAP-discharged (WLIFE-01 live-proven; WLIFE-02/03/04 live-confirmed). Test file committed b40bc23 in rapid-llm-proxy (external repo, not pushed). Next phase: 64 (worker hygiene — CLI version pinning + stderr throttle, GUARD-02/03).
 Last activity: 2026-06-21
 
 ## Performance Metrics
@@ -99,7 +99,7 @@ Last activity: 2026-06-21
 - [63-02]: Stray-result generation guard (D-02 / WLIFE-04) — per-worker monotonic `_generation` integer bumped each `_dispatch`, stamped on `_pending.generation`, echoed on the outgoing `_gen` envelope field; `_onEvent` drops a result whose `_gen` mismatches the live `_pending.generation`. `_pending===null` stays the primary defense (operative on the live CLI path, which never echoes `_gen`); the generation echo closes the narrow in-flight window and is exercised deterministically by the unit suite without adding request-id correlation to the protocol (Pattern 1: concurrency-1 needs none). Belt-and-suspenders behind Plan 04's dispose-on-cancel.
 - [63-03]: Crash-cooldown respawn-storm guard (D-06 / WLIFE-03) — per-key crash-frequency `_crashesByKey` Map<key, number[]> + `_recordCrash(key)` (push `Date.now()` + prune to window) wired into the `_spawnWorker` `once('exit')` handler so EVERY exit on a freshly-spawned worker is a crash candidate; a cooldown gate at the TOP of `complete()` (after GUARD-01, before lazy-spawn) routes a key with >= `LLM_PROXY_WORKER_CRASH_THRESHOLD` (default 3) crashes within `LLM_PROXY_WORKER_CRASH_WINDOW_MS` (default 60s) straight to the execFile overflow (`overflowFn(body, abortSignal)` — same shape as the all-busy path), then lazily spawns again after the window (`_isInCooldown` prune-to-window lifts the gate). EARLY-EXIT HEURISTIC: record every exit, no per-worker served-ok flag — the window+threshold (not exit-site classification) filters healthy spaced churn from a broken key's burst. Suite 39/39 green (33 baseline + 6 new). Reuses the SAME `completeClaudeCodeViaCLI` route the milestone already uses for overflow, not a new degraded path.
 - [63-04]: Client-disconnect cancellation (D-01/D-03/WLIFE-04) — the `complete()` abort handler now SIGTERM+disposes+synchronously-drops the IN-FLIGHT worker via `_disposeAndDrop` (D-08 reuse) and rejects it RETRYABLE (next same-key request cold-respawns), and dequeues+rejects ONLY a QUEUED job via new `ClaudeWorker.abortQueuedJob(job)` (worker + in-flight `_pending` untouched, FIFO preserved). Discrimination mechanism: `ClaudeWorker.writeTracked(content,timeoutMs) -> { promise, job }` exposes the job handle; the handler tests `abortQueuedJob(job)` (true iff `_queue.includes(job)`) then falls through to `_disposeAndDrop`. The dead Phase-62 `worker.cancel()` protocol interrupt (live-HANGS, 62-HUMAN-UAT test 6) is NEVER invoked on the disconnect path (only in comments). `write()` delegates to `writeTracked`; the pool falls back to `write()` for workers lacking it (existing fakes unaffected). server.mjs VERIFY-ONLY: `reqAbort.signal` already threads to `complete` (:1237-1238, :1639) — no change. Suite 46/46 green (39 baseline + 7 new). Commits 959f6d3 (RED) / a33629b (GREEN) on external main, not pushed.
-- [63-05]: `--live` lifecycle verification suite (SC-1..SC-4) authored in `tests/integration/worker-pool-live.test.mjs` — a `ps`/`pgrep` `countClaudeWorkers()` helper + an `afterEach` zero-orphan teardown (T-63-11), the SC-1 cold-start probe (closes the Phase-62 PARTIAL, D-09), SC-2 idle-evict (tiny `idleMs`), SC-3 crash (SIGKILL → WORKER_RETRYABLE, no respawn-storm), and SC-4 cancel (real `controller.abort()` → SIGTERM+dispose, new pid — the live inverse of the Phase-62 cancel HANG, replacing the old SAME-pid case). Reuses the existing `--live` gate; mock gate exits 0 with the live block skipped. Committed `b40bc23` on rapid-llm-proxy `main` (not pushed). `autonomous: false` — the `LLM_PROXY_LIVE=1` run is an OPERATOR checkpoint; WLIFE-01..04 ROADMAP discharge is gated on that live run (see 63-05-SUMMARY § Operator Live-Run — PENDING). WLIFE-01 stays live-pending; WLIFE-02/03/04 remain UNIT-proven (Plans 01..04) with live confirmation pending.
+- [63-05]: `--live` lifecycle verification suite (SC-1..SC-4) authored in `tests/integration/worker-pool-live.test.mjs` — a `ps`/`pgrep` `countClaudeWorkers()` helper + an `afterEach` zero-orphan teardown (T-63-11), the SC-1 cold-start probe (closes the Phase-62 PARTIAL, D-09), SC-2 idle-evict (tiny `idleMs`), SC-3 crash (SIGKILL → WORKER_RETRYABLE, no respawn-storm), and SC-4 cancel (real `controller.abort()` → SIGTERM+dispose, new pid — the live inverse of the Phase-62 cancel HANG, replacing the old SAME-pid case). Reuses the existing `--live` gate; mock gate exits 0 with the live block skipped. Committed `b40bc23` on rapid-llm-proxy `main` (not pushed). `autonomous: false` — the `LLM_PROXY_LIVE=1` run was an OPERATOR checkpoint; it was performed 2026-06-21 (9/9 tests PASS, exit 0, ~35.2s, zero orphaned `claude -p` workers — SC-1 5.0s, SC-2 7.8s, SC-3 5.6s, SC-4 7.2s). **WLIFE-01..04 ROADMAP-discharged 2026-06-21** — WLIFE-01 live-proven (cold-start), WLIFE-02/03/04 live-confirmed (UNIT-proven in Plans 01..04). Phase 63 complete (5/5 plans).
 - [v6.0 start]: Agent-agnostic architecture -- retrieval service is standalone HTTP API, each coding agent has its own adapter
 - [v6.0 start]: Use existing Qdrant instance for vector storage (not LibSQL vector)
 - [v6.0 start]: All four knowledge tiers as sources (observations, digests, insights, KG entities)
