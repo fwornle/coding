@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
 status: executing
-stopped_at: Phase 66 context gathered
-last_updated: "2026-06-21T13:29:09.329Z"
-last_activity: 2026-06-21 -- Phase 66 planning complete
+stopped_at: Completed 66-01-PLAN.md
+last_updated: "2026-06-21T13:42:57.267Z"
+last_activity: 2026-06-21 -- Phase 66 Plan 01 complete (p50_latency_ms median in proxy)
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 50
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 66 — Dashboard Latency Observability (Phase 65 complete 2026-06-21)
+**Current focus:** Phase 66 — dashboard-latency-observability
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 65 (steady-state-latency-crash-survival-acceptance) — COMPLETE (verifier PASS 7/7; PERF-01/PERF-02 discharged). Next: Phase 66 (Dashboard Latency Observability — PERF-03).
-Plan: 1 of 1 complete
-Status: Ready to execute
-Last activity: 2026-06-21 -- Phase 66 planning complete
+Phase: 66 (dashboard-latency-observability) — EXECUTING
+Plan: 2 of 2
+Status: Plan 01 complete (proxy p50_latency_ms median); Plan 02 (dashboard surfaces) next
+Last activity: 2026-06-21
 
 ## Performance Metrics
 
@@ -225,6 +225,7 @@ Last activity: 2026-06-21 -- Phase 66 planning complete
 - [Phase 62]: WorkerPool router wired into completeClaudeCode dispatcher (62-03) — Lazy per-(model x prompt) spawn D-07, concurrency-1 sibling dispatch D-05, execFile overflow at cap D-06, LRU prompt-pool cap D-02, GUARD-01 escape hatch orthogonal to DISABLE_CLAUDE_DIRECT D-08; POOL-04 direct path untouched; SIGTERM handler added for launchd disposeAll reap.
 - [Phase 64]: GUARD-02: claude CLI version pinned at worker boot (ClaudeWorker._bootVersion via deps.readVersion); drift recycled through the existing _reapStale drain+respawn at reuse; pool current-version snapshot refreshed coarsely (lazy, never per-request); degrade-open on probe failure.
 - [Phase ?]: Phase 64-02: GUARD-03 stderr drain+throttle (per-worker <=1/min, <=200-char sample via injected logErr+clock) + WR-02 cache-inclusive recycle ceiling; rapid-llm-proxy 8fbc8d2 local-only
+- [Phase ?]: [66-01]: Per-model p50 median on getSummary by_model via parameterized ORDER BY latency_ms LIMIT 1 OFFSET (count-1)/2 (lower-mid) over the clamped 24h since-window; piggybacks on summary (no new endpoint), best-effort never-throws on empty DB
 
 ### Blockers/Concerns
 
@@ -301,10 +302,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 64 P01 | single-wave | 4 tasks | 2 files |
 | Phase 64 P02 | 1 commit | 4 tasks | 3 files |
 | Phase 64 P02 | 1 commit / single wave | 4 tasks | 3 files |
+| Phase 66 P01 | 9 | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-06-21T12:47:02.425Z
+Last session: 2026-06-21T13:42:50.854Z
 Stopped at: Phase 66 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
