@@ -40,7 +40,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 - [x] **PERF-01:** A sonnet `say OK` probe routed through the claude-code provider via a warm worker (cache hit) completes in ≤ 3s steady-state. (Cold first-spawn call may still take ~10s.)
 - [x] **PERF-02:** The pool survives at least one worker crash (e.g. SIGKILL a worker PID) without dropping subsequent requests for that model.
-- [ ] **PERF-03:** The dashboard's claude-code latency column shows the speedup — median claude-code/sonnet latency drops from ~14s to ≤3s within 24h of rollout.
+- [~] **PERF-03:** The dashboard's claude-code latency column shows the speedup — median claude-code/sonnet latency drops from ~14s to ≤3s within 24h of rollout. (Implemented & verified Phase 66 — both surfaces render the per-model median from fallback-path telemetry; live ≤3s/green-badge confirmation pending in 66-HUMAN-UAT.md.)
 
 ---
 
@@ -67,7 +67,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | GUARD-03 | Phase 64 | Complete (64-02: drain-and-throttle stderr handler — every chunk drained, <=200-char sample logged <=1/min/worker via injected logErr + injectable clock; WR-02 fold-in cache-inclusive recycle ceiling; proxy commit 8fbc8d2; unit-proven via fake-clock throttle + summed-token ceiling, 58 tests pass) |
 | PERF-01 | Phase 65 | Complete (live-proven 2026-06-21 — 65-01 `--live` PERF-01 SC-1 steady-state warm-latency probe PASS: median-of-N≥5 warm `say OK` ≤3000ms hard gate held with summed-`tokens.input` cache-presence floor cleared; the earlier ~3.9s informal observation did NOT reproduce. Operator run 12/12 exit 0, zero orphans — 65-HUMAN-UAT.md) |
 | PERF-02 | Phase 65 | Complete (live-proven 2026-06-21 — 65-01 `--live` PERF-02 SC-2 crash-survival PASS: SIGKILL a worker pid read off the live handle, next same-key request returns a VALID non-empty completion from a NEW pid (acceptance delta over Phase-63 SC-3); SC-3 bounded idle respawn + SC-4 escape-hatch zero-ps + baseline both PASS — 65-HUMAN-UAT.md) |
-| PERF-03 | Phase 66 | Not started |
+| PERF-03 | Phase 66 | Implemented & verified (2026-06-21 — Phase 66 delivered both dashboard surfaces: `:3032` LlmLatencyTile + Token Usage Median column, sourced from proxy `p50_latency_ms` fallback-path telemetry; 6/6 must-haves verified, code review 0 critical. Live ≤3s/green-badge confirmation + pool-disabled regression signal pending — tracked in 66-HUMAN-UAT.md) |
 
 **Coverage:** 14/14 v7.3 requirements mapped to 5 phases (62–66). No orphans, no duplicates.
 
