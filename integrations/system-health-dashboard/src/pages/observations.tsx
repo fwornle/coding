@@ -103,6 +103,24 @@ export function ObservationsPage() {
     }
   }, [filters, page, fetchObservations])
 
+  // Refetch immediately when the tab regains focus/visibility. setInterval is
+  // throttled in background tabs and frozen during system sleep, so the 30s poll
+  // alone leaves the view stale (showing last-session data) until the next tick
+  // after you return — this catches it up the moment the tab is foregrounded.
+  useEffect(() => {
+    const refetchIfVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      const freshTo = new Date().toISOString().split('T')[0]
+      fetchObservations({ ...filters, to: freshTo }, page, true)
+    }
+    document.addEventListener('visibilitychange', refetchIfVisible)
+    window.addEventListener('focus', refetchIfVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', refetchIfVisible)
+      window.removeEventListener('focus', refetchIfVisible)
+    }
+  }, [filters, page, fetchObservations])
+
   // Close expanded card on ESC
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
