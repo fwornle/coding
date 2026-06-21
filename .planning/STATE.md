@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
-status: complete
-stopped_at: Completed 66-05-PLAN.md (gap-closure — SC-2 red live-proven on both :3032 surfaces via the LLM_PROXY_WORKER_SPAWN_DELAY_MS seam, then restored to green; PERF-03 now Complete)
-last_updated: "2026-06-21T18:50:00.000Z"
-last_activity: 2026-06-21
+status: Awaiting next milestone
+stopped_at: Milestone v7.3 (Phases 62–66) completed and archived 2026-06-21 — PERF-03 closed (SC-1 green + SC-2 red live-proven via the LLM_PROXY_WORKER_SPAWN_DELAY_MS seam in 66-05)
+last_updated: "2026-06-21T19:49:56.014Z"
+last_activity: 2026-06-21 — Milestone v7.3 completed and archived
 progress:
   total_phases: 1
   completed_phases: 1
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 66 — dashboard-latency-observability
+**Current focus:** Planning next milestone (v7.3 shipped 2026-06-21) — run `/gsd-new-milestone`
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,10 +53,34 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 66 (dashboard-latency-observability) — COMPLETE (5/5 plans; PERF-03 closed)
-Plan: 5 of 5
-Status: Complete — SC-1 + SC-2 both live-proven; PERF-03 done
-Last activity: 2026-06-21
+Phase: Milestone v7.3 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-21 — Milestone v7.3 completed and archived
+
+## Deferred Items
+
+Items acknowledged and deferred at v7.3 milestone close on 2026-06-21 (23 pre-existing
+cross-milestone artifacts, Feb–May, none v7.3 work — plus 1 new non-blocking v7.3 gap):
+
+| Category | Item | Status |
+|----------|------|--------|
+| debug | entity-naming-paths | unknown |
+| debug | llm-synthesis-failures | diagnosed |
+| debug | pattern-extraction-data-loss | investigating |
+| todo | 2026-03-10-replace-console-log-with-proper-logging | open |
+| todo | 2026-05-10-obs-api-libcxx-mutex-shutdown-crash | open |
+| todo | 2026-05-23-orphan-digest-observation-refs | open |
+| todo | 2026-06-10-okm-express-api-contract-bridge | open |
+| todo | 2026-06-10-sub-agent-dashboard-observability-gap | open |
+| uat_gaps | 7 items (phases 62–66 + earlier) | 1 resolved / 1 passed / 4 partial |
+| verification_gaps | 6 items | human_needed (stale phase-level; reqs live-discharged) |
+| context_questions | 3 items | open |
+| v7.3 (new) | overhead_ms omitted from hourly JSON export/hydrate path (token-usage.ts) | deferred — recovery-path only, ~1-line fix; see milestones/v7.3-MILESTONE-AUDIT.md |
+
+Resolve via `/gsd-capture` triage or a future cleanup phase. The verification_gaps are
+stale phase-level `human_needed` statuses for phases 62/63/66 whose requirements were
+subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see the v7.3 audit.
 
 ## Performance Metrics
 
@@ -327,3 +351,7 @@ Plan 02 follow-up for Plan 7:
   RESEARCH §2 fix #1 single-writer architecture refactor. The workflow runner
   process exits silently before any coordinator.writeProgressFile call fires
   from a completed wave, so the dashboard sees a stuck "running" state.
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

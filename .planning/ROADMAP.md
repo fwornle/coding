@@ -1,14 +1,35 @@
-### Phase 66: Dashboard Latency Observability
-**Goal:** Operators can see the speedup land in production — the dashboard's claude-code latency column reflects the warm-pool steady-state, so the ~14s → ≤3s improvement is visible and trackable within a day of rollout rather than only provable by an ad-hoc probe.
-**Depends on:** Phase 62 (pool emitting the fast-path latencies), Phase 65 (acceptance probe establishes the ≤3s steady-state the dashboard should reflect)
-**Requirements:** PERF-03
-**Success Criteria** (what must be TRUE):
-  1. The dashboard's claude-code latency column surfaces median claude-code/sonnet latency, and within 24h of worker-pool rollout that median drops from ~14s to ≤3s — the operator reads the speedup off the dashboard, not off a manual probe.
-  2. The latency figure the dashboard shows for claude-code/sonnet is sourced from the same fallback-path traffic the pool serves (token-usage / latency telemetry), so a regression (e.g. pool disabled via escape hatch, or workers thrashing) would be visible as the median climbing back toward the ~14s baseline.
-**Plans:** 5/5 plans executed — COMPLETE (PERF-03 closed; SC-1 + SC-2 both live-proven 2026-06-21)
-  - [x] 66-01-PLAN.md — Add MEDIAN(latency_ms) per-model query to the proxy token-usage SQL layer; expose p50_latency_ms on getSummary by_model rows (rapid-llm-proxy)
-  - [x] 66-02-PLAN.md — Surface per-model median on both dashboard surfaces: :3032 headline tile + Token Usage by-model column with green ≤3s / red-toward-14s regression badge (coding)
-  - [x] 66-03-PLAN.md — [gap] Instrument the worker pool to record per-call SPAWN/QUEUE overhead_ms (dispatch→first-output, excludes generation); persist it + a per-model p50_overhead_ms median + /recent passthrough (rapid-llm-proxy)
-  - [x] 66-04-PLAN.md — [gap] Re-point both dashboard surfaces from total latency to the overhead median (overhead_ms / p50_overhead_ms); the ≤3s/amber/red envelope becomes meaningful — warm→green confirmed live; pool-disabled→red deferred to 66-05 (coding)
-  - [x] 66-05-PLAN.md — [gap] Add opt-in `LLM_PROXY_WORKER_SPAWN_DELAY_MS` worker-pool test seam (defers the prompt write so the injected delay lands in the overhead window, no-op when unset) and live-prove SC-2 on :3032: env=6000ms flipped BOTH the tile ("Regressed" red) and the by-model "Spawn Overhead" column RED, then restored to green + healthy pool — closes the 66-04 SC-2 deferral, PERF-03 Complete (rapid-llm-proxy + coding)
-**UI hint:** yes
+# Roadmap: Coding Project — Knowledge Management
+
+## Milestones
+
+- ✅ **v7.3 LLM Proxy Performance — Claude CLI Worker Pool** — Phases 62–66 (shipped 2026-06-21)
+- 📋 **Next milestone** — run `/gsd-new-milestone` to scope
+
+## Phases
+
+<details>
+<summary>✅ v7.3 LLM Proxy Performance — Claude CLI Worker Pool (Phases 62–66) — SHIPPED 2026-06-21</summary>
+
+Replaced the per-call `claude` CLI `execFile` spawn on the claude-code fallback path with a pool of warm, persistent stream-JSON workers — sonnet/opus fallback latency cut from ~10–14s to ~2–3s steady-state. 14/14 requirements satisfied. Full detail: `milestones/v7.3-ROADMAP.md`, `milestones/v7.3-REQUIREMENTS.md`, `milestones/v7.3-MILESTONE-AUDIT.md`.
+
+- [x] Phase 62: Worker Pool Core — Stream-JSON Transport (3 plans) — POOL-01..04, GUARD-01
+- [x] Phase 63: Worker Lifecycle — Lazy Spawn / Idle Eviction / Crash Recovery / Cancellation (5 plans) — WLIFE-01..04 (live-proven 9/9)
+- [x] Phase 64: Worker Hygiene — CLI Version Pinning + stderr Throttling (2 plans) — GUARD-02/03
+- [x] Phase 65: Steady-State Latency, Crash-Survival Acceptance (1 plan) — PERF-01/02 (operator live-run 12/12)
+- [x] Phase 66: Dashboard Latency Observability (5 plans incl. gap-closure 66-03/04/05) — PERF-03 (SC-1 green + SC-2 red live-proven)
+
+</details>
+
+### 📋 Next milestone (planned)
+
+Run `/gsd-new-milestone` to scope the next milestone (questioning → research → requirements → roadmap). Out-of-milestone backlog phases tracked in STATE.md (e.g. Phase 54 ETM hardening, Phase 46 ONBOARDING.md operator UAT, the `999.1` shared-LLM-adapter extraction).
+
+## Progress
+
+| Phase | Milestone | Plans | Status | Completed |
+|-------|-----------|-------|--------|-----------|
+| 62. Worker Pool Core | v7.3 | 3/3 | Complete | 2026-06-21 |
+| 63. Worker Lifecycle | v7.3 | 5/5 | Complete | 2026-06-21 |
+| 64. Worker Hygiene | v7.3 | 2/2 | Complete | 2026-06-21 |
+| 65. Acceptance | v7.3 | 1/1 | Complete | 2026-06-21 |
+| 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |

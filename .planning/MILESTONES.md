@@ -1,5 +1,24 @@
 # Milestones
 
+## v7.3 LLM Proxy Performance — Claude CLI Worker Pool (Shipped: 2026-06-21)
+
+**Phases completed:** 5 phases (62–66), 16 plans
+**Git range:** `638d525e3` (62-01) → milestone close — 2026-06-20 → 2026-06-21
+**Audit:** `tech_debt` — 14/14 requirements satisfied, integration_ok, 0 blockers (see `milestones/v7.3-MILESTONE-AUDIT.md`)
+**Known deferred items at close:** 23 pre-existing cross-milestone artifacts (acknowledged — see STATE.md Deferred Items) + 1 new non-blocking `overhead_ms` export/hydrate gap
+
+**Outcome:** Replaced the per-call `claude` CLI `execFile` spawn on the claude-code fallback path with a pool of warm, persistent stream-JSON workers — cutting sonnet/opus fallback latency from ~10–14s to ~2–3s steady-state and keeping Anthropic's prompt-cache warm.
+
+**Key accomplishments:**
+
+- **Persistent worker pool (Phase 62 — POOL-01..04, GUARD-01):** per-model (haiku/sonnet/opus), concurrency-1, lazily-spawned `claude -p` stream-JSON workers serving ONLY the claude-code CLI-fallback path, behind the orthogonal `LLM_PROXY_DISABLE_WORKER_POOL` escape hatch; direct-OAuth path unchanged.
+- **Full worker lifecycle (Phase 63 — WLIFE-01..04, live-proven 9/9):** lazy spawn, idle eviction (default 30 min), crash-recovery surfaced as RETRYABLE with a per-key respawn-storm cooldown, and client-disconnect cancellation (SIGTERM+dispose+drop in-flight / dequeue queued) so a dead client never pins a concurrency-1 worker.
+- **Worker hygiene (Phase 64 — GUARD-02/03):** CLI version-drift recycle (keeps prompt-cache assumptions valid across `claude` upgrades) + stderr drain-and-throttle (≤1 log/min/worker).
+- **Acceptance, operator live-run (Phase 65 — PERF-01/02, 12/12 PASS):** warm sonnet `say OK` ≤3s steady-state with cache-presence floor; pool survives a worker SIGKILL and keeps serving; idle respawn + escape-hatch revert both clean.
+- **Dashboard observability (Phase 66 — PERF-03):** introduced a per-model SPAWN/QUEUE `overhead_ms` metric (dispatch→first-output, EXCLUDING generation — the latency the pool actually controls) with a NULL-safe `p50_overhead_ms` median, graded green/amber/red on both `:3032` surfaces. Gap-closure arc (66-03/04/05): the executor refused to fake an unreachable SC-2 red on this fast host, surfaced the threshold-vs-real-overhead mismatch, and closed it with an opt-in `LLM_PROXY_WORKER_SPAWN_DELAY_MS` test seam — SC-1 (warm→green) and SC-2 (regression→red) both live-proven via gsd-browser computed-rgb read-back.
+
+---
+
 ## v7.2 VKB & Online-Learning Quality — Graph Data Quality, Ontology Rework, Viewer UX Integrity (ACTIVE)
 
 **Why:** Phase 56.1 visual smoke (2026-06-13/14) surfaced a cluster of seven inter-related quality issues across the unified viewer + online learning pipeline + ontology layer. The foundational pipeline is healthy (km-core export at 1262 nodes / 1592 edges / 88% connectivity after the 2026-06-10 backfill + repair commits), but the long tail of data quality issues makes operators work around the graph view instead of relying on it. Two of the surfaced todos carry operator-set `scope_hint: This is a multi-phase milestone, not a single TODO`.
@@ -7,6 +26,7 @@
 **Goal:** Bring the online learning pipeline → km-core → unified viewer surface to production data quality, so operators rely on the graph view for navigation and triage instead of working around known-broken rendering.
 
 **Target features (6):**
+
 1. Online pipeline emits semantic-content edges (mentions / dependsOn / isRelatedTo / instanceOf) on Insights — not just `capturedBy → LiveLoggingSystem`.
 2. Ontology rework — clarify upper/lower split, build out lower ontology for coding-specific concepts (LSL, ConstraintMonitor, Online-Observation/Digest/Insight tiers), per-project grouping in viewer.
 3. VKB rendering UX integrity — Evidence/Pattern filter symmetry, Legend derived from rendered graph, eliminate Observations/Digests architecture bleed, restore CollectiveKnowledge visibility under Online filter.
@@ -15,6 +35,7 @@
 6. Long-tail orphan fixes — close Phase 48 (System-type vanish), Phase 49 (orphan project-anchor relations); reduce 157-orphan baseline materially.
 
 **Scope seed (cluster of 9 todos):**
+
 - `.planning/todos/pending/2026-06-14-online-pipeline-semantic-edges-and-timeline-bi-source.md` *(operator-flagged multi-phase milestone)*
 - `.planning/todos/pending/2026-06-14-ontology-rework-lower-ontology-and-project-grouping.md` *(operator-flagged multi-phase milestone)*
 - `.planning/todos/pending/2026-06-14-online-filter-hides-ck-truncates-trace.md`
@@ -26,6 +47,7 @@
 - ROADMAP entries Phase 48 (System-type vanish) + Phase 49 (project-anchor orphans) — placeholders folded into v7.2 phase scoping
 
 **Out of scope:**
+
 - LLM proxy worker pool perf (now queued as v7.3 — see below)
 - Cross-agent performance measurement system (now queued as v7.4)
 - Phase 51 follow-up todos (`opencode-schema-migration-update`, `sweep-llm-proxy-probe-fix`, `json-export-missing-source-field`, sub-agent dashboard observability gap) — agent-capture concerns, not graph data quality
@@ -58,6 +80,7 @@
 **Goal:** Build a measurement rig that quantifies, per task, the full cost across all four supported agents (Claude Code, Copilot CLI, OpenCode, Mastra) AND the proxy-routed background services that run during the task. Attribution at the best granularity each agent surfaces (Claude per-turn + per-reasoning-step for extended thinking, Copilot per-session-aggregate or per-turn pending verification, OpenCode per-llm-call via proxy, Mastra TBD). Time-series on one timeline via the existing `.observations/token-usage.db` extended with `agent`, `task_id`, `tool_call_id`, `parent_call_id`, `granularity_tier`, `reasoning_tokens`. Full snapshot/restore for reproducibility (git + KB + `.planning/` + routing config + MCP inventory + external HTTP fixtures). New km-core KB of `Experiment / Run / Route / Step / Decision / Outcome / Report` entities and a "Performance" dashboard tab (slotted after Tokens).
 
 **Scoping artifacts:**
+
 - `.planning/notes/v73-perf-measurement-exploration.md` — 7 architectural decisions + 9-phase shape sketch with Phase 3 flagged FOUNDATIONAL *(filename retains v73 origin; new slot is v7.4)*
 - `.planning/notes/v73-token-attribution-contract.md` — storage / measurement-span / per-agent adapter contracts
 - `.planning/spikes/copilot-proxy-interception.md` — completed spike (4-approach verdict table + recommendation)
