@@ -3,7 +3,7 @@ phase: 66-dashboard-latency-observability
 plan: 02
 subsystem: system-health-dashboard (LLM latency observability)
 tags: [perf, observability, dashboard, react, median, latency, PERF-03]
-status: awaiting-human-verify
+status: complete
 requires:
   - "66-01: getSummary().by_model[].p50_latency_ms (proxy SQL median)"
 provides:
@@ -28,8 +28,8 @@ decisions:
   - "Tile feeds the existing default-export HealthStatusCard via a StatusItem[] builder (cheapest consistent path per D-03 'tile visual layout') rather than a bespoke big-number layout; haiku mapped to neutral 'offline' status so it reads as reference, not pass/fail."
 metrics:
   duration_minutes: 11
-  completed: "2026-06-21 (Tasks 1-3; Task 4 human-verify pending)"
-  tasks_completed: 3
+  completed: "2026-06-21 (all 4 tasks; Task 4 human-verify APPROVED after v3 enhancements)"
+  tasks_completed: 4
   tasks_total: 4
   files_changed: 3
 ---
@@ -129,7 +129,7 @@ The human APPROVED the v2 badge/placement fixes but asked the tile to **explain 
 
 ## Checkpoint Status
 
-**Task 4 (`checkpoint:human-verify`, gate="blocking") is NOT self-approved.** The v3 enhancements (1h window, subtitle/legend, per-model tooltips, trend sparkline) have been applied and the gsd-browser visual evidence re-captured (`/tmp/66-02-tile-v3-full.png`, `/tmp/66-02-tile-v3-crop.png`). Control is being returned to the orchestrator for explicit human re-confirmation. The plan is NOT marked fully complete.
+**Task 4 (`checkpoint:human-verify`, gate="blocking") — APPROVED by the human reviewer on 2026-06-21.** Approval came after the v3 enhancements (1h window, subtitle/legend, per-model tooltips, trend sparkline), with the gsd-browser visual evidence re-captured (`/tmp/66-02-tile-v3-full.png`, `/tmp/66-02-tile-v3-crop.png`). The operator confirmed the tile now explains its assessment (why "Regressed", what "reference") over the fresher 1h window. Plan 66-02 is COMPLETE.
 
 **Resume signal (from the plan):** Type "approved" if both surfaces show the per-model median with the green ≤3s treatment and haiku reference row; otherwise describe what renders wrong.
 
