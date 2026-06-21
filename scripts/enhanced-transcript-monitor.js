@@ -1760,43 +1760,68 @@ class EnhancedTranscriptMonitor {
       return null;
     }
 
+    const projectPath = this.config.projectPath;
+    // Resolve symlinks so we match regardless of which path alias was used
+    let resolvedPath;
+    try { resolvedPath = fs.realpathSync(projectPath); } catch { resolvedPath = projectPath; }
+
+    // Prefer better-sqlite3 (in-process, read-only) — no `sqlite3` CLI spawn, so no
+    // ETIMEDOUT when the OpenCode DB is busy/locked. Mirrors readOpenCodeMessages.
+    try {
+      let Database;
+      try { Database = require('better-sqlite3'); }
+      catch { Database = require('/Users/Q284340/Agentic/coding/node_modules/better-sqlite3'); }
+      const db = Database(dbPath, { readonly: true });
+      const row = db.prepare(
+        `SELECT s.id, s.directory, s.time_updated, s.title FROM session s
+         WHERE s.directory = ? OR s.directory = ? ORDER BY s.time_updated DESC LIMIT 1`
+      ).get(resolvedPath, projectPath);
+      db.close();
+      return this._resolveOpenCodeSession(row ? [row.id, row.directory, row.time_updated, row.title] : null);
+    } catch (error) {
+      this.debug(`better-sqlite3 OpenCode lookup failed (${error.message}); falling back to sqlite3 CLI`);
+    }
+
+    // Fallback: sqlite3 CLI (legacy path; can ETIMEDOUT under DB lock).
     try {
       const execSync = _execSync;
-      const projectPath = this.config.projectPath;
-
-      // Resolve symlinks so we match regardless of which path alias was used
-      const resolvedPath = fs.realpathSync(projectPath);
       const escapedPath = resolvedPath.replace(/'/g, "''");
       const escapedOrig = projectPath.replace(/'/g, "''");
-
-      // Find sessions whose directory matches this project path (try both resolved and original), ordered by most recent
       const query = `SELECT s.id, s.directory, s.time_updated, s.title FROM session s WHERE s.directory = '${escapedPath}' OR s.directory = '${escapedOrig}' ORDER BY s.time_updated DESC LIMIT 1;`;
       const result = execSync(`sqlite3 "${dbPath}" "${query}"`, {
         encoding: 'utf-8',
         timeout: 5000
       }).trim();
-
-      if (!result) {
-        this.debug('No matching OpenCode session found for project');
-        return null;
-      }
-
-      const [sessionId, directory, timeUpdated, title] = result.split('|');
-      const sessionAge = Date.now() - parseInt(timeUpdated, 10);
-
-      // Only consider sessions active within 2x session duration
-      if (sessionAge > this.config.sessionDuration * 2) {
-        this.debug(`OpenCode session too old: ${Math.round(sessionAge / 60000)}min (${title})`);
-        return null;
-      }
-
-      this.openCodeSessionId = sessionId;
-      this.debug(`Found OpenCode session: ${sessionId} (${title}, ${Math.round(sessionAge / 1000)}s ago)`);
-      return `opencode://${sessionId}`;
+      return this._resolveOpenCodeSession(result ? result.split('|') : null);
     } catch (error) {
       this.debug(`Error finding OpenCode transcript: ${error.message}`);
       return null;
     }
+  }
+
+  /**
+   * Shared evaluation of an OpenCode session row [id, directory, time_updated, title]
+   * for both the better-sqlite3 and sqlite3-CLI lookup paths. Applies the freshness
+   * window and records the session id. Returns an `opencode://<id>` handle or null.
+   * @private
+   */
+  _resolveOpenCodeSession(parts) {
+    if (!parts || !parts[0]) {
+      this.debug('No matching OpenCode session found for project');
+      return null;
+    }
+    const [sessionId, , timeUpdated, title] = parts;
+    const sessionAge = Date.now() - parseInt(timeUpdated, 10);
+
+    // Only consider sessions active within 2x session duration
+    if (sessionAge > this.config.sessionDuration * 2) {
+      this.debug(`OpenCode session too old: ${Math.round(sessionAge / 60000)}min (${title})`);
+      return null;
+    }
+
+    this.openCodeSessionId = sessionId;
+    this.debug(`Found OpenCode session: ${sessionId} (${title}, ${Math.round(sessionAge / 1000)}s ago)`);
+    return `opencode://${sessionId}`;
   }
 
   /**
@@ -3320,7 +3345,13 @@ ORDER BY m.time_created ASC;`;
         if (!sessionFile.includes('.specstory/history/') && !sessionFile.includes('.specstory/logs/')) continue;
         try {
           const { exec } = await import('child_process');
-          exec(`git add "${sessionFile}"`, { cwd: this.config.projectPath, timeout: 5000 }, (err) => {
+          // LSL files live in a NESTED git repo (.specstory/history/.git) and are
+          // gitignored in the MAIN repo — so `git add` from the project root is
+          // rejected ("paths are ignored by .gitignore"). Run git from the file's
+          // own directory so git resolves to the nearest enclosing repo (the
+          // nested history repo), and pass -f to defeat any inner ignore rule.
+          const fileDir = path.dirname(sessionFile);
+          exec(`git add -f "${path.basename(sessionFile)}"`, { cwd: fileDir, timeout: 5000 }, (err) => {
             if (err) this.debug(`git add failed for ${path.basename(sessionFile)}: ${err.message}`);
             else this.debug(`git add OK: ${path.basename(sessionFile)}`);
           });
