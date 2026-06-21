@@ -3,7 +3,7 @@ phase: 66-dashboard-latency-observability
 plan: 02
 subsystem: system-health-dashboard (LLM latency observability)
 tags: [perf, observability, dashboard, react, median, latency, PERF-03]
-status: complete
+status: awaiting-checkpoint
 requires:
   - "66-01: getSummary().by_model[].p50_latency_ms (proxy SQL median)"
 provides:
@@ -127,9 +127,60 @@ The human APPROVED the v2 badge/placement fixes but asked the tile to **explain 
 
 **Files touched in this iteration:** `integrations/system-health-dashboard/src/components/llm-latency-tile.tsx` (only).
 
+## Checkpoint-Redesign Iteration v4 (2026-06-21, REOPENED blocking checkpoint — last-N-calls)
+
+The operator REOPENED the blocking checkpoint: the v3 **1h-window** tile (`summary?hours=1`)
+**DROPPED the sonnet/opus rows entirely** whenever there were no claude-code fallback calls in
+the last hour — the tile went blank except for haiku ("no more sonnet?"). The operator chose a
+**last-N-calls + always-keep-rows** redesign. Applied to `llm-latency-tile.tsx` ONLY (no other file
+touched), frontend rebuilt + restarted, fresh gsd-browser screenshots captured. The checkpoint
+remains **blocking and NOT self-approved**.
+
+1. **SINGLE data source = the `/recent` feed.** BOTH the headline median AND the sparkline now
+   derive from `/api/token-usage/recent` (same-origin proxy). The tile **no longer fetches
+   `summary?hours=1`** (`grep -c token-usage/summary llm-latency-tile.tsx` → 0). This also fixes a
+   latent inconsistency: v3's headline came from `summary?hours=1` while the sparkline came from
+   `/recent`, so they could contradict; now they ride identical samples. The `/recent` limit was
+   raised to `?limit=1000` (bounded, not unbounded) so each tracked family can accumulate up to
+   ~50 samples; fewer is fine (uses whatever it has).
+2. **Per-model median over the last ~50 calls.** For each tracked family, filter the feed by family
+   keyword, sort newest-first, slice 50, and take the lower-mid `median()` of `latency_ms` (same
+   convention as 66-01). The sparkline rides those same samples (oldest→newest, per-call) so headline
+   and trend agree.
+3. **ALWAYS keep fixed rows — never drop a model when quiet.** A `TRACKED_FAMILIES` list (sonnet,
+   opus, haiku) drives the row set, matched by **family keyword** (`/sonnet/i` etc.) so a version
+   bump (claude-sonnet-4.6 → 4.x) doesn't break the row. A family with **zero recent calls** renders
+   a muted "no recent calls" placeholder (neutral `'reference'` status, `—` badge, no sparkline)
+   instead of vanishing. This is the direct fix for the operator's "no more sonnet?".
+4. **Threshold + reference semantics preserved (D-03/D-04), wording updated to "last ~50 calls":**
+   sonnet/opus green ≤3000ms ("OK") / amber 3000–5000ms ("Elevated") / red >5000ms ("Regressed");
+   haiku muted italic "reference", no threshold. Tooltips updated: sonnet/opus → "Median of the last
+   ~50 calls. Warm target ≤3s; amber 3–5s; red >5s."; haiku → "Direct-path OAuth baseline — not
+   pool-graded (reference only)." Subtitle/legend now reads `Per-model median · warm target ≤3s ·
+   last ~50 calls`.
+
+The Token Usage drill-down table (`token-usage.tsx`) was **NOT** touched — it stays on its 24h
+summary basis (D-05). This redesign is the headline tile only.
+
+**Files touched in this iteration:** `integrations/system-health-dashboard/src/components/llm-latency-tile.tsx` (only).
+
+**Visual re-confirmation v4** (`/tmp/66-02-tile-v4.png` full page; `/tmp/66-02-tile-v4-crop.png` tile crop):
+the live tile renders THREE rows — **claude-sonnet-4.6** "90.8s median · last ~18 calls" with the red
+**Regressed** badge; **opus** "no recent calls" muted placeholder (kept as a row, NOT dropped — the
+operator's fix); **claude-haiku-4.5** "966ms median (reference) · last ~50 calls" muted italic
+"reference". Subtitle reads "Per-model median · warm target ≤3s · last ~50 calls". Sparklines render
+for sonnet (18 samples) and haiku (50 samples). `tsc --noEmit` clean for the tile; `npm run build`
+exit 0; frontend service RUNNING (pid 31224).
+
+**Resume signal (operator):** approve if sonnet+opus+haiku always render (quiet models show "no recent
+calls" rather than dropping) and the median/sparkline ride the last ~50 calls; otherwise describe what
+renders wrong.
+
 ## Checkpoint Status
 
-**Task 4 (`checkpoint:human-verify`, gate="blocking") — APPROVED by the human reviewer on 2026-06-21.** Approval came after the v3 enhancements (1h window, subtitle/legend, per-model tooltips, trend sparkline), with the gsd-browser visual evidence re-captured (`/tmp/66-02-tile-v3-full.png`, `/tmp/66-02-tile-v3-crop.png`). The operator confirmed the tile now explains its assessment (why "Regressed", what "reference") over the fresher 1h window. Plan 66-02 is COMPLETE.
+**Task 4 (`checkpoint:human-verify`, gate="blocking") — REOPENED on 2026-06-21 for the last-N-calls redesign (v4); awaiting operator re-approval. NOT self-approved.** Prior v3 history below for context.
+
+**Earlier (v3) — APPROVED by the human reviewer on 2026-06-21.** Approval came after the v3 enhancements (1h window, subtitle/legend, per-model tooltips, trend sparkline), with the gsd-browser visual evidence re-captured (`/tmp/66-02-tile-v3-full.png`, `/tmp/66-02-tile-v3-crop.png`). The operator confirmed the tile now explains its assessment (why "Regressed", what "reference") over the fresher 1h window. Plan 66-02 is COMPLETE.
 
 **Resume signal (from the plan):** Type "approved" if both surfaces show the per-model median with the green ≤3s treatment and haiku reference row; otherwise describe what renders wrong.
 
