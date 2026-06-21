@@ -31,7 +31,7 @@ interface SummaryShape {
   by_model?: ModelRow[]
 }
 
-type ItemStatus = 'operational' | 'warning' | 'error' | 'offline'
+type ItemStatus = 'operational' | 'warning' | 'error' | 'offline' | 'reference'
 
 // Reuse the token-usage.tsx formatter idiom (≥1000ms → "N.Ns").
 function formatLatency(ms: number): string {
@@ -54,6 +54,25 @@ function latencyStatus(ms: number): ItemStatus {
   return 'error'
 }
 
+// Latency-specific badge LABELS (not service-health words). The color still
+// comes from the status (green/amber/red), but the text describes LATENCY so
+// it doesn't read as a service outage next to the "Healthy" header (D-03):
+//   green  → "OK"        (≤3s warm bar)
+//   amber  → "Elevated"  (drifting up in the discretion band)
+//   red    → "Regressed" (median climbing toward the ~14s baseline)
+function latencyBadgeLabel(status: ItemStatus): string | undefined {
+  switch (status) {
+    case 'operational':
+      return 'OK'
+    case 'warning':
+      return 'Elevated'
+    case 'error':
+      return 'Regressed'
+    default:
+      return undefined
+  }
+}
+
 // Only surface the claude-code fallback models (sonnet, opus) plus the haiku
 // reference row — the tile is about pool latency, not every model ever logged.
 function isReportableModel(model: string): boolean {
@@ -61,7 +80,7 @@ function isReportableModel(model: string): boolean {
 }
 
 export default function LlmLatencyTile() {
-  const [items, setItems] = useState<Array<{ name: string; status: ItemStatus; description: string; tooltip?: string }>>([])
+  const [items, setItems] = useState<Array<{ name: string; status: ItemStatus; description: string; tooltip?: string; badgeLabel?: string }>>([])
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -83,14 +102,19 @@ export default function LlmLatencyTile() {
         const built = rows.map((m) => {
           const p50 = m.p50_latency_ms as number
           const haiku = isHaikuModel(m.model)
+          const status: ItemStatus = haiku ? 'reference' : latencyStatus(p50)
           return {
             name: m.model,
-            // Haiku → neutral 'offline' (no green/amber/red) so it reads as a
-            // reference baseline, NOT a pass/fail signal (D-04).
-            status: haiku ? ('offline' as ItemStatus) : latencyStatus(p50),
+            // Haiku → neutral 'reference' status (muted "reference" label, no
+            // pass/fail badge) so it reads as the direct-path baseline, NOT a
+            // down/error state (D-04). sonnet/opus → green/amber/red threshold.
+            status,
             description: haiku
               ? `${formatLatency(p50)} median (reference)`
               : `${formatLatency(p50)} median`,
+            // Latency-specific badge text (OK/Elevated/Regressed) so the red
+            // state reads as a latency regression, not a service fault (D-03).
+            badgeLabel: haiku ? 'reference' : latencyBadgeLabel(status),
             tooltip: haiku
               ? 'Direct OAuth path — reference baseline, not a pool-health signal'
               : `Median (p50) latency over the last 24h — green ≤3s, red toward ~14s`,

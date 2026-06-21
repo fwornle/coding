@@ -537,7 +537,9 @@ export default function SystemHealthDashboard() {
       )}
 
       {/* Health Status Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      {/* Phase 66-02: 6-up at xl so the LLM Latency tile flows inline with the
+          other 5 health tiles instead of wrapping to its own row (lg keeps 3-up). */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         <HealthStatusCard
           title="Databases"
           icon={<Database className="h-5 w-5" />}

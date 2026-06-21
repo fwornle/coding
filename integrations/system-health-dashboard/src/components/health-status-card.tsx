@@ -4,14 +4,18 @@ import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, AlertTriangle, XCircle, Clock } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, XCircle, Clock, Minus } from 'lucide-react'
 import { Logger, LogCategories } from '@/utils/logging'
 
 interface StatusItem {
   name: string
-  status: 'operational' | 'warning' | 'error' | 'offline'
+  status: 'operational' | 'warning' | 'error' | 'offline' | 'reference' | 'unknown'
   description: string
   tooltip?: string
+  // Optional badge-label override. Lets latency-style tiles render
+  // domain-specific words ("Regressed"/"Elevated"/"OK") instead of the
+  // generic operational/warning/error labels, while keeping the color.
+  badgeLabel?: string
   action?: {
     label: string
     icon?: React.ReactNode
@@ -51,19 +55,25 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
         return <AlertTriangle className="h-4 w-4 text-yellow-500" />
       case 'error':
         return <XCircle className="h-4 w-4 text-red-500" />
+      case 'reference':
+        // Neutral baseline — no pass/fail semantics (e.g. haiku direct path).
+        return <Minus className="h-4 w-4 text-gray-400" />
       default:
         return <Clock className="h-4 w-4 text-gray-400" />
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, badgeLabel?: string) => {
     switch (status) {
       case 'operational':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">OK</Badge>
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">{badgeLabel || 'OK'}</Badge>
       case 'warning':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Warning</Badge>
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">{badgeLabel || 'Warning'}</Badge>
       case 'error':
-        return <Badge variant="destructive">Error</Badge>
+        return <Badge variant="destructive">{badgeLabel || 'Error'}</Badge>
+      case 'reference':
+        // Neutral muted label — NOT a pass/fail badge. Reads as a baseline.
+        return <span className="text-xs text-muted-foreground italic">{badgeLabel || 'reference'}</span>
       case 'unknown':
         return <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">Unknown</Badge>
       default:
@@ -100,7 +110,7 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
                   </div>
                 </div>
                 <span title={item.tooltip || ''}>
-                  {getStatusBadge(item.status)}
+                  {getStatusBadge(item.status, item.badgeLabel)}
                 </span>
               </div>
               {/* Action button row (below, if action exists) */}
