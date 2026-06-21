@@ -567,7 +567,11 @@
       "Bash(ln -s ../coding-ontology.json coding-ontology.json)",
       "Bash(ln -s ../coding.lower.json coding.lower.json)",
       "Bash(ln -s ../coding.display.json coding.display.json)",
-      "Bash(cat)"
+      "Bash(cat)",
+      "Bash(pmset -g assertions)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules --no-warnings' npx jest tests/integration/observation-writer.km-core.test.js)",
+      "Bash(gsd-browser close *)",
+      "Bash(/opt/homebrew/bin/claude --help)"
     ],
     "deny": [],
     "ask": []
