@@ -1264,11 +1264,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Each worker records the `claude` CLI version at boot; when `claude --version` drifts from a worker's boot version, that worker is recycled (drained + respawned) before serving the next request, keeping prompt-cache assumptions valid across CLI upgrades (verified by simulating a version change and observing the worker recycle).
   2. Worker stderr is drained continuously (so the pipe never blocks the subprocess) and throttled to at most one log line per minute per worker — persistent-worker CLI warnings (e.g. "no stdin data received") do not appear once-per-line in the proxy logs.
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 **Wave 1**
 
-- [ ] 64-01-PLAN.md — GUARD-02 CLI version pinning: deps-injectable boot-version capture + pool current-version snapshot + drift-flag-at-reuse through the existing _reapStale path (unit: simulated drift)
+- [x] 64-01-PLAN.md — GUARD-02 CLI version pinning: deps-injectable boot-version capture + pool current-version snapshot + drift-flag-at-reuse through the existing _reapStale path (unit: simulated drift)
 
 **Wave 2** *(depends on 64-01 — shared worker-pool.mjs/test file)*
 

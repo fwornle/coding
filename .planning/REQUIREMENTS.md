@@ -33,7 +33,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 ### Safety & Compatibility (GUARD)
 
 - [x] **GUARD-01:** Setting `LLM_PROXY_DISABLE_WORKER_POOL=1` reverts the claude-code provider to the current per-call `execFile` path with no behavioral change vs. today.
-- [ ] **GUARD-02:** The pool records the `claude` CLI version at worker boot and recycles a worker when `claude --version` drifts from its boot version, keeping prompt-cache assumptions valid across CLI upgrades.
+- [x] **GUARD-02:** The pool records the `claude` CLI version at worker boot and recycles a worker when `claude --version` drifts from its boot version, keeping prompt-cache assumptions valid across CLI upgrades.
 - [ ] **GUARD-03:** Worker stderr is drained and throttled (logged at most once per minute per worker, not once per line) so persistent-worker CLI warnings (e.g. "no stdin data received") do not flood logs.
 
 ### Performance & Observability (PERF)
@@ -63,7 +63,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | WLIFE-02 | Phase 63 | Complete (live-confirmed 2026-06-21 — 63-05 SC-2 idle-evict PASS) |
 | WLIFE-03 | Phase 63 | Complete (63-02 EPIPE-as-crash fold-in; 63-03 crash-cooldown respawn-storm guard; live-confirmed 2026-06-21 — 63-05 SC-3 crash PASS) |
 | WLIFE-04 | Phase 63 | Complete (63-02 stray-result generation guard + 63-04 D-01/D-03 SIGTERM+dispose+drop in-flight / dequeue queued; commits 959f6d3/a33629b; live-confirmed 2026-06-21 — 63-05 SC-4 cancel PASS) |
-| GUARD-02 | Phase 64 | Not started |
+| GUARD-02 | Phase 64 | Complete (64-01: _bootVersion capture via deps.readVersion + pool _currentVersion snapshot + drift-flag-at-reuse through _reapStale; proxy commit cc4a0b6; unit-proven via simulated version change, 53 tests pass) |
 | GUARD-03 | Phase 64 | Not started |
 | PERF-01 | Phase 65 | Not started |
 | PERF-02 | Phase 65 | Not started |
