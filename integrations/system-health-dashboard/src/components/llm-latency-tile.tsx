@@ -7,8 +7,7 @@ import HealthStatusCard from './health-status-card'
 // Phase 66-02: headline per-model median (p50) latency tile for the :3032
 // system-health dashboard tile grid. This is the GLANCEABLE surface of the
 // BOTH-surfaces requirement (D-01) — the Token Usage page by-model table is the
-// drill-down. The median rides on the existing token-usage summary response
-// (Plan 66-01 added by_model[].p50_latency_ms; no new endpoint).
+// drill-down.
 //
 // Data-source caveat (66-PATTERNS Redux note): the main dashboard reads Redux
 // (state.healthReport) but the median is NOT in the health report, so this tile
@@ -17,39 +16,39 @@ import HealthStatusCard from './health-status-card'
 // host.docker.internal), NOT the proxy host:port directly — the :3032 page is
 // container-served and must ride server.js's reverse proxy.
 //
-// 66-02 ENHANCEMENT (post-checkpoint, user-directed deviation from D-05):
-// the headline tile uses a 1-HOUR rolling window (hours=1), NOT the D-05
-// rolling-24h. Rationale: a 24h median is dominated by stale pre-worker-pool
-// history and reads red even when warm calls are ≤3s; 1h reflects current
-// warm-pool health and goes green as history ages out. The Token Usage
-// drill-down TABLE (token-usage.tsx) STAYS 24h — only this tile changes.
-// A per-model latency TREND sparkline (median-per-bucket over the last 1h) lets
-// an operator SEE how the assessment arose (climbing = regressing) rather than
-// trusting one number. The sparkline is bucketed CLIENT-SIDE from the existing
-// /api/token-usage/recent feed (rows carry timestamp+model+latency_ms) — NO
-// proxy change (cheapest data source per the enhancement priority order 4a).
+// 66-02 ENHANCEMENT v4 (post-checkpoint, operator-directed redesign — supersedes
+// the 1h-window iteration): the tile is now LAST-N-CALLS + ALWAYS-KEEP-ROWS.
+// Why the change: the 1h `summary?hours=1` window DROPPED the sonnet/opus rows
+// entirely whenever there were no claude-code fallback calls in the last hour
+// (the tile went blank except for haiku — "no more sonnet?"). The fix:
+//   1. SINGLE data source = the `/api/token-usage/recent` feed. BOTH the headline
+//      median AND the sparkline derive from the same recent calls, so they can no
+//      longer contradict (the old headline came from `summary?hours=1` while the
+//      sparkline came from `/recent`). We no longer fetch `summary` in this tile.
+//   2. Per-model median over the LAST ~50 calls of that model (filter by family,
+//      newest-first, slice 50, lower-mid median — same convention as 66-01).
+//   3. ALWAYS render fixed rows for the claude-code fallback families (sonnet,
+//      opus) plus the haiku reference, matched by FAMILY KEYWORD so a version bump
+//      (claude-sonnet-4.6 → 4.x) doesn't drop the row. A family with zero recent
+//      calls renders a muted "no recent calls" placeholder instead of vanishing.
+// Threshold + reference semantics (D-03/D-04) are unchanged: sonnet/opus green
+// ≤3s / amber 3–5s / red >5s; haiku is the no-threshold direct-path reference.
 
 const REFRESH_INTERVAL = 30_000
-const WINDOW_HOURS = 1
-const WINDOW_MS = WINDOW_HOURS * 60 * 60 * 1000
-// Number of equal time buckets across the window for the trend sparkline.
-const SPARK_BUCKETS = 12
-// Pull a generous page of recent calls (proxy caps at 500) and window them
-// client-side. Heavy traffic may not span a full hour at 500 rows — the
-// sparkline degrades gracefully to whatever in-window points it has.
-const RECENT_LIMIT = 500
+// How many most-recent calls per model the median + sparkline ride on.
+const SAMPLE_SIZE = 50
+// Pull a generous page so each tracked family can accumulate up to SAMPLE_SIZE
+// samples even when one busy model dominates the feed. Bounded — never unbounded.
+const RECENT_LIMIT = 1000
 
-interface ModelRow {
-  model: string
-  calls: number
-  total_tokens: number
-  avg_latency?: number
-  p50_latency_ms?: number
-}
-
-interface SummaryShape {
-  by_model?: ModelRow[]
-}
+// Tracked model families, in display order. Matched by keyword (case-insensitive)
+// so a version bump doesn't break the row set. `reference` families carry no
+// pass/fail threshold (haiku direct-path baseline, D-04).
+const TRACKED_FAMILIES: Array<{ family: string; label: string; reference: boolean }> = [
+  { family: 'sonnet', label: 'sonnet', reference: false },
+  { family: 'opus', label: 'opus', reference: false },
+  { family: 'haiku', label: 'haiku', reference: true },
+]
 
 interface RecentCall {
   timestamp: string
@@ -69,21 +68,18 @@ interface TileItem {
   description: string
   tooltip?: string
   badgeLabel?: string
-  // Per-bucket median latency (ms) over the last 1h, oldest→newest. Drives the
-  // inline trend sparkline. Empty/short arrays degrade to the number alone.
+  // Per-call latency (ms) over the last ~50 calls for this family, oldest→newest.
+  // Drives the inline trend sparkline. Empty/short arrays degrade to the number.
   spark?: number[]
+  // True when the family had NO recent calls — render a muted placeholder row
+  // (no badge, no sparkline) instead of dropping it.
+  empty?: boolean
 }
 
 // Reuse the token-usage.tsx formatter idiom (≥1000ms → "N.Ns").
 function formatLatency(ms: number): string {
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`
   return `${Math.round(ms)}ms`
-}
-
-// D-04: haiku is the direct-path reference baseline — never a pool-health
-// pass/fail signal. by_model rows carry no provider, so key on the model name.
-function isHaikuModel(model: string): boolean {
-  return /haiku/i.test(model)
 }
 
 // D-03 regression threshold envelope for claude-code fallback models
@@ -114,12 +110,6 @@ function latencyBadgeLabel(status: ItemStatus): string | undefined {
   }
 }
 
-// Only surface the claude-code fallback models (sonnet, opus) plus the haiku
-// reference row — the tile is about pool latency, not every model ever logged.
-function isReportableModel(model: string): boolean {
-  return /sonnet|opus|haiku/i.test(model)
-}
-
 // Lower-mid median (matches the proxy's even-count convention, 66-01).
 function median(values: number[]): number {
   if (values.length === 0) return 0
@@ -127,30 +117,19 @@ function median(values: number[]): number {
   return sorted[Math.floor((sorted.length - 1) / 2)]
 }
 
-// Bucket the last-1h recent calls for one model into SPARK_BUCKETS equal time
-// slices and compute the per-bucket median latency. Empty buckets are dropped
-// (so a sparse stream still draws a line through the points it has) rather than
-// forced to 0, which would draw a misleading dip to the axis.
-function buildSparkline(calls: RecentCall[], model: string, now: number): number[] {
-  const cutoff = now - WINDOW_MS
-  const buckets: number[][] = Array.from({ length: SPARK_BUCKETS }, () => [])
-  for (const c of calls) {
-    if (c.model !== model) continue
-    const t = Date.parse(c.timestamp)
-    if (!Number.isFinite(t) || t < cutoff) continue
-    let idx = Math.floor(((t - cutoff) / WINDOW_MS) * SPARK_BUCKETS)
-    if (idx < 0) idx = 0
-    if (idx >= SPARK_BUCKETS) idx = SPARK_BUCKETS - 1
-    buckets[idx].push(c.latency_ms)
-  }
-  return buckets
-    .map((b) => (b.length > 0 ? median(b) : null))
-    .filter((v): v is number => v != null)
+// The most-recent SAMPLE_SIZE calls for one family, NEWEST-FIRST. The /recent
+// feed is already ordered newest-first, but sort defensively so a feed ordering
+// change can't silently skew the "last N" slice.
+function recentSamplesForFamily(calls: RecentCall[], family: string): RecentCall[] {
+  return calls
+    .filter((c) => new RegExp(family, 'i').test(c.model) && Number.isFinite(c.latency_ms))
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+    .slice(0, SAMPLE_SIZE)
 }
 
 // Tiny inline SVG sparkline (no recharts dependency — keeps the tile cheap and
 // avoids the recharts typing cluster noted in deferred-items.md). Renders the
-// per-bucket median trend left→right (oldest→newest). Rising = regressing.
+// per-call latency trend left→right (oldest→newest). Rising = regressing.
 function Sparkline({ points, color }: { points: number[]; color: string }) {
   if (points.length < 2) return null
   const W = 88
@@ -204,60 +183,62 @@ export default function LlmLatencyTile() {
 
     const fetchData = async () => {
       try {
-        // SAME-ORIGIN proxy — rides server.js's reverse proxy (66-PATTERNS Redux caveat).
-        // 1h window (tile-scoped deviation from D-05) for the headline number;
-        // recent feed (full rows) for the client-side trend sparkline.
-        const [sumRes, recRes] = await Promise.all([
-          fetch(`/api/token-usage/summary?hours=${WINDOW_HOURS}`),
-          fetch(`/api/token-usage/recent?limit=${RECENT_LIMIT}`),
-        ])
-        if (!sumRes.ok) throw new Error(`HTTP ${sumRes.status}`)
-        const data: SummaryShape = await sumRes.json()
-        // Recent is best-effort: if it fails, the tile still renders the number,
-        // just without a sparkline (degrade gracefully on sparse/missing data).
-        let recentCalls: RecentCall[] = []
-        if (recRes.ok) {
-          const recData: RecentShape = await recRes.json()
-          recentCalls = recData.data || []
-        }
+        // SAME-ORIGIN proxy — rides server.js's reverse proxy (66-PATTERNS Redux
+        // caveat). SINGLE source of truth: the recent-calls feed drives BOTH the
+        // headline median AND the sparkline, so they cannot contradict.
+        const recRes = await fetch(`/api/token-usage/recent?limit=${RECENT_LIMIT}`)
+        if (!recRes.ok) throw new Error(`HTTP ${recRes.status}`)
+        const recData: RecentShape = await recRes.json()
+        const recentCalls: RecentCall[] = recData.data || []
         if (cancelled) return
 
-        const now = Date.now()
-        const rows = (data.by_model || [])
-          .filter((m) => isReportableModel(m.model) && m.p50_latency_ms != null)
-          // Reportable models, claude-code fallback ranked by worst median first.
-          .sort((a, b) => (b.p50_latency_ms ?? 0) - (a.p50_latency_ms ?? 0))
+        // ALWAYS emit a row per tracked family (sonnet, opus, haiku) — never drop
+        // a model when it's quiet. A family with no recent calls renders a muted
+        // "no recent calls" placeholder instead of vanishing (operator's fix).
+        const built: TileItem[] = TRACKED_FAMILIES.map(({ family, label, reference }) => {
+          const samples = recentSamplesForFamily(recentCalls, family)
+          // Best-known model name from the samples, else the family label.
+          const name = samples.length > 0 ? samples[0].model : label
 
-        const built: TileItem[] = rows.map((m) => {
-          const p50 = m.p50_latency_ms as number
-          const haiku = isHaikuModel(m.model)
-          const status: ItemStatus = haiku ? 'reference' : latencyStatus(p50)
-          const spark = buildSparkline(recentCalls, m.model, now)
+          if (samples.length === 0) {
+            return {
+              name,
+              // Neutral — no pass/fail. A quiet model is not a fault.
+              status: 'reference' as ItemStatus,
+              description: 'no recent calls',
+              badgeLabel: '—',
+              tooltip: reference
+                ? 'Direct-path OAuth baseline — not pool-graded (reference only).'
+                : 'No recent calls for this model in the latency feed.',
+              empty: true,
+            }
+          }
+
+          const p50 = median(samples.map((c) => c.latency_ms))
+          // Sparkline rides the SAME samples, oldest→newest so headline + trend agree.
+          const spark = samples.map((c) => c.latency_ms).reverse()
+          const status: ItemStatus = reference ? 'reference' : latencyStatus(p50)
           return {
-            name: m.model,
+            name,
             // Haiku → neutral 'reference' status (muted "reference" label, no
             // pass/fail badge) so it reads as the direct-path baseline, NOT a
             // down/error state (D-04). sonnet/opus → green/amber/red threshold.
             status,
-            description: haiku
-              ? `${formatLatency(p50)} median (reference) · last 1h`
-              : `${formatLatency(p50)} median · last 1h`,
+            description: reference
+              ? `${formatLatency(p50)} median (reference) · last ~${samples.length} calls`
+              : `${formatLatency(p50)} median · last ~${samples.length} calls`,
             // Latency-specific badge text (OK/Elevated/Regressed) so the red
             // state reads as a latency regression, not a service fault (D-03).
-            badgeLabel: haiku ? 'reference' : latencyBadgeLabel(status),
-            // Hover tooltips explain the assessment (window + threshold band).
-            tooltip: haiku
+            badgeLabel: reference ? 'reference' : latencyBadgeLabel(status),
+            // Hover tooltips explain the assessment (sample basis + threshold band).
+            tooltip: reference
               ? 'Direct-path OAuth baseline — not pool-graded (reference only).'
-              : 'Median latency over last 1h. Warm target ≤3s; amber 3–5s; red >5s climbing toward the ~14s pre-pool baseline.',
+              : 'Median of the last ~50 calls. Warm target ≤3s; amber 3–5s; red >5s.',
             spark,
           }
         })
 
-        setItems(built.length > 0 ? built : [{
-          name: 'No fallback traffic',
-          status: 'offline' as ItemStatus,
-          description: 'No claude-code median in the last 1h',
-        }])
+        setItems(built)
       } catch {
         if (!cancelled) {
           setItems([{
@@ -277,10 +258,10 @@ export default function LlmLatencyTile() {
     }
   }, [])
 
-  // Strip spark before handing to HealthStatusCard (it owns name/status/desc/
-  // tooltip/badge); render the sparkline ourselves underneath each row so the
-  // operator sees the trend that produced the median.
-  const cardItems = items.map(({ spark, ...rest }) => rest)
+  // Strip tile-only fields before handing to HealthStatusCard (it owns name/
+  // status/desc/tooltip/badge); render the sparkline ourselves underneath each
+  // row so the operator sees the trend that produced the median.
+  const cardItems = items.map(({ spark, empty, ...rest }) => rest)
 
   return (
     <div className="relative">
@@ -291,10 +272,10 @@ export default function LlmLatencyTile() {
       />
       {/* Subtitle/legend + per-model trend sparklines overlaid under the card
           header. Kept muted/small, consistent with the card style. The legend
-          makes the threshold (≤3s) and window (last 1h) visible at a glance. */}
+          makes the threshold (≤3s) and basis (last ~50 calls) visible at a glance. */}
       <div className="px-6 -mt-3 pb-3 space-y-1.5">
         <div className="text-[10px] text-muted-foreground">
-          Per-model median · warm target ≤3s · last 1h
+          Per-model median · warm target ≤3s · last ~50 calls
         </div>
         {items.some((i) => i.spark && i.spark.length >= 2) && (
           <div className="space-y-1 pt-1">
