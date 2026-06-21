@@ -61,8 +61,8 @@ This file tracks the active milestone's requirements at the top, with previous m
 | GUARD-01 | Phase 62 | Complete |
 | WLIFE-01 | Phase 63 | Not started |
 | WLIFE-02 | Phase 63 | Complete |
-| WLIFE-03 | Phase 63 | Not started |
-| WLIFE-04 | Phase 63 | Not started |
+| WLIFE-03 | Phase 63 | In Progress (63-02 EPIPE-as-crash fold-in; respawn-storm cooldown lands 63-03) |
+| WLIFE-04 | Phase 63 | In Progress (63-02 stray-result generation guard; cancellation propagation lands 63-04) |
 | GUARD-02 | Phase 64 | Not started |
 | GUARD-03 | Phase 64 | Not started |
 | PERF-01 | Phase 65 | Not started |

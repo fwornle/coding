@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
 status: executing
-stopped_at: Completed 63-01-PLAN.md
-last_updated: "2026-06-21T07:18:00.000Z"
-last_activity: 2026-06-21 -- Phase 63 Plan 01 complete (D-08 dispose-drop + D-04 idle timer)
+stopped_at: Phase 63 context gathered
+last_updated: "2026-06-21T07:27:25.661Z"
+last_activity: 2026-06-21
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 5
   percent: 20
 ---
 
@@ -54,9 +54,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 63 (worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can) — EXECUTING
-Plan: 2 of 5 (Plan 01 complete)
-Status: Executing Phase 63
-Last activity: 2026-06-21 -- Phase 63 Plan 01 complete (WLIFE-02); D-08 synchronous dispose-drop + D-04 idle timer landed in rapid-llm-proxy (27/27 unit green)
+Plan: 3 of 5 (Plan 01 complete)
+Status: Ready to execute
+Last activity: 2026-06-21
 
 ## Performance Metrics
 
@@ -95,6 +95,8 @@ Last activity: 2026-06-21 -- Phase 63 Plan 01 complete (WLIFE-02); D-08 synchron
 
 - [63-01]: `WorkerPool._disposeAndDrop(key, worker)` is the canonical synchronous dispose+splice+prune lifecycle-disposal path (D-08), closing the acquire-after-SIGTERM race; `complete()`'s post-request recycle finally delegates to it, and Plans 03 (crash-cooldown) + 04 (cancellation) will reuse it. The async `'exit'`->`_dropWorker` reaper stays as the idempotent backstop (`indexOf===-1` guard makes double-drop safe).
 - [63-01]: Idle-eviction timer (D-04 / WLIFE-02) lives on `ClaudeWorker` (not armed by the pool), `unref()`'d, default 30 min via `LLM_PROXY_WORKER_IDLE_MS` (Phase-62 `LLM_PROXY_WORKER_*` house style); armed in constructor, cleared on dispatch, re-armed on settle, cleared in `dispose()` AND `_onExit` so shutdown/crash leaves no dangling timer. On fire it disposes through the existing reap path — no central sweep loop.
+- [63-02]: EPIPE-as-crash (D-07 / WLIFE-03) — `ClaudeWorker._writeGuarded(payload)` is THE write path (both `_dispatch` and `cancel()` route through it); it wraps `stdin.write` in a try/catch AND a write callback so a synchronous EPIPE throw OR an async write-callback `err` both funnel into `_onExit(null, 'EPIPE')` (the existing RETRYABLE reap), recovering the queued-job rejection the raw throw used to lose. No new error path invented.
+- [63-02]: Stray-result generation guard (D-02 / WLIFE-04) — per-worker monotonic `_generation` integer bumped each `_dispatch`, stamped on `_pending.generation`, echoed on the outgoing `_gen` envelope field; `_onEvent` drops a result whose `_gen` mismatches the live `_pending.generation`. `_pending===null` stays the primary defense (operative on the live CLI path, which never echoes `_gen`); the generation echo closes the narrow in-flight window and is exercised deterministically by the unit suite without adding request-id correlation to the protocol (Pattern 1: concurrency-1 needs none). Belt-and-suspenders behind Plan 04's dispose-on-cancel.
 - [v6.0 start]: Agent-agnostic architecture -- retrieval service is standalone HTTP API, each coding agent has its own adapter
 - [v6.0 start]: Use existing Qdrant instance for vector storage (not LibSQL vector)
 - [v6.0 start]: All four knowledge tiers as sources (observations, digests, insights, KG entities)
@@ -294,7 +296,7 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-06-21T06:18:36.921Z
+Last session: 2026-06-21T07:26:15Z — Completed 63-02-PLAN.md (D-07 EPIPE-as-crash + D-02 stray-result generation guard; 33/33 unit cases green in rapid-llm-proxy; commits b318d13/d71d791/cb723a0/987d094 on external main, not pushed). Next: 63-03 (crash cooldown).
 Stopped at: Phase 63 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
