@@ -90,6 +90,20 @@ Logged to `66-dashboard-latency-observability/deferred-items.md`. All confirmed 
 1. `token-usage.tsx` — 2 recharts `Formatter<number, NameType>` TS2322 errors on `<Tooltip formatter={...} />` (pre-existing recharts typing drift). No NEW token-usage.tsx error from the median column.
 2. `system-health-dashboard.tsx` — 3 `StatusItem[]` TS2322 errors where `getDatabaseItems/getServiceItems/getProcessItems` emit a `'unknown'` status not in the `StatusItem` union. Pre-existing; the `<LlmLatencyTile />` registration type-checks cleanly and adds no new error.
 
+## Checkpoint-Fix Iteration (2026-06-21, post-human-review)
+
+The human reviewed the live `:3032` LLM Latency tile at the blocking checkpoint and flagged THREE rendering issues. All three were fixed in a single `fix(66-02): ...` commit, the frontend was rebuilt + restarted, and a fresh gsd-browser screenshot was captured (`/tmp/66-02-tile-fix.png`). The checkpoint remains **blocking and NOT self-approved** — these are presentation fixes for re-review.
+
+1. **Haiku "Offline" badge was misleading** — it read as a fault, but haiku is the direct-path REFERENCE baseline (D-04, alive ~1.3s). Introduced a neutral `'reference'` status in `health-status-card.tsx` that renders a muted italic "reference" label (no pass/fail Badge, no operational/warning/error/offline semantics). The tile maps haiku → `'reference'`.
+2. **Sonnet red "Error" badge text read as a service outage** — the RED color is correct (D-03 regression treatment, kept) but "Error" reads as an outage next to the "Healthy" header. Added latency-specific badge LABELS via a new optional `badgeLabel` override on `StatusItem` (color unchanged): green → "OK", amber → "Elevated", red → "Regressed". The tile now passes these per-state.
+3. **Tile wrapped to its own row** below the 5-up grid. Widened the grid from `lg:grid-cols-5` to `lg:grid-cols-3 xl:grid-cols-6` so all 6 health cards sit inline on one row at wide widths (lg keeps a sensible 3-up). The other 5 tiles render correctly at the new column count.
+
+Also auto-fixed (Rule 1, latent bug my grid edit surfaced): added `'unknown'` to the `StatusItem` status union in `health-status-card.tsx` — `getDatabaseItems/getServiceItems/getProcessItems` already emit `'unknown'` (handled in `getStatusBadge`) but it was missing from the union, causing 3 pre-existing TS2322 errors. Now tsc-clean for all touched files.
+
+**Files touched in this iteration:** `integrations/system-health-dashboard/src/components/llm-latency-tile.tsx`, `integrations/system-health-dashboard/src/components/health-status-card.tsx`, `integrations/system-health-dashboard/src/components/system-health-dashboard.tsx`.
+
+**Visual re-confirmation** (`/tmp/66-02-tile-fix.png`): haiku shows a muted "reference" label (no Offline/fault badge); sonnet (4.6s median) shows the red badge with "Regressed" text; the LLM Latency tile sits inline as the 6th tile in the grid row.
+
 ## Checkpoint Status
 
 **Task 4 (`checkpoint:human-verify`, gate="blocking") is NOT self-approved.** The gsd-browser visual evidence has been captured (paths above). Control is being returned to the orchestrator for explicit human confirmation that both surfaces render the per-model median with the green ≤3s treatment (when warm) and the haiku reference row. The plan is NOT marked fully complete.
