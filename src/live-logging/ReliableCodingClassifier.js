@@ -21,7 +21,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { SemanticAnalyzer } from './SemanticAnalyzer.js';
 import PathAnalyzer from './PathAnalyzer.js';
 import SemanticAnalyzerAdapter from './SemanticAnalyzerAdapter.js';
@@ -211,7 +211,19 @@ class ReliableCodingClassifier {
    */
   async createEmbeddingClassifier(options) {
     const { QdrantClient } = await import('@qdrant/js-client-rest');
-    const { getFastEmbeddingGenerator } = await import(path.join(this.codingRepo, 'scripts/fast-embedding-generator.js'));
+    // Resolve the embedding generator robustly: this.codingRepo can be a
+    // container path (e.g. /coding) when ETM runs host-side with a
+    // docker-oriented CODING_REPO env, which breaks the import. Prefer the
+    // configured repo path, but fall back to this module's own repo root
+    // (src/live-logging -> repo root is two levels up) when the file is absent
+    // there. The module always ships alongside scripts/, so the self-relative
+    // path is correct regardless of how codingRepo was injected.
+    const selfRepoRoot = path.resolve(__dirname, '..', '..');
+    let embGenPath = path.join(this.codingRepo, 'scripts/fast-embedding-generator.js');
+    if (!fs.existsSync(embGenPath)) {
+      embGenPath = path.join(selfRepoRoot, 'scripts/fast-embedding-generator.js');
+    }
+    const { getFastEmbeddingGenerator } = await import(pathToFileURL(embGenPath).href);
 
     const qdrant = new QdrantClient({
       url: `http://${options.qdrantHost}:${options.qdrantPort}`
