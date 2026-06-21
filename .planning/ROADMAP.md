@@ -1264,7 +1264,15 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Each worker records the `claude` CLI version at boot; when `claude --version` drifts from a worker's boot version, that worker is recycled (drained + respawned) before serving the next request, keeping prompt-cache assumptions valid across CLI upgrades (verified by simulating a version change and observing the worker recycle).
   2. Worker stderr is drained continuously (so the pipe never blocks the subprocess) and throttled to at most one log line per minute per worker — persistent-worker CLI warnings (e.g. "no stdin data received") do not appear once-per-line in the proxy logs.
-**Plans:** TBD
+**Plans:** 2 plans
+
+**Wave 1**
+
+- [ ] 64-01-PLAN.md — GUARD-02 CLI version pinning: deps-injectable boot-version capture + pool current-version snapshot + drift-flag-at-reuse through the existing _reapStale path (unit: simulated drift)
+
+**Wave 2** *(depends on 64-01 — shared worker-pool.mjs/test file)*
+
+- [ ] 64-02-PLAN.md — GUARD-03 stderr drain+throttle (per-worker <=1/min, <=200-char, deps logger+clock) + WR-02 fold-in (cache-inclusive recycle-ceiling token sum) (unit: fake clock + summed-token payload)
 
 ### Phase 65: Steady-State Latency & Crash-Survival Acceptance
 **Goal:** Prove the milestone's headline performance and resilience claims against the live proxy — the warm-pool fallback path is fast, survives a worker crash, evicts idle workers, and the escape hatch reverts cleanly — so the speedup is demonstrated, not assumed.
