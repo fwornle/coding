@@ -1233,7 +1233,29 @@ Plans:
   2. A worker that has been idle past the configurable idle timeout (default 30 min) exits and frees its RAM (observable via `ps` — the subprocess is gone), and a subsequent request for that model lazily respawns a fresh worker.
   3. A worker that exits unexpectedly is marked dead, its in-flight request is surfaced to the caller as RETRYABLE (not a hard error), and it respawns lazily only on the next request — never auto-restarted in a tight loop (verified by killing a worker mid-request and confirming no respawn-storm in logs).
   4. Client disconnect / request abort propagates to the worker so the in-flight stream-JSON request is cancelled (protocol cancel if supported, else SIGTERM + respawn) — a dead client never leaves a concurrency-1 worker pinned to a zombie request.
-**Plans:** TBD
+**Plans:** 5 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 63-01-PLAN.md — D-08 synchronous dispose+drop helper + D-04/WLIFE-02 per-worker unref'd idle timer (unit)
+
+**Wave 2** *(depends on 63-01)*
+
+- [ ] 63-02-PLAN.md — D-07 EPIPE-as-crash guard + D-02 monotonic generation guard against stray results (unit)
+
+**Wave 3** *(depends on 63-01, 63-02)*
+
+- [ ] 63-03-PLAN.md — D-06 crash cooldown -> execFile overflow (respawn-storm guard) + boot-crash mock helper (unit)
+
+**Wave 4** *(depends on 63-01, 63-02)*
+
+- [ ] 63-04-PLAN.md — D-01/D-03 cancellation: in-flight abort = SIGTERM+dispose+drop+cold-respawn; queued abort = dequeue-only (unit)
+
+**Wave 5** *(depends on 63-01..04; autonomous:false — live OAuth)*
+
+- [ ] 63-05-PLAN.md — `--live` lifecycle verification suite: ps-based cold-start (WLIFE-01/SC-1), idle-evict (SC-2), crash (SC-3), cancel (SC-4 — Phase-62 hang now passes)
 
 ### Phase 64: Worker Hygiene — CLI Version Pinning & stderr Throttling
 **Goal:** Long-lived workers stay correct and quiet across CLI upgrades and noisy CLI warnings — prompt-cache assumptions don't silently rot when the `claude` binary changes under a running worker, and persistent-worker stderr doesn't flood the logs.
