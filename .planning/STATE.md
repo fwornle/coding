@@ -4,13 +4,13 @@ milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
 status: executing
 stopped_at: Phase 63 context gathered
-last_updated: "2026-06-21T07:27:25.661Z"
+last_updated: "2026-06-21T07:34:34.343Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
   percent: 20
 ---
 
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 63 (worker-lifecycle-lazy-spawn-idle-eviction-crash-recovery-can) — EXECUTING
-Plan: 3 of 5 (Plan 01 complete)
+Plan: 4 of 5 (Plans 01, 02, 03 complete)
 Status: Ready to execute
 Last activity: 2026-06-21
 
@@ -97,6 +97,7 @@ Last activity: 2026-06-21
 - [63-01]: Idle-eviction timer (D-04 / WLIFE-02) lives on `ClaudeWorker` (not armed by the pool), `unref()`'d, default 30 min via `LLM_PROXY_WORKER_IDLE_MS` (Phase-62 `LLM_PROXY_WORKER_*` house style); armed in constructor, cleared on dispatch, re-armed on settle, cleared in `dispose()` AND `_onExit` so shutdown/crash leaves no dangling timer. On fire it disposes through the existing reap path — no central sweep loop.
 - [63-02]: EPIPE-as-crash (D-07 / WLIFE-03) — `ClaudeWorker._writeGuarded(payload)` is THE write path (both `_dispatch` and `cancel()` route through it); it wraps `stdin.write` in a try/catch AND a write callback so a synchronous EPIPE throw OR an async write-callback `err` both funnel into `_onExit(null, 'EPIPE')` (the existing RETRYABLE reap), recovering the queued-job rejection the raw throw used to lose. No new error path invented.
 - [63-02]: Stray-result generation guard (D-02 / WLIFE-04) — per-worker monotonic `_generation` integer bumped each `_dispatch`, stamped on `_pending.generation`, echoed on the outgoing `_gen` envelope field; `_onEvent` drops a result whose `_gen` mismatches the live `_pending.generation`. `_pending===null` stays the primary defense (operative on the live CLI path, which never echoes `_gen`); the generation echo closes the narrow in-flight window and is exercised deterministically by the unit suite without adding request-id correlation to the protocol (Pattern 1: concurrency-1 needs none). Belt-and-suspenders behind Plan 04's dispose-on-cancel.
+- [63-03]: Crash-cooldown respawn-storm guard (D-06 / WLIFE-03) — per-key crash-frequency `_crashesByKey` Map<key, number[]> + `_recordCrash(key)` (push `Date.now()` + prune to window) wired into the `_spawnWorker` `once('exit')` handler so EVERY exit on a freshly-spawned worker is a crash candidate; a cooldown gate at the TOP of `complete()` (after GUARD-01, before lazy-spawn) routes a key with >= `LLM_PROXY_WORKER_CRASH_THRESHOLD` (default 3) crashes within `LLM_PROXY_WORKER_CRASH_WINDOW_MS` (default 60s) straight to the execFile overflow (`overflowFn(body, abortSignal)` — same shape as the all-busy path), then lazily spawns again after the window (`_isInCooldown` prune-to-window lifts the gate). EARLY-EXIT HEURISTIC: record every exit, no per-worker served-ok flag — the window+threshold (not exit-site classification) filters healthy spaced churn from a broken key's burst. Suite 39/39 green (33 baseline + 6 new). Reuses the SAME `completeClaudeCodeViaCLI` route the milestone already uses for overflow, not a new degraded path.
 - [v6.0 start]: Agent-agnostic architecture -- retrieval service is standalone HTTP API, each coding agent has its own adapter
 - [v6.0 start]: Use existing Qdrant instance for vector storage (not LibSQL vector)
 - [v6.0 start]: All four knowledge tiers as sources (observations, digests, insights, KG entities)

@@ -27,7 +27,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 - [ ] **WLIFE-01:** Workers spawn lazily on the first claude-code fallback request for their model — no workers spawn at proxy boot.
 - [x] **WLIFE-02:** An idle worker is evicted (subprocess exits, RAM freed) after a configurable idle timeout (default 30 min); a subsequent request lazily respawns it.
-- [ ] **WLIFE-03:** A worker that exits unexpectedly is marked dead, its in-flight request is surfaced as RETRYABLE (not a hard error), and it respawns lazily on the next request — never auto-restarted in a tight loop.
+- [x] **WLIFE-03:** A worker that exits unexpectedly is marked dead, its in-flight request is surfaced as RETRYABLE (not a hard error), and it respawns lazily on the next request — never auto-restarted in a tight loop.
 - [ ] **WLIFE-04:** Client disconnect / request abort propagates to the worker — the in-flight stream-JSON request is cancelled (protocol cancel if supported, else SIGTERM + respawn) so a dead client never pins a concurrency-1 worker.
 
 ### Safety & Compatibility (GUARD)
@@ -61,7 +61,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | GUARD-01 | Phase 62 | Complete |
 | WLIFE-01 | Phase 63 | Not started |
 | WLIFE-02 | Phase 63 | Complete |
-| WLIFE-03 | Phase 63 | In Progress (63-02 EPIPE-as-crash fold-in; respawn-storm cooldown lands 63-03) |
+| WLIFE-03 | Phase 63 | Complete (63-02 EPIPE-as-crash fold-in; 63-03 crash-cooldown respawn-storm guard) |
 | WLIFE-04 | Phase 63 | In Progress (63-02 stray-result generation guard; cancellation propagation lands 63-04) |
 | GUARD-02 | Phase 64 | Not started |
 | GUARD-03 | Phase 64 | Not started |
