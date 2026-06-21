@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.3
-milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
-status: Awaiting next milestone
-stopped_at: Milestone v7.3 (Phases 62–66) completed and archived 2026-06-21 — PERF-03 closed (SC-1 green + SC-2 red live-proven via the LLM_PROXY_WORKER_SPAWN_DELAY_MS seam in 66-05)
-last_updated: "2026-06-21T19:49:56.014Z"
-last_activity: 2026-06-21 — Milestone v7.3 completed and archived
+milestone: v7.4
+milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
+status: planning
+last_updated: "2026-06-21T20:37:17.893Z"
+last_activity: 2026-06-21
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -53,10 +52,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: Milestone v7.3 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-21 — Milestone v7.3 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-21 — Milestone v7.4 started
 
 ## Deferred Items
 

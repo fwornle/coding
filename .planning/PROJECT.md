@@ -50,7 +50,25 @@ Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), liv
 
 ### Active
 
-(None — v7.3 shipped 2026-06-21. Run `/gsd-new-milestone` to define the next milestone's requirements.)
+See **Current Milestone: v7.4** below — requirements tracked in `.planning/REQUIREMENTS.md`.
+
+## Current Milestone: v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
+
+**Goal:** Build a measurement rig that quantifies, per task, the full cost across all four supported coding agents (Claude Code, Copilot CLI, OpenCode, Mastra) AND the proxy-routed background services that run during the task — so "approach X cost Y for task type Z" becomes evidence, not anecdote.
+
+**Target features:**
+- Reproducibility rig — snapshot/restore internal state (git SHA, KB, routing config, MCP inventory, prompt, `.planning/`, env, agent binary version) + record/replay external state (LLM responses via proxy, WebSearch/Fetch, frozen clock) so N=1 runs become comparable
+- Single-Run km-core KB (`Experiment / Run / Route / Step / Decision / Outcome / Report`) — comparisons as queries; task taxonomy + run-end tag enforcement
+- Token attribution — extend `.observations/token-usage.db` with `agent / task_id / tool_call_id / parent_call_id / granularity_tier / reasoning_tokens` at the best granularity each agent surfaces (all four agents)
+- Goal-anchored route metrics — `goal_sentence` per run; steps / loops / detours, syntactic + semantic
+- 5-dimension success rubric with LLM-judge synthesis
+- "Performance" dashboard tab (after Tokens) — query-builder + Report views
+
+**Key context:**
+- Continues phase numbering from Phase 66 (v7.3) → v7.4 starts at **Phase 67**.
+- Scoping artifacts: `.planning/notes/v73-perf-measurement-exploration.md` (7 decisions + 9-phase sketch, Phase 3 FOUNDATIONAL — filename retains v73 origin), `.planning/notes/v73-token-attribution-contract.md`, completed spike `.planning/spikes/copilot-proxy-interception.md`, hard requirements in `memory/feedback_perf_measurement_requirements.md`.
+- Agent reach: ALL FOUR agents this milestone (Claude Code per-turn + per-reasoning-step; Copilot per-session/turn pending verification; OpenCode per-llm-call via proxy; Mastra granularity TBD).
+- Out of scope (deliberate): policy automation / auto-routing (v7.5 — `seeds/v74-policy-engine.md`), VS Code Copilot Chat (opaque `state.vscdb`), currency conversion.
 
 ### v7.3 Shipped (LLM Proxy Performance — Claude CLI Worker Pool — Phases 62–66)
 
@@ -165,4 +183,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-21 after v7.3 milestone (LLM Proxy Performance — Claude CLI Worker Pool, Phases 62–66) shipped and archived. Worker-pool fallback latency cut from ~10–14s to ~2–3s steady-state; 14/14 requirements satisfied; audit tech_debt (0 blockers). Next: run `/gsd-new-milestone`. v7.2 (VKB & Online-Learning Quality) and v7.1 (KM-Core Unification) previously shipped.*
+*Last updated: 2026-06-21 — v7.4 Performance Measurement System milestone started (cross-agent token + route + outcome attribution across all four agents; phases continue from Phase 66 → start at Phase 67). v7.3 (LLM Proxy Worker Pool, Phases 62–66) shipped 2026-06-21. v7.2 (VKB & Online-Learning Quality) and v7.1 (KM-Core Unification) previously shipped.*
