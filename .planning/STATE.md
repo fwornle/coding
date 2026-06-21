@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.3
 milestone_name: LLM Proxy Performance — Claude CLI Worker Pool
-status: executing
-stopped_at: Completed 66-04-PLAN.md (SC-1 live-green confirmed; SC-2 red deferred — not reachable on this host)
-last_updated: "2026-06-21T18:05:00.000Z"
+status: complete
+stopped_at: Completed 66-05-PLAN.md (gap-closure — SC-2 red live-proven on both :3032 surfaces via the LLM_PROXY_WORKER_SPAWN_DELAY_MS seam, then restored to green; PERF-03 now Complete)
+last_updated: "2026-06-21T18:50:00.000Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 1
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 5
+  completed_plans: 5
   percent: 100
 ---
 
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 66 (dashboard-latency-observability) — EXECUTING
-Plan: 2 of 4
-Status: Ready to execute
+Phase: 66 (dashboard-latency-observability) — COMPLETE (5/5 plans; PERF-03 closed)
+Plan: 5 of 5
+Status: Complete — SC-1 + SC-2 both live-proven; PERF-03 done
 Last activity: 2026-06-21
 
 ## Performance Metrics
@@ -93,6 +93,7 @@ Last activity: 2026-06-21
 
 ### Decisions
 
+- [66-05]: PERF-03 SC-2 closed via an opt-in `LLM_PROXY_WORKER_SPAWN_DELAY_MS` test seam in `worker-pool.mjs` — `_dispatch` defers the prompt write by N ms (unref'd setTimeout) AFTER stamping `dispatchedAt`, so the injected delay lands in the overhead window (`firstOutputAt − dispatchedAt`), NOT generation; per-request timeout armed at `requestTimeoutMs + _spawnDelayMs`; superseded-dispatch guard + `_clearSpawnDelayTimer` in `_onExit`/`dispose`; byte-for-byte no-op when unset/0 (clamp neg/NaN→0). Unit determinism = tiny real defer (15ms) proves the deferral + injectable `_now` fake clock drives the overhead magnitude (no seconds-long sleep). Live-proven 2026-06-21: env=6000ms drove the sonnet overhead median to 6.0s, BOTH :3032 surfaces flipped RED (tile "Regressed" bg `rgb(239,68,68)`, by-model "Spawn Overhead" `rgb(185,28,28)`/bg `rgb(254,242,242)` via gsd-browser computed-rgb), then restored to GREEN + healthy pool. Injection was reversible via the gitignored `.env` (sourced by `start-llm-proxy.sh`, `set -a`) — `launchctl setenv` is inert against the plist `EnvironmentVariables` dict (66-04 finding). Proxy commits `aa474a3` (test) / `a4ce41d` (feat). PERF-03 now Complete (SC-1 green + SC-2 red).
 - [63-01]: `WorkerPool._disposeAndDrop(key, worker)` is the canonical synchronous dispose+splice+prune lifecycle-disposal path (D-08), closing the acquire-after-SIGTERM race; `complete()`'s post-request recycle finally delegates to it, and Plans 03 (crash-cooldown) + 04 (cancellation) will reuse it. The async `'exit'`->`_dropWorker` reaper stays as the idempotent backstop (`indexOf===-1` guard makes double-drop safe).
 - [63-01]: Idle-eviction timer (D-04 / WLIFE-02) lives on `ClaudeWorker` (not armed by the pool), `unref()`'d, default 30 min via `LLM_PROXY_WORKER_IDLE_MS` (Phase-62 `LLM_PROXY_WORKER_*` house style); armed in constructor, cleared on dispatch, re-armed on settle, cleared in `dispose()` AND `_onExit` so shutdown/crash leaves no dangling timer. On fire it disposes through the existing reap path — no central sweep loop.
 - [63-02]: EPIPE-as-crash (D-07 / WLIFE-03) — `ClaudeWorker._writeGuarded(payload)` is THE write path (both `_dispatch` and `cancel()` route through it); it wraps `stdin.write` in a try/catch AND a write callback so a synchronous EPIPE throw OR an async write-callback `err` both funnel into `_onExit(null, 'EPIPE')` (the existing RETRYABLE reap), recovering the queued-job rejection the raw throw used to lose. No new error path invented.

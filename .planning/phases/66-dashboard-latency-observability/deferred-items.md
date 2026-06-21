@@ -25,6 +25,30 @@ any 66-02 edit.
 
 ## Plan 66-04 — SC-2 red-badge live demonstration could not be reached on this host
 
+> **✅ RESOLVED by Plan 66-05 (2026-06-21).** The recommended follow-up below
+> (an opt-in `LLM_PROXY_WORKER_SPAWN_DELAY_MS` proxy test seam) was implemented and
+> live-proven. The seam (worker-pool.mjs, proxy commits `aa474a3` RED / `a4ce41d`
+> GREEN, 65/65 unit tests, tsc clean) defers the prompt write by the configured ms
+> AFTER `dispatchedAt` is stamped, so the injected delay lands entirely in the
+> overhead window (firstOutputAt − dispatchedAt), NOT in model generation; it is a
+> byte-for-byte no-op when unset/0. With `LLM_PROXY_WORKER_SPAWN_DELAY_MS=6000`
+> injected reversibly via the gitignored `.env` (sourced by `bin/start-llm-proxy.sh`
+> with `set -a`; `launchctl setenv` confirmed inert by 66-04 due to the plist's
+> explicit `EnvironmentVariables` dict) and a kickstart, live sonnet `/api/complete`
+> calls reported overheadMs ~6005–6023ms. After driving enough delayed calls to
+> dominate the medians, BOTH `:3032` surfaces flipped RED (gsd-browser computed-rgb
+> read-back, not eyeballed): the "LLM Pool Overhead" tile showed "6.0s overhead
+> median" with a "Regressed" badge bg `rgb(239,68,68)`; the Token Usage by-model
+> "Spawn Overhead" column showed sonnet "6.0s" with badge text `rgb(185,28,28)` on
+> bg `rgb(254,242,242)`. Removing the env + kickstart + warm calls returned both
+> surfaces to GREEN (tile "OK" `rgb(21,128,61)` at 6ms; table 1.1s green) and the
+> pool to healthy (warm overhead 14ms, /health 200, `.env` clean). PERF-03 SC-2 is
+> now closed on any host. Evidence: `evidence/66-05-tile-cold-red.png`,
+> `66-05-table-overhead-red.png`, `66-05-tile-restored-green.png`,
+> `66-05-table-restored-green.png`. See `66-05-SUMMARY.md`.
+>
+> The original 66-04 finding (preserved below for the record):
+
 Discovered during the operator-approved Task 3 disruptive run (2026-06-21).
 The badge turns RED only when the per-model overhead median exceeds **5000ms**
 (amber at >3000ms). On this Apple Silicon host the genuine worker-pool
