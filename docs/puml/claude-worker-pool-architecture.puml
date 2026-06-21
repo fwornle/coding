@@ -1,0 +1,88 @@
+@startuml claude-worker-pool-architecture
+!include _standard-style.puml
+
+title Claude CLI Worker Pool — Architecture (@rapid/llm-proxy)\nTwo-tier claude-code dispatch: persistent stream-JSON workers + execFile overflow\nv7.3 (Phases 62-63)
+
+top to bottom direction
+
+rectangle "LLM Proxy Bridge (proxy-bridge/server.mjs)" as bridge {
+  component [POST /api/complete\n(dispatcher)] as complete <<api>>
+  component [claude-code dispatch\n(two-tier)] as dispatch <<core>>
+  complete -down-> dispatch : model is a\nclaude-code tier
+}
+
+package "Worker Pool (proxy-bridge/worker-pool.mjs)" as poolpkg {
+  component [WorkerPool] as pool <<core>>
+
+  component "workersByKey\nMap<key, ClaudeWorker[]>" as map <<storage>>
+
+  package "key = model :: sha256(systemPrompt)[:16]" as keypkg {
+    component [ClaudeWorker #1\n(busy)] as w1 <<cli>>
+    component [ClaudeWorker #2\n(free)] as w2 <<cli>>
+  }
+
+  component [crash cooldown\n_crashesByKey + _recordCrash] as cooldown <<util>>
+  component [LRU prompt-cap\n_enforcePromptCap + _touch] as lru <<util>>
+
+  pool -down-> map : lazy-spawn /\nacquire free worker
+  map -down-> keypkg
+  pool ..> cooldown : record exits,\ngate storming keys
+  pool ..> lru : evict least-recently\n-used prompt pool
+}
+
+component [completeClaudeCodeViaCLI\n(execFile one-shot overflow)] as overflow <<cli>>
+
+cloud "Anthropic (Claude Max)" as cloud {
+  component [claude -p subprocess\n--input-format stream-json\n--output-format stream-json] as cli <<external>>
+  component [api.anthropic.com\n(via CLI session)] as api <<external>>
+}
+
+' Two-tier routing
+dispatch SYNC_LINE pool : Tier 1 (fast path)\nWorkerPool.complete(body, abortSignal, overflowFn)
+dispatch -down-> overflow : Tier 2 (overflow)\nall workers busy OR key in cooldown\nOR LLM_PROXY_DISABLE_WORKER_POOL=1
+pool .down.> overflow : overflowFn (passed in)\nwhen no free worker
+
+' Worker to subprocess
+w1 SYNC_LINE cli : stream-JSON request\nover persistent stdin/stdout
+w2 SYNC_LINE cli
+overflow SYNC_LINE api : one-shot `claude -p`\nper request (cold)
+cli -down-> api
+
+note right of pool
+  **WorkerPool.complete(body, abortSignal, overflowFn)**
+  1. key = (model x systemPrompt)
+  2. cooldown gate -> overflow if key storming
+  3. acquire free worker (find !busy) or
+     lazy-spawn up to LLM_PROXY_WORKER_POOL_SIZE
+  4. no free worker -> overflowFn (execFile)
+  5. abort: in-flight -> SIGTERM + _disposeAndDrop;
+     queued -> abortQueuedJob (dequeue + reject)
+end note
+
+note right of keypkg
+  **ClaudeWorker** — persistent `claude -p` subprocess
+  - concurrency-1 with a FIFO queue
+  - per-request timeout (LLM_PROXY_WORKER_REQUEST_TIMEOUT_MS)
+  - request-generation guard drops stray late results
+  - _writeGuarded routes EPIPE to the exit reaper (RETRYABLE)
+  - recycles after MAX_REQUESTS / MAX_INPUT_TOKENS
+  - unref'd idle timer evicts after LLM_PROXY_WORKER_IDLE_MS
+end note
+
+note bottom of overflow
+  **Why keep the execFile path?**
+  Overflow absorbs bursts beyond pool size, storming keys in
+  crash-cooldown, and the GUARD-01 escape hatch
+  (LLM_PROXY_DISABLE_WORKER_POOL=1) — a cold one-shot
+  `claude -p` per request, ~10-14s, always available.
+end note
+
+note bottom of cooldown
+  **Crash cooldown (WLIFE-03)**
+  >= LLM_PROXY_WORKER_CRASH_THRESHOLD crashes within
+  LLM_PROXY_WORKER_CRASH_WINDOW_MS -> route the key to
+  overflow until the window elapses, then lazily respawn.
+  Stops a broken key spin-looping spawn->crash->RETRYABLE.
+end note
+
+@enduml

@@ -65,6 +65,37 @@ A snapshot of the Token Usage page's *Recent Calls* table once the direct-OAuth 
 
 ---
 
+## Claude CLI Worker Pool (v7.3)
+
+The Worker Pool is the **v7.3 evolution of the claude-code CLI-fallback path**. Where the legacy fallback spawned a *cold* `claude -p` subprocess per request — paying the CLI's full ~16-22K-token system-prompt warm-up on every call (~10-14s) — the pool keeps a `claude -p` subprocess **warm and reused**, cutting steady-state fallback latency from ~14s to ~2-3s.
+
+It lives in the standalone proxy bridge (`proxy-bridge/worker-pool.mjs`, wired into `proxy-bridge/server.mjs`'s claude-code dispatcher). It only affects the **claude-code** provider — `copilot` remains a direct HTTP POST and is never pooled.
+
+![Claude CLI Worker Pool architecture](../images/claude-worker-pool-architecture.png)
+
+### Two-tier dispatch
+
+When the direct-OAuth fast path 401/403/429s and the dispatcher falls back to the CLI, the fallback itself is now two-tiered:
+
+1. **Tier 1 — warm pool (fast path)**: `WorkerPool.complete(body, abortSignal, overflowFn)` keys requests by `model :: sha256(systemPrompt)[:16]`. The first request for a given key lazily spawns a persistent `claude -p --input-format stream-json --output-format stream-json` subprocess (concurrency-1, FIFO queue) and reuses it warm on subsequent calls. ~2-3s steady-state.
+2. **Tier 2 — overflow (cold one-shot)**: `completeClaudeCodeViaCLI` runs a cold one-shot `execFile` of `claude -p` per request (~10-14s, the legacy behaviour). The pool falls through to overflow when all workers for a key are busy, when the key is in crash-cooldown, or when the worker pool is disabled via `LLM_PROXY_DISABLE_WORKER_POOL=1` (the GUARD-01 escape hatch).
+
+### Lifecycle
+
+The pool guarantees four lifecycle behaviours (WLIFE-01..04):
+
+![Claude CLI Worker Pool lifecycle](../images/claude-worker-pool-lifecycle.png)
+
+- **WLIFE-01 — lazy spawn**: zero workers exist at boot. The first claude-code fallback request spawns exactly one worker; idle keys cost nothing.
+- **WLIFE-02 — idle eviction**: a worker idle past `LLM_PROXY_WORKER_IDLE_MS` (default 30 min) disposes itself via an unref'd timer and is dropped, freeing RAM in quiet periods. The next same-key request lazily respawns it.
+- **WLIFE-03 — crash recovery**: a worker that crashes or EPIPEs mid-request surfaces its in-flight and queued jobs as **RETRYABLE** (never a hang). Per-key crash tracking puts a storming key into cooldown — routing it to overflow — once it crosses `LLM_PROXY_WORKER_CRASH_THRESHOLD` crashes within `LLM_PROXY_WORKER_CRASH_WINDOW_MS`, preventing a spawn→crash→respawn storm.
+- **WLIFE-04 — cancellation**: a client disconnect/abort SIGTERMs and disposes the in-flight worker and drops it synchronously, so the next same-key request gets a fresh cold worker. A queued (not-yet-running) abort only dequeues that one job, leaving the live worker untouched.
+
+Workers also recycle proactively after `LLM_PROXY_WORKER_MAX_REQUESTS` requests or `LLM_PROXY_WORKER_MAX_INPUT_TOKENS` cumulative input tokens, and an LRU prompt-cap (`LLM_PROXY_WORKER_PROMPT_CAP`) bounds the number of distinct (model × prompt) pools kept alive. See [Worker Pool tuning](../guides/llm-providers.md#worker-pool-tuning-claude-code) for the full env-knob reference.
+
+
+---
+
 ## API Endpoints
 
 ### `GET /health`
@@ -229,7 +260,7 @@ The dispatcher fell back to the CLI path. Check the proxy log:
 tail -50 ~/Agentic/coding/.data/llm-proxy/logs/stdout.log | grep claude-code
 ```
 
-Look for `direct API rate-limited ... falling back to CLI`. This is expected today for `sonnet`/`opus` — Anthropic's OAuth bearer endpoint per-model rate limit. The CLI fallback uses the same Max subscription but a different rate-limit bucket. The v7.2 milestone (worker pool) will bring this fallback down to ~2-3s.
+Look for `direct API rate-limited ... falling back to CLI`. This is expected today for `sonnet`/`opus` — Anthropic's OAuth bearer endpoint per-model rate limit. The CLI fallback uses the same Max subscription but a different rate-limit bucket. As of v7.3 the [Claude CLI Worker Pool](#claude-cli-worker-pool-v73) keeps the fallback subprocess warm, bringing steady-state fallback latency down to ~2-3s; cold one-shot overflow calls still take ~10-14s.
 
 ### "say OK" health-coordinator probe burns 16K tokens per call
 

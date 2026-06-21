@@ -1,0 +1,66 @@
+@startuml claude-worker-pool-lifecycle
+!include _standard-style.puml
+
+title Claude CLI Worker Pool — Lifecycle Sequence (@rapid/llm-proxy)\nLazy spawn, idle eviction, crash recovery, cancellation (WLIFE-01..04)\nv7.3 (Phase 63)
+
+actor "client\n(/api/complete)" as client
+participant "WorkerPool" as pool
+participant "ClaudeWorker" as worker
+participant "claude -p\nsubprocess" as proc
+participant "completeClaudeCodeViaCLI\n(overflow)" as overflow
+
+== WLIFE-01: lazy spawn (cold start) ==
+client -> pool : complete(body, signal, overflowFn)
+pool -> pool : key = model :: sha256(prompt)
+note right of pool : zero workers at boot —\nfirst request spawns one
+pool -> worker : new ClaudeWorker(model, systemPrompt)
+worker -> proc : spawn `claude -p --input-format stream-json`
+worker -> worker : _armIdleTimer() (unref'd)
+worker -> proc : stream-JSON request (stdin)
+proc --> worker : {type:"result"} (stdout)
+worker -> worker : _onEvent settle + re-arm idle timer
+worker --> pool : {content, model, tokens}
+pool --> client : 200 OK
+
+== WLIFE-02: idle eviction + lazy respawn ==
+... no requests for LLM_PROXY_WORKER_IDLE_MS (default 30 min) ...
+worker -> worker : idle timer fires -> dispose()
+worker -> proc : stdin.end() + SIGTERM
+proc --> worker : 'exit'
+worker -> pool : 'exit' -> _dropWorker(key, worker)
+note right of pool : RAM freed; next same-key\nrequest lazily respawns a fresh worker
+
+== WLIFE-03: crash recovery + cooldown ==
+client -> pool : complete(...) (in-flight)
+pool -> worker : write(content)
+worker -> proc : stream-JSON request
+proc -> proc : crash / SIGKILL / EPIPE
+worker -> worker : _onExit -> reject in-flight + drain queue (RETRYABLE)
+worker -> pool : 'exit' -> _recordCrash(key) + _dropWorker
+worker --> client : WORKER_RETRYABLE
+note right of pool
+  >= CRASH_THRESHOLD crashes within
+  CRASH_WINDOW_MS -> key enters cooldown
+end note
+client -> pool : complete(...) (same key, storming)
+pool -> overflow : route to execFile overflow\n(no spawn->crash loop)
+overflow --> client : 200 OK (cold one-shot)
+
+== WLIFE-04: cancellation (client disconnect / abort) ==
+client -> pool : complete(body, abortSignal) (in-flight)
+pool -> worker : write(content)
+worker -> proc : stream-JSON request (running)
+client -> pool : abortSignal fires (client disconnects)
+pool -> pool : in-flight -> _disposeAndDrop(key, worker)
+pool -> worker : dispose() (SIGTERM) + synchronous drop
+worker -> proc : SIGTERM
+note right of pool
+  synchronous drop closes the
+  acquire-after-SIGTERM race;
+  queued aborts only dequeue+reject,
+  leaving the live worker untouched
+end note
+client -> pool : complete(...) (next same-key request)
+pool -> worker : lazy-spawn a fresh cold worker (new pid)
+
+@enduml

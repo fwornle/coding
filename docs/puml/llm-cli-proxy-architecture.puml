@@ -1,7 +1,7 @@
 @startuml llm-cli-proxy-architecture
 !include _standard-style.puml
 
-title LLM Subscription Provider Architecture (@rapid/llm-proxy)\nDirect HTTP + Claude Direct-OAuth with CLI Fallback\nv7.1 (2026-05-19)
+title LLM Subscription Provider Architecture (@rapid/llm-proxy)\nDirect HTTP + Claude Direct-OAuth with CLI Fallback (worker pool)\nv7.3 (2026-06-21)
 
 top to bottom direction
 
@@ -71,7 +71,7 @@ cccdirect -down-> cccfall : 401 / 403 / 429\n(shouldFallbackToCLI)
 
 ' External call paths
 cccdirect SYNC_LINE anthropicapi : HTTPS POST\nAuthorization: Bearer <oauth>\nanthropic-version: 2023-06-01
-cccfall SYNC_LINE anthropicapi : via `claude -p` subprocess\n(stream-JSON in worker pool — v7.2)
+cccfall SYNC_LINE anthropicapi : via `claude -p` subprocess\n(persistent stream-JSON worker pool — v7.3;\nsee claude-worker-pool-architecture)
 copilothttp SYNC_LINE copilotapi : HTTPS POST\n/chat/completions
 
 ' Auth flow
@@ -94,8 +94,10 @@ note bottom of claudebox
   Anthropic 429s the OAuth bearer endpoint per-model. Haiku is fine;
   sonnet/opus get rate-limited on the bearer path. The CLI session
   endpoint uses a different bucket and the same Max subscription, so
-  the call succeeds — just slower. v7.2 (queued) adds a persistent
-  worker pool to bring the CLI-fallback path from ~14s to ~2-3s.
+  the call succeeds — just slower. v7.3 lands a persistent worker pool
+  (Phases 62-63) that keeps the `claude -p` subprocess warm, bringing
+  the CLI-fallback path from ~14s to ~2-3s. See
+  claude-worker-pool-architecture + claude-worker-pool-lifecycle.
 end note
 
 note bottom of llmservice

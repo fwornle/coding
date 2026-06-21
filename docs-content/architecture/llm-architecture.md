@@ -92,6 +92,20 @@ The system supports 14 LLM providers with tier-based model selection:
 **Escape hatches**:
 - `LLM_PROXY_DISABLE_CLAUDE_DIRECT=1` — force every claude-code call through the legacy CLI path
 
+#### Claude CLI Worker Pool (v7.3)
+
+The v7.3 milestone restructures the **CLI fallback** described above into a **two-tier dispatch backed by a warm worker pool** (`proxy-bridge/worker-pool.mjs`, wired into the claude-code dispatcher in `proxy-bridge/server.mjs`). The legacy fallback paid the CLI's full system-prompt warm-up (~16-22K `cache_creation` tokens, ~10-14s) on *every* call because each call cold-spawned a fresh `claude -p`. The pool keeps that subprocess warm and reuses it, cutting steady-state fallback latency to ~2-3s. This affects **claude-code only** — `copilot` stays a direct HTTP POST and is never pooled.
+
+![Claude CLI Worker Pool architecture](../images/claude-worker-pool-architecture.png)
+
+**WorkerPool / ClaudeWorker, keyed by (model × systemPrompt)**:
+
+- **`WorkerPool`** owns a map of per-key worker pools, keyed by `model :: sha256(systemPrompt)[:16]`. Keying on both the model *and* the system prompt means callers sharing an identical (model, prompt) pairing reuse the same warm subprocess, while distinct prompts get isolated pools. An LRU prompt-cap bounds the number of distinct (model × prompt) pools held in memory.
+- **`ClaudeWorker`** wraps one persistent `claude -p --input-format stream-json --output-format stream-json` subprocess running concurrency-1 behind a FIFO queue. It owns that worker's lifecycle: lazy spawn, idle eviction, crash tracking, request/token-based recycling, and cancellation (see [LLM Proxy Bridge → Claude CLI Worker Pool](../integrations/llm-cli-proxy.md#claude-cli-worker-pool-v73) for the WLIFE-01..04 lifecycle guarantees).
+
+**How it slots under the claude-code dispatcher**: the dispatcher's direct-OAuth fast path is unchanged. Only when it falls back to the CLI does the pool engage, as **Tier 1**: `WorkerPool.complete(body, abortSignal, overflowFn)`. If every worker for a key is busy, the key is in crash-cooldown, or `LLM_PROXY_DISABLE_WORKER_POOL=1` is set, the call transparently degrades to **Tier 2 overflow** — `completeClaudeCodeViaCLI`, the original cold one-shot `execFile` of `claude -p`. The pool is therefore a latency optimisation layered *inside* the existing CLI-fallback leg of the two-tier claude-code dispatch, not a new provider.
+
+
 #### 2. GitHub Copilot (Primary Provider)
 **Method**: Direct HTTP POST to Copilot API
 **Cost**: $0 per token (uses existing GitHub Copilot subscription)

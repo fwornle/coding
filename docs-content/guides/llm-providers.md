@@ -94,6 +94,35 @@ opencode
 
 ---
 
+## Worker Pool Tuning (claude-code)
+
+When a `claude-code` request can't use the fast direct-OAuth path and falls back to the CLI, the proxy serves it from a **warm worker pool** (v7.3) instead of cold-spawning `claude -p` every time — dropping steady-state fallback latency from ~10-14s to ~2-3s. This applies to `claude-code` only; `copilot` uses direct HTTP and is never pooled. See [LLM Proxy Bridge → Claude CLI Worker Pool](../integrations/llm-cli-proxy.md#claude-cli-worker-pool-v73) for the architecture.
+
+The pool ships with safe defaults — most operators never need to touch it. Tune these env vars on the proxy host when you want to trade RAM for latency, bound prompt-pool memory, or harden against a crash-storming key:
+
+| Env var | Default | Purpose |
+|---------|---------|---------|
+| `LLM_PROXY_WORKER_POOL_SIZE` | 2 | Max persistent workers per (model × prompt) key |
+| `LLM_PROXY_WORKER_PROMPT_CAP` | 8 | LRU cap on distinct prompt-pools |
+| `LLM_PROXY_WORKER_MAX_REQUESTS` | 50 | Requests before a worker recycles |
+| `LLM_PROXY_WORKER_MAX_INPUT_TOKENS` | 150000 | Cumulative input tokens before recycle |
+| `LLM_PROXY_WORKER_REQUEST_TIMEOUT_MS` | 120000 | Per-request timeout |
+| `LLM_PROXY_WORKER_IDLE_MS` | 1800000 | Idle window before eviction (30 min) |
+| `LLM_PROXY_WORKER_CRASH_THRESHOLD` | 3 | Crashes within the window before cooldown |
+| `LLM_PROXY_WORKER_CRASH_WINDOW_MS` | 60000 | Crash-counting window |
+| `LLM_PROXY_DISABLE_WORKER_POOL` | (unset) | Set to `1` to bypass the pool entirely (overflow only) |
+
+**Tuning notes:**
+
+- **Quiet hosts**: leave `LLM_PROXY_WORKER_IDLE_MS` at 30 min — idle workers evict themselves and free RAM; the next request transparently respawns one.
+- **High prompt diversity**: raise `LLM_PROXY_WORKER_PROMPT_CAP` if many distinct (model × prompt) pairings thrash the LRU; lower it to cap memory.
+- **Recycling**: `LLM_PROXY_WORKER_MAX_REQUESTS` and `LLM_PROXY_WORKER_MAX_INPUT_TOKENS` proactively retire long-lived workers before they accumulate state; lower them if you observe drift.
+- **Crash storms**: if a key keeps crashing, the pool routes it to cold one-shot overflow after `LLM_PROXY_WORKER_CRASH_THRESHOLD` crashes within `LLM_PROXY_WORKER_CRASH_WINDOW_MS`, avoiding a spawn→crash→respawn loop.
+- **Escape hatch**: set `LLM_PROXY_DISABLE_WORKER_POOL=1` to disable pooling entirely and force every fallback through the original cold one-shot CLI path — useful for isolating pool behaviour during debugging.
+
+
+---
+
 ## Cloud API Providers
 
 ### Groq (Recommended Fallback)
