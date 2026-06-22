@@ -39,6 +39,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import fs from 'node:fs';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
@@ -71,7 +72,7 @@ function resolveMeasurementsDir(override) {
  * Skips unreadable/corrupt/shape-invalid files with a stderr warning (never
  * throws). Returns the valid spans (task_id + started_at + ended_at present).
  */
-function loadArchivedSpans(measurementsDir) {
+export function loadArchivedSpans(measurementsDir) {
   let names;
   try {
     names = fs.readdirSync(measurementsDir);
@@ -117,7 +118,7 @@ function loadArchivedSpans(measurementsDir) {
  * @param {boolean} dryRun
  * @returns {{ total:number, perSpan: Array<{task_id:string,changes:number}> }}
  */
-function runSweep(db, spans, dryRun) {
+export function runSweep(db, spans, dryRun) {
   // Lexical comparison on ISO-8601 UTC text is chronologically correct.
   const updateStmt = db.prepare(
     "UPDATE token_usage SET task_id = ? WHERE task_id = '' AND timestamp >= ? AND timestamp <= ?",
@@ -249,8 +250,23 @@ async function selfTest() {
   });
 }
 
-if (process.argv.includes('--self-test')) {
-  await selfTest();
-} else {
-  main();
+// Entry-point guard — only run the CLI when invoked directly, NOT when this
+// module is imported for its exported runSweep / loadArchivedSpans (Plan 69-05
+// reuses the locked timestamp-join from the sweep, D-03). Without this guard an
+// `import` of this module would execute main() (open the DB + sweep) as a side
+// effect.
+const isMain = (() => {
+  try {
+    return import.meta.url === pathToFileURL(process.argv[1]).href;
+  } catch {
+    return false;
+  }
+})();
+
+if (isMain) {
+  if (process.argv.includes('--self-test')) {
+    await selfTest();
+  } else {
+    main();
+  }
 }

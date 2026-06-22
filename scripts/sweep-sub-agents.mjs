@@ -45,6 +45,7 @@
  *   LSL_MASTRA_TRANSCRIPTS_DIR   .observations/transcripts/ override
  */
 
+import path from 'node:path';
 import process from 'node:process';
 import { createRegistry } from '../lib/lsl/registry.mjs';
 import { AGENTS, loadAdapter, getAgentSearchPaths } from '../lib/lsl/adapters/index.mjs';
@@ -96,6 +97,95 @@ Exit codes:
   2   all four adapters were missing or all four threw
 `;
   process.stdout.write(help);
+}
+
+/**
+ * Phase 69 (Plan 69-05 Task 2): completed-session Claude token-row emission +
+ * reused timestamp-join backfill. Best-effort — wrapped in try/catch so a token
+ * failure NEVER aborts the sub-agent sweep (D-08).
+ *
+ * For each completed Claude session JSONL (the discovered rows' transcript_path)
+ * it builds per-turn + per-reasoning-step rows (task_id='' — the sweep does NOT
+ * call the live reader) and inserts each, BUT first dedups against live-captured
+ * turns (Pitfall 4): a row whose `(user_hash, tool_call_id)` already exists is
+ * skipped (parameterized `SELECT 1 ... LIMIT 1`). After emission it REUSES the
+ * locked timestamp-join (runSweep + loadArchivedSpans from
+ * backfill-task-id-by-timestamp.mjs, D-03 — never re-implemented) so the just
+ * written task_id='' adapter rows get stamped from archived spans
+ * (`WHERE task_id = ''`, idempotent, never clobbers a live-stamped value).
+ *
+ * @param {Array<object>} discovered registry rows from the claude adapter
+ *   (each carries `transcript_path`).
+ * @returns {Promise<{emitted:number, skipped:number, backfilled:number}>}
+ */
+async function emitClaudeCompletedSessionTokenRows(discovered) {
+  const stats = { emitted: 0, skipped: 0, backfilled: 0 };
+  let db = null;
+  try {
+    const { buildClaudeTokenRows } = await import('../lib/lsl/token/claude-token-rows.mjs');
+    const { openTokenDb, insertTokenRow, ADAPTER_USER_HASH_CLAUDE } = await import('../lib/lsl/token/token-db.mjs');
+    const { runSweep, loadArchivedSpans } = await import('./backfill-task-id-by-timestamp.mjs');
+
+    const dataDir = process.env.LLM_PROXY_DATA_DIR
+      ?? path.join(process.cwd(), '.data');
+    const tokenDbPath = path.join(dataDir, 'llm-proxy', 'token-usage.db');
+    const measurementsDir = path.join(dataDir, 'measurements');
+
+    db = openTokenDb(tokenDbPath);
+
+    // Pitfall 4 dedup probe — parameterized; skip insert when a row with the
+    // same (user_hash, tool_call_id) already exists (live capture wrote it).
+    const existsStmt = db.prepare(
+      'SELECT 1 FROM token_usage WHERE user_hash = ? AND tool_call_id = ? LIMIT 1',
+    );
+
+    for (const row of discovered) {
+      const jsonlPath = row && row.transcript_path;
+      if (!jsonlPath || typeof jsonlPath !== 'string') continue;
+      let rows;
+      try {
+        rows = buildClaudeTokenRows(jsonlPath);
+      } catch (err) {
+        process.stderr.write(`[sweep] token build failed (non-fatal) ${jsonlPath}: ${err.message}\n`);
+        continue;
+      }
+      for (const tokenRow of rows || []) {
+        tokenRow.user_hash = ADAPTER_USER_HASH_CLAUDE;
+        tokenRow.task_id = ''; // the sweep stamps task_id via the join below.
+        // Dedup: skip if live capture already inserted this (user_hash, tool_call_id).
+        const hit = existsStmt.get(tokenRow.user_hash, tokenRow.tool_call_id);
+        if (hit) {
+          stats.skipped += 1;
+          continue;
+        }
+        if (insertTokenRow(db, tokenRow)) stats.emitted += 1;
+      }
+    }
+
+    // REUSE the locked timestamp-join (D-03) — stamp the just-written task_id=''
+    // adapter rows from archived spans. Never clobbers a live value; idempotent.
+    try {
+      const spans = loadArchivedSpans(measurementsDir);
+      if (spans.length > 0) {
+        const { total } = runSweep(db, spans, false);
+        stats.backfilled = total;
+      }
+    } catch (err) {
+      process.stderr.write(`[sweep] token backfill join failed (non-fatal): ${err.message}\n`);
+    }
+
+    process.stderr.write(
+      `[sweep] claude token rows emitted=${stats.emitted} deduped=${stats.skipped} task_id-backfilled=${stats.backfilled}\n`,
+    );
+  } catch (err) {
+    // Best-effort: a sweep token failure NEVER aborts the sub-agent sweep (D-08).
+    process.stderr.write(`[sweep] claude token emission disabled (non-fatal): ${err.message}\n`);
+  } finally {
+    if (db && typeof db.close === 'function') {
+      try { db.close(); } catch { /* ignore */ }
+    }
+  }
+  return stats;
 }
 
 async function main(argv) {
@@ -202,6 +292,15 @@ async function main(argv) {
     process.stderr.write(
       `[sweep] agent=${agentId} discovered=${discovered.length} converted=${converted} skipped=${skipped} failed=${failed}\n`,
     );
+
+    // Phase 69 (Plan 69-05 Task 2): emit completed-session Claude token rows
+    // (dedup'd against live capture) + reuse the timestamp-join backfill. Rides
+    // inside this .mjs (additive) so sub-agent-sweep-job.sh needs no edit. The
+    // helper is fully best-effort and never throws back into the sweep loop.
+    if (agentId === 'claude') {
+      await emitClaudeCompletedSessionTokenRows(discovered);
+    }
+
     anySuccess = true;
   }
 
