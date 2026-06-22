@@ -164,10 +164,12 @@ async function emitClaudeCompletedSessionTokenRows(discovered) {
 
     // REUSE the locked timestamp-join (D-03) — stamp the just-written task_id=''
     // adapter rows from archived spans. Never clobbers a live value; idempotent.
+    // WR-03: scope the join to the Claude adapter user_hash so stats.backfilled
+    // counts ONLY Claude rows (no Copilot cross-contamination when both run).
     try {
       const spans = loadArchivedSpans(measurementsDir);
       if (spans.length > 0) {
-        const { total } = runSweep(db, spans, false);
+        const { total } = runSweep(db, spans, false, ADAPTER_USER_HASH_CLAUDE);
         stats.backfilled = total;
       }
     } catch (err) {
@@ -255,12 +257,14 @@ async function emitCopilotCompletedSessionTokenRows(discovered) {
     }
 
     // REUSE the locked timestamp-join (D-03) — stamp the just-written task_id=''
-    // adapter rows from archived spans. Single join covers BOTH adapters via the
-    // `WHERE task_id = ''` clause. Never clobbers a live value; idempotent.
+    // adapter rows from archived spans. Never clobbers a live value; idempotent.
+    // WR-03: scope the join to the Copilot adapter user_hash so stats.backfilled
+    // counts ONLY Copilot rows — no longer reports 0 just because the Claude
+    // emitter (which runs first in the same pass) already stamped its own rows.
     try {
       const spans = loadArchivedSpans(measurementsDir);
       if (spans.length > 0) {
-        const { total } = runSweep(db, spans, false);
+        const { total } = runSweep(db, spans, false, ADAPTER_USER_HASH_COPILOT);
         stats.backfilled = total;
       }
     } catch (err) {

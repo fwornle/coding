@@ -271,3 +271,84 @@ test('reused runSweep stamps in-window task_id and leaves out-of-window rows at 
     fs.rmSync(dbDir, { recursive: true, force: true });
   }
 });
+
+test('WR-03: user_hash-scoped runSweep only stamps + counts its own adapter rows', () => {
+  const { dir: dbDir, dbPath } = makeTempDb();
+  const db = openTokenDb(dbPath);
+  const COPADT = 'copadt';
+  try {
+    // One in-window Claude row and one in-window Copilot row, both task_id=''.
+    const baseRow = {
+      timestamp: '2026-06-22T10:00:30.000Z',
+      provider: 'x',
+      model: 'm',
+      model_raw: 'm',
+      process: 'p',
+      subscription: '',
+      input_tokens: 1,
+      output_tokens: 1,
+      total_tokens: 2,
+      latency_ms: 0,
+      prompt_preview: '',
+      tokens_estimated: 0,
+      reasoning_tokens: 0,
+      overhead_ms: null,
+      agent: 'a',
+      task_id: '',
+      parent_call_id: '',
+      granularity_tier: 'per-turn',
+    };
+    insertTokenRow(db, {
+      ...baseRow,
+      user_hash: ADAPTER_USER_HASH_CLAUDE,
+      tool_call_id: 'claude-row-1',
+    });
+    insertTokenRow(db, {
+      ...baseRow,
+      user_hash: COPADT,
+      tool_call_id: 'copilot-row-1',
+    });
+
+    const measurementsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wr03-spans-'));
+    fs.writeFileSync(
+      path.join(measurementsDir, 'span.json'),
+      JSON.stringify({
+        task_id: 'span-shared',
+        started_at: '2026-06-22T09:00:00.000Z',
+        ended_at: '2026-06-22T11:00:00.000Z',
+      }),
+    );
+    try {
+      const spans = loadArchivedSpans(measurementsDir);
+
+      // Scope the join to the Claude adapter: ONLY the Claude row is stamped,
+      // and the returned total counts ONLY that row (no Copilot contamination).
+      const claudeResult = runSweep(db, spans, false, ADAPTER_USER_HASH_CLAUDE);
+      expect(claudeResult.total).toBe(1);
+
+      const claudeTaskId = db
+        .prepare('SELECT task_id FROM token_usage WHERE tool_call_id = ?')
+        .get('claude-row-1').task_id;
+      expect(claudeTaskId).toBe('span-shared');
+
+      // The Copilot row is still unattributed — the Claude-scoped sweep skipped it.
+      const copilotTaskIdBefore = db
+        .prepare('SELECT task_id FROM token_usage WHERE tool_call_id = ?')
+        .get('copilot-row-1').task_id;
+      expect(copilotTaskIdBefore).toBe('');
+
+      // Now the Copilot-scoped sweep stamps + counts ONLY the Copilot row.
+      const copilotResult = runSweep(db, spans, false, COPADT);
+      expect(copilotResult.total).toBe(1);
+      const copilotTaskIdAfter = db
+        .prepare('SELECT task_id FROM token_usage WHERE tool_call_id = ?')
+        .get('copilot-row-1').task_id;
+      expect(copilotTaskIdAfter).toBe('span-shared');
+    } finally {
+      fs.rmSync(measurementsDir, { recursive: true, force: true });
+    }
+  } finally {
+    db.close();
+    fs.rmSync(dbDir, { recursive: true, force: true });
+  }
+});

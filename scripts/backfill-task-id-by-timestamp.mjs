@@ -113,19 +113,38 @@ export function loadArchivedSpans(measurementsDir) {
 
 /**
  * Run the sweep against an OPEN better-sqlite3 db handle.
+ *
+ * WR-03 (Phase 69 review fix): an optional `userHashFilter` scopes the
+ * UPDATE/COUNT to one adapter namespace so `stats.backfilled` does not
+ * cross-contaminate when both the Claude and Copilot sweep emitters call
+ * runSweep in the same pass. The filter is OPT-IN and defaults to null — with
+ * no filter the behavior is IDENTICAL to the prior signature (the D-03
+ * timestamp-join contract is unchanged). When supplied, the `user_hash = ?`
+ * predicate is added (parameterized — never interpolated).
+ *
  * @param {import('better-sqlite3').Database} db
  * @param {Array<{task_id:string,started_at:string,ended_at:string}>} spans
  * @param {boolean} dryRun
+ * @param {string|null} [userHashFilter] restrict the sweep to one adapter user_hash
  * @returns {{ total:number, perSpan: Array<{task_id:string,changes:number}> }}
  */
-export function runSweep(db, spans, dryRun) {
+export function runSweep(db, spans, dryRun, userHashFilter = null) {
   // Lexical comparison on ISO-8601 UTC text is chronologically correct.
-  const updateStmt = db.prepare(
-    "UPDATE token_usage SET task_id = ? WHERE task_id = '' AND timestamp >= ? AND timestamp <= ?",
-  );
-  const countStmt = db.prepare(
-    "SELECT COUNT(*) AS n FROM token_usage WHERE task_id = '' AND timestamp >= ? AND timestamp <= ?",
-  );
+  const hasFilter = typeof userHashFilter === 'string' && userHashFilter.length > 0;
+  const updateStmt = hasFilter
+    ? db.prepare(
+        "UPDATE token_usage SET task_id = ? WHERE task_id = '' AND user_hash = ? AND timestamp >= ? AND timestamp <= ?",
+      )
+    : db.prepare(
+        "UPDATE token_usage SET task_id = ? WHERE task_id = '' AND timestamp >= ? AND timestamp <= ?",
+      );
+  const countStmt = hasFilter
+    ? db.prepare(
+        "SELECT COUNT(*) AS n FROM token_usage WHERE task_id = '' AND user_hash = ? AND timestamp >= ? AND timestamp <= ?",
+      )
+    : db.prepare(
+        "SELECT COUNT(*) AS n FROM token_usage WHERE task_id = '' AND timestamp >= ? AND timestamp <= ?",
+      );
 
   let total = 0;
   const perSpan = [];
@@ -133,9 +152,13 @@ export function runSweep(db, spans, dryRun) {
     let changes = 0;
     try {
       if (dryRun) {
-        changes = countStmt.get(span.started_at, span.ended_at).n;
+        changes = hasFilter
+          ? countStmt.get(userHashFilter, span.started_at, span.ended_at).n
+          : countStmt.get(span.started_at, span.ended_at).n;
       } else {
-        const info = updateStmt.run(span.task_id, span.started_at, span.ended_at);
+        const info = hasFilter
+          ? updateStmt.run(span.task_id, userHashFilter, span.started_at, span.ended_at)
+          : updateStmt.run(span.task_id, span.started_at, span.ended_at);
         changes = info.changes;
       }
     } catch (err) {
