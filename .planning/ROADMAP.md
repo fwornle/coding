@@ -28,7 +28,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 
 - [ ] **Phase 67: Reproducibility & Replay Rig** — Snapshot/restore internal state + record/replay external state so N=1 runs become comparable
 - [x] **Phase 68: [FOUNDATIONAL] Token Attribution Storage** — `token_usage` schema extension + measurement-span contract + `attachTokenLogger` task_id stamping (completed 2026-06-22)
-- [ ] **Phase 69: Claude + Copilot Token Adapters** — Claude per-turn + per-reasoning-step JSONL adapter; Copilot events.jsonl adapter with Phase-1 event-vocabulary check
+- [x] **Phase 69: Claude + Copilot Token Adapters** — Claude per-turn + per-reasoning-step JSONL adapter; Copilot events.jsonl adapter with Phase-1 event-vocabulary check (completed 2026-06-22)
 - [ ] **Phase 70: OpenCode + Mastra Token Adapters** — OpenCode proxy-route per-llm-call logging; Mastra instrumentation-surface read + adapter
 - [ ] **Phase 71: Experiment KB & Task Taxonomy** — km-core ontology + Run-write path + enforced task-taxonomy v0 tag
 - [ ] **Phase 72: Syntactic Route Quality** — `goal_sentence` capture + deterministic route heuristics per run
@@ -79,7 +79,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 69-03-PLAN.md — Claude per-turn + estimated per-reasoning-step rows + sub-agent parent_call_id linkage
   - [x] 69-04-PLAN.md — Copilot per-session-aggregate rows + Phase-1 vocabulary check (v1.0.63 verdict)
   - [x] 69-05-PLAN.md — Claude live-watcher/supervisor/sweep wiring + live task_id + dedup + reused backfill
-  - [ ] 69-06-PLAN.md — Copilot live/sweep wiring + reused backfill + cross-adapter best-effort proof
+  - [x] 69-06-PLAN.md — Copilot live/sweep wiring + reused backfill + cross-adapter best-effort proof
 
 ### Phase 70: OpenCode + Mastra Token Adapters
 **Goal**: OpenCode and Mastra token spend lands in `token_usage` on the shared contract, completing the all-four-agent reach.
@@ -146,7 +146,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
 | 67. Reproducibility & Replay Rig | v7.4 | 0/? | Not started | - |
 | 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
-| 69. Claude + Copilot Token Adapters | v7.4 | 5/6 | In Progress|  |
+| 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete   | 2026-06-22 |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 0/? | Not started | - |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 0/? | Not started | - |
 | 72. Syntactic Route Quality | v7.4 | 0/? | Not started | - |

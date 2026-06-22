@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
-status: executing
+status: verifying
 stopped_at: Completed 69-04-PLAN.md
-last_updated: "2026-06-22T15:32:16.808Z"
+last_updated: "2026-06-22T15:39:59.629Z"
 last_activity: 2026-06-22
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 8
-  percent: 13
+  completed_plans: 9
+  percent: 25
 ---
 
 # Project State
@@ -55,7 +55,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 69 (claude-copilot-token-adapters) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-22
 
 ## Deferred Items
@@ -263,6 +263,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [69-03]: D-05 reasoning estimate = max(1,ceil(len/4)); per-reasoning-step rows stamp tokens_estimated=1, per-turn rows tokens_estimated=0 — never a native usage extraction. D-02 sub-agent parent_call_id reuses parentSessionFromClaudeSubagentPath (no subagents-dir re-walk); isSidechain:false first record yields [].
 - [Phase ?]: [69-04]: Copilot per-session-aggregate rows from session.shutdown.modelMetrics (one row per model, all numerics coalesced ?? 0; reasoningTokens-absent model -> 0). parseCopilot reused as recognized-primitive gate; raw JSON.parse reads the session.shutdown type discriminator since parseCopilot returns null for lifecycle events. Vocabulary verdict baked to v1.0.63 -> per-session-aggregate, per-turn upgrade branch present but inert.
 - [Phase ?]: [69-05]: onTokenRow receives { fullPath, exchange }; supervisor builds rows from fullPath. runSweep+loadArchivedSpans exported behind an import.meta entry-point guard for D-03 reuse. Sweep token emission gated to claude in the convert loop.
+- [Phase ?]: [69-06]: Copilot live session.shutdown token-row emission wired into copilot-events-tail with isolated onTokenRow (D-08, dedicated stderr not subagent onError); supervisor stamps rows via resolveLiveTaskIdSafe + user_hash copadt. Sweep Copilot branch reuses the SAME runSweep+loadArchivedSpans join (single empty-task_id backfill covers both adapters, D-03), dedup on (user_hash, tool_call_id). best-effort.test.js certifies the cross-adapter D-08 no-throw guarantee. No plist change; reload via launchctl kickstart com.coding.sub-agent-live-copilot.
 
 ### Blockers/Concerns
 
@@ -349,10 +350,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 69 P03 | 12 min | 2 tasks | 4 files |
 | Phase 69 P04 | 10 | 2 tasks | 3 files |
 | Phase 69 P05 | 12 | 2 tasks | 6 files |
+| Phase 69 P06 | 4 | 2 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-06-22T15:31:58.936Z
+Last session: 2026-06-22T15:39:22.220Z
 Stopped at: Completed 69-04-PLAN.md
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
