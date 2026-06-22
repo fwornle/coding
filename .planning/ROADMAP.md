@@ -74,7 +74,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   4. The Phase-1 Copilot event-vocabulary check is performed (distinct `type:` values listed, per-turn usage payload presence confirmed); if per-turn payloads exist the adapter upgrades to emitting `per-turn` rows.
   5. Both adapters stamp rows with the active `task_id` (live) or backfill it by timestamp join (sweep) per the TELEM resolution rules.
 **Plans**: 6 plans
-  - [ ] 69-01-PLAN.md — Wave 0: WAL-concurrency acceptance test + shared Claude/Copilot JSONL fixtures
+  - [x] 69-01-PLAN.md — Wave 0: WAL-concurrency acceptance test + shared Claude/Copilot JSONL fixtures
   - [ ] 69-02-PLAN.md — shared token-db (best-effort INSERT, distinct user_hash) + single-reader task_id resolver
   - [ ] 69-03-PLAN.md — Claude per-turn + estimated per-reasoning-step rows + sub-agent parent_call_id linkage
   - [ ] 69-04-PLAN.md — Copilot per-session-aggregate rows + Phase-1 vocabulary check (v1.0.63 verdict)
@@ -146,7 +146,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
 | 67. Reproducibility & Replay Rig | v7.4 | 0/? | Not started | - |
 | 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
-| 69. Claude + Copilot Token Adapters | v7.4 | 0/? | Not started | - |
+| 69. Claude + Copilot Token Adapters | v7.4 | 1/6 | In Progress|  |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 0/? | Not started | - |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 0/? | Not started | - |
 | 72. Syntactic Route Quality | v7.4 | 0/? | Not started | - |
