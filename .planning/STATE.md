@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
 status: executing
-stopped_at: Completed 68-02-PLAN.md (TELEM-02 — measurement-span lifecycle: getActiveMeasurement single reader + start/stop atomic archive; proxy 3cdf4ee/7505ba6, coding a326e4e41; live restart+row gate owned by 68-03)
-last_updated: "2026-06-22T05:43:21.188Z"
+stopped_at: PAUSED at 68-03 Task 3 operator checkpoint (TELEM-03 — write path stamps task_id via resolveLiveTaskId single reader + backfill sweep DONE & committed: proxy 5aa92a2/bf17f24, coding ad60b02eb; BLOCKING live restarted-daemon row gate awaits operator — restart com.coding.llm-cli-proxy, drive a real /api/complete call inside a span, confirm task_id=telem-live-68 row + empty-task_id row via sqlite3. See 68-03-SUMMARY.md "Operator commands to run".)
+last_updated: "2026-06-22T05:50:00.000Z"
 last_activity: 2026-06-22
 progress:
   total_phases: 8
@@ -55,7 +55,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 68 (foundational-token-attribution-storage) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute (68-01 + 68-02 complete; 68-03 next — proxy write-path task_id stamping + live restart/row gate)
+Status: PAUSED at 68-03 Task 3 operator checkpoint — autonomous Tasks 1 & 2 (write-path task_id stamping via resolveLiveTaskId single reader + completed-session backfill sweep) DONE, built green, tested (3/3 stamping + 1/1 backfill self-test), committed (proxy 5aa92a2/bf17f24, coding ad60b02eb). BLOCKING: operator must restart com.coding.llm-cli-proxy + verify a live stamped row. Plan NOT yet complete; advance the counter only after "approved".
 Last activity: 2026-06-22
 
 ## Deferred Items
