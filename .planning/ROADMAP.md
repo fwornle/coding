@@ -73,7 +73,13 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   3. Copilot CLI `events.jsonl` is ingested at `per-session-aggregate` granularity from `session.shutdown.modelMetrics`.
   4. The Phase-1 Copilot event-vocabulary check is performed (distinct `type:` values listed, per-turn usage payload presence confirmed); if per-turn payloads exist the adapter upgrades to emitting `per-turn` rows.
   5. Both adapters stamp rows with the active `task_id` (live) or backfill it by timestamp join (sweep) per the TELEM resolution rules.
-**Plans**: TBD
+**Plans**: 6 plans
+  - [ ] 69-01-PLAN.md — Wave 0: WAL-concurrency acceptance test + shared Claude/Copilot JSONL fixtures
+  - [ ] 69-02-PLAN.md — shared token-db (best-effort INSERT, distinct user_hash) + single-reader task_id resolver
+  - [ ] 69-03-PLAN.md — Claude per-turn + estimated per-reasoning-step rows + sub-agent parent_call_id linkage
+  - [ ] 69-04-PLAN.md — Copilot per-session-aggregate rows + Phase-1 vocabulary check (v1.0.63 verdict)
+  - [ ] 69-05-PLAN.md — Claude live-watcher/supervisor/sweep wiring + live task_id + dedup + reused backfill
+  - [ ] 69-06-PLAN.md — Copilot live/sweep wiring + reused backfill + cross-adapter best-effort proof
 
 ### Phase 70: OpenCode + Mastra Token Adapters
 **Goal**: OpenCode and Mastra token spend lands in `token_usage` on the shared contract, completing the all-four-agent reach.
