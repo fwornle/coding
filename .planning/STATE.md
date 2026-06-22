@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
-status: verifying
-stopped_at: Completed 66-04-PLAN.md (SC-1 live-green confirmed; SC-2 pool-disabled-red deferred — overhead < 5s red threshold on this host; see 66 deferred-items.md)
-last_updated: "2026-06-22T05:58:51.546Z"
+status: ready_to_plan
+stopped_at: Phase 68 complete (3/3) — ready to discuss Phase 69
+last_updated: 2026-06-22T06:04:48.664Z
 last_activity: 2026-06-22
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 3
-  completed_plans: 3
+  completed_plans: 189
   percent: 13
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 68 — foundational-token-attribution-storage
+**Current focus:** Phase 69 — claude + copilot token adapters
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 68 (foundational-token-attribution-storage) — COMPLETE (ready for phase verification)
-Plan: 3 of 3 (all complete)
-Status: Phase 68 done. TELEM-01 (attribution columns), TELEM-02 (measurement-span start/stop lifecycle), TELEM-03 (write-path task_id stamping + backfill sweep) all complete. 68-03 live restarted-daemon row gate PASSED 2026-06-22: operator restarted com.coding.llm-cli-proxy (startup migration added all 6 attribution columns), in-span /api/complete landed task_id=telem-live-68 (row 123286), out-of-span landed '' (row 123292), archived span telem-live-68.json written with ended_at. Commits: proxy 5aa92a2/bf17f24, coding ad60b02eb. Next: /gsd:verify-phase 68, then advance to Phase 69.
+Phase: 69
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-22
 
 ## Deferred Items
@@ -86,7 +86,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 **Velocity:**
 
-- Total plans completed: 112 (v6.0)
+- Total plans completed: 115 (v6.0)
 - Average duration: 3 min
 - Total execution time: 0.05 hours
 

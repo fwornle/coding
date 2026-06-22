@@ -139,7 +139,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 65. Acceptance | v7.3 | 1/1 | Complete | 2026-06-21 |
 | 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
 | 67. Reproducibility & Replay Rig | v7.4 | 0/? | Not started | - |
-| 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete   | 2026-06-22 |
+| 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
 | 69. Claude + Copilot Token Adapters | v7.4 | 0/? | Not started | - |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 0/? | Not started | - |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 0/? | Not started | - |
