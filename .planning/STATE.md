@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
-status: in_progress
-last_updated: "2026-06-21T21:00:00.000Z"
-last_activity: 2026-06-21
+status: executing
+stopped_at: Completed 68-01-PLAN.md (TELEM-01 — token_usage 6 attribution columns + idempotent migration; proxy commits 56a8c15/273a252; live restart+row gate owned by 68-03)
+last_updated: "2026-06-22T05:34:19.573Z"
+last_activity: 2026-06-22
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 3
+  completed_plans: 1
+  percent: 33
 ---
 
 # Project State
@@ -20,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** v7.4 Performance Measurement System — roadmap created (Phases 67–74). Next: `/gsd:plan-phase 67`
+**Current focus:** Phase 68 — foundational-token-attribution-storage
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -52,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 67 — Reproducibility & Replay Rig (first v7.4 phase)
-Plan: — (not yet planned)
-Status: Roadmap created — 8 phases (67–74), 21/21 requirements mapped. Ready for `/gsd:plan-phase 67`
-Last activity: 2026-06-21 — v7.4 roadmap created (Phases 67–74). FOUNDATIONAL anchor: Phase 68 (TELEM) gates the per-agent adapter phases 69–70.
+Phase: 68 (foundational-token-attribution-storage) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-06-22
 
 ## Deferred Items
 
@@ -253,6 +254,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: Phase 64-02: GUARD-03 stderr drain+throttle (per-worker <=1/min, <=200-char sample via injected logErr+clock) + WR-02 cache-inclusive recycle ceiling; rapid-llm-proxy 8fbc8d2 local-only
 - [Phase ?]: [66-01]: Per-model p50 median on getSummary by_model via parameterized ORDER BY latency_ms LIMIT 1 OFFSET (count-1)/2 (lower-mid) over the clamped 24h since-window; piggybacks on summary (no new endpoint), best-effort never-throws on empty DB
 - [Phase 66]: 66-03: worker-pool overhead_ms (dispatch-start to first-stdout, excludes generation) + NULL-safe p50_overhead_ms median (offset uses non-null count, WR-02); /recent + summary by_model expose the fields for 66-04 dashboard re-point
+- [Phase ?]: [68-01]: token_usage gains 6 additive attribution columns (agent/task_id/tool_call_id/parent_call_id/granularity_tier TEXT default empty, reasoning_tokens INTEGER default 0) via idempotent PRAGMA-guarded standalone ALTERs mirroring overhead_ms; TokenUsageRow fields optional + logCall coalesces to defaults so no existing writer breaks. SQLite 3.53.1 accepts NOT NULL DEFAULT const ALTER.
 
 ### Blockers/Concerns
 
@@ -332,10 +334,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 66 P01 | 9 | 2 tasks | 4 files |
 | Phase 66 P03 | 6 min | 3 tasks | 5 files |
 | Phase 66 P04 | ~45 min | 3 tasks (T1-2 prior executor; T3 disruptive UAT this run) | 2 files |
+| Phase 68 P01 | 6 min | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-06-21T18:05:00.000Z
+Last session: 2026-06-22T05:34:12.480Z
 Stopped at: Completed 66-04-PLAN.md (SC-1 live-green confirmed; SC-2 pool-disabled-red deferred — overhead < 5s red threshold on this host; see 66 deferred-items.md)
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
