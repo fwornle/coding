@@ -1,0 +1,12 @@
+{"type":"session.start","timestamp":"2026-06-22T11:00:00.000Z","data":{"sessionId":"00000000-0000-4000-a000-000000000000","cliVersion":"1.0.63"}}
+{"type":"user.message","timestamp":"2026-06-22T11:00:05.000Z","data":{"content":"[REDACTED]"}}
+{"type":"assistant.turn_start","timestamp":"2026-06-22T11:00:06.000Z","data":{"turnId":"turn-1"}}
+{"type":"assistant.message","timestamp":"2026-06-22T11:00:09.000Z","data":{"reasoningOpaque":"[REDACTED_OPAQUE_BLOB]","toolRequests":[{"toolCallId":"tc-1","name":"read"}]}}
+{"type":"tool.execution_start","timestamp":"2026-06-22T11:00:10.000Z","data":{"toolCallId":"tc-1","name":"read"}}
+{"type":"tool.execution_complete","timestamp":"2026-06-22T11:00:11.000Z","data":{"toolCallId":"tc-1","name":"read","status":"ok"}}
+{"type":"assistant.turn_end","timestamp":"2026-06-22T11:00:12.000Z","data":{"turnId":"turn-1"}}
+{"type":"user.message","timestamp":"2026-06-22T11:01:00.000Z","data":{"content":"[REDACTED]"}}
+{"type":"assistant.turn_start","timestamp":"2026-06-22T11:01:01.000Z","data":{"turnId":"turn-2"}}
+{"type":"assistant.message","timestamp":"2026-06-22T11:01:05.000Z","data":{"reasoningOpaque":"[REDACTED_OPAQUE_BLOB]","toolRequests":[]}}
+{"type":"assistant.turn_end","timestamp":"2026-06-22T11:01:06.000Z","data":{"turnId":"turn-2"}}
+{"type":"session.shutdown","timestamp":"2026-06-22T11:02:00.000Z","data":{"shutdownType":"routine","modelMetrics":{"claude-opus-4.6":{"requests":{"count":8,"cost":3},"usage":{"inputTokens":232866,"outputTokens":1282,"cacheReadTokens":203106,"cacheWriteTokens":29750,"reasoningTokens":115}},"claude-sonnet-4.6":{"requests":{"count":4,"cost":1},"usage":{"inputTokens":51002,"outputTokens":640,"cacheReadTokens":40110,"cacheWriteTokens":0}}}}}
