@@ -58,7 +58,10 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   3. "Start measurement" writes `.data/active-measurement.json`; "Stop measurement" sets `ended_at`, atomically renames to `.data/measurements/<task_id>.json`, and a span left open >24h surfaces a stale-span warning.
   4. A single `getActiveMeasurement()` SDK reader returns the active span (or null) and is the only JSON parser callers use.
   5. The proxy `attachTokenLogger` write path stamps each row with the active `task_id` per the resolution rules (in-window → task_id; out-of-window / no span → ""; completed-session sweeps backfill by timestamp join against archived spans).
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 68-01-PLAN.md — TELEM-01: token_usage additive columns + idempotent PRAGMA-guarded startup migration + extended row/insert/logCall (Wave 1)
+  - [ ] 68-02-PLAN.md — TELEM-02: measurement-span lifecycle (start/stop atomic archive + >24h stale warning) + single getActiveMeasurement() SDK reader + barrel export + operator CLIs (Wave 1)
+  - [ ] 68-03-PLAN.md — TELEM-03: proxy write-path task_id stamping via the single reader + completed-session timestamp-join backfill sweep + live restarted-daemon row gate (Wave 2)
 
 ### Phase 69: Claude + Copilot Token Adapters
 **Goal**: Claude Code and Copilot CLI token spend lands in `token_usage` on the shared contract at the best granularity each surfaces, with sub-agents linked to their parent.
@@ -136,7 +139,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 65. Acceptance | v7.3 | 1/1 | Complete | 2026-06-21 |
 | 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
 | 67. Reproducibility & Replay Rig | v7.4 | 0/? | Not started | - |
-| 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 0/? | Not started | - |
+| 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 0/3 | Not started | - |
 | 69. Claude + Copilot Token Adapters | v7.4 | 0/? | Not started | - |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 0/? | Not started | - |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 0/? | Not started | - |
