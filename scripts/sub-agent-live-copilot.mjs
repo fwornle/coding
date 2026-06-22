@@ -175,6 +175,77 @@ async function main() {
     }
   }
 
+  // --- Phase 69 (Plan 69-06 Task 1): token-row emission wiring (D-08).
+  //
+  // Dynamic-import the token modules — same guarded pattern as ObservationWriter
+  // above so `--help` works without better-sqlite3 / the proxy DB present.
+  // Construct a SECOND-writer token-db handle against the proxy-owned
+  // token-usage.db. Everything here is best-effort: if the import or DB open
+  // fails, the daemon logs and runs WITHOUT token emission — the LSL/observation
+  // path is never affected (failure isolation).
+  let tokenDb = null;
+  let buildCopilotTokenRows = null;
+  let insertTokenRow = null;
+  let resolveLiveTaskIdSafe = null;
+  let ADAPTER_USER_HASH_COPILOT = null;
+  try {
+    let checkCopilotVocabulary;
+    let warnOnVersionDrift;
+    ({ buildCopilotTokenRows, checkCopilotVocabulary, warnOnVersionDrift } =
+      await import('../lib/lsl/token/copilot-token-rows.mjs'));
+    const tokenDbMod = await import('../lib/lsl/token/token-db.mjs');
+    insertTokenRow = tokenDbMod.insertTokenRow;
+    ADAPTER_USER_HASH_COPILOT = tokenDbMod.ADAPTER_USER_HASH_COPILOT;
+    ({ resolveLiveTaskIdSafe } = await import('../lib/lsl/token/task-id.mjs'));
+
+    const dataDir = process.env.LLM_PROXY_DATA_DIR
+      ?? path.join(process.cwd(), '.data');
+    const tokenDbPath = path.join(dataDir, 'llm-proxy', 'token-usage.db');
+    tokenDb = tokenDbMod.openTokenDb(tokenDbPath);
+    process.stderr.write(`[live-copilot] token emission enabled — db=${tokenDbPath}\n`);
+
+    // One-time event-vocabulary verdict + version-drift warning (D-04 / D-09).
+    // The verdict is informational here — per-session-aggregate is the only
+    // viable tier on v1.0.63; a drift warning prompts a re-probe on CLI upgrade.
+    try {
+      const installed = process.env.COPILOT_CLI_VERSION;
+      if (installed) warnOnVersionDrift(installed);
+      void checkCopilotVocabulary; // available for an opt-in startup probe
+    } catch (err) {
+      process.stderr.write(`[live-copilot] vocabulary probe skipped (non-fatal): ${err.message}\n`);
+    }
+  } catch (err) {
+    tokenDb = null;
+    process.stderr.write(`[live-copilot] token emission disabled (non-fatal): ${err.message}\n`);
+  }
+
+  /**
+   * Additive onTokenRow hook (D-08). Fired from the live tail on a
+   * session.shutdown line; builds the per-session-aggregate rows from the
+   * session's events.jsonl, stamps each with the LIVE task_id (via the single
+   * span reader) + the distinct adapter user_hash, and inserts each best-effort.
+   * The whole body is wrapped in try/catch so an emission failure NEVER
+   * propagates back into the watcher's observation path; insertTokenRow is
+   * itself best-effort (returns false, never throws).
+   *
+   * @param {{eventsPath: string, event: object}} ctx
+   */
+  async function onTokenRow({ eventsPath } = {}) {
+    if (!tokenDb || !eventsPath) return;
+    try {
+      const rows = buildCopilotTokenRows(eventsPath);
+      if (!rows || rows.length === 0) return;
+      const liveTaskId = await resolveLiveTaskIdSafe();
+      for (const row of rows) {
+        row.task_id = liveTaskId;
+        row.user_hash = ADAPTER_USER_HASH_COPILOT;
+        insertTokenRow(tokenDb, row);
+      }
+    } catch (err) {
+      process.stderr.write(`[live-copilot] onTokenRow failed (non-fatal): ${err.message}\n`);
+    }
+  }
+
   // Error budget: bail if >10 errors in any rolling 60s window
   const errorTimes = [];
   const checkErrorBudget = () => {
@@ -203,6 +274,8 @@ async function main() {
       projectRoot: opts.projectRoot,
       liveSessionScanIntervalMs: opts.scanIntervalMs,
       onError,
+      // Phase 69 (Plan 69-06 Task 1): isolated session.shutdown token-row hook (D-08).
+      onTokenRow,
     });
   } catch (err) {
     process.stderr.write(`[live-copilot] startCopilotWatcher failed: ${err.message}\n`);
@@ -257,6 +330,14 @@ async function main() {
       if (writer && typeof writer.close === 'function') await writer.close();
     } catch (err) {
       process.stderr.write(`[live-copilot] writer close error: ${err.message}\n`);
+    }
+    // Phase 69 (Plan 69-06): close the token-db second-writer handle (best-effort).
+    if (tokenDb && typeof tokenDb.close === 'function') {
+      try {
+        tokenDb.close();
+      } catch (err) {
+        process.stderr.write(`[live-copilot] tokenDb close error: ${err.message}\n`);
+      }
     }
     // Final heartbeat with shutdown_at
     writeHeartbeat({ shutdown_at: new Date().toISOString() });
