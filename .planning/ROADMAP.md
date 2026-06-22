@@ -91,7 +91,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   3. Mastra's instrumentation surface is identified from `.opencode/mastra.json` (per-step middleware vs observer hooks vs framework callbacks) and its granularity tier is determined.
   4. A Mastra adapter emits rows on the shared contract at the determined granularity tier, stamped with the active `task_id`.
 **Plans**: 4 plans
-  - [ ] 70-01-PLAN.md — Proxy OpenAI-compatible shim (/v1/chat/completions) + generic agent/granularity_tier/task_id envelope passthrough on logTokenCall (ADAPT-03 proxy half)
+  - [x] 70-01-PLAN.md — Proxy OpenAI-compatible shim (/v1/chat/completions) + generic agent/granularity_tier/task_id envelope passthrough on logTokenCall (ADAPT-03 proxy half)
   - [ ] 70-02-PLAN.md — OpenCode custom-provider config at localhost:12435/v1 + live human-verify gate proving an agent='opencode' per-llm-call row (ADAPT-03 end-to-end)
   - [ ] 70-03-PLAN.md — Mastra instrumentation-surface investigation + D-08 proxy-route-vs-fallback resolution (ADAPT-04 SC-3)
   - [ ] 70-04-PLAN.md — Mastra implementation: Track A proxy-route OR Track B host-side better-sqlite3 fallback adapter + supervisor hook, with live gate (ADAPT-04 SC-4)
@@ -151,7 +151,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 67. Reproducibility & Replay Rig | v7.4 | 0/? | Not started | - |
 | 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
 | 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete    | 2026-06-22 |
-| 70. OpenCode + Mastra Token Adapters | v7.4 | 0/? | Not started | - |
+| 70. OpenCode + Mastra Token Adapters | v7.4 | 1/4 | In Progress|  |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 0/? | Not started | - |
 | 72. Syntactic Route Quality | v7.4 | 0/? | Not started | - |
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 0/? | Not started | - |

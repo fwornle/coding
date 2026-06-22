@@ -85,7 +85,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | TELEM-03 | Phase 68 | Complete |
 | ADAPT-01 | Phase 69 | Complete |
 | ADAPT-02 | Phase 69 | Complete |
-| ADAPT-03 | Phase 70 | Pending |
+| ADAPT-03 | Phase 70 | Complete |
 | ADAPT-04 | Phase 70 | Pending |
 | KB-01 | Phase 71 | Pending |
 | KB-02 | Phase 71 | Pending |
