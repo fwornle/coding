@@ -4,13 +4,13 @@ milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
 status: executing
 stopped_at: Phase 70 context gathered
-last_updated: "2026-06-22T18:39:45.332Z"
+last_updated: "2026-06-22T18:47:48.947Z"
 last_activity: 2026-06-22
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 13
-  completed_plans: 10
+  completed_plans: 11
   percent: 25
 ---
 
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 70 (opencode-mastra-token-adapters) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-22
 
@@ -265,6 +265,8 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [69-05]: onTokenRow receives { fullPath, exchange }; supervisor builds rows from fullPath. runSweep+loadArchivedSpans exported behind an import.meta entry-point guard for D-03 reuse. Sweep token emission gated to claude in the convert loop.
 - [Phase ?]: [69-06]: Copilot live session.shutdown token-row emission wired into copilot-events-tail with isolated onTokenRow (D-08, dedicated stderr not subagent onError); supervisor stamps rows via resolveLiveTaskIdSafe + user_hash copadt. Sweep Copilot branch reuses the SAME runSweep+loadArchivedSpans join (single empty-task_id backfill covers both adapters, D-03), dedup on (user_hash, tool_call_id). best-effort.test.js certifies the cross-adapter D-08 no-throw guarantee. No plist change; reload via launchctl kickstart com.coding.sub-agent-live-copilot.
 - [Phase ?]: [70-01]: OpenAI /v1/chat/completions shim maps onto /api/complete (single pipeline, D-02); generic agent/granularity_tier/task_id envelope passthrough serves opencode default + mastra via X-Agent with zero per-agent branches; T-70-03 0.0.0.0 LAN bind operator-ACCEPTED (load-bearing for host.docker.internal). Proxy commits 58a3514/5536f59/b5cbdc1.
+- [Phase ?]: [70-03] D-08 RESOLVED proxy-route: mastracode customProviders {name,url,apiKey} is a first-class arbitrary-url redirect seam; framework-instrumentation fallback not required
+- [Phase ?]: [70-03] Mastra granularity tier = per-llm-call via proxy-route; Plan 04 executes Track A (X-Agent: mastra stamp)
 
 ### Blockers/Concerns
 
@@ -353,10 +355,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 69 P05 | 12 | 2 tasks | 6 files |
 | Phase 69 P06 | 4 | 2 tasks | 5 files |
 | Phase 70 P01 | 12 min | 3 tasks | 2 files |
+| Phase 70 P03 | ~20 min | 2 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-06-22T18:39:31.663Z
+Last session: 2026-06-22T18:47:41.208Z
 Stopped at: Phase 70 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
