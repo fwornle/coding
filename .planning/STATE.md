@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
 status: executing
-stopped_at: Completed 68-01-PLAN.md (TELEM-01 — token_usage 6 attribution columns + idempotent migration; proxy commits 56a8c15/273a252; live restart+row gate owned by 68-03)
-last_updated: "2026-06-22T05:34:19.573Z"
+stopped_at: Completed 68-02-PLAN.md (TELEM-02 — measurement-span lifecycle: getActiveMeasurement single reader + start/stop atomic archive; proxy 3cdf4ee/7505ba6, coding a326e4e41; live restart+row gate owned by 68-03)
+last_updated: "2026-06-22T05:43:21.188Z"
 last_activity: 2026-06-22
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -54,8 +54,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 68 (foundational-token-attribution-storage) — EXECUTING
-Plan: 2 of 3
-Status: Ready to execute
+Plan: 3 of 3
+Status: Ready to execute (68-01 + 68-02 complete; 68-03 next — proxy write-path task_id stamping + live restart/row gate)
 Last activity: 2026-06-22
 
 ## Deferred Items
@@ -255,6 +255,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [66-01]: Per-model p50 median on getSummary by_model via parameterized ORDER BY latency_ms LIMIT 1 OFFSET (count-1)/2 (lower-mid) over the clamped 24h since-window; piggybacks on summary (no new endpoint), best-effort never-throws on empty DB
 - [Phase 66]: 66-03: worker-pool overhead_ms (dispatch-start to first-stdout, excludes generation) + NULL-safe p50_overhead_ms median (offset uses non-null count, WR-02); /recent + summary by_model expose the fields for 66-04 dashboard re-point
 - [Phase ?]: [68-01]: token_usage gains 6 additive attribution columns (agent/task_id/tool_call_id/parent_call_id/granularity_tier TEXT default empty, reasoning_tokens INTEGER default 0) via idempotent PRAGMA-guarded standalone ALTERs mirroring overhead_ms; TokenUsageRow fields optional + logCall coalesces to defaults so no existing writer breaks. SQLite 3.53.1 accepts NOT NULL DEFAULT const ALTER.
+- [Phase ?]: [68-02]: measurement-span lifecycle landed in rapid-llm-proxy (src/measurement-span.ts) — getActiveMeasurement is the SINGLE active-measurement.json parser (never throws on the proxy hot path; >24h stale stderr warning), startMeasurement/stopMeasurement write the open span + atomically archive to .data/measurements/<task_id>.json via temp+fs.renameSync. task_id sanitized via charset whitelist + path.basename (traversal collapses to safe basename; pure-traversal/empty throws). Coding operator CLIs (scripts/measurement-start.mjs, measurement-stop.mjs) import the LOCAL proxy dist via pathToFileURL — NOT coding's pinned v1.0.0 tarball — so the daemon + Plan 68-03 write path share one reader; LLM_PROXY_DIST_DIR overrides. Proxy 3cdf4ee/7505ba6, coding a326e4e41.
 
 ### Blockers/Concerns
 
@@ -338,7 +339,7 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-06-22T05:34:12.480Z
+Last session: 2026-06-22T05:42:28.028Z
 Stopped at: Completed 66-04-PLAN.md (SC-1 live-green confirmed; SC-2 pool-disabled-red deferred — overhead < 5s red threshold on this host; see 66 deferred-items.md)
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
