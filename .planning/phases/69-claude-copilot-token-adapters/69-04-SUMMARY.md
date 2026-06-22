@@ -105,3 +105,7 @@ None. `task_id=''` on emitted rows is an intentional contract boundary (the call
 - `f15be5b6e` feat(69-04): per-session-aggregate row extraction from modelMetrics (D-04)
 - `605d6ed42` test(69-04): add failing Phase-1 vocabulary-check assertion (D-04/D-09)
 - `a2a13ff43` feat(69-04): Phase-1 vocabulary check + version-keyed verdict (D-04/D-09)
+
+## Self-Check: PASSED
+
+All created files present on disk; all task + summary commits found in git history.

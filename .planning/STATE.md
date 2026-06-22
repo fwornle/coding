@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
 status: executing
-stopped_at: Phase 69 context gathered
-last_updated: "2026-06-22T15:15:13.859Z"
+stopped_at: Completed 69-04-PLAN.md
+last_updated: "2026-06-22T15:22:01.074Z"
 last_activity: 2026-06-22
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 13
 ---
 
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 69 (claude-copilot-token-adapters) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-06-22
 
@@ -261,6 +261,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [69-02] Distinct adapter user_hash 'cladpt'/'copadt' isolates the second writer MAX(id)+1 id-space from the proxy counter (D-06); insertTokenRow binds user_hash directly while coalescing numeric ??0 / TEXT ??'' / overhead_ms ??null
 - [Phase ?]: [69-02] task-id.mjs resolveLiveTaskIdSafe wraps the single span reader (resolveLiveTaskId) with ESM-named + CJS-default interop fallback; returns '' on any failure, no second active-span parser (D-03)
 - [Phase ?]: [69-03]: D-05 reasoning estimate = max(1,ceil(len/4)); per-reasoning-step rows stamp tokens_estimated=1, per-turn rows tokens_estimated=0 — never a native usage extraction. D-02 sub-agent parent_call_id reuses parentSessionFromClaudeSubagentPath (no subagents-dir re-walk); isSidechain:false first record yields [].
+- [Phase ?]: [69-04]: Copilot per-session-aggregate rows from session.shutdown.modelMetrics (one row per model, all numerics coalesced ?? 0; reasoningTokens-absent model -> 0). parseCopilot reused as recognized-primitive gate; raw JSON.parse reads the session.shutdown type discriminator since parseCopilot returns null for lifecycle events. Vocabulary verdict baked to v1.0.63 -> per-session-aggregate, per-turn upgrade branch present but inert.
 
 ### Blockers/Concerns
 
@@ -345,11 +346,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 69 P01 | 9min | 2 tasks | 5 files |
 | Phase 69 P02 | 18 | 2 tasks | 4 files |
 | Phase 69 P03 | 12 min | 2 tasks | 4 files |
+| Phase 69 P04 | 10 | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-06-22T15:15:00.966Z
-Stopped at: Phase 69 context gathered
+Last session: 2026-06-22T15:22:01.067Z
+Stopped at: Completed 69-04-PLAN.md
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
