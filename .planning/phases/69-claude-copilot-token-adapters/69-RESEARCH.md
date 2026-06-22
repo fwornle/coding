@@ -423,16 +423,17 @@ hook.start, hook.end, session.shutdown, abort
 
 **These are the decisions the planner/discuss-phase should surface to the user before execution.** A1–A3 are non-trivial.
 
-## Open Questions
+## Open Questions (RESOLVED 2026-06-22)
 
-1. **Claude reasoning-token source for D-01's per-reasoning-step rows.** [HIGH IMPORTANCE]
+> All three resolved during plan-phase (discuss-phase follow-up + planner). Markers added inline.
+
+1. **Claude reasoning-token source for D-01's per-reasoning-step rows.** [HIGH IMPORTANCE] — **RESOLVED → D-05 (CONTEXT.md).** User chose: emit first-class per-reasoning-step rows with `reasoning_tokens` ESTIMATED from thinking-block content length, stamped `tokens_estimated=1` so the value is flagged as derived (not native). Do NOT claim it is extracted from `usage`.
    - What we know: Claude session JSONL `usage` blocks carry NO reasoning/thinking token count (verified across 8 sessions). Thinking blocks have no token field. `output_tokens` includes thinking. Copilot, by contrast, surfaces `reasoningTokens` in `modelMetrics`.
-   - What's unclear: How to satisfy "per-reasoning-step rows carrying `reasoning_tokens` separate from input/output" (ADAPT-01 / D-01) when Claude provides no such number.
-   - Recommendation: **Surface to the user.** Likely resolution: for Claude, emit per-reasoning-step rows with `reasoning_tokens` ESTIMATED from thinking-block content length and `tokens_estimated=1`, OR document that Claude per-reasoning-step rows carry `reasoning_tokens=0` (structural marker only) until Anthropic exposes the count. For Copilot, `reasoningTokens` is real but only at the aggregate tier — a per-reasoning-step row is not possible there either. The phase should NOT silently emit zero-token reasoning rows without an explicit user decision.
+   - What was unclear: How to satisfy "per-reasoning-step rows carrying `reasoning_tokens` separate from input/output" (ADAPT-01 / D-01) when Claude provides no such number. → Settled by D-05.
 
-2. **Adapter `user_hash` choice and dashboard impact.** Does the user want adapter rows under a distinct `user_hash` (clean id-space, Pitfall 2) and how should they appear in the existing Token dashboard? (Confirm before locking the INSERT helper.)
+2. **Adapter `user_hash` choice and dashboard impact.** — **RESOLVED → D-06 (CONTEXT.md).** User chose a DISTINCT adapter `user_hash` (`cladpt` / `copadt`) so the second writer never collides with the proxy's in-memory id counter; dashboard groups adapter rows under that hash, accepted.
 
-3. **Live vs sweep dedup key.** Confirm `requestId` is present and unique on every Claude assistant turn (a quick multi-turn verification before the dedup design is locked).
+3. **Live vs sweep dedup key.** — **RESOLVED.** Dedup key is `(user_hash, tool_call_id)` where `tool_call_id` derives from `requestId` with an `?? record.uuid ?? ''` fallback. `requestId` has the `req_<26-hex>` format assigned by the Anthropic API per assistant turn; `uuid` is an always-present fallback. Plan 05 Task 2 carries an acceptance grep confirming `requestId` (or `uuid`) is non-empty on the dedup fixture, so absence/non-uniqueness is caught at test time rather than silently failing.
 
 ## Environment Availability
 
