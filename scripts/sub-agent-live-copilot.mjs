@@ -185,7 +185,7 @@ async function main() {
   // path is never affected (failure isolation).
   let tokenDb = null;
   let buildCopilotTokenRows = null;
-  let insertTokenRow = null;
+  let insertTokenRowDeduped = null;
   let resolveLiveTaskIdSafe = null;
   let ADAPTER_USER_HASH_COPILOT = null;
   try {
@@ -194,7 +194,7 @@ async function main() {
     ({ buildCopilotTokenRows, checkCopilotVocabulary, warnOnVersionDrift } =
       await import('../lib/lsl/token/copilot-token-rows.mjs'));
     const tokenDbMod = await import('../lib/lsl/token/token-db.mjs');
-    insertTokenRow = tokenDbMod.insertTokenRow;
+    insertTokenRowDeduped = tokenDbMod.insertTokenRowDeduped;
     ADAPTER_USER_HASH_COPILOT = tokenDbMod.ADAPTER_USER_HASH_COPILOT;
     ({ resolveLiveTaskIdSafe } = await import('../lib/lsl/token/task-id.mjs'));
 
@@ -225,8 +225,15 @@ async function main() {
    * session's events.jsonl, stamps each with the LIVE task_id (via the single
    * span reader) + the distinct adapter user_hash, and inserts each best-effort.
    * The whole body is wrapped in try/catch so an emission failure NEVER
-   * propagates back into the watcher's observation path; insertTokenRow is
-   * itself best-effort (returns false, never throws).
+   * propagates back into the watcher's observation path; the insert is itself
+   * best-effort (returns false, never throws).
+   *
+   * CR-01: the live tail may fire onTokenRow more than once for a session (and
+   * the same session.shutdown aggregate could be re-emitted), so we use the
+   * shared insertTokenRowDeduped which probes `(user_hash, tool_call_id)` and
+   * inserts only absent rows. The Copilot tool_call_id is now session-scoped
+   * (`<sessionUuid>:<model>`, CR-02) so distinct sessions on the same model do
+   * NOT collapse into one another.
    *
    * @param {{eventsPath: string, event: object}} ctx
    */
@@ -239,7 +246,7 @@ async function main() {
       for (const row of rows) {
         row.task_id = liveTaskId;
         row.user_hash = ADAPTER_USER_HASH_COPILOT;
-        insertTokenRow(tokenDb, row);
+        insertTokenRowDeduped(tokenDb, row);
       }
     } catch (err) {
       process.stderr.write(`[live-copilot] onTokenRow failed (non-fatal): ${err.message}\n`);

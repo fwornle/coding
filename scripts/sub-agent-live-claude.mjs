@@ -189,12 +189,12 @@ async function main(argv) {
   let tokenDb = null;
   let openTokenDb = null;
   let buildClaudeTokenRows = null;
-  let insertTokenRow = null;
+  let insertTokenRowDeduped = null;
   let resolveLiveTaskIdSafe = null;
   let ADAPTER_USER_HASH_CLAUDE = null;
   try {
     ({ buildClaudeTokenRows } = await import('../lib/lsl/token/claude-token-rows.mjs'));
-    ({ openTokenDb, insertTokenRow, ADAPTER_USER_HASH_CLAUDE } = await import('../lib/lsl/token/token-db.mjs'));
+    ({ openTokenDb, insertTokenRowDeduped, ADAPTER_USER_HASH_CLAUDE } = await import('../lib/lsl/token/token-db.mjs'));
     ({ resolveLiveTaskIdSafe } = await import('../lib/lsl/token/task-id.mjs'));
     const dataDir = process.env.LLM_PROXY_DATA_DIR
       ?? path.join(process.cwd(), '.data');
@@ -212,7 +212,15 @@ async function main(argv) {
    * the single span reader) + the distinct adapter user_hash, and inserts each
    * best-effort. The whole body is wrapped in try/catch so an emission failure
    * NEVER propagates back into the watcher's observation path or error budget;
-   * insertTokenRow is itself best-effort (returns false, never throws).
+   * the insert is itself best-effort (returns false, never throws).
+   *
+   * CR-01: buildClaudeTokenRows re-reads the ENTIRE JSONL and returns ALL rows,
+   * and this hook fires once per paired exchange — so without dedup, exchange 1's
+   * rows get re-inserted on every later exchange (O(n²) inflation). We use the
+   * shared insertTokenRowDeduped which probes `(user_hash, tool_call_id)` and
+   * inserts only absent rows, making the live path idempotent. Per-turn and
+   * per-reasoning-step rows have DISTINCT tool_call_ids (`base` vs
+   * `base:reason:N`) so they never collapse into each other.
    */
   async function onTokenRow({ fullPath }) {
     if (!tokenDb) return;
@@ -223,7 +231,7 @@ async function main(argv) {
       for (const row of rows) {
         row.task_id = liveTaskId;
         row.user_hash = ADAPTER_USER_HASH_CLAUDE;
-        insertTokenRow(tokenDb, row);
+        insertTokenRowDeduped(tokenDb, row);
       }
     } catch (err) {
       process.stderr.write(`[live-claude] onTokenRow failed (non-fatal): ${err.message}\n`);
