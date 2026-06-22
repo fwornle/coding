@@ -90,7 +90,11 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   2. OpenCode's active `task_id` is passed via the proxy request envelope and lands on the row.
   3. Mastra's instrumentation surface is identified from `.opencode/mastra.json` (per-step middleware vs observer hooks vs framework callbacks) and its granularity tier is determined.
   4. A Mastra adapter emits rows on the shared contract at the determined granularity tier, stamped with the active `task_id`.
-**Plans**: TBD
+**Plans**: 4 plans
+  - [ ] 70-01-PLAN.md — Proxy OpenAI-compatible shim (/v1/chat/completions) + generic agent/granularity_tier/task_id envelope passthrough on logTokenCall (ADAPT-03 proxy half)
+  - [ ] 70-02-PLAN.md — OpenCode custom-provider config at localhost:12435/v1 + live human-verify gate proving an agent='opencode' per-llm-call row (ADAPT-03 end-to-end)
+  - [ ] 70-03-PLAN.md — Mastra instrumentation-surface investigation + D-08 proxy-route-vs-fallback resolution (ADAPT-04 SC-3)
+  - [ ] 70-04-PLAN.md — Mastra implementation: Track A proxy-route OR Track B host-side better-sqlite3 fallback adapter + supervisor hook, with live gate (ADAPT-04 SC-4)
 
 ### Phase 71: Experiment KB & Task Taxonomy
 **Goal**: Each run materializes as an independent, queryable km-core entity with rich tags, and a curated task taxonomy is enforced so comparisons-as-queries return meaningful results.
