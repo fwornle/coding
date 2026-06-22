@@ -78,7 +78,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 69-02-PLAN.md — shared token-db (best-effort INSERT, distinct user_hash) + single-reader task_id resolver
   - [x] 69-03-PLAN.md — Claude per-turn + estimated per-reasoning-step rows + sub-agent parent_call_id linkage
   - [x] 69-04-PLAN.md — Copilot per-session-aggregate rows + Phase-1 vocabulary check (v1.0.63 verdict)
-  - [ ] 69-05-PLAN.md — Claude live-watcher/supervisor/sweep wiring + live task_id + dedup + reused backfill
+  - [x] 69-05-PLAN.md — Claude live-watcher/supervisor/sweep wiring + live task_id + dedup + reused backfill
   - [ ] 69-06-PLAN.md — Copilot live/sweep wiring + reused backfill + cross-adapter best-effort proof
 
 ### Phase 70: OpenCode + Mastra Token Adapters
@@ -146,7 +146,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
 | 67. Reproducibility & Replay Rig | v7.4 | 0/? | Not started | - |
 | 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
-| 69. Claude + Copilot Token Adapters | v7.4 | 4/6 | In Progress|  |
+| 69. Claude + Copilot Token Adapters | v7.4 | 5/6 | In Progress|  |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 0/? | Not started | - |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 0/? | Not started | - |
 | 72. Syntactic Route Quality | v7.4 | 0/? | Not started | - |
