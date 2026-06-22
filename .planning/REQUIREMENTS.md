@@ -31,8 +31,8 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ### Per-Agent Adapters (ADAPT)
 
-- [ ] **ADAPT-01:** Claude Code token rows are ingested from session JSONL `usage` blocks at `per-turn` granularity (plus `per-reasoning-step` rows for extended thinking), with sub-agents linked via `parent_call_id`; live-tail for in-progress sessions + sweep for completed ones.
-- [ ] **ADAPT-02:** Copilot CLI token rows are ingested from `events.jsonl` at `per-session-aggregate` granularity, with the Phase-1 event-vocabulary check that upgrades to `per-turn` if per-turn usage payloads exist.
+- [x] **ADAPT-01:** Claude Code token rows are ingested from session JSONL `usage` blocks at `per-turn` granularity (plus `per-reasoning-step` rows for extended thinking), with sub-agents linked via `parent_call_id`; live-tail for in-progress sessions + sweep for completed ones.
+- [x] **ADAPT-02:** Copilot CLI token rows are ingested from `events.jsonl` at `per-session-aggregate` granularity, with the Phase-1 event-vocabulary check that upgrades to `per-turn` if per-turn usage payloads exist.
 - [ ] **ADAPT-03:** OpenCode LLM calls route through the proxy (`host.docker.internal:12435`) and are logged `per-llm-call` with the active `task_id` passed via the request envelope.
 - [ ] **ADAPT-04:** Mastra's instrumentation surface is identified (from `.opencode/mastra.json`) and an adapter emits rows on the shared contract at its determined granularity tier.
 
