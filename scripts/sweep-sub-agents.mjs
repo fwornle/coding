@@ -188,6 +188,99 @@ async function emitClaudeCompletedSessionTokenRows(discovered) {
   return stats;
 }
 
+/**
+ * Phase 69 (Plan 69-06 Task 2): completed-session Copilot token-row emission +
+ * reused timestamp-join backfill. Best-effort — wrapped in try/catch so a token
+ * failure NEVER aborts the sub-agent sweep (D-08).
+ *
+ * For each completed Copilot session events.jsonl (the discovered rows'
+ * transcript_path) it builds per-session-aggregate rows via buildCopilotTokenRows
+ * (task_id='' — the sweep does NOT call the live reader), sets
+ * user_hash=ADAPTER_USER_HASH_COPILOT, and inserts each — BUT first dedups
+ * against live-captured rows (Pitfall 4 / T-69-id): a row whose
+ * `(user_hash, tool_call_id)` already exists is skipped (parameterized
+ * `SELECT 1 ... LIMIT 1`; Copilot natural key = session-uuid + model, carried as
+ * tool_call_id=model). After emission it REUSES the SAME locked timestamp-join
+ * (runSweep + loadArchivedSpans from backfill-task-id-by-timestamp.mjs, D-03 —
+ * never re-implemented; the `WHERE task_id = ''` clause covers the new Copilot
+ * rows alongside Claude's) so the just-written task_id='' adapter rows get
+ * stamped from archived spans (idempotent, never clobbers a live-stamped value).
+ *
+ * @param {Array<object>} discovered registry rows from the copilot adapter
+ *   (each carries `transcript_path` pointing at events.jsonl).
+ * @returns {Promise<{emitted:number, skipped:number, backfilled:number}>}
+ */
+async function emitCopilotCompletedSessionTokenRows(discovered) {
+  const stats = { emitted: 0, skipped: 0, backfilled: 0 };
+  let db = null;
+  try {
+    const { buildCopilotTokenRows } = await import('../lib/lsl/token/copilot-token-rows.mjs');
+    const { openTokenDb, insertTokenRow, ADAPTER_USER_HASH_COPILOT } = await import('../lib/lsl/token/token-db.mjs');
+    const { runSweep, loadArchivedSpans } = await import('./backfill-task-id-by-timestamp.mjs');
+
+    const dataDir = process.env.LLM_PROXY_DATA_DIR
+      ?? path.join(process.cwd(), '.data');
+    const tokenDbPath = path.join(dataDir, 'llm-proxy', 'token-usage.db');
+    const measurementsDir = path.join(dataDir, 'measurements');
+
+    db = openTokenDb(tokenDbPath);
+
+    // Pitfall 4 dedup probe — parameterized; skip insert when a row with the
+    // same (user_hash, tool_call_id) already exists (live capture wrote it).
+    const existsStmt = db.prepare(
+      'SELECT 1 FROM token_usage WHERE user_hash = ? AND tool_call_id = ? LIMIT 1',
+    );
+
+    for (const row of discovered) {
+      const eventsPath = row && row.transcript_path;
+      if (!eventsPath || typeof eventsPath !== 'string') continue;
+      let rows;
+      try {
+        rows = buildCopilotTokenRows(eventsPath);
+      } catch (err) {
+        process.stderr.write(`[sweep] copilot token build failed (non-fatal) ${eventsPath}: ${err.message}\n`);
+        continue;
+      }
+      for (const tokenRow of rows || []) {
+        tokenRow.user_hash = ADAPTER_USER_HASH_COPILOT;
+        tokenRow.task_id = ''; // the sweep stamps task_id via the join below.
+        // Dedup: skip if live capture already inserted this (user_hash, tool_call_id).
+        const hit = existsStmt.get(tokenRow.user_hash, tokenRow.tool_call_id);
+        if (hit) {
+          stats.skipped += 1;
+          continue;
+        }
+        if (insertTokenRow(db, tokenRow)) stats.emitted += 1;
+      }
+    }
+
+    // REUSE the locked timestamp-join (D-03) — stamp the just-written task_id=''
+    // adapter rows from archived spans. Single join covers BOTH adapters via the
+    // `WHERE task_id = ''` clause. Never clobbers a live value; idempotent.
+    try {
+      const spans = loadArchivedSpans(measurementsDir);
+      if (spans.length > 0) {
+        const { total } = runSweep(db, spans, false);
+        stats.backfilled = total;
+      }
+    } catch (err) {
+      process.stderr.write(`[sweep] copilot token backfill join failed (non-fatal): ${err.message}\n`);
+    }
+
+    process.stderr.write(
+      `[sweep] copilot token rows emitted=${stats.emitted} deduped=${stats.skipped} task_id-backfilled=${stats.backfilled}\n`,
+    );
+  } catch (err) {
+    // Best-effort: a sweep token failure NEVER aborts the sub-agent sweep (D-08).
+    process.stderr.write(`[sweep] copilot token emission disabled (non-fatal): ${err.message}\n`);
+  } finally {
+    if (db && typeof db.close === 'function') {
+      try { db.close(); } catch { /* ignore */ }
+    }
+  }
+  return stats;
+}
+
 async function main(argv) {
   if (hasFlag(argv, '--help') || hasFlag(argv, '-h')) {
     printHelp();
@@ -299,6 +392,13 @@ async function main(argv) {
     // helper is fully best-effort and never throws back into the sweep loop.
     if (agentId === 'claude') {
       await emitClaudeCompletedSessionTokenRows(discovered);
+    }
+
+    // Phase 69 (Plan 69-06 Task 2): emit completed-session Copilot aggregate
+    // rows (dedup'd against live capture) + reuse the timestamp-join backfill.
+    // Additive alongside the Claude branch in the same file; best-effort.
+    if (agentId === 'copilot') {
+      await emitCopilotCompletedSessionTokenRows(discovered);
     }
 
     anySuccess = true;
