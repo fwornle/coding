@@ -41,7 +41,7 @@ afterEach(() => {
 test('resolveLiveTaskIdSafe returns the value from the single span reader', async () => {
   jest.resetModules();
   const dir = makeStubDist(
-    "export function resolveLiveTaskId() { return 'task-abc'; }\n",
+    "module.exports = { resolveLiveTaskId: () => 'task-abc' };\n",
   );
   process.env.LLM_PROXY_DIST_DIR = dir;
   try {
@@ -56,7 +56,7 @@ test('resolveLiveTaskIdSafe returns the value from the single span reader', asyn
 test('resolveLiveTaskIdSafe returns "" and does not throw when the reader throws', async () => {
   jest.resetModules();
   const dir = makeStubDist(
-    "export function resolveLiveTaskId() { throw new Error('boom'); }\n",
+    "module.exports = { resolveLiveTaskId: () => { throw new Error('boom'); } };\n",
   );
   process.env.LLM_PROXY_DIST_DIR = dir;
   try {
