@@ -9,7 +9,8 @@
  *      model in the Wave-0 events fixture (two models in session.shutdown).
  *   2. Each row carries the coalesced input/output token counts,
  *      total_tokens = input + output, granularity_tier='per-session-aggregate',
- *      agent='copilot', provider='copilot', tool_call_id===model, user_hash='copadt'.
+ *      agent='copilot', provider='copilot', user_hash='copadt', and a
+ *      session-scoped tool_call_id `<sessionUuid>:<model>` (CR-02).
  *   3. The model whose usage OMITS reasoningTokens (claude-sonnet-4.6) coalesces
  *      to reasoning_tokens===0 — never NaN/null (Pitfall 5).
  *   4. The model carrying reasoningTokens (claude-opus-4.6) preserves it.
@@ -49,12 +50,16 @@ test('one per-session-aggregate row per model, with coalesced counts', () => {
     // session.shutdown.modelMetrics has exactly two models.
     expect(agg.length).toBe(2);
 
+    // CR-02: the fixture's session.start carries this data.sessionId.
+    const SESSION_ID = '00000000-0000-4000-a000-000000000000';
+
     for (const r of agg) {
       expect(r.agent).toBe('copilot');
       expect(r.provider).toBe('copilot');
       expect(r.process).toBe('token-adapter-copilot');
       expect(r.user_hash).toBe('copadt');
-      expect(r.tool_call_id).toBe(r.model);
+      // Session-scoped natural key: `<sessionUuid>:<model>` (CR-02).
+      expect(r.tool_call_id).toBe(`${SESSION_ID}:${r.model}`);
       expect(typeof r.input_tokens).toBe('number');
       expect(typeof r.output_tokens).toBe('number');
       expect(typeof r.reasoning_tokens).toBe('number');
