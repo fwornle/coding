@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
-status: executing
-stopped_at: PAUSED at 68-03 Task 3 operator checkpoint (TELEM-03 — write path stamps task_id via resolveLiveTaskId single reader + backfill sweep DONE & committed: proxy 5aa92a2/bf17f24, coding ad60b02eb; BLOCKING live restarted-daemon row gate awaits operator — restart com.coding.llm-cli-proxy, drive a real /api/complete call inside a span, confirm task_id=telem-live-68 row + empty-task_id row via sqlite3. See 68-03-SUMMARY.md "Operator commands to run".)
-last_updated: "2026-06-22T05:50:00.000Z"
+status: verifying
+stopped_at: Completed 66-04-PLAN.md (SC-1 live-green confirmed; SC-2 pool-disabled-red deferred — overhead < 5s red threshold on this host; see 66 deferred-items.md)
+last_updated: "2026-06-22T05:58:51.546Z"
 last_activity: 2026-06-22
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 13
 ---
 
 # Project State
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 68 (foundational-token-attribution-storage) — EXECUTING
-Plan: 3 of 3
-Status: PAUSED at 68-03 Task 3 operator checkpoint — autonomous Tasks 1 & 2 (write-path task_id stamping via resolveLiveTaskId single reader + completed-session backfill sweep) DONE, built green, tested (3/3 stamping + 1/1 backfill self-test), committed (proxy 5aa92a2/bf17f24, coding ad60b02eb). BLOCKING: operator must restart com.coding.llm-cli-proxy + verify a live stamped row. Plan NOT yet complete; advance the counter only after "approved".
+Phase: 68 (foundational-token-attribution-storage) — COMPLETE (ready for phase verification)
+Plan: 3 of 3 (all complete)
+Status: Phase 68 done. TELEM-01 (attribution columns), TELEM-02 (measurement-span start/stop lifecycle), TELEM-03 (write-path task_id stamping + backfill sweep) all complete. 68-03 live restarted-daemon row gate PASSED 2026-06-22: operator restarted com.coding.llm-cli-proxy (startup migration added all 6 attribution columns), in-span /api/complete landed task_id=telem-live-68 (row 123286), out-of-span landed '' (row 123292), archived span telem-live-68.json written with ended_at. Commits: proxy 5aa92a2/bf17f24, coding ad60b02eb. Next: /gsd:verify-phase 68, then advance to Phase 69.
 Last activity: 2026-06-22
 
 ## Deferred Items
@@ -256,6 +256,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase 66]: 66-03: worker-pool overhead_ms (dispatch-start to first-stdout, excludes generation) + NULL-safe p50_overhead_ms median (offset uses non-null count, WR-02); /recent + summary by_model expose the fields for 66-04 dashboard re-point
 - [Phase ?]: [68-01]: token_usage gains 6 additive attribution columns (agent/task_id/tool_call_id/parent_call_id/granularity_tier TEXT default empty, reasoning_tokens INTEGER default 0) via idempotent PRAGMA-guarded standalone ALTERs mirroring overhead_ms; TokenUsageRow fields optional + logCall coalesces to defaults so no existing writer breaks. SQLite 3.53.1 accepts NOT NULL DEFAULT const ALTER.
 - [Phase ?]: [68-02]: measurement-span lifecycle landed in rapid-llm-proxy (src/measurement-span.ts) — getActiveMeasurement is the SINGLE active-measurement.json parser (never throws on the proxy hot path; >24h stale stderr warning), startMeasurement/stopMeasurement write the open span + atomically archive to .data/measurements/<task_id>.json via temp+fs.renameSync. task_id sanitized via charset whitelist + path.basename (traversal collapses to safe basename; pure-traversal/empty throws). Coding operator CLIs (scripts/measurement-start.mjs, measurement-stop.mjs) import the LOCAL proxy dist via pathToFileURL — NOT coding's pinned v1.0.0 tarball — so the daemon + Plan 68-03 write path share one reader; LLM_PROXY_DIST_DIR overrides. Proxy 3cdf4ee/7505ba6, coding a326e4e41.
+- [Phase 68]: TELEM-03 live gate (2026-06-22): in-window resolution stamps ALL proxy-routed rows in the span window — concurrent background services (observation-writer) sharing the window are correctly attributed to the active task, not just the foreground call. Intended span semantics.
 
 ### Blockers/Concerns
 
@@ -336,6 +337,7 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 66 P03 | 6 min | 3 tasks | 5 files |
 | Phase 66 P04 | ~45 min | 3 tasks (T1-2 prior executor; T3 disruptive UAT this run) | 2 files |
 | Phase 68 P01 | 6 min | 2 tasks | 2 files |
+| Phase 68 P03 | 40m | 3 tasks | 5 files |
 
 ## Session Continuity
 

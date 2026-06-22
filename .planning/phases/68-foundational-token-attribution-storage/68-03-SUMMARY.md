@@ -2,8 +2,8 @@
 phase: 68-foundational-token-attribution-storage
 plan: 03
 subsystem: rapid-llm-proxy write path + coding backfill sweep
-tags: [telemetry, token-attribution, write-path, backfill, TELEM-03, checkpoint-paused]
-status: paused-at-checkpoint
+tags: [telemetry, token-attribution, write-path, backfill, TELEM-03]
+status: complete
 requires:
   - "Plan 68-01 token_usage attribution columns (task_id TEXT NOT NULL DEFAULT '')"
   - "Plan 68-02 getActiveMeasurement single reader + start/stop lifecycle"
@@ -33,15 +33,15 @@ decisions:
   - "Live span is open (no ended_at), so the in-window rule reduces to 'span present ⇒ in-window' on the hot path; the full started_at ≤ T ≤ ended_at window check lives only in the backfill sweep against archived (ended_at-bearing) spans."
   - "Backfill defaults the data dir to LLM_PROXY_DATA_DIR (→ /Users/Q284340/Agentic/coding/.data fallback); opens the token DB readonly for --dry-run, read-write for apply; a missing .data/measurements dir is a non-fatal no-op (it does not exist until the first stopMeasurement archives a span)."
 metrics:
-  duration: "in progress (paused at checkpoint)"
+  duration: "~40 min (autonomous Tasks 1-2) + operator live gate (Task 3)"
   completed: 2026-06-22
-  tasks: "2 of 3 autonomous tasks complete; Task 3 is a blocking operator checkpoint (live restarted-daemon row gate)"
+  tasks: "3 of 3 complete — Tasks 1 & 2 autonomous, Task 3 live restarted-daemon row gate PASSED by operator"
   files: 5
 ---
 
 # Phase 68 Plan 03: Proxy Write-Path task_id Stamping + Backfill Sweep Summary
 
-Wired the rapid-llm-proxy token-usage write path to stamp every row with the active measurement span's `task_id` through the single `getActiveMeasurement()` reader (via a new exported `resolveLiveTaskId` rule — active span → `span.task_id`, no span / any error → `''`, best-effort and never-throwing), and added a completed-session backfill sweep that timestamp-joins archived spans to already-written unattributed rows without ever overwriting a live-stamped value. **Tasks 1 & 2 are complete and committed atomically across both repos; Task 3 (the live restarted-daemon row gate) is a BLOCKING operator checkpoint — this plan is PAUSED awaiting operator verification and may NOT be marked TELEM-03-complete until the live stamped row is confirmed.**
+Wired the rapid-llm-proxy token-usage write path to stamp every row with the active measurement span's `task_id` through the single `getActiveMeasurement()` reader (via a new exported `resolveLiveTaskId` rule — active span → `span.task_id`, no span / any error → `''`, best-effort and never-throwing), and added a completed-session backfill sweep that timestamp-joins archived spans to already-written unattributed rows without ever overwriting a live-stamped value. **All 3 tasks complete: Tasks 1 & 2 committed atomically across both repos; Task 3 (the live restarted-daemon row gate) PASSED — the operator restarted `com.coding.llm-cli-proxy`, the startup migration added all 6 attribution columns, and a real `/api/complete` call inside a span landed `task_id=telem-live-68` while an out-of-span call landed `task_id=''`. TELEM-03 is satisfied.**
 
 ## What Was Built
 
@@ -67,24 +67,11 @@ Wired the rapid-llm-proxy token-usage write path to stamp every row with the act
   - `grep "task_id = ''" scripts/backfill-task-id-by-timestamp.mjs` → UPDATE + COUNT both gated on the empty-string default.
   - `grep -c "console\." scripts/backfill-task-id-by-timestamp.mjs` → 0.
 
-## Live-DB schema state (evidence for the gate)
+## Task 3 — LIVE RESTARTED-DAEMON ROW GATE: PASSED
 
-The RUNNING daemon predates Plan 68-01's migration — the live token DB does NOT yet carry `task_id`:
+**Type:** human-verify (gate="blocking") — operator-executed 2026-06-22, approved.
 
-```
-cols: id, timestamp, provider, model, process, subscription, input_tokens,
-      output_tokens, total_tokens, latency_ms, prompt_preview, tokens_estimated,
-      user_hash, model_raw, overhead_ms
-has task_id: false
-```
-
-The 68-01 additive columns only apply to NEW `initTokenDb()` connections. Restarting `com.coding.llm-cli-proxy` runs `initTokenDb()` and migrates the live schema (adds the 6 attribution columns), after which the new write path stamps `task_id`. This is exactly what Task 3 verifies.
-
-## CHECKPOINT REACHED — Task 3 (live restarted-daemon row gate)
-
-**Type:** human-verify (gate="blocking")
-**Plan:** 68-03
-**Progress:** 2 / 3 tasks complete (both autonomous tasks done + committed)
+The RUNNING daemon predated Plan 68-01's migration, so the live token DB did NOT carry `task_id` before the restart. The 68-01 additive columns only apply to NEW `initTokenDb()` connections; restarting `com.coding.llm-cli-proxy` runs `initTokenDb()` which migrated the live schema (added the 6 attribution columns), after which the new write path stamped `task_id`. The operator ran the full gate sequence and the executor re-verified the resulting state on disk.
 
 ### Completed Tasks
 
@@ -92,59 +79,58 @@ The 68-01 additive columns only apply to NEW `initTokenDb()` connections. Restar
 | ---- | ---- | ---- | ------ | ----- |
 | 1 | Stamp task_id via resolveLiveTaskId + stamping test | rapid-llm-proxy | `5aa92a2` (feat), `bf17f24` (test) | measurement-span.ts, index.ts, server.mjs, token-stamping.test.mjs, .d.ts.maps |
 | 2 | Completed-session backfill sweep | coding | `ad60b02eb` (feat) | scripts/backfill-task-id-by-timestamp.mjs |
+| 3 | Live restarted-daemon row gate | n/a (verification) | — | live token DB + archived span |
 
-### Why the executor stopped here
+### Live gate evidence (operator-run, executor-verified on disk)
 
-Task 3 requires restarting the launchd-managed live proxy daemon and driving real LLM calls that mutate the live token DB. Per the plan (`autonomous: false`, `gate="blocking"`) and the execution objective, the executor does NOT restart launchd daemons or drive live provider calls — the operator owns the live restart + row verification. The proxy is already built (`npm run build` exit 0) and `dist/` carries the new export, so the daemon will pick up the stamping code on restart.
+**1. Schema migrated on restart** — after `launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy`, the startup migration added all six attribution columns:
 
-### Operator commands to run (exact)
-
-```bash
-# 1. (already done by executor) build is green — confirm if you wish:
-cd /Users/Q284340/Agentic/_work/rapid-llm-proxy && npm run build   # MUST exit 0
-
-# 2. Restart the daemon so it loads the new dist + migrates the live schema:
-launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy
-
-# 2a. Confirm the live schema migrated (task_id now present):
-sqlite3 /Users/Q284340/Agentic/coding/.data/llm-proxy/token-usage.db "PRAGMA table_info(token_usage);" | grep task_id
-
-# 2b. Confirm the proxy is up on the RIGHT port (12435 — NOT 3033):
-curl -s -X POST http://localhost:12435/api/complete -H 'Content-Type: application/json' \
-  -d '{"process":"telem-smoke","messages":[{"role":"user","content":"reply with the single word OK"}]}'
-#   → expect JSON { content, provider, model, ... }  (NOT "Cannot POST" — that means wrong port)
-
-# 3. Start a measurement span:
-node /Users/Q284340/Agentic/coding/scripts/measurement-start.mjs --task-id telem-live-68
-#   → .data/active-measurement.json with task_id=telem-live-68
-
-# 4. Trigger one real LLM call THROUGH the proxy (repeat the curl from 2b).
-
-# 5. Read back the newest row — task_id MUST equal telem-live-68:
-sqlite3 /Users/Q284340/Agentic/coding/.data/llm-proxy/token-usage.db \
-  "SELECT id, timestamp, process, task_id FROM token_usage ORDER BY id DESC LIMIT 3;"
-
-# 6. Stop the span:
-node /Users/Q284340/Agentic/coding/scripts/measurement-stop.mjs
-#   → .data/measurements/telem-live-68.json with ended_at; active-measurement.json gone
-
-# 7. Trigger one MORE LLM call (no active span) and re-query — newest task_id MUST be '' (empty):
-sqlite3 /Users/Q284340/Agentic/coding/.data/llm-proxy/token-usage.db \
-  "SELECT id, timestamp, process, task_id FROM token_usage ORDER BY id DESC LIMIT 3;"
-
-# 8. (optional) Confirm the backfill would attribute step-7's unattributed rows to the archived span:
-node /Users/Q284340/Agentic/coding/scripts/backfill-task-id-by-timestamp.mjs --dry-run
+```
+15|agent|TEXT|1|''|0
+16|task_id|TEXT|1|''|0
+17|tool_call_id|TEXT|1|''|0
+18|parent_call_id|TEXT|1|''|0
+19|granularity_tier|TEXT|1|''|0
+20|reasoning_tokens|INTEGER|1|0|0
 ```
 
-### Evidence required back
+**2. Span started** — `measurement-start.mjs --task-id telem-live-68` → active span `started_at=2026-06-22T05:55:15.270Z`.
 
-1. The step-5 sqlite3 output showing the newest row's `task_id = telem-live-68` (with an active span).
-2. The step-7 sqlite3 output showing the newest row's `task_id = ''` (no active span).
-3. Confirmation `launchctl kickstart` succeeded and `.data/measurements/telem-live-68.json` was written with `ended_at`.
+**3. IN-SPAN `/api/complete` (process telem-smoke)** → newest rows (REQUIRED MATCH ✓):
 
-### Resume signal
+```
+id      process             task_id
+123286  telem-smoke         telem-live-68     ← in-window → span.task_id ✓
+123285  observation-writer  telem-live-68
+123284  observation-writer  telem-live-68
+```
 
-Type **"approved"** (paste the two sqlite3 outputs) once the live stamped row (`task_id=telem-live-68`) and the empty-task_id row are both confirmed, or describe what failed.
+Concurrent `observation-writer` rows in the same window were also stamped `telem-live-68` — correct per the in-window resolution rule; the span captures all proxy-routed background services active during the task.
+
+**4. Span stopped** — `measurement-stop.mjs` → `ended_at=2026-06-22T05:55:30.164Z`, archived to `.data/measurements/telem-live-68.json`; `.data/active-measurement.json` removed.
+
+**5. OUT-OF-SPAN `/api/complete` (process telem-smoke)** → newest row (REQUIRED MATCH ✓):
+
+```
+id      process             task_id
+123292  telem-smoke         (empty '')        ← out-of-window → '' ✓
+123291  observation-writer  telem-live-68
+123290  observation-writer  telem-live-68
+```
+
+**6. Archive verified** — `.data/measurements/telem-live-68.json` carries `task_id=telem-live-68`, `started_at=2026-06-22T05:55:15.270Z`, `ended_at=2026-06-22T05:55:30.164Z`; `.data/active-measurement.json` absent.
+
+### Executor re-verification (independent disk read at close-out)
+
+```
+schema:  task_id at col 16 (+ agent/tool_call_id/parent_call_id/granularity_tier/reasoning_tokens) present
+row 123286 (telem-smoke):  task_id = telem-live-68      ✓
+row 123292 (telem-smoke):  task_id = ''  (empty)        ✓
+.data/measurements/telem-live-68.json:  ended_at present ✓
+.data/active-measurement.json:           ABSENT          ✓
+```
+
+All required matches satisfied: in-window → `span.task_id`, out-of-window → `''`. TELEM-03 verified end-to-end against the running daemon.
 
 ## Threat Model Disposition
 
@@ -173,5 +159,6 @@ None — both autonomous tasks executed as written. The plan's preferred factori
 - FOUND: `.planning/phases/68-foundational-token-attribution-storage/68-03-SUMMARY.md`
 - FOUND commits (rapid-llm-proxy): `5aa92a2`, `bf17f24`
 - FOUND commit (coding): `ad60b02eb`
+- LIVE GATE re-verified on disk at close-out: schema task_id@col16 present; row 123286 task_id=telem-live-68; row 123292 task_id=''; archived span telem-live-68.json has ended_at; active-measurement.json absent.
 
-(Plan PAUSED at the Task 3 operator checkpoint; STATE/ROADMAP keep Plan 68-03 OPEN — they advance only after the live gate is approved.)
+(Plan 68-03 COMPLETE — live gate approved 2026-06-22; STATE plan counter advanced, ROADMAP 68-03 checked, TELEM-03 marked complete.)

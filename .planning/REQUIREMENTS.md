@@ -82,7 +82,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | REPRO-02 | Phase 67 | Pending |
 | TELEM-01 | Phase 68 | Complete |
 | TELEM-02 | Phase 68 | Complete |
-| TELEM-03 | Phase 68 | Pending |
+| TELEM-03 | Phase 68 | Complete |
 | ADAPT-01 | Phase 69 | Pending |
 | ADAPT-02 | Phase 69 | Pending |
 | ADAPT-03 | Phase 70 | Pending |

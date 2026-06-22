@@ -27,7 +27,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 **Foundational ordering:** Phase 68 (TELEM — the `token_usage` row contract + measurement span) is the dependency anchor. Every adapter, route, score, and dashboard requirement reads or writes rows with the new columns and consults `.data/active-measurement.json`. It MUST land and verify before any per-agent adapter work (Phases 69–70) begins.
 
 - [ ] **Phase 67: Reproducibility & Replay Rig** — Snapshot/restore internal state + record/replay external state so N=1 runs become comparable
-- [ ] **Phase 68: [FOUNDATIONAL] Token Attribution Storage** — `token_usage` schema extension + measurement-span contract + `attachTokenLogger` task_id stamping
+- [x] **Phase 68: [FOUNDATIONAL] Token Attribution Storage** — `token_usage` schema extension + measurement-span contract + `attachTokenLogger` task_id stamping (completed 2026-06-22)
 - [ ] **Phase 69: Claude + Copilot Token Adapters** — Claude per-turn + per-reasoning-step JSONL adapter; Copilot events.jsonl adapter with Phase-1 event-vocabulary check
 - [ ] **Phase 70: OpenCode + Mastra Token Adapters** — OpenCode proxy-route per-llm-call logging; Mastra instrumentation-surface read + adapter
 - [ ] **Phase 71: Experiment KB & Task Taxonomy** — km-core ontology + Run-write path + enforced task-taxonomy v0 tag
@@ -61,7 +61,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 **Plans**: 3 plans
   - [x] 68-01-PLAN.md — TELEM-01: token_usage additive columns + idempotent PRAGMA-guarded startup migration + extended row/insert/logCall (Wave 1)
   - [x] 68-02-PLAN.md — TELEM-02: measurement-span lifecycle (start/stop atomic archive + >24h stale warning) + single getActiveMeasurement() SDK reader + barrel export + operator CLIs (Wave 1)
-  - [ ] 68-03-PLAN.md — TELEM-03: proxy write-path task_id stamping via the single reader + completed-session timestamp-join backfill sweep + live restarted-daemon row gate (Wave 2)
+  - [x] 68-03-PLAN.md — TELEM-03: proxy write-path task_id stamping via the single reader + completed-session timestamp-join backfill sweep + live restarted-daemon row gate (Wave 2)
 
 ### Phase 69: Claude + Copilot Token Adapters
 **Goal**: Claude Code and Copilot CLI token spend lands in `token_usage` on the shared contract at the best granularity each surfaces, with sub-agents linked to their parent.
@@ -139,7 +139,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 65. Acceptance | v7.3 | 1/1 | Complete | 2026-06-21 |
 | 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
 | 67. Reproducibility & Replay Rig | v7.4 | 0/? | Not started | - |
-| 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 2/3 | In Progress|  |
+| 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete   | 2026-06-22 |
 | 69. Claude + Copilot Token Adapters | v7.4 | 0/? | Not started | - |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 0/? | Not started | - |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 0/? | Not started | - |
