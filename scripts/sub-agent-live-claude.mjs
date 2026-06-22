@@ -178,6 +178,58 @@ async function main(argv) {
     return 2;
   }
 
+  // --- Phase 69 (Plan 69-05 Task 1): token-row emission wiring (D-08).
+  //
+  // Dynamic-import the token modules — same guarded pattern as
+  // ObservationWriter above so `--help` works without better-sqlite3 / the
+  // proxy DB present. Construct a SECOND-writer token-db handle against the
+  // proxy-owned token-usage.db. Everything here is best-effort: if the import
+  // or the DB open fails, the daemon logs and runs WITHOUT token emission —
+  // the LSL observation path is never affected (failure isolation).
+  let tokenDb = null;
+  let openTokenDb = null;
+  let buildClaudeTokenRows = null;
+  let insertTokenRow = null;
+  let resolveLiveTaskIdSafe = null;
+  let ADAPTER_USER_HASH_CLAUDE = null;
+  try {
+    ({ buildClaudeTokenRows } = await import('../lib/lsl/token/claude-token-rows.mjs'));
+    ({ openTokenDb, insertTokenRow, ADAPTER_USER_HASH_CLAUDE } = await import('../lib/lsl/token/token-db.mjs'));
+    ({ resolveLiveTaskIdSafe } = await import('../lib/lsl/token/task-id.mjs'));
+    const dataDir = process.env.LLM_PROXY_DATA_DIR
+      ?? path.join(process.cwd(), '.data');
+    const tokenDbPath = path.join(dataDir, 'llm-proxy', 'token-usage.db');
+    tokenDb = openTokenDb(tokenDbPath);
+    process.stderr.write(`[live-claude] token emission enabled — db=${tokenDbPath}\n`);
+  } catch (err) {
+    tokenDb = null;
+    process.stderr.write(`[live-claude] token emission disabled (non-fatal): ${err.message}\n`);
+  }
+
+  /**
+   * Additive onTokenRow hook (D-08). Builds per-turn + per-reasoning-step rows
+   * from the just-tailed Claude JSONL, stamps each with the LIVE task_id (via
+   * the single span reader) + the distinct adapter user_hash, and inserts each
+   * best-effort. The whole body is wrapped in try/catch so an emission failure
+   * NEVER propagates back into the watcher's observation path or error budget;
+   * insertTokenRow is itself best-effort (returns false, never throws).
+   */
+  async function onTokenRow({ fullPath }) {
+    if (!tokenDb) return;
+    try {
+      const rows = buildClaudeTokenRows(fullPath);
+      if (!rows || rows.length === 0) return;
+      const liveTaskId = await resolveLiveTaskIdSafe();
+      for (const row of rows) {
+        row.task_id = liveTaskId;
+        row.user_hash = ADAPTER_USER_HASH_CLAUDE;
+        insertTokenRow(tokenDb, row);
+      }
+    } catch (err) {
+      process.stderr.write(`[live-claude] onTokenRow failed (non-fatal): ${err.message}\n`);
+    }
+  }
+
   // Error-budget tracking — if onError fires > ERROR_BUDGET_LIMIT times in
   // ERROR_BUDGET_WINDOW_MS, the daemon exits 1 for the supervisor to restart
   // (T-51-07-DR mitigation).
@@ -204,6 +256,8 @@ async function main(argv) {
       registry,
       observationWriter: writer,
       onError: recordError,
+      // Phase 69 (Plan 69-05 Task 1): additive token-row hook (D-08 isolated).
+      onTokenRow,
     });
   } catch (err) {
     process.stderr.write(`[live-claude] startClaudeWatcher failed: ${err.message}\n`);
@@ -258,6 +312,14 @@ async function main(argv) {
         await writer.close();
       } catch (err) {
         process.stderr.write(`[live-claude] writer.close failed: ${err.message}\n`);
+      }
+    }
+    // Phase 69: close the token-db second-writer handle (best-effort).
+    if (tokenDb && typeof tokenDb.close === 'function') {
+      try {
+        tokenDb.close();
+      } catch (err) {
+        process.stderr.write(`[live-claude] tokenDb.close failed: ${err.message}\n`);
       }
     }
     // Final heartbeat with shutdown_at.
