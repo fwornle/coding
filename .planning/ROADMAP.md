@@ -105,7 +105,12 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   2. A Run-write path materializes each run as a queryable km-core entity carrying tags (`task_hash`, `task_class`, `agent`, `model`, `framework`, `spec_level`, `snapshot_id`, `trace_id`) sourced from `token_usage` + route + score data.
   3. A task taxonomy v0 (`refactor`, `bugfix`, `new-feature`, `migration`, `debug`, `docs`) exists with definitions.
   4. The `task_class` tag is enforced as required at run-end — a run cannot close without one (not optional metadata).
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 71-01-PLAN.md — KB-01: dedicated experiment GraphKMStore + standalone experiment-ontology.json (7 classes, meta+classes, extends upper) + openExperimentStore() factory (Wave 1)
+  - [ ] 71-02-PLAN.md — KB-03: config/task-taxonomy.yaml closed-6 single source of truth + taxonomy.mjs (isValidClass enforcement primitive + zero-LLM deriveClassFromText heuristic) (Wave 1)
+  - [ ] 71-03-PLAN.md — KB-02: read-only token-usage.db aggregateByTaskId (parameterized, self-healing recompute) (Wave 1)
+  - [ ] 71-04-PLAN.md — KB-02: idempotent writeRun (Run with 8 tags keyed on metadata.task_id + Outcome stub + produces relation; Route/Step/Decision/Report schema-only) (Wave 2)
+  - [ ] 71-05-PLAN.md — KB-02/KB-03: close orchestrator (extends measurement-stop.mjs: derive/prompt→enforce→aggregate→writeRun) + experiments query/classify CLIs + SC-4 enforcement/quarantine + live verify + /gsd auto-invoke hook decision (Wave 2)
 
 ### Phase 72: Syntactic Route Quality
 **Goal**: Every run carries a goal sentence and deterministic, zero-LLM route-quality metrics so route inefficiency is measurable without judge cost.
