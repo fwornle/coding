@@ -193,10 +193,15 @@ agent_pre_launch() {
   # agent='mastra', granularity_tier='per-llm-call' with no header injection.
   #
   # Scope discipline (T-70-13): the redirect is the per-mastra customProvider id below
-  # (MASTRA_MODEL) + the mastracode-scoped settings.json entry, NOT a global
+  # (MASTRACODE_MODEL_ID) + the mastracode-scoped settings.json entry, NOT a global
   # ANTHROPIC_BASE_URL export — so other agents' traffic is unaffected. Port 12435 only
   # (the LLM proxy + shim), NEVER 3033 (the Health API).
-  export MASTRA_MODEL="rapid-proxy-mastra/claude-haiku-4-5"
+  #
+  # IMPORTANT: mastracode reads MASTRACODE_MODEL_ID (cli.js resolveInitialStateFromEnv →
+  # initialState.currentModelId), NOT MASTRA_MODEL. The customProvider entry in
+  # settings.json must also carry a non-empty `models` array, else fetchProviders()
+  # drops the provider (`if (!models.length) continue`) and the id won't resolve.
+  export MASTRACODE_MODEL_ID="rapid-proxy-mastra/claude-haiku-4-5"
   _agent_log "Mastra LLM calls route via the proxy shim customProvider rapid-proxy-mastra (http://localhost:12435/v1/mastra) -> token_usage rows stamped agent='mastra'" >&2
 
   # Network-adaptive provider note (the proxy itself picks the upstream provider per
