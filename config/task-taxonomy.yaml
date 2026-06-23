@@ -1,0 +1,28 @@
+# config/task-taxonomy.yaml — single source of truth (D-10).
+# Read by: write-path validator (closed-6 enforcement D-09),
+#          verb→class heuristic (D-11), and doc rendering.
+#
+# Closed-6 taxonomy v0 (KB-03 / SC-3). EXACTLY six classes — no more, no fewer.
+# `unclassified` is NOT a member here: it is the quarantine sentinel applied at
+# write-time by the close orchestrator (D-06), never a curated taxonomy class.
+# Expanding to v1 is a deliberate, versioned change (D-09) — bump `version`.
+version: 0
+classes:
+  refactor:
+    definition: "Restructure existing code without changing externally observable behavior."
+    keywords: [refactor, restructure, rename, extract, cleanup, simplify, deduplicate, reorganize]
+  bugfix:
+    definition: "Correct a defect so existing intended behavior works."
+    keywords: [fix, bug, defect, repair, hotfix, patch, resolve, broken, regression]
+  new-feature:
+    definition: "Add new externally observable capability."
+    keywords: [add, build, implement, create, introduce, feature, support, enable, new]
+  migration:
+    definition: "Move/convert code, data, or config from one system/format/version to another."
+    keywords: [migrate, migration, upgrade, port, convert, move, cutover, transition]
+  debug:
+    definition: "Investigate/diagnose a problem (root-cause) without necessarily shipping a fix."
+    keywords: [debug, investigate, diagnose, trace, reproduce, troubleshoot, analyze]
+  docs:
+    definition: "Author or update documentation."
+    keywords: [docs, doc, documentation, readme, comment, changelog, guide, tutorial]
