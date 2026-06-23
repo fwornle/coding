@@ -29,7 +29,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 - [ ] **Phase 67: Reproducibility & Replay Rig** — Snapshot/restore internal state + record/replay external state so N=1 runs become comparable
 - [x] **Phase 68: [FOUNDATIONAL] Token Attribution Storage** — `token_usage` schema extension + measurement-span contract + `attachTokenLogger` task_id stamping (completed 2026-06-22)
 - [x] **Phase 69: Claude + Copilot Token Adapters** — Claude per-turn + per-reasoning-step JSONL adapter; Copilot events.jsonl adapter with Phase-1 event-vocabulary check (completed 2026-06-22)
-- [ ] **Phase 70: OpenCode + Mastra Token Adapters** — OpenCode proxy-route per-llm-call logging; Mastra instrumentation-surface read + adapter
+- [x] **Phase 70: OpenCode + Mastra Token Adapters** — OpenCode proxy-route per-llm-call logging; Mastra instrumentation-surface read + adapter (completed 2026-06-23)
 - [ ] **Phase 71: Experiment KB & Task Taxonomy** — km-core ontology + Run-write path + enforced task-taxonomy v0 tag
 - [ ] **Phase 72: Syntactic Route Quality** — `goal_sentence` capture + deterministic route heuristics per run
 - [ ] **Phase 73: Semantic Route Judge & Success Scoring** — LLM-judge `goal_aligned_ratio` + 5-dimension rubric + user override
@@ -94,7 +94,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 70-01-PLAN.md — Proxy OpenAI-compatible shim (/v1/chat/completions) + generic agent/granularity_tier/task_id envelope passthrough on logTokenCall (ADAPT-03 proxy half)
   - [x] 70-02-PLAN.md — OpenCode custom-provider config at localhost:12435/v1 + live human-verify gate proving an agent='opencode' per-llm-call row (ADAPT-03 end-to-end)
   - [x] 70-03-PLAN.md — Mastra instrumentation-surface investigation + D-08 proxy-route-vs-fallback resolution (ADAPT-04 SC-3)
-  - [ ] 70-04-PLAN.md — Mastra implementation: Track A proxy-route OR Track B host-side better-sqlite3 fallback adapter + supervisor hook, with live gate (ADAPT-04 SC-4)
+  - [x] 70-04-PLAN.md — Mastra implementation: Track A proxy-route OR Track B host-side better-sqlite3 fallback adapter + supervisor hook, with live gate (ADAPT-04 SC-4)
 
 ### Phase 71: Experiment KB & Task Taxonomy
 **Goal**: Each run materializes as an independent, queryable km-core entity with rich tags, and a curated task taxonomy is enforced so comparisons-as-queries return meaningful results.
@@ -151,7 +151,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 67. Reproducibility & Replay Rig | v7.4 | 0/? | Not started | - |
 | 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
 | 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete    | 2026-06-22 |
-| 70. OpenCode + Mastra Token Adapters | v7.4 | 3/4 | In Progress|  |
+| 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete   | 2026-06-23 |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 0/? | Not started | - |
 | 72. Syntactic Route Quality | v7.4 | 0/? | Not started | - |
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 0/? | Not started | - |
