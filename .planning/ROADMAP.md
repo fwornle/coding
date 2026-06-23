@@ -109,7 +109,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 71-01-PLAN.md — KB-01: dedicated experiment GraphKMStore + standalone experiment-ontology.json (7 classes, meta+classes, extends upper) + openExperimentStore() factory (Wave 1)
   - [x] 71-02-PLAN.md — KB-03: config/task-taxonomy.yaml closed-6 single source of truth + taxonomy.mjs (isValidClass enforcement primitive + zero-LLM deriveClassFromText heuristic) (Wave 1)
   - [x] 71-03-PLAN.md — KB-02: read-only token-usage.db aggregateByTaskId (parameterized, self-healing recompute) (Wave 1)
-  - [ ] 71-04-PLAN.md — KB-02: idempotent writeRun (Run with 8 tags keyed on metadata.task_id + Outcome stub + produces relation; Route/Step/Decision/Report schema-only) (Wave 2)
+  - [x] 71-04-PLAN.md — KB-02: idempotent writeRun (Run with 8 tags keyed on metadata.task_id + Outcome stub + produces relation; Route/Step/Decision/Report schema-only) (Wave 2)
   - [ ] 71-05-PLAN.md — KB-02/KB-03: close orchestrator (extends measurement-stop.mjs: derive/prompt→enforce→aggregate→writeRun) + experiments query/classify CLIs + SC-4 enforcement/quarantine + live verify + /gsd auto-invoke hook decision (Wave 2)
 
 ### Phase 72: Syntactic Route Quality
@@ -157,7 +157,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
 | 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete    | 2026-06-22 |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete    | 2026-06-23 |
-| 71. Experiment KB & Task Taxonomy | v7.4 | 3/5 | In Progress|  |
+| 71. Experiment KB & Task Taxonomy | v7.4 | 4/5 | In Progress|  |
 | 72. Syntactic Route Quality | v7.4 | 0/? | Not started | - |
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 0/? | Not started | - |
 | 74. Performance Dashboard & Reports | v7.4 | 0/? | Not started | - |
