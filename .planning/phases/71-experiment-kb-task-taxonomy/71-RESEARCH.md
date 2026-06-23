@@ -537,16 +537,18 @@ for await (const e of store.iterate({ entityType: 'Run' })) {
 | A4 | Copying `upper.json` into a dedicated `.data/ontologies-experiment/` dir is acceptable (vs. symlink or pointing ontologyDir at the shared dir). | Q1/structure | If the team prefers one ontology dir, point `ontologyDir` at `.data/ontologies/` and accept that coding-ontology classes also load into the experiment registry (harmless for validation). Low risk — both work; copy is cleaner per D-02. |
 | A5 | `coding measure stop` / `coding experiments ...` are invoked as `node scripts/<name>.mjs` (matching the existing `measurement-start/stop.mjs` precedent), NOT as `bin/coding` subcommands (bin/coding is a bash agent-launcher with no subcommand dispatch). | Q7/Q9 | If the user wants true `bin/coding` subcommand dispatch, that bash router is additional (small) work. Medium risk on naming/UX, none on functionality. **Planner: confirm CLI invocation surface.** |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **/gsd run-end hook point (A1/A5).**
    - What we know: the existing measurement CLIs are `node scripts/*.mjs`; `bin/coding` is a bash launcher with no subcommand dispatch; `.claude/commands/` has no gsd entries in this checkout.
    - What's unclear: the exact auto-invocation hook at /gsd run-end.
    - Recommendation: ship the close orchestrator as `scripts/measurement-stop.mjs` (extended) callable manually + by any hook; treat the auto-invoke wiring as a thin add-on the planner confirms with the user. Functionality (derive→enforce→write) does not depend on the auto-invoke.
+   - **RESOLVED:** surfaced to the user via the `checkpoint:decision` task in 71-05 (Task 4); the close-orchestrator functionality derive→enforce→write is fully planned independent of the auto-wiring.
 
 2. **Optional pre-close backfill sweep.**
    - What we know: orphan rows get re-attributed post-close (Pitfall 4); D-14 wants refreshable totals.
    - Recommendation: have the close orchestrator optionally run `runSweep` (imported from `backfill-task-id-by-timestamp.mjs`, which guards its `main()`) before aggregating, and make aggregation a pure recompute so a future `experiments refresh` self-heals.
+   - **RESOLVED:** pure-recompute aggregation per 71-03; the optional pre-close sweep is not wired — D-14's refreshable totals are the safety net for late-attributed orphan rows.
 
 ## Environment Availability
 
