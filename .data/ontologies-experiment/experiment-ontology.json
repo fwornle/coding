@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "name": "experiment-ontology",
+    "version": "1.0.0",
+    "extends": "upper",
+    "description": "Performance-measurement experiment KB: Run/Outcome materialized v0; Route/Step/Decision/Report schema-only stubs; Experiment optional grouping."
+  },
+  "classes": {
+    "Experiment": {
+      "extends": "Feature",
+      "description": "An OPTIONAL named grouping of Runs (e.g. 'opus-vs-haiku-refactor-sweep'). Not required to write a Run (D-04); populated lazily.",
+      "relationships": { "groups": ["Run"] },
+      "properties": {
+        "experimentName": { "type": "string", "description": "Human-readable grouping name" }
+      }
+    },
+    "Run": {
+      "extends": "Revision",
+      "description": "A single coding-agent task run, materialized at close. The queryable unit (D2). Carries 8 tags sourced from token_usage + span.",
+      "relationships": { "produces": ["Outcome"], "tookRoute": ["Route"], "belongsTo": ["Experiment"] },
+      "properties": {
+        "taskId":     { "type": "string", "description": "Measurement span task_id (idempotency key; stored also as metadata.task_id)" },
+        "taskHash":   { "type": "string", "description": "Stable hash of goal_sentence/prompt" },
+        "taskClass":  { "type": "string", "description": "Curated taxonomy class OR 'unclassified' (quarantine)",
+                        "enum": ["refactor", "bugfix", "new-feature", "migration", "debug", "docs", "unclassified"] },
+        "agent":      { "type": "string", "description": "Originating coding agent" },
+        "model":      { "type": "string", "description": "Resolved model name" },
+        "framework":  { "type": "string", "description": "Agent framework/harness" },
+        "specLevel":  { "type": "string", "description": "Spec level (deferred — written null this phase)" },
+        "snapshotId": { "type": "string", "description": "Phase-67 repro snapshot id (deferred — null)" },
+        "traceId":    { "type": "string", "description": "Correlation id (== task_id this phase)" },
+        "pending":    { "type": "boolean", "description": "Quarantine flag — excluded from queries until classified (D-06)" }
+      }
+    },
+    "Route": {
+      "extends": "Process",
+      "description": "The sequence of steps a Run took (schema-only stub; populated Phase 72).",
+      "relationships": { "hasStep": ["Step"] },
+      "properties": {}
+    },
+    "Step": {
+      "extends": "Process",
+      "description": "One step in a Route (schema-only stub; Phase 72).",
+      "relationships": { "madeDecision": ["Decision"] },
+      "properties": {}
+    },
+    "Decision": {
+      "extends": "Contract",
+      "description": "A decision point within a Step (schema-only stub; Phase 73).",
+      "relationships": {},
+      "properties": {}
+    },
+    "Outcome": {
+      "extends": "Contract",
+      "description": "Run result. v0 stub: token totals + closed-state only (D-12). No route/score (Phases 72-73).",
+      "relationships": {},
+      "properties": {
+        "totalTokens":     { "type": "number", "description": "Sum of total_tokens for the Run's task_id" },
+        "inputTokens":     { "type": "number", "description": "Sum input_tokens" },
+        "outputTokens":    { "type": "number", "description": "Sum output_tokens" },
+        "reasoningTokens": { "type": "number", "description": "Sum reasoning_tokens" },
+        "closedState":     { "type": "string", "description": "Close state", "enum": ["closed", "quarantined"] }
+      }
+    },
+    "Report": {
+      "extends": "Feature",
+      "description": "Saved query + stable results snapshot (schema-only stub; Phase 74 KB-04).",
+      "relationships": {},
+      "properties": {}
+    }
+  }
+}
