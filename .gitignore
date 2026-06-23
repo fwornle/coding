@@ -173,6 +173,13 @@ integrations/mcp-server-browserbase/
 # Ontology suggestions (runtime-generated, not needed in git)
 .data/ontologies/suggestions/
 
+# Phase 71 experiment KB — the dedicated single-owner LevelDB binary store
+# (.data/experiments/leveldb) is regenerable runtime state, never committed.
+# The per-domain JSON exports (.data/experiments/exports/*.json) ARE tracked
+# (git-trackable, mirrors the knowledge-graph exports convention). The committed
+# ontology lives at .data/ontologies-experiment/ and is NOT ignored.
+.data/experiments/leveldb/
+
 # Code graph RAG index (binary, regenerated on indexing)
 .data/code-graph-index/
 
