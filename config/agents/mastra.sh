@@ -175,18 +175,39 @@ agent_pre_launch() {
     _agent_log "WARNING: LLM proxy not reachable on port 12435 -- mastracode may not have LLM access"
   fi
 
-  # Network-adaptive model selection (same pattern as opencode.sh)
+  # Phase 70-04 Track A (proxy-route, ADAPT-04): route mastracode's LLM calls through
+  # the rapid-llm-proxy token-attribution shim so each call lands a per-llm-call
+  # token_usage row stamped agent='mastra'.
+  #
+  # Redirect seam: mastracode's first-class `customProviders` array (registered in
+  # ~/Library/Application Support/mastracode/settings.json as provider
+  # "rapid-proxy-mastra", url http://localhost:12435/v1/mastra). resolveModel routes
+  # any `rapid-proxy-mastra/<model>` id through a ModelRouterLanguageModel whose client
+  # POSTs to http://localhost:12435/v1/mastra/chat/completions.
+  #
+  # Agent-stamp mechanism (operator decision A1): mastracode's ModelRouterLanguageModel
+  # custom-provider seam can attach NEITHER an `X-Agent: mastra` header NOR a body.agent
+  # field, so a DEDICATED proxy sub-route /v1/mastra/chat/completions (rapid-llm-proxy
+  # commit 3dab4ac) derives the default agent='mastra' from the path. The shim's
+  # X-Agent/body.agent precedence still wins when present. The row therefore stamps
+  # agent='mastra', granularity_tier='per-llm-call' with no header injection.
+  #
+  # Scope discipline (T-70-13): the redirect is the per-mastra customProvider id below
+  # (MASTRA_MODEL) + the mastracode-scoped settings.json entry, NOT a global
+  # ANTHROPIC_BASE_URL export — so other agents' traffic is unaffected. Port 12435 only
+  # (the LLM proxy + shim), NEVER 3033 (the Health API).
+  export MASTRA_MODEL="rapid-proxy-mastra/claude-haiku-4-5"
+  _agent_log "Mastra LLM calls route via the proxy shim customProvider rapid-proxy-mastra (http://localhost:12435/v1/mastra) -> token_usage rows stamped agent='mastra'" >&2
+
+  # Network-adaptive provider note (the proxy itself picks the upstream provider per
+  # its mastra->copilot routing override; mastracode no longer selects the provider).
   if [ "$INSIDE_CN" = "true" ]; then
-    # VPN/Corporate Network: use GitHub Copilot via corporate subscription
-    export MASTRA_MODEL="github-copilot-enterprise/claude-opus-4.6"
-    _agent_log "VPN -> GitHub Copilot Enterprise (claude-opus-4.6)"
+    _agent_log "VPN -> proxy routes mastra upstream (copilot override)" >&2
   else
-    # Outside VPN: use Anthropic directly
-    export MASTRA_MODEL="claude-opus-4-6"
-    _agent_log "Public -> Anthropic direct (claude-opus-4.6)"
+    _agent_log "Public -> proxy routes mastra upstream (copilot override)" >&2
 
     if [ -z "$ANTHROPIC_API_KEY" ]; then
-      _agent_log "WARNING: ANTHROPIC_API_KEY not set -- mastracode may prompt for auth"
+      _agent_log "Note: ANTHROPIC_API_KEY not set -- not required on the proxy-route path (the proxy holds provider creds)" >&2
     fi
   fi
 
