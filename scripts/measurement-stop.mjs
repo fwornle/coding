@@ -153,13 +153,15 @@ async function main() {
     }
     taskClass = explicit;
   } else if (!isHeadless(args)) {
-    // Interactive: present the candidate (if any) and let the operator confirm/override (D-05).
+    // Interactive: surface the candidate as a SUGGESTION only (D-05). A blank answer
+    // ALWAYS quarantines (D-06) — it never silently confirms the candidate (WR-02).
+    // To accept the heuristic the operator must type the class explicitly.
     const candidate = derived.confident ? derived.taskClass : '';
-    const hint = candidate ? ` [${candidate}]` : '';
+    const hint = candidate ? ` (suggested: ${candidate})` : '';
     const answer = await prompt(
       `task_class${hint} (one of: ${Object.keys(taxonomy.classes).join(', ')}; blank to quarantine): `,
     );
-    const chosen = answer || candidate;
+    const chosen = answer; // NOT `answer || candidate` — blank must quarantine, not confirm (WR-02).
     if (!chosen) {
       // Operator declined to classify → quarantine (D-06), do not throw.
       taskClass = 'unclassified';
