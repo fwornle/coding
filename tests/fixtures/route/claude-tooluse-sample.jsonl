@@ -1,0 +1,10 @@
+{"type":"user","timestamp":"2026-06-22T11:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"please read and edit"}]}}
+{"type":"assistant","timestamp":"2026-06-22T11:00:01.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_read1","name":"Read","input":{"file_path":"/repo/a.txt"}}]}}
+{"type":"user","timestamp":"2026-06-22T11:00:02.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_read1","content":"file contents","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-06-22T11:00:03.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_edit1","name":"Edit","input":{"file_path":"/repo/a.txt","old_string":"x","new_string":"y"}}]}}
+{"type":"user","timestamp":"2026-06-22T11:00:04.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_edit1","content":"applied","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-06-22T11:00:05.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_bash_err","name":"Bash","input":{"command":"exit 1"}}]}}
+{"type":"user","timestamp":"2026-06-22T11:00:06.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_bash_err","content":"command failed","is_error":true}]}}
+{"type":"assistant","timestamp":"2026-06-22T11:00:07.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_abandoned","name":"Grep","input":{"pattern":"never-answered"}}]}}
+{"type":"assistant","timestamp":"2026-06-22T11:00:08.000Z","message":{"role":"assistant","content":[{"type":"text","text":"running two in parallel"},{"type":"tool_use","id":"toolu_par_a","name":"Read","input":{"file_path":"/repo/b.txt"}},{"type":"tool_use","id":"toolu_par_b","name":"Read","input":{"file_path":"/repo/c.txt"}}]}}
+{"type":"user","timestamp":"2026-06-22T11:00:09.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_par_a","content":"b","is_error":false},{"type":"tool_result","tool_use_id":"toolu_par_b","content":"c","is_error":false}]}}

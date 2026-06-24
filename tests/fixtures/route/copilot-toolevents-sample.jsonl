@@ -1,0 +1,10 @@
+{"type":"session.start","timestamp":"2026-06-22T11:00:00.000Z","data":{"sessionId":"00000000-0000-4000-a000-000000000001","cliVersion":"1.0.63"}}
+{"type":"assistant.message","timestamp":"2026-06-22T11:00:09.000Z","data":{"toolRequests":[{"toolCallId":"tc-1","toolName":"read"}]}}
+{"type":"tool.execution_start","timestamp":"2026-06-22T11:00:10.000Z","data":{"toolCallId":"tc-1","toolName":"read","arguments":{"file_path":"/repo/a.txt"}}}
+{"type":"tool.execution_complete","timestamp":"2026-06-22T11:00:11.000Z","data":{"toolCallId":"tc-1","toolName":"read","success":true,"result":"file contents"}}
+{"type":"tool.execution_start","timestamp":"2026-06-22T11:00:12.000Z","data":{"toolCallId":"tc-2","toolName":"edit","arguments":{"file_path":"/repo/a.txt","old":"x","new":"y"}}}
+{"type":"tool.execution_complete","timestamp":"2026-06-22T11:00:13.000Z","data":{"toolCallId":"tc-2","toolName":"edit","success":true,"result":"applied"}}
+{"type":"tool.execution_start","timestamp":"2026-06-22T11:00:14.000Z","data":{"toolCallId":"tc-3","toolName":"bash","arguments":{"command":"exit 1"}}}
+{"type":"tool.execution_complete","timestamp":"2026-06-22T11:00:15.000Z","data":{"toolCallId":"tc-3","toolName":"bash","success":false,"result":"command failed"}}
+{"type":"tool.execution_start","timestamp":"2026-06-22T11:00:16.000Z","data":{"toolCallId":"tc-4","toolName":"grep","arguments":{"pattern":"never-answered"}}}
+{"type":"session.shutdown","timestamp":"2026-06-22T11:02:00.000Z","data":{"shutdownType":"routine"}}
