@@ -8,11 +8,22 @@
 // see memory/reference_node_test_argv_live_gate.md).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   loadTaxonomy,
   isValidClass,
   deriveClassFromText,
 } from '../../lib/experiments/taxonomy.mjs';
+
+/** Write `contents` to a throwaway tmp YAML file and return its path. */
+function writeTmpYaml(contents) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'taxonomy-test-'));
+  const p = path.join(dir, 'task-taxonomy.yaml');
+  fs.writeFileSync(p, contents, 'utf8');
+  return p;
+}
 
 const CLOSED_6 = ['refactor', 'bugfix', 'new-feature', 'migration', 'debug', 'docs'];
 
@@ -30,6 +41,36 @@ test('loadTaxonomy: parses config/task-taxonomy.yaml → { version, classes }', 
       Array.isArray(tax.classes[cls].keywords) && tax.classes[cls].keywords.length > 0,
       `class ${cls} has a non-empty keywords list`,
     );
+  }
+});
+
+test('loadTaxonomy: empty YAML throws a CLEAR error, not an opaque TypeError (WR-03)', () => {
+  const emptyPath = writeTmpYaml('');
+  assert.throws(
+    () => loadTaxonomy(emptyPath),
+    /empty or malformed: missing classes/,
+    'empty file must throw a clear "missing classes" error',
+  );
+  const nullPath = writeTmpYaml('null\n');
+  assert.throws(
+    () => loadTaxonomy(nullPath),
+    /empty or malformed: missing classes/,
+    'explicit YAML null must throw a clear "missing classes" error',
+  );
+  const noClassesPath = writeTmpYaml('version: 0\n');
+  assert.throws(
+    () => loadTaxonomy(noClassesPath),
+    /empty or malformed: missing classes/,
+    'YAML lacking a classes map must throw a clear error',
+  );
+});
+
+test('deriveClassFromText: tolerates a taxonomy with no classes without crashing (WR-03)', () => {
+  // A taxonomy whose classes map is absent must NOT throw — it derives nothing.
+  for (const tax of [{}, { classes: undefined }, { classes: {} }]) {
+    const r = deriveClassFromText('add a new feature', tax);
+    assert.equal(r.taskClass, null, 'no classes → no derived class');
+    assert.equal(r.confident, false, 'no classes → not confident');
   }
 });
 
