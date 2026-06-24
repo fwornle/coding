@@ -1,0 +1,24 @@
+[
+  {
+    "seq": 0,
+    "tool_call_id": "toolu_par_1",
+    "tool_name": "Read",
+    "inputs_digest": "par-read-a",
+    "target_path": "/repo/src/a.ts",
+    "started_at": "2026-06-24T10:40:00.000Z",
+    "ended_at": "2026-06-24T10:40:01.000Z",
+    "outcome": "success",
+    "agent": "claude"
+  },
+  {
+    "seq": 1,
+    "tool_call_id": "toolu_par_2",
+    "tool_name": "Read",
+    "inputs_digest": "par-read-b",
+    "target_path": "/repo/src/b.ts",
+    "started_at": "2026-06-24T10:40:00.000Z",
+    "ended_at": "2026-06-24T10:40:01.000Z",
+    "outcome": "success",
+    "agent": "claude"
+  }
+]

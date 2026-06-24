@@ -1,0 +1,24 @@
+[
+  {
+    "seq": 0,
+    "tool_call_id": "toolu_ab_1",
+    "tool_name": "Bash",
+    "inputs_digest": "ab-cmd-1",
+    "target_path": null,
+    "started_at": "2026-06-24T10:30:00.000Z",
+    "ended_at": "2026-06-24T10:30:01.000Z",
+    "outcome": "success",
+    "agent": "claude"
+  },
+  {
+    "seq": 1,
+    "tool_call_id": "toolu_ab_2",
+    "tool_name": "Bash",
+    "inputs_digest": "ab-cmd-2",
+    "target_path": null,
+    "started_at": "2026-06-24T10:30:02.000Z",
+    "ended_at": null,
+    "outcome": "abandoned",
+    "agent": "claude"
+  }
+]

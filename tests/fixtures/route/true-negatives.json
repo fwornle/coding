@@ -1,0 +1,121 @@
+{
+  "_comment": "Near-miss cases that MUST NOT count, one per heuristic (D-06/D-08 strict-calibration).",
+  "redundant_read_state_changed": [
+    {
+      "seq": 0,
+      "tool_call_id": "toolu_tn_rr_1",
+      "tool_name": "Read",
+      "inputs_digest": "read-a",
+      "target_path": "/repo/src/a.ts",
+      "started_at": "2026-06-24T11:00:00.000Z",
+      "ended_at": "2026-06-24T11:00:01.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    },
+    {
+      "seq": 1,
+      "tool_call_id": "toolu_tn_rr_2",
+      "tool_name": "Edit",
+      "inputs_digest": "edit-a-1",
+      "target_path": "/repo/src/a.ts",
+      "started_at": "2026-06-24T11:00:02.000Z",
+      "ended_at": "2026-06-24T11:00:03.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    },
+    {
+      "seq": 2,
+      "tool_call_id": "toolu_tn_rr_3",
+      "tool_name": "Read",
+      "inputs_digest": "read-a",
+      "target_path": "/repo/src/a.ts",
+      "started_at": "2026-06-24T11:00:04.000Z",
+      "ended_at": "2026-06-24T11:00:05.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    }
+  ],
+  "edit_revert_no_return": [
+    {
+      "seq": 0,
+      "tool_call_id": "toolu_tn_er_1",
+      "tool_name": "Edit",
+      "inputs_digest": "edit-state-A",
+      "target_path": "/repo/src/foo.ts",
+      "started_at": "2026-06-24T11:10:00.000Z",
+      "ended_at": "2026-06-24T11:10:01.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    },
+    {
+      "seq": 1,
+      "tool_call_id": "toolu_tn_er_2",
+      "tool_name": "Edit",
+      "inputs_digest": "edit-state-B",
+      "target_path": "/repo/src/foo.ts",
+      "started_at": "2026-06-24T11:10:02.000Z",
+      "ended_at": "2026-06-24T11:10:03.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    },
+    {
+      "seq": 2,
+      "tool_call_id": "toolu_tn_er_3",
+      "tool_name": "Edit",
+      "inputs_digest": "edit-state-C",
+      "target_path": "/repo/src/foo.ts",
+      "started_at": "2026-06-24T11:10:04.000Z",
+      "ended_at": "2026-06-24T11:10:05.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    }
+  ],
+  "loop_not_adjacent": [
+    {
+      "seq": 0,
+      "tool_call_id": "toolu_tn_lp_1",
+      "tool_name": "Bash",
+      "inputs_digest": "digest-bash-x",
+      "target_path": null,
+      "started_at": "2026-06-24T11:20:00.000Z",
+      "ended_at": "2026-06-24T11:20:01.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    },
+    {
+      "seq": 1,
+      "tool_call_id": "toolu_tn_lp_2",
+      "tool_name": "Bash",
+      "inputs_digest": "digest-bash-y",
+      "target_path": null,
+      "started_at": "2026-06-24T11:20:02.000Z",
+      "ended_at": "2026-06-24T11:20:03.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    },
+    {
+      "seq": 2,
+      "tool_call_id": "toolu_tn_lp_3",
+      "tool_name": "Bash",
+      "inputs_digest": "digest-bash-x",
+      "target_path": null,
+      "started_at": "2026-06-24T11:20:04.000Z",
+      "ended_at": "2026-06-24T11:20:05.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    }
+  ],
+  "abandoned_matched_pair": [
+    {
+      "seq": 0,
+      "tool_call_id": "toolu_tn_ab_1",
+      "tool_name": "Bash",
+      "inputs_digest": "ab-cmd-1",
+      "target_path": null,
+      "started_at": "2026-06-24T11:30:00.000Z",
+      "ended_at": "2026-06-24T11:30:01.000Z",
+      "outcome": "success",
+      "agent": "claude"
+    }
+  ]
+}
