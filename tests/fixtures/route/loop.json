@@ -1,0 +1,35 @@
+[
+  {
+    "seq": 0,
+    "tool_call_id": "toolu_loop_a1",
+    "tool_name": "Bash",
+    "inputs_digest": "digest-bash-x",
+    "target_path": null,
+    "started_at": "2026-06-24T10:00:00.000Z",
+    "ended_at": "2026-06-24T10:00:01.000Z",
+    "outcome": "success",
+    "agent": "claude"
+  },
+  {
+    "seq": 1,
+    "tool_call_id": "toolu_loop_a2",
+    "tool_name": "Bash",
+    "inputs_digest": "digest-bash-x",
+    "target_path": null,
+    "started_at": "2026-06-24T10:00:02.000Z",
+    "ended_at": "2026-06-24T10:00:03.000Z",
+    "outcome": "success",
+    "agent": "claude"
+  },
+  {
+    "seq": 2,
+    "tool_call_id": "toolu_loop_a3",
+    "tool_name": "Bash",
+    "inputs_digest": "digest-bash-x",
+    "target_path": null,
+    "started_at": "2026-06-24T10:00:04.000Z",
+    "ended_at": "2026-06-24T10:00:05.000Z",
+    "outcome": "success",
+    "agent": "claude"
+  }
+]
