@@ -1,0 +1,47 @@
+[
+  {
+    "type": "tool",
+    "callID": "oc_read1",
+    "tool": "read",
+    "state": {
+      "status": "completed",
+      "input": { "file_path": "/repo/a.txt" },
+      "time": { "start": 1770570503748, "end": 1770570503901 }
+    }
+  },
+  {
+    "type": "tool",
+    "callID": "oc_edit1",
+    "tool": "edit",
+    "state": {
+      "status": "completed",
+      "input": { "file_path": "/repo/b.txt", "oldString": "x", "newString": "y" },
+      "time": { "start": 1770570504000, "end": 1770570504250 }
+    }
+  },
+  {
+    "type": "tool",
+    "callID": "oc_bash_err",
+    "tool": "bash",
+    "state": {
+      "status": "error",
+      "input": { "command": "exit 1" },
+      "error": "command failed with exit code 1",
+      "time": { "start": 1770570504500, "end": 1770570504640 }
+    }
+  },
+  {
+    "type": "tool",
+    "callID": "oc_abandoned",
+    "tool": "read",
+    "state": {
+      "status": "running",
+      "input": { "file_path": "/repo/c.txt" },
+      "time": { "start": 1770570505000 }
+    }
+  },
+  {
+    "type": "text",
+    "text": "this is a non-tool part and must be filtered out"
+  }
+]
