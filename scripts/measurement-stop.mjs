@@ -30,8 +30,8 @@
  * loads), since coding's node_modules pins the older v1.0.0 tarball. The
  * lib/experiments/* modules come from the in-repo shared module (71-01..04).
  *
- * Output via process.stdout.write / process.stderr.write only (no console.* —
- * no-console-log / CLAUDE.md).
+ * Output via process.stdout.write / process.stderr.write only — the no-console-log
+ * rule (CLAUDE.md) forbids the stdout/err logging family here.
  *
  * Usage:
  *   node scripts/measurement-stop.mjs                          # derive+prompt (TTY) / quarantine (headless)
@@ -59,6 +59,11 @@ import { openExperimentStore } from '../lib/experiments/store.mjs';
 import { loadTaxonomy, isValidClass, deriveClassFromText } from '../lib/experiments/taxonomy.mjs';
 import { aggregateByTaskId } from '../lib/experiments/token-aggregate.mjs';
 import { writeRun } from '../lib/experiments/run-write.mjs';
+import { deriveGoalSentence } from '../lib/experiments/goal-sentence.mjs';
+import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
+import { computeHeuristics, ALL_NULL_HEURISTICS } from '../lib/experiments/route-heuristics.mjs';
+
+const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
 
 const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
   || '/Users/Q284340/Agentic/_work/rapid-llm-proxy/dist';
@@ -88,6 +93,30 @@ function readArchivedSpan(archivePath, fallback) {
     return JSON.parse(fs.readFileSync(archivePath, 'utf8'));
   } catch {
     return fallback;
+  }
+}
+
+/**
+ * Best-effort locate the active phase's PLAN.md for a /gsd run (D-03). Given the
+ * phases root and a phase token (number or '72-name' slug), find the matching
+ * `<NN>-<slug>` phase dir and return the FIRST `*-PLAN.md` inside it. Fail-soft:
+ * returns null on any read error or no match (deriveGoalSentence then falls back
+ * to ROADMAP, and ultimately quarantines per D-05 — the close NEVER hard-blocks).
+ */
+function locatePlanMd(phasesRoot, phaseToken) {
+  try {
+    const num = String(phaseToken).trim().match(/^\d+/)?.[0];
+    if (!num) return null;
+    const dirs = fs.readdirSync(phasesRoot, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && new RegExp(`^0*${num}(?:[.-]|$)`).test(d.name))
+      .map((d) => d.name);
+    if (dirs.length === 0) return null;
+    const phaseDir = path.join(phasesRoot, dirs[0]);
+    const plans = fs.readdirSync(phaseDir).filter((f) => /-PLAN\.md$/.test(f)).sort();
+    if (plans.length === 0) return null;
+    return path.join(phaseDir, plans[0]);
+  } catch {
+    return null;
   }
 }
 
@@ -184,6 +213,33 @@ async function main() {
     pending = true;
   }
 
+  // ── (2.5) Populate / refine goal_sentence BEFORE writeRun (ROUTE-01, D-03/D-04/D-05) ──
+  //   • /gsd run (--phase present OR a locatable PLAN.md): derive from the active
+  //     phase PLAN.md '**Goal**:' line (ROADMAP fallback) — zero-LLM (D-03). Only
+  //     assigned when the span does not already carry a goal.
+  //   • freeform interactive (TTY): confirm/EDIT the goal at close, pre-filled with
+  //     the start-prompt value the START side captured (D-04 edit-at-close).
+  //   • headless with no goal: leave empty → pending=true via the quarantine path
+  //     below (D-05). NEVER block.
+  if (!span.goal_sentence && phaseArg) {
+    const planPath = path.join(REPO_ROOT, '.planning', 'phases');
+    // Best-effort PLAN.md/ROADMAP derive; deriveGoalSentence is fail-soft (returns '').
+    const roadmapPath = path.join(REPO_ROOT, '.planning', 'ROADMAP.md');
+    const derivedGoal = deriveGoalSentence({
+      phase: phaseArg,
+      planPath: locatePlanMd(planPath, phaseArg),
+      roadmapPath,
+    });
+    if (derivedGoal) span.goal_sentence = derivedGoal;
+  }
+  if (!isHeadless(args)) {
+    // Freeform edit-at-close (D-04): pre-fill with the current goal (start-prompt or derived).
+    const current = span.goal_sentence ?? '';
+    const hint = current ? ` [${current}]` : '';
+    const answer = await prompt(`run goal_sentence${hint} (blank to keep): `);
+    if (answer) span.goal_sentence = answer; // explicit edit overrides; blank keeps current
+  }
+
   // ── (3) Token aggregation (read-only) + tag sourcing ──
   const { totals, byAgentModel } = aggregateByTaskId(span.task_id);
   const dominant = byAgentModel[0] ?? {};
@@ -198,11 +254,19 @@ async function main() {
     trace_id: span.task_id,
   };
 
-  // ── (4) Persist the Run (idempotent) ──
+  // ── (3.5/3.6) Route heuristics from the normalized cross-agent trace ──
+  //   buildNormalizedTrace dispatches on the dominant agent, time-window-scopes the
+  //   events, and returns null when no trace file is located (D-02/Pitfall 4). A null
+  //   trace ⇒ ALL_NULL_HEURISTICS — six nulls, NOT zeros (D-02). A malformed/unreadable
+  //   trace already degrades to null inside the readers, so the close still completes.
+  const trace = await buildNormalizedTrace(span, { dominantAgent: dominant.agent });
+  const heuristics = trace ? computeHeuristics(trace) : ALL_NULL_HEURISTICS;
+
+  // ── (4) Persist the Run (idempotent) — flat heuristics + one Route node (D-09) ──
   const store = await openExperimentStore();
   let pendingCount;
   try {
-    await writeRun(store, { span, taskClass, pending, tags, totals });
+    await writeRun(store, { span, taskClass, pending, tags, totals, heuristics });
     pendingCount = await countPending(store);
   } finally {
     await store.close();

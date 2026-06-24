@@ -19,6 +19,11 @@
  * Usage:
  *   node scripts/measurement-start.mjs --task-id <id> [--goal "<sentence>"]
  *
+ * goal_sentence (D-04 start side): when --goal is omitted AND stdin is a TTY
+ * (interactive freeform run), the operator is PROMPTED for a one-sentence goal.
+ * Headless (no TTY — cron/CI/pipe, D-05) or a blank answer → no goal; the span is
+ * created immediately and the close-side quarantine path sets pending. Never blocks.
+ *
  * Env:
  *   LLM_PROXY_DATA_DIR  data dir for the span files (default <cwd>/.data)
  *   LLM_PROXY_DIST_DIR  proxy dist dir (default _work/rapid-llm-proxy/dist)
@@ -26,6 +31,7 @@
 
 import process from 'node:process';
 import path from 'node:path';
+import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
 const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
@@ -35,6 +41,17 @@ function parseStrArg(argv, flag) {
   const i = argv.indexOf(flag);
   if (i < 0) return null;
   return argv[i + 1] || null;
+}
+
+/** Ask one question on the TTY and resolve the trimmed answer (mirrors measurement-stop.mjs:94-103). */
+function prompt(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(String(answer).trim());
+    });
+  });
 }
 
 async function main() {
@@ -48,12 +65,26 @@ async function main() {
     process.exit(2);
   }
 
+  // ── D-04 (start side): source goal_sentence at span creation ──
+  //   • --goal arg present → use it verbatim.
+  //   • interactive freeform (no --goal, process.stdin.isTTY) → PROMPT for the
+  //     one-sentence goal (single readline question, trimmed).
+  //   • headless (no TTY — cron/CI/pipe, D-05) OR a blank prompt answer → NO goal;
+  //     the span is created with an empty goal and the close-side quarantine path
+  //     (measurement-stop.mjs:181-185) sets pending at write time. NEVER block/hang
+  //     waiting for input (D-05).
+  let goalSentence = goal;
+  if (!goalSentence && process.stdin.isTTY) {
+    const answer = await prompt('one-sentence goal for this run (blank to skip): ');
+    goalSentence = answer || null; // blank → null (no goal; never block)
+  }
+
   const modUrl = pathToFileURL(path.join(PROXY_DIST, 'measurement-span.js')).href;
   const { startMeasurement, resolveMeasurementPaths } = await import(modUrl);
 
   let span;
   try {
-    span = startMeasurement({ task_id: taskId, ...(goal ? { goal_sentence: goal } : {}) });
+    span = startMeasurement({ task_id: taskId, ...(goalSentence ? { goal_sentence: goalSentence } : {}) });
   } catch (err) {
     process.stderr.write(`error: ${err.message}\n`);
     process.exit(1);
