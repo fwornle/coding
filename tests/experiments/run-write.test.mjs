@@ -160,6 +160,11 @@ test('SC-2: re-writing the same task_id UPDATES one node — idempotent (D-14)',
     const outcomes = await collectOutcomes(store);
     assert.equal(outcomes.length, 1, 'exactly one Outcome after re-close');
     assert.equal(outcomes[0].metadata.totalTokens, 400, 'Outcome totals updated on re-close (self-heal)');
+    // WR-01 regression: a re-close must NOT accumulate a duplicate produces edge.
+    // The stable key (`${runId}:produces:${outcomeId}`) makes the second addRelation
+    // a silent key-collision no-op — exactly ONE produces edge survives N re-closes.
+    const rels = await store.findRelations({ type: 'produces', from: secondId });
+    assert.equal(rels.length, 1, 're-close must NOT add a duplicate produces edge (WR-01)');
   } finally {
     await cleanup();
   }
