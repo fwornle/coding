@@ -87,9 +87,9 @@ This file tracks the active milestone's requirements at the top, with previous m
 | ADAPT-02 | Phase 69 | Complete |
 | ADAPT-03 | Phase 70 | Complete |
 | ADAPT-04 | Phase 70 | Complete |
-| KB-01 | Phase 71 | Pending |
-| KB-02 | Phase 71 | Pending |
-| KB-03 | Phase 71 | Pending |
+| KB-01 | Phase 71 | Complete |
+| KB-02 | Phase 71 | Complete |
+| KB-03 | Phase 71 | Complete |
 | ROUTE-01 | Phase 72 | Pending |
 | ROUTE-02 | Phase 72 | Pending |
 | ROUTE-03 | Phase 73 | Pending |
