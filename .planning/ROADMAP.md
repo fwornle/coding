@@ -120,7 +120,12 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   1. Each run carries a one-sentence `goal_sentence` — auto-derived from `PLAN.md` for /gsd runs, prompted at "Start measurement" for freeform runs — stored on the Run.
   2. Deterministic syntactic route heuristics are computed per run: loop count, edit-revert count, redundant/unused read count, abandoned tool-call count, total step count, and wallclock per step.
   3. The computed heuristics are stored on the Run and queryable alongside its tags.
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 72-01-PLAN.md — RouteEvent schema (route-event.mjs) + computeHeuristics six strict heuristics + golden fixtures (ROUTE-02)
+- [ ] 72-02-PLAN.md — deriveGoalSentence zero-LLM PLAN.md/ROADMAP '**Goal**:' extractor (ROUTE-01)
+- [ ] 72-03-PLAN.md — Claude + Copilot normalized route-trace readers (ROUTE-02)
+- [ ] 72-04-PLAN.md — OpenCode read-only route reader + buildNormalizedTrace dispatcher (ROUTE-02)
+- [ ] 72-05-PLAN.md — writeRun Route node + flat metrics, measurement-stop wiring + recompute CLI + live verify (ROUTE-01, ROUTE-02)
 
 ### Phase 73: Semantic Route Judge & Success Scoring
 **Goal**: Every run gets a semantic route-alignment ratio and a 5-dimension success score, both LLM-judge synthesized with rationale and both user-correctable.
