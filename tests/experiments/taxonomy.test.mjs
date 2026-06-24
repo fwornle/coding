@@ -88,11 +88,34 @@ test('isValidClass: accepts the closed-6, rejects unclassified + free strings (S
   assert.equal(isValidClass(undefined), false, 'undefined rejected');
 });
 
-test('deriveClassFromText: migrate → migration (confident)', () => {
+test('deriveClassFromText: migrate + convert → migration (confident, two hits)', () => {
   const tax = loadTaxonomy();
-  const r = deriveClassFromText('migrate the database to postgres', tax);
+  // Two migration keywords ("migrate" + "convert") → score 2 → confident (WR-04).
+  const r = deriveClassFromText('migrate and convert the database to postgres', tax);
   assert.equal(r.taskClass, 'migration');
   assert.equal(r.confident, true);
+});
+
+test('deriveClassFromText: a lone common bare word derives a class but is NOT confident (WR-04)', () => {
+  const tax = loadTaxonomy();
+  // "add" is a single bare-token keyword (score 1) for new-feature. It derives the
+  // class but must NOT be confident — headless would quarantine (D-06), not auto-accept.
+  const add = deriveClassFromText('add', tax);
+  assert.equal(add.taskClass, 'new-feature', 'lone "add" still derives new-feature');
+  assert.equal(add.confident, false, 'a single bare-token hit is NOT confident (WR-04)');
+
+  // A lone "migrate" (score 1) likewise derives but is not confident.
+  const migrate = deriveClassFromText('migrate', tax);
+  assert.equal(migrate.taskClass, 'migration', 'lone "migrate" still derives migration');
+  assert.equal(migrate.confident, false, 'a single bare-token hit is NOT confident (WR-04)');
+});
+
+test('deriveClassFromText: a strong multi-keyword match IS confident (WR-04)', () => {
+  const tax = loadTaxonomy();
+  // Two distinct refactor keywords ("refactor" + "simplify") → score 2 → confident.
+  const r = deriveClassFromText('refactor and simplify this module', tax);
+  assert.equal(r.taskClass, 'refactor');
+  assert.equal(r.confident, true, 'two keyword hits clear the confidence bar (WR-04)');
 });
 
 test('deriveClassFromText: fix...bug → bugfix (confident)', () => {
