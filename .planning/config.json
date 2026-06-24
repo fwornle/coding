@@ -9,5 +9,8 @@
     "verifier": true,
     "_auto_chain_active": false
   },
-  "granularity": "standard"
+  "granularity": "standard",
+  "statusline": {
+    "context_position": "front"
+  }
 }
