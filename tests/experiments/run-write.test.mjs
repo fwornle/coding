@@ -68,6 +68,32 @@ async function collectOutcomes(store) {
   return out;
 }
 
+/** Collect every Route currently in the store. */
+async function collectRoutes(store) {
+  const out = [];
+  for await (const e of store.iterate({ entityType: 'Route' })) out.push(e);
+  return out;
+}
+
+/** The six route-quality heuristic keys (D-09/ROUTE-02), in canonical order. */
+const SIX_HEURISTICS = [
+  'loop_count', 'edit_revert_count', 'redundant_read_count',
+  'abandoned_tool_count', 'total_step_count', 'wallclock_per_step',
+];
+
+/** A representative non-null heuristics block (the close orchestrator's shape). */
+function sampleHeuristics(overrides = {}) {
+  return {
+    loop_count: 1,
+    edit_revert_count: 0,
+    redundant_read_count: 2,
+    abandoned_tool_count: 0,
+    total_step_count: 7,
+    wallclock_per_step: 1234.5,
+    ...overrides,
+  };
+}
+
 /** A representative span + write args (the close orchestrator's call shape). */
 function sampleArgs(overrides = {}) {
   const span = {
@@ -95,6 +121,7 @@ function sampleArgs(overrides = {}) {
       reasoning_tokens: 50,
       calls: 4,
     },
+    ...('heuristics' in overrides ? { heuristics: overrides.heuristics } : {}),
   };
 }
 
@@ -207,6 +234,132 @@ test('SC-2: pending close quarantines — pending true + closedState quarantined
 
     const outcomes = await collectOutcomes(store);
     assert.equal(outcomes[0].metadata.closedState, 'quarantined', 'pending → closedState quarantined');
+  } finally {
+    await cleanup();
+  }
+});
+
+// ── ROUTE-02 / D-09: six flat Run metrics + one idempotent Route node ──────────
+
+test('ROUTE-02: writeRun writes the six heuristics FLAT on the Run.metadata (D-09)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    await writeRun(store, sampleArgs({ heuristics: sampleHeuristics() }));
+
+    const runs = await collectRuns(store);
+    assert.equal(runs.length, 1, 'exactly one Run');
+    const m = runs[0].metadata;
+    for (const k of SIX_HEURISTICS) {
+      assert.ok(k in m, `heuristic '${k}' must be flat on Run.metadata`);
+    }
+    assert.equal(m.loop_count, 1);
+    assert.equal(m.edit_revert_count, 0, '0 is a genuine measured value (NOT null)');
+    assert.equal(m.redundant_read_count, 2);
+    assert.equal(m.total_step_count, 7);
+    assert.equal(m.wallclock_per_step, 1234.5);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('D-09: exactly ONE Route node per Run carrying the six heuristics + goal_sentence', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    const runId = await writeRun(store, sampleArgs({ heuristics: sampleHeuristics() }));
+
+    const routes = await collectRoutes(store);
+    assert.equal(routes.length, 1, 'exactly one Route node after the first write');
+    const route = routes[0];
+    assert.equal(route.entityType, 'Route', 'entityType is Route');
+    assert.equal(route.name, 't1-route', 'Route name is `${task_id}-route`');
+    assert.equal(route.metadata.run_task_id, 't1', 'Route back-links the Run via run_task_id');
+    assert.equal(route.metadata.goal_sentence, 'migrate the legacy store', 'goal_sentence on the Route');
+    assert.equal(route.description, 'migrate the legacy store', 'description = goal_sentence');
+    for (const k of SIX_HEURISTICS) {
+      assert.ok(k in route.metadata, `heuristic '${k}' must be on the Route metadata`);
+    }
+    assert.equal(route.metadata.total_step_count, 7);
+
+    // The Route id is a minted UUIDv7, NEVER span.task_id (Pitfall 1).
+    assert.notEqual(route.id, 't1', 'Route id must be minted, never task_id');
+    assert.match(
+      String(route.id),
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      'Route id must be a UUIDv7 (mintEntityId)',
+    );
+
+    // A tookRoute edge Run --> Route must exist.
+    const rels = await store.findRelations({ type: 'tookRoute', from: runId });
+    assert.equal(rels.length, 1, 'exactly one tookRoute relation from the Run');
+    assert.equal(rels[0].to, route.id, 'tookRoute targets the Route node');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('D-09: re-close UPDATES the same Route — no duplicate, ONE tookRoute edge (Pitfall 2)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    const firstRunId = await writeRun(store, sampleArgs({ heuristics: sampleHeuristics() }));
+    const firstRoutes = await collectRoutes(store);
+    assert.equal(firstRoutes.length, 1);
+    const firstRouteId = firstRoutes[0].id;
+
+    // Re-close with refreshed heuristics (self-heal recompute).
+    const secondRunId = await writeRun(store, sampleArgs({
+      heuristics: sampleHeuristics({ loop_count: 3, total_step_count: 9 }),
+    }));
+    assert.equal(secondRunId, firstRunId, 're-close reuses the same Run id');
+
+    const routes = await collectRoutes(store);
+    assert.equal(routes.length, 1, 'exactly ONE Route after two writes (no duplicate)');
+    assert.equal(routes[0].id, firstRouteId, 're-close reuses the SAME Route id');
+    assert.equal(routes[0].metadata.loop_count, 3, 'Route heuristics updated on re-close');
+    assert.equal(routes[0].metadata.total_step_count, 9);
+
+    // Stable-keyed tookRoute edge dedupes — exactly ONE survives N re-closes (Pitfall 2).
+    const rels = await store.findRelations({ type: 'tookRoute', from: secondRunId });
+    assert.equal(rels.length, 1, 're-close must NOT add a parallel tookRoute edge (Pitfall 2)');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('D-02: null heuristics stay null on BOTH the Run and the Route (never 0)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    const { ALL_NULL_HEURISTICS } = await import('../../lib/experiments/route-heuristics.mjs');
+    await writeRun(store, sampleArgs({ heuristics: ALL_NULL_HEURISTICS }));
+
+    const runs = await collectRuns(store);
+    const routes = await collectRoutes(store);
+    assert.equal(routes.length, 1);
+    for (const k of SIX_HEURISTICS) {
+      assert.equal(runs[0].metadata[k], null, `Run heuristic '${k}' must be null (D-02 — not 0)`);
+      assert.equal(routes[0].metadata[k], null, `Route heuristic '${k}' must be null (D-02 — not 0)`);
+    }
+  } finally {
+    await cleanup();
+  }
+});
+
+test('D-02: writeRun WITHOUT a heuristics arg defaults all six to null (not 0)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    await writeRun(store, sampleArgs()); // no heuristics key at all
+
+    const runs = await collectRuns(store);
+    const routes = await collectRoutes(store);
+    assert.equal(routes.length, 1, 'a Route is still written even with no heuristics arg');
+    for (const k of SIX_HEURISTICS) {
+      assert.equal(runs[0].metadata[k], null, `missing heuristics ⇒ Run '${k}' null (D-02)`);
+      assert.equal(routes[0].metadata[k], null, `missing heuristics ⇒ Route '${k}' null (D-02)`);
+    }
   } finally {
     await cleanup();
   }
