@@ -1277,6 +1277,76 @@ async function pollProxyMode() {
   }
 }
 
+// Hysteresis state for the location-vs-proxyMode staleness detector below.
+let pendingProxyStaleMismatch = null;        // { class, count } or null
+const PROXY_STALE_CONFIRM_TICKS = 3;         // sustained mismatch ticks before restart
+
+// Collapse both network vocabularies onto two comparable classes. The
+// coordinator's network.location speaks {corporate,vpn,open,unknown}; the
+// proxy's self-reported networkMode speaks {corporate,vpn,public,unknown}.
+// Returns null for anything not confidently classifiable (never comparable).
+function classifyNetClass(v) {
+  if (v === 'corporate' || v === 'vpn') return 'corporate';
+  if (v === 'open' || v === 'home' || v === 'public' || v === 'direct') return 'public';
+  return null;
+}
+
+/**
+ * Restart the proxy when the host's authoritative network location disagrees
+ * with the proxy's self-reported networkMode — i.e. the proxy is STALE after a
+ * network switch it never re-detected.
+ *
+ * This complements the flip detector inside pollProxyMode(): that one only sees
+ * transitions in the proxy's OWN self-report, which is frozen at proxy startup.
+ * After a real host network switch (e.g. corporate -> home) the proxy keeps
+ * reporting its boot-time mode with a dead HTTPS_PROXY baked in — every fetch()
+ * then fails with "fetch failed", but the proxy never crashes, so launchd's
+ * KeepAlive never restarts it. That is exactly the 2026-06-24 14-hour zombie
+ * (HTTPS_PROXY=proxy.muc:8080 held over from a corporate startup). Comparing the
+ * authoritative host location against the proxy's report catches it.
+ *
+ * Like the networkMode-flip path, this is a network-change response (a user
+ * action), not a proxy-failure response, so it does NOT touch
+ * kickstart_timestamps and is NOT gated by the failure cooldown.
+ */
+function evaluateProxyStaleness() {
+  // Shares the proxy auto_heal kill-switch (D-07).
+  const rule = RULES?.rules?.services?.llm_cli_proxy;
+  if (!rule || rule.auto_heal !== true) { pendingProxyStaleMismatch = null; return; }
+
+  const hostClass = classifyNetClass(currentState.network?.location);
+  const proxyClass = classifyNetClass(currentState.proxy?.networkMode);
+
+  // Only actionable when BOTH classes are known and disagree. An 'unknown' on
+  // either side is transient (startup / probe error) and must never restart.
+  if (!hostClass || !proxyClass || hostClass === proxyClass) {
+    if (pendingProxyStaleMismatch) {
+      log(`proxy staleness cleared (host=${currentState.network?.location} proxy=${currentState.proxy?.networkMode})`, 'DEBUG');
+      pendingProxyStaleMismatch = null;
+    }
+    return;
+  }
+
+  // Confirmed-disagreement hysteresis — require N consecutive ticks so a
+  // single-tick race between the two probes can't fire a needless restart.
+  if (pendingProxyStaleMismatch && pendingProxyStaleMismatch.class === hostClass) {
+    pendingProxyStaleMismatch.count += 1;
+  } else {
+    pendingProxyStaleMismatch = { class: hostClass, count: 1 };
+  }
+
+  if (pendingProxyStaleMismatch.count < PROXY_STALE_CONFIRM_TICKS) {
+    log(`proxy stale: host=${hostClass} but proxy reports ${proxyClass} (${pendingProxyStaleMismatch.count}/${PROXY_STALE_CONFIRM_TICKS})`, 'DEBUG');
+    return;
+  }
+
+  log(`proxy stale: host=${hostClass} but proxy frozen at ${proxyClass} for ${pendingProxyStaleMismatch.count} ticks — dispatching restart_llm_cli_proxy`, 'INFO');
+  pendingProxyStaleMismatch = null;
+  getRemediationDispatcher()
+    .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'network-location-mismatch' }))
+    .catch(err => log(`proxy staleness kickstart failed: ${err.message}`, 'ERROR'));
+}
+
 // ETM spawn safety net (Phase 33 fills the gap left by removing the legacy
 // per-project LSL coordinator). Discovers projects with an actively-written
 // Claude transcript and ensures an enhanced-transcript-monitor process is
@@ -1924,6 +1994,17 @@ async function runAllChecks() {
   } catch (err) {
     log(`proxy networkMode probe threw: ${err.message}`, 'ERROR');
     currentState.proxy.networkMode = 'unknown';
+  }
+
+  // ----- Proxy staleness vs authoritative host location (network-switch heal) -----
+  // pollProxyMode (above) only catches changes in the proxy's OWN self-report,
+  // which is frozen at proxy startup. Compare the authoritative host location
+  // against the proxy's report and restart on a sustained mismatch — the gap
+  // that let the 2026-06-24 stale-corporate-proxy zombie survive 14h.
+  try {
+    evaluateProxyStaleness();
+  } catch (err) {
+    log(`proxy staleness check threw: ${err.message}`, 'ERROR');
   }
 
   // ----- Proxy semantic readiness (every 60s active / 10 min idle — Plan 34-02 R1; Plan 34-03 adds auto-heal FSM) -----
