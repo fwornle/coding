@@ -526,9 +526,22 @@ const USER_ACTIVE_HEARTBEAT_MAX_AGE_MS = 5 * 60_000;
 function userActiveNow() {
   const now = Date.now();
   for (const entry of Object.values(currentState.lsl || {})) {
-    if (!entry || entry.status === 'stopped') continue;
-    const lb = entry.lastBeat || 0;
-    if (lb > 0 && (now - lb) < USER_ACTIVE_HEARTBEAT_MAX_AGE_MS) return true;
+    if (!entry || entry.status === 'stopped' || !entry.transcriptPath) continue;
+    // FIX (2026-06-25): do NOT key idle-detection off entry.lastBeat. The ETM
+    // posts an lsl_heartbeat on EVERY poll (enhanced-transcript-monitor.js:4329),
+    // so lastBeat tracks "ETM daemon is alive" — NOT real activity — and stays
+    // fresh every few seconds 24/7 while the daemon runs. That made userActiveNow()
+    // return true all night even when the operator was asleep, so the idle proxy-
+    // probe back-off (10min/30min) never engaged and the coordinator burned the
+    // ~1700 "say-OK" calls/night this gate exists to prevent. The transcript .jsonl
+    // is written by the agent/CLI only on real tool calls and user messages, so its
+    // mtime is the authentic activity clock (the same signal the statusline's
+    // per-project lifecycle bubble uses). Sub-agent live-state heartbeats are
+    // intentionally NOT folded in here — they are also daemon-alive (rewritten on a
+    // timer), so they would reintroduce the always-true bug.
+    let mt = 0;
+    try { mt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { mt = 0; }
+    if (mt > 0 && (now - mt) < USER_ACTIVE_HEARTBEAT_MAX_AGE_MS) return true;
   }
   return false;
 }

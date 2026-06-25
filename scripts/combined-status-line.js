@@ -445,10 +445,19 @@ class CombinedStatusLine {
       const lsl = result.state.lsl || {};
       const FRESH_MS = 5 * 60 * 1000;
       const now = Date.now();
+      // FIX (2026-06-25): do NOT key activity off entry.lastBeat. The ETM posts
+      // an lsl_heartbeat on EVERY poll (enhanced-transcript-monitor.js:4329), so
+      // lastBeat tracks "ETM daemon alive", not real activity, and stays fresh
+      // 24/7 while the daemon runs. That made isUserActive() true around the
+      // clock — defeating both the [📚]/[🧠] idle fade and (via the same flaw in
+      // the coordinator's userActiveNow) the proxy-probe back-off. Use the
+      // transcript .jsonl mtime, written by the CLI only on real tool calls / user
+      // messages — the authentic activity clock.
       return Object.values(lsl).some(entry => {
-        if (!entry || entry.status === 'stopped') return false;
-        const lastBeat = entry.lastBeat || 0;
-        return lastBeat > 0 && (now - lastBeat) < FRESH_MS;
+        if (!entry || entry.status === 'stopped' || !entry.transcriptPath) return false;
+        let mt = 0;
+        try { mt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { mt = 0; }
+        return mt > 0 && (now - mt) < FRESH_MS;
       });
     })();
     return this._userActivePromise;
@@ -2052,7 +2061,21 @@ class CombinedStatusLine {
        case 'stalled':
          // Pure fading — no red alarm. The pipeline isn't broken,
          // it just hasn't had a prompt-set complete recently.
-         parts.push(`[📚${obsIcon}]`);
+         //
+         // LIVENESS-SIGNAL FIX (2026-06-25): observations are WRITTEN only at
+         // prompt-set boundaries (the next user prompt closes an exchange) —
+         // never continuously (see note above line ~2024). So during a long
+         // ACTIVE exchange (a /gsd run or any long turn where the agent works
+         // but no new user prompt lands), zero observations are written for
+         // hours even though the ETM is actively buffering and the pipeline is
+         // healthy. Keying the badge purely on obsAge then false-alarms 🟠→🟤→⚫
+         // ("dead") while work is in flight (root cause of the 8pm-orange /
+         // overnight-black confusion). When the user/agent is actively working
+         // (fresh ETM heartbeat), a high obsAge means "observation pending
+         // until the exchange closes" — NOT a stale/dead pipeline — so render
+         // healthy. Genuine in-session breakage still surfaces via the
+         // 'unreachable' case below ([📚🔴]). Only fade when truly idle.
+         parts.push(userActive ? '[📚✅]' : `[📚${obsIcon}]`);
          break;
        case 'disabled':
          parts.push('[📚🔇]');
