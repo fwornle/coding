@@ -31,7 +31,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 - [x] **Phase 69: Claude + Copilot Token Adapters** — Claude per-turn + per-reasoning-step JSONL adapter; Copilot events.jsonl adapter with Phase-1 event-vocabulary check (completed 2026-06-22)
 - [x] **Phase 70: OpenCode + Mastra Token Adapters** — OpenCode proxy-route per-llm-call logging; Mastra instrumentation-surface read + adapter (completed 2026-06-23)
 - [x] **Phase 71: Experiment KB & Task Taxonomy** — km-core ontology + Run-write path + enforced task-taxonomy v0 tag (completed 2026-06-24)
-- [ ] **Phase 72: Syntactic Route Quality** — `goal_sentence` capture + deterministic route heuristics per run
+- [x] **Phase 72: Syntactic Route Quality** — `goal_sentence` capture + deterministic route heuristics per run (completed 2026-06-25)
 - [ ] **Phase 73: Semantic Route Judge & Success Scoring** — LLM-judge `goal_aligned_ratio` + 5-dimension rubric + user override
 - [ ] **Phase 74: Performance Dashboard & Reports** — "Performance" tab query-builder, reasoning-step sub-bands + tier badges, Report entity + saved-query workflow + Report views
 
@@ -125,7 +125,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 - [x] 72-02-PLAN.md — deriveGoalSentence zero-LLM PLAN.md/ROADMAP '**Goal**:' extractor (ROUTE-01)
 - [x] 72-03-PLAN.md — Claude + Copilot normalized route-trace readers (ROUTE-02)
 - [x] 72-04-PLAN.md — OpenCode read-only route reader + buildNormalizedTrace dispatcher (ROUTE-02)
-- [ ] 72-05-PLAN.md — writeRun Route node + flat metrics, measurement-stop wiring + recompute CLI + live verify (ROUTE-01, ROUTE-02)
+- [x] 72-05-PLAN.md — writeRun Route node + flat metrics, measurement-stop wiring + recompute CLI + live verify (ROUTE-01, ROUTE-02)
 
 ### Phase 73: Semantic Route Judge & Success Scoring
 **Goal**: Every run gets a semantic route-alignment ratio and a 5-dimension success score, both LLM-judge synthesized with rationale and both user-correctable.
@@ -163,6 +163,6 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete    | 2026-06-22 |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete    | 2026-06-23 |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 5/5 | Complete    | 2026-06-24 |
-| 72. Syntactic Route Quality | v7.4 | 4/5 | In Progress|  |
+| 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 0/? | Not started | - |
 | 74. Performance Dashboard & Reports | v7.4 | 0/? | Not started | - |
