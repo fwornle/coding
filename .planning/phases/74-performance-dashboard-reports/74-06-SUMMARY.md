@@ -118,3 +118,32 @@ Both created components + the SUMMARY exist on disk; all 3 task commits present 
 ## Checkpoint
 
 The next task is `checkpoint:human-verify` (gate=blocking). Execution stops here. The plan is left **in-progress** — STATE/ROADMAP are NOT advanced — pending operator visual sign-off via `gsd-browser` against `localhost:3032/performance`. See the CHECKPOINT REACHED message for verification steps.
+
+---
+
+## Post-checkpoint fixes (human-verify, 2026-06-28)
+
+The 74-06 human-verify checkpoint surfaced three defects (all found via operator
+`gsd-browser` review of the timeline); fixed and committed before phase sign-off:
+
+1. **Container DB-path bug** (`lib/experiments/timeline-read.mjs`) — `resolveDataDir()`
+   hardcoded the host `.data` path, which does not exist inside the coding-services
+   container where vkb-server (:8080) runs → `readTimeline` returned `[]` for every run,
+   so DASH-02 was empty in the deployed dashboard. Now resolves container-safely
+   (`LLM_PROXY_DATA_DIR` → `CODING_ROOT/.data` → module-relative repo root).
+2. **Timeline render legibility** (`components/performance/timeline.tsx`) — tier-less
+   single-turn rows rendered as a blank badge + a far-right number. Now each turn shows
+   `Turn N · model · tier-badge`, with an empty `granularity_tier` rendered as `untagged`.
+3. **Timeline/drawer coupling** (`performanceSlice.ts` + `runs-table.tsx` +
+   `score-drawer.tsx` + `performance.tsx` + E2E flow c) — the modal drawer's dimming
+   overlay hid the timeline, and both keyed off `selectedTaskId`. Split into
+   `selectedTaskId` (inline timeline, row click) and `overrideTaskId` (modal drawer,
+   explicit per-row "Edit scores" button).
+
+Verification after fixes: `npx tsc --noEmit` clean on all Phase 74 files; Playwright
+`performance.spec.ts` 5 passed / 1 skipped; `gsd-browser` confirms row-click shows the
+timeline with no overlay and "Edit scores" opens the drawer. Human-verify: APPROVED.
+
+Residual (data, not code): the seed `verify-*` runs have only tier-less single-turn rows,
+so expandable per-reasoning-step sub-bands and non-`untagged` tier badges need a run
+produced with proper per-turn/per-reasoning-step tagging to demonstrate.
