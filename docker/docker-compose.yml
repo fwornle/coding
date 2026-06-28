@@ -151,6 +151,10 @@ services:
       - ${CODING_REPO:-.}/src/knowledge-management:/coding/src/knowledge-management:ro
       # VKB server source (live-mounted to avoid Docker rebuild for JS changes)
       - ${CODING_REPO:-.}/lib/vkb-server:/coding/lib/vkb-server:ro
+      # Experiment read/write services (Phase 74) — vkb-server's experiment
+      # handlers dynamic-import ../experiments/*.mjs; live-mounted like vkb-server
+      # so the DASH-01/02/03 + KB-04 endpoints resolve at runtime in-container.
+      - ${CODING_REPO:-.}/lib/experiments:/coding/lib/experiments:ro
       # KM-Core dist (live-mounted to avoid Docker rebuild for TS changes — Phase 37)
       - ${CODING_REPO:-.}/lib/km-core/dist:/coding/lib/km-core/dist:ro
     networks:
