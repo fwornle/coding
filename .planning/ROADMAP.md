@@ -135,7 +135,13 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   1. A semantic `goal_aligned_ratio` is computed by an LLM-judge (Haiku via `taskType` routing) that scores each meaningful trace event toward/neutral/away from the goal sentence, stored with rationale.
   2. Every run is scored on the fixed 5-dimension rubric (`goal_achieved`, `code_quality`, `test_coverage`, `regressions`, `spec_drift`) synthesized by the LLM-judge from whatever evidence is present, with a rationale string.
   3. A user can override any rubric dimension in the dashboard, and the corrected score is stored separately from the judged score.
-**Plans**: TBD
+**Plans**: 6 plans
+  - [ ] 73-01-PLAN.md — Consequential-event classifier + goal_aligned_ratio math (fixture-tested) (Wave 1) [ROUTE-03]
+  - [ ] 73-02-PLAN.md — Score ontology class + idempotent override-preserving writeScore/applyOverride (Wave 1) [SCORE-01, SCORE-02]
+  - [ ] 73-03-PLAN.md — Lean on-disk evidence harness, fail-soft to null (Wave 1) [SCORE-01]
+  - [ ] 73-04-PLAN.md — LLM judge: single structured Haiku call + trivial/pending quarantine (Wave 2) [ROUTE-03, SCORE-01]
+  - [ ] 73-05-PLAN.md — REST PATCH override endpoint: validation + dedicated-store reachability (Wave 2) [SCORE-02]
+  - [ ] 73-06-PLAN.md — Wire judge into close path + idempotent recompute-score CLI (Wave 3) [ROUTE-03, SCORE-01]
 
 ### Phase 74: Performance Dashboard & Reports
 **Goal**: An operator can build task-anchored queries over runs, read reasoning-cost and tier honestly, and save curated findings as durable Reports.
@@ -164,5 +170,5 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete    | 2026-06-23 |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 5/5 | Complete    | 2026-06-24 |
 | 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
-| 73. Semantic Route Judge & Success Scoring | v7.4 | 0/? | Not started | - |
+| 73. Semantic Route Judge & Success Scoring | v7.4 | 0/6 | Planned | - |
 | 74. Performance Dashboard & Reports | v7.4 | 0/? | Not started | - |
