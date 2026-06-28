@@ -125,7 +125,8 @@ interface PerformanceState {
   runs: Run[]
   runsLoading: boolean
   runsError: string | null
-  selectedTaskId: string | null
+  selectedTaskId: string | null // drives the inline Timeline panel (row click)
+  overrideTaskId: string | null // drives the modal Score-override drawer (explicit "Edit scores")
   timelineByTaskId: Record<string, TimelineRow[]>
   timelineLoading: boolean
   timelineError: string | null
@@ -162,6 +163,7 @@ const initialState: PerformanceState = {
   runsLoading: false,
   runsError: null,
   selectedTaskId: null,
+  overrideTaskId: null,
   timelineByTaskId: {},
   timelineLoading: false,
   timelineError: null,
@@ -361,7 +363,13 @@ const performanceSlice = createSlice({
       }
     },
     setSelectedTaskId(state, action: PayloadAction<string | null>) {
+      // Row selection drives ONLY the inline Timeline panel — never the modal
+      // drawer (decoupled so the timeline is viewable without the dimming overlay).
       state.selectedTaskId = action.payload
+    },
+    setOverrideTaskId(state, action: PayloadAction<string | null>) {
+      // Explicit "Edit scores" affordance opens the modal Score-override drawer.
+      state.overrideTaskId = action.payload
       // Opening/closing a run resets the transient override save state so a stale
       // error/success banner never leaks across runs.
       state.saveOverrideError = null
@@ -466,6 +474,7 @@ export const {
   setDateWindow,
   clearFilters,
   setSelectedTaskId,
+  setOverrideTaskId,
   setActiveReportId,
   clearOverrideStatus,
 } = performanceSlice.actions
@@ -500,9 +509,17 @@ export const selectSaveOverrideError = (state: RootState) => state.performance.s
 export const selectSaveOverrideStatus = (state: RootState) => state.performance.saveOverrideStatus
 export const selectSaveOverrideSuccessAt = (state: RootState) => state.performance.saveOverrideSuccessAt
 
-// The currently-selected run (for the drawer), derived from selectedTaskId.
+// The run whose Timeline is shown inline (row selection).
 export const selectSelectedRun = (state: RootState): Run | null => {
   const id = state.performance.selectedTaskId
+  if (!id) return null
+  return state.performance.runs.find((r) => r.task_id === id) ?? null
+}
+
+// The run being edited in the modal Score-override drawer ("Edit scores").
+export const selectOverrideTaskId = (state: RootState) => state.performance.overrideTaskId
+export const selectOverrideRun = (state: RootState): Run | null => {
+  const id = state.performance.overrideTaskId
   if (!id) return null
   return state.performance.runs.find((r) => r.task_id === id) ?? null
 }

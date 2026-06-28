@@ -64,13 +64,15 @@ test('(b) selecting a facet narrows the runs table', async ({ page }) => {
   expect(rowsAfter).toBeLessThanOrEqual(rowsBefore)
 })
 
-test('(c) clicking a run row opens the right-side detail drawer', async ({ page }) => {
+test('(c) the per-row "Edit scores" button opens the right-side detail drawer', async ({ page }) => {
   await navigateToPerformance(page)
   if ((await runRowCount(page)) === 0) {
     test.skip(true, 'No runs in the store — drawer-open flow needs seeded data.')
     return
   }
-  await page.locator('[data-testid="run-row"]').first().click()
+  // Row click drives the inline timeline; the drawer opens only via "Edit scores"
+  // (decoupled so the timeline is viewable without the modal overlay).
+  await page.locator('[data-testid="edit-scores"]').first().click()
   await expect(page.locator('[data-testid="run-detail-drawer"]')).toBeVisible()
   // The drawer shows the 5 rubric rows with editable corrected_* inputs.
   await expect(page.locator('[data-testid="corrected-input-goal_achieved"]')).toBeVisible()

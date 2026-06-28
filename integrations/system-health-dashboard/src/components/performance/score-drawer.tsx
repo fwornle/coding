@@ -12,10 +12,10 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
-  setSelectedTaskId,
+  setOverrideTaskId,
   saveOverride,
-  selectSelectedRun,
-  selectSelectedTaskId,
+  selectOverrideRun,
+  selectOverrideTaskId,
   selectSaveOverridePending,
   selectSaveOverrideError,
   selectSaveOverrideStatus,
@@ -26,15 +26,17 @@ import {
 } from '@/store/slices/performanceSlice'
 import { SCORE_DIMENSIONS, judged } from './corrected-wins'
 
-// D-02 / SCORE-02 score-override drawer. Opens when the slice's selectedTaskId is
-// non-null (set by the runs-table row click — Plan 05). Shows 5 rubric rows: the
-// judged value (read-only, muted) + an editable corrected_* Input (LOCAL useState
-// form state) + the dimension rationale. Save dispatches the saveOverride thunk
-// which issues one EXISTING PATCH /api/experiments/scores/:taskId per edited
-// dimension (no applyOverride re-implementation — server authoritative) and then
-// re-dispatches fetchRuns so corrected-wins refreshes. The client mirrors the
-// server ranges (regressions 0|1, others [0,1]) to block obviously-bad saves, but
-// the server re-validates. Closing dispatches setSelectedTaskId(null).
+// D-02 / SCORE-02 score-override drawer. Opens when the slice's overrideTaskId is
+// non-null (set by the runs-table per-row "Edit scores" button — decoupled from
+// row selection so the inline Timeline panel is viewable without this modal's
+// dimming overlay). Shows 5 rubric rows: the judged value (read-only, muted) + an
+// editable corrected_* Input (LOCAL useState form state) + the dimension rationale.
+// Save dispatches the saveOverride thunk which issues one EXISTING PATCH
+// /api/experiments/scores/:taskId per edited dimension (no applyOverride
+// re-implementation — server authoritative) and then re-dispatches fetchRuns so
+// corrected-wins refreshes. The client mirrors the server ranges (regressions 0|1,
+// others [0,1]) to block obviously-bad saves, but the server re-validates. Closing
+// dispatches setOverrideTaskId(null).
 
 const DIM_LABELS: Record<string, string> = {
   goal_achieved: 'Goal achieved',
@@ -72,8 +74,8 @@ function validateDim(dim: string, raw: string): string | null {
 
 export function ScoreDrawer() {
   const dispatch = useAppDispatch()
-  const taskId = useAppSelector(selectSelectedTaskId)
-  const run = useAppSelector(selectSelectedRun)
+  const taskId = useAppSelector(selectOverrideTaskId)
+  const run = useAppSelector(selectOverrideRun)
   const pending = useAppSelector(selectSaveOverridePending)
   const saveError = useAppSelector(selectSaveOverrideError)
   const saveStatus = useAppSelector(selectSaveOverrideStatus)
@@ -89,7 +91,7 @@ export function ScoreDrawer() {
 
   const open = taskId != null
 
-  const close = () => dispatch(setSelectedTaskId(null))
+  const close = () => dispatch(setOverrideTaskId(null))
 
   // Per-row client validation over the current drafts.
   const rowErrors: Record<string, string | null> = {}

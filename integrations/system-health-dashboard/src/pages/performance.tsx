@@ -149,8 +149,9 @@ export function PerformancePage() {
         </TabsContent>
       </Tabs>
 
-      {/* Score-override drawer — driven entirely by slice selectedTaskId (no
-          page-local open flag). Mounted once; opens when a run row is clicked. */}
+      {/* Score-override drawer — driven by slice overrideTaskId (no page-local open
+          flag). Mounted once; opens via a row's "Edit scores" button. Decoupled from
+          row selection so the inline Timeline panel is viewable without this overlay. */}
       <ScoreDrawer />
     </div>
   )

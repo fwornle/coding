@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Pencil } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -13,14 +14,17 @@ import {
   selectRuns,
   selectSelectedTaskId,
   setSelectedTaskId,
+  setOverrideTaskId,
   type Run,
 } from '@/store/slices/performanceSlice'
 import { effective, isEdited, judged, SCORE_DIMENSIONS } from './corrected-wins'
 
-// D-01/D-03 runs table. Reads the FILTERED set from selectFilteredRuns; row click
-// dispatches setSelectedTaskId (drives the Plan 06 drawer + the timeline panel).
-// Score cells use the shared corrected-wins helper: corrected value as effective
-// with an amber "edited" marker + judged value on hover; null → `—`, never 0.
+// D-01/D-03 runs table. Reads the FILTERED set from selectFilteredRuns. Row click
+// dispatches setSelectedTaskId — this drives ONLY the inline Timeline panel (so the
+// timeline is viewable without a modal overlay). The score-override drawer is opened
+// by an explicit per-row "Edit scores" button (setOverrideTaskId), decoupled from
+// row selection. Score cells use the shared corrected-wins helper: corrected value
+// as effective with an amber "edited" marker + judged value on hover; null → `—`.
 
 const DIM_LABELS: Record<string, string> = {
   goal_achieved: 'Goal',
@@ -109,6 +113,7 @@ export function RunsTable() {
               <TableHead key={dim} className="text-right">{DIM_LABELS[dim]}</TableHead>
             ))}
             <TableHead className="text-right">Tokens</TableHead>
+            <TableHead className="text-right sr-only">Edit</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -143,6 +148,22 @@ export function RunsTable() {
                   {run.outcome?.totalTokens == null
                     ? <span className="text-muted-foreground">—</span>
                     : run.outcome.totalTokens.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    data-testid="edit-scores"
+                    aria-label={`Edit scores for ${run.task_id}`}
+                    onClick={(e) => {
+                      // Don't let the click bubble to the row (which drives the timeline).
+                      e.stopPropagation()
+                      dispatch(setOverrideTaskId(run.task_id))
+                    }}
+                  >
+                    <Pencil className="size-3.5" />
+                    Edit scores
+                  </Button>
                 </TableCell>
               </TableRow>
             )
