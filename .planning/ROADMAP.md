@@ -156,7 +156,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 **Plans**: 6 plans
   - [x] 74-01-PLAN.md — Wave 0: shared seedIsolatedStore/seedTokenDb fixture + 5 RED node:test files + Playwright skeleton (Wave 1)
   - [x] 74-02-PLAN.md — DASH-01/02 read layer: readRuns (join + pending-exclude) + readTimeline (readonly token-usage.db sub-band grouping) (Wave 2)
-  - [ ] 74-03-PLAN.md — KB-04/DASH-03: Report ontology fill-in + writeReport/refreshReport + readReports/readReport (snapshot stability) (Wave 3)
+  - [x] 74-03-PLAN.md — KB-04/DASH-03: Report ontology fill-in + writeReport/refreshReport + readReports/readReport (snapshot stability) (Wave 3)
   - [ ] 74-04-PLAN.md — DASH-01/02/03/KB-04: 5 experiment REST endpoints (transient store) + same-origin server.js proxy to vkb-server:8080 (Wave 4)
   - [ ] 74-05-PLAN.md — DASH-01/02: route + nav + sheet primitive + Performance page (faceted sidebar, corrected-wins table, collapsible timeline) [checkpoint] (Wave 5)
   - [ ] 74-06-PLAN.md — SCORE-02/KB-04/DASH-03: score-override drawer + Saved Reports sub-view + live Playwright [checkpoint] (Wave 6)
@@ -178,4 +178,4 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 71. Experiment KB & Task Taxonomy | v7.4 | 5/5 | Complete    | 2026-06-24 |
 | 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
-| 74. Performance Dashboard & Reports | v7.4 | 2/6 | In Progress|  |
+| 74. Performance Dashboard & Reports | v7.4 | 3/6 | In Progress|  |
