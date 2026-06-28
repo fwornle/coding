@@ -20,7 +20,8 @@ import { useMemo } from 'react'
 import { useViewerStore } from '@/store/viewer-store'
 import { EDGE_STYLES, LAYER_BADGE_CLASS } from '@/graph/vokb-palette'
 import { SHAPE_PALETTE, shapeFallback, classColor, type ShapeKind } from '@/graph/color-fallback'
-import { deriveLayer, type Layer, type OntologyRegistryClass } from '@/graph/layer'
+import { deriveLayer, type Layer } from '@/graph/layer'
+import type { OntologyClass } from '@/api/ApiClient'
 // `graph/types` is the canvas-pipeline shape returned by useGraphData; the
 // LegendPanel receives the same post-filter set that paints the canvas
 // (D-05 same-predicate contract), so it MUST consume the graph/types flavor
@@ -150,9 +151,12 @@ export interface LegendPanelProps {
   entities: readonly Entity[]
   /** Rendered relations — the SAME post-filter set the canvas paints. D-05 contract. */
   relations: readonly Relation[]
-  /** Optional ontology registry — when supplied, deriveLayer walks the extends-chain.
-   *  When omitted, deriveLayer falls back to a direct-class match (Pattern/Insight). */
-  ontologyRegistry?: readonly OntologyRegistryClass[]
+  /** Optional ontology registry — when supplied, deriveLayer walks the extends-chain
+   *  AND the DOMAINS swatches resolve color/shape from each class's
+   *  `display` overlay (the SAME source the graph-builder uses), so the legend
+   *  matches the canvas. When omitted, deriveLayer falls back to a direct-class
+   *  match and swatches fall back to the classColor/shapeFallback palette. */
+  ontologyRegistry?: readonly OntologyClass[]
   /** Hide the LAYERS (Evidence/Pattern) section — it's the OKB/km-core
    *  LearningArtifact `defaultLayer` axis, not native to the coding KG. Set true
    *  for the VKB tab (operator 2026-06-19). */
@@ -178,8 +182,48 @@ export function LegendPanel({
   const toggleRelationType = useViewerStore((s) => s.toggleRelationType)
   const setHiddenNodeTypes = useViewerStore((s) => s.setHiddenNodeTypes)
   const setHiddenRelationTypes = useViewerStore((s) => s.setHiddenRelationTypes)
+  // Theme parity with graph-builder (classColor takes theme; the canvas reads
+  // the same store value).
+  const theme = useViewerStore((s) => s.theme)
 
-  // DOMAINS: distinct entity.ontologyClass values in render order.
+  // Registry lookup (name → class, carrying display.color/shape) so the legend
+  // resolves each swatch with the SAME chain as graph-builder.ts:186/349
+  // (`display overlay ?? classColor/shapeFallback`). Without this the legend
+  // ignored both the registry colors (e.g. Insight=purple, Digest=amber) AND
+  // the per-entity `source`, so online classes the canvas paints red showed up
+  // grey in the legend ("grey circles I don't see in the graph", 2026-06-28).
+  const byName = useMemo(() => {
+    const m = new Map<string, OntologyClass>()
+    for (const c of ontologyRegistry ?? []) m.set(c.name, c)
+    return m
+  }, [ontologyRegistry])
+
+  // Representative learning-source per class. The canvas colors each NODE by
+  // its own metadata.source; a single legend swatch must pick the class's
+  // dominant source. Online* classes are uniformly source='auto' in practice.
+  const sourceByClass = useMemo(() => {
+    const counts = new Map<string, Map<string, number>>()
+    for (const e of entities) {
+      const cls = typeof e.ontologyClass === 'string' ? e.ontologyClass : ''
+      if (!cls) continue
+      const src = (e as { metadata?: { source?: unknown } }).metadata?.source
+      if (typeof src !== 'string' || !src) continue
+      const inner = counts.get(cls) ?? new Map<string, number>()
+      inner.set(src, (inner.get(src) ?? 0) + 1)
+      counts.set(cls, inner)
+    }
+    const rep = new Map<string, string>()
+    for (const [cls, inner] of counts) {
+      let best = ''
+      let n = -1
+      for (const [s, c] of inner) if (c > n) { best = s; n = c }
+      rep.set(cls, best)
+    }
+    return rep
+  }, [entities])
+
+  // DOMAINS: distinct entity.ontologyClass values in render order, each swatch
+  // resolved exactly as the graph-builder resolves the node fill/shape.
   const domains = useMemo<readonly DomainRow[]>(() => {
     const seen = new Set<string>()
     const out: DomainRow[] = []
@@ -187,15 +231,20 @@ export function LegendPanel({
       const cls = typeof e.ontologyClass === 'string' ? e.ontologyClass : ''
       if (!cls || seen.has(cls)) continue
       seen.add(cls)
-      const isFallback = !isRegisteredClass(cls)
-      const shape: ShapeKind = isFallback ? 'circle' : shapeFallback(cls)
-      // Color resolution: registered classes use classColor (theme-independent
-      // hex from color-fallback's hierarchy palette); fallback rows use neutral gray.
-      const color = isFallback ? '#9ca3af' : classColor(cls, 'light')
+      const reg = byName.get(cls)
+      // Mirror graph-builder.ts:186/349 — registry display overlay wins, else
+      // classColor(class, theme, source) / shapeFallback(class).
+      const shape: ShapeKind =
+        (reg?.display?.shape as ShapeKind | undefined) ?? shapeFallback(cls)
+      const color =
+        reg?.display?.color ?? classColor(cls, theme, sourceByClass.get(cls))
+      // `isFallback` (tooltip only): genuinely unstyled — neither the registry
+      // nor SHAPE_PALETTE supplies a shape for this class.
+      const isFallback = !reg?.display?.shape && !isRegisteredClass(cls)
       out.push({ className: cls, shape, color, isFallback })
     }
     return out
-  }, [entities])
+  }, [entities, byName, sourceByClass, theme])
 
   // LAYERS: distinct deriveLayer() values across entities, preserved in
   // insertion order so a (evidence-first) set keeps evidence on top.

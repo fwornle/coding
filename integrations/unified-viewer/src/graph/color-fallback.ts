@@ -66,8 +66,14 @@ export function classColor(
   _theme: 'light' | 'dark',
   source?: string,
 ): string {
-  const palette = source === 'auto' ? ONLINE_PALETTE : BATCH_PALETTE
-  const fallback = source === 'auto' ? DEFAULT_ONLINE : DEFAULT_BATCH
+  // Online-learned = source ∈ {'auto','online'} — the SAME predicate the
+  // visibility filter uses (visibility-predicate.ts:115). The data stamps
+  // ETM/consolidator output as 'online' far more often than 'auto', so the
+  // prior `=== 'auto'` check left most online-learned nodes painted in the
+  // blue/grey batch palette instead of the requested light-red. (2026-06-28)
+  const isOnline = source === 'auto' || source === 'online'
+  const palette = isOnline ? ONLINE_PALETTE : BATCH_PALETTE
+  const fallback = isOnline ? DEFAULT_ONLINE : DEFAULT_BATCH
   const c = (palette as Record<string, string>)[className]
   return c ?? fallback
 }

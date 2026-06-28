@@ -68,6 +68,42 @@ describe('LegendPanel — DOMAINS derivation (D-06)', () => {
     expect(row?.getAttribute('title') || row?.querySelector('[title]')?.getAttribute('title'))
       .toMatch(/class without registered shape/i)
   })
+
+  // 2026-06-28 regression: the legend swatch MUST resolve color/shape via the
+  // same chain as graph-builder.ts (registry display overlay → classColor with
+  // the entity's source). Before the fix it ignored both, so registry-colored
+  // and online-learned classes the canvas painted (purple/amber/red) showed up
+  // grey in the legend — "grey circles I don't see in the graph".
+  test('Test 2b: DOMAINS swatch uses registry display.color when present', () => {
+    const fill = (c: Element | null) => c?.querySelector('svg [fill]')?.getAttribute('fill')
+    const entities: Entity[] = [makeEntity({ ontologyClass: 'Insight' })]
+    const registry = [
+      { name: 'Insight', display: { color: '#a855f7', shape: 'diamond' } },
+    ]
+    const { container } = render(
+      <LegendPanel entities={entities} relations={[]} ontologyRegistry={registry} />,
+    )
+    expect(fill(container.querySelector('[data-testid="legend-domain-Insight"]'))).toBe('#a855f7')
+  })
+
+  test('Test 2c: online-learned class (source=online) gets the red palette, not grey', () => {
+    const fill = (c: Element | null) => c?.querySelector('svg [fill]')?.getAttribute('fill')
+    // OnlineObservation has no registry color → classColor(class, theme, 'online')
+    // → DEFAULT_ONLINE light-red (#ffb6c1), matching the canvas. A batch source
+    // on the same class would instead be the slate batch fallback.
+    const online: Entity[] = [
+      makeEntity({ ontologyClass: 'OnlineObservation', metadata: { source: 'online' } } as Partial<Entity> & { ontologyClass: string }),
+    ]
+    const { container: c1 } = render(<LegendPanel entities={online} relations={[]} />)
+    expect(fill(c1.querySelector('[data-testid="legend-domain-OnlineObservation"]'))).toBe('#ffb6c1')
+
+    cleanup()
+    const batch: Entity[] = [
+      makeEntity({ ontologyClass: 'OnlineObservation', metadata: { source: 'manual' } } as Partial<Entity> & { ontologyClass: string }),
+    ]
+    const { container: c2 } = render(<LegendPanel entities={batch} relations={[]} />)
+    expect(fill(c2.querySelector('[data-testid="legend-domain-OnlineObservation"]'))).toBe('#94a3b8')
+  })
 })
 
 describe('LegendPanel — LAYERS derivation (D-06)', () => {

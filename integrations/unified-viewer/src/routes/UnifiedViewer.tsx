@@ -118,7 +118,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
     }
   }, [])
 
-  const { entities, relations, isLoading, error } = useGraphData(apiClient, system)
+  const { entities, relations, ontology, isLoading, error } = useGraphData(apiClient, system)
 
   // Phase 61-02 — okb relation-cap honesty indicator. Read the pre-cap relation
   // `total` off the SAME cached `[RELATIONS_KEY, system]` query useGraphData
@@ -407,7 +407,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             registerSearchInputRef={registerSearchInputRef}
             system={system}
             entities={entities}
-            bottomSlot={<LegendPanel className="pt-2" entities={entities} relations={relations} hideLayers={system === 'coding'} />}
+            bottomSlot={<LegendPanel className="pt-2" entities={entities} relations={relations} ontologyRegistry={ontology} hideLayers={system === 'coding'} />}
           />
           <main
             className="flex-1 bg-background overflow-hidden relative"
