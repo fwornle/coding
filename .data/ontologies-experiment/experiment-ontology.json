@@ -77,9 +77,15 @@
     },
     "Report": {
       "extends": "Feature",
-      "description": "Saved query + stable results snapshot (schema-only stub; Phase 74 KB-04).",
-      "relationships": {},
-      "properties": {}
+      "description": "Saved query (facet-state) + frozen results snapshot (KB-04 / DASH-03).",
+      "relationships": { "references": ["Run"] },
+      "properties": {
+        "reportId":         { "type": "string", "description": "Stable report slug (idempotency key; stored also as metadata.report_id)" },
+        "title":            { "type": "string", "description": "Human-readable report name" },
+        "createdBy":        { "type": "string", "description": "Operator who saved the report" },
+        "createdAt":        { "type": "string", "description": "ISO timestamp the report was first saved" },
+        "snapshotFrozenAt": { "type": "string", "description": "ISO timestamp the frozen snapshot was last (re)materialized" }
+      }
     }
   }
 }
