@@ -154,6 +154,23 @@ Task 1 is `tdd="true"`. Gate sequence verified in git log:
   — 10/10 pass.
 - REFACTOR: not needed (implementation clean at GREEN).
 
+## Verification Closure (2026-06-28) — ✅ DISCHARGED
+
+The blocking human-verify below was driven by the orchestrator on 2026-06-28. Steps 1, 2,
+4, 5 passed as written. **Step 3 (heuristics > 0) initially FAILED** and exposed a real gap
+this SUMMARY's "Known Stubs: None" had missed: route heuristics were permanently `null` for
+Claude/Copilot runs — the agents that actually run /gsd. Two breaks in the close path:
+  1. proxy token rows leave `agent` blank (only `model` set), so buildNormalizedTrace's
+     `KNOWN_AGENTS.has('')` short-circuited to null;
+  2. build-trace.mjs's default Claude/Copilot locators are stubs awaiting a `__seam` that
+     measurement-stop never passed — so the session file was never resolved.
+Fixed inline in commit **9eb5163c5** (new `lib/experiments/route-trace-resolve.mjs` —
+`normalizeAgent` + `locateClaudeSessionForSpan` + `buildTraceSeam`; wired into both
+measurement-stop.mjs and experiments-recompute-route.mjs). Re-verified live: a
+Claude-dominant run closes with `total_step_count > 0` and `agent='claude'`; recompute
+re-derives the same non-null value idempotently (1 Route node, 1 tookRoute edge). 9 new
+unit tests + 38 route/resolver tests green. **All 5 checkpoint steps now pass.**
+
 ## Pending Human Verification
 
 **Task 3 (`type="checkpoint:human-verify" gate="blocking"`) was NOT executed** — it requires a
