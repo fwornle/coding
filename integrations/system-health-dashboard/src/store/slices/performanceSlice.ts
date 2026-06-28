@@ -234,12 +234,12 @@ export const fetchTimeline = createAsyncThunk(
 // status via rejectWithValue so the drawer can branch 400 (validation) vs 404
 // (score changed/missing). Mirrors initializeWorkflowConfig's rejectWithValue idiom.
 export const saveOverride = createAsyncThunk<
-  { taskId: string },
+  { taskId: string; edits: OverrideEdit[]; overridden_by: string },
   { taskId: string; edits: OverrideEdit[]; overridden_by: string },
   { rejectValue: { status: number; message: string } }
 >(
   'performance/saveOverride',
-  async ({ taskId, edits, overridden_by }, { dispatch, rejectWithValue }) => {
+  async ({ taskId, edits, overridden_by }, { rejectWithValue }) => {
     for (const { dimension, value } of edits) {
       const response = await fetch(`/api/experiments/scores/${encodeURIComponent(taskId)}`, {
         method: 'PATCH',
@@ -257,9 +257,13 @@ export const saveOverride = createAsyncThunk<
         return rejectWithValue({ status: response.status, message })
       }
     }
-    // All edits committed server-side — re-pull the runs so corrected-wins shows.
-    await dispatch(fetchRuns())
-    return { taskId }
+    // The PATCH persisted to the experiment LevelDB. We deliberately do NOT
+    // re-dispatch fetchRuns here: the store's JSON export is debounced (~5s) and
+    // km-core hydrate() prefers it, so an immediate re-read returns the
+    // PRE-override snapshot and would clobber the corrected value back to judged.
+    // Instead the fulfilled reducer applies an optimistic corrected-wins patch;
+    // the next natural fetchRuns reconciles once the export catches up.
+    return { taskId, edits, overridden_by }
   }
 )
 
@@ -419,11 +423,24 @@ const performanceSlice = createSlice({
         state.saveOverrideError = null
         state.saveOverrideStatus = null
       })
-      .addCase(saveOverride.fulfilled, (state) => {
+      .addCase(saveOverride.fulfilled, (state, action) => {
         state.saveOverridePending = false
         state.saveOverrideError = null
         state.saveOverrideStatus = 200
         state.saveOverrideSuccessAt = Date.now()
+        // Optimistic corrected-wins: the PATCH persisted, but the experiment
+        // store's debounced JSON export means an immediate re-fetch returns stale
+        // judged values. Apply the edits locally so the table reflects the
+        // override instantly; a later fetchRuns reconciles with the server.
+        const { taskId, edits, overridden_by } = action.payload
+        const run = state.runs.find((r) => r.task_id === taskId)
+        if (run && run.score) {
+          for (const { dimension, value } of edits) {
+            run.score[`corrected_${dimension}`] = value
+          }
+          run.score.overridden_by = overridden_by
+          run.score.overridden_at = new Date().toISOString()
+        }
       })
       .addCase(saveOverride.rejected, (state, action) => {
         state.saveOverridePending = false
