@@ -26,12 +26,15 @@ import { effective, isEdited, judged, SCORE_DIMENSIONS } from './corrected-wins'
 // row selection. Score cells use the shared corrected-wins helper: corrected value
 // as effective with an amber "edited" marker + judged value on hover; null → `—`.
 
-const DIM_LABELS: Record<string, string> = {
-  goal_achieved: 'Goal',
-  code_quality: 'Quality',
-  test_coverage: 'Coverage',
-  regressions: 'Regress.',
-  spec_drift: 'Drift',
+// Per-dimension header metadata: short label, which direction is "good", and a
+// plain-language description (surfaced as a header tooltip + a ↑/↓ direction glyph)
+// so a bare "1.00" is self-explanatory and the mixed direction is visible.
+const DIM_META: Record<string, { label: string; better: 'higher' | 'lower'; desc: string }> = {
+  goal_achieved: { label: 'Goal', better: 'higher', desc: 'Goal achieved — did the run accomplish its stated goal? Scale 0–1; higher is better (1 = fully achieved).' },
+  code_quality: { label: 'Quality', better: 'higher', desc: 'Code quality of the result. Scale 0–1; higher is better.' },
+  test_coverage: { label: 'Coverage', better: 'higher', desc: 'Test coverage of the change. Scale 0–1; higher is better.' },
+  regressions: { label: 'Regress.', better: 'lower', desc: 'Regressions introduced. 0 or 1; lower is better (0 = none).' },
+  spec_drift: { label: 'Drift', better: 'lower', desc: 'Drift from the spec/intent. Scale 0–1; lower is better (0 = on-spec).' },
 }
 
 // Render a single number (or em-dash for null). NEVER coerce null to 0.
@@ -109,9 +112,26 @@ export function RunsTable() {
             <TableHead>Class</TableHead>
             <TableHead>Agent</TableHead>
             <TableHead>Model</TableHead>
-            {SCORE_DIMENSIONS.map((dim) => (
-              <TableHead key={dim} className="text-right">{DIM_LABELS[dim]}</TableHead>
-            ))}
+            {SCORE_DIMENSIONS.map((dim) => {
+              const m = DIM_META[dim]
+              return (
+                <TableHead key={dim} className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex cursor-help items-center gap-0.5">
+                          {m.label}
+                          <span className="text-muted-foreground" aria-label={m.better === 'higher' ? 'higher is better' : 'lower is better'}>
+                            {m.better === 'higher' ? '↑' : '↓'}
+                          </span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">{m.desc}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
+              )
+            })}
             <TableHead className="text-right">Tokens</TableHead>
             <TableHead className="text-right sr-only">Edit</TableHead>
           </TableRow>
@@ -170,6 +190,11 @@ export function RunsTable() {
           })}
         </TableBody>
       </Table>
+      <p className="border-t px-3 py-2 text-sm text-muted-foreground">
+        Scores are 0–1 rubric values. <span aria-hidden>↑</span> higher is better (Goal, Quality, Coverage);{' '}
+        <span aria-hidden>↓</span> lower is better (Regress., Drift). Hover a column header for details. An
+        amber “edited” marker means an operator override; hover it to see the original judged value.
+      </p>
     </div>
   )
 }

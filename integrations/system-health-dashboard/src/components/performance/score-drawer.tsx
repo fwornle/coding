@@ -129,6 +129,21 @@ export function ScoreDrawer() {
           </SheetDescription>
         </SheetHeader>
 
+        {(typeof run?.score?.rubric_rationale === 'string' && run.score.rubric_rationale.trim()) ||
+         (typeof run?.score?.ratio_rationale === 'string' && run.score.ratio_rationale.trim()) ? (
+          <div className="mt-4 rounded-md border bg-muted/40 p-3">
+            <p className="text-sm font-semibold">Judge rationale</p>
+            {typeof run?.score?.rubric_rationale === 'string' && run.score.rubric_rationale.trim() && (
+              <p className="mt-1 text-sm text-muted-foreground">{run.score.rubric_rationale}</p>
+            )}
+            {typeof run?.score?.ratio_rationale === 'string' && run.score.ratio_rationale.trim() && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Goal-alignment: {run.score.ratio_rationale}
+              </p>
+            )}
+          </div>
+        ) : null}
+
         <div className="mt-4 space-y-3">
           {SCORE_DIMENSIONS.map((dim, i) => {
             const judgedVal = judged(dim, run?.score ?? null)

@@ -47,10 +47,20 @@ function SubBand({ row }: { row: TimelineRow }) {
       <div className="flex items-center gap-2">
         <TierBadge tier={String(row.granularity_tier)} />
         {isEstimated(row) && (
-          <span className="text-sm text-muted-foreground">estimated</span>
+          <span
+            className="text-sm text-muted-foreground"
+            title="Claude does not report reasoning tokens natively (thinking is folded into output tokens); this value is estimated from the thinking text."
+          >
+            estimated
+          </span>
         )}
       </div>
-      <span className="font-mono text-sm">{tokens(row.total_tokens)}</span>
+      <span
+        className="font-mono text-sm"
+        title="Estimated reasoning tokens — a subset already counted in the turn's output, not additive."
+      >
+        {tokens(row.total_tokens)} <span className="text-muted-foreground">reasoning</span>
+      </span>
     </div>
   )
 }
@@ -84,7 +94,9 @@ function ParentRow({ row, index }: { row: TimelineRow; index: number }) {
             <span className="text-sm text-muted-foreground">estimated</span>
           )}
         </div>
-        <span className="font-mono text-sm">{tokens(row.total_tokens)}</span>
+        <span className="font-mono text-sm" title="Full turn tokens (input + output; thinking is folded into output).">
+          {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
+        </span>
       </div>
     )
   }
@@ -101,7 +113,9 @@ function ParentRow({ row, index }: { row: TimelineRow; index: number }) {
             <span className="text-sm text-muted-foreground">estimated</span>
           )}
         </CollapsibleTrigger>
-        <span className="font-mono text-sm">{tokens(row.total_tokens)}</span>
+        <span className="font-mono text-sm" title="Full turn tokens (input + output; thinking is folded into output).">
+          {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
+        </span>
       </div>
       <CollapsibleContent className="space-y-1 px-3 pb-2">
         {children.map((child, i) => (
@@ -151,11 +165,18 @@ export function PerformanceTimeline() {
             No per-turn telemetry recorded for this run.
           </p>
         ) : (
-          <div className="space-y-2">
-            {rows.map((row, i) => (
-              <ParentRow key={row.tool_call_id ?? i} row={row} index={i} />
-            ))}
-          </div>
+          <>
+            <div className="space-y-2">
+              {rows.map((row, i) => (
+                <ParentRow key={row.tool_call_id ?? i} row={row} index={i} />
+              ))}
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Per-turn rows show the full turn’s tokens. Reasoning steps are estimated (Claude folds thinking
+              into output tokens) and are a subset already counted in the turn — they are not expected to sum
+              to the turn total.
+            </p>
+          </>
         )}
       </CardContent>
     </Card>

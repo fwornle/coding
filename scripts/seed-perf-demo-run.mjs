@@ -46,18 +46,21 @@ const remove = process.argv.includes('--remove');
 // Two per-turn parents, each with per-reasoning-step children. total_tokens on a
 // parent is the turn total; children carry reasoning_tokens. tool_call_id of a
 // child is `${parent}:reason:${N}` so timeline-read nests it under the parent.
+// Reasoning estimates are a believable SUBSET of each turn's output tokens (Claude
+// folds thinking into output, so reasoning ≤ output) — they are NOT meant to sum to
+// the turn total. Reasoning rows are always estimated=1 (Claude has no native field).
 const TURNS = [
   {
     tool_call_id: 'seed-turn-1', input: 1200, output: 300, total: 1500,
     children: [
-      { n: 1, reasoning: 200, total: 200, estimated: 1 },
-      { n: 2, reasoning: 150, total: 150, estimated: 0 },
+      { n: 1, reasoning: 120, total: 120, estimated: 1 },
+      { n: 2, reasoning: 90, total: 90, estimated: 1 },
     ],
   },
   {
     tool_call_id: 'seed-turn-2', input: 800, output: 250, total: 1050,
     children: [
-      { n: 1, reasoning: 120, total: 120, estimated: 0 },
+      { n: 1, reasoning: 110, total: 110, estimated: 1 },
     ],
   },
 ];
