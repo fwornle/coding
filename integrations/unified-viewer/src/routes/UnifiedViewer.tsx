@@ -33,6 +33,7 @@ import { ApiClient } from '@/api/ApiClient'
 import { SigmaCanvas } from '@/graph/SigmaCanvas'
 import { D3GraphCanvas } from '@/graph/D3GraphCanvas'
 import { useGraphData, RELATIONS_KEY } from '@/graph/useGraphData'
+import { useVisibleEntityIds } from '@/graph/useVisibleEntityIds'
 import { useQuery } from '@tanstack/react-query'
 import { deriveLevel } from '@/graph/graph-builder'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -119,6 +120,15 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   }, [])
 
   const { entities, relations, ontology, isLoading, error } = useGraphData(apiClient, system)
+
+  // Post-filter visible entity set (same predicate the canvas applies) so the
+  // LegendPanel lists only classes actually on screen — no phantom rows for
+  // classes whose nodes are all filtered out (2026-06-28).
+  const visibleEntityIds = useVisibleEntityIds(apiClient, system)
+  const legendEntities = useMemo(
+    () => entities.filter((e) => visibleEntityIds.has(e.id)),
+    [entities, visibleEntityIds],
+  )
 
   // Phase 61-02 — okb relation-cap honesty indicator. Read the pre-cap relation
   // `total` off the SAME cached `[RELATIONS_KEY, system]` query useGraphData
@@ -407,7 +417,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             registerSearchInputRef={registerSearchInputRef}
             system={system}
             entities={entities}
-            bottomSlot={<LegendPanel className="pt-2" entities={entities} relations={relations} ontologyRegistry={ontology} hideLayers={system === 'coding'} />}
+            bottomSlot={<LegendPanel className="pt-2" entities={legendEntities} relations={relations} ontologyRegistry={ontology} hideLayers={system === 'coding'} />}
           />
           <main
             className="flex-1 bg-background overflow-hidden relative"

@@ -19,7 +19,15 @@
 import { useMemo } from 'react'
 import { useViewerStore } from '@/store/viewer-store'
 import { EDGE_STYLES, LAYER_BADGE_CLASS } from '@/graph/vokb-palette'
-import { SHAPE_PALETTE, shapeFallback, classColor, type ShapeKind } from '@/graph/color-fallback'
+import {
+  nodeFillColor,
+  nodeShapeFor,
+  isOnlineSource,
+  ONLINE_RING_COLOR,
+  DEFAULT_BATCH,
+  type ShapeKind,
+  type ClassRegistryEntry,
+} from '@/graph/color-fallback'
 import { deriveLayer, type Layer } from '@/graph/layer'
 import type { OntologyClass } from '@/api/ApiClient'
 // `graph/types` is the canvas-pipeline shape returned by useGraphData; the
@@ -30,18 +38,15 @@ import type { OntologyClass } from '@/api/ApiClient'
 // reads — id/name/ontologyClass/metadata on Entity, from/to/type on Relation.
 import type { Entity, Relation } from '@/graph/types'
 
-// Detect "is this class registered with a shape in SHAPE_PALETTE?" so the
-// DOMAINS row can carry a tooltip when a class is unknown to the palette.
-// Reads the palette directly so adding a new class to color-fallback.ts
-// auto-extends the legend's known set — no second list to keep in sync.
-function isRegisteredClass(cls: string): boolean {
-  return Object.prototype.hasOwnProperty.call(SHAPE_PALETTE, cls)
-}
-
 interface DomainRow {
   className: string
   shape: ShapeKind
   color: string
+  /** Representative online-learned provenance — drives the pink ring overlay
+   *  on the swatch (matches the canvas's online ring). */
+  online: boolean
+  /** True when the class (and its ancestors) carry no assigned color/shape —
+   *  resolved to the slate fallback. Drives the explanatory tooltip. */
   isFallback: boolean
 }
 
@@ -106,41 +111,45 @@ function AllNoneControl({
 interface ShapeIconProps {
   shape: ShapeKind
   color: string
+  /** When true, draw the swatch with the pink online ring — mirrors the
+   *  canvas's online-learned ring overlay (Hybrid scheme). */
+  online?: boolean
 }
 
-function ShapeIcon({ shape, color }: ShapeIconProps) {
+function ShapeIcon({ shape, color, online }: ShapeIconProps) {
   // 14x14 viewBox so each shape sits visually balanced at 14px swatch size.
-  const stroke = '#000'
-  const strokeOpacity = 0.15
+  const stroke = online ? ONLINE_RING_COLOR : '#000'
+  const strokeOpacity = online ? 1 : 0.15
+  const strokeWidth = online ? 1.5 : 1
   switch (shape) {
     case 'circle':
       return (
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-          <circle cx="7" cy="7" r="5.5" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} />
+          <circle cx="7" cy="7" r="5.5" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth} />
         </svg>
       )
     case 'square':
       return (
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-          <rect x="1.5" y="1.5" width="11" height="11" rx="1" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} />
+          <rect x="1.5" y="1.5" width="11" height="11" rx="1" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth} />
         </svg>
       )
     case 'diamond':
       return (
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-          <polygon points="7,1 13,7 7,13 1,7" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} />
+          <polygon points="7,1 13,7 7,13 1,7" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth} />
         </svg>
       )
     case 'triangle':
       return (
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-          <polygon points="7,1 13,12 1,12" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} />
+          <polygon points="7,1 13,12 1,12" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth} />
         </svg>
       )
     case 'hexagon':
       return (
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-          <polygon points="3.5,1.5 10.5,1.5 13.5,7 10.5,12.5 3.5,12.5 0.5,7" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} />
+          <polygon points="3.5,1.5 10.5,1.5 13.5,7 10.5,12.5 3.5,12.5 0.5,7" fill={color} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth} />
         </svg>
       )
   }
@@ -186,44 +195,38 @@ export function LegendPanel({
   // the same store value).
   const theme = useViewerStore((s) => s.theme)
 
-  // Registry lookup (name → class, carrying display.color/shape) so the legend
-  // resolves each swatch with the SAME chain as graph-builder.ts:186/349
-  // (`display overlay ?? classColor/shapeFallback`). Without this the legend
-  // ignored both the registry colors (e.g. Insight=purple, Digest=amber) AND
-  // the per-entity `source`, so online classes the canvas paints red showed up
-  // grey in the legend ("grey circles I don't see in the graph", 2026-06-28).
+  // Registry map for the SHARED node-visual resolver (nodeFillColor /
+  // nodeShapeFor) — the exact same resolver D3GraphCanvas + SigmaCanvas use,
+  // so the legend can never disagree with the canvas. The resolver parent-walks
+  // the ontology, so L2 classes inherit an ancestor's color instead of going
+  // grey (2026-06-28 fix for "grey circles I don't see in the graph").
   const byName = useMemo(() => {
-    const m = new Map<string, OntologyClass>()
-    for (const c of ontologyRegistry ?? []) m.set(c.name, c)
+    const m = new Map<string, ClassRegistryEntry>()
+    for (const c of ontologyRegistry ?? []) m.set(c.name, c as ClassRegistryEntry)
     return m
   }, [ontologyRegistry])
 
-  // Representative learning-source per class. The canvas colors each NODE by
-  // its own metadata.source; a single legend swatch must pick the class's
-  // dominant source. Online* classes are uniformly source='auto' in practice.
-  const sourceByClass = useMemo(() => {
-    const counts = new Map<string, Map<string, number>>()
+  // Dominant online-learned provenance per class — drives the pink ring overlay
+  // on the swatch (Hybrid scheme: fill = class hue, ring = online).
+  const onlineByClass = useMemo(() => {
+    const onCount = new Map<string, number>()
+    const total = new Map<string, number>()
     for (const e of entities) {
       const cls = typeof e.ontologyClass === 'string' ? e.ontologyClass : ''
       if (!cls) continue
       const src = (e as { metadata?: { source?: unknown } }).metadata?.source
-      if (typeof src !== 'string' || !src) continue
-      const inner = counts.get(cls) ?? new Map<string, number>()
-      inner.set(src, (inner.get(src) ?? 0) + 1)
-      counts.set(cls, inner)
+      total.set(cls, (total.get(cls) ?? 0) + 1)
+      if (isOnlineSource(typeof src === 'string' ? src : undefined)) {
+        onCount.set(cls, (onCount.get(cls) ?? 0) + 1)
+      }
     }
-    const rep = new Map<string, string>()
-    for (const [cls, inner] of counts) {
-      let best = ''
-      let n = -1
-      for (const [s, c] of inner) if (c > n) { best = s; n = c }
-      rep.set(cls, best)
-    }
+    const rep = new Map<string, boolean>()
+    for (const [cls, t] of total) rep.set(cls, (onCount.get(cls) ?? 0) * 2 >= t)
     return rep
   }, [entities])
 
   // DOMAINS: distinct entity.ontologyClass values in render order, each swatch
-  // resolved exactly as the graph-builder resolves the node fill/shape.
+  // resolved by the shared resolver (identical fill/shape to the canvas).
   const domains = useMemo<readonly DomainRow[]>(() => {
     const seen = new Set<string>()
     const out: DomainRow[] = []
@@ -231,20 +234,15 @@ export function LegendPanel({
       const cls = typeof e.ontologyClass === 'string' ? e.ontologyClass : ''
       if (!cls || seen.has(cls)) continue
       seen.add(cls)
-      const reg = byName.get(cls)
-      // Mirror graph-builder.ts:186/349 — registry display overlay wins, else
-      // classColor(class, theme, source) / shapeFallback(class).
-      const shape: ShapeKind =
-        (reg?.display?.shape as ShapeKind | undefined) ?? shapeFallback(cls)
-      const color =
-        reg?.display?.color ?? classColor(cls, theme, sourceByClass.get(cls))
-      // `isFallback` (tooltip only): genuinely unstyled — neither the registry
-      // nor SHAPE_PALETTE supplies a shape for this class.
-      const isFallback = !reg?.display?.shape && !isRegisteredClass(cls)
-      out.push({ className: cls, shape, color, isFallback })
+      const shape = nodeShapeFor(cls, byName)
+      const color = nodeFillColor(cls, byName, theme)
+      const online = onlineByClass.get(cls) ?? false
+      // Unstyled = resolved to the slate fallback (no class/ancestor color).
+      const isFallback = color === DEFAULT_BATCH
+      out.push({ className: cls, shape, color, online, isFallback })
     }
     return out
-  }, [entities, byName, sourceByClass, theme])
+  }, [entities, byName, onlineByClass, theme])
 
   // LAYERS: distinct deriveLayer() values across entities, preserved in
   // insertion order so a (evidence-first) set keeps evidence on top.
@@ -337,7 +335,7 @@ export function LegendPanel({
                         : 'click to hide this node type'
                   }
                 >
-                  <ShapeIcon shape={d.shape} color={d.color} />
+                  <ShapeIcon shape={d.shape} color={d.color} online={d.online} />
                   <span>{d.className}</span>
                   <span className="text-muted-foreground">({d.shape})</span>
                 </button>

@@ -49,7 +49,7 @@ const ONLINE_PALETTE = {
   System:       '#c62828',  // red-800
 } as const
 
-const DEFAULT_BATCH = '#94a3b8' // slate-400 — non-hierarchy classes
+export const DEFAULT_BATCH = '#94a3b8' // slate-400 — non-hierarchy classes
 const DEFAULT_ONLINE = '#ffb6c1' // light-pink
 
 /**
@@ -177,4 +177,82 @@ export function borderStyleFallback(
  */
 export function pulseRuleFallback(_className: string): string | null {
   return null
+}
+
+// -----------------------------------------------------------------------
+// 2026-06-28: ONE canonical node-visual resolver shared by ALL render
+// paths (D3GraphCanvas, SigmaCanvas/buildGraph, LegendPanel) so the legend
+// can never disagree with the canvas again. Previously each had its own
+// color logic: D3 keyed off entityType+source (online→pink, no grey),
+// buildGraph off ontologyClass+registry (grey for unknown), and the legend
+// off classColor — three schemes that diverged ("grey circles in the legend
+// I don't see in the graph"; "Insights are not purple").
+//
+// Operator decision (Hybrid): FILL carries the class hue (source-INDEPENDENT);
+// online-learned provenance is shown as a RING overlay, not the fill. So
+// online Insights are purple-filled with a pink ring, not solid pink.
+// -----------------------------------------------------------------------
+
+/** Minimal registry row this resolver needs (subset of ApiClient.OntologyClass). */
+export interface ClassRegistryEntry {
+  name: string
+  parent?: string | null
+  display?: { color?: string; shape?: string }
+}
+
+/** Light-red ring color for online-learned (source ∈ {auto,online}) nodes. */
+export const ONLINE_RING_COLOR = '#f472b6' // pink-400 — visible on both themes
+
+/** Canonical "is this node online-learned?" — same rule as the visibility
+ *  predicate (visibility-predicate.ts:115). Drives the online ring overlay. */
+export function isOnlineSource(source?: string | null): boolean {
+  return source === 'auto' || source === 'online'
+}
+
+/**
+ * Canonical node FILL color — class/hierarchy hue, SOURCE-INDEPENDENT.
+ * Walks the ontology parent chain so L2 classes inherit an ancestor's color
+ * instead of falling back to grey (LiveLoggingSystem→Component blue,
+ * OnlineInsight→Detail light-blue). Resolution per step:
+ *   1. registry `display.color` on the class or any ancestor
+ *   2. the hierarchy palette (BATCH_PALETTE) on the class or any ancestor
+ *   3. slate fallback ONLY for a class with no styled ancestor.
+ */
+export function nodeFillColor(
+  className: string,
+  registry: ReadonlyMap<string, ClassRegistryEntry> | undefined,
+  _theme: 'light' | 'dark',
+): string {
+  let cur: string | undefined = className
+  const seen = new Set<string>()
+  while (cur && !seen.has(cur)) {
+    seen.add(cur)
+    const reg: ClassRegistryEntry | undefined = registry?.get(cur)
+    if (reg?.display?.color) return reg.display.color
+    const pal = (BATCH_PALETTE as Record<string, string>)[cur]
+    if (pal) return pal
+    cur = reg?.parent ?? undefined
+  }
+  return DEFAULT_BATCH
+}
+
+/**
+ * Canonical node SHAPE — same parent-walk: registry `display.shape` →
+ * SHAPE_PALETTE → ancestor → 'circle'.
+ */
+export function nodeShapeFor(
+  className: string,
+  registry: ReadonlyMap<string, ClassRegistryEntry> | undefined,
+): ShapeKind {
+  let cur: string | undefined = className
+  const seen = new Set<string>()
+  while (cur && !seen.has(cur)) {
+    seen.add(cur)
+    const reg: ClassRegistryEntry | undefined = registry?.get(cur)
+    if (reg?.display?.shape) return reg.display.shape as ShapeKind
+    const pal = SHAPE_PALETTE[cur]
+    if (pal) return pal
+    cur = reg?.parent ?? undefined
+  }
+  return 'circle'
 }

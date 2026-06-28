@@ -12,6 +12,7 @@ import {
   evaluatePulseRule,
   nodeStrokeForState,
 } from './node-renderer'
+import { isOnlineSource, ONLINE_RING_COLOR } from './color-fallback'
 import type { Entity } from './types'
 import { useViewerStore } from '@/store/viewer-store'
 
@@ -179,9 +180,18 @@ export function makeNodeReducer(hoveredNode: string | null) {
     // ring so the user can spot them at a glance. Hover/selected states
     // still win — the user's interaction signal takes precedence.
     const hasInsightDoc = (data as { hasInsightDoc?: boolean }).hasInsightDoc === true
-    const finalStroke = hasInsightDoc && state === 'default'
-      ? { ...stroke, color: '#1565c0', width: 2 }
-      : stroke
+    // 2026-06-28 Hybrid scheme: online-learned provenance is shown as a pink
+    // RING (the fill carries the class hue). Online ring wins over the
+    // insight-doc blue ring in the default state; hover/selected still win.
+    const online = isOnlineSource(
+      (data.metadata as { source?: string } | undefined)?.source,
+    )
+    const finalStroke =
+      online && state === 'default'
+        ? { ...stroke, color: ONLINE_RING_COLOR, width: 3 }
+        : hasInsightDoc && state === 'default'
+          ? { ...stroke, color: '#1565c0', width: 2 }
+          : stroke
 
     return {
       ...data,

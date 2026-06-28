@@ -24,6 +24,12 @@ import type { SelectionSource } from '@/store/viewer-store'
 import { Logger } from '@/lib/logging'
 import { renderNodeShape } from './node-shapes'
 import { EDGE_STYLES } from './vokb-palette'
+import {
+  nodeFillColor,
+  isOnlineSource,
+  ONLINE_RING_COLOR,
+  type ClassRegistryEntry,
+} from './color-fallback'
 import { useGraphData } from './useGraphData'
 import type { Entity, Relation } from './types'
 // 2026-06-13 (Phase 56-04): computeAncestryPath extracted to a shared
@@ -139,6 +145,10 @@ interface D3Node {
   id: string
   name: string
   entityType?: string
+  /** Canonical ontology class — drives fill color (matches the legend +
+   *  registry). Distinct from entityType, which can disagree (e.g.
+   *  CollectiveKnowledge: ontologyClass=Detail, entityType=System). */
+  ontologyClass?: string
   metadata?: Record<string, unknown>
   // D3 mutates these.
   x?: number
@@ -225,8 +235,15 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // never on drill (Layer 1 → Layer 2) or pop (Layer 2 → Layer 1).
   const d3NodesRef = useRef<D3Node[] | null>(null)
 
-  const { entities, relations, isLoading } = useGraphData(apiClient, system)
+  const { entities, relations, ontology, isLoading } = useGraphData(apiClient, system)
   const theme = useViewerStore((s) => s.theme)
+  // Registry map for the shared node-visual resolver (fill = class hue with
+  // parent-walk; matches SigmaCanvas + LegendPanel exactly).
+  const registryMap = useMemo(() => {
+    const m = new Map<string, ClassRegistryEntry>()
+    for (const c of ontology) m.set(c.name, c as ClassRegistryEntry)
+    return m
+  }, [ontology])
   // 2026-06-13 (Phase 56.1 D-1 + D-4): single-selection `selectedNodeId` is
   // GONE — promoted to a multi-set `selectedNodeIds` + derived `focalNodeId`
   // singleton (see viewer-store.ts after Plan 01). `applySelectionStyling`
@@ -695,6 +712,9 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       // ontologyClass when entityType is missing.
       entityType: ((e as unknown as { entityType?: string }).entityType
         ?? e.ontologyClass),
+      // Fill color keys off ontologyClass (matches the registry + legend);
+      // the parent-walk resolver handles the entityType/ontologyClass split.
+      ontologyClass: e.ontologyClass,
       metadata: e.metadata as Record<string, unknown> | undefined,
       x: undefined,
       y: undefined,
@@ -903,25 +923,25 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     // not a class-identity affordance).
     node.each(function (d) {
       const shape = renderNodeShape(d, d3.select(this), 10)
+      const source = (d.metadata as { source?: string } | undefined)?.source
+      const online = isOnlineSource(source)
       shape
-        .attr('fill', () => {
-          if (d.entityType === 'System') return '#3cb371'
-          const source = (d.metadata as { source?: string } | undefined)?.source
-          if (source === 'online' || source === 'auto') return '#FFB6C1'
-          // Hierarchy gradient — matches VKB's NodeDetails palette exactly.
-          if (d.entityType === 'Project') return '#00897b'
-          if (d.entityType === 'Component') return '#1565c0'
-          if (d.entityType === 'SubComponent') return '#42a5f5'
-          return '#90caf9'
-        })
+        // FILL = class hue (source-independent), resolved by the SAME shared
+        // resolver SigmaCanvas + LegendPanel use, with a parent-walk so L2
+        // classes inherit an ancestor's color instead of going grey.
+        .attr('fill', () => nodeFillColor(d.ontologyClass ?? d.entityType ?? '', registryMap, theme))
         .attr('stroke', () => {
-          // Insight-doc border: same predicate as InsightDocumentModal.
+          // Online RING wins (operator decision 2026-06-28: provenance shown
+          // as a ring, fill stays the class hue). Else the insight-doc border,
+          // else the theme default.
+          if (online) return ONLINE_RING_COLOR
           const name = d.name ?? ''
           const hasInsightDoc =
             name.length > 0 && name.length <= 60 && !/[\s:()/?#]/.test(name)
           return hasInsightDoc ? '#1565c0' : (theme === 'dark' ? '#0f172a' : '#fff')
         })
         .attr('stroke-width', () => {
+          if (online) return 3
           const name = d.name ?? ''
           const hasInsightDoc =
             name.length > 0 && name.length <= 60 && !/[\s:()/?#]/.test(name)

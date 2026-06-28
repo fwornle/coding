@@ -9,9 +9,10 @@
 import Graph from 'graphology'
 import {
   borderStyleFallback,
-  classColor,
   pulseRuleFallback,
-  shapeFallback,
+  nodeFillColor,
+  nodeShapeFor,
+  type ClassRegistryEntry,
 } from './color-fallback'
 import type { Entity, NodeState, OntologyClass, Relation } from './types'
 import type { Level, ViewerState } from '@/store/viewer-store'
@@ -70,6 +71,11 @@ export function buildGraph(
   theme: 'light' | 'dark',
 ): Graph {
   const graph = new Graph({ multi: false, allowSelfLoops: true, type: 'undirected' })
+
+  // Shared node-visual resolver registry map (fill = class hue with
+  // parent-walk; identical to D3GraphCanvas + LegendPanel).
+  const registryMap = new Map<string, ClassRegistryEntry>()
+  for (const c of ontology) registryMap.set(c.name, c as ClassRegistryEntry)
 
   // Plan 55-05 (UI-SPEC §14 rule #4): orphan-on-current-view rule is
   // applied AT BUILD TIME. Pre-compute "has any relation in the current
@@ -178,12 +184,10 @@ export function buildGraph(
   const ORPHAN_RING = PROJECT_R * 2.2
   for (const e of entities) {
     const cls = ontology.find((c) => c.name === e.ontologyClass)
-    // 2026-06-11: pass entity source (auto vs manual) into classColor so
-    // online-learned nodes render in the red palette instead of the blue
-    // hierarchy. The overlay (ontology.display.color) still wins when
-    // present.
-    const entSource = (e.metadata as { source?: string } | undefined)?.source
-    const color = cls?.display?.color ?? classColor(e.ontologyClass, theme, entSource)
+    // FILL = class hue (source-independent) via the shared resolver; online
+    // provenance is shown as a ring in the node reducer, not the fill. The
+    // resolver parent-walks so L2 classes inherit an ancestor's color.
+    const color = nodeFillColor(e.ontologyClass, registryMap, theme)
     // Backend payloads omit `level` — derive it from the well-known
     // ontology hierarchy so FilterRail's L0/L1/L2/L3 toggles actually
     // exclude nodes. Falls back to `e.level` when the backend ever
@@ -224,7 +228,7 @@ export function buildGraph(
     //                 branch — i.e. an entity overlay-marked dashed
     //                 stays dashed even with relations)
     //   pulseRule:   overlay → pulseRuleFallback (null)
-    const shape = cls?.display?.shape ?? shapeFallback(e.ontologyClass)
+    const shape = nodeShapeFor(e.ontologyClass, registryMap)
     const hasRelations = hasRelationsById.has(e.id)
     const overlayBorder = cls?.display?.borderStyle
     const borderStyle: 'solid' | 'dashed' =
@@ -332,6 +336,8 @@ export function mergeIntoGraph(
   theme: 'light' | 'dark',
 ): number {
   const before = graph.order
+  const registryMap = new Map<string, ClassRegistryEntry>()
+  for (const c of ontology) registryMap.set(c.name, c as ClassRegistryEntry)
   // For incremental merges we cannot trivially recompute the orphan rule
   // for every PRE-EXISTING node (that would require a full graph scan on
   // every neighbor expand). Strategy:
@@ -345,11 +351,10 @@ export function mergeIntoGraph(
   //     This keeps the visual contract correct over time.
   for (const e of payload.entities) {
     const cls = ontology.find((c) => c.name === e.ontologyClass)
-    const entSource = (e.metadata as { source?: string } | undefined)?.source
-    const color = cls?.display?.color ?? classColor(e.ontologyClass, theme, entSource)
+    const color = nodeFillColor(e.ontologyClass, registryMap, theme)
     // Plan 55-05 attrs — derive at merge time. For the brand-new node
     // path, hasRelations is computed from the payload's relations.
-    const shape = cls?.display?.shape ?? shapeFallback(e.ontologyClass)
+    const shape = nodeShapeFor(e.ontologyClass, registryMap)
     const hasRelationsInPayload = payload.relations.some(
       (r) => r.from === e.id || r.to === e.id,
     )

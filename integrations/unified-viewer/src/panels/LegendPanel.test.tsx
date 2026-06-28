@@ -86,23 +86,38 @@ describe('LegendPanel — DOMAINS derivation (D-06)', () => {
     expect(fill(container.querySelector('[data-testid="legend-domain-Insight"]'))).toBe('#a855f7')
   })
 
-  test('Test 2c: online-learned class (source=online) gets the red palette, not grey', () => {
-    const fill = (c: Element | null) => c?.querySelector('svg [fill]')?.getAttribute('fill')
-    // OnlineObservation has no registry color → classColor(class, theme, 'online')
-    // → DEFAULT_ONLINE light-red (#ffb6c1), matching the canvas. A batch source
-    // on the same class would instead be the slate batch fallback.
+  test('Test 2c: online-learned class (source=online) gets the pink RING (Hybrid), batch does not', () => {
+    const strokeOf = (c: Element | null) =>
+      c?.querySelector('svg [stroke]')?.getAttribute('stroke')
+    // Hybrid scheme: fill carries the class hue; online provenance is shown as
+    // the pink ring (ONLINE_RING_COLOR #f472b6), NOT a pink fill.
     const online: Entity[] = [
       makeEntity({ ontologyClass: 'OnlineObservation', metadata: { source: 'online' } } as Partial<Entity> & { ontologyClass: string }),
     ]
     const { container: c1 } = render(<LegendPanel entities={online} relations={[]} />)
-    expect(fill(c1.querySelector('[data-testid="legend-domain-OnlineObservation"]'))).toBe('#ffb6c1')
+    expect(strokeOf(c1.querySelector('[data-testid="legend-domain-OnlineObservation"]'))).toBe('#f472b6')
 
     cleanup()
     const batch: Entity[] = [
       makeEntity({ ontologyClass: 'OnlineObservation', metadata: { source: 'manual' } } as Partial<Entity> & { ontologyClass: string }),
     ]
     const { container: c2 } = render(<LegendPanel entities={batch} relations={[]} />)
-    expect(fill(c2.querySelector('[data-testid="legend-domain-OnlineObservation"]'))).toBe('#94a3b8')
+    expect(strokeOf(c2.querySelector('[data-testid="legend-domain-OnlineObservation"]'))).not.toBe('#f472b6')
+  })
+
+  test('Test 2d: unstyled L2 class inherits its ancestor color (no grey) via parent-walk', () => {
+    const fill = (c: Element | null) => c?.querySelector('svg [fill]')?.getAttribute('fill')
+    // LiveLoggingSystem has no display color but parent=Component (#3b82f6).
+    // The shared resolver walks up, so the swatch is blue, not slate grey.
+    const entities: Entity[] = [makeEntity({ ontologyClass: 'LiveLoggingSystem' })]
+    const registry = [
+      { name: 'Component', display: { color: '#3b82f6', shape: 'square' } },
+      { name: 'LiveLoggingSystem', parent: 'Component' },
+    ]
+    const { container } = render(
+      <LegendPanel entities={entities} relations={[]} ontologyRegistry={registry} />,
+    )
+    expect(fill(container.querySelector('[data-testid="legend-domain-LiveLoggingSystem"]'))).toBe('#3b82f6')
   })
 })
 
