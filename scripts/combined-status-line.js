@@ -143,8 +143,28 @@ function visibleCellWidth(s) {
 // status-right-length cap configured by tmux-session-wrapper.sh:49). tmux
 // truncates content longer than status-right-length from the LEFT, so an
 // over-pad never eats into the visible right-anchored content.
+// tmux draws status-left and status-right into the SAME window row. Padding
+// status-right to the full pane width makes (status-left + status-right)
+// exceed window_width at narrow widths — tmux then overlaps/overruns the two,
+// and xterm.js (VS Code) leaks the rightmost cells of the previous frame as
+// trailing residue (the "12:59)] 1" artifact). The residue is pane-width
+// dependent: invisible when wide, visible once the pane is narrow enough that
+// the 22-cell status-left no longer fits alongside a full-width status-right.
+//
+// Fix: reserve the cells status-left occupies so status-left + status-right
+// exactly equals window_width at every size. status-left is `[#{session_name}] `
+// (see ~/.tmux.conf), so its width is name.length + 3 (`[`, `]`, trailing
+// space), capped at status-left-length. session name + cap are passed via env;
+// when absent we reserve 0 and fall back to the prior full-width behavior.
+function statusLeftReserveCells() {
+  const name = process.env.TMUX_SESSION_NAME || '';
+  if (!name) return 0;
+  const cap = parseInt(process.env.TMUX_STATUS_LEFT_LENGTH || '40', 10) || 40;
+  return Math.min(name.length + 3, cap);
+}
+
 function leftPadToStableCellWidth(text, paneWidth) {
-  const target = parseInt(paneWidth, 10) || 200;
+  const target = (parseInt(paneWidth, 10) || 200) - statusLeftReserveCells();
   if (target <= 0) return text;
   const cur = visibleCellWidth(text);
   if (cur >= target) return text;
