@@ -16,6 +16,8 @@ import {
 import { FacetedSidebar } from '@/components/performance/faceted-sidebar'
 import { RunsTable } from '@/components/performance/runs-table'
 import { PerformanceTimeline } from '@/components/performance/timeline'
+import { ScoreDrawer } from '@/components/performance/score-drawer'
+import { ReportsSubview } from '@/components/performance/reports-subview'
 
 // DASH-01/DASH-02 Performance page. Layout mirrors token-usage.tsx (header +
 // summary Card focal point + Tabs body) but ALL shared state lives in the
@@ -123,10 +125,12 @@ export function PerformancePage() {
       {/* Summary cards — the visual focal point */}
       <SummaryCards runs={runs} />
 
-      {/* Body — Tabs with a Runs view (Reports sub-view added in Plan 06) */}
+      {/* Body — Tabs with a Runs view + a Reports sub-view (D-05: a second Tabs
+          value INSIDE Performance, NOT a top-level nav tab). */}
       <Tabs defaultValue="runs">
         <TabsList>
           <TabsTrigger value="runs">Runs</TabsTrigger>
+          <TabsTrigger value="reports" data-testid="reports-tab">Reports</TabsTrigger>
         </TabsList>
         <TabsContent value="runs" className="mt-4">
           <div className="grid grid-cols-[260px_1fr] gap-6">
@@ -140,7 +144,14 @@ export function PerformancePage() {
             {filtered.length} of {runs.length} runs shown
           </p>
         </TabsContent>
+        <TabsContent value="reports" className="mt-4">
+          <ReportsSubview />
+        </TabsContent>
       </Tabs>
+
+      {/* Score-override drawer — driven entirely by slice selectedTaskId (no
+          page-local open flag). Mounted once; opens when a run row is clicked. */}
+      <ScoreDrawer />
     </div>
   )
 }

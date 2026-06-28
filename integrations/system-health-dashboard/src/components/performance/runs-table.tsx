@@ -117,6 +117,8 @@ export function RunsTable() {
             return (
               <TableRow
                 key={run.task_id}
+                data-testid="run-row"
+                data-task-id={run.task_id}
                 onClick={() => dispatch(setSelectedTaskId(run.task_id))}
                 className={`cursor-pointer ${isSelected ? 'bg-muted' : ''}`}
               >

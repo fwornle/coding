@@ -85,6 +85,25 @@ export interface TimelineRow {
 // Score-state buckets surfaced as a facet (D-06 quarantine + scored/not_scored).
 export type ScoreState = 'scored' | 'pending' | 'not_scored'
 
+// A saved Report as returned by GET /api/experiments/reports (report-read.mjs
+// toView): the FROZEN snapshot + facet_state deserialized. DASH-03: the view
+// renders `snapshot` verbatim and NEVER re-queries on view.
+export interface Report {
+  reportId: string
+  title: string
+  createdBy?: string | null
+  createdAt?: string | null
+  snapshotFrozenAt?: string | null
+  facetState: Partial<FacetState> | Record<string, unknown>
+  snapshot: Run[]
+}
+
+// A single per-dimension override edit issued by the drawer Save.
+export interface OverrideEdit {
+  dimension: string
+  value: number
+}
+
 // The facet selection state. Each set holds the SELECTED values for that facet
 // group; an empty set means "no filter on this group" (everything passes).
 export interface FacetState {
@@ -110,6 +129,20 @@ interface PerformanceState {
   timelineByTaskId: Record<string, TimelineRow[]>
   timelineLoading: boolean
   timelineError: string | null
+  // Saved Reports (KB-04 / DASH-03) — shared cross-component state.
+  reports: Report[]
+  activeReportId: string | null
+  reportsLoading: boolean
+  reportsError: string | null
+  saveReportPending: boolean
+  // Per-id refresh pending so multiple report cards can refresh independently.
+  refreshReportPendingIds: string[]
+  // Score-override (SCORE-02) save state — drawer reads these to branch on
+  // success / 404 / 400.
+  saveOverridePending: boolean
+  saveOverrideError: string | null
+  saveOverrideStatus: number | null
+  saveOverrideSuccessAt: number | null
 }
 
 const emptyFacetState: FacetState = {
@@ -132,7 +165,22 @@ const initialState: PerformanceState = {
   timelineByTaskId: {},
   timelineLoading: false,
   timelineError: null,
+  reports: [],
+  activeReportId: null,
+  reportsLoading: false,
+  reportsError: null,
+  saveReportPending: false,
+  refreshReportPendingIds: [],
+  saveOverridePending: false,
+  saveOverrideError: null,
+  saveOverrideStatus: null,
+  saveOverrideSuccessAt: null,
 }
+
+// Default operator identity stamped into overridden_by when no richer identity
+// source is wired into the dashboard (documented in 74-06-SUMMARY). The server
+// caps overridden_by at 256 chars and requires non-empty — this satisfies both.
+export const DEFAULT_OVERRIDDEN_BY = 'dashboard-operator'
 
 // ---------------------------------------------------------------------------
 // Async thunks — fetch lives INSIDE the thunk, same-origin /api/experiments/...
@@ -176,6 +224,109 @@ export const fetchTimeline = createAsyncThunk(
   }
 )
 
+// saveOverride (SCORE-02 / D-02): issues ONE same-origin PATCH per edited
+// dimension to the EXISTING Phase 73 endpoint. No applyOverride re-implementation
+// — the server is authoritative (re-validates ranges, writes corrected_* to the
+// dedicated experiment store). On all-success it re-dispatches fetchRuns so the
+// corrected-wins table refreshes. A non-ok PATCH short-circuits with the HTTP
+// status via rejectWithValue so the drawer can branch 400 (validation) vs 404
+// (score changed/missing). Mirrors initializeWorkflowConfig's rejectWithValue idiom.
+export const saveOverride = createAsyncThunk<
+  { taskId: string },
+  { taskId: string; edits: OverrideEdit[]; overridden_by: string },
+  { rejectValue: { status: number; message: string } }
+>(
+  'performance/saveOverride',
+  async ({ taskId, edits, overridden_by }, { dispatch, rejectWithValue }) => {
+    for (const { dimension, value } of edits) {
+      const response = await fetch(`/api/experiments/scores/${encodeURIComponent(taskId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dimension, value, overridden_by }),
+      })
+      if (!response.ok) {
+        let message = `API returned ${response.status}`
+        try {
+          const body = await response.json()
+          if (body?.message) message = body.message
+        } catch {
+          // non-JSON error body — keep the status message
+        }
+        return rejectWithValue({ status: response.status, message })
+      }
+    }
+    // All edits committed server-side — re-pull the runs so corrected-wins shows.
+    await dispatch(fetchRuns())
+    return { taskId }
+  }
+)
+
+// fetchReports (KB-04 / DASH-03): GET the saved Reports (each with its FROZEN
+// snapshot deserialized server-side). Same-origin.
+export const fetchReports = createAsyncThunk<Report[], void | undefined, { rejectValue: string }>(
+  'performance/fetchReports',
+  async (_: void | undefined, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/reports')
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      return (data?.reports ?? []) as Report[]
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// saveReport (KB-04): POST the current facet-state + the currently-filtered run
+// rows as the frozen snapshot. On success re-dispatch fetchReports so the new
+// report appears in the slice list. Same-origin.
+export const saveReport = createAsyncThunk<
+  { reportId: string },
+  { title: string; facetState: FacetState; snapshotRows: Run[] },
+  { rejectValue: string }
+>(
+  'performance/saveReport',
+  async ({ title, facetState, snapshotRows }, { dispatch, rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, facetState, snapshotRows }),
+      })
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      await dispatch(fetchReports())
+      return { reportId: data?.reportId as string }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// refreshReport (DASH-03): re-run the saved query server-side and overwrite ONLY
+// the snapshot + frozen-at. On success re-dispatch fetchReports to pull the new
+// frozen-at. Same-origin.
+export const refreshReport = createAsyncThunk<
+  { reportId: string },
+  string,
+  { rejectValue: string }
+>(
+  'performance/refreshReport',
+  async (reportId: string, { dispatch, rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/experiments/reports/${encodeURIComponent(reportId)}/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      await dispatch(fetchReports())
+      return { reportId }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
 // ---------------------------------------------------------------------------
 // Slice
 // ---------------------------------------------------------------------------
@@ -211,6 +362,19 @@ const performanceSlice = createSlice({
     },
     setSelectedTaskId(state, action: PayloadAction<string | null>) {
       state.selectedTaskId = action.payload
+      // Opening/closing a run resets the transient override save state so a stale
+      // error/success banner never leaks across runs.
+      state.saveOverrideError = null
+      state.saveOverrideStatus = null
+      state.saveOverrideSuccessAt = null
+    },
+    setActiveReportId(state, action: PayloadAction<string | null>) {
+      state.activeReportId = action.payload
+    },
+    clearOverrideStatus(state) {
+      state.saveOverrideError = null
+      state.saveOverrideStatus = null
+      state.saveOverrideSuccessAt = null
     },
   },
   extraReducers: (builder) => {
@@ -241,10 +405,70 @@ const performanceSlice = createSlice({
         state.timelineLoading = false
         state.timelineError = (action.payload as string) ?? 'Failed to load timeline'
       })
+      // saveOverride (SCORE-02)
+      .addCase(saveOverride.pending, (state) => {
+        state.saveOverridePending = true
+        state.saveOverrideError = null
+        state.saveOverrideStatus = null
+      })
+      .addCase(saveOverride.fulfilled, (state) => {
+        state.saveOverridePending = false
+        state.saveOverrideError = null
+        state.saveOverrideStatus = 200
+        state.saveOverrideSuccessAt = Date.now()
+      })
+      .addCase(saveOverride.rejected, (state, action) => {
+        state.saveOverridePending = false
+        state.saveOverrideStatus = action.payload?.status ?? 500
+        state.saveOverrideError = action.payload?.message ?? 'Failed to save the override'
+      })
+      // fetchReports (KB-04)
+      .addCase(fetchReports.pending, (state) => {
+        state.reportsLoading = true
+        state.reportsError = null
+      })
+      .addCase(fetchReports.fulfilled, (state, action) => {
+        state.reports = action.payload
+        state.reportsLoading = false
+        state.reportsError = null
+      })
+      .addCase(fetchReports.rejected, (state, action) => {
+        state.reportsLoading = false
+        state.reportsError = (action.payload as string) ?? 'Failed to load reports'
+      })
+      // saveReport (KB-04)
+      .addCase(saveReport.pending, (state) => {
+        state.saveReportPending = true
+      })
+      .addCase(saveReport.fulfilled, (state) => {
+        state.saveReportPending = false
+      })
+      .addCase(saveReport.rejected, (state) => {
+        state.saveReportPending = false
+      })
+      // refreshReport (DASH-03) — per-id pending tracking
+      .addCase(refreshReport.pending, (state, action) => {
+        const id = action.meta.arg
+        if (!state.refreshReportPendingIds.includes(id)) state.refreshReportPendingIds.push(id)
+      })
+      .addCase(refreshReport.fulfilled, (state, action) => {
+        state.refreshReportPendingIds = state.refreshReportPendingIds.filter((id) => id !== action.payload.reportId)
+      })
+      .addCase(refreshReport.rejected, (state, action) => {
+        const id = action.meta.arg
+        state.refreshReportPendingIds = state.refreshReportPendingIds.filter((rid) => rid !== id)
+      })
   },
 })
 
-export const { setFacet, setDateWindow, clearFilters, setSelectedTaskId } = performanceSlice.actions
+export const {
+  setFacet,
+  setDateWindow,
+  clearFilters,
+  setSelectedTaskId,
+  setActiveReportId,
+  clearOverrideStatus,
+} = performanceSlice.actions
 
 // ---------------------------------------------------------------------------
 // Score-state classification (shared by the facet filter + counts selector).
@@ -269,6 +493,34 @@ export const selectTimelineError = (state: RootState) => state.performance.timel
 // Per-taskId timeline selector factory.
 export const selectTimelineFor = (taskId: string | null) => (state: RootState): TimelineRow[] =>
   taskId ? (state.performance.timelineByTaskId[taskId] ?? []) : []
+
+// Score-override save-state selectors (drawer branches on these).
+export const selectSaveOverridePending = (state: RootState) => state.performance.saveOverridePending
+export const selectSaveOverrideError = (state: RootState) => state.performance.saveOverrideError
+export const selectSaveOverrideStatus = (state: RootState) => state.performance.saveOverrideStatus
+export const selectSaveOverrideSuccessAt = (state: RootState) => state.performance.saveOverrideSuccessAt
+
+// The currently-selected run (for the drawer), derived from selectedTaskId.
+export const selectSelectedRun = (state: RootState): Run | null => {
+  const id = state.performance.selectedTaskId
+  if (!id) return null
+  return state.performance.runs.find((r) => r.task_id === id) ?? null
+}
+
+// Saved-report selectors.
+export const selectReports = (state: RootState) => state.performance.reports
+export const selectReportsLoading = (state: RootState) => state.performance.reportsLoading
+export const selectReportsError = (state: RootState) => state.performance.reportsError
+export const selectActiveReportId = (state: RootState) => state.performance.activeReportId
+export const selectSaveReportPending = (state: RootState) => state.performance.saveReportPending
+export const selectActiveReport = (state: RootState): Report | null => {
+  const id = state.performance.activeReportId
+  if (!id) return null
+  return state.performance.reports.find((r) => r.reportId === id) ?? null
+}
+// Per-id refresh-pending predicate.
+export const selectIsRefreshPending = (reportId: string) => (state: RootState): boolean =>
+  state.performance.refreshReportPendingIds.includes(reportId)
 
 // Predicate: does a run pass the current facet state? (date window + each
 // array facet — an empty array means "no constraint on that group").
