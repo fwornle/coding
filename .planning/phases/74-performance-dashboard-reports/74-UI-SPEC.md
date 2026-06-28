@@ -1,10 +1,11 @@
 ---
 phase: 74
 slug: performance-dashboard-reports
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "new-york / neutral (existing — system-health-dashboard components.json)"
 created: 2026-06-28
+reviewed_at: 2026-06-28
 ---
 
 # Phase 74 — UI Design Contract
