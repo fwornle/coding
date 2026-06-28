@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
-status: verifying
+status: executing
 stopped_at: Phase 73 context gathered
-last_updated: "2026-06-28T14:17:18.255Z"
-last_activity: 2026-06-28 -- Phase 72 human-verify closed
+last_updated: "2026-06-28T14:47:19.283Z"
+last_activity: 2026-06-28 -- Phase 73 execution started
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 23
+  total_plans: 29
   completed_plans: 23
   percent: 63
 ---
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 72 — syntactic-route-quality
+**Current focus:** Phase 73 — semantic-route-judge-success-scoring
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,15 +53,16 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 72 (syntactic-route-quality) — COMPLETE (all 5 plans + human-verify checkpoint)
-Status: Done. The 72-05 blocking human-verify was discharged 2026-06-28. It surfaced a
+Phase: 73 (semantic-route-judge-success-scoring) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 73
 real gap (route heuristics were permanently null for Claude/Copilot runs — agent never
 normalized + Claude session seam never wired into the close orchestrator), fixed inline
 in commit 9eb5163c5 (lib/experiments/route-trace-resolve.mjs + measurement-stop.mjs +
 experiments-recompute-route.mjs). Live-verified: Claude-dominant run closes with
 total_step_count > 0, idempotent across recompute.
 Next: Phase 73 (Semantic Route Judge & Success Scoring) — not yet planned (no dir).
-Last activity: 2026-06-28 -- Phase 72 human-verify closed
+Last activity: 2026-06-28 -- Phase 73 execution started
 
 ## Deferred Items
 
