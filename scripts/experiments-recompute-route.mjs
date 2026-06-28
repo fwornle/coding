@@ -37,6 +37,7 @@ import { aggregateByTaskId } from '../lib/experiments/token-aggregate.mjs';
 import { writeRun } from '../lib/experiments/run-write.mjs';
 import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
 import { computeHeuristics, ALL_NULL_HEURISTICS } from '../lib/experiments/route-heuristics.mjs';
+import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-resolve.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
 
@@ -115,7 +116,14 @@ async function main() {
     const pending = m.pending === true;
 
     // Rebuild the trace + recompute heuristics (D-02 null when no trace).
-    const trace = await buildNormalizedTrace(span, { dominantAgent: tags.agent });
+    // Normalize the agent + inject the Claude session seam exactly as the close
+    // orchestrator does — otherwise recompute would re-null Claude/Copilot runs
+    // (the default locator is a stub awaiting a seam; build-trace.mjs).
+    const normAgent = normalizeAgent({ agent: tags.agent, model: tags.model });
+    const trace = await buildNormalizedTrace(span, {
+      dominantAgent: normAgent,
+      __seam: buildTraceSeam(normAgent, span),
+    });
     const heuristics = trace ? computeHeuristics(trace) : ALL_NULL_HEURISTICS;
 
     out(

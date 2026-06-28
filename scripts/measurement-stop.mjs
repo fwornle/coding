@@ -62,6 +62,7 @@ import { writeRun } from '../lib/experiments/run-write.mjs';
 import { deriveGoalSentence } from '../lib/experiments/goal-sentence.mjs';
 import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
 import { computeHeuristics, ALL_NULL_HEURISTICS } from '../lib/experiments/route-heuristics.mjs';
+import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-resolve.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
 
@@ -243,14 +244,19 @@ async function main() {
   // ── (3) Token aggregation (read-only) + tag sourcing ──
   const { totals, byAgentModel } = aggregateByTaskId(span.task_id);
   const dominant = byAgentModel[0] ?? {};
+  // Normalize to a canonical agent family. Proxy token rows leave `agent` blank
+  // and only set `model` (e.g. 'claude-sonnet-4.6'), so the raw `dominant.agent`
+  // is '' for Claude/Copilot runs — which made the route reader short-circuit to
+  // null. Derive the family from (agent, model) so heuristics actually populate.
+  const normAgent = normalizeAgent(dominant);
   const taskHash = span.goal_sentence
     ? crypto.createHash('sha256').update(span.goal_sentence).digest('hex')
     : null; // A3 — null allowed (D-13)
   const tags = {
     task_hash: taskHash,
-    agent: dominant.agent ?? null,
+    agent: normAgent ?? dominant.agent ?? null, // canonical family when classifiable
     model: dominant.model ?? null,
-    framework: span.meta?.framework ?? dominant.agent ?? null, // A2 — null allowed (D-13)
+    framework: span.meta?.framework ?? normAgent ?? dominant.agent ?? null, // A2 — null allowed (D-13)
     trace_id: span.task_id,
   };
 
@@ -259,7 +265,13 @@ async function main() {
   //   events, and returns null when no trace file is located (D-02/Pitfall 4). A null
   //   trace ⇒ ALL_NULL_HEURISTICS — six nulls, NOT zeros (D-02). A malformed/unreadable
   //   trace already degrades to null inside the readers, so the close still completes.
-  const trace = await buildNormalizedTrace(span, { dominantAgent: dominant.agent });
+  //   Claude/Copilot need the close orchestrator to resolve the per-run session file
+  //   and inject it via the seam (build-trace.mjs's default locator is a stub by
+  //   design); buildTraceSeam supplies a time-window-based Claude locator.
+  const trace = await buildNormalizedTrace(span, {
+    dominantAgent: normAgent,
+    __seam: buildTraceSeam(normAgent, span),
+  });
   const heuristics = trace ? computeHeuristics(trace) : ALL_NULL_HEURISTICS;
 
   // ── (4) Persist the Run (idempotent) — flat heuristics + one Route node (D-09) ──
