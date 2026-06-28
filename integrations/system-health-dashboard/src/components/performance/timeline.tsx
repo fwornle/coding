@@ -32,7 +32,7 @@ function isEstimated(row: TimelineRow): boolean {
 
 function TierBadge({ tier }: { tier: string }) {
   return (
-    <Badge variant="secondary" className="text-sm text-muted-foreground">
+    <Badge variant="secondary" className="text-sm text-muted-foreground" data-testid="granularity-tier-badge">
       {tier}
     </Badge>
   )
@@ -40,7 +40,7 @@ function TierBadge({ tier }: { tier: string }) {
 
 function SubBand({ row }: { row: TimelineRow }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-l-2 border-muted py-1 pl-4 text-sm">
+    <div className="flex items-center justify-between gap-3 border-l-2 border-muted py-1 pl-4 text-sm" data-testid="timeline-reasoning-step">
       <div className="flex items-center gap-2">
         <TierBadge tier={String(row.granularity_tier)} />
         {isEstimated(row) && (
@@ -78,7 +78,7 @@ function ParentRow({ row }: { row: TimelineRow }) {
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border">
       <div className="flex items-center justify-between gap-3 px-3 py-2">
-        <CollapsibleTrigger className="flex flex-1 items-center gap-2 text-left">
+        <CollapsibleTrigger className="flex flex-1 items-center gap-2 text-left" data-testid="timeline-turn">
           <ChevronRight className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`} />
           {/* tier badge sits OUTSIDE CollapsibleContent — always visible */}
           <TierBadge tier={String(row.granularity_tier)} />

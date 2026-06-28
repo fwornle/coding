@@ -67,9 +67,10 @@ function FacetGroup({ groupKey, label }: { groupKey: FacetKey; label: string }) 
           const id = `facet-${groupKey}-${value}`
           const display = groupKey === 'scoreState' ? SCORE_STATE_LABELS[value] ?? value : value
           return (
-            <label key={value} htmlFor={id} className="flex cursor-pointer items-center gap-2 py-1">
+            <label key={value} htmlFor={id} className="flex cursor-pointer items-center gap-2 py-1" data-testid="facet-row">
               <Checkbox
                 id={id}
+                data-testid={`facet-${groupKey}-${value}`}
                 checked={selected.includes(value)}
                 onCheckedChange={() => dispatch(setFacet({ key: groupKey, value }))}
               />
