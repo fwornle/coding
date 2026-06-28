@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
 status: executing
-stopped_at: Phase 74 UI-SPEC approved
-last_updated: "2026-06-28T16:55:34.738Z"
+stopped_at: Completed 74-02-PLAN.md (readRuns + readTimeline read services)
+last_updated: "2026-06-28T17:01:00.800Z"
 last_activity: 2026-06-28
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 35
-  completed_plans: 30
+  completed_plans: 31
   percent: 75
 ---
 
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 74 (performance-dashboard-reports) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 real gap (route heuristics were permanently null for Claude/Copilot runs — agent never
 normalized + Claude session seam never wired into the close orchestrator), fixed inline
@@ -274,6 +274,8 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [70-03] D-08 RESOLVED proxy-route: mastracode customProviders {name,url,apiKey} is a first-class arbitrary-url redirect seam; framework-instrumentation fallback not required
 - [Phase ?]: [70-03] Mastra granularity tier = per-llm-call via proxy-route; Plan 04 executes Track A (X-Agent: mastra stamp)
 - [Phase 74-01]: Wave-0 RED scaffold: shared seedIsolatedStore+seedTokenDb fixture + 5 RED node:test files + Playwright fixme skeleton; report API names (writeReport/refreshReport/readReport, report_id, snapshot array) asserted by RED tests for Plan 05 to honour
+- [Phase ?]: [74-02]: readTimeline child-detection keys on the :reason: separator in tool_call_id, not the granularity_tier string, so it works for both fixture and production tier names
+- [Phase ?]: [74-02]: effectiveDimension(score, dim) exported alongside readRuns as the single corrected-wins (D-03) definition
 
 ### Blockers/Concerns
 
@@ -364,10 +366,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 70 P01 | 12 min | 3 tasks | 2 files |
 | Phase 70 P03 | ~20 min | 2 tasks | 1 files |
 | Phase 74 P01 | 8m | 3 tasks | 7 files |
+| Phase 74 P02 | 6m | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-06-28T16:55:34.728Z
+Last session: 2026-06-28T17:00:36.273Z
 Stopped at: Phase 74 UI-SPEC approved
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
