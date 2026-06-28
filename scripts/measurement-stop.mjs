@@ -63,6 +63,15 @@ import { deriveGoalSentence } from '../lib/experiments/goal-sentence.mjs';
 import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
 import { computeHeuristics, ALL_NULL_HEURISTICS } from '../lib/experiments/route-heuristics.mjs';
 import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-resolve.mjs';
+// 73-06 (Wave 3) — wire the success-scoring half into the close pipeline (ROUTE-03 +
+// SCORE-01). gatherEvidence reads on-disk artifacts (73-03); runJudge does the ONE
+// Haiku /api/complete call and internally quarantines to pending (73-04, never throws);
+// writeScore materializes the Score + scored edge (73-02); filterConsequential/
+// isTrivialRun (73-01) drive the D-04 trivial-run short-circuit (no proxy paid).
+import { gatherEvidence } from '../lib/experiments/evidence-harness.mjs';
+import { runJudge } from '../lib/experiments/judge.mjs';
+import { writeScore } from '../lib/experiments/score-write.mjs';
+import { filterConsequential, isTrivialRun } from '../lib/experiments/consequential-events.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
 
@@ -277,17 +286,41 @@ async function main() {
   // ── (4) Persist the Run (idempotent) — flat heuristics + one Route node (D-09) ──
   const store = await openExperimentStore();
   let pendingCount;
+  let judgment; // surfaced in the (5) close summary (ratio + scored/pending/trivial marker)
   try {
     await writeRun(store, { span, taskClass, pending, tags, totals, heuristics });
+
+    // ── (4.5) gather evidence (D-01) → judge (D-03/D-04) → writeScore + scored edge ──
+    //   The whole scoring path lives INSIDE this try so the SAME open store is reused
+    //   and the existing finally still close()s it. runJudge internally try/catch-
+    //   quarantines to { ...nulls, pending:true } and NEVER throws (73-04), and
+    //   writeScore is a local store write — so the close can NOT hard-block on a
+    //   slow/unreachable proxy (T-73-06-BLOCK / the "never hard-block" contract).
+    const evidence = gatherEvidence({ span, phaseArg, repoRoot: REPO_ROOT });
+    const consequential = trace ? filterConsequential(trace) : [];
+    judgment = isTrivialRun(trace)
+      ? { not_scored: 'trivial' } // D-04 trivial-run guard — proxy NEVER called
+      : await runJudge({ span, trace: consequential, evidence });
+    await writeScore(store, { span, judgment });
+
     pendingCount = await countPending(store);
   } finally {
     await store.close();
   }
 
   // ── (5) Close summary ──
+  //   Resolve a single scored/pending/trivial marker + the goal_aligned_ratio so the
+  //   operator sees how the run was judged without querying the store.
+  const scoreMarker = judgment?.not_scored === 'trivial'
+    ? 'trivial'
+    : (judgment?.pending === true ? 'pending' : 'scored');
+  const ratioStr = judgment?.goal_aligned_ratio == null
+    ? 'null'
+    : judgment.goal_aligned_ratio.toFixed(3);
   process.stdout.write(
     `close summary: task_class=${taskClass}${pending ? ' (quarantined/pending)' : ''} ` +
-    `total_tokens=${totals.total_tokens ?? 0} calls=${totals.calls ?? 0}\n`,
+    `total_tokens=${totals.total_tokens ?? 0} calls=${totals.calls ?? 0} ` +
+    `score=${scoreMarker} goal_aligned_ratio=${ratioStr}\n`,
   );
   if (pendingCount > 0) {
     process.stdout.write(
