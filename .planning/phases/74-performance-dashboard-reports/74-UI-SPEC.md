@@ -43,6 +43,12 @@ created: 2026-06-28
 
 ---
 
+## Visual Hierarchy & Focal Point
+
+**Primary focal point: the summary `Card` grid immediately below the page `h1`** — three-to-four metric cards (30px `text-3xl` numbers) that draw the eye first, before it moves left to the faceted sidebar or down to the results table. This mirrors `token-usage.tsx`, where the summary-card row is the page's visual anchor and the filtered table is the secondary read. The faceted sidebar is deliberately a quieter, secondary-surface rail (muted `--card` background) so it supports rather than competes with the cards-then-table reading path.
+
+---
+
 ## Spacing Scale
 
 Declared values (must be multiples of 4). These are the Tailwind utilities already in use across `token-usage.tsx` — do NOT deviate.
@@ -65,16 +71,16 @@ Exceptions:
 
 ## Typography
 
-Extracted from `token-usage.tsx` usage. Inter throughout. Exactly 4 sizes, exactly 2 weights (400 regular / 600 semibold) — matches the existing dashboard, which never uses a third weight.
+Extracted from `token-usage.tsx` usage. Inter throughout. **Exactly 4 sizes**, exactly 2 weights (400 regular / 600 semibold) — matches the existing dashboard, which never uses a third weight.
 
 | Role | Size | Tailwind | Weight | Line Height |
 |------|------|----------|--------|-------------|
 | Display (card metric) | 30px | `text-3xl` | 600 (`font-bold`→ treat as semibold visual weight) | 1.2 |
 | Heading (page title `h1`) | 24px | `text-2xl` | 600 (`font-bold`) | 1.2 |
 | Section / card title | 16px | `text-base` | 600 (`font-semibold`/`CardTitle`) | 1.2 |
-| Body / table / label | 14px | `text-sm` | 400 | 1.5 |
+| Body / table / label / metadata | 14px | `text-sm` | 400 | 1.5 |
 
-Supporting size (not a primary role — same as token-usage): **12px `text-xs`** for muted metadata, badge text, table sub-labels, and `granularity_tier` badge text. Body line-height 1.5 is set globally in `:root` (`line-height: 1.5`). Numeric/token/score cells use `font-mono` + tabular-nums.
+**De-emphasis is carried by COLOR, not a smaller size.** Muted metadata, badge text, badge counts, table sub-labels, the "edited" marker, and the `granularity_tier` badge text all use the **14px `text-sm`** body size paired with `text-muted-foreground` (the muted color), NOT a fifth `text-xs` step. This holds the size ladder at exactly 4 declared steps while preserving hierarchy: de-emphasized copy reads quieter because it is muted-gray, not because it is smaller. Body line-height 1.5 is set globally in `:root` (`line-height: 1.5`). Numeric/token/score cells use `font-mono` + tabular-nums.
 
 Weights: **regular 400** and **semibold 600** only. `font-bold` in the existing code resolves to the heavy display treatment and is reserved for `text-3xl`/`text-2xl` metrics+title only — do NOT introduce 500/700/800 elsewhere.
 
@@ -93,12 +99,12 @@ This is dark-theme-capable shadcn semantic-token theming (HSL CSS variables in `
 
 **Accent (`--primary`) reserved for — explicit list (never "all interactive elements"):**
 1. Active nav-tab underline (`border-b-2 border-primary`) — existing nav-bar convention, applies to the new Performance tab.
-2. The single **primary action** per surface: drawer **Save score override** button (`Button` default variant = primary) and the **Save report** button. Every other button (Refresh, facet clears, Cancel) uses `variant="outline"` or `variant="ghost"` — matching token-usage's Refresh/Settings outline buttons.
+2. The single **primary action** per surface: drawer **Save score override** button (`Button` default variant = primary) and the **Save report** button. Every other button (Refresh, facet clears, the drawer dismiss) uses `variant="outline"` or `variant="ghost"` — matching token-usage's Refresh/Settings outline buttons.
 3. The results-table progress/share bars reuse the existing per-series data-color palette (`EVOLUTION_PALETTE`/`getProcessColor`), NOT `--primary` — data viz colors are a separate, pre-existing system and are out of the 60/30/10 budget by design (charts are categorical encoding, not brand accent).
 
 **Semantic state colors (pre-existing idiom — reuse, do not expand):**
-- `granularity_tier` badge: neutral `Badge variant="secondary"` (muted bg). The tier badge is an **honesty signal** (ROADMAP SC#2 / D-06), NOT a status color — it must read as informational, never as pass/fail. Reserve red/green for actual quality status only.
-- "edited" / corrected-wins marker (D-03): `Badge variant="outline"` with the existing amber threshold styling vocabulary (`bg-yellow-50 text-yellow-700 border-yellow-200`) OR a small `Pencil` lucide icon (12px) — a low-chroma "modified" signal, NOT destructive red and NOT success green. Judged value revealed on hover via `Tooltip`.
+- `granularity_tier` badge: neutral `Badge variant="secondary"` (muted bg, `text-sm text-muted-foreground`). The tier badge is an **honesty signal** (ROADMAP SC#2 / D-06), NOT a status color — it must read as informational, never as pass/fail. Reserve red/green for actual quality status only.
+- "edited" / corrected-wins marker (D-03): `Badge variant="outline"` (`text-sm text-muted-foreground`) with the existing amber threshold styling vocabulary (`bg-yellow-50 text-yellow-700 border-yellow-200`) OR a small `Pencil` lucide icon (14px / `size-3.5`) — a low-chroma "modified" signal, NOT destructive red and NOT success green. Judged value revealed on hover via `Tooltip`.
 - Threshold/quality badges (if score dimensions are graded green/amber/red) reuse the EXACT existing triad from token-usage: green `bg-green-50 text-green-700 border-green-200`, amber `bg-yellow-50 text-yellow-700 border-yellow-200`, red `bg-red-50 text-red-700 border-red-200`.
 
 ---
@@ -122,14 +128,17 @@ This is dark-theme-capable shadcn semantic-token theming (HSL CSS variables in `
 | Error state (fetch failed) | `Failed to load performance data. Check that the experiment API (vkb-server) is reachable.` (mirrors token-usage error idiom: problem + concrete check) |
 | Drawer save error | `Couldn’t save the override. The score may have changed — reopen the run and try again.` |
 | Drawer save success | `Override saved` (transient — corrected value + "edited" marker appears in the table) |
+| Drawer dismiss (drawer footer) | `Discard changes` |
 | Refresh-in-progress | `Refreshing…` (matches token-usage `Refreshing…` button label) |
 | Snapshot staleness note (report view) | `Snapshot frozen {relative-time}. Refresh snapshot to re-run the saved query.` |
+
+**Drawer dismiss label rationale:** the score-override drawer can hold **unsaved `corrected_*` edits**, so a bare single-word `Cancel` under-describes the consequence. The dismiss button is labelled **`Discard changes`** (`variant="ghost"`) — a noun-bearing label that names what is lost. If a run's drawer is opened and closed without edits, `Discard changes` is still safe (it discards nothing) and avoids a conditional label swap.
 
 **Destructive actions in this phase:** None that delete data. The score override is a **non-destructive, additive correction** — `corrected_*` is stored separately from the judged score (Phase 73 D-06; judged value is never overwritten). Therefore:
 
 | Element | Copy |
 |---------|------|
-| Destructive confirmation | Not applicable — no delete/destructive action. The override is reversible (clearing the `corrected_*` field re-exposes the judged value) and requires no confirmation dialog. Save is a single explicit click on the primary `Save override` button. |
+| Destructive confirmation | Not applicable — no delete/destructive action. The override is reversible (clearing the `corrected_*` field re-exposes the judged value) and requires no confirmation dialog. Save is a single explicit click on the primary `Save override` button. Dismissing the drawer with unsaved edits (`Discard changes`) does not delete stored data — it abandons in-progress edits only. |
 
 If a future "Delete report" affordance is added, it is OUT OF SCOPE here (Report sharing/export is explicitly deferred per CONTEXT Deferred Ideas) — do not build a destructive path this phase.
 
@@ -150,10 +159,10 @@ No third-party registries declared (`components.json` `"registries": {}`). Regis
 
 These translate the locked decisions D-01..D-06 into concrete interaction rules the executor implements and the ui-auditor checks against.
 
-1. **Faceted sidebar (D-01):** Left rail, 260px fixed. Facet groups (`Collapsible`, expanded by default): `task_id`, date window, route-class, `granularity_tier`, score-dimension thresholds — plus permitted additions `score state (not_scored / pending / scored)`. Each facet value row = `Checkbox` + label + live count `Badge variant="secondary"`. Selecting facets progressively narrows the results table; counts update to reflect the post-filter set. `Clear filters` resets all. Empty result → "No runs match these filters" empty state in the table region (sidebar stays).
-2. **Results table + corrected-wins (D-03):** Row click opens the detail drawer. For any overridden dimension, the cell shows the **corrected** value as the effective number + a small "edited" marker (amber `outline` badge or 12px `Pencil`); the **judged** value appears on hover (`Tooltip`) and in the drawer. Any table-computed average/aggregate uses corrected-if-present (locks 73 D-06).
-3. **Detail drawer (D-02):** Right-side `Sheet`, `sm:max-w-md`. Five rubric rows (`goal_achieved`, `code_quality`, `test_coverage`, `regressions`, `spec_drift`): each shows judged value (read-only, muted) + an editable `corrected_*` `Input` (respect `applyOverride` allowlist + value ranges from `lib/experiments/score-write.mjs`) + the rationale text. Footer: primary `Save override` (`Button` default) + `Cancel` (`variant="ghost"`). Save → `PATCH /api/experiments/scores/:taskId`; on success close drawer, reflect corrected-wins in the table, surface transient `Override saved`.
-4. **Timeline sub-bands (D-06):** Each parent turn is a `Collapsible` row, **collapsed by default**, with an always-visible `granularity_tier` `Badge` (neutral, informational). Expanding reveals stacked per-reasoning-step sub-bands. The tier badge stays visible in both states — it is the cross-tier-averaging honesty signal and must never be hidden behind the collapse.
+1. **Faceted sidebar (D-01):** Left rail, 260px fixed. Facet groups (`Collapsible`, expanded by default): `task_id`, date window, route-class, `granularity_tier`, score-dimension thresholds — plus permitted additions `score state (not_scored / pending / scored)`. Each facet value row = `Checkbox` + label + live count `Badge variant="secondary"` (`text-sm text-muted-foreground`). Selecting facets progressively narrows the results table; counts update to reflect the post-filter set. `Clear filters` resets all. Empty result → "No runs match these filters" empty state in the table region (sidebar stays).
+2. **Results table + corrected-wins (D-03):** Row click opens the detail drawer. For any overridden dimension, the cell shows the **corrected** value as the effective number + a small "edited" marker (amber `outline` badge or 14px `Pencil`); the **judged** value appears on hover (`Tooltip`) and in the drawer. Any table-computed average/aggregate uses corrected-if-present (locks 73 D-06).
+3. **Detail drawer (D-02):** Right-side `Sheet`, `sm:max-w-md`. Five rubric rows (`goal_achieved`, `code_quality`, `test_coverage`, `regressions`, `spec_drift`): each shows judged value (read-only, `text-muted-foreground`) + an editable `corrected_*` `Input` (respect `applyOverride` allowlist + value ranges from `lib/experiments/score-write.mjs`) + the rationale text. Footer: primary `Save override` (`Button` default) + `Discard changes` (`variant="ghost"` — names the unsaved-edit loss). Save → `PATCH /api/experiments/scores/:taskId`; on success close drawer, reflect corrected-wins in the table, surface transient `Override saved`.
+4. **Timeline sub-bands (D-06):** Each parent turn is a `Collapsible` row, **collapsed by default**, with an always-visible `granularity_tier` `Badge` (neutral, informational, `text-sm text-muted-foreground`). Expanding reveals stacked per-reasoning-step sub-bands. The tier badge stays visible in both states — it is the cross-tier-averaging honesty signal and must never be hidden behind the collapse.
 5. **Reports sub-view (D-04/D-05):** A "Reports" sub-view (second `Tabs` value) INSIDE the Performance tab — not a top-level nav tab. `Save report` freezes current facet-state + results snapshot. A saved-report view renders the **snapshot** (stable); `Refresh snapshot` re-runs the saved query and updates the snapshot, showing the staleness note with frozen-at relative time.
 
 ---
