@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.lsl-lock-sweeper</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/Q284340/Agentic/coding/scripts/lsl-lock-sweeper-job.sh</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StartInterval</key>
+    <integer>60</integer>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>WorkingDirectory</key>
+    <string>/Users/Q284340/Agentic/coding</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/Q284340/Agentic/coding/.data/lsl-lock-sweeper.log</string>
+    <key>StandardOutPath</key>
+    <string>/Users/Q284340/Agentic/coding/.data/lsl-lock-sweeper.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin</string>
+    </dict>
+</dict>
+</plist>
