@@ -2105,7 +2105,19 @@ app.get('/api/coding/digests', async (_req, res) => {
     const nowDateStr = new Date().toISOString().slice(0, 10);
     const yearAgoStr = new Date(Date.now() - 364 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const readFrom = from || yearAgoStr;
-    const readTo = to || nowDateStr;
+    // ColdStoreReader uses a HALF-OPEN [from, to) window keyed on the digest's
+    // YYYY-MM-DD `date` (see ColdStoreReader._readRange: `k < to`). A date-only
+    // upper bound therefore excludes the entire bound day — most visibly TODAY,
+    // so freshly consolidated digests never surface until the next calendar day
+    // (the "no digest consolidation today?" symptom). The sibling
+    // /api/coding/observations handler dodges this by passing a full-ISO
+    // `to = now()`, but digests key on a date string that readDigests slices to
+    // 10 chars, so we instead advance the read bound by one day. The post-read
+    // inclusive `to` filter below still honours an explicit caller bound.
+    const effectiveTo = (to || nowDateStr).slice(0, 10);
+    const readTo = new Date(
+      new Date(`${effectiveTo}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000,
+    ).toISOString().slice(0, 10);
     // Digest JSON shape from ObservationExporter:
     //   {id, date, theme, summary, observation_ids[], agents[], files_touched[],
     //    quality, created_at, project}
