@@ -31,9 +31,12 @@ function isEstimated(row: TimelineRow): boolean {
 }
 
 function TierBadge({ tier }: { tier: string }) {
+  // Tier is the honesty signal (D-06). Legacy rows carry an empty granularity_tier;
+  // render "untagged" rather than a blank pill so the badge is never invisible.
+  const label = tier && tier.trim() !== '' ? tier : 'untagged'
   return (
     <Badge variant="secondary" className="text-sm text-muted-foreground" data-testid="granularity-tier-badge">
-      {tier}
+      {label}
     </Badge>
   )
 }
@@ -52,19 +55,30 @@ function SubBand({ row }: { row: TimelineRow }) {
   )
 }
 
-function ParentRow({ row }: { row: TimelineRow }) {
+function TurnLabel({ index, model }: { index: number; model?: string | null }) {
+  // Identifies each turn so a row is never just an empty badge + a far-right number.
+  return (
+    <>
+      <span className="text-sm font-medium">Turn {index + 1}</span>
+      {model && <span className="text-sm text-muted-foreground">{model}</span>}
+    </>
+  )
+}
+
+function ParentRow({ row, index }: { row: TimelineRow; index: number }) {
   const [open, setOpen] = useState(false) // collapsed by default (D-06)
   const children = row.children ?? []
   const isAggregate = String(row.granularity_tier) === 'per-session-aggregate'
   const hasChildren = children.length > 0 && !isAggregate
 
-  // per-session-aggregate (copilot): single band, no expand affordance.
+  // per-session-aggregate (copilot) or any tier-less single turn: one band, no expand.
   if (!hasChildren) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
         <div className="flex items-center gap-2">
           {/* spacer to align with expandable rows' chevron column */}
           <span className="inline-block w-4" />
+          <TurnLabel index={index} model={row.model} />
           <TierBadge tier={String(row.granularity_tier)} />
           {isEstimated(row) && (
             <span className="text-sm text-muted-foreground">estimated</span>
@@ -80,6 +94,7 @@ function ParentRow({ row }: { row: TimelineRow }) {
       <div className="flex items-center justify-between gap-3 px-3 py-2">
         <CollapsibleTrigger className="flex flex-1 items-center gap-2 text-left" data-testid="timeline-turn">
           <ChevronRight className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`} />
+          <TurnLabel index={index} model={row.model} />
           {/* tier badge sits OUTSIDE CollapsibleContent — always visible */}
           <TierBadge tier={String(row.granularity_tier)} />
           {isEstimated(row) && (
@@ -138,7 +153,7 @@ export function PerformanceTimeline() {
         ) : (
           <div className="space-y-2">
             {rows.map((row, i) => (
-              <ParentRow key={row.tool_call_id ?? i} row={row} />
+              <ParentRow key={row.tool_call_id ?? i} row={row} index={i} />
             ))}
           </div>
         )}
