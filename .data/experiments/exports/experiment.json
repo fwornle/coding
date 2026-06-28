@@ -1,0 +1,306 @@
+{
+  "attributes": {},
+  "options": {
+    "type": "directed",
+    "multi": true,
+    "allowSelfLoops": true
+  },
+  "nodes": [
+    {
+      "key": "019efcfb-ee67-71cd-b82e-fdfb2715101f",
+      "attributes": {
+        "id": "019efcfb-ee67-71cd-b82e-fdfb2715101f",
+        "name": "verify-headless-1782360826",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "",
+        "metadata": {
+          "task_id": "verify-headless-1782360826",
+          "task_hash": null,
+          "task_class": "debug",
+          "agent": null,
+          "model": null,
+          "framework": null,
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "verify-headless-1782360826",
+          "pending": false,
+          "started_at": "2026-06-25T04:13:46.993Z",
+          "ended_at": "2026-06-25T04:13:49.166Z",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "verify-headless-1782360826",
+              "timestamp": "2026-06-25T04:13:49.543Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "experiments-domain-migration",
+              "model": "n/a",
+              "runId": "migrate-experiment-domain-2026-06-28",
+              "timestamp": "2026-06-28T12:15:04.347Z"
+            },
+            "confirmationCount": 2
+          },
+          "domain": "experiment"
+        },
+        "createdAt": "2026-06-28T12:15:04.348Z",
+        "updatedAt": "2026-06-28T12:15:04.348Z",
+        "validFrom": "2026-06-28T12:15:04.348Z"
+      }
+    },
+    {
+      "key": "019efcfb-ee69-781f-91a5-15f841bb8373",
+      "attributes": {
+        "id": "019efcfb-ee69-781f-91a5-15f841bb8373",
+        "name": "verify-headless-1782360826-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "run_task_id": "verify-headless-1782360826",
+          "totalTokens": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "reasoningTokens": 0,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "verify-headless-1782360826",
+              "timestamp": "2026-06-25T04:13:49.543Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "experiments-domain-migration",
+              "model": "n/a",
+              "runId": "migrate-experiment-domain-2026-06-28",
+              "timestamp": "2026-06-28T12:15:04.347Z"
+            },
+            "confirmationCount": 2
+          },
+          "domain": "experiment"
+        },
+        "createdAt": "2026-06-28T12:15:04.348Z",
+        "updatedAt": "2026-06-28T12:15:04.348Z",
+        "validFrom": "2026-06-28T12:15:04.348Z"
+      }
+    },
+    {
+      "key": "019efcfb-ee69-781f-91a5-15f99c981f34",
+      "attributes": {
+        "id": "019efcfb-ee69-781f-91a5-15f99c981f34",
+        "name": "verify-headless-1782360826-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "",
+        "metadata": {
+          "run_task_id": "verify-headless-1782360826",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "verify-headless-1782360826",
+              "timestamp": "2026-06-25T04:13:49.543Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "experiments-domain-migration",
+              "model": "n/a",
+              "runId": "migrate-experiment-domain-2026-06-28",
+              "timestamp": "2026-06-28T12:15:04.347Z"
+            },
+            "confirmationCount": 2
+          },
+          "domain": "experiment"
+        },
+        "createdAt": "2026-06-28T12:15:04.349Z",
+        "updatedAt": "2026-06-28T12:15:04.349Z",
+        "validFrom": "2026-06-28T12:15:04.349Z"
+      }
+    },
+    {
+      "key": "019efcfc-fd22-7c21-8fac-5a62ce8ded51",
+      "attributes": {
+        "id": "019efcfc-fd22-7c21-8fac-5a62ce8ded51",
+        "name": "verify-live-1782360859",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Prove route heuristics and Route node land on the Run",
+        "metadata": {
+          "task_id": "verify-live-1782360859",
+          "task_hash": "d202589be0401b5b25352d91901e3f9c939642f2244e1e9fedc6f09d34a1eb6e",
+          "task_class": "debug",
+          "agent": null,
+          "model": null,
+          "framework": null,
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "verify-live-1782360859",
+          "pending": false,
+          "started_at": "2026-06-25T04:14:19.229Z",
+          "ended_at": "2026-06-25T04:14:58.735Z",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "verify-live-1782360859",
+              "timestamp": "2026-06-25T04:14:58.850Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "experiments-domain-migration",
+              "model": "n/a",
+              "runId": "migrate-experiment-domain-2026-06-28",
+              "timestamp": "2026-06-28T12:15:04.347Z"
+            },
+            "confirmationCount": 3
+          },
+          "domain": "experiment"
+        },
+        "createdAt": "2026-06-28T12:15:04.348Z",
+        "updatedAt": "2026-06-28T12:15:04.348Z",
+        "validFrom": "2026-06-28T12:15:04.348Z"
+      }
+    },
+    {
+      "key": "019efcfc-fd23-7b7c-9aeb-a7ecb6725ff9",
+      "attributes": {
+        "id": "019efcfc-fd23-7b7c-9aeb-a7ecb6725ff9",
+        "name": "verify-live-1782360859-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "run_task_id": "verify-live-1782360859",
+          "totalTokens": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "reasoningTokens": 0,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "verify-live-1782360859",
+              "timestamp": "2026-06-25T04:14:58.850Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "experiments-domain-migration",
+              "model": "n/a",
+              "runId": "migrate-experiment-domain-2026-06-28",
+              "timestamp": "2026-06-28T12:15:04.347Z"
+            },
+            "confirmationCount": 3
+          },
+          "domain": "experiment"
+        },
+        "createdAt": "2026-06-28T12:15:04.348Z",
+        "updatedAt": "2026-06-28T12:15:04.348Z",
+        "validFrom": "2026-06-28T12:15:04.348Z"
+      }
+    },
+    {
+      "key": "019efcfc-fd24-731c-b6d2-9d023ebad13e",
+      "attributes": {
+        "id": "019efcfc-fd24-731c-b6d2-9d023ebad13e",
+        "name": "verify-live-1782360859-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Prove route heuristics and Route node land on the Run",
+        "metadata": {
+          "run_task_id": "verify-live-1782360859",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Prove route heuristics and Route node land on the Run",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "verify-live-1782360859",
+              "timestamp": "2026-06-25T04:14:58.850Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "experiments-domain-migration",
+              "model": "n/a",
+              "runId": "migrate-experiment-domain-2026-06-28",
+              "timestamp": "2026-06-28T12:15:04.347Z"
+            },
+            "confirmationCount": 3
+          },
+          "domain": "experiment"
+        },
+        "createdAt": "2026-06-28T12:15:04.349Z",
+        "updatedAt": "2026-06-28T12:15:04.349Z",
+        "validFrom": "2026-06-28T12:15:04.349Z"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "key": "019efcfb-ee67-71cd-b82e-fdfb2715101f:produces:019efcfb-ee69-781f-91a5-15f841bb8373",
+      "source": "019efcfb-ee67-71cd-b82e-fdfb2715101f",
+      "target": "019efcfb-ee69-781f-91a5-15f841bb8373",
+      "attributes": {
+        "type": "produces",
+        "from": "019efcfb-ee67-71cd-b82e-fdfb2715101f",
+        "to": "019efcfb-ee69-781f-91a5-15f841bb8373",
+        "key": "019efcfb-ee67-71cd-b82e-fdfb2715101f:produces:019efcfb-ee69-781f-91a5-15f841bb8373"
+      }
+    },
+    {
+      "key": "019efcfb-ee67-71cd-b82e-fdfb2715101f:tookRoute:019efcfb-ee69-781f-91a5-15f99c981f34",
+      "source": "019efcfb-ee67-71cd-b82e-fdfb2715101f",
+      "target": "019efcfb-ee69-781f-91a5-15f99c981f34",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019efcfb-ee67-71cd-b82e-fdfb2715101f",
+        "to": "019efcfb-ee69-781f-91a5-15f99c981f34",
+        "key": "019efcfb-ee67-71cd-b82e-fdfb2715101f:tookRoute:019efcfb-ee69-781f-91a5-15f99c981f34"
+      }
+    },
+    {
+      "key": "019efcfc-fd22-7c21-8fac-5a62ce8ded51:produces:019efcfc-fd23-7b7c-9aeb-a7ecb6725ff9",
+      "source": "019efcfc-fd22-7c21-8fac-5a62ce8ded51",
+      "target": "019efcfc-fd23-7b7c-9aeb-a7ecb6725ff9",
+      "attributes": {
+        "type": "produces",
+        "from": "019efcfc-fd22-7c21-8fac-5a62ce8ded51",
+        "to": "019efcfc-fd23-7b7c-9aeb-a7ecb6725ff9",
+        "key": "019efcfc-fd22-7c21-8fac-5a62ce8ded51:produces:019efcfc-fd23-7b7c-9aeb-a7ecb6725ff9"
+      }
+    },
+    {
+      "key": "019efcfc-fd22-7c21-8fac-5a62ce8ded51:tookRoute:019efcfc-fd24-731c-b6d2-9d023ebad13e",
+      "source": "019efcfc-fd22-7c21-8fac-5a62ce8ded51",
+      "target": "019efcfc-fd24-731c-b6d2-9d023ebad13e",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019efcfc-fd22-7c21-8fac-5a62ce8ded51",
+        "to": "019efcfc-fd24-731c-b6d2-9d023ebad13e",
+        "key": "019efcfc-fd22-7c21-8fac-5a62ce8ded51:tookRoute:019efcfc-fd24-731c-b6d2-9d023ebad13e"
+      }
+    }
+  ]
+}

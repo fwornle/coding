@@ -175,10 +175,21 @@ integrations/mcp-server-browserbase/
 
 # Phase 71 experiment KB — the dedicated single-owner LevelDB binary store
 # (.data/experiments/leveldb) is regenerable runtime state, never committed.
-# The per-domain JSON exports (.data/experiments/exports/*.json) ARE tracked
-# (git-trackable, mirrors the knowledge-graph exports convention). The committed
-# ontology lives at .data/ontologies-experiment/ and is NOT ignored.
+# The per-domain export experiments/exports/experiment.json IS tracked (the
+# active v7.4 measurement data; mirrors the knowledge-graph exports convention).
+# The km-core exporter ALSO always writes a catch-all general.json
+# (exporter.js:148); for this single-domain store it is redundant AND collides
+# in name with the main KG general.json, so it is ignored. run-write.mjs tags
+# every entity metadata.domain='experiment' so real data files into
+# experiment.json, never the catch-all. The committed ontology lives at
+# .data/ontologies-experiment/ and is NOT ignored.
 .data/experiments/leveldb/
+.data/experiments/exports/general.json
+
+# Performance-measurement run spans (.data/measurements/<task_id>.json) — written
+# per measurement close by the proxy / measurement-stop. Regenerable per-run
+# artifacts (epoch-named), never committed.
+.data/measurements/
 
 # Code graph RAG index (binary, regenerated on indexing)
 .data/code-graph-index/
