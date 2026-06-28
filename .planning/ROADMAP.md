@@ -152,6 +152,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   2. The timeline view renders `per-reasoning-step` rows as stacked sub-bands under their parent turn, and shows each run's `granularity_tier` as a badge so cross-tier averages are not over-interpreted.
   3. A `Report` entity plus saved-query workflow points at a query and a stable results snapshot so curated findings are shareable and do not bit-rot.
   4. `Report` views render a saved query against its stable results snapshot.
+  5. Score override UI controls (deferred from Phase 73 per 73-CONTEXT D-07) drive the existing `PATCH /api/experiments/scores/:taskId` endpoint so an operator can correct a judged dimension from the dashboard (closes the SCORE-02 dashboard clause).
 **Plans**: TBD
 **UI hint**: yes
 
