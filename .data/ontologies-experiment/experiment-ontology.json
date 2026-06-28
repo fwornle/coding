@@ -1,9 +1,9 @@
 {
   "meta": {
     "name": "experiment-ontology",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "extends": "upper",
-    "description": "Performance-measurement experiment KB: Run/Outcome materialized v0; Route/Step/Decision/Report schema-only stubs; Experiment optional grouping."
+    "description": "Performance-measurement experiment KB: Run/Outcome materialized v0; Score materialized (D-05/D-06); Route/Step/Decision/Report schema-only stubs; Experiment optional grouping."
   },
   "classes": {
     "Experiment": {
@@ -17,7 +17,7 @@
     "Run": {
       "extends": "Revision",
       "description": "A single coding-agent task run, materialized at close. The queryable unit (D2). Carries 8 tags sourced from token_usage + span.",
-      "relationships": { "produces": ["Outcome"], "tookRoute": ["Route"], "belongsTo": ["Experiment"] },
+      "relationships": { "produces": ["Outcome"], "tookRoute": ["Route"], "belongsTo": ["Experiment"], "scored": ["Score"] },
       "properties": {
         "taskId":     { "type": "string", "description": "Measurement span task_id (idempotency key; stored also as metadata.task_id)" },
         "taskHash":   { "type": "string", "description": "Stable hash of goal_sentence/prompt" },
@@ -60,6 +60,19 @@
         "outputTokens":    { "type": "number", "description": "Sum output_tokens" },
         "reasoningTokens": { "type": "number", "description": "Sum reasoning_tokens" },
         "closedState":     { "type": "string", "description": "Close state", "enum": ["closed", "quarantined"] }
+      }
+    },
+    "Score": {
+      "extends": "Contract",
+      "description": "Semantic scoring of a Run: goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06). corrected_*/overridden_by/overridden_at ride in metadata (not declared properties).",
+      "relationships": {},
+      "properties": {
+        "goalAlignedRatio": { "type": "number", "description": "toward/(toward+away) over consequential events (D-02); judged; null when no evidence" },
+        "goalAchieved":     { "type": "number", "description": "0-1 rubric dimension; judged; null when no evidence (D-01)" },
+        "codeQuality":      { "type": "number", "description": "0-1 rubric dimension; judged; null when no evidence (D-01)" },
+        "testCoverage":     { "type": "number", "description": "0-1 rubric dimension; judged; null when no evidence (D-01)" },
+        "regressions":      { "type": "number", "description": "0|1 rubric dimension; judged; null when no evidence (D-01)" },
+        "specDrift":        { "type": "number", "description": "0-1 rubric dimension; judged; null when no evidence (D-01)" }
       }
     },
     "Report": {
