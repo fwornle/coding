@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
-status: completed
+status: executing
 stopped_at: Phase 74 UI-SPEC approved
-last_updated: "2026-06-28T16:06:17.154Z"
-last_activity: 2026-06-28 -- Phase 73 marked complete
+last_updated: "2026-06-28T16:35:32.270Z"
+last_activity: 2026-06-28 -- Phase 74 planning complete
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 29
+  total_plans: 35
   completed_plans: 29
   percent: 75
 ---
@@ -55,14 +55,14 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 73 — COMPLETE
 Plan: 1 of 6
-Status: Phase 73 complete
+Status: Ready to execute
 real gap (route heuristics were permanently null for Claude/Copilot runs — agent never
 normalized + Claude session seam never wired into the close orchestrator), fixed inline
 in commit 9eb5163c5 (lib/experiments/route-trace-resolve.mjs + measurement-stop.mjs +
 experiments-recompute-route.mjs). Live-verified: Claude-dominant run closes with
 total_step_count > 0, idempotent across recompute.
 Next: Phase 73 (Semantic Route Judge & Success Scoring) — not yet planned (no dir).
-Last activity: 2026-06-28 -- Phase 73 marked complete
+Last activity: 2026-06-28 -- Phase 74 planning complete
 
 ## Deferred Items
 
