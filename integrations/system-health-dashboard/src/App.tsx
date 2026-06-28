@@ -7,6 +7,7 @@ import { DigestsPage } from './pages/digests'
 import { InsightsPage } from './pages/insights'
 import { CoveragePage } from './pages/coverage'
 import { TokenUsagePage } from './pages/token-usage'
+import { PerformancePage } from './pages/performance'
 import { NavBar } from './components/nav-bar'
 import { useEffect } from 'react'
 import { healthRefreshManager } from './store/middleware/healthRefreshMiddleware'
@@ -29,6 +30,7 @@ function AppContent() {
         <Route path="/insights" element={<InsightsPage />} />
         <Route path="/coverage" element={<CoveragePage />} />
         <Route path="/token-usage" element={<TokenUsagePage />} />
+        <Route path="/performance" element={<PerformancePage />} />
       </Routes>
     </>
   )
