@@ -139,8 +139,8 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 73-01-PLAN.md — Consequential-event classifier + goal_aligned_ratio math (fixture-tested) (Wave 1) [ROUTE-03]
   - [x] 73-02-PLAN.md — Score ontology class + idempotent override-preserving writeScore/applyOverride (Wave 1) [SCORE-01, SCORE-02]
   - [x] 73-03-PLAN.md — Lean on-disk evidence harness, fail-soft to null (Wave 1) [SCORE-01]
-  - [ ] 73-04-PLAN.md — LLM judge: single structured Haiku call + trivial/pending quarantine (Wave 2) [ROUTE-03, SCORE-01]
-  - [ ] 73-05-PLAN.md — REST PATCH override endpoint: validation + dedicated-store reachability (Wave 2) [SCORE-02]
+  - [x] 73-04-PLAN.md — LLM judge: single structured Haiku call + trivial/pending quarantine (Wave 2) [ROUTE-03, SCORE-01]
+  - [x] 73-05-PLAN.md — REST PATCH override endpoint: validation + dedicated-store reachability (Wave 2) [SCORE-02]
   - [ ] 73-06-PLAN.md — Wire judge into close path + idempotent recompute-score CLI (Wave 3) [ROUTE-03, SCORE-01]
 
 ### Phase 74: Performance Dashboard & Reports
@@ -170,5 +170,5 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete    | 2026-06-23 |
 | 71. Experiment KB & Task Taxonomy | v7.4 | 5/5 | Complete    | 2026-06-24 |
 | 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
-| 73. Semantic Route Judge & Success Scoring | v7.4 | 3/6 | In Progress|  |
+| 73. Semantic Route Judge & Success Scoring | v7.4 | 5/6 | In Progress|  |
 | 74. Performance Dashboard & Reports | v7.4 | 0/? | Not started | - |
