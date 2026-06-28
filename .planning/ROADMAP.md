@@ -154,7 +154,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   4. `Report` views render a saved query against its stable results snapshot.
   5. Score override UI controls (deferred from Phase 73 per 73-CONTEXT D-07) drive the existing `PATCH /api/experiments/scores/:taskId` endpoint so an operator can correct a judged dimension from the dashboard (closes the SCORE-02 dashboard clause).
 **Plans**: 6 plans
-  - [ ] 74-01-PLAN.md — Wave 0: shared seedIsolatedStore/seedTokenDb fixture + 5 RED node:test files + Playwright skeleton (Wave 1)
+  - [x] 74-01-PLAN.md — Wave 0: shared seedIsolatedStore/seedTokenDb fixture + 5 RED node:test files + Playwright skeleton (Wave 1)
   - [ ] 74-02-PLAN.md — DASH-01/02 read layer: readRuns (join + pending-exclude) + readTimeline (readonly token-usage.db sub-band grouping) (Wave 2)
   - [ ] 74-03-PLAN.md — KB-04/DASH-03: Report ontology fill-in + writeReport/refreshReport + readReports/readReport (snapshot stability) (Wave 3)
   - [ ] 74-04-PLAN.md — DASH-01/02/03/KB-04: 5 experiment REST endpoints (transient store) + same-origin server.js proxy to vkb-server:8080 (Wave 4)
@@ -178,4 +178,4 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 71. Experiment KB & Task Taxonomy | v7.4 | 5/5 | Complete    | 2026-06-24 |
 | 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
-| 74. Performance Dashboard & Reports | v7.4 | 0/? | Not started | - |
+| 74. Performance Dashboard & Reports | v7.4 | 1/6 | In Progress|  |

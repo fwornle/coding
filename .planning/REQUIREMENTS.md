@@ -95,9 +95,9 @@ This file tracks the active milestone's requirements at the top, with previous m
 | ROUTE-03 | Phase 73 | Pending |
 | SCORE-01 | Phase 73 | Pending |
 | SCORE-02 | Phase 73 | Pending |
-| KB-04 | Phase 74 | Pending |
-| DASH-01 | Phase 74 | Pending |
-| DASH-02 | Phase 74 | Pending |
-| DASH-03 | Phase 74 | Pending |
+| KB-04 | Phase 74 | Complete |
+| DASH-01 | Phase 74 | Complete |
+| DASH-02 | Phase 74 | Complete |
+| DASH-03 | Phase 74 | Complete |
 
 **Coverage:** 21/21 requirements mapped across 8 phases (67–74). No orphans, no duplicates.
