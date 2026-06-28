@@ -18,19 +18,23 @@ import {
 } from './color-fallback'
 
 describe('classColor — ontology palette', () => {
-  test('hierarchy classes get progressively-lighter blues', () => {
-    expect(classColor('System', 'dark')).toBe('#1e3a8a')
-    expect(classColor('Project', 'dark')).toBe('#1d4ed8')
-    expect(classColor('Component', 'dark')).toBe('#3b82f6')
-    expect(classColor('SubComponent', 'dark')).toBe('#60a5fa')
-    expect(classColor('Detail', 'dark')).toBe('#93c5fd')
+  test('hierarchy classes use the VKB-reference teal/blue palette (2026-06-11)', () => {
+    // BATCH_PALETTE in color-fallback.ts — Project=teal, descending blue
+    // shades by hierarchy depth, System=teal-800.
+    expect(classColor('System', 'dark')).toBe('#00695c')
+    expect(classColor('Project', 'dark')).toBe('#00897b')
+    expect(classColor('Component', 'dark')).toBe('#1565c0')
+    expect(classColor('SubComponent', 'dark')).toBe('#42a5f5')
+    expect(classColor('Detail', 'dark')).toBe('#90caf9')
   })
 
-  test('typed-views classes get an amber scale', () => {
-    expect(classColor('Observation', 'light')).toBe('#f59e0b')
-    expect(classColor('Digest', 'light')).toBe('#b45309')
-    expect(classColor('Insight', 'light')).toBe('#7c2d12')
-    expect(classColor('LearningArtifact', 'light')).toBe('#854d0e')
+  test('typed-views classes fall back to slate (amber scale removed 2026-06-11)', () => {
+    // The amber typed-views scale was removed; non-hierarchy classes now
+    // fall back to DEFAULT_BATCH (slate-400).
+    expect(classColor('Observation', 'light')).toBe('#94a3b8')
+    expect(classColor('Digest', 'light')).toBe('#94a3b8')
+    expect(classColor('Insight', 'light')).toBe('#94a3b8')
+    expect(classColor('LearningArtifact', 'light')).toBe('#94a3b8')
   })
 
   test('unknown classes fall back to slate-400', () => {

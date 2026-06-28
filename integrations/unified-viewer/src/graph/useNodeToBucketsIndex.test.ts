@@ -53,10 +53,17 @@ vi.mock('./useVisibleEntityIds', () => ({
 }))
 
 vi.mock('@/panels/coding/useLslSessions', () => ({
+  // Phase 61 Plan 03: useLslSessions's query data is now { sessions, total }
+  // (the N-of-M honesty widen) — useNodeToBucketsIndex reads `data.sessions`.
+  // The mock must wrap the seeded array in that shape, not return it bare.
   useLslSessions: () => {
     const sessions =
       (globalThis as unknown as { __mockSessions?: unknown[] }).__mockSessions ?? []
-    return { data: sessions, isLoading: false, error: null }
+    return {
+      data: { sessions, total: sessions.length },
+      isLoading: false,
+      error: null,
+    }
   },
 }))
 

@@ -73,7 +73,8 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     // Active system identity surfaces via the NavLink active state.
     const active = screen.getByTestId('nav-link-coding')
     expect(active).toHaveAttribute('data-active', 'true')
-    expect(active).toHaveTextContent('Coding')
+    // 2026-06-11 rename: visible label is 'VKB' (slug stays 'coding').
+    expect(active).toHaveTextContent('VKB')
     expect(active.getAttribute('aria-current')).toBe('page')
     cleanup()
   })
@@ -83,7 +84,8 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     expect(screen.getByTestId('viewer-wordmark')).toHaveTextContent('Unified Viewer')
     const active = screen.getByTestId('nav-link-okb')
     expect(active).toHaveAttribute('data-active', 'true')
-    expect(active).toHaveTextContent('OKB')
+    // 2026-06-11 rename: visible label is 'VOKB' (slug stays 'okb').
+    expect(active).toHaveTextContent('VOKB')
     cleanup()
   })
 
@@ -97,8 +99,8 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     const links = screen.getByTestId('unknown-system-links').querySelectorAll('a')
     expect(links).toHaveLength(2)
     const labels = Array.from(links).map((a) => a.textContent)
-    expect(labels).toContain('Coding')
-    expect(labels).toContain('OKB')
+    expect(labels).toContain('VKB')
+    expect(labels).toContain('VOKB')
     expect(labels).not.toContain('CAP')
     cleanup()
   })
@@ -110,8 +112,8 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     const links = screen.getByTestId('unknown-system-links').querySelectorAll('a')
     expect(links).toHaveLength(2)
     const labels = Array.from(links).map((a) => a.textContent)
-    expect(labels).toContain('Coding')
-    expect(labels).toContain('OKB')
+    expect(labels).toContain('VKB')
+    expect(labels).toContain('VOKB')
     cleanup()
   })
 
@@ -122,8 +124,8 @@ describe('UnifiedViewer routing (Phase 55 — 2-system viewer)', () => {
     const links = screen.getByTestId('unknown-system-links').querySelectorAll('a')
     expect(links).toHaveLength(2)
     const labels = Array.from(links).map((a) => a.textContent)
-    expect(labels).toContain('Coding')
-    expect(labels).toContain('OKB')
+    expect(labels).toContain('VKB')
+    expect(labels).toContain('VOKB')
     cleanup()
   })
 

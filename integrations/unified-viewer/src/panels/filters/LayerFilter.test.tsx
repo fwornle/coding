@@ -36,20 +36,25 @@ describe('LayerFilter', () => {
     expect(screen.getByText('Layer')).toBeInTheDocument()
   })
 
-  test('clicking Evidence calls store.toggleLayer with "evidence"', () => {
+  // 2026-06-12 store semantic (toggleLayer): empty selectedLayers === "all
+  // visible". The first toggle materialises the full set ['evidence','pattern']
+  // then removes the clicked layer — so unchecking Evidence leaves ['pattern'].
+  test('clicking Evidence (from all-visible) unchecks it → selectedLayers === ["pattern"]', () => {
     render(<LayerFilter entities={[]} />)
     const wrapper = screen.getByTestId('filter-layer-evidence')
     const cb = wrapper.querySelector('button[role="checkbox"]') as HTMLElement
     fireEvent.click(cb)
-    expect(useViewerStore.getState().selectedLayers).toContain('evidence')
+    expect(useViewerStore.getState().selectedLayers).not.toContain('evidence')
+    expect(useViewerStore.getState().selectedLayers).toContain('pattern')
   })
 
-  test('clicking Pattern calls store.toggleLayer with "pattern"', () => {
+  test('clicking Pattern (from all-visible) unchecks it → selectedLayers === ["evidence"]', () => {
     render(<LayerFilter entities={[]} />)
     const wrapper = screen.getByTestId('filter-layer-pattern')
     const cb = wrapper.querySelector('button[role="checkbox"]') as HTMLElement
     fireEvent.click(cb)
-    expect(useViewerStore.getState().selectedLayers).toContain('pattern')
+    expect(useViewerStore.getState().selectedLayers).not.toContain('pattern')
+    expect(useViewerStore.getState().selectedLayers).toContain('evidence')
   })
 
   test('empty selectedLayers === [] → isSelected("evidence") is true (all-visible semantic)', () => {

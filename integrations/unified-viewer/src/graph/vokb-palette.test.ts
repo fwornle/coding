@@ -275,6 +275,46 @@ describe('vokb-palette — EDGE_STYLES (VOKB GraphVisualization.tsx:135-173)', (
           "color": "#22c55e",
           "dasharray": "5,3",
         },
+        "capturedBy": {
+          "color": "#60a5fa",
+          "dasharray": "4,3",
+        },
+        "contains": {
+          "color": "#6b7280",
+          "dasharray": "",
+        },
+        "contributes_to": {
+          "color": "#5eead4",
+          "dasharray": "5,3",
+        },
+        "derivedFrom": {
+          "color": "#22c55e",
+          "dasharray": "",
+        },
+        "has_insight": {
+          "color": "#f59e0b",
+          "dasharray": "",
+        },
+        "implemented_in": {
+          "color": "#14b8a6",
+          "dasharray": "",
+        },
+        "mentions": {
+          "color": "#cbd5e1",
+          "dasharray": "2,2",
+        },
+        "originally_developed_in": {
+          "color": "#f97316",
+          "dasharray": "5,3",
+        },
+        "parent-child": {
+          "color": "#4b5563",
+          "dasharray": "",
+        },
+        "related_to": {
+          "color": "#a855f7",
+          "dasharray": "5,5",
+        },
       }
     `)
   })

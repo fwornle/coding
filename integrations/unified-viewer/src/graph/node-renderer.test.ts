@@ -57,26 +57,29 @@ describe('edgeStateForRelation — Plan 03 round 2 hex palette (sigma WebGL cann
     expect(s2).toEqual({ color: '#3b82f6', opacity: 1.0 })
   })
 
-  test('Test 6b: non-incident (selected=c) → default slate, opacity 0.6', () => {
+  // 2026-06-11: default (light-theme) edge opacity lowered 0.6 → 0.35 and
+  // dimmed 0.15 → 0.08 for the VKB-style faint hairline look (node-renderer.ts
+  // edgeStateForRelation). Default theme arg is 'light'.
+  test('Test 6b: non-incident (selected=c) → default slate, opacity 0.35', () => {
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, 'c')
-    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.6 })
+    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.35 })
   })
 
-  test('Test 6c: both endpoints dimmed → near-invisible slate, opacity 0.15', () => {
+  test('Test 6c: both endpoints dimmed → near-invisible slate, opacity 0.08', () => {
     const dimmed = new Set(['a', 'b'])
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, null, dimmed)
-    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.15 })
+    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.08 })
   })
 
   test('Test 6d: only one endpoint dimmed → default slate', () => {
     const dimmed = new Set(['a'])
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, null, dimmed)
-    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.6 })
+    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.35 })
   })
 
   test('Test 6e: null selectedNodeId, no dimmed set → default slate', () => {
     const s = edgeStateForRelation({ from: 'a', to: 'b' }, null)
-    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.6 })
+    expect(s).toEqual({ color: '#cbd5e1', opacity: 0.35 })
   })
 })
 

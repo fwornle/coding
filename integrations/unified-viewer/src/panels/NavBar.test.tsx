@@ -61,8 +61,9 @@ describe('NavBar', () => {
   test('Test 1: renders two NavLinks Coding/OKB; active matches :system (Phase 55)', () => {
     // Phase 55: 2-system viewer (CAP dropped per D-55-01b).
     renderAt('/viewer/okb')
-    expect(screen.getByTestId('nav-link-coding')).toHaveTextContent('Coding')
-    expect(screen.getByTestId('nav-link-okb')).toHaveTextContent('OKB')
+    // 2026-06-11 rename: visible labels are 'VKB'/'VOKB' (slugs stay coding/okb).
+    expect(screen.getByTestId('nav-link-coding')).toHaveTextContent('VKB')
+    expect(screen.getByTestId('nav-link-okb')).toHaveTextContent('VOKB')
     // CAP nav link is gone.
     expect(screen.queryByTestId('nav-link-cap')).toBeNull()
     expect(screen.getByTestId('nav-link-okb')).toHaveAttribute('data-active', 'true')

@@ -410,8 +410,10 @@ describe('OntologyFilter', () => {
     test('Insight + Digest (level: null) render as selectable flat rows with counts, not dropped', async () => {
       const apiClient = makeApiClient([
         { name: 'Component', level: 1, parent: null },
-        { name: 'Insight', level: null, parent: null },
-        { name: 'Digest', level: null, parent: null },
+        // level-None classes — runtime value stays null; cast satisfies
+        // OntologyClass.level (number | undefined) at compile time.
+        { name: 'Insight', level: null as unknown as undefined, parent: null },
+        { name: 'Digest', level: null as unknown as undefined, parent: null },
       ])
       const entities = [
         makeEntity('a', 'Component'),
@@ -440,7 +442,7 @@ describe('OntologyFilter', () => {
     test('selecting a level-None flat row toggles selectedOntologyClasses', async () => {
       const apiClient = makeApiClient([
         { name: 'Component', level: 1, parent: null },
-        { name: 'Insight', level: null, parent: null },
+        { name: 'Insight', level: null as unknown as undefined, parent: null },
       ])
       const entities = [makeEntity('a', 'Component'), makeEntity('b', 'Insight')]
       render(<OntologyFilter entities={entities} apiClient={apiClient} />)

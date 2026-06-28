@@ -62,8 +62,10 @@ describe('SYSTEM_ENDPOINTS (Phase 55)', () => {
 
 describe('SYSTEM_LABELS (Phase 55)', () => {
   test('has labels for coding and okb only', () => {
-    expect(SYSTEM_LABELS.coding).toBe('Coding')
-    expect(SYSTEM_LABELS.okb).toBe('OKB')
+    // 2026-06-11 rename: tab labels switched from 'Coding'/'OKB' to 'VKB'/'VOKB'
+    // (system-endpoints.ts SYSTEM_LABELS). Route slugs stay 'coding'/'okb'.
+    expect(SYSTEM_LABELS.coding).toBe('VKB')
+    expect(SYSTEM_LABELS.okb).toBe('VOKB')
   })
 
   test('SYSTEM_LABELS has exactly 2 keys (no cap)', () => {

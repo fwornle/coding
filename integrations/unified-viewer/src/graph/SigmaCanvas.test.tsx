@@ -117,11 +117,11 @@ describe('makeEdgeReducer', () => {
     })
   })
 
-  test('default — slate hex #cbd5e1 at opacity 0.6 (Plan 03 round 2: sigma WebGL needs hex)', () => {
+  test('default — slate hex #cbd5e1 at opacity 0.35 (2026-06-11: light-theme edge opacity lowered 0.6 → 0.35)', () => {
     const reducer = makeEdgeReducer()
     const result = reducer('e1', { source: 'a', target: 'b', color: '#000', size: 1 })
     expect((result as { color?: string }).color).toBe('#cbd5e1')
-    expect((result as { opacity?: number }).opacity).toBe(0.6)
+    expect((result as { opacity?: number }).opacity).toBe(0.35)
   })
 
   test('incident on selected — primary blue #3b82f6 at opacity 1.0', () => {
