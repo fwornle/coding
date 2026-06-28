@@ -302,6 +302,35 @@ class SystemHealthAPIServer {
              }
          });
 
+         // Experiments API (Phase 74) — same-origin reverse proxy to the vkb-server
+         // experiment endpoints (DASH-01/02/03, KB-04). The Performance page is
+         // served from this container and fetches same-origin /api/experiments/...;
+         // the only consistent connectivity path is forwarding to the host's
+         // vkb-server on :8080 (RESEARCH Open Question 3). Mirrors the token-usage
+         // proxy above; forwards method + query + body for all experiment subpaths
+         // (GET runs/timeline/reports; POST reports + reports/:id/refresh; PATCH
+         // scores/:taskId). NOTE: server.js is bind-mounted — this change only takes
+         // effect after a FULL `cd docker && docker-compose restart coding-services`
+         // (a supervisor-only restart re-reads the STALE VirtioFS cache).
+         this.app.use('/api/experiments', async (req, res) => {
+             try {
+                 const qs = new URLSearchParams(req.query).toString();
+                 const url = `http://host.docker.internal:8080/api/experiments${req.path}${qs ? '?' + qs : ''}`;
+                 const init = {
+                     method: req.method,
+                     headers: { 'Content-Type': 'application/json' },
+                 };
+                 if (req.method !== 'GET' && req.method !== 'HEAD' && req.body !== undefined) {
+                     init.body = JSON.stringify(req.body);
+                 }
+                 const resp = await fetch(url, init);
+                 const data = await resp.json();
+                 res.status(resp.status).json(data);
+             } catch (err) {
+                 res.status(502).json({ error: 'experiment API (vkb-server) unreachable', details: err.message });
+             }
+         });
+
          // Observations API (Phase 23)
         this.app.get('/api/observations', this.handleGetObservations.bind(this));
         this.app.get('/api/observations/projects', this.handleGetObservationProjects.bind(this));
