@@ -583,16 +583,14 @@ export class ObservationConsolidator {
     if (!this._kmStore) {
       throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
     }
-    const vkbUrl = process.env.VKB_API_URL || 'http://localhost:8080';
     const project = entry.project || 'coding';
     const { entityClass, confidence: classConf } = this._classifyInsightByOntology(entry.topic, entry.summary || '');
 
     // Ensure a Project anchor exists for this team. Without it, the
     // online insights float disconnected from the rest of the graph
-    // because no other entity references them. (Out of scope for D-06.1
-    // to refactor _ensureProjectAnchor; it still hits VKB internally
-    // until a future plan migrates it. We just consume its return value.)
-    const projectName = await this._ensureProjectAnchor(vkbUrl, project);
+    // because no other entity references them. Resolves/creates the anchor
+    // in km-core (migrated off the retired VKB :8080 PUT).
+    const projectName = await this._ensureProjectAnchor(project);
 
     // Phase 58 Plan 02 (D-04 step 2) — run the mentions classifier BEFORE
     // the writeInsight call. Per D-04.1 fail-fast: when the classifier
@@ -711,16 +709,21 @@ export class ObservationConsolidator {
   _projectAnchorCache = new Map();
 
   /**
-   * Return the canonical Project entity name for a team, creating one
-   * if missing. Maps slug-style team names (rapid-automations,
-   * onboarding-repro) to PascalCase entity names (RapidAutomations,
-   * OnboardingRepro) so they can serve as the anchor inside the
-   * viewer's hierarchy.
+   * Return the canonical Project entity name for a team, resolving or
+   * creating the anchor in km-core. Maps slug-style team names
+   * (rapid-automations, onboarding-repro) to PascalCase entity names
+   * (RapidAutomations, OnboardingRepro) so they can serve as the anchor
+   * inside the viewer's hierarchy.
    *
-   * Returns null if the VKB is unavailable; the caller skips the
-   * relation step in that case.
+   * Writes through the shared `this._kmStore` (the same store the
+   * has_insight relink uses) — NOT the legacy VKB :8080 `/api/entities`
+   * PUT, which now 500s with "no such table: knowledge_extractions"
+   * because the unified viewer runs on km-core. That dead endpoint was
+   * the source of the recurring `[Consolidator→KG] project anchor … 500`
+   * loop. Returns null if the km-core write fails; the caller then skips
+   * the relation step.
    */
-  async _ensureProjectAnchor(vkbUrl, team) {
+  async _ensureProjectAnchor(team) {
     if (this._projectAnchorCache.has(team)) return this._projectAnchorCache.get(team);
     const name = team
       .split(/[-_]/)
@@ -729,49 +732,61 @@ export class ObservationConsolidator {
       .join('');
     if (!name) return null;
     try {
-      // Idempotent PUT — if the entity already exists this just
-      // refreshes last_modified; if not, it creates a Project entity
-      // for the team. We preserve any prior source by NOT passing
-      // `source` (the writer falls back to 'manual' for true new
-      // entities, which is correct for a project anchor).
-      const r = await fetch(
-        `${vkbUrl}/api/entities/${encodeURIComponent(name)}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+      // Resolve-or-create the Project anchor in km-core (the canonical
+      // 4-class hierarchy root; `Project` is a valid ontology class, so the
+      // strict putEntity path accepts it). Resolve first to stay idempotent —
+      // the four standing anchors (Coding/DynArch/Timeline/Normalisa) already
+      // exist and must not be duplicated.
+      const projects = await this._kmStore.findByOntologyClass('Project');
+      let projectId = projects.find((p) => p && p.name === name)?.id;
+      if (!projectId) {
+        projectId = await this._kmStore.putEntity(
+          {
+            name,
             entityType: 'Project',
-            observations: [`Project anchor for the ${team} team — auto-created by the observation consolidator so online-learned insights have a parent in the graph.`],
-            significance: 8,
-            team,
-          }),
-        }
-      );
-      if (!r.ok) {
-        process.stderr.write(`[Consolidator→KG] project anchor ${name} failed ${r.status}\n`);
-        this._projectAnchorCache.set(team, null);
-        return null;
+            ontologyClass: 'Project',
+            description: `Project anchor for the ${team} team — auto-created by the observation consolidator so online-learned insights have a parent in the graph.`,
+            metadata: { source: 'observation-consolidator', team },
+          },
+          {
+            // km-core D-30: the strict putEntity path requires a ProvenanceStamp
+            // source. Reuse the consolidator's per-run id (the same createdBy.runId
+            // stamped on its digest/insight writes); no LLM is involved in anchor
+            // creation, so provider/model identify the consolidator itself.
+            provenance: {
+              provider: 'observation-consolidator',
+              model: 'none',
+              runId: this._runId,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        );
       }
       this._projectAnchorCache.set(team, name);
-      // Link the new Project to the central CollectiveKnowledge
-      // (which lives in the coding team) so projects from any team
-      // hang off the same root node in the viewer instead of forming
-      // disconnected sub-graphs. Idempotent — repeat POSTs are
-      // tolerated server-side.
+
+      // Link the Project under the central CollectiveKnowledge root so
+      // projects from any team hang off one node in the viewer instead of
+      // forming disconnected sub-graphs. Dedup-probe before write — km-core
+      // addRelation is NOT idempotent on (from, to, type) (Shared Pattern A
+      // from PATTERNS). Resolve the root id rather than hardcoding it.
       try {
-        await fetch(`${vkbUrl}/api/relations`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: 'CollectiveKnowledge',
-            to: name,
+        const systems = await this._kmStore.findByOntologyClass('System');
+        const ckId = systems.find((s) => s && s.name === 'CollectiveKnowledge')?.id;
+        if (ckId && projectId) {
+          const existing = await this._kmStore.findRelations({
+            from: ckId,
+            to: projectId,
             type: 'includes',
-            team: 'coding',
-            fromTeam: 'coding',
-            toTeam: team,
-            confidence: 1.0,
-          }),
-        });
+          });
+          if (!Array.isArray(existing) || existing.length === 0) {
+            await this._kmStore.addRelation({
+              from: ckId,
+              to: projectId,
+              type: 'includes',
+              metadata: { source: 'observation-consolidator', team, confidence: 1.0 },
+            });
+          }
+        }
       } catch (err) {
         process.stderr.write(`[Consolidator→KG] CollectiveKnowledge → ${name} failed: ${err.message}\n`);
       }
@@ -2114,7 +2129,6 @@ export class ObservationConsolidator {
     // Pass 1 — has_insight relink (kmStore-native; D-06 carryover).
     // ───────────────────────────────────────────────────────────────────────
 
-    const vkbUrl = process.env.VKB_API_URL || 'http://localhost:8080';
     let insightEntities;
     try {
       insightEntities = await kmStore.findByOntologyClass('Insight');
@@ -2136,14 +2150,14 @@ export class ObservationConsolidator {
       }
       if (Array.isArray(incoming) && incoming.length > 0) continue;
 
-      // Resolve the Project anchor — still flows through VKB PUT per D-06.1.
+      // Resolve the Project anchor in km-core (migrated off the VKB PUT).
       const team = insight?.metadata?.team || insight?.metadata?.project || null;
       if (!team) continue;
-      const projectName = await this._ensureProjectAnchor(vkbUrl, team);
+      const projectName = await this._ensureProjectAnchor(team);
       if (!projectName) continue;
 
-      // Look up the Project entity id in kmStore (the VKB PUT created or
-      // refreshed it; we need its kmStore id for the addRelation source).
+      // Look up the Project entity id in kmStore (_ensureProjectAnchor
+      // created or resolved it; we need its id for the addRelation source).
       let projects;
       try {
         projects = await kmStore.findByOntologyClass('Project');
