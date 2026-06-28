@@ -8,6 +8,7 @@ import autoHealingReducer from './slices/autoHealingSlice'
 import ukbReducer from './slices/ukbSlice'
 import cgrReducer from './slices/cgrSlice'
 import workflowConfigReducer from './slices/workflowConfigSlice'
+import performanceReducer from './slices/performanceSlice'
 
 // Import middleware
 import { healthRefreshMiddleware } from './middleware/healthRefreshMiddleware'
@@ -20,6 +21,7 @@ const rootReducer = combineReducers({
   ukb: ukbReducer,
   cgr: cgrReducer,
   workflowConfig: workflowConfigReducer,
+  performance: performanceReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>
