@@ -221,24 +221,29 @@ describe('useViewerStore — Phase 55 action setters (Task 2)', () => {
     })
   })
 
-  test("toggleLayer('evidence') from empty list adds it", () => {
+  // Empty-array "all visible" sentinel (2026-06-12 fix): [] means every option
+  // is checked, so the FIRST click on an option unchecks just that one — it
+  // does NOT collapse the selection to the single clicked option (which would
+  // visually deselect all the others). ALL_LAYERS = ['evidence', 'pattern'].
+  test("toggleLayer('evidence') from the empty='all visible' sentinel unchecks just that one", () => {
     useViewerStore.getState().toggleLayer('evidence')
-    expect(useViewerStore.getState().selectedLayers).toEqual(['evidence'])
+    expect(useViewerStore.getState().selectedLayers).toEqual(['pattern'])
   })
 
-  test("toggleLayer('evidence') when already present removes it", () => {
-    useViewerStore.getState().toggleLayer('evidence')
-    useViewerStore.getState().toggleLayer('evidence')
-    expect(useViewerStore.getState().selectedLayers).toEqual([])
+  test("toggleLayer down to nothing yields the ['__none__'] none-visible sentinel", () => {
+    useViewerStore.getState().toggleLayer('evidence') // → ['pattern']
+    useViewerStore.getState().toggleLayer('pattern') // last one off → none visible
+    expect(useViewerStore.getState().selectedLayers).toEqual(['__none__'])
   })
 
-  test('toggleDomain adds and removes (VOKB parity)', () => {
-    useViewerStore.getState().toggleDomain('raas')
-    expect(useViewerStore.getState().selectedDomains).toEqual(['raas'])
-    useViewerStore.getState().toggleDomain('kpifw')
-    expect(useViewerStore.getState().selectedDomains).toEqual(['raas', 'kpifw'])
-    useViewerStore.getState().toggleDomain('raas')
-    expect(useViewerStore.getState().selectedDomains).toEqual(['kpifw'])
+  // Same sentinel semantics for domains. ALL_DOMAINS = ['raas','kpifw','general'].
+  test('toggleDomain respects the empty="all visible" sentinel', () => {
+    useViewerStore.getState().toggleDomain('raas') // uncheck raas
+    expect(useViewerStore.getState().selectedDomains).toEqual(['kpifw', 'general'])
+    useViewerStore.getState().toggleDomain('kpifw') // uncheck kpifw
+    expect(useViewerStore.getState().selectedDomains).toEqual(['general'])
+    useViewerStore.getState().toggleDomain('raas') // re-check raas
+    expect(useViewerStore.getState().selectedDomains).toEqual(['general', 'raas'])
   })
 
   test('setSelectedOntologyClasses replaces, toggleOntologyClass adds/removes', () => {

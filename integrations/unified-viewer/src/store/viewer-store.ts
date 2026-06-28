@@ -933,13 +933,24 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
 
   toggleDomain: (domain) =>
     set((s) => {
-      const idx = s.selectedDomains.indexOf(domain)
-      if (idx >= 0) {
-        const next = s.selectedDomains.slice()
-        next.splice(idx, 1)
-        return { selectedDomains: next }
+      // Same empty-array sentinel fix as toggleLayer (2026-06-12): [] means
+      // "all visible", so a naive push collapsed the selection to the single
+      // clicked domain and visually deselected the rest. Materialise the full
+      // domain set first; an emptied removal becomes ['__none__'] ("none
+      // visible"); clicking from ['__none__'] selects only that domain.
+      const ALL_DOMAINS = ['raas', 'kpifw', 'general']
+      if (s.selectedDomains.includes('__none__')) {
+        return { selectedDomains: [domain] }
       }
-      return { selectedDomains: [...s.selectedDomains, domain] }
+      const base =
+        s.selectedDomains.length === 0 ? ALL_DOMAINS.slice() : s.selectedDomains
+      const idx = base.indexOf(domain)
+      if (idx >= 0) {
+        const next = base.slice()
+        next.splice(idx, 1)
+        return { selectedDomains: next.length === 0 ? ['__none__'] : next }
+      }
+      return { selectedDomains: [...base, domain] }
     }),
 
   toggleOntologyClass: (cls) =>

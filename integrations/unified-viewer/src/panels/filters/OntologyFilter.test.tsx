@@ -283,6 +283,54 @@ describe('OntologyFilter', () => {
     })
   })
 
+  describe('Test 6b (2026-06-28 regression): group all/none respects the empty="all visible" sentinel', () => {
+    // Bug: from the default [] ("all visible") state, clicking [all] on the
+    // COMPONENT group collapsed selectedOntologyClasses to just that group's
+    // L2 children — which DESELECTED the L0 anchors (Project, System). [none]
+    // emptied the array back to [] which the sentinel reads as "all visible",
+    // re-checking everything. Group buttons must now materialise the full set
+    // first (like the per-row checkbox already did).
+    const schema = [
+      { name: 'System', level: 0, parent: null },
+      { name: 'Project', level: 0, parent: null },
+      { name: 'Component', level: 1, parent: null },
+      { name: 'LiveLoggingSystem', level: 2, parent: 'Component' },
+      { name: 'ConstraintMonitor', level: 2, parent: 'Component' },
+    ]
+    const makeEntities = () => [
+      makeEntity('a', 'System'),
+      makeEntity('b', 'Project'),
+      makeEntity('c', 'LiveLoggingSystem'),
+      makeEntity('d', 'ConstraintMonitor'),
+    ]
+
+    test('[all] on COMPONENT from [] does NOT deselect the Project/System L0 anchors', async () => {
+      useViewerStore.setState({ selectedOntologyClasses: [] }) // "all visible"
+      render(<OntologyFilter entities={makeEntities()} apiClient={makeApiClient(schema)} />)
+      fireEvent.click(await screen.findByTestId('filter-ontology-all-Component'))
+      const sel = useViewerStore.getState().selectedOntologyClasses
+      // The L0 anchors must remain selected (the reported regression).
+      expect(sel).toContain('System')
+      expect(sel).toContain('Project')
+      expect(sel).toContain('LiveLoggingSystem')
+      expect(sel).toContain('ConstraintMonitor')
+    })
+
+    test('[none] on COMPONENT from [] hides only the components, keeps the L0 anchors (not "all visible")', async () => {
+      useViewerStore.setState({ selectedOntologyClasses: [] }) // "all visible"
+      render(<OntologyFilter entities={makeEntities()} apiClient={makeApiClient(schema)} />)
+      fireEvent.click(await screen.findByTestId('filter-ontology-none-Component'))
+      const sel = useViewerStore.getState().selectedOntologyClasses
+      // Must NOT collapse back to [] ("all visible") — Project/System stay,
+      // the component children are removed.
+      expect(sel).not.toEqual([])
+      expect(sel).toContain('System')
+      expect(sel).toContain('Project')
+      expect(sel).not.toContain('LiveLoggingSystem')
+      expect(sel).not.toContain('ConstraintMonitor')
+    })
+  })
+
   describe('Test 7 (D-19): UI-only collapse', () => {
     test('clicking the L1 disclosure triangle does NOT mutate selectedOntologyClasses', async () => {
       useViewerStore.setState({

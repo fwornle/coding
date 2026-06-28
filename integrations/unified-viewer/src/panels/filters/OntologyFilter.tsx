@@ -195,33 +195,52 @@ export function OntologyFilter({
   const isSelected = (cls: string) =>
     selectedOntologyClasses.length === 0 || selectedOntologyClasses.includes(cls)
 
-  // Union-add (VOKB convention: NOT replace) — OntologyFilter.tsx:93-98
+  // Materialise the effective selection EXACTLY the way the per-row checkbox
+  // does (renderClassCheckbox) so a group all/none button can't collide with
+  // the empty-array "all visible" sentinel:
+  //   - []            ("all visible")  → the full available class list
+  //   - ['__none__']  ("none visible") → the empty set
+  //   - otherwise                      → the explicit selection
+  // Before this fix, group all/none mutated the raw `selectedOntologyClasses`:
+  // clicking "all" on ONE group (e.g. COMPONENT) collapsed [] to just that
+  // group's classes, which DESELECTED every other class (Project, System);
+  // clicking "none" emptied the array back to [] which the sentinel reads as
+  // "all visible", re-checking everything. (Bug report 2026-06-28.)
+  const materialiseBase = useCallback((): string[] => {
+    if (selectedOntologyClasses.includes('__none__')) return []
+    if (selectedOntologyClasses.length === 0) return availableClasses.slice()
+    return selectedOntologyClasses.slice()
+  }, [selectedOntologyClasses, availableClasses])
+
+  // Select a group: union-add onto the materialised base (VOKB convention:
+  // add, never replace) — so other groups keep their state.
   const selectGroup = useCallback(
     (classes: string[]) => {
-      const current = new Set(selectedOntologyClasses)
-      for (const c of classes) current.add(c)
-      setSelectedOntologyClasses(Array.from(current))
+      const next = new Set(materialiseBase())
+      for (const c of classes) next.add(c)
+      setSelectedOntologyClasses(Array.from(next))
       Logger.info(
         Logger.Categories.FILTERS,
         `OntologyFilter selectGroup +${classes.length}`,
       )
     },
-    [selectedOntologyClasses, setSelectedOntologyClasses],
+    [materialiseBase, setSelectedOntologyClasses],
   )
 
-  // Filter-remove (VOKB convention) — OntologyFilter.tsx:100-105
+  // Deselect a group: filter-remove from the materialised base. An emptied
+  // result becomes the ['__none__'] "none visible" sentinel — NOT [] (which
+  // the sentinel reads as "all visible"). Mirrors the per-row toggle.
   const deselectGroup = useCallback(
     (classes: string[]) => {
       const toRemove = new Set(classes)
-      setSelectedOntologyClasses(
-        selectedOntologyClasses.filter((c) => !toRemove.has(c)),
-      )
+      const next = materialiseBase().filter((c) => !toRemove.has(c))
+      setSelectedOntologyClasses(next.length === 0 ? ['__none__'] : next)
       Logger.info(
         Logger.Categories.FILTERS,
         `OntologyFilter deselectGroup -${classes.length}`,
       )
     },
-    [selectedOntologyClasses, setSelectedOntologyClasses],
+    [materialiseBase, setSelectedOntologyClasses],
   )
 
   const renderClassCheckbox = (cls: string) => (

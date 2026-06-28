@@ -60,15 +60,22 @@ describe('DomainFilter', () => {
     expect(screen.queryByTestId('filter-domain-raas')).toBeNull()
   })
 
-  test('clicking RaaS calls store.toggleDomain("raas")', () => {
+  test('clicking RaaS from the all-visible sentinel unchecks just RaaS (wired to toggleDomain)', () => {
     const entities = [
       { id: 'a', name: 'A', ontologyClass: 'X', domain: 'raas' },
     ] as unknown as Entity[]
     render(<DomainFilter entities={entities} />)
     const wrapper = screen.getByTestId('filter-domain-raas')
     const cb = wrapper.querySelector('button[role="checkbox"]') as HTMLElement
+    // selectedDomains starts [] = "all visible" (every box checked). Clicking
+    // RaaS materialises the full domain set then unchecks RaaS — it must NOT
+    // collapse the selection to ['raas'] (the old empty-sentinel bug, which
+    // visually deselected kpifw + general). Verifies wiring AND semantics.
     fireEvent.click(cb)
-    expect(useViewerStore.getState().selectedDomains).toContain('raas')
+    const sel = useViewerStore.getState().selectedDomains
+    expect(sel).not.toContain('raas')
+    expect(sel).toContain('kpifw')
+    expect(sel).toContain('general')
   })
 
   test('empty selectedDomains → isSelected("raas") is true (all-visible semantic)', () => {
