@@ -331,6 +331,49 @@ describe('OntologyFilter', () => {
     })
   })
 
+  describe('Test 6c (2026-06-28 regression): L1 class that ALSO carries entities is self-selectable', () => {
+    // Bug: `Detail` (level 1, parent SubComponent) heads a child group of
+    // level-2 Online* classes, so it rendered as a group header — but the
+    // header had no checkbox of its own. `Detail` was the single largest class
+    // (642 nodes) yet could never be deselected, so the graph barely shrank
+    // when the user unchecked the visible groups. The header must now carry a
+    // self-checkbox + count, and its all/none must include the parent class.
+    const schema = [
+      { name: 'SubComponent', level: 1, parent: null },
+      { name: 'Detail', level: 1, parent: 'SubComponent' },
+      { name: 'OnlineObservation', level: 2, parent: 'Detail' },
+      { name: 'OnlineInsight', level: 2, parent: 'Detail' },
+    ]
+    const makeEntities = () => [
+      makeEntity('a', 'Detail'),
+      makeEntity('b', 'Detail'),
+      makeEntity('c', 'OnlineObservation'),
+      makeEntity('d', 'SubComponent'),
+    ]
+
+    test('the Detail group header renders its own checkbox + count', async () => {
+      useViewerStore.setState({ selectedOntologyClasses: [] })
+      render(<OntologyFilter entities={makeEntities()} apiClient={makeApiClient(schema)} />)
+      const selfBox = await screen.findByTestId('filter-ontology-l1-self-Detail')
+      expect(selfBox).toBeInTheDocument()
+      expect(
+        await screen.findByTestId('filter-ontology-l1-count-Detail'),
+      ).toHaveTextContent('2')
+    })
+
+    test('[none] on the Detail group removes the Detail class itself (its nodes can be hidden)', async () => {
+      useViewerStore.setState({ selectedOntologyClasses: [] }) // "all visible"
+      render(<OntologyFilter entities={makeEntities()} apiClient={makeApiClient(schema)} />)
+      fireEvent.click(await screen.findByTestId('filter-ontology-none-Detail'))
+      const sel = useViewerStore.getState().selectedOntologyClasses
+      // The parent class is now removable — the core fix.
+      expect(sel).not.toContain('Detail')
+      expect(sel).not.toContain('OnlineObservation')
+      // Sibling class outside the group is untouched.
+      expect(sel).toContain('SubComponent')
+    })
+  })
+
   describe('Test 7 (D-19): UI-only collapse', () => {
     test('clicking the L1 disclosure triangle does NOT mutate selectedOntologyClasses', async () => {
       useViewerStore.setState({

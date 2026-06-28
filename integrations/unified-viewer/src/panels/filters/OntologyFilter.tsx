@@ -243,6 +243,35 @@ export function OntologyFilter({
     [materialiseBase, setSelectedOntologyClasses],
   )
 
+  // Per-class toggle — shared by the flat rows AND the L1 group-header
+  // checkbox. 2026-06-12: same empty-set-sentinel bug Teams + Layer had.
+  // selectedOntologyClasses === [] means "all visible". Clicking one used
+  // to push `[cls]` which made every other class look unchecked. Materialise
+  // the full available list first, then toggle the clicked class. Also handle
+  // the symmetric `['__none__']` "none visible" sentinel — clicking from that
+  // state selects ONLY the clicked class.
+  const toggleClass = useCallback(
+    (cls: string) => {
+      if (selectedOntologyClasses.includes('__none__')) {
+        setSelectedOntologyClasses([cls])
+      } else {
+        const base = selectedOntologyClasses.length === 0
+          ? availableClasses.slice()
+          : selectedOntologyClasses
+        const idx = base.indexOf(cls)
+        if (idx >= 0) {
+          const next = base.slice()
+          next.splice(idx, 1)
+          setSelectedOntologyClasses(next.length === 0 ? ['__none__'] : next)
+        } else {
+          setSelectedOntologyClasses([...base, cls])
+        }
+      }
+      Logger.info(Logger.Categories.FILTERS, `OntologyFilter toggle: ${cls}`)
+    },
+    [selectedOntologyClasses, availableClasses, setSelectedOntologyClasses],
+  )
+
   const renderClassCheckbox = (cls: string) => (
     <label
       key={cls}
@@ -251,34 +280,7 @@ export function OntologyFilter({
     >
       <Checkbox
         checked={isSelected(cls)}
-        onCheckedChange={() => {
-          // 2026-06-12: same empty-set-sentinel bug Teams + Layer had.
-          // selectedOntologyClasses === [] means "all visible". Clicking
-          // one used to push `[cls]` which made every other class look
-          // unchecked. Materialise the full available list first, then
-          // toggle the clicked class. Also handle the symmetric
-          // `['__none__']` "none visible" sentinel — clicking from that
-          // state selects ONLY the clicked class.
-          if (selectedOntologyClasses.includes('__none__')) {
-            setSelectedOntologyClasses([cls])
-          } else {
-            const base = selectedOntologyClasses.length === 0
-              ? availableClasses.slice()
-              : selectedOntologyClasses
-            const idx = base.indexOf(cls)
-            if (idx >= 0) {
-              const next = base.slice()
-              next.splice(idx, 1)
-              setSelectedOntologyClasses(next.length === 0 ? ['__none__'] : next)
-            } else {
-              setSelectedOntologyClasses([...base, cls])
-            }
-          }
-          Logger.info(
-            Logger.Categories.FILTERS,
-            `OntologyFilter toggle: ${cls}`,
-          )
-        }}
+        onCheckedChange={() => toggleClass(cls)}
         aria-label={cls}
       />
       <span
@@ -533,32 +535,58 @@ export function OntologyFilter({
 
   const renderL1Group = (l1Name: string, children: string[]) => {
     const isCollapsed = collapsedL1[l1Name] === true
+    // An L1 class can BOTH head a child group AND carry its own entities
+    // (e.g. `Detail`: parent=SubComponent, level-2 children=Online*, but 642
+    // entities of its own). Without a self-checkbox those entities — the
+    // single largest class — could never be filtered out (bug 2026-06-28).
+    // Render the parent's own checkbox + count when it's on screen, and fold
+    // it into the group's all/none set so "none" actually clears its nodes.
+    const selfSelectable = availSet.has(l1Name)
+    const groupClasses = selfSelectable ? [l1Name, ...children] : children
     return (
       <div key={l1Name} className="mt-1">
         <div className="flex items-center justify-between px-1 mb-0.5">
-          <button
-            type="button"
-            onClick={() => toggleL1Collapse(l1Name)}
-            className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1 hover:text-foreground"
-            aria-expanded={!isCollapsed}
-          >
-            <span
-              className={`transform transition-transform text-[8px] ${
-                isCollapsed ? '' : 'rotate-90'
-              }`}
-              aria-hidden
-              data-testid={`filter-ontology-l1-triangle-${l1Name}`}
+          <div className="flex items-center gap-1.5 min-w-0">
+            {selfSelectable && (
+              <Checkbox
+                checked={isSelected(l1Name)}
+                onCheckedChange={() => toggleClass(l1Name)}
+                aria-label={l1Name}
+                data-testid={`filter-ontology-l1-self-${l1Name}`}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => toggleL1Collapse(l1Name)}
+              className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1 hover:text-foreground min-w-0"
+              aria-expanded={!isCollapsed}
             >
-              ▶
-            </span>
-            {l1Name}
-          </button>
+              <span
+                className={`transform transition-transform text-[8px] ${
+                  isCollapsed ? '' : 'rotate-90'
+                }`}
+                aria-hidden
+                data-testid={`filter-ontology-l1-triangle-${l1Name}`}
+              >
+                ▶
+              </span>
+              <span className="truncate">{l1Name}</span>
+              {selfSelectable && (
+                <span
+                  className="text-[10px] text-muted-foreground bg-muted px-1 rounded tabular-nums"
+                  data-testid={`filter-ontology-l1-count-${l1Name}`}
+                >
+                  {counts[l1Name] || 0}
+                </span>
+              )}
+            </button>
+          </div>
           <div className="flex gap-1">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                selectGroup(children)
+                selectGroup(groupClasses)
               }}
               className="text-[9px] text-muted-foreground hover:text-foreground"
               data-testid={`filter-ontology-all-${l1Name}`}
@@ -571,7 +599,7 @@ export function OntologyFilter({
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                deselectGroup(children)
+                deselectGroup(groupClasses)
               }}
               className="text-[9px] text-muted-foreground hover:text-foreground"
               data-testid={`filter-ontology-none-${l1Name}`}
