@@ -232,6 +232,39 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
+   * Heartbeat-staleness probe for the singleton lock holder (root-cause fix
+   * for the 25→28 June observation outage). The PSM singleton check only knows
+   * "is the PID alive" — but a WEDGED ETM stays alive and held the lock for
+   * days while writing nothing (orphan PID 28215), because every restart saw
+   * "already running" and exited. This reuses the INDEPENDENT liveness signal
+   * the ETM already emits: it posts an `lsl_heartbeat` to the coordinator on
+   * every poll, so a holder whose poll loop has stalled goes stale here even
+   * though its PID is alive.
+   *
+   * Returns the staleness in ms (now − holder.lastBeat) for the coordinator
+   * `lsl` entry belonging to `pid` (key shape `etm-<pid>-<start>:project`), or
+   * null when staleness cannot be proven (coordinator unreachable, or no
+   * heartbeat entry for that pid). Null → caller MUST defer to the holder
+   * (never kill a process we can't prove is wedged). The probe itself is
+   * bounded by a 2s AbortSignal so the singleton check can never hang on it.
+   */
+  async _holderHeartbeatStalenessMs(pid) {
+    const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
+    try {
+      const r = await fetch(`${url}/health/state`, { signal: AbortSignal.timeout(2000) });
+      if (!r.ok) return null;
+      const state = await r.json();
+      const lsl = state?.lsl || {};
+      // Match the holder's lsl entry by pid embedded in the key (etm-<pid>-...).
+      const entry = Object.entries(lsl).find(([key]) => key.includes(`-${pid}-`))?.[1];
+      if (!entry || typeof entry.lastBeat !== 'number' || entry.lastBeat <= 0) return null;
+      return Date.now() - entry.lastBeat;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get state file path for persisting lastProcessedUuid
    */
   getStateFilePath() {
@@ -3908,13 +3941,31 @@ ORDER BY m.time_created ASC;`;
       console.log(`🧹 Cleaned up ${cleanupStats.total} dead process(es) from registry`);
     }
 
-    // Check if another instance is already running for this project
+    // Check if another instance is already running for this project.
     const existingService = await this.processStateManager.getService(serviceName, 'per-project', { projectPath });
     if (existingService && this.processStateManager.isProcessAlive(existingService.pid)) {
-      console.error(`❌ Another instance of ${serviceName} is already running for project ${path.basename(projectPath)}`);
-      console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}`);
-      console.error(`   To fix: Kill the existing instance with: kill ${existingService.pid}`);
-      process.exit(1);
+      // ROOT-CAUSE FIX (25→28 June outage): "PID alive" is NOT "healthy". A
+      // wedged ETM stays alive and, under the old PID-only check, held this
+      // lock for days while writing zero observations — every restart saw it
+      // and exited. Probe the holder's coordinator heartbeat: if its poll loop
+      // has stalled (heartbeat stale beyond the threshold) it is wedged, so
+      // reclaim the lock rather than deferring to a dead-but-breathing holder.
+      const RECLAIM_STALE_MS = 3 * 60 * 1000;   // > the ETM poll/heartbeat cadence with comfortable margin
+      const holderStaleMs = await this._holderHeartbeatStalenessMs(existingService.pid);
+      if (holderStaleMs != null && holderStaleMs > RECLAIM_STALE_MS) {
+        console.error(`⚠️  Existing ${serviceName} (PID ${existingService.pid}) is alive but its heartbeat is stale (${Math.round(holderStaleMs / 1000)}s > ${RECLAIM_STALE_MS / 1000}s) — WEDGED. Reclaiming the singleton lock.`);
+        try { process.kill(existingService.pid, 'SIGKILL'); } catch (e) { this.debug?.(`reclaim SIGKILL of ${existingService.pid} failed: ${e.message}`); }
+        // Fall through to (re)register this instance as the live singleton.
+      } else {
+        // Holder is heartbeating fresh (real duplicate) OR we could not prove
+        // staleness (coordinator unreachable / no heartbeat entry) — in the
+        // unprovable case defer conservatively rather than risk killing a
+        // healthy instance.
+        console.error(`❌ Another instance of ${serviceName} is already running for project ${path.basename(projectPath)}`);
+        console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}${holderStaleMs == null ? ' (heartbeat staleness unprovable — deferring)' : ` (heartbeat fresh: ${Math.round(holderStaleMs / 1000)}s)`}`);
+        console.error(`   To fix: Kill the existing instance with: kill ${existingService.pid}`);
+        process.exit(1);
+      }
     }
 
     // Register this service instance
