@@ -55,6 +55,16 @@ import { enableAutoRestart } from './auto-restart-watcher.js';
 import { execSync as _execSync } from 'child_process';
 import { ObservationWriter } from '../src/live-logging/ObservationWriter.js';
 import { ObservationApiClient } from '../src/live-logging/ObservationApiClient.js';
+// Phase 75 (OBS-02): the pure mid-prompt-set re-capture fire-boundary helpers.
+// computeRecaptureFires drives the per-decision / per-tool-batch fire logic on
+// raw transcript messages; we reuse its thresholds for the exchange-based path.
+import {
+  DEFAULT_TOOL_BATCH_THRESHOLD,
+  DEFAULT_TIME_THRESHOLD_MS,
+} from '../lib/live-logging/etm-recapture.mjs';
+// Phase 75 (OBS-01): resolve the active task_id at fire time via the SAME
+// single-span reader the token path uses (D-09) — no proxy coupling.
+import { resolveLiveTaskIdSafe } from '../lib/lsl/token/task-id.mjs';
 
 // Knowledge management dependencies
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
@@ -761,24 +771,140 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
-   * Fire observation for a COMPLETE prompt set (all exchanges).
-   * Builds a consolidated message list so the LLM sees the full picture:
-   * user intent + all tool calls + all assistant responses + final outcome.
+   * Detect whether an exchange contains an AskUserQuestion tool call — the
+   * natural operator-steering decision boundary (OBS-02 / D-07). Exchanges
+   * carry tool calls on `toolCalls[].name`.
+   * @param {object} exchange
+   * @returns {boolean}
+   */
+  _isAskUserQuestionExchange(exchange) {
+    return Array.isArray(exchange?.toolCalls)
+      && exchange.toolCalls.some((tc) => tc?.name === 'AskUserQuestion');
+  }
+
+  /**
+   * Split a prompt set's exchanges into re-capture BATCHES (OBS-02 / D-07).
+   *
+   * THE BUG (finding D): the whole set fired once, stamped at T0. THE FIX:
+   * cut a new batch at
+   *   (a) each AskUserQuestion decision boundary (the steering point), and
+   *   (b) significant tool-activity batches between decisions — ≥ 8 tool_use
+   *       blocks OR ≥ 10 min (600000 ms) elapsed since the batch start within a
+   *       question-less stretch (thresholds shared with etm-recapture.mjs).
+   * Each batch then fires its own observation stamped at the batch's REAL
+   * last-message timestamp (D-08), so a session whose only typed prompt is at
+   * T0 but whose decisions are at T0+n yields observations dated ~T0+n.
+   *
+   * @param {object[]} exchanges accumulated prompt-set exchanges (chronological)
+   * @returns {object[][]} array of exchange batches
+   */
+  _splitIntoRecaptureBatches(exchanges) {
+    const toolBatchThreshold = DEFAULT_TOOL_BATCH_THRESHOLD;   // >= 8 tool_use
+    const timeThresholdMs = DEFAULT_TIME_THRESHOLD_MS;         // >= 10*60*1000 = 600000ms
+    const batches = [];
+    let batch = [];
+    let batchToolUse = 0;
+    let batchFirstMs = NaN;
+
+    const flush = () => {
+      if (batch.length > 0) batches.push(batch);
+      batch = [];
+      batchToolUse = 0;
+      batchFirstMs = NaN;
+    };
+
+    for (const ex of exchanges) {
+      batch.push(ex);
+      const exMs = Date.parse(ex?.timestamp ?? '');
+      if (Number.isNaN(batchFirstMs)) batchFirstMs = exMs;
+      batchToolUse += Array.isArray(ex?.toolCalls) ? ex.toolCalls.length : 0;
+
+      // (a) decision boundary — flush INCLUDING the AskUserQuestion exchange
+      // so the fire is stamped at the decision time.
+      if (this._isAskUserQuestionExchange(ex)) {
+        flush();
+        continue;
+      }
+      // (b) significant tool-activity batch in a question-less stretch.
+      const elapsed = (Number.isFinite(batchFirstMs) && Number.isFinite(exMs))
+        ? exMs - batchFirstMs
+        : 0;
+      if (batchToolUse >= toolBatchThreshold || elapsed >= timeThresholdMs) {
+        flush();
+      }
+    }
+    if (batch.length > 0) batches.push(batch);
+    return batches;
+  }
+
+  /**
+   * Fire observations for a prompt set (OBS-02 / OBS-01).
+   *
+   * Refactored from a single whole-set fire (stamped at T0) into per-batch
+   * fires: the set is split at AskUserQuestion decisions + significant
+   * tool-activity batches, each batch fired at its REAL event time (D-08) and
+   * stamped with the active task_id (D-09). A per-transcript
+   * `lastFiredExchangeUuid` cursor (the batch's LAST message uuid) ensures the
+   * next batch starts AFTER the cursor so earlier exchanges are never
+   * re-emitted (Pitfall 4). The OBS dedup key is
+   * `(task_id, batch-last-message-uuid)`.
    */
   _firePromptSetObservation(exchanges) {
     if (!this.observationWriter) return;
     if (!exchanges || exchanges.length === 0) return;
 
-    // Deduplicate: prevent rapid-fire observations for the same exchange
-    // Use exchange count + latest message UUID as dedup key (stable per logical turn)
+    // Per-transcript re-capture cursor (Pitfall 4): skip exchanges already
+    // fired so re-processing the set never re-emits a prior batch.
+    if (!this._lastFiredExchangeUuid) this._lastFiredExchangeUuid = new Map();
+    const cursorKey = this.sessionId || this.agentType || 'default';
+    const cursor = this._lastFiredExchangeUuid.get(cursorKey);
+    let pending = exchanges;
+    if (cursor) {
+      const idx = exchanges.findIndex(
+        (ex) => (ex?.lastMessageUuid || ex?.uuid || ex?.id) === cursor,
+      );
+      if (idx >= 0) pending = exchanges.slice(idx + 1);
+    }
+    if (pending.length === 0) return;
+
+    // Resolve the active task_id ONCE per fire via the shared single-span
+    // reader (D-09). Best-effort: '' when no measurement span is open.
+    const taskIdPromise = resolveLiveTaskIdSafe().catch(() => '');
+
+    const batches = this._splitIntoRecaptureBatches(pending);
+    for (const batch of batches) {
+      const lastEx = batch[batch.length - 1];
+      const batchLastMessageUuid = lastEx?.lastMessageUuid || lastEx?.uuid || lastEx?.id || '';
+      // Advance the cursor so the next call starts after this batch.
+      this._lastFiredExchangeUuid.set(cursorKey, batchLastMessageUuid);
+      taskIdPromise.then((taskId) => {
+        this._fireBatchObservation(batch, taskId, batchLastMessageUuid);
+      });
+    }
+  }
+
+  /**
+   * Fire a SINGLE re-capture batch as one observation (OBS-02 / OBS-01).
+   * Builds a consolidated message list for just this batch so the LLM sees the
+   * batch's local context, and ObservationWriter's earliest-`createdAt`
+   * resolves to the batch's REAL last-message timestamp (D-08).
+   *
+   * @param {object[]} exchanges the batch's exchanges
+   * @param {string} taskId active task_id (D-09)
+   * @param {string} batchLastMessageUuid the batch's last message uuid (dedup)
+   */
+  _fireBatchObservation(exchanges, taskId, batchLastMessageUuid) {
+    if (!this.observationWriter) return;
+    if (!exchanges || exchanges.length === 0) return;
+
+    // Deduplicate by (task_id, batch-last-message-uuid) — the per-batch unit
+    // (Pitfall 4) replaces the old `count|lastExchangeId` key.
     if (!this._firedPromptKeys) this._firedPromptKeys = new Map();
-    const lastExchange = exchanges[exchanges.length - 1];
-    const exchangeId = lastExchange?.id || lastExchange?.uuid || '';
-    const userKey = `${exchanges.length}|${exchangeId}`;
+    const userKey = `${taskId || ''}|${batchLastMessageUuid}`;
     const now = Date.now();
     const lastFired = this._firedPromptKeys.get(userKey);
     if (lastFired && (now - lastFired) < 15000) {
-      this.debug?.(`[ObservationTap] Dedup: skipping duplicate fire for same exchange (${Math.round((now - lastFired)/1000)}s ago)`);
+      this.debug?.(`[ObservationTap] Dedup: skipping duplicate fire for same batch (${Math.round((now - lastFired)/1000)}s ago)`);
       return;
     }
     this._firedPromptKeys.set(userKey, now);
