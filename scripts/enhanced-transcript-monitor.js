@@ -1056,40 +1056,11 @@ class EnhancedTranscriptMonitor {
       return;
     }
 
-    // Direct DB path (legacy fallback when OBS_API_URL is unset).
-    if (!this.observationWriter.db) return;
-    try {
-      const db = this.observationWriter.db;
-      const rows = db.prepare(
-        `SELECT id, summary, metadata FROM observations
-         WHERE agent = ? AND summary LIKE '%Artifacts: none%'
-          AND created_at > datetime('now', '-4 hours')
-         ORDER BY created_at DESC LIMIT 10`
-      ).all(this.agentType);
-
-      if (rows.length === 0) return;
-
-      const artifactsList = modifiedFiles.map(f => `edited ${f.split('/').pop()}`).join(', ');
-
-      for (const row of rows) {
-        const updatedSummary = row.summary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
-        if (updatedSummary === row.summary) continue;
-
-        let meta = {};
-        try { meta = JSON.parse(row.metadata || '{}'); } catch { /* ignore */ }
-        if (meta.modifiedFiles && meta.modifiedFiles.length > 0) continue;
-        meta.modifiedFiles = modifiedFiles;
-        if (readFiles && readFiles.length > 0) {
-          meta.readFiles = [...new Set([...(meta.readFiles || []), ...readFiles])];
-        }
-
-        db.prepare('UPDATE observations SET summary = ?, metadata = ? WHERE id = ?')
-          .run(updatedSummary, JSON.stringify(meta), row.id);
-        process.stderr.write(`[ObservationTap] Patched observation ${row.id.slice(0,8)} with ${modifiedFiles.length} artifacts\n`);
-      }
-     } catch (err) {
-       process.stderr.write(`[ObservationTap] Failed to patch observations: ${err.message}\n`);
-     }
+    // WR-04: No direct-DB fallback exists. ObservationWriter is HTTP-only since
+    // Plan 44-13 (the SQLite handle was removed), so a writer that is not an
+    // ObservationApiClient is a misconfiguration, not a fallback — skip rather than
+    // resurrect a dead raw-SQL UPDATE path.
+    process.stderr.write('[ObservationTap] patchRecentArtifacts skipped: writer is not an ObservationApiClient (direct-DB path removed in Plan 44-13)\n');
    }
 
    /**
@@ -1113,37 +1084,10 @@ class EnhancedTranscriptMonitor {
        return;
      }
 
-     // Direct DB path (legacy fallback).
-     if (!this.observationWriter.db) return;
-     try {
-       const db = this.observationWriter.db;
-       const rows = db.prepare(
-         `SELECT id, summary, metadata FROM observations
-          WHERE summary LIKE '%Artifacts: none%'
-          AND metadata IS NOT NULL AND metadata != '{}'
-          ORDER BY created_at DESC LIMIT 500`
-       ).all();
-
-       let patched = 0;
-       for (const row of rows) {
-         let meta = {};
-         try { meta = JSON.parse(row.metadata || '{}'); } catch { continue; }
-         if (!meta.modifiedFiles || meta.modifiedFiles.length === 0) continue;
-
-         const artifactsList = meta.modifiedFiles.map(f => `edited ${f.split('/').pop()}`).join(', ');
-         const updatedSummary = row.summary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
-         if (updatedSummary === row.summary) continue;
-
-         db.prepare('UPDATE observations SET summary = ? WHERE id = ?')
-           .run(updatedSummary, row.id);
-         patched++;
-       }
-       if (patched > 0) {
-         process.stderr.write(`[ObservationTap] Startup: patched ${patched} historical observations with artifacts from metadata\n`);
-       }
-     } catch (err) {
-       process.stderr.write(`[ObservationTap] Historical artifact patch failed: ${err.message}\n`);
-     }
+     // WR-04: No direct-DB fallback exists (see _patchRecentObservationsWithArtifacts).
+     // ObservationWriter is HTTP-only since Plan 44-13; a non-ApiClient writer is a
+     // misconfiguration, not a fallback — skip rather than run dead raw SQL.
+     process.stderr.write('[ObservationTap] patchHistoricalArtifacts skipped: writer is not an ObservationApiClient (direct-DB path removed in Plan 44-13)\n');
    }
 
    async initializeReliableCodingClassifier() {
