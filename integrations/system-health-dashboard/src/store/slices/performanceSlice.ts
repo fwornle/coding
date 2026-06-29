@@ -72,6 +72,12 @@ export interface TimelineRow {
   granularity_tier: GranularityTier | string
   timestamp?: string | null
   model?: string | null
+  // What produced this row (e.g. consolidator-insight, observation-writer, or the
+  // foreground chat agent). Rendered in the timeline so each row is identifiable
+  // rather than an anonymous "Turn N · untagged" (finding-1 display gap).
+  process?: string | null
+  agent?: string | null
+  provider?: string | null
   reasoning_tokens?: number | null
   input_tokens?: number | null
   output_tokens?: number | null

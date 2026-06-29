@@ -26,6 +26,15 @@ function tokens(v: number | null | undefined): ReactNode {
   return v == null ? <span className="text-muted-foreground">—</span> : v.toLocaleString()
 }
 
+// HH:MM:SS in the viewer's local timezone — so a row reads "08:03:47" rather than
+// being undated. Invalid/absent timestamps render nothing (caller guards).
+function fmtTime(ts: string | null | undefined): string | null {
+  if (!ts) return null
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+}
+
 function isEstimated(row: TimelineRow): boolean {
   return row.estimated === true || row.tokens_estimated === 1
 }
@@ -65,11 +74,28 @@ function SubBand({ row }: { row: TimelineRow }) {
   )
 }
 
-function TurnLabel({ index, model }: { index: number; model?: string | null }) {
+function TurnLabel({ index, row }: { index: number; row: TimelineRow }) {
   // Identifies each turn so a row is never just an empty badge + a far-right number.
+  // Renders, when available: the event time (HH:MM:SS), WHAT produced the row
+  // (process — e.g. consolidator-insight / observation-writer / the foreground chat),
+  // and the model. This is the finding-1 fix: previously only "Turn N" + model showed,
+  // so background-service traffic was indistinguishable from chat turns and undated.
+  const time = fmtTime(row.timestamp)
+  const proc = typeof row.process === 'string' && row.process.trim() !== '' ? row.process : null
+  const model = typeof row.model === 'string' && row.model.trim() !== '' ? row.model : null
   return (
     <>
       <span className="text-sm font-medium">Turn {index + 1}</span>
+      {time && (
+        <span className="font-mono text-sm text-muted-foreground" title={row.timestamp ?? undefined}>
+          {time}
+        </span>
+      )}
+      {proc && (
+        <Badge variant="outline" className="text-sm" data-testid="timeline-process">
+          {proc}
+        </Badge>
+      )}
       {model && <span className="text-sm text-muted-foreground">{model}</span>}
     </>
   )
@@ -88,7 +114,7 @@ function ParentRow({ row, index }: { row: TimelineRow; index: number }) {
         <div className="flex items-center gap-2">
           {/* spacer to align with expandable rows' chevron column */}
           <span className="inline-block w-4" />
-          <TurnLabel index={index} model={row.model} />
+          <TurnLabel index={index} row={row} />
           <TierBadge tier={String(row.granularity_tier)} />
           {isEstimated(row) && (
             <span className="text-sm text-muted-foreground">estimated</span>
@@ -106,7 +132,7 @@ function ParentRow({ row, index }: { row: TimelineRow; index: number }) {
       <div className="flex items-center justify-between gap-3 px-3 py-2">
         <CollapsibleTrigger className="flex flex-1 items-center gap-2 text-left" data-testid="timeline-turn">
           <ChevronRight className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`} />
-          <TurnLabel index={index} model={row.model} />
+          <TurnLabel index={index} row={row} />
           {/* tier badge sits OUTSIDE CollapsibleContent — always visible */}
           <TierBadge tier={String(row.granularity_tier)} />
           {isEstimated(row) && (

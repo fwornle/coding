@@ -53,6 +53,26 @@ test('DASH-02: per-reasoning-step children nest under the per-turn parent', asyn
   }
 });
 
+test('DASH-02: reader exposes process + timestamp per row (finding-1 display fix)', async () => {
+  // The timeline UI renders each row's `process` (what produced it) and `timestamp`
+  // so a row reads "08:03 · consolidator-insight" instead of "Turn N · untagged".
+  // Both must survive the read (they are SELECTed and spread through shape()).
+  const { dbPath, cleanup } = seedTokenDb([
+    { task_id: 'tp', tool_call_id: '', parent_call_id: '', granularity_tier: '',
+      total_tokens: 100, model: 'claude-sonnet-4.6', process: 'consolidator-insight',
+      provider: 'copilot', timestamp: '2026-06-29T05:33:47.751Z' },
+  ]);
+  try {
+    const { readTimeline } = await import('../../lib/experiments/timeline-read.mjs');
+    const [row] = await readTimeline('tp', dbPath);
+    assert.equal(row.process, 'consolidator-insight', 'process is exposed for the row label');
+    assert.equal(row.timestamp, '2026-06-29T05:33:47.751Z', 'timestamp is exposed for the row label');
+    assert.equal(row.provider, 'copilot', 'provider is exposed');
+  } finally {
+    cleanup();
+  }
+});
+
 test('DASH-02: multiple empty-tool_call_id rows each become a distinct parent (no collapse)', async () => {
   // Regression: untagged token rows all share the empty tool_call_id key. The old
   // grouping deduped parents by that shared '' key, dropping all but the first — the
