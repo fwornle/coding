@@ -179,3 +179,20 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
+| 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 0/? | Not started | - |
+
+### Phase 75: Measurement Attribution Accuracy & Observation Linkage
+**Goal**: The measurement system is trustworthy for an interactive foreground agentic session — it captures the foreground chat agent's own tokens, attributes token rows by task/process lineage instead of time-window overlap, shows a canonical + per-process model breakdown, and captures observations continuously (with true event-time stamps) across a long agentic prompt-set.
+**Depends on**: Phase 68 (token_usage schema + active-measurement span), Phase 69 (Claude/Copilot token adapters — `lib/lsl/token`), Phase 74 (dashboard timeline + runs table this corrects). Corrects TELEM-03.
+**Priority note**: Argued **higher priority than Phase 67** (Reproducibility & Replay Rig): without correct attribution the recorded scores/tokens are not trustworthy for an interactive session, so replay would faithfully reproduce wrong numbers. Sequence 75 before 67.
+**Requirements**: ATTR-01, ATTR-02, ATTR-03, OBS-01, OBS-02
+**Source/evidence**: `.planning/v7.4-attribution-findings.md` (findings A–D, from the `exp-dash-start-control` dogfood measurement, 2026-06-29). Finding A (timeline drops untagged rows) and finding-1 (timeline shows event time + process per row) are already FIXED on main.
+**Success Criteria** (what must be TRUE):
+  1. A token row is attributed to a measurement only when it belongs to the measured task's process/agent lineage — concurrent background daemons (`consolidator-*`, `health-coordinator`, `observation-writer`) are excluded from or segregated within a foreground measurement (ATTR-01).
+  2. The foreground Claude Code session's own tokens land in `token_usage` stamped with the active `task_id`, so a measured Opus session records Opus — not haiku/sonnet proxy traffic (ATTR-03).
+  3. Each Run shows one canonical model AND a per-process model breakdown rendered as two columns (chat model | background-service models) consistently across runs table, score drawer, and timeline (ATTR-02).
+  4. Observations produced during a measurement are tagged with its `task_id` and are queryable per Run (OBS-01).
+  5. A multi-hour agentic prompt-set whose only typed prompt is at T0 yields observations dated at their real event times (operator decisions at T0+n appear at ~T0+n), not all collapsed to T0 (OBS-02).
+**Plans**: 0 plans (not planned yet)
+  - [ ] TBD (run /gsd-plan-phase 75 to break down)
+**UI hint**: yes
