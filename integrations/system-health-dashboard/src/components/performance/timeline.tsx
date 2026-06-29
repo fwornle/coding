@@ -8,6 +8,7 @@ import { useAppSelector, useAppDispatch } from '@/store'
 import {
   fetchTimeline,
   selectSelectedTaskId,
+  selectSelectedRun,
   selectTimelineFor,
   selectTimelineLoading,
   type TimelineRow,
@@ -155,6 +156,7 @@ function ParentRow({ row, index }: { row: TimelineRow; index: number }) {
 export function PerformanceTimeline() {
   const dispatch = useAppDispatch()
   const taskId = useAppSelector(selectSelectedTaskId)
+  const run = useAppSelector(selectSelectedRun)
   const rows = useAppSelector(selectTimelineFor(taskId))
   const loading = useAppSelector(selectTimelineLoading)
 
@@ -182,6 +184,25 @@ export function PerformanceTimeline() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Timeline</CardTitle>
+        {/* ATTR-02 Run-level summary: the canonical (foreground chat) model and the
+            concurrent background-service models — READ from the persisted
+            Run.metadata fields (no per-surface recompute, D-06), consistent with the
+            runs-table row and the score drawer. Per-turn fg/bg distinction is kept
+            below via row.process/row.model (finding-1). D-05 sentinels apply. */}
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <span data-testid="timeline-canonical-model">
+            Chat model:{' '}
+            {run?.canonical_model
+              ? <span className="font-mono">{run.canonical_model}</span>
+              : <span className="italic">unmeasured</span>}
+          </span>
+          <span data-testid="timeline-background-models">
+            Background:{' '}
+            {run?.background_models?.length
+              ? <span className="font-mono">{run.background_models.map((b) => b.model).join(', ')}</span>
+              : <span>—</span>}
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         {loading && rows.length === 0 ? (

@@ -104,14 +104,18 @@ export function RunsTable() {
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border" data-testid="runs-table">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Task</TableHead>
             <TableHead>Class</TableHead>
             <TableHead>Agent</TableHead>
-            <TableHead>Model</TableHead>
+            {/* ATTR-02 two-column model display: the canonical (foreground chat)
+                model and the concurrent background-service models. Both READ the
+                persisted Run.metadata fields — no per-surface recompute (D-06). */}
+            <TableHead data-testid="runs-col-canonical-model">Chat model</TableHead>
+            <TableHead data-testid="runs-col-background-models">Background models</TableHead>
             {SCORE_DIMENSIONS.map((dim) => {
               const m = DIM_META[dim]
               return (
@@ -156,8 +160,20 @@ export function RunsTable() {
                 <TableCell className="text-sm">
                   {run.agent ?? <span className="text-muted-foreground">—</span>}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {run.model ?? <span className="text-muted-foreground">—</span>}
+                {/* Canonical (foreground chat) model — read-only from the persisted
+                    field. D-05: empty canonical renders the "unmeasured" sentinel,
+                    NEVER a dominant-by-count fallback. */}
+                <TableCell className="text-sm text-muted-foreground" data-testid="run-canonical-model">
+                  {run.canonical_model
+                    ? <span className="font-mono">{run.canonical_model}</span>
+                    : <span className="text-muted-foreground italic">unmeasured</span>}
+                </TableCell>
+                {/* Background-service models — the segregated concurrent daemons.
+                    Empty → em-dash (reusing the null-not-zero convention). */}
+                <TableCell className="text-sm text-muted-foreground" data-testid="run-background-models">
+                  {run.background_models?.length
+                    ? <span className="font-mono">{run.background_models.map((b) => b.model).join(', ')}</span>
+                    : <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 {SCORE_DIMENSIONS.map((dim) => (
                   <TableCell key={dim} className="text-right">

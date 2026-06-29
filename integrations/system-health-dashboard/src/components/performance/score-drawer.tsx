@@ -127,6 +127,16 @@ export function ScoreDrawer() {
           <SheetDescription>
             {run?.task_id ?? taskId}
           </SheetDescription>
+          {/* ATTR-02: surface the canonical (foreground chat) model in the drawer
+              header — READ from the persisted Run.metadata field, consistent with
+              the runs-table row. D-05: empty canonical shows the "unmeasured"
+              sentinel, never a dominant fallback. */}
+          <p className="text-sm text-muted-foreground" data-testid="drawer-canonical-model">
+            Chat model:{' '}
+            {run?.canonical_model
+              ? <span className="font-mono">{run.canonical_model}</span>
+              : <span className="italic">unmeasured</span>}
+          </p>
         </SheetHeader>
 
         {(typeof run?.score?.rubric_rationale === 'string' && run.score.rubric_rationale.trim()) ||

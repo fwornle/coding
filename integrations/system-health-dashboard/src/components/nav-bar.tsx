@@ -33,7 +33,7 @@ export function NavBar() {
     { label: 'Insights', path: '/insights', count: insightCount },
     { label: 'Coverage', path: '/coverage' },
     { label: 'Token Usage', path: '/token-usage' },
-    { label: 'Performance', path: '/performance' },
+    { label: 'Performance', path: '/performance', testId: 'performance-tab' },
   ]
 
   return (
@@ -46,6 +46,7 @@ export function NavBar() {
             <Link
               key={tab.path}
               to={tab.path}
+              data-testid={tab.testId}
               className={`relative h-full flex items-center gap-2 text-sm font-medium transition-colors ${
                 isActive
                   ? 'text-foreground border-b-2 border-primary'

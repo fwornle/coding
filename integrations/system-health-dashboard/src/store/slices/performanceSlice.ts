@@ -44,6 +44,18 @@ export interface Run {
   task_class?: string | null
   agent?: string | null
   model?: string | null
+  // ATTR-02 (D-05/D-06): canonical = the foreground chat agent/model computed
+  // ONCE at measurement-stop and persisted on Run.metadata (run-write.mjs). All
+  // three Performance surfaces READ these — never recompute per surface (the
+  // per-surface recompute is exactly how finding B's dominant-vs-first-row
+  // divergence arose). Empty canonical persists as null → the "unmeasured"
+  // sentinel (legacy Run with no foreground capture), NEVER a dominant fallback.
+  canonical_model?: string | null
+  canonical_agent?: string | null
+  // The concurrent background-service models (consolidator/health-coordinator/
+  // observation-writer …) segregated from the foreground chat. Empty → []
+  // (renders the em-dash sentinel), never coerced.
+  background_models?: { model: string; process: string; total_tokens: number }[]
   framework?: string | null
   pending?: boolean | null
   started_at?: string | null
