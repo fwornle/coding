@@ -179,7 +179,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
-| 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 0/? | Not started | - |
+| 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 0/6 | Planned | - |
 
 ### Phase 75: Measurement Attribution Accuracy & Observation Linkage
 **Goal**: The measurement system is trustworthy for an interactive foreground agentic session — it captures the foreground chat agent's own tokens, attributes token rows by task/process lineage instead of time-window overlap, shows a canonical + per-process model breakdown, and captures observations continuously (with true event-time stamps) across a long agentic prompt-set.
@@ -193,6 +193,11 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   3. Each Run shows one canonical model AND a per-process model breakdown rendered as two columns (chat model | background-service models) consistently across runs table, score drawer, and timeline (ATTR-02).
   4. Observations produced during a measurement are tagged with its `task_id` and are queryable per Run (OBS-01).
   5. A multi-hour agentic prompt-set whose only typed prompt is at T0 yields observations dated at their real event times (operator decisions at T0+n appear at ~T0+n), not all collapsed to T0 (OBS-02).
-**Plans**: 0 plans (not planned yet)
-  - [ ] TBD (run /gsd-plan-phase 75 to break down)
+**Plans**: 6 plans
+  - [ ] 75-01-PLAN.md — Wave 0: RED test scaffolds + fixtures (canonical-attribution, stop-adapter-registry, ETM-recapture e0af5b8b, e2e two-column) [Wave 1]
+  - [ ] 75-02-PLAN.md — ATTR-01/02: aggregation-time fg/bg lineage classifier + canonical_model/background_models persisted on Run.metadata [Wave 2]
+  - [ ] 75-03-PLAN.md — ATTR-03: per-agent foreground capture registry (claude=transcript cladpt, others stamp-only — no double-count) [Wave 2]
+  - [ ] 75-04-PLAN.md — ATTR-01/02/03: measurement-stop wiring (capture-then-derive canonical, drop dominant selector) + A1 bypass-guard [Wave 3]
+  - [ ] 75-05-PLAN.md — OBS-01/02: ETM mid-set re-capture (decision + tool-batch fires) + true event-time + task_id linkage [Wave 2]
+  - [ ] 75-06-PLAN.md — ATTR-02 display: two-column model render across runs table/score-drawer/timeline + bind-mount rebuild [Wave 3]
 **UI hint**: yes
