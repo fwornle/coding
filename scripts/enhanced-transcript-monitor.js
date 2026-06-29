@@ -584,10 +584,8 @@ class EnhancedTranscriptMonitor {
 
         try {
           const exchanges = await this.getUnprocessedExchanges();
-          console.log(`[ObsDebug] ${exchanges.length} exchanges, promptSet=${this.currentUserPromptSet.length}, lastUuid=${this.lastProcessedUuid?.slice(-8) || 'none'}`);
           if (exchanges.length > 0) {
             await this.processExchanges(exchanges);
-            console.log(`[ObsDebug] After processExchanges: promptSet=${this.currentUserPromptSet.length}`);
           }
 
           // Time-based flush: fire observation for accumulated exchanges even when
@@ -597,7 +595,7 @@ class EnhancedTranscriptMonitor {
             const ageMs = Date.now() - (oldestExchange.timestamp ? new Date(oldestExchange.timestamp).getTime() : Date.now());
             const FLUSH_THRESHOLD_MS = 3 * 60 * 1000;
             if (ageMs > FLUSH_THRESHOLD_MS) {
-              console.log(`⏰ Time-based flush (no new exchanges): ${this.currentUserPromptSet.length} exchanges held for ${Math.round(ageMs / 1000)}s`);
+              this.debug(`⏰ Time-based flush (no new exchanges): ${this.currentUserPromptSet.length} exchanges held for ${Math.round(ageMs / 1000)}s`);
               this._firePromptSetObservation(this.currentUserPromptSet);
               // Update lastProcessedUuid so we don't re-read. Prefer lastMessageUuid
               // over id — see comment in the multi-transcript flush above.
