@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
 status: executing
-stopped_at: Phase 75 context gathered
-last_updated: "2026-06-29T08:56:33.181Z"
-last_activity: 2026-06-29 -- Phase 75 planning complete
+stopped_at: Completed 75-01-PLAN.md (Wave 0 RED scaffolds)
+last_updated: "2026-06-29T10:15:24.392Z"
+last_activity: 2026-06-29
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 41
-  completed_plans: 35
+  completed_plans: 36
   percent: 78
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 74 — performance-dashboard-reports
+**Current focus:** Phase 75 — measurement-attribution-accuracy-observation-linkage
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,8 +53,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 74 (performance-dashboard-reports) — EXECUTING
-Plan: 5 of 6
+Phase: 75 (measurement-attribution-accuracy-observation-linkage) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
 real gap (route heuristics were permanently null for Claude/Copilot runs — agent never
 normalized + Claude session seam never wired into the close orchestrator), fixed inline
@@ -62,7 +62,7 @@ in commit 9eb5163c5 (lib/experiments/route-trace-resolve.mjs + measurement-stop.
 experiments-recompute-route.mjs). Live-verified: Claude-dominant run closes with
 total_step_count > 0, idempotent across recompute.
 Next: Phase 73 (Semantic Route Judge & Success Scoring) — not yet planned (no dir).
-Last activity: 2026-06-29 -- Phase 75 planning complete
+Last activity: 2026-06-29
 
 ## Deferred Items
 
@@ -278,6 +278,8 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase 74-01]: Wave-0 RED scaffold: shared seedIsolatedStore+seedTokenDb fixture + 5 RED node:test files + Playwright fixme skeleton; report API names (writeReport/refreshReport/readReport, report_id, snapshot array) asserted by RED tests for Plan 05 to honour
 - [Phase ?]: [74-02]: readTimeline child-detection keys on the :reason: separator in tool_call_id, not the granularity_tier string, so it works for both fixture and production tier names
 - [Phase ?]: [74-02]: effectiveDimension(score, dim) exported alongside readRuns as the single corrected-wins (D-03) definition
+- [Phase 75]: [75-01]: ETM re-capture RED test targets a NEW module lib/live-logging/etm-recapture.mjs (computeRecaptureFires returning per-batch obs descriptors) — the Plan 05 refactor target — not the ETM daemon class, so RED is a clean missing-module — Booting the daemon would make RED a boot failure, not an absent-behavior failure; the function contract pins fire-boundary + event-time + (task_id, batch-last-message-uuid) dedup
+- [Phase 75]: [75-01]: Added a 'performance' playwright project (testDir tests/e2e/performance, baseURL :3032) so canonical-columns.spec.ts is discoverable by 'npx playwright test --list' — Every existing project carries an explicit testDir, so a spec outside unified-viewer/dashboard was undiscoverable; Rule 3 blocking fix for Task 3's acceptance gate
 
 ### Blockers/Concerns
 
@@ -370,11 +372,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 74 P01 | 8m | 3 tasks | 7 files |
 | Phase 74 P02 | 6m | 2 tasks | 2 files |
 | Phase 74 P03 | 7m | 3 tasks | 3 files |
+| Phase 75 P01 | 6min | 3 tasks | 7 files |
 
 ## Session Continuity
 
-Last session: 2026-06-29T08:20:18.861Z
-Stopped at: Phase 75 context gathered
+Last session: 2026-06-29T10:15:24.385Z
+Stopped at: Completed 75-01-PLAN.md (Wave 0 RED scaffolds)
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
