@@ -2,8 +2,9 @@ import { Link, useLocation } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useState } from 'react'
 
-const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
-const API_BASE_URL = `http://localhost:${API_PORT}`
+// Same-origin /api/* — matches the performanceSlice thunks (WR-05). The dashboard's
+// static-server reverse-proxies /api/* to the Health API, so badge counts survive
+// behind a reverse proxy / non-local host instead of hardcoding http://localhost:3033.
 
 export function NavBar() {
   const location = useLocation()
@@ -12,12 +13,12 @@ export function NavBar() {
   const [insightCount, setInsightCount] = useState<number | null>(null)
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/observations?limit=0`)
+    fetch(`/api/observations?limit=0`)
       .then(r => r.json())
       .then(d => setObsCount(d.total ?? null))
       .catch(() => setObsCount(null))
 
-    fetch(`${API_BASE_URL}/api/consolidation/status`)
+    fetch(`/api/consolidation/status`)
       .then(r => r.json())
       .then(d => {
         setDigestCount(d.totalDigests ?? null)
