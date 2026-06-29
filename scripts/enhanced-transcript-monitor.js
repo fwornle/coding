@@ -864,7 +864,11 @@ class EnhancedTranscriptMonitor {
     // Per-transcript re-capture cursor (Pitfall 4): skip exchanges already
     // fired so re-processing the set never re-emits a prior batch.
     if (!this._lastFiredExchangeUuid) this._lastFiredExchangeUuid = new Map();
-    const cursorKey = this.sessionId || this.agentType || 'default';
+    // IN-02: include the transcript path in the cursor key. The multi-transcript
+    // loop swaps this.agentType per transcript, so keying on sessionId||agentType
+    // alone could collapse cursors across two concurrent transcripts of the same
+    // agent type when sessionId is unset, letting them skip each other's batches.
+    const cursorKey = `${this.sessionId || this.agentType || 'default'}|${this.transcriptPath || ''}`;
     const cursor = this._lastFiredExchangeUuid.get(cursorKey);
     let pending = exchanges;
     if (cursor) {
