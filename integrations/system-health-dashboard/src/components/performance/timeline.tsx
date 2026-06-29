@@ -37,7 +37,9 @@ function fmtTime(ts: string | null | undefined): string | null {
 }
 
 function isEstimated(row: TimelineRow): boolean {
-  return row.estimated === true || row.tokens_estimated === 1
+  // IN-03: tokens_estimated is typed `number | null` — treat any positive count
+  // as estimated, not only the exact value 1, so a future non-1 count still flags.
+  return row.estimated === true || (row.tokens_estimated != null && row.tokens_estimated > 0)
 }
 
 function TierBadge({ tier }: { tier: string }) {
