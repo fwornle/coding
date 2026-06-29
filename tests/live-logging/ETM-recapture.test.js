@@ -135,4 +135,53 @@ describe('Phase 75 ETM re-capture (OBS-02 event-time + OBS-01 task_id) — e0af5
     const keys = fires.map((f) => `${f.metadata.task_id}|${f.dedupKey ?? f.batchLastMessageUuid}`);
     expect(new Set(keys).size).toBe(keys.length);
   });
+
+  // CR-01 regression: computeRecaptureFires is advertised as side-effect-free
+  // and crash-proof. A batch whose last message has a missing/unparseable
+  // timestamp used to make makeFire() call new Date(NaN).toISOString() and throw
+  // RangeError: Invalid time value, taking down the whole computation. The guard
+  // must produce a valid ISO created_at (falling back to an earlier parseable
+  // message, then wall-clock) and NEVER throw.
+  describe('CR-01: malformed/absent last-message timestamp never throws', () => {
+    const ask = (uuid, ts) => ({
+      type: 'assistant',
+      uuid,
+      timestamp: ts,
+      message: {
+        content: [{ type: 'tool_use', name: 'AskUserQuestion', input: {} }],
+      },
+    });
+
+    test('a batch whose last message has NO timestamp still yields a valid ISO created_at', () => {
+      // Two AskUserQuestion turns: the first has a real ts, the second has none.
+      const messages = [
+        ask('u1', '2026-06-29T05:30:00.000Z'),
+        ask('u2', undefined), // missing timestamp at a batch boundary
+      ];
+      let fires;
+      expect(() => {
+        fires = computeRecaptureFires(messages, { taskId: STUB_TASK_ID });
+      }).not.toThrow();
+      expect(fires.length).toBeGreaterThanOrEqual(2);
+      for (const f of fires) {
+        // Every created_at must be a valid, parseable ISO string.
+        expect(typeof f.created_at).toBe('string');
+        expect(Number.isFinite(Date.parse(f.created_at))).toBe(true);
+      }
+      // The timestamp-less batch should fall back to the earlier parseable
+      // message in the batch rather than wall-clock when one is available.
+      // (u2 is alone in its batch after the u1 flush, so it falls back to now —
+      // assert only that it is valid, which the loop above already covers.)
+    });
+
+    test('an unparseable timestamp also yields a valid ISO created_at (no throw)', () => {
+      const messages = [ask('x1', 'not-a-real-timestamp')];
+      let fires;
+      expect(() => {
+        fires = computeRecaptureFires(messages, { taskId: STUB_TASK_ID });
+      }).not.toThrow();
+      expect(fires).toHaveLength(1);
+      expect(Number.isFinite(Date.parse(fires[0].created_at))).toBe(true);
+    });
+  });
 });
