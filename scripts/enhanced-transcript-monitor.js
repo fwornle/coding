@@ -73,6 +73,16 @@ import { DatabaseManager } from '../src/databases/DatabaseManager.js';
 import { UnifiedInferenceEngine } from '../src/inference/UnifiedInferenceEngine.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
+// CR-02: stamp a message timestamp WITHOUT ever throwing. An absent/unparseable
+// exchange.timestamp makes new Date(...).toISOString() throw
+// RangeError: Invalid time value — and this runs from a .then() in a long-lived
+// daemon, so the throw would become an unhandled rejection. Fall back to
+// wall-clock instead of crashing the observation pipeline.
+function safeIso(ts) {
+  const ms = Date.parse(ts ?? '');
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : new Date().toISOString();
+}
+
 // ConfigurableRedactor instance for consistent redaction
 let redactor = null;
 
@@ -877,6 +887,10 @@ class EnhancedTranscriptMonitor {
       this._lastFiredExchangeUuid.set(cursorKey, batchLastMessageUuid);
       taskIdPromise.then((taskId) => {
         this._fireBatchObservation(batch, taskId, batchLastMessageUuid);
+      }).catch((err) => {
+        // CR-02: best-effort — a single malformed exchange must never become an
+        // unhandled rejection that kills the long-lived ETM daemon.
+        process.stderr.write(`[ObservationTap] batch fire failed (non-fatal): ${err?.message || err}\n`);
       });
     }
   }
@@ -920,7 +934,7 @@ class EnhancedTranscriptMonitor {
           id: `${exchange.uuid || exchange.id}-user`,
           role: 'user',
           content: typeof exchange.userMessage === 'string' ? exchange.userMessage : JSON.stringify(exchange.userMessage),
-          createdAt: new Date(exchange.timestamp).toISOString(),
+          createdAt: safeIso(exchange.timestamp),
           metadata: { agent: this.agentType, format: 'live' }
         });
       }
@@ -956,7 +970,7 @@ class EnhancedTranscriptMonitor {
           id: `${exchange.uuid || exchange.id}-assistant`,
           role: 'assistant',
           content: assistantContent,
-          createdAt: new Date(exchange.timestamp).toISOString(),
+          createdAt: safeIso(exchange.timestamp),
           metadata: { agent: this.agentType, format: 'live' }
         });
       }
