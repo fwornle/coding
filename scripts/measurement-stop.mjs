@@ -336,6 +336,25 @@ async function main() {
     total_tokens: g.total_tokens,
   }));
 
+  // ── (3.2) A1 Anthropic-direct bypass-guard (non-fatal warning) ──
+  //   A normally-proxy-routed in-scope agent (claude/copilot/opencode/mastra) that
+  //   ran with NEITHER proxy rows (no group in byAgentModel for it) NOR adapter
+  //   rows (no fgGroups for it) may have bypassed the proxy entirely — the
+  //   network-dependent Anthropic-direct / Claude-Max path outside VPN. Emit ONE
+  //   warning so the uncaptured tokens are VISIBLE rather than silently lost
+  //   (A1 / T-75-43). This reuses byAgentModel/fgGroups already computed — no new
+  //   query — and is a WARNING only: it NEVER blocks the close.
+  const IN_SCOPE_AGENTS = new Set(['claude', 'copilot', 'opencode', 'mastra']);
+  if (IN_SCOPE_AGENTS.has(foregroundAgent)
+      && byAgentModel.length === 0
+      && fgGroups.length === 0) {
+    process.stderr.write(
+      `[measurement-stop] WARN: agent ${foregroundAgent} ran with no proxy rows ` +
+      'and no adapter rows — possible Anthropic-direct bypass; tokens may be ' +
+      'uncaptured (A1)\n',
+    );
+  }
+
   const taskHash = span.goal_sentence
     ? crypto.createHash('sha256').update(span.goal_sentence).digest('hex')
     : null; // A3 — null allowed (D-13)
