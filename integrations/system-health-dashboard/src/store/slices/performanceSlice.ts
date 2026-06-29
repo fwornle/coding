@@ -144,6 +144,18 @@ interface PerformanceState {
   saveOverrideError: string | null
   saveOverrideStatus: number | null
   saveOverrideSuccessAt: number | null
+  // Measurement lifecycle control (dashboard-only MVP).
+  activeMeasurement: ActiveMeasurement | null
+  measurementLoading: boolean
+  measurementError: string | null
+  lastCloseCommand: string | null // host command surfaced after Stop
+}
+
+// The active measurement span (mirrors .data/active-measurement.json).
+export interface ActiveMeasurement {
+  task_id: string
+  started_at: string
+  goal_sentence?: string
 }
 
 const emptyFacetState: FacetState = {
@@ -177,6 +189,10 @@ const initialState: PerformanceState = {
   saveOverrideError: null,
   saveOverrideStatus: null,
   saveOverrideSuccessAt: null,
+  activeMeasurement: null,
+  measurementLoading: false,
+  measurementError: null,
+  lastCloseCommand: null,
 }
 
 // Default operator identity stamped into overridden_by when no richer identity
@@ -333,6 +349,63 @@ export const refreshReport = createAsyncThunk<
   }
 )
 
+// Measurement lifecycle (dashboard-only MVP) — same-origin /api/experiments/measurement/*.
+export const fetchActiveMeasurement = createAsyncThunk<
+  ActiveMeasurement | null, void | undefined, { rejectValue: string }
+>(
+  'performance/fetchActiveMeasurement',
+  async (_arg, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/measurement/active')
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      return data.active ? (data.span as ActiveMeasurement) : null
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+export const startMeasurement = createAsyncThunk<
+  ActiveMeasurement, { task_id: string; goal: string }, { rejectValue: string }
+>(
+  'performance/startMeasurement',
+  async ({ task_id, goal }, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/measurement/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id, goal }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || `API returned ${response.status}`)
+      return data.span as ActiveMeasurement
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+export const stopMeasurement = createAsyncThunk<
+  { close_command: string }, { task_class?: string }, { rejectValue: string }
+>(
+  'performance/stopMeasurement',
+  async ({ task_class }, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/measurement/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_class }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || `API returned ${response.status}`)
+      return { close_command: data.close_command as string }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
 // ---------------------------------------------------------------------------
 // Slice
 // ---------------------------------------------------------------------------
@@ -483,6 +556,36 @@ const performanceSlice = createSlice({
         const id = action.meta.arg
         state.refreshReportPendingIds = state.refreshReportPendingIds.filter((rid) => rid !== id)
       })
+      // Measurement lifecycle
+      .addCase(fetchActiveMeasurement.fulfilled, (state, action) => {
+        state.activeMeasurement = action.payload
+      })
+      .addCase(startMeasurement.pending, (state) => {
+        state.measurementLoading = true
+        state.measurementError = null
+        state.lastCloseCommand = null
+      })
+      .addCase(startMeasurement.fulfilled, (state, action) => {
+        state.measurementLoading = false
+        state.activeMeasurement = action.payload
+      })
+      .addCase(startMeasurement.rejected, (state, action) => {
+        state.measurementLoading = false
+        state.measurementError = action.payload ?? 'Failed to start measurement'
+      })
+      .addCase(stopMeasurement.pending, (state) => {
+        state.measurementLoading = true
+        state.measurementError = null
+      })
+      .addCase(stopMeasurement.fulfilled, (state, action) => {
+        state.measurementLoading = false
+        state.activeMeasurement = null
+        state.lastCloseCommand = action.payload.close_command
+      })
+      .addCase(stopMeasurement.rejected, (state, action) => {
+        state.measurementLoading = false
+        state.measurementError = action.payload ?? 'Failed to stop measurement'
+      })
   },
 })
 
@@ -519,6 +622,12 @@ export const selectTimelineError = (state: RootState) => state.performance.timel
 // Per-taskId timeline selector factory.
 export const selectTimelineFor = (taskId: string | null) => (state: RootState): TimelineRow[] =>
   taskId ? (state.performance.timelineByTaskId[taskId] ?? []) : []
+
+// Measurement lifecycle selectors.
+export const selectActiveMeasurement = (state: RootState) => state.performance.activeMeasurement
+export const selectMeasurementLoading = (state: RootState) => state.performance.measurementLoading
+export const selectMeasurementError = (state: RootState) => state.performance.measurementError
+export const selectLastCloseCommand = (state: RootState) => state.performance.lastCloseCommand
 
 // Score-override save-state selectors (drawer branches on these).
 export const selectSaveOverridePending = (state: RootState) => state.performance.saveOverridePending

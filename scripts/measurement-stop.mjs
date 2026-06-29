@@ -150,6 +150,31 @@ async function countPending(store) {
   return n;
 }
 
+/**
+ * Find a not-yet-closed dashboard close-request marker (two-phase stop). The
+ * vkb-server measurement/stop endpoint archives the span + writes
+ * <task_id>.close-requested.json {closed:false}; this lets the host close resume
+ * from it when no active span remains. Returns { marker, path } or null.
+ */
+function findPendingCloseRequest(archiveDir) {
+  let names;
+  try { names = fs.readdirSync(archiveDir); } catch { return null; }
+  const markers = [];
+  for (const n of names) {
+    if (!n.endsWith('.close-requested.json')) continue;
+    try {
+      const p = path.join(archiveDir, n);
+      const m = JSON.parse(fs.readFileSync(p, 'utf8'));
+      if (m && m.task_id && m.closed !== true) {
+        markers.push({ marker: m, path: p, requested_at: m.requested_at || '' });
+      }
+    } catch { /* skip malformed marker */ }
+  }
+  if (markers.length === 0) return null;
+  markers.sort((a, b) => String(b.requested_at).localeCompare(String(a.requested_at)));
+  return markers[0];
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
@@ -157,22 +182,40 @@ async function main() {
   const modUrl = pathToFileURL(path.join(PROXY_DIST, 'measurement-span.js')).href;
   const { stopMeasurement, resolveMeasurementPaths } = await import(modUrl);
 
-  const archived = stopMeasurement();
+  const { archiveDir } = resolveMeasurementPaths();
+  let archived = stopMeasurement();
+  let closeMarker = null;
+  let closeMarkerPath = null;
   if (!archived) {
-    process.stdout.write('no active measurement span\n');
-    process.exit(0);
+    // No active span. A dashboard-initiated stop (vkb-server measurement/stop) may have
+    // already archived the span + left a *.close-requested.json marker — finish the
+    // close from that (two-phase stop). Otherwise the original idempotent no-op.
+    const pending = findPendingCloseRequest(archiveDir);
+    if (!pending) {
+      process.stdout.write('no active measurement span\n');
+      process.exit(0);
+    }
+    closeMarker = pending.marker;
+    closeMarkerPath = pending.path;
+    archived = { task_id: closeMarker.task_id };
+    process.stdout.write(`resuming dashboard-requested close task_id=${closeMarker.task_id}\n`);
+  } else {
+    // Adopt a close-request marker for THIS task if the dashboard wrote one (task_class).
+    const mp = path.join(archiveDir, `${archived.task_id}.close-requested.json`);
+    try { closeMarker = JSON.parse(fs.readFileSync(mp, 'utf8')); closeMarkerPath = mp; } catch { /* none */ }
+    process.stdout.write(`stopped measurement span task_id=${archived.task_id} ended_at=${archived.ended_at}\n`);
   }
 
-  const { archiveDir } = resolveMeasurementPaths();
   const archivePath = path.join(archiveDir, `${archived.task_id}.json`);
-  process.stdout.write(`stopped measurement span task_id=${archived.task_id} ended_at=${archived.ended_at}\n`);
   process.stdout.write(`archived: ${archivePath}\n`);
 
   // ── (2) Derive / prompt / enforce the task_class ──
   const span = readArchivedSpan(archivePath, archived);
   const taxonomy = loadTaxonomy();
 
-  const explicit = parseStrArg(args, '--task-class');
+  // A dashboard close-request marker can carry the operator-chosen task_class; treat it
+  // like an explicit --task-class when the flag is absent (still closed-6 validated below).
+  const explicit = parseStrArg(args, '--task-class') ?? (closeMarker && closeMarker.task_class) ?? null;
   const goalArg = parseStrArg(args, '--goal');
   const phaseArg = parseStrArg(args, '--phase');
   const deriveText = [span.goal_sentence, goalArg, phaseArg].filter(Boolean).join(' ');
@@ -327,6 +370,17 @@ async function main() {
       `quarantine: ${pendingCount} pending Run(s) excluded from queries — ` +
       `resolve with: node scripts/experiments-classify.mjs\n`,
     );
+  }
+
+  // Mark the dashboard close-request marker resolved (two-phase stop bookkeeping) so a
+  // re-run of measurement-stop.mjs does not re-close the same already-scored span.
+  if (closeMarkerPath) {
+    try {
+      fs.writeFileSync(
+        closeMarkerPath,
+        JSON.stringify({ ...closeMarker, closed: true, closed_at: new Date().toISOString() }, null, 2),
+      );
+    } catch { /* best-effort bookkeeping */ }
   }
 }
 

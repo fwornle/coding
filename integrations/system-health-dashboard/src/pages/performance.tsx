@@ -18,6 +18,7 @@ import { RunsTable } from '@/components/performance/runs-table'
 import { PerformanceTimeline } from '@/components/performance/timeline'
 import { ScoreDrawer } from '@/components/performance/score-drawer'
 import { ReportsSubview } from '@/components/performance/reports-subview'
+import { MeasurementControl } from '@/components/performance/measurement-control'
 
 // DASH-01/DASH-02 Performance page. Layout mirrors token-usage.tsx (header +
 // summary Card focal point + Tabs body) but ALL shared state lives in the
@@ -124,6 +125,9 @@ export function PerformancePage() {
 
       {/* Summary cards — the visual focal point */}
       <SummaryCards runs={runs} />
+
+      {/* Measurement lifecycle control (start/stop the active span) */}
+      <MeasurementControl />
 
       {/* Body — Tabs with a Runs view + a Reports sub-view (D-05: a second Tabs
           value INSIDE Performance, NOT a top-level nav tab). */}
