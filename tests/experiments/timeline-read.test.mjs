@@ -53,6 +53,27 @@ test('DASH-02: per-reasoning-step children nest under the per-turn parent', asyn
   }
 });
 
+test('DASH-02: multiple empty-tool_call_id rows each become a distinct parent (no collapse)', async () => {
+  // Regression: untagged token rows all share the empty tool_call_id key. The old
+  // grouping deduped parents by that shared '' key, dropping all but the first — the
+  // timeline showed 1 row while the aggregate summed them all. Each empty-id row must
+  // be its own parent so the timeline total matches the aggregate.
+  const { dbPath, cleanup } = seedTokenDb([
+    { task_id: 'tu', tool_call_id: '', parent_call_id: '', granularity_tier: '', total_tokens: 100, model: 'claude-haiku-4.5', timestamp: '2026-06-29T00:00:00.000Z' },
+    { task_id: 'tu', tool_call_id: '', parent_call_id: '', granularity_tier: '', total_tokens: 200, model: 'claude-sonnet-4.6', timestamp: '2026-06-29T00:00:01.000Z' },
+    { task_id: 'tu', tool_call_id: '', parent_call_id: '', granularity_tier: '', total_tokens: 300, model: 'claude-haiku-4.5', timestamp: '2026-06-29T00:00:02.000Z' },
+  ]);
+  try {
+    const { readTimeline } = await import('../../lib/experiments/timeline-read.mjs');
+    const timeline = await readTimeline('tu', dbPath);
+    assert.equal(timeline.length, 3, 'all three untagged rows are distinct parents (not collapsed to 1)');
+    const sum = timeline.reduce((s, p) => s + (p.total_tokens || 0), 0);
+    assert.equal(sum, 600, 'timeline total matches the row sum (no dropped rows)');
+  } finally {
+    cleanup();
+  }
+});
+
 test('DASH-02: missing DB path returns graceful empty (no throw)', async () => {
   const { readTimeline } = await import('../../lib/experiments/timeline-read.mjs');
   const missing = path.join(os.tmpdir(), 'does-not-exist-timeline-' + Date.now(), 'token-usage.db');
