@@ -26,7 +26,12 @@ export interface RunScore {
   overridden_by?: string | null
   overridden_at?: string | null
   pending?: boolean | null
-  not_scored?: boolean | null
+  // WR-02: the writer (lib/experiments/score-write.mjs / judge.mjs) persists
+  // this as the string literal 'trivial' (D-04) or null — NOT a boolean. The
+  // consumer (scoreStateOf) only does a truthy check, so 'trivial' worked at
+  // runtime, but the boolean type was wrong (run.score.not_scored === true would
+  // never match). Type it to the real domain value.
+  not_scored?: 'trivial' | boolean | null
   [key: string]: number | string | boolean | null | undefined
 }
 
