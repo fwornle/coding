@@ -51,6 +51,21 @@ export default defineConfig({
         trace: 'retain-on-failure',
       },
     },
+    // Phase 75 ATTR-02 — Performance dashboard specs (two-column model render +
+    // empty-canonical sentinel). Mirrors the dashboard project's :3032 target.
+    // Specs guard for an offline dashboard (test.skip), so this project can sit
+    // RED in the suite until Plan 06 ships the columns.
+    {
+      name: 'performance',
+      testDir: 'tests/e2e/performance',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:3032',
+        headless: true,
+        screenshot: 'only-on-failure',
+        trace: 'retain-on-failure',
+      },
+    },
   ],
   // Vite dev server contract:
   //
