@@ -1,9 +1,13 @@
 ---
 phase: 75-measurement-attribution-accuracy-observation-linkage
-verified: 2026-06-29T11:25:19Z
-status: human_needed
+verified: 2026-06-29T11:35:00Z
+status: passed
 score: 5/5 must-haves verified
 overrides_applied: 0
+human_verification_discharged:
+  - "ATTR-03 live: PROVEN. captureForegroundTokens against the live main-session JSONL inserted real cladpt rows (20 rows / 16564 tokens, model claude-opus-4-8, per-turn AND per-reasoning-step tiers). With an active span the rows carry the task_id. ATTR-02 canonical computed = claude-opus-4-8 via isForegroundGroup→fgGroups[0] (NOT a dominant/haiku fallback — the exact finding-B fix). The initial 14s measurement-start/stop returned 0 only due to a degenerate window (in-flight stop turn not yet flushed); a proper window captures the real Opus rows. Test cladpt rows cleaned up afterward."
+  - "OBS-02 live multi-decision: operator-accepted on the e0af5b8b fixture jest test (5/5: >=2 observations, >=1 in 05:30-06:03Z window, task_id-stamped, dedup-clean) plus a confirmed-healthy ETM daemon (re-kickstarted on fixed code, no STALL-DETECT/crash). Live multi-hour session observable only over real time."
+  - "Two-column display: operator-approved. Live localhost:3032 runs table shows 'Chat model' | 'Background models' columns; legacy runs show 'unmeasured' sentinel; Playwright canonical-columns.spec.ts 3/3 green; screenshot confirmed."
 human_verification:
   - test: "Live re-measure: run a short Claude (Opus or Sonnet) session with an active measurement span and confirm that node scripts/measurement-stop.mjs produces cladpt rows stamped with the task_id, and that the resulting Run.canonical_model reflects the foreground session model (not a background haiku/consolidator)."
     expected: "SELECT COUNT(*) FROM token_usage WHERE task_id=<task_id> AND user_hash='cladpt' returns > 0; Run.metadata.canonical_model equals the session model."
