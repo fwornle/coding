@@ -41,7 +41,8 @@ key-decisions:
 # Metrics
 duration: 7min
 completed: 2026-06-29
-checkpoint: "Task 3 (checkpoint:human-verify) NOT executed — requires live launchd ETM + a real multi-decision session"
+checkpoint: "Task 3 (checkpoint:human-verify) APPROVED by operator 2026-06-29 on fixture-test (5/5 green) + healthy-daemon evidence (pid 10059, no STALL-DETECT/crash) — live multi-decision session is observable only over real time and was accepted as such"
+requirements-completed: [OBS-01, OBS-02]
 ---
 
 # Phase 75 Plan 05: ETM Observation Re-capture & Run Linkage Summary
@@ -52,7 +53,7 @@ checkpoint: "Task 3 (checkpoint:human-verify) NOT executed — requires live lau
 - **Duration:** ~7 min
 - **Started:** 2026-06-29T10:27:47Z
 - **Completed (automated tasks):** 2026-06-29T10:35:10Z
-- **Tasks:** 2 of 3 automated (Task 3 is a human-verify checkpoint — surfaced, not executed)
+- **Tasks:** 3 of 3 complete (Tasks 1–2 automated; Task 3 human-verify checkpoint APPROVED by operator 2026-06-29)
 - **Files modified:** 3 (1 created, 2 modified)
 
 ## Accomplishments
@@ -107,9 +108,15 @@ checkpoint: "Task 3 (checkpoint:human-verify) NOT executed — requires live lau
 - ObservationWriter.pre-llm-dedup.test.js → 7/7 (no regression).
 - `grep -n "messages.find(m => m.createdAt)"` → present and untouched.
 
-## Checkpoint — Task 3 (NOT executed)
+## Checkpoint — Task 3 (APPROVED 2026-06-29)
 
-Task 3 is a `checkpoint:human-verify` (gate=blocking) requiring a LIVE launchd ETM daemon (`com.coding.etm`) kickstarted to pick up the source change + a real multi-decision session — this CANNOT be done autonomously. Surfaced to the operator via `## CHECKPOINT REACHED` with the how-to-verify steps and resume-signal. The plan is NOT complete until the operator approves.
+Task 3 is a `checkpoint:human-verify` (gate=blocking) requiring a LIVE launchd ETM daemon (`com.coding.etm`) kickstarted to pick up the source change + a real multi-decision session — this CANNOT be done synchronously within the executor run (live re-capture is observable only over real session time).
+
+**Operator response: "approved".** The operator accepted the following as sufficient evidence that ETM fires mid-set on AskUserQuestion/tool-batch boundaries, stamps real event-time, and links task_id:
+1. The `e0af5b8b` fixture jest test (`tests/live-logging/ETM-recapture.test.js`) — 5/5 green: >=2 observations, >=1 dated in 05:30-06:03Z (NOT the collapsed 21:00:43Z T0), every obs carries a non-empty `metadata.task_id`, no duplicate `(task_id, batch-last-message-uuid)` keys.
+2. A confirmed-healthy ETM daemon: the orchestrator kickstarted `com.coding.etm` (running pid 10059), with no `[STALL-DETECT]` / crash in `.logs/etm.log` after kickstart.
+
+The live multi-decision session (operator decisions at T0+n producing observations dated ~T0+n in production) is observable only over real wall-clock time across a future GSD session; the operator explicitly accepted the fixture-test + healthy-daemon evidence in lieu of waiting for that real-time confirmation. OBS-01 and OBS-02 are discharged.
 
 ## Known Stubs
 None. `etm-recapture.mjs` is a complete pure function (no placeholder values); the ETM/ObservationWriter edits are wired end-to-end. The only outstanding item is the live operator verification (Task 3 checkpoint).
@@ -121,9 +128,9 @@ None. No new network endpoints, auth paths, or schema changes. T-75-51 (PII reda
 Operator must kickstart the launchd ETM after merge so the daemon picks up the source change: `launchctl kickstart -k gui/$(id -u)/com.coding.etm` (args unchanged → no re-registration). This is the Task 3 checkpoint.
 
 ## Next Phase Readiness
-- Task 3 human-verify checkpoint pending operator approval (live re-capture: multiple, time-spread, task_id-linked observations).
-- `/gsd-verify-phase 75` can run the automated gate (ETM-recapture + ObservationWriter suites) now; the live re-measure is part of the phase gate per RESEARCH §Sampling Rate.
+- Task 3 human-verify checkpoint APPROVED 2026-06-29 (fixture-test + healthy-daemon evidence). OBS-01 + OBS-02 discharged. Plan 75-05 complete (3/3).
+- `/gsd-verify-phase 75` can run the automated gate (ETM-recapture + ObservationWriter suites) now; the live re-measure across a real multi-decision session is the standing phase-gate item per RESEARCH §Sampling Rate (observable only over real time).
 
 ## Self-Check: PASSED
 
-All 4 files (1 created + 3 modified incl. SUMMARY) exist on disk; both task commits (`9810be5f2`, `659e8f7be`) present in git log.
+All 4 files (1 created + 3 modified incl. SUMMARY) exist on disk; both task commits (`9810be5f2`, `659e8f7be`) present in git log. Task 3 checkpoint discharged via operator approval; OBS-01 + OBS-02 marked Complete in REQUIREMENTS.md; ROADMAP 75-05 row checked; plan counter advanced 5→6.

@@ -67,8 +67,8 @@ Evidence: `.planning/v7.4-attribution-findings.md` (findings A–D, from the `ex
 - [ ] **ATTR-01:** A token row is attributed to a measurement only when it belongs to the measured task's process/agent lineage — not by time-window overlap alone (corrects TELEM-03). Background processes (`consolidator-*`, `health-coordinator`, `observation-writer`, other non-task daemons) are excluded from, or segregated within, a foreground interactive measurement. The lineage signal is defined explicitly (process allow/deny list, agent/session id, or an explicit `task_id` stamp at the call site).
 - [ ] **ATTR-02:** Each Run has one canonical model/agent source-of-truth (no dominant-vs-first-row divergence across the runs table, score drawer, and timeline) AND persists a per-process model breakdown, surfaced as a two-column display: the foreground chat model in one column, the full list of background-service models in another.
 - [ ] **ATTR-03:** The foreground interactive agent's (Claude Code) own session tokens are captured into `token_usage` stamped with the active `task_id` — via the existing `lib/lsl/token` adapters (`buildClaudeTokenRows()` + insert helper) wired into the stop/close (or a live) path — so the recorded model reflects reality (e.g. Opus), not concurrent proxy traffic. (Claude Code calls Anthropic directly and bypasses the proxy, so its usage is otherwise invisible.)
-- [ ] **OBS-01:** Observations/digests/insights produced during a measurement are tagged with the active `task_id` (ETM reads `getActiveMeasurement()`), exposed in the observation view, and queryable/correlatable to the Run — so "what happened during measurement X" is reconstructable.
-- [ ] **OBS-02:** ETM captures observations *throughout* a long-running agentic prompt-set, not only at its start — re-capturing on meaningful boundaries (each AskUserQuestion decision and/or significant tool-activity batches / periodic flush) — and stamps each observation with its **real event time**, not the prompt-set start. Acceptance: a session whose only typed prompt is at T0 but which runs for hours with operator decisions at T0+n yields observations dated ~T0+n, not all at T0 (finding D).
+- [x] **OBS-01:** Observations/digests/insights produced during a measurement are tagged with the active `task_id` (ETM reads `getActiveMeasurement()`), exposed in the observation view, and queryable/correlatable to the Run — so "what happened during measurement X" is reconstructable.
+- [x] **OBS-02:** ETM captures observations *throughout* a long-running agentic prompt-set, not only at its start — re-capturing on meaningful boundaries (each AskUserQuestion decision and/or significant tool-activity batches / periodic flush) — and stamps each observation with its **real event time**, not the prompt-set start. Acceptance: a session whose only typed prompt is at T0 but which runs for hours with operator decisions at T0+n yields observations dated ~T0+n, not all at T0 (finding D).
 
 ---
 
@@ -112,7 +112,7 @@ Evidence: `.planning/v7.4-attribution-findings.md` (findings A–D, from the `ex
 | ATTR-01 | Phase 75 | Complete |
 | ATTR-02 | Phase 75 | Complete |
 | ATTR-03 | Phase 75 | Complete |
-| OBS-01 | Phase 75 | Pending |
-| OBS-02 | Phase 75 | Pending |
+| OBS-01 | Phase 75 | Complete |
+| OBS-02 | Phase 75 | Complete |
 
 **Coverage:** 26/26 requirements mapped across 9 phases (67–75). No orphans, no duplicates.
