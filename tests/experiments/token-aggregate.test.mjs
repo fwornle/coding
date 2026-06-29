@@ -43,6 +43,8 @@ function createTokenUsageTable(db) {
     agent            TEXT    NOT NULL DEFAULT '',
     model            TEXT    NOT NULL DEFAULT '',
     provider         TEXT    NOT NULL DEFAULT '',
+    process          TEXT    NOT NULL DEFAULT '',
+    user_hash        TEXT    NOT NULL DEFAULT '',
     granularity_tier TEXT    NOT NULL DEFAULT '',
     input_tokens     INTEGER NOT NULL DEFAULT 0,
     output_tokens    INTEGER NOT NULL DEFAULT 0,
