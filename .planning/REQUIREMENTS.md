@@ -109,8 +109,8 @@ Evidence: `.planning/v7.4-attribution-findings.md` (findings A–D, from the `ex
 | DASH-01 | Phase 74 | Complete |
 | DASH-02 | Phase 74 | Complete |
 | DASH-03 | Phase 74 | Complete |
-| ATTR-01 | Phase 75 | Pending |
-| ATTR-02 | Phase 75 | Pending |
+| ATTR-01 | Phase 75 | Complete |
+| ATTR-02 | Phase 75 | Complete |
 | ATTR-03 | Phase 75 | Pending |
 | OBS-01 | Phase 75 | Pending |
 | OBS-02 | Phase 75 | Pending |
