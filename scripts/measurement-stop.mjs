@@ -172,7 +172,13 @@ function findPendingCloseRequest(archiveDir) {
     } catch { /* skip malformed marker */ }
   }
   if (markers.length === 0) return null;
-  markers.sort((a, b) => String(b.requested_at).localeCompare(String(a.requested_at)));
+  // IN-01: order newest-first by parsed time, not lexical localeCompare (which
+  // only works for ISO-8601 strings). Unparseable timestamps sort last (-Infinity).
+  markers.sort((a, b) => {
+    const ta = Date.parse(a.requested_at);
+    const tb = Date.parse(b.requested_at);
+    return (Number.isNaN(tb) ? -Infinity : tb) - (Number.isNaN(ta) ? -Infinity : ta);
+  });
   return markers[0];
 }
 
