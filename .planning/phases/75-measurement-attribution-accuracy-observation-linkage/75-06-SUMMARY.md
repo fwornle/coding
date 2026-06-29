@@ -2,7 +2,7 @@
 phase: 75-measurement-attribution-accuracy-observation-linkage
 plan: 06
 subsystem: performance-dashboard
-tags: [dashboard, attr-02, two-column-model, run-metadata, react, redux, bind-mount, wave-3, checkpoint-pending]
+tags: [dashboard, attr-02, two-column-model, run-metadata, react, redux, bind-mount, wave-3, checkpoint-approved]
 
 # Dependency graph
 requires:
@@ -40,26 +40,26 @@ key-decisions:
   - "Timeline surfaces the Run-level canonical/background via selectSelectedRun in a CardHeader summary band; the per-turn row.process/row.model rendering (finding-1) is kept unchanged — Run-level read is additive, not a replacement"
   - "Pre-existing TS errors in unrelated files (node-details-sidebar.tsx, token-usage.tsx) left untouched (SCOPE BOUNDARY); npm run build still exits 0 because the build script is 'tsc --noEmit 2>/dev/null; vite build' and vite compiles the edited files clean"
 
-requirements-completed: []  # ATTR-02 display lands here but is DISCHARGED only after the Task 3 human-verify checkpoint (gsd-browser + canonical-columns.spec.ts green)
+requirements-completed: [ATTR-02]  # DISCHARGED 2026-06-29 — Task 3 human-verify checkpoint APPROVED by operator (two columns visible, unmeasured sentinel on legacy runs, canonical-columns.spec.ts 3/3 GREEN, screenshot confirmed)
 
 # Metrics
 duration: 5min
 completed: 2026-06-29
-status: checkpoint-pending
+status: complete
 ---
 
 # Phase 75 Plan 06: Dashboard Two-Column Model Display Summary
 
 **The Performance runs table now renders two model columns — the canonical (foreground chat) model and the concurrent background-service models — and the score drawer + timeline READ the same persisted `Run.metadata` fields, so the operator sees the honest chat model (e.g. Opus) consistently everywhere instead of finding B's daemon-dominated `byAgentModel[0]` (haiku). Legacy Runs with no foreground capture show the D-05 "unmeasured" sentinel; an empty background column shows the em-dash. Built clean and served on localhost:3032; the visual/E2E acceptance is the pending Task 3 operator checkpoint.**
 
-## Status: CHECKPOINT PENDING
+## Status: COMPLETE (3/3 — operator-approved)
 
-Tasks 1-2 (the code + the bind-mount rebuild/restart) are complete and committed. **Task 3 is a `checkpoint:human-verify` gate** (the gsd-browser/dashboard visual check + `npx playwright test tests/e2e/performance/canonical-columns.spec.ts`). It was NOT self-verified — it requires the live dashboard and operator eyes. See the "Awaiting Checkpoint" section below for the exact how-to-verify steps and resume signal.
+Tasks 1-2 (the code + the bind-mount rebuild/restart) are complete and committed. **Task 3 (`checkpoint:human-verify`) was APPROVED by the operator on 2026-06-29.** The orchestrator gathered evidence and the operator confirmed: the live runs table at `localhost:3032` shows two distinct columns ("Chat model" | "Background models"); legacy runs render the "unmeasured" sentinel (NOT a dominant fallback); `run-canonical-model`/`run-background-models` testids are present (7 each); the Playwright spec `tests/e2e/performance/canonical-columns.spec.ts` is **3/3 GREEN**; a screenshot visually confirmed the layout. ATTR-02 is discharged.
 
 ## Performance
 - **Duration:** ~5 min (code through build/restart)
 - **Started:** 2026-06-29T10:44:30Z
-- **Tasks:** 2 of 3 complete (Task 3 = operator checkpoint)
+- **Tasks:** 3 of 3 complete (Task 3 = operator checkpoint, APPROVED)
 - **Files modified:** 5 (0 created, 5 modified)
 
 ## Accomplishments
@@ -73,6 +73,7 @@ Tasks 1-2 (the code + the bind-mount rebuild/restart) are complete and committed
 ## Task Commits
 1. **Task 1: two-column model display reading persisted Run.metadata (ATTR-02)** — `7d9ef2735` (feat)
 2. **Task 2: build the bind-mounted dashboard + restart the frontend** — no commit (build artifact only; `dist/` is gitignored)
+3. **Task 3: operator human-verify checkpoint** — APPROVED 2026-06-29; no code commit (verification gate). Finalization committed in the docs commit below.
 
 ## Files Created/Modified
 - `integrations/system-health-dashboard/src/store/slices/performanceSlice.ts` — Run interface +3 optional-nullable canonical/background fields (read-only render inputs).
@@ -113,18 +114,18 @@ Pre-existing TypeScript strict-mode errors in `src/components/workflow/node-deta
 ## Issues Encountered
 None blocking. One Rule 3 fix (navigation testids), resolved on the first pass.
 
-## Awaiting Checkpoint (Task 3 — human-verify)
+## Checkpoint (Task 3 — human-verify): APPROVED 2026-06-29
 
-The final task is an operator visual/E2E gate that was NOT self-approved:
+The final task was an operator visual/E2E gate. The orchestrator gathered evidence and the operator responded **"approved"**. Evidence on record:
 
-1. `gsd-browser navigate http://localhost:3032` and open the Performance tab.
-2. Confirm the runs table has TWO model columns: a Chat-model column and a Background-models column.
-3. Confirm a legacy Run (pre-Phase-75, no canonical capture) shows "unmeasured" in the chat-model column, not a haiku/sonnet dominant value (the finding-B regression).
-4. Open a Run's score drawer — confirm the same canonical model shows in the header (consistent with the table row).
-5. Open the timeline — confirm the Run-level canonical/background summary is consistent with the table.
-6. Run the e2e spec: `npx playwright test tests/e2e/performance/canonical-columns.spec.ts` — confirm green.
+1. The live runs table at `localhost:3032` shows TWO distinct model columns: "Chat model" | "Background models".
+2. Legacy Runs (pre-Phase-75, no canonical capture) render the "unmeasured" sentinel in the chat-model column — NOT a haiku/sonnet dominant value (the finding-B regression is absent).
+3. `data-testid="run-canonical-model"` and `data-testid="run-background-models"` are present (7 each) in the served bundle.
+4. The score drawer header and timeline summary read the same persisted canonical/background fields, consistent with the table row.
+5. The e2e spec `tests/e2e/performance/canonical-columns.spec.ts` is **3/3 GREEN**.
+6. A screenshot visually confirmed the two-column layout.
 
-**Resume signal:** Type "approved" if the two columns render consistently across all three surfaces and the unmeasured sentinel shows for legacy Runs; otherwise describe the inconsistency.
+**Outcome:** ATTR-02 discharged (REQUIREMENTS.md checkbox + traceability table = Complete). Plan 75-06 complete (3/3).
 
 ## Self-Check: PASSED
 
@@ -135,4 +136,4 @@ The final task is an operator visual/E2E gate that was NOT self-approved:
 
 ---
 *Phase: 75-measurement-attribution-accuracy-observation-linkage*
-*Completed (code): 2026-06-29 — Task 3 operator checkpoint pending*
+*Completed: 2026-06-29 — all 3 tasks done; Task 3 human-verify checkpoint APPROVED; ATTR-02 discharged*
