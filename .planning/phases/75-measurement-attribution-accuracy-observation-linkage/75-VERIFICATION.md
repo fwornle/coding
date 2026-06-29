@@ -23,9 +23,9 @@ human_verification:
 # Phase 75: Measurement Attribution Accuracy & Observation Linkage Verification Report
 
 **Phase Goal:** The measurement system is trustworthy for an interactive foreground agentic session — it captures the foreground chat agent's own tokens, attributes token rows by task/process lineage instead of time-window overlap, shows a canonical + per-process model breakdown, and captures observations continuously (with true event-time stamps) across a long agentic prompt-set.
-**Verified:** 2026-06-29T11:25:19Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Verified:** 2026-06-29T11:25:19Z (initial) · 2026-06-29T12:25:00Z (re-verified after full review cleanup)
+**Status:** passed (human-verification items discharged — see frontmatter)
+**Re-verification:** Yes — all 12 `75-REVIEW.md` findings now fixed (WR-04, WR-05, IN-01..04 closed this round)
 
 ## Goal Achievement
 
@@ -71,10 +71,10 @@ human_verification:
 | `measurement-stop.mjs`               | `writeRun()` with canonical tags          | tags.canonical_model at 368             | ✓ WIRED     | canonical_model, canonical_agent, background_models all in tags passed to writeRun |
 | `run-write.mjs`                      | `Run.metadata.canonical_model`            | metadata spread at line 119-121         | ✓ WIRED     | Persisted as null (not 0 or dominant fallback) when no fg group |
 | ETM `_firePromptSetObservation()`    | `computeRecaptureFires()`                 | import from etm-recapture.mjs at line 64 | ✓ WIRED    | ETM calls the extracted pure function for decision/batch splits |
-| ETM `_fireBatchObservation()`        | `.catch()` on taskIdPromise               | line 890-894                            | ✓ WIRED     | CR-02 fix: unhandled rejection guard present              |
+| ETM `_fireBatchObservation()`        | `.catch()` on taskIdPromise               | line 894                                | ✓ WIRED     | CR-02 fix: unhandled rejection guard present              |
 | `ObservationWriter.processMessages()` | `resolveLiveTaskIdSafe()`                | line 1138                               | ✓ WIRED     | Falls back to span reader when ETM doesn't pass task_id   |
 | `ObservationWriter.processMessages()` | entity metadata task_id                  | line 1180                               | ✓ WIRED     | Only stamped when taskId is non-empty                     |
-| `enhanced-transcript-monitor.js`     | `safeIso()` for createdAt                | lines 937, 973                          | ✓ WIRED     | CR-02 fix: safeIso defined at line 81, used at both fire call sites |
+| `enhanced-transcript-monitor.js`     | `safeIso()` for createdAt                | lines 941, 977                          | ✓ WIRED     | CR-02 fix: safeIso defined at line 81, used at both fire call sites |
 
 ### Data-Flow Trace (Level 4)
 
@@ -115,15 +115,22 @@ No declared probes for this phase. Behavioral spot-checks above serve the equiva
 | ------- | -------- | ------ |
 | CR-01: `makeFire()` throws `RangeError` on missing/unparseable last-message timestamp | Critical | ✓ FIXED — `etm-recapture.mjs:100-107` walks batch backwards for last parseable ts, falls back to `Date.now()`; never throws. CR-01 regression test in ETM-recapture.test.js passes. |
 | CR-02: ETM `_fireBatchObservation` throws → unhandled promise rejection on invalid exchange timestamp | Critical | ✓ FIXED — `safeIso()` defined at `enhanced-transcript-monitor.js:81` and used at lines 937/973; `.catch()` wired at line 890-894 per CR-02 fix. |
-| WR-01: Debug `console.log` in phase-touched fire loop | Warning | ✓ FIXED (phase-touched lines) — commit bd8996c01 removed the `[ObsDebug]` and `⏰ Time-based flush` console.log calls from the multi-transcript fire loop (original lines 587/590/600). Pre-existing console.log calls elsewhere in the 4868-line file predate the phase and are out-of-scope per review. Lines 3985/4406/4409 are in the single-transcript processExchanges path (not the phase-touched multi-transcript path) and are pre-existing. |
+| WR-01: Debug `console.log` in phase-touched fire loop | Warning | ✓ FIXED (phase-touched lines) — commit bd8996c01 removed the `[ObsDebug]` and `⏰ Time-based flush` console.log calls from the multi-transcript fire loop (original lines 587/590/600). Pre-existing console.log calls elsewhere in the file predate the phase and are out-of-scope per review. Lines 4354/4357 (`[ObsDebug-single]`, single-transcript processExchanges path) and 3933 are pre-existing and not in the phase-touched multi-transcript path. |
 | WR-03: Foreground capture lost when JSONL mtime falls after `ended_at` | Warning | ✓ FIXED — `stop-adapter-registry.mjs:132-133` adds `GRACE_MS = 5 * 60 * 1000` to the upper mtime bound so in-flight appends are captured. |
-| WR-02/04/05/06/IN-01..04 | Warning/Info | Not blocking; WR-06 (taskId type guard) also fixed in token-aggregate.mjs:99-101. |
+| WR-02: `RunScore.not_scored` typed `boolean` but persisted as `'trivial'` | Warning | ✓ FIXED (commit `753ed8009`) — type widened to `'trivial' \| boolean \| null` in `performanceSlice.ts`. |
+| WR-04: Dead direct-DB artifact-patch fallback (raw SQL behind always-undefined `.db`) | Warning | ✓ FIXED (commit `7ad081dc5`) — removed the legacy direct-DB branches in `_patchRecentObservationsWithArtifacts` / `_patchHistoricalArtifacts` (now stderr-skip at `enhanced-transcript-monitor.js:1067`/`:1094`); writer is HTTP-only since Plan 44-13, so the dead raw-SQL path can no longer silently reactivate. |
+| WR-05: `nav-bar.tsx` fetched the Health API on a hardcoded cross-origin `http://localhost:3033` | Warning | ✓ FIXED (commit `3c860e13b`) — badge-count fetches now use same-origin `/api/observations` + `/api/consolidation/status` (matches the performanceSlice contract; static-server reverse-proxies `/api/*`). Verified live: counts render 4906 / 91 / 166. |
+| WR-06: `aggregateByTaskId` did not guard non-string `taskId` before SQL bind | Warning | ✓ FIXED (commit `321fe4a3d`) — early-guard returns a zero result for non-string/empty `taskId` (`token-aggregate.mjs:99-101`). |
+| IN-01: `findPendingCloseRequest` sorts markers by lexical `localeCompare` | Info | ✓ FIXED (commit `f1af128c4`) — `measurement-stop.mjs:175-181` sorts by `Date.parse(...)` numerically, unparseable timestamps sort last. |
+| IN-02: re-capture cursor key keyed on `sessionId\|\|agentType` can collapse across transcripts | Info | ✓ FIXED (commit `56443cc2c`) — cursor key now appends `this.transcriptPath` (`enhanced-transcript-monitor.js:871`). |
+| IN-03: `isEstimated` only matched `tokens_estimated === 1` | Info | ✓ FIXED (commit `5b5d53b79`) — `timeline.tsx:42` treats any positive count (`!= null && > 0`) as estimated. |
+| IN-04: stale `webServer.reuseExistingServer` comment contradicting omitted block | Info | ✓ FIXED (commit `925ae3fb8`) — `playwright.config.ts` comment corrected to the actual "operator runs the server" contract. |
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 | ---- | ---- | ------- | -------- | ------ |
-| `scripts/enhanced-transcript-monitor.js` | 3985, 4406, 4409 | `console.log` in processExchanges / single-transcript path | Info | Pre-existing code, not in phase-touched paths; no-console-log rule technically applies but these lines predate Phase 75 and were explicitly acknowledged by the reviewer |
+| `scripts/enhanced-transcript-monitor.js` | 3933, 4354, 4357 | `console.log` in processExchanges / single-transcript path | Info | Pre-existing code, not in phase-touched paths; no-console-log rule technically applies but these lines predate Phase 75 and were explicitly acknowledged by the reviewer. (The WR-04 dead-code removal eliminated the raw-SQL `UPDATE` strings that previously sat in `_patchRecentObservationsWithArtifacts`/`_patchHistoricalArtifacts`.) |
 
 ### Human Verification Required
 
@@ -147,11 +154,13 @@ No declared probes for this phase. Behavioral spot-checks above serve the equiva
 
 ### Gaps Summary
 
-All 5 must-have truths are VERIFIED in the codebase. The two Critical review findings (CR-01, CR-02) and the key Warning (WR-03) are confirmed fixed in the current source. No blocking gaps exist.
+All 5 must-have truths are VERIFIED in the codebase. The **entire `75-REVIEW.md` is now cleared** — all 12 findings are fixed: both Critical (CR-01, CR-02), all four Warning (WR-01, WR-03, WR-04, WR-05; WR-02 and WR-06 from earlier commits), and all four Info (IN-01..IN-04). No blocking gaps exist.
 
-The `status: human_needed` reflects that three behaviors require live-session validation that automated tests cannot substitute for: foreground token capture from a real Claude session, multi-decision ETM observation timing in a live daemon, and visual dashboard rendering sign-off.
+The three human-verification items were discharged (see frontmatter `human_verification_discharged`): ATTR-03 foreground capture was live-proven (20 cladpt rows / 16564 tokens, model `claude-opus-4-8`), ATTR-02 canonical computed via `fgGroups[0]` (not a dominant fallback), and the two-column dashboard display was operator-approved with `canonical-columns.spec.ts` green. The phase is `passed`.
+
+Post-discharge follow-up (this re-verification): the remaining review findings WR-04, WR-05 and IN-01..IN-04 were fixed and committed atomically (`7ad081dc5`, `3c860e13b`, `f1af128c4`, `56443cc2c`, `5b5d53b79`, `925ae3fb8`); node:test (29 pass / 0 fail) and the ETM jest suites (14 pass) remain green, dashboard `tsc --noEmit` shows no new errors, and the nav-bar same-origin fix was confirmed live (counts 4906 / 91 / 166).
 
 ---
 
-_Verified: 2026-06-29T11:25:19Z_
+_Verified: 2026-06-29T11:25:19Z · re-verified 2026-06-29T12:25:00Z (full 75-REVIEW.md cleared)_
 _Verifier: Claude (gsd-verifier)_
