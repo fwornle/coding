@@ -364,3 +364,111 @@ test('D-02: writeRun WITHOUT a heuristics arg defaults all six to null (not 0)',
     await cleanup();
   }
 });
+
+// ── ATTR-02 / D-05 / D-06: canonical_model + canonical_agent + background_models[] ──
+// Plan 02 Task 2 persists the ONCE-computed canonical attribution on Run.metadata
+// so all three dashboard surfaces read it without recomputing. Empty canonical is
+// persisted as null (NEVER a dominant-by-count fallback — the finding-B fix).
+
+test('ATTR-02: writeRun persists explicit canonical_model/agent + background_models[]', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    const backgroundModels = [
+      { model: 'haiku', process: 'consolidator-mentions', total_tokens: 9999 },
+    ];
+    await writeRun(store, sampleArgs({
+      tags: {
+        task_hash: 'deadbeef',
+        agent: 'claude-code',
+        model: 'claude-haiku-4.5',
+        framework: 'gsd',
+        trace_id: 't1',
+        canonical_model: 'claude-opus-4-8',
+        canonical_agent: 'claude',
+        background_models: backgroundModels,
+      },
+    }));
+
+    const runs = await collectRuns(store);
+    assert.equal(runs.length, 1);
+    const m = runs[0].metadata;
+    assert.equal(m.canonical_model, 'claude-opus-4-8', 'canonical_model persisted verbatim');
+    assert.equal(m.canonical_agent, 'claude', 'canonical_agent persisted verbatim');
+    assert.deepEqual(m.background_models, backgroundModels, 'background_models[] persisted verbatim');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('D-05: absent canonical tags persist as null + [] (NEVER a dominant fallback)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    await writeRun(store, sampleArgs()); // sampleArgs tags carry NO canonical_* keys
+
+    const runs = await collectRuns(store);
+    const m = runs[0].metadata;
+    assert.ok('canonical_model' in m, 'canonical_model key always present');
+    assert.ok('canonical_agent' in m, 'canonical_agent key always present');
+    assert.ok('background_models' in m, 'background_models key always present');
+    assert.equal(m.canonical_model, null, 'empty canonical persists as null (D-05) — never byAgentModel[0]');
+    assert.equal(m.canonical_agent, null, 'empty canonical_agent persists as null (D-05)');
+    assert.deepEqual(m.background_models, [], 'no background ⇒ empty array (D-02 — nothing dropped)');
+    // Defensive: the dominant-by-count model tag must NOT leak in as the canonical.
+    assert.notEqual(m.canonical_model, m.model, 'canonical is NOT coerced to the model tag');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('D-06: re-close preserves the canonical fields (idempotent update)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    const tags = {
+      task_hash: 'deadbeef', agent: 'claude-code', model: 'claude-haiku-4.5',
+      framework: 'gsd', trace_id: 't1',
+      canonical_model: 'claude-opus-4-8', canonical_agent: 'claude',
+      background_models: [{ model: 'haiku', process: 'consolidator-mentions', total_tokens: 9999 }],
+    };
+    const firstId = await writeRun(store, sampleArgs({ tags }));
+    const secondId = await writeRun(store, sampleArgs({ tags }));
+    assert.equal(secondId, firstId, 're-close reuses the same Run id');
+
+    const runs = await collectRuns(store);
+    assert.equal(runs.length, 1, 'still exactly one Run after re-close');
+    assert.equal(runs[0].metadata.canonical_model, 'claude-opus-4-8', 're-close preserves canonical_model');
+    assert.equal(runs[0].metadata.canonical_agent, 'claude', 're-close preserves canonical_agent');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('ATTR-02: readRuns surfaces the canonical fields via the ...meta spread (no query.mjs change)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    const { readRuns } = await import('../../lib/experiments/query.mjs');
+    await writeRun(store, sampleArgs({
+      tags: {
+        task_hash: 'deadbeef', agent: 'claude-code', model: 'claude-haiku-4.5',
+        framework: 'gsd', trace_id: 't1',
+        canonical_model: 'claude-opus-4-8', canonical_agent: 'claude',
+        background_models: [{ model: 'haiku', process: 'consolidator-mentions', total_tokens: 9999 }],
+      },
+    }));
+
+    const rows = await readRuns(store);
+    assert.equal(rows.length, 1, 'one Run surfaced');
+    assert.equal(rows[0].canonical_model, 'claude-opus-4-8', 'canonical_model flows through ...meta spread');
+    assert.equal(rows[0].canonical_agent, 'claude', 'canonical_agent flows through ...meta spread');
+    assert.deepEqual(
+      rows[0].background_models,
+      [{ model: 'haiku', process: 'consolidator-mentions', total_tokens: 9999 }],
+      'background_models flows through ...meta spread',
+    );
+  } finally {
+    await cleanup();
+  }
+});
