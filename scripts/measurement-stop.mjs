@@ -57,7 +57,8 @@ import { pathToFileURL } from 'node:url';
 // so the strict-path writeRun validates entityType against the experiment registry.
 import { openExperimentStore } from '../lib/experiments/store.mjs';
 import { loadTaxonomy, isValidClass, deriveClassFromText } from '../lib/experiments/taxonomy.mjs';
-import { aggregateByTaskId } from '../lib/experiments/token-aggregate.mjs';
+import { aggregateByTaskId, isForegroundGroup } from '../lib/experiments/token-aggregate.mjs';
+import { captureForegroundTokens } from '../lib/lsl/token/stop-adapter-registry.mjs';
 import { writeRun } from '../lib/experiments/run-write.mjs';
 import { deriveGoalSentence } from '../lib/experiments/goal-sentence.mjs';
 import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
@@ -293,23 +294,61 @@ async function main() {
     if (answer) span.goal_sentence = answer; // explicit edit overrides; blank keeps current
   }
 
-  // ── (3) Token aggregation (read-only) + tag sourcing ──
+  // ── (3.0) D-03 capture foreground tokens BEFORE aggregation ──
+  //   The foreground Claude session talks to Anthropic DIRECTLY (bypassing the
+  //   proxy), so its own tokens are absent from token_usage until the stop-adapter
+  //   captures them as cladpt rows stamped with this task_id. Run this FIRST so
+  //   those rows exist when the fg/bg sum below runs. The agent for an interactive
+  //   Claude session is 'claude' (derive from the span / known foreground, default
+  //   'claude'). Best-effort exactly like the (4.5) score path — captureForegroundTokens
+  //   already swallows internally, but wrap it here too so the close NEVER crashes.
+  const foregroundAgent = span.agent ?? span.meta?.agent ?? 'claude';
+  try {
+    await captureForegroundTokens(span, { agent: foregroundAgent });
+  } catch (err) {
+    process.stderr.write(
+      `[measurement-stop] foreground capture failed (non-fatal): ${err.message}\n`,
+    );
+  }
+
+  // ── (3.1) Token aggregation (read-only) + fg/bg split → canonical (D-05/D-06) ──
   const { totals, byAgentModel } = aggregateByTaskId(span.task_id);
-  const dominant = byAgentModel[0] ?? {};
+  // Split the breakdown into the measured foreground groups vs the concurrent
+  // background-daemon groups (isForegroundGroup = adapter user_hash AND a
+  // non-denylisted process). Canonical = the FIRST foreground group (or null) —
+  // NEVER the dominant-by-count row, which was the finding-B bug (a 1.24M-token
+  // haiku daemon out-massed the Opus foreground). null persists as "unmeasured"
+  // downstream — it is never coerced to a dominant fallback (D-05).
+  const fgGroups = byAgentModel.filter(isForegroundGroup);
+  const bgGroups = byAgentModel.filter((g) => !isForegroundGroup(g));
+  const canonical = fgGroups[0] ?? null;
+  const canonicalModel = canonical?.model ?? null;
   // Normalize to a canonical agent family. Proxy token rows leave `agent` blank
-  // and only set `model` (e.g. 'claude-sonnet-4.6'), so the raw `dominant.agent`
-  // is '' for Claude/Copilot runs — which made the route reader short-circuit to
+  // and only set `model` (e.g. 'claude-sonnet-4.6'), so the raw group `agent` is
+  // '' for Claude/Copilot runs — which made the route reader short-circuit to
   // null. Derive the family from (agent, model) so heuristics actually populate.
-  const normAgent = normalizeAgent(dominant);
+  const canonicalAgent = canonical ? normalizeAgent(canonical) : null;
+  // Segregate the background daemons (model, process, total_tokens) — nothing is
+  // dropped, so the operator can still see what ran concurrently (D-02).
+  const backgroundModels = bgGroups.map((g) => ({
+    model: g.model,
+    process: g.process,
+    total_tokens: g.total_tokens,
+  }));
+
   const taskHash = span.goal_sentence
     ? crypto.createHash('sha256').update(span.goal_sentence).digest('hex')
     : null; // A3 — null allowed (D-13)
   const tags = {
     task_hash: taskHash,
-    agent: normAgent ?? dominant.agent ?? null, // canonical family when classifiable
-    model: dominant.model ?? null,
-    framework: span.meta?.framework ?? normAgent ?? dominant.agent ?? null, // A2 — null allowed (D-13)
+    agent: canonicalAgent, // canonical foreground family (D-05); null when unmeasured
+    model: canonicalModel,
+    framework: span.meta?.framework ?? canonicalAgent, // A2 — null allowed (D-13)
     trace_id: span.task_id,
+    // ── D-06: canonical attribution + segregated background daemons ──
+    canonical_model: canonicalModel,
+    canonical_agent: canonicalAgent,
+    background_models: backgroundModels,
   };
 
   // ── (3.5/3.6) Route heuristics from the normalized cross-agent trace ──
@@ -321,8 +360,8 @@ async function main() {
   //   and inject it via the seam (build-trace.mjs's default locator is a stub by
   //   design); buildTraceSeam supplies a time-window-based Claude locator.
   const trace = await buildNormalizedTrace(span, {
-    dominantAgent: normAgent,
-    __seam: buildTraceSeam(normAgent, span),
+    dominantAgent: canonicalAgent,
+    __seam: buildTraceSeam(canonicalAgent, span),
   });
   const heuristics = trace ? computeHeuristics(trace) : ALL_NULL_HEURISTICS;
 
