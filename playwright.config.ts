@@ -13,9 +13,9 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   retries: 0,
-  // `webServer.reuseExistingServer: true` honors a pre-running `npm run dev`
-  // on :5173 (the standing development setup); Playwright only spawns its
-  // own Vite if nothing is listening on the port.
+  // NOTE: there is intentionally NO `webServer:` block — the operator runs the
+  // dev server and the tests target it via each project's baseURL. See the
+  // "Vite dev server contract" comment at the bottom of this file for the why.
   // No top-level `use` — each project carries its own baseURL.
   projects: [
     {
