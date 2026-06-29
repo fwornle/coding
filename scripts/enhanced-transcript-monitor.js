@@ -995,6 +995,10 @@ class EnhancedTranscriptMonitor {
       project: path.basename(this.config.projectPath || ''),
       modifiedFiles: modifiedFiles.length > 0 ? modifiedFiles : undefined,
       readFiles: readFiles.length > 0 ? readFiles : undefined,
+      // Phase 75 (OBS-01 / D-09): link this observation to the active Run via
+      // the task_id resolved at the fire site by the SAME single-span reader
+      // the token path uses (resolveLiveTaskIdSafe). '' when no span is open.
+      task_id: taskId || undefined,
     };
 
     // Patch recent observations that have "Artifacts: none" with the actual modified files.

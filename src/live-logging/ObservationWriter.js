@@ -36,6 +36,10 @@ import { EventEmitter } from 'node:events';
 import Redis from 'ioredis';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { getLSLWindow } from '../../lib/lsl/window.mjs';
+// Phase 75 (OBS-01 / D-09): the shared single-span task_id reader. ETM stamps
+// metadata.task_id at the fire site; this is the best-effort fallback so direct
+// callers (without ETM) still link observations to the active Run. Never throws.
+import { resolveLiveTaskIdSafe } from '../../lib/lsl/token/task-id.mjs';
 
 // Phase 55 Plan 06 Task 3 — process-wide observation-write event bus.
 //
@@ -1126,6 +1130,13 @@ export class ObservationWriter {
     const messageTimestamp = messages.find(m => m.createdAt)?.createdAt;
     const nowISO = messageTimestamp || new Date().toISOString();
 
+    // Phase 75 (OBS-01 / D-09): link the observation to the active Run via
+    // task_id. ETM resolves it at the fire site and passes it on metadata; for
+    // direct callers without ETM, fall back to the same single-span reader the
+    // token path uses so token attribution and observation linkage agree on the
+    // active task_id. Best-effort — '' when no span is open / on any failure.
+    const taskId = metadata.task_id ?? (await resolveLiveTaskIdSafe());
+
     // ── Phase 44 Plan 12 (A-1 cutover): write to km-core ──────────────────
     //
     // The legacy SQLite INSERT INTO observations is GONE. Every observation
@@ -1160,7 +1171,14 @@ export class ObservationWriter {
       // (lib/vkb-server/data-processor.js:175) maps it to the 'online'
       // bucket → red dot, not blue.
       entity.ontologyClass = 'Detail';
-      entity.metadata = { ...entity.metadata, source: 'auto' };
+      // Phase 75 (OBS-01): stamp task_id into the persisted entity metadata so
+      // observations are queryable per Run. Only set a non-empty value so a
+      // no-span fire doesn't pollute metadata with ''.
+      entity.metadata = {
+        ...entity.metadata,
+        source: 'auto',
+        ...(taskId ? { task_id: taskId } : {}),
+      };
       const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
       await this._anchorEntity(kmStore, mintedId);
     } catch (err) {
