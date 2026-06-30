@@ -120,6 +120,17 @@ async function redactSecrets(text) {
   return redactorInstance.redact(text);
 }
 
+// Exit-code contract (paired with the launchd plist `KeepAlive:{SuccessfulExit:false}`):
+//   exit 0                 → "intentional, do NOT relaunch" — a clean defer to a
+//                            healthy holder (duplicate) or a signal-driven stop.
+//   exit ETM_EXIT_RELAUNCH → "relaunch me" — idle-cycle auto-exit; launchd brings
+//                            it back to catch a session resumed after the idle window.
+//   exit 1                 → error/crash — launchd relaunches (non-zero).
+// This is what fixes the duplicate-spawn churn: under KeepAlive:true a clean defer
+// (formerly exit 1) was treated as a crash and respawned every ThrottleInterval (15s),
+// storming forever while a healthy holder existed. A defer now exits 0 → no relaunch.
+const ETM_EXIT_RELAUNCH = 70; // non-zero sentinel: "stopped on purpose, please relaunch"
+
 class EnhancedTranscriptMonitor {
   constructor(config = {}) {
     // Initialize debug early so it can be used in getProjectPath
@@ -4077,8 +4088,12 @@ ORDER BY m.time_created ASC;`;
         // healthy instance.
         console.error(`❌ Another instance of ${serviceName} is already running for project ${path.basename(projectPath)}`);
         console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}${probe.staleMs == null ? ' (heartbeat staleness unprovable — deferring)' : ` (heartbeat fresh: ${Math.round(probe.staleMs / 1000)}s, writing)`}`);
-        console.error(`   To fix: Kill the existing instance with: kill ${existingService.pid}`);
-        process.exit(1);
+        console.error(`   This instance is redundant — exiting cleanly (0) so launchd does NOT relaunch it (no respawn storm).`);
+        // Clean defer: a healthy holder already owns the singleton, so this
+        // duplicate has nothing to do. Exit 0 (success) — with the plist's
+        // KeepAlive:{SuccessfulExit:false}, launchd will NOT relaunch us. Exiting
+        // non-zero here is what caused the 15s respawn storm (187 collisions/day).
+        process.exit(0);
       }
     }
 
@@ -4259,13 +4274,15 @@ ORDER BY m.time_created ASC;`;
           const idleMinutes = Math.round(idleTime / 60000);
           process.stderr.write(`[EnhancedTranscriptMonitor] ${new Date().toISOString()} Idle timeout reached: no transcript activity for ${idleMinutes} minutes. Auto-exiting.\n`);
 
-          // Graceful shutdown WITHOUT stop marker — PSM should be free to restart
-          // this monitor when a new Claude session starts. Only user-initiated
-          // stops (SIGINT/SIGTERM) should set the stop marker.
+          // Graceful idle shutdown WITHOUT stop marker — launchd should restart
+          // this monitor when a new Claude session starts. Exit with the relaunch
+          // sentinel (non-zero) so KeepAlive:{SuccessfulExit:false} brings us back
+          // to catch a session resumed after the idle window. (A plain exit 0 would
+          // be treated as "intentional stop" and leave the project unmonitored.)
           if (this.intervalId) clearInterval(this.intervalId);
           if (this.healthIntervalId) clearInterval(this.healthIntervalId);
           await this.stop({ setStopMarker: false });
-          process.exit(0);
+          process.exit(ETM_EXIT_RELAUNCH);
         }
       }
 

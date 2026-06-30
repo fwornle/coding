@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.etm</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/Users/Q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js</string>
+        <string>/Users/Q284340/Agentic/coding</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/Q284340/Agentic/coding</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- KeepAlive: relaunch ONLY on abnormal exit (non-zero), NOT on every exit.
+         A clean defer to a healthy singleton holder exits 0 → no relaunch, which
+         kills the 15s respawn storm (187 collisions/day) that KeepAlive:true caused
+         by treating every legitimate defer as a crash. Idle auto-exit uses a
+         non-zero relaunch sentinel (70) so launchd still brings ETM back to catch a
+         resumed session. See scripts/enhanced-transcript-monitor.js exit-code contract. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>15</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/Q284340/Agentic/coding/.logs/etm.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/Q284340/Agentic/coding/.logs/etm.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin</string>
+        <key>CODING_AGENT</key>
+        <string>claude</string>
+        <key>OBS_API_URL</key>
+        <string>http://localhost:12436</string>
+    </dict>
+</dict>
+</plist>
