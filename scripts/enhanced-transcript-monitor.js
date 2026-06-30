@@ -71,6 +71,14 @@ import {
   evaluateHolderLiveness,
   decideReclaim,
 } from '../lib/live-logging/singleton-reclaim.mjs';
+// Periodic in-progress observations for long turns: fire an extra observation
+// each time a turn accumulates another token-delta of model output, so a 40-min
+// turn isn't collapsed into a single prompt-time row.
+import {
+  DEFAULT_PROGRESS_TOKEN_DELTA,
+  sumOutputTokens,
+  progressFireDecision,
+} from '../lib/live-logging/progress-fire.mjs';
 // Phase 75 (OBS-01): resolve the active task_id at fire time via the SAME
 // single-span reader the token path uses (D-09) — no proxy coupling.
 import { resolveLiveTaskIdSafe } from '../lib/lsl/token/task-id.mjs';
@@ -177,6 +185,16 @@ class EnhancedTranscriptMonitor {
     // This prevents orphaned monitors when Claude sessions are force-quit
     this.idleTimeout = config.idleTimeout || 1800000; // 30 minutes default
     this.lastActivityTime = Date.now(); // Track when we last saw transcript activity
+
+    // In-progress observations: fire an extra observation each time the live
+    // prompt-set accumulates this many model output tokens. 0 disables. Tuned to
+    // 30k (see progress-fire.mjs); override via config or ETM_PROGRESS_TOKEN_DELTA.
+    this.progressTokenDelta = config.progressTokenDelta ??
+      (process.env.ETM_PROGRESS_TOKEN_DELTA != null
+        ? Number(process.env.ETM_PROGRESS_TOKEN_DELTA)
+        : DEFAULT_PROGRESS_TOKEN_DELTA);
+    // Per-cursor mark of output tokens already fired (keyed like _lastFiredExchangeUuid).
+    this._progressFiredTokens = new Map();
     
     // Initialize adaptive exchange extractor for streaming processing
     this.adaptiveExtractor = new AdaptiveExchangeExtractor();
@@ -624,6 +642,9 @@ class EnhancedTranscriptMonitor {
           const exchanges = await this.getUnprocessedExchanges();
           if (exchanges.length > 0) {
             await this.processExchanges(exchanges);
+            // After new content lands, emit an in-progress observation if this
+            // turn has crossed another output-token delta (long-turn coverage).
+            this._maybeFireProgressObservation();
           }
 
           // Time-based flush: fire observation for accumulated exchanges even when
@@ -924,6 +945,42 @@ class EnhancedTranscriptMonitor {
         // unhandled rejection that kills the long-lived ETM daemon.
         process.stderr.write(`[ObservationTap] batch fire failed (non-fatal): ${err?.message || err}\n`);
       });
+    }
+  }
+
+  /**
+   * In-progress observation trigger: while a turn is still accumulating, fire an
+   * extra observation each time it has produced `progressTokenDelta` more model
+   * output tokens since the last fire — so a long (40-min / 100k-token) turn isn't
+   * collapsed into a single prompt-time row.
+   *
+   * Reuses _firePromptSetObservation, whose `_lastFiredExchangeUuid` cursor emits
+   * ONLY exchanges past the last fire, so the eventual completion fire (which
+   * shares that cursor) never re-emits already-progressed work. Observation-only
+   * (no LSL slice) — the full turn still gets one LSL slice at completion.
+   * Best-effort and never throws into the poll loop.
+   */
+  _maybeFireProgressObservation() {
+    try {
+      if (!(this.progressTokenDelta > 0)) return;
+      const set = this.currentUserPromptSet;
+      if (!set || set.length === 0) return;
+      const cursorKey = `${this.sessionId || this.agentType || 'default'}|${this.transcriptPath || ''}`;
+      const setOutputTokens = sumOutputTokens(set);
+      const firedOutputTokens = this._progressFiredTokens.get(cursorKey) || 0;
+      const { fire, mark } = progressFireDecision({
+        setOutputTokens,
+        firedOutputTokens,
+        thresholdTokens: this.progressTokenDelta,
+      });
+      this._progressFiredTokens.set(cursorKey, mark);
+      if (fire) {
+        process.stderr.write(`[ObservationTap] in-progress fire: turn at ${setOutputTokens} output tokens (+${setOutputTokens - firedOutputTokens} since last), Δ=${this.progressTokenDelta}\n`);
+        this._firePromptSetObservation(set);
+      }
+    } catch (err) {
+      // Non-fatal: a progress-fire failure must never break the poll loop.
+      process.stderr.write(`[ObservationTap] in-progress fire skipped (non-fatal): ${err?.message || err}\n`);
     }
   }
 
@@ -2520,7 +2577,8 @@ ORDER BY m.time_created ASC;`;
           isComplete: true,  // FIX: Continuation exchanges ARE complete - they contain accumulated content
           stopReason: 'continuation',
           isContinuation: true,  // Flag for special handling
-          lastMessageUuid: firstMessage.uuid  // Track actual last message for accurate lastProcessedUuid
+          lastMessageUuid: firstMessage.uuid,  // Track actual last message for accurate lastProcessedUuid
+          outputTokens: 0  // Accumulated model output tokens (drives in-progress fires)
         };
         this.debug(`📎 Created continuation exchange for mid-conversation messages (id: ${currentExchange.id})`);
       }
@@ -2547,7 +2605,8 @@ ORDER BY m.time_created ASC;`;
           isUserPrompt: true,
           isComplete: false,  // NEW: Track completion status
           stopReason: null,    // NEW: Track stop reason
-          lastMessageUuid: message.uuid  // Track actual last message for accurate lastProcessedUuid
+          lastMessageUuid: message.uuid,  // Track actual last message for accurate lastProcessedUuid
+          outputTokens: 0  // Accumulated model output tokens (drives in-progress fires)
         };
       } else if (message.type === 'assistant' && currentExchange) {
         if (message.message?.content) {
@@ -2570,6 +2629,12 @@ ORDER BY m.time_created ASC;`;
         // Track the actual last message UUID for accurate resumption
         if (message.uuid) {
           currentExchange.lastMessageUuid = message.uuid;
+        }
+
+        // Accumulate model output tokens (drives token-delta in-progress fires).
+        const outTok = message.message?.usage?.output_tokens;
+        if (typeof outTok === 'number' && outTok > 0) {
+          currentExchange.outputTokens = (currentExchange.outputTokens || 0) + outTok;
         }
 
         // NEW: Mark exchange as complete when stop_reason is present
