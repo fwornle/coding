@@ -961,12 +961,21 @@ class EnhancedTranscriptMonitor {
     // alone could collapse cursors across two concurrent transcripts of the same
     // agent type when sessionId is unset, letting them skip each other's batches.
     const cursorKey = `${this.sessionId || this.agentType || 'default'}|${this.transcriptPath || ''}`;
+    // The cursor must track a STABLE per-exchange identity — the user-prompt START
+    // uuid (exchange.uuid||exchange.id), which is fixed for the life of the
+    // exchange — NOT the mutable lastMessageUuid (the END). As a long turn appends
+    // assistant/tool messages the same logical exchange is rebuilt with a fresh
+    // lastMessageUuid every poll; keying on it meant findIndex couldn't relocate
+    // the last-fired exchange (→ -1), so `pending` fell back to the WHOLE set and
+    // every already-fired batch re-emitted with new batch boundaries the obs-api
+    // (task_id, batch-uuid) dedup couldn't merge — the long-turn / force-flush
+    // re-fire duplicates. The START id is invariant, so the cursor relocates
+    // reliably even after the exchange grows. (Pitfall 4)
+    const stableId = (ex) => ex?.uuid || ex?.id || ex?.lastMessageUuid || '';
     const cursor = this._lastFiredExchangeUuid.get(cursorKey);
     let pending = exchanges;
     if (cursor) {
-      const idx = exchanges.findIndex(
-        (ex) => (ex?.lastMessageUuid || ex?.uuid || ex?.id) === cursor,
-      );
+      const idx = exchanges.findIndex((ex) => stableId(ex) === cursor);
       if (idx >= 0) pending = exchanges.slice(idx + 1);
     }
     if (pending.length === 0) return;
@@ -979,9 +988,13 @@ class EnhancedTranscriptMonitor {
     let advanced = false;
     for (const batch of batches) {
       const lastEx = batch[batch.length - 1];
+      // batchLastMessageUuid stays the MUTABLE end uuid — it is the obs-api content
+      // dedup key ((task_id, batch-last-message-uuid)), where end-of-batch identity
+      // is what we want. The CURSOR, by contrast, advances by the batch's last
+      // exchange STABLE start id so the next poll can relocate it after the
+      // exchange grows (see the stableId rationale above).
       const batchLastMessageUuid = lastEx?.lastMessageUuid || lastEx?.uuid || lastEx?.id || '';
-      // Advance the cursor so the next call starts after this batch.
-      this._lastFiredExchangeUuid.set(cursorKey, batchLastMessageUuid);
+      this._lastFiredExchangeUuid.set(cursorKey, stableId(lastEx));
       advanced = true;
       taskIdPromise.then((taskId) => {
         this._fireBatchObservation(batch, taskId, batchLastMessageUuid);
