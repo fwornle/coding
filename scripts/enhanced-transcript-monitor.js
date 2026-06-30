@@ -193,9 +193,15 @@ class EnhancedTranscriptMonitor {
       (process.env.ETM_PROGRESS_TOKEN_DELTA != null
         ? Number(process.env.ETM_PROGRESS_TOKEN_DELTA)
         : DEFAULT_PROGRESS_TOKEN_DELTA);
-    // Per-cursor mark of output tokens already fired (keyed like _lastFiredExchangeUuid).
-    this._progressFiredTokens = new Map();
-    
+    // Fire cursors — persisted across restarts so a mid-turn restart never
+    // re-fires already-fired exchanges (which produced near-duplicate
+    // observations the obs-api dedup couldn't merge). Loaded from the state file:
+    //   _lastFiredExchangeUuid — last fired batch uuid per cursorKey (dedup boundary)
+    //   _progressFiredTokens   — output-token mark per cursorKey (in-progress fires)
+    const _persisted = this._loadPersistedState();
+    this._lastFiredExchangeUuid = new Map(Object.entries(_persisted.firedExchangeCursors || {}));
+    this._progressFiredTokens = new Map(Object.entries(_persisted.progressFiredTokens || {}));
+
     // Initialize adaptive exchange extractor for streaming processing
     this.adaptiveExtractor = new AdaptiveExchangeExtractor();
     
@@ -340,6 +346,37 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
+   * Read the full persisted state object (or {} if absent/unreadable). Used at
+   * construction to restore the fire cursors across restarts.
+   */
+  _loadPersistedState() {
+    try {
+      if (fs.existsSync(this.stateFile)) {
+        return JSON.parse(fs.readFileSync(this.stateFile, 'utf-8')) || {};
+      }
+    } catch { /* ignore — fall back to empty */ }
+    return {};
+  }
+
+  /**
+   * Serialize the in-memory fire cursors for persistence. Bounded by pruning to
+   * the most recent entries so the state file can't grow without limit across
+   * many sessions (cursors are keyed by sessionId|transcriptPath).
+   */
+  _serializeFireCursors() {
+    const MAX = 50;
+    const prune = (map) => {
+      const entries = [...(map || [])];
+      const kept = entries.length > MAX ? entries.slice(entries.length - MAX) : entries;
+      return Object.fromEntries(kept);
+    };
+    return {
+      firedExchangeCursors: prune(this._lastFiredExchangeUuid),
+      progressFiredTokens: prune(this._progressFiredTokens),
+    };
+  }
+
+  /**
    * Initialize multi-transcript tracking by discovering all active transcripts
    */
   _initMultiTranscriptTracking() {
@@ -479,6 +516,7 @@ class EnhancedTranscriptMonitor {
         lastProcessedUuid: this.lastProcessedUuid,
         transcriptPath: this.transcriptPath,
         perTranscript,
+        ...this._serializeFireCursors(),
         lastUpdated: new Date().toISOString()
       };
       fs.writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
@@ -763,10 +801,15 @@ class EnhancedTranscriptMonitor {
       if (!fs.existsSync(stateDir)) {
         fs.mkdirSync(stateDir, { recursive: true });
       }
+      // Merge with existing so this lighter save can't clobber perTranscript or
+      // the persisted fire cursors written by _saveMultiTranscriptState.
+      const existing = this._loadPersistedState();
       const state = {
+        ...existing,
         lastProcessedUuid: this.lastProcessedUuid,
-        lastUpdated: new Date().toISOString(),
-        transcriptPath: this.transcriptPath
+        transcriptPath: this.transcriptPath,
+        ...this._serializeFireCursors(),
+        lastUpdated: new Date().toISOString()
       };
       fs.writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
     } catch (error) {
@@ -933,11 +976,13 @@ class EnhancedTranscriptMonitor {
     const taskIdPromise = resolveLiveTaskIdSafe().catch(() => '');
 
     const batches = this._splitIntoRecaptureBatches(pending);
+    let advanced = false;
     for (const batch of batches) {
       const lastEx = batch[batch.length - 1];
       const batchLastMessageUuid = lastEx?.lastMessageUuid || lastEx?.uuid || lastEx?.id || '';
       // Advance the cursor so the next call starts after this batch.
       this._lastFiredExchangeUuid.set(cursorKey, batchLastMessageUuid);
+      advanced = true;
       taskIdPromise.then((taskId) => {
         this._fireBatchObservation(batch, taskId, batchLastMessageUuid);
       }).catch((err) => {
@@ -945,6 +990,12 @@ class EnhancedTranscriptMonitor {
         // unhandled rejection that kills the long-lived ETM daemon.
         process.stderr.write(`[ObservationTap] batch fire failed (non-fatal): ${err?.message || err}\n`);
       });
+    }
+    // Persist the advanced fire cursor immediately so a restart between now and
+    // the next poll-loop save cannot re-fire these batches (the duplicate-observation
+    // root cause). Best-effort — never throw into the caller.
+    if (advanced) {
+      try { this.saveLastProcessedUuid(); } catch { /* non-fatal */ }
     }
   }
 
