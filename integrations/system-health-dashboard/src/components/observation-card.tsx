@@ -31,6 +31,8 @@ export interface Observation {
   llmTokens?: string | LlmTokens | null
   llmLatencyMs?: number | null
   quality?: 'high' | 'normal' | 'low'
+  /** 'progress' marks a mid-turn ETM snapshot (rendered faint + filterable). */
+  kind?: string | null
   /** Phase 35: 'cold' rows from JSON cold store, 'sqlite' from primary DB. */
   _origin?: 'cold' | 'sqlite'
 }
@@ -129,6 +131,17 @@ function SubAgentBadge() {
   )
 }
 
+function ProgressBadge() {
+  return (
+    <span
+      className="text-[10px] leading-none px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 font-mono whitespace-nowrap"
+      title="Mid-turn progress snapshot — an in-flight checkpoint of a long turn, superseded by the turn's final observation."
+    >
+      ⋯ progress
+    </span>
+  )
+}
+
 function parseTokens(raw: string | LlmTokens | null | undefined): LlmTokens | null {
   if (!raw) return null
   if (typeof raw === 'string') {
@@ -142,17 +155,22 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
   const llmTag = formatLlmTag(observation)
   const tokens = parseTokens(observation.llmTokens)
   const isLow = observation.quality === 'low'
+  const isProgress = observation.kind === 'progress'
   const isSub = isSubAgent(observation)
+  // Progress snapshots are mid-turn checkpoints — de-emphasized but distinct from
+  // low-value (which is more faded). isLow keeps precedence when both apply.
+  const faint = isLow ? 'opacity-40' : isProgress ? 'opacity-60' : ''
 
   if (compact && !isExpanded) {
     // Single-line compact row
     return (
       <div
-        className={`flex items-center gap-2 px-3 py-1 cursor-pointer rounded hover:bg-accent/50 border-l-2 ${borderColor} ${isLow ? 'opacity-40' : ''}`}
+        className={`flex items-center gap-2 px-3 py-1 cursor-pointer rounded hover:bg-accent/50 border-l-2 ${borderColor} ${faint}`}
         onClick={onToggle}
       >
         <AgentBadge agent={observation.agent} />
         {isSub && <SubAgentBadge />}
+        {isProgress && <ProgressBadge />}
         <span className="text-[11px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
           {observation._origin === 'cold' && (
             <Snowflake className="w-3 h-3 text-sky-400/80 shrink-0" aria-label="From cold storage"><title>Older than retention window — served from JSON cold store.</title></Snowflake>
@@ -179,7 +197,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle}>
       <Card
-        className={`transition-colors overflow-hidden ${isLow ? 'opacity-40' : ''} ${
+        className={`transition-colors overflow-hidden ${faint} ${
           isExpanded
             ? `bg-accent border-l-[3px] ${borderColor}`
             : 'hover:bg-accent/50'
@@ -190,6 +208,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
             <div className="flex items-center gap-3 mb-0.5">
               <AgentBadge agent={observation.agent} />
               {isSub && <SubAgentBadge />}
+              {isProgress && <ProgressBadge />}
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 {observation._origin === 'cold' && (
                   <Snowflake className="w-3.5 h-3.5 text-sky-400/80 shrink-0" aria-label="From cold storage"><title>Older than retention window — served from JSON cold store.</title></Snowflake>

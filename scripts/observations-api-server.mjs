@@ -2015,7 +2015,7 @@ async function collectByOntologyClass(cls) {
 app.get('/api/coding/observations', async (_req, res) => {
   try {
     const req = _req;
-    const { agent, project, from, to, q, quality } = req.query;
+    const { agent, project, from, to, q, quality, excludeKind } = req.query;
     const { limit, offset } = parseLimitOffset(req);
 
     const reader = ensureColdStore();
@@ -2042,6 +2042,8 @@ app.get('/api/coding/observations', async (_req, res) => {
       artifacts: Array.isArray(r.modifiedFiles) ? r.modifiedFiles : [],
       timestamp: typeof r.createdAt === 'string' ? r.createdAt : '',
       quality: typeof r.quality === 'string' ? r.quality : 'normal',
+      // Surface the progress-snapshot tag to the dashboard (faint/filtered render).
+      kind: typeof r.kind === 'string' ? r.kind : null,
     }));
 
     // Legacy filter semantics, ported from the prior SQLite WHERE-builder.
@@ -2062,6 +2064,12 @@ app.get('/api/coding/observations', async (_req, res) => {
     if (from) filtered = filtered.filter((row) => row.timestamp && row.timestamp >= from);
     if (toExclusive) filtered = filtered.filter((row) => row.timestamp && row.timestamp <= toExclusive);
     if (qualitySet) filtered = filtered.filter((row) => qualitySet.has(row.quality ?? 'normal'));
+    // excludeKind (e.g. 'progress') drops mid-turn snapshot rows when the user
+    // unchecks them. Comma-separated list supported; rows with no kind always pass.
+    if (excludeKind) {
+      const excl = new Set(String(excludeKind).split(',').map((s) => s.trim()).filter(Boolean));
+      filtered = filtered.filter((row) => !(row.kind && excl.has(row.kind)));
+    }
     if (qLower) {
       filtered = filtered.filter((row) =>
         typeof row.content === 'string' && row.content.toLowerCase().includes(qLower)

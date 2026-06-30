@@ -22,6 +22,7 @@ export interface FilterState {
   project: string
   q: string
   hideLow: boolean
+  hideProgress: boolean
 }
 
 interface ObservationFiltersProps {
@@ -47,6 +48,7 @@ export function getDefaultFilters(): FilterState {
     project: '',
     q: '',
     hideLow: false,
+    hideProgress: false,
   }
 }
 
@@ -167,6 +169,17 @@ export function ObservationFilters({ filters, onApply }: ObservationFiltersProps
         />
         <label htmlFor="hide-low" className="text-sm cursor-pointer">
           Hide low-value
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="hide-progress"
+          checked={local.hideProgress}
+          onCheckedChange={(checked) => setLocal(prev => ({ ...prev, hideProgress: !!checked }))}
+        />
+        <label htmlFor="hide-progress" className="text-sm cursor-pointer">
+          Hide progress snapshots
         </label>
       </div>
 

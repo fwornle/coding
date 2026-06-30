@@ -34,6 +34,7 @@ function buildQueryString(filters: FilterState, page: number): string {
   if (filters.project) params.set('project', filters.project)
   if (filters.q) params.set('q', filters.q)
   if (filters.hideLow) params.set('quality', 'high,normal')
+  if (filters.hideProgress) params.set('excludeKind', 'progress')
 
   return params.toString()
 }

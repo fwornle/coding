@@ -1,6 +1,25 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useState } from 'react'
+import { Sun, Moon, Monitor } from 'lucide-react'
+import { type Theme, getStoredTheme, cycleTheme } from '@/lib/theme'
+
+function ThemeToggle() {
+  const [theme, setThemeState] = useState<Theme>(() => getStoredTheme())
+  const Icon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
+  const label = theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'System'
+  return (
+    <button
+      type="button"
+      onClick={() => setThemeState(cycleTheme(theme))}
+      title={`Theme: ${label} (click to change)`}
+      aria-label={`Theme: ${label}. Click to change.`}
+      className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  )
+}
 
 // Same-origin /api/* — matches the performanceSlice thunks (WR-05). The dashboard's
 // static-server reverse-proxies /api/* to the Health API, so badge counts survive
@@ -63,6 +82,9 @@ export function NavBar() {
             </Link>
           )
         })}
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </div>
     </nav>
   )

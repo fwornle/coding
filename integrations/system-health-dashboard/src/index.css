@@ -17,9 +17,11 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* The Vite scaffold hardcoded `color: rgba(255,255,255,.87)` + `background-color:
+     #242424` here, which fought the shadcn `--background`/`--foreground` theme
+     vars and forced a dark-on-light contradiction regardless of theme. Colors now
+     come exclusively from the theme vars via `body { @apply bg-background
+     text-foreground }`. color-scheme is set per-mode by lib/theme.ts on <html>. */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;

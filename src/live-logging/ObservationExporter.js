@@ -244,6 +244,9 @@ export class ObservationExporter {
             project: m.project || 'coding',
             source: m.source || null,
             quality: m.quality || 'normal',
+            // kind tags mid-turn progress snapshots ('progress') so the dashboard
+            // can render them faintly / behind a filter. null for normal obs.
+            kind: m.kind || null,
             createdAt: attrs.createdAt || null,
             digestedAt: m.digestedAt || null,
             llm: m.llmModel ? { model: m.llmModel, provider: m.llmProvider || null } : null,
