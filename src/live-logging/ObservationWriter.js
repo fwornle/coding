@@ -1108,8 +1108,13 @@ export class ObservationWriter {
       return null;
     }
 
-    // Semantic dedup: check if a very similar observation was written recently (same agent, last 5)
-    if (await this._isSemanticallyDuplicate(agent, summary)) {
+    // Semantic dedup: check if a very similar observation was written recently (same agent, last 5).
+    // kind:'progress' snapshots are EXEMPT: a long turn emits several near-identical
+    // mid-turn checkpoints (and the final obs is near-identical to them too). Running
+    // them through the 4h window would drop all but the first — and worse, suppress the
+    // turn's FINAL observation as a "duplicate" of an earlier partial snapshot. Progress
+    // snapshots are intentionally periodic; the token-delta gate already rate-limits them.
+    if (metadata.kind !== 'progress' && await this._isSemanticallyDuplicate(agent, summary)) {
       process.stderr.write(`[ObservationWriter] Dedup: semantically similar observation already exists\n`);
       return null;
     }
@@ -1178,6 +1183,9 @@ export class ObservationWriter {
         ...entity.metadata,
         source: 'auto',
         ...(taskId ? { task_id: taskId } : {}),
+        // Persist the progress tag explicitly so _isSemanticallyDuplicate's
+        // candidate filter can exclude these snapshots on later writes.
+        ...(metadata.kind ? { kind: metadata.kind } : {}),
       };
       const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
       await this._anchorEntity(kmStore, mintedId);
@@ -1482,9 +1490,14 @@ export class ObservationWriter {
     // data source moves.
     const fourHoursAgoISO = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const entities = await this._kmStore.findRecentByAgent(agent, fourHoursAgoISO, 50);
-    const recent = entities.map((e) => ({
-      summary: (e.metadata && e.metadata.summary) || e.description || '',
-    }));
+    const recent = entities
+      // kind:'progress' snapshots never act as dedup candidates — otherwise an
+      // earlier partial mid-turn snapshot would suppress the turn's final, complete
+      // observation (the snapshots are intentionally near-identical to it).
+      .filter((e) => !(e.metadata && e.metadata.kind === 'progress'))
+      .map((e) => ({
+        summary: (e.metadata && e.metadata.summary) || e.description || '',
+      }));
 
     const newKeywords = this._extractKeywords(newText);
     if (newKeywords.size < 3) return false;

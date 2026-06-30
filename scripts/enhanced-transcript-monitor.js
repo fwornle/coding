@@ -1018,11 +1018,14 @@ class EnhancedTranscriptMonitor {
    * output tokens since the last fire — so a long (40-min / 100k-token) turn isn't
    * collapsed into a single prompt-time row.
    *
-   * Reuses _firePromptSetObservation, whose `_lastFiredExchangeUuid` cursor emits
-   * ONLY exchanges past the last fire, so the eventual completion fire (which
-   * shares that cursor) never re-emits already-progressed work. Observation-only
-   * (no LSL slice) — the full turn still gets one LSL slice at completion.
-   * Best-effort and never throws into the poll loop.
+   * Fires via _fireProgressSnapshot — a DEDICATED path that does NOT touch the
+   * completion fire-cursor (_lastFiredExchangeUuid). It cannot reuse
+   * _firePromptSetObservation: that cursor advances by the exchange's stable
+   * START id, so once a long turn's single growing exchange has been fired the
+   * cursor would suppress every later snapshot (and the completion). The snapshot
+   * is a distinct, kind:'progress' observation stamped at the snapshot MOMENT.
+   * Observation-only (no LSL slice) — the full turn still gets one LSL slice at
+   * completion. Best-effort and never throws into the poll loop.
    */
   _maybeFireProgressObservation() {
     try {
@@ -1040,12 +1043,41 @@ class EnhancedTranscriptMonitor {
       this._progressFiredTokens.set(cursorKey, mark);
       if (fire) {
         process.stderr.write(`[ObservationTap] in-progress fire: turn at ${setOutputTokens} output tokens (+${setOutputTokens - firedOutputTokens} since last), Δ=${this.progressTokenDelta}\n`);
-        this._firePromptSetObservation(set);
+        this._fireProgressSnapshot(set, mark);
       }
     } catch (err) {
       // Non-fatal: a progress-fire failure must never break the poll loop.
       process.stderr.write(`[ObservationTap] in-progress fire skipped (non-fatal): ${err?.message || err}\n`);
     }
+  }
+
+  /**
+   * Fire a mid-turn progress snapshot as a standalone kind:'progress' observation.
+   *
+   * Deliberately bypasses the _lastFiredExchangeUuid completion cursor (so it
+   * neither gets suppressed by it nor advances it — the turn's final completion
+   * fire is unaffected). Identity is made distinct on three axes so the snapshot
+   * never collides with the final observation or a prior snapshot:
+   *   • dedup key: a synthetic `${lastUuid}-progress-${mark}` batch uuid
+   *     (the obs-api 15s (task_id, batch-uuid) key + ETM _firedPromptKeys),
+   *   • createdAt: the snapshot MOMENT (not prompt time) — avoids the exact
+   *     (agent, project, createdAt) re-fire-dedup tuple the completion owns,
+   *   • metadata.kind:'progress' — obs-api exempts it from the 4h semantic dedup.
+   *
+   * @param {object[]} set the live in-flight prompt-set exchanges
+   * @param {number} mark cumulative output-token mark for this snapshot
+   */
+  _fireProgressSnapshot(set, mark) {
+    const lastEx = set[set.length - 1];
+    const lastUuid = lastEx?.lastMessageUuid || lastEx?.uuid || lastEx?.id || '';
+    const snapshotUuid = `${lastUuid}-progress-${mark}`;
+    const nowIso = new Date().toISOString();
+    const taskIdPromise = resolveLiveTaskIdSafe().catch(() => '');
+    taskIdPromise.then((taskId) => {
+      this._fireBatchObservation(set, taskId, snapshotUuid, { kind: 'progress', createdAt: nowIso });
+    }).catch((err) => {
+      process.stderr.write(`[ObservationTap] progress snapshot fire failed (non-fatal): ${err?.message || err}\n`);
+    });
   }
 
   /**
@@ -1057,10 +1089,20 @@ class EnhancedTranscriptMonitor {
    * @param {object[]} exchanges the batch's exchanges
    * @param {string} taskId active task_id (D-09)
    * @param {string} batchLastMessageUuid the batch's last message uuid (dedup)
+   * @param {object} [opts]
+   * @param {string} [opts.kind] observation kind tag (e.g. 'progress' for a
+   *   mid-turn snapshot). Stamped into metadata so obs-api can exempt it from
+   *   the 4h semantic dedup (a snapshot must never suppress the turn's final obs).
+   * @param {string} [opts.createdAt] ISO override for the observation timestamp.
+   *   Progress snapshots stamp the snapshot MOMENT (not the prompt time) so they
+   *   land at the right point on the timeline and never collide with the final
+   *   observation's (agent, project, createdAt) re-fire-dedup tuple.
    */
-  _fireBatchObservation(exchanges, taskId, batchLastMessageUuid) {
+  _fireBatchObservation(exchanges, taskId, batchLastMessageUuid, opts = {}) {
     if (!this.observationWriter) return;
     if (!exchanges || exchanges.length === 0) return;
+    const kind = opts.kind;
+    const createdAtOverride = opts.createdAt;
 
     // Deduplicate by (task_id, batch-last-message-uuid) — the per-batch unit
     // (Pitfall 4) replaces the old `count|lastExchangeId` key.
@@ -1087,7 +1129,7 @@ class EnhancedTranscriptMonitor {
           id: `${exchange.uuid || exchange.id}-user`,
           role: 'user',
           content: typeof exchange.userMessage === 'string' ? exchange.userMessage : JSON.stringify(exchange.userMessage),
-          createdAt: safeIso(exchange.timestamp),
+          createdAt: createdAtOverride || safeIso(exchange.timestamp),
           metadata: { agent: this.agentType, format: 'live' }
         });
       }
@@ -1123,7 +1165,7 @@ class EnhancedTranscriptMonitor {
           id: `${exchange.uuid || exchange.id}-assistant`,
           role: 'assistant',
           content: assistantContent,
-          createdAt: safeIso(exchange.timestamp),
+          createdAt: createdAtOverride || safeIso(exchange.timestamp),
           metadata: { agent: this.agentType, format: 'live' }
         });
       }
@@ -1158,6 +1200,9 @@ class EnhancedTranscriptMonitor {
       sessionId: this.sessionId || null,
       sourceFile: 'live-etm',
       project: path.basename(this.config.projectPath || ''),
+      // Mid-turn progress snapshot tag — obs-api exempts kind:'progress' from the
+      // 4h semantic dedup so a snapshot never suppresses the turn's final obs.
+      kind: kind || undefined,
       modifiedFiles: modifiedFiles.length > 0 ? modifiedFiles : undefined,
       readFiles: readFiles.length > 0 ? readFiles : undefined,
       // Phase 75 (OBS-01 / D-09): link this observation to the active Run via
