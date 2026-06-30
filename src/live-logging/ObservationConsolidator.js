@@ -1569,6 +1569,15 @@ export class ObservationConsolidator {
       // we had with the old in-batch group of size 1.
       const CHUNK_CONCURRENCY = 4;
       let projectInsightEntries = [];
+      // Circuit breaker for a down/wedged proxy. When the LLM proxy blips, every
+      // chunk returns null (LLM failed) AND links zero digests — yet each null
+      // costs the full per-call timeout (FETCH_TIMEOUT_MS) plus retries, so
+      // grinding through all chunks makes consolidation appear "stuck" for 10-20
+      // min while accomplishing nothing. After 2 consecutive fully-dead batches
+      // (every chunk null), abort the pass: the unsynthesized digests stay queued
+      // and the next trigger retries them once the proxy is healthy.
+      let consecutiveDeadBatches = 0;
+      const MAX_DEAD_BATCHES = 2;
 
       const buildChunkPrompt = (chunk, snapshot) => {
         const digestBlock = chunk.map(d =>
@@ -1637,6 +1646,16 @@ export class ObservationConsolidator {
         }
 
         const batchResults = await Promise.all(batchPromises);
+        // Proxy-down circuit breaker (see consecutiveDeadBatches above).
+        if (batchResults.every((r) => r === null)) {
+          if (++consecutiveDeadBatches >= MAX_DEAD_BATCHES) {
+            const deferred = digestChunks.length - batchEnd;
+            process.stderr.write(`[Consolidator] Aborting ${project} insight synthesis early — LLM proxy unavailable (${consecutiveDeadBatches} consecutive dead batches); ${deferred} chunk(s) deferred to next run\n`);
+            break;
+          }
+        } else {
+          consecutiveDeadBatches = 0;
+        }
         // Merge in deterministic order (ci-asc within the batch) so a
         // topic produced by two chunks in the same batch keeps the later
         // chunk's version with merged digest provenance — same semantic
