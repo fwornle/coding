@@ -62,6 +62,15 @@ import {
   DEFAULT_TOOL_BATCH_THRESHOLD,
   DEFAULT_TIME_THRESHOLD_MS,
 } from '../lib/live-logging/etm-recapture.mjs';
+// Singleton-lock reclaim policy (pure, unit-tested). Lets a fresh ETM reclaim a
+// holder that is heartbeating-but-not-writing (STALL-DETECT), not just one whose
+// poll loop has gone heartbeat-stale.
+import {
+  STALL_DETECT_INTERVAL_MS,
+  computeObservationStalled,
+  evaluateHolderLiveness,
+  decideReclaim,
+} from '../lib/live-logging/singleton-reclaim.mjs';
 // Phase 75 (OBS-01): resolve the active task_id at fire time via the SAME
 // single-span reader the token path uses (D-09) — no proxy coupling.
 import { resolveLiveTaskIdSafe } from '../lib/lsl/token/task-id.mjs';
@@ -252,35 +261,43 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
-   * Heartbeat-staleness probe for the singleton lock holder (root-cause fix
-   * for the 25→28 June observation outage). The PSM singleton check only knows
-   * "is the PID alive" — but a WEDGED ETM stays alive and held the lock for
+   * Liveness probe for the singleton lock holder. The PSM singleton check only
+   * knows "is the PID alive" — but a wedged ETM stays alive and held the lock for
    * days while writing nothing (orphan PID 28215), because every restart saw
-   * "already running" and exited. This reuses the INDEPENDENT liveness signal
-   * the ETM already emits: it posts an `lsl_heartbeat` to the coordinator on
-   * every poll, so a holder whose poll loop has stalled goes stale here even
-   * though its PID is alive.
+   * "already running" and exited. This reuses the INDEPENDENT liveness signals
+   * the holder publishes in its `lsl_heartbeat` to the coordinator and returns
+   * BOTH reclaim signals (policy lives in singleton-reclaim.mjs):
    *
-   * Returns the staleness in ms (now − holder.lastBeat) for the coordinator
-   * `lsl` entry belonging to `pid` (key shape `etm-<pid>-<start>:project`), or
-   * null when staleness cannot be proven (coordinator unreachable, or no
-   * heartbeat entry for that pid). Null → caller MUST defer to the holder
-   * (never kill a process we can't prove is wedged). The probe itself is
-   * bounded by a 2s AbortSignal so the singleton check can never hang on it.
+   *   • staleMs — now − holder.lastBeat. The holder beats on every poll, so a
+   *     WEDGED POLL LOOP goes stale here even though its PID is alive (25→28 June
+   *     outage fix). null when unprovable (coordinator unreachable / no entry for
+   *     pid) → caller MUST defer (never kill a holder we can't prove is wedged).
+   *   • stalled — the holder is heartbeating fresh but self-reports
+   *     `status: 'stalled'` (no observation written for >5min despite an actively
+   *     appended transcript). Catches the HEARTBEATING-BUT-NOT-WRITING holder the
+   *     staleMs probe is blind to — the failure that silenced the stream while the
+   *     lock looked healthy.
+   *
+   * Matches the holder's `lsl` entry by pid embedded in the key (shape
+   * `etm-<pid>-<start>:project`). Bounded by a 2s AbortSignal so the singleton
+   * check can never hang on it.
    */
-  async _holderHeartbeatStalenessMs(pid) {
+  async _probeHolderLiveness(pid, reclaimStaleMs) {
     const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
     try {
       const r = await fetch(`${url}/health/state`, { signal: AbortSignal.timeout(2000) });
-      if (!r.ok) return null;
+      if (!r.ok) return { staleMs: null, stalled: false };
       const state = await r.json();
       const lsl = state?.lsl || {};
       // Match the holder's lsl entry by pid embedded in the key (etm-<pid>-...).
       const entry = Object.entries(lsl).find(([key]) => key.includes(`-${pid}-`))?.[1];
-      if (!entry || typeof entry.lastBeat !== 'number' || entry.lastBeat <= 0) return null;
-      return Date.now() - entry.lastBeat;
+      // Pure policy: heartbeat-staleness AND the holder's self-reported
+      // observation-stall (status:'stalled'). See singleton-reclaim.mjs.
+      return evaluateHolderLiveness(entry, Date.now(), { reclaimStaleMs });
     } catch {
-      return null;
+      // Unprovable (coordinator unreachable) → defer: never kill a holder we
+      // can't prove is wedged.
+      return { staleMs: null, stalled: false };
     }
   }
 
@@ -4034,25 +4051,32 @@ ORDER BY m.time_created ASC;`;
     // Check if another instance is already running for this project.
     const existingService = await this.processStateManager.getService(serviceName, 'per-project', { projectPath });
     if (existingService && this.processStateManager.isProcessAlive(existingService.pid)) {
-      // ROOT-CAUSE FIX (25→28 June outage): "PID alive" is NOT "healthy". A
-      // wedged ETM stays alive and, under the old PID-only check, held this
-      // lock for days while writing zero observations — every restart saw it
-      // and exited. Probe the holder's coordinator heartbeat: if its poll loop
-      // has stalled (heartbeat stale beyond the threshold) it is wedged, so
-      // reclaim the lock rather than deferring to a dead-but-breathing holder.
+      // ROOT-CAUSE FIX: "PID alive" is NOT "healthy". A wedged ETM stays alive
+      // and, under the old PID-only check, held this lock while writing zero
+      // observations — every restart saw it and exited. Probe the holder's
+      // published heartbeat for BOTH wedge modes (policy in singleton-reclaim.mjs):
+      //   • WEDGED POLL LOOP — heartbeat stale beyond RECLAIM_STALE_MS (25→28 June).
+      //   • HEARTBEATING-BUT-NOT-WRITING — holder beats fresh but self-reports
+      //     status:'stalled' (no obs for >5min despite an active transcript). This
+      //     is the failure that silenced the stream while the lock looked healthy.
+      // Reclaim on either; otherwise defer (a real duplicate, or unprovable).
       const RECLAIM_STALE_MS = 3 * 60 * 1000;   // > the ETM poll/heartbeat cadence with comfortable margin
-      const holderStaleMs = await this._holderHeartbeatStalenessMs(existingService.pid);
-      if (holderStaleMs != null && holderStaleMs > RECLAIM_STALE_MS) {
-        console.error(`⚠️  Existing ${serviceName} (PID ${existingService.pid}) is alive but its heartbeat is stale (${Math.round(holderStaleMs / 1000)}s > ${RECLAIM_STALE_MS / 1000}s) — WEDGED. Reclaiming the singleton lock.`);
+      const probe = await this._probeHolderLiveness(existingService.pid, RECLAIM_STALE_MS);
+      const { reclaim, reason } = decideReclaim(probe, RECLAIM_STALE_MS);
+      if (reclaim) {
+        const detail = reason === 'stall-detect'
+          ? `is heartbeating but STALLED (no observation written for >${STALL_DETECT_INTERVAL_MS / 60000}min despite an active transcript) — STALL-DETECT`
+          : `is alive but its heartbeat is stale (${Math.round(probe.staleMs / 1000)}s > ${RECLAIM_STALE_MS / 1000}s) — WEDGED`;
+        console.error(`⚠️  Existing ${serviceName} (PID ${existingService.pid}) ${detail}. Reclaiming the singleton lock.`);
         try { process.kill(existingService.pid, 'SIGKILL'); } catch (e) { this.debug?.(`reclaim SIGKILL of ${existingService.pid} failed: ${e.message}`); }
         // Fall through to (re)register this instance as the live singleton.
       } else {
-        // Holder is heartbeating fresh (real duplicate) OR we could not prove
-        // staleness (coordinator unreachable / no heartbeat entry) — in the
-        // unprovable case defer conservatively rather than risk killing a
+        // Holder is heartbeating fresh AND writing (real duplicate) OR we could
+        // not prove a wedge (coordinator unreachable / no heartbeat entry) — in
+        // the unprovable case defer conservatively rather than risk killing a
         // healthy instance.
         console.error(`❌ Another instance of ${serviceName} is already running for project ${path.basename(projectPath)}`);
-        console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}${holderStaleMs == null ? ' (heartbeat staleness unprovable — deferring)' : ` (heartbeat fresh: ${Math.round(holderStaleMs / 1000)}s)`}`);
+        console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}${probe.staleMs == null ? ' (heartbeat staleness unprovable — deferring)' : ` (heartbeat fresh: ${Math.round(probe.staleMs / 1000)}s, writing)`}`);
         console.error(`   To fix: Kill the existing instance with: kill ${existingService.pid}`);
         process.exit(1);
       }
@@ -4116,7 +4140,8 @@ ORDER BY m.time_created ASC;`;
 
     this.pollCount = 0;
     const ISPROCESSING_WATCHDOG_MS = 60_000; // force-reset if guard stuck >60s
-    const STALL_DETECT_INTERVAL_MS = 5 * 60_000; // alert if no obs for 5min while jsonl active
+    // STALL_DETECT_INTERVAL_MS is imported from singleton-reclaim.mjs so the
+    // watchdog's [STALL-DETECT] log and the heartbeat self-report use one threshold.
     this.intervalId = setInterval(async () => {
       this.pollCount++;
       if (this.isProcessing) {
@@ -4538,6 +4563,19 @@ ORDER BY m.time_created ASC;`;
         console.warn(`   Transcript status: ${transcriptStatus} (${transcriptSize} bytes, age: ${Math.round(transcriptAge/1000)}s)`);
       }
 
+      // Observation-stall self-report (drives singleton STALL-DETECT reclaim).
+      // Published in `status` so a fresh ETM can reclaim a holder that beats
+      // fresh but has written no observation for >5min while the transcript is
+      // still being appended. The transcript age is only trusted when we
+      // actually statted a real file (active/stale); missing/not_found ⇒ null so
+      // an idle holder with no transcript is never falsely flagged.
+      const transcriptStatted = (transcriptStatus === 'active' || transcriptStatus === 'stale');
+      const observationStalled = computeObservationStalled({
+        msSinceLastObs: this.lastObservationWriteAt ? (Date.now() - this.lastObservationWriteAt) : 0,
+        jsonlAgeMs: transcriptStatted ? transcriptAge : null,
+        stallMs: STALL_DETECT_INTERVAL_MS,
+      });
+
       // Phase 33 D-09: POST lsl_heartbeat signal to coordinator (replaces
       // the legacy file write). session_id comes from CLAUDE_SESSION_ID ||
       // SESSION_ID env vars set by bin/coding via launch-agent-common.sh.
@@ -4549,7 +4587,8 @@ ORDER BY m.time_created ASC;`;
         kind: 'lsl_heartbeat',
         session_id: this.sessionId,
         source: 'enhanced-transcript-monitor',
-        status: isSuspiciousActivity ? 'degraded' : 'running',
+        // Precedence: stalled (actionable wedge) > degraded (suspicious) > running.
+        status: observationStalled ? 'stalled' : (isSuspiciousActivity ? 'degraded' : 'running'),
         payload: {
           projectPath: this.config.projectPath,
           transcriptPath: this.transcriptPath,
