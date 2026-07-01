@@ -238,6 +238,12 @@ class EnhancedTranscriptMonitor {
     // Observation tap - fire-and-forget per D-04 (Phase 23)
     this.observationWriter = null;
     this._lastObservationId = null; // Track last written observation for cross-prompt-set artifact updates
+    // Fix (b): rolling buffer of recent artifact patches, keyed by
+    // `${agent}::${sorted-files}`, value `{ agent, files, atMs }`. The periodic
+    // sweep re-applies these for a bounded window so an observation that lands
+    // AFTER its edit batch's immediate patch ran (async LLM enrichment / offline
+    // retry race) still gets its "Artifacts: none" backfilled on a later tick.
+    this._recentArtifactPatches = new Map();
     this._initObservationWriter();
 
     // Initialize classification logger for tracking 4-layer classification decisions
@@ -984,6 +990,14 @@ class EnhancedTranscriptMonitor {
     // reader (D-09). Best-effort: '' when no measurement span is open.
     const taskIdPromise = resolveLiveTaskIdSafe().catch(() => '');
 
+    // Fix (a): compute the turn-level file-change aggregate ONCE over the FULL
+    // prompt set (not `pending`) so every batch observation lists the whole turn's
+    // edits even when the edit landed in a batch fired on an earlier poll. Scanning
+    // `exchanges` (the accumulated currentUserPromptSet), not `pending` (post-cursor
+    // slice), is deliberate — the cursor advances batch-by-batch across polls, so a
+    // later read-only batch would otherwise see an empty aggregate.
+    const turnChanges = this._extractFileChanges(exchanges);
+
     const batches = this._splitIntoRecaptureBatches(pending);
     let advanced = false;
     for (const batch of batches) {
@@ -997,7 +1011,10 @@ class EnhancedTranscriptMonitor {
       this._lastFiredExchangeUuid.set(cursorKey, stableId(lastEx));
       advanced = true;
       taskIdPromise.then((taskId) => {
-        this._fireBatchObservation(batch, taskId, batchLastMessageUuid);
+        this._fireBatchObservation(batch, taskId, batchLastMessageUuid, {
+          turnModifiedFiles: turnChanges.modifiedFiles,
+          turnReadFiles: turnChanges.readFiles,
+        });
       }).catch((err) => {
         // CR-02: best-effort — a single malformed exchange must never become an
         // unhandled rejection that kills the long-lived ETM daemon.
@@ -1078,6 +1095,33 @@ class EnhancedTranscriptMonitor {
     }).catch((err) => {
       process.stderr.write(`[ObservationTap] progress snapshot fire failed (non-fatal): ${err?.message || err}\n`);
     });
+  }
+
+  /**
+   * Extract ground-truth file changes from a set of exchanges' tool calls.
+   * Deterministic (not LLM-inferred): Edit/Write → modifiedFiles, Read → readFiles.
+   * Shared by the batch fire (batch-local) and the prompt-set fire (turn-level
+   * aggregate) so both derive files identically. Order preserved, de-duplicated.
+   *
+   * @param {object[]} exchanges
+   * @returns {{ modifiedFiles: string[], readFiles: string[] }}
+   */
+  _extractFileChanges(exchanges) {
+    const modifiedFiles = [];
+    const readFiles = [];
+    for (const exchange of exchanges || []) {
+      if (!exchange?.toolCalls) continue;
+      for (const tc of exchange.toolCalls) {
+        const filePath = tc.input?.file_path || tc.input?.filePath;
+        if (!filePath) continue;
+        if (tc.name === 'Edit' || tc.name === 'Write') {
+          if (!modifiedFiles.includes(filePath)) modifiedFiles.push(filePath);
+        } else if (tc.name === 'Read') {
+          if (!readFiles.includes(filePath)) readFiles.push(filePath);
+        }
+      }
+    }
+    return { modifiedFiles, readFiles };
   }
 
   /**
@@ -1173,27 +1217,23 @@ class EnhancedTranscriptMonitor {
 
     if (messages.length < 2) return; // Need at least user + assistant
 
-    // Extract modified files programmatically from tool calls (ground truth, not LLM-inferred)
-    const modifiedFiles = [];
-    const readFiles = [];
-    for (const exchange of exchanges) {
-      if (exchange.toolCalls) {
-        for (const tc of exchange.toolCalls) {
-          const filePath = tc.input?.file_path || tc.input?.filePath;
-          if (filePath) {
-            if (tc.name === 'Edit' || tc.name === 'Write') {
-              if (!modifiedFiles.includes(filePath)) modifiedFiles.push(filePath);
-            } else if (tc.name === 'Read') {
-              if (!readFiles.includes(filePath)) readFiles.push(filePath);
-            }
-          }
-        }
-      }
-    }
+    // Extract modified files programmatically from tool calls (ground truth, not LLM-inferred).
+    const { modifiedFiles: batchModified, readFiles: batchRead } = this._extractFileChanges(exchanges);
+
+    // Fix (a) — turn-level artifact aggregation: union the batch's OWN file
+    // changes with the whole-turn aggregate the caller passes (opts.turnModifiedFiles /
+    // opts.turnReadFiles). The ETM over-segments one logical user turn into several
+    // batches; the batch carrying the "patching" narrative may hold only a Read while
+    // its sibling batch did the Edit. Aggregating across the turn means EVERY
+    // observation for the turn lists the turn's edits, so Artifacts aligns with the
+    // narrative regardless of how the turn was segmented. (Progress snapshots pass no
+    // turn opts — their batch IS the whole turn, so the union is a no-op there.)
+    const modifiedFiles = Array.from(new Set([...(opts.turnModifiedFiles || []), ...batchModified]));
+    const readFiles = Array.from(new Set([...(opts.turnReadFiles || []), ...batchRead]));
 
     // Debug: log tool call extraction for artifact tracking diagnosis
     const allToolCalls = exchanges.flatMap(ex => (ex.toolCalls || []).map(tc => tc.name));
-    process.stderr.write(`[ObservationTap] Prompt set: ${exchanges.length} exchanges, ${allToolCalls.length} tool calls [${[...new Set(allToolCalls)].join(',')}], ${modifiedFiles.length} modified, ${readFiles.length} read\n`);
+    process.stderr.write(`[ObservationTap] Prompt set: ${exchanges.length} exchanges, ${allToolCalls.length} tool calls [${[...new Set(allToolCalls)].join(',')}], ${modifiedFiles.length} modified (batch ${batchModified.length} + turn ${(opts.turnModifiedFiles || []).length}), ${readFiles.length} read\n`);
 
     const metadata = {
       agent: this.agentType,
@@ -1215,6 +1255,10 @@ class EnhancedTranscriptMonitor {
     // Handles: incremental re-processing where early fires miss Edit calls,
     // multi-turn tool calls across prompt set boundaries, ETM restarts.
     if (modifiedFiles.length > 0) {
+      // Fix (b): buffer this edit-set so the periodic sweep re-applies the patch
+      // for a bounded window — catches sibling observations that land AFTER this
+      // immediate patch (async enrichment / offline-retry race).
+      this._recordArtifactPatch(this.agentType, modifiedFiles);
       this._patchRecentObservationsWithArtifacts(modifiedFiles, readFiles);
     }
 
@@ -1237,14 +1281,18 @@ class EnhancedTranscriptMonitor {
    * (2) multi-turn tool calls across prompt set boundaries,
    * (3) ETM restarts re-processing already-written exchanges.
    */
-  async _patchRecentObservationsWithArtifacts(modifiedFiles, readFiles) {
+  async _patchRecentObservationsWithArtifacts(modifiedFiles, readFiles, agentOverride) {
     if (!this.observationWriter) return;
     if (!modifiedFiles || modifiedFiles.length === 0) return;
+
+    // The periodic sweep (fix b) runs OUTSIDE the multi-transcript loop, where
+    // this.agentType may have drifted, so it passes the buffered entry's own agent.
+    const agent = agentOverride || this.agentType;
 
     // HTTP path (single-owner mode): delegate to host API.
     if (this.observationWriter instanceof ObservationApiClient) {
       try {
-        const r = await this.observationWriter.patchRecentArtifacts(this.agentType, modifiedFiles);
+        const r = await this.observationWriter.patchRecentArtifacts(agent, modifiedFiles);
         if (r?.patched > 0) {
           process.stderr.write(`[ObservationTap] Patched ${r.patched} recent observations via API\n`);
         }
@@ -1260,6 +1308,53 @@ class EnhancedTranscriptMonitor {
     // resurrect a dead raw-SQL UPDATE path.
     process.stderr.write('[ObservationTap] patchRecentArtifacts skipped: writer is not an ObservationApiClient (direct-DB path removed in Plan 44-13)\n');
    }
+
+  /**
+   * Fix (b): record an edit-set for periodic re-patching. Keyed by
+   * `${agent}::${sorted-files}` so repeated fires of the same turn coalesce (only
+   * the timestamp refreshes). `_sweepRecentArtifactPatches` re-applies each entry
+   * until it ages out — the safety net for observations that land AFTER their
+   * edit batch's immediate patch (async LLM enrichment / offline-retry race).
+   *
+   * @param {string} agent agent type at fire time (the sweep runs out of loop)
+   * @param {string[]} files repo-rooted modified paths
+   */
+  _recordArtifactPatch(agent, files) {
+    if (!Array.isArray(files) || files.length === 0) return;
+    if (!this._recentArtifactPatches) this._recentArtifactPatches = new Map();
+    const key = `${agent || ''}::${[...files].sort().join('|')}`;
+    this._recentArtifactPatches.set(key, { agent, files: [...files], atMs: Date.now() });
+    // Bound memory: 100 distinct edit-sets is far above any real 15-min window.
+    if (this._recentArtifactPatches.size > 100) {
+      const oldestKey = this._recentArtifactPatches.keys().next().value;
+      this._recentArtifactPatches.delete(oldestKey);
+    }
+  }
+
+  /**
+   * Fix (b): re-apply buffered artifact patches whose edit-set is still within the
+   * retention window (15 min → up to ~3 re-tries at the 5-min sweep cadence). This
+   * survives the async/race: an observation created minutes late (offline enrichment
+   * retries pushed the write well past its edit batch's immediate patch) still gets
+   * "Artifacts: none" backfilled on a later tick. Expired entries are pruned.
+   * Best-effort — never throws into the poll loop.
+   */
+  async _sweepRecentArtifactPatches() {
+    if (!this._recentArtifactPatches || this._recentArtifactPatches.size === 0) return;
+    const now = Date.now();
+    const RETENTION_MS = 15 * 60 * 1000;
+    for (const [key, entry] of this._recentArtifactPatches) {
+      if ((now - entry.atMs) >= RETENTION_MS) {
+        this._recentArtifactPatches.delete(key);
+        continue;
+      }
+      try {
+        await this._patchRecentObservationsWithArtifacts(entry.files, [], entry.agent);
+      } catch (err) {
+        process.stderr.write(`[ObservationTap] periodic artifact re-patch failed (non-fatal): ${err?.message || err}\n`);
+      }
+    }
+  }
 
    /**
     * One-time startup patch: fix ALL historical observations where metadata
@@ -4361,11 +4456,15 @@ ORDER BY m.time_created ASC;`;
         }
       }
 
-      // Periodically patch observations missing artifact info
+      // Periodically re-apply recent artifact patches (fix b). The previous
+      // no-arg call here was a dead no-op — _patchRecentObservationsWithArtifacts
+      // returns early without modifiedFiles. The sweep re-drives the buffered
+      // per-turn edit-sets so observations that landed after their immediate
+      // patch (async enrichment / offline-retry race) still get backfilled.
       artifactPatchCounter++;
       if (artifactPatchCounter >= ARTIFACT_PATCH_INTERVAL) {
         artifactPatchCounter = 0;
-        this._patchRecentObservationsWithArtifacts();
+        this._sweepRecentArtifactPatches();
       }
 
       // Periodically finalize classification logger to generate MD summary reports
