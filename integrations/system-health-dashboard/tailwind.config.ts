@@ -69,6 +69,15 @@ const config: Config = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
+        // Semantic status colors — theme-aware via CSS vars (src/index.css).
+        // Usage: text-status-success / bg-status-success-subtle / border-status-success-line
+        status: {
+          success: { DEFAULT: 'var(--st-success-fg)', subtle: 'var(--st-success-bg)', line: 'var(--st-success-bd)' },
+          warning: { DEFAULT: 'var(--st-warning-fg)', subtle: 'var(--st-warning-bg)', line: 'var(--st-warning-bd)' },
+          error:   { DEFAULT: 'var(--st-error-fg)',   subtle: 'var(--st-error-bg)',   line: 'var(--st-error-bd)' },
+          info:    { DEFAULT: 'var(--st-info-fg)',    subtle: 'var(--st-info-bg)',    line: 'var(--st-info-bd)' },
+          neutral: { DEFAULT: 'var(--st-neutral-fg)', subtle: 'var(--st-neutral-bg)', line: 'var(--st-neutral-bd)' },
+        },
       },
     },
   },

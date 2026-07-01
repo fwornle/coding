@@ -66,16 +66,16 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
   const getStatusBadge = (status: string, badgeLabel?: string) => {
     switch (status) {
       case 'operational':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">{badgeLabel || 'OK'}</Badge>
+        return <Badge variant="outline" className="bg-status-success-subtle text-status-success border-status-success-line">{badgeLabel || 'OK'}</Badge>
       case 'warning':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">{badgeLabel || 'Warning'}</Badge>
+        return <Badge variant="outline" className="bg-status-warning-subtle text-status-warning border-status-warning-line">{badgeLabel || 'Warning'}</Badge>
       case 'error':
         return <Badge variant="destructive">{badgeLabel || 'Error'}</Badge>
       case 'reference':
         // Neutral muted label — NOT a pass/fail badge. Reads as a baseline.
         return <span className="text-xs text-muted-foreground italic">{badgeLabel || 'reference'}</span>
       case 'unknown':
-        return <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">Unknown</Badge>
+        return <Badge variant="outline" className="bg-status-neutral-subtle text-status-neutral border-status-neutral-line">Unknown</Badge>
       default:
         return <Badge variant="outline">Offline</Badge>
     }

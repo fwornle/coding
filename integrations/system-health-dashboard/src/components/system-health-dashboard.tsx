@@ -82,13 +82,13 @@ export default function SystemHealthDashboard() {
   const getStatusColor = () => {
     switch (healthStatus.overallStatus) {
       case 'healthy':
-        return 'bg-green-50 border-green-200'
+        return 'bg-status-success-subtle border-status-success-line'
       case 'degraded':
-        return 'bg-yellow-50 border-yellow-200'
+        return 'bg-status-warning-subtle border-status-warning-line'
       case 'unhealthy':
-        return 'bg-red-50 border-red-200'
+        return 'bg-status-error-subtle border-status-error-line'
       default:
-        return 'bg-gray-50 border-gray-200'
+        return 'bg-status-neutral-subtle border-status-neutral-line'
     }
   }
 
@@ -604,7 +604,7 @@ export default function SystemHealthDashboard() {
                         <span className="text-xs text-muted-foreground">{item.description}</span>
                       </div>
                       <Badge variant={item.status === 'operational' ? 'outline' : 'destructive'}
-                             className={item.status === 'operational' ? 'bg-green-50 text-green-700 border-green-200' : ''}>
+                             className={item.status === 'operational' ? 'bg-status-success-subtle text-status-success border-status-success-line' : ''}>
                         {item.status === 'operational' ? 'OK' : 'Down'}
                       </Badge>
                     </div>
@@ -626,8 +626,8 @@ export default function SystemHealthDashboard() {
                       </div>
                       <Badge variant={item.status === 'operational' ? 'outline' : item.status === 'error' ? 'destructive' : 'outline'}
                              className={
-                               item.status === 'operational' ? 'bg-green-50 text-green-700 border-green-200' :
-                               item.status === 'warning' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : ''
+                               item.status === 'operational' ? 'bg-status-success-subtle text-status-success border-status-success-line' :
+                               item.status === 'warning' ? 'bg-status-warning-subtle text-status-warning border-status-warning-line' : ''
                              }>
                         {item.description}
                       </Badge>

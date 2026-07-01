@@ -67,6 +67,18 @@ body {
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    /* Semantic status tokens — single source of truth for status UI (health
+       banners, badges, pass/fail). Prefer these (text-status-success,
+       bg-status-success-subtle, border-status-success-line) over raw
+       bg-green-50/text-green-700 so light/dark parity lives in ONE place.
+       Full color values (not HSL triplets) so the dark `subtle`/`line`
+       variants can carry alpha. See tailwind.config.ts `status`. */
+    --st-success-fg: #15803d; --st-success-bg: #f0fdf4; --st-success-bd: #bbf7d0; /* green 700/50/200 */
+    --st-warning-fg: #b45309; --st-warning-bg: #fffbeb; --st-warning-bd: #fde68a; /* amber 700/50/200 */
+    --st-error-fg:   #b91c1c; --st-error-bg:   #fef2f2; --st-error-bd:   #fecaca; /* red 700/50/200 */
+    --st-info-fg:    #1d4ed8; --st-info-bg:    #eff6ff; --st-info-bd:    #bfdbfe; /* blue 700/50/200 */
+    --st-neutral-fg: #475569; --st-neutral-bg: #f8fafc; --st-neutral-bd: #e2e8f0; /* slate 600/50/200 */
   }
 
   .dark {
@@ -89,6 +101,15 @@ body {
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* Dark status tokens: lighter -300 foreground text that reads on the dark
+       canvas; subtle backgrounds as the hue at low alpha (a tint, not a block);
+       borders as the hue at ~0.3 alpha. */
+    --st-success-fg: #86efac; --st-success-bg: rgb(34 197 94 / 0.15);  --st-success-bd: rgb(34 197 94 / 0.30);
+    --st-warning-fg: #fcd34d; --st-warning-bg: rgb(245 158 11 / 0.15); --st-warning-bd: rgb(245 158 11 / 0.30);
+    --st-error-fg:   #fca5a5; --st-error-bg:   rgb(239 68 68 / 0.15);  --st-error-bd:   rgb(239 68 68 / 0.30);
+    --st-info-fg:    #93c5fd; --st-info-bg:    rgb(59 130 246 / 0.15); --st-info-bd:    rgb(59 130 246 / 0.30);
+    --st-neutral-fg: #94a3b8; --st-neutral-bg: rgb(148 163 184 / 0.12); --st-neutral-bd: rgb(148 163 184 / 0.25);
   }
 }
 
@@ -137,6 +158,11 @@ body {
 .dark .text-yellow-600, .dark .text-yellow-700, .dark .text-yellow-800  { color: rgb(253 224 71); }
 .dark .text-orange-600, .dark .text-orange-700, .dark .text-orange-800  { color: rgb(253 186 116); }
 .dark .text-gray-600,   .dark .text-slate-600,  .dark .text-slate-700   { color: hsl(var(--muted-foreground)); }
+/* Primary/heading greys (gray-700/800/900, slate-800/900) are dark-on-dark once
+   their surface flips — remap to the theme foreground. Closes the last light-only
+   text gap (e.g. trace-history-panel headings). */
+.dark .text-gray-700,   .dark .text-gray-800,   .dark .text-gray-900,
+.dark .text-slate-800,  .dark .text-slate-900   { color: hsl(var(--foreground)); }
 
 .dark .border-green-50,  .dark .border-green-200,  .dark .border-green-300   { border-color: rgb(34 197 94 / 0.3); }
 .dark .border-emerald-50,.dark .border-emerald-200,.dark .border-emerald-300 { border-color: rgb(16 185 129 / 0.3); }
