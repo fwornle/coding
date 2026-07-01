@@ -264,6 +264,17 @@ export const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
   ],
 }
 
+// The canonical wave-analysis pipeline agents. In a historical/completed view
+// the live execution steps are gone, so `agentsInWorkflow` (built from
+// effectiveSteps) is empty — but these agents DID participate and their nodes +
+// edges must still render. Used by both getNodeStatus and shouldShowEdge so the
+// two stay consistent (previously only getNodeStatus knew about it, which left
+// the edges filtered out in history mode).
+const WAVE_AGENTS = [
+  'batch_scheduler', 'semantic_analysis', 'quality_assurance',
+  'ontology_classification', 'persistence', 'kg_operators', 'insight_generation',
+]
+
 export function MultiAgentGraph({
   process,
   aggregatedSteps,
@@ -710,16 +721,19 @@ export function MultiAgentGraph({
     return current ? /_qa_retry$/.test(current) : false
   }, [process.pausedAtStep, process.currentStep])
 
+  // Historical/completed view: all waves done OR the process is marked completed.
+  // In this state effectiveSteps is empty, so node status + edge visibility both
+  // fall back to the canonical WAVE_AGENTS structure.
+  const isWorkflowDone = useMemo(() =>
+    effectiveSteps.some(s => s.name === 'wave4' && s.status === 'completed')
+    || (process as { status?: string }).status === 'completed',
+  [effectiveSteps, process])
+
   const getNodeStatus = useCallback((agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'inactive' | 'retry' => {
-    // When workflow is completed, all participating agents are completed.
-    // Check: all waves done, OR process status is 'completed' (historical view)
-    const allWavesDone = effectiveSteps.some(s => s.name === 'wave4' && s.status === 'completed')
-    const processCompleted = (process as any).status === 'completed'
-    const isWorkflowDone = allWavesDone || processCompleted
-    if (isWorkflowDone) {
-      const waveAgents = ['batch_scheduler', 'semantic_analysis', 'quality_assurance',
-        'ontology_classification', 'persistence', 'kg_operators', 'insight_generation']
-      if (waveAgents.includes(agentId)) return 'completed'
+    // When workflow is completed (historical view), all participating wave
+    // agents are completed even though effectiveSteps is empty.
+    if (isWorkflowDone && WAVE_AGENTS.includes(agentId)) {
+      return 'completed'
     }
 
     // Check if agent has ANY steps in this workflow
@@ -740,7 +754,7 @@ export function MultiAgentGraph({
 
     const isWorkflowComplete = process.completedSteps >= process.totalSteps && process.totalSteps > 0
     return isWorkflowComplete ? 'skipped' : 'pending'
-  }, [stepStatusMap, agentsInWorkflow, process.completedSteps, process.totalSteps, isRetryStep, process.pausedAtStep, process.currentStep, stepToAgent])
+  }, [stepStatusMap, agentsInWorkflow, isWorkflowDone, process.completedSteps, process.totalSteps, isRetryStep, process.pausedAtStep, process.currentStep, stepToAgent])
 
   const handleNodeClickInternal = useCallback((agentId: string) => {
     // Close expanded substeps if clicking a different agent
@@ -783,30 +797,38 @@ export function MultiAgentGraph({
     return touched
   }, [stepStatusMap])
 
-  // Filter edges to only show relevant connections
+  // Filter edges to only show relevant connections.
+  // An agent counts as "in this workflow" if it has live steps (agentsInWorkflow)
+  // OR the workflow is historically complete and it's a canonical wave agent —
+  // the same rule getNodeStatus uses to render the node. Keeping these in sync is
+  // what makes the edges appear in the History view (effectiveSteps is empty there,
+  // so agentsInWorkflow/touchedAgents/stepStatusMap are all empty).
   const shouldShowEdge = useCallback((edge: EdgeDefinition): boolean => {
-    // Hide edges to/from inactive agents (not part of current workflow)
-    const fromInactive = edge.from !== 'orchestrator' && !agentsInWorkflow.has(edge.from)
-    const toInactive = edge.to !== 'orchestrator' && !agentsInWorkflow.has(edge.to)
-    if (fromInactive || toInactive) return false
+    const inWorkflow = (id: string) =>
+      id === 'orchestrator'
+      || agentsInWorkflow.has(id)
+      || (isWorkflowDone && WAVE_AGENTS.includes(id))
+    // Hide edges to/from agents not part of this workflow
+    if (!inWorkflow(edge.from) || !inWorkflow(edge.to)) return false
 
-    // Control edges from orchestrator: only show to touched agents
+    // Control edges from orchestrator: show to touched agents (or, in a completed
+    // historical view, to every wave agent).
     if (edge.type === 'control' && edge.from === 'orchestrator') {
-      return touchedAgents.has(edge.to)
+      return touchedAgents.has(edge.to) || (isWorkflowDone && WAVE_AGENTS.includes(edge.to))
     }
-    // Feedback edges: show if source agent has completed
+    // Feedback edges: show if source agent has completed/run (or is done historically)
     if (edge.type === 'retry') {
       const sourceStatus = stepStatusMap[edge.from]?.status
       return sourceStatus === 'completed' || sourceStatus === 'running'
+        || (isWorkflowDone && WAVE_AGENTS.includes(edge.from))
     }
-    // Dataflow edges: always show once workflow is running.
-    // The numbered pipeline (1→2→3→...) is the canonical flow and should
-    // always be visible so users understand the workflow structure.
+    // Dataflow edges: always show. The numbered pipeline (1→2→3→...) is the
+    // canonical flow and should always be visible so users understand the structure.
     if (edge.type === 'dataflow') {
       return true
     }
     return true // Other edge types always shown
-  }, [touchedAgents, stepStatusMap, agentsInWorkflow])
+  }, [touchedAgents, stepStatusMap, agentsInWorkflow, isWorkflowDone])
 
   // Check if two agents are adjacent in the circular ring layout
   const areAdjacentInRing = useCallback((fromId: string, toId: string): boolean => {
