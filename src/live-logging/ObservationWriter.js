@@ -829,7 +829,12 @@ export class ObservationWriter {
           }
 
           const result = await response.json();
-          const summary = this._sanitizeSummary(result.content) || this._fallbackSummary(messages);
+          const rawSummary = this._sanitizeSummary(result.content) || this._fallbackSummary(messages);
+          // Artifacts must be the literal files touched — never the LLM's prose.
+          // Deterministically overwrite the Artifacts line from the tool-call
+          // ground truth (modifiedFiles), so a no-file turn reads "none" rather
+          // than the LLM inventing an "artifact" from a task/command it narrated.
+          const summary = this._enforceArtifacts(rawSummary, modifiedFiles);
           const llm = result.model && result.provider
             ? { model: result.model, provider: result.provider, tokens: result.tokens || null, latencyMs: result.latencyMs || null }
             : undefined;
@@ -864,6 +869,29 @@ export class ObservationWriter {
     }, {});
     const roleSummary = Object.entries(roles).map(([r, c]) => `${c} ${r}`).join(', ');
     return `[Raw] ${messages.length} messages (${roleSummary}). LLM summary unavailable.`;
+  }
+
+  /**
+   * Overwrite the Artifacts line with the ground-truth files touched in the
+   * exchange. The Artifacts field must list ONLY files modified/created/deleted
+   * (from tool calls) — never the LLM's narration of what it did (that belongs
+   * in Approach/Result). The LLM is asked to do this, but occasionally invents a
+   * non-file "artifact" (a created task, a run command) on a no-file turn; this
+   * makes the field deterministic so it always reflects reality. A summary with
+   * no Artifacts line (e.g. "No actionable content." or a "[Raw]" fallback) is
+   * returned unchanged.
+   * @param {string} summary
+   * @param {string[]} modifiedFiles - repo-rooted paths from tool calls
+   * @returns {string}
+   */
+  _enforceArtifacts(summary, modifiedFiles) {
+    if (!summary || typeof summary !== 'string') return summary;
+    if (!/^[ \t]*Artifacts:/m.test(summary)) return summary; // no Artifacts line to enforce
+    const files = Array.isArray(modifiedFiles) ? modifiedFiles.filter(Boolean) : [];
+    const value = files.length > 0
+      ? files.map(f => `edited ${f}`).join(', ')
+      : 'none';
+    return summary.replace(/^([ \t]*Artifacts:).*$/m, `$1 ${value}`);
   }
 
   /**
