@@ -66,6 +66,54 @@ const SANITY_CAP = 20;
 const REQUEST_TIMEOUT_MS = 60_000;
 
 /**
+ * Global pacing gate for mentions-classify proxy calls.
+ *
+ * Consolidation mirrors insights to the KG in a sequential loop, so mentions
+ * calls arrive as a steady back-to-back stream. Off-corp that stream saturates
+ * the Claude Max-OAuth *haiku* per-model rate limit: each 429'd call is pushed
+ * onto the slow CLI fallback (14-20s), and a single slow call eats the
+ * consolidator's 15s KG-push budget — so the same insights fail every cycle.
+ *
+ * The gate serializes callProxy invocations and spaces consecutive calls at
+ * least MENTIONS_MIN_INTERVAL_MS apart, keeping the endpoint under its limit so
+ * calls stay on the fast direct-OAuth HTTP path. Env-tunable; 0 disables (unit
+ * tests set it to 0 to avoid artificial delay).
+ */
+// Read dynamically (not cached at load) so tests can set the env to 0 to disable
+// pacing without a fixed module-load ordering constraint. Default 1000ms.
+function _minIntervalMs() {
+  const v = Number(process.env.MENTIONS_MIN_INTERVAL_MS);
+  return Number.isFinite(v) && v >= 0 ? v : 1000;
+}
+let _pace = Promise.resolve();
+let _lastCallStartedAt = 0;
+
+/**
+ * Run `fn` behind the pacing gate: wait for the prior gated call to finish, then
+ * for the remaining min-interval since the last call started, then invoke `fn`.
+ * The chain advances regardless of `fn`'s outcome, but the result/rejection is
+ * propagated to THIS caller. Reset for tests via __resetPaceForTests.
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+function _paced(fn) {
+  const run = _pace.then(async () => {
+    const interval = _minIntervalMs();
+    if (interval > 0) {
+      const wait = _lastCallStartedAt + interval - Date.now();
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    }
+    _lastCallStartedAt = Date.now();
+    return fn();
+  });
+  // Advance the chain on both fulfilment and rejection so one failure can't wedge
+  // the gate; swallow here (the real outcome is returned to the caller via `run`).
+  _pace = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+/**
  * `taskType` field that routes this call to claude-haiku via the
  * processOverrides config (CLAUDE.md rapid-llm-proxy routing).
  */
@@ -140,17 +188,21 @@ function joinProxyEndpoint(base) {
  */
 async function callProxy(body) {
   const endpoint = joinProxyEndpoint(resolveProxyUrl());
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  // Pace through the global gate so a batch of mentions calls doesn't saturate
+  // the OAuth-haiku rate limit (see MENTIONS_MIN_INTERVAL_MS).
+  return _paced(async () => {
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`HTTP ${resp.status} ${resp.statusText}: ${text.slice(0, 300)}`);
+    }
+    return resp.json();
   });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
-    throw new Error(`HTTP ${resp.status} ${resp.statusText}: ${text.slice(0, 300)}`);
-  }
-  return resp.json();
 }
 
 // ---------------------------------------------------------------------------
@@ -432,4 +484,13 @@ export function __resetCacheForTests() {
   // Swap the reference for a fresh WeakMap so subsequent loadMentionCandidates
   // calls miss the cache and re-invoke kmStore.findByOntologyClass.
   _candidateCache = new WeakMap();
+}
+
+/**
+ * Reset the global pacing gate. Test-only — clears the serialization chain and
+ * the last-call timestamp so a test's timing assertions start from a clean slate.
+ */
+export function __resetPaceForTests() {
+  _pace = Promise.resolve();
+  _lastCallStartedAt = 0;
 }
