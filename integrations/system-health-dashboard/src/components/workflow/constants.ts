@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import type { AgentDefinition, EdgeDefinition } from './types'
 import { PROCESS_TAGS } from '../../../../mcp-server-semantic-analysis/dist/agents/process-tags.js'
+import { WORKFLOW_COLORS } from '../../lib/colors'
 
 // Phase 52: `llmModel` literals are now D-03 fallback hints (empty-bucket display).
 // Live model badges come from `useLLMBadgeForProcess(processTag)` in trace-modal.tsx.
@@ -937,33 +938,12 @@ export const STEP_DISPLAY_NAMES: Record<string, string> = {
   'link_documentation': 'docs linking',
 }
 
-// Substep arc colors for multi-agent-graph visualization
-// Centralizes color definitions that were previously hardcoded in the component
-export const SUBSTEP_COLORS = {
-  pending:   { fill: '#93c5fd', stroke: '#60a5fa' },  // light blue (blue-300/400)
-  running:   { fill: '#1d4ed8', stroke: '#ffffff' },   // dark blue (blue-700) + white glow
-  completed: { fill: '#22c55e', stroke: '#16a34a' },   // green (green-500/600)
-  skipped:   { fill: '#d1d5db', stroke: '#9ca3af' },   // grey (gray-300/400) — won't run in this wave
-  retry:     { fill: '#f97316', stroke: '#ffffff' },   // orange (orange-500) + white glow — QA retry
-  selected:  { fill: '#60a5fa', stroke: '#3b82f6' },   // medium blue (blue-400/500)
-} as const
-
-// Main node status colors (SVG hex values, mirrors STATUS_COLORS Tailwind classes)
-export const NODE_STATUS_COLORS = {
-  pending:   { bg: '#f3f4f6', border: '#d1d5db', text: '#6b7280' },  // gray-100/300/500
-  running:   { bg: '#dbeafe', border: '#3b82f6', text: '#1d4ed8' },  // blue-100/500/700
-  completed: { bg: '#dcfce7', border: '#22c55e', text: '#15803d' },  // green-100/500/700
-  failed:    { bg: '#fee2e2', border: '#ef4444', text: '#b91c1c' },  // red-100/500/700
-  skipped:   { bg: '#f9fafb', border: '#e5e7eb', text: '#9ca3af' },  // gray-50/200/400
-  retry:     { bg: '#fff7ed', border: '#f97316', text: '#c2410c' },  // orange-50/500/700
-  inactive:  { bg: '#f8fafc', border: '#e2e8f0', text: '#cbd5e1' },  // slate-50/200/300
-} as const
-
-// Edge colors by type
-export const EDGE_TYPE_COLORS = {
-  control: '#6366f1',    // Indigo - orchestrator control
-  retry: '#f59e0b',      // Amber - retry connections
-  dataflow: '#10b981',   // Emerald - data flow
-  dependency: '#64748b', // Slate - dependencies
-  self: '#8b5cf6',       // Purple - self-loops
-} as const
+// Workflow SVG colors now live in the central theme-aware module
+// (src/lib/colors.ts) — the single source of truth, mirroring DynArch's
+// js/config/colors.js central-module pattern. These re-exports preserve the
+// static light-palette objects for backward compatibility (and for the trace
+// tooling that reads them directly); theme-aware SVG consumers should call
+// useWorkflowColors() instead so they recolor in dark mode.
+export const SUBSTEP_COLORS = WORKFLOW_COLORS.light.substep
+export const NODE_STATUS_COLORS = WORKFLOW_COLORS.light.node
+export const EDGE_TYPE_COLORS = WORKFLOW_COLORS.light.edge

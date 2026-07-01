@@ -19,7 +19,8 @@ import type { StepStatus } from '@/shared/workflow-types/schemas'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
 // WebSocket hook disabled - no server-side implementation exists yet
 // import useWorkflowWebSocket from '@/hooks/useWorkflowWebSocket'
-import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES, SUBSTEP_COLORS, NODE_STATUS_COLORS, EDGE_TYPE_COLORS } from './constants'
+import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
+import { useWorkflowColors } from '@/lib/colors'
 import { Logger, LogCategories } from '@/utils/logging'
 
 interface MultiAgentGraphProps {
@@ -37,21 +38,9 @@ interface MultiAgentGraphProps {
   onExpandedSubStepsAgentChange?: (agentId: string | null) => void
 }
 
-// Status colors for nodes
-const STATUS_COLORS = {
-  pending: { bg: 'fill-gray-100', border: 'stroke-gray-300', text: 'text-gray-500' },
-  running: { bg: 'fill-blue-100', border: 'stroke-blue-500', text: 'text-blue-700' },
-  completed: { bg: 'fill-green-100', border: 'stroke-green-500', text: 'text-green-700' },
-  failed: { bg: 'fill-red-100', border: 'stroke-red-500', text: 'text-red-700' },
-  skipped: { bg: 'fill-gray-50', border: 'stroke-gray-200', text: 'text-gray-400' },
-  // Retry = QA retry in progress (orange border)
-  retry: { bg: 'fill-orange-100', border: 'stroke-orange-500', text: 'text-orange-700' },
-  // Inactive = agent exists but has no steps in current workflow (distinct from skipped)
-  inactive: { bg: 'fill-slate-50', border: 'stroke-slate-200', text: 'text-slate-300' },
-}
-
-// Edge colors imported from constants (EDGE_TYPE_COLORS), aliased for local use
-const EDGE_COLORS = EDGE_TYPE_COLORS
+// Node + edge + substep colors now come from the central theme-aware palette
+// (src/lib/colors.ts) via useWorkflowColors(), so the SVG recolors in dark mode
+// without per-hue `.dark .fill-*` CSS overrides. See lib/colors.ts for rationale.
 
 // Sub-step definitions for agents with multiple internal operations
 export interface SubStep {
@@ -287,6 +276,9 @@ export function MultiAgentGraph({
   expandedSubStepsAgent: expandedSubStepsAgentProp,
   onExpandedSubStepsAgentChange,
 }: MultiAgentGraphProps) {
+  // Central theme-aware palette (single source of truth for all SVG colors).
+  const pal = useWorkflowColors()
+
   // Support both callback names for backward compatibility
   // onNodeClick takes string, onNodeSelect takes string | null
   const handleNodeSelection = useCallback((agentId: string | null) => {
@@ -846,7 +838,7 @@ export function MultiAgentGraph({
           key={keyIdx}
           d={path}
           fill="none"
-          stroke={EDGE_COLORS[edge.type || 'dependency']}
+          stroke={pal.edge[edge.type || 'dependency']}
           strokeWidth={1.5}
           strokeDasharray={edge.type === 'retry' ? '4,2' : undefined}
           opacity={0.6}
@@ -859,7 +851,7 @@ export function MultiAgentGraph({
 
     // Active control line gets animated dash
     const isAnimated = isActiveControl && edge.type === 'control'
-    const edgeColor = isAnimated ? '#6366f1' : EDGE_COLORS[edge.type || 'dependency']
+    const edgeColor = isAnimated ? pal.edge.control : pal.edge[edge.type || 'dependency']
 
     // For adjacent dataflow edges, draw a path that bulges outward
     // Path: from node outer edge → outward arc → to node outer edge
@@ -1043,13 +1035,13 @@ export function MultiAgentGraph({
         )}
       </g>
     )
-  }, [getPosition, nodeWidth, nodeHeight, areAdjacentInRing, layout.centerX, layout.centerY, layout.radius])
+  }, [getPosition, nodeWidth, nodeHeight, areAdjacentInRing, layout.centerX, layout.centerY, layout.radius, pal])
 
   // Render a node
   const renderNode = useCallback((position: { agent: AgentDefinition; x: number; y: number }) => {
     const { agent, x, y } = position
     const status = agent.id === 'orchestrator' ? 'running' : getNodeStatus(agent.id)
-    const colors = STATUS_COLORS[status] || STATUS_COLORS.pending
+    const colors = pal.node[status as keyof typeof pal.node] || pal.node.pending
     const Icon = agent.icon
     const isSelected = selectedNode === agent.id
     const isWiggling = wigglingNode === agent.id
@@ -1081,19 +1073,21 @@ export function MultiAgentGraph({
               width={nodeWidth}
               height={nodeHeight}
               rx={isOrchestrator ? nodeHeight/2 : 8}
-              className={`${colors.bg} ${colors.border} ${status === 'running' || status === 'retry' ? 'animate-pulse' : ''}`}
+              fill={colors.bg}
+              stroke={colors.border}
+              className={status === 'running' || status === 'retry' ? 'animate-pulse' : ''}
               strokeWidth={isSelected ? 3 : status === 'running' || status === 'retry' ? 2.5 : isOrchestrator ? 2 : 1.5}
               strokeDasharray={isInactive ? '4,2' : undefined}
               style={{
                 filter: isOrchestrator ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' :
-                        status === 'retry' ? 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.6))' :
-                        status === 'running' ? 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.6))' : undefined,
+                        status === 'retry' ? `drop-shadow(0 0 8px ${pal.chrome.glowRetry})` :
+                        status === 'running' ? `drop-shadow(0 0 8px ${pal.chrome.glowRunning})` : undefined,
               }}
             />
 
             {/* Icon */}
             <foreignObject x={8} y={8} width={24} height={24}>
-              <Icon className={`w-5 h-5 ${colors.text}`} />
+              <Icon className="w-5 h-5" style={{ color: colors.text }} />
             </foreignObject>
 
             {/* Label */}
@@ -1101,8 +1095,8 @@ export function MultiAgentGraph({
               x={nodeWidth / 2 + 6}
               y={nodeHeight / 2 + 4}
               textAnchor="middle"
-              className={`text-[10px] font-medium ${colors.text}`}
-              fill="currentColor"
+              className="text-[10px] font-medium"
+              fill={colors.text}
             >
               {agent.shortName}
             </text>
@@ -1245,7 +1239,7 @@ export function MultiAgentGraph({
 
           </g>
     )
-  }, [getNodeStatus, getStepCount, selectedNode, wigglingNode, handleNodeClickInternal, handleNodeMouseEnter, handleNodeMouseLeave, nodeWidth, nodeHeight, expandedSubStepsAgent])
+  }, [getNodeStatus, getStepCount, selectedNode, wigglingNode, handleNodeClickInternal, handleNodeMouseEnter, handleNodeMouseLeave, nodeWidth, nodeHeight, expandedSubStepsAgent, pal])
 
   if (isLoading) {
     return (
@@ -1274,7 +1268,7 @@ export function MultiAgentGraph({
             refY="2"
             orient="auto"
           >
-            <polygon points="0 0, 6 2, 0 4" fill="#64748b" />
+            <polygon points="0 0, 6 2, 0 4" fill={pal.edge.dependency} />
           </marker>
           <marker
             id="arrowhead-active"
@@ -1284,7 +1278,7 @@ export function MultiAgentGraph({
             refY="3"
             orient="auto"
           >
-            <polygon points="0 0, 8 3, 0 6" fill="#6366f1" />
+            <polygon points="0 0, 8 3, 0 6" fill={pal.edge.control} />
           </marker>
           <marker
             id="arrowhead-dataflow"
@@ -1294,7 +1288,7 @@ export function MultiAgentGraph({
             refY="2"
             orient="auto"
           >
-            <polygon points="0 0, 6 2, 0 4" fill="#10b981" />
+            <polygon points="0 0, 6 2, 0 4" fill={pal.edge.dataflow} />
           </marker>
           {/* Gradient for rotating substep activity indicator */}
           <linearGradient id="substep-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -1471,24 +1465,24 @@ export function MultiAgentGraph({
                 const isPending = !substepStatus || substepStatus === 'pending'
                 const isHighlighted = isSelected || isActiveSubStep || isSubstepCompleted
 
-                // Colors based on derived substep status (centralized in SUBSTEP_COLORS)
-                let fillColor: string = SUBSTEP_COLORS.pending.fill
-                let strokeColor: string = SUBSTEP_COLORS.pending.stroke
+                // Colors based on derived substep status (central theme-aware palette)
+                let fillColor: string = pal.substep.pending.fill
+                let strokeColor: string = pal.substep.pending.stroke
                 if (isSubstepCompleted) {
-                  fillColor = SUBSTEP_COLORS.completed.fill
-                  strokeColor = SUBSTEP_COLORS.completed.stroke
+                  fillColor = pal.substep.completed.fill
+                  strokeColor = pal.substep.completed.stroke
                 } else if (isSubstepSkipped) {
-                  fillColor = SUBSTEP_COLORS.skipped.fill
-                  strokeColor = SUBSTEP_COLORS.skipped.stroke
+                  fillColor = pal.substep.skipped.fill
+                  strokeColor = pal.substep.skipped.stroke
                 } else if (isSubstepFailed) {
-                  fillColor = NODE_STATUS_COLORS.failed.border
-                  strokeColor = NODE_STATUS_COLORS.failed.text
+                  fillColor = pal.node.failed.border
+                  strokeColor = pal.node.failed.text
                 } else if (isActiveSubStep) {
-                  fillColor = SUBSTEP_COLORS.running.fill
-                  strokeColor = SUBSTEP_COLORS.running.stroke
+                  fillColor = pal.substep.running.fill
+                  strokeColor = pal.substep.running.stroke
                 } else if (isSelected && isPending) {
-                  fillColor = SUBSTEP_COLORS.selected.fill
-                  strokeColor = SUBSTEP_COLORS.selected.stroke
+                  fillColor = pal.substep.selected.fill
+                  strokeColor = pal.substep.selected.stroke
                 }
 
                 const statusText = isSubstepCompleted ? ' (Completed)' : isSubstepSkipped ? ' (Skipped)' : isSubstepFailed ? ' (Failed)' : isActiveSubStep ? ' (Currently Running)' : ' (Pending)'
@@ -1513,16 +1507,16 @@ export function MultiAgentGraph({
                       strokeWidth={isActiveSubStep ? 3 : isSubstepCompleted ? 2 : 1.5}
                       className={isActiveSubStep ? 'animate-pulse' : ''}
                       style={isActiveSubStep ? {
-                        filter: 'drop-shadow(0 0 10px rgba(29, 78, 216, 0.9))',
+                        filter: `drop-shadow(0 0 10px ${pal.chrome.glowRunning})`,
                       } : isSubstepCompleted ? {
-                        filter: 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.5))',
+                        filter: `drop-shadow(0 0 4px ${pal.chrome.glowCompleted})`,
                       } : undefined}
                     />
                     <text
                       x={labelX}
                       y={labelY}
                       fontSize={isHighlighted ? '9' : '8'}
-                      fill="#fff"
+                      fill={pal.chrome.onBadge}
                       textAnchor="middle"
                       dominantBaseline="middle"
                       fontWeight="700"
@@ -1568,31 +1562,31 @@ export function MultiAgentGraph({
         {/* Legend - can be hidden when using external WorkflowLegend component */}
         {!hideLegend && (
           <g transform={`translate(${layout.width - 130}, 10)`}>
-            <rect width={130} height={145} rx={4} fill="white" fillOpacity={0.9} stroke="#e2e8f0" />
-            <text x={8} y={16} className="text-[10px] font-semibold fill-slate-700">Legend</text>
+            <rect width={130} height={145} rx={4} fill={pal.chrome.legendBg} fillOpacity={0.9} stroke={pal.chrome.legendBorder} />
+            <text x={8} y={16} className="text-[10px] font-semibold" fill={pal.chrome.legendText}>Legend</text>
 
-            <line x1={8} y1={28} x2={30} y2={28} stroke={EDGE_COLORS.control} strokeWidth={1.5} strokeDasharray="2,2" />
-            <text x={36} y={32} className="text-[9px] fill-slate-600">Control</text>
+            <line x1={8} y1={28} x2={30} y2={28} stroke={pal.edge.control} strokeWidth={1.5} strokeDasharray="2,2" />
+            <text x={36} y={32} className="text-[9px]" fill={pal.chrome.legendSubtext}>Control</text>
 
-            <line x1={8} y1={44} x2={30} y2={44} stroke={EDGE_COLORS.retry} strokeWidth={1.5} strokeDasharray="4,2" />
-            <text x={36} y={48} className="text-[9px] fill-slate-600">Feedback</text>
+            <line x1={8} y1={44} x2={30} y2={44} stroke={pal.edge.retry} strokeWidth={1.5} strokeDasharray="4,2" />
+            <text x={36} y={48} className="text-[9px]" fill={pal.chrome.legendSubtext}>Feedback</text>
 
-            <line x1={8} y1={60} x2={30} y2={60} stroke={EDGE_COLORS.dataflow} strokeWidth={1.5} />
-            <text x={36} y={64} className="text-[9px] fill-slate-600">Dataflow</text>
+            <line x1={8} y1={60} x2={30} y2={60} stroke={pal.edge.dataflow} strokeWidth={1.5} />
+            <text x={36} y={64} className="text-[9px]" fill={pal.chrome.legendSubtext}>Dataflow</text>
 
-            <circle cx={14} cy={78} r={6} fill="none" stroke="#6366f1" strokeWidth={2} />
-            <text x={36} y={82} className="text-[9px] fill-slate-600">Orchestrator</text>
+            <circle cx={14} cy={78} r={6} fill="none" stroke={pal.chrome.orchestratorRing} strokeWidth={2} />
+            <text x={36} y={82} className="text-[9px]" fill={pal.chrome.legendSubtext}>Orchestrator</text>
 
             {/* Step count badge */}
-            <circle cx={14} cy={96} r={6} className="fill-indigo-500" />
-            <text x={14} y={96} textAnchor="middle" dominantBaseline="central" className="text-[7px] fill-white font-bold">6</text>
-            <text x={36} y={100} className="text-[9px] fill-slate-600">Steps per agent</text>
+            <circle cx={14} cy={96} r={6} fill={pal.chrome.stepBadge} />
+            <text x={14} y={96} textAnchor="middle" dominantBaseline="central" className="text-[7px] font-bold" fill={pal.chrome.onBadge}>6</text>
+            <text x={36} y={100} className="text-[9px]" fill={pal.chrome.legendSubtext}>Steps per agent</text>
 
             {/* Inactive indicator */}
-            <rect x={6} y={108} width={16} height={10} rx={2} fill="none" stroke="#94a3b8" strokeWidth={1} strokeDasharray="2,1" opacity={0.5} />
-            <text x={36} y={118} className="text-[9px] fill-slate-600">Not yet run</text>
+            <rect x={6} y={108} width={16} height={10} rx={2} fill="none" stroke={pal.chrome.inactiveStroke} strokeWidth={1} strokeDasharray="2,1" opacity={0.5} />
+            <text x={36} y={118} className="text-[9px]" fill={pal.chrome.legendSubtext}>Not yet run</text>
 
-            <text x={8} y={138} className="text-[8px] fill-slate-500">Click node for details</text>
+            <text x={8} y={138} className="text-[8px]" fill={pal.chrome.legendHint}>Click node for details</text>
           </g>
         )}
       </svg>
@@ -1604,6 +1598,7 @@ export default MultiAgentGraph
 
 // Standalone Legend component for use outside the graph
 export function WorkflowLegend() {
+  const pal = useWorkflowColors()
   return (
     <div className="p-3 bg-white dark:bg-slate-900 border rounded-lg shadow-sm">
       <h4 className="text-xs font-semibold text-slate-700 mb-2">Legend</h4>
@@ -1611,19 +1606,19 @@ export function WorkflowLegend() {
         {/* Edge types */}
         <div className="flex items-center gap-2">
           <svg width="24" height="2">
-            <line x1="0" y1="1" x2="24" y2="1" stroke={EDGE_COLORS.control} strokeWidth={1.5} strokeDasharray="2,2" />
+            <line x1="0" y1="1" x2="24" y2="1" stroke={pal.edge.control} strokeWidth={1.5} strokeDasharray="2,2" />
           </svg>
           <span className="text-slate-600">Control</span>
         </div>
         <div className="flex items-center gap-2">
           <svg width="24" height="2">
-            <line x1="0" y1="1" x2="24" y2="1" stroke={EDGE_COLORS.retry} strokeWidth={1.5} strokeDasharray="4,2" />
+            <line x1="0" y1="1" x2="24" y2="1" stroke={pal.edge.retry} strokeWidth={1.5} strokeDasharray="4,2" />
           </svg>
           <span className="text-slate-600">Feedback</span>
         </div>
         <div className="flex items-center gap-2">
           <svg width="24" height="2">
-            <line x1="0" y1="1" x2="24" y2="1" stroke={EDGE_COLORS.dataflow} strokeWidth={1.5} />
+            <line x1="0" y1="1" x2="24" y2="1" stroke={pal.edge.dataflow} strokeWidth={1.5} />
           </svg>
           <span className="text-slate-600">Dataflow</span>
         </div>
@@ -1633,20 +1628,20 @@ export function WorkflowLegend() {
         {/* Node types */}
         <div className="flex items-center gap-2">
           <svg width="16" height="16">
-            <circle cx="8" cy="8" r="6" fill="none" stroke="#6366f1" strokeWidth={2} />
+            <circle cx="8" cy="8" r="6" fill="none" stroke={pal.chrome.orchestratorRing} strokeWidth={2} />
           </svg>
           <span className="text-slate-600">Orchestrator</span>
         </div>
         <div className="flex items-center gap-2">
           <svg width="16" height="16">
-            <circle cx="8" cy="8" r="6" className="fill-indigo-500" />
-            <text x="8" y="8" textAnchor="middle" dominantBaseline="central" className="text-[6px] fill-white font-bold">N</text>
+            <circle cx="8" cy="8" r="6" fill={pal.chrome.stepBadge} />
+            <text x="8" y="8" textAnchor="middle" dominantBaseline="central" className="text-[6px] font-bold" fill={pal.chrome.onBadge}>N</text>
           </svg>
           <span className="text-slate-600">Steps per agent</span>
         </div>
         <div className="flex items-center gap-2">
           <svg width="16" height="12">
-            <rect x="0" y="1" width="16" height="10" rx="2" fill="none" stroke="#94a3b8" strokeWidth={1} strokeDasharray="2,1" opacity={0.5} />
+            <rect x="0" y="1" width="16" height="10" rx="2" fill="none" stroke={pal.chrome.inactiveStroke} strokeWidth={1} strokeDasharray="2,1" opacity={0.5} />
           </svg>
           <span className="text-slate-600">Not yet run</span>
         </div>
