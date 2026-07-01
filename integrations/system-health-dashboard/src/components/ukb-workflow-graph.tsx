@@ -1586,7 +1586,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     <TooltipProvider>
       <div className="flex gap-4 w-full h-full">
         {/* Graph Container - contains scrollable SVG, fills available height */}
-        <div className="flex-1 relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border overflow-auto h-full">
+        <div className="flex-1 relative bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 rounded-lg border overflow-auto h-full">
           <svg
             width={gridWidth + padding * 2}
             height={gridHeight + padding * 2}
@@ -2513,7 +2513,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
         </div>
 
         {/* Legend - positioned outside graph to avoid overlap */}
-        <div className="flex-shrink-0 w-32 bg-white/90 backdrop-blur-sm rounded-lg p-2 border shadow-sm self-end max-h-[500px] overflow-y-auto">
+        <div className="flex-shrink-0 w-32 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-lg p-2 border shadow-sm self-end max-h-[500px] overflow-y-auto">
           <div className="text-xs font-medium mb-2">Legend</div>
           <div className="flex flex-col gap-1.5 text-xs">
             <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Status</div>

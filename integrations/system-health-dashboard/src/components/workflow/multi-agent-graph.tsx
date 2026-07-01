@@ -1261,7 +1261,7 @@ export function MultiAgentGraph({
   return (
     <div
       ref={scrollRef}
-      className="relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border overflow-auto h-full"
+      className="relative bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 rounded-lg border overflow-auto h-full"
     >
       <svg width={layout.width} height={layout.height + 40}>
         {/* Arrow marker definitions */}
@@ -1605,7 +1605,7 @@ export default MultiAgentGraph
 // Standalone Legend component for use outside the graph
 export function WorkflowLegend() {
   return (
-    <div className="p-3 bg-white border rounded-lg shadow-sm">
+    <div className="p-3 bg-white dark:bg-slate-900 border rounded-lg shadow-sm">
       <h4 className="text-xs font-semibold text-slate-700 mb-2">Legend</h4>
       <div className="space-y-2 text-xs">
         {/* Edge types */}
