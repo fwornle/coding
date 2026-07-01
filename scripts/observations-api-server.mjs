@@ -749,6 +749,55 @@ app.post('/api/observations/resolve-lsl', async (req, res) => {
 });
 
 /**
+ * POST /api/observations/delete — delete observations by km-core entity id.
+ *
+ * Body: { ids: string[] } — the km-core graph ids (the v7 `019f…` ids the
+ * dashboard/cold-store key on, NOT the v4 legacyId returned by the writer).
+ * Returns { deleted, notFound, requested }. Single-owner store, so deletion must
+ * go through obs-api. Triggers a re-export so the cold-store/dashboard drop them.
+ */
+app.post('/api/observations/delete', async (req, res) => {
+  try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    const ids = Array.isArray(req.body && req.body.ids)
+      ? req.body.ids.filter((x) => typeof x === 'string' && x.length > 0)
+      : [];
+    if (ids.length === 0) return res.status(400).json({ error: 'ids[] required' });
+    let deleted = 0;
+    const notFound = [];
+    for (const id of ids) {
+      try { if (await store.deleteEntity(id)) deleted++; else notFound.push(id); }
+      catch (err) { process.stderr.write(`[obs-api] /observations/delete ${id} failed: ${err.message}\n`); notFound.push(id); }
+    }
+    // Also prune the cold-store JSON: the exporter's safety-merge PRESERVES
+    // existing rows not present in km-core (anti-data-loss), so a km-core delete
+    // alone leaves the row on the dashboard forever. Prune here so the deletion
+    // actually propagates, then re-export from the now-consistent state.
+    let coldPruned = 0;
+    try {
+      const coldPath = path.join(REPO_ROOT, '.data', 'observation-export', 'observations.json');
+      if (fs.existsSync(coldPath)) {
+        const arr = JSON.parse(fs.readFileSync(coldPath, 'utf-8'));
+        if (Array.isArray(arr)) {
+          const idSet = new Set(ids);
+          const kept = arr.filter((o) => !idSet.has(o && o.id));
+          coldPruned = arr.length - kept.length;
+          if (coldPruned > 0) fs.writeFileSync(coldPath, JSON.stringify(kept, null, 2));
+        }
+      }
+    } catch (err) {
+      process.stderr.write(`[obs-api] /observations/delete cold-store prune failed: ${err.message}\n`);
+    }
+    if (deleted > 0 || coldPruned > 0) { scheduleExport(); _stalenessCache.invalidate(); }
+    res.json({ deleted, coldPruned, notFound, requested: ids.length });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /observations/delete error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Failed to delete observations' });
+  }
+});
+
+/**
  * POST /api/insights/dedup — one-shot cleanup of duplicate Insight entities.
  *
  * Collapses Insight entities that share a normalized topic down to a single

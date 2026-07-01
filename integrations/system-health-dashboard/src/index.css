@@ -100,3 +100,74 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/*
+ * Dark-mode status-color retrofit.
+ *
+ * Much of the dashboard predates dark mode and hardcodes LIGHT-only status
+ * colors (bg-green-50, text-green-700, border-green-200, …) with no `dark:`
+ * variant. Under the dark theme those render as near-white panels (the washed-out
+ * "Healthy" banner) and dark-on-dark text. Rather than hand-edit ~280 call sites,
+ * remap the small set of distinct light utilities once here. `.dark .bg-green-50`
+ * (specificity 0,2,0) beats Tailwind's `.bg-green-50` (0,1,0), so these win in
+ * dark mode without !important. Tints mirror the existing subtle-badge aesthetic
+ * (color-500 @ low alpha bg, color-300 text, color-500 @ .3 border). Light text
+ * utilities (text-*-50) are intentionally left alone — they sit on colored fills.
+ */
+.dark .bg-green-50,  .dark .bg-green-100   { background-color: rgb(34 197 94 / 0.15); }
+.dark .bg-emerald-50,.dark .bg-emerald-100 { background-color: rgb(16 185 129 / 0.15); }
+.dark .bg-blue-50,   .dark .bg-blue-100    { background-color: rgb(59 130 246 / 0.15); }
+.dark .bg-sky-50,    .dark .bg-sky-100     { background-color: rgb(14 165 233 / 0.15); }
+.dark .bg-red-50,    .dark .bg-red-100     { background-color: rgb(239 68 68 / 0.15); }
+.dark .bg-rose-50,   .dark .bg-rose-100    { background-color: rgb(244 63 94 / 0.15); }
+.dark .bg-amber-50,  .dark .bg-amber-100   { background-color: rgb(245 158 11 / 0.15); }
+.dark .bg-yellow-50, .dark .bg-yellow-100  { background-color: rgb(234 179 8 / 0.15); }
+.dark .bg-orange-50, .dark .bg-orange-100  { background-color: rgb(249 115 22 / 0.15); }
+.dark .bg-gray-50,   .dark .bg-gray-100,
+.dark .bg-slate-50,  .dark .bg-slate-100,
+.dark .bg-gray-300                          { background-color: hsl(var(--muted)); }
+
+.dark .text-green-600,  .dark .text-green-700,  .dark .text-green-800   { color: rgb(134 239 172); }
+.dark .text-emerald-600,.dark .text-emerald-700,.dark .text-emerald-800 { color: rgb(110 231 183); }
+.dark .text-blue-600,   .dark .text-blue-700,   .dark .text-blue-800    { color: rgb(147 197 253); }
+.dark .text-sky-600,    .dark .text-sky-700,    .dark .text-sky-800     { color: rgb(125 211 252); }
+.dark .text-red-600,    .dark .text-red-700,    .dark .text-red-800     { color: rgb(252 165 165); }
+.dark .text-rose-600,   .dark .text-rose-700,   .dark .text-rose-800    { color: rgb(253 164 175); }
+.dark .text-amber-600,  .dark .text-amber-700,  .dark .text-amber-800   { color: rgb(252 211 77); }
+.dark .text-yellow-600, .dark .text-yellow-700, .dark .text-yellow-800  { color: rgb(253 224 71); }
+.dark .text-orange-600, .dark .text-orange-700, .dark .text-orange-800  { color: rgb(253 186 116); }
+.dark .text-gray-600,   .dark .text-slate-600,  .dark .text-slate-700   { color: hsl(var(--muted-foreground)); }
+
+.dark .border-green-50,  .dark .border-green-200,  .dark .border-green-300   { border-color: rgb(34 197 94 / 0.3); }
+.dark .border-emerald-50,.dark .border-emerald-200,.dark .border-emerald-300 { border-color: rgb(16 185 129 / 0.3); }
+.dark .border-blue-50,   .dark .border-blue-200,   .dark .border-blue-300    { border-color: rgb(59 130 246 / 0.3); }
+.dark .border-sky-50,    .dark .border-sky-200,    .dark .border-sky-300     { border-color: rgb(14 165 233 / 0.3); }
+.dark .border-red-50,    .dark .border-red-200,    .dark .border-red-300     { border-color: rgb(239 68 68 / 0.3); }
+.dark .border-rose-50,   .dark .border-rose-200,   .dark .border-rose-300    { border-color: rgb(244 63 94 / 0.3); }
+.dark .border-amber-50,  .dark .border-amber-200,  .dark .border-amber-300   { border-color: rgb(245 158 11 / 0.3); }
+.dark .border-yellow-50, .dark .border-yellow-200, .dark .border-yellow-300  { border-color: rgb(234 179 8 / 0.3); }
+.dark .border-orange-50, .dark .border-orange-200, .dark .border-orange-300  { border-color: rgb(249 115 22 / 0.3); }
+.dark .border-gray-200,  .dark .border-slate-200                             { border-color: hsl(var(--border)); }
+
+/* Accent hues used for category/agent badges. */
+.dark .bg-purple-50, .dark .bg-purple-100   { background-color: rgb(168 85 247 / 0.15); }
+.dark .bg-violet-50, .dark .bg-violet-100    { background-color: rgb(139 92 246 / 0.15); }
+.dark .bg-indigo-50, .dark .bg-indigo-100    { background-color: rgb(99 102 241 / 0.15); }
+.dark .bg-fuchsia-50,.dark .bg-fuchsia-100   { background-color: rgb(217 70 239 / 0.15); }
+.dark .bg-pink-50,   .dark .bg-pink-100      { background-color: rgb(236 72 153 / 0.15); }
+.dark .bg-cyan-50,   .dark .bg-cyan-100      { background-color: rgb(6 182 212 / 0.15); }
+.dark .bg-teal-50,   .dark .bg-teal-100      { background-color: rgb(20 184 166 / 0.15); }
+.dark .text-purple-600, .dark .text-purple-700, .dark .text-purple-800   { color: rgb(216 180 254); }
+.dark .text-violet-600, .dark .text-violet-700, .dark .text-violet-800   { color: rgb(196 181 253); }
+.dark .text-indigo-600, .dark .text-indigo-700, .dark .text-indigo-800   { color: rgb(165 180 252); }
+.dark .text-fuchsia-600,.dark .text-fuchsia-700,.dark .text-fuchsia-800  { color: rgb(240 171 252); }
+.dark .text-pink-600,   .dark .text-pink-700,   .dark .text-pink-800     { color: rgb(249 168 212); }
+.dark .text-cyan-600,   .dark .text-cyan-700,   .dark .text-cyan-800     { color: rgb(103 232 249); }
+.dark .text-teal-600,   .dark .text-teal-700,   .dark .text-teal-800     { color: rgb(94 234 212); }
+.dark .border-purple-50, .dark .border-purple-200, .dark .border-purple-300   { border-color: rgb(168 85 247 / 0.3); }
+.dark .border-violet-50, .dark .border-violet-200, .dark .border-violet-300   { border-color: rgb(139 92 246 / 0.3); }
+.dark .border-indigo-50, .dark .border-indigo-200, .dark .border-indigo-300   { border-color: rgb(99 102 241 / 0.3); }
+.dark .border-fuchsia-50,.dark .border-fuchsia-200,.dark .border-fuchsia-300  { border-color: rgb(217 70 239 / 0.3); }
+.dark .border-pink-50,   .dark .border-pink-200,   .dark .border-pink-300     { border-color: rgb(236 72 153 / 0.3); }
+.dark .border-cyan-50,   .dark .border-cyan-200,   .dark .border-cyan-300     { border-color: rgb(6 182 212 / 0.3); }
+.dark .border-teal-50,   .dark .border-teal-200,   .dark .border-teal-300     { border-color: rgb(20 184 166 / 0.3); }
