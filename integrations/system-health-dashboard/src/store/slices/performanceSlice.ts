@@ -106,6 +106,18 @@ export interface TimelineRow {
   [key: string]: unknown
 }
 
+// A development-narrative item: an observation written during a run's time window,
+// carrying the plain-language "Intent: …" of a foreground turn. Joined by time
+// window + agent (observations have no task_id), so it is best-effort and only
+// meaningful for real coding runs.
+export interface NarrativeItem {
+  id: string
+  timestamp: string | null
+  agent: string | null
+  content: string
+  artifacts?: unknown[]
+}
+
 // Score-state buckets surfaced as a facet (D-06 quarantine + scored/not_scored).
 export type ScoreState = 'scored' | 'pending' | 'not_scored'
 
@@ -156,6 +168,8 @@ interface PerformanceState {
   timelineByTaskId: Record<string, TimelineRow[]>
   timelineLoading: boolean
   timelineError: string | null
+  narrativeByTaskId: Record<string, NarrativeItem[]>
+  narrativeLoadingId: string | null
   // Saved Reports (KB-04 / DASH-03) — shared cross-component state.
   reports: Report[]
   activeReportId: string | null
@@ -207,6 +221,8 @@ const initialState: PerformanceState = {
   timelineByTaskId: {},
   timelineLoading: false,
   timelineError: null,
+  narrativeByTaskId: {},
+  narrativeLoadingId: null,
   reports: [],
   activeReportId: null,
   reportsLoading: false,
@@ -264,6 +280,40 @@ export const fetchTimeline = createAsyncThunk(
       const data = await response.json()
       const timeline: TimelineRow[] = (data?.timeline ?? []) as TimelineRow[]
       return { taskId, timeline }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// fetchRunNarrative (B): join the plain-language "Intent: …" observations written
+// during a run's time window into a chronological development story. Observations
+// have no task_id, so the join is by [from,to] window + agent (best-effort). The
+// caller computes the window from the run (started/ended or timeline min/max).
+export const fetchRunNarrative = createAsyncThunk<
+  { taskId: string; items: NarrativeItem[] },
+  { taskId: string; from: string; to: string; agent?: string | null },
+  { rejectValue: string }
+>(
+  'performance/fetchRunNarrative',
+  async ({ taskId, from, to, agent }, { rejectWithValue }) => {
+    try {
+      const qs = new URLSearchParams({ from, to, limit: '200' })
+      if (agent) qs.set('agent', agent)
+      const response = await fetch(`/api/observations?${qs.toString()}`)
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      const raw: Record<string, unknown>[] = data?.data ?? data?.observations ?? data?.rows ?? []
+      const items: NarrativeItem[] = raw.map((r) => ({
+        id: String(r.id ?? ''),
+        timestamp: (r.timestamp ?? r.createdAt ?? null) as string | null,
+        agent: (r.agent ?? null) as string | null,
+        content: String(r.content ?? r.summary ?? ''),
+        artifacts: Array.isArray(r.artifacts) ? r.artifacts : Array.isArray(r.modifiedFiles) ? r.modifiedFiles : [],
+      }))
+      // Oldest → newest so the story reads top-to-bottom.
+      items.sort((a, b) => (a.timestamp ?? '').localeCompare(b.timestamp ?? ''))
+      return { taskId, items }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -524,6 +574,16 @@ const performanceSlice = createSlice({
         state.timelineLoading = false
         state.timelineError = (action.payload as string) ?? 'Failed to load timeline'
       })
+      .addCase(fetchRunNarrative.pending, (state, action) => {
+        state.narrativeLoadingId = action.meta.arg.taskId
+      })
+      .addCase(fetchRunNarrative.fulfilled, (state, action) => {
+        state.narrativeByTaskId[action.payload.taskId] = action.payload.items
+        if (state.narrativeLoadingId === action.payload.taskId) state.narrativeLoadingId = null
+      })
+      .addCase(fetchRunNarrative.rejected, (state) => {
+        state.narrativeLoadingId = null
+      })
       // saveOverride (SCORE-02)
       .addCase(saveOverride.pending, (state) => {
         state.saveOverridePending = true
@@ -660,6 +720,10 @@ export const selectTimelineError = (state: RootState) => state.performance.timel
 // Per-taskId timeline selector factory.
 export const selectTimelineFor = (taskId: string | null) => (state: RootState): TimelineRow[] =>
   taskId ? (state.performance.timelineByTaskId[taskId] ?? []) : []
+
+export const selectNarrativeFor = (taskId: string | null) => (state: RootState): NarrativeItem[] =>
+  taskId ? (state.performance.narrativeByTaskId[taskId] ?? []) : []
+export const selectNarrativeLoadingId = (state: RootState) => state.performance.narrativeLoadingId
 
 // Measurement lifecycle selectors.
 export const selectActiveMeasurement = (state: RootState) => state.performance.activeMeasurement

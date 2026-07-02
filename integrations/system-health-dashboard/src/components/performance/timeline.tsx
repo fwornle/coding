@@ -11,12 +11,16 @@ import {
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
   fetchTimeline,
+  fetchRunNarrative,
   selectSelectedTaskId,
   selectSelectedRun,
   selectTimelineFor,
   selectTimelineLoading,
+  selectNarrativeFor,
+  selectNarrativeLoadingId,
   type Run,
   type TimelineRow,
+  type NarrativeItem,
 } from '@/store/slices/performanceSlice'
 import { distinctModels, normalizeModel } from './models'
 import {
@@ -202,18 +206,100 @@ function StorySummary({ stats }: { stats: RoleStat[] }) {
   )
 }
 
+// The run's time window for the narrative join: prefer the timeline's own
+// min/max turn timestamps (most precise), else the run's started/ended fields.
+// The `to` bound is padded because observations are written just AFTER the turn
+// they describe (the observation-writer runs post-turn).
+function runWindow(rows: TimelineRow[], run: Run | null): { from: string; to: string } | null {
+  const ts = rows.map((r) => r.timestamp).filter((t): t is string => !!t).sort()
+  let from = ts[0] ?? run?.started_at ?? null
+  let to = ts[ts.length - 1] ?? run?.ended_at ?? null
+  if (!from || !to) return null
+  const pad = (iso: string, ms: number) => {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return new Date(d.getTime() + ms).toISOString()
+  }
+  from = pad(from, -60_000)
+  to = pad(to, 5 * 60_000)
+  return { from, to }
+}
+
+function intentLine(content: string): string {
+  const trimmed = content.replace(/^Intent:\s*/i, '').trim()
+  const firstSentence = trimmed.split(/(?<=[.!?])\s|\n/)[0] ?? trimmed
+  return firstSentence.length > 200 ? `${firstSentence.slice(0, 200)}…` : firstSentence
+}
+
+// The plain-language development story: the "Intent: …" observations written
+// during the run's window, in order. Answers "what did the foreground actually
+// do" without brittle per-turn matching. Collapsed by default.
+function DevelopmentNarrative({ taskId, items, loading }: { taskId: string; items: NarrativeItem[]; loading: boolean }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mb-3 rounded-md border" data-testid="timeline-narrative">
+      <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium">
+        <ChevronRight className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`} />
+        Development narrative
+        <span className="font-normal text-muted-foreground">
+          {loading ? 'loading…' : `${items.length} intent${items.length === 1 ? '' : 's'} in this run’s window`}
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-1 px-3 pb-3">
+        {!loading && items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No observations were recorded in this run’s time window (expected for smoke/replay runs — the narrative
+            is populated by the knowledge pipeline during real coding sessions).
+          </p>
+        ) : (
+          <ol className="space-y-1.5" data-testid="narrative-list" data-count={items.length}>
+            {items.map((it) => (
+              <li key={it.id} className="flex gap-2 border-l-2 border-l-primary/40 pl-3 text-sm">
+                <span className="font-mono text-xs text-muted-foreground" title={it.timestamp ?? undefined}>
+                  {fmtTime(it.timestamp) ?? '—'}
+                </span>
+                <span>
+                  {intentLine(it.content)}
+                  {Array.isArray(it.artifacts) && it.artifacts.length > 0 && (
+                    <span className="ml-1 text-xs text-muted-foreground">· {it.artifacts.length} file(s)</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+        <p className="pt-1 text-xs text-muted-foreground">
+          Joined from observations by time window + agent ({taskId}), best-effort — observations carry no run id.
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 export function PerformanceTimeline() {
   const dispatch = useAppDispatch()
   const taskId = useAppSelector(selectSelectedTaskId)
   const run = useAppSelector(selectSelectedRun)
   const rows = useAppSelector(selectTimelineFor(taskId))
   const loading = useAppSelector(selectTimelineLoading)
+  const narrative = useAppSelector(selectNarrativeFor(taskId))
+  const narrativeLoadingId = useAppSelector(selectNarrativeLoadingId)
   const [hiddenRoles, setHiddenRoles] = useState<Set<Role>>(new Set())
 
   useEffect(() => {
     if (taskId) dispatch(fetchTimeline(taskId))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId])
+
+  // Once the timeline is loaded, derive the run window and fetch the narrative.
+  const win = runWindow(rows, run)
+  const winKey = win ? `${win.from}|${win.to}` : ''
+  useEffect(() => {
+    if (taskId && win) {
+      dispatch(fetchRunNarrative({ taskId, from: win.from, to: win.to, agent: run?.agent ?? run?.canonical_agent ?? undefined }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId, winKey])
 
   const stats = summarizeByRole(rows, run)
   const statByRole = Object.fromEntries(stats.map((s) => [s.role, s])) as Record<Role, RoleStat>
@@ -268,6 +354,12 @@ export function PerformanceTimeline() {
         ) : (
           <>
             <StorySummary stats={stats} />
+
+            <DevelopmentNarrative
+              taskId={taskId}
+              items={narrative}
+              loading={narrativeLoadingId === taskId}
+            />
 
             {/* Role filter chips — click to show/hide a whole role. Serves the
                 "focus on just the development" need without losing the counts. */}
