@@ -18,6 +18,7 @@ import {
   type Run,
 } from '@/store/slices/performanceSlice'
 import { effective, isEdited, judged, SCORE_DIMENSIONS } from './corrected-wins'
+import { distinctModels, normalizeModel } from './models'
 
 // D-01/D-03 runs table. Reads the FILTERED set from selectFilteredRuns. Row click
 // dispatches setSelectedTaskId — this drives ONLY the inline Timeline panel (so the
@@ -165,14 +166,16 @@ export function RunsTable() {
                     NEVER a dominant-by-count fallback. */}
                 <TableCell className="text-sm text-muted-foreground" data-testid="run-canonical-model">
                   {run.canonical_model
-                    ? <span className="font-mono">{run.canonical_model}</span>
+                    ? <span className="font-mono">{normalizeModel(run.canonical_model)}</span>
                     : <span className="text-muted-foreground italic">unmeasured</span>}
                 </TableCell>
-                {/* Background-service models — the segregated concurrent daemons.
+                {/* Background-service models — the segregated concurrent daemons,
+                    shown as the DISTINCT set of models (one entry per background
+                    process would otherwise repeat the same model many times).
                     Empty → em-dash (reusing the null-not-zero convention). */}
                 <TableCell className="text-sm text-muted-foreground" data-testid="run-background-models">
                   {run.background_models?.length
-                    ? <span className="font-mono">{run.background_models.map((b) => b.model).join(', ')}</span>
+                    ? <span className="font-mono">{distinctModels(run.background_models).join(', ')}</span>
                     : <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 {SCORE_DIMENSIONS.map((dim) => (

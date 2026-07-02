@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, createSelector, PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '../index'
+import { normalizeModel } from '@/components/performance/models'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -694,7 +695,7 @@ function runPassesFacets(run: Run, f: FacetState): boolean {
   if (f.task_id.length && !f.task_id.includes(run.task_id)) return false
   if (f.task_class.length && !f.task_class.includes(run.task_class ?? 'unclassified')) return false
   if (f.agent.length && !f.agent.includes(run.agent ?? '—')) return false
-  if (f.model.length && !f.model.includes(run.model ?? '—')) return false
+  if (f.model.length && !f.model.includes(normalizeModel(run.model) ?? '—')) return false
   if (f.framework.length && !f.framework.includes(run.framework ?? '—')) return false
   if (f.scoreState.length && !f.scoreState.includes(scoreStateOf(run))) return false
   if (f.startedAfter && (!run.started_at || run.started_at < f.startedAfter)) return false
@@ -735,7 +736,7 @@ export const selectFacetCounts = createSelector(
     for (const r of filtered) {
       bump(counts.task_class, r.task_class ?? 'unclassified')
       bump(counts.agent, r.agent ?? '—')
-      bump(counts.model, r.model ?? '—')
+      bump(counts.model, normalizeModel(r.model) ?? '—')
       bump(counts.framework, r.framework ?? '—')
       bump(counts.scoreState, scoreStateOf(r))
     }
@@ -753,7 +754,7 @@ export const selectFacetOptions = createSelector(
     return {
       task_class: distinct(runs.map((r) => r.task_class), 'unclassified'),
       agent: distinct(runs.map((r) => r.agent), '—'),
-      model: distinct(runs.map((r) => r.model), '—'),
+      model: distinct(runs.map((r) => normalizeModel(r.model)), '—'),
       framework: distinct(runs.map((r) => r.framework), '—'),
       scoreState: ['scored', 'pending', 'not_scored'] as ScoreState[],
     }
