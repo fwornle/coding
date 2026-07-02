@@ -334,7 +334,14 @@ async function main() {
   // downstream — it is never coerced to a dominant fallback (D-05).
   const fgGroups = byAgentModel.filter(isForegroundGroup);
   const bgGroups = byAgentModel.filter((g) => !isForegroundGroup(g));
-  const canonical = fgGroups[0] ?? null;
+  // Canonical = the largest foreground group that is NOT a captured sub-agent
+  // (ATTR-04). Sub-agent rows are foreground (they belong to this task) and count
+  // toward totals, but the canonical CHAT model is the interactive main session —
+  // never a Task/Agent sub-agent, which may run a cheaper model (e.g. Explore on
+  // haiku) with more tokens and would otherwise win fgGroups[0] (ordered by tokens).
+  // Fall back to fgGroups[0] only if the main session left no non-subagent group.
+  const isSubagentGroup = (g) => g?.process === 'token-adapter-claude-subagent';
+  const canonical = fgGroups.find((g) => !isSubagentGroup(g)) ?? fgGroups[0] ?? null;
   // canonical_model stays null when no foreground group was measured — we NEVER
   // guess a model (D-05: null persists as "unmeasured", never coerced to a
   // dominant fallback).

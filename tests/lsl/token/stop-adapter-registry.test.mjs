@@ -40,6 +40,7 @@ import { buildClaudeTokenRows } from '../../../lib/lsl/token/claude-token-rows.m
 import {
   STOP_ADAPTERS,
   captureForegroundTokens,
+  SUBAGENT_PROCESS,
 } from '../../../lib/lsl/token/stop-adapter-registry.mjs';
 
 const require = createRequire(import.meta.url);
@@ -145,6 +146,64 @@ test('captureForegroundTokens(claude): inserts cladpt rows stamped with the acti
       assert.ok(rows.length >= 2, 'cladpt rows inserted from the main-session transcript');
       assert.ok(rows.every((r) => r.user_hash === 'cladpt'), 'all inserted rows are cladpt');
       assert.ok(rows.every((r) => r.task_id === 'm-stop-1'), 'every row stamped with the active task_id');
+    } finally {
+      db.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('captureForegroundTokens(claude): ATTR-04 captures sub-agents with the SUBAGENT_PROCESS marker, main stays token-adapter-claude', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // A minimal sub-agent transcript with a DISTINCT model + requestId so its rows
+    // neither collide (dedup key) nor merge with the main-session opus rows.
+    const subFixture = path.join(dir, 'agent-sub.jsonl');
+    fs.writeFileSync(
+      subFixture,
+      JSON.stringify({
+        type: 'assistant',
+        requestId: 'req-sub-0001',
+        uuid: 'aaaa0001',
+        timestamp: '2026-06-29T05:31:00.000Z',
+        message: { model: 'claude-haiku-4-5', usage: { input_tokens: 400, output_tokens: 120 }, content: [] },
+      }) + '\n',
+    );
+
+    const span = {
+      task_id: 'm-stop-sub',
+      agent: 'claude',
+      started_at: '2026-06-29T05:29:00.000Z',
+      ended_at: '2026-06-29T05:35:00.000Z',
+    };
+    const inserted = await captureForegroundTokens(span, {
+      dbPath,
+      mainSessionPath: MAIN_SESSION_FIXTURE,
+      subagentPaths: [subFixture], // inject the located sub-agent list
+      resolveTaskId: async () => 'm-stop-sub',
+    });
+    assert.ok(inserted >= 2, 'inserted main + sub-agent rows');
+
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const rows = db
+        .prepare('SELECT user_hash, task_id, process, model FROM token_usage')
+        .all();
+      // Every captured row is foreground (cladpt) + task-stamped.
+      assert.ok(rows.every((r) => r.user_hash === 'cladpt'), 'all rows cladpt');
+      assert.ok(rows.every((r) => r.task_id === 'm-stop-sub'), 'all rows task-stamped');
+
+      // The sub-agent (haiku) rows carry the SUBAGENT_PROCESS marker; the main
+      // (opus) rows keep the plain adapter process — so canonical selection in
+      // measurement-stop can exclude the sub-agent from chat-model attribution.
+      const sub = rows.filter((r) => r.process === SUBAGENT_PROCESS);
+      const main = rows.filter((r) => r.process !== SUBAGENT_PROCESS);
+      assert.ok(sub.length >= 1, 'at least one sub-agent row captured');
+      assert.ok(sub.every((r) => r.model === 'claude-haiku-4-5'), 'sub-agent rows are the haiku model');
+      assert.ok(main.length >= 1, 'main-session rows still captured');
+      assert.ok(main.every((r) => r.model === 'claude-opus-4-8'), 'main rows are the opus model');
+      assert.ok(main.every((r) => r.process === 'token-adapter-claude'), 'main rows keep the plain adapter process');
     } finally {
       db.close();
     }
