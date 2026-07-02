@@ -4,8 +4,8 @@ milestone: v7.4
 milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
 status: executing
 stopped_at: Phase 67 context gathered
-last_updated: "2026-07-02T08:43:24.892Z"
-last_activity: 2026-07-02 -- Phase 67 planning complete
+last_updated: "2026-07-02T08:48:24.309Z"
+last_activity: 2026-07-02 -- Phase 67 execution started
 progress:
   total_phases: 9
   completed_phases: 8
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 75 — measurement-attribution-accuracy-observation-linkage
+**Current focus:** Phase 67 — reproducibility-replay-rig
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,16 +53,16 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 75 — COMPLETE
-Plan: 6 of 6
-Status: Ready to execute
+Phase: 67 (reproducibility-replay-rig) — EXECUTING
+Plan: 1 of 7
+Status: Executing Phase 67
 real gap (route heuristics were permanently null for Claude/Copilot runs — agent never
 normalized + Claude session seam never wired into the close orchestrator), fixed inline
 in commit 9eb5163c5 (lib/experiments/route-trace-resolve.mjs + measurement-stop.mjs +
 experiments-recompute-route.mjs). Live-verified: Claude-dominant run closes with
 total_step_count > 0, idempotent across recompute.
 Next: Phase 73 (Semantic Route Judge & Success Scoring) — not yet planned (no dir).
-Last activity: 2026-07-02 -- Phase 67 planning complete
+Last activity: 2026-07-02 -- Phase 67 execution started
 
 ## Deferred Items
 
