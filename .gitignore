@@ -196,6 +196,11 @@ integrations/mcp-server-browserbase/
 # These MUST NOT be committed (Security V9, T-67-03-02); verified by git check-ignore.
 .data/run-snapshots/
 
+# Restore sandboxes (Phase 67, Plan 67-05): isolated git worktrees + sandbox
+# LLM_PROXY_DATA_DIR reconstructed from a RunSnapshot (D-04). They hold copies of live
+# workspace/KB/config state and MUST NOT be committed (same security class as run-snapshots).
+.data/run-restores/
+
 # Code graph RAG index (binary, regenerated on indexing)
 .data/code-graph-index/
 
