@@ -784,13 +784,26 @@ function facetAgent(v: string | null | undefined): string {
 }
 // Framework shares the same actor aliasing as agent (claude-code == claude).
 const facetFramework = facetAgent
-function facetModel(v: string | null | undefined): string {
-  const t = (normalizeModel(v) ?? '').trim()
-  return t || FACET_NONE
-}
 function facetTaskClass(v: string | null | undefined): string {
   const t = (v ?? '').trim()
   return t || 'unclassified'
+}
+
+// The Model facet is MULTI-VALUED and derived from the SAME fields the runs table
+// displays — the canonical (foreground chat) model plus the background-service
+// models — so filtering by a model only surfaces runs where that model is actually
+// visible in the table. (It deliberately does NOT use the legacy run.model field,
+// which ATTR-02 suppresses as "unmeasured" — using it made the facet disagree with
+// the table.) A run with no attributed models falls into the single `(none)` bucket.
+export function runModels(run: Run): string[] {
+  const set = new Set<string>()
+  const cm = normalizeModel(run.canonical_model)
+  if (cm && cm.trim()) set.add(cm)
+  for (const b of run.background_models ?? []) {
+    const m = normalizeModel(b.model)
+    if (m && m.trim()) set.add(m)
+  }
+  return set.size ? [...set] : [FACET_NONE]
 }
 
 // Predicate: does a run pass the current facet state? (date window + each
@@ -799,7 +812,10 @@ function runPassesFacets(run: Run, f: FacetState): boolean {
   if (f.task_id.length && !f.task_id.includes(run.task_id)) return false
   if (f.task_class.length && !f.task_class.includes(facetTaskClass(run.task_class))) return false
   if (f.agent.length && !f.agent.includes(facetAgent(run.agent))) return false
-  if (f.model.length && !f.model.includes(facetModel(run.model))) return false
+  if (f.model.length) {
+    const models = runModels(run)
+    if (!f.model.some((m) => models.includes(m))) return false
+  }
   if (f.framework.length && !f.framework.includes(facetFramework(run.framework))) return false
   if (f.scoreState.length && !f.scoreState.includes(scoreStateOf(run))) return false
   if (f.startedAfter && (!run.started_at || run.started_at < f.startedAfter)) return false
@@ -840,7 +856,7 @@ export const selectFacetCounts = createSelector(
     for (const r of filtered) {
       bump(counts.task_class, facetTaskClass(r.task_class))
       bump(counts.agent, facetAgent(r.agent))
-      bump(counts.model, facetModel(r.model))
+      for (const m of runModels(r)) bump(counts.model, m)
       bump(counts.framework, facetFramework(r.framework))
       bump(counts.scoreState, scoreStateOf(r))
     }
@@ -857,7 +873,7 @@ export const selectFacetOptions = createSelector(
     return {
       task_class: uniqSorted(runs.map((r) => facetTaskClass(r.task_class))),
       agent: uniqSorted(runs.map((r) => facetAgent(r.agent))),
-      model: uniqSorted(runs.map((r) => facetModel(r.model))),
+      model: uniqSorted(runs.flatMap((r) => runModels(r))),
       framework: uniqSorted(runs.map((r) => facetFramework(r.framework))),
       scoreState: ['scored', 'pending', 'not_scored'] as ScoreState[],
     }
