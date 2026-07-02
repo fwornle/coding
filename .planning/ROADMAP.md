@@ -46,7 +46,14 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   2. Restoring a snapshot returns the workspace and KB to the captured state byte-for-byte for a repeat run.
   3. During a recorded run, LLM provider responses (via `rapid-llm-proxy`), `WebSearch`/`WebFetch` results, remote MCP replies, and the clock are written to fixtures.
   4. A replay run reads those fixtures instead of hitting live providers, so repeated N=1 runs are comparable modulo provider non-determinism.
-**Plans**: TBD
+**Plans**: 7 plans
+  - [ ] 67-01-PLAN.md — LLM channel core: D-07 match-key + record/replay pure functions + round-trip test (Wave 1)
+  - [ ] 67-02-PLAN.md — Harness record + honest replay hard-fail + deterministic clock shim (Wave 1)
+  - [ ] 67-03-PLAN.md — Internal-state capture primitives: git-state + secret-safe env allowlist + MCP inventory + gitignore (Wave 1)
+  - [ ] 67-04-PLAN.md — KB capture (D-02) + full RunSnapshot assembly with manifest + clock_base (Wave 2)
+  - [ ] 67-05-PLAN.md — Sandbox restore (D-04) + confirm-gated --in-place (D-05) + repro-restore CLI (Wave 3)
+  - [ ] 67-06-PLAN.md — Proxy /api/complete replay+record taps (D-06 hard-fail on miss) (Wave 2)
+  - [ ] 67-07-PLAN.md — Measurement-span integration (D-09): capture-at-open + arm + fixture archive + snapshot_id + live e2e checkpoint (Wave 3)
 
 ### Phase 68: [FOUNDATIONAL] Token Attribution Storage
 **Goal**: The `token_usage` store carries the cross-agent row contract (new columns) and a measurement span exists that every writer can consult to stamp the active `task_id`.
