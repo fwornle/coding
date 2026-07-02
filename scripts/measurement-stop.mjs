@@ -335,12 +335,21 @@ async function main() {
   const fgGroups = byAgentModel.filter(isForegroundGroup);
   const bgGroups = byAgentModel.filter((g) => !isForegroundGroup(g));
   const canonical = fgGroups[0] ?? null;
+  // canonical_model stays null when no foreground group was measured — we NEVER
+  // guess a model (D-05: null persists as "unmeasured", never coerced to a
+  // dominant fallback).
   const canonicalModel = canonical?.model ?? null;
   // Normalize to a canonical agent family. Proxy token rows leave `agent` blank
   // and only set `model` (e.g. 'claude-sonnet-4.6'), so the raw group `agent` is
   // '' for Claude/Copilot runs — which made the route reader short-circuit to
   // null. Derive the family from (agent, model) so heuristics actually populate.
-  const canonicalAgent = canonical ? normalizeAgent(canonical) : null;
+  // When NO foreground group was captured (the Anthropic-direct bypass: an
+  // interactive Claude session talks to Anthropic directly, leaving no proxy/
+  // adapter rows), fall back to the span's DECLARED foreground agent so the Run is
+  // still attributed to the actor that ran it. Agent-only — the model stays null.
+  const canonicalAgent = canonical
+    ? normalizeAgent(canonical)
+    : normalizeAgent({ agent: foregroundAgent });
   // Segregate the background daemons (model, process, total_tokens) — nothing is
   // dropped, so the operator can still see what ran concurrently (D-02).
   const backgroundModels = bgGroups.map((g) => ({

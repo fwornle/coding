@@ -9,7 +9,11 @@
 //
 // GAP-FILL ONLY: it never clobbers existing values. It sets background_models only
 // when the persisted list is empty, and canonical_model/agent only when currently
-// null and a foreground group exists. Idempotent — re-running is a no-op.
+// null. When NO foreground token group was captured (the Anthropic-direct bypass),
+// canonical_agent falls back to the run's DECLARED foreground agent — the historical
+// metadata.agent, the persisted analog of measurement-stop's span.agent fallback —
+// while canonical_model stays null (agent-only; a model is never guessed).
+// Idempotent — re-running is a no-op.
 //
 // Usage: node scripts/backfill-run-attribution.mjs [--dry-run]
 
@@ -20,14 +24,21 @@ import { normalizeAgent } from '../lib/experiments/route-trace-resolve.mjs';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
-function computeAttribution(taskId) {
+function computeAttribution(taskId, md) {
   const { byAgentModel } = aggregateByTaskId(taskId);
   const fg = byAgentModel.filter(isForegroundGroup);
   const bg = byAgentModel.filter((g) => !isForegroundGroup(g));
   const canonical = fg[0] ?? null;
+  // Foreground-agent fallback (agent-only): with no measured foreground group,
+  // attribute the run to its declared foreground agent — the historical
+  // metadata.agent, mirroring measurement-stop's span.agent fallback. Unlike the
+  // live close (which defaults an unknown foreground to 'claude' — ground truth at
+  // close time), the backfill has no live span, so it stays conservative: only a
+  // KNOWN recorded agent produces a family; an absent/empty one leaves it null.
+  const fgAgent = normalizeAgent({ agent: md?.agent || '' });
   return {
     canonical_model: canonical?.model ?? null,
-    canonical_agent: canonical ? normalizeAgent(canonical) : null,
+    canonical_agent: canonical ? normalizeAgent(canonical) : fgAgent,
     background_models: bg.map((g) => ({
       model: g.model,
       process: g.process,
@@ -52,25 +63,28 @@ async function main() {
       if (!taskId) continue;
 
       const persistedBg = Array.isArray(md.background_models) ? md.background_models : [];
-      const persistedCanonical = md.canonical_model ?? null;
-      const attr = computeAttribution(taskId);
+      const attr = computeAttribution(taskId, md);
 
-      // Gap-fill: only fill what is missing; never overwrite existing values.
+      // Gap-fill: only fill what is missing; never overwrite existing values. Model
+      // and agent fill INDEPENDENTLY — the foreground-agent fallback populates
+      // canonical_agent even when canonical_model stays null (bypass runs).
       const fillBg = persistedBg.length === 0 && attr.background_models.length > 0;
-      const fillCanonical = persistedCanonical == null && attr.canonical_model != null;
-      if (!fillBg && !fillCanonical) continue;
+      const fillModel = (md.canonical_model ?? null) == null && attr.canonical_model != null;
+      const fillAgent = (md.canonical_agent ?? null) == null && attr.canonical_agent != null;
+      if (!fillBg && !fillModel && !fillAgent) continue;
 
       const nextMd = {
         ...md,
-        canonical_model: fillCanonical ? attr.canonical_model : (md.canonical_model ?? null),
-        canonical_agent: fillCanonical ? attr.canonical_agent : (md.canonical_agent ?? null),
+        canonical_model: fillModel ? attr.canonical_model : (md.canonical_model ?? null),
+        canonical_agent: fillAgent ? attr.canonical_agent : (md.canonical_agent ?? null),
         background_models: fillBg ? attr.background_models : persistedBg,
       };
 
       const bgSummary = nextMd.background_models.map((b) => b.model).join(', ') || '(none)';
       process.stdout.write(
         `${DRY_RUN ? '[dry-run] ' : ''}${taskId}: ` +
-        `${fillCanonical ? `canonical→${attr.canonical_model} ` : ''}` +
+        `${fillModel ? `model→${attr.canonical_model} ` : ''}` +
+        `${fillAgent ? `agent→${attr.canonical_agent} ` : ''}` +
         `${fillBg ? `bg→[${bgSummary}]` : ''}\n`,
       );
 
