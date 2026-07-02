@@ -340,19 +340,22 @@ snapshot_id: null,   // deferred → Phase 67 (D-13)  ← this phase populates i
 | A4 | LevelDB compaction perturbs on-disk bytes across clean-closes (so byte-exact only holds for a point-in-time artifact). | Pitfall 1 | If LevelDB were byte-stable, a stricter SC-2 guarantee is possible; the recommended dir-copy approach is safe either way. |
 | A5 | The transcript JSONL reliably contains WebSearch/WebFetch/MCP tool_result content within the span window. | Harness Channels | Verified structurally (31 tool_result blocks) but not that *every* harness tool's full output is present; some large results may be truncated in the transcript. Sample real WebSearch/WebFetch entries during planning. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Consistent live-KB capture without stopping obs-api.**
    - Known: obs-api is the single LevelDB owner and always running; JSON export is atomically written and 5s-debounced.
    - Unclear: whether a `cp -R` of the live dir at span-open is reliably consistent, or whether a brief writer-quiesce hook (or export-only capture) is required.
    - Recommendation: default to capturing the atomically-written `exports/general.json` as the canonical KB + best-effort `leveldb` tar; document the consistency caveat; consider an optional `POST /api/observations/flush`-style quiesce if km-core/obs-api exposes one.
+   - **RESOLVED:** canonical = `exports/general.json`, LevelDB tar best-effort, `kb_caveat` surfaced in the snapshot manifest — implemented in Plan 04 (`kb-capture.mjs` / `capture-snapshot.mjs`).
 
 2. **Exact `--replay` arming channel through `active-measurement.json`.**
    - Known: `startMeasurement` accepts a `meta` object (measurement-span.ts:174,186-191) that is persisted into the span file and readable by `getActiveMeasurement`.
    - Recommendation: thread `--replay <snapshot>` and record-on as `meta: { replay_from, record }` — no schema change needed; the proxy reads them off the span. Confirm `startMeasurement`'s `meta` passthrough is not filtered.
+   - **RESOLVED:** armed via the existing `startMeasurement({ meta })` passthrough (no schema change) — implemented in Plan 07 Task 1 (measurement-start.mjs) and read off the span by the proxy tap (Plan 06).
 
 3. **Which prompt text to capture for freeform (non-/gsd) runs.**
    - Recommendation: reuse the start-side `--goal`/prompt captured by measurement-start; for /gsd, the PLAN.md goal already resolved in measurement-stop. Full turn-by-turn prompt capture is out of scope (transcript already holds it).
+   - **RESOLVED:** reuse the start-side `--goal`/prompt; full turn-by-turn capture explicitly out of scope (transcript holds it) — reflected in Plans 04/07.
 
 ## Environment Availability
 
