@@ -12,15 +12,19 @@ import { useAppSelector, useAppDispatch } from '@/store'
 import {
   fetchTimeline,
   fetchRunNarrative,
+  fetchRunDigests,
   selectSelectedTaskId,
   selectSelectedRun,
   selectTimelineFor,
   selectTimelineLoading,
   selectNarrativeFor,
   selectNarrativeLoadingId,
+  selectDigestsFor,
+  selectDigestLoadingId,
   type Run,
   type TimelineRow,
   type NarrativeItem,
+  type DigestItem,
 } from '@/store/slices/performanceSlice'
 import { distinctModels, normalizeModel } from './models'
 import {
@@ -128,36 +132,78 @@ function TurnLabel({ index, row, run }: { index: number; row: TimelineRow; run: 
   )
 }
 
-function ParentRow({ row, index, run }: { row: TimelineRow; index: number; run: Run | null }) {
+// The plain-language "Intent: …" observation(s) the knowledge pipeline recorded for
+// THIS turn — rendered directly under the turn so a generic "Turn 5 · token-adapter
+// · 12k tok" gains a human sentence of what it actually did. `digestThemes` names the
+// digest(s) those observations rolled up into, closing the turn → observation →
+// digest chain the user follows the development along.
+function TurnObservations({ items, digestThemes }: { items: NarrativeItem[]; digestThemes: string[] }) {
+  return (
+    <div className="mt-1 space-y-1 pl-8 pr-3 pb-2" data-testid="turn-observations">
+      {items.map((it) => (
+        <div key={it.id} className="flex gap-2 text-sm">
+          <span className="select-none text-muted-foreground" aria-hidden>↳</span>
+          <span className="text-foreground/90">
+            {intentLine(it.content)}
+            {Array.isArray(it.artifacts) && it.artifacts.length > 0 && (
+              <span className="ml-1 text-xs text-muted-foreground">· {it.artifacts.length} file(s)</span>
+            )}
+          </span>
+        </div>
+      ))}
+      {digestThemes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 pl-5 pt-0.5" data-testid="turn-digest-themes">
+          <span className="text-xs text-muted-foreground">rolled into digest:</span>
+          {digestThemes.map((t) => (
+            <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ParentRow({
+  row, index, run, observations, digestThemes,
+}: {
+  row: TimelineRow; index: number; run: Run | null; observations: NarrativeItem[]; digestThemes: string[]
+}) {
   const [open, setOpen] = useState(false)
   const children = row.children ?? []
   const isAggregate = String(row.granularity_tier) === 'per-session-aggregate'
   const hasChildren = children.length > 0 && !isAggregate
   const role = roleForProcess(row.process, run)
   const accent = `border-l-2 ${ROLE_META[role].stripe}`
+  const obs = observations.length > 0
+    ? <TurnObservations items={observations} digestThemes={digestThemes} />
+    : null
 
   if (!hasChildren) {
     return (
       <div
-        className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 ${accent}`}
+        className={`rounded-md border ${accent}`}
         data-testid="timeline-row"
         data-role={role}
+        data-has-observations={observations.length > 0 ? 'true' : 'false'}
       >
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-4" />
-          <TurnLabel index={index} row={row} run={run} />
-          <TierBadge tier={String(row.granularity_tier)} />
-          {isEstimated(row) && <span className="text-sm text-muted-foreground">estimated</span>}
+        <div className="flex items-center justify-between gap-3 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-4" />
+            <TurnLabel index={index} row={row} run={run} />
+            <TierBadge tier={String(row.granularity_tier)} />
+            {isEstimated(row) && <span className="text-sm text-muted-foreground">estimated</span>}
+          </div>
+          <span className="font-mono text-sm" title="Full turn tokens (input + output; thinking is folded into output).">
+            {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
+          </span>
         </div>
-        <span className="font-mono text-sm" title="Full turn tokens (input + output; thinking is folded into output).">
-          {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
-        </span>
+        {obs}
       </div>
     )
   }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className={`rounded-md border ${accent}`} data-testid="timeline-row" data-role={role}>
+    <Collapsible open={open} onOpenChange={setOpen} className={`rounded-md border ${accent}`} data-testid="timeline-row" data-role={role} data-has-observations={observations.length > 0 ? 'true' : 'false'}>
       <div className="flex items-center justify-between gap-3 px-3 py-2">
         <CollapsibleTrigger className="flex flex-1 items-center gap-2 text-left" data-testid="timeline-turn">
           <ChevronRight className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`} />
@@ -169,6 +215,7 @@ function ParentRow({ row, index, run }: { row: TimelineRow; index: number; run: 
           {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
         </span>
       </div>
+      {obs}
       <CollapsibleContent className="space-y-1 px-3 pb-2">
         {children.map((child, i) => (
           <SubBand key={child.tool_call_id ?? i} row={child} />
@@ -176,6 +223,68 @@ function ParentRow({ row, index, run }: { row: TimelineRow; index: number; run: 
       </CollapsibleContent>
     </Collapsible>
   )
+}
+
+// Assign each observation to the turn it describes. The observation-writer runs
+// just AFTER a turn, so an observation belongs to the LATEST turn whose timestamp is
+// at/before it (a small tolerance absorbs clock skew where the obs is stamped a hair
+// early). Rows are already chronological. Observations before the first turn (or with
+// no timestamp) stay `unmatched` and fall to the run-level narrative so nothing is
+// lost. Keyed by the row OBJECT so role-filtering the rendered list never desyncs.
+function assignObservationsToTurns(
+  rows: TimelineRow[],
+  items: NarrativeItem[],
+): { byRow: Map<TimelineRow, NarrativeItem[]>; unmatched: NarrativeItem[] } {
+  const byRow = new Map<TimelineRow, NarrativeItem[]>()
+  const unmatched: NarrativeItem[] = []
+  const TOL_MS = 60_000       // obs stamped a hair AFTER its turn (clock skew)
+  const LEAD_MS = 5 * 60_000  // obs stamped at prompt-time, BEFORE the first turn
+  const turnTs = rows.map((r) => (r.timestamp ? new Date(r.timestamp).getTime() : NaN))
+  const firstValid = turnTs.findIndex((t) => !Number.isNaN(t))
+  for (const it of items) {
+    const t = it.timestamp ? new Date(it.timestamp).getTime() : NaN
+    if (Number.isNaN(t)) { unmatched.push(it); continue }
+    let best = -1
+    for (let i = 0; i < turnTs.length; i++) {
+      if (Number.isNaN(turnTs[i])) continue
+      if (turnTs[i] <= t + TOL_MS) best = i
+      else break // chronological — no later turn can qualify
+    }
+    // Prompt-time observations precede every turn: attach one that sits within
+    // LEAD_MS before the first turn to that first turn (it kicked the run off).
+    if (best === -1) {
+      if (firstValid !== -1 && t >= turnTs[firstValid] - LEAD_MS) best = firstValid
+      else { unmatched.push(it); continue }
+    }
+    const arr = byRow.get(rows[best]) ?? []
+    arr.push(it)
+    byRow.set(rows[best], arr)
+  }
+  return { byRow, unmatched }
+}
+
+// The digest(s) whose observationIds intersect this run's observations — the precise
+// tie (not a time guess). Returns the linked digests plus a set of the observation
+// ids they cover, so a turn can name the digest its observation rolled into.
+function linkDigestsToRun(
+  digests: DigestItem[],
+  narrative: NarrativeItem[],
+): { linked: DigestItem[]; themeByObsId: Map<string, string[]> } {
+  const runObsIds = new Set(narrative.map((n) => n.id).filter(Boolean))
+  const linked: DigestItem[] = []
+  const themeByObsId = new Map<string, string[]>()
+  for (const d of digests) {
+    const hits = d.observationIds.filter((id) => runObsIds.has(id))
+    if (hits.length === 0) continue
+    linked.push(d)
+    const theme = d.theme || d.summary.slice(0, 40) || 'digest'
+    for (const id of hits) {
+      const arr = themeByObsId.get(id) ?? []
+      if (!arr.includes(theme)) arr.push(theme)
+      themeByObsId.set(id, arr)
+    }
+  }
+  return { linked, themeByObsId }
 }
 
 // The comparison-ready run story: one card per role with turns + tokens + models.
@@ -220,7 +329,10 @@ function runWindow(rows: TimelineRow[], run: Run | null): { from: string; to: st
     if (Number.isNaN(d.getTime())) return iso
     return new Date(d.getTime() + ms).toISOString()
   }
-  from = pad(from, -60_000)
+  // Back-pad generously: an observation is stamped at USER-PROMPT time, which
+  // precedes the turns it describes (the agent works after the prompt). So the
+  // intent for turn 1 can sit a few minutes BEFORE the first captured turn.
+  from = pad(from, -5 * 60_000)
   to = pad(to, 5 * 60_000)
   return { from, to }
 }
@@ -231,45 +343,86 @@ function intentLine(content: string): string {
   return firstSentence.length > 200 ? `${firstSentence.slice(0, 200)}…` : firstSentence
 }
 
-// The plain-language development story: the "Intent: …" observations written
-// during the run's window, in order. Answers "what did the foreground actually
-// do" without brittle per-turn matching. Collapsed by default.
-function DevelopmentNarrative({ taskId, items, loading }: { taskId: string; items: NarrativeItem[]; loading: boolean }) {
+// The run-level story: the digest(s) this run's observations rolled up into (the
+// consolidated summary), plus any "Intent: …" observations that did NOT tie to a
+// specific turn. Per-turn intents now render inline against their turn, so this
+// section is the higher-level view + the safety net for unmatched items. Collapsed
+// by default.
+function DevelopmentNarrative({
+  taskId, digests, unmatched, matchedCount, obsLoading, digestLoading,
+}: {
+  taskId: string
+  digests: DigestItem[]
+  unmatched: NarrativeItem[]
+  matchedCount: number
+  obsLoading: boolean
+  digestLoading: boolean
+}) {
   const [open, setOpen] = useState(false)
+  const loading = obsLoading || digestLoading
+  const summary = loading
+    ? 'loading…'
+    : `${matchedCount} intent${matchedCount === 1 ? '' : 's'} linked to turns · ${digests.length} digest${digests.length === 1 ? '' : 's'}`
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mb-3 rounded-md border" data-testid="timeline-narrative">
       <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium">
         <ChevronRight className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`} />
         Development narrative
-        <span className="font-normal text-muted-foreground">
-          {loading ? 'loading…' : `${items.length} intent${items.length === 1 ? '' : 's'} in this run’s window`}
-        </span>
+        <span className="font-normal text-muted-foreground">{summary}</span>
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-1 px-3 pb-3">
-        {!loading && items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No observations were recorded in this run’s time window (expected for smoke/replay runs — the narrative
-            is populated by the knowledge pipeline during real coding sessions).
-          </p>
-        ) : (
-          <ol className="space-y-1.5" data-testid="narrative-list" data-count={items.length}>
-            {items.map((it) => (
-              <li key={it.id} className="flex gap-2 border-l-2 border-l-primary/40 pl-3 text-sm">
-                <span className="font-mono text-xs text-muted-foreground" title={it.timestamp ?? undefined}>
-                  {fmtTime(it.timestamp) ?? '—'}
-                </span>
-                <span>
-                  {intentLine(it.content)}
-                  {Array.isArray(it.artifacts) && it.artifacts.length > 0 && (
-                    <span className="ml-1 text-xs text-muted-foreground">· {it.artifacts.length} file(s)</span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ol>
+      <CollapsibleContent className="space-y-3 px-3 pb-3">
+        {/* Digests: the consolidated summary this run's observations feed. */}
+        <div data-testid="narrative-digests" data-count={digests.length}>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Digests</p>
+          {digests.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No digest has consolidated this run’s observations yet (digests are written by the
+              knowledge pipeline, usually a while after the work).
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {digests.map((d) => (
+                <li key={d.id} className="border-l-2 border-l-primary/40 pl-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    {d.theme && <Badge variant="secondary" className="text-xs">{d.theme}</Badge>}
+                    <span className="font-mono text-xs text-muted-foreground">{d.date ?? fmtTime(d.createdAt) ?? ''}</span>
+                  </div>
+                  <p className="mt-0.5 text-foreground/90">{d.summary.length > 240 ? `${d.summary.slice(0, 240)}…` : d.summary}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Unmatched intents — observations we could not tie to a specific turn. */}
+        {unmatched.length > 0 && (
+          <div data-testid="narrative-unmatched" data-count={unmatched.length}>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Other intents (not tied to a turn)
+            </p>
+            <ol className="space-y-1.5">
+              {unmatched.map((it) => (
+                <li key={it.id} className="flex gap-2 border-l-2 border-l-muted pl-3 text-sm">
+                  <span className="font-mono text-xs text-muted-foreground" title={it.timestamp ?? undefined}>
+                    {fmtTime(it.timestamp) ?? '—'}
+                  </span>
+                  <span>{intentLine(it.content)}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         )}
-        <p className="pt-1 text-xs text-muted-foreground">
-          Joined from observations by time window + agent ({taskId}), best-effort — observations carry no run id.
+
+        {!loading && matchedCount === 0 && digests.length === 0 && unmatched.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No observations were recorded in this run’s time window (expected for smoke/replay runs — the
+            narrative is populated by the knowledge pipeline during real coding sessions).
+          </p>
+        )}
+
+        <p className="text-xs text-muted-foreground">
+          Turn intents are joined from observations by time window + agent ({taskId}); digests are tied by
+          shared observation ids — best-effort, since observations carry no run id.
         </p>
       </CollapsibleContent>
     </Collapsible>
@@ -284,6 +437,8 @@ export function PerformanceTimeline() {
   const loading = useAppSelector(selectTimelineLoading)
   const narrative = useAppSelector(selectNarrativeFor(taskId))
   const narrativeLoadingId = useAppSelector(selectNarrativeLoadingId)
+  const digests = useAppSelector(selectDigestsFor(taskId))
+  const digestLoadingId = useAppSelector(selectDigestLoadingId)
   const [hiddenRoles, setHiddenRoles] = useState<Set<Role>>(new Set())
 
   useEffect(() => {
@@ -297,6 +452,7 @@ export function PerformanceTimeline() {
   useEffect(() => {
     if (taskId && win) {
       dispatch(fetchRunNarrative({ taskId, from: win.from, to: win.to, agent: run?.agent ?? run?.canonical_agent ?? undefined }))
+      dispatch(fetchRunDigests({ taskId, from: win.from, to: win.to }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, winKey])
@@ -304,6 +460,18 @@ export function PerformanceTimeline() {
   const stats = summarizeByRole(rows, run)
   const statByRole = Object.fromEntries(stats.map((s) => [s.role, s])) as Record<Role, RoleStat>
   const visibleRows = rows.filter((r) => !hiddenRoles.has(roleForProcess(r.process, run)))
+
+  // Tie observations → turns and digests → this run, so each turn can show what it
+  // did and which digest it fed. Computed over the FULL rows (role-filtering the
+  // rendered list only hides, never remaps).
+  const { byRow: obsByRow, unmatched } = assignObservationsToTurns(rows, narrative)
+  const { linked: linkedDigests, themeByObsId } = linkDigestsToRun(digests, narrative)
+  const matchedCount = narrative.length - unmatched.length
+  const digestThemesForRow = (r: TimelineRow): string[] => {
+    const themes = new Set<string>()
+    for (const it of obsByRow.get(r) ?? []) for (const th of themeByObsId.get(it.id) ?? []) themes.add(th)
+    return [...themes]
+  }
 
   const toggleRole = (role: Role) => {
     setHiddenRoles((prev) => {
@@ -357,8 +525,11 @@ export function PerformanceTimeline() {
 
             <DevelopmentNarrative
               taskId={taskId}
-              items={narrative}
-              loading={narrativeLoadingId === taskId}
+              digests={linkedDigests}
+              unmatched={unmatched}
+              matchedCount={matchedCount}
+              obsLoading={narrativeLoadingId === taskId}
+              digestLoading={digestLoadingId === taskId}
             />
 
             {/* Role filter chips — click to show/hide a whole role. Serves the
@@ -389,7 +560,14 @@ export function PerformanceTimeline() {
             ) : (
               <div className="space-y-2">
                 {visibleRows.map((row, i) => (
-                  <ParentRow key={row.tool_call_id ?? i} row={row} index={i} run={run} />
+                  <ParentRow
+                    key={row.tool_call_id ?? i}
+                    row={row}
+                    index={i}
+                    run={run}
+                    observations={obsByRow.get(row) ?? []}
+                    digestThemes={digestThemesForRow(row)}
+                  />
                 ))}
               </div>
             )}

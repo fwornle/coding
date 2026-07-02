@@ -118,6 +118,19 @@ export interface NarrativeItem {
   artifacts?: unknown[]
 }
 
+// A digest: the consolidated, higher-level summary the knowledge pipeline writes
+// over a set of observations. `observationIds` is the load-bearing link — it lets
+// the timeline tie a digest back to the exact observations (and therefore turns)
+// of a run, instead of a fuzzy time-window guess.
+export interface DigestItem {
+  id: string
+  date: string | null
+  createdAt: string | null
+  theme: string
+  summary: string
+  observationIds: string[]
+}
+
 // Score-state buckets surfaced as a facet (D-06 quarantine + scored/not_scored).
 export type ScoreState = 'scored' | 'pending' | 'not_scored'
 
@@ -170,6 +183,8 @@ interface PerformanceState {
   timelineError: string | null
   narrativeByTaskId: Record<string, NarrativeItem[]>
   narrativeLoadingId: string | null
+  digestsByTaskId: Record<string, DigestItem[]>
+  digestLoadingId: string | null
   // Saved Reports (KB-04 / DASH-03) — shared cross-component state.
   reports: Report[]
   activeReportId: string | null
@@ -223,6 +238,8 @@ const initialState: PerformanceState = {
   timelineError: null,
   narrativeByTaskId: {},
   narrativeLoadingId: null,
+  digestsByTaskId: {},
+  digestLoadingId: null,
   reports: [],
   activeReportId: null,
   reportsLoading: false,
@@ -313,6 +330,40 @@ export const fetchRunNarrative = createAsyncThunk<
       }))
       // Oldest → newest so the story reads top-to-bottom.
       items.sort((a, b) => (a.timestamp ?? '').localeCompare(b.timestamp ?? ''))
+      return { taskId, items }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// fetchRunDigests: pull the digests that consolidate a run's observations. Digests
+// carry `observationIds`, so the caller can precisely intersect them with the run's
+// narrative observations (rather than a fuzzy time guess). The date window is a
+// coarse pre-filter passed to the API; the exact tie is done in the selector/UI by
+// observationIds. Best-effort, mirrors fetchRunNarrative.
+export const fetchRunDigests = createAsyncThunk<
+  { taskId: string; items: DigestItem[] },
+  { taskId: string; from: string; to: string },
+  { rejectValue: string }
+>(
+  'performance/fetchRunDigests',
+  async ({ taskId, from, to }, { rejectWithValue }) => {
+    try {
+      const qs = new URLSearchParams({ from, to, limit: '200' })
+      const response = await fetch(`/api/digests?${qs.toString()}`)
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      const raw: Record<string, unknown>[] = data?.data ?? data?.digests ?? data?.rows ?? []
+      const items: DigestItem[] = raw.map((r) => ({
+        id: String(r.id ?? ''),
+        date: (r.date ?? null) as string | null,
+        createdAt: (r.createdAt ?? null) as string | null,
+        theme: String(r.theme ?? ''),
+        summary: String(r.summary ?? ''),
+        observationIds: Array.isArray(r.observationIds) ? r.observationIds.map((x) => String(x)) : [],
+      }))
+      items.sort((a, b) => (a.createdAt ?? a.date ?? '').localeCompare(b.createdAt ?? b.date ?? ''))
       return { taskId, items }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
@@ -584,6 +635,16 @@ const performanceSlice = createSlice({
       .addCase(fetchRunNarrative.rejected, (state) => {
         state.narrativeLoadingId = null
       })
+      .addCase(fetchRunDigests.pending, (state, action) => {
+        state.digestLoadingId = action.meta.arg.taskId
+      })
+      .addCase(fetchRunDigests.fulfilled, (state, action) => {
+        state.digestsByTaskId[action.payload.taskId] = action.payload.items
+        if (state.digestLoadingId === action.payload.taskId) state.digestLoadingId = null
+      })
+      .addCase(fetchRunDigests.rejected, (state) => {
+        state.digestLoadingId = null
+      })
       // saveOverride (SCORE-02)
       .addCase(saveOverride.pending, (state) => {
         state.saveOverridePending = true
@@ -724,6 +785,9 @@ export const selectTimelineFor = (taskId: string | null) => (state: RootState): 
 export const selectNarrativeFor = (taskId: string | null) => (state: RootState): NarrativeItem[] =>
   taskId ? (state.performance.narrativeByTaskId[taskId] ?? []) : []
 export const selectNarrativeLoadingId = (state: RootState) => state.performance.narrativeLoadingId
+export const selectDigestsFor = (taskId: string | null) => (state: RootState): DigestItem[] =>
+  taskId ? (state.performance.digestsByTaskId[taskId] ?? []) : []
+export const selectDigestLoadingId = (state: RootState) => state.performance.digestLoadingId
 
 // Measurement lifecycle selectors.
 export const selectActiveMeasurement = (state: RootState) => state.performance.activeMeasurement
