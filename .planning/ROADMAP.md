@@ -51,7 +51,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 67-02-PLAN.md — Harness record + honest replay hard-fail + deterministic clock shim (Wave 1)
   - [x] 67-03-PLAN.md — Internal-state capture primitives: git-state + secret-safe env allowlist + MCP inventory + gitignore (Wave 1)
   - [x] 67-04-PLAN.md — KB capture (D-02) + full RunSnapshot assembly with manifest + clock_base (Wave 2)
-  - [ ] 67-05-PLAN.md — Sandbox restore (D-04) + confirm-gated --in-place (D-05) + repro-restore CLI (Wave 3)
+  - [x] 67-05-PLAN.md — Sandbox restore (D-04) + confirm-gated --in-place (D-05) + repro-restore CLI (Wave 3)
   - [x] 67-06-PLAN.md — Proxy /api/complete replay+record taps (D-06 hard-fail on miss) (Wave 2)
   - [ ] 67-07-PLAN.md — Measurement-span integration (D-09): capture-at-open + arm + fixture archive + snapshot_id + live e2e checkpoint (Wave 3)
 
@@ -178,7 +178,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 64. Worker Hygiene | v7.3 | 2/2 | Complete | 2026-06-21 |
 | 65. Acceptance | v7.3 | 1/1 | Complete | 2026-06-21 |
 | 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
-| 67. Reproducibility & Replay Rig | v7.4 | 5/7 | In Progress|  |
+| 67. Reproducibility & Replay Rig | v7.4 | 6/7 | In Progress|  |
 | 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
 | 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete    | 2026-06-22 |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete    | 2026-06-23 |
