@@ -1811,10 +1811,18 @@ ${foreignOnly ? `**Coding Repository:** ${this.codingRepo}` : ''}
     
     const start = new Date(date);
     start.setHours(startHour, startMin, 0, 0);
-    
+
     const end = new Date(date);
     end.setHours(endHour, endMin, 0, 0);
-    
+
+    // Midnight-crossing tranche: the 23:00-24:00 window is named "2300-0000", so
+    // end 00:00 lands on the SAME day (before the 23:00 start), inverting the window
+    // and dropping every file in the 23:00 hour. Roll the end forward a day when the
+    // end-of-window is at/before its start so the window is valid across midnight.
+    if (end.getTime() <= start.getTime()) {
+      end.setDate(end.getDate() + 1);
+    }
+
     return { start, end };
   }
 
