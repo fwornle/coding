@@ -191,6 +191,11 @@ integrations/mcp-server-browserbase/
 # artifacts (epoch-named), never committed.
 .data/measurements/
 
+# Reproducibility/replay-rig run snapshots (Phase 67, REPRO-01) — each snapshot holds
+# captured prompts, KB, processOverrides, MCP inventory, and agent-affecting env vars.
+# These MUST NOT be committed (Security V9, T-67-03-02); verified by git check-ignore.
+.data/run-snapshots/
+
 # Code graph RAG index (binary, regenerated on indexing)
 .data/code-graph-index/
 
