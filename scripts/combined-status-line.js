@@ -265,15 +265,26 @@ class CombinedStatusLine {
     const now = new Date();
     const currentHour = now.getHours();
     const currentMin = now.getMinutes();
-    
+
     // Calculate end time for today
     const endTime = new Date();
     endTime.setHours(parseInt(endHour), parseInt(endMin), 0, 0);
-    
+
+    // Midnight-crossing tranche: the 23:00-24:00 window is formatted "2300-0000",
+    // so the end "00:00" would land on THIS morning's midnight (already ~a day in
+    // the past) and yield a large-negative remaining → a false "(ended)" red badge
+    // for the whole 23:00 hour. When the end-of-window is at/before its own start,
+    // the window spans midnight; roll the end forward one day so it is in the future.
+    const startMinutes = parseInt(startHour) * 60 + parseInt(startMin);
+    const endMinutes = parseInt(endHour) * 60 + parseInt(endMin);
+    if (endMinutes <= startMinutes) {
+      endTime.setDate(endTime.getDate() + 1);
+    }
+
     // Calculate remaining minutes
     const currentTime = new Date();
     currentTime.setHours(currentHour, currentMin, 0, 0);
-    
+
     const remainingMs = endTime.getTime() - currentTime.getTime();
     const remainingMinutes = Math.floor(remainingMs / (1000 * 60));
     
