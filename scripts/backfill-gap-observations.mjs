@@ -70,6 +70,15 @@ for (const ln of fs.readFileSync(file, 'utf8').split('\n')) {
 // non-empty text (string OR text blocks), and is NOT a pure tool_result and NOT
 // a bare slash-command marker.
 function userPromptText(o) {
+  // Queued/interrupt prompts (sent while the agent was working, incl. image
+  // messages) are stored as type:'queue-operation' operation:'enqueue' with the
+  // prose in the top-level `content` and NO type:user counterpart — so the ETM and
+  // this tool used to skip them entirely (no observation). Recognize them here.
+  if (o.type === 'queue-operation' && o.operation === 'enqueue' && typeof o.content === 'string') {
+    const t = o.content.trim();
+    if (!t || (t.startsWith('<command-') && t.length < 200)) return null;
+    return t;
+  }
   if (o.type !== 'user' || o.isMeta) return null;
   const c = o.message?.content;
   let txt = '';

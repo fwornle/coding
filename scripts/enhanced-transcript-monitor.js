@@ -2809,6 +2809,24 @@ ORDER BY m.time_created ASC;`;
       }
     }
 
+    // Prompts the user QUEUED while the agent was working (incl. image messages)
+    // are stored as type:'queue-operation' operation:'enqueue' with the prose in the
+    // top-level `content` and (usually) NO type:user counterpart — so they were
+    // skipped and never observed. Collect the text of every real type:user prompt so
+    // that in the rare case a queued prompt DOES also have a type:user entry we don't
+    // double-count it.
+    const userPromptTexts = new Set();
+    for (const m of messages) {
+      if (m.type === 'user' && m.message?.role === 'user' && !this.isToolResultMessage(m)) {
+        const c = m.message.content;
+        let txt = typeof c === 'string'
+          ? c
+          : Array.isArray(c) ? c.filter((b) => b && b.type === 'text').map((b) => b.text || '').join('\n') : '';
+        txt = (txt || '').trim();
+        if (txt) userPromptTexts.add(txt.slice(0, 120));
+      }
+    }
+
     for (const message of messages) {
       // Skip tool result messages - they are NOT user prompts
       if (message.type === 'user' && message.message?.role === 'user' && 
@@ -2881,6 +2899,32 @@ ORDER BY m.time_created ASC;`;
         if (message.uuid && currentExchange) {
           currentExchange.lastMessageUuid = message.uuid;
         }
+      } else if (
+        message.type === 'queue-operation' &&
+        message.operation === 'enqueue' &&
+        typeof message.content === 'string' &&
+        message.content.trim() &&
+        !userPromptTexts.has(message.content.trim().slice(0, 120))
+      ) {
+        // A queued/interrupt user prompt with no type:user counterpart. Open a new
+        // exchange for it so it gets an observation like any other prompt. The
+        // queue-operation entry has no uuid, but subsequent assistant messages in
+        // the exchange update lastMessageUuid, so cursor resumption still advances.
+        if (currentExchange) exchanges.push(currentExchange);
+        const qtext = message.content.trim();
+        currentExchange = {
+          id: message.uuid || `queued_${message.timestamp || Date.now()}`,
+          timestamp: message.timestamp || Date.now(),
+          userMessage: qtext,
+          claudeResponse: '',
+          toolCalls: [],
+          toolResults: [],
+          isUserPrompt: true,
+          isComplete: false,
+          stopReason: null,
+          lastMessageUuid: message.uuid || null,
+          outputTokens: 0,
+        };
       }
     }
 
