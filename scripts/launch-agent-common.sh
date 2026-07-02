@@ -367,6 +367,80 @@ _inject_knowledge_context() {
 }
 
 # ============================================
+# Proxy routing (Route 1) — measure EVERY agent
+# ============================================
+#
+# Route each coding agent's foreground LLM traffic through the coding LLM proxy on
+# :${LLM_PROXY_PORT:-12435} so its tokens land in token_usage and are measurable —
+# not just claude. Each agent needs a different redirect seam (all → the one proxy):
+#   claude    ANTHROPIC_BASE_URL  → proxy /v1/messages (Max-OAuth bearer forwarded)
+#   opencode  ANTHROPIC_BASE_URL  → same seam (opencode's AI-SDK anthropic provider
+#                                    honours it) for the anthropic path
+#   mastra    self-routed by its config (MASTRACODE_MODEL_ID=rapid-proxy-mastra →
+#                                    proxy /v1/mastra); nothing to add here
+#   copilot   no base-URL override on the Copilot CLI (GitHub-enterprise OAuth) —
+#                                    not yet proxy-routable; flagged honestly
+#
+# HEALTH-GATED: if the proxy is unreachable we log a loud warning and launch the
+# agent UNROUTED (direct, unmeasured) rather than brick it. Runs AFTER
+# agent_pre_launch + _set_agent_env_vars so it has the final say on the routing env.
+configure_proxy_routing() {
+  # Opt-out safety valve: CODING_PROXY_ROUTE=0 launches the agent direct (unmeasured)
+  # without touching its env — use if the proxy is misbehaving in the hot path.
+  case "${CODING_PROXY_ROUTE:-1}" in
+    0|false|no|off)
+      _agent_log "ℹ️  CODING_PROXY_ROUTE=${CODING_PROXY_ROUTE} — proxy routing disabled; ${AGENT_NAME:-$AGENT} launches direct (unmeasured)."
+      return 0
+      ;;
+  esac
+
+  local port="${LLM_PROXY_PORT:-12435}"
+  local base="http://127.0.0.1:${port}"
+
+  if ! curl -sf -o /dev/null --max-time 2 "${base}/health" 2>/dev/null; then
+    _agent_log "⚠️  LLM proxy unreachable at ${base} — launching ${AGENT_NAME:-$AGENT} UNROUTED; its traffic will NOT be measured."
+    _agent_log "    Start it:  launchctl kickstart -k gui/\$(id -u)/com.coding.llm-cli-proxy  then relaunch."
+    return 0
+  fi
+
+  case "${AGENT_NAME:-$AGENT}" in
+    claude)
+      # VERIFIED: Claude Code honours ANTHROPIC_BASE_URL and forwards its Max-OAuth
+      # bearer to it. Unset the API-key envs so OAuth is used — they take precedence
+      # over the subscription login and would bypass the measured (Max) path; the
+      # proxy passthrough re-injects the Max bearer when the caller sends none.
+      export ANTHROPIC_BASE_URL="${base}"
+      unset ANTHROPIC_API_KEY ANTHROPIC_ADMIN_API_KEY ANTHROPIC_AUTH_TOKEN
+      _agent_log "🔌 claude → proxy ${base}/v1/messages (Max-OAuth forwarded; token_usage agent='claude')"
+      ;;
+    opencode)
+      # BEST-EFFORT: opencode's AI-SDK anthropic provider should honour
+      # ANTHROPIC_BASE_URL for its anthropic path; the proxy forwards opencode's own
+      # credential (KEEP its ANTHROPIC_API_KEY — unsetting it would trip opencode's
+      # auth prompt). The VPN/copilot-enterprise path is unaffected (not anthropic).
+      # Validate end-to-end with a live opencode run — if unhonoured, opencode falls
+      # back to the direct endpoint (works, just unmeasured — never broken).
+      export ANTHROPIC_BASE_URL="${base}"
+      _agent_log "🔌 opencode → proxy ${base}/v1/messages (anthropic path; best-effort — validate live)"
+      ;;
+    mastra)
+      # Self-routed in mastra.sh's agent_pre_launch via the customProvider seam.
+      if [ -n "${MASTRACODE_MODEL_ID:-}" ]; then
+        _agent_log "🔌 mastra → proxy ${base}/v1/mastra (self-routed via MASTRACODE_MODEL_ID)"
+      else
+        _agent_log "⚠️  mastra: MASTRACODE_MODEL_ID unset — proxy routing may be inactive."
+      fi
+      ;;
+    copilot)
+      _agent_log "⚠️  copilot: the Copilot CLI has no base-URL override (GitHub-enterprise OAuth), so its foreground traffic is NOT yet proxy-measured (follow-up)."
+      ;;
+    *)
+      _agent_log "ℹ️  ${AGENT_NAME:-$AGENT}: no proxy-routing rule; launching as configured (traffic may be unmeasured)."
+      ;;
+  esac
+}
+
+# ============================================
 # Main Entry Point
 # ============================================
 
@@ -506,6 +580,10 @@ launch_agent() {
 
   # 17. Set env vars
   _set_agent_env_vars
+
+  # 17b. Route this agent's LLM traffic through the proxy so it is measurable
+  #      (Route 1). AFTER agent_pre_launch + env vars so it has the final say.
+  configure_proxy_routing
 
   # 18. cd to project
   cd "$TARGET_PROJECT_DIR"
