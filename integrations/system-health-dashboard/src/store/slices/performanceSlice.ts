@@ -767,14 +767,40 @@ export const selectActiveReport = (state: RootState): Report | null => {
 export const selectIsRefreshPending = (reportId: string) => (state: RootState): boolean =>
   state.performance.refreshReportPendingIds.includes(reportId)
 
+// ---------------------------------------------------------------------------
+// Facet-value canonicalization — a SINGLE source of truth used by the options,
+// counts, and filter predicate so the three never disagree. Collapses the two
+// "no value" spellings (null and empty string) into one `(none)` bucket, and
+// unifies agent/framework aliases (claude-code == claude) so the same actor is
+// not split across two facet rows.
+// ---------------------------------------------------------------------------
+export const FACET_NONE = '(none)'
+const AGENT_ALIASES: Record<string, string> = { 'claude-code': 'claude' }
+
+function facetAgent(v: string | null | undefined): string {
+  const t = (v ?? '').trim()
+  if (!t) return FACET_NONE
+  return AGENT_ALIASES[t] ?? t
+}
+// Framework shares the same actor aliasing as agent (claude-code == claude).
+const facetFramework = facetAgent
+function facetModel(v: string | null | undefined): string {
+  const t = (normalizeModel(v) ?? '').trim()
+  return t || FACET_NONE
+}
+function facetTaskClass(v: string | null | undefined): string {
+  const t = (v ?? '').trim()
+  return t || 'unclassified'
+}
+
 // Predicate: does a run pass the current facet state? (date window + each
 // array facet — an empty array means "no constraint on that group").
 function runPassesFacets(run: Run, f: FacetState): boolean {
   if (f.task_id.length && !f.task_id.includes(run.task_id)) return false
-  if (f.task_class.length && !f.task_class.includes(run.task_class ?? 'unclassified')) return false
-  if (f.agent.length && !f.agent.includes(run.agent ?? '—')) return false
-  if (f.model.length && !f.model.includes(normalizeModel(run.model) ?? '—')) return false
-  if (f.framework.length && !f.framework.includes(run.framework ?? '—')) return false
+  if (f.task_class.length && !f.task_class.includes(facetTaskClass(run.task_class))) return false
+  if (f.agent.length && !f.agent.includes(facetAgent(run.agent))) return false
+  if (f.model.length && !f.model.includes(facetModel(run.model))) return false
+  if (f.framework.length && !f.framework.includes(facetFramework(run.framework))) return false
   if (f.scoreState.length && !f.scoreState.includes(scoreStateOf(run))) return false
   if (f.startedAfter && (!run.started_at || run.started_at < f.startedAfter)) return false
   if (f.startedBefore && (!run.started_at || run.started_at > f.startedBefore)) return false
@@ -812,10 +838,10 @@ export const selectFacetCounts = createSelector(
       bucket[key] = (bucket[key] ?? 0) + 1
     }
     for (const r of filtered) {
-      bump(counts.task_class, r.task_class ?? 'unclassified')
-      bump(counts.agent, r.agent ?? '—')
-      bump(counts.model, normalizeModel(r.model) ?? '—')
-      bump(counts.framework, r.framework ?? '—')
+      bump(counts.task_class, facetTaskClass(r.task_class))
+      bump(counts.agent, facetAgent(r.agent))
+      bump(counts.model, facetModel(r.model))
+      bump(counts.framework, facetFramework(r.framework))
       bump(counts.scoreState, scoreStateOf(r))
     }
     return counts
@@ -827,13 +853,12 @@ export const selectFacetCounts = createSelector(
 export const selectFacetOptions = createSelector(
   [selectRuns],
   (runs) => {
-    const distinct = (vals: Array<string | null | undefined>, fallback: string) =>
-      Array.from(new Set(vals.map((v) => v ?? fallback))).sort()
+    const uniqSorted = (vals: string[]) => Array.from(new Set(vals)).sort()
     return {
-      task_class: distinct(runs.map((r) => r.task_class), 'unclassified'),
-      agent: distinct(runs.map((r) => r.agent), '—'),
-      model: distinct(runs.map((r) => normalizeModel(r.model)), '—'),
-      framework: distinct(runs.map((r) => r.framework), '—'),
+      task_class: uniqSorted(runs.map((r) => facetTaskClass(r.task_class))),
+      agent: uniqSorted(runs.map((r) => facetAgent(r.agent))),
+      model: uniqSorted(runs.map((r) => facetModel(r.model))),
+      framework: uniqSorted(runs.map((r) => facetFramework(r.framework))),
       scoreState: ['scored', 'pending', 'not_scored'] as ScoreState[],
     }
   }
