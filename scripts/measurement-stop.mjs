@@ -73,6 +73,13 @@ import { gatherEvidence } from '../lib/experiments/evidence-harness.mjs';
 import { runJudge } from '../lib/experiments/judge.mjs';
 import { writeScore } from '../lib/experiments/score-write.mjs';
 import { filterConsequential, isTrivialRun } from '../lib/experiments/consequential-events.mjs';
+// Phase 67-07 (REPRO-01/02): archive the span's fixtures into the RunSnapshot at
+// close + link snapshot_id onto the Run. recordHarnessFixtures scrapes the
+// WebSearch/WebFetch/MCP tool_use pairs for the span window (LLM fixtures are
+// already written into the snapshot's fixtures/llm/ by the Plan 06 record tap).
+// sanitizeTaskId keeps the snapshot dir under .data/run-snapshots/ (T-67-07-01).
+import { recordHarnessFixtures } from '../lib/repro/fixtures/harness-record.mjs';
+import { sanitizeTaskId } from '../lib/repro/capture-snapshot.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
 
@@ -361,6 +368,36 @@ async function main() {
     );
   }
 
+  // ── (3.3) Phase 67-07: archive fixtures into the RunSnapshot + resolve snapshot_id ──
+  //   The LLM record tap (Plan 06) already wrote the recorded /api/complete responses
+  //   directly into .data/run-snapshots/<id>/fixtures/llm/ during the record run. Here,
+  //   best-effort, we (a) scrape the harness channels (WebSearch/WebFetch/MCP) for the
+  //   span window into fixtures/harness/, and (b) resolve snapshot_id from the snapshot
+  //   dir so writeRun links the Run to its snapshot. ALL best-effort (try/catch + stderr):
+  //   a fixture-archive failure NEVER breaks span close (T-67-07-05).
+  let snapshotId = null;
+  try {
+    const snapshotDirId = sanitizeTaskId(span.task_id);
+    const snapDir = path.join(REPO_ROOT, '.data', 'run-snapshots', snapshotDirId);
+    if (fs.existsSync(snapDir)) {
+      snapshotId = snapshotDirId; // link the Run to this snapshot
+      const fixturesDir = path.join(snapDir, 'fixtures');
+      if (span.started_at && span.ended_at) {
+        const n = recordHarnessFixtures({
+          startedAt: span.started_at,
+          endedAt: span.ended_at,
+          outDir: fixturesDir,
+        });
+        process.stderr.write(
+          `[measurement-stop] archived ${n} harness fixture(s) into ${fixturesDir} ` +
+          '(LLM fixtures already written by the record tap)\n',
+        );
+      }
+    }
+  } catch (err) {
+    process.stderr.write(`[measurement-stop] fixture archive failed (non-fatal): ${err.message}\n`);
+  }
+
   const taskHash = span.goal_sentence
     ? crypto.createHash('sha256').update(span.goal_sentence).digest('hex')
     : null; // A3 — null allowed (D-13)
@@ -370,6 +407,7 @@ async function main() {
     model: canonicalModel,
     framework: span.meta?.framework ?? canonicalAgent, // A2 — null allowed (D-13)
     trace_id: span.task_id,
+    snapshot_id: snapshotId, // Phase 67-07: link the Run to its RunSnapshot (null when none)
     // ── D-06: canonical attribution + segregated background daemons ──
     canonical_model: canonicalModel,
     canonical_agent: canonicalAgent,
