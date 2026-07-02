@@ -1,0 +1,11 @@
+{
+  "process": "wave-analysis-dedup",
+  "messages": [
+    { "role": "system", "content": "You are a deterministic classifier. Answer with a single JSON object." },
+    { "role": "user", "content": "Classify the entity: { name: 'LiveLoggingSystem', kind: 'component' }" }
+  ],
+  "model": "claude-haiku",
+  "subscription": "corp-pool-7",
+  "temperature": 0,
+  "max_tokens": 512
+}

@@ -1,0 +1,3 @@
+{"type":"assistant","timestamp":"2026-07-02T10:15:03.100Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_REDACTED01","name":"WebSearch","input":{"query":"node:test argv gotcha trailing flag child process"}}]}}
+{"type":"user","timestamp":"2026-07-02T10:15:05.420Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_REDACTED01","content":[{"type":"text","text":"Result 1: node --test drops trailing argv for per-file child processes; gate live tests on an env var instead."}]}]}}
+{"type":"assistant","timestamp":"2026-07-02T10:15:06.900Z","message":{"role":"assistant","content":[{"type":"text","text":"Confirmed: gate on LLM_PROXY_LIVE=1 rather than a --live flag."}]}}
