@@ -108,6 +108,11 @@ None - no external service configuration required. (The proxy runtime edit is lo
 - **Ready for Plan 67-07** (integration): `measurement-start` arms `meta:{record,replay_from}` and captures the snapshot; `measurement-stop` archives `fixtures/` and threads `snapshot_id`. The record/replay dir convention this plan uses (`.data/run-snapshots/<task_id>/fixtures`, replay reads `<dir>/llm/`) matches Plan 07's archive target.
 - **Note for Plan 07:** the external proxy edit is uncommitted on the proxy repo's protected `main` and is not tracked by the coding repo. If the daemon host is ever re-provisioned or the proxy repo hard-reset, re-apply the two taps. A PR to the proxy repo is out of scope for this plan.
 
+## Self-Check: PASSED
+- FOUND: `.planning/phases/67-reproducibility-replay-rig/67-06-SUMMARY.md`
+- FOUND commit: `9116921bb` (docs(67-06))
+- FOUND external edit: `_work/rapid-llm-proxy/proxy-bridge/server.mjs` — `node --check` OK; `replay_from`=5, `REPLAY_MISS`=2, `getActiveMeasurement`=5, `span?.meta?.record` guard=3.
+
 ---
 *Phase: 67-reproducibility-replay-rig*
 *Completed: 2026-07-02*
