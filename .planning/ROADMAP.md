@@ -26,7 +26,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 
 **Foundational ordering:** Phase 68 (TELEM — the `token_usage` row contract + measurement span) is the dependency anchor. Every adapter, route, score, and dashboard requirement reads or writes rows with the new columns and consults `.data/active-measurement.json`. It MUST land and verify before any per-agent adapter work (Phases 69–70) begins.
 
-- [ ] **Phase 67: Reproducibility & Replay Rig** — Snapshot/restore internal state + record/replay external state so N=1 runs become comparable
+- [x] **Phase 67: Reproducibility & Replay Rig** — Snapshot/restore internal state + record/replay external state so N=1 runs become comparable (completed 2026-07-02)
 - [x] **Phase 68: [FOUNDATIONAL] Token Attribution Storage** — `token_usage` schema extension + measurement-span contract + `attachTokenLogger` task_id stamping (completed 2026-06-22)
 - [x] **Phase 69: Claude + Copilot Token Adapters** — Claude per-turn + per-reasoning-step JSONL adapter; Copilot events.jsonl adapter with Phase-1 event-vocabulary check (completed 2026-06-22)
 - [x] **Phase 70: OpenCode + Mastra Token Adapters** — OpenCode proxy-route per-llm-call logging; Mastra instrumentation-surface read + adapter (completed 2026-06-23)
@@ -53,7 +53,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 67-04-PLAN.md — KB capture (D-02) + full RunSnapshot assembly with manifest + clock_base (Wave 2)
   - [x] 67-05-PLAN.md — Sandbox restore (D-04) + confirm-gated --in-place (D-05) + repro-restore CLI (Wave 3)
   - [x] 67-06-PLAN.md — Proxy /api/complete replay+record taps (D-06 hard-fail on miss) (Wave 2)
-  - [ ] 67-07-PLAN.md — Measurement-span integration (D-09): capture-at-open + arm + fixture archive + snapshot_id + live e2e checkpoint (Wave 3)
+  - [x] 67-07-PLAN.md — Measurement-span integration (D-09): capture-at-open + arm + fixture archive + snapshot_id + live e2e checkpoint (Wave 3)
 
 ### Phase 68: [FOUNDATIONAL] Token Attribution Storage
 **Goal**: The `token_usage` store carries the cross-agent row contract (new columns) and a measurement span exists that every writer can consult to stamp the active `task_id`.
@@ -178,7 +178,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 | 64. Worker Hygiene | v7.3 | 2/2 | Complete | 2026-06-21 |
 | 65. Acceptance | v7.3 | 1/1 | Complete | 2026-06-21 |
 | 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
-| 67. Reproducibility & Replay Rig | v7.4 | 6/7 | In Progress|  |
+| 67. Reproducibility & Replay Rig | v7.4 | 7/7 | Complete   | 2026-07-02 |
 | 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
 | 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete    | 2026-06-22 |
 | 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete    | 2026-06-23 |

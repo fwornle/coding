@@ -20,8 +20,8 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ### Reproducibility & Replay (REPRO)
 
-- [ ] **REPRO-01:** A run can snapshot internal state — git SHA + workspace dirty state, `.data/knowledge-graph/` KB, `processOverrides` routing config, MCP server inventory + versions, prompt text, `.planning/` state, agent-affecting env vars, and agent binary version — and restore it byte-for-byte for a repeat run.
-- [ ] **REPRO-02:** External state (LLM provider responses via `rapid-llm-proxy`, `WebSearch`/`WebFetch` results, remote MCP replies, clock) is recorded during a run and replayable from fixtures, so repeated N=1 runs are comparable modulo provider non-determinism.
+- [x] **REPRO-01:** A run can snapshot internal state — git SHA + workspace dirty state, `.data/knowledge-graph/` KB, `processOverrides` routing config, MCP server inventory + versions, prompt text, `.planning/` state, agent-affecting env vars, and agent binary version — and restore it byte-for-byte for a repeat run.
+- [x] **REPRO-02:** External state (LLM provider responses via `rapid-llm-proxy`, `WebSearch`/`WebFetch` results, remote MCP replies, clock) is recorded during a run and replayable from fixtures, so repeated N=1 runs are comparable modulo provider non-determinism.
 
 ### Token Attribution Storage (TELEM) — FOUNDATIONAL
 
@@ -88,8 +88,8 @@ Evidence: `.planning/v7.4-attribution-findings.md` (findings A–D, from the `ex
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REPRO-01 | Phase 67 | Pending |
-| REPRO-02 | Phase 67 | Pending |
+| REPRO-01 | Phase 67 | Complete |
+| REPRO-02 | Phase 67 | Complete |
 | TELEM-01 | Phase 68 | Complete |
 | TELEM-02 | Phase 68 | Complete |
 | TELEM-03 | Phase 68 | Complete |
