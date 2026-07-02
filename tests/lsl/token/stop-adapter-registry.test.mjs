@@ -212,6 +212,45 @@ test('captureForegroundTokens(claude): ATTR-04 captures sub-agents with the SUBA
   }
 });
 
+test('captureForegroundTokens(claude): stamps span.task_id (not the gone-at-close live span) + window-scopes rows', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // A transcript with one IN-window turn (05:31) and one OUT-of-window turn
+    // (04:00, an hour before the span). buildClaudeTokenRows returns BOTH (whole
+    // file); captureForegroundTokens must drop the out-of-window one.
+    const fixture = path.join(dir, 'session.jsonl');
+    fs.writeFileSync(
+      fixture,
+      [
+        { type: 'assistant', requestId: 'req-in', uuid: 'i', timestamp: '2026-06-29T05:31:00.000Z', message: { model: 'claude-opus-4-8', usage: { input_tokens: 500, output_tokens: 120 }, content: [] } },
+        { type: 'assistant', requestId: 'req-out', uuid: 'o', timestamp: '2026-06-29T04:00:00.000Z', message: { model: 'claude-opus-4-8', usage: { input_tokens: 999, output_tokens: 999 }, content: [] } },
+      ].map((o) => JSON.stringify(o)).join('\n') + '\n',
+    );
+
+    const span = {
+      task_id: 'span-tid',
+      agent: 'claude',
+      started_at: '2026-06-29T05:29:00.000Z',
+      ended_at: '2026-06-29T05:35:00.000Z',
+    };
+    // NO resolveTaskId injected → must fall back to span.task_id (never '').
+    const inserted = await captureForegroundTokens(span, { dbPath, mainSessionPath: fixture });
+
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const rows = db.prepare('SELECT task_id, tool_call_id FROM token_usage').all();
+      assert.equal(rows.length, 1, 'only the in-window turn persisted (out-of-window dropped)');
+      assert.equal(rows[0].task_id, 'span-tid', 'stamped with span.task_id, not an empty/live id');
+      assert.equal(rows[0].tool_call_id, 'req-in', 'the in-window turn, not the 04:00 one');
+      assert.equal(inserted, 1);
+    } finally {
+      db.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('captureForegroundTokens(opencode): stamp-only inserts NOTHING (no transcript build)', async () => {
   const { dir, dbPath } = newTempDb();
   try {
