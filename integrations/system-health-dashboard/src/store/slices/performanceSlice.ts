@@ -151,6 +151,8 @@ interface PerformanceState {
   runsError: string | null
   selectedTaskId: string | null // drives the inline Timeline panel (row click)
   overrideTaskId: string | null // drives the modal Score-override drawer (explicit "Edit scores")
+  compareA: string | null // run-comparison view: left run
+  compareB: string | null // run-comparison view: right run
   timelineByTaskId: Record<string, TimelineRow[]>
   timelineLoading: boolean
   timelineError: string | null
@@ -200,6 +202,8 @@ const initialState: PerformanceState = {
   runsError: null,
   selectedTaskId: null,
   overrideTaskId: null,
+  compareA: null,
+  compareB: null,
   timelineByTaskId: {},
   timelineLoading: false,
   timelineError: null,
@@ -480,6 +484,12 @@ const performanceSlice = createSlice({
     setActiveReportId(state, action: PayloadAction<string | null>) {
       state.activeReportId = action.payload
     },
+    setCompareA(state, action: PayloadAction<string | null>) {
+      state.compareA = action.payload
+    },
+    setCompareB(state, action: PayloadAction<string | null>) {
+      state.compareB = action.payload
+    },
     clearOverrideStatus(state) {
       state.saveOverrideError = null
       state.saveOverrideStatus = null
@@ -620,6 +630,8 @@ export const {
   setSelectedTaskId,
   setOverrideTaskId,
   setActiveReportId,
+  setCompareA,
+  setCompareB,
   clearOverrideStatus,
 } = performanceSlice.actions
 
@@ -640,6 +652,8 @@ export const selectRunsLoading = (state: RootState) => state.performance.runsLoa
 export const selectRunsError = (state: RootState) => state.performance.runsError
 export const selectFacetState = (state: RootState) => state.performance.facetState
 export const selectSelectedTaskId = (state: RootState) => state.performance.selectedTaskId
+export const selectCompareA = (state: RootState) => state.performance.compareA
+export const selectCompareB = (state: RootState) => state.performance.compareB
 export const selectTimelineLoading = (state: RootState) => state.performance.timelineLoading
 export const selectTimelineError = (state: RootState) => state.performance.timelineError
 

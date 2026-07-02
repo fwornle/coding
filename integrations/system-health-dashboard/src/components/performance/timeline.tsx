@@ -19,7 +19,10 @@ import {
   type TimelineRow,
 } from '@/store/slices/performanceSlice'
 import { distinctModels, normalizeModel } from './models'
-import { ROLE_META, ROLE_ORDER, processMeta, roleForProcess, type Role } from './roles'
+import {
+  ROLE_META, ROLE_ORDER, processMeta, roleForProcess, summarizeByRole,
+  type Role, type RoleStat,
+} from './roles'
 
 // D-06 collapsible timeline, re-cast as a role-aware narrative. Each turn is
 // classified into a role (foreground development / knowledge capture /
@@ -169,35 +172,6 @@ function ParentRow({ row, index, run }: { row: TimelineRow; index: number; run: 
       </CollapsibleContent>
     </Collapsible>
   )
-}
-
-// Per-role rollup for the story summary + filter chips.
-interface RoleStat {
-  role: Role
-  turns: number
-  totalTokens: number
-  models: string[]
-}
-
-function summarizeByRole(rows: TimelineRow[], run: Run | null): RoleStat[] {
-  const acc: Record<Role, { turns: number; totalTokens: number; models: Set<string> }> = {
-    foreground: { turns: 0, totalTokens: 0, models: new Set() },
-    knowledge: { turns: 0, totalTokens: 0, models: new Set() },
-    infrastructure: { turns: 0, totalTokens: 0, models: new Set() },
-  }
-  for (const r of rows) {
-    const role = roleForProcess(r.process, run)
-    acc[role].turns += 1
-    acc[role].totalTokens += typeof r.total_tokens === 'number' ? r.total_tokens : 0
-    const m = normalizeModel(r.model)
-    if (m) acc[role].models.add(m)
-  }
-  return ROLE_ORDER.map((role) => ({
-    role,
-    turns: acc[role].turns,
-    totalTokens: acc[role].totalTokens,
-    models: [...acc[role].models],
-  }))
 }
 
 // The comparison-ready run story: one card per role with turns + tokens + models.

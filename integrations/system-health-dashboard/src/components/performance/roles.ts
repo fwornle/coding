@@ -4,7 +4,8 @@
 // human-readable label, a role, and a one-line explanation so a reader can follow
 // what the run actually did (and compare two runs by role).
 
-import type { Run } from '@/store/slices/performanceSlice'
+import type { Run, TimelineRow } from '@/store/slices/performanceSlice'
+import { normalizeModel } from './models'
 
 export type Role = 'foreground' | 'knowledge' | 'infrastructure'
 
@@ -139,4 +140,35 @@ export function processMeta(process: string | null | undefined, run: Run | null)
 
 export function roleForProcess(process: string | null | undefined, run: Run | null): Role {
   return processMeta(process, run).role
+}
+
+// Per-role rollup of a run's timeline rows: turn count, total tokens, and the
+// distinct (normalized) models used in that role. Shared by the timeline story
+// summary and the run-comparison view so both compute roles identically.
+export interface RoleStat {
+  role: Role
+  turns: number
+  totalTokens: number
+  models: string[]
+}
+
+export function summarizeByRole(rows: TimelineRow[], run: Run | null): RoleStat[] {
+  const acc: Record<Role, { turns: number; totalTokens: number; models: Set<string> }> = {
+    foreground: { turns: 0, totalTokens: 0, models: new Set() },
+    knowledge: { turns: 0, totalTokens: 0, models: new Set() },
+    infrastructure: { turns: 0, totalTokens: 0, models: new Set() },
+  }
+  for (const r of rows) {
+    const role = roleForProcess(r.process, run)
+    acc[role].turns += 1
+    acc[role].totalTokens += typeof r.total_tokens === 'number' ? r.total_tokens : 0
+    const m = normalizeModel(r.model)
+    if (m) acc[role].models.add(m)
+  }
+  return ROLE_ORDER.map((role) => ({
+    role,
+    turns: acc[role].turns,
+    totalTokens: acc[role].totalTokens,
+    models: [...acc[role].models],
+  }))
 }

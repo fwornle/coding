@@ -19,6 +19,7 @@ import { PerformanceTimeline } from '@/components/performance/timeline'
 import { ScoreDrawer } from '@/components/performance/score-drawer'
 import { ReportsSubview } from '@/components/performance/reports-subview'
 import { MeasurementControl } from '@/components/performance/measurement-control'
+import { RunCompare } from '@/components/performance/run-compare'
 
 // DASH-01/DASH-02 Performance page. Layout mirrors token-usage.tsx (header +
 // summary Card focal point + Tabs body) but ALL shared state lives in the
@@ -134,6 +135,7 @@ export function PerformancePage() {
       <Tabs defaultValue="runs">
         <TabsList>
           <TabsTrigger value="runs">Runs</TabsTrigger>
+          <TabsTrigger value="compare" data-testid="compare-tab">Compare</TabsTrigger>
           <TabsTrigger value="reports" data-testid="reports-tab">Reports</TabsTrigger>
         </TabsList>
         <TabsContent value="runs" className="mt-4">
@@ -147,6 +149,9 @@ export function PerformancePage() {
           <p className="mt-2 text-sm text-muted-foreground">
             {filtered.length} of {runs.length} runs shown
           </p>
+        </TabsContent>
+        <TabsContent value="compare" className="mt-4">
+          <RunCompare />
         </TabsContent>
         <TabsContent value="reports" className="mt-4">
           <ReportsSubview />
