@@ -1,0 +1,7 @@
+{
+  "content": "{\"entityType\":\"Component\",\"canonicalName\":\"LiveLoggingSystem\"}",
+  "provider": "copilot",
+  "model": "claude-haiku",
+  "tokens": { "input": 84, "output": 21, "total": 105 },
+  "latencyMs": 742
+}
