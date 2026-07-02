@@ -997,6 +997,7 @@ class EnhancedTranscriptMonitor {
     // slice), is deliberate — the cursor advances batch-by-batch across polls, so a
     // later read-only batch would otherwise see an empty aggregate.
     const turnChanges = this._extractFileChanges(exchanges);
+    const turnKey = this._turnKeyForSet(exchanges);
 
     const batches = this._splitIntoRecaptureBatches(pending);
     let advanced = false;
@@ -1014,6 +1015,7 @@ class EnhancedTranscriptMonitor {
         this._fireBatchObservation(batch, taskId, batchLastMessageUuid, {
           turnModifiedFiles: turnChanges.modifiedFiles,
           turnReadFiles: turnChanges.readFiles,
+          turnKey,
         });
       }).catch((err) => {
         // CR-02: best-effort — a single malformed exchange must never become an
@@ -1090,8 +1092,9 @@ class EnhancedTranscriptMonitor {
     const snapshotUuid = `${lastUuid}-progress-${mark}`;
     const nowIso = new Date().toISOString();
     const taskIdPromise = resolveLiveTaskIdSafe().catch(() => '');
+    const turnKey = this._turnKeyForSet(set);
     taskIdPromise.then((taskId) => {
-      this._fireBatchObservation(set, taskId, snapshotUuid, { kind: 'progress', createdAt: nowIso });
+      this._fireBatchObservation(set, taskId, snapshotUuid, { kind: 'progress', createdAt: nowIso, turnKey });
     }).catch((err) => {
       process.stderr.write(`[ObservationTap] progress snapshot fire failed (non-fatal): ${err?.message || err}\n`);
     });
@@ -1106,6 +1109,21 @@ class EnhancedTranscriptMonitor {
    * @param {object[]} exchanges
    * @returns {{ modifiedFiles: string[], readFiles: string[] }}
    */
+  /**
+   * Stable per-turn identity: the START uuid of the turn's first exchange
+   * (invariant for the life of the turn, unlike lastMessageUuid which grows).
+   * Every observation of one turn — progress snapshots, re-capture batches, and
+   * the final — carries this as metadata.turnKey so obs-api's semantic dedup can
+   * scope to a single turn (never collapse two DISTINCT user turns that happen to
+   * read alike). '' when the set is empty (dedup then falls back to agent-scope).
+   * @param {object[]} exchanges
+   * @returns {string}
+   */
+  _turnKeyForSet(exchanges) {
+    const first = exchanges && exchanges[0];
+    return (first && (first.uuid || first.id || first.lastMessageUuid)) || '';
+  }
+
   _extractFileChanges(exchanges) {
     const modifiedFiles = [];
     const readFiles = [];
@@ -1243,6 +1261,9 @@ class EnhancedTranscriptMonitor {
       // Mid-turn progress snapshot tag — obs-api exempts kind:'progress' from the
       // 4h semantic dedup so a snapshot never suppresses the turn's final obs.
       kind: kind || undefined,
+      // Stable per-turn identity so obs-api's semantic dedup only suppresses
+      // re-fires of the SAME turn, never two distinct-but-similar user turns.
+      turnKey: opts.turnKey || undefined,
       modifiedFiles: modifiedFiles.length > 0 ? modifiedFiles : undefined,
       readFiles: readFiles.length > 0 ? readFiles : undefined,
       // Phase 75 (OBS-01 / D-09): link this observation to the active Run via

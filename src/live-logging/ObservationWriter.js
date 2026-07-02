@@ -1006,6 +1006,9 @@ export class ObservationWriter {
     return {
       id: e.legacyId?.id ?? e.id,
       summary: meta.summary ?? e.description ?? '',
+      // Surfaced so the write paths can detect a FINAL hashing into an earlier
+      // progress snapshot and promote it (Fix 1 reconcile) rather than orphaning.
+      kind: (typeof meta === 'object' && meta) ? meta.kind : undefined,
       metadata: typeof meta === 'string' ? meta : JSON.stringify(meta),
     };
   }
@@ -1092,6 +1095,49 @@ export class ObservationWriter {
   }
 
   /**
+   * Reconcile (Fix 1): promote an orphaned progress snapshot into the turn's
+   * proper final observation. A completed turn's final can hash identically to an
+   * earlier mid-turn kind:'progress' snapshot; deduping the final INTO it would
+   * leave the turn shown only as "in progress". Instead fetch the canonical
+   * snapshot entity, drop the progress tag, and swap in the final summary (+ any
+   * ground-truth artifacts), preserving id/createdAt/legacyId verbatim.
+   *
+   * @param {{id:string}} existing - row from _findExistingByContentHash
+   * @param {string} finalSummary - the completed turn's summary
+   * @param {object} metadata - the final fire's metadata (modifiedFiles/readFiles)
+   * @returns {Promise<boolean>} true when the snapshot was promoted
+   */
+  async _promoteProgressSnapshot(existing, finalSummary, metadata) {
+    if (!this._kmStore) return false;
+    const entity = await this._kmStore.findByLegacyId({ system: 'A', id: existing.id });
+    if (!entity) return false;
+    // Idempotent: if a successor already cleared the progress tag, do nothing.
+    if (!(entity.metadata && entity.metadata.kind === 'progress')) return false;
+
+    const redactedSummary = this._redact(finalSummary);
+    const promotedMeta = { ...(entity.metadata || {}) };
+    delete promotedMeta.kind;                    // drop the 'progress' tag → proper entry
+    promotedMeta.summary = redactedSummary;
+    if (metadata.modifiedFiles) promotedMeta.modifiedFiles = metadata.modifiedFiles;
+    if (metadata.readFiles) promotedMeta.readFiles = metadata.readFiles;
+
+    const promoted = {
+      ...entity,
+      description: redactedSummary,
+      metadata: promotedMeta,
+    };
+    try {
+      await this._kmStore.putEntity(promoted, { skipOntologyCheck: true });
+    } catch (err) {
+      process.stderr.write(
+        `[ObservationWriter] Promote-snapshot putEntity failed for ${existing.id}: ${err.message}\n`
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Write a single observation to the database.
    *
    * @param {string} summary - Observation summary text
@@ -1128,6 +1174,18 @@ export class ObservationWriter {
     const contentHash = this._computeContentHash(messages, metadata);
     const existing = await this._findExistingByContentHash(agent, contentHash);
     if (existing) {
+      // Reconcile (Fix 1): a completed turn's FINAL observation whose content
+      // hashes identically to an earlier mid-turn progress snapshot would
+      // otherwise dedup INTO that snapshot, leaving the turn represented only by
+      // a kind:'progress' row (reads as perpetually "in progress"). Promote the
+      // snapshot in place — drop the progress tag, swap in the final summary —
+      // so the turn ends with exactly one proper entry.
+      if (metadata.kind !== 'progress' && existing.kind === 'progress') {
+        if (await this._promoteProgressSnapshot(existing, summary, metadata)) {
+          process.stderr.write(`[ObservationWriter] Promoted progress snapshot ${existing.id.slice(0, 8)} → final (content-hash match)\n`);
+          return existing.id;
+        }
+      }
       if (await this._maybePatchArtifacts(existing, metadata)) {
         process.stderr.write(`[ObservationWriter] Dedup+patch: updated ${existing.id.slice(0, 8)} with ${(metadata.modifiedFiles || []).length} artifacts\n`);
         return existing.id;
@@ -1142,7 +1200,7 @@ export class ObservationWriter {
     // them through the 4h window would drop all but the first — and worse, suppress the
     // turn's FINAL observation as a "duplicate" of an earlier partial snapshot. Progress
     // snapshots are intentionally periodic; the token-delta gate already rate-limits them.
-    if (metadata.kind !== 'progress' && await this._isSemanticallyDuplicate(agent, summary)) {
+    if (metadata.kind !== 'progress' && await this._isSemanticallyDuplicate(agent, summary, metadata.turnKey)) {
       process.stderr.write(`[ObservationWriter] Dedup: semantically similar observation already exists\n`);
       return null;
     }
@@ -1214,6 +1272,10 @@ export class ObservationWriter {
         // Persist the progress tag explicitly so _isSemanticallyDuplicate's
         // candidate filter can exclude these snapshots on later writes.
         ...(metadata.kind ? { kind: metadata.kind } : {}),
+        // Stable per-turn identity (ETM prompt-set first-exchange uuid) so
+        // semantic dedup only suppresses re-fires of the SAME turn, never two
+        // distinct-but-similar user turns.
+        ...(metadata.turnKey ? { turnKey: metadata.turnKey } : {}),
       };
       const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
       await this._anchorEntity(kmStore, mintedId);
@@ -1499,7 +1561,7 @@ export class ObservationWriter {
    * Jaccard > 0.45 OR stem-aware containment > 0.7 (containment catches the
    * asymmetric case where one Intent extends the other with qualifiers).
    */
-  async _isSemanticallyDuplicate(agent, summary) {
+  async _isSemanticallyDuplicate(agent, summary, turnKey) {
     if (!this._kmStore) return false;
 
     const newIntent = this._extractIntent(summary);
@@ -1523,6 +1585,14 @@ export class ObservationWriter {
       // earlier partial mid-turn snapshot would suppress the turn's final, complete
       // observation (the snapshots are intentionally near-identical to it).
       .filter((e) => !(e.metadata && e.metadata.kind === 'progress'))
+      // Fix 2 (turn-aware): a semantic match against a DIFFERENT turn is a false
+      // positive — two distinct user turns each deserve their own observation, even
+      // when their Intent/Approach read alike. Only same-turn candidates (a genuine
+      // re-fire) may suppress. When EITHER side lacks a turnKey (direct callers /
+      // pre-Fix-2 rows), keep the candidate so the original agent-scoped behaviour
+      // is preserved — this filter only ever REMOVES candidates, never adds, so it
+      // cannot make dedup more aggressive.
+      .filter((e) => !(turnKey && e.metadata && e.metadata.turnKey && e.metadata.turnKey !== turnKey))
       .map((e) => ({
         summary: (e.metadata && e.metadata.summary) || e.description || '',
       }));
@@ -1693,7 +1763,13 @@ export class ObservationWriter {
         const preAgent = metadata.agent || null;
         const preHash = this._computeContentHash(chunk, metadata);
         const preExisting = await this._findExistingByContentHash(preAgent, preHash);
-        if (preExisting) {
+        // Reconcile (Fix 1): if this chunk is a completed turn's FINAL but its
+        // content hashes into an earlier progress snapshot, do NOT short-circuit
+        // here — fall through so the LLM produces the final summary and
+        // writeObservation() promotes the snapshot (drops kind:'progress'). The
+        // pre-LLM path has no summary yet, so it can't promote itself.
+        const finalizingSnapshot = preExisting && preExisting.kind === 'progress' && metadata.kind !== 'progress';
+        if (preExisting && !finalizingSnapshot) {
           if (await this._maybePatchArtifacts(preExisting, metadata)) {
             process.stderr.write(`[ObservationWriter] Pre-LLM dedup+patch: updated ${preExisting.id.slice(0, 8)} with ${(metadata.modifiedFiles || []).length} artifacts (no LLM call)\n`);
           } else {
