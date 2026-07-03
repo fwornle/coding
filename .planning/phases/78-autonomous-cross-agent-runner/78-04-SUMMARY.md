@@ -98,6 +98,13 @@ None - no external service configuration required.
 - Operators can now run/narrow a whole matrix from one command; SC#4 is automatically gated in CI (`node --test tests/experiments/experiment-runner.integration.test.mjs`).
 - Ready for Phase 79 comparison work — the per-cell Runs (variant/repeat/terminal_state tags) are the comparison input.
 
+## Self-Check: PASSED
+
+- FOUND: scripts/experiment-run.mjs
+- FOUND: tests/experiments/experiment-runner.integration.test.mjs
+- FOUND: .planning/phases/78-autonomous-cross-agent-runner/78-04-SUMMARY.md
+- FOUND commits: bbb6d2fb0 (feat), 895176b37 (test), dce9fe885 (docs)
+
 ---
 *Phase: 78-autonomous-cross-agent-runner*
 *Completed: 2026-07-03*
