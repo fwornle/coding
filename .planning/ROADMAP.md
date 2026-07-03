@@ -220,7 +220,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 **Plans**: 4 plans
   - [x] 76-01-PLAN.md — VALID-01: close the residual recompute-route model read-path (drop the dominant-by-count fallback; use canonical fg-not-dominant) (Wave 1)
   - [x] 76-02-PLAN.md — VALID-02: idle-excluding wallclock_per_step with a named 5-min threshold (kills the ~28k s/step artifact) (Wave 1)
-  - [ ] 76-03-PLAN.md — VALID-03: derive non-GSD code_quality/test_coverage/regressions from diff + fail-soft fixed-argv test run + score-path overlay (Wave 1)
+  - [x] 76-03-PLAN.md — VALID-03: derive non-GSD code_quality/test_coverage/regressions from diff + fail-soft fixed-argv test run + score-path overlay (Wave 1)
   - [ ] 76-04-PLAN.md — Regression anchor: recompute the archived pilot span + live fresh-Opus dashboard verification [checkpoint] (Wave 2)
 
 ### Phase 77: Experiment Spec & Per-Variant Snapshot Foundation
@@ -285,7 +285,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 6/6 | Complete   | 2026-06-29 |
-| 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 1/4 | In Progress|  |
+| 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 3/4 | In Progress|  |
 | 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 0/? | Not started | - |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 0/? | Not started | - |
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
