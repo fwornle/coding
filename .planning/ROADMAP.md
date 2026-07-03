@@ -232,7 +232,10 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   2. Each variant resolves to a concrete executable config, validated BEFORE any run starts; unsupported combinations (e.g. Copilot headless) fail fast with an actionable message rather than mid-run (SPEC-02).
   3. Before each variant × repeat, the runner restores the identical Phase-67 starting snapshot, so every variant begins from the same git tree + `.data/knowledge-graph/` KB + routing config (RUN-01).
   4. Two repeats of the same variant are shown to start from byte-identical restored conditions (the snapshot restore is repeatable, not one-shot).
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 77-01-PLAN.md — experiment-spec.mjs: YAML matrix load + cartesian-axis expansion + fail-fast validation (agent enum, unsupported-combo gate, test_command shell-safety) [SPEC-01, SPEC-02]
+- [ ] 77-02-PLAN.md — measurement-start.mjs: --spec/--variant + per-field flags thread validated cell into span.meta, flags override the file [SPEC-01, SPEC-02]
+- [ ] 77-03-PLAN.md — experiment-restore.mjs: per-cell isolated snapshot restore + byte-identical determinism digest/assert [RUN-01]
 
 ### Phase 78: Autonomous Cross-Agent Runner
 **Goal**: The runner drives each variant × repeat unattended — launching the specified agent against the goal inside a measured span — producing a scored Run per cell without operator steering, with Copilot participation gated on an explicit headless-drivability capability check.
