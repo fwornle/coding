@@ -125,14 +125,22 @@ EVIDENCE_TEST_TIMEOUT_MS=12000 node scripts/experiments-recompute-score.mjs exp-
 
 - The un-bounded score dry-run initially timed out at 120s because `gatherEvidence` runs the repo's `package.json` `"test"` fallback (whole-repo jest, `DEFAULT_TEST_RUN_TIMEOUT_MS=120000`). Resolved by setting `EVIDENCE_TEST_TIMEOUT_MS=12000` so the score CLI terminates deterministically. This surfaced the recorded finding that jest's summary format is not among `parseTestCounts`'s recognized formats — a forward-looking note for Phase 77 (which will set a task-scoped `test_command`).
 
-## Task 2 — CHECKPOINT (human-verify): Live fresh-Opus dashboard render
+## Task 2 — Live fresh-Opus dashboard render (human-verify): COMPLETE ✅
 
-**Status: NOT executed — this is a `checkpoint:human-verify` gate (D-04, never DB-only). Awaiting operator.** See the `## CHECKPOINT REACHED` block returned to the orchestrator for the exact `gsd-browser` render steps (runs table + score drawer + timeline must all show `claude-opus-4-8`, never `claude-haiku-4.5`).
+**Status: COMPLETE — operator-approved on the live dashboard (`localhost:3032/performance`), 2026-07-03 (D-04 satisfied: live measured sessions, never DB-only).**
+
+Operator-confirmed evidence across the runs table (canonical/Chat model column with background daemons segregated):
+
+- **`link-obs-control`** (93,183-tok Opus session) → **Chat model = `claude-opus-4.8`** while **`claude-haiku-4.5` stays in the Background models column** — the POSITIVE VALID-01 proof: the Opus foreground wins even with a Haiku daemon sharing the measurement window.
+- **`repro-e2e`** → Chat model = `claude-opus-4.8` (corroborating).
+- The pilot **`exp-dash-start-control`** (1,244,689 tok) → Chat model = **`unmeasured`** (NOT `claude-haiku-4.5`); Haiku/Sonnet confined to Background — the old by-count bug is gone, matching this plan's Task 1 dry-run (`canonical=null`).
+- **No row anywhere shows Haiku or Sonnet as the Chat (canonical) model** — background daemons are correctly segregated.
+
+**Success Criterion #1 (VALID-01)** is therefore satisfied on LIVE data: a measured Opus interactive session records `claude-opus-4.8` across the canonical surfaces, not the most-frequent proxy token-row model. Combined with Task 1 (O2 no-28k + O3 diff-derivation on the archived pilot span), **all of VALID-01/02/03 are verified and the prerequisite Phase 76 gate is signed off.**
 
 ## Next Phase Readiness
 
-- Task 1 (the autonomous regression anchor) is complete and recorded. The three fixes hold on real pilot data: canonical never haiku, no 28k artifact, non-GSD diff-derivation fires.
-- Task 2 (the live Opus dashboard verification) is the remaining human gate before the prerequisite Phase 76 is fully signed off and Phases 77–80 are trusted.
+- Both tasks complete. The three fixes hold on real pilot data (Task 1 dry-run) AND on a live fresh Opus session (Task 2 operator-verified). VALID-01/02/03 verified; the prerequisite gate is signed off — Phases 77–80 (the runner) may now be trusted.
 - Forward note for Phase 77: set a task-scoped `test_command` in the experiment SPEC so `test_coverage`/`regressions` derive from a fast, parseable (node:test/mocha) suite rather than the whole-repo jest fallback.
 
 ## Self-Check: PASSED
@@ -140,7 +148,8 @@ EVIDENCE_TEST_TIMEOUT_MS=12000 node scripts/experiments-recompute-score.mjs exp-
 - `.planning/phases/76-measurement-validity-fixes-prerequisite/76-04-SUMMARY.md` — FOUND
 - Plan automated verify (`! grep -q "claude-haiku-4.5" /tmp/recompute-route.out`) — PASS
 - Archived Run/Route/Score preserved intact (no apply) — CONFIRMED
+- Task 2 live human-verify — APPROVED (operator, 2026-07-03; Opus across canonical surfaces, daemons segregated)
 
 ---
 *Phase: 76-measurement-validity-fixes-prerequisite*
-*Completed (Task 1): 2026-07-03 — Task 2 awaiting human verification*
+*Completed: 2026-07-03 — Task 1 (regression anchor) + Task 2 (live human-verify) both complete; VALID-01/02/03 verified*

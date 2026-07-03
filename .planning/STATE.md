@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 76 (measurement-validity-fixes-prerequisite) — EXECUTING
-Plan: 4 of 4
-Status: 76-04 Task 1 COMPLETE — Task 2 (live fresh-Opus dashboard render) AWAITING HUMAN VERIFICATION (checkpoint:human-verify, D-04 never-DB-only)
-Last activity: 2026-07-03 -- 76-04 Task 1 (Wave-2 regression anchor) complete. Dry-run recompute of the archived exp-dash-start-control-claude-opus-4-8 pilot span proves the three fixes hold on real data: canonical model NEVER claude-haiku-4.5 (OLD rig byAgentModel[0]=haiku 731,649-tok consolidator-mentions daemon → NEW rig fgGroups=[] → canonical=null/unmeasured); the 28,364 s/step artifact NOT reproduced (wallclock null, no rebuildable trace); code_quality diff-derivation FIRES (0.26 when a diff exists), test_coverage/regressions null with a recorded reason (repo jest fallback not among parseTestCounts formats). NON-DESTRUCTIVE: dry-run only, archived Run/Route/Score preserved (apply would null captured heuristics + overwrite the 0.933 Score). Task 2 = operator runs a fresh measured Opus session and confirms claude-opus-4-8 in runs table + score drawer + timeline via gsd-browser.
+Phase: 76 (measurement-validity-fixes-prerequisite) — COMPLETE (4/4 plans; VALID-01/02/03 verified)
+Plan: 4 of 4 — COMPLETE
+Status: 76-04 COMPLETE — both tasks done. Task 1 (Wave-2 regression anchor, dry-run) + Task 2 (live fresh-Opus dashboard render, operator-approved 2026-07-03). Prerequisite gate SIGNED OFF; Phases 77–80 (the runner) may now be trusted.
+Last activity: 2026-07-03 -- 76-04 complete. Task 1: dry-run recompute of the archived exp-dash-start-control-claude-opus-4-8 pilot span proves the three fixes hold on real data (canonical NEVER haiku: OLD byAgentModel[0]=haiku 731,649-tok daemon → NEW fgGroups=[] → canonical=null; 28,364 s/step artifact NOT reproduced; code_quality diff-derivation fires at 0.26; non-destructive dry-run, archived Run/Score preserved). Task 2 (operator-verified on localhost:3032/performance): link-obs-control (93,183-tok Opus) → Chat model=claude-opus-4.8 while claude-haiku-4.5 stays in Background column (positive VALID-01 proof, Opus wins even with a Haiku daemon in-window); repro-e2e corroborates; pilot exp-dash-start-control → Chat model=unmeasured (NOT haiku); no row shows Haiku/Sonnet as canonical. VALID-01/02/03 all verified.
 
 ## Deferred Items
 

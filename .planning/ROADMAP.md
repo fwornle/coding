@@ -46,7 +46,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 
 **Prerequisite ordering:** the **VALID** phase (Phase 76) corrects correctness gaps in v7.4's already-shipped attribution / route / score code (diagnosed as O1/O2/O3 in `.planning/v7.4-attribution-findings.md`). VALID-01 (model mis-attribution) breaks "Opus vs Fable"; VALID-03 (non-GSD rubric coverage) breaks "straight vs GSD". Phase 76 MUST land and verify BEFORE the runner phases (RUN/CMP) are trusted. RUN-04 (Copilot headless-drivability) is a **gated spike** — a small capability check inside Phase 78, not a blocking dependency for the rest.
 
-- [ ] **Phase 76: Measurement Validity Fixes [PREREQUISITE]** — Canonical foreground model attribution, plausible route-time math, and 5-dimension scoring for non-GSD/ad-hoc tasks — so the two canonical comparisons are no longer corrupted at the source (VALID-01/02/03)
+- [x] **Phase 76: Measurement Validity Fixes [PREREQUISITE]** — Canonical foreground model attribution, plausible route-time math, and 5-dimension scoring for non-GSD/ad-hoc tasks — so the two canonical comparisons are no longer corrupted at the source (VALID-01/02/03) — verified live 2026-07-03
 - [ ] **Phase 77: Experiment Spec & Per-Variant Snapshot Foundation** — Declarative validated variant matrix + fail-fast config resolution + per-variant×repeat snapshot restore off the Phase-67 rig (SPEC-01/02, RUN-01)
 - [ ] **Phase 78: Autonomous Cross-Agent Runner** — Unattended per-cell agent launch wrapped in a measured span; timeouts/aborts recorded; Copilot gated on a headless-drivability spike (RUN-02/03/04)
 - [ ] **Phase 79: Comparison, Aggregation & Report** — Objective success gate, N-repeat aggregation with variance, ranked side-by-side report keyed by `task_hash` (CMP-01/02/03)
@@ -221,7 +221,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   - [x] 76-01-PLAN.md — VALID-01: close the residual recompute-route model read-path (drop the dominant-by-count fallback; use canonical fg-not-dominant) (Wave 1)
   - [x] 76-02-PLAN.md — VALID-02: idle-excluding wallclock_per_step with a named 5-min threshold (kills the ~28k s/step artifact) (Wave 1)
   - [x] 76-03-PLAN.md — VALID-03: derive non-GSD code_quality/test_coverage/regressions from diff + fail-soft fixed-argv test run + score-path overlay (Wave 1)
-  - [~] 76-04-PLAN.md — Regression anchor: recompute the archived pilot span + live fresh-Opus dashboard verification [checkpoint] (Wave 2) — **Task 1 COMPLETE** (dry-run recompute proves canonical never haiku / no 28k artifact / non-GSD diff-derivation fires; SC 1-3 evidenced); **Task 2 AWAITING HUMAN VERIFICATION** (live fresh-Opus dashboard render, SC 4)
+  - [x] 76-04-PLAN.md — Regression anchor: recompute the archived pilot span + live fresh-Opus dashboard verification [checkpoint] (Wave 2) — **COMPLETE**. Task 1: dry-run recompute proves canonical never haiku (OLD byAgentModel[0]=haiku daemon → NEW fgGroups=[] → canonical=null) / no 28k artifact / non-GSD diff-derivation fires (0.26). Task 2: operator-verified live on localhost:3032/performance — link-obs-control Opus session shows Chat model=claude-opus-4.8 with claude-haiku-4.5 confined to Background; pilot span=unmeasured (not haiku); no row shows a daemon as canonical. SC 1-4 all satisfied.
 
 ### Phase 77: Experiment Spec & Per-Variant Snapshot Foundation
 **Goal**: A user can declare an experiment as a validated variant matrix, and the runner can restore the identical Phase-67 starting snapshot before every variant × repeat so each run begins from the same tree + KB + routing state.
@@ -285,7 +285,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 6/6 | Complete   | 2026-06-29 |
-| 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 3/4 | In Progress|  |
+| 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 4/4 | Complete | VALID-01/02/03 verified (live 2026-07-03) |
 | 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 0/? | Not started | - |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 0/? | Not started | - |
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
