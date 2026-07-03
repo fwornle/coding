@@ -62,9 +62,24 @@ test('buildVariantMeta: --variant stamps meta.variant for provenance', () => {
 test('buildVariantMeta: omitting a flag leaves that meta key ABSENT (no null/undefined pollution)', () => {
   const meta = buildVariantMeta([]);
   const keys = Object.keys(meta);
-  for (const k of ['agent', 'model', 'framework', 'test_command']) {
+  for (const k of ['agent', 'model', 'framework', 'test_command', 'repeat']) {
     assert.ok(!keys.includes(k), `no ${k} key when its flag is omitted`);
   }
+});
+
+// ── R2 (Phase 78-01, D-10): --repeat threads into span.meta as a numeric index,
+//    symmetric with --variant (conditional-spread; absent → omitted). ──
+
+test('buildVariantMeta: --repeat threads a numeric repeat index into meta alongside --variant', () => {
+  const meta = buildVariantMeta(['--variant', 'claude-sonnet', '--repeat', '2']);
+  assert.equal(meta.variant, 'claude-sonnet');
+  assert.equal(meta.repeat, 2, 'repeat coerced to a Number');
+  assert.equal(typeof meta.repeat, 'number', 'repeat stored as a number, not the "2" string');
+});
+
+test('buildVariantMeta: --repeat 0 is preserved as the numeric index 0 (not omitted)', () => {
+  const meta = buildVariantMeta(['--repeat', '0']);
+  assert.equal(meta.repeat, 0, 'repeat index 0 is a genuine value (presence-checked, not truthiness)');
 });
 
 test('CLI: a --test-command with a shell metacharacter aborts non-zero BEFORE the span opens', () => {

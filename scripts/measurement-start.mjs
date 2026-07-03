@@ -95,6 +95,11 @@ export function buildVariantMeta(args, { resolveSpec = resolveExperimentSpec } =
   const flagTestCmd = parseStrArg(args, '--test-command');
   const variant = parseStrArg(args, '--variant');
   const specPath = parseStrArg(args, '--spec');
+  // R2 (Phase 78-01, D-10): --repeat threads the numeric repeat index into span.meta,
+  // symmetric with --variant. Presence-checked (not truthiness) so index 0 survives;
+  // a non-numeric value is dropped (omitted), same conditional-spread idiom as variant.
+  const flagRepeat = parseStrArg(args, '--repeat');
+  const repeat = flagRepeat != null ? Number(flagRepeat) : null;
 
   // Fail fast on an unsafe --test-command BEFORE the span opens (D-08 / T-77-05). The
   // direct-CLI path must not smuggle a shell-metacharacter command into span.meta.
@@ -161,6 +166,7 @@ export function buildVariantMeta(args, { resolveSpec = resolveExperimentSpec } =
     ...(testCmd ? { test_command: testCmd } : {}),
     ...(env ? { env } : {}),
     ...(variant ? { variant } : {}),
+    ...(repeat != null && Number.isFinite(repeat) ? { repeat } : {}),
   };
 }
 

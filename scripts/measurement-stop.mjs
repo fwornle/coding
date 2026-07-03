@@ -89,6 +89,10 @@ const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
 // The three deterministic, harness-derived (non-LLM) rubric dims (76-03, D-08).
 const NON_GSD_DIMS = Object.freeze(['code_quality', 'test_coverage', 'regressions']);
 
+// R3 (Phase 78-01, D-04): the closed terminal-state enum, verbatim. A --terminal-state
+// value MUST be one of these or the close fails fast (Tampering mitigation T-78-01-01).
+export const TERMINAL_STATES = Object.freeze(['complete', 'timeout', 'abort']);
+
 /**
  * Gap-fill the deterministic non-GSD dims onto a judgment IN PLACE (VALID-03 / D-08).
  * For each of code_quality/test_coverage/regressions, set the judged value from the
@@ -114,6 +118,58 @@ function parseStrArg(argv, flag) {
   const i = argv.indexOf(flag);
   if (i < 0) return null;
   return argv[i + 1] ?? null;
+}
+
+/**
+ * Parse + enum-validate --terminal-state (R3 / D-04). Returns the validated value
+ * (one of complete|timeout|abort), or null when the flag is absent (null-preserved).
+ * Throws on an out-of-enum value so the close fails fast BEFORE any span/proxy work
+ * (Tampering mitigation T-78-01-01) — the caller surfaces the message + exits non-zero.
+ * @param {string[]} argv process.argv.slice(2)
+ * @returns {string|null}
+ */
+export function parseTerminalState(argv) {
+  const v = parseStrArg(argv, '--terminal-state');
+  if (v === null) return null;
+  if (!TERMINAL_STATES.includes(v)) {
+    throw new Error(
+      `--terminal-state '${v}' is not valid. Allowed: ${TERMINAL_STATES.join(', ')}`,
+    );
+  }
+  return v;
+}
+
+/**
+ * Assemble the writeRun tags object from the resolved close context. The existing
+ * canonical-attribution tags are unchanged; the R2/R3/R4 fields (Phase 78-01) are
+ * ADDITIVE and null-preserved: variant/repeat fold from span.meta (D-10), and the
+ * parsed terminal_state/skip_reason fold from the close flags (D-04/D-08). No value
+ * is ever coerced — `?? null` keeps a genuine repeat index 0.
+ * @param {object} ctx
+ * @returns {object} the tags passed to writeRun.
+ */
+export function buildRunTags({
+  span, taskHash, canonicalAgent, canonicalModel, snapshotId,
+  backgroundModels, terminalState, skipReason,
+}) {
+  return {
+    task_hash: taskHash,
+    agent: canonicalAgent, // canonical foreground family (D-05); null when unmeasured
+    model: canonicalModel,
+    framework: span.meta?.framework ?? canonicalAgent, // A2 — null allowed (D-13)
+    trace_id: span.task_id,
+    snapshot_id: snapshotId, // Phase 67-07: link the Run to its RunSnapshot (null when none)
+    // ── D-06: canonical attribution + segregated background daemons ──
+    canonical_model: canonicalModel,
+    canonical_agent: canonicalAgent,
+    background_models: backgroundModels,
+    // ── R2/R3/R4 (Phase 78-01): variant/repeat from span.meta; terminal_state/skip_reason
+    //    from the close flags. null-preserved (never coerced; `?? null` keeps repeat 0). ──
+    variant:        span.meta?.variant ?? null,
+    repeat:         span.meta?.repeat ?? null,
+    terminal_state: terminalState ?? null, // D-04 enum: complete | timeout | abort
+    skip_reason:    skipReason ?? null,
+  };
 }
 
 /** A close is headless when --headless is passed, CI is set, or there is no TTY. */
@@ -214,6 +270,19 @@ function findPendingCloseRequest(archiveDir) {
 
 async function main() {
   const args = process.argv.slice(2);
+
+  // ── (0) R3/R4 close-outcome flags — parsed + enum-validated FIRST so an invalid
+  //   --terminal-state fails fast (non-zero exit, no span archived, no proxy import;
+  //   Tampering mitigation T-78-01-01). --skip-reason is a free operator label (D-08,
+  //   T-78-01-03 accepted): local repo KB only, no external sink. Both null when absent.
+  let terminalState;
+  try {
+    terminalState = parseTerminalState(args);
+  } catch (err) {
+    process.stderr.write(`error: ${err.message}\n`);
+    process.exit(1);
+  }
+  const skipReason = parseStrArg(args, '--skip-reason');
 
   // ── (1) Archive the active span (original behavior — idempotent no-span path) ──
   const modUrl = pathToFileURL(path.join(PROXY_DIST, 'measurement-span.js')).href;
@@ -440,18 +509,19 @@ async function main() {
   const taskHash = span.goal_sentence
     ? crypto.createHash('sha256').update(span.goal_sentence).digest('hex')
     : null; // A3 — null allowed (D-13)
-  const tags = {
-    task_hash: taskHash,
-    agent: canonicalAgent, // canonical foreground family (D-05); null when unmeasured
-    model: canonicalModel,
-    framework: span.meta?.framework ?? canonicalAgent, // A2 — null allowed (D-13)
-    trace_id: span.task_id,
-    snapshot_id: snapshotId, // Phase 67-07: link the Run to its RunSnapshot (null when none)
-    // ── D-06: canonical attribution + segregated background daemons ──
-    canonical_model: canonicalModel,
-    canonical_agent: canonicalAgent,
-    background_models: backgroundModels,
-  };
+  // Assemble the writeRun tags (buildRunTags folds the additive R2/R3/R4 fields —
+  // variant/repeat from span.meta, terminal_state/skip_reason from the close flags —
+  // onto the unchanged canonical-attribution tags; all null-preserved).
+  const tags = buildRunTags({
+    span,
+    taskHash,
+    canonicalAgent,
+    canonicalModel,
+    snapshotId,
+    backgroundModels,
+    terminalState,
+    skipReason,
+  });
 
   // ── (3.5/3.6) Route heuristics from the normalized cross-agent trace ──
   //   buildNormalizedTrace dispatches on the dominant agent, time-window-scopes the
@@ -534,7 +604,14 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`FATAL: ${err.stack || err.message}\n`);
-  process.exit(1);
-});
+// Run main() only when executed directly as a CLI — NOT when imported (the stop-tags
+// tests import buildRunTags/parseTerminalState as pure helpers and must not archive a
+// span on module load). Mirrors scripts/measurement-start.mjs's isDirectRun guard.
+const isDirectRun = process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  main().catch((err) => {
+    process.stderr.write(`FATAL: ${err.stack || err.message}\n`);
+    process.exit(1);
+  });
+}

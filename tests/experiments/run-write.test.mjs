@@ -445,6 +445,98 @@ test('D-06: re-close preserves the canonical fields (idempotent update)', async 
   }
 });
 
+// ── R2/R3/R4 (Phase 78-01): variant + repeat + terminal_state + skip_reason ──
+// D-03/D-04/D-08/D-10 make a single experiment's cells distinguishable (variant/
+// repeat) and record every terminal outcome (complete|timeout|abort) + probe-skip
+// reason. All four are null-preserved Run.metadata tags surfaced by readRuns' spread.
+
+const R2R3R4_TAGS = ['variant', 'repeat', 'terminal_state', 'skip_reason'];
+
+test('R2/R3/R4: writeRun persists variant/repeat/terminal_state/skip_reason on Run.metadata', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    await writeRun(store, sampleArgs({
+      tags: {
+        task_hash: 'deadbeef', agent: 'claude-code', model: 'claude-haiku-4.5',
+        framework: 'gsd', trace_id: 't1',
+        variant: 'claude-sonnet', repeat: 2, terminal_state: 'timeout', skip_reason: null,
+      },
+    }));
+
+    const runs = await collectRuns(store);
+    assert.equal(runs.length, 1);
+    const m = runs[0].metadata;
+    for (const k of R2R3R4_TAGS) {
+      assert.ok(k in m, `tag '${k}' must be present in metadata`);
+    }
+    assert.equal(m.variant, 'claude-sonnet', 'D-10 variant persisted verbatim');
+    assert.equal(m.repeat, 2, 'D-10 repeat persisted verbatim (a genuine index, incl. 0)');
+    assert.equal(m.terminal_state, 'timeout', 'D-04 terminal_state persisted verbatim');
+    assert.equal(m.skip_reason, null, 'D-08 explicit null skip_reason preserved (never coerced/absent)');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('R2/R3/R4: absent variant/repeat/terminal_state/skip_reason persist as null (never absent)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    await writeRun(store, sampleArgs()); // sampleArgs tags carry NONE of the four
+
+    const m = (await collectRuns(store))[0].metadata;
+    for (const k of R2R3R4_TAGS) {
+      assert.ok(k in m, `tag '${k}' key always present`);
+      assert.equal(m[k], null, `tag '${k}' null-preserved when no source (never coerced)`);
+    }
+  } finally {
+    await cleanup();
+  }
+});
+
+test('R2/R3/R4: repeat index 0 is preserved as 0, not coerced to null', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    await writeRun(store, sampleArgs({
+      tags: {
+        task_hash: 'deadbeef', agent: 'claude-code', model: 'claude-haiku-4.5',
+        framework: 'gsd', trace_id: 't1', repeat: 0,
+      },
+    }));
+    const m = (await collectRuns(store))[0].metadata;
+    assert.equal(m.repeat, 0, 'repeat 0 is a genuine index (NOT null — ?? null keeps 0)');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('R2/R3/R4: readRuns surfaces the four fields via the ...meta spread (no query.mjs change)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    const { readRuns } = await import('../../lib/experiments/query.mjs');
+    await writeRun(store, sampleArgs({
+      tags: {
+        task_hash: 'deadbeef', agent: 'claude-code', model: 'claude-haiku-4.5',
+        framework: 'gsd', trace_id: 't1',
+        variant: 'claude-opus', repeat: 3, terminal_state: 'abort',
+        skip_reason: 'copilot-headless-unsupported',
+      },
+    }));
+
+    const rows = await readRuns(store);
+    assert.equal(rows.length, 1, 'one Run surfaced');
+    assert.equal(rows[0].variant, 'claude-opus', 'variant flows through ...meta spread');
+    assert.equal(rows[0].repeat, 3, 'repeat flows through ...meta spread');
+    assert.equal(rows[0].terminal_state, 'abort', 'terminal_state flows through ...meta spread');
+    assert.equal(rows[0].skip_reason, 'copilot-headless-unsupported', 'skip_reason flows through ...meta spread');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('ATTR-02: readRuns surfaces the canonical fields via the ...meta spread (no query.mjs change)', async () => {
   const { store, cleanup } = await openIsolatedStore();
   try {
