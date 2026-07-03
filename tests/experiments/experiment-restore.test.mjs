@@ -14,14 +14,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import {
   digestRestoredState,
   restoreForCell,
+  assertRepeatsIdentical,
+  runVariantRepeats,
 } from '../../lib/experiments/experiment-restore.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CLI = path.resolve(__dirname, '..', '..', 'scripts', 'experiment-restore.mjs');
 const HEX64 = /^[0-9a-f]{64}$/;
 
 /** Make a throwaway sandbox `.data` tree with a KB dir + llm-settings.json. */
@@ -127,4 +131,74 @@ test('restoreForCell invokes the injected restore with inPlace:false and returns
   assert.equal(r.sandboxDataDir, s.dataDir);
   assert.equal(r.worktree, s.root);
   assert.match(r.digest, HEX64);
+});
+
+// ---------------------------------------------------------------------------
+// Task 2: assertRepeatsIdentical (byte-identical or abort — D-11/D-12)
+// ---------------------------------------------------------------------------
+
+test('assertRepeatsIdentical returns the shared digest when all repeats match', () => {
+  const shared = 'a'.repeat(64);
+  const out = assertRepeatsIdentical([{ digest: shared }, { digest: shared }], { variantName: 'A' });
+  assert.equal(out, shared);
+});
+
+test('assertRepeatsIdentical throws with BOTH divergent digests on mismatch', () => {
+  const d1 = 'a'.repeat(64);
+  const d2 = 'b'.repeat(64);
+  assert.throws(
+    () => assertRepeatsIdentical([{ digest: d1 }, { digest: d2 }], { variantName: 'A' }),
+    (err) => err.message.includes(d1) && err.message.includes(d2),
+  );
+});
+
+test('runVariantRepeats pipes matching restores through the assert and returns the digest', async () => {
+  const s = makeSandbox({ kbFiles: { 'a.json': '{"n":1}' } });
+  const stubRestore = async () => ({
+    worktree: s.root,
+    sandboxDataDir: s.dataDir,
+    replayArmed: false,
+    inPlace: false,
+    steps: {},
+  });
+  const { digest, sandboxes } = await runVariantRepeats('snap-1', 2, {
+    repoRoot: '/repo',
+    dataDir: '/repo/.data',
+    variantName: 'A',
+    restore: stubRestore,
+  });
+  assert.match(digest, HEX64);
+  assert.equal(sandboxes.length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// Task 2: operator CLI exit-code + digest contract (EXPERIMENT_RESTORE_FAKE seam)
+// ---------------------------------------------------------------------------
+
+test('CLI exits 0 and prints the shared digest + byte-identical notice for a matching double-restore', () => {
+  const res = spawnSync(process.execPath, [CLI, '--snapshot', 'fake-snap', '--repeats', '2'], {
+    encoding: 'utf8',
+    env: { ...process.env, EXPERIMENT_RESTORE_FAKE: 'match' },
+  });
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(res.stderr, /[0-9a-f]{64}/);
+  assert.match(res.stderr, /byte-identical/);
+});
+
+test('CLI exits non-zero and prints both digests for a forced divergence', () => {
+  const res = spawnSync(process.execPath, [CLI, '--snapshot', 'fake-snap', '--repeats', '2'], {
+    encoding: 'utf8',
+    env: { ...process.env, EXPERIMENT_RESTORE_FAKE: 'diverge' },
+  });
+  assert.notEqual(res.status, 0);
+  const digests = res.stderr.match(/[0-9a-f]{64}/g) || [];
+  assert.ok(new Set(digests).size >= 2, `expected >=2 distinct digests in stderr, got: ${res.stderr}`);
+});
+
+test('CLI exits 2 when --snapshot is missing', () => {
+  const res = spawnSync(process.execPath, [CLI, '--repeats', '2'], {
+    encoding: 'utf8',
+    env: { ...process.env },
+  });
+  assert.equal(res.status, 2);
 });
