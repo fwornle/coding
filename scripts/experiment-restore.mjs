@@ -81,8 +81,10 @@ async function main() {
   }
 
   const repeats = repeatsArg ? Number.parseInt(repeatsArg, 10) : 2;
-  if (!Number.isInteger(repeats) || repeats < 1) {
-    process.stderr.write(`error: --repeats must be a positive integer (got '${repeatsArg}')\n`);
+  // WR-03 (Phase 77 review): a determinism proof compares at least two restores. `--repeats 1`
+  // would print a vacuous "byte-identical" success, so reject <2 as a usage error (exit 2).
+  if (!Number.isInteger(repeats) || repeats < 2) {
+    process.stderr.write(`error: --repeats must be an integer >= 2 (a determinism proof needs at least two restores to compare; got '${repeatsArg}')\n`);
     process.exit(2);
   }
 

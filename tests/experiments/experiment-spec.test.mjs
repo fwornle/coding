@@ -21,6 +21,7 @@ import {
   KNOWN_AGENTS,
 } from '../../lib/experiments/experiment-spec.mjs';
 import { SHELL_META_RE } from '../../lib/experiments/evidence-harness.mjs';
+import { KNOWN_AGENTS as ROUTE_TRACE_KNOWN_AGENTS } from '../../lib/experiments/route-trace-resolve.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXAMPLE_SPEC_PATH = path.resolve(
@@ -163,7 +164,16 @@ test('SHELL_META_RE is exported from evidence-harness (single canonical regex, D
 });
 
 test('KNOWN_AGENTS equals the route-trace-resolve SoT set (no silent divergence, D-05)', () => {
-  assert.deepEqual([...KNOWN_AGENTS].sort(), ['claude', 'copilot', 'opencode'].sort());
+  // WR-02 (Phase 77 review): compare against the ACTUAL exported route-trace set, not a
+  // hardcoded literal — otherwise this test gives zero drift protection if route-trace changes.
+  assert.deepEqual([...KNOWN_AGENTS].sort(), [...ROUTE_TRACE_KNOWN_AGENTS].sort());
+});
+
+test('WR-01: an explicit empty variants:[] aborts (never collapse to zero cells)', () => {
+  assert.throws(
+    () => resolveExperimentSpec({ goal_sentence: 'nothing to run', variants: [] }),
+    /ZERO variant cells/,
+  );
 });
 
 test('resolveExperimentSpec: a cell with an unknown agent aborts the whole matrix (D-06)', () => {

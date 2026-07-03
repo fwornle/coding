@@ -195,6 +195,16 @@ test('runVariantRepeats pipes matching restores through the assert and returns t
   assert.equal(sandboxes.length, 2);
 });
 
+test('WR-03: runVariantRepeats rejects repeats < 2 (a determinism proof needs two restores)', async () => {
+  const stubRestore = async () => ({
+    worktree: '/x', sandboxDataDir: '/x/.data', replayArmed: false, inPlace: false, steps: {},
+  });
+  await assert.rejects(
+    () => runVariantRepeats('snap-1', 1, { restore: stubRestore }),
+    /repeats must be an integer >= 2/,
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Task 2: operator CLI exit-code + digest contract (EXPERIMENT_RESTORE_FAKE seam)
 // ---------------------------------------------------------------------------
@@ -225,4 +235,13 @@ test('CLI exits 2 when --snapshot is missing', () => {
     env: { ...process.env },
   });
   assert.equal(res.status, 2);
+});
+
+test('WR-03: CLI exits 2 on --repeats 1 (vacuous determinism proof rejected)', () => {
+  const res = spawnSync(process.execPath, [CLI, '--snapshot', 'fake-snap', '--repeats', '1'], {
+    encoding: 'utf8',
+    env: { ...process.env, EXPERIMENT_RESTORE_FAKE: 'match' },
+  });
+  assert.equal(res.status, 2, res.stderr);
+  assert.match(res.stderr, /at least two restores/);
 });
