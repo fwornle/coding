@@ -233,7 +233,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   3. Before each variant × repeat, the runner restores the identical Phase-67 starting snapshot, so every variant begins from the same git tree + `.data/knowledge-graph/` KB + routing config (RUN-01).
   4. Two repeats of the same variant are shown to start from byte-identical restored conditions (the snapshot restore is repeatable, not one-shot).
 **Plans**: 3 plans
-- [ ] 77-01-PLAN.md — experiment-spec.mjs: YAML matrix load + cartesian-axis expansion + fail-fast validation (agent enum, unsupported-combo gate, test_command shell-safety) [SPEC-01, SPEC-02]
+- [x] 77-01-PLAN.md — experiment-spec.mjs: YAML matrix load + cartesian-axis expansion + fail-fast validation (agent enum, unsupported-combo gate, test_command shell-safety) [SPEC-01, SPEC-02]
 - [ ] 77-02-PLAN.md — measurement-start.mjs: --spec/--variant + per-field flags thread validated cell into span.meta, flags override the file [SPEC-01, SPEC-02]
 - [ ] 77-03-PLAN.md — experiment-restore.mjs: per-cell isolated snapshot restore + byte-identical determinism digest/assert [RUN-01]
 
@@ -289,7 +289,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 6/6 | Complete   | 2026-06-29 |
 | 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 4/4 | Complete | VALID-01/02/03 verified (live 2026-07-03) |
-| 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 0/? | Not started | - |
+| 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 1/3 | In Progress|  |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 0/? | Not started | - |
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
