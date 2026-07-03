@@ -145,3 +145,8 @@ No new security surface introduced beyond the plan's threat register.
 - 65f84a32c — test(78-01): failing tests for --repeat threading + stop-side tags (RED)
 - 4fcefe394 — feat(78-01): thread --repeat into span.meta (GREEN)
 - 6b6ef4086 — feat(78-01): fold variant/repeat + --terminal-state/--skip-reason into Run tags (GREEN)
+
+## Self-Check: PASSED
+
+All 6 key files (1 created, 5 modified) exist on disk; all 7 commits are present in the
+worktree branch history. No plan files left uncommitted.
