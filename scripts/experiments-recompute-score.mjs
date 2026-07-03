@@ -46,7 +46,7 @@ import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-r
 //   /api/complete call and internally quarantines to pending (73-04, never throws);
 //   writeScore materializes the Score + scored edge, preserving corrected_* (73-02);
 //   isTrivialRun (73-01) short-circuits trivial runs before the proxy is paid.
-import { gatherEvidence } from '../lib/experiments/evidence-harness.mjs';
+import { gatherEvidence, deriveNonGsdRubric } from '../lib/experiments/evidence-harness.mjs';
 import { runJudge } from '../lib/experiments/judge.mjs';
 import { writeScore } from '../lib/experiments/score-write.mjs';
 import { isTrivialRun, filterConsequential } from '../lib/experiments/consequential-events.mjs';
@@ -55,6 +55,30 @@ const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
 
 const out = (s) => process.stdout.write(s + '\n');
 const warn = (s) => process.stderr.write(s + '\n');
+
+// The three deterministic, harness-derived (non-LLM) rubric dims (76-03, D-08).
+const NON_GSD_DIMS = Object.freeze(['code_quality', 'test_coverage', 'regressions']);
+
+/**
+ * Gap-fill the deterministic non-GSD dims onto a judgment IN PLACE (VALID-03 / D-08) —
+ * the SAME overlay the live close applies, so a backfill scores non-GSD dims too. For
+ * each of code_quality/test_coverage/regressions, set the judged value from the
+ * harness-derived signal ONLY when the judged value is null AND the derived value is
+ * non-null; never clobber a real judged dim, never overwrite with a derived null.
+ * Trivial runs (no rubric) are skipped; pending judgments (null rubric) ARE filled.
+ * @param {object} judgment the judgment object (mutated).
+ * @param {object} evidence the gathered evidence (diff + test run).
+ */
+function overlayNonGsdRubric(judgment, evidence) {
+  if (!judgment || judgment.not_scored === 'trivial') return;
+  const derived = deriveNonGsdRubric(evidence);
+  const rubric = judgment.rubric ?? (judgment.rubric = {});
+  for (const dim of NON_GSD_DIMS) {
+    if ((rubric[dim] ?? null) === null && derived[dim] !== null) {
+      rubric[dim] = derived[dim];
+    }
+  }
+}
 
 /** Resolve the default data dir (mirrors the proxy/backfill resolution order). */
 function resolveDataDir() {
@@ -132,6 +156,12 @@ async function main() {
     const judgment = isTrivialRun(trace)
       ? { not_scored: 'trivial' }
       : await runJudge({ span, trace: filterConsequential(trace), evidence });
+
+    // VALID-03 (76-03, D-08): overlay the deterministic non-GSD dims onto the
+    // judgment (gap-fill only — never clobber a judged dim, skip trivial runs), so
+    // re-scoring an EXISTING non-GSD Run persists code_quality/test_coverage/
+    // regressions from the harness derivation without any LLM call for those dims.
+    overlayNonGsdRubric(judgment, evidence);
 
     const ratioStr = judgment?.goal_aligned_ratio == null
       ? 'null'
