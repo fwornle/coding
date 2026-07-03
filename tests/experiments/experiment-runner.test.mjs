@@ -103,7 +103,11 @@ test('launchCell: uses async spawn — a hanging agent does not block the return
     argv: [],
     worktree: '/w',
     sandboxDataDir: '/w/.data',
-    timeoutMs: 60_000, // long — will not fire during the test
+    // Longer than the sentinel so the launch promise is provably still pending when the
+    // sentinel wins; short + tiny grace so no timer dangles past the test (the fake child
+    // never emits exit, so the promise settling is irrelevant — only non-blocking matters).
+    timeoutMs: 300,
+    graceMs: 5,
     spawn: fakeSpawn,
   });
   const sentinel = new Promise((r) => setTimeout(() => r('pending'), 50));
