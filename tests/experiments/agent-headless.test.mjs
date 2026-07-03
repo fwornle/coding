@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import {
   argvForAgent,
   resolveAgentBinary,
+  probeCopilotHeadless,
 } from '../../lib/experiments/agent-headless.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -81,4 +82,45 @@ test('resolveAgentBinary reads the registry AGENT_COMMAND for non-overridden age
   assert.equal(resolveAgentBinary('opencode', AGENTS_DIR), 'opencode');
   assert.equal(resolveAgentBinary('mastracode', AGENTS_DIR), 'mastracode');
   assert.equal(resolveAgentBinary('copilot', AGENTS_DIR), 'copilot');
+});
+
+// --- Task 2: probeCopilotHeadless (RUN-04) ------------------------------------------
+
+const fakeExit0 = () => ({ status: 0, error: undefined });
+const fakeNonZero = () => ({ status: 3, error: undefined });
+const fakeError = () => ({ status: null, error: new Error('spawn ENOENT') });
+
+test('probeCopilotHeadless returns true on status 0 & no error', () => {
+  assert.equal(probeCopilotHeadless({ spawn: fakeExit0 }), true);
+});
+
+test('probeCopilotHeadless returns false on non-zero exit', () => {
+  assert.equal(probeCopilotHeadless({ spawn: fakeNonZero }), false);
+});
+
+test('probeCopilotHeadless returns false (never throws) when res.error is set', () => {
+  let out;
+  assert.doesNotThrow(() => { out = probeCopilotHeadless({ spawn: fakeError }); });
+  assert.equal(out, false);
+});
+
+test('probe argv is exactly [-p, <trivial prompt>, --allow-all-tools] — fixed argv, no shell string', () => {
+  let seen;
+  const capture = (cmd, args, opts) => {
+    seen = { cmd, args, opts };
+    return { status: 0, error: undefined };
+  };
+  probeCopilotHeadless({ spawn: capture });
+  assert.equal(seen.cmd, 'copilot');
+  assert.ok(Array.isArray(seen.args), 'args must be an argv array');
+  assert.equal(seen.args[0], '-p');
+  assert.equal(typeof seen.args[1], 'string', 'the one-turn prompt is a single argv element');
+  assert.ok(seen.args[1].length > 0, 'prompt must be non-empty');
+  assert.equal(seen.args[2], '--allow-all-tools');
+  assert.equal(seen.args.length, 3, 'trivial one-turn check — exactly three argv elements');
+  // never a shell string
+  assert.ok(!seen.opts || seen.opts.shell !== true, 'shell:true must never be set');
+  // bounded timeout so a hung probe cannot block the matrix (T-78-02-03)
+  assert.equal(typeof seen.opts.timeout, 'number');
+  assert.ok(seen.opts.timeout > 0);
 });
