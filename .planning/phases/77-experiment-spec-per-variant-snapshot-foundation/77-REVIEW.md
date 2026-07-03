@@ -18,7 +18,11 @@ findings:
   warning: 4
   info: 3
   total: 8
-status: issues_found
+status: resolved
+resolved: 2026-07-03
+resolution_commits:
+  - 8da836c70  # CR-01: exclude non-deterministic leveldb/ from restore digest
+  - 783313aa5  # WR-01..04: empty-variants abort, route-trace SoT drift test, repeats>=2, gitHead guard
 ---
 
 # Phase 77: Code Review Report
@@ -26,7 +30,29 @@ status: issues_found
 **Reviewed:** 2026-07-03T09:50:27Z
 **Depth:** standard
 **Files Reviewed:** 9
-**Status:** issues_found
+**Status:** resolved (all findings fixed 2026-07-03 in 8da836c70 + 783313aa5)
+
+## Resolution (2026-07-03)
+
+All review findings were fixed before phase completion:
+
+- **CR-01 (BLOCKER) — FIXED** in `8da836c70`. `digestRestoredState` now excludes the
+  regenerated `knowledge-graph/leveldb/` subtree and digests only the canonical
+  `exports/*.json` (+ git_sha + routing). A regression test proves leveldb churn does not
+  flip the digest while `exports/general.json` still does — the determinism proof no longer
+  self-aborts against the real rig.
+- **WR-01 — FIXED** in `783313aa5`. `resolveExperimentSpec` aborts on zero cells (empty
+  `variants:[]` / empty axes).
+- **WR-02 — FIXED** in `783313aa5`. `route-trace-resolve.mjs` exports `KNOWN_AGENTS`; the
+  drift test compares against the real SoT instead of a hardcoded literal.
+- **WR-03 — FIXED** in `783313aa5`. `runVariantRepeats` rejects `repeats<2`; the CLI exits 2
+  on `--repeats 1`.
+- **WR-04 — FIXED** in `783313aa5`. `restoreForCell` fails loudly when a real `.git` worktree
+  has an unreadable HEAD (non-git unit stub stays fail-soft).
+- **IN-01** subsumed by WR-03's strict validation. IN-02 (memoized `resolveSpec` path) and
+  IN-03 (fake-restore tmp cleanup) are informational and left as tracked follow-ups.
+
+Full experiments suite after fixes: 209 pass / 0 fail / 2 skipped.
 
 ## Summary
 
