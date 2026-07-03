@@ -1,0 +1,43 @@
+# config/experiments/example-experiment.yaml — human-authored experiment SoT (SPEC-01).
+#
+# Read by: lib/experiments/experiment-spec.mjs (resolveExperimentSpec). This file is
+# the documented schema example a user copies to declare a cross-agent comparison
+# experiment. The resolver expands the `axes:` cartesian product into concrete variant
+# cells and validates every cell BEFORE run 0 (D-05 agent enum, D-07 unsupported-combo
+# gate, D-08 test_command shell-safety; whole-run all-or-nothing fail-fast D-06).
+#
+# Schema (v1):
+#   version:        int   — schema version; bump on a breaking schema change.
+#   goal_sentence:  str   — REQUIRED. The one-line task the agents attempt; it is the
+#                           task_hash source downstream, so it must be present.
+#   repeats:        int   — how many times to run each variant cell (determinism proof).
+#                           Carried on the resolved ENVELOPE, never multiplied into cells.
+#   test_command:   str   — top-level default test command applied to every cell unless
+#                           a cell overrides it. MUST be a fixed argv (no shell
+#                           metacharacters: |, $(, ;, &, newline) — rejected at resolve
+#                           time per D-08.
+#   axes:                 — the cartesian matrix. Each dimension is a list; the resolver
+#                           produces one cell per combination.
+#     agent:      list — closed enum (claude | copilot | opencode), D-05 strict.
+#     model:      list — free-form (warn on unknown, never blocks), D-05 loose.
+#     framework:  list — free-form (e.g. straight, tdd), D-05 loose.
+#     env:        list — free-form (e.g. default, headless); copilot + headless is an
+#                        unsupported combination gated by Phase-78 RUN-04 (D-07).
+#
+# Alternative to `axes:` — an explicit `variants:` list of named cells (Claude's
+# Discretion escape hatch) resolves to the same cell shape; each entry may carry its
+# own test_command.
+version: 1
+
+goal_sentence: "Add an input-validation guard to the config loader and cover it with a test."
+
+repeats: 2
+
+# Fixed-argv test command (no shell metacharacters) — threaded into every cell.
+test_command: "node --test tests/experiments"
+
+axes:
+  agent: [claude, copilot]
+  model: [opus, sonnet]
+  framework: [straight]
+  env: [default]
