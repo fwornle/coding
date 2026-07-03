@@ -217,7 +217,11 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   2. A multi-hour session with steering pauses yields per-step route times within a documented sane bound (no implausible ~28,000 s/step artifacts); idle/wait gaps are excluded or the metric is explicitly defined per active step (VALID-02).
   3. A straight-coding (non-GSD) run scores all 5 rubric dimensions — `code_quality`, `test_coverage`, `regressions` are non-null when `VERIFICATION.md` / `REVIEW.md` are absent, with signal derived from the task's tests + working-tree diff rather than only GSD artifacts (VALID-03).
   4. Re-running the two canonical comparisons ("Opus vs Fable", "straight vs GSD/SDD") on the corrected rig yields model / score / time values a human judges plausible against the known sessions — i.e. neither comparison is corrupted by O1 or O3.
-**Plans**: TBD
+**Plans**: 4 plans
+  - [ ] 76-01-PLAN.md — VALID-01: close the residual recompute-route model read-path (drop the dominant-by-count fallback; use canonical fg-not-dominant) (Wave 1)
+  - [ ] 76-02-PLAN.md — VALID-02: idle-excluding wallclock_per_step with a named 5-min threshold (kills the ~28k s/step artifact) (Wave 1)
+  - [ ] 76-03-PLAN.md — VALID-03: derive non-GSD code_quality/test_coverage/regressions from diff + fail-soft fixed-argv test run + score-path overlay (Wave 1)
+  - [ ] 76-04-PLAN.md — Regression anchor: recompute the archived pilot span + live fresh-Opus dashboard verification [checkpoint] (Wave 2)
 
 ### Phase 77: Experiment Spec & Per-Variant Snapshot Foundation
 **Goal**: A user can declare an experiment as a validated variant matrix, and the runner can restore the identical Phase-67 starting snapshot before every variant × repeat so each run begins from the same tree + KB + routing state.
@@ -281,7 +285,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 6/6 | Complete   | 2026-06-29 |
-| 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 0/? | Not started | - |
+| 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 0/4 | Planned | - |
 | 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 0/? | Not started | - |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 0/? | Not started | - |
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
