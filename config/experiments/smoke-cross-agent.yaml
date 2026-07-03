@@ -1,0 +1,67 @@
+# config/experiments/smoke-cross-agent.yaml — Phase-78 LIVE cross-agent smoke matrix (78-05).
+#
+# The phase's live acceptance gate (RUN-02 / RUN-03 / RUN-04, SC#4). A minimal REAL matrix
+# with a trivial goal that is driven end-to-end through scripts/experiment-run.mjs against the
+# two REQUIRED headless-drivable CLIs (claude + opencode, D-12) plus the probe-gated Copilot
+# cell (RUN-04). Read by lib/experiments/experiment-spec.mjs (resolveExperimentSpec).
+#
+# WHY `variants:` (not `axes:`): each agent needs a DIFFERENT model-string FORMAT — claude
+# takes an alias (`haiku`), opencode takes `provider/model` (`rapid-proxy/claude-haiku-4-5`,
+# routed through the rapid-llm-proxy on :12435 for clean sandbox token-attribution), and
+# copilot takes `auto`. A single shared `axes.model` value cannot satisfy all three, so the
+# explicit named-variant escape hatch (Claude's Discretion, experiment-spec.mjs normalizeVariant)
+# gives each cell its own model. All cells still resolve to the canonical
+# {agent, model, framework, env, test_command} shape.
+#
+# WHY copilot is authored `env: default` (Q1, RESOLVED 78-03): the frozen
+# UNSUPPORTED_COMBINATIONS table hard-throws {agent:copilot, env:headless} at resolve time.
+# Copilot participates under env:default so validateCells passes WITHOUT mutating the frozen
+# gate; the standalone one-turn drivability probe (runMatrix) alone decides run-vs-skip-Run.
+#
+# WHY NO mastra cell (deviation — see 78-05 SUMMARY / checkpoint): the D-05 agent enum
+# KNOWN_AGENTS (lib/experiments/experiment-spec.mjs:39) is FROZEN at [claude, copilot, opencode]
+# and is a shared source-of-truth with lib/experiments/route-trace-resolve.mjs:27 (guarded by a
+# divergence test). `mastracode` is NOT in the enum, so authoring a mastra cell makes
+# validateCells hard-throw and abort the WHOLE matrix before run 0 (D-06 fail-fast) — which
+# would prevent the REQUIRED claude+opencode cells from ever running (SC#4). D-12's "mastra
+# best-effort recorded-skip" presupposes mastra reaches the runner's per-cell try/catch, which
+# requires it in KNOWN_AGENTS. Admitting `mastracode` is an architectural change to a frozen,
+# test-guarded, route-attribution-coupled enum (out of this yaml-only plan's scope, Rule 4).
+# The mastra cell is therefore intentionally OMITTED here and surfaced at the human-verify
+# checkpoint for an operator decision (extend the enum in a follow-up plan vs. accept the
+# 3-agent smoke as sufficient for SC#4's "≥2 agents").
+version: 1
+
+# Declare-time baseline snapshot (D-09) each cell restores into an ISOLATED sandbox worktree
+# (restoreForCell inPlace:false, D-02). Read off the raw spec by runMatrix (spec.snapshot_id);
+# restoreSnapshot resolves it to .data/run-snapshots/<id>/. `smoke-spec` is an existing,
+# complete Phase-78 baseline (manifest + git-sha + dirty.patch + planning/ + untracked/ +
+# submodules). Without it the runner restores from `unknown` and every cell aborts pre-launch.
+snapshot_id: smoke-spec
+
+goal_sentence: "Create a file named HELLO.txt in the current directory containing the single word hello."
+
+repeats: 1
+
+# Fast fixed-argv scoring command (D-05: runs at SCORE time only, NEVER the completion gate).
+# `node --version` is trivially fast, deterministic, exit-0, and carries no shell metacharacter
+# (SHELL_META_RE) — it exercises the scoring harness path without depending on sandbox contents.
+test_command: "node --version"
+
+variants:
+  # REQUIRED agent (D-12) — claude via -p, alias model, --permission-mode acceptEdits.
+  - agent: claude
+    model: haiku
+    framework: straight
+    env: default
+  # REQUIRED agent (D-12) — opencode via `run`, model routed through rapid-proxy (:12435).
+  - agent: opencode
+    model: rapid-proxy/claude-haiku-4-5
+    framework: straight
+    env: default
+  # Probe-gated (RUN-04) — env:default so validateCells passes; the runner's one-turn probe
+  # decides run (copilot -p --allow-all-tools) vs. recorded skip (copilot-headless-unsupported).
+  - agent: copilot
+    model: auto
+    framework: straight
+    env: default
