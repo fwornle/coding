@@ -114,3 +114,89 @@ test('launchCell: uses async spawn — a hanging agent does not block the return
   const winner = await Promise.race([launch.then(() => 'resolved'), sentinel]);
   assert.equal(winner, 'pending');
 });
+
+// ---------------------------------------------------------------------------
+// Task 2: runCell — restore → measured span → launch → inline score in a finally
+// ---------------------------------------------------------------------------
+
+const AGENTS_DIR = path.resolve(__dirname, '..', '..', 'config', 'agents');
+const CELL = { agent: 'claude', model: 'sonnet', framework: 'none', env: 'default' };
+
+// Build a runCell invocation with recording seams; `terminal` sets the fake agent result.
+function runCellWith({ terminal = 'complete', cell = CELL, taskClass } = {}) {
+  const calls = [];
+  const restore = async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' });
+  const runMeasurement = async (phase, argv, o) => {
+    calls.push({ phase, argv, env: o?.env });
+    return 0;
+  };
+  const spawnAgent = async () => terminal;
+  const promise = runCell({
+    cell,
+    rep: 0,
+    expId: 'exp1',
+    goal: 'do a thing',
+    snapshotId: 'snap-1',
+    taskClass,
+    agentsDir: AGENTS_DIR,
+    restore,
+    runMeasurement,
+    spawnAgent,
+  });
+  return { promise, calls };
+}
+
+test('runCell: restores then measurement-start with composite task_id + variant/repeat/agent + sandbox env', async () => {
+  const { promise, calls } = runCellWith({ terminal: 'complete' });
+  const res = await promise;
+  const start = calls.find((c) => c.phase === 'start');
+  assert.ok(start, 'measurement-start was invoked');
+  const a = start.argv;
+  assert.ok(Array.isArray(a), 'start argv is a fixed array (no shell string)');
+  assert.equal(a[a.indexOf('--task-id') + 1], 'exp1--claude-sonnet-none-default--r0');
+  assert.equal(a[a.indexOf('--variant') + 1], 'claude-sonnet-none-default');
+  assert.equal(a[a.indexOf('--repeat') + 1], '0');
+  assert.equal(a[a.indexOf('--agent') + 1], 'claude');
+  assert.equal(a[a.indexOf('--model') + 1], 'sonnet');
+  assert.equal(a[a.indexOf('--framework') + 1], 'none');
+  assert.ok(a.includes('--goal'));
+  assert.equal(start.env.LLM_PROXY_DATA_DIR, '/wt/.data');
+  assert.equal(res.terminalState, 'complete');
+});
+
+test('runCell: on complete, measurement-stop runs once with --headless --terminal-state complete + sandbox env', async () => {
+  const { promise, calls } = runCellWith({ terminal: 'complete' });
+  await promise;
+  const stops = calls.filter((c) => c.phase === 'stop');
+  assert.equal(stops.length, 1);
+  assert.ok(stops[0].argv.includes('--headless'));
+  assert.equal(stops[0].argv[stops[0].argv.indexOf('--terminal-state') + 1], 'complete');
+  assert.equal(stops[0].env.LLM_PROXY_DATA_DIR, '/wt/.data');
+});
+
+test('runCell: on abort, measurement-stop STILL runs (finally) with the mapped --terminal-state abort', async () => {
+  const { promise, calls } = runCellWith({ terminal: 'abort' });
+  const res = await promise;
+  const stops = calls.filter((c) => c.phase === 'stop');
+  assert.equal(stops.length, 1, 'no cell dropped — stop runs on abort too');
+  assert.equal(stops[0].argv[stops[0].argv.indexOf('--terminal-state') + 1], 'abort');
+  assert.equal(res.terminalState, 'abort');
+});
+
+test('runCell: on timeout, measurement-stop STILL runs with --terminal-state timeout', async () => {
+  const { promise, calls } = runCellWith({ terminal: 'timeout' });
+  await promise;
+  const stops = calls.filter((c) => c.phase === 'stop');
+  assert.equal(stops[0].argv[stops[0].argv.indexOf('--terminal-state') + 1], 'timeout');
+});
+
+test('runCell: start + stop are fixed-argv arrays of strings (no shell string) and carry --task-class when set', async () => {
+  const { promise, calls } = runCellWith({ terminal: 'complete', taskClass: 'feature' });
+  await promise;
+  for (const c of calls) {
+    assert.ok(Array.isArray(c.argv), `${c.phase} argv is an array`);
+    for (const el of c.argv) assert.equal(typeof el, 'string', `${c.phase} argv element is a string`);
+  }
+  const stop = calls.find((c) => c.phase === 'stop');
+  assert.equal(stop.argv[stop.argv.indexOf('--task-class') + 1], 'feature');
+});
