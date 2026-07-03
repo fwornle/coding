@@ -4,7 +4,56 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ---
 
-# Milestone v7.4 Requirements — Performance Measurement System (ACTIVE)
+# Milestone v7.5 Requirements — Cross-Agent Comparison Experiment Runner (ACTIVE)
+
+**Goal:** Turn the v7.4 measurement rig into an experiment tool. A user states a goal plus a variant matrix ("develop X, measure it under settings A vs B") and a repeat count; the system drives each variant across agents from an identical starting snapshot, evaluates an objective success gate, and returns a scored, side-by-side comparison with per-variant variance.
+
+**Builds on (do NOT rebuild):** `measurement-start/stop.mjs`, `task_hash` comparability, the experiment km-core KB + `experiments-*` CLIs, the Performance dashboard tab, proxy routing for all four agents (commit `2a23a9a25`), and the Phase 67 reproducibility-replay rig. This milestone is an **orchestration layer** on those primitives.
+
+**Sequencing:** The Validity (VALID) requirements are **prerequisites** — they correct correctness gaps in v7.4's shipped attribution/route/score code that the `exp-dash-start-control` pilot (2026-06-29) dogfood-exposed, and they specifically corrupt the two canonical comparisons ("Opus vs Fable", "straight vs GSD/SDD"). VALID must land and verify before the runner (RUN/CMP) is trusted.
+
+**Phase numbering:** Continues from Phase 75 (v7.4) → v7.5 phases start at **Phase 76**.
+
+**Reslot:** the previously-earmarked v7.5 (policy automation / auto-routing, currency conversion — `seeds/v74-policy-engine.md`) moves to **v7.6**; it consumes this runner's comparisons.
+
+---
+
+## v7.5 Requirements
+
+### Measurement Validity — prerequisites (VALID)
+
+*Corrections to v7.4 shipped code, diagnosed in `.planning/v7.4-attribution-findings.md` (pilot run) — required for a comparison to be meaningful.*
+
+- [ ] **VALID-01 (O1 — model attribution):** A Run's canonical model reflects the actual foreground interactive session model (e.g. `claude-opus-4-8`), not the most-frequent proxy token-row model (skewed by Haiku judge/consolidator calls sharing the window). Acceptance: a measured Opus session records model Opus in the runs table, score drawer, and timeline — not `claude-haiku-4.5`.
+- [ ] **VALID-02 (O2 — route time math):** Route wallclock/step and interval metrics produce plausible values over long, partially-idle interactive windows (no implausible ~28,000 s/step artifacts). Idle/wait gaps are excluded or the metric is defined per active step. Acceptance: a multi-hour session with steering pauses yields per-step times within a sane bound, documented.
+- [ ] **VALID-03 (O3 — non-GSD rubric coverage):** The 5-dimension outcome rubric is scored for non-GSD / ad-hoc tasks — `code_quality`, `test_coverage`, `regressions` are not null when `VERIFICATION.md`/`REVIEW.md` are absent; the evidence harness derives signal from the task's tests + working-tree diff, not only GSD artifacts. Acceptance: a straight-coding run scores all 5 dims (none null solely due to missing GSD files).
+
+### Experiment Specification (SPEC)
+
+- [ ] **SPEC-01:** A user declares an experiment as `{goal_sentence, variants[], repeats N}` where each variant is a named settings bundle over `{agent, model, framework/approach, env}` — via CLI flags and/or a declarative spec file.
+- [ ] **SPEC-02:** Each variant resolves to a concrete executable config, validated before any run starts; unsupported combinations (e.g. Copilot headless) fail fast with an actionable message rather than mid-run.
+
+### Cross-Agent Runner (RUN)
+
+- [ ] **RUN-01:** For each variant × repeat, the runner restores the identical starting snapshot (Phase 67 rig) before launching, so every variant starts from the same tree + state.
+- [ ] **RUN-02:** The runner launches the specified agent (Claude / OpenCode / Mastra) autonomously against the goal, wrapping the work in a measured span tagged with `variant`, `repeat`, and `task_hash`.
+- [ ] **RUN-03:** Runs execute unattended to completion, timeout, or abort — producing a scored Run per variant × repeat without requiring interactive operator steering; timeouts/aborts are recorded as such.
+- [ ] **RUN-04:** Copilot participation is gated on an explicit headless-drivability capability check; if unsupported, the Copilot variant is skipped with a recorded reason (never silently absent).
+
+### Comparison & Reporting (CMP)
+
+- [ ] **CMP-01:** An objective success gate (task test suite / UAT command) is evaluated per run; cost/route/score metrics are compared only across runs that pass the gate — failed runs are reported separately, not averaged into a variant's cost.
+- [ ] **CMP-02:** The runner aggregates N repeats per variant into a per-variant summary with central tendency **and** variance (spread) for tokens, wallclock, route metrics, and rubric scores.
+- [ ] **CMP-03:** A side-by-side comparison report (CLI table + machine-readable export) ranks variants on the chosen metric(s), showing variance and each variant's success-gate outcome, keyed by `task_hash` for reproducibility.
+- [ ] **CMP-04:** The comparison is viewable in the Performance dashboard tab as variant columns (surfaces CMP-03 without re-running).
+
+### Orchestration Surface (ORCH)
+
+- [ ] **ORCH-01:** The full flow is invokable as a single command/skill (e.g. `experiment run --goal "…" --variants A,B --agents claude,opencode --repeats N`), installed and usable across the coding agents per the multi-agent skill ecosystem.
+
+---
+
+# Milestone v7.4 Requirements — Performance Measurement System (COMPLETE — pending formal close)
 
 **Goal:** Build a measurement rig that quantifies, per task, the full cost (tokens), time-to-delivery, route quality, and outcome success across all four supported coding agents (Claude Code, Copilot CLI, OpenCode, Mastra) AND the proxy-routed background services that run during the task — so dev teams can be told, evidence-backed: *for task type X at complexity Y, use agent/model Z at spec-level W.*
 
