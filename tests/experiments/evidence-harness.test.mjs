@@ -13,7 +13,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { gatherEvidence } from '../../lib/experiments/evidence-harness.mjs';
+import {
+  gatherEvidence,
+  deriveNonGsdRubric,
+  resolveTestCommand,
+} from '../../lib/experiments/evidence-harness.mjs';
 
 // Build a throwaway repoRoot with a .planning/phases/<NN>-slug/ dir.
 function makeRepo(prefix) {
@@ -104,5 +108,162 @@ describe('gatherEvidence — Case C: diffStat never throws', () => {
     } finally {
       fs.rmSync(bare, { recursive: true, force: true });
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 76, Plan 76-03 (VALID-03 / D-08..D-11) — deterministic non-GSD rubric
+// derivation: the working-tree diff → code_quality; a fail-soft fixed-argv test
+// run → test_coverage + regressions. A dim is null ONLY when genuinely no signal
+// exists (no diff AND no runnable test), never merely because GSD files are absent
+// (D-11), and NEVER a guessed 0 on a failed/missing run (D-10). The derivation is
+// deterministic — NOT an LLM judge (D-08 / security note).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('deriveNonGsdRubric — null only when no signal (D-11), never a guessed 0 (D-10)', () => {
+  test('no diff AND no runnable test → all three dims null', () => {
+    const r = deriveNonGsdRubric({ diffStat: null, testRun: null });
+    assert.equal(r.code_quality, null);
+    assert.equal(r.test_coverage, null);
+    assert.equal(r.regressions, null);
+  });
+
+  test('diff present → non-null code_quality bounded to [0,1]; other dims null without a test', () => {
+    const r = deriveNonGsdRubric({
+      diffStat: ' 3 files changed, 42 insertions(+), 10 deletions(-)',
+      testRun: null,
+    });
+    assert.equal(typeof r.code_quality, 'number');
+    assert.ok(r.code_quality >= 0 && r.code_quality <= 1);
+    assert.equal(r.test_coverage, null);
+    assert.equal(r.regressions, null);
+  });
+
+  test('passing test run (counts, 0 failures) → coverage non-null + regressions clean (0)', () => {
+    const r = deriveNonGsdRubric({
+      diffStat: null,
+      testRun: { status: 0, counts: { passed: 5, failed: 0 } },
+    });
+    assert.equal(typeof r.test_coverage, 'number');
+    assert.ok(r.test_coverage > 0);
+    assert.equal(r.regressions, 0); // 0 is a REAL clean signal here, not null
+  });
+
+  test('failed run with NO parseable counts → coverage null (never 0) + regressions flagged (1)', () => {
+    const r = deriveNonGsdRubric({
+      diffStat: null,
+      testRun: { status: 3, counts: null },
+    });
+    assert.equal(r.test_coverage, null); // null, NOT a guessed 0 (D-10)
+    assert.notEqual(r.test_coverage, 0);
+    assert.equal(r.regressions, 1);
+  });
+
+  test('parsed counts WITH failures → coverage is the pass rate (non-null) + regressions flagged', () => {
+    const r = deriveNonGsdRubric({
+      diffStat: null,
+      testRun: { status: 1, counts: { passed: 3, failed: 1 } },
+    });
+    assert.equal(typeof r.test_coverage, 'number');
+    assert.equal(r.regressions, 1);
+  });
+});
+
+describe('resolveTestCommand — run-metadata first, else package.json test (D-09), argv-only (D-10)', () => {
+  let root;
+  before(() => { ({ root } = makeRepo('ev-cmd-')); });
+  after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('run-metadata span.meta.test_command wins, tokenized to a fixed argv array', () => {
+    const argv = resolveTestCommand({ meta: { test_command: 'node --test tests/x.mjs' } }, root);
+    assert.deepEqual(argv, ['node', '--test', 'tests/x.mjs']);
+  });
+
+  test('top-level span.test_command is honored when meta is absent', () => {
+    const argv = resolveTestCommand({ test_command: 'node --test y.mjs' }, root);
+    assert.deepEqual(argv, ['node', '--test', 'y.mjs']);
+  });
+
+  test('a command needing shell interpretation is rejected → null (D-10 injection guard)', () => {
+    assert.equal(resolveTestCommand({ meta: { test_command: 'node --test && rm -rf /' } }, root), null);
+    assert.equal(resolveTestCommand({ meta: { test_command: 'node -e "process.exit(1)"' } }, root), null);
+    assert.equal(resolveTestCommand({ meta: { test_command: 'echo $HOME | cat' } }, root), null);
+  });
+
+  test('falls back to package.json "test" script as a fixed argv (npm run test)', () => {
+    fs.writeFileSync(path.join(root, 'package.json'),
+      JSON.stringify({ name: 'x', scripts: { test: 'node --test' } }));
+    const argv = resolveTestCommand({}, root);
+    assert.deepEqual(argv, ['npm', 'run', 'test']);
+  });
+
+  test('no metadata and no package.json test script → null (genuinely no command)', () => {
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'ev-nocmd-'));
+    try {
+      assert.equal(resolveTestCommand({}, bare), null);
+    } finally {
+      fs.rmSync(bare, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('gatherEvidence — runs the resolved test command fail-soft via fixed-argv spawnSync (D-08 exec seam)', () => {
+  test('passing node:test fixture → testRun carries parsed counts; derive gives non-null coverage', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ev-run-pass-'));
+    try {
+      fs.writeFileSync(path.join(root, 'pass.test.mjs'),
+        "import { test } from 'node:test';\ntest('ok', () => {});\n");
+      const ev = gatherEvidence({
+        span: { meta: { test_command: 'node --test pass.test.mjs' } },
+        phaseArg: '88',
+        repoRoot: root,
+      });
+      assert.ok(ev.testRun && ev.testRun.counts, 'testRun.counts should be parsed');
+      assert.equal(ev.testRun.counts.failed, 0);
+      const r = deriveNonGsdRubric(ev);
+      assert.ok(r.test_coverage > 0);
+      assert.equal(r.regressions, 0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('non-zero-exit command with no TAP counts → testRun present, coverage null, regressions flagged', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ev-run-fail-'));
+    try {
+      fs.writeFileSync(path.join(root, 'run-fail.mjs'), 'process.exit(3);\n');
+      const ev = gatherEvidence({
+        span: { meta: { test_command: 'node run-fail.mjs' } },
+        phaseArg: '88',
+        repoRoot: root,
+      });
+      assert.ok(ev.testRun, 'testRun object present (command ran)');
+      const r = deriveNonGsdRubric(ev);
+      assert.equal(r.test_coverage, null);
+      assert.equal(r.regressions, 1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('no resolvable test command → testRun null (no diff+no test ⇒ all three dims null)', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ev-run-none-'));
+    try {
+      const ev = gatherEvidence({ phaseArg: '88', repoRoot: root });
+      assert.equal(ev.testRun, null);
+      const r = deriveNonGsdRubric(ev);
+      // no diff (tmpdir is not a git repo) AND no test → all null
+      assert.equal(r.test_coverage, null);
+      assert.equal(r.regressions, null);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('the test-command exec is a fixed argv array — the source contains no shell:true', () => {
+    const src = fs.readFileSync(
+      new URL('../../lib/experiments/evidence-harness.mjs', import.meta.url), 'utf8');
+    assert.equal(/shell\s*:\s*true/.test(src), false);
+    assert.ok(src.includes('spawnSync'));
   });
 });
