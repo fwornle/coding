@@ -111,6 +111,10 @@ None — no new network endpoints, auth paths, or trust-boundary surface beyond 
 - `runMatrix` is the drive engine ready to be wired behind a CLI / experiment entrypoint (Wave 3/4).
 - No blockers. The engine assumes a declare-time baseline snapshot id (`snapshotId`) and a resolved/validated spec are supplied by the caller.
 
+## Self-Check: PASSED
+
+All created files present on disk; all task + metadata commits present in history; worktree clean.
+
 ---
 *Phase: 78-autonomous-cross-agent-runner*
 *Completed: 2026-07-03*
