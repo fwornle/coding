@@ -1441,6 +1441,40 @@ function discoverProjectCandidates(agenticDir) {
 }
 
 /**
+ * Project paths with an OpenCode session updated within the freshness window.
+ * OpenCode stores sessions in ~/.local/share/opencode/opencode.db (a `session`
+ * row has `directory` = project path and `time_updated` = epoch ms). This lets
+ * the auto-spawner start an ETM for OpenCode-only projects that have no Claude
+ * `.jsonl` transcript at all (e.g. rapid-automations). Fully guarded and
+ * timeboxed — a missing db, missing sqlite3 CLI, or slow query yields an empty
+ * set rather than blocking the coordinator tick. Bounded by a `time_updated`
+ * predicate so the (multi-GB) DB is not fully scanned.
+ */
+function openCodeFreshProjects(now) {
+  const homeDir = process.env.HOME;
+  if (!homeDir) return new Set();
+  const dbPath = path.join(homeDir, '.local', 'share', 'opencode', 'opencode.db');
+  if (!fs.existsSync(dbPath)) return new Set();
+  const cutoff = now - ETM_TRANSCRIPT_ACTIVE_MS;
+  try {
+    const out = spawnSync(
+      'sqlite3',
+      ['-readonly', dbPath, `SELECT DISTINCT directory FROM session WHERE time_updated > ${cutoff};`],
+      { encoding: 'utf8', timeout: 3000 }
+    );
+    if (out.status !== 0 || !out.stdout) return new Set();
+    const paths = new Set();
+    for (const line of out.stdout.split('\n')) {
+      const p = line.trim();
+      if (p) paths.add(p);
+    }
+    return paths;
+  } catch {
+    return new Set();
+  }
+}
+
+/**
  * Ensure an enhanced-transcript-monitor is running for every project with an
  * actively-written Claude transcript. Skips projects that already have a
  * running heartbeat in currentState.lsl (set by ETM heartbeats; staleness
@@ -1477,31 +1511,41 @@ function ensureEtmForActiveProjects() {
   // 4 hours ago) silently drop out of the statusline because no ETM ever
   // gets spawned for them.
   const tmuxOpen = tmuxOpenProjectPaths(agenticDir);
+  const openCodeFresh = openCodeFreshProjects(now);
 
   for (const projectPath of discoverProjectCandidates(agenticDir)) {
     const projectName = path.basename(projectPath);
     if (coveredProjects.has(projectName)) continue;
 
-    const transcriptDir = path.join(claudeProjectsDir, encodeClaudeProjectDir(projectPath));
-    if (!fs.existsSync(transcriptDir)) continue;
-
+    // Claude transcript freshness. Absence of the ~/.claude/projects dir is
+    // NON-FATAL: OpenCode-only projects (e.g. rapid-automations) never have one
+    // but still qualify via the OpenCode DB or a live tmux session below.
     let latestMtime = 0;
-    try {
-      for (const f of fs.readdirSync(transcriptDir)) {
-        if (!f.endsWith('.jsonl')) continue;
-        const m = fs.statSync(path.join(transcriptDir, f)).mtime.getTime();
-        if (m > latestMtime) latestMtime = m;
+    const transcriptDir = path.join(claudeProjectsDir, encodeClaudeProjectDir(projectPath));
+    if (fs.existsSync(transcriptDir)) {
+      try {
+        for (const f of fs.readdirSync(transcriptDir)) {
+          if (!f.endsWith('.jsonl')) continue;
+          const m = fs.statSync(path.join(transcriptDir, f)).mtime.getTime();
+          if (m > latestMtime) latestMtime = m;
+        }
+      } catch {
+        // Unreadable transcript dir → treat as no Claude transcript; other
+        // signals (tmux / OpenCode) may still qualify the project.
       }
-    } catch {
-      continue;
     }
-    // Gate: transcript fresh OR an open tmux session is rooted at this
-    // project (which means the user has a Claude window open right now,
-    // even if no prompt has been sent recently).
+
+    // Gate: spawn one ETM if the project shows activity on ANY source —
+    //   - transcriptFresh: a Claude .jsonl written within the window
+    //   - tmuxAlive:       an open tmux session rooted at this project
+    //   - openCodeFresh:   an OpenCode session updated within the window
+    // ETM itself then discovers the correct transcript (Claude .jsonl or the
+    // OpenCode DB). The former hard `latestMtime === 0` guard is removed — it
+    // defeated the tmux/OpenCode bypass for projects with no Claude transcript.
     const transcriptFresh = latestMtime > 0 && (now - latestMtime) <= ETM_TRANSCRIPT_ACTIVE_MS;
     const tmuxAlive = tmuxOpen.has(projectPath);
-    if (!transcriptFresh && !tmuxAlive) continue;
-    if (latestMtime === 0) continue; // need at least one transcript file to read
+    const hasOpenCode = openCodeFresh.has(projectPath);
+    if (!transcriptFresh && !tmuxAlive && !hasOpenCode) continue;
 
     log(`spawning ETM for active project ${projectName} (${projectPath})`, 'INFO');
     try {
