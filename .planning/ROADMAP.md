@@ -47,7 +47,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 **Prerequisite ordering:** the **VALID** phase (Phase 76) corrects correctness gaps in v7.4's already-shipped attribution / route / score code (diagnosed as O1/O2/O3 in `.planning/v7.4-attribution-findings.md`). VALID-01 (model mis-attribution) breaks "Opus vs Fable"; VALID-03 (non-GSD rubric coverage) breaks "straight vs GSD". Phase 76 MUST land and verify BEFORE the runner phases (RUN/CMP) are trusted. RUN-04 (Copilot headless-drivability) is a **gated spike** — a small capability check inside Phase 78, not a blocking dependency for the rest.
 
 - [x] **Phase 76: Measurement Validity Fixes [PREREQUISITE]** — Canonical foreground model attribution, plausible route-time math, and 5-dimension scoring for non-GSD/ad-hoc tasks — so the two canonical comparisons are no longer corrupted at the source (VALID-01/02/03) — verified live 2026-07-03
-- [ ] **Phase 77: Experiment Spec & Per-Variant Snapshot Foundation** — Declarative validated variant matrix + fail-fast config resolution + per-variant×repeat snapshot restore off the Phase-67 rig (SPEC-01/02, RUN-01)
+- [x] **Phase 77: Experiment Spec & Per-Variant Snapshot Foundation** — Declarative validated variant matrix + fail-fast config resolution + per-variant×repeat snapshot restore off the Phase-67 rig (SPEC-01/02, RUN-01) (completed 2026-07-03)
 - [ ] **Phase 78: Autonomous Cross-Agent Runner** — Unattended per-cell agent launch wrapped in a measured span; timeouts/aborts recorded; Copilot gated on a headless-drivability spike (RUN-02/03/04)
 - [ ] **Phase 79: Comparison, Aggregation & Report** — Objective success gate, N-repeat aggregation with variance, ranked side-by-side report keyed by `task_hash` (CMP-01/02/03)
 - [ ] **Phase 80: Experiment Surface — Dashboard & Skill Packaging** — Comparison as variant columns in the Performance tab + single installed `experiment run` skill across the coding agents (CMP-04, ORCH-01)
@@ -234,8 +234,8 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   4. Two repeats of the same variant are shown to start from byte-identical restored conditions (the snapshot restore is repeatable, not one-shot).
 **Plans**: 3 plans
 - [x] 77-01-PLAN.md — experiment-spec.mjs: YAML matrix load + cartesian-axis expansion + fail-fast validation (agent enum, unsupported-combo gate, test_command shell-safety) [SPEC-01, SPEC-02]
-- [ ] 77-02-PLAN.md — measurement-start.mjs: --spec/--variant + per-field flags thread validated cell into span.meta, flags override the file [SPEC-01, SPEC-02]
-- [ ] 77-03-PLAN.md — experiment-restore.mjs: per-cell isolated snapshot restore + byte-identical determinism digest/assert [RUN-01]
+- [x] 77-02-PLAN.md — measurement-start.mjs: --spec/--variant + per-field flags thread validated cell into span.meta, flags override the file [SPEC-01, SPEC-02]
+- [x] 77-03-PLAN.md — experiment-restore.mjs: per-cell isolated snapshot restore + byte-identical determinism digest/assert [RUN-01]
 
 ### Phase 78: Autonomous Cross-Agent Runner
 **Goal**: The runner drives each variant × repeat unattended — launching the specified agent against the goal inside a measured span — producing a scored Run per cell without operator steering, with Copilot participation gated on an explicit headless-drivability capability check.
@@ -289,7 +289,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 6/6 | Complete   | 2026-06-29 |
 | 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 4/4 | Complete | VALID-01/02/03 verified (live 2026-07-03) |
-| 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 1/3 | In Progress|  |
+| 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 3/3 | Complete   | 2026-07-03 |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 0/? | Not started | - |
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
