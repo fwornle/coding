@@ -60,9 +60,9 @@ This file tracks the active milestone's requirements at the top, with previous m
 | VALID-01 | Phase 76 | Complete |
 | VALID-02 | Phase 76 | Complete (76-02) |
 | VALID-03 | Phase 76 | Complete |
-| SPEC-01 | Phase 77 | Pending |
-| SPEC-02 | Phase 77 | Pending |
-| RUN-01 | Phase 77 | Pending |
+| SPEC-01 | Phase 77 | Complete |
+| SPEC-02 | Phase 77 | Complete |
+| RUN-01 | Phase 77 | Complete |
 | RUN-02 | Phase 78 | Pending |
 | RUN-03 | Phase 78 | Pending |
 | RUN-04 | Phase 78 | Pending |

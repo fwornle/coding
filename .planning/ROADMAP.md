@@ -289,7 +289,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
 | 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 6/6 | Complete   | 2026-06-29 |
 | 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 4/4 | Complete | VALID-01/02/03 verified (live 2026-07-03) |
-| 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 3/3 | Complete   | 2026-07-03 |
+| 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 3/3 | Complete    | 2026-07-03 |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 0/? | Not started | - |
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
