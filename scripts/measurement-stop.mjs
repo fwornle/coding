@@ -534,7 +534,14 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`FATAL: ${err.stack || err.message}\n`);
-  process.exit(1);
-});
+// Run main() only when executed directly as a CLI — NOT when imported (the stop-tags
+// tests import buildRunTags/parseTerminalState as pure helpers and must not archive a
+// span on module load). Mirrors scripts/measurement-start.mjs's isDirectRun guard.
+const isDirectRun = process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  main().catch((err) => {
+    process.stderr.write(`FATAL: ${err.stack || err.message}\n`);
+    process.exit(1);
+  });
+}
