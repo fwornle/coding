@@ -33,7 +33,7 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import { openExperimentStore } from '../lib/experiments/store.mjs';
-import { aggregateByTaskId } from '../lib/experiments/token-aggregate.mjs';
+import { aggregateByTaskId, isForegroundGroup } from '../lib/experiments/token-aggregate.mjs';
 import { writeRun } from '../lib/experiments/run-write.mjs';
 import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
 import { computeHeuristics, ALL_NULL_HEURISTICS } from '../lib/experiments/route-heuristics.mjs';
@@ -103,14 +103,52 @@ async function main() {
     // Re-aggregate tokens (read-only) and reuse the run's stored class/tags so the
     // recompute is a faithful idempotent re-close (no re-prompt, no reclassification).
     const { totals, byAgentModel } = aggregateByTaskId(taskId);
-    const dominant = byAgentModel[0] ?? {};
     const m = run.metadata ?? {};
+
+    // ── Canonical model/agent selection — MIRROR the stop path (measurement-stop.mjs
+    //    §327-360; do NOT re-derive isForegroundGroup). We NEVER fall back to the
+    //    by-count winner (byAgentModel[0]); that by-count fallback was the finding-B
+    //    bug — a 1.24M-token haiku daemon out-massed the Opus foreground and re-stamped
+    //    the Run as haiku. Precedence: (1) the Run's already-persisted canonical value
+    //    when non-null; (2) else the foreground group that is NOT a captured sub-agent
+    //    (isForegroundGroup filter, fall back to fgGroups[0]); (3) else null. A null
+    //    persists as "unmeasured" downstream — it is never coerced to a by-count group.
+    const fgGroups = byAgentModel.filter(isForegroundGroup);
+    const bgGroups = byAgentModel.filter((g) => !isForegroundGroup(g));
+    const isSubagentGroup = (g) => g?.process === 'token-adapter-claude-subagent';
+    const canonical = fgGroups.find((g) => !isSubagentGroup(g)) ?? fgGroups[0] ?? null;
+    // Declared foreground agent — the agent-only fallback for the Anthropic-direct
+    // bypass (no proxy/adapter fg group), mirroring measurement-stop's span.agent
+    // fallback. Model stays null when no fg group was measured (never guessed).
+    const declaredAgent = span.agent ?? span.meta?.agent ?? m.agent ?? null;
+    const canonicalModel = m.canonical_model ?? canonical?.model ?? null;
+    const canonicalAgent =
+      m.canonical_agent
+      ?? (canonical
+        ? normalizeAgent(canonical)
+        : (declaredAgent ? normalizeAgent({ agent: declaredAgent }) : null));
+    const backgroundModels =
+      Array.isArray(m.background_models) && m.background_models.length
+        ? m.background_models
+        : bgGroups.map((g) => ({
+          model: g.model,
+          process: g.process,
+          total_tokens: g.total_tokens,
+        }));
+
+    // writeRun persists canonical_model/canonical_agent/background_models from the
+    // tags object (run-write.mjs §119-121 reads them off `tags`), so thread the
+    // resolved canonical value in — this makes the idempotent re-close preserve the
+    // corrected model and is what prevents a re-close from regressing it back to null.
     const tags = {
       task_hash: m.task_hash ?? null,
-      agent: m.agent ?? dominant.agent ?? null,
-      model: m.model ?? dominant.model ?? null,
+      agent: m.agent ?? canonicalAgent ?? null,
+      model: m.model ?? canonicalModel ?? null,
       framework: m.framework ?? null,
       trace_id: m.trace_id ?? taskId,
+      canonical_model: canonicalModel,
+      canonical_agent: canonicalAgent,
+      background_models: backgroundModels,
     };
     const taskClass = m.task_class ?? 'unclassified';
     const pending = m.pending === true;
@@ -128,6 +166,7 @@ async function main() {
 
     out(
       `[recompute] task_class=${taskClass} agent=${tags.agent ?? 'null'} ` +
+      `canonical_model=${canonicalModel ?? 'null'} ` +
       `steps=${heuristics.total_step_count ?? 'null'} loops=${heuristics.loop_count ?? 'null'}`,
     );
 
