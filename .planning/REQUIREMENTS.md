@@ -25,7 +25,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 *Corrections to v7.4 shipped code, diagnosed in `.planning/v7.4-attribution-findings.md` (pilot run) — required for a comparison to be meaningful.*
 
 - [ ] **VALID-01 (O1 — model attribution):** A Run's canonical model reflects the actual foreground interactive session model (e.g. `claude-opus-4-8`), not the most-frequent proxy token-row model (skewed by Haiku judge/consolidator calls sharing the window). Acceptance: a measured Opus session records model Opus in the runs table, score drawer, and timeline — not `claude-haiku-4.5`.
-- [ ] **VALID-02 (O2 — route time math):** Route wallclock/step and interval metrics produce plausible values over long, partially-idle interactive windows (no implausible ~28,000 s/step artifacts). Idle/wait gaps are excluded or the metric is defined per active step. Acceptance: a multi-hour session with steering pauses yields per-step times within a sane bound, documented.
+- [x] **VALID-02 (O2 — route time math):** Route wallclock/step and interval metrics produce plausible values over long, partially-idle interactive windows (no implausible ~28,000 s/step artifacts). Idle/wait gaps are excluded or the metric is defined per active step. Acceptance: a multi-hour session with steering pauses yields per-step times within a sane bound, documented.
 - [ ] **VALID-03 (O3 — non-GSD rubric coverage):** The 5-dimension outcome rubric is scored for non-GSD / ad-hoc tasks — `code_quality`, `test_coverage`, `regressions` are not null when `VERIFICATION.md`/`REVIEW.md` are absent; the evidence harness derives signal from the task's tests + working-tree diff, not only GSD artifacts. Acceptance: a straight-coding run scores all 5 dims (none null solely due to missing GSD files).
 
 ### Experiment Specification (SPEC)
@@ -58,7 +58,7 @@ This file tracks the active milestone's requirements at the top, with previous m
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | VALID-01 | Phase 76 | Complete |
-| VALID-02 | Phase 76 | Pending |
+| VALID-02 | Phase 76 | Complete (76-02) |
 | VALID-03 | Phase 76 | Pending |
 | SPEC-01 | Phase 77 | Pending |
 | SPEC-02 | Phase 77 | Pending |

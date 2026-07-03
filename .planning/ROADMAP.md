@@ -219,7 +219,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   4. Re-running the two canonical comparisons ("Opus vs Fable", "straight vs GSD/SDD") on the corrected rig yields model / score / time values a human judges plausible against the known sessions — i.e. neither comparison is corrupted by O1 or O3.
 **Plans**: 4 plans
   - [x] 76-01-PLAN.md — VALID-01: close the residual recompute-route model read-path (drop the dominant-by-count fallback; use canonical fg-not-dominant) (Wave 1)
-  - [ ] 76-02-PLAN.md — VALID-02: idle-excluding wallclock_per_step with a named 5-min threshold (kills the ~28k s/step artifact) (Wave 1)
+  - [x] 76-02-PLAN.md — VALID-02: idle-excluding wallclock_per_step with a named 5-min threshold (kills the ~28k s/step artifact) (Wave 1)
   - [ ] 76-03-PLAN.md — VALID-03: derive non-GSD code_quality/test_coverage/regressions from diff + fail-soft fixed-argv test run + score-path overlay (Wave 1)
   - [ ] 76-04-PLAN.md — Regression anchor: recompute the archived pilot span + live fresh-Opus dashboard verification [checkpoint] (Wave 2)
 

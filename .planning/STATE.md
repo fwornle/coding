@@ -10,7 +10,7 @@ progress:
   total_phases: 14
   completed_phases: 9
   total_plans: 52
-  completed_plans: 49
+  completed_plans: 50
   percent: 64
 ---
 
@@ -54,9 +54,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 76 (measurement-validity-fixes-prerequisite) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-07-03 -- 76-01 complete (closed D-03 route-recompute residual read-path; canonical fg-not-dominant model selection)
+Last activity: 2026-07-03 -- 76-02 complete (VALID-02: idle-excluding wallclockPerStep — sum of active inter-event gaps ÷ step count, named DEFAULT_IDLE_GAP_MS=5min with ROUTE_IDLE_GAP_MS env override; kills the ~28k s/step artifact)
 
 ## Deferred Items
 
@@ -122,6 +122,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 ### Decisions
 
+- [76-02]: VALID-02 route time math (D-05/06/07) — `wallclockPerStep` (`lib/experiments/route-heuristics.mjs`) redefined from the naïve `(lastTerminal − firstStart)/count` to the SUM of ACTIVE inter-event gaps (`nextStart − prevTerminal`, `prevTerminal = ended_at ?? started_at`) ÷ `max(1, count)`. Gaps STRICTLY GREATER than a single named idle threshold `DEFAULT_IDLE_GAP_MS` (300000 ms / 5 min) are operator-thinking/AFK and excluded; a gap exactly AT the threshold is included (documented boundary rule). Threshold is env-overridable via `ROUTE_IDLE_GAP_MS`, resolved per-invocation by `resolveIdleGapMs()` (fail-soft to default on malformed/non-positive) so tests toggle it without re-import — kept inside the module (D-06 Claude's Discretion), no shared config. Single-event (`ended − started`) and empty-trace (null via computeHeuristics) edge cases preserved; metric stays pure (no fs/network/LLM, D-07). Kills the ~28k s/step artifact on multi-hour steering-paused traces. TDD RED `3d57f3090` / GREEN `15d884824`; 19/19 tests green. Wave-2 regression anchor is 76-04 (recompute the archived `exp-dash-start-control` pilot span).
 - [67-07]: Measurement-span integration (D-09) arms record/replay via the existing `startMeasurement` meta passthrough (`meta.record` / `meta.replay_from`) — NO schema change and NO second reader of `active-measurement.json` (single-reader discipline preserved, T-67-07-04). `captureSnapshot` runs after span open and both capture + fixture-archive are best-effort try/catch so a failure never aborts the measurement (T-67-07-05). `run-write.mjs:108` now reads `snapshot_id: t.snapshot_id ?? null` (was hardcoded null), linking each Run to its RunSnapshot. Live E2E APPROVED 2026-07-02: recorded LLM responses served byte-identical from fixtures, novel prompt hard-failed `409 REPLAY_MISS` (no live fallthrough), default `repro-restore` sandbox left live HEAD unchanged (f36fa5db4). Known limitation: km-core submodule may not be fetchable in the restore sandbox (`unable to read tree`) — restore falls back to JSON-export KB hydration (1201 nodes) with a best-effort warning, non-fatal. Phase 67 complete (7/7); REPRO-01 + REPRO-02 discharged.
 - [66-05]: PERF-03 SC-2 closed via an opt-in `LLM_PROXY_WORKER_SPAWN_DELAY_MS` test seam in `worker-pool.mjs` — `_dispatch` defers the prompt write by N ms (unref'd setTimeout) AFTER stamping `dispatchedAt`, so the injected delay lands in the overhead window (`firstOutputAt − dispatchedAt`), NOT generation; per-request timeout armed at `requestTimeoutMs + _spawnDelayMs`; superseded-dispatch guard + `_clearSpawnDelayTimer` in `_onExit`/`dispose`; byte-for-byte no-op when unset/0 (clamp neg/NaN→0). Unit determinism = tiny real defer (15ms) proves the deferral + injectable `_now` fake clock drives the overhead magnitude (no seconds-long sleep). Live-proven 2026-06-21: env=6000ms drove the sonnet overhead median to 6.0s, BOTH :3032 surfaces flipped RED (tile "Regressed" bg `rgb(239,68,68)`, by-model "Spawn Overhead" `rgb(185,28,28)`/bg `rgb(254,242,242)` via gsd-browser computed-rgb), then restored to GREEN + healthy pool. Injection was reversible via the gitignored `.env` (sourced by `start-llm-proxy.sh`, `set -a`) — `launchctl setenv` is inert against the plist `EnvironmentVariables` dict (66-04 finding). Proxy commits `aa474a3` (test) / `a4ce41d` (feat). PERF-03 now Complete (SC-1 green + SC-2 red).
 - [63-01]: `WorkerPool._disposeAndDrop(key, worker)` is the canonical synchronous dispose+splice+prune lifecycle-disposal path (D-08), closing the acquire-after-SIGTERM race; `complete()`'s post-request recycle finally delegates to it, and Plans 03 (crash-cooldown) + 04 (cancellation) will reuse it. The async `'exit'`->`_dropWorker` reaper stays as the idempotent backstop (`indexOf===-1` guard makes double-drop safe).
