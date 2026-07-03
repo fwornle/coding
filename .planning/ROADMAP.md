@@ -221,7 +221,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   - [x] 76-01-PLAN.md — VALID-01: close the residual recompute-route model read-path (drop the dominant-by-count fallback; use canonical fg-not-dominant) (Wave 1)
   - [x] 76-02-PLAN.md — VALID-02: idle-excluding wallclock_per_step with a named 5-min threshold (kills the ~28k s/step artifact) (Wave 1)
   - [x] 76-03-PLAN.md — VALID-03: derive non-GSD code_quality/test_coverage/regressions from diff + fail-soft fixed-argv test run + score-path overlay (Wave 1)
-  - [ ] 76-04-PLAN.md — Regression anchor: recompute the archived pilot span + live fresh-Opus dashboard verification [checkpoint] (Wave 2)
+  - [~] 76-04-PLAN.md — Regression anchor: recompute the archived pilot span + live fresh-Opus dashboard verification [checkpoint] (Wave 2) — **Task 1 COMPLETE** (dry-run recompute proves canonical never haiku / no 28k artifact / non-GSD diff-derivation fires; SC 1-3 evidenced); **Task 2 AWAITING HUMAN VERIFICATION** (live fresh-Opus dashboard render, SC 4)
 
 ### Phase 77: Experiment Spec & Per-Variant Snapshot Foundation
 **Goal**: A user can declare an experiment as a validated variant matrix, and the runner can restore the identical Phase-67 starting snapshot before every variant × repeat so each run begins from the same tree + KB + routing state.
