@@ -77,6 +77,30 @@ test('digestRestoredState changes when a single KB byte changes', () => {
   assert.notEqual(d0, d1);
 });
 
+test('CR-01: digestRestoredState IGNORES the non-deterministic leveldb/ subtree', () => {
+  // Reproduces the real-rig failure mode: hydrateSandbox regenerates knowledge-graph/leveldb/
+  // (GraphKMStore.close()) with wall-clock-stamped, sequence-numbered bytes that differ across
+  // two identical restores. The proof MUST digest only the canonical exports/, so leveldb churn
+  // (different bytes, added/removed files) must NOT flip the digest — else a correct restore aborts.
+  const s = makeSandbox({ kbFiles: { 'exports/general.json': '{"nodes":1}' } });
+  fs.mkdirSync(path.join(s.kbDir, 'leveldb'), { recursive: true });
+  fs.writeFileSync(path.join(s.kbDir, 'leveldb', 'LOG'), 'ts=1000 seq=1\n');
+  fs.writeFileSync(path.join(s.kbDir, 'leveldb', '000005.ldb'), 'AAAA');
+  const d0 = digestRestoredState({ gitSha: 'abc', kbDir: s.kbDir, settingsPath: s.settingsPath });
+
+  // Simulate a second restore's leveldb regeneration: different bytes + different file set.
+  fs.writeFileSync(path.join(s.kbDir, 'leveldb', 'LOG'), 'ts=2000 seq=42\n');
+  fs.writeFileSync(path.join(s.kbDir, 'leveldb', '000007.ldb'), 'BBBBBB');
+  fs.rmSync(path.join(s.kbDir, 'leveldb', '000005.ldb'));
+  const d1 = digestRestoredState({ gitSha: 'abc', kbDir: s.kbDir, settingsPath: s.settingsPath });
+  assert.equal(d1, d0, 'leveldb churn must not change the digest (CR-01)');
+
+  // But the canonical export IS still part of the proof — a one-byte change there flips it.
+  fs.writeFileSync(path.join(s.kbDir, 'exports', 'general.json'), '{"nodes":2}');
+  const d2 = digestRestoredState({ gitSha: 'abc', kbDir: s.kbDir, settingsPath: s.settingsPath });
+  assert.notEqual(d2, d0, 'canonical exports/general.json must still be digested');
+});
+
 test('digestRestoredState changes when the git_sha changes', () => {
   const s = makeSandbox({ kbFiles: { 'a.json': '{"n":1}' } });
   const d0 = digestRestoredState({ gitSha: 'abc', kbDir: s.kbDir, settingsPath: s.settingsPath });
