@@ -458,9 +458,15 @@ start_transcript_monitoring() {
   # Otherwise fall back to nohup spawn for backward compat.
   local uid_gui="gui/$(id -u)"
   if launchctl print "${uid_gui}/com.coding.etm" >/dev/null 2>&1; then
-    # Kill any orphan manually-spawned ETM that might still hold the transcript file
+    # Kill any orphan manually-spawned ETM for THIS (coding) project that might
+    # still hold the transcript file. Scope the match to ETMs whose project-path
+    # ARGUMENT is the coding repo — the com.coding.etm singleton is coding-only.
+    # NOTE: the ETM script itself lives under "$coding_repo/scripts/", so a bare
+    # "coding" substring would false-match a per-project ETM for another project
+    # (e.g. the coordinator-spawned rapid-automations ETM). Anchor on the arg
+    # after ".js " so only "…enhanced-transcript-monitor.js <coding_repo>" hits.
     local orphan_pids
-    orphan_pids=$(pgrep -f 'enhanced-transcript-monitor\.js' 2>/dev/null | xargs -I{} sh -c 'launchctl print "'${uid_gui}'/com.coding.etm" 2>/dev/null | grep -q "pid = {}" || echo {}' || true)
+    orphan_pids=$(pgrep -f "enhanced-transcript-monitor\.js ${coding_repo}" 2>/dev/null | xargs -I{} sh -c 'launchctl print "'${uid_gui}'/com.coding.etm" 2>/dev/null | grep -q "pid = {}" || echo {}' || true)
     if [ -n "$orphan_pids" ]; then
       log "Killing orphan manual ETM(s) before kickstart: $orphan_pids"
       echo "$orphan_pids" | xargs kill -TERM 2>/dev/null || true
