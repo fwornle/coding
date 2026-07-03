@@ -18,7 +18,9 @@ import {
   resolveExperimentSpec,
   expandAxes,
   UNSUPPORTED_COMBINATIONS,
+  KNOWN_AGENTS,
 } from '../../lib/experiments/experiment-spec.mjs';
+import { SHELL_META_RE } from '../../lib/experiments/evidence-harness.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXAMPLE_SPEC_PATH = path.resolve(
@@ -126,4 +128,109 @@ test('resolveExperimentSpec: the shipped example YAML resolves to cells covering
 test('UNSUPPORTED_COMBINATIONS is a frozen list (extensible by later phases)', () => {
   assert.ok(Array.isArray(UNSUPPORTED_COMBINATIONS), 'exported as an array');
   assert.ok(Object.isFrozen(UNSUPPORTED_COMBINATIONS), 'frozen');
+});
+
+// ---------------------------------------------------------------------------
+// Task 2: cell validation (D-05 agent enum, D-07 combo gate, D-08 shell-safety,
+// D-06 aggregated whole-run fail-fast) + D-05 loose model/framework warnings.
+// ---------------------------------------------------------------------------
+
+/** Run `fn` while capturing everything written to process.stderr; return { threw, err, stderr }. */
+function captureStderr(fn) {
+  const orig = process.stderr.write;
+  let buf = '';
+  process.stderr.write = (chunk) => { buf += String(chunk); return true; };
+  let threw = false;
+  let err;
+  try {
+    fn();
+  } catch (e) {
+    threw = true;
+    err = e;
+  } finally {
+    process.stderr.write = orig;
+  }
+  return { threw, err, stderr: buf };
+}
+
+test('SHELL_META_RE is exported from evidence-harness (single canonical regex, D-08)', () => {
+  assert.ok(SHELL_META_RE instanceof RegExp, 'exported as a RegExp');
+  // Byte-identical character class to the pre-edit private constant.
+  assert.equal(SHELL_META_RE.source, "[|&;<>()$`\\\\\"'\\n\\r]", 'char class unchanged');
+  assert.ok(SHELL_META_RE.test('node --test | rm'), 'rejects a pipe');
+  assert.ok(SHELL_META_RE.test('node $(whoami)'), 'rejects command substitution');
+  assert.ok(!SHELL_META_RE.test('node --test tests/experiments'), 'accepts a fixed argv');
+});
+
+test('KNOWN_AGENTS equals the route-trace-resolve SoT set (no silent divergence, D-05)', () => {
+  assert.deepEqual([...KNOWN_AGENTS].sort(), ['claude', 'copilot', 'opencode'].sort());
+});
+
+test('resolveExperimentSpec: a cell with an unknown agent aborts the whole matrix (D-06)', () => {
+  const { threw, err } = captureStderr(() => resolveExperimentSpec({
+    goal_sentence: 'bad agent',
+    variants: [{ agent: 'foo', model: 'opus', framework: 'straight', env: 'default' }],
+  }));
+  assert.ok(threw, 'unknown agent throws');
+  assert.match(err.message, /agent/, 'names the agent dimension');
+  assert.match(err.message, /foo/, 'names the bad value');
+  assert.match(err.message, /claude,\s*copilot,\s*opencode/, 'lists the legal set');
+});
+
+test('resolveExperimentSpec: TWO invalid cells appear in ONE aggregated thrown message (never skip)', () => {
+  const { threw, err } = captureStderr(() => resolveExperimentSpec({
+    goal_sentence: 'two bad cells',
+    variants: [
+      { agent: 'foo', model: 'opus', framework: 'straight', env: 'default' },
+      { agent: 'copilot', model: 'sonnet', framework: 'straight', env: 'headless' },
+    ],
+  }));
+  assert.ok(threw, 'aggregated throw');
+  assert.match(err.message, /foo/, 'first offending value present');
+  assert.match(err.message, /RUN-04/, 'second offending combo present in the SAME message');
+});
+
+test('resolveExperimentSpec: copilot + headless is an unsupported combination (D-07)', () => {
+  const { threw, err } = captureStderr(() => resolveExperimentSpec({
+    goal_sentence: 'unsupported combo',
+    variants: [{ agent: 'copilot', model: 'sonnet', framework: 'straight', env: 'headless' }],
+  }));
+  assert.ok(threw, 'copilot+headless throws');
+  assert.match(err.message, /RUN-04/, 'points at the Phase-78 RUN-04 spike');
+});
+
+for (const bad of ['node --test | rm', 'node $(whoami)', 'node --test; ls', 'a && b', 'node\ntest']) {
+  test(`resolveExperimentSpec: test_command with a shell metacharacter is rejected (${JSON.stringify(bad)})`, () => {
+    const { threw, err } = captureStderr(() => resolveExperimentSpec({
+      goal_sentence: 'shell unsafe',
+      variants: [{ agent: 'claude', model: 'opus', framework: 'straight', env: 'default', test_command: bad }],
+    }));
+    assert.ok(threw, 'shell-unsafe command throws');
+    assert.match(err.message, /test_command/, 'names the test_command dimension');
+    assert.match(err.message, /shell/, 'explains the shell-safety violation');
+  });
+}
+
+test('resolveExperimentSpec: an unknown model does NOT throw — it WARNs to stderr (D-05 loose)', () => {
+  const { threw, stderr } = captureStderr(() => resolveExperimentSpec({
+    goal_sentence: 'loose model',
+    variants: [{ agent: 'claude', model: 'some-unheard-of-model', framework: 'straight', env: 'default' }],
+  }));
+  assert.equal(threw, false, 'unknown model resolves (loose validation)');
+  assert.match(stderr, /WARN/, 'emits a warning to stderr');
+  assert.match(stderr, /some-unheard-of-model/, 'names the unrecognized model');
+});
+
+test('resolveExperimentSpec: a fully-valid 2x2 matrix resolves with zero throws and zero warnings', () => {
+  const { threw, stderr } = captureStderr(() => {
+    const { cells } = resolveExperimentSpec({
+      goal_sentence: 'clean run',
+      repeats: 2,
+      axes: { agent: ['claude', 'copilot'], model: ['opus', 'sonnet'], framework: ['straight'], env: ['default'] },
+      test_command: 'node --test tests/experiments',
+    });
+    assert.equal(cells.length, 4);
+  });
+  assert.equal(threw, false, 'valid matrix does not throw');
+  assert.equal(stderr, '', 'no stderr warnings for a fully-recognized matrix');
 });
