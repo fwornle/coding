@@ -246,7 +246,12 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   2. Runs execute unattended to completion, timeout, or abort — each producing a scored Run per variant × repeat without interactive operator steering; timeouts and aborts are recorded as such, not dropped (RUN-03).
   3. Copilot participation is gated on an explicit headless-drivability capability check (a small spike); if unsupported, the Copilot variant is skipped with a recorded reason — never silently absent (RUN-04).
   4. A full N-repeat matrix across ≥2 agents completes end-to-end and lands exactly one Run per variant × repeat cell in the experiment KB.
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 78-01-PLAN.md — Run-record schema + span-seam threading (variant/repeat/terminal_state/skip_reason; R2/R3/R4)
+- [ ] 78-02-PLAN.md — Headless agent adapter + Copilot one-turn probe (RUN-02/04)
+- [ ] 78-03-PLAN.md — Runner engine: sequential idempotent matrix loop, terminal-state machine, probe gate, skip-Run
+- [ ] 78-04-PLAN.md — Operator CLI (scripts/experiment-run.mjs) + SC#4 integration test
+- [ ] 78-05-PLAN.md — Live cross-agent smoke + acceptance checkpoint (autonomous:false)
 
 ### Phase 79: Comparison, Aggregation & Report
 **Goal**: The runner turns raw per-cell Runs into an honest side-by-side comparison — gating on an objective success signal, aggregating repeats with variance, and ranking variants — so only genuinely successful runs are cost-compared.
