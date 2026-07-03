@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-07-03T04:42:59.514Z"
 last_activity: 2026-07-03
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,7 +20,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 67 — reproducibility-replay-rig
+**Current focus:** Phase 76 — measurement-validity-fixes (v7.5 prerequisite gate)
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -52,10 +52,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 76 — Measurement Validity Fixes [PREREQUISITE] (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-07-03 — Milestone v7.5 started
+Status: Roadmap created — awaiting `/gsd-plan-phase 76`
+Last activity: 2026-07-03 — v7.5 roadmap created (Phases 76–80, 14/14 reqs mapped)
 
 ## Deferred Items
 
@@ -95,6 +95,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 ### Roadmap Evolution
 
+- v7.5 roadmap created 2026-07-03: **5 phases (76–80)** for the Cross-Agent Comparison Experiment Runner — an orchestration layer on the v7.4 measurement substrate (measurement-start/stop.mjs, task_hash, the experiment km-core KB + experiments-* CLIs, the Performance dashboard tab, proxy routing for all four agents commit 2a23a9a25, the Phase 67 reproducibility-replay rig). 14/14 v7.5 reqs mapped, no orphans. **VALID-before-RUN ordering enforced.** Dependency order: **Phase 76 [PREREQUISITE] Measurement Validity Fixes (VALID-01/02/03)** — corrects the shipped attribution/route/score code diagnosed as O1/O2/O3 in .planning/v7.4-attribution-findings.md (O1 model mis-attribution breaks 'Opus vs Fable'; O3 non-GSD rubric coverage breaks 'straight vs GSD'); extends the Phase-75 canonical-model/lineage work; MUST verify before the runner is trusted -> Phase 77 (Experiment Spec & Per-Variant Snapshot Foundation — SPEC-01/02 declarative validated variant matrix + fail-fast config resolution + RUN-01 per-variant×repeat snapshot restore off the Phase-67 rig) -> Phase 78 (Autonomous Cross-Agent Runner — RUN-02 measured-span agent launch + RUN-03 unattended-to-completion/timeout/abort + RUN-04 Copilot headless-drivability GATED SPIKE, skip-with-reason not silent) -> Phase 79 (Comparison, Aggregation & Report — CMP-01 objective success gate compares only gate-passers + CMP-02 N-repeat central-tendency+variance + CMP-03 ranked side-by-side report keyed by task_hash) -> Phase 80 (Experiment Surface — CMP-04 variant columns in the Performance dashboard tab + ORCH-01 single installed `experiment run` skill across the coding agents). Granularity=standard. Reslot: policy automation/auto-routing + currency conversion moved v7.5->v7.6 (consumes this runner's comparisons). Run `/gsd-plan-phase 76` to break down the prerequisite phase first.
 - Phase 75 added 2026-06-29: **Measurement Attribution Accuracy & Observation Linkage** (ATTR-01/02/03 + OBS-01/02). Registered (not yet planned) from the `exp-dash-start-control` dogfood measurement findings (`.planning/v7.4-attribution-findings.md`, findings A–D). Corrects TELEM-03's time-window attribution, which conflates concurrent background-daemon traffic with the measured task and misses the foreground agent's own tokens (the measured "Opus" session recorded 1.24M tokens of haiku/sonnet consolidator traffic). Also fixes finding D: ETM only captures a long agentic prompt-set's opening burst, stamped at the prompt-set start, so multi-hour GSD sessions yield no mid-session observations and mis-time them to the start. Argued **higher priority than Phase 67** (correct attribution must precede replay, else replay reproduces wrong numbers). Findings A + finding-1 (timeline shows event time + process per row) already fixed on main (commits a1ffe24e2, 47f28ad3b). Run `/gsd-plan-phase 75` to break down. Coverage now 26/26 reqs across 9 phases (67-75).
 
 - v7.4 roadmap created 2026-06-21: 8 phases (67-74) for the Performance Measurement System (cross-agent token + route + outcome attribution across all four agents). 21/21 reqs mapped, no orphans. Dependency order: Phase 67 (Reproducibility/Replay rig - REPRO-01/02; non-blocking infra, independent of TELEM) -> **Phase 68 [FOUNDATIONAL] Token Attribution Storage (TELEM-01/02/03)** - the dependency anchor: token_usage additive schema migration + .data/active-measurement.json span contract + getActiveMeasurement() reader + attachTokenLogger task_id stamping; MUST land+verify before any adapter work -> Phase 69 (Claude per-turn+per-reasoning-step JSONL + Copilot events.jsonl with Phase-1 event-vocabulary check - ADAPT-01/02, gated on 68) -> Phase 70 (OpenCode proxy-route per-llm-call + Mastra instrumentation-surface read+adapter - ADAPT-03/04, gated on 68) -> Phase 71 (km-core Experiment/Run/Route/Step/Decision/Outcome/Report ontology + Run-write path + enforced task-taxonomy v0 - KB-01/02/03) -> Phase 72 (goal_sentence capture + deterministic syntactic route heuristics - ROUTE-01/02) -> Phase 73 (LLM-judge goal_aligned_ratio + 5-dim rubric + user override - ROUTE-03, SCORE-01/02) -> Phase 74 (Performance dashboard tab: query-builder, reasoning-step sub-bands + tier badges, Report entity + saved-query workflow + Report views - DASH-01/02/03, KB-04). Granularity=standard. The 4-agent ADAPT work split across two phases (69 Claude+Copilot / 70 OpenCode+Mastra) per operator-confirmed all-four reach. Seeds: .planning/notes/v73-perf-measurement-exploration.md (Phase 3 sketch = our Phase 68 FOUNDATIONAL) + v73-token-attribution-contract.md (row shape + measurement-span + per-agent identifier conventions). Out of scope: policy/auto-routing (v7.5), VS Code Copilot Chat (opaque state.vscdb), currency conversion.

@@ -3,7 +3,8 @@
 ## Milestones
 
 - ✅ **v7.3 LLM Proxy Performance — Claude CLI Worker Pool** — Phases 62–66 (shipped 2026-06-21)
-- 🚧 **v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution** — Phases 67–74 (active 2026-06-21)
+- ✅ **v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution** — Phases 67–75 (100% of phases; complete pending formal `/gsd-complete-milestone` close)
+- 🚧 **v7.5 Cross-Agent Comparison Experiment Runner** — Phases 76–80 (active 2026-07-03)
 
 ## Phases
 
@@ -20,7 +21,8 @@ Replaced the per-call `claude` CLI `execFile` spawn on the claude-code fallback 
 
 </details>
 
-### 🚧 v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution (Phases 67–74)
+<details>
+<summary>✅ v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution (Phases 67–75) — 100% of phases; complete pending formal close</summary>
 
 Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and outcome success across all four supported coding agents (Claude Code, Copilot CLI, OpenCode, Mastra) AND the proxy-routed background services that run during the task — so "approach X cost Y for task type Z" becomes evidence, not anecdote.
 
@@ -34,6 +36,21 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 - [x] **Phase 72: Syntactic Route Quality** — `goal_sentence` capture + deterministic route heuristics per run (completed 2026-06-25)
 - [x] **Phase 73: Semantic Route Judge & Success Scoring** — LLM-judge `goal_aligned_ratio` + 5-dimension rubric + user override (completed 2026-06-28)
 - [x] **Phase 74: Performance Dashboard & Reports** — "Performance" tab query-builder, reasoning-step sub-bands + tier badges, Report entity + saved-query workflow + Report views (completed 2026-06-28)
+- [x] **Phase 75: Measurement Attribution Accuracy & Observation Linkage** — foreground token capture + lineage attribution + canonical/per-process model + continuous ETM capture (completed 2026-06-29)
+
+</details>
+
+### 🚧 v7.5 Cross-Agent Comparison Experiment Runner (Phases 76–80)
+
+Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus a variant matrix ("develop X, measure it under settings A vs B") and a repeat count; the system drives each variant across agents from an identical starting snapshot, evaluates an objective success gate, and returns a scored, side-by-side comparison with per-variant variance. This is an **orchestration layer** on the v7.4 substrate (`measurement-start/stop.mjs`, `task_hash`, the experiment km-core KB + `experiments-*` CLIs, the Performance dashboard tab, proxy routing for all four agents, the Phase 67 reproducibility-replay rig) — it WIRES those primitives, it does not rebuild them.
+
+**Prerequisite ordering:** the **VALID** phase (Phase 76) corrects correctness gaps in v7.4's already-shipped attribution / route / score code (diagnosed as O1/O2/O3 in `.planning/v7.4-attribution-findings.md`). VALID-01 (model mis-attribution) breaks "Opus vs Fable"; VALID-03 (non-GSD rubric coverage) breaks "straight vs GSD". Phase 76 MUST land and verify BEFORE the runner phases (RUN/CMP) are trusted. RUN-04 (Copilot headless-drivability) is a **gated spike** — a small capability check inside Phase 78, not a blocking dependency for the rest.
+
+- [ ] **Phase 76: Measurement Validity Fixes [PREREQUISITE]** — Canonical foreground model attribution, plausible route-time math, and 5-dimension scoring for non-GSD/ad-hoc tasks — so the two canonical comparisons are no longer corrupted at the source (VALID-01/02/03)
+- [ ] **Phase 77: Experiment Spec & Per-Variant Snapshot Foundation** — Declarative validated variant matrix + fail-fast config resolution + per-variant×repeat snapshot restore off the Phase-67 rig (SPEC-01/02, RUN-01)
+- [ ] **Phase 78: Autonomous Cross-Agent Runner** — Unattended per-cell agent launch wrapped in a measured span; timeouts/aborts recorded; Copilot gated on a headless-drivability spike (RUN-02/03/04)
+- [ ] **Phase 79: Comparison, Aggregation & Report** — Objective success gate, N-repeat aggregation with variance, ranked side-by-side report keyed by `task_hash` (CMP-01/02/03)
+- [ ] **Phase 80: Experiment Surface — Dashboard & Skill Packaging** — Comparison as variant columns in the Performance tab + single installed `experiment run` skill across the coding agents (CMP-04, ORCH-01)
 
 ## Phase Details
 
@@ -169,25 +186,6 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 74-06-PLAN.md — SCORE-02/KB-04/DASH-03: score-override drawer + Saved Reports sub-view + live Playwright [checkpoint] (Wave 6)
 **UI hint**: yes
 
-## Progress
-
-| Phase | Milestone | Plans | Status | Completed |
-|-------|-----------|-------|--------|-----------|
-| 62. Worker Pool Core | v7.3 | 3/3 | Complete | 2026-06-21 |
-| 63. Worker Lifecycle | v7.3 | 5/5 | Complete | 2026-06-21 |
-| 64. Worker Hygiene | v7.3 | 2/2 | Complete | 2026-06-21 |
-| 65. Acceptance | v7.3 | 1/1 | Complete | 2026-06-21 |
-| 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
-| 67. Reproducibility & Replay Rig | v7.4 | 7/7 | Complete   | 2026-07-02 |
-| 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
-| 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete    | 2026-06-22 |
-| 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete    | 2026-06-23 |
-| 71. Experiment KB & Task Taxonomy | v7.4 | 5/5 | Complete    | 2026-06-24 |
-| 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
-| 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
-| 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
-| 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 6/6 | Complete   | 2026-06-29 |
-
 ### Phase 75: Measurement Attribution Accuracy & Observation Linkage
 **Goal**: The measurement system is trustworthy for an interactive foreground agentic session — it captures the foreground chat agent's own tokens, attributes token rows by task/process lineage instead of time-window overlap, shows a canonical + per-process model breakdown, and captures observations continuously (with true event-time stamps) across a long agentic prompt-set.
 **Depends on**: Phase 68 (token_usage schema + active-measurement span), Phase 69 (Claude/Copilot token adapters — `lib/lsl/token`), Phase 74 (dashboard timeline + runs table this corrects). Corrects TELEM-03.
@@ -208,3 +206,83 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
   - [x] 75-05-PLAN.md — OBS-01/02: ETM mid-set re-capture (decision + tool-batch fires) + true event-time + task_id linkage [Wave 2]
   - [x] 75-06-PLAN.md — ATTR-02 display: two-column model render across runs table/score-drawer/timeline + bind-mount rebuild [Wave 3]
 **UI hint**: yes
+
+### Phase 76: Measurement Validity Fixes [PREREQUISITE]
+**Goal**: The measurement rig reports a trustworthy foreground model, plausible route timing, and a full 5-dimension score for ANY task — including non-GSD / ad-hoc tasks and long, partially-idle interactive sessions — so a variant comparison is meaningful at the source and the two canonical comparisons ("Opus vs Fable", "straight vs GSD/SDD") are no longer corrupted.
+**Depends on**: Phase 75 (corrects the same shipped attribution / route / score code path — extends the canonical-model + lineage work rather than re-deriving it)
+**Requirements**: VALID-01, VALID-02, VALID-03
+**Source/evidence**: `.planning/v7.4-attribution-findings.md` (O1/O2/O3, `exp-dash-start-control` pilot 2026-06-29). This phase is the **prerequisite gate** — RUN/CMP phases are not trusted until it verifies.
+**Success Criteria** (what must be TRUE):
+  1. A measured Opus interactive session records model `claude-opus-4-8` — its actual foreground session model — in the runs table, score drawer, AND timeline, not the most-frequent proxy token-row model (`claude-haiku-4.5`) skewed by Haiku judge/consolidator calls sharing the window (VALID-01).
+  2. A multi-hour session with steering pauses yields per-step route times within a documented sane bound (no implausible ~28,000 s/step artifacts); idle/wait gaps are excluded or the metric is explicitly defined per active step (VALID-02).
+  3. A straight-coding (non-GSD) run scores all 5 rubric dimensions — `code_quality`, `test_coverage`, `regressions` are non-null when `VERIFICATION.md` / `REVIEW.md` are absent, with signal derived from the task's tests + working-tree diff rather than only GSD artifacts (VALID-03).
+  4. Re-running the two canonical comparisons ("Opus vs Fable", "straight vs GSD/SDD") on the corrected rig yields model / score / time values a human judges plausible against the known sessions — i.e. neither comparison is corrupted by O1 or O3.
+**Plans**: TBD
+
+### Phase 77: Experiment Spec & Per-Variant Snapshot Foundation
+**Goal**: A user can declare an experiment as a validated variant matrix, and the runner can restore the identical Phase-67 starting snapshot before every variant × repeat so each run begins from the same tree + KB + routing state.
+**Depends on**: Phase 76 (a comparison is only meaningful once measurement is valid), Phase 67 (wires the reproducibility-replay snapshot/restore rig — does not rebuild it)
+**Requirements**: SPEC-01, SPEC-02, RUN-01
+**Success Criteria** (what must be TRUE):
+  1. A user declares an experiment as `{goal_sentence, variants[], repeats N}` where each variant is a named settings bundle over `{agent, model, framework/approach, env}`, via CLI flags and/or a declarative spec file (SPEC-01).
+  2. Each variant resolves to a concrete executable config, validated BEFORE any run starts; unsupported combinations (e.g. Copilot headless) fail fast with an actionable message rather than mid-run (SPEC-02).
+  3. Before each variant × repeat, the runner restores the identical Phase-67 starting snapshot, so every variant begins from the same git tree + `.data/knowledge-graph/` KB + routing config (RUN-01).
+  4. Two repeats of the same variant are shown to start from byte-identical restored conditions (the snapshot restore is repeatable, not one-shot).
+**Plans**: TBD
+
+### Phase 78: Autonomous Cross-Agent Runner
+**Goal**: The runner drives each variant × repeat unattended — launching the specified agent against the goal inside a measured span — producing a scored Run per cell without operator steering, with Copilot participation gated on an explicit headless-drivability capability check.
+**Depends on**: Phase 77 (consumes the validated spec + per-variant snapshot restore), Phase 75/76 (each run wrapped in a trustworthy measured span)
+**Requirements**: RUN-02, RUN-03, RUN-04
+**Success Criteria** (what must be TRUE):
+  1. The runner launches the specified agent (Claude / OpenCode / Mastra) autonomously against the goal, wrapping the work in a measured span tagged with `variant`, `repeat`, and `task_hash` (RUN-02).
+  2. Runs execute unattended to completion, timeout, or abort — each producing a scored Run per variant × repeat without interactive operator steering; timeouts and aborts are recorded as such, not dropped (RUN-03).
+  3. Copilot participation is gated on an explicit headless-drivability capability check (a small spike); if unsupported, the Copilot variant is skipped with a recorded reason — never silently absent (RUN-04).
+  4. A full N-repeat matrix across ≥2 agents completes end-to-end and lands exactly one Run per variant × repeat cell in the experiment KB.
+**Plans**: TBD
+
+### Phase 79: Comparison, Aggregation & Report
+**Goal**: The runner turns raw per-cell Runs into an honest side-by-side comparison — gating on an objective success signal, aggregating repeats with variance, and ranking variants — so only genuinely successful runs are cost-compared.
+**Depends on**: Phase 78 (consumes the per-cell Runs), Phase 71 (aggregates over the experiment Run KB)
+**Requirements**: CMP-01, CMP-02, CMP-03
+**Success Criteria** (what must be TRUE):
+  1. An objective success gate (task test suite / UAT command) is evaluated per run; cost / route / score metrics are compared only across runs that PASS the gate — failed runs are reported separately, not averaged into a variant's cost (CMP-01).
+  2. N repeats per variant aggregate into a per-variant summary carrying central tendency AND variance (spread) for tokens, wallclock, route metrics, and rubric scores (CMP-02).
+  3. A side-by-side comparison report (CLI table + machine-readable export) ranks variants on the chosen metric(s), showing variance and each variant's success-gate outcome, keyed by `task_hash` for reproducibility (CMP-03).
+  4. A variant whose runs all fail the gate is shown as "no successful runs", never surfaced as a cheap winner by averaging failed cheap runs.
+**Plans**: TBD
+
+### Phase 80: Experiment Surface — Dashboard & Skill Packaging
+**Goal**: The whole experiment flow is invokable as a single installed skill/command across the coding agents, and its comparison is viewable in the Performance dashboard tab without re-running.
+**Depends on**: Phase 79 (surfaces the comparison it produces), Phase 74 (extends the existing "Performance" dashboard tab)
+**Requirements**: CMP-04, ORCH-01
+**Success Criteria** (what must be TRUE):
+  1. The full flow runs as a single command / skill (e.g. `experiment run --goal "…" --variants A,B --agents claude,opencode --repeats N`), installed and usable across the coding agents per the multi-agent skill ecosystem (ORCH-01).
+  2. The comparison is viewable in the Performance dashboard tab as variant columns, surfacing CMP-03 without re-running the experiment (CMP-04).
+  3. An operator can go from a one-line command to a rendered side-by-side variant comparison in the dashboard, end-to-end.
+**Plans**: TBD
+**UI hint**: yes
+
+## Progress
+
+| Phase | Milestone | Plans | Status | Completed |
+|-------|-----------|-------|--------|-----------|
+| 62. Worker Pool Core | v7.3 | 3/3 | Complete | 2026-06-21 |
+| 63. Worker Lifecycle | v7.3 | 5/5 | Complete | 2026-06-21 |
+| 64. Worker Hygiene | v7.3 | 2/2 | Complete | 2026-06-21 |
+| 65. Acceptance | v7.3 | 1/1 | Complete | 2026-06-21 |
+| 66. Dashboard Observability | v7.3 | 5/5 | Complete | 2026-06-21 |
+| 67. Reproducibility & Replay Rig | v7.4 | 7/7 | Complete   | 2026-07-02 |
+| 68. Token Attribution Storage [FOUNDATIONAL] | v7.4 | 3/3 | Complete    | 2026-06-22 |
+| 69. Claude + Copilot Token Adapters | v7.4 | 6/6 | Complete    | 2026-06-22 |
+| 70. OpenCode + Mastra Token Adapters | v7.4 | 4/4 | Complete    | 2026-06-23 |
+| 71. Experiment KB & Task Taxonomy | v7.4 | 5/5 | Complete    | 2026-06-24 |
+| 72. Syntactic Route Quality | v7.4 | 5/5 | Complete   | 2026-06-25 |
+| 73. Semantic Route Judge & Success Scoring | v7.4 | 6/6 | Complete   | 2026-06-28 |
+| 74. Performance Dashboard & Reports | v7.4 | 6/6 | Complete   | 2026-06-28 |
+| 75. Measurement Attribution Accuracy & Observation Linkage | v7.4 | 6/6 | Complete   | 2026-06-29 |
+| 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 0/? | Not started | - |
+| 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 0/? | Not started | - |
+| 78. Autonomous Cross-Agent Runner | v7.5 | 0/? | Not started | - |
+| 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
+| 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |

@@ -53,6 +53,36 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ---
 
+## v7.5 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| VALID-01 | Phase 76 | Pending |
+| VALID-02 | Phase 76 | Pending |
+| VALID-03 | Phase 76 | Pending |
+| SPEC-01 | Phase 77 | Pending |
+| SPEC-02 | Phase 77 | Pending |
+| RUN-01 | Phase 77 | Pending |
+| RUN-02 | Phase 78 | Pending |
+| RUN-03 | Phase 78 | Pending |
+| RUN-04 | Phase 78 | Pending |
+| CMP-01 | Phase 79 | Pending |
+| CMP-02 | Phase 79 | Pending |
+| CMP-03 | Phase 79 | Pending |
+| CMP-04 | Phase 80 | Pending |
+| ORCH-01 | Phase 80 | Pending |
+
+**Coverage:** 14/14 v7.5 requirements mapped across 5 phases (76–80). No orphans, no duplicates.
+
+**Phase map (goal-backward):**
+- **Phase 76 — Measurement Validity Fixes [PREREQUISITE]:** VALID-01, VALID-02, VALID-03 — corrects the shipped attribution/route/score code so a comparison is meaningful; gates the runner phases.
+- **Phase 77 — Experiment Spec & Per-Variant Snapshot Foundation:** SPEC-01, SPEC-02, RUN-01 — declarative validated variant matrix + fail-fast resolution + per-variant snapshot restore off the Phase-67 rig.
+- **Phase 78 — Autonomous Cross-Agent Runner:** RUN-02, RUN-03, RUN-04 — unattended per-cell agent launch in a measured span; Copilot gated on a headless-drivability spike.
+- **Phase 79 — Comparison, Aggregation & Report:** CMP-01, CMP-02, CMP-03 — success gate + N-repeat variance + ranked report keyed by `task_hash`.
+- **Phase 80 — Experiment Surface — Dashboard & Skill Packaging:** CMP-04, ORCH-01 — variant columns in the Performance tab + single installed `experiment run` skill across agents.
+
+---
+
 # Milestone v7.4 Requirements — Performance Measurement System (COMPLETE — pending formal close)
 
 **Goal:** Build a measurement rig that quantifies, per task, the full cost (tokens), time-to-delivery, route quality, and outcome success across all four supported coding agents (Claude Code, Copilot CLI, OpenCode, Mastra) AND the proxy-routed background services that run during the task — so dev teams can be told, evidence-backed: *for task type X at complexity Y, use agent/model Z at spec-level W.*
@@ -123,15 +153,15 @@ Evidence: `.planning/v7.4-attribution-findings.md` (findings A–D, from the `ex
 
 ## Future Requirements (deferred from v7.4)
 
-- Policy automation / auto-routing of tasks to agents/models — v7.5 (`seeds/v74-policy-engine.md`); gated on the v7.4 KB holding ≥~50 completed Runs across ≥3 task_classes with ≥2 agents and ≥2 models per class.
-- Cost-in-currency conversion (tokens → $) — v7.5, downstream of policy work.
+- Policy automation / auto-routing of tasks to agents/models — v7.6 (`seeds/v74-policy-engine.md`); gated on the v7.4 KB holding ≥~50 completed Runs across ≥3 task_classes with ≥2 agents and ≥2 models per class. **Consumes the v7.5 runner's comparisons — this milestone is its prerequisite.**
+- Cost-in-currency conversion (tokens → $) — v7.6, downstream of policy work.
 - Cross-task aggregation reports beyond saved `Report` queries.
 
 ## Out of Scope
 
 - **VS Code Copilot Chat** — `state.vscdb` LevelDB is opaque with no stable per-call telemetry surface (operator decision at scoping).
 - **Token-attribution row deletion / TTL** — existing `token_usage` retain-indefinitely behaviour preserved.
-- **Auto-routing / policy engine in `bin/coding`** — explicitly v7.5.
+- **Auto-routing / policy engine in `bin/coding`** — explicitly v7.6 (reslotted from v7.5).
 
 ## Traceability
 
