@@ -50,9 +50,27 @@ Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), liv
 
 ### Active
 
-See **Current Milestone: v7.4** below — requirements tracked in `.planning/REQUIREMENTS.md`.
+See **Current Milestone: v7.5** below — requirements tracked in `.planning/REQUIREMENTS.md`.
 
-## Current Milestone: v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
+## Current Milestone: v7.5 Cross-Agent Comparison Experiment Runner
+
+**Goal:** Turn the v7.4 measurement rig into an experiment tool — a user states a goal plus a variant matrix ("develop X, measure it under settings A vs B"), and the system drives each variant across agents from an identical starting snapshot, then returns a scored, side-by-side comparison with variance.
+
+**Target features:**
+- **Measurement-validity fixes (prerequisite — must precede the runner):** canonical per-run model attribution (not the most-frequent token-row model, which the judge-call skew corrupts); correct route wallclock/step math over long interactive windows; outcome-rubric coverage for non-GSD / ad-hoc tasks (so a "straight coding" variant scores on all dimensions, not 2/5). Diagnosed as O1/O2/O3 in the `exp-dash-start-control` pilot run.
+- **Declarative experiment spec** — a variant matrix over model / framework / approach (e.g. `{A: opus-4.8·claude-code, B: fable}` or `{A: straight, B: gsd/SDD}`), with N repeats per variant.
+- **Cross-agent experiment runner** — per variant × repeat: restore the same snapshot (Phase 67 replay rig) → launch the specified agent in the specified model/framework autonomously against the goal → measured span auto-wraps → stop + score → aggregate. Agents: Claude / OpenCode / Mastra (Copilot gated on a headless-drivability check).
+- **Comparison report** — side-by-side tokens / time / route / outcome across variants with per-variant variance; an objective success gate (tests/UAT) so cost is only compared between runs that both actually succeeded.
+- **Experiment surface** — expose the run + comparison via CLI and (optionally) the Performance dashboard tab built in v7.4.
+
+**Key context:**
+- Continues phase numbering from the previous milestone (v7.4). Orchestration layer on existing primitives — NOT greenfield.
+- Builds on the v7.4 substrate: `measurement-start/stop.mjs`, `task_hash` comparability, the experiment km-core KB + `experiments-*` CLIs, proxy routing for all four agents (commit `2a23a9a25`), and the Phase 67 reproducibility-replay rig.
+- Hard constraints: Copilot headless/per-prompt drivability is an open question (Phase-32 issue) — treat the Copilot variant as gated on a spike; agentic nondeterminism forces N-repeats-with-variance, not single-shot A-vs-B.
+- Reslot: the previously-earmarked v7.5 (policy automation / auto-routing, currency conversion) moves to **v7.6** — it consumes this runner's comparisons, so this milestone is its prerequisite.
+- v7.4 (Performance Measurement System) reached 100% of phases (9/9) and is complete pending a formal `/gsd-complete-milestone` close (audit + archive).
+
+### v7.4 Complete (pending formal close) — Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
 
 **Goal:** Build a measurement rig that quantifies, per task, the full cost across all four supported coding agents (Claude Code, Copilot CLI, OpenCode, Mastra) AND the proxy-routed background services that run during the task — so "approach X cost Y for task type Z" becomes evidence, not anecdote.
 
@@ -183,4 +201,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-21 — v7.4 Performance Measurement System milestone started (cross-agent token + route + outcome attribution across all four agents; phases continue from Phase 66 → start at Phase 67). v7.3 (LLM Proxy Worker Pool, Phases 62–66) shipped 2026-06-21. v7.2 (VKB & Online-Learning Quality) and v7.1 (KM-Core Unification) previously shipped.*
+*Last updated: 2026-07-03 — v7.5 Cross-Agent Comparison Experiment Runner milestone started (declarative A/B variant matrix + cross-agent runner + scored comparison, on the v7.4 measurement substrate; phases continue from the previous milestone). v7.4 (Performance Measurement System) reached 100% of phases (9/9), complete pending formal close; auto-routing/policy reslotted to v7.6. v7.3 (LLM Proxy Worker Pool, Phases 62–66) shipped 2026-06-21. v7.2 (VKB & Online-Learning Quality) and v7.1 (KM-Core Unification) previously shipped.*

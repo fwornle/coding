@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.4
-milestone_name: Performance Measurement System — Cross-agent Token + Route + Outcome Attribution
-status: executing
-stopped_at: Completed 67-07-PLAN.md — Phase 67 complete (7/7)
-last_updated: "2026-07-02T09:50:00.000Z"
-last_activity: 2026-07-02 -- Phase 67 complete (REPRO-01 + REPRO-02 live-verified)
+milestone: v7.5
+milestone_name: Cross-Agent Comparison Experiment Runner
+status: planning
+last_updated: "2026-07-03T04:42:59.514Z"
+last_activity: 2026-07-03
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 48
-  completed_plans: 48
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -53,16 +52,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 67 (reproducibility-replay-rig) — COMPLETE (7/7 plans)
-Plan: 7 of 7 (done)
-Status: Phase 67 complete — REPRO-01 + REPRO-02 live-verified end-to-end
-real gap (route heuristics were permanently null for Claude/Copilot runs — agent never
-normalized + Claude session seam never wired into the close orchestrator), fixed inline
-in commit 9eb5163c5 (lib/experiments/route-trace-resolve.mjs + measurement-stop.mjs +
-experiments-recompute-route.mjs). Live-verified: Claude-dominant run closes with
-total_step_count > 0, idempotent across recompute.
-Next: Phase 73 (Semantic Route Judge & Success Scoring) — not yet planned (no dir).
-Last activity: 2026-07-02 -- Phase 67 execution started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-03 — Milestone v7.5 started
 
 ## Deferred Items
 
