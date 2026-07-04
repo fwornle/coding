@@ -1,0 +1,21 @@
+{
+  "schema": "manual-run-snapshot/v0 (pre-Phase-67)",
+  "task_id": "exp-dash-start-control-claude-opus-4-8",
+  "goal_sentence": "Add a Start/Stop measurement control to the Performance dashboard tab wired to the measurement CLI.",
+  "task_hash": "9eb8949af0b8fe513662a45abe5dc360025b32417d5b38ed9ea13111a9d15557",
+  "captured_at": "2026-06-29T05:33:58.590Z",
+  "run_parameters": {
+    "model": "claude-opus-4-8[1m]",
+    "agent": "claude",
+    "framework": "claude-code",
+    "spec_level": "adhoc"
+  },
+  "internal_state": {
+    "git_sha": "bbf191eef9a3536e5d00867177f6fc025a765de5",
+    "git_branch": "main",
+    "git_dirty_file_count": 9,
+    "git_stash_object": "e07c4b4fd8dfc14b7ad37daf6d3edfc3a0d56aea",
+    "restore_hint": "git checkout bbf191eef9a3536e5d00867177f6fc025a765de5 && git stash apply e07c4b4fd8dfc14b7ad37daf6d3edfc3a0d56aea"
+  },
+  "note": "Lightweight manual snapshot. Phase 67 (REPRO-01/02) would also capture .data/knowledge-graph KB, processOverrides, MCP inventory+versions, .planning state, env vars, agent binary version, and external-response fixtures for deterministic replay."
+}
