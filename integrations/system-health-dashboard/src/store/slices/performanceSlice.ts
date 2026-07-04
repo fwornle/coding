@@ -100,6 +100,11 @@ export interface TimelineRow {
   input_tokens?: number | null
   output_tokens?: number | null
   total_tokens?: number | null
+  // Prompt-cache tokens, surfaced SEPARATELY from total_tokens (which is input+output).
+  // cache_read = cache HIT (cheap), cache_write = cache creation. A heavily-cached claude
+  // run is dominated by these; without them it looks far cheaper than it is.
+  cache_read_tokens?: number | null
+  cache_write_tokens?: number | null
   tokens_estimated?: number | null
   estimated?: boolean
   children?: TimelineRow[]
@@ -171,6 +176,11 @@ export type FacetKey = keyof Omit<FacetState, 'startedAfter' | 'startedBefore'>
 
 interface PerformanceState {
   facetState: FacetState
+  // When true, fetchRuns requests ?includePending=true so D-06-quarantined
+  // (pending) runs — e.g. trivial/unclassified smoke runs — are surfaced in the
+  // Runs table instead of hidden. Default false: quarantined runs stay out of the
+  // comparison view (the server excludes them unless includePending is set).
+  includePending: boolean
   runs: Run[]
   runsLoading: boolean
   runsError: string | null
@@ -226,6 +236,7 @@ const emptyFacetState: FacetState = {
 
 const initialState: PerformanceState = {
   facetState: emptyFacetState,
+  includePending: false,
   runs: [],
   runsLoading: false,
   runsError: null,
@@ -268,9 +279,16 @@ export const DEFAULT_OVERRIDDEN_BY = 'dashboard-operator'
 
 export const fetchRuns = createAsyncThunk(
   'performance/fetchRuns',
-  async (_: void | undefined, { rejectWithValue }) => {
+  // Optional override: pass a boolean to force include/exclude quarantined runs.
+  // When omitted (mount, score-drawer re-dispatch), read the current toggle from
+  // state so every refetch respects the operator's "Show quarantined" choice.
+  async (includePending: boolean | void | undefined, { getState, rejectWithValue }) => {
     try {
-      const response = await fetch('/api/experiments/runs')
+      const inc = typeof includePending === 'boolean'
+        ? includePending
+        : (getState() as RootState).performance.includePending
+      const url = inc ? '/api/experiments/runs?includePending=true' : '/api/experiments/runs'
+      const response = await fetch(url)
       if (!response.ok) {
         throw new Error(`API returned ${response.status}`)
       }
@@ -551,6 +569,12 @@ const performanceSlice = createSlice({
       if (idx === -1) arr.push(value)
       else arr.splice(idx, 1)
     },
+    // Toggle whether D-06-quarantined (pending) runs are requested. The caller
+    // re-dispatches fetchRuns after flipping this so the table reloads with the
+    // new ?includePending value.
+    setIncludePending(state, action: PayloadAction<boolean>) {
+      state.includePending = action.payload
+    },
     // Set the date-window bounds (either side may be null = unbounded).
     setDateWindow(state, action: PayloadAction<{ startedAfter?: string | null; startedBefore?: string | null }>) {
       if ('startedAfter' in action.payload) state.facetState.startedAfter = action.payload.startedAfter ?? null
@@ -746,6 +770,7 @@ const performanceSlice = createSlice({
 
 export const {
   setFacet,
+  setIncludePending,
   setDateWindow,
   clearFilters,
   setSelectedTaskId,
@@ -769,6 +794,7 @@ export function scoreStateOf(run: Run): ScoreState {
 // Selectors — live in the slice file, typed against RootState.
 // ---------------------------------------------------------------------------
 export const selectRuns = (state: RootState) => state.performance.runs
+export const selectIncludePending = (state: RootState) => state.performance.includePending
 export const selectRunsLoading = (state: RootState) => state.performance.runsLoading
 export const selectRunsError = (state: RootState) => state.performance.runsError
 export const selectFacetState = (state: RootState) => state.performance.facetState

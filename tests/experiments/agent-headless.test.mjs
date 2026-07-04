@@ -38,9 +38,9 @@ test('argvForAgent(claude) → -p goal --model --permission-mode acceptEdits', (
   ]);
 });
 
-test('argvForAgent(opencode) → run goal -m model', () => {
+test('argvForAgent(opencode) → run goal -m model --dangerously-skip-permissions', () => {
   const argv = argvForAgent('opencode', GOAL, { model: MODEL });
-  assert.deepEqual(argv, ['run', GOAL, '-m', MODEL]);
+  assert.deepEqual(argv, ['run', GOAL, '-m', MODEL, '--dangerously-skip-permissions']);
 });
 
 test('argvForAgent(mastracode) → --prompt goal -m model', () => {

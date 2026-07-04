@@ -242,9 +242,16 @@ async function main() {
     : null;
   // Merge the variant meta (SPEC-01/SPEC-02) onto the record/replay base — only defined
   // keys land, preserving record:true and the conditional replay_from (Phase 77-02, D-03).
+  // --cwd: the directory the measured AGENT runs in. For a sandboxed experiment cell this is the
+  // throwaway worktree — NOT this start-process's cwd. The claude transcript locator (stop-adapter-
+  // registry) encodes this to find `~/.claude/projects/<cwd>/*.jsonl`; without it the locator uses
+  // the stop-process cwd (main repo) and MISSES the sandbox session → claude falls back to the
+  // cache-excluded proxy passthrough (a ~530× undercount). Absent → locator uses process.cwd().
+  const agentCwd = parseStrArg(args, '--cwd');
   const meta = {
     record: true,
     ...(replayFixturesDir ? { replay_from: replayFixturesDir } : {}),
+    ...(agentCwd ? { cwd: agentCwd } : {}),
     ...variantMeta,
   };
 

@@ -111,8 +111,16 @@ test('STOP_ADAPTERS.claude is a transcript adapter (cladpt + build) ', () => {
   assert.equal(typeof STOP_ADAPTERS.claude.build, 'function', 'claude adapter carries a build function');
 });
 
-test('STOP_ADAPTERS copilot/opencode/mastra are stamp-only with NO build (double-count guard)', () => {
-  for (const agent of ['copilot', 'opencode', 'mastra']) {
+test('STOP_ADAPTERS.copilot is a transcript adapter (copadt + build) — Copilot CLI cannot be proxy-routed', () => {
+  assert.ok(STOP_ADAPTERS.copilot, 'copilot adapter present');
+  assert.equal(STOP_ADAPTERS.copilot.mode, 'transcript', 'copilot foreground bypasses the proxy → transcript mode');
+  assert.equal(STOP_ADAPTERS.copilot.userHash, 'copadt', 'copilot rows are inserted as copadt');
+  assert.equal(typeof STOP_ADAPTERS.copilot.build, 'function', 'copilot adapter carries a build function');
+  assert.equal(STOP_ADAPTERS.copilot.subagents, false, 'copilot has no Task sub-agents');
+});
+
+test('STOP_ADAPTERS opencode/mastra are stamp-only with NO build (double-count guard — they DO route through the proxy)', () => {
+  for (const agent of ['opencode', 'mastra']) {
     assert.ok(STOP_ADAPTERS[agent], `${agent} adapter present`);
     assert.equal(STOP_ADAPTERS[agent].mode, 'stamp-only', `${agent} is proxy-routed → stamp-only`);
     assert.equal(
@@ -243,6 +251,50 @@ test('captureForegroundTokens(claude): stamps span.task_id (not the gone-at-clos
       assert.equal(rows[0].task_id, 'span-tid', 'stamped with span.task_id, not an empty/live id');
       assert.equal(rows[0].tool_call_id, 'req-in', 'the in-window turn, not the 04:00 one');
       assert.equal(inserted, 1);
+    } finally {
+      db.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('captureForegroundTokens(copilot): builds copadt rows from events.jsonl stamped with the task_id, window-scoped', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // Minimal copilot session-state events.jsonl: session.start (carries sessionId) +
+    // session.shutdown (carries modelMetrics.<model>.usage). buildCopilotTokenRows emits
+    // one per-session-aggregate row per model, timestamped at the shutdown event.
+    const fixture = path.join(dir, 'events.jsonl');
+    fs.writeFileSync(
+      fixture,
+      [
+        { type: 'session.start', timestamp: '2026-06-29T05:30:00.000Z', data: { sessionId: '11111111-0000-4000-a000-000000000000', cliVersion: '1.0.68' } },
+        { type: 'session.shutdown', timestamp: '2026-06-29T05:34:00.000Z', data: { shutdownType: 'routine', modelMetrics: { 'claude-sonnet-4.6': { usage: { inputTokens: 4200, outputTokens: 310 } } } } },
+      ].map((o) => JSON.stringify(o)).join('\n') + '\n',
+    );
+
+    const span = {
+      task_id: 'copi-stop-1',
+      agent: 'copilot',
+      started_at: '2026-06-29T05:29:00.000Z',
+      ended_at: '2026-06-29T05:35:00.000Z',
+    };
+    const inserted = await captureForegroundTokens(span, {
+      dbPath,
+      mainSessionPath: fixture, // inject the located copilot events.jsonl
+      resolveTaskId: async () => 'copi-stop-1',
+    });
+    assert.ok(inserted >= 1, 'copilot foreground rows built from events.jsonl');
+
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const rows = db.prepare('SELECT user_hash, task_id, process, model, total_tokens FROM token_usage').all();
+      assert.ok(rows.length >= 1, 'at least one copadt row inserted');
+      assert.ok(rows.every((r) => r.user_hash === 'copadt'), 'all rows are copadt (→ classified FOREGROUND)');
+      assert.ok(rows.every((r) => r.task_id === 'copi-stop-1'), 'every row stamped with the task_id');
+      assert.ok(rows.every((r) => r.process === 'token-adapter-copilot'), 'process is the copilot adapter (not a background daemon)');
+      assert.ok(rows.some((r) => r.total_tokens === 4510), 'aggregate tokens (4200+310) captured');
     } finally {
       db.close();
     }

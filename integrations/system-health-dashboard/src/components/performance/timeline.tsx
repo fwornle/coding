@@ -305,6 +305,14 @@ function StorySummary({ stats }: { stats: RoleStat[] }) {
               <span className="font-mono">{s.totalTokens.toLocaleString()}</span>
               <span className="text-muted-foreground">tok</span>
             </div>
+            {(s.cacheRead > 0 || s.cacheWrite > 0) && (
+              <div className="mt-0.5 flex items-baseline gap-2 text-xs" title="Prompt-cache tokens (read = cache hit, write = cache creation) — separate from the in+out total above.">
+                <span className="font-mono text-muted-foreground">{s.cacheRead.toLocaleString()}</span>
+                <span className="text-muted-foreground">cache r</span>
+                <span className="font-mono text-muted-foreground">{s.cacheWrite.toLocaleString()}</span>
+                <span className="text-muted-foreground">cache w</span>
+              </div>
+            )}
             <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground" title={s.models.join(', ')}>
               {s.models.length ? s.models.join(', ') : '—'}
             </div>

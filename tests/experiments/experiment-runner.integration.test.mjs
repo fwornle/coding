@@ -143,6 +143,8 @@ function buildOpts({ repoRoot, cells, repeats, rec, terminalFor = () => 'complet
     },
     // In-process measurement → real writeRun into the isolated store.
     runMeasurement: makeMeasurementWriter(repoRoot, rec),
+    // Passthrough routing seam — never probe a live proxy in the integration loop.
+    configureRouting: async (_agent, env) => env,
   };
 }
 

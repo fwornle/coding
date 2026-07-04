@@ -84,7 +84,7 @@ function RunPicker({ value, onChange, runs, label, exclude }: {
         </SelectTrigger>
         <SelectContent>
           {runs.map((r) => (
-            <SelectItem key={r.task_id} value={r.task_id} disabled={r.task_id === exclude}>
+            <SelectItem key={r.task_id} value={r.task_id} disabled={r.task_id === exclude} data-testid={`compare-option-${r.task_id}`}>
               {r.task_id}
               {r.canonical_model ? ` · ${normalizeModel(r.canonical_model)}` : ''}
             </SelectItem>
@@ -96,7 +96,7 @@ function RunPicker({ value, onChange, runs, label, exclude }: {
 }
 
 function statOf(stats: RoleStat[], role: Role): RoleStat {
-  return stats.find((s) => s.role === role) ?? { role, turns: 0, totalTokens: 0, models: [] }
+  return stats.find((s) => s.role === role) ?? { role, turns: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, models: [] }
 }
 
 function metaLine(run: Run | null, stats: RoleStat[]): ReactNode {
@@ -133,7 +133,11 @@ export function RunCompare() {
   const rows: MetricRow[] = [
     ...ROLE_ORDER.flatMap((role): MetricRow[] => [
       { label: `${ROLE_META[role].label} — turns`, a: statOf(statsA, role).turns, b: statOf(statsB, role).turns, better: role === 'foreground' ? 'neutral' : 'lower', group: true },
-      { label: `${ROLE_META[role].label} — tokens`, a: statOf(statsA, role).totalTokens, b: statOf(statsB, role).totalTokens, better: role === 'foreground' ? 'neutral' : 'lower' },
+      { label: `${ROLE_META[role].label} — tokens (in+out)`, a: statOf(statsA, role).totalTokens, b: statOf(statsB, role).totalTokens, better: role === 'foreground' ? 'neutral' : 'lower' },
+      // Cache tokens shown SEPARATELY from the in+out total — a heavily-cached run (claude) is
+      // dominated by these; without them its total looks implausibly small vs a fresh-read run.
+      { label: `${ROLE_META[role].label} — cache read`, a: statOf(statsA, role).cacheRead, b: statOf(statsB, role).cacheRead, better: 'neutral' },
+      { label: `${ROLE_META[role].label} — cache write`, a: statOf(statsA, role).cacheWrite, b: statOf(statsB, role).cacheWrite, better: 'neutral' },
     ]),
     { label: 'Total tokens', a: runA?.outcome?.totalTokens ?? null, b: runB?.outcome?.totalTokens ?? null, better: 'lower', group: true },
     { label: 'Wallclock / step (s)', a: runA?.wallclock_per_step ?? null, b: runB?.wallclock_per_step ?? null, better: 'lower', digits: 1 },

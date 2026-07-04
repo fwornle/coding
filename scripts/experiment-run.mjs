@@ -16,14 +16,25 @@
  * constraint, CLAUDE.md). Usage errors exit 2; a required-agent (claude/opencode) cell that
  * did not complete exits non-zero; any thrown runtime failure exits 1.
  *
+ * RUN UNATTENDED — token attribution caveat: each cell opens ONE global measurement span
+ * (active-measurement.json) that the shared host llm-proxy reads to stamp token_usage.task_id.
+ * There is a single span slot per data dir, so ANY concurrent main-session LLM call in this repo
+ * while a cell is open would be mis-stamped with the cell's task_id. Run this CLI standalone (no
+ * interactive agent driving the same repo) — consistent with the Phase-78 D-09 single-owner intent.
+ *
  * Env:
  *   CODING_REPO        repo working-tree root (default: cwd) → runMatrix repoRoot.
- *   LLM_PROXY_DATA_DIR live data dir (default: <repoRoot>/.data) → restore source.
+ *   LLM_PROXY_DATA_DIR live data dir (default: <repoRoot>/.data) → restore source AND the span
+ *                      dir the shared proxy reads for task_id attribution (must match the proxy).
+ *   LLM_PROXY_PORT     proxy port agents are routed through (default 12435) → ANTHROPIC_BASE_URL.
+ *   CODING_PROXY_ROUTE set to 0/false/no/off to launch agents DIRECT (unrouted → unmeasured);
+ *                      default routes claude/opencode through the proxy so their tokens attribute.
  *   EXPERIMENT_RUN_FAKE test-only seam — injects fail-soft stub seams (a stub agent that
  *                       always 'complete's, a throwaway restore sandbox, a no-op measurement
- *                       + resume store) so the CLI is drivable end-to-end WITHOUT a live
- *                       agent, snapshot, or the real Run store. Fail-soft; ignored in
- *                       production (mirrors EXPERIMENT_RESTORE_FAKE).
+ *                       + resume store, and a passthrough proxy-routing seam so no live proxy is
+ *                       probed) so the CLI is drivable end-to-end WITHOUT a live agent, snapshot,
+ *                       proxy, or the real Run store. Fail-soft; ignored in production
+ *                       (mirrors EXPERIMENT_RESTORE_FAKE).
  */
 
 import fs from 'node:fs';
@@ -74,6 +85,8 @@ function makeFakeSeams() {
     spawnAgent: async () => 'complete',
     runMeasurement: async () => 0,
     probeCopilot: () => true,
+    // Passthrough routing seam — never probe a live proxy under the fake harness.
+    configureRouting: async (_agent, env) => env,
   };
 }
 

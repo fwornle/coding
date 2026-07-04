@@ -1,0 +1,56 @@
+# config/experiments/compare-fizzbuzz.yaml — Phase-78 REAL cross-agent comparison matrix.
+#
+# Unlike smoke-cross-agent.yaml (a trivial plumbing proof whose runs quarantine as
+# not_scored:"trivial"), this spec drives a NON-TRIVIAL goal that produces ≥2 consequential
+# (state-changing) events per cell, so isTrivialRun is false and the judge actually scores each
+# run (goal/quality/coverage/regressions/drift). Combined with the 78-06 token-attribution fix
+# (the span is written to the MAIN data dir + agents are proxy-routed), each cell lands a SCORED
+# Run with non-zero token usage — so the dashboard /performance Compare view shows real deltas.
+#
+# Shares the smoke spec's structure (see its header for the WHY of `variants:`, copilot env:default
+# probe-gating, and the omitted mastra cell): each agent needs a different model-string FORMAT, so
+# the explicit named-variant escape hatch gives each cell its own model, all resolving to the
+# canonical {agent, model, framework, env, test_command} shape.
+#
+# RUN UNATTENDED (token-attribution caveat): one global active-measurement.json span slot + the
+# shared host proxy means any concurrent main-session LLM call in this repo during an open cell
+# would be mis-stamped with the cell's task_id. Kick this off standalone via
+# `node scripts/experiment-run.mjs --spec config/experiments/compare-fizzbuzz.yaml` and let it run.
+version: 1
+
+# Stable explicit experiment id → deterministic composite task_ids
+# (compare-fizzbuzz--<variant>--r<rep>) and correct D-10 idempotent resume. Without it the id is
+# derived from the goal hash, which is fine but opaque.
+experiment_id: compare-fizzbuzz
+
+# Declare-time baseline snapshot (D-09) — reuse the existing complete Phase-78 baseline each cell
+# restores into an ISOLATED sandbox worktree (restoreForCell inPlace:false, D-02, zero blast radius).
+snapshot_id: smoke-spec
+
+# Non-trivial goal: two file writes (module + test) → ≥2 consequential events → judged, not trivial.
+goal_sentence: "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'."
+
+repeats: 1
+
+# Real score-time test command (D-05: runs at SCORE time only, NEVER the completion gate). It
+# executes each agent's actual output in the cell's sandbox worktree, so the coverage/quality
+# rubric reflects whether the agent produced a working, tested module. Fixed argv, no shell meta.
+test_command: "node --test fizzbuzz.test.mjs"
+
+variants:
+  # REQUIRED agent (D-12) — claude via -p, alias model, --permission-mode acceptEdits.
+  - agent: claude
+    model: sonnet
+    framework: straight
+    env: default
+  # REQUIRED agent (D-12) — opencode via `run`, model routed through rapid-proxy (:12435).
+  - agent: opencode
+    model: rapid-proxy/claude-haiku-4-5
+    framework: straight
+    env: default
+  # Probe-gated (RUN-04) — env:default so validateCells passes; the runner's one-turn probe
+  # decides run (copilot -p --allow-all-tools) vs. recorded skip (copilot-headless-unsupported).
+  - agent: copilot
+    model: auto
+    framework: straight
+    env: default

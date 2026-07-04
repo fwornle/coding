@@ -21,7 +21,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 
-import { launchCell, runCell, runMatrix, composeTaskId, cellName } from '../../lib/experiments/experiment-runner.mjs';
+import { launchCell, runCell, runMatrix, composeTaskId, cellName, configureProxyRoutingEnv } from '../../lib/experiments/experiment-runner.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STUB = path.resolve(__dirname, '_fixtures', 'stub-agent.mjs');
@@ -123,14 +123,18 @@ const AGENTS_DIR = path.resolve(__dirname, '..', '..', 'config', 'agents');
 const CELL = { agent: 'claude', model: 'sonnet', framework: 'none', env: 'default' };
 
 // Build a runCell invocation with recording seams; `terminal` sets the fake agent result.
-function runCellWith({ terminal = 'complete', cell = CELL, taskClass } = {}) {
+// `configureRouting` defaults to a passthrough so no live proxy is probed; a test may inject
+// the real helper (with a fake probe) to assert routing. The span uses an explicit MAIN
+// dataDir ('/main/.data') distinct from the sandbox ('/wt/.data') to prove the split.
+function runCellWith({ terminal = 'complete', cell = CELL, taskClass, configureRouting } = {}) {
   const calls = [];
+  let agentSpawnEnv;
   const restore = async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' });
   const runMeasurement = async (phase, argv, o) => {
     calls.push({ phase, argv, env: o?.env });
     return 0;
   };
-  const spawnAgent = async () => terminal;
+  const spawnAgent = async ({ env }) => { agentSpawnEnv = env; return terminal; };
   const promise = runCell({
     cell,
     rep: 0,
@@ -139,14 +143,16 @@ function runCellWith({ terminal = 'complete', cell = CELL, taskClass } = {}) {
     snapshotId: 'snap-1',
     taskClass,
     agentsDir: AGENTS_DIR,
+    dataDir: '/main/.data',
     restore,
     runMeasurement,
     spawnAgent,
+    configureRouting: configureRouting || (async (_a, env) => env),
   });
-  return { promise, calls };
+  return { promise, calls, get agentSpawnEnv() { return agentSpawnEnv; } };
 }
 
-test('runCell: restores then measurement-start with composite task_id + variant/repeat/agent + sandbox env', async () => {
+test('runCell: restores then measurement-start with composite task_id + variant/repeat/agent + span→MAIN dataDir', async () => {
   const { promise, calls } = runCellWith({ terminal: 'complete' });
   const res = await promise;
   const start = calls.find((c) => c.phase === 'start');
@@ -160,18 +166,21 @@ test('runCell: restores then measurement-start with composite task_id + variant/
   assert.equal(a[a.indexOf('--model') + 1], 'sonnet');
   assert.equal(a[a.indexOf('--framework') + 1], 'none');
   assert.ok(a.includes('--goal'));
-  assert.equal(start.env.LLM_PROXY_DATA_DIR, '/wt/.data');
+  // The span MUST be written to the MAIN data dir (the shared proxy's dir), NOT the sandbox —
+  // this is what makes the proxy stamp the run's task_id onto captured token rows.
+  assert.equal(start.env.LLM_PROXY_DATA_DIR, '/main/.data');
   assert.equal(res.terminalState, 'complete');
 });
 
-test('runCell: on complete, measurement-stop runs once with --headless --terminal-state complete + sandbox env', async () => {
+test('runCell: on complete, measurement-stop runs once with --headless --terminal-state complete + span→MAIN dataDir', async () => {
   const { promise, calls } = runCellWith({ terminal: 'complete' });
   await promise;
   const stops = calls.filter((c) => c.phase === 'stop');
   assert.equal(stops.length, 1);
   assert.ok(stops[0].argv.includes('--headless'));
   assert.equal(stops[0].argv[stops[0].argv.indexOf('--terminal-state') + 1], 'complete');
-  assert.equal(stops[0].env.LLM_PROXY_DATA_DIR, '/wt/.data');
+  // stop aggregates from the MAIN token-usage.db → span env is the MAIN dir, matching start.
+  assert.equal(stops[0].env.LLM_PROXY_DATA_DIR, '/main/.data');
 });
 
 test('runCell: on abort, measurement-stop STILL runs (finally) with the mapped --terminal-state abort', async () => {
@@ -199,6 +208,45 @@ test('runCell: start + stop are fixed-argv arrays of strings (no shell string) a
   }
   const stop = calls.find((c) => c.phase === 'stop');
   assert.equal(stop.argv[stop.argv.indexOf('--task-class') + 1], 'feature');
+});
+
+test('runCell: opencode is spawned with proxy routing (ANTHROPIC_BASE_URL) + sandbox LLM_PROXY_DATA_DIR', async () => {
+  // Inject the REAL configureProxyRoutingEnv with a fake probe reporting the proxy up. opencode
+  // is the proxy-routed agent (claude/copilot use their own file adapters and are NOT routed).
+  const routing = async (agent, env) =>
+    configureProxyRoutingEnv(agent, env, { port: 12435, probe: async () => ({ status: 'running' }), route: '1' });
+  const cell = { agent: 'opencode', model: 'rapid-proxy/claude-haiku-4-5', framework: 'straight', env: 'default' };
+  const handle = runCellWith({ terminal: 'complete', cell, configureRouting: routing });
+  await handle.promise;
+  const env = handle.agentSpawnEnv;
+  assert.ok(env, 'agent spawn env was captured');
+  assert.equal(env.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435', 'opencode routed through the proxy');
+  assert.equal(env.LLM_PROXY_DATA_DIR, '/wt/.data', 'agent keeps sandbox data dir (isolation preserved)');
+});
+
+test('configureProxyRoutingEnv: opencode routes+keeps key; claude is NOT routed (transcript adapter); unreachable/opt-out→unrouted', async () => {
+  const up = async () => ({ status: 'running' });
+  const down = async () => ({ status: 'stopped', error: 'ECONNREFUSED' });
+  const base = { ANTHROPIC_API_KEY: 'k', LLM_PROXY_DATA_DIR: '/wt/.data' };
+
+  const oc = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: up, route: '1' });
+  assert.equal(oc.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435');
+  assert.equal(oc.ANTHROPIC_API_KEY, 'k', 'opencode keeps its own credential');
+
+  // claude is deliberately NOT proxy-routed even when the proxy is up — it is captured via its
+  // ~/.claude transcript adapter (which includes cache tokens); routing it would record
+  // cache-excluded rows that beat the accurate transcript rows on dedup. The coding session
+  // EXPORTS ANTHROPIC_BASE_URL, so an INHERITED value must be actively DELETED, not just left unset.
+  const inherited = { ...base, ANTHROPIC_BASE_URL: 'http://127.0.0.1:12435' };
+  const cl = await configureProxyRoutingEnv('claude', inherited, { port: 12435, probe: up, route: '1' });
+  assert.ok(!('ANTHROPIC_BASE_URL' in cl), 'claude drops the inherited ANTHROPIC_BASE_URL → goes direct, transcript captures it');
+  assert.equal(cl.ANTHROPIC_API_KEY, 'k', 'claude keeps its own creds');
+
+  const unreachable = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: down, route: '1' });
+  assert.ok(!('ANTHROPIC_BASE_URL' in unreachable), 'proxy down → launched unrouted (fail-soft)');
+
+  const optOut = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: up, route: '0' });
+  assert.ok(!('ANTHROPIC_BASE_URL' in optOut), 'CODING_PROXY_ROUTE=0 → unrouted');
 });
 
 // ---------------------------------------------------------------------------
@@ -229,9 +277,11 @@ function matrixHarness({ cells, repeats = 1, done = [], copilotOk = true, spawnI
   };
   const defaultSpawn = async ({ argv }) => { rec.launched.push(argv); return 'complete'; };
   const spawnAgent = spawnImpl || defaultSpawn;
+  // Passthrough routing seam so runMatrix→runCell never probes a live proxy under test.
+  const configureRouting = async (_agent, env) => env;
   return { rec, store, opts: {
     expId: 'exp1', snapshotId: 'snap-1', agentsDir: AGENTS_DIR,
-    resolveSpec, openStore, readDone, probeCopilot, restore, runMeasurement, spawnAgent,
+    resolveSpec, openStore, readDone, probeCopilot, restore, runMeasurement, spawnAgent, configureRouting,
   } };
 }
 

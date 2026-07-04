@@ -149,19 +149,28 @@ export interface RoleStat {
   role: Role
   turns: number
   totalTokens: number
+  // Prompt-cache tokens, kept SEPARATE from totalTokens (which is input+output). A heavily
+  // cached run (e.g. claude) is dominated by cacheRead/cacheWrite; showing them separately
+  // explains why its input+output total looks small.
+  cacheRead: number
+  cacheWrite: number
   models: string[]
 }
 
+const num = (v: unknown): number => (typeof v === 'number' && !Number.isNaN(v) ? v : 0)
+
 export function summarizeByRole(rows: TimelineRow[], run: Run | null): RoleStat[] {
-  const acc: Record<Role, { turns: number; totalTokens: number; models: Set<string> }> = {
-    foreground: { turns: 0, totalTokens: 0, models: new Set() },
-    knowledge: { turns: 0, totalTokens: 0, models: new Set() },
-    infrastructure: { turns: 0, totalTokens: 0, models: new Set() },
+  const acc: Record<Role, { turns: number; totalTokens: number; cacheRead: number; cacheWrite: number; models: Set<string> }> = {
+    foreground: { turns: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, models: new Set() },
+    knowledge: { turns: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, models: new Set() },
+    infrastructure: { turns: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, models: new Set() },
   }
   for (const r of rows) {
     const role = roleForProcess(r.process, run)
     acc[role].turns += 1
-    acc[role].totalTokens += typeof r.total_tokens === 'number' ? r.total_tokens : 0
+    acc[role].totalTokens += num(r.total_tokens)
+    acc[role].cacheRead += num(r.cache_read_tokens)
+    acc[role].cacheWrite += num(r.cache_write_tokens)
     const m = normalizeModel(r.model)
     if (m) acc[role].models.add(m)
   }
@@ -169,6 +178,8 @@ export function summarizeByRole(rows: TimelineRow[], run: Run | null): RoleStat[
     role,
     turns: acc[role].turns,
     totalTokens: acc[role].totalTokens,
+    cacheRead: acc[role].cacheRead,
+    cacheWrite: acc[role].cacheWrite,
     models: [...acc[role].models],
   }))
 }
