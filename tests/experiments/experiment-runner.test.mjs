@@ -21,7 +21,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 
-import { launchCell, runCell, runMatrix } from '../../lib/experiments/experiment-runner.mjs';
+import { launchCell, runCell, runMatrix, composeTaskId, cellName } from '../../lib/experiments/experiment-runner.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STUB = path.resolve(__dirname, '_fixtures', 'stub-agent.mjs');
@@ -327,4 +327,15 @@ test('runMatrix: summary lists one result per attempted cell with a status', asy
     assert.ok(['ran', 'skipped'].includes(s.status));
     assert.ok(typeof s.task_id === 'string' && s.task_id.startsWith('exp1--'));
   }
+});
+
+test('composeTaskId slugifies path separators so an opencode provider/model task_id stays filesystem-safe (fix B) while the variant keeps the slash', () => {
+  const cell = { agent: 'opencode', model: 'rapid-proxy/claude-haiku-4-5', framework: 'straight', env: 'default' };
+  const taskId = composeTaskId('exp-abc', cell, 0);
+  // task_id must carry NO path separator — it is used as a filesystem key downstream (D-10 resume).
+  assert.ok(!taskId.includes('/'), `task_id must not contain '/': ${taskId}`);
+  assert.ok(!taskId.includes('\\'), `task_id must not contain '\\': ${taskId}`);
+  assert.equal(taskId, 'exp-abc--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0');
+  // The variant tag (cellName) intentionally stays human-readable, slash preserved.
+  assert.equal(cellName(cell), 'opencode-rapid-proxy/claude-haiku-4-5-straight-default');
 });
