@@ -211,8 +211,8 @@ test('runCell: start + stop are fixed-argv arrays of strings (no shell string) a
 });
 
 test('runCell: opencode is spawned with proxy routing (ANTHROPIC_BASE_URL) + sandbox LLM_PROXY_DATA_DIR', async () => {
-  // Inject the REAL configureProxyRoutingEnv with a fake probe reporting the proxy up. opencode
-  // is the proxy-routed agent (claude/copilot use their own file adapters and are NOT routed).
+  // Inject the REAL configureProxyRoutingEnv with a fake probe reporting the proxy up. Since
+  // Phase 82, claude and copilot are ALSO routed (see the dedicated routing test below).
   const routing = async (agent, env) =>
     configureProxyRoutingEnv(agent, env, { port: 12435, probe: async () => ({ status: 'running' }), route: '1' });
   const cell = { agent: 'opencode', model: 'rapid-proxy/claude-haiku-4-5', framework: 'straight', env: 'default' };
@@ -224,7 +224,7 @@ test('runCell: opencode is spawned with proxy routing (ANTHROPIC_BASE_URL) + san
   assert.equal(env.LLM_PROXY_DATA_DIR, '/wt/.data', 'agent keeps sandbox data dir (isolation preserved)');
 });
 
-test('configureProxyRoutingEnv: opencode routes+keeps key; claude is NOT routed (transcript adapter); unreachable/opt-out→unrouted', async () => {
+test('configureProxyRoutingEnv: opencode routes+keeps key; claude routes + x-task-id header (Phase 82); unreachable/opt-out→unrouted', async () => {
   const up = async () => ({ status: 'running' });
   const down = async () => ({ status: 'stopped', error: 'ECONNREFUSED' });
   const base = { ANTHROPIC_API_KEY: 'k', LLM_PROXY_DATA_DIR: '/wt/.data' };
@@ -233,14 +233,17 @@ test('configureProxyRoutingEnv: opencode routes+keeps key; claude is NOT routed 
   assert.equal(oc.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435');
   assert.equal(oc.ANTHROPIC_API_KEY, 'k', 'opencode keeps its own credential');
 
-  // claude is deliberately NOT proxy-routed even when the proxy is up — it is captured via its
-  // ~/.claude transcript adapter (which includes cache tokens); routing it would record
-  // cache-excluded rows that beat the accurate transcript rows on dedup. The coding session
-  // EXPORTS ANTHROPIC_BASE_URL, so an INHERITED value must be actively DELETED, not just left unset.
-  const inherited = { ...base, ANTHROPIC_BASE_URL: 'http://127.0.0.1:12435' };
-  const cl = await configureProxyRoutingEnv('claude', inherited, { port: 12435, probe: up, route: '1' });
-  assert.ok(!('ANTHROPIC_BASE_URL' in cl), 'claude drops the inherited ANTHROPIC_BASE_URL → goes direct, transcript captures it');
+  // Phase 82 re-routes claude through the proxy: the former unroute workaround existed only
+  // because the tap dropped cache accounting (fixed Plan 02) and first-writer-wins dedup shadowed
+  // the richer cladpt transcript row (fixed Plan 04). The x-task-id header binds the tap's
+  // passthrough rows to THIS cell's span per-request (kills ambient-span leakage).
+  const cl = await configureProxyRoutingEnv('claude', base, { port: 12435, probe: up, route: '1', taskId: 't-1' });
+  assert.equal(cl.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435', 'claude is proxy-routed (Phase 82)');
+  assert.equal(cl.ANTHROPIC_CUSTOM_HEADERS, 'x-task-id: t-1', 'claude carries the per-request task binding header');
   assert.equal(cl.ANTHROPIC_API_KEY, 'k', 'claude keeps its own creds');
+
+  const clNoTask = await configureProxyRoutingEnv('claude', base, { port: 12435, probe: up, route: '1' });
+  assert.ok(!('ANTHROPIC_CUSTOM_HEADERS' in clNoTask), 'no taskId → no custom headers env');
 
   const unreachable = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: down, route: '1' });
   assert.ok(!('ANTHROPIC_BASE_URL' in unreachable), 'proxy down → launched unrouted (fail-soft)');
