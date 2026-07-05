@@ -4,7 +4,7 @@
 
 - ✅ **v7.3 LLM Proxy Performance — Claude CLI Worker Pool** — Phases 62–66 (shipped 2026-06-21)
 - ✅ **v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution** — Phases 67–75 (100% of phases; complete pending formal `/gsd-complete-milestone` close)
-- 🚧 **v7.5 Cross-Agent Comparison Experiment Runner** — Phases 76–80 (active 2026-07-03)
+- 🚧 **v7.5 Cross-Agent Comparison Experiment Runner** — Phases 76–87 (active 2026-07-03)
 
 ## Phases
 
@@ -40,7 +40,7 @@ Quantify, per task, the full cost (tokens), time-to-delivery, route quality, and
 
 </details>
 
-### 🚧 v7.5 Cross-Agent Comparison Experiment Runner (Phases 76–80)
+### 🚧 v7.5 Cross-Agent Comparison Experiment Runner (Phases 76–87)
 
 Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus a variant matrix ("develop X, measure it under settings A vs B") and a repeat count; the system drives each variant across agents from an identical starting snapshot, evaluates an objective success gate, and returns a scored, side-by-side comparison with per-variant variance. This is an **orchestration layer** on the v7.4 substrate (`measurement-start/stop.mjs`, `task_hash`, the experiment km-core KB + `experiments-*` CLIs, the Performance dashboard tab, proxy routing for all four agents, the Phase 67 reproducibility-replay rig) — it WIRES those primitives, it does not rebuild them.
 
@@ -51,6 +51,16 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [ ] **Phase 78: Autonomous Cross-Agent Runner** — Unattended per-cell agent launch wrapped in a measured span; timeouts/aborts recorded; Copilot gated on a headless-drivability spike (RUN-02/03/04)
 - [ ] **Phase 79: Comparison, Aggregation & Report** — Objective success gate, N-repeat aggregation with variance, ranked side-by-side report keyed by `task_hash` (CMP-01/02/03)
 - [ ] **Phase 80: Experiment Surface — Dashboard & Skill Packaging** — Comparison as variant columns in the Performance tab + single installed `experiment run` skill across the coding agents (CMP-04, ORCH-01)
+
+**Uniform-measurement extension (2026-07-05):** Phases 81–87 extend the milestone with the uniform 4-agent measurement program — wire-level token + context-window capture at the proxy for ALL agents, per-turn context revelation, dashboard control center + timeline v2, and interactive branch-avenue measurement. Research: `.planning/research/uniform-measurement-dossier.md`, `.planning/research/proxy-infra-report.md`.
+
+- [ ] **Phase 81: Copilot BYOK Proxy-Routing Verification Spike** — Live probes of `COPILOT_PROVIDER_BASE_URL` against the proxy; verdict recorded in the spike doc (gates copilot wire scope in Phase 82)
+- [ ] **Phase 82: Wire-Measurement Foundation** — Uniform 4-agent proxy capture: cache-token columns + /v1/messages tap cache parse + x-task-id/x-agent header binding + claude-cell & copilot routing + richer-row dedup merge
+- [ ] **Phase 83: Token Reconciliation Layer** — Transcript adapters (cladpt/copadt) verify/enrich wire rows; per-span discrepancy sink; no double-counting
+- [ ] **Phase 84: Per-Turn Context Revelation** — Persist every measured request as context-turns JSONL with paired usage; read APIs; honest cache explainer
+- [ ] **Phase 85: Experiment Control Center** — Launch / re-run (same snapshot, param overrides) / monitor / cancel experiments from the performance dashboard
+- [ ] **Phase 86: Timeline v2 & Performance Page Declutter** — Per-turn story (prompt, tool calls, cache split, context band) + IA cleanup
+- [ ] **Phase 87: Interactive Spans & Branch Avenues** — Span snapshot from the main agent; forked avenue branches re-running the initial prompt with modified params; compare & merge
 
 ## Phase Details
 
@@ -275,6 +285,52 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 **Plans**: TBD
 **UI hint**: yes
 
+### Phase 81: Copilot BYOK Proxy-Routing Verification Spike
+**Goal**: A live-evidence verdict on routing Copilot CLI through the measurement proxy via BYOK env vars (`COPILOT_PROVIDER_BASE_URL`/`COPILOT_PROVIDER_TYPE`/`COPILOT_PROVIDER_WIRE_MODEL`): shim reached, model mapping resolved, streaming + tool calls intact, copilot-stamped token rows in token-usage.db — recorded in `.planning/spikes/copilot-proxy-interception.md` (confirms or overturns the 2026-06-04 "no seam" conclusion). Fallback verdict if BYOK fails: copilot stays copadt-primary (3 wire + 1 reconciled).
+**Depends on**: Nothing (independent live spike; gates copilot scope in Phase 82)
+**Requirements**: TBD
+**Plans**: TBD
+
+### Phase 82: Wire-Measurement Foundation (Uniform 4-Agent Proxy Capture)
+**Goal**: All four agents' LLM calls land in proxy `token_usage` with cache split and per-request task binding: cache-token columns in the proxy schema (names matching coding-side `ensureCacheColumns`), `/v1/messages` tap parses `cache_read/cache_creation` usage (SSE + non-streaming), `x-task-id`/`x-agent` headers honored on `/v1/messages` (kills ambient-singleton leakage), claude experiment cells re-routed through the proxy, copilot BYOK routing per the Phase 81 verdict, and `insertTokenRowDeduped` merges richer rows instead of first-writer-wins. Flag-gated: opencode anthropic-native provider for prompt-cache fidelity.
+**Depends on**: Phase 81 (copilot scope)
+**Requirements**: TBD
+**Plans**: TBD
+
+### Phase 83: Token Reconciliation Layer
+**Goal**: cladpt/copadt transcript adapters become verify/enrich sources (new `reconcile` mode): wire rows are primary; transcript rows match by request-id (time+model fuzzy fallback); discrepancies recorded per span in `reconciliation.json`; transcript fallback preserved for proxy-down windows; copilot cache split merged from session-state — zero double-counting.
+**Depends on**: Phase 82
+**Requirements**: TBD
+**Plans**: TBD
+
+### Phase 84: Per-Turn Context Revelation
+**Goal**: Every measured request persisted as one context-turns JSONL line (category analysis, cache-breakpoint positions, per-message digests incl. tool_use names + sizes, paired response usage), gzipped at span close with retention policy; optional flag-gated full raw bodies; read APIs on proxy (`/api/context-turns`) + vkb-server pass-through; cache explainer shows honest per-turn sent/cached/fresh numbers for all agents with the "how prompt caching actually works" copy.
+**Depends on**: Phase 82
+**Requirements**: TBD
+**Plans**: TBD
+
+### Phase 85: Experiment Control Center
+**Goal**: Experiments can be launched, re-run (same snapshot_id + param overrides via `rerun_of`), monitored (progress-file polling), and cancelled from the performance dashboard through new detached-run trigger APIs (`POST /api/experiments/run`, `run-status`, `run-cancel`) and an experiment-launcher UI.
+**Depends on**: Phase 78 (runner CLI); parallelizable with Phase 84
+**Requirements**: TBD
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 86: Timeline v2 & Performance Page Declutter
+**Goal**: The run timeline tells the per-turn story — user-prompt excerpt, tool calls with args digests, token cost with cache split, stacked context-window band per turn — with drill-down modal and fullscreen view; performance page IA decluttered (surfaced quarantine toggle, compare-from-selection, one-step scoring, reconciliation badge); graceful degradation for runs without context-turns data.
+**Depends on**: Phases 82, 84 (data); Phase 83 (reconciliation badge)
+**Requirements**: TBD
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 87: Interactive Spans & Branch Avenues
+**Goal**: A measurement span started from the main interactive agent captures origin snapshot + initial prompt; completed spans fork into "avenues" — headless re-runs of the initial prompt with modified agent/model/framework, each on a persistent `avenue/<task_id>` git branch — grouped by origin, compared in the dashboard, merge-status tracked; measurement data survives across branches (main-`.data` stores).
+**Depends on**: Phases 82, 85
+**Requirements**: TBD
+**Plans**: TBD
+**UI hint**: yes
+
+
 ## Progress
 
 | Phase | Milestone | Plans | Status | Completed |
@@ -298,3 +354,10 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 78. Autonomous Cross-Agent Runner | v7.5 | 4/5 | In Progress|  |
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
+| 81. Copilot BYOK Verification Spike | v7.5 | 0/? | Not started | - |
+| 82. Wire-Measurement Foundation | v7.5 | 0/? | Not started | - |
+| 83. Token Reconciliation Layer | v7.5 | 0/? | Not started | - |
+| 84. Per-Turn Context Revelation | v7.5 | 0/? | Not started | - |
+| 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
+| 86. Timeline v2 & Declutter | v7.5 | 0/? | Not started | - |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 0/? | Not started | - |
