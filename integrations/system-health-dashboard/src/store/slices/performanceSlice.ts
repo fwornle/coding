@@ -63,6 +63,10 @@ export interface Run {
   // (renders the em-dash sentinel), never coerced.
   background_models?: { model: string; process: string; total_tokens: number }[]
   framework?: string | null
+  // Human-readable goal sentence typed at measurement start (persisted on the
+  // Run entity's `description`, surfaced by readRuns as goal_sentence). null for
+  // legacy runs that recorded no goal. Distinct from the goal_achieved *score*.
+  goal_sentence?: string | null
   pending?: boolean | null
   started_at?: string | null
   ended_at?: string | null
@@ -186,6 +190,9 @@ interface PerformanceState {
   runsError: string | null
   selectedTaskId: string | null // drives the inline Timeline panel (row click)
   overrideTaskId: string | null // drives the modal Score-override drawer (explicit "Edit scores")
+  explainTaskId: string | null // drives the Context/Caching explainer dialog (explicit "Explain" button)
+  selectedRunIds: string[] // multi-select for bulk run deletion
+  deleteRunsPending: boolean
   compareA: string | null // run-comparison view: left run
   compareB: string | null // run-comparison view: right run
   timelineByTaskId: Record<string, TimelineRow[]>
@@ -242,6 +249,9 @@ const initialState: PerformanceState = {
   runsError: null,
   selectedTaskId: null,
   overrideTaskId: null,
+  explainTaskId: null,
+  selectedRunIds: [],
+  deleteRunsPending: false,
   compareA: null,
   compareB: null,
   timelineByTaskId: {},
@@ -300,6 +310,34 @@ export const fetchRuns = createAsyncThunk(
       return rows
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// Delete one or more runs (Run + joined Score/Outcome/Route) from the experiment
+// store, then re-fetch the runs list and clear the selection. Server-authoritative
+// via DELETE /api/experiments/runs { taskIds }.
+export const deleteSelectedRuns = createAsyncThunk<
+  { deleted: string[]; entities: number },
+  string[],
+  { rejectValue: string }
+>(
+  'performance/deleteSelectedRuns',
+  async (taskIds, { dispatch, rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/runs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds }),
+      })
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      // Refresh the table so the deleted rows disappear (respects the current
+      // includePending toggle via the no-arg fetchRuns).
+      await dispatch(fetchRuns())
+      return { deleted: (data?.deleted ?? []) as string[], entities: (data?.entities ?? 0) as number }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Delete failed')
     }
   }
 )
@@ -606,6 +644,26 @@ const performanceSlice = createSlice({
       state.saveOverrideStatus = null
       state.saveOverrideSuccessAt = null
     },
+    setExplainTaskId(state, action: PayloadAction<string | null>) {
+      // Explicit "Explain context & caching" affordance opens the read-only
+      // ContextCacheExplainer dialog. Decoupled from row selection (like the
+      // score drawer) so the inline Timeline panel stays viewable underneath.
+      state.explainTaskId = action.payload
+    },
+    toggleRunSelected(state, action: PayloadAction<string>) {
+      const id = action.payload
+      const i = state.selectedRunIds.indexOf(id)
+      if (i === -1) state.selectedRunIds.push(id)
+      else state.selectedRunIds.splice(i, 1)
+    },
+    // Replace the whole selection (used by select-all / select-none over the
+    // currently-filtered set; the caller passes the exact id list).
+    setRunsSelected(state, action: PayloadAction<string[]>) {
+      state.selectedRunIds = action.payload
+    },
+    clearRunSelection(state) {
+      state.selectedRunIds = []
+    },
     setActiveReportId(state, action: PayloadAction<string | null>) {
       state.activeReportId = action.payload
     },
@@ -635,6 +693,17 @@ const performanceSlice = createSlice({
       .addCase(fetchRuns.rejected, (state, action) => {
         state.runsLoading = false
         state.runsError = (action.payload as string) ?? 'Failed to load runs'
+      })
+      .addCase(deleteSelectedRuns.pending, (state) => {
+        state.deleteRunsPending = true
+      })
+      .addCase(deleteSelectedRuns.fulfilled, (state) => {
+        state.deleteRunsPending = false
+        state.selectedRunIds = [] // selection consumed; fetchRuns already re-dispatched
+      })
+      .addCase(deleteSelectedRuns.rejected, (state, action) => {
+        state.deleteRunsPending = false
+        state.runsError = (action.payload as string) ?? 'Failed to delete runs'
       })
       .addCase(fetchTimeline.pending, (state) => {
         state.timelineLoading = true
@@ -775,6 +844,10 @@ export const {
   clearFilters,
   setSelectedTaskId,
   setOverrideTaskId,
+  setExplainTaskId,
+  toggleRunSelected,
+  setRunsSelected,
+  clearRunSelection,
   setActiveReportId,
   setCompareA,
   setCompareB,
@@ -838,6 +911,16 @@ export const selectSelectedRun = (state: RootState): Run | null => {
 export const selectOverrideTaskId = (state: RootState) => state.performance.overrideTaskId
 export const selectOverrideRun = (state: RootState): Run | null => {
   const id = state.performance.overrideTaskId
+  if (!id) return null
+  return state.performance.runs.find((r) => r.task_id === id) ?? null
+}
+
+// The run whose context/caching is explained in the ContextCacheExplainer dialog.
+export const selectSelectedRunIds = (state: RootState) => state.performance.selectedRunIds
+export const selectDeleteRunsPending = (state: RootState) => state.performance.deleteRunsPending
+export const selectExplainTaskId = (state: RootState) => state.performance.explainTaskId
+export const selectExplainRun = (state: RootState): Run | null => {
+  const id = state.performance.explainTaskId
   if (!id) return null
   return state.performance.runs.find((r) => r.task_id === id) ?? null
 }

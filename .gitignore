@@ -191,6 +191,16 @@ integrations/mcp-server-browserbase/
 # artifacts (epoch-named), never committed.
 .data/measurements/
 
+# LLM-proxy runtime state: token-usage.db (+ wal/shm), logs, and the Phase-78
+# context-window captures (context-breakdown.json + per-run context-breakdown/).
+# All regenerable at request time — never committed. (llm-settings.json already
+# ignored above.)
+.data/llm-proxy/
+
+# Session scratch + Playwright/browser artifacts — local only, never committed.
+scratchpad/
+integrations/system-health-dashboard/test-results/
+
 # Reproducibility/replay-rig run snapshots (Phase 67, REPRO-01) — each snapshot holds
 # captured prompts, KB, processOverrides, MCP inventory, and agent-affecting env vars.
 # These MUST NOT be committed (Security V9, T-67-03-02); verified by git check-ignore.

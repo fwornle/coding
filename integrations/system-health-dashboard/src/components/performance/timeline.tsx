@@ -507,6 +507,14 @@ export function PerformanceTimeline() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Timeline</CardTitle>
+        {/* The human-readable goal sentence (Run.description → goal_sentence),
+            distinct from the goal_achieved score column. Hidden for legacy runs
+            that recorded no goal. */}
+        {run?.goal_sentence && (
+          <p className="mt-0.5 text-sm" data-testid="timeline-goal">
+            <span className="text-muted-foreground">Goal:</span> {run.goal_sentence}
+          </p>
+        )}
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span data-testid="timeline-canonical-model">
             Chat model:{' '}

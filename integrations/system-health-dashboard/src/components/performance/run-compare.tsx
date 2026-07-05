@@ -108,6 +108,11 @@ function metaLine(run: Run | null, stats: RoleStat[]): ReactNode {
       <div className="text-muted-foreground">
         {run.agent ?? '—'} · fg models: {fg.models.length ? fg.models.join(', ') : '—'}
       </div>
+      {/* Goal sentence (Run.description), if recorded — lets the operator confirm
+          both runs pursued the same goal before trusting the Δ. */}
+      {run.goal_sentence && (
+        <div className="mt-0.5 text-muted-foreground">Goal: {run.goal_sentence}</div>
+      )}
     </div>
   )
 }

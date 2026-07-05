@@ -288,6 +288,21 @@ class SystemHealthAPIServer {
         this.app.get('/api/cgr/progress', this.handleGetCGRProgress.bind(this));
         this.app.post('/api/cgr/reindex', this.handleCGRReindex.bind(this));
 
+         // Context-window breakdown (Phase 78) — real per-category sizes of the
+         // main session's latest /v1/messages, captured proxy-side. Same-origin
+         // passthrough to the LLM proxy, mirroring the token-usage proxy below.
+         this.app.get('/api/context-breakdown', async (req, res) => {
+             try {
+                 const qs = new URLSearchParams(req.query).toString();
+                 const url = `http://host.docker.internal:12435/api/context-breakdown${qs ? '?' + qs : ''}`;
+                 const resp = await fetch(url);
+                 const data = await resp.json();
+                 res.status(resp.status).json(data);
+             } catch (err) {
+                 res.status(502).json({ error: 'LLM proxy unreachable', details: err.message });
+             }
+         });
+
          // Token Usage API (proxy to LLM proxy)
          this.app.get('/api/token-usage/:endpoint', async (req, res) => {
              try {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Pencil } from 'lucide-react'
+import { useState } from 'react'
+import { Pencil, Layers, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,6 +16,13 @@ import {
   selectSelectedTaskId,
   setSelectedTaskId,
   setOverrideTaskId,
+  setExplainTaskId,
+  toggleRunSelected,
+  setRunsSelected,
+  clearRunSelection,
+  deleteSelectedRuns,
+  selectSelectedRunIds,
+  selectDeleteRunsPending,
   type Run,
 } from '@/store/slices/performanceSlice'
 import { effective, isEdited, judged, SCORE_DIMENSIONS } from './corrected-wins'
@@ -80,6 +88,26 @@ export function RunsTable() {
   const filtered = useAppSelector(selectFilteredRuns)
   const allRuns = useAppSelector(selectRuns)
   const selectedTaskId = useAppSelector(selectSelectedTaskId)
+  const selectedRunIds = useAppSelector(selectSelectedRunIds)
+  const deletePending = useAppSelector(selectDeleteRunsPending)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  // Multi-select over the CURRENTLY-FILTERED set. "All" selects every visible
+  // row; "None" clears. The header checkbox reflects all/some/none.
+  const filteredIds = filtered.map((r) => r.task_id)
+  const selectedSet = new Set(selectedRunIds)
+  const visibleSelected = filteredIds.filter((id) => selectedSet.has(id))
+  const allSelected = filteredIds.length > 0 && visibleSelected.length === filteredIds.length
+  const someSelected = visibleSelected.length > 0 && !allSelected
+  const toggleAll = () => {
+    if (allSelected) dispatch(setRunsSelected([]))
+    else dispatch(setRunsSelected(filteredIds))
+  }
+  const doDelete = async () => {
+    setConfirmOpen(false)
+    if (selectedRunIds.length === 0) return
+    await dispatch(deleteSelectedRuns(selectedRunIds))
+  }
 
   // Empty states (UI-SPEC Copywriting): distinguish "no runs at all" from
   // "filters exclude everything".
@@ -106,9 +134,54 @@ export function RunsTable() {
 
   return (
     <div className="rounded-md border" data-testid="runs-table">
+      {/* Bulk-selection toolbar — visible whenever ≥1 run is selected. */}
+      {selectedRunIds.length > 0 && (
+        <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-3 py-2" data-testid="runs-bulk-toolbar">
+          <span className="text-sm">
+            <span className="font-semibold">{selectedRunIds.length}</span> run{selectedRunIds.length === 1 ? '' : 's'} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => dispatch(clearRunSelection())} disabled={deletePending}>
+              Clear
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              data-testid="delete-selected-runs"
+              onClick={() => setConfirmOpen(true)}
+              disabled={deletePending}
+            >
+              <Trash2 className="size-3.5" />
+              {deletePending ? 'Deleting…' : `Delete ${selectedRunIds.length}`}
+            </Button>
+          </div>
+        </div>
+      )}
+      {confirmOpen && (
+        <div className="flex items-center justify-between gap-3 border-b bg-destructive/10 px-3 py-2" data-testid="delete-confirm-bar" role="alertdialog">
+          <span className="text-sm">
+            Permanently delete <span className="font-semibold">{selectedRunIds.length}</span> run{selectedRunIds.length === 1 ? '' : 's'} and their scores? This cannot be undone.
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" size="sm" data-testid="confirm-delete-runs" onClick={doDelete}>Delete</Button>
+          </div>
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-8">
+              <input
+                type="checkbox"
+                aria-label="Select all runs"
+                data-testid="select-all-runs"
+                className="cursor-pointer"
+                checked={allSelected}
+                ref={(el) => { if (el) el.indeterminate = someSelected }}
+                onChange={toggleAll}
+              />
+            </TableHead>
             <TableHead>Task</TableHead>
             <TableHead>Class</TableHead>
             <TableHead>Agent</TableHead>
@@ -152,6 +225,16 @@ export function RunsTable() {
                 onClick={() => dispatch(setSelectedTaskId(run.task_id))}
                 className={`cursor-pointer ${isSelected ? 'bg-muted' : ''}`}
               >
+                <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select run ${run.task_id}`}
+                    data-testid="select-run"
+                    className="cursor-pointer"
+                    checked={selectedSet.has(run.task_id)}
+                    onChange={() => dispatch(toggleRunSelected(run.task_id))}
+                  />
+                </TableCell>
                 <TableCell className="max-w-[200px] truncate font-mono text-sm" title={run.task_id}>
                   {run.task_id}
                 </TableCell>
@@ -189,20 +272,37 @@ export function RunsTable() {
                     : run.outcome.totalTokens.toLocaleString()}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    data-testid="edit-scores"
-                    aria-label={`Edit scores for ${run.task_id}`}
-                    onClick={(e) => {
-                      // Don't let the click bubble to the row (which drives the timeline).
-                      e.stopPropagation()
-                      dispatch(setOverrideTaskId(run.task_id))
-                    }}
-                  >
-                    <Pencil className="size-3.5" />
-                    Edit scores
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-testid="explain-context"
+                      aria-label={`Explain context and caching for ${run.task_id}`}
+                      title="Explain context & caching"
+                      onClick={(e) => {
+                        // Don't let the click bubble to the row (which drives the timeline).
+                        e.stopPropagation()
+                        dispatch(setExplainTaskId(run.task_id))
+                      }}
+                    >
+                      <Layers className="size-3.5" />
+                      Explain
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-testid="edit-scores"
+                      aria-label={`Edit scores for ${run.task_id}`}
+                      onClick={(e) => {
+                        // Don't let the click bubble to the row (which drives the timeline).
+                        e.stopPropagation()
+                        dispatch(setOverrideTaskId(run.task_id))
+                      }}
+                    >
+                      <Pencil className="size-3.5" />
+                      Edit scores
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             )

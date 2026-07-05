@@ -17,6 +17,7 @@ import { FacetedSidebar } from '@/components/performance/faceted-sidebar'
 import { RunsTable } from '@/components/performance/runs-table'
 import { PerformanceTimeline } from '@/components/performance/timeline'
 import { ScoreDrawer } from '@/components/performance/score-drawer'
+import { ContextCacheExplainer } from '@/components/performance/context-cache-explainer'
 import { ReportsSubview } from '@/components/performance/reports-subview'
 import { MeasurementControl } from '@/components/performance/measurement-control'
 import { RunCompare } from '@/components/performance/run-compare'
@@ -162,6 +163,10 @@ export function PerformancePage() {
           flag). Mounted once; opens via a row's "Edit scores" button. Decoupled from
           row selection so the inline Timeline panel is viewable without this overlay. */}
       <ScoreDrawer />
+
+      {/* Context/caching explainer — driven by slice explainTaskId. Mounted once;
+          opens via a row's "Explain" button. Read-only pop-up over the runs view. */}
+      <ContextCacheExplainer />
     </div>
   )
 }

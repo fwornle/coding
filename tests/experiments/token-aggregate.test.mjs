@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { aggregateByTaskId } from '../../lib/experiments/token-aggregate.mjs';
+import { aggregateByTaskId, isForegroundGroup } from '../../lib/experiments/token-aggregate.mjs';
 
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
@@ -197,6 +197,39 @@ test('missing DB file: graceful zero totals + empty array (no throw)', () => {
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ── isForegroundGroup — fg/bg lineage classifier (ATTR-01 + Phase 78 opencode) ──
+
+test('isForegroundGroup: claude/copilot file-adapter hashes are foreground', () => {
+  assert.equal(isForegroundGroup({ user_hash: 'cladpt', process: 'token-adapter-claude' }), true, 'claude adapter');
+  assert.equal(isForegroundGroup({ user_hash: 'copadt', process: 'token-adapter-copilot' }), true, 'copilot adapter');
+});
+
+test('isForegroundGroup: opencode/mastra proxy rows (session hash, own process name) are foreground', () => {
+  // Regression for the "unmeasured" bug: opencode routes through the proxy, so its
+  // foreground row carries the SESSION hash (not cladpt/copadt) and stamps
+  // process='opencode'. It must still classify as foreground.
+  assert.equal(isForegroundGroup({ user_hash: 'c197ef', process: 'opencode' }), true, 'opencode fg via process');
+  assert.equal(isForegroundGroup({ user_hash: 'abc123', process: 'mastra' }), true, 'mastra fg via process');
+});
+
+test('isForegroundGroup: background daemons are NOT foreground (denylist wins over any hint)', () => {
+  // Same opencode run: its concurrent consolidator daemon must stay background.
+  assert.equal(isForegroundGroup({ user_hash: 'c197ef', process: 'consolidator-digest' }), false, 'consolidator');
+  assert.equal(isForegroundGroup({ user_hash: 'c197ef', process: 'observation-writer' }), false, 'obs-writer');
+  // Denylist OVERRIDES the adapter hash — a daemon row carrying cladpt is still bg (T-75-23).
+  assert.equal(isForegroundGroup({ user_hash: 'cladpt', process: 'observation-writer' }), false, 'cladpt+daemon → bg');
+  assert.equal(isForegroundGroup({ user_hash: 'c197ef', process: 'health-coordinator' }), false, 'health-coordinator');
+});
+
+test('isForegroundGroup: unknown session-hash rows with no known process are NOT foreground', () => {
+  // A bare proxy row that is neither an adapter hash nor a known fg process stays
+  // background — we do not blanket-promote unknown→fg here (that is the timeline-only
+  // heuristic; this backend classifier stays conservative to avoid daemon leakage).
+  assert.equal(isForegroundGroup({ user_hash: 'deadbe', process: 'route-judge' }), false, 'route-judge daemon');
+  assert.equal(isForegroundGroup({ user_hash: 'deadbe', process: '' }), false, 'unknown empty process');
+  assert.equal(isForegroundGroup({}), false, 'empty group');
 });
 
 // Live assertion against the real proxy-owned DB — opt-in via EXPERIMENTS_LIVE
