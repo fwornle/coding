@@ -54,7 +54,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 
 **Uniform-measurement extension (2026-07-05):** Phases 81–87 extend the milestone with the uniform 4-agent measurement program — wire-level token + context-window capture at the proxy for ALL agents, per-turn context revelation, dashboard control center + timeline v2, and interactive branch-avenue measurement. Research: `.planning/research/uniform-measurement-dossier.md`, `.planning/research/proxy-infra-report.md`.
 
-- [ ] **Phase 81: Copilot BYOK Proxy-Routing Verification Spike** — Live probes of `COPILOT_PROVIDER_BASE_URL` against the proxy; verdict recorded in the spike doc (gates copilot wire scope in Phase 82)
+- [x] **Phase 81: Copilot BYOK Proxy-Routing Verification Spike** — CONFIRMED live 2026-07-05 (copilot 1.0.68 → proxy shim, token row matches CLI footer); gaps → Phase 82: shim tool-call passthrough (HARD), dedicated /v1/copilot path, ambient-binding-only for copilot. Verdict: `81-SPIKE-VERDICT.md`
 - [ ] **Phase 82: Wire-Measurement Foundation** — Uniform 4-agent proxy capture: cache-token columns + /v1/messages tap cache parse + x-task-id/x-agent header binding + claude-cell & copilot routing + richer-row dedup merge
 - [ ] **Phase 83: Token Reconciliation Layer** — Transcript adapters (cladpt/copadt) verify/enrich wire rows; per-span discrepancy sink; no double-counting
 - [ ] **Phase 84: Per-Turn Context Revelation** — Persist every measured request as context-turns JSONL with paired usage; read APIs; honest cache explainer
@@ -354,7 +354,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 78. Autonomous Cross-Agent Runner | v7.5 | 4/5 | In Progress|  |
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
-| 81. Copilot BYOK Verification Spike | v7.5 | 0/? | Not started | - |
+| 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 0/? | Not started | - |
 | 83. Token Reconciliation Layer | v7.5 | 0/? | Not started | - |
 | 84. Per-Turn Context Revelation | v7.5 | 0/? | Not started | - |

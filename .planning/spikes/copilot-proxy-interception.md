@@ -8,7 +8,8 @@ discovered_in: /gsd-explore v7.3 perf measurement, 2026-06-04
 blocks: v7.3 milestone planning (MVP anchor decision)
 timebox: 0.5-1 day
 completed: 2026-06-04
-recommendation: ship Copilot-CLI in scope (already shipping); empirical test required to decide VS Code Chat
+revised: 2026-07-05 (Phase 81 — BYOK seam found and live-verified; see § 2026-07-05 revision at the end)
+recommendation: SUPERSEDED — Copilot CLI CAN proxy-route via COPILOT_PROVIDER_BASE_URL (BYOK, verified live); Approach D (events.jsonl) demoted to cache-split reconciliation source
 ---
 
 # Spike — Can we measure GitHub Copilot through `rapid-llm-proxy`?
@@ -245,3 +246,57 @@ actually reachable.
 - [Memory: reference-llm-proxy-corp-wrapper](../../.claude/projects/-Users-Q284340-Agentic-coding/memory/reference_llm_proxy_corp_wrapper.md) — proxy wrapper architecture
 - [Memory: feedback-perf-measurement-requirements](../../.claude/projects/-Users-Q284340-Agentic-coding/memory/feedback_perf_measurement_requirements.md) — per-step time-series requirement
 - `CLAUDE.md` § km-core LLM proxy endpoint — `:12435` contract
+
+---
+
+## 2026-07-05 revision (v7.5 Phase 81) — BYOK seam found; original verdict OVERTURNED
+
+The 2026-06-04 conclusion ("no base-URL override — Approach D only") missed
+`copilot help environment`, which documents a full BYOK provider seam. Verified
+live on Copilot CLI **1.0.68** against rapid-llm-proxy `:12435`:
+
+### What was proven (live probes, scratchpad/byok-spike)
+
+1. **Routing works.**
+   `COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:12435/v1` +
+   `COPILOT_PROVIDER_TYPE=openai` + `COPILOT_MODEL=claude-haiku-4-5` →
+   one-shot prompt answered THROUGH the proxy. The request hit the
+   `/v1/chat/completions` shim and produced token_usage row id=163286
+   (`input=6208 / output=8`), exactly matching copilot's own footer
+   (`↑6.2k ↓8`). Reply rendered correctly (single-shot SSE reframe).
+2. **`COPILOT_PROVIDER_TYPE=anthropic` reaches `/v1/messages` but 401s** —
+   the passthrough forwards the placeholder key verbatim to
+   api.anthropic.com. Viable only with real Anthropic credentials, which
+   defeats the purpose (GHE-billed models). → openai type is the route.
+3. **Auth**: `COPILOT_PROVIDER_API_KEY` accepts a placeholder for the local
+   proxy (same convention as opencode's rapid-proxy provider).
+
+### Gaps surfaced (feed v7.5 Phase 82 scope)
+
+- **The shim drops `tools[]`** — `internalBody` forwards only
+  model/messages/agent/tier/process (server.mjs ~2185), so NO native
+  tool_calls flow through it. Probe 3 (file-creation task) produced a
+  single LLM call whose text CLAIMED success; no file was written.
+  ⇒ Native tool-call passthrough is a HARD Phase 82 requirement for
+  agentic BYOK copilot — and re-opens the question whether past
+  shim-routed opencode experiment runs really executed tools
+  (v9 opencode run scored `goal: null`; its "success" text is suspect).
+  The claude-code CLI provider cannot serve tool calls (`--tools ''`);
+  the copilot HTTP provider (function-calling capable) can.
+- **Agent mis-stamping**: BYOK requests default to `agent='opencode'`
+  (path-derived). Copilot cannot set headers/body fields ⇒ add a
+  dedicated `/v1/copilot/chat/completions` path (mirrors the
+  Phase 70-04 mastra precedent).
+- **No per-request identity seam** in BYOK (no custom headers) ⇒ copilot
+  task binding stays ambient-span (+ dedicated path) until upstream adds one.
+- **Ambient-span leakage seen live**: v9 opencode task rows include
+  observation-writer/health-coordinator background calls stamped with the
+  cell task_id — confirms Phase 82's x-task-id header-binding priority.
+
+### Revised recommendation
+
+Copilot CLI joins the wire-measured set via BYOK (openai type, dedicated
+copilot path, tool-call passthrough — all Phase 82). `copadt`
+events.jsonl reading is demoted from primary capture to
+**cache-split reconciliation** (BYOK/OpenAI usage lacks the
+cacheRead/WriteTokens split that session-state provides).
