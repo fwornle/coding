@@ -411,7 +411,12 @@ configure_proxy_routing() {
       # proxy passthrough re-injects the Max bearer when the caller sends none.
       export ANTHROPIC_BASE_URL="${base}"
       unset ANTHROPIC_API_KEY ANTHROPIC_ADMIN_API_KEY ANTHROPIC_AUTH_TOKEN
-      _agent_log "🔌 claude → proxy ${base}/v1/messages (Max-OAuth forwarded; token_usage agent='claude')"
+      # Bind this launcher's measurement span to the proxy tap's Route-1 passthrough rows
+      # PER-REQUEST (newline-separated `Name: value` form). An empty TASK_ID leaves the header
+      # value blank → the tap falls back to its ambient resolveLiveTaskId() (safety valve).
+      # Header env format verified live in Plan 06's EARLY gate before the full run.
+      export ANTHROPIC_CUSTOM_HEADERS="x-task-id: ${TASK_ID:-}"
+      _agent_log "🔌 claude → proxy ${base}/v1/messages (Max-OAuth forwarded; token_usage agent='claude'; x-task-id=${TASK_ID:-<ambient>})"
       ;;
     opencode)
       # BEST-EFFORT: opencode's AI-SDK anthropic provider should honour
@@ -424,15 +429,33 @@ configure_proxy_routing() {
       _agent_log "🔌 opencode → proxy ${base}/v1/messages (anthropic path; best-effort — validate live)"
       ;;
     mastra)
-      # Self-routed in mastra.sh's agent_pre_launch via the customProvider seam.
+      # Self-routed in mastra.sh's agent_pre_launch via the customProvider seam. The MASTRACODE_MODEL_ID
+      # → /v1/mastra path is NOT launcher-controlled per-launch (no base-URL path seam to embed a
+      # task_id), so mastra stays AMBIENT-BOUND this phase (documented deviation — see SUMMARY).
       if [ -n "${MASTRACODE_MODEL_ID:-}" ]; then
-        _agent_log "🔌 mastra → proxy ${base}/v1/mastra (self-routed via MASTRACODE_MODEL_ID)"
+        _agent_log "🔌 mastra → proxy ${base}/v1/mastra (self-routed via MASTRACODE_MODEL_ID; ambient-bound this phase)"
       else
         _agent_log "⚠️  mastra: MASTRACODE_MODEL_ID unset — proxy routing may be inactive."
       fi
       ;;
     copilot)
-      _agent_log "⚠️  copilot: the Copilot CLI has no base-URL override (GitHub-enterprise OAuth), so its foreground traffic is NOT yet proxy-measured (follow-up)."
+      # BYOK measurement seam (Phase-81 verified live). The Copilot CLI cannot set request headers,
+      # so its ONLY per-request binding seam is the task-scoped base-URL PATH (/v1/copilot/t/<task_id>,
+      # Plan 03); the CLI appends /chat/completions. Falls back to the unbound /v1/copilot path when no
+      # TASK_ID span is active. The API key is a literal non-secret placeholder against the localhost
+      # no-auth proxy (T-82-05-01, accepted). Gated by the same opt-out + health gate above.
+      if [ -n "${TASK_ID:-}" ]; then
+        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot/t/${TASK_ID}"
+      else
+        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot"
+      fi
+      export COPILOT_PROVIDER_TYPE="openai"
+      export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
+      export COPILOT_MODEL="${COPILOT_MODEL:-claude-haiku-4-5}"
+      export COPILOT_AUTO_UPDATE="false"
+      # COPILOT_PROVIDER_WIRE_MODEL is honoured if the caller pre-set it (wire name ≠ COPILOT_MODEL);
+      # left inherited rather than forced, since the launcher has no wire-name mapping.
+      _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; token_usage agent='copilot'; model=${COPILOT_MODEL})"
       ;;
     *)
       _agent_log "ℹ️  ${AGENT_NAME:-$AGENT}: no proxy-routing rule; launching as configured (traffic may be unmeasured)."
