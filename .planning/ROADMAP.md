@@ -296,11 +296,11 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 **Depends on**: Phase 81 (copilot scope)
 **Requirements**: WIRE-01 (proxy cache-token schema + logCall/summary/export), WIRE-02 (/v1/messages tap cache parse SSE+non-streaming), WIRE-03 (x-task-id/x-agent per-request binding, kill ambient singleton), WIRE-04 (/v1/copilot dedicated shim path + copilot agent stamping), WIRE-05 (shim tool-call passthrough + capability gating — real files on disk), WIRE-06 (insertTokenRowDeduped merge-on-cache), WIRE-07 (coding-repo routing: claude re-route + copilot BYOK + headers + flag-gated opencode), WIRE-08 (live verification: concurrent spans, cache fidelity, file-creation)
 **Plans**: 6 plans
-- [ ] 82-01-PLAN.md — Proxy cache-token schema migration + logCall/getSummary/export-hydrate (src/token-usage.ts)
+- [x] 82-01-PLAN.md — Proxy cache-token schema migration + logCall/getSummary/export-hydrate (src/token-usage.ts)
 - [ ] 82-02-PLAN.md — /v1/messages tap cache parse + x-task-id/x-agent per-request binding (usage-cache.ts + server.mjs)
 - [ ] 82-03-PLAN.md — /v1/copilot dedicated path + shim tool-call passthrough + capability gating (server.mjs + copilot-provider.ts)
-- [ ] 82-04-PLAN.md — insertTokenRowDeduped merge-on-cache upgrade (lib/lsl/token/token-db.mjs)
-- [ ] 82-05-PLAN.md — Coding-repo routing: claude re-route + x-task-id header + copilot BYOK env + flag-gated opencode provider
+- [x] 82-04-PLAN.md — insertTokenRowDeduped merge-on-cache upgrade (lib/lsl/token/token-db.mjs)
+- [x] 82-05-PLAN.md — Coding-repo routing: claude re-route + x-task-id header + copilot BYOK env + flag-gated opencode provider
 - [ ] 82-06-PLAN.md — Live verification: deploy + header format + 2-cell concurrent + copilot/opencode file-creation
 
 ### Phase 83: Token Reconciliation Layer
@@ -361,7 +361,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
-| 82. Wire-Measurement Foundation | v7.5 | 0/? | Not started | - |
+| 82. Wire-Measurement Foundation | v7.5 | 3/6 | In Progress|  |
 | 83. Token Reconciliation Layer | v7.5 | 0/? | Not started | - |
 | 84. Per-Turn Context Revelation | v7.5 | 0/? | Not started | - |
 | 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
