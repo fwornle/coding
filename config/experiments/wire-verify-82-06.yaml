@@ -1,0 +1,29 @@
+# config/experiments/wire-verify-82-06.yaml — Phase 82 Plan 06 Task 2 live gate.
+#
+# 2-cell (claude + opencode) concurrent-attribution proof, run ATTENDED by design:
+# an interactive claude session + background daemons (observation-writer,
+# health-coordinator) generate live proxy traffic DURING the run. Pre-82 this
+# mis-stamped rows via the single ambient span slot (the contaminated
+# compare-fizzbuzz-v9); Phase 82's per-request x-task-id binding must keep every
+# row on its own task_id. Fresh experiment_id so v9 resume state is untouched.
+version: 1
+
+experiment_id: wire-verify-82-06
+
+snapshot_id: smoke-spec
+
+goal_sentence: "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'."
+
+repeats: 1
+
+test_command: "node --test fizzbuzz.test.mjs"
+
+variants:
+  - agent: claude
+    model: sonnet
+    framework: straight
+    env: default
+  - agent: opencode
+    model: rapid-proxy/claude-haiku-4-5
+    framework: straight
+    env: default

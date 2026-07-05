@@ -1,0 +1,35 @@
+# config/experiments/wire-verify-82-06-v2.yaml — Phase 82 Plan 06 Task 2 RE-RUN.
+#
+# v2 re-run after the Task 2 gate FAILED: background daemons (health-coordinator,
+# consolidator-insight) were stamped with the cell task_id via the /api/complete
+# ambient span fallback (86% of one cell's tokens were daemon contamination).
+# Fixed in proxy commit d3f3869 (isBackgroundProcess denylist gates the ambient
+# fallback). Fresh experiment_id so the v1 (and v9) resume state is untouched —
+# D-10 resume would otherwise skip already-complete cells.
+#
+# 2-cell (claude + opencode) concurrent-attribution proof, ATTENDED by design:
+# an interactive claude session + background daemons generate live proxy traffic
+# DURING the run. health-coordinator fires frequently — it IS the reproducer; the
+# gate PASSES iff its /api/complete rows land during the cell windows but are NOT
+# stamped with any cell task_id (task_id='').
+version: 1
+
+experiment_id: wire-verify-82-06-v2
+
+snapshot_id: smoke-spec
+
+goal_sentence: "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'."
+
+repeats: 1
+
+test_command: "node --test fizzbuzz.test.mjs"
+
+variants:
+  - agent: claude
+    model: sonnet
+    framework: straight
+    env: default
+  - agent: opencode
+    model: rapid-proxy/claude-haiku-4-5
+    framework: straight
+    env: default
