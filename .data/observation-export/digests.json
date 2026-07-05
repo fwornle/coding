@@ -50154,5 +50154,539 @@
       "createdAt": "2026-07-04T14:15:05.590Z"
     },
     "project": "coding"
+  },
+  {
+    "id": "2aacb202-d41b-4531-b0ac-8798ed35f1e3",
+    "date": "2026-07-04",
+    "theme": "Session Context Continuity Initialization from LSL Files",
+    "summary": "- **claude** executed a structured session continuity command to re-establish context from prior work by querying `.specstory/history/` for Live Session Log (LSL) files\n- Applied recency-first ranking with secondary size-based heuristics to determine how many historical files to load\n- Also prepared to optionally cross-reference the coding project if operating in a different project context\n- No artifacts produced; this was a bootstrapping step to prime the assistant with sufficient prior-session context before resuming active work",
+    "observationIds": [
+      "7b6c2d71-9262-451e-81b6-35c2d5944206"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-07-04T14:25:18.630Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-07-04",
+      "theme": "Session Context Continuity Initialization from LSL Files",
+      "summary": "- **claude** executed a structured session continuity command to re-establish context from prior work by querying `.specstory/history/` for Live Session Log (LSL) files\n- Applied recency-first ranking with secondary size-based heuristics to determine how many historical files to load\n- Also prepared to optionally cross-reference the coding project if operating in a different project context\n- No artifacts produced; this was a bootstrapping step to prime the assistant with sufficient prior-session context before resuming active work",
+      "observation_ids": [
+        "7b6c2d71-9262-451e-81b6-35c2d5944206"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-04T14:25:18.630Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f563c9aa-a3d0-436a-9080-b831b9165d7f",
+    "date": "2026-07-04",
+    "theme": "Planning and Verifying .data Directory Git Commits",
+    "summary": "- Continuation of the `.data` commit work begun in the prior session (cf. earlier isolated-exports commit)\n- **claude** verified that `.data` artifact contents — git SHAs, stash refs, narrative logs — carry no secrets and are safe to commit\n- Confirmed the deliberate `.gitignore` split: `.data/run-snapshots/` is excluded, while `.data/experiments/snapshots/` is intentionally tracked\n- Planned **two logically-separate commits** to cleanly distinguish regenerated exports from new experiment artifacts, maintaining auditability of the snapshot history",
+    "observationIds": [
+      "e0a09864-32b2-4df4-835d-137bf4be599f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-07-04T14:25:18.630Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-07-04",
+      "theme": "Planning and Verifying .data Directory Git Commits",
+      "summary": "- Continuation of the `.data` commit work begun in the prior session (cf. earlier isolated-exports commit)\n- **claude** verified that `.data` artifact contents — git SHAs, stash refs, narrative logs — carry no secrets and are safe to commit\n- Confirmed the deliberate `.gitignore` split: `.data/run-snapshots/` is excluded, while `.data/experiments/snapshots/` is intentionally tracked\n- Planned **two logically-separate commits** to cleanly distinguish regenerated exports from new experiment artifacts, maintaining auditability of the snapshot history",
+      "observation_ids": [
+        "e0a09864-32b2-4df4-835d-137bf4be599f"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-04T14:25:18.630Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a190277d-a389-40b0-a270-4fd8edc67476",
+    "date": "2026-07-04",
+    "theme": "Investigating Opencode Model Attribution and Token Count Discrepancy",
+    "summary": "A multi-front investigation into two related opencode measurement anomalies in the Compare/runs views:\n\n**Model attribution inconsistency (obs 3)**\n- Runs-table shows `\"unmeasured\"` for opencode's chat model, while the timeline for the same run correctly attributes `claude-haiku-4.5` as the foreground model\n- Identified a genuine logic divergence between the two UI code paths feeding the runs-table display vs. the timeline view; traced to the backend classifier and display layer needing unification\n\n**Token count discrepancy (obs 4, 5)**\n- opencode reports only ~14k tokens vs. claude (~155k) and copilot (~221k), raising suspicion of incomplete measurement\n- Searched `lib/` and `scripts/` for all `isForegroundGroup` consumers via `grep` to locate where token budget scoping diverges across implementations\n- Read `experiments-recompute-route` script and began querying the token database to trace token flow for the opencode run\n- Investigation incomplete — user's intent in obs 5 was truncated mid-request before a proposed token-distribution diagram could be produced; `isForegroundGroup` consumer map and token breakdown query were initiated but not resolved",
+    "observationIds": [
+      "4fdb3d76-7c0a-4f91-9581-9b8333168afb",
+      "222cc37d-4fdb-4dd9-85b6-9fbba4de6eca",
+      "5e329524-d652-4d0d-b039-226854891054"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-07-04T14:25:18.630Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-07-04",
+      "theme": "Investigating Opencode Model Attribution and Token Count Discrepancy",
+      "summary": "A multi-front investigation into two related opencode measurement anomalies in the Compare/runs views:\n\n**Model attribution inconsistency (obs 3)**\n- Runs-table shows `\"unmeasured\"` for opencode's chat model, while the timeline for the same run correctly attributes `claude-haiku-4.5` as the foreground model\n- Identified a genuine logic divergence between the two UI code paths feeding the runs-table display vs. the timeline view; traced to the backend classifier and display layer needing unification\n\n**Token count discrepancy (obs 4, 5)**\n- opencode reports only ~14k tokens vs. claude (~155k) and copilot (~221k), raising suspicion of incomplete measurement\n- Searched `lib/` and `scripts/` for all `isForegroundGroup` consumers via `grep` to locate where token budget scoping diverges across implementations\n- Read `experiments-recompute-route` script and began querying the token database to trace token flow for the opencode run\n- Investigation incomplete — user's intent in obs 5 was truncated mid-request before a proposed token-distribution diagram could be produced; `isForegroundGroup` consumer map and token breakdown query were initiated but not resolved",
+      "observation_ids": [
+        "4fdb3d76-7c0a-4f91-9581-9b8333168afb",
+        "222cc37d-4fdb-4dd9-85b6-9fbba4de6eca",
+        "5e329524-d652-4d0d-b039-226854891054"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-04T14:25:18.630Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "78486b64-7a9e-4bfe-ac3e-38e97a1b7a29",
+    "date": "2026-07-04",
+    "theme": "isForegroundGroup Classifier Fix and Caching Asymmetry Visualization",
+    "summary": "Two-part effort to fix opencode foreground agent misclassification and surface caching asymmetry data in the UI, both landing in `lib/experiments/token-aggregate.mjs`.\n\n- **Obs 1**: Decided to proceed with targeted fix #1 (extending `isForegroundGroup` for opencode, recomputing affected runs, adding a test) while explicitly deferring fix #2 (proxy-side cache capture for opencode/mastra) as a separate larger-scope architectural item\n- **Obs 4**: Implemented the classifier fix — updated `isForegroundGroup` to recognize proxy-routed foreground agents identified by process name (opencode/mastra, no adapter hash), while preserving daemon denylist precedence; added test coverage for the classifier logic\n- Caching asymmetry facts confirmed: cache visible for claude (direct Anthropic calls), absent for proxy-routed adapters (opencode/mastra) and copilot (GHE OAuth)\n- Enhanced health monitor/performance page with a pop-up window rendering actual caching asymmetry data, gated behind the corrected foreground classification",
+    "observationIds": [
+      "2965dc1e-a132-4335-b613-59bafef94fa2",
+      "8ad3a9d6-602b-4502-bf62-a90c0ef3ca37"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/experiments/token-aggregate.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-07-04T14:38:46.977Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-07-04",
+      "theme": "isForegroundGroup Classifier Fix and Caching Asymmetry Visualization",
+      "summary": "Two-part effort to fix opencode foreground agent misclassification and surface caching asymmetry data in the UI, both landing in `lib/experiments/token-aggregate.mjs`.\n\n- **Obs 1**: Decided to proceed with targeted fix #1 (extending `isForegroundGroup` for opencode, recomputing affected runs, adding a test) while explicitly deferring fix #2 (proxy-side cache capture for opencode/mastra) as a separate larger-scope architectural item\n- **Obs 4**: Implemented the classifier fix — updated `isForegroundGroup` to recognize proxy-routed foreground agents identified by process name (opencode/mastra, no adapter hash), while preserving daemon denylist precedence; added test coverage for the classifier logic\n- Caching asymmetry facts confirmed: cache visible for claude (direct Anthropic calls), absent for proxy-routed adapters (opencode/mastra) and copilot (GHE OAuth)\n- Enhanced health monitor/performance page with a pop-up window rendering actual caching asymmetry data, gated behind the corrected foreground classification",
+      "observation_ids": [
+        "2965dc1e-a132-4335-b613-59bafef94fa2",
+        "8ad3a9d6-602b-4502-bf62-a90c0ef3ca37"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/experiments/token-aggregate.mjs"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-07-04T14:38:46.977Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6dc8b934-e5f4-4802-95a8-f69fd7128479",
+    "date": "2026-07-04",
+    "theme": "Documentation Style Guide Creation for Diagrams and Markdown",
+    "summary": "Established and refined a comprehensive Documentation Style Guide governing all diagram and markdown artifacts in the coding project.\n\n- **Hard placement rules**: `.puml` sources → `docs/puml/`; generated PNGs → `docs/images/`; no files outside designated directories\n- **Naming conventions**: strict kebab-case throughout; no incremental suffixes (e.g., no `-v2`, `-new`)\n- **PlantUML requirements**: mandatory `_standard-style.puml` include, component stereotypes enforced, PNG generation via `plantuml` CLI\n- **Mermaid**: inline-only within markdown, no standalone diagram files\n- **Validation workflow**: checklist to run before committing any documentation changes, with violation examples as negative references\n- Obs 3 also clarified token capture and caching behavior across the three adapter types (claude, opencode/mastra via proxy, copilot) as factual grounding to ensure any architecture diagrams produced under the new style guide are accurate",
+    "observationIds": [
+      "c7c3a1fc-1e14-4d60-a8eb-3cc346cb050e",
+      "01594e3f-823c-469c-acba-a53472408d9c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/experiments/token-aggregate.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-07-04T14:38:46.977Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-07-04",
+      "theme": "Documentation Style Guide Creation for Diagrams and Markdown",
+      "summary": "Established and refined a comprehensive Documentation Style Guide governing all diagram and markdown artifacts in the coding project.\n\n- **Hard placement rules**: `.puml` sources → `docs/puml/`; generated PNGs → `docs/images/`; no files outside designated directories\n- **Naming conventions**: strict kebab-case throughout; no incremental suffixes (e.g., no `-v2`, `-new`)\n- **PlantUML requirements**: mandatory `_standard-style.puml` include, component stereotypes enforced, PNG generation via `plantuml` CLI\n- **Mermaid**: inline-only within markdown, no standalone diagram files\n- **Validation workflow**: checklist to run before committing any documentation changes, with violation examples as negative references\n- Obs 3 also clarified token capture and caching behavior across the three adapter types (claude, opencode/mastra via proxy, copilot) as factual grounding to ensure any architecture diagrams produced under the new style guide are accurate",
+      "observation_ids": [
+        "c7c3a1fc-1e14-4d60-a8eb-3cc346cb050e",
+        "01594e3f-823c-469c-acba-a53472408d9c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/experiments/token-aggregate.mjs"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-07-04T14:38:46.977Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b91591c5-30bb-4ad1-acd9-09fa695a3ef4",
+    "date": "2026-07-04",
+    "theme": "Crash Investigation and Session Recovery",
+    "summary": "- A crash occurred during active claude work at 14:37, interrupting the in-progress task\n- Recovery approach: examine LSL (line-sequential log) files and session transcripts to pinpoint the failure location before resuming\n- No artifacts modified; investigation was initiated but outcome not yet recorded in this observation window\n- Likely connected to the dense sequence of concurrent changes across `token-aggregate.mjs`, classifier logic, and health monitor integration occurring in the preceding minutes",
+    "observationIds": [
+      "95a85458-642c-439b-82d9-44d3273902cf"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-07-04T14:38:46.977Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-07-04",
+      "theme": "Crash Investigation and Session Recovery",
+      "summary": "- A crash occurred during active claude work at 14:37, interrupting the in-progress task\n- Recovery approach: examine LSL (line-sequential log) files and session transcripts to pinpoint the failure location before resuming\n- No artifacts modified; investigation was initiated but outcome not yet recorded in this observation window\n- Likely connected to the dense sequence of concurrent changes across `token-aggregate.mjs`, classifier logic, and health monitor integration occurring in the preceding minutes",
+      "observation_ids": [
+        "95a85458-642c-439b-82d9-44d3273902cf"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-04T14:38:46.977Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "214a47ea-dc80-4983-ae03-69da4eb74fa0",
+    "date": "2026-07-04",
+    "theme": "Resuming Store Module Import Path Bug Fix",
+    "summary": "Resumed a prior coding session focused on store-related functionality within the project.\n\n- **Goal:** Continue work on a store dump module, specifically addressing an import path issue.\n- **Approach:** Navigated to the project directory and began scaffolding a scratchpad file for store operations using module imports.\n- **Issue identified:** A bug related to relative-to-absolute import path resolution in the store dump module file.\n- **Result:** The session was set up and the import path fix was in progress, but the operation was left incomplete at the exchange endpoint — no artifacts were finalized or committed.\n- Agent involved: `claude`",
+    "observationIds": [
+      "798c0cb5-51c2-4083-bb9a-a4be2afe1702"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-07-05T03:32:19.196Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-07-04",
+      "theme": "Resuming Store Module Import Path Bug Fix",
+      "summary": "Resumed a prior coding session focused on store-related functionality within the project.\n\n- **Goal:** Continue work on a store dump module, specifically addressing an import path issue.\n- **Approach:** Navigated to the project directory and began scaffolding a scratchpad file for store operations using module imports.\n- **Issue identified:** A bug related to relative-to-absolute import path resolution in the store dump module file.\n- **Result:** The session was set up and the import path fix was in progress, but the operation was left incomplete at the exchange endpoint — no artifacts were finalized or committed.\n- Agent involved: `claude`",
+      "observation_ids": [
+        "798c0cb5-51c2-4083-bb9a-a4be2afe1702"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-05T03:32:19.196Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "aaae36fd-34c0-400c-a745-2e641e5a21f1",
+    "date": "2026-07-05",
+    "theme": "Investigating Pending Unmeasured Runs in Compare Tab",
+    "summary": "Resumed a session to investigate why opencode fizzbuzz runs were previously appearing as \"fg unmeasured\" in the performance dashboard.\n\n- **Approach:** Re-established session state via a performance page screenshot, then used browser automation to navigate to the Compare tab.\n- **Finding:** The pending opencode fizzbuzz runs reside in the **Compare tab**, not the Runs tab — this explains why they appeared unmeasured in earlier sessions.\n- The assistant confirmed run state and positioned to drill into a specific pending run for further investigation.\n- No artifacts were produced; this was a diagnostic/orientation step.\n- Agent involved: `claude`",
+    "observationIds": [
+      "15ee0679-8d7f-459b-bc8a-c118476d6e1f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-07-05T03:32:52.983Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-07-05",
+      "theme": "Investigating Pending Unmeasured Runs in Compare Tab",
+      "summary": "Resumed a session to investigate why opencode fizzbuzz runs were previously appearing as \"fg unmeasured\" in the performance dashboard.\n\n- **Approach:** Re-established session state via a performance page screenshot, then used browser automation to navigate to the Compare tab.\n- **Finding:** The pending opencode fizzbuzz runs reside in the **Compare tab**, not the Runs tab — this explains why they appeared unmeasured in earlier sessions.\n- The assistant confirmed run state and positioned to drill into a specific pending run for further investigation.\n- No artifacts were produced; this was a diagnostic/orientation step.\n- Agent involved: `claude`",
+      "observation_ids": [
+        "15ee0679-8d7f-459b-bc8a-c118476d6e1f"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-05T03:32:52.983Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9d20e418-fb45-4507-9c84-8f65b2ba6c8a",
+    "date": "2026-07-05",
+    "theme": "Building and Validating Cache Visualization Modal Component",
+    "summary": "Designed, planned, and began validating a pop-up modal to expose per-turn cache token asymmetry between Claude and OpenCode runs on the performance dashboard.\n\n- **Discovery phase (obs. 2):** Implementation was intentionally deferred pending findings from an Explore agent, to avoid fabricating data structures absent from the real schema.\n- **Design spec (obs. 3):** Modal planned as a full-screen `Dialog` reusing the `overrideTaskId` Redux pattern from the score-drawer (`Sheet` trigger + local form state), with three display regions:\n  - Service topology strip (agent → proxy → Docker + backend)\n  - Context-window anatomy diagram (system prompt / tool definitions / history / reasoning + measured cacheable-prefix size)\n  - Per-turn cache breakdown via `recharts` `BarChart` or custom SVG bars, using `useWorkflowColors()` (`green` for cache hits, `amber` for writes)\n- **Data source:** `selectTimelineFor(taskId)` timeline endpoint, using real `cache_read_tokens` / `cache_write_tokens` per-turn fields.\n- **Validation (obs. 4):** Focus shifted to the **Claude Sonnet v6** run (cr=`130,919` / cw=`23,567`) as the test case for the \"caches\" render state, paired against the **OpenCode v6** run (zero cache metrics) — confirming the asymmetry pair that the modal is designed to expose.\n- No code artifacts were committed across any of the three steps; all work remained in planning and UI verification phases.\n- Agent involved: `claude`",
+    "observationIds": [
+      "02e798b1-b472-40d4-b130-2b50ae7b5e81",
+      "36cb4c7d-6a52-4b6b-afce-d7ea5bebafc7",
+      "31c9c3b3-d806-466f-ae46-574e1aa953be"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-07-05T03:32:52.983Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-07-05",
+      "theme": "Building and Validating Cache Visualization Modal Component",
+      "summary": "Designed, planned, and began validating a pop-up modal to expose per-turn cache token asymmetry between Claude and OpenCode runs on the performance dashboard.\n\n- **Discovery phase (obs. 2):** Implementation was intentionally deferred pending findings from an Explore agent, to avoid fabricating data structures absent from the real schema.\n- **Design spec (obs. 3):** Modal planned as a full-screen `Dialog` reusing the `overrideTaskId` Redux pattern from the score-drawer (`Sheet` trigger + local form state), with three display regions:\n  - Service topology strip (agent → proxy → Docker + backend)\n  - Context-window anatomy diagram (system prompt / tool definitions / history / reasoning + measured cacheable-prefix size)\n  - Per-turn cache breakdown via `recharts` `BarChart` or custom SVG bars, using `useWorkflowColors()` (`green` for cache hits, `amber` for writes)\n- **Data source:** `selectTimelineFor(taskId)` timeline endpoint, using real `cache_read_tokens` / `cache_write_tokens` per-turn fields.\n- **Validation (obs. 4):** Focus shifted to the **Claude Sonnet v6** run (cr=`130,919` / cw=`23,567`) as the test case for the \"caches\" render state, paired against the **OpenCode v6** run (zero cache metrics) — confirming the asymmetry pair that the modal is designed to expose.\n- No code artifacts were committed across any of the three steps; all work remained in planning and UI verification phases.\n- Agent involved: `claude`",
+      "observation_ids": [
+        "02e798b1-b472-40d4-b130-2b50ae7b5e81",
+        "36cb4c7d-6a52-4b6b-afce-d7ea5bebafc7",
+        "31c9c3b3-d806-466f-ae46-574e1aa953be"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-07-05T03:32:52.983Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "78dbd328-25bf-4feb-8f63-45742f65dc15",
+    "date": "2026-07-05",
+    "theme": "Context Window Diagram: Visual Design and Caching Strategy",
+    "summary": "The session focused on redesigning the context window diagram in the modal to match a more detailed reference example, adding a dedicated segment for the observations-digest-insights DB injection, and accurately depicting caching provenance.\n\n- **Goal:** Produce a richly annotated, interactive horizontal band visualization of the context window, matching the anatomical detail and annotation style of a provided reference image\n- **Design decisions:**\n  - Extend the existing segmented band architecture with a new segment for the observations-digest-insights DB injection (first 2k tokens)\n  - Implement tiered interactivity: hover tooltip for summary metrics → click modal for full breakdown\n  - Overlay real-time cache breakpoint indicators distinguishing newly assembled vs. cached/retrieved content\n  - Explicitly label whether caching is agent-side vs. model-side\n- The working memory / insights / digests / observations injection block was identified as coming from the coding agent's retrieval system, with its source, size, and cache location requiring confirmation before finalizing the diagram\n- No artifacts were modified during this session — all work was investigative and structural planning",
+    "observationIds": [
+      "5d415ebb-6fc1-4b0b-8c84-67ef62472685",
+      "62ea0b1d-b40d-4e5a-a4cf-b1393fd85626",
+      "d00f252e-1b51-41d2-a2a4-52156d8c4155"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-07-05T06:53:16.075Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-07-05",
+      "theme": "Context Window Diagram: Visual Design and Caching Strategy",
+      "summary": "The session focused on redesigning the context window diagram in the modal to match a more detailed reference example, adding a dedicated segment for the observations-digest-insights DB injection, and accurately depicting caching provenance.\n\n- **Goal:** Produce a richly annotated, interactive horizontal band visualization of the context window, matching the anatomical detail and annotation style of a provided reference image\n- **Design decisions:**\n  - Extend the existing segmented band architecture with a new segment for the observations-digest-insights DB injection (first 2k tokens)\n  - Implement tiered interactivity: hover tooltip for summary metrics → click modal for full breakdown\n  - Overlay real-time cache breakpoint indicators distinguishing newly assembled vs. cached/retrieved content\n  - Explicitly label whether caching is agent-side vs. model-side\n- The working memory / insights / digests / observations injection block was identified as coming from the coding agent's retrieval system, with its source, size, and cache location requiring confirmation before finalizing the diagram\n- No artifacts were modified during this session — all work was investigative and structural planning",
+      "observation_ids": [
+        "5d415ebb-6fc1-4b0b-8c84-67ef62472685",
+        "62ea0b1d-b40d-4e5a-a4cf-b1393fd85626",
+        "d00f252e-1b51-41d2-a2a4-52156d8c4155"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-05T06:53:16.075Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "8296ab3e-0127-4696-9d06-b30b7e43a1f2",
+    "date": "2026-07-05",
+    "theme": "Goal Text Not Surfaced in Runs UI: Investigation and Fix Plan",
+    "summary": "Investigated why the human-readable goal sentence is absent from the run selection and run comparison panels, then confirmed findings and charted a multi-thread remediation plan.\n\n- **Root cause identified:** `readRuns` projection in `query.mjs` (lines 106–110) drops `goal_sentence` from the response; the text itself is durably stored in `Run.description` and `Route.metadata.goal_sentence` — data is not lost, just not surfaced\n- The API currently returns only `task_hash` (a hash derived from the goal text), leaving the UI with no human-readable label\n- **Also confirmed during investigation:** knowledge injection budget is 300 tokens (Working Memory max) + 700 tokens (semantic results from Qdrant / SQLite FTS5), assembled per-turn by `retrieval-service.js`; the prompt cache lives at the Anthropic provider layer, not agent-side\n- **Four-thread fix planned:**\n  - **A:** Restore `goal_sentence` to `readRuns` projection and surface it in run selector / comparison panels\n  - **B/D:** Build segmented context-window band (System Instructions · Tool Descriptions · Retrieved Knowledge · Conversation History · Tool Outputs · User Input) with cache breakpoint overlay and explicit model-provider cache callout\n  - **C:** Interactive KB segment with source and token-budget details (hover/click)\n  - **Execution order:** B/D → C → A",
+    "observationIds": [
+      "e6c4ea92-741b-4b2c-af9b-9c34de98bec1",
+      "036e697f-f597-4118-b38b-008753fb614c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-07-05T06:53:16.075Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-07-05",
+      "theme": "Goal Text Not Surfaced in Runs UI: Investigation and Fix Plan",
+      "summary": "Investigated why the human-readable goal sentence is absent from the run selection and run comparison panels, then confirmed findings and charted a multi-thread remediation plan.\n\n- **Root cause identified:** `readRuns` projection in `query.mjs` (lines 106–110) drops `goal_sentence` from the response; the text itself is durably stored in `Run.description` and `Route.metadata.goal_sentence` — data is not lost, just not surfaced\n- The API currently returns only `task_hash` (a hash derived from the goal text), leaving the UI with no human-readable label\n- **Also confirmed during investigation:** knowledge injection budget is 300 tokens (Working Memory max) + 700 tokens (semantic results from Qdrant / SQLite FTS5), assembled per-turn by `retrieval-service.js`; the prompt cache lives at the Anthropic provider layer, not agent-side\n- **Four-thread fix planned:**\n  - **A:** Restore `goal_sentence` to `readRuns` projection and surface it in run selector / comparison panels\n  - **B/D:** Build segmented context-window band (System Instructions · Tool Descriptions · Retrieved Knowledge · Conversation History · Tool Outputs · User Input) with cache breakpoint overlay and explicit model-provider cache callout\n  - **C:** Interactive KB segment with source and token-budget details (hover/click)\n  - **Execution order:** B/D → C → A",
+      "observation_ids": [
+        "e6c4ea92-741b-4b2c-af9b-9c34de98bec1",
+        "036e697f-f597-4118-b38b-008753fb614c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-05T06:53:16.075Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a0643a86-1fc3-4b73-a81d-9ead3c70a6f3",
+    "date": "2026-07-05",
+    "theme": "Context Cache Explainer Accuracy Fixes and Wire Inspection",
+    "summary": "The goal was to correct multiple accuracy issues in the `context-cache-explainer.tsx` component and then verify the real underlying behavior through wire inspection.\n\n**Accuracy fixes applied (obs 1):**\n- Updated Opus 4.8 context window from 200k → **1M tokens**\n- Fixed black-on-black label contrast in dark mode\n- Restructured the visual model to represent context as a **single contiguous interleaved token buffer** rather than separate blocks with gaps\n- Added an explicit disclaimer that wire formats were not directly inspected\n- Corrected the architecture diagram to show ETM, obs-cli, and constraint bundle as **parallel independent clients** of the LLM proxy, not downstream consumers of the chat proxy's output\n\n**Follow-up investigation (obs 2–3):**\n- gsd-browser was restarted and stabilized to pull up a prior `link-obs-control` run's enriched modal for visual comparison against the corrected explainer\n- Initiated a code inspection of the proxy's `/v1/messages` handler at `:12435` to locate where real Anthropic payloads (system, tools, messages, `cache_control`) could be tapped for measuring true per-category sizes and cache boundaries — no code changes resulted from this phase, confirming the \"uninspected wire\" disclaimer added in obs 1 was warranted",
+    "observationIds": [
+      "dedf681c-b33b-4bce-8507-6014e63d9743",
+      "2024bd93-3418-47af-a12c-7b779f339c55",
+      "d128b447-a1e6-43df-b28a-a17b0111606c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/performance/context-cache-explainer.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-07-05T08:40:32.982Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-07-05",
+      "theme": "Context Cache Explainer Accuracy Fixes and Wire Inspection",
+      "summary": "The goal was to correct multiple accuracy issues in the `context-cache-explainer.tsx` component and then verify the real underlying behavior through wire inspection.\n\n**Accuracy fixes applied (obs 1):**\n- Updated Opus 4.8 context window from 200k → **1M tokens**\n- Fixed black-on-black label contrast in dark mode\n- Restructured the visual model to represent context as a **single contiguous interleaved token buffer** rather than separate blocks with gaps\n- Added an explicit disclaimer that wire formats were not directly inspected\n- Corrected the architecture diagram to show ETM, obs-cli, and constraint bundle as **parallel independent clients** of the LLM proxy, not downstream consumers of the chat proxy's output\n\n**Follow-up investigation (obs 2–3):**\n- gsd-browser was restarted and stabilized to pull up a prior `link-obs-control` run's enriched modal for visual comparison against the corrected explainer\n- Initiated a code inspection of the proxy's `/v1/messages` handler at `:12435` to locate where real Anthropic payloads (system, tools, messages, `cache_control`) could be tapped for measuring true per-category sizes and cache boundaries — no code changes resulted from this phase, confirming the \"uninspected wire\" disclaimer added in obs 1 was warranted",
+      "observation_ids": [
+        "dedf681c-b33b-4bce-8507-6014e63d9743",
+        "2024bd93-3418-47af-a12c-7b779f339c55",
+        "d128b447-a1e6-43df-b28a-a17b0111606c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/performance/context-cache-explainer.tsx"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-07-05T08:40:32.982Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3608cc33-3d77-4cdf-9812-69b05a1f257b",
+    "date": "2026-07-05",
+    "theme": "Radix Tooltip Off-Screen Positioning Fixed via Portal Wrapper",
+    "summary": "The problem was `TooltipContent` rendering off-screen (bottom-left spillage) when tooltips appeared inside a Dialog component.\n\n- **Root cause confirmed:** the Dialog ancestor's CSS `transform` property creates a new containing block, preventing Radix's collision detection and viewport-aware repositioning from functioning correctly without a Portal escape hatch\n- **Fix (obs 5):** added a `Portal` wrapper and collision padding to the shared `TooltipContent` primitive in `/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ui/tooltip.tsx`\n- The fix was applied at the **shared primitive level** rather than per-instance, resolving the off-screen spillage across all dashboard tooltip-in-dialog usages in a single change\n- Observation 4 was diagnostic (reading `tooltip.tsx` to confirm the missing Portal); observation 5 executed the fix",
+    "observationIds": [
+      "7acb65f4-2f76-45e1-b781-b58cdbcd5886",
+      "2636ec96-bc2a-4f40-9348-3cec19a2f86c"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ui/tooltip.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-07-05T08:40:32.982Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-07-05",
+      "theme": "Radix Tooltip Off-Screen Positioning Fixed via Portal Wrapper",
+      "summary": "The problem was `TooltipContent` rendering off-screen (bottom-left spillage) when tooltips appeared inside a Dialog component.\n\n- **Root cause confirmed:** the Dialog ancestor's CSS `transform` property creates a new containing block, preventing Radix's collision detection and viewport-aware repositioning from functioning correctly without a Portal escape hatch\n- **Fix (obs 5):** added a `Portal` wrapper and collision padding to the shared `TooltipContent` primitive in `/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ui/tooltip.tsx`\n- The fix was applied at the **shared primitive level** rather than per-instance, resolving the off-screen spillage across all dashboard tooltip-in-dialog usages in a single change\n- Observation 4 was diagnostic (reading `tooltip.tsx` to confirm the missing Portal); observation 5 executed the fix",
+      "observation_ids": [
+        "7acb65f4-2f76-45e1-b781-b58cdbcd5886",
+        "2636ec96-bc2a-4f40-9348-3cec19a2f86c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ui/tooltip.tsx"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-07-05T08:40:32.982Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b06b0496-ca11-4333-b9ff-7f2588eb627c",
+    "date": "2026-07-05",
+    "theme": "Context Cache Explainer Per-Run Data Correctness and Real Sizing",
+    "summary": "**Goal:** Fix the `context-cache-explainer` component to display accurate, per-agent buffer data for each historical run rather than reusing Claude's global session figures across all model variants (Claude, OpenCode, Copilot, Mastra).\n\nTwo root bugs were diagnosed and traced:\n- The anatomy band and live-wire capture both read from a session-global `/api/context-breakdown` file, causing all historical runs to incorrectly display Claude's proportions — fix requires gating the anatomy band and live capture to live-run-only.\n- UI wording conflated \"bytes re-transmitted over the wire\" with \"cached computation\" — `cache_read` tokens are re-sent each turn (stateless API) but billed at ~0.1× because the provider caches computation keyed on the prefix content hash; tooltip reword required.\n\nAdditional findings from investigation of OpenCode run sizes:\n- OpenCode runs predate the wire-tap measurement system and lack captured raw buffers; displaying sizes for these runs would fabricate data.\n- The correct forward path is to extend the wire-tap to the `/api/complete` route and persist wire-level breakdowns per-run at measurement time.\n- A regression was confirmed where conceptual sizing replaced real sizing; each agent needs its own instrumented capture from its respective endpoint (`/v1/messages` for Claude, `/api/complete` for OpenCode/Copilot/Mastra).\n\nOnly `tooltip.tsx` was directly edited during this session (observation 1); observations 3, 4, and 5 were investigative/diagnostic with no artifact changes, but prepared the re-instrumentation plan for real per-agent scaled bands.",
+    "observationIds": [
+      "e7fa5dc3-c494-4f3a-abaa-5b94aa9a0be6",
+      "b0461f67-c6f7-40e8-8f93-4a14e4a3277c",
+      "cd4ad754-3759-43fb-b272-018d2e27e1c3",
+      "9b5405f0-5d50-46d2-8ae7-a111f617a8a6"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ui/tooltip.tsx"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-07-05T08:58:42.979Z",
+    "metadata": {
+      "sourceCount": 4,
+      "date": "2026-07-05",
+      "theme": "Context Cache Explainer Per-Run Data Correctness and Real Sizing",
+      "summary": "**Goal:** Fix the `context-cache-explainer` component to display accurate, per-agent buffer data for each historical run rather than reusing Claude's global session figures across all model variants (Claude, OpenCode, Copilot, Mastra).\n\nTwo root bugs were diagnosed and traced:\n- The anatomy band and live-wire capture both read from a session-global `/api/context-breakdown` file, causing all historical runs to incorrectly display Claude's proportions — fix requires gating the anatomy band and live capture to live-run-only.\n- UI wording conflated \"bytes re-transmitted over the wire\" with \"cached computation\" — `cache_read` tokens are re-sent each turn (stateless API) but billed at ~0.1× because the provider caches computation keyed on the prefix content hash; tooltip reword required.\n\nAdditional findings from investigation of OpenCode run sizes:\n- OpenCode runs predate the wire-tap measurement system and lack captured raw buffers; displaying sizes for these runs would fabricate data.\n- The correct forward path is to extend the wire-tap to the `/api/complete` route and persist wire-level breakdowns per-run at measurement time.\n- A regression was confirmed where conceptual sizing replaced real sizing; each agent needs its own instrumented capture from its respective endpoint (`/v1/messages` for Claude, `/api/complete` for OpenCode/Copilot/Mastra).\n\nOnly `tooltip.tsx` was directly edited during this session (observation 1); observations 3, 4, and 5 were investigative/diagnostic with no artifact changes, but prepared the re-instrumentation plan for real per-agent scaled bands.",
+      "observation_ids": [
+        "e7fa5dc3-c494-4f3a-abaa-5b94aa9a0be6",
+        "b0461f67-c6f7-40e8-8f93-4a14e4a3277c",
+        "cd4ad754-3759-43fb-b272-018d2e27e1c3",
+        "9b5405f0-5d50-46d2-8ae7-a111f617a8a6"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ui/tooltip.tsx"
+      ],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-07-05T08:58:42.979Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "6755dcc9-ad6d-4d37-a66d-336c0c858250",
+    "date": "2026-07-05",
+    "theme": "Bulk Run Deletion with Multi-Select UI Controls",
+    "summary": "**Goal:** Improve workflow efficiency when managing accumulated historical run data by avoiding manual one-by-one deletion.\n\n- Implemented a multi-select deletion interface on the runs management view, allowing users to select multiple runs simultaneously and delete them in batch.\n- Added **all/none** selection toggles to support fast full-selection or full-deselection workflows.\n- Changes landed in `tooltip.tsx`.",
+    "observationIds": [
+      "515c83cc-9f67-48b0-b768-9ef9c3c2912f"
+    ],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ui/tooltip.tsx"
+    ],
+    "quality": "high",
+    "createdAt": "2026-07-05T08:58:42.979Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-07-05",
+      "theme": "Bulk Run Deletion with Multi-Select UI Controls",
+      "summary": "**Goal:** Improve workflow efficiency when managing accumulated historical run data by avoiding manual one-by-one deletion.\n\n- Implemented a multi-select deletion interface on the runs management view, allowing users to select multiple runs simultaneously and delete them in batch.\n- Added **all/none** selection toggles to support fast full-selection or full-deselection workflows.\n- Changes landed in `tooltip.tsx`.",
+      "observation_ids": [
+        "515c83cc-9f67-48b0-b768-9ef9c3c2912f"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/system-health-dashboard/src/components/ui/tooltip.tsx"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-07-05T08:58:42.979Z"
+    },
+    "project": "coding"
   }
 ]
