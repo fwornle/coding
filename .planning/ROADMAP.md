@@ -298,7 +298,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 **Plans**: 6 plans
 - [x] 82-01-PLAN.md — Proxy cache-token schema migration + logCall/getSummary/export-hydrate (src/token-usage.ts)
 - [x] 82-02-PLAN.md — /v1/messages tap cache parse + x-task-id/x-agent per-request binding (usage-cache.ts + server.mjs)
-- [ ] 82-03-PLAN.md — /v1/copilot dedicated path + shim tool-call passthrough + capability gating (server.mjs + copilot-provider.ts)
+- [x] 82-03-PLAN.md — /v1/copilot dedicated path + shim tool-call passthrough + capability gating (server.mjs + copilot-provider.ts)
 - [x] 82-04-PLAN.md — insertTokenRowDeduped merge-on-cache upgrade (lib/lsl/token/token-db.mjs)
 - [x] 82-05-PLAN.md — Coding-repo routing: claude re-route + x-task-id header + copilot BYOK env + flag-gated opencode provider
 - [ ] 82-06-PLAN.md — Live verification: deploy + header format + 2-cell concurrent + copilot/opencode file-creation
@@ -361,7 +361,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
-| 82. Wire-Measurement Foundation | v7.5 | 4/6 | In Progress|  |
+| 82. Wire-Measurement Foundation | v7.5 | 5/6 | In Progress|  |
 | 83. Token Reconciliation Layer | v7.5 | 0/? | Not started | - |
 | 84. Per-Turn Context Revelation | v7.5 | 0/? | Not started | - |
 | 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
