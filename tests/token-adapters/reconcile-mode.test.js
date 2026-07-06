@@ -448,6 +448,76 @@ test('unmatched_wire: an orphan span-window wire row is counted; all-matched yie
 });
 
 // ---------------------------------------------------------------------------
+// CR-03 (Plan 83-08) — reconcile gap-fill backfills the span task_id onto a
+// matched wire row whose task_id is '' (interactive-launch, blank x-task-id per
+// D-08). A pre-bound (non-empty task_id) wire row is NEVER overwritten. This is a
+// span-scoped stamp on an already-matched transcript row — NOT ambient inheritance.
+// ---------------------------------------------------------------------------
+test("CR-03/task_id gap-fill: a matched task_id='' wire row is stamped the span task_id; a pre-bound row is untouched", async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // (a) production-shape cladpt wire row with a BLANK task_id (interactive launch).
+    seedWireRow(dbPath, {
+      user_hash: 'cladpt',
+      tool_call_id: 'req-blank',
+      task_id: '',
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      input_tokens: 111,
+      output_tokens: 22,
+    });
+    // (b) a wire row ALREADY bound to a different task — must never be overwritten.
+    seedWireRow(dbPath, {
+      user_hash: 'cladpt',
+      tool_call_id: 'req-bound',
+      task_id: 'other-task',
+      cache_read_tokens: 5,
+      cache_write_tokens: 7,
+      input_tokens: 200,
+      output_tokens: 40,
+    });
+
+    const fixture = writeClaudeFixture(dir, [claudeTurn('req-blank'), claudeTurn('req-bound')]);
+    await captureForegroundTokens(claudeSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: fixture,
+      resolveTaskId: async () => 'recon-task',
+    });
+
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const blank = db
+        .prepare(
+          'SELECT task_id, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens FROM token_usage WHERE tool_call_id = ?',
+        )
+        .get('req-blank');
+      assert.equal(blank.task_id, 'recon-task', "blank task_id wire row stamped with the span task_id");
+      // Wire token counts NOT altered by the task_id backfill.
+      assert.equal(blank.input_tokens, 111, 'wire input_tokens unchanged by the task_id backfill');
+      assert.equal(blank.output_tokens, 22);
+
+      // aggregateByTaskId(span.task_id) now recovers the previously-blank wire row.
+      const recovered = db
+        .prepare('SELECT SUM(input_tokens) AS s FROM token_usage WHERE task_id = ?')
+        .get('recon-task').s;
+      assert.ok(recovered >= 111, 'foreground tokens recovered under the span task_id');
+
+      const bound = db
+        .prepare('SELECT task_id, cache_read_tokens, cache_write_tokens FROM token_usage WHERE tool_call_id = ?')
+        .get('req-bound');
+      assert.equal(bound.task_id, 'other-task', 'a pre-bound wire row keeps its task_id (never overwritten)');
+      assert.equal(bound.cache_read_tokens, 5, 'wire cache unchanged by the task_id backfill');
+      assert.equal(bound.cache_write_tokens, 7);
+    } finally {
+      db.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // D-04 — copilot session-state cache split → matched wire row still lacking cache.
 // ---------------------------------------------------------------------------
 test('copilot D-04: injected session-state cache split fills a matched wire row lacking cache (gap-fill only)', async () => {
