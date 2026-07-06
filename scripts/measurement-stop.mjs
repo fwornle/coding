@@ -408,12 +408,81 @@ async function main() {
   //   'claude'). Best-effort exactly like the (4.5) score path — captureForegroundTokens
   //   already swallows internally, but wrap it here too so the close NEVER crashes.
   const foregroundAgent = span.agent ?? span.meta?.agent ?? 'claude';
+  // D-01 (measured-span path ONLY): request the reconciliation report by passing
+  // `reconcile: true` and capture the FLAT report Plan 04 returns
+  // ({ matched, unmatched_wire, unmatched_transcript, fallback, perRequest,
+  //   flaggedCount }). On a stamp-only/unknown agent or a no-session-file span the
+  // adapter returns the numeric insert-count 0 instead — the sink below guards for
+  // a non-report return. This is the ONLY reconcile:true caller; the interactive
+  // Stop/sweep path is never touched here.
+  let reconcileReport = null;
   try {
-    await captureForegroundTokens(span, { agent: foregroundAgent });
+    reconcileReport = await captureForegroundTokens(span, {
+      agent: foregroundAgent,
+      reconcile: true,
+    });
   } catch (err) {
     process.stderr.write(
       `[measurement-stop] foreground capture failed (non-fatal): ${err.message}\n`,
     );
+  }
+
+  // ── (3.0b) D-12/D-06: assemble + persist the self-contained reconciliation.json ──
+  //   83-05 owns the span-summary WRAPPER around Plan 04's flat return: (a) a
+  //   top-level `span` metadata header, (b) a `summary.aggregateDeltas` per-field
+  //   SUM rolled up from `perRequest[].deltas` (Plan 04 emits per-request deltas
+  //   only), (c) the matched/unmatched/fallback/flagged counts carried into
+  //   `summary`, (d) `perRequest` passed through unchanged. Written verbatim to
+  //   .data/measurements/<sanitizeTaskId(task_id)>/reconciliation.json. D-06: the
+  //   flagged count is recorded but NEVER sets a run-taint/invalidation marker — a
+  //   discrepancy is advisory only. ALL best-effort (try/catch + stderr): a sink
+  //   failure NEVER hard-blocks the close (mirrors the fixture-archive contract).
+  if (reconcileReport && typeof reconcileReport === 'object') {
+    try {
+      const perRequest = Array.isArray(reconcileReport.perRequest)
+        ? reconcileReport.perRequest
+        : [];
+      // aggregateDeltas = per-field SUM of perRequest[].deltas across all requests.
+      const aggregateDeltas = {};
+      for (const r of perRequest) {
+        const deltas = (r && typeof r.deltas === 'object' && r.deltas) || {};
+        for (const [field, val] of Object.entries(deltas)) {
+          if (typeof val === 'number' && Number.isFinite(val)) {
+            aggregateDeltas[field] = (aggregateDeltas[field] ?? 0) + val;
+          }
+        }
+      }
+      const reconciliation = {
+        schemaVersion: 1,
+        span: {
+          task_id: span.task_id ?? null,
+          agent: foregroundAgent,
+          started_at: span.started_at ?? null,
+          ended_at: span.ended_at ?? null,
+        },
+        summary: {
+          matched: reconcileReport.matched ?? 0,
+          unmatched_wire: reconcileReport.unmatched_wire ?? 0,
+          unmatched_transcript: reconcileReport.unmatched_transcript ?? 0,
+          fallback: reconcileReport.fallback ?? 0,
+          aggregateDeltas,
+          // D-06: advisory-only — a non-zero flaggedCount NEVER invalidates the run.
+          flaggedCount: reconcileReport.flaggedCount ?? 0,
+        },
+        perRequest,
+      };
+      const reconcileDirId = sanitizeTaskId(span.task_id);
+      const reconcileDir = path.join(REPO_ROOT, '.data', 'measurements', reconcileDirId);
+      fs.mkdirSync(reconcileDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(reconcileDir, 'reconciliation.json'),
+        JSON.stringify(reconciliation, null, 2),
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[measurement-stop] reconciliation sink failed (non-fatal): ${err.message}\n`,
+      );
+    }
   }
 
   // ── (3.1) Token aggregation (read-only) + fg/bg split → canonical (D-05/D-06) ──
