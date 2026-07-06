@@ -94,15 +94,18 @@ function newTempDb() {
 }
 
 /**
- * Seed one authoritative WIRE row (the proxy-tap row). Its user_hash is a
- * DISTINCT valid adapter-charset hash (`wire01`) — NOT cladpt/copadt — so the
- * reconcile matcher joins across the hash boundary on tool_call_id and the
- * post-loop unmatched_wire query recognizes it as a wire row.
+ * Seed one authoritative WIRE row (the proxy-tap row). The default user_hash is
+ * `cladpt` — the PRODUCTION shape: for claude the proxy tap stamps the SAME hash
+ * the transcript adapter uses (server.mjs:2217), so wire and transcript rows are
+ * indistinguishable by user_hash OR process — only the PK separates them (CR-02).
+ * The old default `wire01` (a hash the production tap never writes for claude)
+ * MASKED CR-02 — the broken `user_hash != 'cladpt'` unmatched-wire query passed
+ * vacuously. Callers may still override user_hash (e.g. copilot → wire02).
  */
 function seedWireRow(dbPath, overrides = {}) {
   const db = new Database(dbPath);
   try {
-    const userHash = overrides.user_hash ?? 'wire01';
+    const userHash = overrides.user_hash ?? 'cladpt';
     const next = db
       .prepare('SELECT COALESCE(MAX(id),0)+1 AS n FROM token_usage WHERE user_hash = ?')
       .get(userHash).n;
@@ -320,8 +323,12 @@ test(':reason:N row inserts unconditionally regardless of wire state', async () 
   try {
     // Seed a wire row that shares the reasoning-step tool_call_id — the reason
     // row must STILL insert its own cladpt row (wire never carries a reasoning
-    // split, so it is an expected always-insert, not a match).
-    seedWireRow(dbPath, { tool_call_id: 'req-r:reason:0', cache_read_tokens: 9, cache_write_tokens: 9 });
+    // split, so it is an expected always-insert, not a match). Pin a DISTINCT
+    // user_hash ('wire01') so the always-inserted cladpt reason row does NOT
+    // dedup-collide with this seeded row — the two must be observable as 2 rows.
+    // (In production the wire never carries a :reason: tool_call_id at all, so
+    // this shared-id fixture is a deliberate "even if" isolation check.)
+    seedWireRow(dbPath, { user_hash: 'wire01', tool_call_id: 'req-r:reason:0', cache_read_tokens: 9, cache_write_tokens: 9 });
 
     const fixture = writeClaudeFixture(dir, [
       claudeTurn('req-r', {}, [{ type: 'thinking', thinking: 'a genuinely long reasoning trace to estimate tokens from' }]),
@@ -444,6 +451,99 @@ test('unmatched_wire: an orphan span-window wire row is counted; all-matched yie
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CR-02 (Plan 83-08) — unmatched_wire counts a PRODUCTION-shape cladpt orphan.
+// The old query excluded user_hash='cladpt' (the exact hash the claude tap
+// stamps), making unmatched_wire structurally 0. The PK-snapshot approach counts
+// by row identity, so a genuine cladpt orphan wire row is now >= 1.
+// ---------------------------------------------------------------------------
+test('CR-02/unmatched_wire: a production-shape cladpt orphan wire row is counted (1); all-matched → 0', async () => {
+  // Scenario A: two cladpt wire rows (production tap shape); only req-m has a
+  // transcript counterpart → req-o is a genuine orphan.
+  {
+    const { dir, dbPath } = newTempDb();
+    try {
+      seedWireRow(dbPath, { user_hash: 'cladpt', tool_call_id: 'req-m' });
+      seedWireRow(dbPath, { user_hash: 'cladpt', tool_call_id: 'req-o' });
+      const fixture = writeClaudeFixture(dir, [claudeTurn('req-m')]);
+      const report = await captureForegroundTokens(claudeSpan(), {
+        dbPath,
+        reconcile: true,
+        mainSessionPath: fixture,
+        resolveTaskId: async () => 'recon-task',
+      });
+      assert.equal(report.matched, 1);
+      assert.equal(
+        report.unmatched_wire,
+        1,
+        'cladpt orphan wire row counted by PK snapshot (not excluded by user_hash)',
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  // Scenario B: both cladpt wire rows matched → healthy span reports 0.
+  {
+    const { dir, dbPath } = newTempDb();
+    try {
+      seedWireRow(dbPath, { user_hash: 'cladpt', tool_call_id: 'req-m' });
+      seedWireRow(dbPath, { user_hash: 'cladpt', tool_call_id: 'req-o' });
+      const fixture = writeClaudeFixture(dir, [claudeTurn('req-m'), claudeTurn('req-o')]);
+      const report = await captureForegroundTokens(claudeSpan(), {
+        dbPath,
+        reconcile: true,
+        mainSessionPath: fixture,
+        resolveTaskId: async () => 'recon-task',
+      });
+      assert.equal(report.matched, 2);
+      assert.equal(report.unmatched_wire, 0, 'every cladpt wire row matched → 0, not vacuous');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CR-02b (Plan 83-08) — a cladpt FALLBACK row inserted DURING the loop is NOT
+// miscounted as an orphan wire row (it post-dates the pre-loop snapshot).
+// ---------------------------------------------------------------------------
+test('CR-02/fallback-not-counted: a loop-inserted cladpt fallback row is not counted as unmatched wire', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // One matched cladpt wire row; the transcript also has a no-match turn whose
+    // cladpt fallback row is inserted DURING the loop (post-snapshot). The no-match
+    // turn uses a DISTINCT model so it cannot fuzzy-match the sole wire candidate.
+    seedWireRow(dbPath, { user_hash: 'cladpt', tool_call_id: 'req-m' });
+    const otherModelTurn = {
+      type: 'assistant',
+      requestId: 'req-fallback',
+      uuid: 'req-fallback',
+      timestamp: IN_WINDOW_TS,
+      message: {
+        model: 'some-other-model',
+        usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        content: [],
+      },
+    };
+    const fixture = writeClaudeFixture(dir, [claudeTurn('req-m'), otherModelTurn]);
+    const report = await captureForegroundTokens(claudeSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: fixture,
+      resolveTaskId: async () => 'recon-task',
+    });
+    assert.equal(report.matched, 1);
+    assert.equal(report.fallback, 1, 'the no-match turn inserted one cladpt fallback row');
+    assert.equal(
+      report.unmatched_wire,
+      0,
+      'the loop-inserted fallback cladpt row post-dates the snapshot → not an orphan wire row',
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
