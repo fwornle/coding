@@ -85,3 +85,8 @@ None. Both modules are fully wired and unit-tested; `reconcileRow` is consumed b
 - `9325f2a3a` test(83-03): add failing tests for reconcile matcher
 - `2eca387f5` feat(83-03): reconcile matcher — request-id+fuzzy match, deltas, tolerance flag
 - `e8febfee1` docs(83-03): log pre-existing token-db.test.js node:test import gap (out of scope)
+- `aff2a4e4f` docs(83-03): complete reconcile matcher plan
+
+## Self-Check: PASSED
+
+All created/modified files exist on disk (`reconcile.mjs`, `reconcile-matcher.test.js`, `token-db.mjs`, SUMMARY, deferred-items) and all six commit hashes are present in `git log`.
