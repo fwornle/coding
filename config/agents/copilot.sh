@@ -61,25 +61,22 @@ agent_pre_launch() {
     HTTP_SERVER_PID=""
   fi
 
-  # BYOK measurement env (Phase 82 / Phase-81 verified). Route the Copilot CLI's completions
-  # through the local rapid-llm-proxy so token_usage stamps agent='copilot'. copilot cannot set
-  # request headers, so the ONLY per-request binding seam is the task-scoped base-URL PATH
-  # (/v1/copilot/t/<task_id>, Plan 03); fall back to the unbound /v1/copilot path when no TASK_ID
-  # span is active. configure_proxy_routing() in launch-agent-common.sh runs AFTER this and, being
-  # health-gated, has the final say — these exports are the inherited defaults. Port per CLAUDE.md
-  # contract: LLM proxy host port is 12435 (NOT 3033, the Health API). The API key is a literal
-  # non-secret placeholder against the localhost no-auth proxy (T-82-05-01, accepted).
+  # copilot BYOK measurement env is INTENTIONALLY NOT exported here (D-03 / WR-02 / WR-05).
+  # agent_pre_launch runs for EVERY copilot launch, including interactive sessions with no
+  # measured span. Exporting COPILOT_PROVIDER_* unconditionally made interactive copilot
+  # (a) DOUBLE-WRITE tokens (proxy wire + copadt transcript, WR-02) and (b) BREAK fail-soft
+  # when the proxy URL was dead (WR-05). BYOK now lives ONLY in the health-gated MEASURED
+  # wiring: scripts/launch-agent-common.sh configure_proxy_routing() (runs AFTER this, behind
+  # the curl health gate + a TASK_ID measured-span check) for launcher-driven measured spans,
+  # and lib/experiments/experiment-runner.mjs configureProxyRoutingEnv() for experiment cells.
+  # Defensive unset (WR-05): clear any COPILOT_PROVIDER_* inherited from the environment so a
+  # stale/dead proxy URL can NEVER reach an interactive copilot and break its fail-soft. The
+  # measured wiring re-exports these when — and only when — the proxy is healthy and the launch
+  # is measured. Port contract retained for reference (LLM proxy host port 12435, NOT 3033).
   local _copilot_proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
-  if [ -n "${TASK_ID:-}" ]; then
-    export COPILOT_PROVIDER_BASE_URL="http://127.0.0.1:${_copilot_proxy_port}/v1/copilot/t/${TASK_ID}"
-  else
-    export COPILOT_PROVIDER_BASE_URL="http://127.0.0.1:${_copilot_proxy_port}/v1/copilot"
-  fi
-  export COPILOT_PROVIDER_TYPE="openai"
-  export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
-  export COPILOT_MODEL="${COPILOT_MODEL:-claude-haiku-4-5}"
+  unset COPILOT_PROVIDER_BASE_URL COPILOT_PROVIDER_TYPE COPILOT_PROVIDER_API_KEY
   export COPILOT_AUTO_UPDATE="false"
-  _agent_log "🔌 copilot BYOK → ${COPILOT_PROVIDER_BASE_URL} (openai; model=${COPILOT_MODEL})"
+  _agent_log "🔌 copilot BYOK deferred to health-gated measured wiring (proxy port ${_copilot_proxy_port}); interactive copilot is copadt-only (COPILOT_PROVIDER_* unset)"
 
   # Validate GitHub API connectivity
   validate_agent_connectivity "$AGENT_NAME" || true
