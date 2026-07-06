@@ -40,7 +40,7 @@ const {
   reconcileGapFill,
 } = await import('../../lib/lsl/token/token-db.mjs');
 
-const { matchWireRow, computeDeltas, reconcileRow } = await import(
+const { matchWireRow, computeDeltas, reconcileRow, aggregatePerRequestDeltas } = await import(
   '../../lib/lsl/token/reconcile.mjs'
 );
 
@@ -473,6 +473,60 @@ test('Task2/reason bypass: a :reason:N tool_call_id is never matched and is repo
     db.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// CR-01 (Plan 83-08) — aggregatePerRequestDeltas roll-up.
+// The sink's summary.aggregateDeltas must be the per-field SUM of every
+// perRequest[].deltas[field].delta. The OLD inline loop tested
+// `typeof val === 'number'` against the whole {wire,transcript,delta,flagged}
+// object (always false) → always `{}`. The helper unwraps `.delta` first.
+// ---------------------------------------------------------------------------
+
+test('CR-01/aggregate: empty perRequest → {}', () => {
+  assert.deepEqual(aggregatePerRequestDeltas([]), {});
+});
+
+test('CR-01/aggregate: a single non-zero delta is summed by field', () => {
+  const r = aggregatePerRequestDeltas([
+    { deltas: { cache_read_tokens: { wire: 100, transcript: 150, delta: 50, flagged: false } } },
+  ]);
+  assert.deepEqual(r, { cache_read_tokens: 50 });
+});
+
+test('CR-01/aggregate: the same field across two entries accumulates (50 + 30 = 80)', () => {
+  const r = aggregatePerRequestDeltas([
+    { deltas: { cache_read_tokens: { wire: 100, transcript: 150, delta: 50, flagged: false } } },
+    { deltas: { cache_read_tokens: { wire: 0, transcript: 30, delta: 30, flagged: false } } },
+  ]);
+  assert.equal(r.cache_read_tokens, 80);
+});
+
+test('CR-01/aggregate: distinct fields accumulate independently', () => {
+  const r = aggregatePerRequestDeltas([
+    {
+      deltas: {
+        cache_read_tokens: { wire: 100, transcript: 150, delta: 50, flagged: false },
+        reasoning_tokens: { wire: 0, transcript: 7, delta: 7, flagged: false },
+      },
+    },
+    { deltas: { reasoning_tokens: { wire: 0, transcript: 3, delta: 3, flagged: false } } },
+  ]);
+  assert.equal(r.cache_read_tokens, 50);
+  assert.equal(r.reasoning_tokens, 10);
+});
+
+test('CR-01/aggregate: empty/null/missing deltas contribute nothing and never throw', () => {
+  const r = aggregatePerRequestDeltas([
+    { deltas: {} },
+    { deltas: null },
+    {},
+    null,
+    undefined,
+    'not-an-object',
+    { deltas: { input_tokens: { wire: 5, transcript: 5, delta: 20, flagged: false } } },
+  ]);
+  assert.deepEqual(r, { input_tokens: 20 });
 });
 
 test('Task2/never-throw: a closed/failing db handle yields a safe unmatched result, not an exception', () => {
