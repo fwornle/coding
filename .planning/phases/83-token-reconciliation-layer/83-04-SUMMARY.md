@@ -118,3 +118,11 @@ None - no external service configuration required.
 ---
 *Phase: 83-token-reconciliation-layer*
 *Completed: 2026-07-06*
+
+## Self-Check: PASSED
+- FOUND: lib/lsl/token/stop-adapter-registry.mjs
+- FOUND: tests/token-adapters/reconcile-mode.test.js
+- FOUND: .planning/phases/83-token-reconciliation-layer/83-04-SUMMARY.md
+- FOUND commit cba559d24 (test RED)
+- FOUND commit 6b617621b (feat GREEN)
+- FOUND commit 30de21d26 (docs SUMMARY)
