@@ -307,7 +307,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 **Goal**: cladpt/copadt transcript adapters become verify/enrich sources (new `reconcile` mode): wire rows are primary; transcript rows match by request-id (time+model fuzzy fallback); discrepancies recorded per span in `reconciliation.json`; transcript fallback preserved for proxy-down windows; copilot cache split merged from session-state — zero double-counting.
 **Depends on**: Phase 82
 **Requirements**: No REQUIREMENTS.md IDs mapped; plans traced to CONTEXT decisions D-01..D-13 (all 13 covered)
-**Plans**: 7 plans
+**Plans**: 8 plans (7 + 1 gap-closure)
 - [x] 83-01-PLAN.md — Proxy task-id binding hardening: CR-01 guard + WR-06 seam unification + WR-01 ambient-span leak (server.mjs) [D-07/D-08/D-10]
 - [x] 83-02-PLAN.md — Proxy wire cache parse (IN-05) + dup-id constraint (D-11) + build/deploy [D-09/D-11]
 - [x] 83-03-PLAN.md — Reconcile matcher core: cross-user_hash request-id join + fuzzy fallback + delta/tolerance (reconcile.mjs + token-db.mjs) [D-04/D-05]
@@ -315,6 +315,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] 83-05-PLAN.md — measurement-stop reconciliation.json sink + GET read API (measurement-stop.mjs + api-routes.js) [D-01/D-06/D-12/D-13]
 - [x] 83-06-PLAN.md — Copilot BYOK gating to measured launches only (copilot.sh + launch-agent-common.sh + experiment-runner.mjs) [D-03]
 - [x] 83-07-PLAN.md — Golden-comparison live acceptance (human checkpoint) [D-01/D-02/D-04/D-05/D-12]
+- [ ] 83-08-PLAN.md — Gap closure: aggregateDeltas roll-up (CR-01) + meaningful unmatched_wire (CR-02) + interactive-launch task_id backfill (CR-03) [D-04/D-05/D-08/D-12]
 
 ### Phase 84: Per-Turn Context Revelation
 **Goal**: Every measured request persisted as one context-turns JSONL line (category analysis, cache-breakpoint positions, per-message digests incl. tool_use names + sizes, paired response usage), gzipped at span close with retention policy; optional flag-gated full raw bodies; read APIs on proxy (`/api/context-turns`) + vkb-server pass-through; cache explainer shows honest per-turn sent/cached/fresh numbers for all agents with the "how prompt caching actually works" copy.
