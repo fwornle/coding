@@ -441,21 +441,29 @@ configure_proxy_routing() {
     copilot)
       # BYOK measurement seam (Phase-81 verified live). The Copilot CLI cannot set request headers,
       # so its ONLY per-request binding seam is the task-scoped base-URL PATH (/v1/copilot/t/<task_id>,
-      # Plan 03); the CLI appends /chat/completions. Falls back to the unbound /v1/copilot path when no
-      # TASK_ID span is active. The API key is a literal non-secret placeholder against the localhost
-      # no-auth proxy (T-82-05-01, accepted). Gated by the same opt-out + health gate above.
+      # Plan 03); the CLI appends /chat/completions. The API key is a literal non-secret placeholder
+      # against the localhost no-auth proxy (T-82-05-01, accepted). This is the SINGLE measured home
+      # for launcher-driven copilot BYOK (copilot.sh agent_pre_launch delegates here, Plan 06 / D-03).
+      #
+      # MEASURED-SPAN GATE (D-03 / WR-02): export BYOK ONLY when a measured span is active (TASK_ID set).
+      # An interactive copilot launch (no TASK_ID) — even through a HEALTHY proxy — must NOT route through
+      # the proxy, or it would double-write (proxy wire + copadt transcript, WR-02) and break fail-soft on
+      # a dead URL (WR-05). The former unconditional else-branch (unbound /v1/copilot for no-TASK_ID) was
+      # exactly that interactive double-writer; it is removed. The no-span branch UNSETS COPILOT_PROVIDER_*
+      # so nothing stale (inherited or otherwise) survives into an unmeasured copilot session.
       if [ -n "${TASK_ID:-}" ]; then
         export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot/t/${TASK_ID}"
+        export COPILOT_PROVIDER_TYPE="openai"
+        export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
+        export COPILOT_MODEL="${COPILOT_MODEL:-claude-haiku-4-5}"
+        export COPILOT_AUTO_UPDATE="false"
+        # COPILOT_PROVIDER_WIRE_MODEL is honoured if the caller pre-set it (wire name ≠ COPILOT_MODEL);
+        # left inherited rather than forced, since the launcher has no wire-name mapping.
+        _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; measured span; token_usage agent='copilot'; model=${COPILOT_MODEL})"
       else
-        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot"
+        unset COPILOT_PROVIDER_BASE_URL COPILOT_PROVIDER_TYPE COPILOT_PROVIDER_API_KEY
+        _agent_log "ℹ️  copilot: no measured span (TASK_ID unset) — interactive launch stays copadt-only; BYOK not applied (COPILOT_PROVIDER_* cleared)."
       fi
-      export COPILOT_PROVIDER_TYPE="openai"
-      export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
-      export COPILOT_MODEL="${COPILOT_MODEL:-claude-haiku-4-5}"
-      export COPILOT_AUTO_UPDATE="false"
-      # COPILOT_PROVIDER_WIRE_MODEL is honoured if the caller pre-set it (wire name ≠ COPILOT_MODEL);
-      # left inherited rather than forced, since the launcher has no wire-name mapping.
-      _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; token_usage agent='copilot'; model=${COPILOT_MODEL})"
       ;;
     *)
       _agent_log "ℹ️  ${AGENT_NAME:-$AGENT}: no proxy-routing rule; launching as configured (traffic may be unmeasured)."
