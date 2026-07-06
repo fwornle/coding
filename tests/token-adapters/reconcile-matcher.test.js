@@ -40,6 +40,10 @@ const {
   reconcileGapFill,
 } = await import('../../lib/lsl/token/token-db.mjs');
 
+const { matchWireRow, computeDeltas, reconcileRow } = await import(
+  '../../lib/lsl/token/reconcile.mjs'
+);
+
 /**
  * The full token_usage shape (Phase-68 base + cache columns). Mirrors the
  * production schema so the primitives run against a realistic table.
@@ -284,6 +288,207 @@ test('Task1/gap-fill: empty/degenerate tool_call_id is a safe no-op (never colla
     assert.equal(reconcileGapFill(db, '', { cache_read_tokens: 5 }), false);
   } finally {
     db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Task 2 — reconcile.mjs matcher (D-04 / D-05)
+// ---------------------------------------------------------------------------
+
+/** A transcript row (adapter-derived) carrying the cladpt/copadt-shaped hash. */
+function transcriptRow(overrides = {}) {
+  return {
+    timestamp: '2026-07-06T10:00:00.000Z',
+    model: 'claude-opus-4-8',
+    user_hash: 'cladpt',
+    input_tokens: 100,
+    output_tokens: 20,
+    reasoning_tokens: 0,
+    cache_read_tokens: 0,
+    cache_write_tokens: 0,
+    tool_call_id: '',
+    parent_call_id: '',
+    granularity_tier: '',
+    ...overrides,
+  };
+}
+
+test('Task2/request-id: a transcript row matches its wire row by tool_call_id (method request-id)', () => {
+  const { dir, dbPath } = makeTempDb();
+  const db = openTokenDb(dbPath);
+  try {
+    insertWireRow(db, { id: 1, tool_call_id: 'r1', user_hash: 'proxy1' });
+
+    const m = matchWireRow(db, transcriptRow({ tool_call_id: 'r1' }), {});
+    assert.equal(m.method, 'request-id');
+    assert.ok(m.wireRow);
+    assert.equal(m.wireRow.tool_call_id, 'r1');
+
+    const r = reconcileRow(
+      db,
+      transcriptRow({ tool_call_id: 'r1', reasoning_tokens: 4, granularity_tier: 'per-turn' }),
+      {},
+    );
+    assert.equal(r.method, 'request-id');
+    assert.equal(r.matched, true);
+    assert.equal(r.enriched, true);
+    assert.equal(r.fallback, false);
+    // Enrich filled the wire-empty reasoning/granularity gaps.
+    const wire = probeWireRowByRequestId(db, 'r1');
+    assert.equal(wire.reasoning_tokens, 4);
+    assert.equal(wire.granularity_tier, 'per-turn');
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Task2/fuzzy: a no-request-id transcript row matches the nearest same-model wire row within the window', () => {
+  const { dir, dbPath } = makeTempDb();
+  const db = openTokenDb(dbPath);
+  try {
+    // Two same-model candidates; the transcript ts is nearer to w1 (10s) than w2 (40s).
+    insertWireRow(db, { id: 1, tool_call_id: 'w1', model: 'M', timestamp: '2026-07-06T10:00:10.000Z' });
+    insertWireRow(db, { id: 2, tool_call_id: 'w2', model: 'M', timestamp: '2026-07-06T10:00:40.000Z' });
+
+    const t = transcriptRow({ tool_call_id: '', model: 'M', timestamp: '2026-07-06T10:00:00.000Z' });
+    const m = matchWireRow(db, t, {});
+    assert.equal(m.method, 'fuzzy');
+    assert.equal(m.wireRow.tool_call_id, 'w1'); // nearest timestamp wins
+
+    const r = reconcileRow(db, t, {});
+    assert.equal(r.method, 'fuzzy');
+    assert.equal(r.matched, true);
+    assert.equal(r.fallback, false);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Task2/fuzzy tie-break: equal timestamp distance breaks to the lowest id', () => {
+  const { dir, dbPath } = makeTempDb();
+  const db = openTokenDb(dbPath);
+  try {
+    // Two candidates equidistant (±10s) from the transcript ts → lowest id wins.
+    insertWireRow(db, { id: 2, tool_call_id: 'wHi', model: 'M', timestamp: '2026-07-06T10:00:10.000Z' });
+    insertWireRow(db, { id: 1, tool_call_id: 'wLo', model: 'M', timestamp: '2026-07-06T09:59:50.000Z' });
+
+    const t = transcriptRow({ tool_call_id: '', model: 'M', timestamp: '2026-07-06T10:00:00.000Z' });
+    const m = matchWireRow(db, t, {});
+    assert.equal(m.method, 'fuzzy');
+    assert.equal(m.wireRow.id, 1);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Task2/no-match: neither request-id nor fuzzy → unmatched result flagged for fallback insertion', () => {
+  const { dir, dbPath } = makeTempDb();
+  const db = openTokenDb(dbPath);
+  try {
+    insertWireRow(db, { id: 1, tool_call_id: 'w1', model: 'M', timestamp: '2026-07-06T10:00:00.000Z' });
+
+    // Different model + no request-id → no match.
+    const t = transcriptRow({ tool_call_id: 'ghost', model: 'other-model' });
+    const m = matchWireRow(db, t, {});
+    assert.equal(m.method, null);
+    assert.equal(m.wireRow, null);
+
+    const r = reconcileRow(db, t, {});
+    assert.equal(r.matched, false);
+    assert.equal(r.fallback, true);
+    assert.equal(r.method, null);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Task2/deltas: computeDeltas records EVERY nonzero per-field delta on a matched pair', () => {
+  const wire = {
+    input_tokens: 100, output_tokens: 20,
+    cache_read_tokens: 5, cache_write_tokens: 7, reasoning_tokens: 3,
+  };
+  const transcript = {
+    input_tokens: 130, output_tokens: 20, // output delta 0 → NOT recorded
+    cache_read_tokens: 9, cache_write_tokens: 7, // cache_write delta 0 → NOT recorded
+    reasoning_tokens: 8,
+  };
+  const d = computeDeltas(wire, transcript);
+  assert.equal(d.input_tokens.delta, 30);
+  assert.equal(d.cache_read_tokens.delta, 4);
+  assert.equal(d.reasoning_tokens.delta, 5);
+  // Zero-delta fields are not recorded.
+  assert.equal(d.output_tokens, undefined);
+  assert.equal(d.cache_write_tokens, undefined);
+});
+
+test('Task2/tolerance: max(2% of larger, 50) does NOT false-flag legitimate large matched pairs', () => {
+  // Legitimate large cache_read pair (82-06 v2 range ~47946–72264): a modest
+  // relative spread stays within 2% → recorded but NOT flagged.
+  const legit = computeDeltas(
+    { cache_read_tokens: 47946, input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0 },
+    { cache_read_tokens: 48800, input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0 },
+  );
+  assert.ok(legit.cache_read_tokens, 'a nonzero delta is still recorded');
+  assert.equal(legit.cache_read_tokens.delta, 854);
+  assert.equal(legit.cache_read_tokens.flagged, false); // 854 <= 2% of 48800 (976)
+
+  // A small delta within the 50-token floor is recorded but not flagged.
+  const small = computeDeltas(
+    { output_tokens: 100, input_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0 },
+    { output_tokens: 130, input_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0 },
+  );
+  assert.equal(small.output_tokens.flagged, false); // delta 30 <= 50 floor
+
+  // A delta beyond BOTH the 2% and the 50-token floor is flagged.
+  const beyond = computeDeltas(
+    { input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0 },
+    { input_tokens: 5000, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0 },
+  );
+  assert.equal(beyond.input_tokens.flagged, true); // delta 4900 > max(100, 50)
+});
+
+test('Task2/reason bypass: a :reason:N tool_call_id is never matched and is reported always-insert', () => {
+  const { dir, dbPath } = makeTempDb();
+  const db = openTokenDb(dbPath);
+  try {
+    // Even with an exact-id wire row present, a reasoning-step row bypasses matching.
+    insertWireRow(db, { id: 1, tool_call_id: 'r1:reason:0', model: 'M' });
+
+    const t = transcriptRow({ tool_call_id: 'r1:reason:0', model: 'M' });
+    const m = matchWireRow(db, t, {});
+    assert.equal(m.method, null);
+    assert.equal(m.wireRow, null);
+
+    const r = reconcileRow(db, t, {});
+    assert.equal(r.matched, false);
+    assert.equal(r.method, null);
+    assert.equal(r.alwaysInsert, true);
+    assert.equal(r.fallback, true);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Task2/never-throw: a closed/failing db handle yields a safe unmatched result, not an exception', () => {
+  const { dir, dbPath } = makeTempDb();
+  const db = openTokenDb(dbPath);
+  db.close(); // subsequent prepares throw inside the matcher
+  try {
+    const t = transcriptRow({ tool_call_id: 'r1', model: 'M' });
+    const m = matchWireRow(db, t, {});
+    assert.equal(m.method, null);
+    assert.equal(m.wireRow, null);
+
+    const r = reconcileRow(db, t, {});
+    assert.equal(r.matched, false);
+    assert.equal(r.fallback, true);
+  } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
