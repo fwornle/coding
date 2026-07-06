@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
-stopped_at: Phase 78 context gathered
-last_updated: "2026-07-05T16:20:19.816Z"
-last_activity: 2026-07-05 -- Phase 82 execution started
+stopped_at: Phase 82 complete (6/6) — WIRE-08 discharged
+last_updated: "2026-07-06T00:00:00.000Z"
+last_activity: 2026-07-06 -- Phase 82 complete (live wire-measurement acceptance gate passed)
 progress:
   total_phases: 21
   completed_phases: 11
   total_plans: 66
-  completed_plans: 59
+  completed_plans: 60
   percent: 52
 ---
 
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 82 (wire-measurement-foundation) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 82
-Last activity: 2026-07-05 -- Phase 82 execution started
+Phase: 82 (wire-measurement-foundation) — COMPLETE (6/6)
+Plan: 6 of 6 (done)
+Status: Phase 82 complete — WIRE-08 discharged; ready for Phase 83 (Token Reconciliation Layer)
+Last activity: 2026-07-06 -- Phase 82 live acceptance gate passed (all 3 human checkpoints approved)
 
 ## Deferred Items
 
@@ -123,6 +123,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 ### Decisions
 
+- [82-06]: Live acceptance gate PASSED (WIRE-08; Phase 82 complete 6/6, all 3 human checkpoints approved 2026-07-06). Task 1 verified the ANTHROPIC_CUSTOM_HEADERS newline-separated `Name: value` shape binds the tap (sentinel row id 164372). Task 2 (concurrent 2-cell + interactive) surfaced a RESIDUAL /api/complete ambient-span leak — `proxy-bridge/server.mjs:2656` stamped `resolveLiveTaskId()` for any /api/complete caller without `body.task_id`, so background daemons (health-coordinator ×3 + consolidator-insight) inherited the claude cell's task_id (86% contamination, cell ids 164402-164405). Plan 82-02 had killed the ambient singleton only on the /v1/messages tap, NOT /api/complete. Fixed with a new `src/background-process.ts` `isBackgroundProcess()` denylist (exact: health-coordinator, observation-writer; prefixes: consolidator-, token-adapter-, wave-analysis-) at the stamping site — explicit body.task_id always wins, unknown processes keep legacy span fallback. Proxy commit d3f3869; regression test 2/2 green; v2 re-run (experiment wire-verify-82-06-v2) PASSED clean (zero daemon rows in cell task_ids, claude cache 47946-72264 matches cladpt, one row per tool_call_id). Task 3 proved tool-passthrough behaviorally: copilot BYOK (`claude-sonnet-4.6`, /v1/copilot/t/<task> path) and opencode each wrote a real /tmp file via a 2-turn agentic loop; capability gating kept tools-bearing requests off the tools-off claude-code CLI. TWO follow-ups carried forward (non-blocking): (1) duplicate `id` values in token_usage from a missing PK/unique constraint between the /v1/messages tap and adapter writers — attribution unaffected; (2) COPILOT_MODEL=haiku narrates instead of emitting tool_calls against copilot's large tool schema (model-choice, not a proxy defect; dotted names required, `claude-sonnet-4-5` rejected 400).
 - [76-02]: VALID-02 route time math (D-05/06/07) — `wallclockPerStep` (`lib/experiments/route-heuristics.mjs`) redefined from the naïve `(lastTerminal − firstStart)/count` to the SUM of ACTIVE inter-event gaps (`nextStart − prevTerminal`, `prevTerminal = ended_at ?? started_at`) ÷ `max(1, count)`. Gaps STRICTLY GREATER than a single named idle threshold `DEFAULT_IDLE_GAP_MS` (300000 ms / 5 min) are operator-thinking/AFK and excluded; a gap exactly AT the threshold is included (documented boundary rule). Threshold is env-overridable via `ROUTE_IDLE_GAP_MS`, resolved per-invocation by `resolveIdleGapMs()` (fail-soft to default on malformed/non-positive) so tests toggle it without re-import — kept inside the module (D-06 Claude's Discretion), no shared config. Single-event (`ended − started`) and empty-trace (null via computeHeuristics) edge cases preserved; metric stays pure (no fs/network/LLM, D-07). Kills the ~28k s/step artifact on multi-hour steering-paused traces. TDD RED `3d57f3090` / GREEN `15d884824`; 19/19 tests green. Wave-2 regression anchor is 76-04 (recompute the archived `exp-dash-start-control` pilot span).
 - [67-07]: Measurement-span integration (D-09) arms record/replay via the existing `startMeasurement` meta passthrough (`meta.record` / `meta.replay_from`) — NO schema change and NO second reader of `active-measurement.json` (single-reader discipline preserved, T-67-07-04). `captureSnapshot` runs after span open and both capture + fixture-archive are best-effort try/catch so a failure never aborts the measurement (T-67-07-05). `run-write.mjs:108` now reads `snapshot_id: t.snapshot_id ?? null` (was hardcoded null), linking each Run to its RunSnapshot. Live E2E APPROVED 2026-07-02: recorded LLM responses served byte-identical from fixtures, novel prompt hard-failed `409 REPLAY_MISS` (no live fallthrough), default `repro-restore` sandbox left live HEAD unchanged (f36fa5db4). Known limitation: km-core submodule may not be fetchable in the restore sandbox (`unable to read tree`) — restore falls back to JSON-export KB hydration (1201 nodes) with a best-effort warning, non-fatal. Phase 67 complete (7/7); REPRO-01 + REPRO-02 discharged.
 - [66-05]: PERF-03 SC-2 closed via an opt-in `LLM_PROXY_WORKER_SPAWN_DELAY_MS` test seam in `worker-pool.mjs` — `_dispatch` defers the prompt write by N ms (unref'd setTimeout) AFTER stamping `dispatchedAt`, so the injected delay lands in the overhead window (`firstOutputAt − dispatchedAt`), NOT generation; per-request timeout armed at `requestTimeoutMs + _spawnDelayMs`; superseded-dispatch guard + `_clearSpawnDelayTimer` in `_onExit`/`dispose`; byte-for-byte no-op when unset/0 (clamp neg/NaN→0). Unit determinism = tiny real defer (15ms) proves the deferral + injectable `_now` fake clock drives the overhead magnitude (no seconds-long sleep). Live-proven 2026-06-21: env=6000ms drove the sonnet overhead median to 6.0s, BOTH :3032 surfaces flipped RED (tile "Regressed" bg `rgb(239,68,68)`, by-model "Spawn Overhead" `rgb(185,28,28)`/bg `rgb(254,242,242)` via gsd-browser computed-rgb), then restored to GREEN + healthy pool. Injection was reversible via the gitignored `.env` (sourced by `start-llm-proxy.sh`, `set -a`) — `launchctl setenv` is inert against the plist `EnvironmentVariables` dict (66-04 finding). Proxy commits `aa474a3` (test) / `a4ce41d` (feat). PERF-03 now Complete (SC-1 green + SC-2 red).
