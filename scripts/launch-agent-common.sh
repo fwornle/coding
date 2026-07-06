@@ -412,8 +412,11 @@ configure_proxy_routing() {
       export ANTHROPIC_BASE_URL="${base}"
       unset ANTHROPIC_API_KEY ANTHROPIC_ADMIN_API_KEY ANTHROPIC_AUTH_TOKEN
       # Bind this launcher's measurement span to the proxy tap's Route-1 passthrough rows
-      # PER-REQUEST (newline-separated `Name: value` form). An empty TASK_ID leaves the header
-      # value blank → the tap falls back to its ambient resolveLiveTaskId() (safety valve).
+      # PER-REQUEST (newline-separated `Name: value` form). An empty TASK_ID sends a BLANK
+      # x-task-id and, per D-08 (no-inherit), the tap stamps task_id='' on those wire rows
+      # — there is NO ambient resolveLiveTaskId() fallback. The span binding is recovered
+      # later at reconcile time by the RECONCILE_GAP_FILL_SQL task_id backfill (CR-03), which
+      # stamps the span task_id onto a matched task_id='' wire row (span-scoped, not ambient).
       # Header env format verified live in Plan 06's EARLY gate before the full run.
       export ANTHROPIC_CUSTOM_HEADERS="x-task-id: ${TASK_ID:-}"
       _agent_log "🔌 claude → proxy ${base}/v1/messages (Max-OAuth forwarded; token_usage agent='claude'; x-task-id=${TASK_ID:-<ambient>})"
