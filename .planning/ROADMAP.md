@@ -361,7 +361,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
-| 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete   | 2026-07-06 |
+| 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
 | 83. Token Reconciliation Layer | v7.5 | 0/? | Not started | - |
 | 84. Per-Turn Context Revelation | v7.5 | 0/? | Not started | - |
 | 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
