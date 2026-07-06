@@ -252,6 +252,64 @@ test('configureProxyRoutingEnv: opencode routes+keeps key; claude routes + x-tas
   assert.ok(!('ANTHROPIC_BASE_URL' in optOut), 'CODING_PROXY_ROUTE=0 → unrouted');
 });
 
+test('configureProxyRoutingEnv: copilot BYOK — task-scoped URL, all envs set, URL-encoding, proxy-down/opt-out fail-soft, no baseEnv mutation', async () => {
+  // Gap WIRE-07: copilot BYOK branch was untested. This test verifies every behavioural
+  // claim in the Plan-05 SUMMARY and aligns assertions to what the implementation
+  // actually does (switch case 'copilot' in lib/experiments/experiment-runner.mjs).
+
+  const up = async () => ({ status: 'running' });
+  const down = async () => ({ status: 'stopped', error: 'ECONNREFUSED' });
+  const base = { ANTHROPIC_API_KEY: 'k', LLM_PROXY_DATA_DIR: '/wt/.data' };
+
+  // a. With taskId and model: task-scoped URL + all BYOK envs present.
+  const cp = await configureProxyRoutingEnv('copilot', base, {
+    port: 12435, probe: up, route: '1', taskId: 't-1', model: 'claude-haiku-4-5',
+  });
+  assert.equal(cp.COPILOT_PROVIDER_BASE_URL, 'http://127.0.0.1:12435/v1/copilot/t/t-1');
+  assert.equal(cp.COPILOT_PROVIDER_TYPE, 'openai');
+  assert.equal(cp.COPILOT_PROVIDER_API_KEY, 'rapid-proxy-no-auth-placeholder');
+  assert.equal(cp.COPILOT_MODEL, 'claude-haiku-4-5');
+  assert.equal(cp.COPILOT_AUTO_UPDATE, 'false');
+
+  // b. Without taskId: falls back to unbound /v1/copilot path.
+  const cpNoTask = await configureProxyRoutingEnv('copilot', base, {
+    port: 12435, probe: up, route: '1', model: 'claude-haiku-4-5',
+  });
+  assert.equal(cpNoTask.COPILOT_PROVIDER_BASE_URL, 'http://127.0.0.1:12435/v1/copilot');
+
+  // c. taskId containing '#' (ASCII 0x23) → encodeURIComponent encodes it as %23.
+  //    Path segment must carry the percent-encoded form so the proxy URL is valid.
+  const cpEncoded = await configureProxyRoutingEnv('copilot', base, {
+    port: 12435, probe: up, route: '1', taskId: 'task#42',
+  });
+  assert.equal(
+    cpEncoded.COPILOT_PROVIDER_BASE_URL,
+    'http://127.0.0.1:12435/v1/copilot/t/task%2342',
+    'taskId with # must arrive percent-encoded in the path segment',
+  );
+
+  // d. Proxy down (probe returns stopped) → NO COPILOT_PROVIDER_* envs (fail-soft).
+  const cpDown = await configureProxyRoutingEnv('copilot', base, {
+    port: 12435, probe: down, route: '1', taskId: 't-1', model: 'claude-haiku-4-5',
+  });
+  assert.ok(!('COPILOT_PROVIDER_BASE_URL' in cpDown), 'proxy down → no COPILOT_PROVIDER_BASE_URL');
+  assert.ok(!('COPILOT_PROVIDER_TYPE' in cpDown), 'proxy down → no COPILOT_PROVIDER_TYPE');
+  assert.ok(!('COPILOT_PROVIDER_API_KEY' in cpDown), 'proxy down → no COPILOT_PROVIDER_API_KEY');
+  assert.ok(!('COPILOT_AUTO_UPDATE' in cpDown), 'proxy down → no COPILOT_AUTO_UPDATE');
+
+  // Opt-out (CODING_PROXY_ROUTE=0) → NO COPILOT_PROVIDER_* envs (fail-soft).
+  const cpOptOut = await configureProxyRoutingEnv('copilot', base, {
+    port: 12435, probe: up, route: '0', taskId: 't-1', model: 'claude-haiku-4-5',
+  });
+  assert.ok(!('COPILOT_PROVIDER_BASE_URL' in cpOptOut), 'CODING_PROXY_ROUTE=0 → no COPILOT_PROVIDER_BASE_URL');
+  assert.ok(!('COPILOT_PROVIDER_TYPE' in cpOptOut), 'CODING_PROXY_ROUTE=0 → no COPILOT_PROVIDER_TYPE');
+
+  // e. baseEnv is not mutated — BYOK envs appear only on the returned copy.
+  assert.ok(!('COPILOT_PROVIDER_BASE_URL' in base), 'baseEnv not mutated: no COPILOT_PROVIDER_BASE_URL');
+  assert.ok(!('COPILOT_PROVIDER_TYPE' in base), 'baseEnv not mutated: no COPILOT_PROVIDER_TYPE');
+  assert.ok(!('COPILOT_AUTO_UPDATE' in base), 'baseEnv not mutated: no COPILOT_AUTO_UPDATE');
+});
+
 // ---------------------------------------------------------------------------
 // Task 3: runMatrix — sequential idempotent loop + copilot probe gate + skip-Run
 // ---------------------------------------------------------------------------
