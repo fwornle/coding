@@ -52,8 +52,8 @@
 #
 # ── SINK + READ ──
 #   Per-span file: .data/measurements/<span>/reconciliation.json (written by measurement-stop.mjs)
-#   Read API:      GET http://localhost:12436/api/experiments/runs/<taskId>/reconciliation
-#                  (vkb-server, Plan 05 — serves the file verbatim)
+#   Read API:      GET http://localhost:8080/api/experiments/runs/<taskId>/reconciliation
+#                  (vkb-server, Plan 05 — serves the file verbatim; :12436 is obs-api, NOT this route)
 #
 # Fresh experiment_id so no prior wire-verify-82-* / compare-fizzbuzz resume state is touched.
 version: 1
