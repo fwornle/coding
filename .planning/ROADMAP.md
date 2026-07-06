@@ -56,7 +56,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 
 - [x] **Phase 81: Copilot BYOK Proxy-Routing Verification Spike** — CONFIRMED live 2026-07-05 (copilot 1.0.68 → proxy shim, token row matches CLI footer); gaps → Phase 82: shim tool-call passthrough (HARD), dedicated /v1/copilot path, ambient-binding-only for copilot. Verdict: `81-SPIKE-VERDICT.md`
 - [x] **Phase 82: Wire-Measurement Foundation** — Uniform 4-agent proxy capture: cache-token columns + /v1/messages tap cache parse + x-task-id/x-agent header binding + claude-cell & copilot routing + richer-row dedup merge (completed 2026-07-06)
-- [ ] **Phase 83: Token Reconciliation Layer** — Transcript adapters (cladpt/copadt) verify/enrich wire rows; per-span discrepancy sink; no double-counting
+- [x] **Phase 83: Token Reconciliation Layer** — Transcript adapters (cladpt/copadt) verify/enrich wire rows; per-span discrepancy sink; no double-counting (completed 2026-07-06)
 - [ ] **Phase 84: Per-Turn Context Revelation** — Persist every measured request as context-turns JSONL with paired usage; read APIs; honest cache explainer
 - [ ] **Phase 85: Experiment Control Center** — Launch / re-run (same snapshot, param overrides) / monitor / cancel experiments from the performance dashboard
 - [ ] **Phase 86: Timeline v2 & Performance Page Declutter** — Per-turn story (prompt, tool calls, cache split, context band) + IA cleanup
@@ -314,7 +314,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] 83-04-PLAN.md — Reconcile mode in captureForegroundTokens: match-then-enrich-or-fallback + provenance + report (stop-adapter-registry.mjs) [D-01/D-02/D-04]
 - [x] 83-05-PLAN.md — measurement-stop reconciliation.json sink + GET read API (measurement-stop.mjs + api-routes.js) [D-01/D-06/D-12/D-13]
 - [x] 83-06-PLAN.md — Copilot BYOK gating to measured launches only (copilot.sh + launch-agent-common.sh + experiment-runner.mjs) [D-03]
-- [ ] 83-07-PLAN.md — Golden-comparison live acceptance (human checkpoint) [D-01/D-02/D-04/D-05/D-12]
+- [x] 83-07-PLAN.md — Golden-comparison live acceptance (human checkpoint) [D-01/D-02/D-04/D-05/D-12]
 
 ### Phase 84: Per-Turn Context Revelation
 **Goal**: Every measured request persisted as one context-turns JSONL line (category analysis, cache-breakpoint positions, per-message digests incl. tool_use names + sizes, paired response usage), gzipped at span close with retention policy; optional flag-gated full raw bodies; read APIs on proxy (`/api/context-turns`) + vkb-server pass-through; cache explainer shows honest per-turn sent/cached/fresh numbers for all agents with the "how prompt caching actually works" copy.
@@ -369,7 +369,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
-| 83. Token Reconciliation Layer | v7.5 | 6/7 | In Progress|  |
+| 83. Token Reconciliation Layer | v7.5 | 7/7 | Complete   | 2026-07-06 |
 | 84. Per-Turn Context Revelation | v7.5 | 0/? | Not started | - |
 | 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
 | 86. Timeline v2 & Declutter | v7.5 | 0/? | Not started | - |

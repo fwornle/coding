@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
-stopped_at: Phase 83 context gathered
-last_updated: "2026-07-06T07:02:03.729Z"
-last_activity: 2026-07-06 -- Phase 83 execution started
+stopped_at: Phase 83 complete (7/7 plans) — 83-07 golden-comparison acceptance gate PASSED
+last_updated: "2026-07-06T08:36:23.849Z"
+last_activity: 2026-07-06 -- Phase 83 complete; 83-07 acceptance gate PASSED
 progress:
   total_phases: 21
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 73
-  completed_plans: 65
-  percent: 57
+  completed_plans: 72
+  percent: 62
 ---
 
 # Project State
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 83 (token-reconciliation-layer) — EXECUTING
-Plan: 1 of 7
-Status: Executing Phase 83
-Last activity: 2026-07-06 -- Phase 83 execution started
+Phase: 83 (token-reconciliation-layer) — COMPLETE (7/7 plans)
+Plan: 7 of 7 (83-07 golden-comparison acceptance gate PASSED)
+Status: Phase 83 complete — reconciliation stack proven end-to-end
+Last activity: 2026-07-06 -- Phase 83 complete; 83-07 acceptance gate PASSED (all three golden-comparison properties confirmed on a live run)
 
 ## Deferred Items
 
@@ -123,6 +123,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 ### Decisions
 
+- [83-07]: Golden-comparison acceptance gate PASSED — **Phase 83 complete (7/7 plans)**. Two-cell live run (UNATTENDED, 2026-07-06): (1) healthy-routed claude cell `wire-verify-83-reconcile--…-default--r0` reconciled totals (matched=5, unmatched_wire=0, fallback=0, flaggedCount=0; token_usage SUM input=5/output=677/cache_read=61902) EQUAL the pre-change transcript-only `wire-verify-82-06-v2--…-default--r0` baseline (input=5/output=679) within run-to-run variance — no double-count, no loss; cache_read 61902 within the calibrated 47946–72264 band. (2) proxy-down cell `…--proxy-down--r0` fell back to full transcript capture: `process=token-adapter-claude-fallback` (input=3/output=273/cache_read=15934), `summary.fallback=1`, the `:reason:0` row normal-provenance per D-01; the 3 fuzzy matches against task-less interactive wire rows were all tolerance-FLAGGED (loud, never silently mis-attributed; enrich is fill-gaps-only). (3) D-08 no-inherit held under live concurrency — daemon/interactive rows (health-coordinator, consolidator-insight) carried EMPTY task_id, only cell traffic carries the cell task_ids. GET reconciliation route lives on the **vkb-server :8080** (NOT obs-api :12436 — required restarting `web-services:vkb-server` because the live process predated Plan 05; F3 comment fix `0d3ba54f4`). THREE advisory follow-ups (non-blocking, NOT fixed here): F1 `lib/experiments/experiment-runner.mjs` fail-soft branch leaves an inherited `ANTHROPIC_BASE_URL` in baseEnv when the proxy is unhealthy (WR-05-class; caused Cell B attempt-1 ConnectionRefused abort from a proxy-routed parent env); F2 zero-wire proxy-down spans allow non-primary transcript rows to fuzzy-match adjacent task-less interactive wire rows (correctly flagged); F3 spec/plan named :12436 (fixed to :8080). Reqs D-01/D-02/D-04/D-05/D-12 discharged. Spec commit `6c0a97754`; F3 fix `0d3ba54f4`; SUMMARY `4f021611a`.
 - [82-06]: Live acceptance gate PASSED (WIRE-08; Phase 82 complete 6/6, all 3 human checkpoints approved 2026-07-06). Task 1 verified the ANTHROPIC_CUSTOM_HEADERS newline-separated `Name: value` shape binds the tap (sentinel row id 164372). Task 2 (concurrent 2-cell + interactive) surfaced a RESIDUAL /api/complete ambient-span leak — `proxy-bridge/server.mjs:2656` stamped `resolveLiveTaskId()` for any /api/complete caller without `body.task_id`, so background daemons (health-coordinator ×3 + consolidator-insight) inherited the claude cell's task_id (86% contamination, cell ids 164402-164405). Plan 82-02 had killed the ambient singleton only on the /v1/messages tap, NOT /api/complete. Fixed with a new `src/background-process.ts` `isBackgroundProcess()` denylist (exact: health-coordinator, observation-writer; prefixes: consolidator-, token-adapter-, wave-analysis-) at the stamping site — explicit body.task_id always wins, unknown processes keep legacy span fallback. Proxy commit d3f3869; regression test 2/2 green; v2 re-run (experiment wire-verify-82-06-v2) PASSED clean (zero daemon rows in cell task_ids, claude cache 47946-72264 matches cladpt, one row per tool_call_id). Task 3 proved tool-passthrough behaviorally: copilot BYOK (`claude-sonnet-4.6`, /v1/copilot/t/<task> path) and opencode each wrote a real /tmp file via a 2-turn agentic loop; capability gating kept tools-bearing requests off the tools-off claude-code CLI. TWO follow-ups carried forward (non-blocking): (1) duplicate `id` values in token_usage from a missing PK/unique constraint between the /v1/messages tap and adapter writers — attribution unaffected; (2) COPILOT_MODEL=haiku narrates instead of emitting tool_calls against copilot's large tool schema (model-choice, not a proxy defect; dotted names required, `claude-sonnet-4-5` rejected 400).
 - [76-02]: VALID-02 route time math (D-05/06/07) — `wallclockPerStep` (`lib/experiments/route-heuristics.mjs`) redefined from the naïve `(lastTerminal − firstStart)/count` to the SUM of ACTIVE inter-event gaps (`nextStart − prevTerminal`, `prevTerminal = ended_at ?? started_at`) ÷ `max(1, count)`. Gaps STRICTLY GREATER than a single named idle threshold `DEFAULT_IDLE_GAP_MS` (300000 ms / 5 min) are operator-thinking/AFK and excluded; a gap exactly AT the threshold is included (documented boundary rule). Threshold is env-overridable via `ROUTE_IDLE_GAP_MS`, resolved per-invocation by `resolveIdleGapMs()` (fail-soft to default on malformed/non-positive) so tests toggle it without re-import — kept inside the module (D-06 Claude's Discretion), no shared config. Single-event (`ended − started`) and empty-trace (null via computeHeuristics) edge cases preserved; metric stays pure (no fs/network/LLM, D-07). Kills the ~28k s/step artifact on multi-hour steering-paused traces. TDD RED `3d57f3090` / GREEN `15d884824`; 19/19 tests green. Wave-2 regression anchor is 76-04 (recompute the archived `exp-dash-start-control` pilot span).
 - [67-07]: Measurement-span integration (D-09) arms record/replay via the existing `startMeasurement` meta passthrough (`meta.record` / `meta.replay_from`) — NO schema change and NO second reader of `active-measurement.json` (single-reader discipline preserved, T-67-07-04). `captureSnapshot` runs after span open and both capture + fixture-archive are best-effort try/catch so a failure never aborts the measurement (T-67-07-05). `run-write.mjs:108` now reads `snapshot_id: t.snapshot_id ?? null` (was hardcoded null), linking each Run to its RunSnapshot. Live E2E APPROVED 2026-07-02: recorded LLM responses served byte-identical from fixtures, novel prompt hard-failed `409 REPLAY_MISS` (no live fallthrough), default `repro-restore` sandbox left live HEAD unchanged (f36fa5db4). Known limitation: km-core submodule may not be fetchable in the restore sandbox (`unable to read tree`) — restore falls back to JSON-export KB hydration (1201 nodes) with a best-effort warning, non-fatal. Phase 67 complete (7/7); REPRO-01 + REPRO-02 discharged.
