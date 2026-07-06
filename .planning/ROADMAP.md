@@ -312,7 +312,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] 83-02-PLAN.md — Proxy wire cache parse (IN-05) + dup-id constraint (D-11) + build/deploy [D-09/D-11]
 - [x] 83-03-PLAN.md — Reconcile matcher core: cross-user_hash request-id join + fuzzy fallback + delta/tolerance (reconcile.mjs + token-db.mjs) [D-04/D-05]
 - [x] 83-04-PLAN.md — Reconcile mode in captureForegroundTokens: match-then-enrich-or-fallback + provenance + report (stop-adapter-registry.mjs) [D-01/D-02/D-04]
-- [ ] 83-05-PLAN.md — measurement-stop reconciliation.json sink + GET read API (measurement-stop.mjs + api-routes.js) [D-01/D-06/D-12/D-13]
+- [x] 83-05-PLAN.md — measurement-stop reconciliation.json sink + GET read API (measurement-stop.mjs + api-routes.js) [D-01/D-06/D-12/D-13]
 - [x] 83-06-PLAN.md — Copilot BYOK gating to measured launches only (copilot.sh + launch-agent-common.sh + experiment-runner.mjs) [D-03]
 - [ ] 83-07-PLAN.md — Golden-comparison live acceptance (human checkpoint) [D-01/D-02/D-04/D-05/D-12]
 
@@ -369,7 +369,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
-| 83. Token Reconciliation Layer | v7.5 | 5/7 | In Progress|  |
+| 83. Token Reconciliation Layer | v7.5 | 6/7 | In Progress|  |
 | 84. Per-Turn Context Revelation | v7.5 | 0/? | Not started | - |
 | 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
 | 86. Timeline v2 & Declutter | v7.5 | 0/? | Not started | - |
