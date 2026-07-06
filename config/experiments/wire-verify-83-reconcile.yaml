@@ -1,0 +1,91 @@
+# config/experiments/wire-verify-83-reconcile.yaml — Phase 83 Plan 07 GOLDEN-COMPARISON acceptance.
+#
+# This is Phase 83's acceptance gate. It exercises the full reconciliation stack end-to-end:
+# proxy task-id hardening + OpenAI cache parse + dup-id constraint (Plans 01/02), the
+# cross-user_hash request-id matcher with fuzzy time+model fallback and tolerance flagging
+# (Plan 03), reconcile mode in captureForegroundTokens with provenance-tagged transcript
+# fallback (Plan 04), the reconciliation.json sink + read API (Plan 05), and copilot BYOK
+# gating (Plan 06). Modeled on wire-verify-82-06-v2.yaml (2-cell, ATTENDED-by-design
+# reproducer), but here BOTH cells are claude — the golden comparison is a claude-only test.
+#
+# ┌─ THREE GOLDEN-COMPARISON PROPERTIES the operator confirms (blocking human checkpoint) ─┐
+# │                                                                                         │
+# │ (1) NO DOUBLE-COUNT / NO LOSS — the HEALTHY routed claude cell's RECONCILED token       │
+# │     totals must EQUAL the pre-change transcript-only totals for the same goal (the      │
+# │     82-06 baseline). Not roughly-double (double-count), not near-zero (loss). On        │
+# │     matched pairs, claude cache_read must sit in the calibrated 47946–72264 range       │
+# │     (the wire-vs-cladpt matched-pair band from the 82-06 v2 verify run).                │
+# │                                                                                         │
+# │ (2) PROXY-DOWN → FULL TRANSCRIPT FALLBACK — with the proxy STOPPED for the second        │
+# │     cell, ALL of that cell's tokens must be captured via transcript fallback, tagged     │
+# │     with the fallback provenance marker and counted in reconciliation.json              │
+# │     (summary.fallback > 0). A fallback MISS shows as a low fallback count — loud, not     │
+# │     a silent token loss (D-02 match-outcome-driven fallback).                            │
+# │                                                                                         │
+# │ (3) HEALTHY SPAN unmatched_wire=0 — every wire row in the healthy measured span finds    │
+# │     its transcript match (summary.unmatched_wire === 0) and the per-request array is     │
+# │     well-formed (each entry carries method, per-field deltas, and flags).                │
+# │                                                                                         │
+# └─────────────────────────────────────────────────────────────────────────────────────────┘
+#
+# ── OPERATOR PROTOCOL (proxy-down cell is operator-driven — no code change) ──
+#   Cell A (claude-sonnet-straight-default)    — HEALTHY: proxy UP. Exercises properties (1) + (3).
+#   Cell B (claude-sonnet-straight-proxy-down) — FALLBACK: operator STOPS the proxy for the
+#     duration of this cell so every token lands via transcript fallback, then RESTARTS it.
+#       stop:    launchctl stop com.coding.llm-cli-proxy
+#       restart: launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy
+#                (confirm coordinator :3034 reports location=open BEFORE the kickstart, then
+#                 probe POST http://localhost:12435/api/complete to confirm the proxy is healthy)
+#   The two cells differ ONLY by the free-form `env` label (default vs proxy-down); this makes
+#   the composite task_ids distinct (claude-sonnet-straight-default vs -proxy-down) so D-10
+#   idempotent resume treats them as separate cells. The `env` value does NOT change the launch
+#   argv (argv is agent/model/goal-driven) — it is a label + a variant discriminator only.
+#
+# ── RUN UNATTENDED (compare-fizzbuzz caveat) ──
+#   ONE global active-measurement.json span slot + the shared host proxy: any concurrent
+#   main-session LLM call in THIS repo while a cell is open would be mis-stamped with the cell's
+#   task_id. Kick this off standalone and let it run to completion (per cell for the proxy-down
+#   coordination):
+#       node scripts/experiment-run.mjs --spec config/experiments/wire-verify-83-reconcile.yaml
+#   Before starting, remove any stale .data/measurements/active-measurement.json left by a prior
+#   manual test.
+#
+# ── SINK + READ ──
+#   Per-span file: .data/measurements/<span>/reconciliation.json (written by measurement-stop.mjs)
+#   Read API:      GET http://localhost:12436/api/experiments/runs/<taskId>/reconciliation
+#                  (vkb-server, Plan 05 — serves the file verbatim)
+#
+# Fresh experiment_id so no prior wire-verify-82-* / compare-fizzbuzz resume state is touched.
+version: 1
+
+experiment_id: wire-verify-83-reconcile
+
+# Declare-time baseline snapshot (D-09) — reuse the existing complete Phase-78 baseline; each
+# cell restores into an ISOLATED sandbox worktree (restoreForCell inPlace:false, zero blast radius).
+snapshot_id: smoke-spec
+
+# Non-trivial goal: two file writes (module + test) → ≥2 consequential events → the run is SCORED,
+# not quarantined as trivial. Identical to the 82-06 / compare-fizzbuzz goal so the healthy cell's
+# reconciled totals are directly comparable to the pre-change transcript-only baseline (property 1).
+goal_sentence: "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'."
+
+repeats: 1
+
+# Score-time test command (runs at SCORE time only, never the completion gate). Fixed argv, no shell meta.
+test_command: "node --test fizzbuzz.test.mjs"
+
+variants:
+  # Cell A — HEALTHY routed claude cell (proxy UP). Properties (1) no double-count/no loss and
+  # (3) unmatched_wire=0. env:default keeps the launch on the standard proxy-routed path.
+  - agent: claude
+    model: sonnet
+    framework: straight
+    env: default
+  # Cell B — PROXY-DOWN claude cell. Property (2) full transcript fallback with provenance.
+  # OPERATOR stops the proxy for this cell (launchctl stop com.coding.llm-cli-proxy), lets it
+  # run so all tokens fall back through the transcript adapter, then restarts the proxy. The
+  # `proxy-down` env is a variant discriminator/label only — it does not alter the launch argv.
+  - agent: claude
+    model: sonnet
+    framework: straight
+    env: proxy-down
