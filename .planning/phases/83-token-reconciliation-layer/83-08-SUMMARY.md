@@ -131,3 +131,7 @@ No ambient inheritance reintroduced (D-08 preserved: the task_id stamp is span-s
 - T-83-08-01 (SQL injection): all new SQL (task_id backfill CASE + wire-row snapshot SELECT) uses `?` binds only; task_id/tool_call_id/user_hash never interpolated; values coalesced via existing `text()`/`num()`.
 - T-83-08-02 (DoS): the roll-up helper, the snapshot query, and the count all preserve the best-effort/never-throw contract — a failure returns a safe default (empty aggregate / empty snapshot / 0 unmatched) and never blocks the measurement-stop close.
 - T-83-08-03 (attribution tamper): the task_id CASE-guard stamps only when currently '' and only on tool_call_id-matched rows — span-scoped, no cross-span leakage.
+
+## Self-Check: PASSED
+
+All 7 modified files present on disk; all 7 commits (3 RED + 3 GREEN + docs) present in git history.
