@@ -154,28 +154,37 @@ async function main(argv) {
 
   process.stderr.write(`[live-claude] starting daemon — projectsDir=${projectsDir} stateFile=${stateFile} heartbeat=${heartbeatInterval}s\n`);
 
-  // Dynamic import ObservationWriter — its constructor opens a DB, which can
-  // fail at startup. Keep the import out of the top of file so --help works
-  // even when the DB layer is unavailable (e.g. in a test fixture without
-  // SQLite).
-  let ObservationWriter;
+  // Dynamic import kept so --help works without the live-logging layer.
+  // 2026-07-06: writes go via obs-api (single km-core owner) — the bare
+  // ObservationWriter constructor has had no standalone write path since
+  // Phase 44 Plan 12 (LLM call spent, km-core write threw, nothing
+  // persisted). ObservationApiClient.init() health-probes obs-api before
+  // any LLM spend.
+  let ObservationApiClient;
   try {
-    ({ ObservationWriter } = await import('../src/live-logging/ObservationWriter.js'));
+    ({ ObservationApiClient } = await import('../src/live-logging/ObservationApiClient.js'));
   } catch (err) {
-    process.stderr.write(`[live-claude] failed to load ObservationWriter: ${err.message}\n`);
+    process.stderr.write(`[live-claude] failed to load ObservationApiClient: ${err.message}\n`);
     return 2;
   }
 
   const registry = createRegistry();
   let writer;
   try {
-    writer = new ObservationWriter();
+    writer = new ObservationApiClient();
     if (typeof writer.init === 'function') {
       await writer.init();
     }
   } catch (err) {
-    process.stderr.write(`[live-claude] ObservationWriter init failed: ${err.message}\n`);
-    return 2;
+    // obs-api unreachable: fall back to a no-op writer so the daemon's
+    // OTHER duties (registry heartbeats, Phase-69 token-row emission) keep
+    // running. Observations resume on the next daemon restart with obs-api up.
+    process.stderr.write(`[live-claude] ObservationApiClient init failed (${err.message}) — observations disabled, continuing\n`);
+    writer = {
+      init: async () => {},
+      close: async () => {},
+      processMessages: async () => ({ observations: 0, errors: 0 }),
+    };
   }
 
   // --- Phase 69 (Plan 69-05 Task 1): token-row emission wiring (D-08).

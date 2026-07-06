@@ -156,22 +156,32 @@ async function main() {
   // Bootstrap registry + writer.
   const registry = createRegistry();
 
-  // ObservationWriter lazy-imported to keep --help fast (no DB connection
-  // overhead just to print help text).
+  // Writer lazy-imported to keep --help fast. 2026-07-06: writes go via
+  // obs-api (single km-core owner) — the bare ObservationWriter constructor
+  // has had no standalone write path since Phase 44 Plan 12 (LLM call spent,
+  // km-core write threw, nothing persisted). ObservationApiClient.init()
+  // health-probes obs-api before any LLM spend.
   let ObservationWriterCtor;
   try {
-    ({ ObservationWriter: ObservationWriterCtor } = await import('../src/live-logging/ObservationWriter.js'));
+    ({ ObservationApiClient: ObservationWriterCtor } = await import('../src/live-logging/ObservationApiClient.js'));
   } catch (err) {
-    process.stderr.write(`[live-copilot] failed to load ObservationWriter: ${err.message}\n`);
+    process.stderr.write(`[live-copilot] failed to load ObservationApiClient: ${err.message}\n`);
     process.exit(1);
   }
-  const writer = new ObservationWriterCtor();
+  let writer = new ObservationWriterCtor();
   if (typeof writer.init === 'function') {
     try {
       await writer.init();
     } catch (err) {
-      process.stderr.write(`[live-copilot] writer init failed: ${err.message}\n`);
-      process.exit(1);
+      // obs-api unreachable: fall back to a no-op writer so the daemon's
+      // OTHER duties (registry heartbeats, Phase-69 token-row emission) keep
+      // running. Observations resume on the next daemon restart with obs-api up.
+      process.stderr.write(`[live-copilot] writer init failed (${err.message}) — observations disabled, continuing\n`);
+      writer = {
+        init: async () => {},
+        close: async () => {},
+        processMessages: async () => ({ observations: 0, errors: 0 }),
+      };
     }
   }
 

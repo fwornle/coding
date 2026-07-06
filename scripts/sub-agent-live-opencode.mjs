@@ -184,22 +184,21 @@ async function main() {
     }
   }
 
-  // Minimal observationWriter stub: the production wiring loads the real
-  // src/live-logging/ObservationWriter.js dynamically. We use a duck-typed
-  // wrapper so the daemon stays testable without ObservationWriter's sqlite
-  // dependencies during dry-run smoke.
+  // Duck-typed writer wrapper so the daemon stays testable without the
+  // live-logging layer during dry-run smoke. 2026-07-06: writes go via
+  // obs-api (single km-core owner) — the former ObservationWriter({dbPath})
+  // path died with Phase 44 Plan 12 (SQLite write path removed): the LLM
+  // call was spent, then the km-core write threw, so nothing persisted.
   let observationWriter;
   try {
-    const mod = await import('../src/live-logging/ObservationWriter.js');
-    observationWriter = new mod.ObservationWriter({
-      dbPath: process.env.OBSERVATIONS_DB_PATH || '.observations/observations.db',
-    });
+    const mod = await import('../src/live-logging/ObservationApiClient.js');
+    observationWriter = new mod.ObservationApiClient();
     if (typeof observationWriter.init === 'function') {
       await observationWriter.init();
     }
   } catch (err) {
     process.stderr.write(
-      `[live-opencode] ObservationWriter init failed: ${err.message}\n`,
+      `[live-opencode] ObservationApiClient init failed: ${err.message}\n`,
     );
     // Fall back to a no-op writer so the daemon still produces heartbeats
     // (useful in environments without the observations DB).

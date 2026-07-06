@@ -21,7 +21,7 @@ version: 1
 # Stable explicit experiment id → deterministic composite task_ids
 # (compare-fizzbuzz--<variant>--r<rep>) and correct D-10 idempotent resume. Without it the id is
 # derived from the goal hash, which is fine but opaque.
-experiment_id: compare-fizzbuzz
+experiment_id: compare-fizzbuzz-v9
 
 # Declare-time baseline snapshot (D-09) — reuse the existing complete Phase-78 baseline each cell
 # restores into an ISOLATED sandbox worktree (restoreForCell inPlace:false, D-02, zero blast radius).

@@ -34,8 +34,8 @@ const FIXTURE_PATH = path.join(__dirname, '..', 'fixtures', 'mastra', 'mastra-tr
 
 // Mock the heavy deps used by convertToObservations so we don't touch the DB / network.
 const writerCalls = [];
-jest.unstable_mockModule('../../src/live-logging/ObservationWriter.js', () => ({
-  ObservationWriter: class {
+jest.unstable_mockModule('../../src/live-logging/ObservationApiClient.js', () => ({
+  ObservationApiClient: class {
     constructor(opts) { this.opts = opts; }
     async init() { /* no-op */ }
     async close() { /* no-op */ }

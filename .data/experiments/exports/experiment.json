@@ -652,6 +652,1928 @@
         "updatedAt": "2026-07-04T12:27:13.476Z",
         "validFrom": "2026-07-04T12:27:13.476Z"
       }
+    },
+    {
+      "key": "019f31ab-a465-748c-8335-fae3838fc1c4",
+      "attributes": {
+        "id": "019f31ab-a465-748c-8335-fae3838fc1c4",
+        "name": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "claude",
+          "model": "claude-sonnet-4-6",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+          "trace_id": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T09:45:00.325Z",
+          "ended_at": "2026-07-05T09:45:57.869Z",
+          "canonical_model": "claude-sonnet-4-6",
+          "canonical_agent": "claude",
+          "background_models": [
+            {
+              "model": "claude-haiku-4.5",
+              "process": "observation-writer",
+              "total_tokens": 23126
+            },
+            {
+              "model": "claude-sonnet-4.6",
+              "process": "consolidator-insight",
+              "total_tokens": 14604
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "health-coordinator",
+              "total_tokens": 26
+            }
+          ],
+          "variant": "claude-sonnet-straight-default",
+          "repeat": 0,
+          "terminal_state": "complete",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T09:46:00.165Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T09:46:00.165Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T09:46:00.166Z",
+        "updatedAt": "2026-07-05T09:46:00.166Z",
+        "validFrom": "2026-07-05T09:46:00.166Z"
+      }
+    },
+    {
+      "key": "019f31ab-a466-7776-a345-e64ba5e71e95",
+      "attributes": {
+        "id": "019f31ab-a466-7776-a345-e64ba5e71e95",
+        "name": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+          "totalTokens": 39117,
+          "inputTokens": 29116,
+          "outputTokens": 10001,
+          "reasoningTokens": 47,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T09:46:00.165Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T09:46:00.165Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T09:46:00.166Z",
+        "updatedAt": "2026-07-05T09:46:00.166Z",
+        "validFrom": "2026-07-05T09:46:00.166Z"
+      }
+    },
+    {
+      "key": "019f31ab-a466-7776-a345-e64c56089cd2",
+      "attributes": {
+        "id": "019f31ab-a466-7776-a345-e64c56089cd2",
+        "name": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T09:46:00.165Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T09:46:00.165Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T09:46:00.166Z",
+        "updatedAt": "2026-07-05T09:46:00.166Z",
+        "validFrom": "2026-07-05T09:46:00.166Z"
+      }
+    },
+    {
+      "key": "019f31ab-a54a-77f2-a125-adc5544235b7",
+      "attributes": {
+        "id": "019f31ab-a54a-77f2-a125-adc5544235b7",
+        "name": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T09:46:00.394Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T09:46:00.394Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T09:46:00.395Z",
+        "updatedAt": "2026-07-05T09:46:00.395Z",
+        "validFrom": "2026-07-05T09:46:00.395Z"
+      }
+    },
+    {
+      "key": "019f31bf-55b7-7f25-acf2-2ee19842797b",
+      "attributes": {
+        "id": "019f31bf-55b7-7f25-acf2-2ee19842797b",
+        "name": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "opencode",
+          "model": "claude-haiku-4.5",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "trace_id": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T09:47:02.050Z",
+          "ended_at": "2026-07-05T10:07:24.752Z",
+          "canonical_model": "claude-haiku-4.5",
+          "canonical_agent": "opencode",
+          "background_models": [
+            {
+              "model": "claude-haiku-4.5",
+              "process": "consolidator-mentions",
+              "total_tokens": 338617
+            },
+            {
+              "model": "claude-sonnet-4.6",
+              "process": "consolidator-insight",
+              "total_tokens": 99319
+            },
+            {
+              "model": "claude-sonnet-4.6",
+              "process": "consolidator-digest",
+              "total_tokens": 17101
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "observation-writer",
+              "total_tokens": 3424
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "health-coordinator",
+              "total_tokens": 39
+            }
+          ],
+          "variant": "opencode-rapid-proxy/claude-haiku-4-5-straight-default",
+          "repeat": 0,
+          "terminal_state": "timeout",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T10:07:30.742Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T10:07:30.742Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T10:07:30.744Z",
+        "updatedAt": "2026-07-05T10:07:30.744Z",
+        "validFrom": "2026-07-05T10:07:30.744Z"
+      }
+    },
+    {
+      "key": "019f31bf-55b8-7f5e-8a4f-745627a0b593",
+      "attributes": {
+        "id": "019f31bf-55b8-7f5e-8a4f-745627a0b593",
+        "name": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "totalTokens": 459217,
+          "inputTokens": 384209,
+          "outputTokens": 75008,
+          "reasoningTokens": 0,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T10:07:30.742Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T10:07:30.742Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T10:07:30.744Z",
+        "updatedAt": "2026-07-05T10:07:30.744Z",
+        "validFrom": "2026-07-05T10:07:30.744Z"
+      }
+    },
+    {
+      "key": "019f31bf-55b8-7f5e-8a4f-74578b52e31c",
+      "attributes": {
+        "id": "019f31bf-55b8-7f5e-8a4f-74578b52e31c",
+        "name": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T10:07:30.742Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T10:07:30.742Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T10:07:30.744Z",
+        "updatedAt": "2026-07-05T10:07:30.744Z",
+        "validFrom": "2026-07-05T10:07:30.744Z"
+      }
+    },
+    {
+      "key": "019f31bf-56e5-7833-a7cf-de5069018182",
+      "attributes": {
+        "id": "019f31bf-56e5-7833-a7cf-de5069018182",
+        "name": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T10:07:31.045Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T10:07:31.045Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T10:07:31.045Z",
+        "updatedAt": "2026-07-05T10:07:31.045Z",
+        "validFrom": "2026-07-05T10:07:31.045Z"
+      }
+    },
+    {
+      "key": "019f31c1-8635-7ba8-8227-5c8dd16acf66",
+      "attributes": {
+        "id": "019f31c1-8635-7ba8-8227-5c8dd16acf66",
+        "name": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "copilot",
+          "model": "gpt-5.3-codex",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+          "trace_id": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T10:08:32.999Z",
+          "ended_at": "2026-07-05T10:09:52.057Z",
+          "canonical_model": "gpt-5.3-codex",
+          "canonical_agent": "copilot",
+          "background_models": [
+            {
+              "model": "claude-haiku-4.5",
+              "process": "consolidator-mentions",
+              "total_tokens": 193022
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "consolidator-insight",
+              "total_tokens": 6928
+            }
+          ],
+          "variant": "copilot-auto-straight-default",
+          "repeat": 0,
+          "terminal_state": "complete",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+              "timestamp": "2026-07-05T10:09:54.229Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+              "timestamp": "2026-07-05T10:09:54.229Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T10:09:54.230Z",
+        "updatedAt": "2026-07-05T10:09:54.230Z",
+        "validFrom": "2026-07-05T10:09:54.230Z"
+      }
+    },
+    {
+      "key": "019f31c1-8636-7910-859f-4287e9fe628b",
+      "attributes": {
+        "id": "019f31c1-8636-7910-859f-4287e9fe628b",
+        "name": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+          "totalTokens": 316458,
+          "inputTokens": 314617,
+          "outputTokens": 1841,
+          "reasoningTokens": 435,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+              "timestamp": "2026-07-05T10:09:54.229Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+              "timestamp": "2026-07-05T10:09:54.229Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T10:09:54.231Z",
+        "updatedAt": "2026-07-05T10:09:54.231Z",
+        "validFrom": "2026-07-05T10:09:54.231Z"
+      }
+    },
+    {
+      "key": "019f31c1-8637-7feb-81b5-a15d8550bed5",
+      "attributes": {
+        "id": "019f31c1-8637-7feb-81b5-a15d8550bed5",
+        "name": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+              "timestamp": "2026-07-05T10:09:54.229Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+              "timestamp": "2026-07-05T10:09:54.229Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T10:09:54.231Z",
+        "updatedAt": "2026-07-05T10:09:54.231Z",
+        "validFrom": "2026-07-05T10:09:54.231Z"
+      }
+    },
+    {
+      "key": "019f31c1-8754-768a-a1e9-fb0fd125d394",
+      "attributes": {
+        "id": "019f31c1-8754-768a-a1e9-fb0fd125d394",
+        "name": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+              "timestamp": "2026-07-05T10:09:54.516Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v7--copilot-auto-straight-default--r0",
+              "timestamp": "2026-07-05T10:09:54.516Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T10:09:54.516Z",
+        "updatedAt": "2026-07-05T10:09:54.516Z",
+        "validFrom": "2026-07-05T10:09:54.516Z"
+      }
+    },
+    {
+      "key": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb",
+      "attributes": {
+        "id": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb",
+        "name": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "opencode",
+          "model": "claude-haiku-4.5",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "trace_id": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T13:46:33.020Z",
+          "ended_at": "2026-07-05T13:48:13.396Z",
+          "canonical_model": "claude-haiku-4.5",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "variant": "opencode-rapid-proxy/claude-haiku-4-5-straight-default",
+          "repeat": 0,
+          "terminal_state": "complete",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T13:48:18.877Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T13:48:18.877Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T13:48:18.878Z",
+        "updatedAt": "2026-07-05T13:48:18.878Z",
+        "validFrom": "2026-07-05T13:48:18.878Z"
+      }
+    },
+    {
+      "key": "019f3289-7c3e-71b1-89d7-881a336acfc9",
+      "attributes": {
+        "id": "019f3289-7c3e-71b1-89d7-881a336acfc9",
+        "name": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "totalTokens": 15019,
+          "inputTokens": 13574,
+          "outputTokens": 1445,
+          "reasoningTokens": 0,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T13:48:18.877Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T13:48:18.877Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T13:48:18.878Z",
+        "updatedAt": "2026-07-05T13:48:18.878Z",
+        "validFrom": "2026-07-05T13:48:18.878Z"
+      }
+    },
+    {
+      "key": "019f3289-7c3e-71b1-89d7-881b412c732e",
+      "attributes": {
+        "id": "019f3289-7c3e-71b1-89d7-881b412c732e",
+        "name": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T13:48:18.877Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T13:48:18.877Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T13:48:18.879Z",
+        "updatedAt": "2026-07-05T13:48:18.879Z",
+        "validFrom": "2026-07-05T13:48:18.879Z"
+      }
+    },
+    {
+      "key": "019f3289-7d83-7052-b615-2ce2a0da9c62",
+      "attributes": {
+        "id": "019f3289-7d83-7052-b615-2ce2a0da9c62",
+        "name": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T13:48:19.203Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v8--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T13:48:19.203Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T13:48:19.203Z",
+        "updatedAt": "2026-07-05T13:48:19.203Z",
+        "validFrom": "2026-07-05T13:48:19.203Z"
+      }
+    },
+    {
+      "key": "019f329f-525a-7329-9dcb-f98d33c00229",
+      "attributes": {
+        "id": "019f329f-525a-7329-9dcb-f98d33c00229",
+        "name": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "opencode",
+          "model": "claude-haiku-4.5",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "trace_id": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T14:10:45.733Z",
+          "ended_at": "2026-07-05T14:12:04.522Z",
+          "canonical_model": "claude-haiku-4.5",
+          "canonical_agent": "opencode",
+          "background_models": [
+            {
+              "model": "claude-haiku-4.5",
+              "process": "observation-writer",
+              "total_tokens": 9400
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "health-coordinator",
+              "total_tokens": 26
+            }
+          ],
+          "variant": "opencode-rapid-proxy/claude-haiku-4-5-straight-default",
+          "repeat": 0,
+          "terminal_state": "complete",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T14:12:09.946Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T14:12:09.946Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T14:12:09.947Z",
+        "updatedAt": "2026-07-05T14:12:09.947Z",
+        "validFrom": "2026-07-05T14:12:09.947Z"
+      }
+    },
+    {
+      "key": "019f329f-525b-7877-9c1b-f8c79d98b882",
+      "attributes": {
+        "id": "019f329f-525b-7877-9c1b-f8c79d98b882",
+        "name": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "totalTokens": 23618,
+          "inputTokens": 21737,
+          "outputTokens": 1881,
+          "reasoningTokens": 0,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T14:12:09.946Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T14:12:09.946Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T14:12:09.947Z",
+        "updatedAt": "2026-07-05T14:12:09.947Z",
+        "validFrom": "2026-07-05T14:12:09.947Z"
+      }
+    },
+    {
+      "key": "019f329f-525b-7877-9c1b-f8c8259a6bc3",
+      "attributes": {
+        "id": "019f329f-525b-7877-9c1b-f8c8259a6bc3",
+        "name": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T14:12:09.946Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T14:12:09.946Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T14:12:09.947Z",
+        "updatedAt": "2026-07-05T14:12:09.947Z",
+        "validFrom": "2026-07-05T14:12:09.947Z"
+      }
+    },
+    {
+      "key": "019f329f-53bb-739a-8c78-c5932dbe223e",
+      "attributes": {
+        "id": "019f329f-53bb-739a-8c78-c5932dbe223e",
+        "name": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T14:12:10.299Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "compare-fizzbuzz-v9--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T14:12:10.299Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T14:12:10.299Z",
+        "updatedAt": "2026-07-05T14:12:10.299Z",
+        "validFrom": "2026-07-05T14:12:10.299Z"
+      }
+    },
+    {
+      "key": "019f3351-b4aa-709b-804a-dec86f8e195c",
+      "attributes": {
+        "id": "019f3351-b4aa-709b-804a-dec86f8e195c",
+        "name": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "claude",
+          "model": "claude-sonnet-4.6",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+          "trace_id": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T17:26:11.484Z",
+          "ended_at": "2026-07-05T17:26:57.529Z",
+          "canonical_model": "claude-sonnet-4.6",
+          "canonical_agent": "claude",
+          "background_models": [
+            {
+              "model": "claude-sonnet-4.6",
+              "process": "consolidator-insight",
+              "total_tokens": 7375
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "health-coordinator",
+              "total_tokens": 26
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "health-coordinator",
+              "total_tokens": 13
+            }
+          ],
+          "variant": "claude-sonnet-straight-default",
+          "repeat": 0,
+          "terminal_state": "complete",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:27:00.522Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:27:00.522Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:27:00.524Z",
+        "updatedAt": "2026-07-05T17:27:00.524Z",
+        "validFrom": "2026-07-05T17:27:00.524Z"
+      }
+    },
+    {
+      "key": "019f3351-b4ac-7146-94d4-a7247288c399",
+      "attributes": {
+        "id": "019f3351-b4ac-7146-94d4-a7247288c399",
+        "name": "wire-verify-82-06--claude-sonnet-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+          "totalTokens": 8599,
+          "inputTokens": 4676,
+          "outputTokens": 3923,
+          "reasoningTokens": 47,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:27:00.522Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:27:00.522Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:27:00.524Z",
+        "updatedAt": "2026-07-05T17:27:00.524Z",
+        "validFrom": "2026-07-05T17:27:00.524Z"
+      }
+    },
+    {
+      "key": "019f3351-b4ac-7146-94d4-a7259d25300b",
+      "attributes": {
+        "id": "019f3351-b4ac-7146-94d4-a7259d25300b",
+        "name": "wire-verify-82-06--claude-sonnet-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:27:00.522Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:27:00.522Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:27:00.524Z",
+        "updatedAt": "2026-07-05T17:27:00.524Z",
+        "validFrom": "2026-07-05T17:27:00.524Z"
+      }
+    },
+    {
+      "key": "019f3351-b650-7130-96c8-ec16d67060d5",
+      "attributes": {
+        "id": "019f3351-b650-7130-96c8-ec16d67060d5",
+        "name": "wire-verify-82-06--claude-sonnet-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:27:00.944Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:27:00.944Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:27:00.945Z",
+        "updatedAt": "2026-07-05T17:27:00.945Z",
+        "validFrom": "2026-07-05T17:27:00.945Z"
+      }
+    },
+    {
+      "key": "019f3353-252a-7280-ba94-1138e224333d",
+      "attributes": {
+        "id": "019f3353-252a-7280-ba94-1138e224333d",
+        "name": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "opencode",
+          "model": "claude-haiku-4.5",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "trace_id": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T17:28:02.447Z",
+          "ended_at": "2026-07-05T17:28:29.994Z",
+          "canonical_model": "claude-haiku-4.5",
+          "canonical_agent": "opencode",
+          "background_models": [
+            {
+              "model": "claude-haiku-4.5",
+              "process": "health-coordinator",
+              "total_tokens": 39
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "health-coordinator",
+              "total_tokens": 13
+            }
+          ],
+          "variant": "opencode-rapid-proxy/claude-haiku-4-5-straight-default",
+          "repeat": 0,
+          "terminal_state": "complete",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:28:34.858Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:28:34.858Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:28:34.859Z",
+        "updatedAt": "2026-07-05T17:28:34.859Z",
+        "validFrom": "2026-07-05T17:28:34.859Z"
+      }
+    },
+    {
+      "key": "019f3353-252c-7eb4-ab67-c0e281963066",
+      "attributes": {
+        "id": "019f3353-252c-7eb4-ab67-c0e281963066",
+        "name": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "totalTokens": 26848,
+          "inputTokens": 26597,
+          "outputTokens": 251,
+          "reasoningTokens": 0,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:28:34.858Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:28:34.858Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:28:34.860Z",
+        "updatedAt": "2026-07-05T17:28:34.860Z",
+        "validFrom": "2026-07-05T17:28:34.860Z"
+      }
+    },
+    {
+      "key": "019f3353-252c-7eb4-ab67-c0e3ac11c49f",
+      "attributes": {
+        "id": "019f3353-252c-7eb4-ab67-c0e3ac11c49f",
+        "name": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:28:34.858Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:28:34.858Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:28:34.860Z",
+        "updatedAt": "2026-07-05T17:28:34.860Z",
+        "validFrom": "2026-07-05T17:28:34.860Z"
+      }
+    },
+    {
+      "key": "019f3353-26d8-7361-82b4-b372d8395eca",
+      "attributes": {
+        "id": "019f3353-26d8-7361-82b4-b372d8395eca",
+        "name": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:28:35.288Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:28:35.288Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:28:35.288Z",
+        "updatedAt": "2026-07-05T17:28:35.288Z",
+        "validFrom": "2026-07-05T17:28:35.288Z"
+      }
+    },
+    {
+      "key": "019f3361-6113-7ba2-861f-9bedcc8d2b1a",
+      "attributes": {
+        "id": "019f3361-6113-7ba2-861f-9bedcc8d2b1a",
+        "name": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "claude",
+          "model": "claude-sonnet-4.6",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+          "trace_id": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T17:43:26.322Z",
+          "ended_at": "2026-07-05T17:44:05.664Z",
+          "canonical_model": "claude-sonnet-4.6",
+          "canonical_agent": "claude",
+          "background_models": [],
+          "variant": "claude-sonnet-straight-default",
+          "repeat": 0,
+          "terminal_state": "complete",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:44:07.699Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:44:07.699Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:44:07.700Z",
+        "updatedAt": "2026-07-05T17:44:07.700Z",
+        "validFrom": "2026-07-05T17:44:07.700Z"
+      }
+    },
+    {
+      "key": "019f3361-6115-722d-b52a-d9fdd725b691",
+      "attributes": {
+        "id": "019f3361-6115-722d-b52a-d9fdd725b691",
+        "name": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+          "totalTokens": 684,
+          "inputTokens": 5,
+          "outputTokens": 679,
+          "reasoningTokens": 47,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:44:07.699Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:44:07.699Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:44:07.701Z",
+        "updatedAt": "2026-07-05T17:44:07.701Z",
+        "validFrom": "2026-07-05T17:44:07.701Z"
+      }
+    },
+    {
+      "key": "019f3361-6115-722d-b52a-d9fedc5e7c20",
+      "attributes": {
+        "id": "019f3361-6115-722d-b52a-d9fedc5e7c20",
+        "name": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:44:07.699Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:44:07.699Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:44:07.701Z",
+        "updatedAt": "2026-07-05T17:44:07.701Z",
+        "validFrom": "2026-07-05T17:44:07.701Z"
+      }
+    },
+    {
+      "key": "019f3361-62e0-7073-b08f-aa05766470a1",
+      "attributes": {
+        "id": "019f3361-62e0-7073-b08f-aa05766470a1",
+        "name": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:44:08.160Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:44:08.160Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:44:08.160Z",
+        "updatedAt": "2026-07-05T17:44:08.160Z",
+        "validFrom": "2026-07-05T17:44:08.160Z"
+      }
+    },
+    {
+      "key": "019f3363-13f3-7bff-8082-063ae659b26c",
+      "attributes": {
+        "id": "019f3363-13f3-7bff-8082-063ae659b26c",
+        "name": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "task_hash": "d4164dca2e742c881d7dfb1b06889cfc4d518fd939209f0612efef3369d504b6",
+          "task_class": "unclassified",
+          "agent": "opencode",
+          "model": "claude-haiku-4.5",
+          "framework": "straight",
+          "spec_level": null,
+          "snapshot_id": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "trace_id": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T17:45:09.645Z",
+          "ended_at": "2026-07-05T17:45:54.718Z",
+          "canonical_model": "claude-haiku-4.5",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "variant": "opencode-rapid-proxy/claude-haiku-4-5-straight-default",
+          "repeat": 0,
+          "terminal_state": "complete",
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:45:59.027Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:45:59.027Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:45:59.028Z",
+        "updatedAt": "2026-07-05T17:45:59.028Z",
+        "validFrom": "2026-07-05T17:45:59.028Z"
+      }
+    },
+    {
+      "key": "019f3363-13f5-7636-8a2a-b938ce0ef9ed",
+      "attributes": {
+        "id": "019f3363-13f5-7636-8a2a-b938ce0ef9ed",
+        "name": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "totalTokens": 27167,
+          "inputTokens": 27011,
+          "outputTokens": 156,
+          "reasoningTokens": 0,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:45:59.027Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:45:59.027Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:45:59.029Z",
+        "updatedAt": "2026-07-05T17:45:59.029Z",
+        "validFrom": "2026-07-05T17:45:59.029Z"
+      }
+    },
+    {
+      "key": "019f3363-13f5-7636-8a2a-b939b74350dd",
+      "attributes": {
+        "id": "019f3363-13f5-7636-8a2a-b939b74350dd",
+        "name": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'.",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:45:59.027Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:45:59.027Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:45:59.029Z",
+        "updatedAt": "2026-07-05T17:45:59.029Z",
+        "validFrom": "2026-07-05T17:45:59.029Z"
+      }
+    },
+    {
+      "key": "019f3363-15b1-78eb-96a8-0a702228ba4b",
+      "attributes": {
+        "id": "019f3363-15b1-78eb-96a8-0a702228ba4b",
+        "name": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:45:59.473Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-v2--opencode-rapid-proxy-claude-haiku-4-5-straight-default--r0",
+              "timestamp": "2026-07-05T17:45:59.473Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:45:59.473Z",
+        "updatedAt": "2026-07-05T17:45:59.473Z",
+        "validFrom": "2026-07-05T17:45:59.473Z"
+      }
+    },
+    {
+      "key": "019f3364-efe5-7a09-a56f-6088f1185864",
+      "attributes": {
+        "id": "019f3364-efe5-7a09-a56f-6088f1185864",
+        "name": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "repro guard test",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+          "task_hash": "56f25ad5052c1df04ba3d4b0558574891cc615c18c2c7351bc676d9a68fa872a",
+          "task_class": "unclassified",
+          "agent": "claude",
+          "model": null,
+          "framework": "claude",
+          "spec_level": null,
+          "snapshot_id": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+          "trace_id": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+          "pending": true,
+          "started_at": "2026-07-05T17:47:41.438Z",
+          "ended_at": "2026-07-05T17:47:59.575Z",
+          "canonical_model": null,
+          "canonical_agent": "claude",
+          "background_models": [
+            {
+              "model": "claude-haiku-4.5",
+              "process": "claude",
+              "total_tokens": 517
+            },
+            {
+              "model": "claude-haiku-4.5",
+              "process": "health-coordinator",
+              "total_tokens": 16
+            }
+          ],
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:48:00.869Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:48:00.869Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:48:00.870Z",
+        "updatedAt": "2026-07-05T17:48:00.870Z",
+        "validFrom": "2026-07-05T17:48:00.870Z"
+      }
+    },
+    {
+      "key": "019f3364-efe7-7f0d-8660-cb8606d40a70",
+      "attributes": {
+        "id": "019f3364-efe7-7f0d-8660-cb8606d40a70",
+        "name": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+          "totalTokens": 533,
+          "inputTokens": 517,
+          "outputTokens": 16,
+          "reasoningTokens": 0,
+          "closedState": "quarantined",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:48:00.869Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:48:00.869Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:48:00.871Z",
+        "updatedAt": "2026-07-05T17:48:00.871Z",
+        "validFrom": "2026-07-05T17:48:00.871Z"
+      }
+    },
+    {
+      "key": "019f3364-efe7-7f0d-8660-cb87e95e6e83",
+      "attributes": {
+        "id": "019f3364-efe7-7f0d-8660-cb87e95e6e83",
+        "name": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "repro guard test",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "repro guard test",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:48:00.869Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:48:00.869Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:48:00.871Z",
+        "updatedAt": "2026-07-05T17:48:00.871Z",
+        "validFrom": "2026-07-05T17:48:00.871Z"
+      }
+    },
+    {
+      "key": "019f3366-c608-772f-9a9f-3d85146004c1",
+      "attributes": {
+        "id": "019f3366-c608-772f-9a9f-3d85146004c1",
+        "name": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0-score",
+        "entityType": "Score",
+        "layer": "evidence",
+        "description": "goal_aligned_ratio + 5-dim judged rubric + corrected_* overrides (D-05/D-06)",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+          "goal_aligned_ratio": null,
+          "event_labels": "[]",
+          "ratio_rationale": "",
+          "goal_achieved": null,
+          "code_quality": null,
+          "test_coverage": null,
+          "regressions": null,
+          "spec_drift": null,
+          "rubric_rationale": "",
+          "pending": false,
+          "not_scored": "trivial",
+          "corrected_goal_achieved": null,
+          "corrected_code_quality": null,
+          "corrected_test_coverage": null,
+          "corrected_regressions": null,
+          "corrected_spec_drift": null,
+          "overridden_by": null,
+          "overridden_at": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:50:01.224Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "wire-verify-82-06-repro--claude-sonnet-straight-default--r0",
+              "timestamp": "2026-07-05T17:50:01.224Z"
+            },
+            "confirmationCount": 1
+          }
+        },
+        "createdAt": "2026-07-05T17:50:01.224Z",
+        "updatedAt": "2026-07-05T17:50:01.224Z",
+        "validFrom": "2026-07-05T17:50:01.224Z"
+      }
     }
   ],
   "edges": [
@@ -719,6 +2641,336 @@
         "from": "019f2d18-e116-7f7c-9882-927a785703c6",
         "to": "019f2d18-e2c4-7db3-a531-11a2ed4bbf43",
         "key": "019f2d18-e116-7f7c-9882-927a785703c6:scored:019f2d18-e2c4-7db3-a531-11a2ed4bbf43"
+      }
+    },
+    {
+      "key": "019f31ab-a465-748c-8335-fae3838fc1c4:produces:019f31ab-a466-7776-a345-e64ba5e71e95",
+      "source": "019f31ab-a465-748c-8335-fae3838fc1c4",
+      "target": "019f31ab-a466-7776-a345-e64ba5e71e95",
+      "attributes": {
+        "type": "produces",
+        "from": "019f31ab-a465-748c-8335-fae3838fc1c4",
+        "to": "019f31ab-a466-7776-a345-e64ba5e71e95",
+        "key": "019f31ab-a465-748c-8335-fae3838fc1c4:produces:019f31ab-a466-7776-a345-e64ba5e71e95"
+      }
+    },
+    {
+      "key": "019f31ab-a465-748c-8335-fae3838fc1c4:tookRoute:019f31ab-a466-7776-a345-e64c56089cd2",
+      "source": "019f31ab-a465-748c-8335-fae3838fc1c4",
+      "target": "019f31ab-a466-7776-a345-e64c56089cd2",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f31ab-a465-748c-8335-fae3838fc1c4",
+        "to": "019f31ab-a466-7776-a345-e64c56089cd2",
+        "key": "019f31ab-a465-748c-8335-fae3838fc1c4:tookRoute:019f31ab-a466-7776-a345-e64c56089cd2"
+      }
+    },
+    {
+      "key": "019f31ab-a465-748c-8335-fae3838fc1c4:scored:019f31ab-a54a-77f2-a125-adc5544235b7",
+      "source": "019f31ab-a465-748c-8335-fae3838fc1c4",
+      "target": "019f31ab-a54a-77f2-a125-adc5544235b7",
+      "attributes": {
+        "type": "scored",
+        "from": "019f31ab-a465-748c-8335-fae3838fc1c4",
+        "to": "019f31ab-a54a-77f2-a125-adc5544235b7",
+        "key": "019f31ab-a465-748c-8335-fae3838fc1c4:scored:019f31ab-a54a-77f2-a125-adc5544235b7"
+      }
+    },
+    {
+      "key": "019f31bf-55b7-7f25-acf2-2ee19842797b:produces:019f31bf-55b8-7f5e-8a4f-745627a0b593",
+      "source": "019f31bf-55b7-7f25-acf2-2ee19842797b",
+      "target": "019f31bf-55b8-7f5e-8a4f-745627a0b593",
+      "attributes": {
+        "type": "produces",
+        "from": "019f31bf-55b7-7f25-acf2-2ee19842797b",
+        "to": "019f31bf-55b8-7f5e-8a4f-745627a0b593",
+        "key": "019f31bf-55b7-7f25-acf2-2ee19842797b:produces:019f31bf-55b8-7f5e-8a4f-745627a0b593"
+      }
+    },
+    {
+      "key": "019f31bf-55b7-7f25-acf2-2ee19842797b:tookRoute:019f31bf-55b8-7f5e-8a4f-74578b52e31c",
+      "source": "019f31bf-55b7-7f25-acf2-2ee19842797b",
+      "target": "019f31bf-55b8-7f5e-8a4f-74578b52e31c",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f31bf-55b7-7f25-acf2-2ee19842797b",
+        "to": "019f31bf-55b8-7f5e-8a4f-74578b52e31c",
+        "key": "019f31bf-55b7-7f25-acf2-2ee19842797b:tookRoute:019f31bf-55b8-7f5e-8a4f-74578b52e31c"
+      }
+    },
+    {
+      "key": "019f31bf-55b7-7f25-acf2-2ee19842797b:scored:019f31bf-56e5-7833-a7cf-de5069018182",
+      "source": "019f31bf-55b7-7f25-acf2-2ee19842797b",
+      "target": "019f31bf-56e5-7833-a7cf-de5069018182",
+      "attributes": {
+        "type": "scored",
+        "from": "019f31bf-55b7-7f25-acf2-2ee19842797b",
+        "to": "019f31bf-56e5-7833-a7cf-de5069018182",
+        "key": "019f31bf-55b7-7f25-acf2-2ee19842797b:scored:019f31bf-56e5-7833-a7cf-de5069018182"
+      }
+    },
+    {
+      "key": "019f31c1-8635-7ba8-8227-5c8dd16acf66:produces:019f31c1-8636-7910-859f-4287e9fe628b",
+      "source": "019f31c1-8635-7ba8-8227-5c8dd16acf66",
+      "target": "019f31c1-8636-7910-859f-4287e9fe628b",
+      "attributes": {
+        "type": "produces",
+        "from": "019f31c1-8635-7ba8-8227-5c8dd16acf66",
+        "to": "019f31c1-8636-7910-859f-4287e9fe628b",
+        "key": "019f31c1-8635-7ba8-8227-5c8dd16acf66:produces:019f31c1-8636-7910-859f-4287e9fe628b"
+      }
+    },
+    {
+      "key": "019f31c1-8635-7ba8-8227-5c8dd16acf66:tookRoute:019f31c1-8637-7feb-81b5-a15d8550bed5",
+      "source": "019f31c1-8635-7ba8-8227-5c8dd16acf66",
+      "target": "019f31c1-8637-7feb-81b5-a15d8550bed5",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f31c1-8635-7ba8-8227-5c8dd16acf66",
+        "to": "019f31c1-8637-7feb-81b5-a15d8550bed5",
+        "key": "019f31c1-8635-7ba8-8227-5c8dd16acf66:tookRoute:019f31c1-8637-7feb-81b5-a15d8550bed5"
+      }
+    },
+    {
+      "key": "019f31c1-8635-7ba8-8227-5c8dd16acf66:scored:019f31c1-8754-768a-a1e9-fb0fd125d394",
+      "source": "019f31c1-8635-7ba8-8227-5c8dd16acf66",
+      "target": "019f31c1-8754-768a-a1e9-fb0fd125d394",
+      "attributes": {
+        "type": "scored",
+        "from": "019f31c1-8635-7ba8-8227-5c8dd16acf66",
+        "to": "019f31c1-8754-768a-a1e9-fb0fd125d394",
+        "key": "019f31c1-8635-7ba8-8227-5c8dd16acf66:scored:019f31c1-8754-768a-a1e9-fb0fd125d394"
+      }
+    },
+    {
+      "key": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb:produces:019f3289-7c3e-71b1-89d7-881a336acfc9",
+      "source": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb",
+      "target": "019f3289-7c3e-71b1-89d7-881a336acfc9",
+      "attributes": {
+        "type": "produces",
+        "from": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb",
+        "to": "019f3289-7c3e-71b1-89d7-881a336acfc9",
+        "key": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb:produces:019f3289-7c3e-71b1-89d7-881a336acfc9"
+      }
+    },
+    {
+      "key": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb:tookRoute:019f3289-7c3e-71b1-89d7-881b412c732e",
+      "source": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb",
+      "target": "019f3289-7c3e-71b1-89d7-881b412c732e",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb",
+        "to": "019f3289-7c3e-71b1-89d7-881b412c732e",
+        "key": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb:tookRoute:019f3289-7c3e-71b1-89d7-881b412c732e"
+      }
+    },
+    {
+      "key": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb:scored:019f3289-7d83-7052-b615-2ce2a0da9c62",
+      "source": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb",
+      "target": "019f3289-7d83-7052-b615-2ce2a0da9c62",
+      "attributes": {
+        "type": "scored",
+        "from": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb",
+        "to": "019f3289-7d83-7052-b615-2ce2a0da9c62",
+        "key": "019f3289-7c3d-7c34-aaa1-55a4c2c05dcb:scored:019f3289-7d83-7052-b615-2ce2a0da9c62"
+      }
+    },
+    {
+      "key": "019f329f-525a-7329-9dcb-f98d33c00229:produces:019f329f-525b-7877-9c1b-f8c79d98b882",
+      "source": "019f329f-525a-7329-9dcb-f98d33c00229",
+      "target": "019f329f-525b-7877-9c1b-f8c79d98b882",
+      "attributes": {
+        "type": "produces",
+        "from": "019f329f-525a-7329-9dcb-f98d33c00229",
+        "to": "019f329f-525b-7877-9c1b-f8c79d98b882",
+        "key": "019f329f-525a-7329-9dcb-f98d33c00229:produces:019f329f-525b-7877-9c1b-f8c79d98b882"
+      }
+    },
+    {
+      "key": "019f329f-525a-7329-9dcb-f98d33c00229:tookRoute:019f329f-525b-7877-9c1b-f8c8259a6bc3",
+      "source": "019f329f-525a-7329-9dcb-f98d33c00229",
+      "target": "019f329f-525b-7877-9c1b-f8c8259a6bc3",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f329f-525a-7329-9dcb-f98d33c00229",
+        "to": "019f329f-525b-7877-9c1b-f8c8259a6bc3",
+        "key": "019f329f-525a-7329-9dcb-f98d33c00229:tookRoute:019f329f-525b-7877-9c1b-f8c8259a6bc3"
+      }
+    },
+    {
+      "key": "019f329f-525a-7329-9dcb-f98d33c00229:scored:019f329f-53bb-739a-8c78-c5932dbe223e",
+      "source": "019f329f-525a-7329-9dcb-f98d33c00229",
+      "target": "019f329f-53bb-739a-8c78-c5932dbe223e",
+      "attributes": {
+        "type": "scored",
+        "from": "019f329f-525a-7329-9dcb-f98d33c00229",
+        "to": "019f329f-53bb-739a-8c78-c5932dbe223e",
+        "key": "019f329f-525a-7329-9dcb-f98d33c00229:scored:019f329f-53bb-739a-8c78-c5932dbe223e"
+      }
+    },
+    {
+      "key": "019f3351-b4aa-709b-804a-dec86f8e195c:produces:019f3351-b4ac-7146-94d4-a7247288c399",
+      "source": "019f3351-b4aa-709b-804a-dec86f8e195c",
+      "target": "019f3351-b4ac-7146-94d4-a7247288c399",
+      "attributes": {
+        "type": "produces",
+        "from": "019f3351-b4aa-709b-804a-dec86f8e195c",
+        "to": "019f3351-b4ac-7146-94d4-a7247288c399",
+        "key": "019f3351-b4aa-709b-804a-dec86f8e195c:produces:019f3351-b4ac-7146-94d4-a7247288c399"
+      }
+    },
+    {
+      "key": "019f3351-b4aa-709b-804a-dec86f8e195c:tookRoute:019f3351-b4ac-7146-94d4-a7259d25300b",
+      "source": "019f3351-b4aa-709b-804a-dec86f8e195c",
+      "target": "019f3351-b4ac-7146-94d4-a7259d25300b",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f3351-b4aa-709b-804a-dec86f8e195c",
+        "to": "019f3351-b4ac-7146-94d4-a7259d25300b",
+        "key": "019f3351-b4aa-709b-804a-dec86f8e195c:tookRoute:019f3351-b4ac-7146-94d4-a7259d25300b"
+      }
+    },
+    {
+      "key": "019f3351-b4aa-709b-804a-dec86f8e195c:scored:019f3351-b650-7130-96c8-ec16d67060d5",
+      "source": "019f3351-b4aa-709b-804a-dec86f8e195c",
+      "target": "019f3351-b650-7130-96c8-ec16d67060d5",
+      "attributes": {
+        "type": "scored",
+        "from": "019f3351-b4aa-709b-804a-dec86f8e195c",
+        "to": "019f3351-b650-7130-96c8-ec16d67060d5",
+        "key": "019f3351-b4aa-709b-804a-dec86f8e195c:scored:019f3351-b650-7130-96c8-ec16d67060d5"
+      }
+    },
+    {
+      "key": "019f3353-252a-7280-ba94-1138e224333d:produces:019f3353-252c-7eb4-ab67-c0e281963066",
+      "source": "019f3353-252a-7280-ba94-1138e224333d",
+      "target": "019f3353-252c-7eb4-ab67-c0e281963066",
+      "attributes": {
+        "type": "produces",
+        "from": "019f3353-252a-7280-ba94-1138e224333d",
+        "to": "019f3353-252c-7eb4-ab67-c0e281963066",
+        "key": "019f3353-252a-7280-ba94-1138e224333d:produces:019f3353-252c-7eb4-ab67-c0e281963066"
+      }
+    },
+    {
+      "key": "019f3353-252a-7280-ba94-1138e224333d:tookRoute:019f3353-252c-7eb4-ab67-c0e3ac11c49f",
+      "source": "019f3353-252a-7280-ba94-1138e224333d",
+      "target": "019f3353-252c-7eb4-ab67-c0e3ac11c49f",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f3353-252a-7280-ba94-1138e224333d",
+        "to": "019f3353-252c-7eb4-ab67-c0e3ac11c49f",
+        "key": "019f3353-252a-7280-ba94-1138e224333d:tookRoute:019f3353-252c-7eb4-ab67-c0e3ac11c49f"
+      }
+    },
+    {
+      "key": "019f3353-252a-7280-ba94-1138e224333d:scored:019f3353-26d8-7361-82b4-b372d8395eca",
+      "source": "019f3353-252a-7280-ba94-1138e224333d",
+      "target": "019f3353-26d8-7361-82b4-b372d8395eca",
+      "attributes": {
+        "type": "scored",
+        "from": "019f3353-252a-7280-ba94-1138e224333d",
+        "to": "019f3353-26d8-7361-82b4-b372d8395eca",
+        "key": "019f3353-252a-7280-ba94-1138e224333d:scored:019f3353-26d8-7361-82b4-b372d8395eca"
+      }
+    },
+    {
+      "key": "019f3361-6113-7ba2-861f-9bedcc8d2b1a:produces:019f3361-6115-722d-b52a-d9fdd725b691",
+      "source": "019f3361-6113-7ba2-861f-9bedcc8d2b1a",
+      "target": "019f3361-6115-722d-b52a-d9fdd725b691",
+      "attributes": {
+        "type": "produces",
+        "from": "019f3361-6113-7ba2-861f-9bedcc8d2b1a",
+        "to": "019f3361-6115-722d-b52a-d9fdd725b691",
+        "key": "019f3361-6113-7ba2-861f-9bedcc8d2b1a:produces:019f3361-6115-722d-b52a-d9fdd725b691"
+      }
+    },
+    {
+      "key": "019f3361-6113-7ba2-861f-9bedcc8d2b1a:tookRoute:019f3361-6115-722d-b52a-d9fedc5e7c20",
+      "source": "019f3361-6113-7ba2-861f-9bedcc8d2b1a",
+      "target": "019f3361-6115-722d-b52a-d9fedc5e7c20",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f3361-6113-7ba2-861f-9bedcc8d2b1a",
+        "to": "019f3361-6115-722d-b52a-d9fedc5e7c20",
+        "key": "019f3361-6113-7ba2-861f-9bedcc8d2b1a:tookRoute:019f3361-6115-722d-b52a-d9fedc5e7c20"
+      }
+    },
+    {
+      "key": "019f3361-6113-7ba2-861f-9bedcc8d2b1a:scored:019f3361-62e0-7073-b08f-aa05766470a1",
+      "source": "019f3361-6113-7ba2-861f-9bedcc8d2b1a",
+      "target": "019f3361-62e0-7073-b08f-aa05766470a1",
+      "attributes": {
+        "type": "scored",
+        "from": "019f3361-6113-7ba2-861f-9bedcc8d2b1a",
+        "to": "019f3361-62e0-7073-b08f-aa05766470a1",
+        "key": "019f3361-6113-7ba2-861f-9bedcc8d2b1a:scored:019f3361-62e0-7073-b08f-aa05766470a1"
+      }
+    },
+    {
+      "key": "019f3363-13f3-7bff-8082-063ae659b26c:produces:019f3363-13f5-7636-8a2a-b938ce0ef9ed",
+      "source": "019f3363-13f3-7bff-8082-063ae659b26c",
+      "target": "019f3363-13f5-7636-8a2a-b938ce0ef9ed",
+      "attributes": {
+        "type": "produces",
+        "from": "019f3363-13f3-7bff-8082-063ae659b26c",
+        "to": "019f3363-13f5-7636-8a2a-b938ce0ef9ed",
+        "key": "019f3363-13f3-7bff-8082-063ae659b26c:produces:019f3363-13f5-7636-8a2a-b938ce0ef9ed"
+      }
+    },
+    {
+      "key": "019f3363-13f3-7bff-8082-063ae659b26c:tookRoute:019f3363-13f5-7636-8a2a-b939b74350dd",
+      "source": "019f3363-13f3-7bff-8082-063ae659b26c",
+      "target": "019f3363-13f5-7636-8a2a-b939b74350dd",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f3363-13f3-7bff-8082-063ae659b26c",
+        "to": "019f3363-13f5-7636-8a2a-b939b74350dd",
+        "key": "019f3363-13f3-7bff-8082-063ae659b26c:tookRoute:019f3363-13f5-7636-8a2a-b939b74350dd"
+      }
+    },
+    {
+      "key": "019f3363-13f3-7bff-8082-063ae659b26c:scored:019f3363-15b1-78eb-96a8-0a702228ba4b",
+      "source": "019f3363-13f3-7bff-8082-063ae659b26c",
+      "target": "019f3363-15b1-78eb-96a8-0a702228ba4b",
+      "attributes": {
+        "type": "scored",
+        "from": "019f3363-13f3-7bff-8082-063ae659b26c",
+        "to": "019f3363-15b1-78eb-96a8-0a702228ba4b",
+        "key": "019f3363-13f3-7bff-8082-063ae659b26c:scored:019f3363-15b1-78eb-96a8-0a702228ba4b"
+      }
+    },
+    {
+      "key": "019f3364-efe5-7a09-a56f-6088f1185864:produces:019f3364-efe7-7f0d-8660-cb8606d40a70",
+      "source": "019f3364-efe5-7a09-a56f-6088f1185864",
+      "target": "019f3364-efe7-7f0d-8660-cb8606d40a70",
+      "attributes": {
+        "type": "produces",
+        "from": "019f3364-efe5-7a09-a56f-6088f1185864",
+        "to": "019f3364-efe7-7f0d-8660-cb8606d40a70",
+        "key": "019f3364-efe5-7a09-a56f-6088f1185864:produces:019f3364-efe7-7f0d-8660-cb8606d40a70"
+      }
+    },
+    {
+      "key": "019f3364-efe5-7a09-a56f-6088f1185864:tookRoute:019f3364-efe7-7f0d-8660-cb87e95e6e83",
+      "source": "019f3364-efe5-7a09-a56f-6088f1185864",
+      "target": "019f3364-efe7-7f0d-8660-cb87e95e6e83",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "019f3364-efe5-7a09-a56f-6088f1185864",
+        "to": "019f3364-efe7-7f0d-8660-cb87e95e6e83",
+        "key": "019f3364-efe5-7a09-a56f-6088f1185864:tookRoute:019f3364-efe7-7f0d-8660-cb87e95e6e83"
+      }
+    },
+    {
+      "key": "019f3364-efe5-7a09-a56f-6088f1185864:scored:019f3366-c608-772f-9a9f-3d85146004c1",
+      "source": "019f3364-efe5-7a09-a56f-6088f1185864",
+      "target": "019f3366-c608-772f-9a9f-3d85146004c1",
+      "attributes": {
+        "type": "scored",
+        "from": "019f3364-efe5-7a09-a56f-6088f1185864",
+        "to": "019f3366-c608-772f-9a9f-3d85146004c1",
+        "key": "019f3364-efe5-7a09-a56f-6088f1185864:scored:019f3366-c608-772f-9a9f-3d85146004c1"
       }
     }
   ]

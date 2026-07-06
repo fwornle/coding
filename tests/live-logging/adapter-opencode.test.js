@@ -36,8 +36,8 @@ import { jest } from '@jest/globals';
 // ---- Mock ObservationWriter (Test 11 / 12) ------------------------------
 const writerCalls = [];
 
-jest.unstable_mockModule('../../src/live-logging/ObservationWriter.js', () => ({
-  ObservationWriter: class {
+jest.unstable_mockModule('../../src/live-logging/ObservationApiClient.js', () => ({
+  ObservationApiClient: class {
     constructor(opts) { this.opts = opts; }
     async init() { /* no-op */ }
     async close() { /* no-op */ }

@@ -80,9 +80,11 @@ function spawnDaemon({ pollIntervalMs = 200, heartbeatIntervalSec = 1 } = {}) {
       env: {
         ...process.env,
         LSL_PROJECT_ROOT_CODING: '/Users/Q284340/Agentic/coding',
-        // Point ObservationWriter at a tmpdir DB so init doesn't touch
-        // production .observations/observations.db.
-        OBSERVATIONS_DB_PATH: path.join(tmpDir, 'observations.db'),
+        // Point the writer at a dead port so ObservationApiClient.init()
+        // fails and the daemon falls back to its no-op writer — the test
+        // must never POST seeded fixture messages to the production obs-api
+        // (LLM spend + real observation rows).
+        OBS_API_URL: 'http://127.0.0.1:59998',
       },
       cwd: REPO_ROOT,
     },
