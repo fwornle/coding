@@ -59,6 +59,7 @@ import { openExperimentStore } from '../lib/experiments/store.mjs';
 import { loadTaxonomy, isValidClass, deriveClassFromText } from '../lib/experiments/taxonomy.mjs';
 import { aggregateByTaskId, isForegroundGroup } from '../lib/experiments/token-aggregate.mjs';
 import { captureForegroundTokens } from '../lib/lsl/token/stop-adapter-registry.mjs';
+import { aggregatePerRequestDeltas } from '../lib/lsl/token/reconcile.mjs';
 import { writeRun } from '../lib/experiments/run-write.mjs';
 import { deriveGoalSentence } from '../lib/experiments/goal-sentence.mjs';
 import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
@@ -443,15 +444,11 @@ async function main() {
         ? reconcileReport.perRequest
         : [];
       // aggregateDeltas = per-field SUM of perRequest[].deltas across all requests.
-      const aggregateDeltas = {};
-      for (const r of perRequest) {
-        const deltas = (r && typeof r.deltas === 'object' && r.deltas) || {};
-        for (const [field, val] of Object.entries(deltas)) {
-          if (typeof val === 'number' && Number.isFinite(val)) {
-            aggregateDeltas[field] = (aggregateDeltas[field] ?? 0) + val;
-          }
-        }
-      }
+      // CR-01 (83-08): computeDeltas emits per-field {wire,transcript,delta,flagged}
+      // OBJECTS — the roll-up MUST unwrap `.delta` before summing. The shared helper
+      // does exactly that (the OLD inline numeric-typeof guard tested the whole delta
+      // object and was always false → aggregateDeltas was always `{}`).
+      const aggregateDeltas = aggregatePerRequestDeltas(perRequest);
       const reconciliation = {
         schemaVersion: 1,
         span: {
