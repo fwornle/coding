@@ -61,7 +61,13 @@ if ! launchctl bootstrap "gui/${UID_VAL}" "${DEST_PLIST}"; then
   exit 1
 fi
 
-if launchctl list | grep -qF "${LABEL}"; then
+# Capture `launchctl list` into a variable BEFORE grepping. Piping straight into
+# `grep -qF` breaks under `set -o pipefail`: grep -q exits on the first match and
+# closes the pipe, so the still-writing `launchctl list` dies with SIGPIPE (141)
+# and pipefail propagates that non-zero status as a FALSE "did not load" failure
+# (more likely the earlier the label sorts in launchctl's large output).
+LAUNCHCTL_LIST="$(launchctl list || true)"
+if grep -qF "${LABEL}" <<<"${LAUNCHCTL_LIST}"; then
   log "OK: ${LABEL} is loaded"
 else
   log "FAIL: ${LABEL} did not load — check Console.app or ${LOG_DIR}/context-turns-sweeper.log"
