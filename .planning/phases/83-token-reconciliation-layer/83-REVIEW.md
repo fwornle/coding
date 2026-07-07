@@ -1,6 +1,6 @@
 ---
 phase: 83-token-reconciliation-layer
-reviewed: 2026-07-06T08:49:46Z
+reviewed: 2026-07-06T14:31:00Z
 depth: standard
 files_reviewed: 16
 files_reviewed_list:
@@ -21,350 +21,363 @@ files_reviewed_list:
   - tests/token-adapters/reconcile-mode.test.js
   - tests/vkb-server/reconciliation-route.test.js
 findings:
-  critical: 3
-  warning: 9
-  info: 9
-  total: 21
+  critical: 2
+  warning: 8
+  info: 12
+  total: 22
 status: issues_found
 ---
 
-# Phase 83: Code Review Report
+# Phase 83: Code Review Report (Re-Review after Plan 83-08 Gap Closure)
 
-**Reviewed:** 2026-07-06T08:49:46Z
+**Reviewed:** 2026-07-06T14:31:00Z
 **Depth:** standard
 **Files Reviewed:** 16
 **Status:** issues_found
 
 ## Summary
 
-Phase 83 builds the token-reconciliation layer: a request-id + fuzzy matcher joining
-adapter transcript rows to authoritative proxy wire rows, a reconcile mode in
-`captureForegroundTokens`, a `reconciliation.json` sink + read route, proxy-side task-id
-hardening / OpenAI cache parse / duplicate-id fixes, and copilot BYOK gating. The proxy
-files were reviewed as the Phase-83 diff range `d3f3869..7a01346` (commits 5512068,
-3b73e59, 8ff4b41, 634f23b, be925ae, 530351e, 7a01346) only.
+Re-review of the Phase 83 token-reconciliation scope after Plan 83-08
+(commits b48979db8..a5caca166) closed the three blockers from the
+2026-07-06T08:49Z review. **All three prior fixes are verified sound on the
+claude path:**
 
-The matcher core (`reconcile.mjs`, `token-db.mjs` primitives) is well-tested and its
-never-throw / parameterized-bind contracts hold. However, three critical defects were
-found in the wiring around it: the sink's `aggregateDeltas` roll-up is arithmetically
-dead (always `{}`), the `unmatched_wire` metric is structurally always 0 for claude
-(the exact "trivially passing golden property" the code comments claim to prevent),
-and the D-08 no-inherit tap change silently zeroes foreground attribution for measured
-spans started after agent launch. Several tests seed fixtures whose shape diverges from
-production data (`wire01` user_hash, non-empty copilot wire `tool_call_id`), which is
-why the suites pass while the production paths are broken.
+- **Prior CR-01 (aggregateDeltas dead typeof guard) — FIXED.**
+  `aggregatePerRequestDeltas` (`lib/lsl/token/reconcile.mjs:216-230`) correctly
+  unwraps `.delta` before summing, skips non-finite values, never throws, and is
+  wired into the sink (`scripts/measurement-stop.mjs:62,451`). Unit coverage
+  (`tests/token-adapters/reconcile-matcher.test.js:486-530`) is adequate.
+- **Prior CR-02 (vacuous unmatched_wire) — FIXED for claude.** The PK snapshot
+  (`snapshotWireRowIds`, `lib/lsl/token/stop-adapter-registry.mjs:603-621`) keys on
+  row identity; `countUnmatchedWireRows` and its user_hash exclusion are gone;
+  regression tests seed production-shape `cladpt` wire rows. **However the same
+  vacuous-zero defect persists for copilot via a different route** — new CR-02 below.
+- **Prior CR-03 (task_id='' wire rows) — FIXED.** `RECONCILE_GAP_FILL_SQL`
+  (`lib/lsl/token/token-db.mjs:260-268`) adds `task_id = CASE WHEN task_id = ''
+  THEN ? ELSE task_id END`; bind order in `reconcileGapFill` (:311-321) matches the
+  SQL positionally; the CR-03 test proves both backfill and never-overwrite.
 
-Note: the proxy repo gitignores `dist/*.js`; the local `dist/usage-cache.js` and
-`dist/token-usage.js` were verified to contain the new code (`parseOpenAICache`,
-`idx_token_usage_reqid`), so no stale-dist issue exists locally — but the daemon must
-be restarted to load it (operational, not a code finding).
+Also resolved since the prior review: the stale launcher ambient-fallback comment
+(prior WR-09 — `scripts/launch-agent-common.sh:414-421` now documents the
+no-inherit + CR-03 recovery correctly) and the false "DIFFERENT user_hash by
+design" header claim (prior IN-01 — `reconcile.mjs:25-31` now carries the CR-02
+correction).
+
+**New blockers found in this pass.** Adversarial tracing of the reconcile loop
+shows the fuzzy matcher can consume rows that are not wire rows — including
+fallback rows inserted seconds earlier in the same loop — silently dropping
+transcript tokens in exactly the proxy-down scenario golden property (2) exists to
+protect (an escalation of prior WR-02, which Plan 83-08 did not address). And the
+CR-02 fix does not extend to copilot: copilot wire rows carry the machine hash, so
+the copadt-keyed snapshot is always empty and `unmatched_wire` is structurally 0
+for copilot spans.
+
+Prior warnings/infos not addressed by 83-08 and re-verified as still present are
+carried forward below with fresh line references.
 
 ## Critical Issues
 
-### CR-01: `aggregateDeltas` in reconciliation.json is always empty — the sum guard checks the wrong type
+### CR-01: Fuzzy matcher matches non-wire rows — including fallback rows inserted earlier in the same loop — silently dropping transcript tokens in the proxy-down scenario
 
-**File:** `scripts/measurement-stop.mjs:446-454`
-**Issue:** The sink rolls up `perRequest[].deltas` with:
+**File:** `lib/lsl/token/reconcile.mjs:71-141` (`FUZZY_CANDIDATES_SQL` / `fuzzyMatch`), `lib/lsl/token/stop-adapter-registry.mjs:487-581` (`reconcileBatches`)
+
+**Issue:** `FUZZY_CANDIDATES_SQL` selects **every** `token_usage` row with the
+transcript's model — no restriction to the pre-loop wire snapshot, no exclusion of
+rows inserted during the current loop, no exclusion of already-matched wire rows.
+Three concrete failure modes:
+
+1. **Proxy-down token loss (defeats golden property 2).** In the proxy-down cell
+   there are no wire rows. Turn 1's request-id probe misses and it is
+   fallback-inserted (same model, in-window timestamp). Turn 2's probe also misses,
+   but `fuzzyMatch` now finds **turn 1's just-inserted fallback row** — consecutive
+   agent turns are typically seconds apart, well inside the 2-min
+   `DEFAULT_FUZZY_WINDOW_MS`. Turn 2 is reported `matched`, its tokens are **never
+   inserted** (matched → zero net rows), and gap-fill mangles turn 1's row with
+   turn 2's cache/reasoning values. Every subsequent turn within 2 min of any prior
+   fallback row is likewise swallowed. The wire-verify gate
+   (`config/experiments/wire-verify-83-reconcile.yaml` property 2) only asserts
+   `summary.fallback > 0`, which turn 1 alone satisfies — the acceptance run passes
+   while most of the cell's tokens are silently lost. The CR-02b test
+   (`tests/token-adapters/reconcile-mode.test.js:513-548`) explicitly sidesteps this
+   by giving the fallback turn "a DISTINCT model so it cannot fuzzy-match" — the
+   hazard is acknowledged in the test but unguarded in production code.
+2. **Double-consumption of one wire row** (prior WR-02, unfixed and escalated).
+   `matchedWireRowIds` is recorded (`stop-adapter-registry.mjs:539`) but never fed
+   back to exclude already-matched rows from later fuzzy matches. Two transcript
+   rows can both "match" the same wire row; the second row's tokens are dropped
+   with no fallback insert.
+3. **Cross-session task_id stamping.** A fuzzy match can land on a same-model,
+   in-window row belonging to a concurrent interactive session (`task_id=''`), and
+   the CR-03 gap-fill then stamps the measured span's task_id onto that unrelated
+   row while the measured transcript row's tokens are dropped.
+
+**Fix:** Scope fuzzy candidates to the pre-loop wire snapshot and consume matches:
 
 ```js
-for (const [field, val] of Object.entries(deltas)) {
-  if (typeof val === 'number' && Number.isFinite(val)) {
-    aggregateDeltas[field] = (aggregateDeltas[field] ?? 0) + val;
-  }
+// stop-adapter-registry.mjs — reconcileBatches: pass snapshot + consumed set
+result = reconcileRow(db, transcriptRow, span, {
+  ...opts,
+  candidateWireIds: wireRowIds,        // pre-loop snapshot (Set<number>)
+  consumedWireIds: matchedWireRowIds,  // already-matched PKs
+});
+
+// reconcile.mjs — fuzzyMatch: honor both sets
+for (const c of candidates) {
+  if (opts.candidateWireIds && !opts.candidateWireIds.has(c.id)) continue;
+  if (opts.consumedWireIds && opts.consumedWireIds.has(c.id)) continue;
+  ...
 }
 ```
 
-But each `deltas[field]` produced by `computeDeltas` (lib/lsl/token/reconcile.mjs:181-192)
-is an **object** `{ wire, transcript, delta, flagged }`, never a number. The
-`typeof val === 'number'` guard is therefore always false and
-`summary.aggregateDeltas` is written as `{}` on every close — the D-12 per-field
-delta roll-up (consumed by the Plan-07 golden comparison and the Phase-86 badge) is
-dead code. The route test fixture (`tests/vkb-server/reconciliation-route.test.js:49`)
-shows the intended shape (`aggregateDeltas: { input_tokens: 5 }`), but no test
-exercises the sink itself, so this passed green.
-**Fix:**
+The request-id probe path is safe as-is (the partial unique index guarantees at
+most one row per `(user_hash, tool_call_id)`, and a fallback row never carries a
+later turn's request-id); only the fuzzy path needs the restriction.
+
+### CR-02: `unmatched_wire` is still structurally 0 for copilot — the CR-02 fix repaired claude only
+
+**File:** `lib/lsl/token/stop-adapter-registry.mjs:504,603-610` (`snapshotWireRowIds` keyed on `adapter.userHash`), `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:2666-2736` (shim wire rows)
+
+**Issue:** `snapshotWireRowIds` queries `WHERE user_hash = ?` bound to
+`adapter.userHash` — `'copadt'` for copilot. But copilot BYOK wire rows are written
+by the `/api/complete` pipeline `logTokenCall` at `server.mjs:2668`, which passes
+**no `user_hash` field**, so `logCall` (`token-usage.ts:926`) defaults them to the
+machine `USER_HASH`. Only the `/v1/messages` Anthropic tap stamps
+`adapterUserHash(agent)` (`server.mjs:2217`) — copilot traffic never hits that
+route (it uses `/v1/copilot/t/<taskId>/chat/completions`). Result: for a copilot
+measured span the snapshot is always the **empty set** and `report.unmatched_wire`
+is vacuously 0 — the exact defect class the prior CR-02 fix was supposed to
+eliminate ("a matching bug surfaces as a metric, never a silent zero"). The
+`snapshotWireRowIds` docstring's premise ("every row carrying the adapter
+`user_hash` is a proxy-tap WIRE row") holds only for claude. As a knock-on, copilot
+transcript rows only ever match via fuzzy (the wire rows carry `tool_call_id=''` —
+see WR-06 — so the request-id probe can never hit), and fuzzy finds the machine-hash
+rows precisely because it has no hash filter — so `matched` can be non-zero while
+the snapshot that is supposed to audit those same rows sees none of them.
+
+**Fix:** Stamp shim-originated agent traffic with the per-agent adapter hash at the
+source, mirroring the `/v1/messages` tap — in the `/api/complete` `logTokenCall`
+(`server.mjs:2668`):
+
 ```js
-for (const [field, val] of Object.entries(deltas)) {
-  const d = val && typeof val === 'object' ? val.delta : val;
-  if (typeof d === 'number' && Number.isFinite(d)) {
-    aggregateDeltas[field] = (aggregateDeltas[field] ?? 0) + d;
-  }
-}
+...(typeof body.agent === 'string' && body.agent
+  ? { user_hash: adapterUserHash(body.agent) }
+  : {}),
 ```
 
-### CR-02: `unmatched_wire` is structurally always 0 for claude spans — wire rows carry the adapter user_hash the query excludes
-
-**File:** `lib/lsl/token/stop-adapter-registry.mjs:589-595` (with `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:2217`)
-**Issue:** `countUnmatchedWireRows` scopes wire rows via
-`WHERE task_id = ? AND user_hash != ?`, excluding `adapter.userHash` (`cladpt` for
-claude). But the production `/v1/messages` tap stamps claude wire rows with
-`user_hash: adapterUserHash(agent)` — which **is** `cladpt`
-(server.mjs:2217, `adapterUserHash()` at :70). So for a measured claude span every
-wire row is excluded from the query and `unmatched_wire` is 0 no matter how many
-orphan wire rows exist. This makes golden property (3) of
-`config/experiments/wire-verify-83-reconcile.yaml` ("HEALTHY SPAN unmatched_wire=0")
-**trivially pass** — the precise failure mode the code comment at :479
-("NEVER defaulted to 0 — which a silent default would make trivially pass") claims
-to avoid. The unit test masks this by seeding wire rows with `user_hash: 'wire01'`
-(tests/token-adapters/reconcile-mode.test.js:105), a hash the production tap never
-writes for claude. The header comment of `reconcile.mjs` (:21-24, "wire rows and
-transcript rows carry DIFFERENT user_hash by design") is false for claude.
-**Fix:** Distinguish wire rows by `process`/provenance rather than `user_hash`, e.g.
-exclude only rows whose `process` is a transcript-adapter provenance
-(`token-adapter-claude` rows written by the tap vs adapter cannot be told apart by
-hash — add a distinct wire marker, or exclude by
-`process NOT IN (fallbackProcessFor(agent))` combined with tracking the rowids the
-transcript loop actually inserted). At minimum, count wire candidates as
-"rows with this task_id whose tool_call_id was NOT produced by this run's inserts",
-and add a test seeding wire rows with `user_hash: 'cladpt'` to mirror production.
-
-### CR-03: Measured spans started after agent launch lose all foreground attribution — no-inherit tap rows keep `task_id=''` and reconcile never stamps them
-
-**Files:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:2037-2046`, `lib/lsl/token/token-db.mjs:253-260`, `scripts/launch-agent-common.sh:414-418`
-**Issue:** Chain of three facts:
-1. D-08 (commit 3b73e59): a header-less `/v1/messages` tap request now stamps
-   `task_id=''` instead of inheriting the ambient span. The launcher sets
-   `ANTHROPIC_CUSTOM_HEADERS="x-task-id: ${TASK_ID:-}"` **once at launch time**
-   (launch-agent-common.sh:418), so any interactive claude session launched without a
-   span (the normal `coding --claude` case) sends an empty header for its entire
-   lifetime — including during a span later opened via dashboard Start/Stop
-   (Phase 74) or manual `measurement-start`. All its wire rows get `task_id=''`.
-2. In reconcile mode those wire rows still match by request-id, so the transcript
-   rows (which DO carry the span's task_id) are **not inserted** — zero net rows.
-3. `RECONCILE_GAP_FILL_SQL` fills reasoning/tier/parent/cache but **not** `task_id`,
-   so the matched wire rows stay `task_id=''` forever.
-
-Result: `aggregateByTaskId(span.task_id)` finds no foreground rows; the run closes
-with `total_tokens=0` and canonical model null. Pre-83, ambient inheritance stamped
-these rows — this is a regression on the mainline interactive-measurement path,
-partially masked because experiment cells (launched with `TASK_ID` set) are
-unaffected. The only signal is the single A1 stderr warning at
-measurement-stop.mjs:541-545.
-**Fix:** Have the reconcile gap-fill also stamp the span task_id onto matched wire
-rows whose `task_id` is empty (wire-authoritative counts unaffected):
-```sql
-task_id = CASE WHEN task_id = '' THEN ? ELSE task_id END
-```
-passing `transcriptRow.task_id` in `reconcileGapFill`, and add a reconcile-mode test
-where the seeded wire row has `task_id=''`.
+(`copadt` rows already take the DB-authoritative MAX(id)+1 allocation path, which is
+collision-safe post-D-11.) Alternatively, scope `snapshotWireRowIds` for non-claude
+agents by `task_id = ?` (copilot BYOK rows always carry an explicit path-bound
+task_id) instead of the adapter hash.
 
 ## Warnings
 
-### WR-01: `:reason:N` rows bypass the span-window clamp — out-of-window reasoning rows are stamped with the measured task_id
+### WR-01: `:reason:N` rows bypass the span-window clamp in reconcile mode — whole-session reasoning over-attribution
 
-**File:** `lib/lsl/token/stop-adapter-registry.mjs:511`
-**Issue:** `if (!reasonStep && !withinSpanWindow(transcriptRow, span)) continue;` —
-reason-step rows skip the window filter that exists precisely because
-`buildClaudeTokenRows` returns the WHOLE transcript (comment at :336-341). Bypassing
-the **match** is justified (the wire has no reasoning split); bypassing the
-**window** is not: a reasoning row whose parent turn is outside the span is inserted
-with the span's task_id while its parent turn is correctly excluded — internally
-inconsistent and over-attributing reasoning tokens to the run whenever the ambient
-session is longer than the span and the interactive sweep has not already captured
-those rows (dedup would then drop them). The interactive (non-reconcile) loop at
-:431-433 window-filters ALL rows including reason rows.
-**Fix:** Apply the window to reason rows too; keep only the match bypass:
-```js
-if (!withinSpanWindow(transcriptRow, span)) continue;
-if (reasonStep) { insertTokenRowDeduped(db, transcriptRow); ... }
-```
+**File:** `lib/lsl/token/stop-adapter-registry.mjs:517-520`
+**Issue:** (Carried forward — not addressed by 83-08.) The interactive loop
+window-scopes **every** row (:433); the reconcile loop exempts reason-steps:
+`if (!reasonStep && !withinSpanWindow(...)) continue;`. D-02 justifies bypassing the
+*match* (the wire never carries a reasoning split), not the *window*.
+`buildClaudeTokenRows` returns the whole ambient transcript, so a short measured
+span over a long-lived session inserts every out-of-window `:reason:N` row stamped
+with the span's task_id. Impact is bounded to `reasoning_tokens` (reason rows carry
+`input/output/total = 0`, `claude-token-rows.mjs:218-232`), but it inflates the
+measured run's reasoning metric with hours of unrelated thinking.
+**Fix:** Apply the window clamp before the `reasonStep` branch (keep the match
+bypass): `if (!withinSpanWindow(transcriptRow, span)) continue;`
 
-### WR-02: Two transcript rows can fuzzy-match the same wire row — the second row's tokens are silently lost
+### WR-02: Fallback insert overwrites the SUBAGENT_PROCESS marker — canonical-model selection can be hijacked in proxy-down runs
 
-**File:** `lib/lsl/token/reconcile.mjs:111-134` (loop at `stop-adapter-registry.mjs:498-557`)
-**Issue:** `fuzzyMatch` has no notion of already-claimed wire rows. Two id-less
-transcript rows near the same timestamp both resolve to the same nearest wire row;
-both are reported `matched`, neither is inserted. One distinct LLM call's tokens
-vanish from `token_usage` with no fallback row and no flag — violating the
-"not near-zero (loss)" golden property (1). This is the realistic copilot shape
-(one aggregate transcript row is fine, but any multi-row adapter without request-ids
-hits this).
-**Fix:** Thread the `matchedRequestIds`/claimed-wire-id set (or the wire row PK)
-into `fuzzyMatch` and skip already-claimed candidates; on exhaustion fall back to a
-provenance-tagged insert.
+**File:** `lib/lsl/token/stop-adapter-registry.mjs:548`
+**Issue:** `insertTokenRowDeduped(db, { ...transcriptRow, process: fallbackProcess })`
+replaces whatever `batch.process` stamped — for sub-agent batches that is
+`token-adapter-claude-subagent`. A proxy-down sub-agent row lands as
+`token-adapter-claude-fallback`, so `isSubagentGroup`
+(`scripts/measurement-stop.mjs:501`) no longer recognizes it, and a cheap
+high-volume Explore sub-agent can win `fgGroups.find(...)` and become the run's
+canonical chat model — the exact hijack SUBAGENT_PROCESS exists to prevent.
+**Fix:** Compose provenance instead of replacing it (e.g.
+`` process: batch.process ? `${fallbackProcess}-subagent` : fallbackProcess ``) and
+match sub-agent groups by suffix in the canonical picker.
 
-### WR-03: Proxy `logCall` dedup drops the richer duplicate — diverges from the coding-side merge-on-cache semantics it claims to mirror
+### WR-03: Proxy `logCall` dedup drops the richer duplicate — diverges from the coding-side merge-on-cache semantics
 
 **File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts:993-996,1016`
-**Issue:** On a `(user_hash, tool_call_id)` hit, `logCall` returns (drops the row)
-unconditionally. The coding-side `insertTokenRowDeduped`
-(lib/lsl/token/token-db.mjs:319-359) instead ENRICHES a cache-less existing row when
-the incoming duplicate carries cache/reasoning (the Phase 82-04 fix for exactly this
-data-loss mode). Commit 530351e claims "byte-identical dedup semantics to
-coding-side lib/lsl/token/token-db.mjs" — it is not. If the adapter's cache-less row
-lands first (live Stop-hook sweep racing a still-streaming tap write within the
-5-min grace window), the tap's authoritative cache split is permanently dropped.
-**Fix:** On dedup hit, replicate the merge-on-cache branch (existing cache sum 0 and
-incoming carries cache/reasoning → in-place UPDATE) before returning.
+**Issue:** (Carried forward.) On a `(user_hash, tool_call_id)` hit, `logCall` drops
+the incoming row even when the existing row is cache-less and the incoming row
+carries cache/reasoning — whereas the coding-side `insertTokenRowDeduped`
+(`token-db.mjs:331-361`) merges-on-cache in that situation. If a stop-time
+transcript row lands first (e.g. proxy restart mid-session), a later tap write with
+the real cache split is discarded.
+**Fix:** Mirror the merge-on-cache branch (UPDATE cache/reasoning when the existing
+row's cache sum is 0), or explicitly document first-writer-wins on the tap.
 
-### WR-04: One-shot dup repair keeps the earliest rowid without merging — legacy cache/reasoning data on the later duplicate is deleted
+### WR-04: One-shot dup repair keeps the earliest rowid without merging — cache/reasoning data on the deleted duplicate is lost
 
-**File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts:667-686`
-**Issue:** The migration `DELETE`s every `(user_hash, tool_call_id)` duplicate except
-`MIN(rowid)`. Pre-existing duplicate pairs in the live DB are typically a cache-less
-tap row plus a later cache-bearing enrich/adapter row; keeping the earliest blindly
-discards the richer values with no merge and no backup. Also the comment "keep the
-earliest rowid — the wire row the reconcile matcher deterministically prefers" is
-wrong on two counts: the matcher's probe orders by `id` (per-hash counter), not
-`rowid`, and per-hash id spaces make "earliest" arbitrary across writers.
-**Fix:** Before deleting, fold `MAX(cache_read_tokens)`, `MAX(cache_write_tokens)`,
-`MAX(reasoning_tokens)` from the doomed duplicates into the surviving row (an
-UPDATE-then-DELETE in one transaction), or keep the row with the larger
-cache sum.
+**File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts:671-684`
+**Issue:** (Carried forward.) The pre-index repair `DELETE ... WHERE rowid NOT IN
+(SELECT MIN(rowid) ... GROUP BY user_hash, tool_call_id)` unconditionally deletes
+the later duplicate. When the earlier row is a cache-less transcript row and the
+later one the cache-bearing tap row, the cache split is destroyed rather than
+merged before deletion.
+**Fix:** Before deleting, gap-fill the survivor from the doomed row (cache when
+survivor cache sum is 0; `MAX(reasoning_tokens)`), mirroring `MERGE_ON_CACHE_SQL`.
 
-### WR-05: Coding-side `insertTokenRow` still has no id-collision retry — the race D-11 fixed on the proxy side silently drops adapter rows on the other side
+### WR-05: Coding-side `insertTokenRow` still has no id-collision retry — the race D-11 fixed on the proxy side drops adapter rows on the coding side
 
 **File:** `lib/lsl/token/token-db.mjs:132-173`
-**Issue:** The proxy now writes `cladpt`/`copadt` rows from its own connection with
-`MAX(id)+1` + retry (token-usage.ts:998-1021). The coding-side second writer
-allocates `MAX(id)+1` (NEXT_ID_SQL:84-85) with **no retry**: on a composite-PK
-collision the catch at :167 logs and returns false — the row is dropped. The D-06
-"distinct hash spaces never race" invariant in this file's header is obsolete now
-that both writers share the adapter hash space (Route 1 tap + stop-time adapter run
-concurrently inside the 5-min locator grace window).
-**Fix:** Mirror the proxy's disambiguation: on `SQLITE_CONSTRAINT*`, re-probe the
-dedup key; if not a dup, recompute `MAX(id)+1` and retry (bounded).
+**Issue:** (Carried forward.) `insertTokenRow` computes `MAX(id)+1` and does a
+single INSERT; a concurrent proxy write into the same adapter hash space (which now
+happens by design — the tap stamps `cladpt`) between the SELECT and the INSERT
+raises `SQLITE_CONSTRAINT` and the row is silently dropped (`return false`), with
+no recompute-and-retry equivalent to `logCall`'s D-11 loop.
+**Fix:** Wrap the INSERT in a bounded retry that recomputes `MAX(id)+1` on a
+constraint error that is not a `(user_hash, tool_call_id)` duplicate — the same
+probe-disambiguation `logCall` uses.
 
-### WR-06: Copilot production wire rows carry `tool_call_id=''` — gap-fill, cache-merge, and matched-id tracking are all no-ops for copilot
+### WR-06: Copilot production wire rows carry `tool_call_id=''` — request-id matching, gap-fill, and cache-merge are all no-ops for copilot
 
-**Files:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:2717-2718`, `lib/lsl/token/stop-adapter-registry.mjs:529-535,633-649`
-**Issue:** Shim-path (`/v1/copilot/...`) rows never set `tool_call_id` ("stay unset
-here — logCall defaults them" server.mjs:2718). Consequences in reconcile mode:
-(a) request-id matching can never fire for copilot (fuzzy only); (b) a fuzzy-matched
-wire row cannot be enriched — `reconcileGapFill(db, '', …)` returns false on the
-degenerate-id guard; (c) `mergeCopilotSessionStateCache` keys `opts.copilotCacheSplit`
-on wire `tool_call_id`s that are all `''` in production — a shipped no-op; (d) the
-matched wire row is never added to `matchedRequestIds` (`if (wireRow.tool_call_id)`),
-so it is still counted in `unmatched_wire`. The copilot test masks all four by
-seeding wire rows with non-empty ids (`'sess-1:claude-sonnet-4.6'`,
-reconcile-mode.test.js:459-472).
-**Fix:** Stamp a per-request id on shim wire rows (e.g. the provider response `id`
-already available in the completion envelope, or a UUID minted per shim request) so
-copilot rows join like claude rows; track fuzzy matches by wire PK
-(`user_hash`,`id`) instead of `tool_call_id`.
+**File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:2716-2718` (comment: "tool_call_id/parent_call_id/reasoning_tokens stay unset here")
+**Issue:** (Carried forward.) The `/api/complete` pipeline never sets
+`tool_call_id`, so copilot BYOK wire rows have an empty request-id. Consequences in
+the reconcile layer: the request-id probe can never match a copilot wire row;
+`reconcileGapFill` returns false for a fuzzy-matched empty-id wire row (`token-db.mjs:310`),
+so the CR-03 task_id backfill and the cache split never land; `wireToolCallId` is
+falsy so the D-04 `copilotCacheSplit` merge (`stop-adapter-registry.mjs:644-660`)
+can never apply in production (only in tests that seed synthetic shared ids).
+**Fix:** Stamp a per-request id on shim-originated rows (e.g. the upstream
+response id / a generated UUID threaded through `internalBody.tool_call_id`) so
+copilot wire rows carry an identity.
 
-### WR-07: `_validTaskId` accepts `.` and `..` — the reconciliation route's traversal gate is weaker than documented and tested
+### WR-07: `_validTaskId` accepts `'.'` and `'..'` — one-level path escape from `.data/measurements/`
 
-**File:** `lib/vkb-server/api-routes.js:777-779` (used at :608, :614)
-**Issue:** `/^[A-Za-z0-9._-]+$/` matches dots-only strings, so `taskId = '..'` passes
-validation and `path.join(dataDir, 'measurements', '..', 'reconciliation.json')`
-resolves to `.data/reconciliation.json` — one level above the intended root. Impact
-is bounded (no `/` allowed, fixed filename appended) but the handler comment claims
-"a `../` traversal is rejected with 400 and the read can never escape
-.data/measurements/", and the test only covers `'../etc'` and `'a/b'`
-(reconciliation-route.test.js:66-77), not bare `'..'`. The write side
-(`sanitizeTaskId`, lib/repro/capture-snapshot.mjs:45-49) strips leading dots, so the
-two sides also disagree on which ids are representable.
-**Fix:** Reject dot-only / leading-dot ids: `if (/^\.+$/.test(id)) return false;`
-(or reuse `sanitizeTaskId` and require `sanitizeTaskId(id) === id`), and add a bare
-`'..'` 400 test.
+**File:** `lib/vkb-server/api-routes.js:777-779` (used by `handleReconciliation` :614)
+**Issue:** (Carried forward.) The regex `/^[A-Za-z0-9._-]+$/` matches dot-only
+strings. `taskId='..'` (URL-encoded `%2E%2E` survives Express param decoding)
+resolves `path.join(dataDir, 'measurements', '..', 'reconciliation.json')` →
+`.data/reconciliation.json`, outside the intended directory. The docstring claims it
+"mirrors the proxy span gate", but the proxy's `sanitizeTaskId`
+(`measurement-span.ts:90`) explicitly rejects `'.'`/`'..'`. Impact is bounded (only
+a file named `reconciliation.json` one level up), but the T-83-05-01 traversal
+guard is incomplete and the test suite never probes dot-only ids.
+**Fix:**
+```js
+_validTaskId(id) {
+  return typeof id === 'string' && id.length > 0 && id.length <= 80
+    && /^[A-Za-z0-9._-]+$/.test(id) && id !== '.' && id !== '..';
+}
+```
 
-### WR-08: Machine-hash id counter is never resynced after a collision retry — every subsequent `logCall` permanently pays a failed INSERT + probe
+### WR-08: Machine-hash id counter never resynced after a collision retry — every subsequent `logCall` pays a failed INSERT + probe
 
-**File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts:998-1021` (`nextLocalId` at :727)
-**Issue:** After a PK collision, attempt 1 allocates `MAX(id)+1` from the DB, but
-`_localIdSeq` (a plain `_localIdSeq++` counter) is not advanced to match. Once the DB
-max runs ahead of the counter, every following machine-hash `logCall` attempt 0
-collides again (counter value ≤ existing max), triggering a constraint error, a
-dedup re-probe, and a retry — on every insert until process restart. Correctness is
-preserved by the retry, but the hot path degrades permanently and the stderr channel
-fills with recurring constraint noise (the exact symptom 7a01346 was fixing).
-**Fix:** After a successful retry insert (or on any recompute), resync the counter:
-expose `handle.bumpLocalSeq(id + 1)` and call it when `effectiveUserHash === USER_HASH`
-and the DB-computed id was used.
-
-### WR-09: Stale launcher comment documents the removed ambient-fallback "safety valve" for the empty x-task-id header
-
-**File:** `scripts/launch-agent-common.sh:414-418`
-**Issue:** "An empty TASK_ID leaves the header value blank → the tap falls back to
-its ambient resolveLiveTaskId() (safety valve)." After D-08 (commit 3b73e59) the tap
-stamps `task_id=''` for a blank header — there is no ambient fallback anymore. The
-comment now documents the opposite of the shipped behavior and hides the CR-03
-regression from any operator reading the launcher.
-**Fix:** Rewrite the comment to state the no-inherit rule and that only a non-empty
-`TASK_ID` at launch binds a measured cell.
+**File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts:999-1023`
+**Issue:** (Carried forward.) When the first attempt (`handle.nextLocalId()`)
+collides, the retry recomputes `MAX(id)+1` from the DB but never updates
+`_localIdSeq` — which is now permanently behind, so **every** future machine-hash
+insert first fails on the composite PK, runs the dedup probe, then retries. Correct
+but wasteful and noisy in the constraint-error path.
+**Fix:** After a successful retry insert, resync the counter (expose a
+`handle.bumpLocalId(id)` or re-run `seedLocalSeq`).
 
 ## Info
 
-### IN-01: `reconcile.mjs` header claims wire and transcript rows "carry DIFFERENT user_hash by design" — false for claude
+### IN-01: `RECONCILE_GAP_FILL_SQL` updates every row sharing the tool_call_id (no user_hash/rowid scope)
 
-**File:** `lib/lsl/token/reconcile.mjs:21-24`
-**Issue:** Claude wire tap rows are `cladpt` (server.mjs:2217) — the same hash as the
-transcript adapter. The cross-hash framing misled `countUnmatchedWireRows` (CR-02).
-**Fix:** Correct the comment: the join crosses hash boundaries for copilot/shims only;
-claude wire and transcript rows share `cladpt` and are distinguished by write order +
-dedup.
+**File:** `lib/lsl/token/token-db.mjs:260-268`
+**Issue:** `WHERE tool_call_id = ?` has no `user_hash`/`id` bound; the partial
+unique index only constrains per-hash, so a same-request-id row under a different
+hash is also stamped with the span task_id/cache. `reconcileRow` now carries
+`wireRowId` — consider `WHERE rowid = ?` keyed on the probed row.
 
-### IN-02: `RECONCILE_GAP_FILL_SQL` updates every row sharing the tool_call_id (no user_hash scope)
+### IN-02: `RECONCILE_PROBE_SQL` comment overstates determinism
 
-**File:** `lib/lsl/token/token-db.mjs:253-260`
-**Issue:** `WHERE tool_call_id = ?` touches all hashes' rows with that id (e.g. a
-prior fallback cladpt row AND the wire row). Fill-gaps-only semantics bound the
-damage, but tier/parent/cache can be stamped onto rows that are not the matched wire
-row. **Fix:** Add `AND (user_hash = ? OR ...)` scoping to the matched wire row's PK.
+**File:** `lib/lsl/token/token-db.mjs:230-238`
+**Issue:** "ORDER BY id makes the earliest (wire) row the deterministic winner" —
+ids are per-user_hash sequences, so a cross-hash comparison by bare `id` does not
+order by insertion time. Deterministic, but not "earliest". Fix the comment (or
+order by rowid).
 
-### IN-03: `RECONCILE_PROBE_SQL` comment: "ORDER BY id makes the earliest (wire) row the deterministic winner" is not guaranteed
+### IN-03: `withinSpanWindow` duplicated in two modules
 
-**File:** `lib/lsl/token/token-db.mjs:227-238`
-**Issue:** Ids are independent per-user_hash counters; a cladpt adapter row can carry
-a lower id than the wire row for the same tool_call_id. The pick is deterministic but
-not necessarily the wire row. **Fix:** Order by a wire-provenance discriminator (e.g.
-`process`) first, or document that either row is acceptable because gap-fill hits all
-rows (see IN-02).
+**File:** `lib/lsl/token/reconcile.mjs:102-110`, `lib/lsl/token/stop-adapter-registry.mjs:342-351`
+**Issue:** Two copies of the same clamp (acknowledged in comments) with different
+signatures; a future grace-window change must be made twice. Export one from a
+shared location.
 
-### IN-04: `withinSpanWindow` duplicated in two modules
+### IN-04: Shim/tap degrade a malformed explicit x-task-id to the ambient span
 
-**Files:** `lib/lsl/token/reconcile.mjs:95-103`, `lib/lsl/token/stop-adapter-registry.mjs:342-351`
-**Issue:** Two copies of the identical clamp (acknowledged in the comment). A future
-grace-window change in one silently desynchronizes the matcher from the loop.
-**Fix:** Export it from one module (registry already imports from token-db/reconcile).
+**File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:2030-2036`
+**Issue:** A malformed explicit `x-task-id` falls back to
+`safeSanitizeTaskId(resolveLiveTaskId())` — i.e. the ambient span — which is the
+inheritance behavior D-08 forbids for header-less requests. A caller that *tried*
+to bind explicitly and failed gets silently rebound to whatever span is live.
+Falling back to `''` (neutral) would be safer.
 
-### IN-05: Shim path silently degrades a malformed explicit task id to the ambient span
-
-**File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs:2329-2337`
-**Issue:** `safeSanitizeTaskId` maps an illegal explicit header/body/path id to `''`,
-after which `taskId || safeSanitizeTaskId(resolveLiveTaskId())` (and the downstream
-`body.task_id ?? resolveLiveTaskId()`) rebinds the call to whatever span is live —
-the ambient-leak class Phase 82-06 closed — with no log line. The tap branch logs the
-rejection (:2034); the shim does not. **Fix:** Log the rejection like the tap branch.
-
-### IN-06: `logCall` re-prepares two statements on every insert
+### IN-05: `logCall` re-prepares two statements on every insert
 
 **File:** `/Users/Q284340/Agentic/_work/rapid-llm-proxy/src/token-usage.ts:983-988`
-**Issue:** `nextIdStmt`/`dedupStmt` are `db.prepare`d per call instead of once on the
-handle (like `insertStmt`). Not a correctness issue; hot-path churn on every token
-log. **Fix:** Hoist both onto the handle next to `insertStmt`.
+**Issue:** `nextIdStmt`/`dedupStmt` are prepared per call in the hot path. Hoist to
+module/handle scope like `insertStmt` (better-sqlite3 statement cache mitigates,
+but the intent-level fix is trivial).
 
-### IN-07: Reconciliation route's ENOENT shape differs from the served-file shape
+### IN-06: Reconciliation route's ENOENT shape differs from the served-file shape
 
 **File:** `lib/vkb-server/api-routes.js:620-623`
-**Issue:** Hit → verbatim top-level `{ schemaVersion, span, summary, perRequest }`;
-miss → `{ reconciliation: null }`. Consumers (Phase 86 badge) must special-case two
-shapes; a `null`-check on `body.reconciliation` would misread a hit as a miss.
-**Fix:** Return `{ reconciliation: <file> }` on hit or a documented
-`{ schemaVersion: null }` empty on miss — one envelope.
+**Issue:** A hit returns the file verbatim (`{schemaVersion, span, summary, perRequest}`);
+a miss returns `{reconciliation: null}` — a different envelope. Consumers need two
+shape branches. Consider `204`, or a consistent envelope for both cases.
 
-### IN-08: Re-running a close re-counts `fallback` without inserting
+### IN-07: Re-running a close re-counts `fallback` without inserting
 
-**File:** `lib/lsl/token/stop-adapter-registry.mjs:543-547`
-**Issue:** The fallback branch increments `unmatched_transcript`/`fallback` before
-`insertTokenRowDeduped`, whose dedup hit (row already inserted by a prior run) makes
-it return false — the report claims a fallback insert that did not happen, so a
-re-close overwrites `reconciliation.json` with inflated-looking (but row-less)
-fallback counts. **Fix:** Count only when the insert/enrich returns true, or record
-`deduped: true` in `perRequest`.
+**File:** `lib/lsl/token/stop-adapter-registry.mjs:545-548`
+**Issue:** `report.fallback`/`unmatched_transcript` increment regardless of
+`insertTokenRowDeduped`'s return value; on a re-run the dedup hit returns false but
+the counters still climb, so a second close of the same span reports phantom
+fallbacks. Count only when the insert returned true (or record a `deduped` counter).
 
-### IN-09: Sink writes under `sanitizeTaskId(task_id)` while the read route looks up the raw id
+### IN-08: Sink writes under `sanitizeTaskId(task_id)` while the read route looks up the raw id
 
-**Files:** `scripts/measurement-stop.mjs:474-479`, `lib/vkb-server/api-routes.js:614`
-**Issue:** A task_id whose sanitized form differs from itself (leading dot, illegal
-char → `_`) is written under the transformed directory name but requested by the
-original id → permanent graceful-empty 200. Proxy-minted ids are pre-sanitized so
-this is latent, but the two ends should share one canonicalization. **Fix:** Have the
-route resolve `sanitizeTaskId(taskId)` (after validation) before the path join.
+**File:** `scripts/measurement-stop.mjs:471-476` vs `lib/vkb-server/api-routes.js:614`
+**Issue:** If a task_id contains characters `sanitizeTaskId` strips, the file lands
+under the sanitized name but `GET .../runs/<rawId>/reconciliation` joins the raw
+id → permanent graceful-empty. Experiment ids are currently charset-safe, so this
+is latent; align by sanitizing in the route too.
+
+### IN-09: Stale test comments describe the deleted post-loop `unmatched_wire` query
+
+**File:** `tests/token-adapters/reconcile-mode.test.js:26-27,413-415`
+**Issue:** The header ("counted via the POST-LOOP DB query") and Test 7 banner still
+describe the removed `countUnmatchedWireRows` design; the implementation is now a
+pre-loop PK snapshot diff. Update the comments.
+
+### IN-10: `num()` coalesces only null/undefined — NaN and strings pass through
+
+**File:** `lib/lsl/token/reconcile.mjs:51-53`, `lib/lsl/token/token-db.mjs:88-90`
+**Issue:** `v ?? 0` lets `NaN`/strings into `computeDeltas` arithmetic (a NaN delta
+is recorded un-flagged; the aggregate helper then skips it) and into DB binds
+(better-sqlite3 throws, caught non-fatally). Contrast `usage-cache.ts`'s
+`Number.isFinite` guard. Fix:
+`return typeof v === 'number' && Number.isFinite(v) ? v : 0;`
+
+### IN-11: `unmatched_transcript` and `fallback` are always identical
+
+**File:** `lib/lsl/token/stop-adapter-registry.mjs:546-547`
+**Issue:** Both counters increment together in the single no-match branch — two
+names for one number. Either document the intended divergence or make `fallback`
+count actual successful inserts (see IN-07).
+
+### IN-12: Wire snapshot admits concurrent-session `task_id=''` rows — `unmatched_wire` inflation when run attended
+
+**File:** `lib/lsl/token/stop-adapter-registry.mjs:608`
+**Issue:** `(task_id = ? OR task_id = '')` plus the span-window clamp means a
+concurrent interactive claude session's tap rows (blank task_id per D-08) enter the
+snapshot and, having no transcript counterpart in the measured cell, inflate
+`unmatched_wire`. The wire-verify YAML mitigates by mandating UNATTENDED runs;
+document the metric caveat or restrict the `''` arm to rows the CR-03 backfill
+actually stamped.
 
 ---
 
-_Reviewed: 2026-07-06T08:49:46Z_
+_Reviewed: 2026-07-06T14:31:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
