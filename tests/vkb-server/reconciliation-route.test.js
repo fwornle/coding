@@ -76,6 +76,18 @@ describe('GET /api/experiments/runs/:taskId/reconciliation', () => {
     assert.equal(res.statusCode, 400);
   });
 
+  // WR-07 (re-review): dot-only ids match the [A-Za-z0-9._-] charset but are
+  // path navigation — '..' resolved the read to .data/reconciliation.json,
+  // one level ABOVE the measurements dir. Both must 400.
+  test("rejects dot-only taskIds ('.', '..') with 400 (one-level escape)", async () => {
+    for (const taskId of ['.', '..']) {
+      const res = makeRes();
+      await routes.handleReconciliation({ params: { taskId } }, res);
+      assert.equal(res.statusCode, 400, `taskId '${taskId}' must be rejected`);
+      assert.equal(res.body.error, 'Invalid taskId');
+    }
+  });
+
   test('rejects an empty taskId with 400', async () => {
     const res = makeRes();
     await routes.handleReconciliation({ params: { taskId: '' } }, res);
