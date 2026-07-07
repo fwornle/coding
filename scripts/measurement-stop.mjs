@@ -498,7 +498,11 @@ async function main() {
   // never a Task/Agent sub-agent, which may run a cheaper model (e.g. Explore on
   // haiku) with more tokens and would otherwise win fgGroups[0] (ordered by tokens).
   // Fall back to fgGroups[0] only if the main session left no non-subagent group.
-  const isSubagentGroup = (g) => g?.process === 'token-adapter-claude-subagent';
+  // WR-02 (re-review): match by SUFFIX, not the exact marker — a proxy-down
+  // sub-agent fallback row carries the COMPOSED provenance
+  // 'token-adapter-<agent>-fallback-subagent' (stop-adapter-registry.mjs), which
+  // must still be excluded from canonical chat-model selection.
+  const isSubagentGroup = (g) => typeof g?.process === 'string' && g.process.endsWith('-subagent');
   const canonical = fgGroups.find((g) => !isSubagentGroup(g)) ?? fgGroups[0] ?? null;
   // canonical_model stays null when no foreground group was measured — we NEVER
   // guess a model (D-05: null persists as "unmeasured", never coerced to a
