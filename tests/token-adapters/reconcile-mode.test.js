@@ -751,6 +751,74 @@ test('CR-01/double-consumption: one fuzzy-only wire row + two same-model turns �
   }
 });
 
+// cross-hash id collision (re-review CR-01): the bare `id` column is NOT unique
+// — the PK is composite (user_hash, id) and each adapter hash runs its own
+// MAX(id)+1 sequence, so cladpt id=1 and copadt id=1 coexist BY DESIGN (D-11).
+// Pre-fix the snapshot/consumed Sets keyed on the bare id, so a copadt row with
+// a colliding numeric id passed the candidateWireIds filter: the claude turn
+// fuzzy-matched the COPADT row (its own tokens silently dropped), the genuine
+// cladpt wire row was marked consumed, and unmatched_wire reported 0 (truth: 1).
+// Post-fix identity keys on rowid: the copadt row is excluded, the turn FALLS
+// BACK, and the cladpt orphan is counted.
+test('CR-01/cross-hash-id-collision: a copadt row sharing the cladpt wire row numeric id is never fuzzy-consumed (fallback=1, unmatched_wire=1)', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // (1) The genuine cladpt WIRE row: fuzzy-only (tool_call_id matches no turn),
+    //     in the SPAN window but 3 min from the transcript turn's timestamp —
+    //     OUTSIDE the 2-min fuzzy window, so the turn cannot legitimately match
+    //     anything. seedWireRow allocates id=1 (first cladpt row).
+    seedWireRow(dbPath, {
+      user_hash: 'cladpt',
+      tool_call_id: 'req-wire-only',
+      timestamp: '2026-06-29T05:34:00.000Z',
+    });
+    // (2) A concurrent COPILOT session's row under a DIFFERENT hash with the SAME
+    //     numeric id=1 (first copadt row), same model, timestamped exactly at the
+    //     transcript turn — the perfect (illegitimate) fuzzy candidate.
+    seedWireRow(dbPath, {
+      user_hash: 'copadt',
+      task_id: 'other-copilot-task',
+      tool_call_id: 'copadt-other-req',
+      timestamp: IN_WINDOW_TS,
+      input_tokens: 999,
+    });
+
+    // One claude turn with an UNMATCHED request-id (forces the fuzzy path).
+    const fixture = writeClaudeFixture(dir, [claudeTurn('req-collide-1')]);
+    const report = await captureForegroundTokens(claudeSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: fixture,
+      resolveTaskId: async () => 'recon-task',
+    });
+
+    assert.equal(report.matched, 0, 'the copadt id-collision row must NOT be fuzzy-consumed');
+    assert.equal(report.fallback, 1, 'the claude turn falls back (its tokens are never silently dropped)');
+    assert.equal(
+      report.unmatched_wire,
+      1,
+      'the genuine cladpt wire row is counted as an orphan — not hidden by the collision',
+    );
+
+    const rows = readAll(dbPath);
+    const fallbackRows = rows.filter((r) => r.process === 'token-adapter-claude-fallback');
+    assert.equal(fallbackRows.length, 1, 'exactly one cladpt fallback row captured the turn');
+    assert.equal(fallbackRows[0].tool_call_id, 'req-collide-1');
+    // The unrelated copadt row is untouched: never gap-filled with the span task.
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const copadt = db
+        .prepare("SELECT task_id FROM token_usage WHERE user_hash = 'copadt'")
+        .get();
+      assert.equal(copadt.task_id, 'other-copilot-task', 'no cross-session attribution capture');
+    } finally {
+      db.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ===========================================================================
 // CR-02 (Plan 83-09 / gap-2) — unmatched_wire is MEANINGFUL for copilot spans.
 // This locks the copadt PRODUCTION shape produced by the proxy fix (Task 2):
