@@ -819,6 +819,57 @@ test('CR-01/cross-hash-id-collision: a copadt row sharing the cladpt wire row nu
   }
 });
 
+// WR-11 (re-review): a CONCURRENT interactive claude session's tap row carries
+// task_id='' (D-08 no-inherit) and lands in the measured span's wire snapshot
+// when in-window. It must NEVER be fuzzy-bound to the span: pre-fix an
+// unmatched measured-span turn fuzzy-matched it (same model, within 2 min),
+// reported it matched (its own tokens dropped), and the CR-03 gap-fill stamped
+// the SPAN task_id onto the unrelated session's row — cross-session
+// attribution capture. task_id='' rows are now fuzzy-EXCLUDED (diff-only);
+// request-id matching still reaches them (CR-03 stays intact).
+test("WR-11/neutral-row-capture: a concurrent task_id='' tap row is never fuzzy-bound to the span", async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // Concurrent interactive session's tap row: same hash+model, in-window,
+    // neutral task_id='', request-id NOT in the measured span's transcript.
+    seedWireRow(dbPath, {
+      user_hash: 'cladpt',
+      task_id: '',
+      tool_call_id: 'req-other-session',
+      timestamp: IN_WINDOW_TS,
+    });
+
+    // One measured-span turn with an unmatched request-id (forces fuzzy).
+    const fixture = writeClaudeFixture(dir, [claudeTurn('req-mine-1')]);
+    const report = await captureForegroundTokens(claudeSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: fixture,
+      resolveTaskId: async () => 'recon-task',
+    });
+
+    assert.equal(report.matched, 0, "the neutral '' row must NOT be fuzzy-consumed");
+    assert.equal(report.fallback, 1, 'the turn falls back (its tokens are captured, not dropped)');
+    assert.equal(
+      report.unmatched_wire,
+      1,
+      "the '' row is still REPORTED as an orphan (diff-only, not hidden)",
+    );
+
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const other = db
+        .prepare('SELECT task_id FROM token_usage WHERE tool_call_id = ?')
+        .get('req-other-session');
+      assert.equal(other.task_id, '', 'no CR-03 stamp onto the unrelated session row');
+    } finally {
+      db.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ===========================================================================
 // CR-02 (Plan 83-09 / gap-2) — unmatched_wire is MEANINGFUL for copilot spans.
 // This locks the copadt PRODUCTION shape produced by the proxy fix (Task 2):
