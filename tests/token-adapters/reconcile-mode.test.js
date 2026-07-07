@@ -691,3 +691,158 @@ test('copilot D-04: injected session-state cache split fills a matched wire row 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ===========================================================================
+// CR-01 (Plan 83-09) — the fuzzy matcher is scoped to the PRE-LOOP wire
+// snapshot (candidateWireIds) and excludes already-consumed rows
+// (consumedWireIds). These two guards close golden property 2 (proxy-down
+// capture integrity) and the double-consumption hazard. See 83-VERIFICATION.md
+// gaps[0] + 83-REVIEW.md CR-01.
+// ===========================================================================
+
+// proxy-down: in a proxy-down cell NO wire rows exist. Two consecutive
+// SAME-MODEL turns seconds apart must BOTH fall back — turn 2 must NOT
+// fuzzy-match turn 1's just-inserted fallback row (which post-dates the empty
+// pre-loop snapshot). Pre-fix this reported matched=1/fallback=1 (turn 2's
+// tokens silently dropped onto turn 1's fallback row).
+test('CR-01/proxy-down: two same-model turns with NO wire rows both fall back (fallback=2, matched=0)', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // No seedWireRow — a proxy-down cell has an EMPTY wire snapshot.
+    const fixture = writeClaudeFixture(dir, [claudeTurn('req-down-1'), claudeTurn('req-down-2')]);
+    const report = await captureForegroundTokens(claudeSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: fixture,
+      resolveTaskId: async () => 'recon-task',
+    });
+    assert.equal(report.matched, 0, 'no wire rows → nothing can match');
+    assert.equal(report.fallback, 2, 'BOTH same-model turns fall back (turn 2 never matches turn 1 fallback)');
+
+    const rows = readAll(dbPath);
+    const fallbackRows = rows.filter((r) => r.process === 'token-adapter-claude-fallback');
+    assert.equal(fallbackRows.length, 2, 'two distinct fallback rows captured (golden property 2)');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// double-consumption guard: ONE fuzzy-only wire row (tool_call_id matches
+// NEITHER turn) + two same-model turns. Only ONE turn may consume the single
+// wire row; the second must fall back. Pre-fix both turns fuzzy-matched the same
+// wire row (matched=2, fallback=0 — one wire row double-consumed).
+test('CR-01/double-consumption: one fuzzy-only wire row + two same-model turns → matched=1, fallback=1', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // A cladpt wire row whose tool_call_id matches NEITHER transcript turn,
+    // forcing the fuzzy path for both turns.
+    seedWireRow(dbPath, { user_hash: 'cladpt', tool_call_id: 'req-wire-only' });
+    const fixture = writeClaudeFixture(dir, [claudeTurn('req-dc-1'), claudeTurn('req-dc-2')]);
+    const report = await captureForegroundTokens(claudeSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: fixture,
+      resolveTaskId: async () => 'recon-task',
+    });
+    assert.equal(report.matched, 1, 'exactly one turn consumes the single wire row');
+    assert.equal(report.fallback, 1, 'the second turn cannot re-consume the already-matched wire row');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
+// CR-02 (Plan 83-09 / gap-2) — unmatched_wire is MEANINGFUL for copilot spans.
+// This locks the copadt PRODUCTION shape produced by the proxy fix (Task 2):
+// once copilot BYOK wire rows carry user_hash='copadt', the coding-side
+// copadt-keyed snapshotWireRowIds is non-empty, so a genuine copadt orphan wire
+// row is COUNTED (not vacuously 0) and a fully-matched copilot span reports 0.
+// See 83-VERIFICATION.md gaps[1]. NOTE (documented, not asserted): in production
+// copilot wire rows carry tool_call_id='' (WR-06) so real copilot matching runs
+// through fuzzy (scoped by Task 1's candidateWireIds); this test shares a
+// request-id purely to exercise the snapshot/counting contract deterministically.
+// ===========================================================================
+
+/** A copilot events.jsonl fixture producing one aggregate transcript row. */
+function writeCopilotEvents(dir, model) {
+  const events = path.join(dir, `events-${Math.random().toString(36).slice(2)}.jsonl`);
+  fs.writeFileSync(
+    events,
+    [
+      { type: 'session.start', timestamp: '2026-06-29T05:30:00.000Z', data: { sessionId: 'sess-1' } },
+      {
+        type: 'session.shutdown',
+        timestamp: IN_WINDOW_TS,
+        data: { modelMetrics: { [model]: { usage: { inputTokens: 100, outputTokens: 20 } } } },
+      },
+    ].map((o) => JSON.stringify(o)).join('\n') + '\n',
+  );
+  return events;
+}
+
+const COPILOT_MODEL = 'claude-sonnet-4.6';
+function copilotSpan() {
+  return { task_id: 'recon-task', agent: 'copilot', started_at: STARTED_AT, ended_at: ENDED_AT };
+}
+
+test('CR-02/copilot-orphan: a genuine copadt orphan wire row is counted → unmatched_wire === 1', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // (1) copadt wire row whose tool_call_id matches the copilot transcript's
+    //     request-id ('<sessionId>:<model>') — this one matches.
+    seedWireRow(dbPath, {
+      user_hash: 'copadt',
+      task_id: 'recon-task',
+      model: COPILOT_MODEL,
+      tool_call_id: `sess-1:${COPILOT_MODEL}`,
+    });
+    // (2) a genuine copadt ORPHAN wire row (no transcript counterpart).
+    seedWireRow(dbPath, {
+      user_hash: 'copadt',
+      task_id: 'recon-task',
+      model: COPILOT_MODEL,
+      tool_call_id: 'copadt-orphan-req',
+    });
+
+    const events = writeCopilotEvents(dir, COPILOT_MODEL);
+    const report = await captureForegroundTokens(copilotSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: events,
+      resolveTaskId: async () => 'recon-task',
+    });
+    assert.equal(report.matched, 1, 'the transcript matched its copadt wire row by request-id');
+    assert.equal(
+      report.unmatched_wire,
+      1,
+      'the copadt orphan wire row is counted — the copadt snapshot is non-empty (not vacuously 0)',
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CR-02/copilot-healthy: a fully-matched copilot span reports unmatched_wire === 0', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // Only the matched copadt wire row — every wire row has a transcript counterpart.
+    seedWireRow(dbPath, {
+      user_hash: 'copadt',
+      task_id: 'recon-task',
+      model: COPILOT_MODEL,
+      tool_call_id: `sess-1:${COPILOT_MODEL}`,
+    });
+
+    const events = writeCopilotEvents(dir, COPILOT_MODEL);
+    const report = await captureForegroundTokens(copilotSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: events,
+      resolveTaskId: async () => 'recon-task',
+    });
+    assert.equal(report.matched, 1, 'the copilot transcript matched its copadt wire row');
+    assert.equal(report.unmatched_wire, 0, 'a healthy copilot span reports 0 — not vacuous');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
