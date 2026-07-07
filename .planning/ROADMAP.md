@@ -316,7 +316,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] 83-06-PLAN.md — Copilot BYOK gating to measured launches only (copilot.sh + launch-agent-common.sh + experiment-runner.mjs) [D-03]
 - [x] 83-07-PLAN.md — Golden-comparison live acceptance (human checkpoint) [D-01/D-02/D-04/D-05/D-12]
 - [x] 83-08-PLAN.md — Gap closure: aggregateDeltas roll-up (CR-01) + meaningful unmatched_wire (CR-02) + interactive-launch task_id backfill (CR-03) [D-04/D-05/D-08/D-12]
-- [ ] 83-09-PLAN.md — Gap closure (re-verify): fuzzy candidate scoping vs loop-inserted fallback (new CR-01) + copilot copadt wire-row provenance for meaningful unmatched_wire (new CR-02) [D-02/D-04/D-05/D-12]
+- [x] 83-09-PLAN.md — Gap closure (re-verify): fuzzy candidate scoping vs loop-inserted fallback (new CR-01) + copilot copadt wire-row provenance for meaningful unmatched_wire (new CR-02) [D-02/D-04/D-05/D-12]
 
 ### Phase 84: Per-Turn Context Revelation
 **Goal**: Every measured request persisted as one context-turns JSONL line (category analysis, cache-breakpoint positions, per-message digests incl. tool_use names + sizes, paired response usage), gzipped at span close with retention policy; optional flag-gated full raw bodies; read APIs on proxy (`/api/context-turns`) + vkb-server pass-through; cache explainer shows honest per-turn sent/cached/fresh numbers for all agents with the "how prompt caching actually works" copy.
@@ -371,7 +371,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
-| 83. Token Reconciliation Layer | v7.5 | 8/8 | Complete   | 2026-07-06 |
+| 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete   | 2026-07-07 |
 | 84. Per-Turn Context Revelation | v7.5 | 0/? | Not started | - |
 | 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
 | 86. Timeline v2 & Declutter | v7.5 | 0/? | Not started | - |
