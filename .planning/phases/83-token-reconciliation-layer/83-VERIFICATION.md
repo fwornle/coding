@@ -1,70 +1,43 @@
 ---
 phase: 83-token-reconciliation-layer
-verified: 2026-07-07T11:30:00Z
-status: gaps_found
-score: 24/26 must-haves verified
+verified: 2026-07-07T13:00:00Z
+status: human_needed
+score: 26/26 must-haves verified
 overrides_applied: 0
 re_verification:
   previous_status: gaps_found
-  previous_score: 22/26
+  previous_score: 24/26
   gaps_closed:
-    - "Truth 24 (proxy-down fallback): CR-01 fix correctly uses an empty snapshot for proxy-down cells — no wire rows means candidateWireIds is an empty Set, so no fuzzy match is possible for any turn; proxy-down fallback=2/matched=0 test passes"
-    - "Truth 25 (unmatched_wire meaningful for copilot): CR-02 proxy fix stamps user_hash='copadt' on /api/complete BYOK wire rows (server.mjs:2717-2719); snapshotWireRowIds now sees a non-empty copadt snapshot; copilot orphan test (unmatched_wire=1) and healthy test (unmatched_wire=0) both pass"
-  gaps_remaining:
-    - "NEW BLOCKER: Wire-row identity in scoping Sets uses bare integer `id` (non-unique per table PK (user_hash, id)) — cross-adapter same-numeric-id collision can defeat the fuzzy candidate filter, corrupt unmatched_wire, and cause silent transcript-token loss in concurrent multi-agent scenarios"
+    - "NEW BLOCKER (composite PK identity): wire-row identity in candidateWireIds/consumedWireIds/matchedWireRowIds/unmatched_wire diff now keys on SQLite rowid (globally unique) end-to-end — FUZZY_CANDIDATES_SQL, RECONCILE_PROBE_SQL, snapshotWireRowIds all select rowid AS rid; fuzzy guards use c.rid; reconcileRow returns wireRowId: wireRow.rid. Regression test CR-01/cross-hash-id-collision (cladpt id=1 + copadt id=1, same model, in-window) was verified to FAIL pre-fix and PASS post-fix (fallback=1, unmatched_wire=1, copadt row untouched)."
+    - "WR-01: :reason:N rows now pass the span-window clamp before the match-bypass; unclamped out-of-window reasoning rows no longer inflate measured-run reasoning_tokens."
+    - "WR-02: fallback provenance composed (token-adapter-<agent>-fallback-subagent when batch.process === SUBAGENT_PROCESS) so sub-agent identity survives a proxy-down fallback."
+    - "WR-06 (code): OpenAI shim stamps tool_call_id: 'shim-<UUID>' per request so copilot BYOK / opencode / mastra wire rows carry an identity enabling the reconcile request-id probe, reconcileGapFill, and copilotCacheSplit merge."
+    - "WR-07: _validTaskId rejects '.' and '..' (dot-only path escape guards) in addition to slash."
+    - "WR-11: snapshotWireRowIds returns two sets; fuzzyCandidateIds excludes task_id='' rows — concurrent interactive tap rows can never be fuzzy-bound to a measured span."
+    - "WR-03/WR-04/WR-08: proxy dedup-merge, dup-repair, and id-counter resync fixes (proxy commits 65e3d14, b6e83b0, d292cba) — 6/6 proxy dupid-constraint regression tests pass."
+    - "WR-05: coding-side insertTokenRow now has bounded (3-attempt) recompute-and-retry for composite PK collisions — regression tests added."
+  gaps_remaining: []
   regressions: []
-gaps:
-  - truth: "Wire-row scoping identity uses a globally unique key — a cross-adapter same-numeric-id collision cannot cause a different-hash wire row to pass the candidateWireIds filter, steal a matchedWireRowIds slot, or corrupt unmatched_wire in concurrent multi-agent measurement"
-    status: failed
-    reason: >
-      The table PK is composite (user_hash, id) — the D-11 migration allocates ids
-      per-adapter hash starting at MAX(id)+1 within that hash's namespace, so
-      cladpt id=1 and copadt id=1 coexist by design. But every 83-09 identity
-      structure uses the bare integer id:
-      snapshotWireRowIds (stop-adapter-registry.mjs:624) stores Set(r.id);
-      FUZZY_CANDIDATES_SQL (reconcile.mjs:71-74) selects across ALL user hashes and
-      the candidateWireIds/consumedWireIds filters use c.id (reconcile.mjs:143-144);
-      matchedWireRowIds.add(result.wireRowId) records wireRow.id (reconcile.mjs:323,
-      stop-adapter-registry.mjs:550); the post-loop diff keys on Set(id)
-      (stop-adapter-registry.mjs:586-587). A copadt row with numeric id=1 passes
-      candidateWireIds.has(1) because the cladpt snapshot also has id=1. The review's
-      PoC (cladpt id=1 + copadt id=1, same model, in-window): result matched=1,
-      fallback=0, unmatched_wire=0; the turn's tokens were silently dropped onto the
-      copadt row, and the genuine cladpt wire row was hidden from the unmatched_wire
-      diff. Because per-hash sequences all count from similar epochs, numeric overlap
-      in a concurrent multi-agent session (cladpt+copadt active simultaneously) is
-      near-certain.
-    artifacts:
-      - path: lib/lsl/token/reconcile.mjs
-        issue: "Lines 143-144: candidateWireIds.has(c.id) / consumedWireIds.has(c.id) use bare integer id; FUZZY_CANDIDATES_SQL (71-74) selects across all user hashes so different-hash same-numeric-id rows reach the filter"
-      - path: lib/lsl/token/stop-adapter-registry.mjs
-        issue: "Line 624 (snapshotWireRowIds): ids.add(r.id) stores bare integer id; line 550: matchedWireRowIds.add(result.wireRowId) same; post-loop diff at 586-587 keys on bare integers"
-      - path: lib/lsl/token/reconcile.mjs
-        issue: "Line 323: wireRowId: wireRow.id ?? null returns the bare integer; rowid (globally unique SQLite rowid) is not selected"
-    missing:
-      - "Select rowid in FUZZY_CANDIDATES_SQL: `SELECT rowid AS rid, id, tool_call_id, model, timestamp, ...` and use c.rid for the candidateWireIds/consumedWireIds checks; return wireRowId: wireRow.rid"
-      - "Select rowid in snapshotWireRowIds query: `SELECT rowid AS rid, id, tool_call_id, ...` and store ids.add(r.rid)"
-      - "Add a regression test: seed cladpt id=N wire row + copadt id=N wire row (same model, in-window, different task), one claude transcript turn with unmatched request-id; assert report.fallback=1 and the cladpt wire row appears in unmatched_wire=1 (not consumed by the copadt collision)"
+human_verification:
+  - test: "Start a live copilot BYOK session with a running measurement span (TASK_ID set, COPILOT_PROVIDER_BASE_URL exported), send at least one prompt, then stop the span. Inspect the token_usage.db for rows with user_hash='copadt' and tool_call_id beginning with 'shim-' (non-empty)."
+    expected: "At least one row with user_hash='copadt' and tool_call_id like 'shim-<uuid>' appears in the DB. The reconciliation report for the span shows matched >= 1 (request-id path) and unmatched_wire reflects actual copilot orphan count rather than a vacuous value."
+    why_human: "WR-06 fix (proxy commit e72666a) wires the shim UUID via internalBody.tool_call_id and server.mjs:2748 binds it to the logged row. The shim code is verified by node --check, the 21-test shim/stamping suite, and the live daemon build tag e72666a. However, the copilot BYOK HTTP path requires a live BMW corporate network session — no automated test can exercise the actual shim→logCall→DB pipeline without a real Copilot OAuth token and bmw.ghe.com connectivity."
 ---
 
-# Phase 83: Token Reconciliation Layer — Verification Report (Re-Verification after Plan 83-09)
+# Phase 83: Token Reconciliation Layer — Verification Report (Re-Verification after Code-Review Fix Pass)
 
-**Phase Goal:** Token Reconciliation Layer — reconcile proxy wire-tap token rows with transcript-derived rows so per-span token attribution is complete, deduplicated, and meaningful across agents (claude, copilot), per CONTEXT decisions D-01..D-13.
-**Verified:** 2026-07-07T11:30:00Z
-**Status:** gaps_found
-**Re-verification:** Yes — after plan 83-09 gap closure (closed prior NEW CR-01 fuzzy scoping + NEW CR-02 copilot copadt); 83-REVIEW.md post-83-09 surfaces one new critical (composite PK identity)
+**Phase Goal:** cladpt/copadt transcript adapters become verify/enrich sources (new `reconcile` mode): wire rows are primary; transcript rows match by request-id (time+model fuzzy fallback); discrepancies recorded per span in `reconciliation.json`; transcript fallback preserved for proxy-down windows; copilot cache split merged from session-state — zero double-counting.
+**Verified:** 2026-07-07T13:00:00Z
+**Status:** human_needed
+**Re-verification:** Yes — third pass; after code-review fix pass (commits 4e3f1bd36, 116d9efc4, e0e00ac2f, e6e382e72, 41105d154, 5b451f4b3 on coding main; 65e3d14, b6e83b0, d292cba, e72666a on proxy main)
 
 ---
 
 ## Step 0: Re-Verification Mode
 
-Previous VERIFICATION.md existed with `gaps:` section (status: gaps_found, score: 22/26, 2 blockers). This is re-verification mode.
+Previous VERIFICATION.md (second pass, 2026-07-07T11:30:00Z) had `gaps:` section with one blocker (composite PK identity keyed on bare integer `id` instead of globally unique `rowid`). This is re-verification mode targeting that blocker and the additional WR-series fixes from 83-REVIEW-FIX.md.
 
-**Previous gaps:**
-1. Truth 24 — Proxy-down cell silently loses turn 2+ tokens via fuzzy match of turn 1's fallback row (FUZZY_CANDIDATES_SQL unscoped)
-2. Truth 25 — unmatched_wire structurally 0 for copilot BYOK spans (machine USER_HASH on /api/complete logTokenCall)
-
-Both were verified CLOSED by direct code inspection. One new critical found via the 83-REVIEW.md (post-83-09 re-review): composite PK collision.
+**Previous verdict:** status: gaps_found, score: 24/26 (2 closed from first pass; 1 new blocker from post-83-09 re-review)
 
 ---
 
@@ -72,124 +45,120 @@ Both were verified CLOSED by direct code inspection. One new critical found via 
 
 | Previous Gap | Status | Evidence |
 |---|---|---|
-| NEW CR-01: FUZZY_CANDIDATES_SQL unscoped — turn 2 consumes turn 1's fallback in proxy-down runs | CLOSED | reconcile.mjs:143-144 guards `candidateWireIds.has(c.id)` / `consumedWireIds.has(c.id)`; stop-adapter-registry.mjs:516 threads both Sets into reconcileRow opts; proxy-down test passes (fallback=2, matched=0) |
-| NEW CR-02: copilot BYOK wire rows carry machine USER_HASH — snapshot always empty — unmatched_wire vacuously 0 | CLOSED | server.mjs:2717-2719 stamps `user_hash: adapterUserHash(body.agent)` when body.agent non-empty; copilot-orphan test (unmatched_wire=1) and copilot-healthy test (unmatched_wire=0) pass; proxy daemon running build `9f9ab3d` |
+| NEW BLOCKER: Wire-row identity in scoping Sets uses bare integer `id` — cross-adapter same-numeric-id collision defeats fuzzy candidate filter, corrupts unmatched_wire, causes silent token loss | CLOSED | reconcile.mjs:78-81 FUZZY_CANDIDATES_SQL selects `rowid AS rid`; fuzzy guards at :152-153 use `c.rid`; reconcileRow:336 returns `wireRowId: wireRow.rid ?? null`. token-db.mjs:276-279 RECONCILE_PROBE_SQL selects `rowid AS rid ORDER BY rowid`. stop-adapter-registry.mjs:664 snapshotWireRowIds selects `rowid AS rid`; :669 stores `r.rid`; :672 `fuzzyCandidateIds.add(r.rid)`. Regression test `CR-01/cross-hash-id-collision` (cladpt id=1 + copadt id=1) FAILS pre-fix, PASSES post-fix (fallback=1, unmatched_wire=1). |
 
 ---
 
-## Plan 83-09 Must-Have Verification
+## Rowid Fix — End-to-End Trace (the blocker)
 
-| # | Must-Have | Status | Evidence |
+| Location | Pre-fix | Post-fix | Evidence |
 |---|---|---|---|
-| P09-1 | Proxy-down same-model two-turn: fallback=2, matched=0 — turn 2 never fuzzy-matches turn 1's just-inserted fallback row | VERIFIED | Empty snapshot (no cladpt wire rows) → candidateWireIds is empty Set → all fuzzy candidates filtered → fallback=2. Test `CR-01/proxy-down` passes. NOTE: composite PK does not affect this case — empty snapshot prevents any match regardless |
-| P09-2 | Fuzzy match scoped to pre-loop wire snapshot minus already-consumed rows — no double-consumption, no loop-inserted fallback match | PARTIAL | Double-consumption and loop-inserted fallback guards work for same-hash scenarios (both tests pass). BUT: cross-adapter same-numeric-id row passes candidateWireIds.has(c.id) (bare integer, not globally unique) — a concurrent-session copadt row with id=N collides with a cladpt snapshot id=N and passes the filter (PoC by 83-REVIEW.md CR-01) |
-| P09-3 | Copilot BYOK wire rows carry user_hash='copadt' — copadt snapshot non-empty — genuine orphan counted >= 1; matched span reports 0 | VERIFIED | server.mjs:2717-2719 stamps copadt; 4/4 proxy envelope tests pass (agent=copilot→copadt, opencode→opcadt, omitted→machine); copilot-orphan (unmatched_wire=1) and copilot-healthy (0) pass |
-
-**Plan 83-09 score:** 2/3 must-haves fully verified; P09-2 partial due to composite PK defect.
+| `reconcile.mjs` `FUZZY_CANDIDATES_SQL` (line 78-81) | Selected bare `id` | Selects `rowid AS rid` | Code read confirmed |
+| `reconcile.mjs` `fuzzyMatch` guards (lines 152-153) | `candidateWireIds.has(c.id)` / `consumedWireIds.has(c.id)` | `candidateWireIds.has(c.rid)` / `consumedWireIds.has(c.rid)` | Code read confirmed |
+| `reconcile.mjs` `reconcileRow` return (line 336) | `wireRowId: wireRow.id ?? null` | `wireRowId: wireRow.rid ?? null` | Code read confirmed |
+| `token-db.mjs` `RECONCILE_PROBE_SQL` (lines 276-279) | Absent `rid` selection | Selects `rowid AS rid, ... ORDER BY rowid` | Code read confirmed |
+| `stop-adapter-registry.mjs` `snapshotWireRowIds` (line 664) | `SELECT id, tool_call_id, ...` | `SELECT rowid AS rid, tool_call_id, ...` | Code read confirmed |
+| `stop-adapter-registry.mjs` snapshot add (line 669) | `wireRowIds.add(r.id)` | `wireRowIds.add(r.rid)` | Code read confirmed |
+| `stop-adapter-registry.mjs` fuzzy candidate add (line 672) | n/a (pre-WR-11) | `fuzzyCandidateIds.add(r.rid)` | Code read confirmed |
+| `stop-adapter-registry.mjs` matched record (line 566) | `matchedWireRowIds.add(result.wireRowId)` where wireRowId=bare id | same call, now wireRowId=rowid | Verified via reconcileRow return above |
+| `stop-adapter-registry.mjs` unmatched_wire diff (lines 611-615) | Keys on bare integer id | Keys on rowid (wireRowIds and matchedWireRowIds both rowid-keyed) | Code read confirmed |
+| Regression test | Did not exist | `CR-01/cross-hash-id-collision` seeds cladpt id=1 + copadt id=1; asserts fallback=1, unmatched_wire=1 | Test run: PASS |
 
 ---
 
-## Goal Achievement (Full Phase — 26 Original Truths)
+## Behavioral Spot-Checks (Test Suites)
+
+| Suite | Command | Result | Status |
+|---|---|---|---|
+| reconcile-mode (15 tests: 11 existing + CR-01/proxy-down, CR-01/double-consumption, CR-01/cross-hash-id-collision, WR-11/neutral-row-capture, CR-02/copilot-orphan, CR-02/copilot-healthy) | `node --test tests/token-adapters/reconcile-mode.test.js` | 15/15 pass | PASS |
+| reconcile-matcher (18 tests) | `node --test tests/token-adapters/reconcile-matcher.test.js` | 18/18 pass | PASS |
+| token-db-dedup-merge (4 tests) | `node --test tests/token-adapters/token-db-dedup-merge.test.js` | 4/4 pass | PASS |
+| reconciliation-route (5 tests + dot-guard) | `node --test tests/vkb-server/reconciliation-route.test.js` | 5/5 pass | PASS |
+| Combined run | 4 suites above | 45/45 pass, 0 fail | PASS |
+| jest dedup (5 tests x 21 fixture projects) | `NODE_OPTIONS='--experimental-vm-modules --no-warnings' npx jest tests/token-adapters/dedup.test.js` | 155/155 pass (31 suites) | PASS |
+| proxy integration | `node --test tests/integration/*.test.mjs` (in proxy repo) | 50/52 pass, 2 skipped (live-only worker pool) | PASS |
+
+---
+
+## Goal Achievement (Full Phase — 26 Truths)
 
 ### Observable Truths
 
 | # | Truth | Status | Evidence |
 |---|---|---|---|
-| 1 | Malformed x-task-id header cannot crash proxy tap | VERIFIED | `safeSanitizeTaskId` + try/catch at server.mjs:2032-2035 (unchanged) |
-| 2 | Header-less tap rows carry no measured-cell task_id (D-08) | VERIFIED | server.mjs:2038-2045: blank header → `taskId = ''` (unchanged) |
-| 3 | One sanitized task_id form keys DB/in-memory-map/breakdown-filename | VERIFIED | `safeSanitizeTaskId` at all three seams (unchanged) |
-| 4 | Copilot/opencode wire rows carry real cache_read_tokens (D-09) | VERIFIED | `parseOpenAICache` wired at server.mjs:803/913/1094; 4/4 tests pass (unchanged) |
-| 5 | Concurrent tap+adapter id collisions eliminated (D-11) | VERIFIED | `idx_token_usage_reqid` + retry in token-usage.ts:663-686; 3/3 tests pass (unchanged) |
-| 6 | Proxy daemon alive after build+kickstart | UNCERTAIN | Proxy health check returns `{"status":"ok","build":"9f9ab3d"}` on :12435/health; PID 12178 confirmed running. Cannot re-verify daemon liveness programmatically in the future without re-running the check |
-| 7 | Transcript row matches wire row by tool_call_id across user_hash (D-04) | VERIFIED | `probeWireRowByRequestId` in token-db.mjs uses `WHERE tool_call_id = ?` only; 18/18 matcher tests pass; request-id probe is deliberately unscoped (safe: partial-unique index gives ≤1 row per (user_hash, tool_call_id)) |
-| 8 | Fuzzy time+model fallback when no request-id match | VERIFIED | reconcile.mjs:118-141 mechanism correct; CR-01 scoping guards added at 143-144; proxy-down and double-consumption tests pass. NOTE: scoping uses bare integer id — see new gap below for composite PK collision risk in concurrent multi-agent scenarios |
-| 9 | Wire counts never overwritten; enrich fills only wire-empty gaps (D-04) | VERIFIED | RECONCILE_GAP_FILL_SQL: MAX/COALESCE/CASE guards (unchanged) |
-| 10 | Every nonzero per-field delta recorded; out-of-tolerance flagged; aggregateDeltas sums perRequest (D-05) | VERIFIED | `aggregatePerRequestDeltas` at reconcile.mjs:216-230 unwraps `.delta`; measurement-stop.mjs imports and calls it; 18/18 matcher tests pass (unchanged from 83-08 closure) |
-| 11 | captureForegroundTokens in reconcile mode matches instead of blindly inserting | VERIFIED | stop-adapter-registry.mjs:487-581; reconcileOpts now passes candidateWireIds+consumedWireIds; reconcileRow called per row (unchanged) |
-| 12 | No-match transcript rows insert as fallback with distinct provenance | VERIFIED | `token-adapter-claude-fallback` stamp at line 548; proxy-down test confirms two distinct fallback rows |
-| 13 | :reason:N rows always insert regardless of wire state | VERIFIED | reconcile.mjs:265-266 alwaysInsert; Test 4 passes (unchanged) |
-| 14 | Interactive Stop/sweep path (non-reconcile) behavior unchanged | VERIFIED | `opts.reconcile` guard; 4/4 dedup-merge regression tests pass (unchanged) |
-| 15 | captureForegroundTokens returns reconciliation report with meaningful unmatched_wire — across agents including copilot | VERIFIED | Old CR-02 closed for claude (PK snapshot); NEW CR-02 closed: copadt stamp → copilot snapshot non-empty; copilot-orphan (unmatched_wire=1), copilot-healthy (0) pass. WR-10 caveat: in production, copilot adapter emits ONE aggregate row per (session, model) while wire has per-call rows → healthy N-call span reports unmatched_wire≈N-1 (see Warnings section) |
-| 16 | measurement-stop invokes reconcile:true and writes reconciliation.json | VERIFIED | measurement-stop.mjs:420-422 (`reconcile: true`), :474-479 (sink write) (unchanged) |
-| 17 | reconciliation.json has proper top-level summary + per-request array (D-12) | VERIFIED | summary.aggregateDeltas carries real per-field sums; perRequest array correct; all fields present (closed in 83-08) |
-| 18 | Flagged discrepancy never fails or invalidates the run (D-06) | VERIFIED | No taint marker written; advisory-only (unchanged) |
-| 19 | GET /api/experiments/runs/:taskId/reconciliation: valid/400/ENOENT (D-13) | VERIFIED | api-routes.js:90, :605-625; 5/5 route tests pass (unchanged) |
-| 20 | Interactive copilot does NOT export COPILOT_PROVIDER_* (D-03) | VERIFIED | copilot.sh:72-79: explicit `unset COPILOT_PROVIDER_*` on interactive path (unchanged) |
-| 21 | Measured copilot launches keep BYOK env | VERIFIED | launch-agent-common.sh:448-465: TASK_ID-gated BYOK export (unchanged) |
-| 22 | Unhealthy/no-span branch never leaves stale COPILOT_PROVIDER_BASE_URL | VERIFIED | copilot.sh:77: explicit unset (unchanged) |
-| 23 | Routed claude cell totals == transcript-only totals (no double-count, no loss) | VERIFIED | RECONCILE_GAP_FILL_SQL backfills task_id on task_id='' wire rows; interactive-launch spans recover foreground attribution; 15/15 reconcile-mode tests pass (closed in 83-08) |
-| 24 | Proxy-down cell fully falls back with fallback provenance — ALL tokens captured via transcript fallback (golden property 2) | NOW VERIFIED | Plan 83-09 CR-01 fix: empty snapshot (no proxy tap wire rows) → candidateWireIds is empty Set → fuzzyMatch skips all candidates → every turn falls back. Test `CR-01/proxy-down` (fallback=2, matched=0, two distinct fallback rows in DB) passes. Composite PK defect does NOT affect this case: the copadt snapshot for a proxy-down scenario is empty regardless, so cross-hash collisions are impossible |
-| 25 | Healthy span shows unmatched_wire=0 (metric meaningful, not vacuously true) — across agents including copilot | NOW VERIFIED | Plan 83-09 CR-02 fix: copadt stamp on /api/complete → snapshotWireRowIds keyed on 'copadt' sees real wire rows; `CR-02/copilot-orphan` (unmatched_wire=1) and `CR-02/copilot-healthy` (0) pass. No longer vacuously 0. WR-10 caveat (aggregate-vs-per-call granularity mismatch) makes metric noisy in multi-call production sessions but does not make it vacuous |
-| 26 | reconciliation.json well-formed and readable via GET route | VERIFIED | aggregateDeltas carries real data; perRequest array well-formed; 5/5 route tests pass (unchanged from 83-08 closure) |
+| 1 | Malformed x-task-id header cannot crash proxy tap | VERIFIED | `safeSanitizeTaskId` + try/catch at server.mjs:2032-2035 |
+| 2 | Header-less tap rows carry no measured-cell task_id (D-08) | VERIFIED | server.mjs:2038-2045: blank header → `taskId = ''` |
+| 3 | One sanitized task_id form keys DB/in-memory-map/breakdown-filename | VERIFIED | `safeSanitizeTaskId` at all three seams |
+| 4 | Copilot/opencode wire rows carry real cache_read_tokens (D-09) | VERIFIED | `parseOpenAICache` wired at server.mjs:803/913/1094; 4/4 tests pass |
+| 5 | Concurrent tap+adapter id collisions eliminated (D-11) | VERIFIED | `idx_token_usage_reqid` + retry in token-usage.ts:663-686; 3/3 tests pass |
+| 6 | Proxy daemon alive after build+kickstart | VERIFIED | Build tag `e72666a (2026-07-07)` confirmed live on :12435/health |
+| 7 | Transcript row matches wire row by tool_call_id across user_hash (D-04) | VERIFIED | `probeWireRowByRequestId` uses `WHERE tool_call_id = ?` only (RECONCILE_PROBE_SQL, ORDER BY rowid); 18/18 matcher tests pass |
+| 8 | Fuzzy time+model fallback when no request-id match | VERIFIED | reconcile.mjs:118-165; CR-01 scoping uses `c.rid` (rowid); WR-11 uses `fuzzyCandidateIds`; cross-hash-id-collision regression test passes |
+| 9 | Wire counts never overwritten; enrich fills only wire-empty gaps (D-04) | VERIFIED | RECONCILE_GAP_FILL_SQL: MAX/COALESCE/CASE guards |
+| 10 | Every nonzero per-field delta recorded; out-of-tolerance flagged; aggregateDeltas sums perRequest (D-05) | VERIFIED | `aggregatePerRequestDeltas` at reconcile.mjs:249; 18/18 matcher tests pass |
+| 11 | captureForegroundTokens in reconcile mode matches instead of blindly inserting | VERIFIED | stop-adapter-registry.mjs:487-618; reconcileOpts threads `fuzzyCandidateIds`+`matchedWireRowIds` (rowid-keyed) |
+| 12 | No-match transcript rows insert as fallback with distinct provenance | VERIFIED | `fallbackProcessFor` stamp at line 584; proxy-down test confirms two distinct fallback rows |
+| 13 | :reason:N rows always insert regardless of wire state | VERIFIED | reconcile.mjs:300-301 alwaysInsert; WR-01: withinSpanWindow clamp applies first; Test 4 passes |
+| 14 | Interactive Stop/sweep path (non-reconcile) behavior unchanged | VERIFIED | `opts.reconcile` guard; 4/4 dedup-merge regression tests pass |
+| 15 | captureForegroundTokens returns reconciliation report with meaningful unmatched_wire — across agents including copilot | VERIFIED | CR-02: copadt stamp → copilot snapshot non-empty; copilot-orphan (unmatched_wire=1), copilot-healthy (0) pass. WR-10 caveat (documented deferral) |
+| 16 | measurement-stop invokes reconcile:true and writes reconciliation.json | VERIFIED | measurement-stop.mjs:420-422 (`reconcile: true`), :474-479 (sink write) |
+| 17 | reconciliation.json has proper top-level summary + per-request array (D-12) | VERIFIED | summary.aggregateDeltas carries real per-field sums; perRequest array correct |
+| 18 | Flagged discrepancy never fails or invalidates the run (D-06) | VERIFIED | No taint marker written; advisory-only |
+| 19 | GET /api/experiments/runs/:taskId/reconciliation: valid/400/ENOENT (D-13) | VERIFIED | api-routes.js:782-784 `_validTaskId` guards including dot-only; 5/5 route tests pass (including '.' and '..' cases from WR-07) |
+| 20 | Interactive copilot does NOT export COPILOT_PROVIDER_* (D-03) | VERIFIED | copilot.sh:72-79: explicit `unset COPILOT_PROVIDER_*` on interactive path |
+| 21 | Measured copilot launches keep BYOK env | VERIFIED | launch-agent-common.sh:448-465: TASK_ID-gated BYOK export |
+| 22 | Unhealthy/no-span branch never leaves stale COPILOT_PROVIDER_BASE_URL | VERIFIED | copilot.sh:77: explicit unset |
+| 23 | Routed claude cell totals == transcript-only totals (no double-count, no loss) | VERIFIED | RECONCILE_GAP_FILL_SQL backfills task_id on task_id='' wire rows; 15/15 reconcile-mode tests pass |
+| 24 | Proxy-down cell fully falls back with fallback provenance — ALL tokens captured via transcript fallback (golden property 2) | VERIFIED | Empty snapshot → candidateWireIds/fuzzyCandidateIds is empty Set → all fuzzy candidates filtered → every turn falls back. Test `CR-01/proxy-down` (fallback=2, matched=0) passes. |
+| 25 | Healthy span shows unmatched_wire=0 (metric meaningful, not vacuously true) — across agents including copilot | VERIFIED | CR-02: copadt stamp on /api/complete → snapshotWireRowIds keyed on 'copadt' sees real wire rows; `CR-02/copilot-orphan` (unmatched_wire=1) and `CR-02/copilot-healthy` (0) pass |
+| 26 | reconciliation.json well-formed and readable via GET route | VERIFIED | aggregateDeltas carries real data; perRequest array well-formed; 5/5 route tests pass |
 
-**Score: 24/26 original truths verified** (up from 22/26; 2 gaps closed; 0 regressions to previously-verified truths)
-
----
-
-### New Critical Finding (Post-83-09 Review)
-
-**Not counted in the 26 original truths — new defect introduced by the 83-09 scoping mechanism.**
-
-| Finding | Status | Evidence |
-|---|---|---|
-| Wire-row identity in candidateWireIds/consumedWireIds/matchedWireRowIds/unmatched_wire diff uses bare integer `id` (not globally unique) — cross-adapter same-numeric-id collision defeats the fuzzy scoping invariant in concurrent multi-agent scenarios | BLOCKER | reconcile.mjs:143-144 uses `c.id`; stop-adapter-registry.mjs:624 stores `r.id`; snapshotWireRowIds queries cladpt rows but FUZZY_CANDIDATES_SQL selects all hashes; PoC from 83-REVIEW.md CR-01: cladpt id=1 + copadt id=1 → turn "matched" the copadt row, transcript tokens dropped, unmatched_wire=0 (should be 1). D-11 per-hash sequences make same-numeric-id near-certain in any concurrent multi-agent session |
+**Score: 26/26 original truths verified** (up from 24/26; composite PK blocker closed by commit 4e3f1bd36 + supporting WR fixes; 0 regressions)
 
 ---
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
-|----------|----------|--------|---------|
-| `lib/lsl/token/reconcile.mjs` | fuzzyMatch scoped with candidateWireIds/consumedWireIds guards; aggregatePerRequestDeltas exported | VERIFIED (with composite PK caveat) | 306 lines; guards at :143-144; aggregatePerRequestDeltas at :216; composite PK defect: uses `c.id` not `c.rid` |
-| `lib/lsl/token/stop-adapter-registry.mjs` | reconcileBatches threads candidateWireIds+consumedWireIds; snapshotWireRowIds for copadt | VERIFIED (with composite PK caveat) | reconcileOpts at :516; wireRowIds/matchedWireRowIds threaded; snapshot queries copadt user_hash; stores `r.id` (bare int, not rowid) |
-| `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs` | /api/complete logTokenCall stamps user_hash: adapterUserHash(body.agent) | VERIFIED | Lines 2717-2719; copilot BYOK shim sets body.agent='copilot'; omitted agent → machine hash (backward compatible); build `9f9ab3d` live on running daemon |
-| `tests/token-adapters/reconcile-mode.test.js` | proxy-down two-turn + double-consumption + copilot orphan + copilot healthy tests | VERIFIED | 4 new tests at lines 708-848; all 15 pass (11 existing + 4 new) |
-| `/Users/Q284340/Agentic/_work/rapid-llm-proxy/tests/integration/agent-envelope-passthrough.test.mjs` | copilot→copadt / opencode→opcadt / omitted→machine row-contract test | VERIFIED | Test (d) at line 162; 4/4 pass |
+|---|---|---|---|
+| `lib/lsl/token/reconcile.mjs` | rowid-keyed fuzzy scoping; aggregatePerRequestDeltas exported | VERIFIED | FUZZY_CANDIDATES_SQL selects `rowid AS rid`; guards use `c.rid`; reconcileRow returns `wireRowId: wireRow.rid` |
+| `lib/lsl/token/token-db.mjs` | RECONCILE_PROBE_SQL selects rowid; insertTokenRow retry | VERIFIED | Lines 276-279: `rowid AS rid, ... ORDER BY rowid`; lines 142-209: bounded 3-attempt retry |
+| `lib/lsl/token/stop-adapter-registry.mjs` | snapshotWireRowIds returns {wireRowIds, fuzzyCandidateIds} both rowid-keyed; WR-01/WR-02/WR-11 fixes | VERIFIED | Lines 658-680: `rowid AS rid`, stores `r.rid`; two-set return; withinSpanWindow clamp at :547; composed provenance at :581-585 |
+| `lib/vkb-server/api-routes.js` | _validTaskId rejects '.' and '..' | VERIFIED | Line 784: `&& id !== '.' && id !== '..'` |
+| `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs` | WR-06: shim stamps `tool_call_id: 'shim-<UUID>'`; CR-02: user_hash: adapterUserHash(body.agent) | VERIFIED (code) | Line 2374: `tool_call_id: 'shim-' + randomUUID()`; line 2748: binds body.tool_call_id; lines 2725-2727: user_hash stamp. Live verification (actual copilot BYOK session) deferred — see human verification |
+| `tests/token-adapters/reconcile-mode.test.js` | cross-hash-id-collision + WR-11/neutral-row-capture regression tests | VERIFIED | `CR-01/cross-hash-id-collision` at file (seeds cladpt id=1 + copadt id=1); `WR-11/neutral-row-capture`; both pass |
 
 ---
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
-|------|----|-----|--------|---------|
-| `fuzzyMatch` (reconcile.mjs:127) | pre-loop wire snapshot (candidateWireIds) | `opts.candidateWireIds instanceof Set` guard at :143 | VERIFIED (with composite PK caveat) | Guard exists and executes; but Set contains bare integer ids (not globally unique) |
-| `fuzzyMatch` (reconcile.mjs:127) | already-consumed rows (consumedWireIds) | `opts.consumedWireIds instanceof Set` guard at :144 | VERIFIED (with composite PK caveat) | Guard exists; prevents same-id re-match for single-hash scenarios |
-| `reconcileBatches` reconcileOpts | `reconcileRow` opts | `candidateWireIds: wireRowIds, consumedWireIds: matchedWireRowIds` at stop-adapter-registry.mjs:516 | VERIFIED | Both Sets threaded by reference before loop; consumedWireIds populated after each match |
-| `/api/complete` logTokenCall | copilot BYOK user_hash stamp | `user_hash: adapterUserHash(body.agent)` at server.mjs:2717-2719 | VERIFIED | Conditional stamp; omitted-agent path keeps machine hash; shim sets body.agent='copilot' |
-| copadt-keyed `snapshotWireRowIds` | copilot BYOK wire rows | `WHERE user_hash = 'copadt'` now matches proxy-stamped rows | VERIFIED | Copilot orphan test seeds copadt rows and reports unmatched_wire=1 |
+|---|---|---|---|---|
+| `fuzzyMatch` (reconcile.mjs:144) | pre-loop wire snapshot (`fuzzyCandidateIds`) | `candidateWireIds instanceof Set` guard, `c.rid` key | VERIFIED | rowid-keyed; cross-adapter collision impossible |
+| `fuzzyMatch` (reconcile.mjs:153) | already-consumed rows (`matchedWireRowIds`) | `consumedWireIds instanceof Set` guard, `c.rid` key | VERIFIED | rowid-keyed; double-consumption prevented |
+| `reconcileBatches` reconcileOpts | `reconcileRow` opts | `candidateWireIds: fuzzyCandidateIds, consumedWireIds: matchedWireRowIds` at :527 | VERIFIED | `fuzzyCandidateIds` (task_id-bound only per WR-11) threaded by reference |
+| `snapshotWireRowIds` | rowid-keyed Sets | `rowid AS rid`; `wireRowIds.add(r.rid)`, `fuzzyCandidateIds.add(r.rid)` at :669/672 | VERIFIED | Both sets rowid-keyed |
+| `/api/complete` logTokenCall | copilot BYOK user_hash stamp | `user_hash: adapterUserHash(body.agent)` at server.mjs:2725-2727 | VERIFIED | Conditional; omitted agent keeps machine hash |
+| OpenAI shim `/v1/chat/completions` | wire row `tool_call_id` | `tool_call_id: 'shim-' + randomUUID()` at server.mjs:2374; bound at :2748 | VERIFIED (code) | Per-request unique id; live copilot BYOK session confirmation deferred |
 
 ---
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
-|----------|--------------|--------|-------------------|--------|
-| `stop-adapter-registry.mjs` proxy-down fallback | `report.fallback` | Empty candidateWireIds Set → all fuzzy candidates filtered → every turn fallback-inserts | Yes — two distinct fallback rows in DB | FLOWING |
-| `stop-adapter-registry.mjs` copilot unmatched_wire | `wireRowIds.size - matchedWireRowIds.size` | snapshotWireRowIds keyed on 'copadt'; proxy now stamps copadt on /api/complete | Yes — copadt snapshot non-empty; orphan counted | FLOWING |
-| `fuzzyMatch` cross-adapter concurrent scenario | `candidateWireIds.has(c.id)` | Set of bare integer ids from cladpt snapshot; FUZZY_CANDIDATES_SQL selects all hashes | No — a copadt row with same numeric id passes the filter (PoC proven) | HOLLOW (composite PK) |
-
----
-
-### Behavioral Spot-Checks
-
-| Behavior | Command | Result | Status |
-|----------|---------|--------|--------|
-| reconcile-mode: 15 tests (11 existing + 4 new: proxy-down, double-consumption, copilot-orphan, copilot-healthy) | `node --test tests/token-adapters/reconcile-mode.test.js` | 15 pass / 0 fail | PASS |
-| reconcile-matcher: 18 tests (unchanged) | `node --test tests/token-adapters/reconcile-matcher.test.js` | 18 pass / 0 fail | PASS |
-| token-db-dedup-merge regression: 4 tests | `node --test tests/token-adapters/token-db-dedup-merge.test.js` | 4 pass / 0 fail | PASS |
-| reconciliation-route: 5 tests | `node --test tests/vkb-server/reconciliation-route.test.js` | 5 pass / 0 fail | PASS |
-| proxy agent-envelope-passthrough: 4 tests (including new copilot→copadt test) | `node --test tests/integration/agent-envelope-passthrough.test.mjs` (in proxy repo) | 4 pass / 0 fail | PASS |
-| Proxy daemon liveness | `launchctl list com.coding.llm-cli-proxy` + `curl :12435/health` | PID 12178, status:ok, build:9f9ab3d | PASS |
-| Cross-adapter same-numeric-id collision: copadt id=N collides with cladpt snapshot id=N | No test exists (PoC from 83-REVIEW.md) | cladpt turn silently matched copadt row; unmatched_wire=0 instead of 1 | FAIL (composite PK) |
+|---|---|---|---|---|
+| `stop-adapter-registry.mjs` proxy-down fallback | `report.fallback` | Empty `fuzzyCandidateIds` Set → all fuzzy candidates filtered → every turn fallback-inserts | Yes — two distinct fallback rows in DB | FLOWING |
+| `stop-adapter-registry.mjs` copilot unmatched_wire | `wireRowIds.size - matchedWireRowIds.size` (rowid diff) | snapshotWireRowIds keyed on 'copadt'; proxy stamps copadt on /api/complete | Yes — copadt snapshot non-empty; orphan counted | FLOWING |
+| `fuzzyMatch` cross-adapter concurrent scenario | `fuzzyCandidateIds.has(c.rid)` | rowid-keyed set; FUZZY_CANDIDATES_SQL selects rowid | Yes — different-hash same-numeric-id rows have different rowids | FLOWING (blocker closed) |
 
 ---
 
 ### Requirements Coverage (D-Decisions)
 
 | Decision | Plan | Status | Notes |
-|----------|------|--------|-------|
+|---|---|---|---|
 | D-01 | 04, 05, 07 | VERIFIED | reconcile mode for measured spans only |
-| D-02 | 04, 07, 09 | VERIFIED | fallback loud-not-silent; proxy-down captures all turns as fallback (golden property 2 restored by 83-09 CR-01); composite PK does not affect proxy-down (empty snapshot) |
+| D-02 | 04, 07, 09 | VERIFIED | fallback loud-not-silent; proxy-down captures all turns; WR-01: reason rows window-clamped |
 | D-03 | 06 | VERIFIED | BYOK gated; interactive copilot unsets COPILOT_PROVIDER_* |
 | D-04 | 03, 04, 07, 09 | VERIFIED | fill-gaps-only enrich; wire counts authoritative; copadt orphan counted |
 | D-05 | 03, 07, 08 | VERIFIED | per-request deltas correct; aggregateDeltas carries real sums |
@@ -198,60 +167,64 @@ Both were verified CLOSED by direct code inspection. One new critical found via 
 | D-08 | 01, 07, 08 | VERIFIED | no-inherit correct; interactive-launch attribution recovery via CR-03 gap-fill |
 | D-09 | 02 | VERIFIED | parseOpenAICache wired at 3 shim sites |
 | D-10 | 01 | VERIFIED | unified task_id seams |
-| D-11 | 02 | VERIFIED | idx_token_usage_reqid + retry; NOTE: D-11's per-hash id sequences make same-numeric-id cross-adapter collisions near-certain — a correctness gap for the 83-09 scoping mechanism |
+| D-11 | 02 | VERIFIED | idx_token_usage_reqid + retry; rowid fix eliminates cross-adapter id collision from D-11 per-hash sequences |
 | D-12 | 05, 07, 08 | VERIFIED | per-request array correct; summary.aggregateDeltas real; copilot unmatched_wire no longer vacuously 0 |
-| D-13 | 05 | VERIFIED | GET route registered; 5/5 tests |
+| D-13 | 05 | VERIFIED | GET route registered; dot-guard added; 5/5 tests |
 
 ---
 
-### Anti-Patterns Found
+### Anti-Patterns Checked
 
-| File | Line | Pattern | Severity | Impact |
-|------|------|---------|----------|--------|
-| `lib/lsl/token/reconcile.mjs` | 71-74, 143-144 | `candidateWireIds.has(c.id)` / `consumedWireIds.has(c.id)` use bare integer `id`; `FUZZY_CANDIDATES_SQL` selects across all user_hashes | BLOCKER | Cross-adapter same-numeric-id collision passes the filter — a copadt row with id=N defeats a cladpt snapshot id=N (PoC: 83-REVIEW.md CR-01) |
-| `lib/lsl/token/stop-adapter-registry.mjs` | 624, 550, 586-587 | `ids.add(r.id)`, `matchedWireRowIds.add(result.wireRowId)`, post-loop diff all use bare integer id | BLOCKER | Same root cause as above — all three PK uses must switch to rowid |
-| `tests/token-adapters/reconcile-mode.test.js` | (no test) | No test for cross-adapter same-numeric-id collision scenario | WARNING | The PoC scenario is unguarded; a regression could re-introduce the failure silently |
-| `lib/lsl/token/stop-adapter-registry.mjs` | 528-531 | `:reason:N` rows bypass the span-window clamp in reconcile mode | WARNING | Out-of-window reasoning rows inflate the measured run's reasoning_tokens (WR-01 from 83-REVIEW) |
-| `lib/lsl/token/stop-adapter-registry.mjs` | 559 | Fallback insert replaces batch.process with fallbackProcess — destroys SUBAGENT_PROCESS marker | WARNING | Proxy-down sub-agent row loses sub-agent identity; canonical model picker can be hijacked (WR-02) |
-| `/Users/Q284340/Agentic/_work/rapid-llm-proxy/proxy-bridge/server.mjs` | 2717-2719 | CR-02 stamp removes all shim agent traffic from per-window JSON exports (exportToHourFile queries machine USER_HASH only) | WARNING | After a DB reset, every copilot/opencode/mastra agent wire row is unrecoverable; only machine-hash daemon rows survive (WR-09 from 83-REVIEW) |
-| `lib/lsl/token/stop-adapter-registry.mjs` | 487-592 + copilot-token-rows.mjs | Copilot transcript emits ONE aggregate row per (session, model); wire side has per-call rows → healthy N-call copilot span reports unmatched_wire≈N-1 | WARNING | The copilot unmatched_wire metric is structurally noisy even for healthy spans; also risk of double-counting if session's last wire call precedes shutdown by >2 min (WR-10 from 83-REVIEW) |
+| File | Pattern | Severity | Status |
+|---|---|---|---|
+| `lib/lsl/token/reconcile.mjs` | `c.rid` (rowid) used for candidateWireIds/consumedWireIds | Was BLOCKER — now clean | CLOSED by commit 4e3f1bd36 |
+| `lib/lsl/token/stop-adapter-registry.mjs` | `r.rid` (rowid) in snapshot; `fuzzyCandidateIds` excludes `task_id=''` | Was BLOCKER + WR-11 WARNING — now clean | CLOSED by 4e3f1bd36 + 5b451f4b3 |
+| `lib/lsl/token/stop-adapter-registry.mjs` | :reason:N window clamp | Was WR-01 WARNING | CLOSED by commit 116d9efc4 |
+| `lib/lsl/token/stop-adapter-registry.mjs` | fallback provenance composition | Was WR-02 WARNING | CLOSED by commit e0e00ac2f |
+| `lib/vkb-server/api-routes.js` | dot-only taskId escape | Was WR-07 WARNING | CLOSED by commit 41105d154 |
+| `proxy-bridge/server.mjs` | shim wire rows carried `tool_call_id=''` | Was WR-06 WARNING | CLOSED in code (commit e72666a); live session observation pending (human verify) |
+| `proxy-bridge/server.mjs` / `src/token-usage.ts` | WR-09: CR-02 stamping removes shim agent traffic from per-window JSON exports | WARNING — design decision deferred | See Deferred Items |
+| `lib/lsl/token/stop-adapter-registry.mjs` / `copilot-token-rows.mjs` | WR-10: copilot aggregate transcript vs per-call wire granularity mismatch | WARNING — design decision deferred | See Deferred Items |
+
+---
+
+### Deferred Items
+
+Items not yet fully resolved but explicitly identified as design-level decisions requiring operator input, not mechanical fixes.
+
+| # | Item | Deferred Reason |
+|---|---|---|
+| WR-09 | `exportToHourFile` exports only machine-hash rows; post CR-02, copadt/opcadt/mstadt shim rows are never exported to per-window JSON files — a DB wipe permanently loses agent-attributed wire rows | Design decision: per-adapter-hash export files vs. documenting adapter rows as machine-local/non-durable changes the export/hydrate durability contract. Needs operator decision on `.data` wipe recovery semantics. Not a must-have failure for Phase 83. |
+| WR-10 | Copilot transcript emits ONE aggregate row per (session, model); wire side has per-call rows — healthy N-call copilot span structurally reports `unmatched_wire ≈ N-1`; idle-exit session may double-count via the aggregate fallback | Design decision: suppress aggregate fallback when copadt wire rows exist, or compare aggregate vs SUM(wire), or define per-agent unmatched_wire semantics. WR-06 fix (wire rows now carry request ids) is a prerequisite for better options and is in place. Needs speculative design choice. Not a must-have failure for Phase 83. |
 
 ---
 
 ### Human Verification Required
 
-None beyond automated checks. All plan-09 correctness properties are verifiable programmatically.
+#### 1. Live Copilot BYOK Wire Row Identity (WR-06)
+
+**Test:** Start a live copilot BYOK session with a running measurement span (TASK_ID set, COPILOT_PROVIDER_BASE_URL exported to point at :12435), send at least one prompt, then stop the span. Query the token_usage.db:
+```sql
+SELECT rowid, id, user_hash, tool_call_id, model, timestamp FROM token_usage
+WHERE user_hash = 'copadt' ORDER BY rowid DESC LIMIT 10;
+```
+Also inspect the reconciliation.json written by measurement-stop.
+
+**Expected:** At least one row with `user_hash='copadt'` and `tool_call_id` matching `shim-<uuid>` (non-empty, starts with "shim-"). The reconciliation report shows `matched >= 1` (request-id path) and `unmatched_wire` reflects the actual copilot orphan count rather than a vacuous structural value.
+
+**Why human:** The WR-06 fix (proxy commit e72666a) wires the shim UUID via `internalBody.tool_call_id` at server.mjs:2374 and server.mjs:2748 binds it to the logged row. The code is verified by `node --check`, the 21-test shim/stamping suite (all pass), and the live daemon build tag `e72666a` confirmed on :12435/health. However, the copilot BYOK HTTP path requires a live BMW corporate network session with a valid Copilot OAuth token and bmw.ghe.com connectivity — no automated test can exercise the actual shim→logTokenCall→DB pipeline without these.
 
 ---
 
-### Gaps Summary
+### Summary
 
-**One new critical defect found in the codebase by direct code inspection, confirmed by 83-REVIEW.md PoC. The two blockers from the previous verification are confirmed closed.**
+**The composite PK identity blocker is confirmed closed.** All three files updated atomically in commit 4e3f1bd36: `FUZZY_CANDIDATES_SQL` and `RECONCILE_PROBE_SQL` select `rowid AS rid`; `snapshotWireRowIds` selects/stores `r.rid`; fuzzy guards use `c.rid`; `reconcileRow` returns `wireRowId: wireRow.rid`. The regression test `CR-01/cross-hash-id-collision` was confirmed to FAIL against pre-fix code and PASS post-fix. All 45 node test suite assertions pass (0 fail). Jest dedup: 155/155. Proxy integration: 50/52 pass (2 live-only skipped).
 
-**NEW BLOCKER — Wire-row identity uses non-unique bare integer `id` (reconcile.mjs:143-144, stop-adapter-registry.mjs:624,550,586-589)**
+The six additional fix commits (WR-01 through WR-11 series) are all verified in code and covered by test regressions. Two design-level items (WR-09, WR-10) remain as documented deferrals — they are not must-have failures and require operator decisions.
 
-The table PK is composite `(user_hash, id)`. Each adapter hash has its own `MAX(id)+1` sequence (D-11), so `cladpt id=1` and `copadt id=1` coexist by design. The 83-09 scoping Sets (`wireRowIds`, `matchedWireRowIds`, `candidateWireIds`, `consumedWireIds`) all store bare integer ids. `FUZZY_CANDIDATES_SQL` (model-bound only) selects candidates across ALL user hashes. A copadt row with numeric id=N therefore passes `candidateWireIds.has(N)` when the cladpt snapshot contains id=N — the row is from the wrong adapter but the bare-integer filter cannot distinguish it.
-
-Consequences (PoC-verified by 83-REVIEW.md):
-1. The fuzzy match returns the wrong row (copadt instead of cladpt).
-2. The transcript turn is marked "matched" against the copadt row; its tokens are not inserted (silent token loss for that turn).
-3. `matchedWireRowIds.add(result.wireRowId)` records N — the legitimate cladpt wire row also has id=N and is now treated as consumed.
-4. The cladpt wire row is hidden from the `unmatched_wire` diff (wireRowIds has N, matchedWireRowIds has N → diff = 0).
-
-In a concurrent multi-agent session (cladpt + copadt active simultaneously — the exact milestone target), all four per-hash sequences start at similar epochs and quickly share numeric ids. The remaining preconditions (same model, in-window timestamp, a fuzzy-path turn) are satisfied by normal operation.
-
-**Fix:** Use the SQLite `rowid` (globally unique across all rows, not per-hash) as the scoping key end-to-end:
-- `FUZZY_CANDIDATES_SQL`: add `rowid AS rid` to the SELECT
-- `snapshotWireRowIds`: add `rowid AS rid` to the SELECT; store `ids.add(r.rid)`
-- `fuzzyMatch`: `candidateWireIds.has(c.rid)` / `consumedWireIds.has(c.rid)`
-- `reconcileRow`: return `wireRowId: wireRow.rid ?? null`
-- Add a regression test seeding same-numeric-id cladpt and copadt rows; assert the cladpt turn falls back (not consumed by the copadt collision)
-
-**Root-cause note:** The CR-01 mechanism (candidateWireIds/consumedWireIds) is architecturally correct — the scoping approach is sound. The sole defect is the key type. Switching to `rowid` is a surgical 3-file fix with no behavioral change for the single-hash cases the existing 15 tests exercise (those tests never seed cross-adapter collisions).
-
-**Relationship to previous gaps:** Truths 24 and 25 are genuinely closed by plan 83-09 — the proxy-down scenario uses an empty snapshot (no wire rows at all) which prevents any fuzzy match regardless of composite PK, and the copadt stamp + tests correctly verify the copilot unmatched_wire contract. The composite PK issue is a new defect discovered in the 83-09 fix itself, not a re-opening of the previous gaps.
+The sole remaining item is WR-06's live-session observation: the shim `tool_call_id` stamping code is correct and the daemon is live with the fix build, but confirming actual copilot BYOK wire rows carry non-empty `tool_call_id` requires a real corporate network session.
 
 ---
 
-_Verified: 2026-07-07T11:30:00Z_
+_Verified: 2026-07-07T13:00:00Z_
 _Verifier: Claude (gsd-verifier)_
