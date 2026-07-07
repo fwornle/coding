@@ -4,13 +4,13 @@ milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Phase 84 context gathered
-last_updated: "2026-07-07T16:01:35.729Z"
+last_updated: "2026-07-07T16:21:07.193Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 21
   completed_phases: 13
   total_plans: 84
-  completed_plans: 75
+  completed_plans: 76
   percent: 62
 ---
 
@@ -54,8 +54,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 84 (per-turn-context-revelation) — EXECUTING
-Plan: 2 of 9
-Status: Ready to execute
+Plan: 3 of 9
+Status: 84-02 complete (redaction config-load rewire); ready for next wave-1 plan
 Last activity: 2026-07-07
 
 ## Deferred Items
@@ -289,6 +289,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [76-01]: experiments-recompute-route.mjs canonical model selection now mirrors measurement-stop (persisted canonical_model -> foreground-not-subagent group -> null, NEVER byAgentModel[0]); canonical fields threaded via the tags object writeRun reads (not totals), closing the D-03 residual read-path so a re-close cannot regress a measured Opus run to the dominant haiku daemon.
 - [Phase ?]: [76-03]: VALID-03 non-GSD rubric coverage (D-08..D-11) — evidence-harness derives code_quality from git diff --stat (bounded churn/file heuristic) and test_coverage/regressions from a fail-soft FIXED-ARGV spawnSync run of the task test command (resolveTestCommand: metadata test_command first, shell-meta rejected to null, else package.json test); null ONLY when no diff AND no runnable test, never a guessed 0. deriveNonGsdRubric overlaid gap-fill before writeScore in BOTH measurement-stop.mjs + experiments-recompute-score.mjs — harness-computed, NOT the LLM (D-08). TDD RED fa9c4df4e/GREEN 9692e3d4d; overlay 9437865cd; 21/21 green.
 - [Phase ?]: [84-01]: Wave-0 test scaffold — node:test + node:assert/strict house style for the context-turns suite; each behavior gets a skipped stub whose skip reason names the downstream plan (84-0X) that un-skips it. Node 25.8.1 broke bare-directory 'node --test <dir>' (resolves dir as module); portable verify is the shell-glob form. Fixtures mirror VERIFIED observation export keys with ZERO task_id, incl one out-of-window record for the correlation filter.
+- [Phase 84-02]: Redaction applier renamed .js -> .cjs (root type:module forces .js to ESM on Node 25, erasing CommonJS module.exports). loadRedactionPatterns loads the 27-pattern config; redact() applies it BEFORE the hardcoded PII net (additive), preserving {content,redactionCount,securityLevel} + fail-closed catch. Exported for Plan 06 proxy-side reuse. — Commits c3c0bac5f (feat) / 5b8d14761 (test)
 
 ### Blockers/Concerns
 
@@ -389,10 +390,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 76 P01 | 8min | 1 tasks | 1 files |
 | Phase 76 P03 | 20min | 2 tasks | 4 files |
 | Phase 84 P01 | 12min | 2 tasks | 13 files |
+| Phase 84 P02 | 20 | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-07-07T16:01:19.967Z
+Last session: 2026-07-07T16:20:19.240Z
 Stopped at: Phase 84 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
