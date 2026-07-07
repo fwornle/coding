@@ -236,3 +236,70 @@ test('insertTokenRow returns false and does NOT throw on a closed/locked db', ()
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// WR-05 (Phase 83 re-review): the MAX(id)+1 → INSERT pair is not atomic; a
+// concurrent writer in the SAME adapter hash space (the proxy tap stamps
+// cladpt/copadt post-83-09) can win the id between the SELECT and the INSERT.
+// insertTokenRow must recompute-and-retry on the composite-PK constraint
+// instead of silently dropping the row. Simulated deterministically by feeding
+// ONE stale id seed through a prepare() shim.
+test('insertTokenRow retries with a recomputed id on a composite-PK collision (WR-05)', () => {
+  const { dir, dbPath } = makeTempDb();
+  const db = openTokenDb(dbPath);
+  try {
+    // Existing row occupies (cladpt, id=1).
+    expect(insertTokenRow(db, claudeRow({ tool_call_id: 'req-first' }))).toBe(true);
+
+    // Shim: the NEXT id seed is served STALE exactly once (next=1 → collides),
+    // then the real statement takes over for the retry's recompute.
+    const realPrepare = db.prepare.bind(db);
+    let staleServed = false;
+    db.prepare = (sql) => {
+      if (!staleServed && typeof sql === 'string' && sql.includes('COALESCE(MAX(id), 0) + 1')) {
+        staleServed = true;
+        return { get: () => ({ next: 1 }) }; // the lost race
+      }
+      return realPrepare(sql);
+    };
+
+    const ok = insertTokenRow(db, claudeRow({ tool_call_id: 'req-second' }));
+    expect(staleServed).toBe(true);
+    expect(ok).toBe(true); // NOT silently dropped
+
+    db.prepare = realPrepare;
+    const rows = db
+      .prepare('SELECT id, tool_call_id FROM token_usage WHERE user_hash = ? ORDER BY id')
+      .all(ADAPTER_USER_HASH_CLAUDE);
+    expect(rows.length).toBe(2);
+    expect(rows.map((r) => r.id)).toEqual([1, 2]); // retry recomputed MAX(id)+1
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// WR-05 disambiguation: a constraint error that IS a (user_hash, tool_call_id)
+// duplicate (partial-unique index) must NOT retry — it is a genuine dedup hit
+// and the row is dropped (return false), never double-inserted.
+test('insertTokenRow drops (no retry) on a genuine (user_hash, tool_call_id) duplicate (WR-05)', () => {
+  const { dir, dbPath } = makeTempDb();
+  const seed = new Database(dbPath);
+  seed.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_token_usage_hash_toolcall ON token_usage (user_hash, tool_call_id) WHERE tool_call_id != ''",
+  );
+  seed.close();
+  const db = openTokenDb(dbPath);
+  try {
+    expect(insertTokenRow(db, claudeRow({ tool_call_id: 'req-dup' }))).toBe(true);
+    // Same request-id → the partial-unique index fires; probe-disambiguation
+    // classifies it a dedup hit → false, exactly ONE row remains.
+    expect(insertTokenRow(db, claudeRow({ tool_call_id: 'req-dup' }))).toBe(false);
+    const n = db
+      .prepare("SELECT COUNT(*) AS n FROM token_usage WHERE tool_call_id = 'req-dup'")
+      .get().n;
+    expect(n).toBe(1);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
