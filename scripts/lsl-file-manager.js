@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
-const EnhancedRedactionSystem = require('./enhanced-redaction-system');
+const EnhancedRedactionSystem = require('./enhanced-redaction-system.cjs');
 
 class LSLFileManager {
     constructor(options = {}) {
