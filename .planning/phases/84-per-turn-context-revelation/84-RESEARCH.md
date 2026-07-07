@@ -452,19 +452,22 @@ function loadRedactionPatterns(configPath) {
 | A5 | Retention config lives in `.planning/config.json` under a new key (D-02 says "or an env var") | D-02 | Low — Claude's Discretion; env var (`CONTEXT_TURNS_RETENTION_DAYS`) is the simplest for the bash sweeper |
 | A6 | `/api/complete` write site should use `body.messages`/`body.tools` (internalBody) since `oaBody` is out of scope there | A | Low — verified internalBody carries messages+tools; alternatively stash `req._ctxSnapshot` in the shim block |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where exactly does the observation correlation run — span close vs read time?**
    - What we know: obs have no task_id, joined by time+agent (fetchRunNarrative pattern); CONTEXT says "queried at span close."
    - What's unclear: whether close-time obs-api reachability is reliable (obs-api can be mid-restart on SIGTERM per MEMORY). Read-time correlation in the vkb pass-through is a robust fallback.
    - Recommendation: implement close-time enrichment best-effort; if `observation_ref` is null at read time, the vkb route MAY re-attempt correlation. Either way the preview never fails.
+   - **RESOLVED:** Close-time enrichment, best-effort, in `measurement-stop.mjs` (Plan 05 Task 2); on obs-api unreachable or no match, leave `observation_ref: null` — the ≤120-char preview from Plan 04 always stands. Proxy hot path never correlates.
 
 2. **Should the proxy compute cache-breakpoint message indices, or derive from `analyzeAnthropicRequest`?**
    - What we know: `analyzeAnthropicRequest` already detects `cache_control` per block and counts `cache_breakpoints` (server.mjs:1674,1748) but returns a COUNT, not indices.
    - Recommendation: extend the analyzer (or a small sibling) to also emit the message indices carrying `cache_control` — a few lines, same traversal. OpenAI-wire has no cache_control → indices `[]`.
+   - **RESOLVED:** Extend `analyzeAnthropicRequest` to emit `cache_breakpoint_indices` (message indices carrying `cache_control`), reusing the existing traversal (Plan 04 Task 1); OpenAI-wire → `[]`. Category taxonomy stays the existing one — no divergence.
 
 3. **Retention units — per-file age or per-span-dir age?**
    - Recommendation: per-file mtime (matches the sweeper's `file_mtime` helper); delete `context-turns.jsonl(.gz)` and `raw-bodies.jsonl.gz` older than N days independently, so a raw-body file can be dropped while a digest survives (D-05 intent).
+   - **RESOLVED:** Per-file mtime (Plan 03); `context-turns.jsonl(.gz)` and `raw-bodies.jsonl.gz` are aged and deleted independently, so a raw-body file can be dropped while its digest survives (honors D-05 independent-retention intent).
 
 ## Environment Availability
 
