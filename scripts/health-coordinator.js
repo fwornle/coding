@@ -503,6 +503,16 @@ const PROXY_KICKSTART_MAX = 3;                    // D-06: 3 kickstarts then coo
 // fire at all during active sessions.
 const PROXY_STRONG_PROBE_INTERVAL_MS = 5 * 60_000;       // every 5 min
 const PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000; // real obs within 5 min counts as proof
+// Cheap-probe real-traffic gate (2026-07-07): same principle as the strong
+// probe's skip — ANY successful real LLM call through the proxy within this
+// window proves /api/complete liveness better than a synthetic say-OK, at
+// zero marginal cost. This is what stops the synthetic ping bursts during
+// AFK windows where only background pipeline work (consolidators,
+// observation-writer) is running: that work IS the liveness proof. A dead
+// proxy is still detected within one gate cycle because the token-usage
+// read below hits the proxy itself and fails fast when it is down, falling
+// through to the synthetic probe.
+const PROXY_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000;
 
 // Idle-aware probe cadence: when no ETM heartbeat is fresh across any
 // project/pane, the user is AFK and there is no one watching the
@@ -826,6 +836,11 @@ async function pollProxySemantic() {
   try {
     const probeEndedAt = () => new Date().toISOString();
     const start = Date.now();
+    // Re-entry guard (2026-07-07): stamp last_probe_end up-front so an
+    // overlapping tick sees a fresh attempt and does not stack a concurrent
+    // say-OK (observed as duplicate same-second probe rows in the token
+    // export). Every outcome path below overwrites it with the real end time.
+    currentState.proxy.last_probe_end = probeEndedAt();
     const probeBody = {
       process: 'health-coordinator',
       messages: [{ role: 'user', content: 'say OK' }],
@@ -963,6 +978,35 @@ async function fetchLastObservationWriterCallAge() {
     // "proxy says no observation-writer calls".
     throw err;
   }
+}
+
+/**
+ * Query the LLM proxy for the most recent real (non-probe) LLM call from ANY
+ * process — the cheap-probe counterpart of fetchLastObservationWriterCallAge.
+ * Returns the age in ms since that call, or null when no qualifying row
+ * exists. Throws when the proxy is unreachable so the caller falls through
+ * to the synthetic probe (which will then fail fast and drive the FSM).
+ */
+async function fetchLastRealProxyCallAge() {
+  const res = await fetch(
+    `${PROXY_URL}/api/token-usage/recent?limit=20`,
+    { signal: AbortSignal.timeout(3000) },
+  );
+  if (!res.ok) return null;
+  const body = await res.json();
+  const rows = body?.data || [];
+  // A qualifying row is any successful call that is not one of our own
+  // synthetic say-OK probes (cheap probe logs as health-coordinator, strong
+  // probe as observation-writer — both carry the 'say OK' preview).
+  const row = rows.find(r =>
+    r.timestamp &&
+    Number(r.output_tokens) > 0 &&
+    (r.prompt_preview || '').toLowerCase() !== 'say ok'
+  );
+  if (!row?.timestamp) return null;
+  const t = new Date(row.timestamp).getTime();
+  if (!Number.isFinite(t)) return null;
+  return Date.now() - t;
 }
 
 async function pollProxySemanticStrong() {
@@ -2070,13 +2114,36 @@ async function runAllChecks() {
     : Infinity;
   const _proxyProbeGate = userActiveNow() ? PROXY_PROBE_INTERVAL_MS : PROXY_PROBE_INTERVAL_IDLE_MS;
   if (_proxyProbeAge >= _proxyProbeGate) {
+    // Real-traffic skip (2026-07-07, mirrors the strong probe below): a
+    // recent successful real call through the proxy is strictly stronger
+    // proof of /api/complete liveness than a synthetic say-OK. Only when the
+    // pipeline is quiet does the synthetic probe fire — which is exactly the
+    // "ping every now and then" cadence the probe exists to provide.
+    let _realCallAgeMs = null;
     try {
-      await pollProxySemantic();
+      _realCallAgeMs = await fetchLastRealProxyCallAge();
     } catch (err) {
-      log(`proxy semantic probe threw: ${err.message}`, 'ERROR');
-      currentState.proxy.semantic_ok = false;
-      currentState.proxy.reason = err.message;
+      // Proxy unreachable on the token-usage read — fall through to the
+      // synthetic probe, which will classify the failure and drive the FSM.
+      log(`proxy real-traffic check threw: ${err.message}; firing synthetic probe`, 'DEBUG');
+    }
+    if (_realCallAgeMs !== null && _realCallAgeMs < PROXY_PROBE_REAL_TRAFFIC_MAX_AGE_MS) {
+      const prevSemantic = currentState.proxy.semantic_ok;
+      currentState.proxy.semantic_ok = true;
+      currentState.proxy.reason = 'recent-real-traffic';
+      currentState.proxy.last_round_trip_ms = null;
       currentState.proxy.last_probe_end = new Date().toISOString();
+      if (prevSemantic !== true) log(`proxy semantic_ok flip -> true (recent-real-traffic age=${Math.round(_realCallAgeMs / 1000)}s)`, 'INFO');
+      evaluateAutoHealFSM();
+    } else {
+      try {
+        await pollProxySemantic();
+      } catch (err) {
+        log(`proxy semantic probe threw: ${err.message}`, 'ERROR');
+        currentState.proxy.semantic_ok = false;
+        currentState.proxy.reason = err.message;
+        currentState.proxy.last_probe_end = new Date().toISOString();
+      }
     }
   }
 
