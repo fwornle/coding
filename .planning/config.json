@@ -12,5 +12,9 @@
   "granularity": "standard",
   "statusline": {
     "context_position": "front"
+  },
+  "context_turns": {
+    "retention_days": 14,
+    "_note": "Age-retention window (days) for .data/measurements/<task_id>/context-turns.jsonl(.gz) + raw-bodies.jsonl(.gz). Enforced hourly by com.coding.context-turns-sweeper; override at runtime via the CONTEXT_TURNS_RETENTION_DAYS env var (Phase 84 D-01/D-02)."
   }
 }
