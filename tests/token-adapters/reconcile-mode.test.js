@@ -750,3 +750,99 @@ test('CR-01/double-consumption: one fuzzy-only wire row + two same-model turns �
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ===========================================================================
+// CR-02 (Plan 83-09 / gap-2) — unmatched_wire is MEANINGFUL for copilot spans.
+// This locks the copadt PRODUCTION shape produced by the proxy fix (Task 2):
+// once copilot BYOK wire rows carry user_hash='copadt', the coding-side
+// copadt-keyed snapshotWireRowIds is non-empty, so a genuine copadt orphan wire
+// row is COUNTED (not vacuously 0) and a fully-matched copilot span reports 0.
+// See 83-VERIFICATION.md gaps[1]. NOTE (documented, not asserted): in production
+// copilot wire rows carry tool_call_id='' (WR-06) so real copilot matching runs
+// through fuzzy (scoped by Task 1's candidateWireIds); this test shares a
+// request-id purely to exercise the snapshot/counting contract deterministically.
+// ===========================================================================
+
+/** A copilot events.jsonl fixture producing one aggregate transcript row. */
+function writeCopilotEvents(dir, model) {
+  const events = path.join(dir, `events-${Math.random().toString(36).slice(2)}.jsonl`);
+  fs.writeFileSync(
+    events,
+    [
+      { type: 'session.start', timestamp: '2026-06-29T05:30:00.000Z', data: { sessionId: 'sess-1' } },
+      {
+        type: 'session.shutdown',
+        timestamp: IN_WINDOW_TS,
+        data: { modelMetrics: { [model]: { usage: { inputTokens: 100, outputTokens: 20 } } } },
+      },
+    ].map((o) => JSON.stringify(o)).join('\n') + '\n',
+  );
+  return events;
+}
+
+const COPILOT_MODEL = 'claude-sonnet-4.6';
+function copilotSpan() {
+  return { task_id: 'recon-task', agent: 'copilot', started_at: STARTED_AT, ended_at: ENDED_AT };
+}
+
+test('CR-02/copilot-orphan: a genuine copadt orphan wire row is counted → unmatched_wire === 1', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // (1) copadt wire row whose tool_call_id matches the copilot transcript's
+    //     request-id ('<sessionId>:<model>') — this one matches.
+    seedWireRow(dbPath, {
+      user_hash: 'copadt',
+      task_id: 'recon-task',
+      model: COPILOT_MODEL,
+      tool_call_id: `sess-1:${COPILOT_MODEL}`,
+    });
+    // (2) a genuine copadt ORPHAN wire row (no transcript counterpart).
+    seedWireRow(dbPath, {
+      user_hash: 'copadt',
+      task_id: 'recon-task',
+      model: COPILOT_MODEL,
+      tool_call_id: 'copadt-orphan-req',
+    });
+
+    const events = writeCopilotEvents(dir, COPILOT_MODEL);
+    const report = await captureForegroundTokens(copilotSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: events,
+      resolveTaskId: async () => 'recon-task',
+    });
+    assert.equal(report.matched, 1, 'the transcript matched its copadt wire row by request-id');
+    assert.equal(
+      report.unmatched_wire,
+      1,
+      'the copadt orphan wire row is counted — the copadt snapshot is non-empty (not vacuously 0)',
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CR-02/copilot-healthy: a fully-matched copilot span reports unmatched_wire === 0', async () => {
+  const { dir, dbPath } = newTempDb();
+  try {
+    // Only the matched copadt wire row — every wire row has a transcript counterpart.
+    seedWireRow(dbPath, {
+      user_hash: 'copadt',
+      task_id: 'recon-task',
+      model: COPILOT_MODEL,
+      tool_call_id: `sess-1:${COPILOT_MODEL}`,
+    });
+
+    const events = writeCopilotEvents(dir, COPILOT_MODEL);
+    const report = await captureForegroundTokens(copilotSpan(), {
+      dbPath,
+      reconcile: true,
+      mainSessionPath: events,
+      resolveTaskId: async () => 'recon-task',
+    });
+    assert.equal(report.matched, 1, 'the copilot transcript matched its copadt wire row');
+    assert.equal(report.unmatched_wire, 0, 'a healthy copilot span reports 0 — not vacuous');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
