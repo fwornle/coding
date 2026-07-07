@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: executing
-stopped_at: Phase 83 context gathered
-last_updated: "2026-07-07T01:09:40.662Z"
+status: ready_to_plan
+stopped_at: Phase 83 complete (9/9) — ready to discuss Phase 84
+last_updated: 2026-07-07T03:36:16.098Z
 last_activity: 2026-07-07 -- Phase 83 execution started
 progress:
   total_phases: 21
   completed_phases: 12
   total_plans: 75
-  completed_plans: 73
+  completed_plans: 260
   percent: 57
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 83 — token-reconciliation-layer
+**Current focus:** Phase 84 — per turn context revelation
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 83 (token-reconciliation-layer) — EXECUTING
-Plan: 1 of 9
-Status: Executing Phase 83
-Last activity: 2026-07-07 -- Phase 83 execution started
+Phase: 84
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-07
 
 ## Deferred Items
 
@@ -86,7 +86,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 **Velocity:**
 
-- Total plans completed: 139 (v6.0)
+- Total plans completed: 148 (v6.0)
 - Average duration: 3 min
 - Total execution time: 0.05 hours
 
