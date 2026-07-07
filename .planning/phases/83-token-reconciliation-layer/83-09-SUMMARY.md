@@ -89,3 +89,7 @@ rapid-llm-proxy repo (separate, own commits on main):
 ## Out of Scope (unchanged, documented follow-ups)
 
 WR-06 (copilot production wire rows carry `tool_call_id=''` → match via fuzzy, not request-id) remains a follow-up; the CR-01 fuzzy-scoping makes that safe and the metric meaningful without fixing WR-06. WR-01..WR-08 / IN-01..IN-12 review warnings were not touched.
+
+## Self-Check: PASSED
+
+All modified files present on disk; all 4 coding commits + 2 proxy commits verified in their respective git logs.
