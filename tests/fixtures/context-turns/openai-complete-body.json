@@ -1,0 +1,55 @@
+{
+  "process": "wave-analysis-consolidator",
+  "agent": "copilot",
+  "task_id": "84-fixture-openai-r0",
+  "taskType": "dedup",
+  "internalBody": {
+    "model": "gpt-4o",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a consolidator. Merge near-duplicate observations."
+      },
+      {
+        "role": "user",
+        "content": "Consolidate these two observations into one."
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_9zYxWvUt",
+            "type": "function",
+            "function": {
+              "name": "emit_merged",
+              "arguments": "{\"kept\":\"obs-a\",\"dropped\":\"obs-b\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_9zYxWvUt",
+        "content": "{\"ok\":true}"
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "emit_merged",
+          "description": "Emit the merged observation decision.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "kept": { "type": "string" },
+              "dropped": { "type": "string" }
+            },
+            "required": ["kept", "dropped"]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "obs-11111111-1111-4111-8111-111111111111",
+    "summary": "Intent: Investigate why context-turns JSONL lines omitted cache split.\nApproach: Traced the tap parser and confirmed input/read/write/output were folded.\nArtifacts: edited proxy-bridge/server.mjs analyzer.\nResult: Cache columns now carried separately.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-07-07T10:05:00.000Z",
+    "digestedAt": null,
+    "llm": null,
+    "modifiedFiles": ["proxy-bridge/server.mjs"]
+  },
+  {
+    "id": "obs-22222222-2222-4222-8222-222222222222",
+    "summary": "Intent: Add gzip-at-close for the raw-bodies sibling file.\nApproach: Wrapped the close handler to gzip then unlink the plaintext.\nArtifacts: edited context-turns writer.\nResult: .gz produced, plaintext removed on clean close.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "medium",
+    "createdAt": "2026-07-07T10:20:00.000Z",
+    "digestedAt": null,
+    "llm": null,
+    "modifiedFiles": null
+  },
+  {
+    "id": "obs-33333333-3333-4333-8333-333333333333",
+    "summary": "Intent: Wire the age sweeper for retention.\nApproach: Drove the sweeper job via CONTEXT_TURNS_RETENTION_DAYS on a temp measurements dir.\nArtifacts: added context-turns-sweeper-job.sh test harness.\nResult: Files older than retention deleted; younger kept.",
+    "agent": "copilot",
+    "project": "coding",
+    "quality": "high",
+    "createdAt": "2026-07-07T10:40:00.000Z",
+    "digestedAt": null,
+    "llm": null,
+    "modifiedFiles": null
+  },
+  {
+    "id": "obs-44444444-4444-4444-8444-444444444444",
+    "summary": "Intent: Unrelated prior-day observation outside the span window.\nApproach: Should NOT correlate to a turn inside the 2026-07-07 10:00-11:00 span.\nArtifacts: none.\nResult: Sits before the window to prove nearest-by-createdAt filtering.",
+    "agent": "claude",
+    "project": "coding",
+    "quality": "low",
+    "createdAt": "2026-07-06T09:00:00.000Z",
+    "digestedAt": null,
+    "llm": null,
+    "modifiedFiles": null
+  }
+]
