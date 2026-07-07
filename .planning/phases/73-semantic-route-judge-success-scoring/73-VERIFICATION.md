@@ -1,13 +1,13 @@
 ---
 phase: 73-semantic-route-judge-success-scoring
 verified: 2026-06-28T17:45:00Z
-status: human_needed
-score: 8/9
+resolved: 2026-07-07T04:20:00Z
+status: passed
+score: 9/9
 overrides_applied: 0
-human_verification:
+human_verification_resolved:
   - test: "Confirm SCORE-02 dashboard UI is captured in Phase 74"
-    expected: "Phase 74's plans (once created) include override UI controls in the Performance tab that call PATCH /api/experiments/scores/:taskId"
-    why_human: "SCORE-02 requires override 'in the dashboard'. Phase 73 delivers the API+storage (PATCH endpoint, applyOverride). The 73-CONTEXT.md D-07 decision says the dashboard UI controls land in Phase 74, but Phase 74's ROADMAP entry does not list SCORE-02 in its requirements or success criteria. A human must confirm Phase 74 planning will formally claim the UI half."
+    resolution: "RESOLVED 2026-07-07 — Phase 74 (completed 2026-06-28) delivered the override UI in plan 74-06: score-drawer.tsx (tagged D-02/SCORE-02) opens from the runs-table per-row 'Edit scores' button and dispatches the saveOverride thunk (performanceSlice.ts:430), which issues PATCH /api/experiments/scores/:taskId with { dimension, value, overridden_by } per edited dimension — the exact Phase 73 endpoint. Verified from code, not plan intent. SC3b upgraded UNCERTAIN → VERIFIED."
 ---
 
 # Phase 73: Semantic Route Judge & Success Scoring — Verification Report
@@ -28,9 +28,9 @@ human_verification:
 | SC1 | A semantic `goal_aligned_ratio` is computed by an LLM-judge (Haiku via `taskType` routing) that scores each meaningful trace event toward/neutral/away from the goal sentence, stored with rationale | VERIFIED | `runJudge` in `judge.mjs:289` issues one `/api/complete` call with `taskType:'route_judge'`; ratio computed via `computeGoalAlignedRatio` (not LLM arithmetic); live probe confirmed `claude-haiku-4-5-20251001`; `writeScore` stores it with `ratio_rationale` |
 | SC2 | Every run is scored on the fixed 5-dimension rubric (`goal_achieved`, `code_quality`, `test_coverage`, `regressions`, `spec_drift`) synthesized by the LLM-judge from whatever evidence is present, with a rationale string | VERIFIED | `judge.mjs` parses + clamps all 5 dimensions with null-not-zero; `score-write.mjs` stores them; wired into `measurement-stop.mjs` step 4.5; all 43 tests pass including happy-path rubric check |
 | SC3a | The corrected score is stored separately from the judged score | VERIFIED | `applyOverride` in `score-write.mjs:197` writes `corrected_<dim>` + `overridden_by/at` without mutating judged fields; D-06 preservation proven by test suite (5 groups, isolated store) |
-| SC3b | A user can override any rubric dimension **in the dashboard** | UNCERTAIN | PATCH `/api/experiments/scores/:taskId` endpoint exists and works (6 tests pass). The dashboard UI controls are explicitly deferred to Phase 74 per 73-CONTEXT.md D-07 (line 47: "Storage + PATCH API in Phase 73; override UI in Phase 74"). Phase 74's ROADMAP entry does not list SCORE-02 in its requirements/success criteria — human confirmation needed that Phase 74 planning will formally claim this |
+| SC3b | A user can override any rubric dimension **in the dashboard** | VERIFIED | PATCH `/api/experiments/scores/:taskId` endpoint exists and works (6 tests pass). Dashboard UI shipped in Phase 74 plan 74-06: `score-drawer.tsx` (D-02/SCORE-02) opens from the runs-table "Edit scores" button and dispatches `saveOverride` (`performanceSlice.ts:430`), issuing one PATCH per edited dimension against this exact endpoint. Resolved from code 2026-07-07 (was UNCERTAIN pending Phase 74 delivery) |
 
-**Score:** 8/9 must-have truths verified (SC3 split into SC3a + SC3b)
+**Score:** 9/9 must-have truths verified (SC3 split into SC3a + SC3b)
 
 ---
 
@@ -99,7 +99,7 @@ No `probe-*.sh` files declared in PLANs. Step 7c skipped.
 |-------------|------------|-------------|--------|----------|
 | ROUTE-03 | 73-01, 73-04, 73-06 | Semantic goal_aligned_ratio via LLM-judge (Haiku), toward/neutral/away labels, stored with rationale | SATISFIED | `computeGoalAlignedRatio` in `consequential-events.mjs`; `runJudge` calls Haiku via `/api/complete`; `writeScore` stores ratio + rationale; wired in `measurement-stop.mjs` step 4.5 |
 | SCORE-01 | 73-02, 73-03, 73-04, 73-06 | Fixed 5-dim rubric synthesized by LLM-judge from evidence, with rationale string | SATISFIED | `gatherEvidence` harness; `JUDGE_SYSTEM_PROMPT` references all 5 dims with evidence sources; `writeScore` stores all 5 + rubric_rationale; null-not-zero on absent evidence |
-| SCORE-02 | 73-02, 73-05 | User can override any rubric dimension in the dashboard; corrected stored separately | PARTIALLY SATISFIED | API: PATCH `/api/experiments/scores/:taskId` + `applyOverride` fully implemented and tested. Dashboard UI controls: explicitly deferred to Phase 74 per D-07 — Phase 74 does not currently list SCORE-02 in its ROADMAP requirements |
+| SCORE-02 | 73-02, 73-05 | User can override any rubric dimension in the dashboard; corrected stored separately | SATISFIED | API: PATCH `/api/experiments/scores/:taskId` + `applyOverride` fully implemented and tested (Phase 73). Dashboard UI: delivered in Phase 74 plan 74-06 (`score-drawer.tsx` → `saveOverride` thunk → PATCH per dimension). Full SCORE-02 contract now closed across Phases 73+74 |
 
 ---
 
@@ -113,15 +113,17 @@ No `TBD`, `FIXME`, `XXX`, or `console.*` calls found in any of the 7 phase-deliv
 
 ---
 
-### Human Verification Required
+### Human Verification — RESOLVED
 
-#### 1. SCORE-02 Dashboard UI Coverage in Phase 74
+#### 1. SCORE-02 Dashboard UI Coverage in Phase 74 — ✓ RESOLVED (2026-07-07)
 
-**Test:** Review Phase 74 plans (once created) to confirm they include override UI controls in the Performance tab that wire against `PATCH /api/experiments/scores/:taskId`.
+**Original question:** Would Phase 74 formally deliver the "in the dashboard" half of SCORE-02 — override UI controls wired against `PATCH /api/experiments/scores/:taskId`?
 
-**Expected:** Phase 74 formally claims the "in the dashboard" half of SCORE-02 in its plans. The PATCH endpoint accepts `{ dimension, value, overridden_by }` and returns `{ success:true, taskId, dimension }` — Phase 74 needs only to call this endpoint from the override controls.
+**Resolution:** Confirmed delivered from code. Phase 74 (completed 2026-06-28) plan 74-06 shipped the override UI:
+- `integrations/system-health-dashboard/src/components/performance/score-drawer.tsx` — the D-02/SCORE-02 score-override drawer, opened from the runs-table per-row "Edit scores" button.
+- `integrations/system-health-dashboard/src/store/slices/performanceSlice.ts:430` — the `saveOverride` thunk issues one `PATCH /api/experiments/scores/:taskId` (`{ dimension, value, overridden_by }`) per edited dimension against the exact Phase 73 endpoint, then refreshes the corrected-wins table.
 
-**Why human:** The code contract is fully verified (API + storage 100% working). The question is planning/requirements coverage: Phase 73 CONTEXT.md line 47 locked D-07 ("override UI in Phase 74") but Phase 74's ROADMAP success criteria do not mention SCORE-02 or override UI. A human must confirm Phase 74 planning captures this before the v7.4 milestone closes.
+Verified against shipped code, not plan intent. SC3b upgraded UNCERTAIN → VERIFIED; SCORE-02 traceability upgraded PARTIALLY SATISFIED → SATISFIED; phase status human_needed → passed (9/9).
 
 ---
 
@@ -129,11 +131,12 @@ No `TBD`, `FIXME`, `XXX`, or `console.*` calls found in any of the 7 phase-deliv
 
 No code gaps blocking goal achievement. All 7 deliverables exist, are substantive, are wired, and have passing test suites. The 43 combined test cases pass (0 fail). All key integration links are verified in the actual code.
 
-The single `human_needed` item (SCORE-02 dashboard UI in Phase 74) is a **planning coverage concern**, not a code defect. The backend contract for SCORE-02 is complete — the `PATCH /api/experiments/scores/:taskId` endpoint is validated, wired, and tested end-to-end. Only the question of whether Phase 74 formally owns the UI controls requires human confirmation.
+The former `human_needed` item (SCORE-02 dashboard UI) is **RESOLVED** — Phase 74 plan 74-06 delivered the override drawer wired to the Phase 73 PATCH endpoint. The full SCORE-02 contract is now closed end-to-end across Phases 73 (API + storage) and 74 (UI).
 
 **Live Haiku probe result (deferred from 73-04 due to sandbox):** `provider=claude-code, model=claude-haiku-4-5-20251001`. The `taskType:'route_judge'` routing works correctly.
 
 ---
 
 _Verified: 2026-06-28T17:45:00Z_
+_Human item resolved: 2026-07-07T04:20:00Z (SCORE-02 UI confirmed delivered in Phase 74/74-06)_
 _Verifier: Claude (gsd-verifier)_
