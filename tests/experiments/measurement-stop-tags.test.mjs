@@ -110,6 +110,26 @@ test('buildRunTags: absent terminal_state / skip_reason leave the tags null (nul
   assert.equal(tags.skip_reason, null);
 });
 
+// ---------------------------------------------------------------------------
+// D-05/D-07 (Phase 85-01): rerun_of + base_variant fold from span.meta into the tags
+// ---------------------------------------------------------------------------
+
+test('buildRunTags: rerun_of + base_variant fold from span.meta into the tags object', () => {
+  const tags = buildRunTags(sampleTagInputs({
+    span: { task_id: 't1', meta: { rerun_of: 'exp-orig--r0', base_variant: 'A' } },
+  }));
+  assert.equal(tags.rerun_of, 'exp-orig--r0', 'span.meta.rerun_of → tags.rerun_of');
+  assert.equal(tags.base_variant, 'A', 'span.meta.base_variant → tags.base_variant');
+});
+
+test('buildRunTags: absent span.meta rerun_of/base_variant leave the tags null (never absent)', () => {
+  const tags = buildRunTags(sampleTagInputs({ span: { task_id: 't1', meta: {} } }));
+  assert.ok('rerun_of' in tags, 'rerun_of key always present');
+  assert.ok('base_variant' in tags, 'base_variant key always present');
+  assert.equal(tags.rerun_of, null, 'no span.meta.rerun_of → null');
+  assert.equal(tags.base_variant, null, 'no span.meta.base_variant → null');
+});
+
 test('CLI: an invalid --terminal-state fails fast non-zero with a stderr diagnostic', () => {
   const res = spawnSync(process.execPath, [CLI, '--terminal-state', 'foo'], {
     encoding: 'utf8',
