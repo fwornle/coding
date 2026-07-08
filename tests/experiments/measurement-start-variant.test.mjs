@@ -92,6 +92,39 @@ test('CLI: a --test-command with a shell metacharacter aborts non-zero BEFORE th
 });
 
 // ---------------------------------------------------------------------------
+// Phase 85-01 Task 3: --capture-raw-bodies (D-12) + --base-variant (D-07) → span.meta
+// ---------------------------------------------------------------------------
+
+test('buildVariantMeta: --capture-raw-bodies sets span.meta.capture_raw_bodies === true (D-12)', () => {
+  const meta = buildVariantMeta(['--variant', 'A', '--capture-raw-bodies']);
+  assert.equal(meta.capture_raw_bodies, true, 'presence flag sets the meta key strictly true');
+});
+
+test('buildVariantMeta: absence of --capture-raw-bodies leaves capture_raw_bodies falsy/absent (default OFF)', () => {
+  const meta = buildVariantMeta(['--variant', 'A']);
+  assert.ok(!meta.capture_raw_bodies, 'capture_raw_bodies absent/falsy by default (D-12 OFF)');
+  assert.equal('capture_raw_bodies' in meta, false, 'key omitted entirely when flag absent (no pollution)');
+});
+
+test('buildVariantMeta: --base-variant X sets span.meta.base_variant === "X" (D-07)', () => {
+  const meta = buildVariantMeta(['--variant', 'A@opus-4.8', '--base-variant', 'A']);
+  assert.equal(meta.base_variant, 'A', 'base_variant threads the ORIGINAL variant name into meta');
+});
+
+test('buildVariantMeta: absent --base-variant leaves base_variant absent (no null pollution)', () => {
+  const meta = buildVariantMeta(['--variant', 'A']);
+  assert.equal('base_variant' in meta, false, 'no base_variant key when the flag is omitted');
+});
+
+test('CLI: a --base-variant with a shell metacharacter aborts non-zero BEFORE the span opens', () => {
+  const res = spawnSync(process.execPath, [
+    CLI, '--task-id', 't-bv-shell', '--base-variant', 'a|b',
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.notEqual(res.status, 0, 'non-zero exit on an unsafe --base-variant');
+  assert.match(res.stderr, /shell/, 'stderr explains the shell-metacharacter rejection');
+});
+
+// ---------------------------------------------------------------------------
 // Task 2: --spec/--variant resolution mode with flag-over-spec override
 // ---------------------------------------------------------------------------
 

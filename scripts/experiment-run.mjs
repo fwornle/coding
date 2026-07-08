@@ -45,10 +45,16 @@ import yaml from 'js-yaml';
 
 import { runMatrix, cellName } from '../lib/experiments/experiment-runner.mjs';
 import { resolveExperimentSpec } from '../lib/experiments/experiment-spec.mjs';
+import { writeProgress } from '../lib/experiments/run-progress.mjs';
 
 // Required agents whose non-completion makes the whole run fail (copilot may legitimately
 // land a recorded skip-Run when the headless probe fails — that is NOT a failure).
 const REQUIRED_AGENTS = new Set(['claude', 'opencode']);
+
+// T-85-01-01: the run_id becomes a run-dir path segment AND the composeTaskId salt, so it MUST
+// be short + path-safe. Charset [A-Za-z0-9._-], length ≤ 12 (a 6-8 char suffix is the target —
+// Pitfall 1: a long salt blows composeTaskId's slug/path-key limit and re-breaks D-10 resume).
+const RUN_ID_RE = /^[A-Za-z0-9._-]{1,12}$/;
 
 function parseStrArg(argv, flag) {
   const i = argv.indexOf(flag);
@@ -56,13 +62,45 @@ function parseStrArg(argv, flag) {
   return argv[i + 1] || null;
 }
 
+/**
+ * Parse repeatable per-variant override flags into a variantOverrides map (D-06). Each
+ * `--model <variant>=<model>` / `--agent <variant>=<agent>` pair is keyed by the ORIGINAL
+ * variant name (cellName). Returns `{ [originalVariantName]: { model?, agent? } }`. This is
+ * the SAME field name the API (Plan 04) and UI (Plan 05) submit — do NOT rename in isolation.
+ * A malformed pair (no `=`, empty variant or value) is a usage error (returns { error }).
+ */
+function parseVariantOverrides(argv) {
+  const overrides = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const flag = argv[i];
+    if (flag !== '--model' && flag !== '--agent') continue;
+    const raw = argv[i + 1];
+    const dim = flag === '--model' ? 'model' : 'agent';
+    const eq = raw == null ? -1 : raw.indexOf('=');
+    if (eq <= 0 || eq === raw.length - 1) {
+      return { error: `${flag} expects <variant>=<${dim}> (got '${raw ?? ''}')` };
+    }
+    const variant = raw.slice(0, eq);
+    const value = raw.slice(eq + 1);
+    (overrides[variant] ??= {})[dim] = value;
+  }
+  return { overrides };
+}
+
 function usage() {
   process.stderr.write(
     'usage: node scripts/experiment-run.mjs --spec <file> [--variant <name>] [--repeats N] [--timeout <sec>]\n' +
+    '                                       [--run-id <id>] [--run-dir <dir>] [--rerun-of <run_id>]\n' +
+    '                                       [--model <variant>=<model>]... [--agent <variant>=<agent>]...\n' +
     '  --spec <file>     (required) the YAML experiment matrix spec (config/experiments/*.yaml)\n' +
     '  --variant <name>  narrow the run to the single cell whose agent-model-framework-env name matches\n' +
     '  --repeats N       override the spec repeats (positive integer)\n' +
-    '  --timeout <sec>   override the per-cell wall-clock cap (seconds; default 20 min — D-06)\n',
+    '  --timeout <sec>   override the per-cell wall-clock cap (seconds; default 20 min — D-06)\n' +
+    '  --run-id <id>     short path-safe run identity ([A-Za-z0-9._-], ≤12) — the composeTaskId salt\n' +
+    '  --run-dir <dir>   directory to emit progress.json into (dashboard poll surface — D-03/D-04)\n' +
+    '  --rerun-of <id>   the ORIGINAL run_id this run re-runs (Run.metadata.rerun_of — D-05)\n' +
+    '  --model V=M       per-variant model override keyed by ORIGINAL variant name V (D-06; repeatable)\n' +
+    '  --agent V=A       per-variant agent override keyed by ORIGINAL variant name V (D-06; repeatable)\n',
   );
 }
 
@@ -96,10 +134,34 @@ async function main() {
   const variant = parseStrArg(args, '--variant') || undefined;
   const repeatsArg = parseStrArg(args, '--repeats');
   const timeoutArg = parseStrArg(args, '--timeout');
+  // Phase 85-01: run identity (D-05), progress surface (D-03/D-04), per-variant overrides (D-06).
+  const runIdArg = parseStrArg(args, '--run-id');
+  const runDir = parseStrArg(args, '--run-dir') || undefined;
+  const rerunOf = parseStrArg(args, '--rerun-of') || undefined;
 
   if (!specPath) {
     process.stderr.write('error: --spec <file> is required\n');
     usage();
+    process.exit(2);
+  }
+
+  // T-85-01-01: validate --run-id is short + path-safe BEFORE it touches any run-dir path or the
+  // composeTaskId salt (Pitfall 1: a long/unsafe salt blows the slug/path-key limit → breaks D-10).
+  let runId;
+  if (runIdArg != null) {
+    if (!RUN_ID_RE.test(runIdArg)) {
+      process.stderr.write(
+        `error: --run-id must match [A-Za-z0-9._-] and be 1–12 chars (got '${runIdArg}')\n`,
+      );
+      process.exit(2);
+    }
+    runId = runIdArg;
+  }
+
+  // D-06: parse repeatable --model/--agent <variant>=<value> pairs into the variantOverrides map.
+  const { overrides: variantOverrides, error: overrideError } = parseVariantOverrides(args);
+  if (overrideError) {
+    process.stderr.write(`error: ${overrideError}\n`);
     process.exit(2);
   }
 
@@ -146,12 +208,42 @@ async function main() {
   const repeats = repeatsOverride ?? resolved.repeats;
   const narrowed = { goal_sentence: resolved.goal_sentence, repeats, cells };
 
+  // D-03/D-04: when a --run-dir is set, initialize progress.json as a `pending` grid BEFORE the
+  // loop so the dashboard poller (Plan 05) has a header + one cell per variant×repeat immediately.
+  // writeProgress is atomic + never-throw, so a progress-init failure never blocks the run.
+  if (runDir) {
+    const pendingCells = [];
+    for (const c of cells) {
+      const v = cellName(c);
+      for (let rep = 0; rep < repeats; rep += 1) {
+        pendingCells.push({ variant: v, rep, state: 'pending' });
+      }
+    }
+    await writeProgress(runDir, {
+      run_id: runId ?? null,
+      spec: specPath,
+      snapshot_id: specObj?.snapshot_id ?? null,
+      pid: process.pid,
+      done: 0,
+      total: pendingCells.length,
+      overall: 'running',
+      cells: pendingCells,
+    });
+  }
+
   const opts = {
     repoRoot,
     dataDir,
     // Inject the already-resolved+narrowed envelope so runMatrix uses exactly these cells /
     // repeats (its default resolveSpec would re-read the whole unnarrowed matrix).
     resolveSpec: () => narrowed,
+    // Phase 85-01: run identity + progress surface + per-variant override map (D-03/D-05/D-06).
+    // The APPLICATION of variantOverrides (mutating the cell + derived name + --base-variant)
+    // lands in runMatrix/runCell (Task 4); here we only thread them through.
+    runDir,
+    runId,
+    rerunOf,
+    variantOverrides,
   };
   if (timeoutMs != null) opts.timeoutMs = timeoutMs;
 
