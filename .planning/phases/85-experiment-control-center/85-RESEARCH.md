@@ -429,16 +429,19 @@ metadata: {
 | A4 | Re-run with per-variant model/agent overrides (D-06) produces a **new snapshot-identical** run — i.e. the same `snapshot_id` restore path still applies when the model changes. | Re-run semantics | LOW — snapshot is code/data state, independent of model; `restoreForCell(snapshotId)` doesn't care about the cell's model. Confirmed by reading `runCell` (model only affects agent launch, not restore). |
 | A5 | No requirement IDs exist for this phase, so D-01..D-11 are the acceptance surface. | phase_requirements | LOW — if REQUIREMENTS.md gains v-block IDs later, map them then. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where does the detached runner actually spawn?** (BLOCKING for planning the spawn tasks)
+   **RESOLVED 2026-07-08:** User locked option (a) — extend health-coordinator :3034 (CONTEXT.md D-01 AMENDED); implemented in Plan 85-03.
    - What we know: vkb-server is container-only; the container has no agent CLIs; the runner needs host CLIs + live proxy. The dashboard→coordinator `/health/remediate` is the sole existing dashboard-triggered host-spawn pattern.
    - What's unclear: (a) extend health-coordinator with an `experiment_run` remediation action, (b) add a tiny experiment-run HTTP endpoint to another host daemon (obs-api :12436?), or (c) a new `com.coding.experiment-runner` launchd daemon (contradicts D-01 "no new daemon").
    - Recommendation: **(a) extend the coordinator** — reuses the proxy path, honors "no new daemon", minimal surface. Flag to the user in discuss/plan; do not lock without confirmation (A1).
 
 2. **run-cancel target when the launcher daemon has restarted.** After a coordinator/vkb restart, there is no live child handle — only the pid in `run.json`. `run-cancel` must read `run.json.pid` and `process.kill(-pid, …)`. Confirm the pid is the group leader's pid (it is, given `detached:true`) and that a reused-pid guard exists (check the pid's process still looks like the runner before killing — e.g. compare start time, or accept the small reuse risk as the Phase-78/coordinator patterns do).
+   **RESOLVED:** pid-reuse sanity guard specified in Plan 85-02 Task 2 (`run-launch.mjs` cancel + liveness cases).
 
 3. **Does `active-measurement.json` reliably clear on cancel?** A hard SIGKILL bypasses the runner's per-cell `measurement-stop finally`. The canceller (or a `run-status` reconciler) may need to clear a stale `active-measurement.json` whose task_id belongs to the cancelled run, so the 409 slot frees. Recommend the canceller writes both the progress `cancelled` patch AND clears the span file it owns.
+   **RESOLVED:** canceller writes the `cancelled` progress patch AND clears the stale span file — Plan 85-03 Tasks 1/2.
 
 ## Environment Availability
 
