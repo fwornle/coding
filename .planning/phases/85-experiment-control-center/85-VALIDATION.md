@@ -43,7 +43,8 @@ created: 2026-07-08
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 85-01-01 | 01 | 1 | D-03/D-04 | plan-01 TM | never-throw emitter; atomic tmp+rename write | unit | `node --test tests/experiments/run-progress.test.mjs tests/experiments/experiment-runner.integration.test.mjs` | ❌ W0 (integration ✅ must stay green) | ⬜ pending |
 | 85-01-02 | 01 | 1 | D-05/D-07 | plan-01 TM | null-preserved rerun_of/base_variant tags; task_hash constant | unit | `node --test tests/experiments/run-write.test.mjs tests/experiments/measurement-stop-tags.test.mjs` | ⚠️ extend existing | ⬜ pending |
-| 85-01-03 | 01 | 1 | D-06/D-12 | plan-01 TM | capture_raw_bodies strict opt-in; salted run_id path-safe (≤12 salt) | unit | `node --test tests/experiments/measurement-start-variant.test.mjs` | ❌ W0 | ⬜ pending |
+| 85-01-03 | 01 | 1 | D-06/D-12 | plan-01 TM | capture_raw_bodies strict opt-in; salted run_id path-safe (≤12 salt); parses `variantOverrides` map | unit | `node --test tests/experiments/measurement-start-variant.test.mjs` | ❌ W0 | ⬜ pending |
+| 85-01-04 | 01 | 1 | D-06/D-07 | plan-01 TM | `applyVariantOverride`/`deriveVariantName` mutate effective cell + `@`-suffix variant; `composeTaskId` unchanged (task_hash comparable) | unit | `node --test tests/experiments/variant-override.test.mjs` | ❌ W0 | ⬜ pending |
 | 85-02-01 | 02 | 1 | D-01 | T: argv injection | fixed-argv detached spawn, no shell strings | unit | `node --test tests/experiments/run-launch.test.mjs` | ❌ W0 | ⬜ pending |
 | 85-02-02 | 02 | 1 | D-08 | T: pid reuse | `process.kill(-pid)` group kill + pid-reuse sanity guard | unit | `node --test tests/experiments/run-launch.test.mjs` | ❌ W0 | ⬜ pending |
 | 85-03-01 | 03 | 2 | D-01/D-02 | T: container→host EoP | executor endpoints validate run_id charset; spawn only listed specs | unit | `node --test tests/experiments/experiment-executor.test.mjs` | ❌ W0 | ⬜ pending |
@@ -70,6 +71,7 @@ created: 2026-07-08
 - [ ] `tests/experiments/spec-list-endpoint.test.mjs` — resolveExperimentSpec preview (D-09)
 - [ ] extend `tests/experiments/run-write.test.mjs` — rerun_of / base_variant tags (D-05/D-07)
 - [ ] `tests/experiments/measurement-start-variant.test.mjs` — capture_raw_bodies + base_variant passthrough (D-06/D-12)
+- [ ] `tests/experiments/variant-override.test.mjs` — override application + derived `@`-suffix variant name, task_hash unchanged (D-06/D-07)
 - [ ] `tests/e2e/performance/experiment-control.spec.ts` — launcher + monitor + Re-run (Playwright, `tests/e2e/<area>/` per CLAUDE.md)
 
 ---
