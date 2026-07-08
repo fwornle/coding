@@ -65,6 +65,85 @@ test('run: delegates to launchRun with the exact spec/run_id/run_dir/overrides a
   }
 });
 
+test('run: HOST-side D-02 slot guard — refuses (slot_busy + holder) when a sibling run is live', async () => {
+  const { root, runDir, cleanup } = await makeTmp('run-busy');
+  try {
+    // A sibling run dir (same runs root) whose progress.json says running + a pid
+    // the injected isAliveFn reports alive.
+    const siblingDir = path.join(root, 'live-sibling');
+    await fs.mkdir(siblingDir, { recursive: true });
+    await fs.writeFile(
+      path.join(siblingDir, 'progress.json'),
+      JSON.stringify({ run_id: 'live-run', pid: 7777, overall: 'running', cells: [] })
+    );
+
+    let launched = false;
+    const result = await runExperiment({
+      spec: '/abs/spec.yaml',
+      run_id: 'run-new',
+      run_dir: runDir,
+      launchFn: async () => { launched = true; return { pid: 1, runDir }; },
+      isAliveFn: (pid) => pid === 7777,
+    });
+
+    assert.equal(result.success, false, 'launch refused');
+    assert.equal(result.slot_busy, true, 'reports slot_busy so the vkb maps a 409');
+    assert.deepEqual(result.holder, { kind: 'experiment', run_id: 'live-run', pid: 7777 });
+    assert.equal(launched, false, 'launchRun NEVER called while the slot is held');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('run: a stale sibling (running but DEAD pid) does not block the launch', async () => {
+  const { root, runDir, cleanup } = await makeTmp('run-stale');
+  try {
+    const siblingDir = path.join(root, 'stale-sibling');
+    await fs.mkdir(siblingDir, { recursive: true });
+    await fs.writeFile(
+      path.join(siblingDir, 'progress.json'),
+      JSON.stringify({ run_id: 'stale-run', pid: 8888, overall: 'running', cells: [] })
+    );
+
+    const result = await runExperiment({
+      spec: '/abs/spec.yaml',
+      run_id: 'run-new',
+      run_dir: runDir,
+      launchFn: async (args) => ({ pid: 4243, runDir: args.runDir }),
+      isAliveFn: () => false, // every pid is dead → stale, never a holder
+    });
+
+    assert.equal(result.success, true, 'stale run never blocks');
+    assert.equal(result.pid, 4243);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('run: repo-relative seam paths resolve against the HOST repo root (never a container /coding)', async () => {
+  const { runDir, cleanup } = await makeTmp('run-relpath');
+  try {
+    const calls = [];
+    const result = await runExperiment({
+      spec: 'demo.yaml', // basename → <repo>/config/experiments/demo.yaml
+      run_id: 'run-rel',
+      run_dir: '.data/experiments/runs/run-rel', // repo-relative seam value
+      launchFn: async (args) => { calls.push(args); return { pid: 1, runDir: args.runDir }; },
+      isAliveFn: () => false,
+    });
+
+    assert.equal(result.success, true);
+    assert.ok(path.isAbsolute(calls[0].specPath), 'spec resolved to an absolute host path');
+    assert.match(calls[0].specPath, /config[\\/]experiments[\\/]demo\.yaml$/, 'basename composed under config/experiments');
+    assert.ok(path.isAbsolute(calls[0].runDir), 'run_dir resolved to an absolute host path');
+    assert.ok(!calls[0].runDir.startsWith('/coding'), 'never the container root');
+    assert.match(calls[0].runDir, /\.data[\\/]experiments[\\/]runs[\\/]run-rel$/);
+    void runDir;
+  } finally {
+    await cleanup();
+  }
+});
+
 test('cancel: delegates to cancelRun, writes progress overall=cancelled, clears the run-owned span', async () => {
   const { runDir, dataDir, cleanup } = await makeTmp('cancel-own');
   try {

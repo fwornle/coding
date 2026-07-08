@@ -2664,7 +2664,9 @@ app.post('/experiments/run', async (req, res) => {
     // LLM_PROXY_DATA_DIR, LLM_PROXY_PORT, CODING_PROXY_ROUTE (run-launch merges
     // the four contract vars from it onto the child's process.env).
     const result = await runExperiment({ spec, run_id, run_dir, overrides, env: process.env });
-    return res.status(result.success ? 200 : 500).json({ ok: result.success, ...result });
+    // slot_busy = the HOST-side D-02 live-run guard (Phase 85-06) — a 409, not a 500.
+    const status = result.success ? 200 : (result.slot_busy ? 409 : 500);
+    return res.status(status).json({ ok: result.success, ...result });
   } catch (err) {
     log(`experiments/run threw: ${err.message}`, 'ERROR');
     return res.status(500).json({ ok: false, error: err.message });
