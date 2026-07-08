@@ -303,6 +303,22 @@ class SystemHealthAPIServer {
              }
          });
 
+         // Per-turn context-turns (Phase 84 / D-10) — same-origin passthrough to
+         // the LLM proxy's context-turns surface, mirroring /api/context-breakdown
+         // above. The proxy returns 200 graceful-empty ({contextTurns:[]}) for an
+         // unknown task_id, so a missing span never 500s through the dashboard.
+         this.app.get('/api/context-turns', async (req, res) => {
+             try {
+                 const qs = new URLSearchParams(req.query).toString();
+                 const url = `http://host.docker.internal:12435/api/context-turns${qs ? '?' + qs : ''}`;
+                 const resp = await fetch(url);
+                 const data = await resp.json();
+                 res.status(resp.status).json(data);
+             } catch (err) {
+                 res.status(502).json({ error: 'LLM proxy unreachable', details: err.message });
+             }
+         });
+
          // Token Usage API (proxy to LLM proxy)
          this.app.get('/api/token-usage/:endpoint', async (req, res) => {
              try {
