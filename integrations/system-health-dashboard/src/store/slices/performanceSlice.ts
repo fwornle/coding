@@ -115,6 +115,47 @@ export interface TimelineRow {
   [key: string]: unknown
 }
 
+// A per-message digest inside a context-turn line (D-07 fallback): the role,
+// UTF-8 byte size, optional tool metadata, and a ≤120-char preview. Written
+// VERBATIM by the proxy line-builder (buildAnthropicLine/buildOpenAILine).
+export interface ContextTurnMessage {
+  i: number
+  role: string | null
+  bytes: number
+  tool: { name: string | null; size: number } | null
+  preview: string
+}
+
+// A single per-request context-turns line as returned by
+// GET /api/experiments/runs/:taskId/context-turns → `{ contextTurns: [...] }`.
+// Served VERBATIM from the proxy's context-turns.jsonl(.gz) (Plan 84-04 write
+// hook + 84-07 read route). The `wire` discriminator is load-bearing: OpenAI-wire
+// lines carry `usage.cache_write: null` so the explainer renders "N/A (provider
+// reports no cache-creation)" instead of an inferred 0 (D-12). The cache split is
+// kept as four separate fields, never folded into a total (D-09).
+export interface ContextTurnRow {
+  ts: string
+  task_id: string
+  agent: string
+  wire: 'anthropic' | 'openai'
+  request_id: string
+  model: string
+  usage: {
+    input: number
+    output: number
+    cache_read: number
+    // null ONLY on the OpenAI wire — the provider reports no cache-creation
+    // counter, so the UI must render N/A, never 0 (D-12).
+    cache_write: number | null
+  }
+  // Message INDICES carrying cache_control (D-08) — empty [] on the OpenAI wire.
+  cache_breakpoints: number[]
+  categories: { key: string; label: string; bytes: number }[]
+  messages: ContextTurnMessage[]
+  // Correlated at span close (Plan 84-05); null in the hot path.
+  observation_ref: string | null
+}
+
 // A development-narrative item: an observation written during a run's time window,
 // carrying the plain-language "Intent: …" of a foreground turn. Joined by time
 // window + agent (observations have no task_id), so it is best-effort and only
@@ -198,6 +239,9 @@ interface PerformanceState {
   timelineByTaskId: Record<string, TimelineRow[]>
   timelineLoading: boolean
   timelineError: string | null
+  // Per-request context-turns (Plan 84-08) keyed by taskId, mirroring the
+  // timeline cache above. Populated by fetchContextTurns.
+  contextTurnsByTaskId: Record<string, ContextTurnRow[]>
   narrativeByTaskId: Record<string, NarrativeItem[]>
   narrativeLoadingId: string | null
   digestsByTaskId: Record<string, DigestItem[]>
@@ -257,6 +301,7 @@ const initialState: PerformanceState = {
   timelineByTaskId: {},
   timelineLoading: false,
   timelineError: null,
+  contextTurnsByTaskId: {},
   narrativeByTaskId: {},
   narrativeLoadingId: null,
   digestsByTaskId: {},
@@ -353,6 +398,28 @@ export const fetchTimeline = createAsyncThunk(
       const data = await response.json()
       const timeline: TimelineRow[] = (data?.timeline ?? []) as TimelineRow[]
       return { taskId, timeline }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// fetchContextTurns (Plan 84-08): pull the per-request context-turns lines the
+// proxy appended for THIS run (Plan 84-04 write hook), served VERBATIM by the vkb
+// read route (Plan 84-07). Mirrors fetchTimeline exactly — same-origin, graceful
+// on absence (the route returns `{ contextTurns: [] }` on miss, never 500). Feeds
+// the honest per-turn sent/cached/fresh split into the cache explainer.
+export const fetchContextTurns = createAsyncThunk(
+  'performance/fetchContextTurns',
+  async (taskId: string, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/experiments/runs/${encodeURIComponent(taskId)}/context-turns`)
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`)
+      }
+      const data = await response.json()
+      const contextTurns: ContextTurnRow[] = (data?.contextTurns ?? []) as ContextTurnRow[]
+      return { taskId, contextTurns }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -718,6 +785,12 @@ const performanceSlice = createSlice({
         state.timelineLoading = false
         state.timelineError = (action.payload as string) ?? 'Failed to load timeline'
       })
+      // fetchContextTurns (Plan 84-08) — store the per-request lines keyed by
+      // taskId. Best-effort: on rejection we leave the existing (possibly empty)
+      // array so the explainer degrades to the timeline path.
+      .addCase(fetchContextTurns.fulfilled, (state, action) => {
+        state.contextTurnsByTaskId[action.payload.taskId] = action.payload.contextTurns
+      })
       .addCase(fetchRunNarrative.pending, (state, action) => {
         state.narrativeLoadingId = action.meta.arg.taskId
       })
@@ -880,6 +953,12 @@ export const selectTimelineError = (state: RootState) => state.performance.timel
 // Per-taskId timeline selector factory.
 export const selectTimelineFor = (taskId: string | null) => (state: RootState): TimelineRow[] =>
   taskId ? (state.performance.timelineByTaskId[taskId] ?? []) : []
+
+// Per-taskId context-turns selector factory (Plan 84-08). Returns the stored
+// per-request lines, or [] when absent/null so the explainer never crashes on a
+// missing or failed fetch (T-84-08-02).
+export const selectContextTurnsFor = (taskId: string | null) => (state: RootState): ContextTurnRow[] =>
+  taskId ? (state.performance.contextTurnsByTaskId[taskId] ?? []) : []
 
 export const selectNarrativeFor = (taskId: string | null) => (state: RootState): NarrativeItem[] =>
   taskId ? (state.performance.narrativeByTaskId[taskId] ?? []) : []
