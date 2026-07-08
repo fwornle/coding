@@ -195,9 +195,30 @@ export function ExperimentLauncher() {
                     <div className="mb-1"><span className="text-muted-foreground">goal:</span> {selectedSpec.goal_sentence}</div>
                   )}
                   <div>
-                    <span className="font-mono">{selectedSpec.variantCount ?? variantNames.length}</span> variants ×{' '}
-                    <span className="font-mono">{repeats.trim() !== '' ? repeats : (selectedSpec.repeats ?? '?')}</span> repeats ={' '}
-                    <span className="font-mono font-semibold" data-testid="matrix-cell-count">{previewCellCount ?? '?'}</span> cells
+                    {/* Self-consistent with the selected SUBSET: "1 of 3 variants × 1
+                        repeat = 1 cell" when a subset is picked; the plain full-matrix
+                        product otherwise. The base variant count stays the SERVER's
+                        variantCount (D-09 — never a client-side axes recompute). */}
+                    {(() => {
+                      const baseVariants = selectedSpec.variantCount ?? variantNames.length
+                      const pickedVariants = variantSubset.length > 0 ? variantSubset.length : baseVariants
+                      const effRepeatsRaw = repeats.trim() !== '' ? Number(repeats) : (selectedSpec.repeats ?? null)
+                      const effRepeats = effRepeatsRaw != null && Number.isFinite(effRepeatsRaw) ? effRepeatsRaw : null
+                      const plural = (n: number | null, word: string) => (n === 1 ? word : `${word}s`)
+                      return (
+                        <>
+                          <span className="font-mono">
+                            {variantSubset.length > 0 ? `${pickedVariants} of ${baseVariants}` : pickedVariants}
+                          </span>{' '}
+                          {/* "1 of 3 variants" — the noun follows the BASE count in
+                              the subset phrasing, the picked count otherwise. */}
+                          {plural(variantSubset.length > 0 ? baseVariants : pickedVariants, 'variant')} ×{' '}
+                          <span className="font-mono">{effRepeats ?? '?'}</span> {plural(effRepeats, 'repeat')} ={' '}
+                          <span className="font-mono font-semibold" data-testid="matrix-cell-count">{previewCellCount ?? '?'}</span>{' '}
+                          {plural(previewCellCount, 'cell')}
+                        </>
+                      )
+                    })()}
                   </div>
                 </>
               )}

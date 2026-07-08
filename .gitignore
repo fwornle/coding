@@ -153,6 +153,10 @@ integrations/mcp-server-browserbase/
 .data/ukb-trace-reports/
 .data/step-timing-statistics.json
 
+# Experiment Control Center per-run runtime state (Phase 85 — progress.json /
+# run.json emitted under a run_id dir by scripts/experiment-run.mjs)
+.data/experiments/runs/
+
 # One-shot repair / backfill / soak session logs — timestamped, disposable run
 # artifacts written by scripts/{repair-*,backfill-*,poll-orphan-floor-soak}.mjs.
 # Kept on disk for the run, never needed in git.
