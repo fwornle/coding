@@ -16,12 +16,15 @@ import { Badge } from '@/components/ui/badge'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
   fetchTimeline,
+  fetchContextTurns,
   selectExplainTaskId,
   selectExplainRun,
   selectTimelineFor,
+  selectContextTurnsFor,
   selectTimelineLoading,
   setExplainTaskId,
   type TimelineRow,
+  type ContextTurnRow,
 } from '@/store/slices/performanceSlice'
 import { normalizeModel } from './models'
 
@@ -112,22 +115,72 @@ interface TurnDatum {
   write: number
   input: number
   output: number
+  // Wire discriminator (Plan 84-08) — carried through so the per-turn cache-write
+  // render can branch: OpenAI-wire has no cache-creation counter (D-12).
+  wire?: 'anthropic' | 'openai'
+  // True when this turn's cache_write is null (OpenAI wire) — render N/A, not 0.
+  writeNA?: boolean
 }
 
-/** Flatten the timeline's top-level per-turn rows into chart data + totals. */
-function summarize(timeline: TimelineRow[]) {
-  const turns = timeline
-    .filter((r) => (r.granularity_tier ?? '') !== 'per-session-aggregate')
-    .slice()
-    .sort((a, b) => String(a.timestamp ?? '').localeCompare(String(b.timestamp ?? '')))
+// The exact honesty string for OpenAI-wire cache-write (D-12). OpenAI-wire
+// providers (copilot/opencode) report cache reads but NO cache-creation counter,
+// so a 0 would falsely imply "we tried to cache and wrote nothing". This string
+// is load-bearing — the plan's acceptance greps for it verbatim.
+const CACHE_WRITE_NA = 'N/A (provider reports no cache-creation)'
 
-  const data: TurnDatum[] = turns.map((t, i) => ({
-    turn: `T${i + 1}`,
-    read: num(t.cache_read_tokens),
-    write: num(t.cache_write_tokens),
-    input: num(t.input_tokens),
-    output: num(t.output_tokens),
-  }))
+/**
+ * Flatten per-turn rows into chart data + totals. Prefers the REAL per-request
+ * wire values from context-turns (Plan 84-08) when present — those carry the
+ * honest cache split straight from the proxy tap, including the OpenAI-wire
+ * `cache_write: null` (→ N/A, D-12). Falls back to the timeline rows (bytes/4
+ * estimate) for runs with no captured context-turns.
+ */
+function summarize(timeline: TimelineRow[], contextTurns: ContextTurnRow[] = []) {
+  const useWire = contextTurns.length > 0
+
+  let data: TurnDatum[]
+  let anyOpenAiWire = false
+  let anyAnthropicWire = false
+
+  if (useWire) {
+    const turns = contextTurns
+      .slice()
+      .sort((a, b) => String(a.ts ?? '').localeCompare(String(b.ts ?? '')))
+    data = turns.map((t, i) => {
+      if (t.wire === 'openai') anyOpenAiWire = true
+      if (t.wire === 'anthropic') anyAnthropicWire = true
+      const writeNA = t.usage?.cache_write == null // null ONLY on the OpenAI wire (D-12)
+      return {
+        turn: `T${i + 1}`,
+        read: num(t.usage?.cache_read),
+        // Never infer a cache-write value: OpenAI-wire is null → plot 0 height but
+        // flag writeNA so the numeric render is replaced by the N/A string.
+        write: writeNA ? 0 : num(t.usage?.cache_write),
+        input: num(t.usage?.input),
+        output: num(t.usage?.output),
+        wire: t.wire,
+        writeNA,
+      }
+    })
+  } else {
+    const turns = timeline
+      .filter((r) => (r.granularity_tier ?? '') !== 'per-session-aggregate')
+      .slice()
+      .sort((a, b) => String(a.timestamp ?? '').localeCompare(String(b.timestamp ?? '')))
+    data = turns.map((t, i) => ({
+      turn: `T${i + 1}`,
+      read: num(t.cache_read_tokens),
+      write: num(t.cache_write_tokens),
+      input: num(t.input_tokens),
+      output: num(t.output_tokens),
+    }))
+  }
+
+  // Run-level cache-write honesty: a PURE OpenAI-wire run (copilot/opencode) has
+  // no cache-creation counter at all, so the aggregate Cache-write must render as
+  // N/A, never a summed 0 (D-12). A run with ANY Anthropic-wire turn keeps the
+  // real number.
+  const writeIsNA = useWire && anyOpenAiWire && !anyAnthropicWire
 
   const totalRead = data.reduce((s, d) => s + d.read, 0)
   const totalWrite = data.reduce((s, d) => s + d.write, 0)
@@ -155,16 +208,27 @@ function summarize(timeline: TimelineRow[]) {
     reusePct,
     firstWrite,
     maxSeg,
-    turnCount: turns.length,
+    turnCount: data.length,
     caches: totalRead > 0,
+    // Plan 84-08: honest wire provenance for the render layer.
+    usingWire: useWire,
+    writeIsNA,
   }
 }
 
 function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
+  // Long honesty strings (e.g. the OpenAI-wire N/A note) shrink so they stay
+  // legible inside the card instead of overflowing the fixed-size number slot.
+  const long = value.length > 12
   return (
     <div className="rounded-md border bg-muted/30 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 font-mono text-lg font-semibold" style={color ? { color } : undefined}>{value}</p>
+      <p
+        className={`mt-1 font-semibold ${long ? 'font-sans text-xs leading-snug' : 'font-mono text-lg'}`}
+        style={color ? { color } : undefined}
+      >
+        {value}
+      </p>
     </div>
   )
 }
@@ -292,6 +356,7 @@ export function ContextCacheExplainer() {
   const taskId = useAppSelector(selectExplainTaskId)
   const run = useAppSelector(selectExplainRun)
   const timeline = useAppSelector(selectTimelineFor(taskId))
+  const contextTurns = useAppSelector(selectContextTurnsFor(taskId))
   const loading = useAppSelector(selectTimelineLoading)
   const [kbOpen, setKbOpen] = useState(false)
   const [real, setReal] = useState<RealBreakdown | null>(null)
@@ -301,6 +366,9 @@ export function ContextCacheExplainer() {
 
   useEffect(() => {
     if (taskId && timeline.length === 0) dispatch(fetchTimeline(taskId))
+    // Plan 84-08: also pull the real per-request context-turns for honest wire
+    // values (sent/cached/fresh + OpenAI-wire N/A cache-write).
+    if (taskId && contextTurns.length === 0) dispatch(fetchContextTurns(taskId))
   }, [taskId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Real wire-buffer breakdown — PER RUN. We ask the proxy for THIS run's own
@@ -320,7 +388,7 @@ export function ContextCacheExplainer() {
     return () => { cancelled = true }
   }, [open, taskId])
 
-  const s = useMemo(() => summarize(timeline), [timeline])
+  const s = useMemo(() => summarize(timeline, contextTurns), [timeline, contextTurns])
 
   // `real` is already THIS run's own capture (fetched by task_id), so it is
   // safe to use directly — no cross-run leakage possible.
@@ -523,11 +591,18 @@ export function ContextCacheExplainer() {
             {activeReal ? (
               <>
                 Sizes above are <span className="font-medium text-foreground">exact UTF-8 bytes</span> from the real
-                <span className="font-mono"> /v1/messages</span> buffer (token figures are a ~bytes/4 estimate); the dashed line
-                is the true <span className="font-mono">cache_control</span> prefix boundary. It’s still one contiguous buffer —
+                <span className="font-mono"> /v1/messages</span> buffer; the dashed line is the true{' '}
+                <span className="font-mono">cache_control</span> prefix boundary. It’s still one contiguous buffer —
                 categories are inferred by walking <span className="font-mono">system</span> → <span className="font-mono">tools</span>
                 {' '}→ <span className="font-mono">messages</span> (tool outputs &amp; user turns are interleaved in the history,
-                shown grouped here for legibility).
+                shown grouped here for legibility).{' '}
+                {s.usingWire ? (
+                  <>The per-turn <span className="font-medium text-foreground">token</span> split below is now the{' '}
+                  <span className="font-medium text-foreground">real usage-reported count</span> from each request’s wire
+                  response — not a ~bytes/4 estimate.</>
+                ) : (
+                  <>Per-turn token figures below are a ~bytes/4 estimate (no captured context-turns for this run yet).</>
+                )}
               </>
             ) : (
               <>
@@ -629,10 +704,82 @@ export function ContextCacheExplainer() {
           )}
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <StatCard label="Cache read" value={fmt(s.totalRead)} color={C_READ} />
-            <StatCard label="Cache write" value={fmt(s.totalWrite)} color={C_WRITE} />
+            <StatCard label="Cache write" value={s.writeIsNA ? CACHE_WRITE_NA : fmt(s.totalWrite)} color={C_WRITE} />
             <StatCard label="Fresh input" value={fmt(s.totalInput)} color={C_INPUT} />
             <StatCard label="Output" value={fmt(s.totalOutput)} color={C_OUTPUT} />
           </div>
+
+          {/* Per-turn honest split (Plan 84-08) — real wire values, one row per
+              measured request. cache-write branches on the turn's wire: an
+              Anthropic-wire turn shows the real number; an OpenAI-wire turn
+              (copilot/opencode) shows the N/A string, NEVER 0 (D-12). */}
+          {s.usingWire && s.turnCount > 0 && (
+            <div className="mt-3 overflow-x-auto rounded-md border" data-testid="per-turn-wire-table">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-muted-foreground">
+                    <th className="px-2 py-1 text-left font-medium">Turn</th>
+                    <th className="px-2 py-1 text-left font-medium">Wire</th>
+                    <th className="px-2 py-1 font-medium" style={{ color: C_READ }}>cache read</th>
+                    <th className="px-2 py-1 font-medium" style={{ color: C_WRITE }}>cache write</th>
+                    <th className="px-2 py-1 font-medium" style={{ color: C_INPUT }}>fresh input</th>
+                    <th className="px-2 py-1 font-medium" style={{ color: C_OUTPUT }}>output</th>
+                  </tr>
+                </thead>
+                <tbody className="font-mono">
+                  {s.data.map((d) => (
+                    <tr key={d.turn} className="border-b last:border-0">
+                      <td className="px-2 py-1 text-left">{d.turn}</td>
+                      <td className="px-2 py-1 text-left font-sans">
+                        <Badge variant="outline" className="text-[10px]">{d.wire ?? 'unknown'}</Badge>
+                      </td>
+                      <td className="px-2 py-1" style={{ color: C_READ }}>{fmt(d.read)}</td>
+                      <td className="px-2 py-1" style={{ color: C_WRITE }}>
+                        {d.writeNA
+                          ? <span className="font-sans text-[10px] text-muted-foreground" title={CACHE_WRITE_NA}>{CACHE_WRITE_NA}</span>
+                          : fmt(d.write)}
+                      </td>
+                      <td className="px-2 py-1" style={{ color: C_INPUT }}>{fmt(d.input)}</td>
+                      <td className="px-2 py-1" style={{ color: C_OUTPUT }}>{fmt(d.output)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* 5. How prompt caching ACTUALLY works — the Anthropic-wire vs OpenAI-wire
+            asymmetry that makes cache-write N/A honest, not a bug (D-12). */}
+        <div className="rounded-md border bg-muted/30 p-4" data-testid="caching-explainer-copy">
+          <p className="text-sm font-semibold">How prompt caching actually works — and why cache-write is sometimes “N/A”</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Prompt caching is a <span className="font-medium text-foreground">provider-side</span> optimisation: the model host
+            hashes the stable prefix of your prompt and, on a later request with the same prefix, reuses the already-computed
+            attention state instead of re-running the model over those tokens. The bytes still cross the wire every turn — caching
+            cuts <em>re-computation &amp; cost</em>, not transmission.
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            The two provider wires report this differently, which is why the numbers above branch on <span className="font-mono">wire</span>:
+          </p>
+          <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+            <li>
+              <span className="font-medium" style={{ color: C_READ }}>Anthropic wire</span> (claude, via{' '}
+              <span className="font-mono">/v1/messages</span>) exposes BOTH a <span className="font-mono">cache_read</span> and a
+              dedicated <span className="font-mono">cache-creation</span> (write) counter. When the agent marks a prefix with{' '}
+              <span className="font-mono">cache_control</span>, the first request that warms it is billed as{' '}
+              <span style={{ color: C_WRITE }}>cache write</span> (~1.25×); every subsequent hit is{' '}
+              <span style={{ color: C_READ }}>cache read</span> (~0.1×). Here we show the <span className="font-medium text-foreground">real</span> cache-write number.
+            </li>
+            <li>
+              <span className="font-medium" style={{ color: C_INPUT }}>OpenAI wire</span> (copilot / opencode, via{' '}
+              <span className="font-mono">/api/complete</span>) reports <span className="font-mono">cache_read</span> only —
+              there is <span className="font-medium text-foreground">no cache-creation counter on the wire at all</span>. So we
+              render cache-write as <span className="font-medium text-foreground">{CACHE_WRITE_NA}</span> rather than{' '}
+              <span className="font-mono">0</span>: a zero would falsely imply the run tried to cache and wrote nothing, when in
+              truth the provider simply never reports that figure. Honest measurement over inference (D-12).
+            </li>
+          </ul>
         </div>
 
         <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} />
