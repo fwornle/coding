@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
-stopped_at: Phase 84 context gathered
-last_updated: "2026-07-08T04:23:55.060Z"
+stopped_at: Phase 84 Plan 09 — live E2E gate AWAITING human-verify
+last_updated: "2026-07-08T05:05:00.000Z"
 last_activity: 2026-07-08
 progress:
   total_phases: 21
@@ -54,13 +54,19 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 84 (per-turn-context-revelation) — EXECUTING
-Plan: 9 of 9
-Status: Ready to execute (84-08 COMPLETE — human-verify APPROVED 2026-07-08). The
-  cache explainer now consumes real per-request context-turns: fetchContextTurns
-  thunk/selector (89ebc89eb) + honest per-turn wire render with OpenAI-wire
-  "N/A (provider reports no cache-creation)" + caching copy (4e981c5b2). Frontend
-  rebuilt + health-dashboard-frontend restarted; vkb-server restarted to activate
-  84-07's read route. 84-09 (live E2E / proxy redeploy) is the last plan of the phase.
+Plan: 9 of 9 — autonomous proof DONE, human-verify checkpoint AWAITING
+Status: 84-09 live E2E gate executed. Proxy redeployed (e72666a → b1e0a49) after
+  confirming coordinator location=open; coding-services restarted to activate 84-07's
+  dashboard mirror. One live measured span (capture_raw_bodies=true) produced real
+  context-turns.jsonl.gz + raw-bodies.jsonl.gz; both read APIs serve the turns;
+  redaction verified on live traffic (no secret bodies survive). Operator review of
+  the first run caught two real issues, both fixed: (1) claude-code CLI token counts
+  were a flat baseline → re-ran through copilot (tools[]) for real varying per-request
+  usage (input 903/1037/1119, output 226/1052/4); (2) the context-window make-up band
+  regressed to illustrative widths → rewired to the real per-request categories[].bytes
+  (scaled + exact-byte legend) + added a per-turn "what it was doing" narrative + UI
+  secret scrub (commit cd5fb9cbe). Evidence + screenshots in 84-LIVE-GATE.md.
+  AWAITING human-verify approval of the live end-to-end render (Task 3, not self-approved).
 Last activity: 2026-07-08
 
 ## Deferred Items
