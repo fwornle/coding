@@ -333,7 +333,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] 85-02-PLAN.md — Host-side run-launch primitives: detached fixed-argv spawn + process-group cancel + pid liveness (D-01/08) [Wave 1]
 - [x] 85-03-PLAN.md — Host executor seam on health-coordinator :3034 (delegates spawn/cancel; clears stale span) (D-01/02/08) [Wave 2]
 - [x] 85-04-PLAN.md — vkb-server API routes: run (dual-source 409 → delegate), run-status (verbatim), run-cancel, specs (matrix preview) (D-01/02/04/08/09) [Wave 3]
-- [ ] 85-05-PLAN.md — Dashboard UI: launcher (spec picker + preview + overrides + capture checkbox) + 5s monitor grid + Re-run button (D-09/10/11/12) [Wave 4]
+- [x] 85-05-PLAN.md — Dashboard UI: launcher (spec picker + preview + overrides + capture checkbox) + 5s monitor grid + Re-run button (D-09/10/11/12) [Wave 4]
 - [ ] 85-06-PLAN.md — Proxy passthrough verify + deploy + live launch/monitor/cancel/re-run/capture gate [checkpoint] (D-01/02/08/09/10/11/12) [Wave 5]
 **UI hint**: yes
 
@@ -379,6 +379,6 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
 | 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete    | 2026-07-07 |
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
-| 85. Experiment Control Center | v7.5 | 4/6 | In Progress|  |
+| 85. Experiment Control Center | v7.5 | 5/6 | In Progress|  |
 | 86. Timeline v2 & Declutter | v7.5 | 0/? | Not started | - |
 | 87. Interactive Spans & Branch Avenues | v7.5 | 0/? | Not started | - |
