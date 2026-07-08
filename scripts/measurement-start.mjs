@@ -107,6 +107,9 @@ export function buildVariantMeta(args, { resolveSpec = resolveExperimentSpec } =
   // Phase 85-01 (D-07): --base-variant carries the ORIGINAL variant name when a per-variant
   // model/agent override derived a suffixed --variant. String flag → span.meta.base_variant.
   const baseVariant = parseStrArg(args, '--base-variant');
+  // Phase 85-01 (D-05): --rerun-of carries the ORIGINAL run_id this run re-runs. String flag →
+  // span.meta.rerun_of (buildRunTags folds it into Run.metadata; task_hash stays constant).
+  const rerunOf = parseStrArg(args, '--rerun-of');
 
   // Fail fast on an unsafe --test-command BEFORE the span opens (D-08 / T-77-05). The
   // direct-CLI path must not smuggle a shell-metacharacter command into span.meta.
@@ -186,6 +189,8 @@ export function buildVariantMeta(args, { resolveSpec = resolveExperimentSpec } =
     ...(repeat != null && Number.isFinite(repeat) ? { repeat } : {}),
     // D-07: the ORIGINAL variant name (only when an override derived a suffixed --variant).
     ...(baseVariant ? { base_variant: baseVariant } : {}),
+    // D-05: the ORIGINAL run_id this run re-runs (only when re-running).
+    ...(rerunOf ? { rerun_of: rerunOf } : {}),
     // D-12: default OFF — only stamp the key (strictly true) when the presence flag is passed.
     ...(captureRawBodies ? { capture_raw_bodies: true } : {}),
   };
