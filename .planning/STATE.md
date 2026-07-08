@@ -55,7 +55,16 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 84 (per-turn-context-revelation) — EXECUTING
 Plan: 8 of 9
-Status: Ready to execute
+Status: AWAITING HUMAN-VERIFY CHECKPOINT — Plan 84-08 Task 3. Autonomous tasks 1–2
+  complete + committed (89ebc89eb fetchContextTurns thunk/selector; 4e981c5b2
+  honest explainer + N/A + caching copy). Frontend rebuilt + health-dashboard-frontend
+  restarted; vkb-server restarted to activate 84-07's read route. gsd-browser
+  screenshots of the honest explainer (real per-turn cache split, OpenAI-wire
+  "N/A (provider reports no cache-creation)", Anthropic-wire real cache-write,
+  caching-explainer copy) captured under
+  .planning/phases/84-per-turn-context-revelation/evidence/. Awaiting operator
+  "approved" to finalize the plan SUMMARY. Demo fixture at
+  .data/measurements/ctx-demo-mixed-84-08/ (delete after approval).
 Last activity: 2026-07-08
 
 ## Deferred Items
