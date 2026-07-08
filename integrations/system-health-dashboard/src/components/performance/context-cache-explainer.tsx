@@ -458,6 +458,15 @@ export function ContextCacheExplainer() {
 
   const s = useMemo(() => summarize(timeline, contextTurns), [timeline, contextTurns])
 
+  // Rows the raw token-usage timeline would show for this task (same filter
+  // summarize uses). When it exceeds the measured per-request context-turns count,
+  // the difference is concurrent foreground/background traffic swept into the
+  // task's wall-clock window (Phase-75) — surfaced in the reconciliation note.
+  const timelineTurnCount = useMemo(
+    () => timeline.filter((r) => (r.granularity_tier ?? '') !== 'per-session-aggregate').length,
+    [timeline],
+  )
+
   // `real` is already THIS run's own capture (fetched by task_id), so it is
   // safe to use directly — no cross-run leakage possible.
   const activeReal = real
@@ -852,6 +861,32 @@ export function ContextCacheExplainer() {
             <StatCard label="Fresh input" value={fmt(s.totalInput)} color={C_INPUT} />
             <StatCard label="Output" value={fmt(s.totalOutput)} color={C_OUTPUT} />
           </div>
+
+          {/* Reconciliation (Plan 84-09): give an explicit measured grand total so
+              it reconciles against a raw token-usage timeline, AND explain why the
+              timeline may show MORE rows/tokens than this modal — the timeline is a
+              wall-clock correlation that also attributes concurrent foreground/
+              background proxy traffic to the task window (Phase-75), whereas these
+              per-request context-turns count ONLY the measured requests. */}
+          {s.usingWire && s.turnCount > 0 && (
+            <p className="mt-2 rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground" data-testid="reconciliation-note">
+              <span className="font-medium text-foreground">{fmt(s.totalRead + s.totalWrite + s.totalInput + s.totalOutput)} tokens</span>{' '}
+              transmitted across <span className="font-medium text-foreground">{s.turnCount}</span> measured
+              request{s.turnCount === 1 ? '' : 's'} (cache read {fmt(s.totalRead)} + cache write{' '}
+              {s.writeIsNA ? 'N/A' : fmt(s.totalWrite)} + fresh input {fmt(s.totalInput)} + output {fmt(s.totalOutput)}).
+              {timelineTurnCount > s.turnCount && (
+                <>
+                  {' '}A raw token-usage timeline for this task may list{' '}
+                  <span className="font-medium text-foreground">{timelineTurnCount}</span> rows — the extra{' '}
+                  <span className="font-medium text-foreground">{timelineTurnCount - s.turnCount}</span> are concurrent
+                  foreground/background proxy calls attributed to this task’s wall-clock window (Phase-75 time-window
+                  attribution), <span className="font-medium text-foreground">not</span> part of the measured request.
+                  This modal counts only the measured requests, so those rows — and any large{' '}
+                  <span style={{ color: C_READ }}>cache_read</span> they carry — are deliberately excluded here.
+                </>
+              )}
+            </p>
+          )}
 
           {/* Per-turn honest split (Plan 84-08) — real wire values, one row per
               measured request. cache-write branches on the turn's wire: an
