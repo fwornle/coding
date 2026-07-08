@@ -30,7 +30,11 @@ key-files:
     - .planning/phases/84-per-turn-context-revelation/84-LIVE-GATE.md
     - .planning/phases/84-per-turn-context-revelation/evidence/84-09-live-explainer.png
     - .planning/phases/84-per-turn-context-revelation/evidence/84-09-live-perturn-table.png
-  modified: []
+    - .planning/phases/84-per-turn-context-revelation/evidence/84-09-divider-aligned.png
+    - .planning/phases/84-per-turn-context-revelation/evidence/84-09-reconciliation-note.png
+    - .planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md
+  modified:
+    - integrations/system-health-dashboard/src/components/performance/context-cache-explainer.tsx
 
 key-decisions:
   - "Coordinator network.location=open + proxy.networkMode=public + 0 strong-network failures were confirmed BEFORE the kickstart (T-84-09-02 / Pitfall 6); post-kickstart re-confirmed still open — no corporate mis-detect."
@@ -47,24 +51,30 @@ completed: 2026-07-08
 
 # Phase 84 Plan 09: Live End-to-End Gate Summary
 
-**The whole per-turn-context-revelation pipeline was proven honestly end-to-end on one live measured span: the proxy was redeployed (build `e72666a` -> `b1e0a49`) after confirming the coordinator `location=open`, a single measured span with `capture_raw_bodies=true` fired three real `/api/complete` requests, span close produced real `context-turns.jsonl.gz` + `raw-bodies.jsonl.gz`, both read APIs (proxy + vkb-via-dashboard, plus the newly-activated dashboard mirror) served the three OpenAI-wire turns, the live raw bodies redacted three embedded synthetic secrets to `<SECRET/TOKEN/JWT_REDACTED>` with zero unredacted survivors, and the cache explainer rendered the live per-turn split with "N/A (provider reports no cache-creation)" for every OpenAI-wire turn — captured in two gsd-browser screenshots. The phase-gate human-verify checkpoint (Task 3) is AWAITING operator sign-off; the executor did NOT self-approve.**
+**The whole per-turn-context-revelation pipeline was proven honestly end-to-end on one live measured span: the proxy was redeployed (build `e72666a` -> `b1e0a49`) after confirming the coordinator `location=open`, a single measured span with `capture_raw_bodies=true` fired three real `/api/complete` requests, span close produced real `context-turns.jsonl.gz` + `raw-bodies.jsonl.gz`, both read APIs (proxy + vkb-via-dashboard, plus the newly-activated dashboard mirror) served the three OpenAI-wire turns, the live raw bodies redacted three embedded synthetic secrets to `<SECRET/TOKEN/JWT_REDACTED>` with zero unredacted survivors, and the cache explainer rendered the live per-turn split with "N/A (provider reports no cache-creation)" for every OpenAI-wire turn — captured in gsd-browser screenshots. The phase-gate human-verify checkpoint (Task 3) was APPROVED by the operator, who requested three post-approval UI refinements (#1 divider visibility+alignment and #2 an honest Timeline reconciliation note — both applied; #3 a Timeline per-turn intent fallback — assessed and deferred to Phase 86). Phase 84 is COMPLETE (9/9 plans).**
 
 ## Performance
 
 - **Duration:** ~18 min
 - **Completed (autonomous tasks):** 2026-07-08
-- **Tasks:** 3 (2 autonomous PASS + 1 human-verify checkpoint AWAITING)
-- **Files created:** 3 (evidence md + 2 screenshots); **modified:** 0 in-repo code (this plan is a live proof; the runtime edits live in the `_work/rapid-llm-proxy` repo from 84-04/06)
+- **Tasks:** 3 (2 autonomous PASS + 1 human-verify checkpoint APPROVED with refinements)
+- **Files created:** 5 (evidence md + 4 screenshots) + 1 follow-up; **modified:** 1 in-repo component (`context-cache-explainer.tsx` refinements) + the live-gate + deferred-items docs. The proxy runtime edits live in the `_work/rapid-llm-proxy` repo from 84-04/06.
 
 ## Accomplishments
 
 - **Task 1 — redeploy + live span (PASS).** Confirmed coordinator `network.location=open` / `proxy.networkMode=public` / `consecutive_strong_network_failures=0`, then `launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy` (server.mjs is runtime JS — **no build**). Build flipped `e72666a` -> `b1e0a49`, `networkMode` stayed `public`, and `GET /api/context-turns` flipped from `{"error":"Not found"}` to graceful-empty (route now live). Opened one measured span (`task_id=ctx-live-84-09--copilot-openai--r0`) with `meta.capture_raw_bodies=true`, fired three real `POST /api/complete` requests (all 200), and closed via `scripts/measurement-stop.mjs --headless`. Produced real `context-turns.jsonl.gz` (540 B) + `raw-bodies.jsonl.gz` (473 B), plaintext removed, `active-measurement.json` gone.
 - **Task 2 — read APIs + redaction (PASS).** Proxy `GET :12435/api/context-turns?task_id=` -> 3 turns with the separate `usage.{input,output,cache_read,cache_write:null}` split + `wire` + `preview`. vkb-via-dashboard `GET :3032/api/experiments/runs/<tid>/context-turns` -> same 3 turns (the explainer's data source). Activated the dashboard `/api/context-turns` mirror via `docker-compose restart coding-services` (84-07's deferred restart) -> 3 turns; both routes graceful-empty on a nonexistent id. Redaction on live traffic: request #2 embedded three synthetic fake secrets; the gunzipped `raw-bodies.jsonl.gz` had **0** unredacted secret substrings, with `<SECRET_REDACTED>` / `<TOKEN_REDACTED>` / `<JWT_REDACTED>` markers proving the shared 27-pattern applier ran (fail-closed, T-84-09-01).
-- **Task 3 — phase-gate human-verify (AWAITING).** Drove the explainer open for the REAL live task_id (Redux `setExplainTaskId`; runs KB empty for this ad-hoc span, so no "Explain" button — the DATA is pulled live by `fetchContextTurns` through the read route, not a fixture). Live DOM + two gsd-browser screenshots confirm: per-turn table T1/T2/T3 all `openai`, cache-write "N/A (provider reports no cache-creation)", fresh input 508 / output 11 each; stat cards Cache read 0 / Cache write N/A / Fresh input 1,524 / Output 33; verdict "does not reuse a prompt cache … 1,524 tokens"; and the "How prompt caching actually works — and why cache-write is sometimes 'N/A'" copy block. **Executor did NOT self-approve** — returned the structured checkpoint for operator confirmation.
+- **Task 3 — phase-gate human-verify: APPROVED WITH REFINEMENTS.** Drove the explainer open for the REAL live task_id (Redux `setExplainTaskId`; runs KB empty for this ad-hoc span, so no "Explain" button — the DATA is pulled live by `fetchContextTurns` through the read route, not a fixture). Live DOM + gsd-browser screenshots confirmed the honest render (per-turn table all `openai`, cache-write "N/A (provider reports no cache-creation)", real varying input, verdict + caching copy). The operator **approved** the gate and requested three refinements before phase close, all handled in this continuation:
+  - **#1 (APPLIED)** — Cache-boundary divider now bold **3px dashed, theme-aware `border-foreground`** (crisp in light+dark), and the band + `◀ cacheable prefix / new this turn ▶` label row share one relative wrapper so the divider spans both and lands on the label split. Evidence: `evidence/84-09-divider-aligned.png`.
+  - **#2 (APPLIED)** — Honest reconciliation note by the per-turn table. A parallel edit had also added a Phase-75 wall-clock note; the two were consolidated into ONE block (commit `19f066f5e`) that shows the measured grand total AND, when the raw token-usage timeline lists more rows than the measured context-turns, names the operator-verified root cause: the extra turns are ones the context-turns write hook never sees (e.g. claude-code CLI adapter turns) plus Phase-75 wall-clock concurrent traffic. No fabricated rows. Live-verified on run-b: "3 measured requests … timeline may list 5 rows — the extra 2 …". Evidence: `evidence/84-09-reconciliation-note.png`.
+  - **#3 (ASSESSED → DEFERRED to Phase 86)** — `timeline.tsx` already has the D-07 correlation machinery and renders per-turn intents when observations exist; `0 intents` is genuine for a synthetic span. The user-input-preview fallback is Phase-86 "Timeline v2 + declutter" scope → follow-up `.planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md`.
 
 ## Task Commits
 
 1. **Live-gate evidence + 2 screenshots** — `b7c083e6d` (docs)
+2. **Explainer redesign fixes (make-up band + per-turn narrative + secret scrub)** — `cd5fb9cbe` (feat)
+3. **Refinements #1 divider + #2 reconciliation note + #3 follow-up** — `6f72052f0` (feat)
+4. **Consolidate the reconciliation note (merged a parallel Phase-75 note + this plan's write-hook note into one; dynamic N-vs-M row count)** — `19f066f5e` (feat)
 
 ## Files Created
 
@@ -99,8 +109,15 @@ completed: 2026-07-08
 
 ## Next Phase Readiness
 
-- Phase 84 (per-turn-context-revelation) is functionally complete pending the Task-3 operator sign-off. The full write -> close -> read -> explainer path is proven live end-to-end. Downstream: Phase 86 (Timeline v2) consumes these per-turn context-turns for richer per-turn UI.
+- **Phase 84 (per-turn-context-revelation) is COMPLETE (9/9 plans).** Task-3 human-verify APPROVED (with the three refinements applied/assessed above). The full write -> close -> read -> explainer path is proven live end-to-end and operator-signed-off. Downstream: Phase 86 (Timeline v2 + declutter) consumes these per-turn context-turns AND picks up the deferred per-turn intent fallback (`.planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md`).
+
+## Self-Check: PASSED
+
+- `context-cache-explainer.tsx` modified, tsc-clean, live-rendered (turns-capture-banner + timeline-reconciliation-note both present via gsd-browser DOM assertions).
+- Evidence screenshots `84-09-divider-aligned.png` + `84-09-reconciliation-note.png` exist on disk.
+- Follow-up `.planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md` created.
+- Commits `b7c083e6d`, `cd5fb9cbe`, `6f72052f0` in git history.
 
 ---
 *Phase: 84-per-turn-context-revelation*
-*Completed (autonomous): 2026-07-08; human-verify checkpoint AWAITING*
+*Completed: 2026-07-08; human-verify APPROVED with refinements — Phase 84 COMPLETE (9/9)*

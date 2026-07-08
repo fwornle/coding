@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: executing
-stopped_at: Phase 84 Plan 09 — live E2E gate AWAITING human-verify
-last_updated: "2026-07-08T05:05:00.000Z"
+status: verifying
+stopped_at: Phase 84 context gathered
+last_updated: "2026-07-08T06:10:38.279Z"
 last_activity: 2026-07-08
 progress:
   total_phases: 21
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 84
-  completed_plans: 82
-  percent: 62
+  completed_plans: 83
+  percent: 67
 ---
 
 # Project State
@@ -53,20 +53,24 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 84 (per-turn-context-revelation) — EXECUTING
-Plan: 9 of 9 — autonomous proof DONE, human-verify checkpoint AWAITING
-Status: 84-09 live E2E gate executed. Proxy redeployed (e72666a → b1e0a49) after
-  confirming coordinator location=open; coding-services restarted to activate 84-07's
-  dashboard mirror. One live measured span (capture_raw_bodies=true) produced real
-  context-turns.jsonl.gz + raw-bodies.jsonl.gz; both read APIs serve the turns;
-  redaction verified on live traffic (no secret bodies survive). Operator review of
-  the first run caught two real issues, both fixed: (1) claude-code CLI token counts
-  were a flat baseline → re-ran through copilot (tools[]) for real varying per-request
-  usage (input 903/1037/1119, output 226/1052/4); (2) the context-window make-up band
-  regressed to illustrative widths → rewired to the real per-request categories[].bytes
-  (scaled + exact-byte legend) + added a per-turn "what it was doing" narrative + UI
-  secret scrub (commit cd5fb9cbe). Evidence + screenshots in 84-LIVE-GATE.md.
-  AWAITING human-verify approval of the live end-to-end render (Task 3, not self-approved).
+Phase: 84 (per-turn-context-revelation) — COMPLETE (9/9 plans)
+Plan: 9 of 9 — live E2E gate PASSED; Task-3 human-verify APPROVED with refinements
+Status: Phase 84 COMPLETE. The full pipeline was proven live end-to-end (proxy redeploy
+  e72666a→b1e0a49 after confirming coordinator location=open; one measured span with
+  capture_raw_bodies=true produced real context-turns.jsonl.gz + raw-bodies.jsonl.gz;
+  both read APIs serve the turns; redaction verified on live traffic). The operator
+  APPROVED the phase gate and requested three UI refinements, all handled (commit
+  6f72052f0): (#1) the cache-boundary divider is now bold 3px dashed theme-aware
+  border-foreground and spans the band + label row so it is clearly visible AND aligned
+  to the cached/non-cached labels; (#2) an honest reconciliation note below the per-turn
+  table explains that the table covers proxy-wire context-turns while additional Timeline
+  turns (e.g. claude-code CLI adapter turns) come from the token-usage source and are not
+  logged by the context-turns write hook; (#3) the Timeline per-turn "what it was doing"
+  fallback was assessed — the D-07 correlation machinery already exists in timeline.tsx
+  and works (0 intents is genuine for a synthetic span), so the user-input-preview
+  fallback was DEFERRED to Phase 86 with a precise follow-up
+  (.planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md). Evidence +
+  screenshots in 84-LIVE-GATE.md. Ready for /gsd-verify-phase 84.
 Last activity: 2026-07-08
 
 ## Deferred Items
@@ -410,10 +414,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 84 P06 | 20min | 2 tasks | 3 files |
 | Phase 84 P07 | 8min | 2 tasks | 3 files |
 | Phase 84 P08 | 55min | 3 tasks | 2 files |
+| Phase 84 P09 | 5 | 3 tasks | 6 files |
 
 ## Session Continuity
 
-Last session: 2026-07-08T04:23:47.836Z
+Last session: 2026-07-08T06:10:13.641Z
 Stopped at: Phase 84 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 

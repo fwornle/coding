@@ -237,4 +237,51 @@ The always-captured `categories[].bytes` make-up is faithful on every route.
 - Proxy daemon now on build `b1e0a49` (the 84-04/06 hooks live). `networkMode=public`.
 - `coding-services` container restarted (dashboard `/api/context-turns` mirror + vkb route live).
 - Live evidence artifacts retained under `.data/measurements/ctx-live-84-09--copilot-openai--r0/`
-  (age-swept in 14 days by `com.coding.context-turns-sweeper`, D-01).
+  AND `.data/measurements/ctx-live-84-09b--copilot-openai--r0/` (the credible varying re-run;
+  age-swept in 14 days by `com.coding.context-turns-sweeper`, D-01 — operator chose to keep).
+
+---
+
+## Phase-gate human-verify: APPROVED WITH REFINEMENTS (2026-07-08)
+
+The operator **approved** the live end-to-end gate (Task 3) and requested three UI
+refinements before phase close. All three assessed/applied (commit `6f72052f0`):
+
+### #1 — Anatomy band: cache-boundary divider now visible + aligned (APPLIED)
+The faint 2px green dashed divider between the cacheable-prefix segments and the
+fresh User-Input tail was replaced by a bold **3px dashed, theme-aware
+`border-foreground`** line (crisp in both light and dark mode). The band and its
+`◀ cacheable prefix … / new this turn ▶` label row now share ONE relative wrapper,
+so the divider **spans both** — it extends down from the band boundary and lands
+exactly on the label split, visually connecting the two segments to their labels.
+- Evidence: `evidence/84-09-divider-aligned.png` — the white dashed divider spans the
+  band down through the `new this turn ▶` label (position reflects the real data: the
+  cacheable prefix is ~95% of this run's largest turn, User Input the small fresh tail).
+
+### #2 — Honest Timeline reconciliation note (APPLIED)
+Root cause (verified): the multi-agent Timeline counts all turns from the token-usage
+source (T1–T3 = copilot `/api/complete` openai-wire; T4–T5 = claude-code CLI worker
+turns via `token-adapter-claude`). The explainer per-turn table shows only T1–T3
+because `context-turns.jsonl` logs only proxy `/api/complete` + `/v1/messages` requests
+— the claude-code CLI adapter turns never pass through the context-turns write hook.
+A short, honest note now renders below the per-turn table stating exactly this: the
+table covers proxy-wire requests captured in context-turns; additional Timeline turns
+(e.g. claude-code CLI adapter turns) are measured via the token source but not logged
+by the context-turns write hook. No fabricated rows.
+- Evidence: `evidence/84-09-reconciliation-note.png` — per-turn table (T1–T3, secret
+  scrubbed `api_key=sk-***`) + the reconciliation note beneath it.
+
+### #3 — Timeline per-turn "what it was doing" (ASSESSED → DEFERRED to Phase 86)
+Investigation: `timeline.tsx` ALREADY contains the full D-07 correlation machinery
+(`assignObservationsToTurns`, `linkDigestsToRun`, `TurnObservations`, the per-turn
+`Intent: …` render) and it works — it shows `N intents linked to turns` whenever ETM
+observations exist in the run window. The `0 intents linked to turns` for this span is
+**genuine**: an ad-hoc measured span produces no ETM observations (not a real coding
+session); `timeline.tsx:~426` explicitly documents this as expected for smoke/replay
+runs. The real gap — giving the Timeline the explainer's user-input-preview fallback so
+every turn shows "what it was doing" even without ETM observations — is a genuine
+feature belonging to Phase 86 ("Timeline v2 + declutter"). Not a small render bug, so
+**not** built here. Precise follow-up recorded:
+`.planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md`.
+
+**Gate disposition: APPROVED. Phase 84 COMPLETE (9/9 plans).**

@@ -57,7 +57,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] **Phase 81: Copilot BYOK Proxy-Routing Verification Spike** — CONFIRMED live 2026-07-05 (copilot 1.0.68 → proxy shim, token row matches CLI footer); gaps → Phase 82: shim tool-call passthrough (HARD), dedicated /v1/copilot path, ambient-binding-only for copilot. Verdict: `81-SPIKE-VERDICT.md`
 - [x] **Phase 82: Wire-Measurement Foundation** — Uniform 4-agent proxy capture: cache-token columns + /v1/messages tap cache parse + x-task-id/x-agent header binding + claude-cell & copilot routing + richer-row dedup merge (completed 2026-07-06)
 - [x] **Phase 83: Token Reconciliation Layer** — Transcript adapters (cladpt/copadt) verify/enrich wire rows; per-span discrepancy sink; no double-counting (completed 2026-07-06)
-- [ ] **Phase 84: Per-Turn Context Revelation** — Persist every measured request as context-turns JSONL with paired usage; read APIs; honest cache explainer
+- [x] **Phase 84: Per-Turn Context Revelation** — Persist every measured request as context-turns JSONL with paired usage; read APIs; honest cache explainer (completed 2026-07-08)
 - [ ] **Phase 85: Experiment Control Center** — Launch / re-run (same snapshot, param overrides) / monitor / cancel experiments from the performance dashboard
 - [ ] **Phase 86: Timeline v2 & Performance Page Declutter** — Per-turn story (prompt, tool calls, cache split, context band) + IA cleanup
 - [ ] **Phase 87: Interactive Spans & Branch Avenues** — Span snapshot from the main agent; forked avenue branches re-running the initial prompt with modified params; compare & merge
@@ -372,7 +372,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
 | 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete    | 2026-07-07 |
-| 84. Per-Turn Context Revelation | v7.5 | 8/9 | In Progress|  |
+| 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
 | 86. Timeline v2 & Declutter | v7.5 | 0/? | Not started | - |
 | 87. Interactive Spans & Branch Avenues | v7.5 | 0/? | Not started | - |
