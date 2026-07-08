@@ -268,6 +268,21 @@ interface PerformanceState {
   measurementLoading: boolean
   measurementError: string | null
   lastCloseCommand: string | null // host command surfaced after Stop
+  // Experiment Control Center (Plan 85-05).
+  specList: SpecSummary[]
+  specListLoading: boolean
+  // The run currently being monitored (drives the 5s run-status poll). Set on a
+  // successful launch; cleared when the operator dismisses the monitor.
+  activeRunId: string | null
+  runStatus: RunProgress | null
+  runStatusError: string | null
+  // The 409-holder / validation message surfaced after a rejected launch (never
+  // a silent failure — D-09).
+  launchError: string | null
+  launchPending: boolean
+  // D-11 re-run pre-fill payload (set by the runs-table Re-run button, consumed
+  // + cleared by the launcher on mount).
+  launcherPrefill: LauncherPrefill | null
 }
 
 // The active measurement span (mirrors .data/active-measurement.json).
@@ -275,6 +290,99 @@ export interface ActiveMeasurement {
   task_id: string
   started_at: string
   goal_sentence?: string
+}
+
+// ---------------------------------------------------------------------------
+// Experiment Control Center (Plan 85-05, D-09/D-10/D-11/D-12)
+// ---------------------------------------------------------------------------
+
+// One resolved spec summary as returned by GET /api/experiments/specs (Plan 04
+// handleSpecList): `{ specs: [{ file, goal_sentence, repeats, variantCount,
+// cellCount, snapshot_id, variants }] }`. cellCount is computed SERVER-SIDE
+// (variantCount × repeats) — D-09: the launcher previews this number, it does
+// NOT recompute the axes client-side. A malformed spec is listed with `error`
+// (not fatal) so the picker can show it disabled.
+export interface SpecSummary {
+  file: string
+  goal_sentence?: string | null
+  repeats?: number | null
+  variantCount?: number | null
+  cellCount?: number | null
+  snapshot_id?: string | null
+  variants?: string[] | null
+  // Present only when resolveExperimentSpec threw for this file — the endpoint
+  // lists it rather than dropping it (Plan 04).
+  error?: string | null
+}
+
+// The per-variant model/agent override map (D-06). Keyed by the ORIGINAL variant
+// name — the runner's applyVariantOverride (Plan 01 Task 4) keys on this exact
+// name. This is the cross-plan contract field name — do NOT rename in isolation.
+export interface VariantOverride {
+  model?: string
+  agent?: string
+}
+
+// The overrides payload bundled into launchExperiment's body. Matches the Plan
+// 01/04 runner/API field names exactly (repeats/timeout/variants/
+// capture_raw_bodies/variantOverrides). Every field optional — an empty object
+// means "run the spec as-authored".
+export interface ExperimentOverrides {
+  repeats?: number
+  timeout?: number
+  // The variant SUBSET to run (D-06). Each entry must be one of the spec's
+  // resolved variant names — the server re-validates (Plan 04 _validateOverrides).
+  variants?: string[]
+  // D-12 — default OFF. When true the proxy captures raw request/response bodies
+  // for the measured cells (rawBodyCaptureEnabled strict === true).
+  capture_raw_bodies?: boolean
+  // D-06 per-variant model/agent override map, keyed by ORIGINAL variant name.
+  variantOverrides?: Record<string, VariantOverride>
+}
+
+// The verbatim progress.json served by GET /api/experiments/run-status/:runId
+// (Plan 04 handleRunStatus). Rendered STRAIGHT by the monitor (D-10, no log-tail).
+// ENOENT is served gracefully as `{ runId, overall:'unknown', cells:[] }`.
+export type RunCellState =
+  | 'pending' | 'restoring' | 'running' | 'scoring'
+  | 'complete' | 'timeout' | 'abort' | 'skipped'
+
+export interface RunProgressCell {
+  variant: string
+  rep: number
+  task_id?: string | null
+  state: RunCellState | string
+  started_at?: string | null
+  ended_at?: string | null
+  // Abort/skip explanation (D-10). Rendered as React text content (auto-escaped)
+  // — never dangerouslySetInnerHTML (T-85-05-03).
+  reason?: string | null
+  [key: string]: unknown
+}
+
+export interface RunProgress {
+  run_id?: string | null
+  // The graceful-empty ENOENT shape names the id as `runId`; a live progress.json
+  // names it `run_id`. Both are tolerated by the selectors.
+  runId?: string | null
+  spec?: string | null
+  snapshot_id?: string | null
+  pid?: number | null
+  done?: number | null
+  total?: number | null
+  overall?: string | null
+  cells: RunProgressCell[]
+  [key: string]: unknown
+}
+
+// The D-11 re-run pre-fill payload. Set by the runs-table Re-run button and
+// consumed by the launcher to pre-populate the spec select + snapshot_id +
+// rerun_of + override fields (including any seeded per-variant variantOverrides).
+export interface LauncherPrefill {
+  spec: string
+  snapshot_id?: string | null
+  rerun_of?: string | null
+  overrides?: ExperimentOverrides
 }
 
 const emptyFacetState: FacetState = {
@@ -323,6 +431,14 @@ const initialState: PerformanceState = {
   measurementLoading: false,
   measurementError: null,
   lastCloseCommand: null,
+  specList: [],
+  specListLoading: false,
+  activeRunId: null,
+  runStatus: null,
+  runStatusError: null,
+  launchError: null,
+  launchPending: false,
+  launcherPrefill: null,
 }
 
 // Default operator identity stamped into overridden_by when no richer identity
@@ -662,6 +778,101 @@ export const stopMeasurement = createAsyncThunk<
 )
 
 // ---------------------------------------------------------------------------
+// Experiment Control Center thunks (Plan 85-05) — same-origin
+// /api/experiments/*. Mirror the startMeasurement/fetchActiveMeasurement shape:
+// a rejected POST surfaces `data?.message` (the 409 holder) via rejectWithValue
+// so the launcher can render it, never a silent failure (D-09).
+// ---------------------------------------------------------------------------
+
+// fetchSpecList (D-09): GET the resolved variant-matrix preview for every
+// config/experiments/*.yaml. Feeds the launcher's spec picker + cellCount preview.
+export const fetchSpecList = createAsyncThunk<SpecSummary[], void | undefined, { rejectValue: string }>(
+  'performance/fetchSpecList',
+  async (_arg, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/specs')
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      return (data?.specs ?? []) as SpecSummary[]
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// launchExperiment (D-09/D-11/D-12): POST a chosen spec + overrides (+ rerun_of).
+// The `overrides` object carries the D-06 variantOverrides map per the cross-plan
+// contract — forwarded whole, not renamed. A 409 (interactive span or a live run
+// already holding the single slot) surfaces the holder message via rejectWithValue
+// — the operator always sees WHY the launch was refused (D-09).
+export const launchExperiment = createAsyncThunk<
+  { run_id: string; pid?: number | null },
+  { spec: string; overrides?: ExperimentOverrides; rerun_of?: string | null },
+  { rejectValue: string }
+>(
+  'performance/launchExperiment',
+  async ({ spec, overrides, rerun_of }, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spec, overrides: overrides ?? {}, rerun_of: rerun_of ?? null }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
+      return { run_id: data.run_id as string, pid: (data.pid ?? null) as number | null }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// fetchRunStatus (D-10): GET the verbatim progress.json for a run. Polled every 5s
+// by the monitor. The server serves ENOENT gracefully as
+// `{ runId, overall:'unknown', cells:[] }`, so this never 500s on a not-yet-started
+// run.
+export const fetchRunStatus = createAsyncThunk<RunProgress, string, { rejectValue: string }>(
+  'performance/fetchRunStatus',
+  async (runId, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/experiments/run-status/${encodeURIComponent(runId)}`)
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      // Normalize the cells array so downstream renders never index into undefined.
+      return { ...data, cells: Array.isArray(data?.cells) ? data.cells : [] } as RunProgress
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// cancelRun (D-08): POST a run cancel. The server delegates a negated-pid group
+// kill to the host coordinator — it acts immediately (no graceful-after-cell
+// latency). Body carries run_id + run_dir (Plan 04 handleRunCancel reads run.json
+// for the pid).
+export const cancelRun = createAsyncThunk<
+  { killed?: boolean; run_id?: string },
+  { run_id: string; run_dir?: string },
+  { rejectValue: string }
+>(
+  'performance/cancelRun',
+  async ({ run_id, run_dir }, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/run-cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_id, run_dir }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
+      return { killed: data?.killed as boolean, run_id: data?.run_id as string }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// ---------------------------------------------------------------------------
 // Slice
 // ---------------------------------------------------------------------------
 
@@ -747,6 +958,28 @@ const performanceSlice = createSlice({
       state.saveOverrideError = null
       state.saveOverrideStatus = null
       state.saveOverrideSuccessAt = null
+    },
+    // D-11: seed the launcher pre-fill (spec + snapshot_id + rerun_of + override
+    // fields incl. per-variant variantOverrides). Dispatched by the runs-table
+    // Re-run button; consumed + cleared by the launcher on mount.
+    setLauncherPrefill(state, action: PayloadAction<LauncherPrefill | null>) {
+      state.launcherPrefill = action.payload
+      // Re-opening the launcher clears any stale launch error banner.
+      state.launchError = null
+    },
+    clearLauncherPrefill(state) {
+      state.launcherPrefill = null
+    },
+    // Set/clear the run being monitored (drives the 5s run-status poll).
+    setActiveRunId(state, action: PayloadAction<string | null>) {
+      state.activeRunId = action.payload
+      if (action.payload === null) {
+        state.runStatus = null
+        state.runStatusError = null
+      }
+    },
+    clearLaunchError(state) {
+      state.launchError = null
     },
   },
   extraReducers: (builder) => {
@@ -910,6 +1143,51 @@ const performanceSlice = createSlice({
         state.measurementLoading = false
         state.measurementError = action.payload ?? 'Failed to stop measurement'
       })
+      // Experiment Control Center (Plan 85-05)
+      .addCase(fetchSpecList.pending, (state) => {
+        state.specListLoading = true
+      })
+      .addCase(fetchSpecList.fulfilled, (state, action) => {
+        state.specListLoading = false
+        state.specList = action.payload
+      })
+      .addCase(fetchSpecList.rejected, (state) => {
+        state.specListLoading = false
+        // Leave the (possibly empty) list in place — the picker degrades to empty.
+      })
+      .addCase(launchExperiment.pending, (state) => {
+        state.launchPending = true
+        state.launchError = null
+      })
+      .addCase(launchExperiment.fulfilled, (state, action) => {
+        state.launchPending = false
+        state.launchError = null
+        // Start monitoring the freshly-launched run.
+        state.activeRunId = action.payload.run_id
+        state.runStatus = null
+        state.runStatusError = null
+        // Consume the pre-fill once the launch succeeds.
+        state.launcherPrefill = null
+      })
+      .addCase(launchExperiment.rejected, (state, action) => {
+        state.launchPending = false
+        // D-09: surface the 409 holder / validation message (never silent).
+        state.launchError = action.payload ?? 'Failed to launch experiment'
+      })
+      .addCase(fetchRunStatus.fulfilled, (state, action) => {
+        state.runStatus = action.payload
+        state.runStatusError = null
+      })
+      .addCase(fetchRunStatus.rejected, (state, action) => {
+        state.runStatusError = action.payload ?? 'Failed to load run status'
+      })
+      .addCase(cancelRun.fulfilled, (state) => {
+        // The host group-kill was requested; the next 5s poll reflects the
+        // terminal cell states. Keep monitoring so the operator sees the wind-down.
+      })
+      .addCase(cancelRun.rejected, (state, action) => {
+        state.runStatusError = action.payload ?? 'Failed to cancel run'
+      })
   },
 })
 
@@ -928,6 +1206,10 @@ export const {
   setCompareA,
   setCompareB,
   clearOverrideStatus,
+  setLauncherPrefill,
+  clearLauncherPrefill,
+  setActiveRunId,
+  clearLaunchError,
 } = performanceSlice.actions
 
 // ---------------------------------------------------------------------------
@@ -975,6 +1257,16 @@ export const selectActiveMeasurement = (state: RootState) => state.performance.a
 export const selectMeasurementLoading = (state: RootState) => state.performance.measurementLoading
 export const selectMeasurementError = (state: RootState) => state.performance.measurementError
 export const selectLastCloseCommand = (state: RootState) => state.performance.lastCloseCommand
+
+// Experiment Control Center selectors (Plan 85-05).
+export const selectSpecList = (state: RootState) => state.performance.specList
+export const selectSpecListLoading = (state: RootState) => state.performance.specListLoading
+export const selectActiveRunId = (state: RootState) => state.performance.activeRunId
+export const selectRunStatus = (state: RootState) => state.performance.runStatus
+export const selectRunStatusError = (state: RootState) => state.performance.runStatusError
+export const selectLaunchError = (state: RootState) => state.performance.launchError
+export const selectLaunchPending = (state: RootState) => state.performance.launchPending
+export const selectLauncherPrefill = (state: RootState) => state.performance.launcherPrefill
 
 // Score-override save-state selectors (drawer branches on these).
 export const selectSaveOverridePending = (state: RootState) => state.performance.saveOverridePending

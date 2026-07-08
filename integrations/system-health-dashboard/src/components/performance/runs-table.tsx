@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { Pencil, Layers, Trash2 } from 'lucide-react'
+import { Pencil, Layers, Trash2, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,10 +23,59 @@ import {
   deleteSelectedRuns,
   selectSelectedRunIds,
   selectDeleteRunsPending,
+  setLauncherPrefill,
   type Run,
+  type ExperimentOverrides,
+  type VariantOverride,
 } from '@/store/slices/performanceSlice'
 import { effective, isEdited, judged, SCORE_DIMENSIONS } from './corrected-wins'
 import { distinctModels, normalizeModel } from './models'
+
+// D-11 Re-run guard: a Re-run button is only meaningful on a COMPLETED experiment
+// run. A run is an experiment if it carries variant/base_variant provenance (only
+// the experiment runner stamps these — an interactive/ad-hoc measurement has
+// neither), and it's completed once terminal_state === 'complete' (D-04 enum
+// persisted by run-write.mjs). These fields ride on the Run index signature
+// (`[key: string]: unknown`) from readRuns — read them defensively as strings.
+function runStr(run: Run, key: string): string | null {
+  const v = run[key]
+  return typeof v === 'string' && v.trim() !== '' ? v : null
+}
+
+function isCompletedExperimentRun(run: Run): boolean {
+  const isExperiment = runStr(run, 'variant') !== null || runStr(run, 'base_variant') !== null
+  const isComplete = runStr(run, 'terminal_state') === 'complete'
+  return isExperiment && isComplete
+}
+
+// Build the D-11 re-run pre-fill from a completed experiment run. Same spec +
+// snapshot_id, rerun_of = the original run's task_id. When the run was itself a
+// single-variant cell we seed a variantOverrides entry keyed by the ORIGINAL
+// variant name (base_variant when present, else variant) so the launcher opens
+// pre-filled with the same model/agent (cross-plan contract field name).
+function buildRerunPrefill(run: Run): {
+  spec: string
+  snapshot_id: string | null
+  rerun_of: string
+  overrides: ExperimentOverrides
+} {
+  const originalVariant = runStr(run, 'base_variant') ?? runStr(run, 'variant')
+  const overrides: ExperimentOverrides = {}
+  if (originalVariant) {
+    const ov: VariantOverride = {}
+    const model = runStr(run, 'canonical_model') ?? runStr(run, 'model')
+    const agent = runStr(run, 'canonical_agent') ?? runStr(run, 'agent')
+    if (model) ov.model = model
+    if (agent) ov.agent = agent
+    if (ov.model || ov.agent) overrides.variantOverrides = { [originalVariant]: ov }
+  }
+  return {
+    spec: runStr(run, 'spec') ?? '',
+    snapshot_id: runStr(run, 'snapshot_id'),
+    rerun_of: run.task_id,
+    overrides,
+  }
+}
 
 // D-01/D-03 runs table. Reads the FILTERED set from selectFilteredRuns. Row click
 // dispatches setSelectedTaskId — this drives ONLY the inline Timeline panel (so the
@@ -273,6 +322,26 @@ export function RunsTable() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
+                    {/* D-11: Re-run — only on COMPLETED experiment runs. Opens the
+                        launcher pre-filled (same spec + snapshot, rerun_of set, plus
+                        the per-variant model/agent seed). */}
+                    {isCompletedExperimentRun(run) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        data-testid="rerun-experiment"
+                        aria-label={`Re-run experiment ${run.task_id}`}
+                        title="Re-run this experiment pre-filled"
+                        onClick={(e) => {
+                          // Don't bubble to the row (which drives the timeline).
+                          e.stopPropagation()
+                          dispatch(setLauncherPrefill(buildRerunPrefill(run)))
+                        }}
+                      >
+                        <RotateCcw className="size-3.5" />
+                        Re-run
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
