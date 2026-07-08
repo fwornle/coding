@@ -198,6 +198,65 @@ test('runCell: on abort, measurement-stop STILL runs (finally) with the mapped -
   assert.equal(res.terminalState, 'abort');
 });
 
+test('runCell: --capture-raw-bodies is forwarded to measurement-start ONLY when captureRawBodies is set (D-12)', async () => {
+  // 85-06 D-12: the runner threads the raw-body capture opt-in into each cell's measurement-start
+  // argv so the proxy writes raw-bodies.jsonl. Assert BOTH directions: present when set, absent
+  // when not (byte-identical omission).
+  const startArgvOf = async (captureRawBodies) => {
+    const calls = [];
+    const restore = async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' });
+    const runMeasurement = async (phase, argv, o) => { calls.push({ phase, argv, env: o?.env }); return 0; };
+    const spawnAgent = async () => 'complete';
+    await runCell({
+      cell: CELL, rep: 0, expId: 'exp1', goal: 'do a thing', snapshotId: 'snap-1',
+      agentsDir: AGENTS_DIR, dataDir: '/main/.data', captureRawBodies,
+      restore, runMeasurement, spawnAgent, configureRouting: async (_a, env) => env,
+    });
+    return calls.find((c) => c.phase === 'start').argv;
+  };
+
+  const withCapture = await startArgvOf(true);
+  assert.ok(withCapture.includes('--capture-raw-bodies'), 'ON → measurement-start argv carries --capture-raw-bodies');
+
+  const withoutCapture = await startArgvOf(false);
+  assert.ok(!withoutCapture.includes('--capture-raw-bodies'), 'OFF → the flag is omitted (byte-identical)');
+  // Default (param absent) must also omit — proves OFF-by-default.
+  const defaultOff = await (async () => {
+    const calls = [];
+    await runCell({
+      cell: CELL, rep: 0, expId: 'exp1', goal: 'g', snapshotId: 's',
+      agentsDir: AGENTS_DIR, dataDir: '/main/.data',
+      restore: async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' }),
+      runMeasurement: async (phase, argv) => { calls.push({ phase, argv }); return 0; },
+      spawnAgent: async () => 'complete', configureRouting: async (_a, env) => env,
+    });
+    return calls.find((c) => c.phase === 'start').argv;
+  })();
+  assert.ok(!defaultOff.includes('--capture-raw-bodies'), 'absent param → OFF by default');
+});
+
+test('runMatrix: captureRawBodies opt threads through to the cell measurement-start argv (D-12)', async () => {
+  // End-to-end through runMatrix: a captureRawBodies:true opt must reach the per-cell
+  // measurement-start argv (the runner CLI sets this from its own --capture-raw-bodies flag).
+  const startArgvs = [];
+  const spec = { experiment_id: 'expM', snapshot_id: 'snapM' };
+  const resolveSpec = () => ({ goal_sentence: 'do it', repeats: 1, cells: [CELL] });
+  await runMatrix(spec, {
+    captureRawBodies: true,
+    resolveSpec,
+    dataDir: '/main/.data',
+    agentsDir: AGENTS_DIR,
+    restore: async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' }),
+    runMeasurement: async (phase, argv) => { if (phase === 'start') startArgvs.push(argv); return 0; },
+    spawnAgent: async () => 'complete',
+    configureRouting: async (_a, env) => env,
+    openStore: async () => ({ close: async () => {} }),
+    readDone: async () => [],
+  });
+  assert.equal(startArgvs.length, 1, 'one cell → one measurement-start');
+  assert.ok(startArgvs[0].includes('--capture-raw-bodies'), 'runMatrix threaded the capture opt to the cell');
+});
+
 test('runCell: an abort with a launchCell reason propagates that reason (A1 diagnosability)', async () => {
   // 85-06 A1: launchCell now resolves { state, reason } — runCell must surface the reason so
   // an aborted cell records WHY (not a bare "abort"). A spawnAgent seam returning the object

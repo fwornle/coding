@@ -117,7 +117,8 @@ function usage() {
     '  --task-class <c>  closed-taxonomy class for scoring (falls back to the spec task_class field;\n' +
     '                    absent → the Run quarantines as unclassified and is hidden from default queries)\n' +
     '  --model V=M       per-variant model override keyed by ORIGINAL variant name V (D-06; repeatable)\n' +
-    '  --agent V=A       per-variant agent override keyed by ORIGINAL variant name V (D-06; repeatable)\n',
+    '  --agent V=A       per-variant agent override keyed by ORIGINAL variant name V (D-06; repeatable)\n' +
+    '  --capture-raw-bodies  arm raw request/response body capture per cell (D-12; presence flag, off by default)\n',
   );
 }
 
@@ -162,6 +163,11 @@ async function main() {
   // quarantines as `unclassified` (pending=true) and is EXCLUDED from the default
   // dashboard runs query — a spec-launched run would complete invisibly.
   const taskClassArg = parseStrArg(args, '--task-class') || undefined;
+  // Phase 85-06 (D-12): --capture-raw-bodies is a PRESENCE flag (no value). run-launch.mjs pushes
+  // it onto THIS runner's argv when the launcher's capture_raw_bodies toggle is ON. Thread it into
+  // every cell's measurement-start (via runMatrix→runCell) so the proxy writes raw-bodies.jsonl.
+  // OFF by default; when absent the per-cell measurement-start argv is byte-identical to before.
+  const captureRawBodies = args.includes('--capture-raw-bodies');
 
   if (!specPath) {
     process.stderr.write('error: --spec <file> is required\n');
@@ -291,6 +297,8 @@ async function main() {
     runId,
     rerunOf,
     variantOverrides,
+    // D-12: propagate the raw-body capture opt-in to each cell's measurement-start.
+    captureRawBodies,
   };
   if (timeoutMs != null) opts.timeoutMs = timeoutMs;
   // Phase 85-06: thread the validated task_class → runCell --task-class → the
