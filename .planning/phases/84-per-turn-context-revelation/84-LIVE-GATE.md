@@ -166,6 +166,73 @@ checkpoint. The executor does NOT self-approve.
 | 3 | `raw-bodies.jsonl.gz` gunzips with NO unredacted secrets | PASS | 0 secret substrings; `<SECRET/TOKEN/JWT_REDACTED>` markers present |
 | 4 | Explainer renders live data with N/A for OpenAI-wire | PASS (pending human sign-off) | 2 gsd-browser screenshots; T1-T3 openai N/A; verdict on real 1,524 fresh input |
 
+---
+
+## Operator-review findings + credible re-run (b)
+
+The first live span (run **a**, `ctx-live-84-09--copilot-openai--r0`) exposed a real honesty
+problem the operator caught immediately: **all three turns reported identical `input:508,
+output:11`** despite visibly different prompt sizes (msg content 38 / 163 / 40 chars). Root
+cause: `/api/complete` auto-routed to the **claude-code CLI worker**, whose reported usage is
+dominated by a fixed system-prompt/tools baseline and does NOT vary with the tiny user
+message — so those token counts are NOT a faithful per-request measurement. (The trustworthy
+per-request signal even in run a was the `categories[].bytes`, which DID vary: 66 / 342 / 68.)
+
+### Re-run (b) — `ctx-live-84-09b--copilot-openai--r0` (credible, varying)
+
+Forced a genuine per-request measurement by including a `tools[]` array (the proxy drops the
+tools-incapable claude-code CLI and routes to the tools-capable **copilot** provider, which
+reports real usage) and a realistic prompt (system + retrieved-knowledge block + growing
+conversation history + varying user input). Result — **real, varying** per-request tokens:
+
+```
+REQ_1 provider=copilot model=claude-sonnet-4.6 tokens={input:903,  output:226}
+REQ_2 provider=copilot model=claude-sonnet-4.6 tokens={input:1037, output:1052}
+REQ_3 provider=copilot model=claude-sonnet-4.6 tokens={input:1119, output:4}
+```
+
+Input grows 903 → 1037 → 1119 as history accumulates; output varies 226 / 1052 / 4. Believable.
+
+Real per-category context-window make-up (bytes), scaling per turn:
+
+```
+turn 1: sys 381 · tools 468 · know 643 · hist 0   · user 73   (total 1565)
+turn 2: sys 381 · tools 468 · know 643 · hist 116 · user 448  (total 2056)
+turn 3: sys 381 · tools 468 · know 643 · hist 654 · user 74   (total 2220)
+```
+
+Redaction (run b, realistic-length secrets): `sk-ant-api03-…` → `<SECRET_REDACTED>`, the
+GitHub-PAT token body → `<AWS_SECRET_REDACTED>` (only the inert literal `ghp_`/`Bearer`
+prefixes remain — no secret VALUE survives; a structured detector requiring secret-body
+characters found 0 real leaks).
+
+### Explainer fixes prompted by the review (commit `cd5fb9cbe`)
+
+1. **Restored the real context-window make-up (regression fix).** The "Anatomy of the context
+   window" band was keyed off the OLD `/api/context-breakdown` endpoint (empty for this run →
+   it fell back to fixed illustrative widths). It now scales from THIS phase's per-request
+   `categories[].bytes` (largest turn), with the legend stating **exact UTF-8 bytes per
+   category** (System Instructions 381 B · Tool Descriptions 468 B · Retrieved Knowledge 643 B
+   · Conversation History 829 B · User Input 74 B). Screenshot `84-09-makeup-band-fixed.png`.
+2. **Per-turn "what it was doing" narrative.** Each per-turn row now states the turn's intent
+   (D-07: the correlated ETM observation intent, else the fresh user-input preview). Screenshot
+   `84-09-perturn-narrative.png`.
+3. **UI secret scrub.** Context-turns previews are unredacted digests at the source (84-04
+   T-84-04-04); since the narrative now surfaces a preview, secret shapes (sk-/ghp_/Bearer/JWT/
+   AKIA) are masked client-side — T2 renders `api_key=sk-***`, never the raw key.
+4. **Type fix.** `ContextTurnRow.observation_ref` corrected to the `{id,intent,theme?}` shape
+   84-05 actually writes.
+
+**Honest caveat recorded:** when `/api/complete` routes to the claude-code CLI worker, its
+per-request token counts reflect a fixed CLI baseline, not the varying user content — use a
+tools-bearing / copilot (or Anthropic-wire) route for faithful per-request token measurement.
+The always-captured `categories[].bytes` make-up is faithful on every route.
+
+### Evidence screenshots (run b, restored + credible)
+- `84-09-makeup-band-fixed.png` — restored scaled make-up band + real per-category byte legend.
+- `84-09-perturn-narrative.png` — per-turn chart (varying) + stat cards + "what it was doing"
+  narrative (secret scrubbed to `sk-***`).
+
 ## Runtime state left behind
 - Proxy daemon now on build `b1e0a49` (the 84-04/06 hooks live). `networkMode=public`.
 - `coding-services` container restarted (dashboard `/api/context-turns` mirror + vkb route live).
