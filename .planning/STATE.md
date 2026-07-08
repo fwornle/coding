@@ -4,8 +4,8 @@ milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Phase 85 context gathered
-last_updated: "2026-07-08T08:58:50.720Z"
-last_activity: 2026-07-08 -- Phase 85 planning complete
+last_updated: "2026-07-08T09:24:31.010Z"
+last_activity: 2026-07-08 -- Phase 85 execution started
 progress:
   total_phases: 21
   completed_phases: 14
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 84 — per-turn-context-revelation
+**Current focus:** Phase 85 — experiment-control-center
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 84 (per-turn-context-revelation) — COMPLETE (9/9 plans)
-Plan: 9 of 9 — live E2E gate PASSED; Task-3 human-verify APPROVED with refinements
-Status: Ready to execute
+Phase: 85 (experiment-control-center) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 85
   e72666a→b1e0a49 after confirming coordinator location=open; one measured span with
   capture_raw_bodies=true produced real context-turns.jsonl.gz + raw-bodies.jsonl.gz;
   both read APIs serve the turns; redaction verified on live traffic). The operator
@@ -71,7 +71,7 @@ Status: Ready to execute
   fallback was DEFERRED to Phase 86 with a precise follow-up
   (.planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md). Evidence +
   screenshots in 84-LIVE-GATE.md. Ready for /gsd-verify-phase 84.
-Last activity: 2026-07-08 -- Phase 85 planning complete
+Last activity: 2026-07-08 -- Phase 85 execution started
 
 ## Deferred Items
 
