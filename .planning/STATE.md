@@ -4,13 +4,13 @@ milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Phase 84 context gathered
-last_updated: "2026-07-08T03:48:11.839Z"
+last_updated: "2026-07-08T04:23:55.060Z"
 last_activity: 2026-07-08
 progress:
   total_phases: 21
   completed_phases: 13
   total_plans: 84
-  completed_plans: 81
+  completed_plans: 82
   percent: 62
 ---
 
@@ -54,17 +54,13 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 84 (per-turn-context-revelation) — EXECUTING
-Plan: 8 of 9
-Status: AWAITING HUMAN-VERIFY CHECKPOINT — Plan 84-08 Task 3. Autonomous tasks 1–2
-  complete + committed (89ebc89eb fetchContextTurns thunk/selector; 4e981c5b2
-  honest explainer + N/A + caching copy). Frontend rebuilt + health-dashboard-frontend
-  restarted; vkb-server restarted to activate 84-07's read route. gsd-browser
-  screenshots of the honest explainer (real per-turn cache split, OpenAI-wire
-  "N/A (provider reports no cache-creation)", Anthropic-wire real cache-write,
-  caching-explainer copy) captured under
-  .planning/phases/84-per-turn-context-revelation/evidence/. Awaiting operator
-  "approved" to finalize the plan SUMMARY. Demo fixture at
-  .data/measurements/ctx-demo-mixed-84-08/ (delete after approval).
+Plan: 9 of 9
+Status: Ready to execute (84-08 COMPLETE — human-verify APPROVED 2026-07-08). The
+  cache explainer now consumes real per-request context-turns: fetchContextTurns
+  thunk/selector (89ebc89eb) + honest per-turn wire render with OpenAI-wire
+  "N/A (provider reports no cache-creation)" + caching copy (4e981c5b2). Frontend
+  rebuilt + health-dashboard-frontend restarted; vkb-server restarted to activate
+  84-07's read route. 84-09 (live E2E / proxy redeploy) is the last plan of the phase.
 Last activity: 2026-07-08
 
 ## Deferred Items
@@ -407,10 +403,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 84 P03 | 6min | 2 tasks | 5 files |
 | Phase 84 P06 | 20min | 2 tasks | 3 files |
 | Phase 84 P07 | 8min | 2 tasks | 3 files |
+| Phase 84 P08 | 55min | 3 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-07-08T03:46:16.920Z
+Last session: 2026-07-08T04:23:47.836Z
 Stopped at: Phase 84 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
