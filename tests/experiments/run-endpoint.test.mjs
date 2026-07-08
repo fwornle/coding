@@ -112,6 +112,48 @@ test('409 live-run: a running progress.json with a live pid blocks a launch', as
   assert.equal(coord.calls.length, 0);
 });
 
+test('409 cell-span: an experiment cell span (meta.variant) reports kind=experiment, not interactive (85-06)', async () => {
+  const repoRoot = makeRepoRoot('t1b');
+  const active = {
+    task_id: 'exp-x--claude-sonnet-straight-default--r0',
+    started_at: new Date().toISOString(),
+    meta: { variant: 'claude-sonnet-straight-default', repeat: 0 },
+  };
+  await fs.writeFile(path.join(repoRoot, '.data', 'active-measurement.json'), JSON.stringify(active));
+  const coord = fakeCoordinator();
+  const ctx = await makeCtx(repoRoot, coord);
+  const res = mockRes();
+  await ctx.handleExperimentRun({ body: { spec: 'demo.yaml' } }, res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.holder.kind, 'experiment', 'a cell span is the RUN holding the slot');
+  assert.match(res.body.message, /experiment cell|cancel/i, 'message points at the run, not Measurement Control');
+  assert.ok(!/interactive/i.test(res.body.message), 'never mislabelled interactive');
+  assert.equal(coord.calls.length, 0);
+});
+
+test('run completes → span closed → slot FREE: a completed run dir + no active span accepts a fresh launch (85-06 regression)', async () => {
+  const repoRoot = makeRepoRoot('t3b');
+  // The post-completion disk state the runner leaves behind: progress overall=complete
+  // (span archived by measurement-stop, active-measurement.json REMOVED).
+  const runDir = path.join(repoRoot, '.data', 'experiments', 'runs', 'done1');
+  await fs.mkdir(runDir, { recursive: true });
+  await fs.writeFile(path.join(runDir, 'progress.json'), JSON.stringify({
+    run_id: 'done1', overall: 'complete', pid: process.pid, done: 1, total: 1,
+    cells: [{ variant: 'claude-sonnet-straight-default', rep: 0, state: 'complete', task_id: 'exp--v--r0' }],
+  }));
+  const measDir = path.join(repoRoot, '.data', 'measurements');
+  await fs.mkdir(measDir, { recursive: true });
+  await fs.writeFile(path.join(measDir, 'exp--v--r0.json'), JSON.stringify({
+    task_id: 'exp--v--r0', started_at: new Date().toISOString(), ended_at: new Date().toISOString(),
+  }));
+  const coord = fakeCoordinator();
+  const ctx = await makeCtx(repoRoot, coord);
+  const res = mockRes();
+  await ctx.handleExperimentRun({ body: { spec: 'demo.yaml' } }, res);
+  assert.equal(res.statusCode, 200, 'a COMPLETED run must never hold the slot (even with a live-pid progress.json)');
+  assert.equal(coord.calls.length, 1, 'the fresh launch was delegated');
+});
+
 test('stale-run does NOT block: overall running but a dead pid is ignored', async () => {
   const repoRoot = makeRepoRoot('t3');
   const runDir = path.join(repoRoot, '.data', 'experiments', 'runs', 'stale1');
