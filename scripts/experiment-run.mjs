@@ -63,6 +63,20 @@ function parseStrArg(argv, flag) {
 }
 
 /**
+ * Collect EVERY occurrence of a repeatable string flag (Phase 85-06 fix). The
+ * launcher UI (Plan 05) submits a `variants` SUBSET (multi-pick) which run-launch
+ * maps to repeated `--variant <name>` pairs — a single-value parse silently
+ * dropped all but the first and the run executed the FULL matrix.
+ */
+function parseMultiStrArg(argv, flag) {
+  const values = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === flag && argv[i + 1]) values.push(argv[i + 1]);
+  }
+  return values;
+}
+
+/**
  * Parse repeatable per-variant override flags into a variantOverrides map (D-06). Each
  * `--model <variant>=<model>` / `--agent <variant>=<agent>` pair is keyed by the ORIGINAL
  * variant name (cellName). Returns `{ [originalVariantName]: { model?, agent? } }`. This is
@@ -89,11 +103,11 @@ function parseVariantOverrides(argv) {
 
 function usage() {
   process.stderr.write(
-    'usage: node scripts/experiment-run.mjs --spec <file> [--variant <name>] [--repeats N] [--timeout <sec>]\n' +
+    'usage: node scripts/experiment-run.mjs --spec <file> [--variant <name>]... [--repeats N] [--timeout <sec>]\n' +
     '                                       [--run-id <id>] [--run-dir <dir>] [--rerun-of <run_id>]\n' +
     '                                       [--model <variant>=<model>]... [--agent <variant>=<agent>]...\n' +
     '  --spec <file>     (required) the YAML experiment matrix spec (config/experiments/*.yaml)\n' +
-    '  --variant <name>  narrow the run to the single cell whose agent-model-framework-env name matches\n' +
+    '  --variant <name>  narrow the run to the cells named (repeatable — a SUBSET of the matrix)\n' +
     '  --repeats N       override the spec repeats (positive integer)\n' +
     '  --timeout <sec>   override the per-cell wall-clock cap (seconds; default 20 min — D-06)\n' +
     '  --run-id <id>     short path-safe run identity ([A-Za-z0-9._-], ≤12) — the composeTaskId salt\n' +
@@ -131,7 +145,9 @@ function makeFakeSeams() {
 async function main() {
   const args = process.argv.slice(2);
   const specPath = parseStrArg(args, '--spec');
-  const variant = parseStrArg(args, '--variant') || undefined;
+  // Repeatable: `--variant a --variant b` narrows the run to that SUBSET (a
+  // single occurrence keeps the original single-cell narrowing semantics).
+  const variants = parseMultiStrArg(args, '--variant');
   const repeatsArg = parseStrArg(args, '--repeats');
   const timeoutArg = parseStrArg(args, '--timeout');
   // Phase 85-01: run identity (D-05), progress surface (D-03/D-04), per-variant overrides (D-06).
@@ -194,16 +210,21 @@ async function main() {
   const specObj = yaml.load(fs.readFileSync(specPath, 'utf8'));
   const resolved = resolveExperimentSpec(specObj);
 
-  // --variant narrowing: keep only the cell whose derived name matches. An unknown variant is
-  // a usage error (exit 2) — list the legal variant names so the operator can correct it.
+  // --variant narrowing: keep only the cells whose derived names are in the requested
+  // SUBSET (repeatable flag — Phase 85-06). ANY unknown variant name is a usage error
+  // (exit 2) — list the legal variant names so the operator can correct it. This matches
+  // the server-side Plan-04 _validateOverrides strictness (never silently drop a name).
   let cells = resolved.cells;
-  if (variant) {
-    cells = cells.filter((c) => cellName(c) === variant);
-    if (cells.length === 0) {
-      const names = resolved.cells.map((c) => cellName(c)).join(', ');
-      process.stderr.write(`error: --variant '${variant}' matches no cell — legal variants: ${names}\n`);
+  if (variants.length > 0) {
+    const legalNames = resolved.cells.map((c) => cellName(c));
+    const legal = new Set(legalNames);
+    const unknown = variants.filter((v) => !legal.has(v));
+    if (unknown.length > 0) {
+      process.stderr.write(`error: --variant '${unknown.join("', '")}' matches no cell — legal variants: ${legalNames.join(', ')}\n`);
       process.exit(2);
     }
+    const wanted = new Set(variants);
+    cells = cells.filter((c) => wanted.has(cellName(c)));
   }
   const repeats = repeatsOverride ?? resolved.repeats;
   const narrowed = { goal_sentence: resolved.goal_sentence, repeats, cells };

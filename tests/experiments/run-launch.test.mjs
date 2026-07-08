@@ -75,6 +75,25 @@ test('buildRunArgv stringifies numeric override values (argv must be strings)', 
   for (const el of argv) assert.equal(typeof el, 'string', 'every argv element must be a string');
 });
 
+test('buildRunArgv maps a variants SUBSET to repeated --variant flags (Phase 85-06 / D-09)', () => {
+  const argv = buildRunArgv('/spec.yaml', 'run-1', '/runs/run-1', {
+    variants: ['claude-sonnet-straight-default', 'copilot-auto-straight-default'],
+  });
+  const positions = argv.reduce((acc, el, i) => (el === '--variant' ? [...acc, i] : acc), []);
+  assert.equal(positions.length, 2, 'one --variant flag PER subset entry');
+  assert.equal(argv[positions[0] + 1], 'claude-sonnet-straight-default');
+  assert.equal(argv[positions[1] + 1], 'copilot-auto-straight-default');
+});
+
+test('buildRunArgv skips empty/nullish variants entries and omits the flag for an empty array', () => {
+  const argv = buildRunArgv('/spec.yaml', 'run-1', '/runs/run-1', { variants: [] });
+  assert.ok(!argv.includes('--variant'), 'empty subset → no --variant flag (full matrix)');
+  const argv2 = buildRunArgv('/spec.yaml', 'run-1', '/runs/run-1', { variants: ['', null, 'real-variant'] });
+  const positions = argv2.reduce((acc, el, i) => (el === '--variant' ? [...acc, i] : acc), []);
+  assert.equal(positions.length, 1, 'blank/nullish entries are skipped');
+  assert.equal(argv2[positions[0] + 1], 'real-variant');
+});
+
 // ---------------------------------------------------------------------------
 // launchRun — detached + unref'd fixed-argv spawn + run.json (D-01)
 // ---------------------------------------------------------------------------
