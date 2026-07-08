@@ -171,6 +171,10 @@ export function buildRunTags({
     repeat:         span.meta?.repeat ?? null,
     terminal_state: terminalState ?? null, // D-04 enum: complete | timeout | abort
     skip_reason:    skipReason ?? null,
+    // ── D-05/D-07 (Phase 85-01): re-run pairing + override provenance fold from span.meta,
+    //    the same null-preserved way variant/repeat do (never coerced; `?? null` keeps null). ──
+    rerun_of:       span.meta?.rerun_of ?? null,
+    base_variant:   span.meta?.base_variant ?? null,
   };
 }
 
