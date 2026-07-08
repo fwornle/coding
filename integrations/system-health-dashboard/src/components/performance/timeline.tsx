@@ -454,16 +454,29 @@ export function PerformanceTimeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId])
 
-  // Once the timeline is loaded, derive the run window and fetch the narrative.
+  // Experiment-cell provenance (variant/base_variant ride the Run index signature).
+  // A sandboxed experiment cell runs its agent in a THROWAWAY worktree — the ambient
+  // observations in its time window belong to whatever interactive session was live
+  // in the repo (85-06 live-gate: the orchestration session's "Approve the
+  // checkpoint…" intents rendered against the cell's own turns). The knowledge
+  // pipeline never observes the sandbox, so the honest narrative for a cell is its
+  // goal_sentence — NEVER a time-window join against foreign sessions.
+  const runUnknown = run as unknown as Record<string, unknown> | null
+  const isExperimentCell = !!(
+    runUnknown && (typeof runUnknown.variant === 'string' || typeof runUnknown.base_variant === 'string')
+  )
+
+  // Once the timeline is loaded, derive the run window and fetch the narrative
+  // (SKIPPED for experiment cells — cross-session bleed, see above).
   const win = runWindow(rows, run)
   const winKey = win ? `${win.from}|${win.to}` : ''
   useEffect(() => {
-    if (taskId && win) {
+    if (taskId && win && !isExperimentCell) {
       dispatch(fetchRunNarrative({ taskId, from: win.from, to: win.to, agent: run?.agent ?? run?.canonical_agent ?? undefined }))
       dispatch(fetchRunDigests({ taskId, from: win.from, to: win.to }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId, winKey])
+  }, [taskId, winKey, isExperimentCell])
 
   const stats = summarizeByRole(rows, run)
   const statByRole = Object.fromEntries(stats.map((s) => [s.role, s])) as Record<Role, RoleStat>
@@ -471,10 +484,13 @@ export function PerformanceTimeline() {
 
   // Tie observations → turns and digests → this run, so each turn can show what it
   // did and which digest it fed. Computed over the FULL rows (role-filtering the
-  // rendered list only hides, never remaps).
-  const { byRow: obsByRow, unmatched } = assignObservationsToTurns(rows, narrative)
-  const { linked: linkedDigests, themeByObsId } = linkDigestsToRun(digests, narrative)
-  const matchedCount = narrative.length - unmatched.length
+  // rendered list only hides, never remaps). For an experiment cell the narrative
+  // is forced empty (defense-in-depth alongside the skipped fetch above) so a
+  // stale slice entry can never re-introduce the cross-session bleed.
+  const scopedNarrative = isExperimentCell ? [] : narrative
+  const { byRow: obsByRow, unmatched } = assignObservationsToTurns(rows, scopedNarrative)
+  const { linked: linkedDigests, themeByObsId } = linkDigestsToRun(digests, scopedNarrative)
+  const matchedCount = scopedNarrative.length - unmatched.length
   const digestThemesForRow = (r: TimelineRow): string[] => {
     const themes = new Set<string>()
     for (const it of obsByRow.get(r) ?? []) for (const th of themeByObsId.get(it.id) ?? []) themes.add(th)
@@ -539,14 +555,29 @@ export function PerformanceTimeline() {
           <>
             <StorySummary stats={stats} />
 
-            <DevelopmentNarrative
-              taskId={taskId}
-              digests={linkedDigests}
-              unmatched={unmatched}
-              matchedCount={matchedCount}
-              obsLoading={narrativeLoadingId === taskId}
-              digestLoading={digestLoadingId === taskId}
-            />
+            {isExperimentCell ? (
+              /* 85-06: a sandboxed cell has no session observations of its own — show
+                 the goal instead of a time-window join against foreign sessions. */
+              <div className="mb-3 rounded-md border px-3 py-2 text-sm" data-testid="timeline-cell-goal">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Experiment cell
+                </span>
+                <p className="mt-0.5 text-muted-foreground">
+                  {typeof runUnknown?.goal_sentence === 'string' && runUnknown.goal_sentence
+                    ? String(runUnknown.goal_sentence)
+                    : 'Sandboxed experiment run — ambient session observations are not attributed to cells.'}
+                </p>
+              </div>
+            ) : (
+              <DevelopmentNarrative
+                taskId={taskId}
+                digests={linkedDigests}
+                unmatched={unmatched}
+                matchedCount={matchedCount}
+                obsLoading={narrativeLoadingId === taskId}
+                digestLoading={digestLoadingId === taskId}
+              />
+            )}
 
             {/* Role filter chips — click to show/hide a whole role. Serves the
                 "focus on just the development" need without losing the counts. */}

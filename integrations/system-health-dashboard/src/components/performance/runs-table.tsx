@@ -24,9 +24,11 @@ import {
   selectSelectedRunIds,
   selectDeleteRunsPending,
   setLauncherPrefill,
+  selectSpecList,
   type Run,
   type ExperimentOverrides,
   type VariantOverride,
+  type SpecSummary,
 } from '@/store/slices/performanceSlice'
 import { effective, isEdited, judged, SCORE_DIMENSIONS } from './corrected-wins'
 import { distinctModels, normalizeModel } from './models'
@@ -48,12 +50,27 @@ function isCompletedExperimentRun(run: Run): boolean {
   return isExperiment && isComplete
 }
 
+// Derive the spec FILE for a re-run (85-06): the Run row carries no `spec` field
+// (run-write never stamped one), so join the run to the server-listed spec whose
+// goal_sentence is IDENTICAL — the goal is the task_hash anchor (D-05: same goal
+// → same task_hash), so an exact-goal match IS the comparable spec. Returns ''
+// when no listed spec matches (the launcher then opens with rerun_of set but the
+// operator picks the spec manually).
+function deriveSpecFile(run: Run, specs: SpecSummary[]): string {
+  const direct = runStr(run, 'spec')
+  if (direct) return direct
+  const goal = runStr(run, 'goal_sentence')
+  if (!goal) return ''
+  const match = specs.find((s) => !s.error && s.goal_sentence === goal)
+  return match?.file ?? ''
+}
+
 // Build the D-11 re-run pre-fill from a completed experiment run. Same spec +
 // snapshot_id, rerun_of = the original run's task_id. When the run was itself a
 // single-variant cell we seed a variantOverrides entry keyed by the ORIGINAL
 // variant name (base_variant when present, else variant) so the launcher opens
 // pre-filled with the same model/agent (cross-plan contract field name).
-function buildRerunPrefill(run: Run): {
+function buildRerunPrefill(run: Run, specs: SpecSummary[]): {
   spec: string
   snapshot_id: string | null
   rerun_of: string
@@ -70,7 +87,7 @@ function buildRerunPrefill(run: Run): {
     if (ov.model || ov.agent) overrides.variantOverrides = { [originalVariant]: ov }
   }
   return {
-    spec: runStr(run, 'spec') ?? '',
+    spec: deriveSpecFile(run, specs),
     snapshot_id: runStr(run, 'snapshot_id'),
     rerun_of: run.task_id,
     overrides,
@@ -139,6 +156,9 @@ export function RunsTable() {
   const selectedTaskId = useAppSelector(selectSelectedTaskId)
   const selectedRunIds = useAppSelector(selectSelectedRunIds)
   const deletePending = useAppSelector(selectDeleteRunsPending)
+  // 85-06: the server-listed specs (fetched by the launcher on mount) — the re-run
+  // prefill derives the spec file from them by exact goal_sentence match.
+  const specList = useAppSelector(selectSpecList)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   // Multi-select over the CURRENTLY-FILTERED set. "All" selects every visible
@@ -335,7 +355,7 @@ export function RunsTable() {
                         onClick={(e) => {
                           // Don't bubble to the row (which drives the timeline).
                           e.stopPropagation()
-                          dispatch(setLauncherPrefill(buildRerunPrefill(run)))
+                          dispatch(setLauncherPrefill(buildRerunPrefill(run, specList)))
                         }}
                       >
                         <RotateCcw className="size-3.5" />

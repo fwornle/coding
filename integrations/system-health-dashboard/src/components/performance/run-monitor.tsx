@@ -1,11 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
+  fetchRuns,
   fetchRunStatus,
   cancelRun,
+  clearLaunchError,
   setActiveRunId,
   setSelectedTaskId,
   selectActiveRunId,
@@ -22,7 +24,7 @@ import {
 // table / timeline via setSelectedTaskId.
 
 // Terminal states after which the run is done winding down.
-const TERMINAL = new Set(['complete', 'timeout', 'abort', 'skipped'])
+const TERMINAL = new Set(['complete', 'timeout', 'abort', 'skipped', 'cancelled', 'failed'])
 
 // Map a cell state to a Badge variant so the grid is glanceable.
 function badgeVariant(state: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -45,6 +47,22 @@ export function RunMonitor() {
     const t = setInterval(() => dispatch(fetchRunStatus(activeRunId)), 5000)
     return () => clearInterval(t)
   }, [dispatch, activeRunId])
+
+  // On the poll observing a TERMINAL overall (85-06 live-gate feedback):
+  //   (1) refresh the runs table — the Run row is written at span close, and the
+  //       mount-time fetchRuns() never re-fires, so a freshly completed run was
+  //       invisible ("No runs recorded yet") until a page reload;
+  //   (2) clear a stale launchError — a 409 captured while the run held the slot
+  //       otherwise renders forever, reading as "the slot never freed".
+  const overallNow = activeRunId ? (status?.overall ?? 'unknown') : 'unknown'
+  const refreshedForRun = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeRunId || !TERMINAL.has(overallNow)) return
+    if (refreshedForRun.current === activeRunId) return
+    refreshedForRun.current = activeRunId
+    dispatch(fetchRuns())
+    dispatch(clearLaunchError())
+  }, [dispatch, activeRunId, overallNow])
 
   if (!activeRunId) return null
 

@@ -8,6 +8,7 @@ import {
   fetchSpecList,
   launchExperiment,
   clearLauncherPrefill,
+  clearLaunchError,
   selectSpecList,
   selectSpecListLoading,
   selectLaunchError,
@@ -305,9 +306,23 @@ export function ExperimentLauncher() {
             </Button>
           </div>
 
-          {/* D-09: a 409 holder / validation message surfaces here — never silent. */}
+          {/* D-09: a 409 holder / validation message surfaces here — never silent.
+              Dismissible (85-06): a 409 captured while a run held the slot otherwise
+              renders forever after the slot frees, reading as a stuck launcher. The
+              run-monitor also auto-clears it when the run reaches a terminal state. */}
           {launchError && (
-            <p className="mt-1 text-sm text-destructive" role="alert" data-testid="launch-error">{launchError}</p>
+            <p className="mt-1 flex items-start gap-2 text-sm text-destructive" role="alert" data-testid="launch-error">
+              <span className="flex-1">{launchError}</span>
+              <button
+                type="button"
+                aria-label="dismiss launch error"
+                data-testid="dismiss-launch-error"
+                className="shrink-0 rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => dispatch(clearLaunchError())}
+              >
+                ×
+              </button>
+            </p>
           )}
         </div>
       </CardContent>
