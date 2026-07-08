@@ -634,66 +634,76 @@ export function ContextCacheExplainer() {
           <p className="mb-1 text-center text-xs font-medium text-muted-foreground">◜ Context Window sent to the model each turn ◝</p>
 
           {/* One CONTIGUOUS token buffer (messages array) — no gaps. Blocks are
-              colour-only; labels live in the legend so nothing is unreadable. */}
+              colour-only; labels live in the legend so nothing is unreadable. The
+              band and its prefix/fresh label row share ONE relative wrapper so the
+              cache-boundary divider can span BOTH — visually connecting the split
+              in the band to the labels beneath it (operator refinement #1). */}
           <TooltipProvider delayDuration={100}>
-            <div className="relative flex w-full overflow-hidden rounded-md border" style={{ height: 44 }}>
-              {segView.map((seg, i) => {
-                const divider = i > 0 ? '1px solid rgba(0,0,0,0.28)' : undefined
-                if (seg.key !== 'know') {
-                  return (
-                    <div
-                      key={seg.key}
-                      className="h-full"
-                      title={seg.label}
-                      style={{ width: `${seg.w}%`, background: seg.fill, borderLeft: divider }}
-                    />
-                  )
-                }
-                // Retrieved Knowledge — interactive (hover detail + click deep modal)
-                return (
-                  <Tooltip key={seg.key}>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => setKbOpen(true)}
-                        data-testid="kb-segment"
-                        className="flex h-full cursor-pointer items-center justify-center p-0 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <div className="relative">
+              <div className="relative flex w-full overflow-hidden rounded-md border" style={{ height: 44 }}>
+                {segView.map((seg, i) => {
+                  const divider = i > 0 ? '1px solid rgba(0,0,0,0.28)' : undefined
+                  if (seg.key !== 'know') {
+                    return (
+                      <div
+                        key={seg.key}
+                        className="h-full"
+                        title={seg.label}
                         style={{ width: `${seg.w}%`, background: seg.fill, borderLeft: divider }}
-                        aria-label="Retrieved Knowledge — click for detail"
-                      >
-                        <span className="rounded-full bg-white/80 px-1.5 text-xs font-bold text-purple-800" title="Retrieved Knowledge — click for detail">ⓘ</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs">
-                      <p className="font-semibold">Retrieved Knowledge — the injected KB block</p>
-                      <p className="mt-1 text-xs">
-                        ~1,000 tokens prepended every prompt: 300 Working Memory (project/milestone/state) + 700 semantic
-                        (Insights ≤4 · Digests ≤3 · Entities ≤3 · Observations ≤3) via Qdrant RRF from the
-                        observations/digests/insights DB. <span className="underline">Click for full detail.</span>
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                )
-              })}
+                      />
+                    )
+                  }
+                  // Retrieved Knowledge — interactive (hover detail + click deep modal)
+                  return (
+                    <Tooltip key={seg.key}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setKbOpen(true)}
+                          data-testid="kb-segment"
+                          className="flex h-full cursor-pointer items-center justify-center p-0 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          style={{ width: `${seg.w}%`, background: seg.fill, borderLeft: divider }}
+                          aria-label="Retrieved Knowledge — click for detail"
+                        >
+                          <span className="rounded-full bg-white/80 px-1.5 text-xs font-bold text-purple-800" title="Retrieved Knowledge — click for detail">ⓘ</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <p className="font-semibold">Retrieved Knowledge — the injected KB block</p>
+                        <p className="mt-1 text-xs">
+                          ~1,000 tokens prepended every prompt: 300 Working Memory (project/milestone/state) + 700 semantic
+                          (Insights ≤4 · Digests ≤3 · Entities ≤3 · Observations ≤3) via Qdrant RRF from the
+                          observations/digests/insights DB. <span className="underline">Click for full detail.</span>
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+              </div>
 
-              {/* cache breakpoint line at the prefix boundary */}
+              {/* prefix / fresh brackets */}
+              <div className="mt-1 flex w-full text-[11px]">
+                <div className="text-center" style={{ width: `${prefixPct}%` }}>
+                  <span className="font-medium" style={{ color: C_READ }}>◀ cacheable prefix — reused from provider cache</span>
+                </div>
+                <div className="text-center" style={{ width: `${100 - prefixPct}%` }}>
+                  <span className="font-medium" style={{ color: C_INPUT }}>new this turn ▶</span>
+                </div>
+              </div>
+
+              {/* Cache-boundary divider — the cacheable-prefix ↔ new-this-turn split.
+                  It spans the band AND the label row (this shared relative wrapper),
+                  aligned to prefixPct, so it visually connects the boundary in the
+                  band down to the two labels beneath it. Bold (3px) + theme-aware
+                  border-foreground for clear visibility in light AND dark mode —
+                  replaces the faint 2px green line (operator refinement #1). */}
               <div
-                className="pointer-events-none absolute top-0 bottom-0 border-l-2 border-dashed"
-                style={{ left: `${prefixPct}%`, borderColor: C_READ }}
+                className="pointer-events-none absolute top-0 bottom-0 z-10 border-l-[3px] border-dashed border-foreground"
+                style={{ left: `${prefixPct}%`, marginLeft: -1.5 }}
                 aria-hidden
               />
             </div>
           </TooltipProvider>
-
-          {/* prefix / fresh brackets */}
-          <div className="mt-1 flex w-full text-[11px]">
-            <div className="text-center" style={{ width: `${prefixPct}%` }}>
-              <span className="font-medium" style={{ color: C_READ }}>◀ cacheable prefix — reused from provider cache</span>
-            </div>
-            <div className="text-center" style={{ width: `${100 - prefixPct}%` }}>
-              <span className="font-medium" style={{ color: C_INPUT }}>new this turn ▶</span>
-            </div>
-          </div>
 
           {/* legend — real per-category bytes when a live capture exists */}
           <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
@@ -903,6 +913,27 @@ export function ContextCacheExplainer() {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {/* Honest reconciliation with the multi-agent Timeline (operator refinement
+              #2). The per-turn table above only covers requests that crossed the proxy
+              wire and were logged to context-turns. The Timeline can show MORE turns
+              because it counts the token-usage source, which also includes turns the
+              context-turns write hook never sees (e.g. claude-code CLI adapter turns).
+              This is two capture surfaces, not a discrepancy — and we do NOT fabricate
+              rows for turns that were never logged. */}
+          {s.usingWire && s.turnCount > 0 && (
+            <p className="mt-2 border-t pt-2 text-[11px] leading-snug text-muted-foreground" data-testid="timeline-reconciliation-note">
+              <span className="font-medium text-foreground">Reconciling with the Timeline:</span> the{' '}
+              {s.turnCount} row{s.turnCount === 1 ? '' : 's'} above are the{' '}
+              <span className="font-medium text-foreground">proxy-wire requests captured in context-turns</span>{' '}
+              (the proxy <span className="font-mono">/api/complete</span> + <span className="font-mono">/v1/messages</span> tap).
+              The multi-agent Timeline may show additional turns — e.g.{' '}
+              <span className="font-mono">claude-code</span> CLI adapter turns — that are measured via the{' '}
+              token-usage source but are <span className="font-medium text-foreground">not logged by the context-turns write
+              hook</span>, so they don’t appear as rows here. Two capture surfaces, not a discrepancy; we don’t invent
+              per-turn rows for turns that were never logged.
+            </p>
           )}
         </div>
 
