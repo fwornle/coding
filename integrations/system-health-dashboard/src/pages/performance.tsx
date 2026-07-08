@@ -21,6 +21,8 @@ import { ContextCacheExplainer } from '@/components/performance/context-cache-ex
 import { ReportsSubview } from '@/components/performance/reports-subview'
 import { MeasurementControl } from '@/components/performance/measurement-control'
 import { RunCompare } from '@/components/performance/run-compare'
+import { ExperimentLauncher } from '@/components/performance/experiment-launcher'
+import { RunMonitor } from '@/components/performance/run-monitor'
 
 // DASH-01/DASH-02 Performance page. Layout mirrors token-usage.tsx (header +
 // summary Card focal point + Tabs body) but ALL shared state lives in the
@@ -128,8 +130,18 @@ export function PerformancePage() {
       {/* Summary cards — the visual focal point */}
       <SummaryCards runs={runs} />
 
-      {/* Measurement lifecycle control (start/stop the active span) */}
-      <MeasurementControl />
+      {/* Measurement lifecycle control (start/stop the active span) beside the
+          Experiment Launcher (spec picker + matrix preview + capture_raw_bodies
+          + re-run pre-fill target). Two-column so the launcher renders next to
+          Measurement Control per the Phase 85 control-center layout. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <MeasurementControl />
+        <ExperimentLauncher />
+      </div>
+
+      {/* 5s-polling variant×repeat cell-grid monitor — self-gates on activeRunId
+          (renders nothing until a run is launched, then polls run-status). */}
+      <RunMonitor />
 
       {/* Body — Tabs with a Runs view + a Reports sub-view (D-05: a second Tabs
           value INSIDE Performance, NOT a top-level nav tab). */}
