@@ -4,13 +4,13 @@ milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Phase 84 context gathered
-last_updated: "2026-07-08T03:41:06.193Z"
+last_updated: "2026-07-08T03:48:11.839Z"
 last_activity: 2026-07-08
 progress:
   total_phases: 21
   completed_phases: 13
   total_plans: 84
-  completed_plans: 80
+  completed_plans: 81
   percent: 62
 ---
 
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 84 (per-turn-context-revelation) — EXECUTING
-Plan: 7 of 9
+Plan: 8 of 9
 Status: Ready to execute
 Last activity: 2026-07-08
 
@@ -293,6 +293,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase 84-02]: Redaction applier renamed .js -> .cjs (root type:module forces .js to ESM on Node 25, erasing CommonJS module.exports). loadRedactionPatterns loads the 27-pattern config; redact() applies it BEFORE the hardcoded PII net (additive), preserving {content,redactionCount,securityLevel} + fail-closed catch. Exported for Plan 06 proxy-side reuse. — Commits c3c0bac5f (feat) / 5b8d14761 (test)
 - [Phase ?]: [84-03]: Context-turns age-retention sweeper — hourly com.coding.context-turns-sweeper reclaims .data/measurements/<task>/context-turns.jsonl(.gz)+raw-bodies.jsonl(.gz) by per-file mtime, decoupled from span close; default 14d in config.json, runtime CONTEXT_TURNS_RETENTION_DAYS. Fixed cloned-installer SIGPIPE-under-pipefail false-FAIL in launchctl verify (capture-to-var). Commits 3f63896f8/e03885119; job registered live.
 - [Phase ?]: 84-06: Flag-gated raw-body capture at the proxy (D-05/D-06), default OFF via strict span.meta.capture_raw_bodies===true; bodies redacted via Plan 02 shared 27-pattern loader BEFORE write, fail-closed [REDACTION_ERROR_CONTENT_BLOCKED], separate raw-bodies.jsonl sibling; helpers in pure sibling raw-bodies.mjs; not redeployed (Plan 09). Proxy a1d0912/b1e0a49; test 5f214fd3b.
+- [Phase 84-07]: Context-turns read surfaces landed. handleContextTurns in lib/vkb-server/api-routes.js clones handleReconciliation VERBATIM (D-13 pattern): _validTaskId guard BEFORE the path build (traversal/slash/dot-only/empty -> 400), then read .data/measurements/<id>/context-turns.jsonl.gz, promisified zlib.gunzip on the RAW buffer, split -> JSON.parse each line -> 200 {contextTurns}. Falls back to plaintext .jsonl only on .gz ENOENT (span still open); BOTH ENOENT -> 200 {contextTurns:[]} graceful-empty (D-10), 500 only on unexpected error. Registered parallel to reconciliation. Dashboard server.js adds a /api/context-turns same-origin mirror to :12435 (cloned from /api/context-breakdown); the vkb runs/:taskId/context-turns route rides the EXISTING /api/experiments/* reverse-proxy (server.js:330, no new line). Container NOT restarted (VirtioFS); live E2E + curl deferred to 84-09. Last Wave-0 vkb stub un-skipped (8 tests green). Commits b89d3582d + 720775e27.
 
 ### Blockers/Concerns
 
@@ -396,10 +397,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 84 P02 | 20 | 2 tasks | 3 files |
 | Phase 84 P03 | 6min | 2 tasks | 5 files |
 | Phase 84 P06 | 20min | 2 tasks | 3 files |
+| Phase 84 P07 | 8min | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-07-08T03:40:41.938Z
+Last session: 2026-07-08T03:46:16.920Z
 Stopped at: Phase 84 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
