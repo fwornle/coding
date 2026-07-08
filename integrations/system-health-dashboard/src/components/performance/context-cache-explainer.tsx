@@ -874,15 +874,26 @@ export function ContextCacheExplainer() {
               transmitted across <span className="font-medium text-foreground">{s.turnCount}</span> measured
               request{s.turnCount === 1 ? '' : 's'} (cache read {fmt(s.totalRead)} + cache write{' '}
               {s.writeIsNA ? 'N/A' : fmt(s.totalWrite)} + fresh input {fmt(s.totalInput)} + output {fmt(s.totalOutput)}).
-              {timelineTurnCount > s.turnCount && (
+              {timelineTurnCount > s.turnCount ? (
                 <>
                   {' '}A raw token-usage timeline for this task may list{' '}
                   <span className="font-medium text-foreground">{timelineTurnCount}</span> rows — the extra{' '}
-                  <span className="font-medium text-foreground">{timelineTurnCount - s.turnCount}</span> are concurrent
-                  foreground/background proxy calls attributed to this task’s wall-clock window (Phase-75 time-window
-                  attribution), <span className="font-medium text-foreground">not</span> part of the measured request.
-                  This modal counts only the measured requests, so those rows — and any large{' '}
-                  <span style={{ color: C_READ }}>cache_read</span> they carry — are deliberately excluded here.
+                  <span className="font-medium text-foreground">{timelineTurnCount - s.turnCount}</span> are turns the
+                  context-turns write hook never sees (e.g. <span className="font-mono">claude-code</span> CLI adapter
+                  turns), plus concurrent foreground/background proxy calls attributed to this task’s wall-clock window
+                  (Phase-75 time-window attribution) — measured via the token-usage source but{' '}
+                  <span className="font-medium text-foreground">not</span> part of these proxy-wire requests. This modal
+                  counts only the measured requests, so those rows — and any large{' '}
+                  <span style={{ color: C_READ }}>cache_read</span> they carry — are deliberately excluded here. Two
+                  capture surfaces, not a discrepancy; we don’t invent per-turn rows for turns that were never logged.
+                </>
+              ) : (
+                <>
+                  {' '}The multi-agent Timeline may show additional turns — e.g.{' '}
+                  <span className="font-mono">claude-code</span> CLI adapter turns — measured via the token-usage source
+                  but <span className="font-medium text-foreground">not logged by the context-turns write hook</span>, so
+                  they don’t appear as rows here. Two capture surfaces, not a discrepancy; we don’t invent per-turn rows
+                  for turns that were never logged.
                 </>
               )}
             </p>
@@ -948,27 +959,6 @@ export function ContextCacheExplainer() {
                 </tbody>
               </table>
             </div>
-          )}
-
-          {/* Honest reconciliation with the multi-agent Timeline (operator refinement
-              #2). The per-turn table above only covers requests that crossed the proxy
-              wire and were logged to context-turns. The Timeline can show MORE turns
-              because it counts the token-usage source, which also includes turns the
-              context-turns write hook never sees (e.g. claude-code CLI adapter turns).
-              This is two capture surfaces, not a discrepancy — and we do NOT fabricate
-              rows for turns that were never logged. */}
-          {s.usingWire && s.turnCount > 0 && (
-            <p className="mt-2 border-t pt-2 text-[11px] leading-snug text-muted-foreground" data-testid="timeline-reconciliation-note">
-              <span className="font-medium text-foreground">Reconciling with the Timeline:</span> the{' '}
-              {s.turnCount} row{s.turnCount === 1 ? '' : 's'} above are the{' '}
-              <span className="font-medium text-foreground">proxy-wire requests captured in context-turns</span>{' '}
-              (the proxy <span className="font-mono">/api/complete</span> + <span className="font-mono">/v1/messages</span> tap).
-              The multi-agent Timeline may show additional turns — e.g.{' '}
-              <span className="font-mono">claude-code</span> CLI adapter turns — that are measured via the{' '}
-              token-usage source but are <span className="font-medium text-foreground">not logged by the context-turns write
-              hook</span>, so they don’t appear as rows here. Two capture surfaces, not a discrepancy; we don’t invent
-              per-turn rows for turns that were never logged.
-            </p>
           )}
         </div>
 
