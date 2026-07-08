@@ -372,7 +372,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
 | 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete    | 2026-07-07 |
-| 84. Per-Turn Context Revelation | v7.5 | 3/9 | In Progress|  |
+| 84. Per-Turn Context Revelation | v7.5 | 4/9 | In Progress|  |
 | 85. Experiment Control Center | v7.5 | 0/? | Not started | - |
 | 86. Timeline v2 & Declutter | v7.5 | 0/? | Not started | - |
 | 87. Interactive Spans & Branch Avenues | v7.5 | 0/? | Not started | - |
