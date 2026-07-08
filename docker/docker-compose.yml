@@ -155,6 +155,16 @@ services:
       # handlers dynamic-import ../experiments/*.mjs; live-mounted like vkb-server
       # so the DASH-01/02/03 + KB-04 endpoints resolve at runtime in-container.
       - ${CODING_REPO:-.}/lib/experiments:/coding/lib/experiments:ro
+      # Reproducibility/snapshot rig (Phase 67) — lib/experiments/experiment-restore.mjs
+      # imports ../repro/restore-snapshot.mjs during spec resolution (the /api/experiments/specs
+      # matrix preview loads the spec resolver chain), so lib/repro must be mounted too
+      # (Phase 85 Plan 06 live-deploy fix — the specs route 500'd on a missing module otherwise).
+      - ${CODING_REPO:-.}/lib/repro:/coding/lib/repro:ro
+      # Experiment spec catalog (Phase 85) — the /api/experiments/specs matrix
+      # preview + the launch spec-membership gate read config/experiments/*.yaml
+      # via _repoRoot()=/coding. Not baked into the image, so mount it live
+      # (Phase 85 Plan 06 live-deploy fix — the spec list was empty otherwise).
+      - ${CODING_REPO:-.}/config/experiments:/coding/config/experiments:ro
       # KM-Core dist (live-mounted to avoid Docker rebuild for TS changes — Phase 37)
       - ${CODING_REPO:-.}/lib/km-core/dist:/coding/lib/km-core/dist:ro
     networks:
