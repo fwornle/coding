@@ -177,6 +177,12 @@ export class HealthRemediationActions {
         case 'check_mastra_agent':
           result = await this.checkMastraAgent(issueDetails);
           break;
+        case 'experiment_run':
+          result = await this.experimentRun(issueDetails);
+          break;
+        case 'experiment_cancel':
+          result = await this.experimentCancel(issueDetails);
+          break;
         default:
           this.log(`Unknown action: ${actionName}`, 'ERROR');
           return {
@@ -819,6 +825,67 @@ export class HealthRemediationActions {
       };
     } catch (error) {
       return { success: false, message: `Docker supervisorctl error: ${error.message}` };
+    }
+  }
+
+  /**
+   * Phase 85-03 (D-01 amended): dispatch a detached experiment run on the HOST.
+   *
+   * The dedicated `POST /experiments/run` coordinator endpoint is the primary seam;
+   * this executeAction case reaches the SAME host executor via the existing
+   * `/health/remediate` dispatcher (RESEARCH OQ1 discretion). Delegates the fixed-argv
+   * detached spawn to run-launch.launchRun through experiment-executor.runExperiment
+   * (never a shell string here). The runner inherits the coordinator's contract env.
+   *
+   * @param {object} details  { spec, run_id, run_dir, overrides? }
+   * @returns {Promise<{success:boolean, pid?:number, message?:string}>}
+   */
+  async experimentRun(details = {}) {
+    try {
+      const { spec, run_id, run_dir, overrides } = details;
+      if (!spec || !run_id || !run_dir) {
+        return { success: false, message: 'spec, run_id and run_dir required' };
+      }
+      const { runExperiment } = await import('../lib/experiments/experiment-executor.mjs');
+      const result = await runExperiment({ spec, run_id, run_dir, overrides, env: process.env });
+      return {
+        success: result.success,
+        pid: result.pid,
+        message: result.success ? `experiment run spawned (pid ${result.pid})` : result.message,
+      };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Phase 85-03 (D-08 + OQ3): cancel a host experiment run.
+   *
+   * Delegates the negated-pid group kill to run-launch.cancelRun (via
+   * experiment-executor.cancelExperiment), writes the terminal 'cancelled' progress
+   * patch via run-progress.writeProgress (Plan 01), and clears the run-owned
+   * active-measurement.json span (OQ3) so the D-02 409 slot frees even after a hard
+   * SIGKILL.
+   *
+   * @param {object} details  { run_id, run_dir, pid }
+   * @returns {Promise<{success:boolean, killed?:boolean, span_cleared?:boolean, message?:string}>}
+   */
+  async experimentCancel(details = {}) {
+    try {
+      const { run_id, run_dir, pid } = details;
+      if (!run_dir || pid === undefined || pid === null) {
+        return { success: false, message: 'run_dir and pid required' };
+      }
+      const { cancelExperiment } = await import('../lib/experiments/experiment-executor.mjs');
+      const result = await cancelExperiment({ run_id, run_dir, pid, env: process.env });
+      return {
+        success: result.success,
+        killed: result.killed,
+        span_cleared: result.span_cleared,
+        message: `experiment cancel: killed=${result.killed} span_cleared=${result.span_cleared}`,
+      };
+    } catch (error) {
+      return { success: false, message: error.message };
     }
   }
 

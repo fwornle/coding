@@ -2592,6 +2592,112 @@ app.post('/health/remediate', async (req, res) => {
 });
 
 // =====================================================================
+// Phase 85-03: Experiment-executor host seam (D-01 amended / OQ3)
+// =====================================================================
+// The detached runner spawn + process-group cancel MUST run on the HOST
+// (where the agent CLIs live) — the container has only `node` (Pitfall 4).
+// The vkb-server container proxy (Plan 04) reaches these two endpoints over
+// HTTP; the handlers delegate to lib/experiments/experiment-executor.mjs,
+// which in turn delegates spawn→run-launch.launchRun and cancel→cancelRun,
+// writes the terminal 'cancelled' progress patch via run-progress.writeProgress,
+// and clears the run-owned active-measurement.json span (OQ3) so the D-02
+// 409 slot frees even after a hard SIGKILL.
+//
+// V4 origin gate: accept the container (host-gateway, a NON-loopback private
+// IP) AND host-side loopback callers; reject arbitrary EXTERNAL callers. Do
+// NOT reuse the /test/* LOOPBACK_IPS gate — it would 403 the container proxy
+// (85-PATTERNS V4 note). The coordinator port is not published beyond
+// localhost / the Docker-desktop loopback, so a private-range origin is the
+// container proxy, never a public caller.
+
+/**
+ * True when the request originates from the host (loopback) OR a container on
+ * the Docker private network (host-gateway). Rejects public/external IPs.
+ *
+ * @param {import('express').Request} req
+ * @returns {boolean}
+ */
+function isExperimentOriginAllowed(req) {
+  const raw = req.socket?.remoteAddress || '';
+  // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1).
+  const ip = raw.replace(/^::ffff:/, '');
+  // Host-side loopback.
+  if (ip === '127.0.0.1' || ip === '::1') return true;
+  // RFC1918 / Docker private ranges (host-gateway origin): 10/8, 172.16–31/12,
+  // 192.168/16. A container reaching the coordinator via host-gateway presents
+  // one of these; an external caller cannot (port not published beyond localhost).
+  if (/^10\./.test(ip)) return true;
+  if (/^192\.168\./.test(ip)) return true;
+  const m = /^172\.(\d{1,3})\./.exec(ip);
+  if (m) {
+    const second = Number(m[1]);
+    if (second >= 16 && second <= 31) return true;
+  }
+  return false;
+}
+
+let experimentExecutorModule = null;
+async function getExperimentExecutor() {
+  if (experimentExecutorModule) return experimentExecutorModule;
+  experimentExecutorModule = await import('../lib/experiments/experiment-executor.mjs');
+  return experimentExecutorModule;
+}
+
+// POST /experiments/run — detached host spawn of the experiment runner (D-01).
+//   body: { spec, run_id, run_dir, overrides? }
+//   200: { ok: true, success: true, pid }
+//   400: missing fields / bad request
+//   403: external origin (V4 gate)
+//   500: executor error
+app.post('/experiments/run', async (req, res) => {
+  if (!isExperimentOriginAllowed(req)) {
+    log(`experiments/run rejected external origin ${req.socket?.remoteAddress}`, 'WARN');
+    return res.status(403).json({ ok: false, error: 'origin not allowed' });
+  }
+  const { spec, run_id, run_dir, overrides } = req.body || {};
+  if (!spec || !run_id || !run_dir) {
+    return res.status(400).json({ ok: false, error: 'spec, run_id and run_dir required' });
+  }
+  try {
+    const { runExperiment } = await getExperimentExecutor();
+    // hostEnv is the coordinator's OWN env — it already carries CODING_REPO,
+    // LLM_PROXY_DATA_DIR, LLM_PROXY_PORT, CODING_PROXY_ROUTE (run-launch merges
+    // the four contract vars from it onto the child's process.env).
+    const result = await runExperiment({ spec, run_id, run_dir, overrides, env: process.env });
+    return res.status(result.success ? 200 : 500).json({ ok: result.success, ...result });
+  } catch (err) {
+    log(`experiments/run threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /experiments/cancel — negated-pid group kill + terminal progress patch +
+// OQ3 stale-span clear (Plan 02 cancelRun + Plan 01 writeProgress).
+//   body: { run_id, run_dir, pid }
+//   200: { ok: true, success: true, killed, span_cleared }
+//   400: missing fields
+//   403: external origin (V4 gate)
+//   500: executor error
+app.post('/experiments/cancel', async (req, res) => {
+  if (!isExperimentOriginAllowed(req)) {
+    log(`experiments/cancel rejected external origin ${req.socket?.remoteAddress}`, 'WARN');
+    return res.status(403).json({ ok: false, error: 'origin not allowed' });
+  }
+  const { run_id, run_dir, pid } = req.body || {};
+  if (!run_dir || pid === undefined || pid === null) {
+    return res.status(400).json({ ok: false, error: 'run_dir and pid required' });
+  }
+  try {
+    const { cancelExperiment } = await getExperimentExecutor();
+    const result = await cancelExperiment({ run_id, run_dir, pid, env: process.env });
+    return res.status(result.success ? 200 : 500).json({ ok: result.success, ...result });
+  } catch (err) {
+    log(`experiments/cancel threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// =====================================================================
 // Phase 33-15: Test injection endpoints (loopback-gated, AC#13)
 // =====================================================================
 // Replaces 33-12's plist-propagation approach (empirically falsified — see
