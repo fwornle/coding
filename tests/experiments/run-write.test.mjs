@@ -537,6 +537,73 @@ test('R2/R3/R4: readRuns surfaces the four fields via the ...meta spread (no que
   }
 });
 
+// ── D-05/D-07 (Phase 85-01): rerun_of + base_variant null-preserved Run metadata ──
+// A re-run's Run carries rerun_of=<original run_id>; a model/agent-overridden cell carries
+// base_variant=<original variant name>. Both follow the null-not-zero house rule EXACTLY:
+// a first (non-rerun, non-override) Run surfaces null — never '', never undefined, never absent.
+
+test('D-05/D-07: writeRun stamps rerun_of + base_variant from tags (null-preserved)', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    await writeRun(store, sampleArgs({
+      tags: {
+        task_hash: 'deadbeef', agent: 'claude-code', model: 'claude-opus-4-8',
+        framework: 'gsd', trace_id: 't1',
+        rerun_of: 'exp-orig--claude-sonnet--r0', base_variant: 'A',
+      },
+    }));
+
+    const m = (await collectRuns(store))[0].metadata;
+    assert.ok('rerun_of' in m, 'rerun_of key always present');
+    assert.ok('base_variant' in m, 'base_variant key always present');
+    assert.equal(m.rerun_of, 'exp-orig--claude-sonnet--r0', 'rerun_of persisted verbatim');
+    assert.equal(m.base_variant, 'A', 'base_variant persisted verbatim (D-07 original variant name)');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('D-05/D-07: absent rerun_of + base_variant persist as null (never absent, never "")', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    await writeRun(store, sampleArgs()); // sampleArgs tags carry NEITHER key
+
+    const m = (await collectRuns(store))[0].metadata;
+    assert.ok('rerun_of' in m, 'rerun_of key always present');
+    assert.ok('base_variant' in m, 'base_variant key always present');
+    assert.equal(m.rerun_of, null, 'first run → rerun_of null (never "" — the null-not-zero rule)');
+    assert.notEqual(m.rerun_of, '', 'rerun_of never coerced to empty string');
+    assert.equal(m.base_variant, null, 'no override → base_variant null');
+    assert.notEqual(m.base_variant, '', 'base_variant never coerced to empty string');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('D-05/D-07: readRuns surfaces rerun_of + base_variant via the ...meta spread', async () => {
+  const { store, cleanup } = await openIsolatedStore();
+  try {
+    const { writeRun } = await import('../../lib/experiments/run-write.mjs');
+    const { readRuns } = await import('../../lib/experiments/query.mjs');
+    await writeRun(store, sampleArgs({
+      tags: {
+        task_hash: 'deadbeef', agent: 'claude-code', model: 'claude-opus-4-8',
+        framework: 'gsd', trace_id: 't1',
+        rerun_of: 'exp-orig--r0', base_variant: 'A',
+      },
+    }));
+
+    const rows = await readRuns(store);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].rerun_of, 'exp-orig--r0', 'rerun_of flows through ...meta spread');
+    assert.equal(rows[0].base_variant, 'A', 'base_variant flows through ...meta spread');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('ATTR-02: readRuns surfaces the canonical fields via the ...meta spread (no query.mjs change)', async () => {
   const { store, cleanup } = await openIsolatedStore();
   try {
