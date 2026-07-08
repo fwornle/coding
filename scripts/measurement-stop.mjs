@@ -48,6 +48,7 @@
 import process from 'node:process';
 import path from 'node:path';
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
@@ -269,6 +270,181 @@ function findPendingCloseRequest(archiveDir) {
   return markers[0];
 }
 
+// ── Phase 84-05 (D-03/D-07): context-turns span-close lifecycle ──────────────
+//   The proxy (Plan 84-04) appends one plaintext `context-turns.jsonl` line per
+//   measured request with `observation_ref: null`. At span close (HERE — never in
+//   the proxy hot path, Pitfall 1: observations have no task_id and don't exist at
+//   request time) we (1) enrich each turn with the nearest correlating ETM
+//   observation (time-window + agent, best-effort D-07), then (2) gzip the plaintext
+//   → `.gz` and remove it (D-03), plus gzip `raw-bodies.jsonl` when present. A
+//   crashed/never-closed span leaves the readable plaintext for the age sweeper.
+
+/**
+ * A short "what is this turn doing" snippet derived from an observation's summary
+ * (prefer the `Intent:` clause; fall back to the whole summary), single-lined and
+ * capped at 120 chars. Never throws; returns '' on any malformed input.
+ */
+function intentSnippet(obs) {
+  try {
+    const s = String(obs?.summary ?? '').replace(/\s+/g, ' ').trim();
+    if (!s) return '';
+    const m = s.match(/Intent:\s*(.+?)(?:\s+Approach:|\s+Result:|\s+Artifacts:|$)/);
+    const t = (m ? m[1] : s).trim();
+    return t.length > 120 ? t.slice(0, 120) : t;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Best-effort correlation of each parsed context-turns line to the nearest ETM
+ * observation (D-07). Observations carry NO task_id, so the join is a coarse
+ * [from,to]-window + agent reference (many turns → ONE observation), not a 1:1
+ * join. For each turn whose `ts` falls inside the span window we pick the
+ * observation with the same agent whose `createdAt` is nearest to the turn's ts;
+ * `observation_ref` is set to `{ id, intent, theme? }`, else left `null`. Mutates
+ * and returns `lines`. Injecting `observations` keeps this offline/deterministic
+ * (the tests drive it with the fixture; production passes the fetched array).
+ * @param {object[]} lines parsed context-turns lines (mutated in place).
+ * @param {{from?:string,to?:string,agent?:string,observations?:object[]}} opts
+ * @returns {object[]} the same `lines`.
+ */
+export function enrichObservationRefs(lines, { from, to, agent, observations } = {}) {
+  const rows = Array.isArray(lines) ? lines : [];
+  const obs = Array.isArray(observations) ? observations : [];
+  const fromMs = Date.parse(from);
+  const toMs = Date.parse(to);
+  const validWindow = Number.isFinite(fromMs) && Number.isFinite(toMs) && fromMs <= toMs;
+  for (const line of rows) {
+    try {
+      if (!line || typeof line !== 'object') continue;
+      // Default to null — enrichment only ever UPGRADES a match (the preview stands).
+      line.observation_ref = null;
+      if (!validWindow || obs.length === 0) continue;
+      const tsMs = Date.parse(line.ts);
+      // Turns outside the span window get no correlation (null; the preview covers them).
+      if (!Number.isFinite(tsMs) || tsMs < fromMs || tsMs > toMs) continue;
+      const wantAgent = line.agent || agent || null;
+      let best = null;
+      let bestDist = Infinity;
+      for (const o of obs) {
+        const oMs = Date.parse(o?.createdAt);
+        if (!Number.isFinite(oMs) || oMs < fromMs || oMs > toMs) continue;
+        // Match agent when both sides declare one; a blank obs agent is not excluded.
+        if (wantAgent && o?.agent && o.agent !== wantAgent) continue;
+        const dist = Math.abs(oMs - tsMs);
+        if (dist < bestDist) { bestDist = dist; best = o; }
+      }
+      if (best) {
+        line.observation_ref = {
+          id: best.id ?? null,
+          intent: intentSnippet(best),
+          ...(best.theme ? { theme: best.theme } : {}),
+        };
+      }
+    } catch {
+      /* never-throw: leave this turn's observation_ref null */
+    }
+  }
+  return rows;
+}
+
+/**
+ * Fetch observations for the span window+agent, best-effort. Tries obs-api
+ * (:12436) first (host or container), then falls back to the exported
+ * `.data/observation-export/observations.json` snapshot when obs-api is
+ * unreachable (e.g. mid-restart). Returns `[]` on total failure — a correlation
+ * miss then leaves every `observation_ref` null and the proxy preview stands.
+ * @param {{from?:string,to?:string,agent?:string}} opts
+ * @returns {Promise<object[]>}
+ */
+export async function loadObservationsForWindow({ from, to, agent } = {}) {
+  const bases = [
+    process.env.OBS_API_URL,
+    'http://localhost:12436',
+    'http://host.docker.internal:12436',
+  ].filter(Boolean);
+  const qs = new URLSearchParams({ limit: '200' });
+  if (from) qs.set('from', from);
+  if (to) qs.set('to', to);
+  if (agent) qs.set('agent', agent);
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}/api/observations?${qs.toString()}`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const arr = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.observations) ? data.observations : null);
+      if (Array.isArray(arr)) return arr;
+    } catch {
+      /* try the next base / fall through to the export snapshot */
+    }
+  }
+  try {
+    const p = path.join(REPO_ROOT, '.data', 'observation-export', 'observations.json');
+    const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Span-close lifecycle for the context-turns capture in `dir`
+ * (`.data/measurements/<sanitized task_id>/`): enrich `context-turns.jsonl` in
+ * place with observation_refs, gzip it → `context-turns.jsonl.gz`, remove the
+ * plaintext (D-03), and gzip `raw-bodies.jsonl` → `.gz` when present. Each file
+ * is guarded independently so a failure on one never skips the other and never
+ * throws (the caller also wraps this best-effort). A missing file is normal — the
+ * span may have had no measured requests — and is silently skipped.
+ * @param {string} dir the per-task measurements directory.
+ * @param {{from?:string,to?:string,agent?:string,observations?:object[]}} opts
+ */
+export function closeContextTurns(dir, { from, to, agent, observations } = {}) {
+  // (1) context-turns.jsonl → enrich → gzip → unlink plaintext.
+  try {
+    const plainPath = path.join(dir, 'context-turns.jsonl');
+    if (fs.existsSync(plainPath)) {
+      const lines = fs.readFileSync(plainPath, 'utf8')
+        .split('\n')
+        .filter((l) => l.trim().length > 0)
+        .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+        .filter(Boolean);
+      enrichObservationRefs(lines, { from, to, agent, observations });
+      const out = lines.length
+        ? lines.map((l) => JSON.stringify(l)).join('\n') + '\n'
+        : '';
+      fs.writeFileSync(
+        path.join(dir, 'context-turns.jsonl.gz'),
+        zlib.gzipSync(Buffer.from(out, 'utf8')),
+      );
+      fs.unlinkSync(plainPath);
+    }
+  } catch (err) {
+    process.stderr.write(
+      `[measurement-stop] context-turns gzip failed (non-fatal): ${err.message}\n`,
+    );
+  }
+  // (2) raw-bodies.jsonl → gzip bytes verbatim → unlink plaintext (no enrichment).
+  try {
+    const rawPath = path.join(dir, 'raw-bodies.jsonl');
+    if (fs.existsSync(rawPath)) {
+      fs.writeFileSync(
+        path.join(dir, 'raw-bodies.jsonl.gz'),
+        zlib.gzipSync(fs.readFileSync(rawPath)),
+      );
+      fs.unlinkSync(rawPath);
+    }
+  } catch (err) {
+    process.stderr.write(
+      `[measurement-stop] raw-bodies gzip failed (non-fatal): ${err.message}\n`,
+    );
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
@@ -480,6 +656,32 @@ async function main() {
         `[measurement-stop] reconciliation sink failed (non-fatal): ${err.message}\n`,
       );
     }
+  }
+
+  // ── (3.0c) D-03/D-07: enrich observation_ref + gzip context-turns at span close ──
+  //   Beside the reconciliation write, reusing the SAME sanitizeTaskId(span.task_id)
+  //   + .data/measurements path build. Runs the correlation HERE (not the proxy hot
+  //   path — Pitfall 1). Best-effort never-throw: a failure writes to stderr and
+  //   NEVER aborts span close. A crashed span (no close) leaves the readable
+  //   plaintext context-turns.jsonl for the age sweeper to reclaim.
+  try {
+    const ctDir = path.join(REPO_ROOT, '.data', 'measurements', sanitizeTaskId(span.task_id));
+    const hasCt = fs.existsSync(path.join(ctDir, 'context-turns.jsonl'));
+    const hasRb = fs.existsSync(path.join(ctDir, 'raw-bodies.jsonl'));
+    if (hasCt || hasRb) {
+      const from = span.started_at ?? null;
+      const to = span.ended_at ?? null;
+      // Correlation only matters when there are turns to enrich; skip the fetch for
+      // a raw-bodies-only dir (nothing to annotate).
+      const observations = hasCt
+        ? await loadObservationsForWindow({ from, to, agent: foregroundAgent })
+        : [];
+      closeContextTurns(ctDir, { from, to, agent: foregroundAgent, observations });
+    }
+  } catch (err) {
+    process.stderr.write(
+      `[measurement-stop] context-turns close failed (non-fatal): ${err.message}\n`,
+    );
   }
 
   // ── (3.1) Token aggregation (read-only) + fg/bg split → canonical (D-05/D-06) ──
