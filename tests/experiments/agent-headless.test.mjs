@@ -13,6 +13,8 @@
 // real config/agents/*.sh registry files (on disk) and the probe's spawn seam is faked.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,9 +81,24 @@ test('resolveAgentBinary(claude) parses AGENT_COMMAND yet overrides to `claude` 
 });
 
 test('resolveAgentBinary reads the registry AGENT_COMMAND for non-overridden agents', () => {
-  assert.equal(resolveAgentBinary('opencode', AGENTS_DIR), 'opencode');
   assert.equal(resolveAgentBinary('mastracode', AGENTS_DIR), 'mastracode');
   assert.equal(resolveAgentBinary('copilot', AGENTS_DIR), 'copilot');
+});
+
+// 85-06 A2: opencode is PATH-ambiguous — the bare `opencode` resolves to a `-m`-incapable
+// homebrew Cobra build under the launchd runner. resolveAgentBinary pins the canonical
+// `~/.opencode/bin/opencode` (the `-m`-capable v1.15.x build) WHEN it exists on the host,
+// falling back to the registry binary otherwise. Assert whichever branch applies on this host.
+test('resolveAgentBinary(opencode) pins the canonical ~/.opencode/bin/opencode when present, else the registry binary (A2)', () => {
+  const canonical = path.join(os.homedir(), '.opencode', 'bin', 'opencode');
+  const bin = resolveAgentBinary('opencode', AGENTS_DIR);
+  let canonicalExecutable = false;
+  try { fs.accessSync(canonical, fs.constants.X_OK); canonicalExecutable = true; } catch { /* absent */ }
+  if (canonicalExecutable) {
+    assert.equal(bin, canonical, 'canonical opencode present → the absolute path is pinned (never the PATH-ambiguous bare name)');
+  } else {
+    assert.equal(bin, 'opencode', 'no canonical build → falls back to the registry AGENT_COMMAND');
+  }
 });
 
 // --- Task 2: probeCopilotHeadless (RUN-04) ------------------------------------------
