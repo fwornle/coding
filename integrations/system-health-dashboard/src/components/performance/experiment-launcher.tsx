@@ -52,6 +52,10 @@ export function ExperimentLauncher() {
   // Per-variant model/agent overrides, keyed by the ORIGINAL variant name (D-06).
   const [variantOverrides, setVariantOverrides] = useState<Record<string, VariantOverride>>({})
   const [captureRawBodies, setCaptureRawBodies] = useState(false)
+  // 85-06 DEFECT B: a transient highlight + confirmation shown when a Re-run pre-fills the
+  // launcher, so the operator sees the click landed (the runs-table Re-run button also scrolls
+  // this card into view). Cleared after a few seconds so it doesn't linger.
+  const [prefilledFrom, setPrefilledFrom] = useState<string | null>(null)
 
   // Fetch the spec list once on mount.
   useEffect(() => {
@@ -71,8 +75,18 @@ export function ExperimentLauncher() {
     setVariantSubset(Array.isArray(o.variants) ? o.variants : [])
     setVariantOverrides(o.variantOverrides ?? {})
     setCaptureRawBodies(o.capture_raw_bodies === true)
+    // DEFECT B: flag the pre-fill source so a confirmation banner + highlight ring render.
+    setPrefilledFrom(prefill.rerun_of ?? prefill.spec ?? 'a completed run')
     dispatch(clearLauncherPrefill())
   }, [prefill, dispatch])
+
+  // DEFECT B: auto-clear the pre-fill highlight a few seconds after it appears so the ring +
+  // confirmation banner are a transient affordance, not permanent chrome.
+  useEffect(() => {
+    if (!prefilledFrom) return
+    const t = setTimeout(() => setPrefilledFrom(null), 6000)
+    return () => clearTimeout(t)
+  }, [prefilledFrom])
 
   const selectedSpec: SpecSummary | undefined = useMemo(
     () => specs.find((s) => s.file === specFile),
@@ -154,12 +168,32 @@ export function ExperimentLauncher() {
   }
 
   return (
-    <Card>
+    <Card
+      id="experiment-launcher"
+      data-testid="experiment-launcher"
+      // DEFECT B: a transient highlight ring when pre-filled from a Re-run, so scrolling this
+      // card into view is unmistakably tied to the click (the ring fades when prefilledFrom clears).
+      className={
+        prefilledFrom
+          ? 'scroll-mt-4 ring-2 ring-primary transition-shadow'
+          : 'scroll-mt-4 transition-shadow'
+      }
+    >
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Launch experiment</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
+          {prefilledFrom && (
+            <p
+              className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-sm text-foreground"
+              role="status"
+              data-testid="rerun-prefill-confirmation"
+            >
+              Launcher pre-filled from <span className="font-mono">{prefilledFrom}</span> — review the
+              spec + overrides below, then Launch.
+            </p>
+          )}
           {rerunOf && (
             <p className="text-sm text-muted-foreground" data-testid="rerun-banner">
               Re-running <span className="font-mono">{rerunOf}</span> — same spec + snapshot, comparable task_hash.

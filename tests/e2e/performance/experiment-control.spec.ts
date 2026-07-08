@@ -42,6 +42,8 @@ const CAPTURE_RAW_BODIES = '[data-testid="capture-raw-bodies"]';
 const LAUNCH_EXPERIMENT = '[data-testid="launch-experiment"]';
 const RERUN_EXPERIMENT = '[data-testid="rerun-experiment"]';
 const RERUN_BANNER = '[data-testid="rerun-banner"]';
+// 85-06 DEFECT B: the visible confirmation shown when a Re-run pre-fills the launcher.
+const RERUN_PREFILL_CONFIRMATION = '[data-testid="rerun-prefill-confirmation"]';
 
 /**
  * Navigate to the Performance tab. Returns false (→ test.skip) when the
@@ -136,5 +138,9 @@ test.describe('Phase 85 Experiment Control Center — launcher / matrix preview 
     await expect(page.locator(RERUN_BANNER)).toBeVisible();
     // And the spec select is now non-empty (pre-filled with the run's spec).
     await expect(page.locator(SPEC_SELECT)).not.toHaveValue('');
+    // 85-06 DEFECT B: a visible pre-fill confirmation renders so the click is not silent
+    // (the runs-table handler also scrolls the launcher into view). It is transient (auto-
+    // clears after a few seconds) so assert it promptly after the click.
+    await expect(page.locator(RERUN_PREFILL_CONFIRMATION)).toBeVisible();
   });
 });

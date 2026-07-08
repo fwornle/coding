@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pencil, Layers, Trash2, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ import {
   selectDeleteRunsPending,
   setLauncherPrefill,
   selectSpecList,
+  fetchSpecList,
   type Run,
   type ExperimentOverrides,
   type VariantOverride,
@@ -160,6 +161,16 @@ export function RunsTable() {
   // prefill derives the spec file from them by exact goal_sentence match.
   const specList = useAppSelector(selectSpecList)
   const [confirmOpen, setConfirmOpen] = useState(false)
+
+  // 85-06 DEFECT B: the re-run prefill derives the spec file from the server-listed specs by
+  // exact goal_sentence match. The launcher normally fetches them on mount, but a defensive
+  // fetch here guarantees specList is populated even if a user reaches the runs table before the
+  // launcher's fetch resolves — otherwise deriveSpecFile returns '' and the spec does NOT
+  // pre-select (the Re-run then opens rerun_of-only, reading as a partial no-op).
+  useEffect(() => {
+    if (specList.length === 0) dispatch(fetchSpecList())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Multi-select over the CURRENTLY-FILTERED set. "All" selects every visible
   // row; "None" clears. The header checkbox reflects all/some/none.
@@ -356,6 +367,14 @@ export function RunsTable() {
                           // Don't bubble to the row (which drives the timeline).
                           e.stopPropagation()
                           dispatch(setLauncherPrefill(buildRerunPrefill(run, specList)))
+                          // 85-06 DEFECT B: the launcher card sits at the TOP of the page while
+                          // this button is far down the runs table, so the pre-fill happened
+                          // OFF-SCREEN and the click read as dead. Bring the launcher INTO VIEW
+                          // so the operator sees the rerun banner + pre-selected spec. The
+                          // launcher's own useEffect applies a transient highlight on consume.
+                          document
+                            .getElementById('experiment-launcher')
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                         }}
                       >
                         <RotateCcw className="size-3.5" />
