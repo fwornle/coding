@@ -32,6 +32,11 @@ goal_sentence: "Create a file named fizzbuzz.mjs at the repository root that exp
 
 repeats: 1
 
+# Closed-taxonomy class (Phase 85-06): writing a new module + its test = new-feature.
+# Without it every Run of this matrix quarantines as `unclassified` (pending=true)
+# and is EXCLUDED from the default dashboard runs query — the run completes invisibly.
+task_class: new-feature
+
 # Real score-time test command (D-05: runs at SCORE time only, NEVER the completion gate). It
 # executes each agent's actual output in the cell's sandbox worktree, so the coverage/quality
 # rubric reflects whether the agent produced a working, tested module. Fixed argv, no shell meta.

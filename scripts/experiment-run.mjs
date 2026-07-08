@@ -46,6 +46,7 @@ import yaml from 'js-yaml';
 import { runMatrix, cellName } from '../lib/experiments/experiment-runner.mjs';
 import { resolveExperimentSpec } from '../lib/experiments/experiment-spec.mjs';
 import { writeProgress } from '../lib/experiments/run-progress.mjs';
+import { loadTaxonomy, isValidClass } from '../lib/experiments/taxonomy.mjs';
 
 // Required agents whose non-completion makes the whole run fail (copilot may legitimately
 // land a recorded skip-Run when the headless probe fails — that is NOT a failure).
@@ -113,6 +114,8 @@ function usage() {
     '  --run-id <id>     short path-safe run identity ([A-Za-z0-9._-], ≤12) — the composeTaskId salt\n' +
     '  --run-dir <dir>   directory to emit progress.json into (dashboard poll surface — D-03/D-04)\n' +
     '  --rerun-of <id>   the ORIGINAL run_id this run re-runs (Run.metadata.rerun_of — D-05)\n' +
+    '  --task-class <c>  closed-taxonomy class for scoring (falls back to the spec task_class field;\n' +
+    '                    absent → the Run quarantines as unclassified and is hidden from default queries)\n' +
     '  --model V=M       per-variant model override keyed by ORIGINAL variant name V (D-06; repeatable)\n' +
     '  --agent V=A       per-variant agent override keyed by ORIGINAL variant name V (D-06; repeatable)\n',
   );
@@ -154,6 +157,11 @@ async function main() {
   const runIdArg = parseStrArg(args, '--run-id');
   const runDir = parseStrArg(args, '--run-dir') || undefined;
   const rerunOf = parseStrArg(args, '--rerun-of') || undefined;
+  // Phase 85-06: the closed-taxonomy task_class for scoring. Flag wins; the spec's
+  // own `task_class:` field is the declarative fallback. WITHOUT one, every Run
+  // quarantines as `unclassified` (pending=true) and is EXCLUDED from the default
+  // dashboard runs query — a spec-launched run would complete invisibly.
+  const taskClassArg = parseStrArg(args, '--task-class') || undefined;
 
   if (!specPath) {
     process.stderr.write('error: --spec <file> is required\n');
@@ -209,6 +217,24 @@ async function main() {
   // resolve+whole-run-validate the matrix via the shipped Phase-77 resolver (fail-fast).
   const specObj = yaml.load(fs.readFileSync(specPath, 'utf8'));
   const resolved = resolveExperimentSpec(specObj);
+
+  // Resolve + validate the task_class (flag > spec field). Fail-fast on an unknown
+  // class (matches the VALID-before-RUN spec-validation ethos) — a typo'd class
+  // would otherwise quarantine every Run of the matrix.
+  const taskClass = taskClassArg ?? (typeof specObj?.task_class === 'string' ? specObj.task_class : undefined);
+  if (taskClass !== undefined) {
+    let taxonomy;
+    try {
+      taxonomy = loadTaxonomy();
+    } catch (e) {
+      process.stderr.write(`error: task-taxonomy load failed: ${e.message}\n`);
+      process.exit(2);
+    }
+    if (!isValidClass(taskClass, taxonomy)) {
+      process.stderr.write(`error: task_class '${taskClass}' is not in the closed taxonomy — legal classes: ${Object.keys(taxonomy.classes).join(', ')}\n`);
+      process.exit(2);
+    }
+  }
 
   // --variant narrowing: keep only the cells whose derived names are in the requested
   // SUBSET (repeatable flag — Phase 85-06). ANY unknown variant name is a usage error
@@ -267,6 +293,10 @@ async function main() {
     variantOverrides,
   };
   if (timeoutMs != null) opts.timeoutMs = timeoutMs;
+  // Phase 85-06: thread the validated task_class → runCell --task-class → the
+  // measurement-stop judge, so spec-launched Runs land CLASSIFIED (visible in the
+  // default dashboard runs query) instead of quarantined `unclassified`.
+  if (taskClass !== undefined) opts.taskClass = taskClass;
 
   if (process.env.EXPERIMENT_RUN_FAKE) {
     Object.assign(opts, makeFakeSeams());
