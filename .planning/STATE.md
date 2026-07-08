@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: completed
+status: executing
 stopped_at: Phase 85 context gathered
-last_updated: "2026-07-08T07:31:28.734Z"
-last_activity: 2026-07-08
+last_updated: "2026-07-08T08:58:50.720Z"
+last_activity: 2026-07-08 -- Phase 85 planning complete
 progress:
   total_phases: 21
   completed_phases: 14
-  total_plans: 84
+  total_plans: 90
   completed_plans: 83
   percent: 67
 ---
@@ -55,7 +55,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 84 (per-turn-context-revelation) — COMPLETE (9/9 plans)
 Plan: 9 of 9 — live E2E gate PASSED; Task-3 human-verify APPROVED with refinements
-Status: Phase 84 COMPLETE. The full pipeline was proven live end-to-end (proxy redeploy
+Status: Ready to execute
   e72666a→b1e0a49 after confirming coordinator location=open; one measured span with
   capture_raw_bodies=true produced real context-turns.jsonl.gz + raw-bodies.jsonl.gz;
   both read APIs serve the turns; redaction verified on live traffic). The operator
@@ -71,7 +71,7 @@ Status: Phase 84 COMPLETE. The full pipeline was proven live end-to-end (proxy r
   fallback was DEFERRED to Phase 86 with a precise follow-up
   (.planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md). Evidence +
   screenshots in 84-LIVE-GATE.md. Ready for /gsd-verify-phase 84.
-Last activity: 2026-07-08
+Last activity: 2026-07-08 -- Phase 85 planning complete
 
 ## Deferred Items
 
