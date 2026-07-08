@@ -112,6 +112,11 @@ test('launchRun spawns detached + unref\'d with a fixed-argv and writes run.json
     return { pid: 4242, unref: () => { unrefCalled = true; } };
   };
 
+  // 85-06 A1: inject openLogFn so no real fd is opened; assert the runner stdio is redirected
+  // to <runDir>/runner.log (stdin ignored, stdout+stderr → the log fd) for diagnosability.
+  let openedLogPath;
+  const fakeOpenLog = (p) => { openedLogPath = p; return 77; }; // fake fd
+
   const result = await launchRun({
     specPath: '/spec.yaml',
     runId: 'run-42',
@@ -119,6 +124,7 @@ test('launchRun spawns detached + unref\'d with a fixed-argv and writes run.json
     overrides: { repeats: 2 },
     env: { CODING_REPO: '/repo' },
     spawnFn: fakeSpawn,
+    openLogFn: fakeOpenLog,
   });
 
   // Spawned process.execPath (node), not a shell.
@@ -127,14 +133,44 @@ test('launchRun spawns detached + unref\'d with a fixed-argv and writes run.json
   assert.equal(capturedArgs.opts.detached, true, 'detached:true required (D-01 survival)');
   assert.notEqual(capturedArgs.opts.shell, true, 'must NEVER pass shell:true');
   assert.equal(unrefCalled, true, 'unref() must be called so a launcher restart does not kill the run');
-  assert.deepEqual(result, { pid: 4242, runDir });
 
-  // run.json persisted with pid + identity.
+  // A1 diagnosability: stdio must be ['ignore', logFd, logFd] — the detached child's
+  // stdout+stderr land in runner.log instead of being discarded (the old stdio:'ignore').
+  assert.equal(openedLogPath, path.join(runDir, 'runner.log'), 'log opened at <runDir>/runner.log');
+  assert.deepEqual(capturedArgs.opts.stdio, ['ignore', 77, 77], 'stdout+stderr → the log fd; stdin ignored');
+  assert.equal(result.pid, 4242);
+  assert.equal(result.runDir, runDir);
+  assert.equal(result.logPath, path.join(runDir, 'runner.log'));
+
+  // run.json persisted with pid + identity + the log path.
   const runJson = JSON.parse(fs.readFileSync(path.join(runDir, 'run.json'), 'utf8'));
   assert.equal(runJson.pid, 4242);
   assert.equal(runJson.run_id, 'run-42');
   assert.equal(runJson.spec, '/spec.yaml');
+  assert.equal(runJson.log, path.join(runDir, 'runner.log'), 'run.json records the log path');
   assert.ok(typeof runJson.started_at === 'string' && runJson.started_at.length > 0);
+});
+
+test('launchRun falls back to stdio:ignore when the log file cannot be opened (never blocks a launch)', async () => {
+  const base = mkRunDir();
+  const runDir = path.join(base, 'run-nolog');
+  let capturedStdio;
+  const fakeSpawn = (_cmd, _argv, opts) => {
+    capturedStdio = opts.stdio;
+    return { pid: 9, unref: () => {} };
+  };
+  // openLogFn throws (e.g. EACCES) — the launch must proceed with stdio:'ignore', not throw.
+  const failingOpen = () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); };
+  const result = await launchRun({
+    specPath: '/spec.yaml',
+    runId: 'run-nolog',
+    runDir,
+    env: {},
+    spawnFn: fakeSpawn,
+    openLogFn: failingOpen,
+  });
+  assert.equal(capturedStdio, 'ignore', 'a failed log-open falls back to stdio:ignore (fail-soft)');
+  assert.equal(result.pid, 9);
 });
 
 test('launchRun merges the four contract env vars into the child env', async () => {

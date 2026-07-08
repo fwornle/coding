@@ -40,29 +40,34 @@ function fakeChild() {
 // ---------------------------------------------------------------------------
 
 test('launchCell: a stub agent exiting 0 resolves terminal_state complete', async () => {
-  const state = await launchCell({
+  const result = await launchCell({
     bin: process.execPath,
     argv: [STUB, 'exit0'],
     worktree: process.cwd(),
     sandboxDataDir: path.join(process.cwd(), '.data'),
     stdio: 'ignore',
   });
-  assert.equal(state, 'complete');
+  // 85-06 A1: launchCell resolves an object { state, code, signal, reason? }.
+  assert.equal(result.state, 'complete');
+  assert.equal(result.code, 0);
+  assert.equal(result.reason, undefined); // complete carries no reason
 });
 
-test('launchCell: a stub agent exiting non-zero resolves abort', async () => {
-  const state = await launchCell({
+test('launchCell: a stub agent exiting non-zero resolves abort with an exit-code reason', async () => {
+  const result = await launchCell({
     bin: process.execPath,
     argv: [STUB, 'exitN'],
     worktree: process.cwd(),
     sandboxDataDir: path.join(process.cwd(), '.data'),
     stdio: 'ignore',
   });
-  assert.equal(state, 'abort');
+  assert.equal(result.state, 'abort');
+  // A1: the abort now carries a human-readable reason naming the exit code (diagnosability).
+  assert.match(result.reason, /exited with code/);
 });
 
 test('launchCell: a hanging stub is SIGTERM-killed after the timeout and resolves timeout', async () => {
-  const state = await launchCell({
+  const result = await launchCell({
     bin: process.execPath,
     argv: [STUB, 'hang'],
     worktree: process.cwd(),
@@ -71,7 +76,8 @@ test('launchCell: a hanging stub is SIGTERM-killed after the timeout and resolve
     graceMs: 150,
     stdio: 'ignore',
   });
-  assert.equal(state, 'timeout');
+  assert.equal(result.state, 'timeout');
+  assert.match(result.reason, /wall-clock timeout/);
 });
 
 test('launchCell: child is spawned with cwd=worktree and env.LLM_PROXY_DATA_DIR=sandboxDataDir', async () => {
@@ -82,14 +88,14 @@ test('launchCell: child is spawned with cwd=worktree and env.LLM_PROXY_DATA_DIR=
     setImmediate(() => child.emit('exit', 0, null));
     return child;
   };
-  const state = await launchCell({
+  const result = await launchCell({
     bin: 'agent-bin',
     argv: ['-p', 'goal'],
     worktree: '/sandbox/worktree',
     sandboxDataDir: '/sandbox/worktree/.data',
     spawn: fakeSpawn,
   });
-  assert.equal(state, 'complete');
+  assert.equal(result.state, 'complete');
   assert.equal(capturedOpts.cwd, '/sandbox/worktree');
   assert.equal(capturedOpts.env.LLM_PROXY_DATA_DIR, '/sandbox/worktree/.data');
 });
@@ -190,6 +196,38 @@ test('runCell: on abort, measurement-stop STILL runs (finally) with the mapped -
   assert.equal(stops.length, 1, 'no cell dropped — stop runs on abort too');
   assert.equal(stops[0].argv[stops[0].argv.indexOf('--terminal-state') + 1], 'abort');
   assert.equal(res.terminalState, 'abort');
+});
+
+test('runCell: an abort with a launchCell reason propagates that reason (A1 diagnosability)', async () => {
+  // 85-06 A1: launchCell now resolves { state, reason } — runCell must surface the reason so
+  // an aborted cell records WHY (not a bare "abort"). A spawnAgent seam returning the object
+  // shape must be honored (normalizeCellResult); the returned res carries the reason.
+  const calls = [];
+  const restore = async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' });
+  const runMeasurement = async (phase, argv, o) => { calls.push({ phase, argv, env: o?.env }); return 0; };
+  const spawnAgent = async () => ({ state: 'abort', code: 42, signal: null, reason: 'agent exited with code 42' });
+  const res = await runCell({
+    cell: CELL, rep: 0, expId: 'exp1', goal: 'do a thing', snapshotId: 'snap-1',
+    agentsDir: AGENTS_DIR, dataDir: '/main/.data',
+    restore, runMeasurement, spawnAgent,
+    configureRouting: async (_a, env) => env,
+  });
+  assert.equal(res.terminalState, 'abort');
+  assert.equal(res.reason, 'agent exited with code 42', 'the abort reason is threaded through runCell');
+  const stop = calls.find((c) => c.phase === 'stop');
+  assert.equal(stop.argv[stop.argv.indexOf('--terminal-state') + 1], 'abort');
+});
+
+test('normalizeCellResult accepts both a bare string (legacy seam) and an object', async () => {
+  const { normalizeCellResult } = await import('../../lib/experiments/experiment-runner.mjs');
+  assert.deepEqual(normalizeCellResult('complete'), { state: 'complete' });
+  assert.deepEqual(
+    normalizeCellResult({ state: 'abort', reason: 'boom' }),
+    { state: 'abort', reason: 'boom' },
+  );
+  // A nullish/odd result defaults to an abort with an explanatory reason.
+  assert.equal(normalizeCellResult(null).state, 'abort');
+  assert.match(normalizeCellResult(null).reason, /no terminal result/);
 });
 
 test('runCell: on timeout, measurement-stop STILL runs with --terminal-state timeout', async () => {
