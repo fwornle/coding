@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend,
 } from 'recharts'
@@ -25,6 +25,7 @@ import {
   setExplainTaskId,
   type TimelineRow,
   type ContextTurnRow,
+  type ContextTurnMessage,
 } from '@/store/slices/performanceSlice'
 import { normalizeModel } from './models'
 
@@ -80,6 +81,23 @@ const num = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x)
 const fmt = (n: number): string => n.toLocaleString()
 const kb = (bytes: number): string => (bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`)
 
+// Build a scaled context-window band from a real per-category byte map. Each
+// PRESENT category (bytes > 0) is floored to a visible sliver (≥1.2%) so a
+// tiny-but-real segment doesn't vanish, then renormalised so widths sum to 100.
+// The dashed prefix boundary is everything except the fresh 'user' tail. Returns
+// null when there is no real size to draw. Shared by the context-turns band
+// (Phase 84 — real per-request categories) and the /api/context-breakdown band.
+function scaledBand(byKey: Record<string, number>, totalBytes: number): { view: Segment[]; prefixPct: number } | null {
+  if (totalBytes <= 0) return null
+  const raw = SEGMENTS.map((seg) => ({ seg, bytes: byKey[seg.key] ?? 0 })).filter((r) => r.bytes > 0)
+  if (raw.length === 0) return null
+  const floored = raw.map((r) => ({ ...r, w: Math.max(1.2, (r.bytes / totalBytes) * 100) }))
+  const sum = floored.reduce((a, r) => a + r.w, 0)
+  const view = floored.map((r) => ({ ...r.seg, w: (r.w / sum) * 100 }))
+  const prefixW = view.filter((v) => v.key !== 'user').reduce((a, v) => a + v.w, 0)
+  return { view, prefixPct: Math.min(100, prefixW) }
+}
+
 // Real wire-buffer breakdown as returned by GET /api/context-breakdown (proxy).
 interface RealBreakdown {
   capturedAt: string
@@ -120,6 +138,48 @@ interface TurnDatum {
   wire?: 'anthropic' | 'openai'
   // True when this turn's cache_write is null (OpenAI wire) — render N/A, not 0.
   writeNA?: boolean
+  // "What this turn is actually doing" (D-07). Primary = the correlated ETM
+  // observation's intent; fallback = the fresh user-input preview for the turn.
+  note?: string
+  // Source of `note` so the UI can label it honestly (observation vs preview).
+  noteSource?: 'observation' | 'preview'
+  // Bytes of the fresh (last-user) input this turn — the part that's new.
+  freshBytes?: number
+}
+
+// Belt-and-suspenders client-side scrub for the per-turn narrative. Context-turns
+// message previews are unredacted digests at the source (Plan 84-04 T-84-04-04:
+// the redacted channel is raw-bodies.jsonl). Since we now surface a preview in the
+// UI, mask the common secret shapes so a real secret in a prompt never renders on
+// the dashboard. (The observation-intent path is already redacted upstream.)
+const SECRET_SCRUBS: [RegExp, string][] = [
+  [/sk-[A-Za-z0-9-]{6,}/g, 'sk-***'],
+  [/ghp_[A-Za-z0-9]{6,}/g, 'ghp_***'],
+  [/eyJ[A-Za-z0-9._-]{10,}/g, 'eyJ***'],
+  [/\bBearer\s+[A-Za-z0-9._-]{6,}/gi, 'Bearer ***'],
+  [/\bAKIA[0-9A-Z]{12,}/g, 'AKIA***'],
+]
+function scrubSecrets(s: string): string {
+  let out = s
+  for (const [re, rep] of SECRET_SCRUBS) out = out.replace(re, rep)
+  return out
+}
+
+// Pull the "what's happening" note for a turn (D-07 order of preference):
+// correlated ETM observation intent first, else the fresh user-input preview.
+function turnNote(t: ContextTurnRow): { note: string; noteSource: 'observation' | 'preview' } {
+  const ref = t.observation_ref
+  if (ref && typeof ref === 'object' && typeof ref.intent === 'string' && ref.intent.trim()) {
+    return { note: scrubSecrets(ref.intent.trim()), noteSource: 'observation' }
+  }
+  if (typeof ref === 'string' && ref.trim()) {
+    return { note: scrubSecrets(ref.trim()), noteSource: 'observation' }
+  }
+  const msgs = Array.isArray(t.messages) ? t.messages : []
+  let lastUser: ContextTurnMessage | null = null
+  for (const m of msgs) if (m?.role === 'user') lastUser = m
+  const preview = (lastUser?.preview ?? '').trim()
+  return { note: scrubSecrets(preview), noteSource: 'preview' }
 }
 
 // The exact honesty string for OpenAI-wire cache-write (D-12). OpenAI-wire
@@ -150,6 +210,11 @@ function summarize(timeline: TimelineRow[], contextTurns: ContextTurnRow[] = [])
       if (t.wire === 'openai') anyOpenAiWire = true
       if (t.wire === 'anthropic') anyAnthropicWire = true
       const writeNA = t.usage?.cache_write == null // null ONLY on the OpenAI wire (D-12)
+      const { note, noteSource } = turnNote(t)
+      // Fresh input this turn = bytes of the User Input category (the new tail).
+      const freshBytes = (Array.isArray(t.categories) ? t.categories : [])
+        .filter((c) => c.key === 'user')
+        .reduce((a, c) => a + num(c.bytes), 0)
       return {
         turn: `T${i + 1}`,
         read: num(t.usage?.cache_read),
@@ -160,6 +225,9 @@ function summarize(timeline: TimelineRow[], contextTurns: ContextTurnRow[] = [])
         output: num(t.usage?.output),
         wire: t.wire,
         writeNA,
+        note,
+        noteSource,
+        freshBytes,
       }
     })
   } else {
@@ -394,28 +462,66 @@ export function ContextCacheExplainer() {
   // safe to use directly — no cross-run leakage possible.
   const activeReal = real
 
-  // Effective band segments: real byte proportions when this run has a capture,
-  // else the illustrative widths. Same 6 keys either way.
-  const { segView, prefixPct, realByKey } = useMemo(() => {
+  // Effective band segments — the real make-up of the context window, size-scaled,
+  // with actual per-category bytes surfaced in the legend. Source precedence:
+  //   1. THIS PHASE's per-request context-turns (Plan 84): the representative
+  //      (largest) turn carries a real `categories[].bytes` split straight from
+  //      the proxy write hook — the honest, always-captured make-up for any
+  //      measured run of any wire (anthropic OR openai).
+  //   2. The older /api/context-breakdown per-run buffer capture (activeReal).
+  //   3. Illustrative fixed widths, only when neither real source exists.
+  const { segView, prefixPct, realByKey, bandSource, bandTotalBytes, bandMsgCount } = useMemo(() => {
+    // 1) Per-request context-turns — pick the turn with the largest total
+    //    context (the representative "one full prompt sent to the backend").
+    if (contextTurns.length > 0) {
+      let best: ContextTurnRow | null = null
+      let bestTotal = -1
+      for (const t of contextTurns) {
+        const cats = Array.isArray(t.categories) ? t.categories : []
+        const total = cats.reduce((a, c) => a + num(c.bytes), 0)
+        if (total > bestTotal) { bestTotal = total; best = t }
+      }
+      if (best && bestTotal > 0) {
+        const byKey: Record<string, number> = {}
+        for (const c of best.categories) byKey[c.key] = num(c.bytes)
+        const band = scaledBand(byKey, bestTotal)
+        if (band) {
+          return {
+            segView: band.view,
+            prefixPct: band.prefixPct,
+            realByKey: byKey,
+            bandSource: 'turns' as const,
+            bandTotalBytes: bestTotal,
+            bandMsgCount: Array.isArray(best.messages) ? best.messages.length : 0,
+          }
+        }
+      }
+    }
+    // 2) /api/context-breakdown capture.
     const real = activeReal
     const byKey: Record<string, number> = {}
     if (real) for (const c of real.categories) byKey[c.key] = c.bytes
     if (real && real.total_bytes > 0) {
-      // Floor each present category to a visible sliver (≥1.2%) so a tiny-but-real
-      // segment (e.g. 0.3 KB of fresh User Input in a 3 MB buffer) doesn't vanish;
-      // renormalise so widths still sum to 100. The banner shows exact bytes.
-      const raw = SEGMENTS.map((seg) => ({ seg, bytes: byKey[seg.key] ?? 0 }))
-        .filter((r) => r.bytes > 0)
-      const floored = raw.map((r) => ({ ...r, w: Math.max(1.2, (r.bytes / real.total_bytes) * 100) }))
-      const sum = floored.reduce((a, r) => a + r.w, 0)
-      const view = floored.map((r) => ({ ...r.seg, w: (r.w / sum) * 100 }))
-      // Prefix boundary in the SAME floored coordinate space (everything except
-      // the fresh 'user' tail).
-      const prefixW = view.filter((v) => v.key !== 'user').reduce((a, v) => a + v.w, 0)
-      return { segView: view, prefixPct: Math.min(100, prefixW), realByKey: byKey }
+      const band = scaledBand(byKey, real.total_bytes)
+      if (band) {
+        return {
+          segView: band.view,
+          prefixPct: band.prefixPct,
+          realByKey: byKey,
+          bandSource: 'real' as const,
+          bandTotalBytes: real.total_bytes,
+          bandMsgCount: real.message_count,
+        }
+      }
     }
-    return { segView: SEGMENTS, prefixPct: PREFIX_PCT, realByKey: byKey }
-  }, [activeReal])
+    // 3) Illustrative.
+    return { segView: SEGMENTS, prefixPct: PREFIX_PCT, realByKey: byKey, bandSource: 'illustrative' as const, bandTotalBytes: 0, bandMsgCount: 0 }
+  }, [activeReal, contextTurns])
+
+  // True whenever the band is drawn from a real size source (either context-turns
+  // or the /api/context-breakdown capture) — controls the "measured" copy + the
+  // per-category byte sizes in the legend.
+  const bandMeasured = bandSource !== 'illustrative'
 
   const agent = run?.canonical_agent ?? run?.agent ?? ''
   const model = run?.canonical_model ? normalizeModel(run.canonical_model) : null
@@ -476,15 +582,31 @@ export function ContextCacheExplainer() {
           <div className="mb-2 flex items-baseline justify-between">
             <p className="text-sm font-semibold">Anatomy of the context window</p>
             <p className="text-xs text-muted-foreground">
-              {activeReal
-                ? <>proportions <span className="font-medium text-foreground">measured</span> from this run’s captured buffer · cache boundary is the real <span className="font-mono">cache_control</span> offset</>
-                : <>proportions illustrative · this run’s real cache split is shown below</>}
+              {bandSource === 'turns'
+                ? <>proportions <span className="font-medium text-foreground">measured</span> from this run’s per-request context-turns (largest turn) · exact UTF-8 bytes per category</>
+                : bandSource === 'real'
+                  ? <>proportions <span className="font-medium text-foreground">measured</span> from this run’s captured buffer · cache boundary is the real <span className="font-mono">cache_control</span> offset</>
+                  : <>proportions illustrative · this run’s real cache split is shown below</>}
             </p>
           </div>
 
+          {/* Per-request context-turns make-up (Plan 84) — the representative
+              (largest) turn's real per-category byte split. Always captured for a
+              measured run, so this is the primary "real make-up" banner. */}
+          {bandSource === 'turns' && (
+            <div className="mb-2 rounded-md border px-3 py-1.5 text-xs" style={{ borderColor: C_READ, background: C_READ + '10' }} data-testid="turns-capture-banner">
+              <span className="font-medium" style={{ color: C_READ }}>Measured context make-up ({agent || 'agent'})</span>{' '}
+              — this run’s largest turn assembled{' '}
+              <span className="font-mono">{kb(bandTotalBytes)}</span> across {bandMsgCount} message{bandMsgCount === 1 ? '' : 's'};
+              the band + legend below are <span className="font-medium text-foreground">exact UTF-8 bytes per category</span> from the
+              per-request context-turns. Only the <span style={{ color: C_INPUT }}>User Input</span> tail is fresh each turn — the
+              cacheable prefix (everything to its left) is what a provider cache can re-read.
+            </div>
+          )}
+
           {/* Per-run wire capture — this run's OWN buffer (fetched by task_id).
               Absent for runs that predate the tap, or copilot (no proxy seam). */}
-          {activeReal && (
+          {bandSource === 'real' && activeReal && (
             <div className="mb-2 rounded-md border px-3 py-1.5 text-xs" style={{ borderColor: C_READ, background: C_READ + '10' }} data-testid="real-capture-banner">
               <span className="font-medium" style={{ color: C_READ }}>Measured wire capture ({agent || 'agent'})</span>{' '}
               — this run’s actual request buffer:{' '}
@@ -499,7 +621,7 @@ export function ContextCacheExplainer() {
               {activeReal.cache_breakpoints === 1 ? 'breakpoint' : 'breakpoints'}.
             </div>
           )}
-          {!activeReal && (
+          {bandSource === 'illustrative' && (
             <div className="mb-2 rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground" data-testid="no-real-capture-note">
               The band below is <span className="font-medium text-foreground">illustrative</span> — this run has no per-category
               wire capture. It predates the capture tap{run?.agent === 'copilot' ? ' (and copilot has no proxy seam to measure)' : ''};
@@ -579,7 +701,7 @@ export function ContextCacheExplainer() {
               <div key={seg.key} className="flex items-center gap-2 text-xs">
                 <span className="inline-block h-3 w-3 rounded-sm border" style={{ background: seg.fill, borderColor: seg.stroke }} />
                 <span>{seg.label}</span>
-                {activeReal
+                {bandMeasured
                   ? <span className="font-mono text-muted-foreground">{kb(realByKey[seg.key] ?? 0)}</span>
                   : seg.real && <span className="text-muted-foreground">(real ~1k tok · click)</span>}
               </div>
@@ -588,7 +710,19 @@ export function ContextCacheExplainer() {
 
           {/* Honesty note — accurate to whether we measured the buffer or not. */}
           <p className="mt-3 border-t pt-2 text-xs text-muted-foreground">
-            {activeReal ? (
+            {bandSource === 'turns' ? (
+              <>
+                Sizes above are <span className="font-medium text-foreground">exact UTF-8 bytes per category</span> from this run’s
+                <span className="font-mono"> per-request context-turns</span> (the largest turn shown). The dashed line is the
+                cacheable-prefix boundary — everything before the fresh <span style={{ color: C_INPUT }}>User Input</span> tail. It’s
+                one contiguous buffer; categories are attributed by walking <span className="font-mono">system</span> →{' '}
+                <span className="font-mono">tools</span> → <span className="font-mono">messages</span>.{' '}
+                {s.usingWire ? (
+                  <>The per-turn <span className="font-medium text-foreground">token</span> split below is the{' '}
+                  <span className="font-medium text-foreground">real usage-reported count</span> from each request’s wire response.</>
+                ) : null}
+              </>
+            ) : bandSource === 'real' ? (
               <>
                 Sizes above are <span className="font-medium text-foreground">exact UTF-8 bytes</span> from the real
                 <span className="font-mono"> /v1/messages</span> buffer; the dashed line is the true{' '}
@@ -715,6 +849,11 @@ export function ContextCacheExplainer() {
               (copilot/opencode) shows the N/A string, NEVER 0 (D-12). */}
           {s.usingWire && s.turnCount > 0 && (
             <div className="mt-3 overflow-x-auto rounded-md border" data-testid="per-turn-wire-table">
+              <p className="border-b bg-muted/20 px-2 py-1 text-left text-[11px] text-muted-foreground">
+                Each turn: <span className="font-medium text-foreground">what it was doing</span> (the correlated ETM
+                observation’s intent, or the fresh user-input preview when no observation correlated) + the real transmitted
+                token split.
+              </p>
               <table className="w-full text-right text-xs">
                 <thead>
                   <tr className="border-b bg-muted/40 text-muted-foreground">
@@ -728,20 +867,38 @@ export function ContextCacheExplainer() {
                 </thead>
                 <tbody className="font-mono">
                   {s.data.map((d) => (
-                    <tr key={d.turn} className="border-b last:border-0">
-                      <td className="px-2 py-1 text-left">{d.turn}</td>
-                      <td className="px-2 py-1 text-left font-sans">
-                        <Badge variant="outline" className="text-[10px]">{d.wire ?? 'unknown'}</Badge>
-                      </td>
-                      <td className="px-2 py-1" style={{ color: C_READ }}>{fmt(d.read)}</td>
-                      <td className="px-2 py-1" style={{ color: C_WRITE }}>
-                        {d.writeNA
-                          ? <span className="font-sans text-[10px] text-muted-foreground" title={CACHE_WRITE_NA}>{CACHE_WRITE_NA}</span>
-                          : fmt(d.write)}
-                      </td>
-                      <td className="px-2 py-1" style={{ color: C_INPUT }}>{fmt(d.input)}</td>
-                      <td className="px-2 py-1" style={{ color: C_OUTPUT }}>{fmt(d.output)}</td>
-                    </tr>
+                    <Fragment key={d.turn}>
+                      <tr className="border-b border-dashed last:border-0">
+                        <td className="px-2 pt-1 text-left align-top">{d.turn}</td>
+                        <td className="px-2 pt-1 text-left align-top font-sans">
+                          <Badge variant="outline" className="text-[10px]">{d.wire ?? 'unknown'}</Badge>
+                        </td>
+                        <td className="px-2 pt-1 align-top" style={{ color: C_READ }}>{fmt(d.read)}</td>
+                        <td className="px-2 pt-1 align-top" style={{ color: C_WRITE }}>
+                          {d.writeNA
+                            ? <span className="font-sans text-[10px] text-muted-foreground" title={CACHE_WRITE_NA}>{CACHE_WRITE_NA}</span>
+                            : fmt(d.write)}
+                        </td>
+                        <td className="px-2 pt-1 align-top" style={{ color: C_INPUT }}>{fmt(d.input)}</td>
+                        <td className="px-2 pt-1 align-top" style={{ color: C_OUTPUT }}>{fmt(d.output)}</td>
+                      </tr>
+                      {/* What this turn is actually doing (D-07) — full-width narrative row. */}
+                      <tr className="border-b last:border-0">
+                        <td />
+                        <td colSpan={5} className="px-2 pb-1.5 text-left font-sans">
+                          {d.note ? (
+                            <span className="text-[11px] leading-snug text-muted-foreground">
+                              <Badge variant="outline" className="mr-1.5 align-middle text-[9px]">
+                                {d.noteSource === 'observation' ? 'observation' : 'user input'}
+                              </Badge>
+                              <span className="text-foreground/80">{d.note}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[11px] italic text-muted-foreground">no observation correlated and no preview captured for this turn</span>
+                          )}
+                        </td>
+                      </tr>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

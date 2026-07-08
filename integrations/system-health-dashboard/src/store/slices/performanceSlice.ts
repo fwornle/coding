@@ -152,8 +152,11 @@ export interface ContextTurnRow {
   cache_breakpoints: number[]
   categories: { key: string; label: string; bytes: number }[]
   messages: ContextTurnMessage[]
-  // Correlated at span close (Plan 84-05); null in the hot path.
-  observation_ref: string | null
+  // Correlated at span close (Plan 84-05); null in the hot path. When an ETM
+  // observation lands in the turn's time+agent window it carries the semantic
+  // "what this turn is doing" — `intent` is a ≤120-char snippet of the
+  // observation's Intent clause (D-07 primary explanation), `theme` optional.
+  observation_ref: { id: string; intent: string; theme?: string } | string | null
 }
 
 // A development-narrative item: an observation written during a run's time window,
