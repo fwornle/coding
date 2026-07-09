@@ -176,6 +176,22 @@ function loadConfig(configPath) {
 
 export class ObservationWriter {
   /**
+   * Whole-message acknowledgements/greetings the pre-LLM triviality gate skips
+   * (only when the turn touched no files). Curated + length-capped so a real
+   * short request never matches — see _looksLikeAck / processMessages gate.
+   * @type {Set<string>}
+   */
+  static _ACK_PHRASES = new Set([
+    'y', 'n', 'yes', 'no', 'ok', 'okay', 'k', 'kk', 'yep', 'yeah', 'yup', 'nope',
+    'proceed', 'continue', 'go', 'go ahead', 'go on', 'next', 'stop', 'done',
+    'approved', 'approve', 'lgtm', 'sounds good', 'sgtm', 'looks good',
+    'thanks', 'thank you', 'thx', 'ty', 'cheers', 'great', 'perfect', 'nice',
+    'got it', 'gotcha', 'sure', 'fine', 'cool', 'right', 'correct', 'exactly',
+    'please proceed', 'yes please', 'do it', 'ship it', 'merge it',
+    'hi', 'hello', 'hey', 'agreed', 'ack', 'noted', 'good',
+  ]);
+
+  /**
    * @param {Object} [options]
    * @param {string} [options.dbPath] - Path to SQLite database file
    * @param {string} [options.proxyUrl] - LLM proxy URL (default: http://localhost:$LLM_CLI_PROXY_PORT)
@@ -936,6 +952,35 @@ export class ObservationWriter {
     }
 
     return summary;
+  }
+
+  /**
+   * True when EVERY user turn in the chunk is a bare acknowledgement/greeting
+   * (whole-message match against a curated set, capped length). Used by the
+   * pre-LLM triviality gate: content-hash dedup only catches EXACT re-fires,
+   * so a stream of unique-but-trivial acks ("yes", "proceed", "approved") each
+   * still cost one haiku call that the summary LLM answers with "No actionable
+   * content." High-precision by design — anything not a whole-message ack is
+   * left for the LLM, so a real short request is never dropped.
+   */
+  _isTrivialAck(messages) {
+    const userTexts = (messages || [])
+      .filter(m => m && m.role === 'user' && typeof m.content === 'string')
+      .map(m => m.content.trim())
+      .filter(Boolean);
+    if (userTexts.length === 0) return false; // no-user case handled earlier
+    return userTexts.every(t => this._looksLikeAck(t));
+  }
+
+  /** Whole-message acknowledgement/greeting test (case/punct-insensitive). */
+  _looksLikeAck(text) {
+    const t = String(text || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[.!?,…\s]+$/u, ''); // strip trailing punctuation/whitespace
+    if (t.length === 0) return true;
+    if (t.length > 24) return false; // real requests run longer than a bare ack
+    return ObservationWriter._ACK_PHRASES.has(t);
   }
 
   /**
@@ -1777,6 +1822,21 @@ export class ObservationWriter {
           }
           observations++;
           lastObservationId = preExisting.id;
+          continue;
+        }
+
+        // Pre-LLM triviality gate: a unique-but-trivial exchange (a bare ack
+        // with NO tool activity) is what summarize() labels "No actionable
+        // content" — but it still costs one haiku call to find that out, and
+        // content-hash dedup misses it because each ack is textually unique.
+        // Skip the LLM here when the user turn(s) are bare acknowledgements AND
+        // no files were touched. Conservative: never for progress snapshots,
+        // never when tool work happened. Nothing is written (no observation).
+        if (metadata.kind !== 'progress' &&
+            (metadata.modifiedFiles || []).length === 0 &&
+            (metadata.readFiles || []).length === 0 &&
+            this._isTrivialAck(chunk)) {
+          process.stderr.write(`[ObservationWriter] Pre-LLM triviality gate: bare ack + no tool work — skipping LLM call\n`);
           continue;
         }
 
