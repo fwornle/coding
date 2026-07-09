@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: executing
+status: verifying
 stopped_at: Phase 85 context gathered
-last_updated: "2026-07-08T09:24:31.010Z"
-last_activity: 2026-07-08 -- Phase 85 execution started
+last_updated: "2026-07-09T02:08:25.575Z"
+last_activity: 2026-07-09 -- Phase 85 complete (85-06 live gate approved)
 progress:
   total_phases: 21
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 90
-  completed_plans: 83
-  percent: 67
+  completed_plans: 89
+  percent: 71
 ---
 
 # Project State
@@ -53,25 +53,32 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 85 (experiment-control-center) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 85
-  e72666a→b1e0a49 after confirming coordinator location=open; one measured span with
-  capture_raw_bodies=true produced real context-turns.jsonl.gz + raw-bodies.jsonl.gz;
-  both read APIs serve the turns; redaction verified on live traffic). The operator
-  APPROVED the phase gate and requested three UI refinements, all handled (commit
-  6f72052f0): (#1) the cache-boundary divider is now bold 3px dashed theme-aware
-  border-foreground and spans the band + label row so it is clearly visible AND aligned
-  to the cached/non-cached labels; (#2) an honest reconciliation note below the per-turn
-  table explains that the table covers proxy-wire context-turns while additional Timeline
-  turns (e.g. claude-code CLI adapter turns) come from the token-usage source and are not
-  logged by the context-turns write hook; (#3) the Timeline per-turn "what it was doing"
-  fallback was assessed — the D-07 correlation machinery already exists in timeline.tsx
-  and works (0 intents is genuine for a synthetic span), so the user-input-preview
-  fallback was DEFERRED to Phase 86 with a precise follow-up
-  (.planning/todos/pending/2026-07-08-timeline-per-turn-intent-fallback.md). Evidence +
-  screenshots in 84-LIVE-GATE.md. Ready for /gsd-verify-phase 84.
-Last activity: 2026-07-08 -- Phase 85 execution started
+Phase: 85 (experiment-control-center) — COMPLETE (6/6 plans; awaiting /gsd-verify-phase 85)
+Plan: 6 of 6 (all landed)
+Status: Phase 85 complete — live human-verify gate APPROVED 2026-07-09
+  Plan 85-06 (E2E deploy + live gate) closed after four rounds of operator click-through
+  feedback. The Experiment Control Center is proven LIVE end-to-end: a dashboard click
+  spawns a real cross-agent runner ON THE HOST via the health-coordinator :3034 seam, the
+  5s-poll monitor advances, Cancel reaps the detached process group + frees the 409 slot,
+  Re-run pre-fills with a constant task_hash, and capture_raw_bodies produces raw bodies
+  only when ON. server.js needed NO edit (the /api/experiments req.path passthrough
+  forwards the four subpaths for free). Round-1..4 checkpoint fixes: container bind-mount
+  of lib/repro + config/experiments (43f0b9367), launcher/monitor wired into
+  performance.tsx + e2e spec (5dc47a679), host-agnostic seam + D-02 slot guard (1e8987a86),
+  variants SUBSET honored end-to-end (464653f7e), matrix-preview text (e60de65ea),
+  experiment-cell 409 relabel + regression tests (97225442c), task_class threading so
+  spec-launched Runs land visible (d61ac249f), terminal-state refresh + dismissible error
+
+  + cell-scoped timeline + goal-joined re-run prefill (3b7076ee8), runner stdio →
+  runner.log + abort reason A1 (072b87504), Re-run scroll-into-view + confirmation ring B
+  (e48b77702), opencode canonical ~/.opencode/bin path pin — fixed the -m abort A2
+  (bcab1b430), and D-12 --capture-raw-bodies threaded runner→cell measurement-start
+  (55501c057). Evidence: full experiments suite 336 green, Playwright experiment-control
+  4/4, live D-12 paired proof (rmrcu6xa9 ON → raw-bodies.jsonl.gz 175KB/4 records +
+  span.meta.capture_raw_bodies=true; rmrcuat7g OFF → no file); opencode cell now completes
+  (was abort); both live runs freed the slot. Deferred (out-of-scope): pre-existing tsc
+  diagnostic in src/pages/token-usage.tsx. See 85-06-SUMMARY.md. Ready for /gsd-verify-phase 85.
+Last activity: 2026-07-09 -- Phase 85 complete (85-06 live gate approved)
 
 ## Deferred Items
 
@@ -418,7 +425,7 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-07-08T07:31:28.711Z
+Last session: 2026-07-09T02:08:25.559Z
 Stopped at: Phase 85 context gathered
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
