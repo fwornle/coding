@@ -40,7 +40,15 @@ findings:
   warning: 6
   info: 4
   total: 13
-status: issues_found
+resolved:
+  - CR-01  # run_id/run_dir containment on host coordinator (commit 9615aacf0)
+  - CR-02  # cancel pid-ownership + reuse guard (commit 9615aacf0)
+  - CR-03  # timeout unit relabel to seconds (commit 4eb9884a6)
+  - WR-01  # rerun_of forwarded launcher→runner (commit f7d907376)
+  - WR-03  # argvForAgent fails fast on missing model (commit b7be5b2fa)
+resolved_count: 5
+deferred_count: 8  # WR-02/04/05/06 + 4 info — tracked for a follow-up pass
+status: partially_resolved
 ---
 
 # Phase 85: Code Review Report
