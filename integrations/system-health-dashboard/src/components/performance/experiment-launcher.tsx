@@ -142,6 +142,9 @@ export function ExperimentLauncher() {
   const buildOverrides = (): ExperimentOverrides => {
     const o: ExperimentOverrides = {}
     if (repeats.trim() !== '' && Number.isFinite(Number(repeats))) o.repeats = Number(repeats)
+    // CR-03 (Phase 85 REVIEW): the runner CLI contract is SECONDS (scripts/experiment-run.mjs
+    // multiplies by 1000). The field is now labelled "timeout seconds (override)" and forwarded
+    // verbatim — label and backend unit agree, no client-side conversion.
     if (timeout.trim() !== '' && Number.isFinite(Number(timeout))) o.timeout = Number(timeout)
     const subset = parseVariantSubset(variantSubset)
     if (subset) o.variants = subset
@@ -275,7 +278,7 @@ export function ExperimentLauncher() {
               className="w-48"
               type="number"
               min={1}
-              placeholder="timeout ms (override)"
+              placeholder="timeout seconds (override)"
               value={timeout}
               onChange={(e) => setTimeoutVal(e.target.value)}
               data-testid="override-timeout"
