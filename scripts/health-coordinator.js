@@ -2643,6 +2643,21 @@ async function getExperimentExecutor() {
   return experimentExecutorModule;
 }
 
+// CR-01 (Phase 85 REVIEW): the coordinator is the real trust boundary — every co-resident
+// container on the Docker bridge passes the broad RFC1918 origin gate, so run_id/run_dir MUST
+// be validated HERE before they reach the executor's fs sinks. Mirror the container-side
+// `_validRunId` charset+length bound and require run_dir to stay under .data/experiments/runs/.
+const EXPERIMENT_RUN_ID_RE = /^[A-Za-z0-9._-]{1,12}$/;
+const EXPERIMENT_RUNS_ROOT = path.resolve(REPO_ROOT, '.data', 'experiments', 'runs');
+function isValidExperimentRunId(runId) {
+  return typeof runId === 'string' && EXPERIMENT_RUN_ID_RE.test(runId) && runId !== '.' && runId !== '..';
+}
+function isContainedRunDir(runDir) {
+  if (typeof runDir !== 'string' || runDir.length === 0) return false;
+  const abs = path.isAbsolute(runDir) ? path.resolve(runDir) : path.resolve(REPO_ROOT, runDir);
+  return abs === EXPERIMENT_RUNS_ROOT || abs.startsWith(EXPERIMENT_RUNS_ROOT + path.sep);
+}
+
 // POST /experiments/run — detached host spawn of the experiment runner (D-01).
 //   body: { spec, run_id, run_dir, overrides? }
 //   200: { ok: true, success: true, pid }
@@ -2657,6 +2672,15 @@ app.post('/experiments/run', async (req, res) => {
   const { spec, run_id, run_dir, overrides } = req.body || {};
   if (!spec || !run_id || !run_dir) {
     return res.status(400).json({ ok: false, error: 'spec, run_id and run_dir required' });
+  }
+  // CR-01: reject a traversal-y run_id/run_dir BEFORE the executor touches the filesystem.
+  if (!isValidExperimentRunId(run_id)) {
+    log(`experiments/run rejected invalid run_id: ${JSON.stringify(run_id)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'invalid run_id' });
+  }
+  if (!isContainedRunDir(run_dir)) {
+    log(`experiments/run rejected out-of-tree run_dir: ${JSON.stringify(run_dir)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'run_dir escapes .data/experiments/runs/' });
   }
   try {
     const { runExperiment } = await getExperimentExecutor();
@@ -2689,10 +2713,22 @@ app.post('/experiments/cancel', async (req, res) => {
   if (!run_dir || pid === undefined || pid === null) {
     return res.status(400).json({ ok: false, error: 'run_dir and pid required' });
   }
+  // CR-01: reject a traversal-y run_id/run_dir BEFORE the executor touches the filesystem.
+  if (run_id !== undefined && run_id !== null && !isValidExperimentRunId(run_id)) {
+    log(`experiments/cancel rejected invalid run_id: ${JSON.stringify(run_id)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'invalid run_id' });
+  }
+  if (!isContainedRunDir(run_dir)) {
+    log(`experiments/cancel rejected out-of-tree run_dir: ${JSON.stringify(run_dir)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'run_dir escapes .data/experiments/runs/' });
+  }
   try {
     const { cancelExperiment } = await getExperimentExecutor();
     const result = await cancelExperiment({ run_id, run_dir, pid, env: process.env });
-    return res.status(result.success ? 200 : 500).json({ ok: result.success, ...result });
+    // CR-02: a pid that does not match the run's recorded run.json.pid is a 409 refusal,
+    // not a 500 executor error — the request is well-formed but not authorized to signal it.
+    const status = result.success ? 200 : (result.pid_mismatch ? 409 : 500);
+    return res.status(status).json({ ok: result.success, ...result });
   } catch (err) {
     log(`experiments/cancel threw: ${err.message}`, 'ERROR');
     return res.status(500).json({ ok: false, error: err.message });
