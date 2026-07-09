@@ -74,6 +74,20 @@ test('argvForAgent throws on an unknown agent', () => {
   assert.throws(() => argvForAgent('bogus', GOAL, { model: MODEL }));
 });
 
+test('WR-03: argvForAgent fails fast when model is missing (never pushes undefined into argv)', () => {
+  for (const agent of ['claude', 'opencode', 'mastracode', 'copilot']) {
+    // No opts.model → must THROW a clear error (routed through the D-12 record path),
+    // NOT push `undefined` into the fixed argv (which spawn rejects with a raw TypeError).
+    assert.throws(
+      () => argvForAgent(agent, GOAL),
+      /model required/,
+      `${agent}: missing model must throw a clear error`,
+    );
+    // And prove no undefined ever reaches an argv element in the accidental-empty-string case.
+    assert.throws(() => argvForAgent(agent, GOAL, { model: '' }), /model required/, `${agent}: empty model rejected`);
+  }
+});
+
 test('resolveAgentBinary(claude) parses AGENT_COMMAND yet overrides to `claude` (never bin/claude-mcp)', () => {
   const bin = resolveAgentBinary('claude', AGENTS_DIR);
   assert.equal(bin, 'claude');
