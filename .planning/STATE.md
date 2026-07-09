@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: verifying
-stopped_at: Phase 85 context gathered
-last_updated: "2026-07-09T02:08:25.575Z"
+status: ready_to_plan
+stopped_at: Phase 85 complete (6/6) — ready to discuss Phase 86
+last_updated: 2026-07-09T02:55:53.671Z
 last_activity: 2026-07-09 -- Phase 85 complete (85-06 live gate approved)
 progress:
   total_phases: 21
   completed_phases: 15
   total_plans: 90
-  completed_plans: 89
+  completed_plans: 275
   percent: 71
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 85 — experiment-control-center
+**Current focus:** Phase 86 — timeline v2 and declutter
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 85 (experiment-control-center) — COMPLETE (6/6 plans; awaiting /gsd-verify-phase 85)
-Plan: 6 of 6 (all landed)
-Status: Phase 85 complete — live human-verify gate APPROVED 2026-07-09
+Phase: 86
+Plan: Not started
+Status: Ready to plan
   Plan 85-06 (E2E deploy + live gate) closed after four rounds of operator click-through
   feedback. The Experiment Control Center is proven LIVE end-to-end: a dashboard click
   spawns a real cross-agent runner ON THE HOST via the health-coordinator :3034 seam, the
@@ -78,7 +78,7 @@ Status: Phase 85 complete — live human-verify gate APPROVED 2026-07-09
   span.meta.capture_raw_bodies=true; rmrcuat7g OFF → no file); opencode cell now completes
   (was abort); both live runs freed the slot. Deferred (out-of-scope): pre-existing tsc
   diagnostic in src/pages/token-usage.tsx. See 85-06-SUMMARY.md. Ready for /gsd-verify-phase 85.
-Last activity: 2026-07-09 -- Phase 85 complete (85-06 live gate approved)
+Last activity: 2026-07-09
 
 ## Deferred Items
 
@@ -108,7 +108,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 **Velocity:**
 
-- Total plans completed: 148 (v6.0)
+- Total plans completed: 154 (v6.0)
 - Average duration: 3 min
 - Total execution time: 0.05 hours
 
