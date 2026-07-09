@@ -203,6 +203,40 @@ test('clean launch with variantOverrides: forwards the map WHOLE in the coordina
   assert.equal(forwarded.repeats, 2);
 });
 
+test('WR-01: a top-level rerun_of is folded into overrides.rerun_of in the coordinator body', async () => {
+  const repoRoot = makeRepoRoot('t5b');
+  const coord = fakeCoordinator({ ok: true, success: true, pid: 5151 });
+  const ctx = await makeCtx(repoRoot, coord);
+  const res = mockRes();
+  await ctx.handleExperimentRun({ body: { spec: 'demo.yaml', overrides: { repeats: 2 }, rerun_of: 'r0abc' } }, res);
+  assert.equal(res.statusCode, 200, 'launch accepted');
+  assert.equal(coord.calls.length, 1);
+  const forwarded = coord.calls[0].body.overrides;
+  assert.equal(forwarded.rerun_of, 'r0abc', 'top-level rerun_of folded into overrides.rerun_of (D-05)');
+  assert.equal(forwarded.repeats, 2, 'existing overrides preserved alongside rerun_of');
+});
+
+test('WR-01: rerun_of=null is a no-op (no overrides.rerun_of forwarded)', async () => {
+  const repoRoot = makeRepoRoot('t5c');
+  const coord = fakeCoordinator({ ok: true, success: true, pid: 5152 });
+  const ctx = await makeCtx(repoRoot, coord);
+  const res = mockRes();
+  await ctx.handleExperimentRun({ body: { spec: 'demo.yaml', rerun_of: null } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(coord.calls[0].body.overrides.rerun_of, undefined, 'null rerun_of never forwarded');
+});
+
+test('WR-01: an ill-shaped rerun_of (traversal) is rejected 400, never forwarded', async () => {
+  const repoRoot = makeRepoRoot('t5d');
+  const coord = fakeCoordinator();
+  const ctx = await makeCtx(repoRoot, coord);
+  const res = mockRes();
+  await ctx.handleExperimentRun({ body: { spec: 'demo.yaml', rerun_of: '../../etc' } }, res);
+  assert.equal(res.statusCode, 400, 'ill-shaped rerun_of rejected');
+  assert.match(res.body.error, /rerun_of/i);
+  assert.equal(coord.calls.length, 0, 'never delegated to the coordinator');
+});
+
 test('bad variantOverrides key: a key that is not a resolved variant name -> 400', async () => {
   const repoRoot = makeRepoRoot('t6');
   const coord = fakeCoordinator();
