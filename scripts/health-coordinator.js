@@ -632,10 +632,16 @@ async function pollKnowledgePipeline() {
   };
   evaluateObsApiAutoHeal();
 
-  // Auto-trigger consolidation when undigested observations accumulate
+  // Auto-trigger consolidation when undigested observations accumulate.
+  // AFK-gated (2026-07-10): consolidation is deferrable background LLM work with
+  // no live consumer while the operator is away — so suspend it entirely when
+  // AFK (this trigger drove ~5k overnight consolidator calls). The backlog is
+  // preserved and drains on the operator's return (undigested only grows), when
+  // userActiveNow() flips true. Same presence authority as the proxy probes.
   const CONSOLIDATION_THRESHOLD = 5;
   const CONSOLIDATION_COOLDOWN_MS = 10 * 60_000; // 10 min between auto-triggers
   if (
+    userActiveNow() &&
     body.undigested >= CONSOLIDATION_THRESHOLD &&
     !body.inflight &&
     (!pollKnowledgePipeline._lastAutoConsolidate ||
@@ -2115,6 +2121,10 @@ async function runAllChecks() {
   // When AFK (_userActive === false) BOTH synthetic probes are skipped entirely
   // — see the AFK full-suspend note near PROXY_PROBE_INTERVAL_MS.
   const _userActive = userActiveNow();
+  // Surface presence in /health/state so external AFK-gated background jobs
+  // (e.g. the sub-agent-sweep launchd job) can suspend their own LLM work while
+  // the operator is away — the coordinator is the single presence authority.
+  currentState.user_active = _userActive;
   const _proxyProbeAge = currentState.proxy.last_probe_end
     ? Date.now() - new Date(currentState.proxy.last_probe_end).getTime()
     : Infinity;

@@ -60,6 +60,32 @@ case "${PROXY_HTTP_CODE}" in
     ;;
 esac
 
+# ---- 1b. AFK gate. -----------------------------------------------------------
+# This sweep makes one LLM call per discovered sub-agent transcript — the
+# dominant overnight LLM burn while the operator is away (no live consumer for
+# the resulting observations). The health-coordinator is the single presence
+# authority: it exposes `user_active` on /health/state (transcript-mtime based,
+# see scripts/health-coordinator.js userActiveNow()). Skip the whole run while
+# AFK; the --since window is preserved (state file untouched on exit 0 before
+# the CLI runs), so the first run after the operator returns covers the gap.
+#
+# Fail-safe: if the coordinator is unreachable OR the field is absent, we CANNOT
+# prove the user is away, so we DEFAULT TO PROCEEDING (fail-open) rather than
+# silently starving capture during a coordinator restart window.
+COORD_URL="${HEALTH_COORDINATOR_URL:-http://localhost:3034}"
+USER_ACTIVE="$(curl -sS --max-time 5 "${COORD_URL}/health/state" 2>/dev/null | node -e "
+  let s=''; process.stdin.on('data',d=>s+=d).on('end',()=>{
+    try { const j = JSON.parse(s); process.stdout.write(j.user_active === false ? 'afk' : 'active'); }
+    catch (e) { process.stdout.write('unknown'); }
+  });
+" 2>/dev/null || echo 'unknown')"
+
+if [[ "${USER_ACTIVE}" == "afk" ]]; then
+  log "operator AFK (coordinator user_active=false) — suspending sweep this run"
+  exit 0
+fi
+log "operator present or presence unknown (${USER_ACTIVE}) — proceeding"
+
 # ---- 2. Compute --since. -----------------------------------------------------
 SINCE=""
 if [[ -f "${STATE_FILE}" ]]; then

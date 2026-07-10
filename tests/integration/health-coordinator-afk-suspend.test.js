@@ -58,6 +58,20 @@ describe('health-coordinator — AFK full-suspend contract', () => {
     expect(flat).not.toMatch(/userActiveNow\(\) \? PROXY_STRONG_PROBE_INTERVAL_MS :/);
   });
 
+  test('auto-consolidation is AFK-gated (deferrable background LLM work — no burn while away)', () => {
+    // The consolidation auto-trigger must require presence, else it drives
+    // thousands of overnight consolidator LLM calls draining the backlog while
+    // no one is watching. The gate must be the FIRST condition in the if.
+    expect(flat).toMatch(/if \( ?userActiveNow\(\) && body\.undigested >= CONSOLIDATION_THRESHOLD/);
+  });
+
+  test('presence is exposed on /health/state as user_active (the signal external jobs read)', () => {
+    // The sub-agent-sweep job (and any other AFK-gated background daemon) reads
+    // currentState.user_active over HTTP; it must be stamped from the same
+    // _userActive the probe gates use.
+    expect(flat).toMatch(/currentState\.user_active = _userActive/);
+  });
+
   test('presence is derived from transcript mtime, not the always-fresh ETM lastBeat (protects a40052b7a)', () => {
     // userActiveNow() must read the transcript file's mtime as the activity
     // clock. lastBeat tracks daemon liveness and made the gate always-true.
