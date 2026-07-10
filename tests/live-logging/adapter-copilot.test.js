@@ -147,6 +147,36 @@ describe('copilot-events adapter contract', () => {
     expect(row.transcript_path.endsWith('events.jsonl')).toBe(true);
   });
 
+  test('Test 2b — since-gate: sessions with events.jsonl mtime <= since are skipped; newer ones flow through', async () => {
+    // Regression for the 30-min re-burn (2026-07-10): `since` was advisory, so
+    // the sweep re-summarized the same static historical sessions on every run
+    // (one LLM call each). discover() must now honor `since` via events.jsonl
+    // mtime — excluding un-modified sessions while still yielding newly-active ones.
+    const oldDir = makeSession('old-static', {
+      workspaceYaml: DEFAULT_WORKSPACE,
+      eventsLines: [startedEvent('toolu_vrtx_01OLD1234'), completedEvent('toolu_vrtx_01OLD1234')],
+    });
+    const newDir = makeSession('new-active', {
+      workspaceYaml: DEFAULT_WORKSPACE,
+      eventsLines: [startedEvent('toolu_vrtx_01NEW5678'), completedEvent('toolu_vrtx_01NEW5678')],
+    });
+    const since = '2026-07-01T00:00:00Z';
+    const sinceMs = Date.parse(since);
+    // old session last touched a day BEFORE since → excluded; new one AFTER → kept.
+    const oldT = new Date(sinceMs - 24 * 3600_000);
+    const newT = new Date(sinceMs + 24 * 3600_000);
+    fs.utimesSync(path.join(oldDir, 'events.jsonl'), oldT, oldT);
+    fs.utimesSync(path.join(newDir, 'events.jsonl'), newT, newT);
+
+    const rows = await adapter.discover({ searchPaths: [tmpRoot], project: 'coding', since });
+    expect(rows.length).toBe(1);
+    expect(rows[0].parent_session_id).toBe('new-active');
+
+    // And with no `since`, BOTH are returned (filter is opt-in on a valid since).
+    const all = await adapter.discover({ searchPaths: [tmpRoot], project: 'coding' });
+    expect(all.length).toBe(2);
+  });
+
   test('Test 3 — workspace.yaml regex parser extracts cwd/git_root/repository/branch + prefers git_root', async () => {
     makeSession('uuid-3', {
       workspaceYaml: DEFAULT_WORKSPACE,
