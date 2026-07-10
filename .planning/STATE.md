@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
-stopped_at: Completed 86-01-PLAN.md
-last_updated: "2026-07-10T16:18:03.624Z"
+stopped_at: Completed 86-02-PLAN.md
+last_updated: "2026-07-10T16:30:34.076Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 21
   completed_phases: 15
   total_plans: 95
-  completed_plans: 90
+  completed_plans: 91
   percent: 71
 ---
 
@@ -54,30 +54,27 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 86 (timeline-v2-and-declutter) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
-  Plan 85-06 (E2E deploy + live gate) closed after four rounds of operator click-through
-  feedback. The Experiment Control Center is proven LIVE end-to-end: a dashboard click
-  spawns a real cross-agent runner ON THE HOST via the health-coordinator :3034 seam, the
-  5s-poll monitor advances, Cancel reaps the detached process group + frees the 409 slot,
-  Re-run pre-fills with a constant task_hash, and capture_raw_bodies produces raw bodies
-  only when ON. server.js needed NO edit (the /api/experiments req.path passthrough
-  forwards the four subpaths for free). Round-1..4 checkpoint fixes: container bind-mount
-  of lib/repro + config/experiments (43f0b9367), launcher/monitor wired into
-  performance.tsx + e2e spec (5dc47a679), host-agnostic seam + D-02 slot guard (1e8987a86),
-  variants SUBSET honored end-to-end (464653f7e), matrix-preview text (e60de65ea),
-  experiment-cell 409 relabel + regression tests (97225442c), task_class threading so
-  spec-launched Runs land visible (d61ac249f), terminal-state refresh + dismissible error
-
-  + cell-scoped timeline + goal-joined re-run prefill (3b7076ee8), runner stdio →
-  runner.log + abort reason A1 (072b87504), Re-run scroll-into-view + confirmation ring B
-  (e48b77702), opencode canonical ~/.opencode/bin path pin — fixed the -m abort A2
-  (bcab1b430), and D-12 --capture-raw-bodies threaded runner→cell measurement-start
-  (55501c057). Evidence: full experiments suite 336 green, Playwright experiment-control
-  4/4, live D-12 paired proof (rmrcu6xa9 ON → raw-bodies.jsonl.gz 175KB/4 records +
-  span.meta.capture_raw_bodies=true; rmrcuat7g OFF → no file); opencode cell now completes
-  (was abort); both live runs freed the slot. Deferred (out-of-scope): pre-existing tsc
-  diagnostic in src/pages/token-usage.tsx. See 85-06-SUMMARY.md. Ready for /gsd-verify-phase 85.
+  Plan 86-02 (Wave 1 — frozen band + slice contract) done (2/2 tasks, 2 commits, ~6 min).
+  Exported the band-rendering primitives from context-cache-explainer.tsx (additive `export`
+  on SEGMENTS/scaledBand/scrubSecrets/CACHE_WRITE_NA + Segment — zero behavior change, the
+  explainer keeps using them internally, 34f4fe319), and built the shared context-band.tsx
+  (ContextBand variant mini|cumulative + ContextBandLegend): mini = one turn's category
+  byte-share at h-2, cumulative = run-wide accreting bytes at h-4, both via the SHARED
+  scaledBand/SEGMENTS (D-05 one taxonomy, never forked). Cache-read renders as a 45deg
+  hatched CSS repeating-linear-gradient overlay (~4px pitch, ~0.55 opacity), solid=fresh
+  (UI-SPEC Q3); honesty gate branches on usage.cache_write===null -> verbatim CACHE_WRITE_NA,
+  never ??0, no amber write segment (D-12); no recharts/SVG. Slice (d82c8538d): landed the
+  frozen Redux contract Waves 2/3 read — fetchReconciliation thunk (mirrors fetchContextTurns
+  exactly; graceful-empty; normalises BOTH the {reconciliation:{summary}} sketch AND the
+  real VERBATIM top-level-summary wire shape to ReconciliationSummary|null; served AS-IS,
+  never client-recomputed, T-86-02-03) + reconciliationByTaskId + selectReconciliationFor;
+  modalTaskId/modalTurnIndex + openTurnModal/closeTurnModal + selectModalTurn (D-01/D-02,
+  mirror setExplainTaskId). ONE slice, no new slice (UI-SPEC Q2). Dashboard build passes;
+  all Task 1/2 acceptance greps green. The only 4 `error TS` are pre-existing out-of-scope
+  diagnostics (node-details-sidebar.tsx + the deferred token-usage.tsx). See 86-02-SUMMARY.md.
+  Next: Wave 2 UI plans consume this frozen contract (turn-modal, difference-viewer, badge).
 Last activity: 2026-07-10
 
 ## Deferred Items
@@ -317,6 +314,8 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: 84-06: Flag-gated raw-body capture at the proxy (D-05/D-06), default OFF via strict span.meta.capture_raw_bodies===true; bodies redacted via Plan 02 shared 27-pattern loader BEFORE write, fail-closed [REDACTION_ERROR_CONTENT_BLOCKED], separate raw-bodies.jsonl sibling; helpers in pure sibling raw-bodies.mjs; not redeployed (Plan 09). Proxy a1d0912/b1e0a49; test 5f214fd3b.
 - [Phase 84-07]: Context-turns read surfaces landed. handleContextTurns in lib/vkb-server/api-routes.js clones handleReconciliation VERBATIM (D-13 pattern): _validTaskId guard BEFORE the path build (traversal/slash/dot-only/empty -> 400), then read .data/measurements/<id>/context-turns.jsonl.gz, promisified zlib.gunzip on the RAW buffer, split -> JSON.parse each line -> 200 {contextTurns}. Falls back to plaintext .jsonl only on .gz ENOENT (span still open); BOTH ENOENT -> 200 {contextTurns:[]} graceful-empty (D-10), 500 only on unexpected error. Registered parallel to reconciliation. Dashboard server.js adds a /api/context-turns same-origin mirror to :12435 (cloned from /api/context-breakdown); the vkb runs/:taskId/context-turns route rides the EXISTING /api/experiments/* reverse-proxy (server.js:330, no new line). Container NOT restarted (VirtioFS); live E2E + curl deferred to 84-09. Last Wave-0 vkb stub un-skipped (8 tests green). Commits b89d3582d + 720775e27.
 - [Phase 86]: [86-01]: A3/OQ1 confirmed empirically against a real captured context-turns.jsonl — line is one-per-LLM-request with no per-reasoning-step field; alignRuns operates on the request sequence (parent-turn-equivalent) with no pre-flatten. run-align.ts + loop-heuristic.ts are dependency-free pure modules tested by root Jest (ts-jest ESM importing .ts directly via a jest-only tsconfig.jest.json rootDir='.'; no vitest, no new package).
+- [Phase ?]: [86-02]: reconciliation route serves reconciliation.json VERBATIM with a top-level summary object (ENOENT -> {reconciliation:null}); fetchReconciliation normalises both wire shapes to ReconciliationSummary|null so Waves 2/3 read one type.
+- [Phase ?]: [86-02]: band primitives (scaledBand/SEGMENTS/scrubSecrets/CACHE_WRITE_NA + Segment) exported additively from context-cache-explainer.tsx (zero behavior change); context-band.tsx imports them (one taxonomy, D-05). Cache-read = hatched CSS repeating-linear-gradient overlay, no recharts/SVG; cache_write===null -> verbatim CACHE_WRITE_NA, never ??0.
 
 ### Blockers/Concerns
 
@@ -424,11 +423,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 84 P08 | 55min | 3 tasks | 2 files |
 | Phase 84 P09 | 5 | 3 tasks | 6 files |
 | Phase 86 P01 | 7 | 3 tasks | 9 files |
+| Phase 86 P02 | 6 | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-07-10T16:18:03.610Z
-Stopped at: Completed 86-01-PLAN.md
+Last session: 2026-07-10T16:30:34.067Z
+Stopped at: Completed 86-02-PLAN.md
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
