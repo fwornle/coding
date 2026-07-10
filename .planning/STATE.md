@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: planning
-stopped_at: Phase 86 context gathered
-last_updated: "2026-07-10T12:23:53.397Z"
-last_activity: 2026-07-09
+status: executing
+stopped_at: Completed 86-01-PLAN.md
+last_updated: "2026-07-10T16:18:03.624Z"
+last_activity: 2026-07-10
 progress:
   total_phases: 21
   completed_phases: 15
-  total_plans: 90
-  completed_plans: 89
+  total_plans: 95
+  completed_plans: 90
   percent: 71
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 86 — timeline v2 and declutter
+**Current focus:** Phase 86 — timeline-v2-and-declutter
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 86
-Plan: Not started
-Status: Ready to plan
+Phase: 86 (timeline-v2-and-declutter) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
   Plan 85-06 (E2E deploy + live gate) closed after four rounds of operator click-through
   feedback. The Experiment Control Center is proven LIVE end-to-end: a dashboard click
   spawns a real cross-agent runner ON THE HOST via the health-coordinator :3034 seam, the
@@ -78,7 +78,7 @@ Status: Ready to plan
   span.meta.capture_raw_bodies=true; rmrcuat7g OFF → no file); opencode cell now completes
   (was abort); both live runs freed the slot. Deferred (out-of-scope): pre-existing tsc
   diagnostic in src/pages/token-usage.tsx. See 85-06-SUMMARY.md. Ready for /gsd-verify-phase 85.
-Last activity: 2026-07-09
+Last activity: 2026-07-10
 
 ## Deferred Items
 
@@ -316,6 +316,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [84-03]: Context-turns age-retention sweeper — hourly com.coding.context-turns-sweeper reclaims .data/measurements/<task>/context-turns.jsonl(.gz)+raw-bodies.jsonl(.gz) by per-file mtime, decoupled from span close; default 14d in config.json, runtime CONTEXT_TURNS_RETENTION_DAYS. Fixed cloned-installer SIGPIPE-under-pipefail false-FAIL in launchctl verify (capture-to-var). Commits 3f63896f8/e03885119; job registered live.
 - [Phase ?]: 84-06: Flag-gated raw-body capture at the proxy (D-05/D-06), default OFF via strict span.meta.capture_raw_bodies===true; bodies redacted via Plan 02 shared 27-pattern loader BEFORE write, fail-closed [REDACTION_ERROR_CONTENT_BLOCKED], separate raw-bodies.jsonl sibling; helpers in pure sibling raw-bodies.mjs; not redeployed (Plan 09). Proxy a1d0912/b1e0a49; test 5f214fd3b.
 - [Phase 84-07]: Context-turns read surfaces landed. handleContextTurns in lib/vkb-server/api-routes.js clones handleReconciliation VERBATIM (D-13 pattern): _validTaskId guard BEFORE the path build (traversal/slash/dot-only/empty -> 400), then read .data/measurements/<id>/context-turns.jsonl.gz, promisified zlib.gunzip on the RAW buffer, split -> JSON.parse each line -> 200 {contextTurns}. Falls back to plaintext .jsonl only on .gz ENOENT (span still open); BOTH ENOENT -> 200 {contextTurns:[]} graceful-empty (D-10), 500 only on unexpected error. Registered parallel to reconciliation. Dashboard server.js adds a /api/context-turns same-origin mirror to :12435 (cloned from /api/context-breakdown); the vkb runs/:taskId/context-turns route rides the EXISTING /api/experiments/* reverse-proxy (server.js:330, no new line). Container NOT restarted (VirtioFS); live E2E + curl deferred to 84-09. Last Wave-0 vkb stub un-skipped (8 tests green). Commits b89d3582d + 720775e27.
+- [Phase 86]: [86-01]: A3/OQ1 confirmed empirically against a real captured context-turns.jsonl — line is one-per-LLM-request with no per-reasoning-step field; alignRuns operates on the request sequence (parent-turn-equivalent) with no pre-flatten. run-align.ts + loop-heuristic.ts are dependency-free pure modules tested by root Jest (ts-jest ESM importing .ts directly via a jest-only tsconfig.jest.json rootDir='.'; no vitest, no new package).
 
 ### Blockers/Concerns
 
@@ -422,11 +423,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 84 P07 | 8min | 2 tasks | 3 files |
 | Phase 84 P08 | 55min | 3 tasks | 2 files |
 | Phase 84 P09 | 5 | 3 tasks | 6 files |
+| Phase 86 P01 | 7 | 3 tasks | 9 files |
 
 ## Session Continuity
 
-Last session: 2026-07-10T12:23:53.375Z
-Stopped at: Phase 86 context gathered
+Last session: 2026-07-10T16:18:03.610Z
+Stopped at: Completed 86-01-PLAN.md
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
