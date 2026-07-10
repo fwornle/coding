@@ -345,7 +345,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   - [x] 86-01-PLAN.md — Pure algorithm modules: run-align (first-divergence + LCS) + loop-heuristic + fixtures + root-Jest tests (Wave 1)
   - [x] 86-02-PLAN.md — Shared primitives: export band/scrub from explainer + context-band component + slice fetchReconciliation/modal state (Wave 1)
   - [ ] 86-03-PLAN.md — Timeline v2: turn-row + drill-down modal + fullscreen route; DASH-02 + D-06 fallback preserved [checkpoint] (Wave 2)
-  - [ ] 86-04-PLAN.md — Full difference viewer: aligned side-by-side trajectory diff with cumulative deltas + loop badges (Wave 2)
+  - [x] 86-04-PLAN.md — Full difference viewer: aligned side-by-side trajectory diff with cumulative deltas + loop badges (Wave 2)
   - [ ] 86-05-PLAN.md — Declutter IA: reconciliation badge + inline score edits + header quarantine control + compare-from-selection [checkpoint] (Wave 3)
 **UI hint**: yes
 
@@ -385,5 +385,5 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete    | 2026-07-07 |
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
-| 86. Timeline v2 & Declutter | v7.5 | 2/5 | In Progress|  |
+| 86. Timeline v2 & Declutter | v7.5 | 3/5 | In Progress|  |
 | 87. Interactive Spans & Branch Avenues | v7.5 | 0/? | Not started | - |

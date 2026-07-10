@@ -4,13 +4,13 @@ milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Completed 86-02-PLAN.md
-last_updated: "2026-07-10T16:30:34.076Z"
+last_updated: "2026-07-10T16:38:09.340Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 21
   completed_phases: 15
   total_plans: 95
-  completed_plans: 91
+  completed_plans: 92
   percent: 71
 ---
 
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 86 (timeline-v2-and-declutter) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
   Plan 86-02 (Wave 1 — frozen band + slice contract) done (2/2 tasks, 2 commits, ~6 min).
   Exported the band-rendering primitives from context-cache-explainer.tsx (additive `export`
@@ -316,6 +316,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase 86]: [86-01]: A3/OQ1 confirmed empirically against a real captured context-turns.jsonl — line is one-per-LLM-request with no per-reasoning-step field; alignRuns operates on the request sequence (parent-turn-equivalent) with no pre-flatten. run-align.ts + loop-heuristic.ts are dependency-free pure modules tested by root Jest (ts-jest ESM importing .ts directly via a jest-only tsconfig.jest.json rootDir='.'; no vitest, no new package).
 - [Phase ?]: [86-02]: reconciliation route serves reconciliation.json VERBATIM with a top-level summary object (ENOENT -> {reconciliation:null}); fetchReconciliation normalises both wire shapes to ReconciliationSummary|null so Waves 2/3 read one type.
 - [Phase ?]: [86-02]: band primitives (scaledBand/SEGMENTS/scrubSecrets/CACHE_WRITE_NA + Segment) exported additively from context-cache-explainer.tsx (zero behavior change); context-band.tsx imports them (one taxonomy, D-05). Cache-read = hatched CSS repeating-linear-gradient overlay, no recharts/SVG; cache_write===null -> verbatim CACHE_WRITE_NA, never ??0.
+- [Phase ?]: [86-04]: DifferenceViewer consumes the pure Wave-1 seams (alignRuns/loopFlags) with zero re-implementation; per-aligned-pair cumulative token delta B-A accretes down the tail, decrease->text-status-success (Q5); canonical_model verbatim, null->unmeasured (ATTR-02, never recomputed); lightweight inline TurnCell avoids a Plan-03 file dependency.
 
 ### Blockers/Concerns
 
@@ -424,10 +425,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 84 P09 | 5 | 3 tasks | 6 files |
 | Phase 86 P01 | 7 | 3 tasks | 9 files |
 | Phase 86 P02 | 6 | 2 tasks | 3 files |
+| Phase 86 P04 | 2 | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-07-10T16:30:34.067Z
+Last session: 2026-07-10T16:37:53.304Z
 Stopped at: Completed 86-02-PLAN.md
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
