@@ -340,8 +340,13 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 ### Phase 86: Timeline v2 & Performance Page Declutter
 **Goal**: The run timeline tells the per-turn story — user-prompt excerpt, tool calls with args digests, token cost with cache split, stacked context-window band per turn — with drill-down modal and fullscreen view; performance page IA decluttered (surfaced quarantine toggle, compare-from-selection, one-step scoring, reconciliation badge); graceful degradation for runs without context-turns data.
 **Depends on**: Phases 82, 84 (data); Phase 83 (reconciliation badge)
-**Requirements**: TBD
-**Plans**: TBD
+**Requirements**: DASH-02, VALID-01, ATTR-02 (preserved/no-regression — canonical READ-through + tier badge/sub-bands survive the v2 evolution)
+**Plans**: 5 plans
+  - [ ] 86-01-PLAN.md — Pure algorithm modules: run-align (first-divergence + LCS) + loop-heuristic + fixtures + root-Jest tests (Wave 1)
+  - [ ] 86-02-PLAN.md — Shared primitives: export band/scrub from explainer + context-band component + slice fetchReconciliation/modal state (Wave 1)
+  - [ ] 86-03-PLAN.md — Timeline v2: turn-row + drill-down modal + fullscreen route; DASH-02 + D-06 fallback preserved [checkpoint] (Wave 2)
+  - [ ] 86-04-PLAN.md — Full difference viewer: aligned side-by-side trajectory diff with cumulative deltas + loop badges (Wave 2)
+  - [ ] 86-05-PLAN.md — Declutter IA: reconciliation badge + inline score edits + header quarantine control + compare-from-selection [checkpoint] (Wave 3)
 **UI hint**: yes
 
 ### Phase 87: Interactive Spans & Branch Avenues
@@ -380,5 +385,5 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete    | 2026-07-07 |
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
-| 86. Timeline v2 & Declutter | v7.5 | 0/? | Not started | - |
+| 86. Timeline v2 & Declutter | v7.5 | 0/5 | Planned | - |
 | 87. Interactive Spans & Branch Avenues | v7.5 | 0/? | Not started | - |
