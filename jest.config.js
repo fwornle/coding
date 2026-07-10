@@ -20,7 +20,12 @@ export default {
   setupFilesAfterEnv: ['<rootDir>/test/setup.js'],
   transform: {
     '^.+\\.ts$': ['ts-jest', {
-      useESM: true
+      useESM: true,
+      // Use a jest-only tsconfig with rootDir='.' so pure TS modules under
+      // integrations/system-health-dashboard/src/components/performance/ (imported by
+      // root tests) transpile without the root build's rootDir='./src' constraint.
+      // Does NOT alter the root tsconfig used by `npm run build`.
+      tsconfig: 'tsconfig.jest.json'
     }]
   },
   moduleNameMapper: {
