@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Maximize2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -11,11 +12,13 @@ import {
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
   fetchTimeline,
+  fetchContextTurns,
   fetchRunNarrative,
   fetchRunDigests,
   selectSelectedTaskId,
   selectSelectedRun,
   selectTimelineFor,
+  selectContextTurnsFor,
   selectTimelineLoading,
   selectNarrativeFor,
   selectNarrativeLoadingId,
@@ -23,6 +26,7 @@ import {
   selectDigestLoadingId,
   type Run,
   type TimelineRow,
+  type ContextTurnRow,
   type NarrativeItem,
   type DigestItem,
 } from '@/store/slices/performanceSlice'
@@ -31,6 +35,9 @@ import {
   ROLE_META, ROLE_ORDER, processMeta, roleForProcess, summarizeByRole,
   type Role, type RoleStat,
 } from './roles'
+import { loopFlags } from './loop-heuristic'
+import { TurnRow } from './turn-row'
+import { TurnModal } from './turn-modal'
 
 // D-06 collapsible timeline, re-cast as a role-aware narrative. Each turn is
 // classified into a role (foreground development / knowledge capture /
@@ -437,6 +444,73 @@ function DevelopmentNarrative({
   )
 }
 
+// The v2 turn: a compact TurnRow (chips + mini band + advisory loop badge, opens
+// the drill-down modal) PLUS the preserved DASH-02 collapsible reasoning sub-bands.
+// The TierBadge is passed to TurnRow as a slot (data-testid="granularity-tier-badge"
+// survives); the children (per-reasoning-step sub-bands, data-testid=
+// "timeline-reasoning-step") stay collapsible under the v2 row so DASH-02 does not
+// regress. When the timeline row carries no children (or is a per-session-aggregate)
+// only the v2 row shows.
+function TurnRowWithChildren({
+  timelineRow, contextTurn, taskId, index, loopFlag,
+}: {
+  timelineRow: TimelineRow
+  contextTurn: ContextTurnRow | undefined
+  taskId: string
+  index: number
+  loopFlag: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const children = timelineRow.children ?? []
+  const isAggregate = String(timelineRow.granularity_tier) === 'per-session-aggregate'
+  const hasChildren = children.length > 0 && !isAggregate
+  const tierBadge = <TierBadge tier={String(timelineRow.granularity_tier)} />
+
+  // A run may have more timeline rows than captured context-turns (or vice
+  // versa). When THIS row has no matching context-turn, fall back to the v1
+  // ParentRow so nothing is dropped (defensive; the top-level gate already
+  // requires ≥1 context-turn to enter the v2 branch).
+  if (!contextTurn) {
+    return (
+      <ParentRow
+        row={timelineRow}
+        index={index}
+        run={null}
+        observations={[]}
+        digestThemes={[]}
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-1">
+      <TurnRow
+        taskId={taskId}
+        index={index}
+        turn={contextTurn}
+        loopFlag={loopFlag}
+        tierBadge={tierBadge}
+      />
+      {hasChildren && (
+        <Collapsible open={open} onOpenChange={setOpen} className="ml-4 rounded-md border" data-testid="timeline-turn-children">
+          <CollapsibleTrigger
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-muted-foreground"
+            data-testid="timeline-turn"
+          >
+            <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} />
+            {children.length} reasoning step{children.length === 1 ? '' : 's'}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1 px-3 pb-2">
+            {children.map((child, i) => (
+              <SubBand key={child.tool_call_id ?? i} row={child} />
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
+  )
+}
+
 export function PerformanceTimeline() {
   const dispatch = useAppDispatch()
   const taskId = useAppSelector(selectSelectedTaskId)
@@ -449,8 +523,16 @@ export function PerformanceTimeline() {
   const digestLoadingId = useAppSelector(selectDigestLoadingId)
   const [hiddenRoles, setHiddenRoles] = useState<Set<Role>>(new Set())
 
+  const contextTurns = useAppSelector(selectContextTurnsFor(taskId))
+
   useEffect(() => {
-    if (taskId) dispatch(fetchTimeline(taskId))
+    if (taskId) {
+      dispatch(fetchTimeline(taskId))
+      // Per-request context-turns power the v2 row (chips + band + loop badge +
+      // drill-down modal). Graceful-empty: a run without captured context-turns
+      // returns [] → the v1 fallback + "no per-turn context captured" note (D-06).
+      dispatch(fetchContextTurns(taskId))
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId])
 
@@ -481,6 +563,18 @@ export function PerformanceTimeline() {
   const stats = summarizeByRole(rows, run)
   const statByRole = Object.fromEntries(stats.map((s) => [s.role, s])) as Record<Role, RoleStat>
   const visibleRows = rows.filter((r) => !hiddenRoles.has(roleForProcess(r.process, run)))
+
+  // v2 gate (D-01/D-06): render the compact v2 TurnRow only when this run has
+  // captured per-request context-turns. The advisory loop badge is computed ONCE
+  // over the full context-turn sequence (fuzzy, non-persisted — distinct from the
+  // backend strict loop_count). A run WITHOUT context-turns falls through to the
+  // v1 ParentRow rendering + the "no per-turn context captured" note.
+  const hasContextTurns = contextTurns.length > 0
+  const turnLoopFlags = hasContextTurns ? loopFlags(contextTurns) : []
+  // capture_raw_bodies rides the Run's overrides (span-level); full raw arg text
+  // in the modal renders only when it was ON — else name+size+intent, never
+  // fabricated. Read through the Run index signature (honest default: false).
+  const captureRawBodies = !!(runUnknown && runUnknown.capture_raw_bodies === true)
 
   // Tie observations → turns and digests → this run, so each turn can show what it
   // did and which digest it fed. Computed over the FULL rows (role-filtering the
@@ -522,7 +616,27 @@ export function PerformanceTimeline() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Timeline</CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="text-base">Timeline</CardTitle>
+          {/* Fullscreen whole-run view (D-02) — routed child at
+              /performance/timeline/:taskId. Icon button per the Copywriting
+              contract (Maximize2 + aria-label + tooltip). */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  to={`/performance/timeline/${encodeURIComponent(taskId)}`}
+                  aria-label="Open fullscreen timeline"
+                  data-testid="timeline-fullscreen-link"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Fullscreen timeline</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         {/* The human-readable goal sentence (Run.description → goal_sentence),
             distinct from the goal_achieved score column. Hidden for legacy runs
             that recorded no goal. */}
@@ -604,20 +718,51 @@ export function PerformanceTimeline() {
               <p className="text-sm text-muted-foreground">
                 All roles are hidden. Re-enable a role above to see its turns.
               </p>
-            ) : (
+            ) : hasContextTurns ? (
+              /* v2 (D-01): compact TurnRow per turn (chips + mini band + advisory
+                 loop badge, opens the drill-down modal). The DASH-02 TierBadge is
+                 passed as a slot; the collapsible reasoning sub-bands (children)
+                 are preserved BELOW each v2 row so the tier badge + per-reasoning
+                 -step sub-bands survive the evolution. */
               <div className="space-y-2">
                 {visibleRows.map((row, i) => (
-                  <ParentRow
+                  <TurnRowWithChildren
                     key={row.tool_call_id ?? i}
-                    row={row}
+                    timelineRow={row}
+                    contextTurn={contextTurns[i]}
+                    taskId={taskId}
                     index={i}
-                    run={run}
-                    observations={obsByRow.get(row) ?? []}
-                    digestThemes={digestThemesForRow(row)}
+                    loopFlag={turnLoopFlags[i] ?? false}
                   />
                 ))}
               </div>
+            ) : (
+              /* v1 fallback (D-06): no per-request context-turns for this run, so
+                 render today's v1 ParentRow (turn label + tokens + observation
+                 lines) with the v2 enrichments simply absent + the subtle note.
+                 This is the DESIGNED degradation path — never an error. */
+              <>
+                <p className="mb-2 text-xs text-muted-foreground" data-testid="timeline-no-context-note">
+                  no per-turn context captured
+                </p>
+                <div className="space-y-2">
+                  {visibleRows.map((row, i) => (
+                    <ParentRow
+                      key={row.tool_call_id ?? i}
+                      row={row}
+                      index={i}
+                      run={run}
+                      observations={obsByRow.get(row) ?? []}
+                      digestThemes={digestThemesForRow(row)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
+
+            {/* Single-turn drill-down modal — mounted once, driven by the slice
+                open-state (openTurnModal from the v2 rows / closeTurnModal). */}
+            <TurnModal captureRawBodies={captureRawBodies} />
 
             <p className="mt-3 text-sm text-muted-foreground">
               Turns are chronological. Colours mark the role — foreground development, knowledge capture, or

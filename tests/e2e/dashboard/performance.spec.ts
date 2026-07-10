@@ -114,3 +114,98 @@ test('(e) "Save report" freezes a snapshot that appears in the Reports sub-view'
     .toBeGreaterThan(reportsBefore)
   await expect(page.locator('[data-testid="report-row"]').first()).toBeVisible()
 })
+
+// ── Timeline v2 flows (LIVE — Plan 86-03) ──
+
+// Open a run's inline timeline and return whether it rendered any v2 turn rows
+// (context-turns present). Runs without context-turns show the D-06 fallback.
+async function openFirstRunTimeline(page: Page): Promise<boolean> {
+  if ((await runRowCount(page)) === 0) return false
+  await page.locator('[data-testid="run-row"]').first().click()
+  await page.waitForTimeout(600) // fetchTimeline + fetchContextTurns settle
+  return true
+}
+
+test('(f) a v2 timeline-row opens the single-turn drill-down modal (D-01)', async ({ page }) => {
+  await navigateToPerformance(page)
+  if (!(await openFirstRunTimeline(page))) {
+    test.skip(true, 'No runs in the store — v2 modal flow needs seeded data.')
+    return
+  }
+  const rows = page.locator('[data-testid="timeline-row"]')
+  if ((await rows.count()) === 0) {
+    test.skip(true, 'Selected run has no per-turn timeline rows.')
+    return
+  }
+  await rows.first().click()
+  // The Radix Dialog opens with the single-turn detail.
+  await expect(page.locator('[data-testid="turn-modal"]')).toBeVisible()
+  await expect(page.locator('[data-testid="turn-message-list"]')).toBeVisible()
+})
+
+test('(g) the fullscreen route /performance/timeline/:taskId renders', async ({ page }) => {
+  await navigateToPerformance(page)
+  if ((await runRowCount(page)) === 0) {
+    // The route still renders its shell (title + keyboard hint) with a synthetic
+    // taskId even without seeded data — assert the shell mounts.
+    await page.goto('http://localhost:3032/performance/timeline/no-such-task', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('[data-testid="timeline-fullscreen"]')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('[data-testid="fullscreen-canonical-model"]')).toBeVisible()
+    return
+  }
+  // With data, open the inline timeline then click the fullscreen affordance.
+  await openFirstRunTimeline(page)
+  const link = page.locator('[data-testid="timeline-fullscreen-link"]')
+  if ((await link.count()) === 0) {
+    test.skip(true, 'No timeline rendered for the selected run.')
+    return
+  }
+  await link.first().click()
+  await expect(page.locator('[data-testid="timeline-fullscreen"]')).toBeVisible({ timeout: 15000 })
+  await expect(page.locator('[data-testid="fullscreen-title"]')).toBeVisible()
+})
+
+test('(h) DASH-02 tier badge + reasoning sub-bands survive the v2 evolution', async ({ page }) => {
+  await navigateToPerformance(page)
+  if (!(await openFirstRunTimeline(page))) {
+    test.skip(true, 'No runs in the store — DASH-02 regression check needs seeded data.')
+    return
+  }
+  if ((await page.locator('[data-testid="timeline-row"]').count()) === 0) {
+    test.skip(true, 'Selected run has no per-turn timeline rows.')
+    return
+  }
+  // The granularity tier badge is visible on the v2 row (DASH-02 anchor).
+  await expect(page.locator('[data-testid="granularity-tier-badge"]').first()).toBeVisible()
+  // If the row has collapsible reasoning children, expanding shows the sub-bands.
+  const childTriggers = page.locator('[data-testid="timeline-turn"]')
+  if ((await childTriggers.count()) > 0) {
+    await childTriggers.first().click()
+    await expect(page.locator('[data-testid="timeline-reasoning-step"]').first()).toBeVisible()
+  }
+})
+
+test('(i) a run without context-turns shows the D-06 "no per-turn context captured" note', async ({ page }) => {
+  await navigateToPerformance(page)
+  if ((await runRowCount(page)) === 0) {
+    test.skip(true, 'No runs in the store — D-06 fallback check needs seeded data.')
+    return
+  }
+  // Walk the runs until one renders the D-06 fallback note (a run lacking
+  // captured context-turns). If none do, the note path is untriggerable on this
+  // dataset — skip rather than fail (data-dependent, like the other flows).
+  const count = await runRowCount(page)
+  let found = false
+  for (let i = 0; i < count; i++) {
+    await page.locator('[data-testid="run-row"]').nth(i).click()
+    await page.waitForTimeout(500)
+    if (await page.locator('[data-testid="timeline-no-context-note"]').count() > 0) {
+      found = true
+      await expect(page.locator('[data-testid="timeline-no-context-note"]').first()).toHaveText('no per-turn context captured')
+      break
+    }
+  }
+  if (!found) {
+    test.skip(true, 'No run without context-turns in this dataset — D-06 note path not exercised.')
+  }
+})

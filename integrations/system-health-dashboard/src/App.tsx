@@ -8,6 +8,7 @@ import { InsightsPage } from './pages/insights'
 import { CoveragePage } from './pages/coverage'
 import { TokenUsagePage } from './pages/token-usage'
 import { PerformancePage } from './pages/performance'
+import { TimelineFullscreen } from './components/performance/timeline-fullscreen'
 import { NavBar } from './components/nav-bar'
 import { useEffect } from 'react'
 import { healthRefreshManager } from './store/middleware/healthRefreshMiddleware'
@@ -31,6 +32,8 @@ function AppContent() {
         <Route path="/coverage" element={<CoveragePage />} />
         <Route path="/token-usage" element={<TokenUsagePage />} />
         <Route path="/performance" element={<PerformancePage />} />
+        {/* Fullscreen whole-run timeline (D-02) — routed child of Performance. */}
+        <Route path="/performance/timeline/:taskId" element={<TimelineFullscreen />} />
       </Routes>
     </>
   )
