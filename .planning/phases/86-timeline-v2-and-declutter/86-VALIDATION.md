@@ -66,7 +66,7 @@ created: 2026-07-10
 - [ ] `loop-heuristic.ts` — pure windowed fuzzy repeat detector, shares `turnSignature` with `run-align`
 - [ ] Test home decision: confirm root Jest can import the two `.ts` modules, OR add a minimal `vitest.config.ts` to the dashboard (resolve A5/OQ2 first)
 - [ ] Fixture run-pairs as `ContextTurnRow[]` JSON: (a) identical runs, (b) rerun that diverges at turn N then re-converges, (c) a known-looping run
-- [ ] Verify one real `context-turns.jsonl` granularity vs timeline parent count (resolve A3/OQ1) before locking align granularity
+- [x] Verify one real context-turns.jsonl granularity vs timeline parent count (resolve A3/OQ1) before locking align granularity — **RESOLVED 86-01 Task 0**: `test/performance/context-turns-granularity.test.js` proves a captured line is one-per-LLM-request with no `granularity_tier`/`parent_call_id`/`reasoning` field; alignment operates on the request sequence (parent-turn-equivalent), no pre-flatten.
 - [ ] Extend `tests/e2e/dashboard/performance.spec.ts` + `performance-compare.spec.ts` for D-01/D-02/D-08/D-11/D-12
 
 ---

@@ -424,12 +424,13 @@ function TurnModal({ open, onClose, turn }: { open: boolean; onClose: () => void
 | A4 | `run.loop_count` (backend strict count) is safe to surface beside the fuzzy badges as the "hard" number | Patterns §3 | If `loop_count` is frequently null (no trace), the "hard" column is mostly em-dashes — acceptable (null-not-zero house rule), just note it. |
 | A5 | The dashboard has no unit-test runner; pure modules test via the root Jest (`ts-jest` ESM) harness | Validation Architecture | If root Jest can't resolve the dashboard's `@/` path alias or TSX-adjacent `.ts`, a tiny per-dashboard vitest config may be needed instead. **Verify in Wave 0.** |
 
-## Open Questions
+## Open Questions (OQ1 RESOLVED)
 
 1. **Does a per-reasoning-step proxy request emit its own `context-turns.jsonl` line?** (A3)
    - What we know: the timeline models reasoning steps as `TimelineRow.children` (sub-bands); the context-turns line is per *measured LLM request*.
    - What's unclear: whether a thinking sub-step is a separate request (→ separate context-turn) or folded into the parent turn's request.
    - Recommendation: in Wave 0, read one real run's `context-turns.jsonl` and compare its length to that run's timeline parent-turn count. Align on whatever the context-turns granularity actually is; render reasoning children as sub-bands regardless (DASH-02).
+   - **RESOLVED (86-01 Task 0):** Measured empirically against a real Phase-84-captured run (`.data/measurements/compare-fizzbuzz-v9-rmrc7qh6j--claude-sonnet-straight-default--r0/context-turns.jsonl.gz`, 4 lines) via the root-Jest test `test/performance/context-turns-granularity.test.js`. Every line is **one-per-LLM-request** carrying the ContextTurnRow field set (`request_id`, un-folded `usage`, `messages`, `categories`), and **NO line carries a `granularity_tier` / `parent_call_id` / `reasoning` / `thinking` per-reasoning-step field**. Reasoning steps are therefore NOT emitted as separate context-turn lines (they exist only as timeline `children` sub-bands). **Conclusion: `alignRuns` operates on the `ContextTurnRow[]` request sequence = the parent-turn-equivalent stream, with NO pre-flatten.** A3 holds as written; the Task-1 alignRuns input contract needs no adjustment.
 
 2. **Where do the two pure modules' unit tests live?** (A5)
    - What we know: root uses Jest+ts-jest (ESM); the dashboard has only Playwright E2E under `tests/e2e/`.
