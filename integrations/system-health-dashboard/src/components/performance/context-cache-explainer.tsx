@@ -56,7 +56,7 @@ const C_INPUT = '#3b82f6' // fresh input — re-sent full context
 const C_OUTPUT = '#8b5cf6' // model output
 
 // Context-window category palette — matches the reference anatomy diagram.
-interface Segment {
+export interface Segment {
   key: string
   label: string
   fill: string
@@ -67,7 +67,7 @@ interface Segment {
 }
 // Prompt-assembly order (left→right). The stable prefix (system → history) is
 // cacheable; the fresh tail (latest tool outputs + user input) is new each turn.
-const SEGMENTS: Segment[] = [
+export const SEGMENTS: Segment[] = [
   { key: 'sys', label: 'System Instructions', fill: '#d9f99d', stroke: '#84cc16', w: 14, cached: true },
   { key: 'tools', label: 'Tool Descriptions', fill: '#cffafe', stroke: '#06b6d4', w: 12, cached: true },
   { key: 'know', label: 'Retrieved Knowledge', fill: '#e9d5ff', stroke: '#a855f7', w: 14, cached: true, real: true },
@@ -87,7 +87,7 @@ const kb = (bytes: number): string => (bytes >= 1024 ? `${(bytes / 1024).toFixed
 // The dashed prefix boundary is everything except the fresh 'user' tail. Returns
 // null when there is no real size to draw. Shared by the context-turns band
 // (Phase 84 — real per-request categories) and the /api/context-breakdown band.
-function scaledBand(byKey: Record<string, number>, totalBytes: number): { view: Segment[]; prefixPct: number } | null {
+export function scaledBand(byKey: Record<string, number>, totalBytes: number): { view: Segment[]; prefixPct: number } | null {
   if (totalBytes <= 0) return null
   const raw = SEGMENTS.map((seg) => ({ seg, bytes: byKey[seg.key] ?? 0 })).filter((r) => r.bytes > 0)
   if (raw.length === 0) return null
@@ -159,7 +159,7 @@ const SECRET_SCRUBS: [RegExp, string][] = [
   [/\bBearer\s+[A-Za-z0-9._-]{6,}/gi, 'Bearer ***'],
   [/\bAKIA[0-9A-Z]{12,}/g, 'AKIA***'],
 ]
-function scrubSecrets(s: string): string {
+export function scrubSecrets(s: string): string {
   let out = s
   for (const [re, rep] of SECRET_SCRUBS) out = out.replace(re, rep)
   return out
@@ -186,7 +186,7 @@ function turnNote(t: ContextTurnRow): { note: string; noteSource: 'observation' 
 // providers (copilot/opencode) report cache reads but NO cache-creation counter,
 // so a 0 would falsely imply "we tried to cache and wrote nothing". This string
 // is load-bearing — the plan's acceptance greps for it verbatim.
-const CACHE_WRITE_NA = 'N/A (provider reports no cache-creation)'
+export const CACHE_WRITE_NA = 'N/A (provider reports no cache-creation)'
 
 /**
  * Flatten per-turn rows into chart data + totals. Prefers the REAL per-request
