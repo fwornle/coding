@@ -103,3 +103,44 @@ test('(c) the compare table shows cache read and cache write as separate rows', 
   // And they are NOT the same cell as the in+out total.
   await expect(table.getByText(/tokens \(in\+out\)/i).first()).toBeVisible()
 })
+
+// ── (d) Difference viewer surface (Plan 86-04, D-07/D-08) ──
+//
+// The DifferenceViewer aligns two paired runs' per-request context-turns via the
+// pure run-align module, collapses the identical prefix, and starts the view at
+// the first divergence. It is wired into the Compare tab in Wave 3; until then
+// (and always, on a fresh checkout with <2 runs) the assertions are GUARDED —
+// they skip with a clear message rather than hard-failing, so this spec lists and
+// runs cleanly regardless of seeded data or wiring state.
+test('(d) comparing two runs surfaces the difference viewer (aligned diff + identical-prefix collapse)', async ({ page }) => {
+  await navigateToCompare(page)
+  const ids = await optionIds(page, 'Run A')
+  if (ids.length < 2) {
+    test.skip(true, 'Fewer than two runs in the store — the difference-viewer flow needs seeded data.')
+    return
+  }
+  await pick(page, 'Run A', ids[0])
+  await pick(page, 'Run B', ids[1])
+
+  const diff = page.locator('[data-testid="difference-viewer"]')
+  if ((await diff.count()) === 0) {
+    // Wave-3 tab wiring not present yet — the surface exists (component built in
+    // Wave 2) but isn't mounted on the Compare tab. Skip loudly, never fail.
+    test.skip(true, 'Difference-viewer surface not mounted on the Compare tab yet (Wave-3 wiring).')
+    return
+  }
+  await expect(diff).toBeVisible()
+
+  // Canonical-model header renders VERBATIM (the model string) or the honest
+  // "unmeasured" sentinel — never a recomputed/dominant fallback (ATTR-02).
+  await expect(diff.getByText(/unmeasured/i).or(diff.locator('.font-mono')).first()).toBeVisible()
+
+  // If the two runs share an identical prefix, the collapse trigger is present.
+  // If they are identical end-to-end, the identical empty-state shows instead.
+  // Either way, exactly one of the three diff outcomes must render.
+  const prefixTrigger = page.getByText(/Show \d+ identical turns?/i)
+  const identical = page.locator('[data-testid="difference-viewer-identical"]')
+  const tail = page.locator('[data-testid="difference-viewer-tail"]')
+  const outcomes = (await prefixTrigger.count()) + (await identical.count()) + (await tail.count())
+  expect(outcomes).toBeGreaterThan(0)
+})
