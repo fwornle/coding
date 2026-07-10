@@ -80,6 +80,16 @@ export class ObservationExporter {
       source: 'observations.db',
     };
 
+    // Keep digest→observation provenance consistent with what is actually
+    // exported: drop observationIds that no longer resolve to an exported
+    // observation (obs pruned by retention / excluded when quality==='low',
+    // but km-core Digest entities retain their original ids). Without this the
+    // exporter re-emits ~1,988 dangling refs on every write. Idempotent.
+    merged.digests = this._stripDanglingObservationIds(
+      merged.digests,
+      new Set(merged.observations.map((o) => o && o.id).filter(Boolean)),
+    );
+
     this._writeJSON('observations.json', merged.observations);
     this._writeJSON('digests.json', merged.digests);
     this._writeJSON('insights.json', merged.insights);
@@ -109,6 +119,11 @@ export class ObservationExporter {
     const digests = this._exportDigests();
     const insights = this._exportInsights();
     const merged = this._mergeWithExisting(null, digests, insights);
+    // See exportAll(): keep digest refs consistent with exported observations.
+    merged.digests = this._stripDanglingObservationIds(
+      merged.digests,
+      this._exportedObservationIdSet(),
+    );
     this._writeJSON('digests.json', merged.digests);
     this._writeJSON('insights.json', merged.insights);
     this._updateMetadataCounts();
@@ -284,6 +299,41 @@ export class ObservationExporter {
       llm: r.llmModel ? { model: r.llmModel, provider: r.llmProvider } : null,
       modifiedFiles: r.modifiedFiles ? JSON.parse(r.modifiedFiles) : null,
     }));
+  }
+
+  /**
+   * Remove digest `observationIds` that don't resolve to a currently-exported
+   * observation. Digest summary/theme are untouched; only unresolvable
+   * provenance ids are dropped, so the cold store never carries dangling
+   * digest→observation refs. Idempotent. Safety: if the id set is empty
+   * (observations.json unreadable), the digests are returned unchanged rather
+   * than stripped wholesale.
+   * @param {Array} digests
+   * @param {Set<string>} obsIdSet
+   */
+  _stripDanglingObservationIds(digests, obsIdSet) {
+    if (!Array.isArray(digests) || !obsIdSet || obsIdSet.size === 0) return digests;
+    let removed = 0;
+    const out = digests.map((d) => {
+      const ids = Array.isArray(d.observationIds) ? d.observationIds : null;
+      if (!ids || ids.length === 0) return d;
+      const kept = ids.filter((id) => obsIdSet.has(id));
+      if (kept.length === ids.length) return d;
+      removed += ids.length - kept.length;
+      return { ...d, observationIds: kept };
+    });
+    if (removed > 0) {
+      process.stderr.write(`[ObservationExporter] pruned ${removed} dangling digest→observation refs\n`);
+    }
+    return out;
+  }
+
+  /** Id set of currently-exported observations (from observations.json). */
+  _exportedObservationIdSet() {
+    try {
+      const arr = JSON.parse(fs.readFileSync(path.join(this.exportDir, 'observations.json'), 'utf-8'));
+      return new Set((Array.isArray(arr) ? arr : []).map((o) => o && o.id).filter(Boolean));
+    } catch { return new Set(); }
   }
 
   _exportDigests() {

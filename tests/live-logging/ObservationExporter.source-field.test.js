@@ -108,3 +108,39 @@ describe('ObservationExporter — metadata.source round-trip', () => {
     expect(exporterSrc).toMatch(/json_extract\(metadata,\s*'\$\.source'\)\s+as\s+source/i);
   });
 });
+
+describe('ObservationExporter — dangling digest-ref strip', () => {
+  let tmpDir;
+  let exportDir;
+  let db;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'observation-exporter-strip-'));
+    exportDir = path.join(tmpDir, 'export');
+    db = new Database(path.join(tmpDir, 'observations.db'));
+  });
+  afterEach(() => {
+    try { db.close(); } catch { /* best effort */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* best effort */ }
+  });
+
+  test('drops observationIds not in the exported set; preserves summaries & partial refs', () => {
+    const exporter = new ObservationExporter({ db, exportDir });
+    const digests = [
+      { id: 'd1', date: '2026-01-01', theme: 't', summary: 'S1', observationIds: ['a', 'b', 'gone'] },
+      { id: 'd2', date: '2026-01-02', theme: 't', summary: 'S2', observationIds: ['x-gone', 'y-gone'] },
+      { id: 'd3', date: '2026-01-03', theme: 't', summary: 'S3', observationIds: [] },
+    ];
+    const out = exporter._stripDanglingObservationIds(digests, new Set(['a', 'b']));
+    expect(out[0].observationIds).toEqual(['a', 'b']);   // 'gone' removed
+    expect(out[0].summary).toBe('S1');                    // content untouched
+    expect(out[1].observationIds).toEqual([]);            // fully orphaned → []
+    expect(out[2]).toBe(digests[2]);                      // no refs → same object
+  });
+
+  test('SAFETY: empty id set returns digests unchanged (never strips wholesale)', () => {
+    const exporter = new ObservationExporter({ db, exportDir });
+    const digests = [{ id: 'd1', date: '2026-01-01', theme: 't', summary: 'S', observationIds: ['a'] }];
+    expect(exporter._stripDanglingObservationIds(digests, new Set())).toBe(digests);
+  });
+});
