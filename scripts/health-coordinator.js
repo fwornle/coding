@@ -514,13 +514,15 @@ const PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000; // real obs withi
 // through to the synthetic probe.
 const PROXY_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000;
 
-// Idle-aware probe cadence: when no ETM heartbeat is fresh across any
-// project/pane, the user is AFK and there is no one watching the
-// dashboard. Stretch the probe intervals so we don't burn ~1700+
-// "say OK" calls/night during overnight idle. The next ETM heartbeat
-// flips us back to the fast cadence within one tick (≤TICK_MS).
-const PROXY_PROBE_INTERVAL_IDLE_MS = 10 * 60_000;        // 10 min when AFK (vs 60s active)
-const PROXY_STRONG_PROBE_INTERVAL_IDLE_MS = 30 * 60_000; // 30 min when AFK (vs 5 min active)
+// AFK full-suspend (restored 2026-07-10): when no session transcript is fresh
+// across any project/pane, the user is AFK and no one is watching the dashboard
+// — so a synthetic liveness ping has no consumer. The probe gates in the tick
+// loop therefore SUPPRESS the synthetic probes ENTIRELY while AFK (gated on
+// `userActiveNow()`), rather than throttling them to a 10-min/30-min floor.
+// This restores the original Gate-1 contract ("returning false suppresses all
+// probes for this tick") that commit 2129be37b silently downgraded to a floor.
+// Probing resumes on the first fresh transcript mtime, one tick (≤TICK_MS)
+// after the user returns; a proxy that died mid-AFK is detected on that tick.
 // What counts as "active" — same threshold the [📚] badge uses for
 // ETM-heartbeat promotion in combined-status-line.js (~line 1019).
 const USER_ACTIVE_HEARTBEAT_MAX_AGE_MS = 5 * 60_000;
@@ -2108,12 +2110,15 @@ async function runAllChecks() {
     log(`proxy staleness check threw: ${err.message}`, 'ERROR');
   }
 
-  // ----- Proxy semantic readiness (every 60s active / 10 min idle — Plan 34-02 R1; Plan 34-03 adds auto-heal FSM) -----
+  // ----- Proxy semantic readiness (every 60s while ACTIVE; fully suspended while AFK — Plan 34-02 R1; Plan 34-03 auto-heal FSM) -----
+  // Compute presence once and reuse for both the cheap and strong probe gates.
+  // When AFK (_userActive === false) BOTH synthetic probes are skipped entirely
+  // — see the AFK full-suspend note near PROXY_PROBE_INTERVAL_MS.
+  const _userActive = userActiveNow();
   const _proxyProbeAge = currentState.proxy.last_probe_end
     ? Date.now() - new Date(currentState.proxy.last_probe_end).getTime()
     : Infinity;
-  const _proxyProbeGate = userActiveNow() ? PROXY_PROBE_INTERVAL_MS : PROXY_PROBE_INTERVAL_IDLE_MS;
-  if (_proxyProbeAge >= _proxyProbeGate) {
+  if (_userActive && _proxyProbeAge >= PROXY_PROBE_INTERVAL_MS) {
     // Real-traffic skip (2026-07-07, mirrors the strong probe below): a
     // recent successful real call through the proxy is strictly stronger
     // proof of /api/complete liveness than a synthetic say-OK. Only when the
@@ -2159,8 +2164,7 @@ async function runAllChecks() {
   const _strongAge = currentState.proxy.semantic_strong_last_probe_end
     ? Date.now() - new Date(currentState.proxy.semantic_strong_last_probe_end).getTime()
     : Infinity;
-  const _strongGate = userActiveNow() ? PROXY_STRONG_PROBE_INTERVAL_MS : PROXY_STRONG_PROBE_INTERVAL_IDLE_MS;
-  if (_strongAge >= _strongGate) {
+  if (_userActive && _strongAge >= PROXY_STRONG_PROBE_INTERVAL_MS) {
     // Query the proxy's token-usage DB for the most recent observation-writer
     // call. That timestamp is set the instant the LLM call completes — much
     // tighter than knowledge_pipeline.lastObservationAt which lags by 10-15s
