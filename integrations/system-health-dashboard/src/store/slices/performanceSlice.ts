@@ -159,6 +159,24 @@ export interface ContextTurnRow {
   observation_ref: { id: string; intent: string; theme?: string } | string | null
 }
 
+// The per-span reconciliation summary (Phase 83, D-13) as returned by
+// GET /api/experiments/runs/:taskId/reconciliation. The route serves the
+// per-span reconciliation.json VERBATIM (top-level `summary` object), and on
+// ENOENT returns `{ reconciliation: null }`. fetchReconciliation normalises
+// both wire shapes to a single `ReconciliationSummary | null` (see the thunk),
+// so consumers read one type. The summary is served AS-IS — never recomputed
+// client-side (T-86-02-03): matched/flagged counts are Phase-83 truth.
+export interface ReconciliationSummary {
+  matched: number
+  unmatched_wire: number
+  unmatched_transcript: number
+  fallback: number
+  // aggregate per-field deltas between the wire and transcript token counts;
+  // shape is provider-defined, kept opaque here (rendered as-is by the badge).
+  aggregateDeltas: Record<string, number>
+  flaggedCount: number
+}
+
 // A development-narrative item: an observation written during a run's time window,
 // carrying the plain-language "Intent: …" of a foreground turn. Joined by time
 // window + agent (observations have no task_id), so it is best-effort and only
@@ -235,6 +253,11 @@ interface PerformanceState {
   selectedTaskId: string | null // drives the inline Timeline panel (row click)
   overrideTaskId: string | null // drives the modal Score-override drawer (explicit "Edit scores")
   explainTaskId: string | null // drives the Context/Caching explainer dialog (explicit "Explain" button)
+  // Turn-modal open-state (Phase 86, D-01/D-02) — mirrors explainTaskId, but
+  // carries WHICH turn within the run is focused. Drives turn-modal.tsx (Wave 2);
+  // both null = closed. Decoupled from row selection like explainTaskId.
+  modalTaskId: string | null
+  modalTurnIndex: number | null
   selectedRunIds: string[] // multi-select for bulk run deletion
   deleteRunsPending: boolean
   compareA: string | null // run-comparison view: left run
@@ -245,6 +268,10 @@ interface PerformanceState {
   // Per-request context-turns (Plan 84-08) keyed by taskId, mirroring the
   // timeline cache above. Populated by fetchContextTurns.
   contextTurnsByTaskId: Record<string, ContextTurnRow[]>
+  // Per-span reconciliation summaries (Phase 86, D-12/D-13) keyed by taskId,
+  // mirroring the context-turns cache above. Populated by fetchReconciliation;
+  // `null` value = fetched-but-absent (a run with no reconciliation.json).
+  reconciliationByTaskId: Record<string, ReconciliationSummary | null>
   narrativeByTaskId: Record<string, NarrativeItem[]>
   narrativeLoadingId: string | null
   digestsByTaskId: Record<string, DigestItem[]>
@@ -405,6 +432,8 @@ const initialState: PerformanceState = {
   selectedTaskId: null,
   overrideTaskId: null,
   explainTaskId: null,
+  modalTaskId: null,
+  modalTurnIndex: null,
   selectedRunIds: [],
   deleteRunsPending: false,
   compareA: null,
@@ -413,6 +442,7 @@ const initialState: PerformanceState = {
   timelineLoading: false,
   timelineError: null,
   contextTurnsByTaskId: {},
+  reconciliationByTaskId: {},
   narrativeByTaskId: {},
   narrativeLoadingId: null,
   digestsByTaskId: {},
@@ -539,6 +569,40 @@ export const fetchContextTurns = createAsyncThunk(
       const data = await response.json()
       const contextTurns: ContextTurnRow[] = (data?.contextTurns ?? []) as ContextTurnRow[]
       return { taskId, contextTurns }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// fetchReconciliation (Phase 86, D-12/D-13): pull THIS run's per-span
+// reconciliation summary — the Phase-83 wire-vs-transcript match/flag counts —
+// served VERBATIM by the vkb read route (lib/vkb-server/api-routes.js:623). A
+// direct mirror of fetchContextTurns: same-origin, graceful on absence (the
+// route returns `{ reconciliation: null }` on ENOENT, never 500). The reconciled
+// counts feed the diff-viewer/badge header note (Waves 2/3) — NEVER recomputed
+// client-side (T-86-02-03). The route serves the file's top-level `summary`
+// object AS-IS; a missing/empty file yields `{ reconciliation: null }`. We
+// normalise BOTH shapes to `ReconciliationSummary | null` so consumers read one
+// type: prefer `data.reconciliation?.summary` (the documented empty-wrapper
+// shape), else `data.summary` (the verbatim file shape), else null.
+export const fetchReconciliation = createAsyncThunk(
+  'performance/fetchReconciliation',
+  async (taskId: string, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/experiments/runs/${encodeURIComponent(taskId)}/reconciliation`)
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`)
+      }
+      const data = await response.json()
+      // Graceful-empty: ENOENT → `{ reconciliation: null }`; a real file is the
+      // verbatim reconciliation.json carrying a top-level `summary`. Never throw
+      // on absence — resolve to null so the badge degrades cleanly.
+      const summary: ReconciliationSummary | null =
+        (data?.reconciliation?.summary as ReconciliationSummary | undefined) ??
+        (data?.summary as ReconciliationSummary | undefined) ??
+        null
+      return { taskId, reconciliation: summary }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -931,6 +995,17 @@ const performanceSlice = createSlice({
       // score drawer) so the inline Timeline panel stays viewable underneath.
       state.explainTaskId = action.payload
     },
+    // Open the per-turn modal at a specific turn (Phase 86, D-01/D-02). Mirrors
+    // setExplainTaskId but carries the focused turn index. The turn-modal (Wave
+    // 2) mounts once in performance.tsx and reads modalTaskId/modalTurnIndex.
+    openTurnModal(state, action: PayloadAction<{ taskId: string; index: number }>) {
+      state.modalTaskId = action.payload.taskId
+      state.modalTurnIndex = action.payload.index
+    },
+    closeTurnModal(state) {
+      state.modalTaskId = null
+      state.modalTurnIndex = null
+    },
     toggleRunSelected(state, action: PayloadAction<string>) {
       const id = action.payload
       const i = state.selectedRunIds.indexOf(id)
@@ -1026,6 +1101,12 @@ const performanceSlice = createSlice({
       // array so the explainer degrades to the timeline path.
       .addCase(fetchContextTurns.fulfilled, (state, action) => {
         state.contextTurnsByTaskId[action.payload.taskId] = action.payload.contextTurns
+      })
+      // fetchReconciliation (Phase 86) — store the per-span summary keyed by
+      // taskId (null = fetched-but-absent). Best-effort like fetchContextTurns:
+      // on rejection we leave the existing entry so the badge degrades cleanly.
+      .addCase(fetchReconciliation.fulfilled, (state, action) => {
+        state.reconciliationByTaskId[action.payload.taskId] = action.payload.reconciliation
       })
       .addCase(fetchRunNarrative.pending, (state, action) => {
         state.narrativeLoadingId = action.meta.arg.taskId
@@ -1199,6 +1280,8 @@ export const {
   setSelectedTaskId,
   setOverrideTaskId,
   setExplainTaskId,
+  openTurnModal,
+  closeTurnModal,
   toggleRunSelected,
   setRunsSelected,
   clearRunSelection,
@@ -1244,6 +1327,12 @@ export const selectTimelineFor = (taskId: string | null) => (state: RootState): 
 // missing or failed fetch (T-84-08-02).
 export const selectContextTurnsFor = (taskId: string | null) => (state: RootState): ContextTurnRow[] =>
   taskId ? (state.performance.contextTurnsByTaskId[taskId] ?? []) : []
+
+// Per-taskId reconciliation-summary selector factory (Phase 86, D-12/D-13),
+// mirroring selectContextTurnsFor. Returns the stored summary, or null when
+// absent/failed so the badge never crashes on a missing or failed fetch.
+export const selectReconciliationFor = (taskId: string | null) => (state: RootState): ReconciliationSummary | null =>
+  taskId ? (state.performance.reconciliationByTaskId[taskId] ?? null) : null
 
 export const selectNarrativeFor = (taskId: string | null) => (state: RootState): NarrativeItem[] =>
   taskId ? (state.performance.narrativeByTaskId[taskId] ?? []) : []
@@ -1297,6 +1386,15 @@ export const selectExplainRun = (state: RootState): Run | null => {
   const id = state.performance.explainTaskId
   if (!id) return null
   return state.performance.runs.find((r) => r.task_id === id) ?? null
+}
+
+// The per-turn modal open-state (Phase 86, D-01/D-02): the focused run + turn
+// index, plus a `open` convenience flag. Both null = closed. turn-modal.tsx
+// (Wave 2) mounts once and reads this; mirrors selectExplainTaskId/selectExplainRun.
+export const selectModalTurn = (state: RootState): { taskId: string | null; index: number | null; open: boolean } => {
+  const taskId = state.performance.modalTaskId
+  const index = state.performance.modalTurnIndex
+  return { taskId, index, open: taskId != null && index != null }
 }
 
 // Saved-report selectors.
