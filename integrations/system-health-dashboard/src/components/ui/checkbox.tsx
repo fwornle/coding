@@ -9,10 +9,12 @@ interface CheckboxProps {
   disabled?: boolean
   className?: string
   id?: string
+  /** Forwarded to the underlying button so tests/tooling can target it. */
+  'data-testid'?: string
 }
 
 const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
-  ({ checked = false, onCheckedChange, disabled = false, className = '', id }, ref) => {
+  ({ checked = false, onCheckedChange, disabled = false, className = '', id, 'data-testid': dataTestid }, ref) => {
     return (
       <button
         ref={ref}
@@ -21,6 +23,7 @@ const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
         aria-checked={checked}
         disabled={disabled}
         id={id}
+        data-testid={dataTestid}
         onClick={() => onCheckedChange?.(!checked)}
         className={`
           peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background
