@@ -352,8 +352,15 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 ### Phase 87: Interactive Spans & Branch Avenues
 **Goal**: A measurement span started from the main interactive agent captures origin snapshot + initial prompt; completed spans fork into "avenues" — headless re-runs of the initial prompt with modified agent/model/framework, each on a persistent `avenue/<task_id>` git branch — grouped by origin, compared in the dashboard, merge-status tracked; measurement data survives across branches (main-`.data` stores).
 **Depends on**: Phases 82, 85
-**Requirements**: TBD
-**Plans**: TBD
+**Requirements**: AVN-01, AVN-02, AVN-03, AVN-04, AVN-05, AVN-06, AVN-07, AVN-08, AVN-09
+**Plans**: 6 plans
+Plans:
+- [ ] 87-01-PLAN.md — Persistent avenue/<task_id> branch lifecycle: named-branch worktree + commit-on-close + prune primitive (AVN-05/09)
+- [ ] 87-02-PLAN.md — Spec axes: mastracode agent enum + knowledge-injection kb-on/kb-off env-axis + per-agent injection on/off guard (AVN-03/04)
+- [ ] 87-03-PLAN.md — Avenue execution: spec synthesis + origin_span_id + runner branch/injection wiring + cross-branch no-double-count integration test (AVN-01/04/06)
+- [ ] 87-04-PLAN.md — Merge-status/promote/prune git primitives + coordinator + vkb-server routes (AVN-08/09)
+- [ ] 87-05-PLAN.md — Fork button + 4-axis variant picker + mandatory sweep count/cost guardrail (AVN-02/03)
+- [ ] 87-06-PLAN.md — Origin-grouped N-way ranked panel + merge badge + Promote/Prune actions, reusing DifferenceViewer (AVN-07/08/09)
 **UI hint**: yes
 
 
@@ -386,4 +393,4 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
-| 87. Interactive Spans & Branch Avenues | v7.5 | 0/? | Not started | - |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 0/6 | Not started | - |
