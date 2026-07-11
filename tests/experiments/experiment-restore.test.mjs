@@ -23,6 +23,7 @@ import {
   assertRepeatsIdentical,
   runVariantRepeats,
 } from '../../lib/experiments/experiment-restore.mjs';
+import { buildWorktreeAddArgs } from '../../lib/repro/restore-snapshot.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(__dirname, '..', '..', 'scripts', 'experiment-restore.mjs');
@@ -244,4 +245,45 @@ test('WR-03: CLI exits 2 on --repeats 1 (vacuous determinism proof rejected)', (
   });
   assert.equal(res.status, 2, res.stderr);
   assert.match(res.stderr, /at least two restores/);
+});
+
+// ── Phase 87 (AVN-05): avenueMode branch option threaded through the rig (hermetic — argv only) ──
+
+test('AVN-05: buildWorktreeAddArgs emits --detach by default (regression anchor)', () => {
+  const args = buildWorktreeAddArgs({ worktree: '/wt', sha: 'abc123' });
+  assert.deepEqual(args, ['worktree', 'add', '--detach', '/wt', 'abc123']);
+});
+
+test('AVN-05: buildWorktreeAddArgs emits -b <branch> when avenueMode requested', () => {
+  const args = buildWorktreeAddArgs({ worktree: '/wt', sha: 'abc123', avenueMode: true, branchName: 'avenue/task-9' });
+  assert.deepEqual(args, ['worktree', 'add', '-b', 'avenue/task-9', '/wt', 'abc123']);
+});
+
+test('AVN-05: avenueMode without a branchName falls back to the detached default', () => {
+  const args = buildWorktreeAddArgs({ worktree: '/wt', sha: 'abc123', avenueMode: true, branchName: '' });
+  assert.deepEqual(args, ['worktree', 'add', '--detach', '/wt', 'abc123']);
+});
+
+test('AVN-05: restoreForCell threads avenueMode+branchName into the rig call', async () => {
+  let seen = null;
+  const restoreStub = async (id, o) => {
+    seen = o;
+    // Minimal shape restoreForCell needs: a non-git worktree so gitHead → '' (no .git → no throw).
+    return { worktree: fs.mkdtempSync(path.join(os.tmpdir(), 'avn-cell-')), sandboxDataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'avn-sb-')) };
+  };
+  await restoreForCell('snap-1', { avenueMode: true, branchName: 'avenue/task-7', restore: restoreStub });
+  assert.equal(seen.avenueMode, true);
+  assert.equal(seen.branchName, 'avenue/task-7');
+  assert.equal(seen.inPlace, false, 'restoreForCell must never select the destructive in-place path');
+});
+
+test('AVN-05: restoreForCell omits avenue opts when not requested (detached default preserved)', async () => {
+  let seen = null;
+  const restoreStub = async (id, o) => {
+    seen = o;
+    return { worktree: fs.mkdtempSync(path.join(os.tmpdir(), 'avn-cell-')), sandboxDataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'avn-sb-')) };
+  };
+  await restoreForCell('snap-1', { restore: restoreStub });
+  assert.equal(seen.avenueMode, undefined, 'no avenueMode leaks onto the default restore call');
+  assert.equal(seen.branchName, undefined, 'no branchName leaks onto the default restore call');
 });
