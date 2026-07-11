@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: planning
-stopped_at: Phase 87 context gathered
-last_updated: "2026-07-11T06:43:49.715Z"
-last_activity: 2026-07-11
+status: executing
+stopped_at: Phase 87 UI-SPEC approved
+last_updated: "2026-07-11T07:48:01.935Z"
+last_activity: 2026-07-11 -- Phase 87 planning complete
 progress:
   total_phases: 21
   completed_phases: 16
-  total_plans: 95
+  total_plans: 101
   completed_plans: 94
   percent: 76
 ---
@@ -55,7 +55,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 87
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
   Plan 86-05 (Wave 3 — declutter IA) done (3 autonomous tasks + 1 blocking human-verify
   checkpoint APPROVED, 3 feat commits 394777f88/c11d4327c/acebed864). Shipped the declutter
   IA (D-08/D-10/D-11/D-12): a per-run reconciliation badge (reconciliation-badge.tsx,
@@ -126,7 +126,7 @@ Status: Ready to plan
   all Task 1/2 acceptance greps green. The only 4 `error TS` are pre-existing out-of-scope
   diagnostics (node-details-sidebar.tsx + the deferred token-usage.tsx). See 86-02-SUMMARY.md.
   Next: Wave 2 UI plans consume this frozen contract (turn-modal, difference-viewer, badge).
-Last activity: 2026-07-11
+Last activity: 2026-07-11 -- Phase 87 planning complete
 
 ## Deferred Items
 
@@ -481,8 +481,8 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 
 ## Session Continuity
 
-Last session: 2026-07-11T06:43:49.704Z
-Stopped at: Phase 87 context gathered
+Last session: 2026-07-11T06:59:38.315Z
+Stopped at: Phase 87 UI-SPEC approved
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
