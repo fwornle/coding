@@ -527,6 +527,54 @@ const PROXY_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000;
 // ETM-heartbeat promotion in combined-status-line.js (~line 1019).
 const USER_ACTIVE_HEARTBEAT_MAX_AGE_MS = 5 * 60_000;
 
+// Physical-presence gate (2026-07-11): the transcript-mtime signal alone is not
+// sufficient proof a HUMAN is here. A scheduled task, a /loop, or any background
+// agent write keeps a session .jsonl fresh with nobody at the keyboard, so
+// userActiveNow() returned true all night and the (correctly AFK-gated)
+// consolidation + synthetic probes fired anyway (~225 consolidator-insight calls
+// on 2026-07-10 overnight). macOS HID idle time is the authentic "a person
+// touched this machine" clock — independent of agent/daemon activity and of the
+// machine being kept awake. When a human has been idle longer than this, treat
+// them as away and suppress deferrable background LLM work regardless of
+// transcript churn.
+const HUMAN_HID_IDLE_MAX_MS = 10 * 60_000;
+let _hidIdleCache = { at: 0, ms: null };
+
+/**
+ * macOS HID idle time in ms (time since last real keyboard/mouse input), or
+ * null when it cannot be determined (non-darwin, or ioreg failure). Cached for
+ * 3s so multiple userActiveNow() calls in one tick don't each spawn ioreg.
+ */
+function hidIdleMs() {
+  const now = Date.now();
+  if (now - _hidIdleCache.at < 3000) return _hidIdleCache.ms;
+  let ms = null;
+  if (process.platform === 'darwin') {
+    try {
+      const out = execSync('ioreg -c IOHIDSystem', {
+        encoding: 'utf8', timeout: 2000, maxBuffer: 8 * 1024 * 1024,
+      });
+      const m = out.match(/"HIDIdleTime"\s*=\s*(\d+)/);
+      if (m) ms = Number(m[1]) / 1e6; // nanoseconds → ms
+    } catch { ms = null; }
+  }
+  _hidIdleCache = { at: now, ms };
+  return ms;
+}
+
+/**
+ * Tri-state human-presence signal from HID idle time:
+ *   true  — a person used input within HUMAN_HID_IDLE_MAX_MS
+ *   false — demonstrably idle longer than that (away / asleep / lid closed)
+ *   null  — unknown (non-darwin or ioreg unavailable) → callers must fall back
+ *           to the transcript-mtime signal rather than over-suppressing.
+ */
+function humanPresentByHid() {
+  const idle = hidIdleMs();
+  if (idle === null) return null;
+  return idle < HUMAN_HID_IDLE_MAX_MS;
+}
+
 /**
  * True when at least one tracked ETM is heartbeating fresh. The ETM
  * heartbeat fires on every tool call, permission response, and prompt-set
@@ -537,6 +585,11 @@ const USER_ACTIVE_HEARTBEAT_MAX_AGE_MS = 5 * 60_000;
  */
 function userActiveNow() {
   const now = Date.now();
+  // Physical-presence gate: if HID proves the human has been idle past the
+  // threshold, they are away — suppress deferrable background LLM work even if a
+  // session .jsonl is being written by a background agent / scheduled task. When
+  // HID is unknown (null, e.g. non-darwin) fall through to transcript-only.
+  if (humanPresentByHid() === false) return false;
   for (const entry of Object.values(currentState.lsl || {})) {
     if (!entry || entry.status === 'stopped' || !entry.transcriptPath) continue;
     // FIX (2026-06-25): do NOT key idle-detection off entry.lastBeat. The ETM
