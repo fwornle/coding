@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
-import { Pencil, Layers, Trash2, RotateCcw } from 'lucide-react'
+import { Pencil, Layers, Trash2, RotateCcw, GitCompare } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -26,6 +27,11 @@ import {
   setLauncherPrefill,
   selectSpecList,
   fetchSpecList,
+  saveOverride,
+  setCompareA,
+  setCompareB,
+  selectSaveOverridePending,
+  DEFAULT_OVERRIDDEN_BY,
   type Run,
   type ExperimentOverrides,
   type VariantOverride,
@@ -119,39 +125,153 @@ function num(v: number | null): ReactNode {
   return v == null ? <span className="text-muted-foreground">—</span> : v.toFixed(2)
 }
 
+// D-11 client-side range mirror of api-routes.js:441-453 (score-drawer L63-73).
+// regressions is binary; the other four are continuous [0,1]. UX-only — the
+// server re-validates and is authoritative. Returns an error string or null.
+function validateDim(dim: string, raw: string): string | null {
+  if (raw.trim() === '') return 'Enter a value'
+  const value = Number(raw)
+  if (Number.isNaN(value)) return 'Must be a number'
+  if (dim === 'regressions') {
+    if (value !== 0 && value !== 1) return 'Regressions must be 0 or 1'
+  } else if (value < 0 || value > 1) {
+    return 'Must be between 0 and 1'
+  }
+  return null
+}
+
+// D-11 inline-editable score cell. The value shows as before (effective +
+// "edited" yellow badge + judged tooltip); click/focus swaps it for a numeric
+// Input. On blur/Enter it autosaves via the EXISTING server-authoritative
+// `saveOverride` PATCH thunk (server re-validates ranges + writes corrected_*;
+// the fulfilled reducer applies an optimistic corrected-wins patch). The client
+// range mirror (validateDim) blocks obviously-bad values before the round-trip,
+// but the server is authoritative: a non-2xx PATCH reverts the optimistic value
+// and surfaces 400 (server message) vs 404 ("reopen the run") inline. The cell
+// stops click propagation so editing never triggers the row's setSelectedTaskId.
 function ScoreCell({ dim, run }: { dim: string; run: Run }) {
+  const dispatch = useAppDispatch()
+  const savePending = useAppSelector(selectSaveOverridePending)
   const eff = effective(dim, run.score)
   const edited = isEdited(dim, run.score)
   const judgedVal = judged(dim, run.score)
 
-  if (!edited) {
-    return <span className="font-mono">{num(eff)}</span>
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  // Inline error message shown UNDER the cell after a rejected PATCH (or a
+  // failed client range check). Cleared when a fresh edit starts.
+  const [inlineError, setInlineError] = useState<string | null>(null)
+
+  const beginEdit = () => {
+    setDraft(eff == null ? '' : String(eff))
+    setInlineError(null)
+    setEditing(true)
   }
 
+  const cancelEdit = () => {
+    setEditing(false)
+    setDraft('')
+  }
+
+  const commit = async () => {
+    // No change → just exit edit mode (the optimistic value stays what it was).
+    if (eff != null && draft.trim() === String(eff)) {
+      cancelEdit()
+      return
+    }
+    const clientErr = validateDim(dim, draft)
+    if (clientErr) {
+      // Block obviously-bad values before the round-trip (UX-only); keep editing.
+      setInlineError(clientErr)
+      return
+    }
+    const value = Number(draft)
+    const result = await dispatch(
+      saveOverride({ taskId: run.task_id, edits: [{ dimension: dim, value }], overridden_by: DEFAULT_OVERRIDDEN_BY }),
+    )
+    if (saveOverride.rejected.match(result)) {
+      // Server is authoritative — REVERT the optimistic value (the fulfilled
+      // reducer never ran, so run.score is unchanged) and surface the reason.
+      const status = result.payload?.status
+      setInlineError(
+        status === 404
+          ? 'This score changed on the server — reopen the run to edit.'
+          : (result.payload?.message ?? 'Could not save — the value was rejected.'),
+      )
+      return
+    }
+    // Fulfilled: the reducer applied the optimistic corrected-wins patch.
+    cancelEdit()
+  }
+
+  if (editing) {
+    return (
+      <span onClick={(e) => e.stopPropagation()}>
+        <Input
+          autoFocus
+          inputMode="decimal"
+          data-testid="inline-score-input"
+          aria-label={`Edit ${dim} score for ${run.task_id}`}
+          className="ml-auto w-16 text-sm font-mono"
+          value={draft}
+          disabled={savePending}
+          onChange={(e) => { setDraft(e.target.value); setInlineError(null) }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); void commit() }
+            else if (e.key === 'Escape') { e.preventDefault(); cancelEdit() }
+          }}
+        />
+        {inlineError && (
+          <p className="mt-1 text-xs text-status-error" role="alert">{inlineError}</p>
+        )}
+      </span>
+    )
+  }
+
+  // Non-editing view: value + (when overridden) the retained yellow "edited"
+  // badge with the judged tooltip. Click/focus enters edit mode.
+  const view = (
+    <span
+      role="button"
+      tabIndex={0}
+      className="inline-flex cursor-text items-center gap-1"
+      onClick={(e) => { e.stopPropagation(); beginEdit() }}
+      onFocus={beginEdit}
+    >
+      <span className="font-mono">{num(eff)}</span>
+      {edited && (
+        <Badge
+          variant="outline"
+          className="gap-1 border-yellow-200 bg-yellow-50 text-yellow-700"
+        >
+          <Pencil className="size-3.5" />
+          edited
+        </Badge>
+      )}
+    </span>
+  )
+
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex items-center gap-1">
-            <span className="font-mono">{num(eff)}</span>
-            <Badge
-              variant="outline"
-              className="gap-1 border-yellow-200 bg-yellow-50 text-yellow-700"
-            >
-              <Pencil className="size-3.5" />
-              edited
-            </Badge>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          Judged: {judgedVal == null ? '—' : judgedVal.toFixed(2)}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <span onClick={(e) => e.stopPropagation()}>
+      {edited ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>{view}</TooltipTrigger>
+            <TooltipContent>
+              Judged: {judgedVal == null ? '—' : judgedVal.toFixed(2)}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : view}
+      {inlineError && !editing && (
+        <p className="mt-1 text-xs text-status-error" role="alert">{inlineError}</p>
+      )}
+    </span>
   )
 }
 
-export function RunsTable() {
+export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
   const dispatch = useAppDispatch()
   const filtered = useAppSelector(selectFilteredRuns)
   const allRuns = useAppSelector(selectRuns)
@@ -222,6 +342,39 @@ export function RunsTable() {
             <span className="font-semibold">{selectedRunIds.length}</span> run{selectedRunIds.length === 1 ? '' : 's'} selected
           </span>
           <div className="flex items-center gap-2">
+            {/* D-08 Compare-from-selection: enabled ONLY when exactly 2 runs are
+                selected. Sets the compare pair and asks the page to switch to the
+                Compare tab (which mounts the Plan-04 DifferenceViewer). */}
+            {(() => {
+              const canCompare = selectedRunIds.length === 2
+              return (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          size="sm"
+                          data-testid="compare-selected"
+                          disabled={!canCompare}
+                          onClick={() => {
+                            if (!canCompare) return
+                            dispatch(setCompareA(selectedRunIds[0]))
+                            dispatch(setCompareB(selectedRunIds[1]))
+                            onCompare?.()
+                          }}
+                        >
+                          <GitCompare className="size-3.5" />
+                          Compare selected ({selectedRunIds.length})
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!canCompare && (
+                      <TooltipContent>Select two runs to compare.</TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              )
+            })()}
             <Button variant="ghost" size="sm" onClick={() => dispatch(clearRunSelection())} disabled={deletePending}>
               Clear
             </Button>
