@@ -118,7 +118,9 @@ function usage() {
     '                    absent → the Run quarantines as unclassified and is hidden from default queries)\n' +
     '  --model V=M       per-variant model override keyed by ORIGINAL variant name V (D-06; repeatable)\n' +
     '  --agent V=A       per-variant agent override keyed by ORIGINAL variant name V (D-06; repeatable)\n' +
-    '  --capture-raw-bodies  arm raw request/response body capture per cell (D-12; presence flag, off by default)\n',
+    '  --capture-raw-bodies  arm raw request/response body capture per cell (D-12; presence flag, off by default)\n' +
+    '  --avenue          run the matrix as an AVENUE fork (restore onto avenue/<task_id>, commit on close; presence flag, off by default)\n' +
+    '  --origin-span-id <id>  the forked origin span task_id linked onto each avenue Run (AVN-01; run-write stamps origin_span_id)\n',
   );
 }
 
@@ -168,6 +170,13 @@ async function main() {
   // every cell's measurement-start (via runMatrix→runCell) so the proxy writes raw-bodies.jsonl.
   // OFF by default; when absent the per-cell measurement-start argv is byte-identical to before.
   const captureRawBodies = args.includes('--capture-raw-bodies');
+  // Phase 87-07 (CR-01, D-01 scriptable-CLI path): --avenue is a PRESENCE flag that turns
+  // the matrix into an AVENUE run (runCell restores onto avenue/<task_id>, commits on close);
+  // --origin-span-id <id> links each avenue Run back to the forked origin span so run-write
+  // stamps origin_span_id. run-launch.mjs's buildRunArgv emits both when the launch overrides
+  // carry them. OFF/absent → the argv + per-cell measurement-start is byte-identical to before.
+  const avenue = args.includes('--avenue');
+  const originSpanId = parseStrArg(args, '--origin-span-id') || undefined;
 
   if (!specPath) {
     process.stderr.write('error: --spec <file> is required\n');
@@ -299,6 +308,11 @@ async function main() {
     variantOverrides,
     // D-12: propagate the raw-body capture opt-in to each cell's measurement-start.
     captureRawBodies,
+    // Phase 87-07 (CR-01): avenue-mode + the forked origin span id. runMatrix forwards both
+    // into runCell so an avenue matrix restores onto named branches and stamps origin_span_id.
+    // avenue defaults false (non-avenue matrices unchanged); originSpanId only threads when set.
+    avenue,
+    originSpanId,
   };
   if (timeoutMs != null) opts.timeoutMs = timeoutMs;
   // Phase 85-06: thread the validated task_class → runCell --task-class → the

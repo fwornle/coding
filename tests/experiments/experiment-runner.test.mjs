@@ -257,6 +257,62 @@ test('runMatrix: captureRawBodies opt threads through to the cell measurement-st
   assert.ok(startArgvs[0].includes('--capture-raw-bodies'), 'runMatrix threaded the capture opt to the cell');
 });
 
+test('runMatrix: avenue + originSpanId opts reach the runCell seam → measurement-start --origin-span-id (CR-01)', async () => {
+  // Phase 87-07: runMatrix must forward avenue/originSpanId from its opts into the runCell call so
+  // the already-correct avenue seam is reachable. Proof at the measurement-start boundary: the
+  // per-cell start argv carries --origin-span-id <id>, AND the avenue commit-on-close seam fires.
+  const startArgvs = [];
+  let commitCalls = 0;
+  const spec = { experiment_id: 'expAvn', snapshot_id: 'snapAvn' };
+  const resolveSpec = () => ({ goal_sentence: 'fork it', repeats: 1, cells: [CELL] });
+  await runMatrix(spec, {
+    avenue: true,
+    originSpanId: 'origin-xyz',
+    // Injectable branch-commit seam — assert it fires on close for an avenue cell.
+    commitAvenue: () => { commitCalls += 1; return { committed: true }; },
+    resolveSpec,
+    dataDir: '/main/.data',
+    agentsDir: AGENTS_DIR,
+    restore: async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' }),
+    runMeasurement: async (phase, argv) => { if (phase === 'start') startArgvs.push(argv); return 0; },
+    spawnAgent: async () => 'complete',
+    configureRouting: async (_a, env) => env,
+    openStore: async () => ({ close: async () => {} }),
+    readDone: async () => [],
+  });
+  assert.equal(startArgvs.length, 1, 'one cell → one measurement-start');
+  const argv = startArgvs[0];
+  const idx = argv.indexOf('--origin-span-id');
+  assert.ok(idx >= 0, 'runMatrix threaded originSpanId → measurement-start --origin-span-id');
+  assert.equal(argv[idx + 1], 'origin-xyz', 'the exact forked origin span id reaches the persistence boundary');
+  assert.equal(commitCalls, 1, 'the injected avenue commit-on-close seam fired (avenue-mode reached runCell)');
+});
+
+test('runMatrix: a non-avenue matrix threads NEITHER --origin-span-id NOR any avenue commit (byte-identical)', async () => {
+  // The absence proof: with avenue omitted the per-cell start argv is byte-identical to before
+  // (no --origin-span-id) and the commit seam is never called — non-avenue cells stay unchanged.
+  const startArgvs = [];
+  let commitCalls = 0;
+  const spec = { experiment_id: 'expPlain', snapshot_id: 'snapPlain' };
+  const resolveSpec = () => ({ goal_sentence: 'plain', repeats: 1, cells: [CELL] });
+  await runMatrix(spec, {
+    // NO avenue / originSpanId. commitAvenue is injected only to PROVE it is never called.
+    commitAvenue: () => { commitCalls += 1; return { committed: true }; },
+    resolveSpec,
+    dataDir: '/main/.data',
+    agentsDir: AGENTS_DIR,
+    restore: async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' }),
+    runMeasurement: async (phase, argv) => { if (phase === 'start') startArgvs.push(argv); return 0; },
+    spawnAgent: async () => 'complete',
+    configureRouting: async (_a, env) => env,
+    openStore: async () => ({ close: async () => {} }),
+    readDone: async () => [],
+  });
+  assert.equal(startArgvs.length, 1);
+  assert.ok(!startArgvs[0].includes('--origin-span-id'), 'non-avenue start argv omits --origin-span-id');
+  assert.equal(commitCalls, 0, 'non-avenue cells never invoke the avenue commit seam');
+});
+
 test('runCell: an abort with a launchCell reason propagates that reason (A1 diagnosability)', async () => {
   // 85-06 A1: launchCell now resolves { state, reason } — runCell must surface the reason so
   // an aborted cell records WHY (not a bare "abort"). A spawnAgent seam returning the object
