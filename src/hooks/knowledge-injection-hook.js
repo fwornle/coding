@@ -18,6 +18,27 @@ import fs from 'node:fs';
 import readline from 'node:readline';
 import { callRetrieval } from './retrieval-client.js';
 
+/**
+ * Per-avenue knowledge-injection toggle (Phase 87, AVN-04).
+ *
+ * A comparison avenue may declare `env: kb-off`; the runner (Plan 03) maps that to
+ * `CODING_KNOWLEDGE_INJECTION=0` in the SPAWNED agent's child env. When that env var is
+ * disabled, this hook must NOT retrieve or inject anything for that avenue's turns.
+ *
+ * CRITICAL (Pitfall 4 — scope): this reads process.env, so it only affects a process whose
+ * env carries the disable value. The operator's interactive session leaves the var unset →
+ * injection stays ON. Default is ON; only the literal `0` / `false` / `off` (case-insensitive,
+ * trimmed) disables — any other value (including unset/empty) keeps injection enabled.
+ *
+ * @returns {boolean} true when injection is enabled, false when explicitly disabled.
+ */
+function isInjectionEnabled() {
+  const raw = process.env.CODING_KNOWLEDGE_INJECTION;
+  if (raw == null) return true; // unset → default ON (interactive session unaffected)
+  const v = String(raw).trim().toLowerCase();
+  return !(v === '0' || v === 'false' || v === 'off');
+}
+
 // Absolute safety ceiling -- never let the hook hang Claude Code
 const SAFETY_TIMEOUT_MS = 5000;
 const safetyTimer = setTimeout(() => process.exit(0), SAFETY_TIMEOUT_MS);
@@ -102,6 +123,12 @@ function extractConversationTopics(transcriptPath) {
 
 async function main() {
   try {
+    // 0. Per-avenue injection toggle (AVN-04). When an avenue declares kb-off, the runner
+    //    sets CODING_KNOWLEDGE_INJECTION=0 in this hook process's env — early-return BEFORE
+    //    any retrieval so no working-memory prefix / additionalContext is emitted. Scoped to
+    //    this process only (Pitfall 4): the operator's interactive session leaves it unset.
+    if (!isInjectionEnabled()) return;
+
     // 1. Read stdin (Claude Code pipes JSON to hook process)
     const chunks = [];
     if (!process.stdin.isTTY) {

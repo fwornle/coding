@@ -341,6 +341,17 @@ _inject_knowledge_context() {
   local agent="$AGENT_NAME"
   local hooks_dir="$CODING_REPO/src/hooks"
 
+  # Per-avenue injection toggle (Phase 87, AVN-04). An avenue declaring env=kb-off gets
+  # CODING_KNOWLEDGE_INJECTION=0 in the spawned agent's env (runner, Plan 03). This ONE
+  # guard covers opencode/copilot/mastra: early-return before running any adapter. Default
+  # ON; only the literal 0/false/off disables. Scoped to this process env (Pitfall 4) — the
+  # operator's interactive session leaves the var unset, so injection stays on for them.
+  local _kb="$(printf '%s' "${CODING_KNOWLEDGE_INJECTION:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  if [ "$_kb" = "0" ] || [ "$_kb" = "false" ] || [ "$_kb" = "off" ]; then
+    _agent_log "Knowledge injection disabled for ${AGENT_DISPLAY_NAME:-$agent} (CODING_KNOWLEDGE_INJECTION=${CODING_KNOWLEDGE_INJECTION})"
+    return 0
+  fi
+
   # Claude uses per-prompt hook (registered in ~/.claude/settings.json) -- skip here
   if [ "$agent" = "claude" ]; then
     return 0
