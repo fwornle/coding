@@ -444,7 +444,7 @@ Plans:
 
 **Wave 5** *(gap closure — fork-launch chain wiring, 2026-07-11)*
 
-- [ ] 87-07-PLAN.md — Thread origin_span_id + forkAxes end-to-end (runMatrix→runCell, experiment-run.mjs CLI, run-launch argv, handleExperimentRun synthesizeAvenueSpec, coordinator, client payload+axes-aware preview) so a real fork produces an origin_span_id-bearing avenue Run (CR-01/02/03 → AVN-01/02/03/07)
+- [x] 87-07-PLAN.md — Thread origin_span_id + forkAxes end-to-end (runMatrix→runCell, experiment-run.mjs CLI, run-launch argv, handleExperimentRun synthesizeAvenueSpec, coordinator, client payload+axes-aware preview) so a real fork produces an origin_span_id-bearing avenue Run (CR-01/02/03 → AVN-01/02/03/07)
 - [ ] 87-08-PLAN.md — Correct the two Blocker misleading comments (G4) + add the AVN-01..09 REQUIREMENTS.md section (G5) + live main-tree dashboard rebuild/restart + gsd-browser human verify of the origin-grouped ranked Avenues panel in both themes (AVN-01/02/03/07)
 
 **UI hint**: yes
@@ -478,4 +478,4 @@ Plans:
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
-| 87. Interactive Spans & Branch Avenues | v7.5 | 6/8 | Gap Closure Planned | 2026-07-11 |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 7/8 | In Progress|  |

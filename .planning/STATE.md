@@ -4,8 +4,8 @@ milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Phase 87 UI-SPEC approved
-last_updated: "2026-07-11T12:17:10.632Z"
-last_activity: 2026-07-11 -- Phase 87 planning complete
+last_updated: "2026-07-11T14:42:50.008Z"
+last_activity: 2026-07-11 -- Phase 87 execution started
 progress:
   total_phases: 21
   completed_phases: 16
@@ -54,8 +54,8 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 87 (interactive-spans-and-branch-avenues) — EXECUTING
-Plan: 1 of 6
-Status: Ready to execute
+Plan: 1 of 8
+Status: Executing Phase 87
   Plan 86-05 (Wave 3 — declutter IA) done (3 autonomous tasks + 1 blocking human-verify
   checkpoint APPROVED, 3 feat commits 394777f88/c11d4327c/acebed864). Shipped the declutter
   IA (D-08/D-10/D-11/D-12): a per-run reconciliation badge (reconciliation-badge.tsx,
@@ -126,7 +126,7 @@ Status: Ready to execute
   all Task 1/2 acceptance greps green. The only 4 `error TS` are pre-existing out-of-scope
   diagnostics (node-details-sidebar.tsx + the deferred token-usage.tsx). See 86-02-SUMMARY.md.
   Next: Wave 2 UI plans consume this frozen contract (turn-modal, difference-viewer, badge).
-Last activity: 2026-07-11 -- Phase 87 planning complete
+Last activity: 2026-07-11 -- Phase 87 execution started
 
 ## Deferred Items
 
