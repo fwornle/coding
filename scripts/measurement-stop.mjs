@@ -175,6 +175,9 @@ export function buildRunTags({
     //    the same null-preserved way variant/repeat do (never coerced; `?? null` keeps null). ──
     rerun_of:       span.meta?.rerun_of ?? null,
     base_variant:   span.meta?.base_variant ?? null,
+    // ── AVN-01 (Phase 87-03): the forked origin span's task_id, folded from span.meta the
+    //    same null-preserved way rerun_of/base_variant do (never coerced; `?? null` keeps null). ──
+    origin_span_id: span.meta?.origin_span_id ?? null,
   };
 }
 
