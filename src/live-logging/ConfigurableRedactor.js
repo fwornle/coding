@@ -395,8 +395,8 @@ class ConfigurableRedactor {
         {
           id: "corporate_user_ids",
           name: "Corporate User IDs",
-          description: "Corporate user identifiers (q + 6 characters)",
-          pattern: "\\bq[0-9a-zA-Z]{6}\\b",
+          description: "Corporate user identifiers (q + 6 alphanumerics, at least one digit — avoids matching plain English words like 'quality')",
+          pattern: "\\bq(?=[0-9a-z]{6}\\b)(?=[0-9a-z]*\\d)[0-9a-z]{6}\\b",
           flags: "gi",
           replacementType: "user_id",
           replacement: "<USER_ID_REDACTED>",
