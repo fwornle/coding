@@ -5,7 +5,7 @@ milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Phase 87 UI-SPEC approved
 last_updated: "2026-07-11T07:53:54.257Z"
-last_activity: 2026-07-11 -- Phase 87 execution started
+last_activity: 2026-07-11 -- Phase 87 executed (6/6 plans); verification gaps_found — fork-launch chain not wired
 progress:
   total_phases: 21
   completed_phases: 16
@@ -126,7 +126,7 @@ Status: Executing Phase 87
   all Task 1/2 acceptance greps green. The only 4 `error TS` are pre-existing out-of-scope
   diagnostics (node-details-sidebar.tsx + the deferred token-usage.tsx). See 86-02-SUMMARY.md.
   Next: Wave 2 UI plans consume this frozen contract (turn-modal, difference-viewer, badge).
-Last activity: 2026-07-11 -- Phase 87 execution started
+Last activity: 2026-07-11 -- Phase 87 executed (6/6 plans); verification gaps_found (fork-launch chain not wired end-to-end)
 
 ## Deferred Items
 
