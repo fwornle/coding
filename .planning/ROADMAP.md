@@ -60,7 +60,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] **Phase 84: Per-Turn Context Revelation** — Persist every measured request as context-turns JSONL with paired usage; read APIs; honest cache explainer (completed 2026-07-08)
 - [x] **Phase 85: Experiment Control Center** — Launch / re-run (same snapshot, param overrides) / monitor / cancel experiments from the performance dashboard (completed 2026-07-09)
 - [x] **Phase 86: Timeline v2 & Performance Page Declutter** — Per-turn story (prompt, tool calls, cache split, context band) + IA cleanup (completed 2026-07-11)
-- [ ] **Phase 87: Interactive Spans & Branch Avenues** — Span snapshot from the main agent; forked avenue branches re-running the initial prompt with modified params; compare & merge
+- [x] **Phase 87: Interactive Spans & Branch Avenues** — Span snapshot from the main agent; forked avenue branches re-running the initial prompt with modified params; compare & merge (completed 2026-07-11)
 
 ## Phase Details
 
@@ -440,7 +440,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 87-06-PLAN.md — Origin-grouped N-way ranked panel + merge badge + Promote/Prune actions, reusing DifferenceViewer (AVN-07/08/09)
+- [x] 87-06-PLAN.md — Origin-grouped N-way ranked panel + merge badge + Promote/Prune actions, reusing DifferenceViewer (AVN-07/08/09)
 
 **UI hint**: yes
 
@@ -473,4 +473,4 @@ Plans:
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
-| 87. Interactive Spans & Branch Avenues | v7.5 | 5/6 | In Progress|  |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 6/6 | Complete   | 2026-07-11 |
