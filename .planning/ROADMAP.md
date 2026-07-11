@@ -422,7 +422,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 **Goal**: A measurement span started from the main interactive agent captures origin snapshot + initial prompt; completed spans fork into "avenues" — headless re-runs of the initial prompt with modified agent/model/framework, each on a persistent `avenue/<task_id>` git branch — grouped by origin, compared in the dashboard, merge-status tracked; measurement data survives across branches (main-`.data` stores).
 **Depends on**: Phases 82, 85
 **Requirements**: AVN-01, AVN-02, AVN-03, AVN-04, AVN-05, AVN-06, AVN-07, AVN-08, AVN-09
-**Plans**: 6 plans
+**Plans**: 8 plans (6 original + 2 gap-closure)
 Plans:
 **Wave 1**
 
@@ -441,6 +441,11 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 87-06-PLAN.md — Origin-grouped N-way ranked panel + merge badge + Promote/Prune actions, reusing DifferenceViewer (AVN-07/08/09)
+
+**Wave 5** *(gap closure — fork-launch chain wiring, 2026-07-11)*
+
+- [ ] 87-07-PLAN.md — Thread origin_span_id + forkAxes end-to-end (runMatrix→runCell, experiment-run.mjs CLI, run-launch argv, handleExperimentRun synthesizeAvenueSpec, coordinator, client payload+axes-aware preview) so a real fork produces an origin_span_id-bearing avenue Run (CR-01/02/03 → AVN-01/02/03/07)
+- [ ] 87-08-PLAN.md — Correct the two Blocker misleading comments (G4) + add the AVN-01..09 REQUIREMENTS.md section (G5) + live main-tree dashboard rebuild/restart + gsd-browser human verify of the origin-grouped ranked Avenues panel in both themes (AVN-01/02/03/07)
 
 **UI hint**: yes
 
@@ -473,4 +478,4 @@ Plans:
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
-| 87. Interactive Spans & Branch Avenues | v7.5 | 6/6 | Gaps Found | 2026-07-11 |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 6/8 | Gap Closure Planned | 2026-07-11 |
