@@ -7,6 +7,7 @@ import { useAppSelector, useAppDispatch } from '@/store'
 import {
   fetchSpecList,
   launchExperiment,
+  previewForkCount,
   clearLauncherPrefill,
   clearLaunchError,
   selectSpecList,
@@ -90,6 +91,12 @@ export function ExperimentLauncher() {
   const [sweep, setSweep] = useState(false)
   const isForkMode = originSpanId !== null
 
+  // Phase 87-07 (CR-02/CR-03): the SERVER-resolved axes-aware fork cell count. In fork mode
+  // this REPLACES the origin spec's static YAML metadata as the preview source — the server
+  // synthesizes+counts the avenue matrix from the CHOSEN forkAxes (D-09 authoritative). Null
+  // until the server round-trip resolves → the launch button stays disabled (D-02).
+  const [forkPreviewCount, setForkPreviewCount] = useState<number | null>(null)
+
   // Fetch the spec list once on mount.
   useEffect(() => {
     dispatch(fetchSpecList())
@@ -126,6 +133,28 @@ export function ExperimentLauncher() {
     return () => clearTimeout(t)
   }, [prefilledFrom])
 
+  // Phase 87-07 (CR-02/CR-03): dispatch the SERVER fork-preview whenever the chosen
+  // forkAxes / sweep / repeats change in fork mode, so previewCellCount stays axes-aware
+  // and honest (D-09 server-authoritative — never a client cross-product). Reset the count
+  // to null on each change so the launch button disables until the fresh count resolves.
+  useEffect(() => {
+    if (!isForkMode || !originSpanId) {
+      setForkPreviewCount(null)
+      return
+    }
+    setForkPreviewCount(null)
+    let cancelled = false
+    const reps = repeats.trim() !== '' && Number.isFinite(Number(repeats)) ? Number(repeats) : undefined
+    dispatch(previewForkCount({ origin_span_id: originSpanId, forkAxes, sweep, repeats: reps }))
+      .then((action) => {
+        if (cancelled) return
+        if (previewForkCount.fulfilled.match(action)) {
+          setForkPreviewCount(action.payload.cellCount)
+        }
+      })
+    return () => { cancelled = true }
+  }, [dispatch, isForkMode, originSpanId, forkAxes, sweep, repeats])
+
   const selectedSpec: SpecSummary | undefined = useMemo(
     () => specs.find((s) => s.file === specFile),
     [specs, specFile]
@@ -139,11 +168,16 @@ export function ExperimentLauncher() {
     [selectedSpec]
   )
 
-  // D-09 matrix preview — read the SERVER-computed cellCount (variantCount ×
-  // repeats). We never recompute the axes client-side; when an operator overrides
-  // repeats we show the adjusted product but the base count still comes from the
-  // server's variantCount.
+  // D-09 matrix preview — read the SERVER-computed cellCount.
+  //
+  // Phase 87-07 (CR-02/CR-03): in FORK mode the count MUST come from the server
+  // fork-preview round-trip (forkPreviewCount), which synthesizes+counts the avenue
+  // matrix from the CHOSEN forkAxes — NOT the origin spec's static YAML metadata
+  // (selectedSpec.variantCount, the wrong source per CR-02). Null until the server
+  // preview resolves → the launch stays disabled (D-02). Only the NON-fork (plain
+  // rerun/launch) branch reads selectedSpec — that path is unchanged.
   const previewCellCount: number | null = useMemo(() => {
+    if (isForkMode) return forkPreviewCount
     if (!selectedSpec) return null
     const baseVariants = selectedSpec.variantCount ?? selectedSpec.variants?.length ?? null
     if (baseVariants == null) return selectedSpec.cellCount ?? null
@@ -151,7 +185,7 @@ export function ExperimentLauncher() {
     const overriddenRepeats = repeats.trim() !== '' ? Number(repeats) : (selectedSpec.repeats ?? null)
     if (overriddenRepeats == null || !Number.isFinite(overriddenRepeats)) return selectedSpec.cellCount ?? null
     return subsetCount * overriddenRepeats
-  }, [selectedSpec, variantSubset, repeats])
+  }, [isForkMode, forkPreviewCount, selectedSpec, variantSubset, repeats])
 
   // AVN-03 (D-09) — the avenue count shown in the guardrail and reflected in the
   // "Launch {N} avenues" CTA is the SERVER-resolved previewCellCount. We do NOT
@@ -232,6 +266,10 @@ export function ExperimentLauncher() {
         overrides: buildOverrides(),
         rerun_of: rerunOf,
         origin_span_id: originSpanId,
+        // Phase 87-07 (CR-02): in fork mode carry the CHOSEN axes + sweep so the server
+        // synthesizes the AVENUE matrix (not the origin spec's static matrix). The picker
+        // is no longer decorative — these fields now actually reach the server.
+        ...(isForkMode ? { forkAxes, sweep } : {}),
       })
     )
     if (launchExperiment.fulfilled.match(result)) {
@@ -247,6 +285,7 @@ export function ExperimentLauncher() {
       setOriginSpanId(null)
       setForkAxes({})
       setSweep(false)
+      setForkPreviewCount(null)
     }
   }
 

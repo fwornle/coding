@@ -24,6 +24,8 @@ import os from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
 
+import { seedIsolatedStore } from './_fixtures/seed-experiment-store.mjs';
+
 /** Minimal Express res double: captures statusCode + json body, chainable. */
 function mockRes() {
   const res = { statusCode: null, body: null };
@@ -268,6 +270,151 @@ test('unlisted spec: a spec not in config/experiments/*.yaml -> 400', async () =
   await ctx.handleExperimentRun({ body: { spec: 'nonexistent.yaml' } }, res);
   assert.equal(res.statusCode, 400);
   assert.equal(coord.calls.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Phase 87-07 (CR-02) — FORK MODE: origin_span_id + forkAxes → synthesize + persist
+// the avenue spec, forward origin_span_id/avenue through the coordinator.
+// ---------------------------------------------------------------------------
+
+/**
+ * Seed an isolated experiment store with one origin Run, then add the config/experiments
+ * dir + .data/experiments/runs slot the fork path needs (so the synthesized avenue spec is
+ * written into a REAL config/experiments and passes the V5 listing gate). Returns the same
+ * repoRoot _resolveOriginRun reads from AND synthesizeToYamlFile writes into.
+ */
+async function seedForkRepoRoot(originTaskId, spanOverrides = {}) {
+  const { repoRoot, cleanup } = await seedIsolatedStore(originTaskId, {
+    span: {
+      goal_sentence: 'Refactor the auth module for the origin span.',
+      ...spanOverrides,
+    },
+    // snapshot_id is a Run TAG (run-write reads t.snapshot_id), not a span field.
+    tags: { agent: 'claude', model: 'sonnet', framework: 'straight', snapshot_id: 'snap-origin-1' },
+  });
+  fsSync.mkdirSync(path.join(repoRoot, 'config', 'experiments'), { recursive: true });
+  fsSync.mkdirSync(path.join(repoRoot, '.data', 'experiments', 'runs'), { recursive: true });
+  return { repoRoot, cleanup };
+}
+
+test('fork: origin_span_id + forkAxes synthesize+persist an avenue spec and forward origin_span_id/avenue (CR-02)', async () => {
+  const { repoRoot, cleanup } = await seedForkRepoRoot('origin-xyz');
+  try {
+    const coord = fakeCoordinator({ ok: true, success: true, pid: 8080 });
+    const ctx = await makeCtx(repoRoot, coord);
+    const res = mockRes();
+    await ctx.handleExperimentRun({
+      body: {
+        spec: 'ignored-in-fork.yaml', // fork mode overrides the spec with the synthesized basename
+        origin_span_id: 'origin-xyz',
+        forkAxes: { agents: ['claude', 'copilot'], models: ['opus'], kbOn: true },
+      },
+    }, res);
+    assert.equal(res.statusCode, 200, 'a valid fork launches');
+    assert.equal(coord.calls.length, 1, 'the fork was delegated to the coordinator');
+    const body = coord.calls[0].body;
+    // The synthesized avenue spec basename was persisted + forwarded (NOT the client spec).
+    assert.match(body.spec, /^avenue-.*\.yaml$/, 'the persisted avenue-<origin>.yaml basename is forwarded');
+    assert.ok(fsSync.existsSync(path.join(repoRoot, 'config', 'experiments', body.spec)), 'avenue spec persisted on disk');
+    // origin_span_id + avenue folded into the forwarded overrides (→ run-launch emits the flags).
+    assert.equal(body.overrides.origin_span_id, 'origin-xyz', 'origin_span_id folded into overrides');
+    assert.equal(body.overrides.avenue, true, 'avenue:true folded into overrides');
+    // The synthesized spec carries the origin prompt + snapshot + the 2 chosen agent cells.
+    const spec = yaml.load(fsSync.readFileSync(path.join(repoRoot, 'config', 'experiments', body.spec), 'utf8'));
+    assert.match(spec.goal_sentence, /Refactor the auth module/, 'origin prompt becomes goal_sentence');
+    assert.equal(spec.snapshot_id, 'snap-origin-1', 'origin snapshot carried onto the avenue spec');
+    assert.equal(spec.origin_span_id, 'origin-xyz', 'origin_span_id stamped on the synthesized spec');
+    assert.equal(spec.variants.length, 2, 'agents:[claude,copilot] × models:[opus] × kb-on → 2 cells');
+  } finally {
+    cleanup();
+  }
+});
+
+test('fork: an ill-shaped origin_span_id (traversal) is rejected 400, never resolved or forwarded (T-87-07-02)', async () => {
+  const { repoRoot, cleanup } = await seedForkRepoRoot('origin-xyz');
+  try {
+    const coord = fakeCoordinator();
+    const ctx = await makeCtx(repoRoot, coord);
+    const res = mockRes();
+    await ctx.handleExperimentRun({
+      body: { spec: 'demo.yaml', origin_span_id: '../../etc/passwd', forkAxes: { agents: ['claude'] } },
+    }, res);
+    assert.equal(res.statusCode, 400, 'a path-navigation origin_span_id is rejected');
+    assert.match(res.body.error, /origin_span_id/i);
+    assert.equal(coord.calls.length, 0, 'never delegated');
+  } finally {
+    cleanup();
+  }
+});
+
+test('fork: an unknown origin_span_id (no matching Run) is 404, never forwarded (T-87-07-02)', async () => {
+  const { repoRoot, cleanup } = await seedForkRepoRoot('origin-xyz');
+  try {
+    const coord = fakeCoordinator();
+    const ctx = await makeCtx(repoRoot, coord);
+    const res = mockRes();
+    await ctx.handleExperimentRun({
+      body: { spec: 'demo.yaml', origin_span_id: 'no-such-origin', forkAxes: { agents: ['claude'] } },
+    }, res);
+    assert.equal(res.statusCode, 404, 'an unresolvable origin span is 404');
+    assert.equal(coord.calls.length, 0, 'never delegated');
+  } finally {
+    cleanup();
+  }
+});
+
+test('fork: a bare fork with no forkAxes seeds one origin-shaped cell (agents/models from the origin Run)', async () => {
+  const { repoRoot, cleanup } = await seedForkRepoRoot('origin-xyz');
+  try {
+    const coord = fakeCoordinator({ ok: true, success: true, pid: 1 });
+    const ctx = await makeCtx(repoRoot, coord);
+    const res = mockRes();
+    await ctx.handleExperimentRun({ body: { spec: 'demo.yaml', origin_span_id: 'origin-xyz' } }, res);
+    assert.equal(res.statusCode, 200);
+    const body = coord.calls[0].body;
+    const spec = yaml.load(fsSync.readFileSync(path.join(repoRoot, 'config', 'experiments', body.spec), 'utf8'));
+    assert.equal(spec.variants.length, 1, 'no axes → exactly one origin-seeded cell');
+    assert.equal(spec.variants[0].agent, 'claude', 'seeded from the origin Run agent');
+    assert.equal(spec.variants[0].model, 'sonnet', 'seeded from the origin Run model');
+  } finally {
+    cleanup();
+  }
+});
+
+test('fork-preview: returns a server-resolved axes-aware cellCount WITHOUT persisting or launching (CR-03)', async () => {
+  const { repoRoot, cleanup } = await seedForkRepoRoot('origin-xyz');
+  try {
+    const coord = fakeCoordinator();
+    const ctx = await makeCtx(repoRoot, coord);
+    const res = mockRes();
+    await ctx.handleExperimentForkPreview({
+      body: { origin_span_id: 'origin-xyz', forkAxes: { agents: ['claude', 'copilot'], models: ['opus', 'sonnet'], kbOn: true, kbOff: true }, repeats: 2 },
+    }, res);
+    assert.equal(res.statusCode, 200);
+    // 2 agents × 2 models × 1 framework(seed) × 2 env(kb-on+kb-off) × 2 repeats = 16.
+    assert.equal(res.body.cellCount, 16, 'axes-aware server-resolved cell count');
+    assert.equal(coord.calls.length, 0, 'preview NEVER touches the coordinator');
+    // No avenue spec persisted (preview is synthesize-and-count only).
+    const specs = fsSync.readdirSync(path.join(repoRoot, 'config', 'experiments'));
+    assert.ok(!specs.some((f) => f.startsWith('avenue-')), 'preview does NOT persist an avenue spec');
+  } finally {
+    cleanup();
+  }
+});
+
+test('fork-preview: an ill-shaped origin_span_id -> 400; an unknown origin -> 404 (defensive parity)', async () => {
+  const { repoRoot, cleanup } = await seedForkRepoRoot('origin-xyz');
+  try {
+    const ctx = await makeCtx(repoRoot, fakeCoordinator());
+    const bad = mockRes();
+    await ctx.handleExperimentForkPreview({ body: { origin_span_id: '../../etc' } }, bad);
+    assert.equal(bad.statusCode, 400);
+    const missing = mockRes();
+    await ctx.handleExperimentForkPreview({ body: { origin_span_id: 'no-such' } }, missing);
+    assert.equal(missing.statusCode, 404);
+  } finally {
+    cleanup();
+  }
 });
 
 test('handleRunCancel: reads run.json and delegates the group-kill to the coordinator', async () => {

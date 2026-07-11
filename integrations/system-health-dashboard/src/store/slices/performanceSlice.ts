@@ -963,11 +963,11 @@ export const fetchSpecList = createAsyncThunk<SpecSummary[], void | undefined, {
 // — the operator always sees WHY the launch was refused (D-09).
 export const launchExperiment = createAsyncThunk<
   { run_id: string; pid?: number | null },
-  { spec: string; overrides?: ExperimentOverrides; rerun_of?: string | null; origin_span_id?: string | null },
+  { spec: string; overrides?: ExperimentOverrides; rerun_of?: string | null; origin_span_id?: string | null; forkAxes?: ForkAxes; sweep?: boolean },
   { rejectValue: string }
 >(
   'performance/launchExperiment',
-  async ({ spec, overrides, rerun_of, origin_span_id }, { rejectWithValue }) => {
+  async ({ spec, overrides, rerun_of, origin_span_id, forkAxes, sweep }, { rejectWithValue }) => {
     try {
       const response = await fetch('/api/experiments/run', {
         method: 'POST',
@@ -977,16 +977,47 @@ export const launchExperiment = createAsyncThunk<
         // the WR-01 top-level `rerun_of` idiom). The server threads it to the
         // runner's --origin-span-id (Plan 87-03) so avenue Runs group by origin;
         // it is null-preserved (absent → null) exactly like rerun_of.
+        // Phase 87-07 (CR-02): also carry the chosen forkAxes + sweep flag so the
+        // server synthesizes the AVENUE matrix (not the origin spec's static matrix).
         body: JSON.stringify({
           spec,
           overrides: overrides ?? {},
           rerun_of: rerun_of ?? null,
           origin_span_id: origin_span_id ?? null,
+          forkAxes: forkAxes ?? null,
+          sweep: sweep ?? false,
         }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
       return { run_id: data.run_id as string, pid: (data.pid ?? null) as number | null }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// Phase 87-07 (CR-02/CR-03): the axes-aware fork PREVIEW thunk. POSTs the chosen
+// { origin_span_id, forkAxes, sweep, repeats } to the server and returns the
+// SERVER-resolved { cellCount } (D-09 — the count is authoritative server-side, never
+// a client axes cross-product). Mirrors the refreshReport POST-thunk idiom. The launcher
+// dispatches this when the chosen axes/sweep/repeats change so the preview stays honest.
+export const previewForkCount = createAsyncThunk<
+  { cellCount: number },
+  { origin_span_id: string; forkAxes?: ForkAxes; sweep?: boolean; repeats?: number },
+  { rejectValue: string }
+>(
+  'performance/previewForkCount',
+  async ({ origin_span_id, forkAxes, sweep, repeats }, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/fork-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin_span_id, forkAxes: forkAxes ?? null, sweep: sweep ?? false, repeats: repeats ?? null }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
+      return { cellCount: (data.cellCount ?? 0) as number }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }

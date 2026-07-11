@@ -39,9 +39,40 @@ test('buildRunArgv returns a flat Array (fixed-argv, never a shell string)', () 
 
 test('buildRunArgv omits override flags when not provided', () => {
   const argv = buildRunArgv('/spec.yaml', 'run-1', '/runs/run-1', {});
-  for (const flag of ['--rerun-of', '--repeats', '--timeout', '--variant', '--model', '--agent', '--capture-raw-bodies']) {
+  for (const flag of ['--rerun-of', '--repeats', '--timeout', '--variant', '--model', '--agent', '--capture-raw-bodies', '--origin-span-id', '--avenue']) {
     assert.ok(!argv.includes(flag), `should not include ${flag} when override absent`);
   }
+});
+
+// Phase 87-07 (CR-01): the non-fork argv MUST stay byte-identical when the avenue overrides
+// are absent — a plain rerun/launch emits neither --origin-span-id nor --avenue.
+test('buildRunArgv non-fork argv is byte-identical (no avenue flags) when overrides omit them', () => {
+  const base = buildRunArgv('/spec.yaml', 'run-1', '/runs/run-1', { repeats: 2, rerun_of: 'prev' });
+  const again = buildRunArgv('/spec.yaml', 'run-1', '/runs/run-1', {
+    repeats: 2, rerun_of: 'prev', avenue: false, origin_span_id: undefined,
+  });
+  assert.deepEqual(again, base, 'avenue:false + no origin_span_id must not change the argv');
+  assert.ok(!again.includes('--avenue'));
+  assert.ok(!again.includes('--origin-span-id'));
+});
+
+// Phase 87-07 (CR-01): a real dashboard fork folds origin_span_id + avenue:true into the
+// overrides → buildRunArgv MUST emit --origin-span-id <id> and --avenue so the runner runs
+// an AVENUE matrix that stamps origin_span_id (AVN-01).
+test('buildRunArgv emits --origin-span-id <id> and --avenue when the fork overrides carry them', () => {
+  const argv = buildRunArgv('/spec.yaml', 'run-1', '/runs/run-1', {
+    origin_span_id: 'origin-xyz',
+    avenue: true,
+  });
+  const idx = argv.indexOf('--origin-span-id');
+  assert.ok(idx >= 0, '--origin-span-id flag emitted');
+  assert.equal(argv[idx + 1], 'origin-xyz', 'origin_span_id value threaded onto the argv');
+  assert.ok(argv.includes('--avenue'), '--avenue presence flag emitted for a real fork');
+});
+
+test('buildRunArgv treats avenue===false as absent (no --avenue flag)', () => {
+  const argv = buildRunArgv('/spec.yaml', 'run-1', '/runs/run-1', { avenue: false });
+  assert.ok(!argv.includes('--avenue'));
 });
 
 test('buildRunArgv appends override flags only when defined', () => {

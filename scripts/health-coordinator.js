@@ -2755,6 +2755,10 @@ app.post('/experiments/run', async (req, res) => {
     // hostEnv is the coordinator's OWN env — it already carries CODING_REPO,
     // LLM_PROXY_DATA_DIR, LLM_PROXY_PORT, CODING_PROXY_ROUTE (run-launch merges
     // the four contract vars from it onto the child's process.env).
+    // Phase 87-07 (CR-02): `overrides` is forwarded WHOLE to runExperiment — the coordinator
+    // never filters override keys, so the avenue-fork keys folded in by handleExperimentRun
+    // (overrides.origin_span_id + overrides.avenue) reach run-launch's buildRunArgv unchanged
+    // (→ --origin-span-id + --avenue on the runner argv). No coordinator passthrough needed.
     const result = await runExperiment({ spec, run_id, run_dir, overrides, env: process.env });
     // slot_busy = the HOST-side D-02 live-run guard (Phase 85-06) — a 409, not a 500.
     const status = result.success ? 200 : (result.slot_busy ? 409 : 500);
