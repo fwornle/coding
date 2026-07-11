@@ -381,6 +381,42 @@ test('fork: a bare fork with no forkAxes seeds one origin-shaped cell (agents/mo
   }
 });
 
+test('fork-preview: returns a server-resolved axes-aware cellCount WITHOUT persisting or launching (CR-03)', async () => {
+  const { repoRoot, cleanup } = await seedForkRepoRoot('origin-xyz');
+  try {
+    const coord = fakeCoordinator();
+    const ctx = await makeCtx(repoRoot, coord);
+    const res = mockRes();
+    await ctx.handleExperimentForkPreview({
+      body: { origin_span_id: 'origin-xyz', forkAxes: { agents: ['claude', 'copilot'], models: ['opus', 'sonnet'], kbOn: true, kbOff: true }, repeats: 2 },
+    }, res);
+    assert.equal(res.statusCode, 200);
+    // 2 agents × 2 models × 1 framework(seed) × 2 env(kb-on+kb-off) × 2 repeats = 16.
+    assert.equal(res.body.cellCount, 16, 'axes-aware server-resolved cell count');
+    assert.equal(coord.calls.length, 0, 'preview NEVER touches the coordinator');
+    // No avenue spec persisted (preview is synthesize-and-count only).
+    const specs = fsSync.readdirSync(path.join(repoRoot, 'config', 'experiments'));
+    assert.ok(!specs.some((f) => f.startsWith('avenue-')), 'preview does NOT persist an avenue spec');
+  } finally {
+    cleanup();
+  }
+});
+
+test('fork-preview: an ill-shaped origin_span_id -> 400; an unknown origin -> 404 (defensive parity)', async () => {
+  const { repoRoot, cleanup } = await seedForkRepoRoot('origin-xyz');
+  try {
+    const ctx = await makeCtx(repoRoot, fakeCoordinator());
+    const bad = mockRes();
+    await ctx.handleExperimentForkPreview({ body: { origin_span_id: '../../etc' } }, bad);
+    assert.equal(bad.statusCode, 400);
+    const missing = mockRes();
+    await ctx.handleExperimentForkPreview({ body: { origin_span_id: 'no-such' } }, missing);
+    assert.equal(missing.statusCode, 404);
+  } finally {
+    cleanup();
+  }
+});
+
 test('handleRunCancel: reads run.json and delegates the group-kill to the coordinator', async () => {
   const repoRoot = makeRepoRoot('t9');
   const runDir = path.join(repoRoot, '.data', 'experiments', 'runs', 'cancelme');
