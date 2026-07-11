@@ -81,3 +81,8 @@ None material. The plan executed as written. The est-tokens/cost figure is an ex
 ## Known Stubs
 
 None. The fork picker wires real axis state, the guardrail reads the real server `previewCellCount`, and launch reuses the real `launchExperiment` bridge threading `origin_span_id`. The `Est.` tokens/cost line is honestly labelled as a planning estimate (not a fabricated authoritative value).
+
+## Self-Check: PASSED
+
+- Created files present: `performance.spec.ts`, `playwright.config.ts`, `87-05-SUMMARY.md`.
+- Commits present: `d78f6c876` (Task 1), `6df3ece1d` (Task 2), `cc4f74eff` (Task 3), `9b54ad177` (SUMMARY).
