@@ -17,7 +17,31 @@ import {
   type SpecSummary,
   type ExperimentOverrides,
   type VariantOverride,
+  type ForkAxes,
 } from '@/store/slices/performanceSlice'
+
+// AVN-03 (D-03) — the four fork axes rendered as curated-by-default groups. The
+// agent literals match the runner's KNOWN_AGENTS (mastra is surfaced as the
+// `mastracode` literal Plan 87-02 added). SDD-framework options are the
+// spec-driven-development harnesses (disambiguated from a code framework). The
+// knowledge-injection dimension is a prominent on/off toggle encoded server-side
+// into the existing `env` axis as kb-on/kb-off (Plan 87-02) — NOT a 5th cell key.
+const FORK_AGENTS = ['claude', 'copilot', 'opencode', 'mastracode'] as const
+const FORK_MODELS = ['opus', 'sonnet', 'gpt-5', 'haiku'] as const
+const FORK_FRAMEWORKS = ['gsd', 'spec-workflow', 'none'] as const
+
+// D-02 guardrail threshold: above this many avenues a sweep gets the amber
+// "review before confirming" caution line. Kept conservative — a sequential
+// runner (one avenue at a time) makes a large matrix cost-bearing.
+const SWEEP_CAUTION_THRESHOLD = 8
+
+// Rough per-avenue token/cost estimate for the pre-launch preview. This is a
+// PLANNING hint only (labelled "Est."); the authoritative count is the SERVER
+// cellCount (D-09) and real spend is measured post-run. A single avenue restores
+// a full snapshot + runs one agent turn-loop — order ~120k tokens is a sane
+// order-of-magnitude anchor for the operator's go/no-go, never billed.
+const EST_TOKENS_PER_AVENUE = 120_000
+const EST_USD_PER_1K_TOKENS = 0.003
 
 // Experiment launcher (D-09/D-11/D-12) — the operator-facing CONTROL surface. It
 // lists specs, previews the server-resolved matrix (variantCount × repeats = N
@@ -57,6 +81,15 @@ export function ExperimentLauncher() {
   // this card into view). Cleared after a few seconds so it doesn't linger.
   const [prefilledFrom, setPrefilledFrom] = useState<string | null>(null)
 
+  // AVN-03 (D-03) fork state — populated ONLY when "Fork into avenues" pre-fills
+  // the launcher (origin_span_id present). It drives the four-axis picker + the
+  // sweep guardrail. In fork mode the launch threads origin_span_id so avenue
+  // Runs group by origin (Plan 87-03).
+  const [originSpanId, setOriginSpanId] = useState<string | null>(null)
+  const [forkAxes, setForkAxes] = useState<ForkAxes>({})
+  const [sweep, setSweep] = useState(false)
+  const isForkMode = originSpanId !== null
+
   // Fetch the spec list once on mount.
   useEffect(() => {
     dispatch(fetchSpecList())
@@ -75,8 +108,13 @@ export function ExperimentLauncher() {
     setVariantSubset(Array.isArray(o.variants) ? o.variants : [])
     setVariantOverrides(o.variantOverrides ?? {})
     setCaptureRawBodies(o.capture_raw_bodies === true)
+    // AVN-03: consume the D-03 fork fields (present only for a Fork pre-fill). A
+    // plain Re-run leaves origin_span_id null → the axis picker stays hidden.
+    setOriginSpanId(prefill.origin_span_id ?? null)
+    setForkAxes(prefill.axes ?? {})
+    setSweep(prefill.sweep === true)
     // DEFECT B: flag the pre-fill source so a confirmation banner + highlight ring render.
-    setPrefilledFrom(prefill.rerun_of ?? prefill.spec ?? 'a completed run')
+    setPrefilledFrom(prefill.origin_span_id ?? prefill.rerun_of ?? prefill.spec ?? 'a completed run')
     dispatch(clearLauncherPrefill())
   }, [prefill, dispatch])
 
@@ -114,6 +152,32 @@ export function ExperimentLauncher() {
     if (overriddenRepeats == null || !Number.isFinite(overriddenRepeats)) return selectedSpec.cellCount ?? null
     return subsetCount * overriddenRepeats
   }, [selectedSpec, variantSubset, repeats])
+
+  // AVN-03 (D-09) — the avenue count shown in the guardrail and reflected in the
+  // "Launch {N} avenues" CTA is the SERVER-resolved previewCellCount. We do NOT
+  // multiply the picked axes client-side to produce the launch-gating number
+  // (T-87-05-03 — the server cellCount is authoritative; a client cross-product
+  // could spoof it). The axis selections shape WHAT is forked; the SERVER resolves
+  // HOW MANY cells that becomes. Null until the preview has resolved → launch stays
+  // disabled (D-02: launch disabled until the preview has rendered).
+  const avenueCount: number | null = previewCellCount
+
+  // Est. token / cost preview (D-02) — a labelled PLANNING hint derived from the
+  // SERVER count, never billed. Absent until the count resolves.
+  const estTokens: number | null = avenueCount == null ? null : avenueCount * EST_TOKENS_PER_AVENUE
+  const estCostUsd: number | null = estTokens == null ? null : (estTokens / 1000) * EST_USD_PER_1K_TOKENS
+  const overThreshold = avenueCount != null && avenueCount > SWEEP_CAUTION_THRESHOLD
+
+  // Toggle a value in one of the multi-select fork axes (agents/models/frameworks).
+  const toggleAxisMember = (axis: 'agents' | 'models' | 'frameworks', value: string) => {
+    setForkAxes((prev) => {
+      const current = prev[axis] ?? []
+      const next = current.includes(value)
+        ? current.filter((v) => v !== value)
+        : [...current, value]
+      return { ...prev, [axis]: next }
+    })
+  }
 
   const setVariantOverrideField = (variant: string, field: keyof VariantOverride, value: string) => {
     setVariantOverrides((prev) => {
@@ -155,8 +219,20 @@ export function ExperimentLauncher() {
 
   const onLaunch = async () => {
     if (!specFile) return
+    // D-02: in fork mode the launch is gated on the SERVER preview having rendered
+    // (avenueCount resolved). Guard here too so a keyboard-driven launch can't beat
+    // the disabled button.
+    if (isForkMode && avenueCount == null) return
     const result = await dispatch(
-      launchExperiment({ spec: specFile, overrides: buildOverrides(), rerun_of: rerunOf })
+      // AVN-02: the fork is a THIN wrapper — same launchExperiment thunk, plus the
+      // origin_span_id link so the avenue Runs group by origin (Plan 87-03). A
+      // plain Re-run passes origin_span_id undefined (null-preserved server-side).
+      launchExperiment({
+        spec: specFile,
+        overrides: buildOverrides(),
+        rerun_of: rerunOf,
+        origin_span_id: originSpanId,
+      })
     )
     if (launchExperiment.fulfilled.match(result)) {
       // Reset the transient overrides after a successful launch; keep the spec
@@ -167,6 +243,10 @@ export function ExperimentLauncher() {
       setVariantSubset([])
       setVariantOverrides({})
       setCaptureRawBodies(false)
+      // Reset the fork axis picker back to non-fork mode on success.
+      setOriginSpanId(null)
+      setForkAxes({})
+      setSweep(false)
     }
   }
 
@@ -183,7 +263,9 @@ export function ExperimentLauncher() {
       }
     >
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Launch experiment</CardTitle>
+        <CardTitle className="text-base">
+          {isForkMode ? 'Fork span into avenues' : 'Launch experiment'}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -221,6 +303,112 @@ export function ExperimentLauncher() {
               ))}
             </select>
           </div>
+
+          {/* AVN-03 (D-03): the four-axis variant picker — rendered ONLY in fork
+              mode (origin_span_id present). Curated-by-default: each picked
+              combination is one avenue. A Sweep toggle expands the chosen axes
+              into their cross-product. Reuses the existing Checkbox primitive +
+              token classes only. */}
+          {isForkMode && (
+            <div className="space-y-3" data-testid="fork-axes">
+              {/* Agent axis */}
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Agent</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  {FORK_AGENTS.map((agent) => (
+                    <label key={agent} className="flex items-center gap-1 text-sm">
+                      <Checkbox
+                        checked={(forkAxes.agents ?? []).includes(agent)}
+                        onCheckedChange={() => toggleAxisMember('agents', agent)}
+                        id={`fork-agent-${agent}`}
+                      />
+                      <span className="font-mono">{agent}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Model axis */}
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Model</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  {FORK_MODELS.map((model) => (
+                    <label key={model} className="flex items-center gap-1 text-sm">
+                      <Checkbox
+                        checked={(forkAxes.models ?? []).includes(model)}
+                        onCheckedChange={() => toggleAxisMember('models', model)}
+                        id={`fork-model-${model}`}
+                      />
+                      <span className="font-mono">{model}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* SDD framework axis — DISAMBIGUATED (mandatory caption). */}
+              <div className="space-y-1">
+                <p className="text-sm font-medium">SDD framework</p>
+                <p className="text-xs text-muted-foreground">
+                  The spec-driven-development harness (gsd / spec-workflow / none) — not a code framework.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  {FORK_FRAMEWORKS.map((fw) => (
+                    <label key={fw} className="flex items-center gap-1 text-sm">
+                      <Checkbox
+                        checked={(forkAxes.frameworks ?? []).includes(fw)}
+                        onCheckedChange={() => toggleAxisMember('frameworks', fw)}
+                        id={`fork-framework-${fw}`}
+                      />
+                      <span className="font-mono">{fw}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Knowledge injection — PROMINENT first-class on/off toggle. Encodes
+                  to the runner's env axis kb-on/kb-off (Plan 87-02). Both on → the
+                  injection axis is A/B'd (on vs off). */}
+              <div className="space-y-1" data-testid="fork-knowledge-injection">
+                <p className="text-sm font-medium">Knowledge injection</p>
+                <p className="text-xs text-muted-foreground">
+                  Inject observations, digests, insights &amp; VKB context (the working-memory prefix) into the agent. A/B this on vs off.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-1 text-sm">
+                    <Checkbox
+                      checked={forkAxes.kbOn === true}
+                      onCheckedChange={(v) => setForkAxes((prev) => ({ ...prev, kbOn: v === true }))}
+                      id="fork-kb-on"
+                    />
+                    <span>on (kb-on)</span>
+                  </label>
+                  <label className="flex items-center gap-1 text-sm">
+                    <Checkbox
+                      checked={forkAxes.kbOff === true}
+                      onCheckedChange={(v) => setForkAxes((prev) => ({ ...prev, kbOff: v === true }))}
+                      id="fork-kb-off"
+                    />
+                    <span>off (kb-off)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Sweep toggle — expands the chosen axes into their cross-product. */}
+              <div className="space-y-1" data-testid="fork-sweep">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Checkbox
+                    checked={sweep}
+                    onCheckedChange={(v) => setSweep(v === true)}
+                    id="fork-sweep-toggle"
+                  />
+                  <span>Sweep (cross-product of chosen axes)</span>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Expands the selected dimensions into every combination.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* D-09: server-resolved matrix preview shown BEFORE launch. */}
           {selectedSpec && (
@@ -260,6 +448,55 @@ export function ExperimentLauncher() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* AVN-03 (D-02) MANDATORY sweep guardrail — the primary focal point of
+              the fork surface. Reuses the matrix-preview bg-muted/40 box. The count
+              is the SERVER-resolved avenueCount (= previewCellCount, D-09 — never a
+              client axes recompute); until it resolves the launch stays disabled.
+              Over-threshold shows the amber caution line. */}
+          {isForkMode && (
+            <div
+              className="rounded-md border bg-muted/40 p-2 text-sm"
+              data-testid="sweep-guardrail"
+            >
+              {(() => {
+                const plural = (n: number | null, word: string) => (n === 1 ? word : `${word}s`)
+                // V (variants) × R (repeats) framing kept for continuity with the
+                // spec matrix-preview copy; both figures are SERVER-resolved via the
+                // selected spec (or shown as ? until the preview resolves).
+                const v = selectedSpec?.variantCount ?? selectedSpec?.variants?.length ?? null
+                const r = repeats.trim() !== '' ? Number(repeats) : (selectedSpec?.repeats ?? null)
+                const rNum = r != null && Number.isFinite(r) ? r : null
+                return (
+                  <>
+                    <div>
+                      <span className="font-mono">{v ?? '?'}</span> {plural(v, 'variant')} ×{' '}
+                      <span className="font-mono">{rNum ?? '?'}</span> {plural(rNum, 'repeat')} ={' '}
+                      <span className="font-mono font-semibold" data-testid="avenue-count">
+                        {avenueCount ?? '?'}
+                      </span>{' '}
+                      {plural(avenueCount, 'avenue')}
+                    </div>
+                    <div className="text-muted-foreground" data-testid="avenue-cost-preview">
+                      Est.{' '}
+                      <span className="font-mono">
+                        {estTokens != null ? estTokens.toLocaleString() : '?'}
+                      </span>{' '}
+                      tokens ·{' '}
+                      <span className="font-mono">
+                        {estCostUsd != null ? `~$${estCostUsd.toFixed(2)}` : '~?'}
+                      </span>
+                    </div>
+                    {overThreshold && (
+                      <div className="mt-1 text-status-warning" data-testid="sweep-caution" role="status">
+                        This will launch <span className="font-mono">{avenueCount}</span> avenues. Review before confirming.
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           )}
 
@@ -336,10 +573,22 @@ export function ExperimentLauncher() {
           <div className="flex items-center gap-2">
             <Button
               onClick={onLaunch}
-              disabled={launchPending || specFile === '' || !!selectedSpec?.error}
+              // D-02: in fork mode the launch is DISABLED until the server-resolved
+              // avenue count (previewCellCount) has rendered — the guardrail must be
+              // seen before any launch is possible.
+              disabled={
+                launchPending ||
+                specFile === '' ||
+                !!selectedSpec?.error ||
+                (isForkMode && avenueCount == null)
+              }
               data-testid="launch-experiment"
             >
-              {launchPending ? 'Launching…' : 'Launch experiment'}
+              {launchPending
+                ? 'Launching…'
+                : isForkMode
+                  ? `Launch ${avenueCount ?? '…'} avenues`
+                  : 'Launch experiment'}
             </Button>
           </div>
 
