@@ -25,6 +25,7 @@ import { ReportsSubview } from '@/components/performance/reports-subview'
 import { MeasurementControl } from '@/components/performance/measurement-control'
 import { RunCompare } from '@/components/performance/run-compare'
 import { DifferenceViewer } from '@/components/performance/difference-viewer'
+import { AvenuePanel } from '@/components/performance/avenue-panel'
 import { ExperimentLauncher } from '@/components/performance/experiment-launcher'
 import { RunMonitor } from '@/components/performance/run-monitor'
 
@@ -197,6 +198,7 @@ export function PerformancePage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="runs">Runs</TabsTrigger>
+          <TabsTrigger value="avenues" data-testid="avenues-tab">Avenues</TabsTrigger>
           <TabsTrigger value="compare" data-testid="compare-tab">Compare</TabsTrigger>
           <TabsTrigger value="reports" data-testid="reports-tab">Reports</TabsTrigger>
         </TabsList>
@@ -211,6 +213,13 @@ export function PerformancePage() {
           <p className="mt-2 text-sm text-muted-foreground">
             {filtered.length} of {runs.length} runs shown
           </p>
+        </TabsContent>
+        {/* AVN-07 origin-grouped N-way ranked panel — the primary Phase-87 screen.
+            Select 2 avenue rows → "Compare selected (2)" dispatches setCompareA/B
+            and switches to the Compare tab where the EXISTING DifferenceViewer
+            renders (86-05 wiring; we do NOT rebuild trajectory diffing). */}
+        <TabsContent value="avenues" className="mt-4">
+          <AvenuePanel onCompare={() => setActiveTab('compare')} />
         </TabsContent>
         <TabsContent value="compare" className="mt-4 space-y-6">
           {/* Metric compare stays (UI-SPEC Q1); the Plan-04 divergence-point
