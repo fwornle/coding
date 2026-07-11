@@ -537,7 +537,8 @@ const USER_ACTIVE_HEARTBEAT_MAX_AGE_MS = 5 * 60_000;
 // machine being kept awake. When a human has been idle longer than this, treat
 // them as away and suppress deferrable background LLM work regardless of
 // transcript churn.
-const HUMAN_HID_IDLE_MAX_MS = 10 * 60_000;
+const HUMAN_HID_IDLE_MAX_MS =
+  parseInt(process.env.HUMAN_HID_IDLE_MAX_MS || '', 10) || 10 * 60_000;
 let _hidIdleCache = { at: 0, ms: null };
 
 /**
