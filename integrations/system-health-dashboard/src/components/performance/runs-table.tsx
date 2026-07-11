@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
-import { Pencil, Layers, Trash2, RotateCcw, GitCompare } from 'lucide-react'
+import { Pencil, Layers, Trash2, RotateCcw, GitCompare, GitBranch } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,7 @@ import {
   setCompareA,
   setCompareB,
   selectSaveOverridePending,
+  buildForkPrefill,
   DEFAULT_OVERRIDDEN_BY,
   type Run,
   type ExperimentOverrides,
@@ -540,6 +541,34 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                       >
                         <RotateCcw className="size-3.5" />
                         Re-run
+                      </Button>
+                    )}
+                    {/* AVN-02 (D-01/D-03): Fork into avenues — SAME completed-span
+                        guard as Re-run. Pre-fills the launcher's four-axis picker
+                        (buildForkPrefill seeds it from this span + carries the
+                        origin_span_id link) and scrolls it into view with the
+                        transient ring-2 ring-primary highlight. The fork does NOT
+                        add a new API path — launch reuses launchExperiment; the
+                        avenue-spec synthesis is Plan 87-03's synthesizeAvenueSpec
+                        invoked server-side via the existing run bridge. */}
+                    {isCompletedExperimentRun(run) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        data-testid="fork-into-avenues"
+                        aria-label={`Fork span ${run.task_id} into avenues`}
+                        title="Fork this span into avenues"
+                        onClick={(e) => {
+                          // Don't bubble to the row (which drives the timeline).
+                          e.stopPropagation()
+                          dispatch(setLauncherPrefill(buildForkPrefill(run)))
+                          document
+                            .getElementById('experiment-launcher')
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }}
+                      >
+                        <GitBranch className="size-3.5" />
+                        Fork into avenues
                       </Button>
                     )}
                     <Button

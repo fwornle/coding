@@ -402,14 +402,87 @@ export interface RunProgress {
   [key: string]: unknown
 }
 
-// The D-11 re-run pre-fill payload. Set by the runs-table Re-run button and
-// consumed by the launcher to pre-populate the spec select + snapshot_id +
-// rerun_of + override fields (including any seeded per-variant variantOverrides).
+// The D-03 fork axis selections (AVN-03). Curated-by-default four-axis picker —
+// Agent × Model × SDD-framework × Knowledge-injection. The knowledge-injection
+// dimension is encoded into the runner's existing `env` axis as `kb-on`/`kb-off`
+// (Plan 87-02 — NOT a 5th cell key), so the frontend surfaces it as a prominent
+// on/off toggle and the server maps env==='kb-off' → CODING_KNOWLEDGE_INJECTION=0.
+// `agent` uses the runner literals (mastra is surfaced as `mastracode`, the
+// literal Plan 87-02 added to KNOWN_AGENTS). Every field optional — an empty
+// object means "seed from the origin span's own agent/model".
+export interface ForkAxes {
+  // Multi-select agent literals (claude / copilot / opencode / mastracode).
+  agents?: string[]
+  // Multi-select model literals (opus / sonnet / gpt-5 / haiku / …).
+  models?: string[]
+  // Multi-select SDD-framework literals (gsd / spec-workflow / none) — the
+  // spec-driven-development harness, disambiguated from a code framework.
+  frameworks?: string[]
+  // Knowledge-injection A/B: when true a kb-on cell is included; when false a
+  // kb-off cell. Both true → the injection axis is swept on vs off (2 cells).
+  kbOn?: boolean
+  kbOff?: boolean
+}
+
+// The D-11 re-run / D-03 fork pre-fill payload. Set by the runs-table Re-run and
+// Fork buttons and consumed by the launcher to pre-populate the spec select +
+// snapshot_id + rerun_of + override fields (including any seeded per-variant
+// variantOverrides). The fork extension (EXTENDS this interface, does NOT fork
+// the slice — Phase 86 frozen-contract discipline) carries the origin span link
+// (`origin_span_id`), the four selectable axes, and the sweep flag.
 export interface LauncherPrefill {
   spec: string
   snapshot_id?: string | null
   rerun_of?: string | null
   overrides?: ExperimentOverrides
+  // D-03 fork fields — present only when the launcher was pre-filled by "Fork
+  // into avenues" (absent for a plain Re-run, so the launcher renders the axis
+  // picker only in fork mode).
+  origin_span_id?: string | null
+  axes?: ForkAxes
+  // The D-02 sweep flag: expand the chosen axes into their cross-product. The
+  // count/cost preview MUST still resolve SERVER-side (D-09), never a client
+  // axes recompute.
+  sweep?: boolean
+}
+
+// Read a string field off a Run's index signature defensively (the experiment
+// runner stamps provenance fields — origin_span_id / snapshot_id / canonical_* —
+// onto the Run's `[key: string]: unknown` map). Returns null for missing/blank.
+function forkRunStr(run: Run, key: string): string | null {
+  const v = run[key]
+  return typeof v === 'string' && v.trim() !== '' ? v : null
+}
+
+// buildForkPrefill (AVN-02/D-03) — the fork analogue of buildRerunPrefill. Seeds
+// the four-axis picker from a COMPLETED span and carries the origin link
+// (`origin_span_id` = the origin Run's task_id, mirroring Plan 87-03's threading).
+// The picker opens CURATED-BY-DEFAULT: the origin's own agent/model pre-selected,
+// the SDD-framework at the origin's framework (or `none`), knowledge-injection ON
+// (the working-memory default), sweep OFF. The launch stays a THIN wrapper — the
+// server synthesizes the avenue-spec (Plan 87-03 synthesizeAvenueSpec) and the
+// count/cost preview is SERVER-resolved (D-09), never a client axes recompute.
+export function buildForkPrefill(run: Run): LauncherPrefill {
+  const originAgent = forkRunStr(run, 'canonical_agent') ?? forkRunStr(run, 'agent')
+  const originModel = forkRunStr(run, 'canonical_model') ?? forkRunStr(run, 'model')
+  const originFramework = forkRunStr(run, 'framework')
+  return {
+    spec: forkRunStr(run, 'spec') ?? '',
+    snapshot_id: forkRunStr(run, 'snapshot_id'),
+    // The fork groups avenues under the origin span — the origin Run's task_id is
+    // the origin_span_id the runner stamps onto each avenue Run (Plan 87-03).
+    origin_span_id: run.task_id,
+    axes: {
+      agents: originAgent ? [originAgent] : [],
+      models: originModel ? [originModel] : [],
+      frameworks: [originFramework ?? 'none'],
+      // Curated default: knowledge injection ON (the working-memory prefix is the
+      // normal operating mode); the operator A/Bs it off via the prominent toggle.
+      kbOn: true,
+      kbOff: false,
+    },
+    sweep: false,
+  }
 }
 
 const emptyFacetState: FacetState = {
@@ -871,16 +944,26 @@ export const fetchSpecList = createAsyncThunk<SpecSummary[], void | undefined, {
 // — the operator always sees WHY the launch was refused (D-09).
 export const launchExperiment = createAsyncThunk<
   { run_id: string; pid?: number | null },
-  { spec: string; overrides?: ExperimentOverrides; rerun_of?: string | null },
+  { spec: string; overrides?: ExperimentOverrides; rerun_of?: string | null; origin_span_id?: string | null },
   { rejectValue: string }
 >(
   'performance/launchExperiment',
-  async ({ spec, overrides, rerun_of }, { rejectWithValue }) => {
+  async ({ spec, overrides, rerun_of, origin_span_id }, { rejectWithValue }) => {
     try {
       const response = await fetch('/api/experiments/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spec, overrides: overrides ?? {}, rerun_of: rerun_of ?? null }),
+        // AVN-02/D-01: the fork is a THIN wrapper over the existing run bridge —
+        // it POSTs the SAME body plus the top-level `origin_span_id` link (mirrors
+        // the WR-01 top-level `rerun_of` idiom). The server threads it to the
+        // runner's --origin-span-id (Plan 87-03) so avenue Runs group by origin;
+        // it is null-preserved (absent → null) exactly like rerun_of.
+        body: JSON.stringify({
+          spec,
+          overrides: overrides ?? {},
+          rerun_of: rerun_of ?? null,
+          origin_span_id: origin_span_id ?? null,
+        }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
