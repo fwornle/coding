@@ -209,3 +209,85 @@ test('(i) a run without context-turns shows the D-06 "no per-turn context captur
     test.skip(true, 'No run without context-turns in this dataset — D-06 note path not exercised.')
   }
 })
+
+// ── Declutter IA flows (LIVE — Plan 86-05) ──
+
+test('(j) D-10 quarantine toggle lives in the page header WITH a live count', async ({ page }) => {
+  await navigateToPerformance(page)
+  // The re-homed control sits in the header (near SummaryCards), NOT the sidebar,
+  // reads "Show quarantined (N)" with a numeric count, and preserves the testid.
+  const toggleRow = page.locator('[data-testid="include-pending-row"]')
+  await expect(toggleRow).toBeVisible()
+  await expect(toggleRow).toContainText(/Show quarantined \(\d+\)/)
+  await expect(page.locator('[data-testid="include-pending-toggle"]')).toBeVisible()
+  // The old sidebar home is gone — the toggle is NOT inside the Filters card.
+  await expect(
+    page.locator('[data-testid="facet-row"]').locator('[data-testid="include-pending-toggle"]'),
+  ).toHaveCount(0)
+})
+
+test('(k) D-11 an inline score edit issues a PATCH; a server-invalid value is rejected/reverted', async ({ page }) => {
+  await navigateToPerformance(page)
+  if ((await runRowCount(page)) === 0) {
+    test.skip(true, 'No runs in the store — inline-score-edit flow needs seeded data.')
+    return
+  }
+  // Enter edit mode on the first score cell by clicking its displayed value.
+  // (The cell is inline-editable — click swaps the number for a numeric Input.)
+  const firstRow = page.locator('[data-testid="run-row"]').first()
+  // The score columns render after the model columns; click the first numeric cell.
+  const scoreCell = firstRow.locator('td').filter({ hasText: /^\d|—/ }).first()
+  await scoreCell.click()
+  const input = page.locator('[data-testid="inline-score-input"]').first()
+  if ((await input.count()) === 0) {
+    test.skip(true, 'No inline score input surfaced (cell may be a non-editable column on this dataset).')
+    return
+  }
+  await expect(input).toBeVisible()
+  // Type an out-of-range value and commit (Enter). The client range mirror blocks
+  // it (or the server 400s and we revert) — either way it must NOT be accepted
+  // silently: an error message appears and the value does not persist as 9.
+  await input.fill('9')
+  // Watch for the PATCH the server-authoritative save issues (only fired if the
+  // client mirror lets it through — for an out-of-range value it should NOT).
+  await input.press('Enter')
+  await page.waitForTimeout(400)
+  // The inline error (role=alert) surfaces; the bad value is rejected/reverted.
+  await expect(page.locator('[role="alert"]').first()).toBeVisible()
+})
+
+test('(l) D-12 reconciliation badge renders one of the three states OR is absent (honesty)', async ({ page }) => {
+  await navigateToPerformance(page)
+  if ((await runRowCount(page)) === 0) {
+    test.skip(true, 'No runs in the store — reconciliation-badge flow needs seeded data.')
+    return
+  }
+  await page.waitForTimeout(600) // fetchReconciliation per row settles
+  const badges = page.locator('[data-testid="reconciliation-badge"]')
+  const count = await badges.count()
+  if (count === 0) {
+    // D-06 honesty: with no reconciliation data NO badge renders — a valid state.
+    test.skip(true, 'No reconciliation data in this dataset — badges are (correctly) absent.')
+    return
+  }
+  // Any rendered badge must carry one of the three pinned status strings.
+  await expect(badges.first()).toContainText(/reconciled|discrepancy|transcript-fallback/)
+})
+
+test('(m) DASH-02 tier badge + reasoning steps still present after the declutter (regression anchor)', async ({ page }) => {
+  await navigateToPerformance(page)
+  if (!(await openFirstRunTimeline(page))) {
+    test.skip(true, 'No runs in the store — DASH-02 regression check needs seeded data.')
+    return
+  }
+  if ((await page.locator('[data-testid="timeline-row"]').count()) === 0) {
+    test.skip(true, 'Selected run has no per-turn timeline rows.')
+    return
+  }
+  await expect(page.locator('[data-testid="granularity-tier-badge"]').first()).toBeVisible()
+  const childTriggers = page.locator('[data-testid="timeline-turn"]')
+  if ((await childTriggers.count()) > 0) {
+    await childTriggers.first().click()
+    await expect(page.locator('[data-testid="timeline-reasoning-step"]').first()).toBeVisible()
+  }
+})

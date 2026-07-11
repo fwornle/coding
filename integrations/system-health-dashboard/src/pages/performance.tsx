@@ -1,11 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
   fetchRuns,
+  setIncludePending,
+  selectIncludePending,
   selectRuns,
   selectRunsLoading,
   selectRunsError,
@@ -21,6 +24,7 @@ import { ContextCacheExplainer } from '@/components/performance/context-cache-ex
 import { ReportsSubview } from '@/components/performance/reports-subview'
 import { MeasurementControl } from '@/components/performance/measurement-control'
 import { RunCompare } from '@/components/performance/run-compare'
+import { DifferenceViewer } from '@/components/performance/difference-viewer'
 import { ExperimentLauncher } from '@/components/performance/experiment-launcher'
 import { RunMonitor } from '@/components/performance/run-monitor'
 
@@ -85,12 +89,49 @@ function SummaryCards({ runs }: { runs: Run[] }) {
   )
 }
 
+// D-10: the quarantine control re-homed from the faceted sidebar to the page
+// header, now WITH a live count — "Show quarantined (N)" where N is the number
+// of quarantined (pending) runs among the already-fetched rows. Toggling it
+// re-fetches with ?includePending=<next> (the fetch param is UNCHANGED from the
+// old sidebar home). The count is a client-side filter over fetched rows — a
+// low-value internal metric, never authoritative (T-86-05-03). There is no
+// `run.quarantined` field; `pending` is the quarantine flag (Run.pending).
+function QuarantineHeaderToggle({ runs }: { runs: Run[] }) {
+  const dispatch = useAppDispatch()
+  const includePending = useAppSelector(selectIncludePending)
+  const quarantinedCount = runs.filter((r) => r.pending === true).length
+
+  return (
+    <label
+      htmlFor="include-pending"
+      className="flex cursor-pointer items-center gap-2 text-sm"
+      data-testid="include-pending-row"
+    >
+      <Checkbox
+        id="include-pending"
+        data-testid="include-pending-toggle"
+        checked={includePending}
+        onCheckedChange={(checked) => {
+          const next = checked === true
+          dispatch(setIncludePending(next))
+          dispatch(fetchRuns(next))
+        }}
+      />
+      <span className="truncate">Show quarantined ({quarantinedCount})</span>
+    </label>
+  )
+}
+
 export function PerformancePage() {
   const dispatch = useAppDispatch()
   const runs = useAppSelector(selectRuns)
   const loading = useAppSelector(selectRunsLoading)
   const error = useAppSelector(selectRunsError)
   const filtered = useAppSelector(selectFilteredRuns)
+
+  // D-08: the body Tabs are CONTROLLED so the runs-table "Compare selected (2)"
+  // CTA can switch to the Compare tab (which mounts the DifferenceViewer).
+  const [activeTab, setActiveTab] = useState('runs')
 
   useEffect(() => {
     dispatch(fetchRuns())
@@ -127,8 +168,16 @@ export function PerformancePage() {
         </p>
       </div>
 
-      {/* Summary cards — the visual focal point */}
-      <SummaryCards runs={runs} />
+      {/* Summary cards — the visual focal point — with the D-10 quarantine
+          control re-homed here (out of the sidebar) with a live count. */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <SummaryCards runs={runs} />
+        </div>
+        <div className="pt-2">
+          <QuarantineHeaderToggle runs={runs} />
+        </div>
+      </div>
 
       {/* Measurement lifecycle control (start/stop the active span) beside the
           Experiment Launcher (spec picker + matrix preview + capture_raw_bodies
@@ -145,7 +194,7 @@ export function PerformancePage() {
 
       {/* Body — Tabs with a Runs view + a Reports sub-view (D-05: a second Tabs
           value INSIDE Performance, NOT a top-level nav tab). */}
-      <Tabs defaultValue="runs">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="compare" data-testid="compare-tab">Compare</TabsTrigger>
@@ -155,7 +204,7 @@ export function PerformancePage() {
           <div className="grid grid-cols-[260px_1fr] gap-6">
             <FacetedSidebar />
             <div className="space-y-6">
-              <RunsTable />
+              <RunsTable onCompare={() => setActiveTab('compare')} />
               <PerformanceTimeline />
             </div>
           </div>
@@ -163,8 +212,11 @@ export function PerformancePage() {
             {filtered.length} of {runs.length} runs shown
           </p>
         </TabsContent>
-        <TabsContent value="compare" className="mt-4">
+        <TabsContent value="compare" className="mt-4 space-y-6">
+          {/* Metric compare stays (UI-SPEC Q1); the Plan-04 divergence-point
+              difference viewer sits BESIDE it, self-reading the compare pair. */}
           <RunCompare />
+          <DifferenceViewer />
         </TabsContent>
         <TabsContent value="reports" className="mt-4">
           <ReportsSubview />

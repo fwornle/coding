@@ -10,13 +10,10 @@ import { Separator } from '@/components/ui/separator'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
   setFacet,
-  setIncludePending,
   clearFilters,
-  fetchRuns,
   selectFacetState,
   selectFacetCounts,
   selectFacetOptions,
-  selectIncludePending,
   type FacetKey,
 } from '@/store/slices/performanceSlice'
 
@@ -92,7 +89,6 @@ function FacetGroup({ groupKey, label }: { groupKey: FacetKey; label: string }) 
 export function FacetedSidebar() {
   const dispatch = useAppDispatch()
   const facetState = useAppSelector(selectFacetState)
-  const includePending = useAppSelector(selectIncludePending)
 
   const hasActiveFilters =
     facetState.task_id.length > 0 ||
@@ -118,26 +114,9 @@ export function FacetedSidebar() {
         </Button>
       </CardHeader>
       <CardContent className="p-0">
-        {/* Reveal D-06-quarantined (pending) runs — trivial/unclassified smoke runs
-            are hidden by default; this re-fetches with ?includePending=true. */}
-        <label
-          htmlFor="include-pending"
-          className="flex cursor-pointer items-center gap-2 px-4 py-2"
-          data-testid="include-pending-row"
-        >
-          <Checkbox
-            id="include-pending"
-            data-testid="include-pending-toggle"
-            checked={includePending}
-            onCheckedChange={(checked) => {
-              const next = checked === true
-              dispatch(setIncludePending(next))
-              dispatch(fetchRuns(next))
-            }}
-          />
-          <span className="flex-1 truncate text-sm">Show quarantined runs</span>
-        </label>
-        <Separator className="my-1" />
+        {/* D-10: the "Show quarantined" control moved OUT of this rail and up to
+            the page header (with a live count) — see pages/performance.tsx. The
+            sidebar now holds only the facet groups. */}
         <ScrollArea className="h-[calc(100vh-16rem)]">
           <div className="space-y-1 px-4 pb-4">
             {FACET_GROUPS.map((g, i) => (

@@ -108,10 +108,10 @@ test('(c) the compare table shows cache read and cache write as separate rows', 
 //
 // The DifferenceViewer aligns two paired runs' per-request context-turns via the
 // pure run-align module, collapses the identical prefix, and starts the view at
-// the first divergence. It is wired into the Compare tab in Wave 3; until then
-// (and always, on a fresh checkout with <2 runs) the assertions are GUARDED —
-// they skip with a clear message rather than hard-failing, so this spec lists and
-// runs cleanly regardless of seeded data or wiring state.
+// the first divergence. It is mounted on the Compare tab as of Wave 3 (Plan
+// 86-05), beside RunCompare. On a fresh checkout with <2 runs the assertions are
+// GUARDED — they skip with a clear message rather than hard-failing, so this spec
+// lists and runs cleanly regardless of seeded data.
 test('(d) comparing two runs surfaces the difference viewer (aligned diff + identical-prefix collapse)', async ({ page }) => {
   await navigateToCompare(page)
   const ids = await optionIds(page, 'Run A')
@@ -123,12 +123,8 @@ test('(d) comparing two runs surfaces the difference viewer (aligned diff + iden
   await pick(page, 'Run B', ids[1])
 
   const diff = page.locator('[data-testid="difference-viewer"]')
-  if ((await diff.count()) === 0) {
-    // Wave-3 tab wiring not present yet — the surface exists (component built in
-    // Wave 2) but isn't mounted on the Compare tab. Skip loudly, never fail.
-    test.skip(true, 'Difference-viewer surface not mounted on the Compare tab yet (Wave-3 wiring).')
-    return
-  }
+  // Wave 3 (Plan 86-05) mounts the surface on the Compare tab. The viewer
+  // self-reads compareA/compareB, so selecting the pair above drives it.
   await expect(diff).toBeVisible()
 
   // Canonical-model header renders VERBATIM (the model string) or the honest
