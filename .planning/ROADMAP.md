@@ -426,8 +426,8 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 Plans:
 **Wave 1**
 
-- [ ] 87-01-PLAN.md — Persistent avenue/<task_id> branch lifecycle: named-branch worktree + commit-on-close + prune primitive (AVN-05/09)
-- [ ] 87-02-PLAN.md — Spec axes: mastracode agent enum + knowledge-injection kb-on/kb-off env-axis + per-agent injection on/off guard (AVN-03/04)
+- [x] 87-01-PLAN.md — Persistent avenue/<task_id> branch lifecycle: named-branch worktree + commit-on-close + prune primitive (AVN-05/09)
+- [x] 87-02-PLAN.md — Spec axes: mastracode agent enum + knowledge-injection kb-on/kb-off env-axis + per-agent injection on/off guard (AVN-03/04)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -473,4 +473,4 @@ Plans:
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
-| 87. Interactive Spans & Branch Avenues | v7.5 | 0/6 | Not started | - |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 2/6 | In Progress|  |
