@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
-stopped_at: Completed 86-02-PLAN.md
-last_updated: "2026-07-10T16:38:09.340Z"
-last_activity: 2026-07-10
+stopped_at: Completed 86-03-PLAN.md
+last_updated: "2026-07-11T00:00:00.000Z"
+last_activity: 2026-07-11
 progress:
   total_phases: 21
   completed_phases: 15
   total_plans: 95
-  completed_plans: 92
-  percent: 71
+  completed_plans: 93
+  percent: 72
 ---
 
 # Project State
@@ -54,8 +54,31 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 86 (timeline-v2-and-declutter) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
+  Plan 86-03 (Wave 2 — Timeline v2 + drill-down + fullscreen) done (2 autonomous tasks +
+  1 blocking human-verify checkpoint APPROVED, 2 feat commits 8708bc150/baf336522).
+  Shipped the v2 compact TurnRow (turn-row.tsx: tool-name chips +N overflow, mini ContextBand,
+  advisory loopFlags Repeat badge w/ tooltip, font-mono token/cache summary; whole row →
+  openTurnModal; DASH-02 TierBadge slot preserved) + the single-turn drill-down Radix modal
+  (turn-modal.tsx: full per-message list, D-03 semantic-first intent lines, cache-breakpoint
+  markers, per-message bytes; every string through scrubSecrets, ZERO dangerouslySetInnerHTML;
+  raw args only behind capture_raw_bodies; cache_write===null → CACHE_WRITE_NA never 0) + the
+  routed fullscreen /performance/timeline/:taskId view (timeline-fullscreen.tsx: cumulative
+  ContextBand + legend, verbatim canonical_model → italic "unmeasured" when null [ATTR-02],
+  verbatim reconciliation note [D-12], ↑/↓/Enter/Esc keyboard nav). Evolved timeline.tsx in
+  place: v2 TurnRow per turn when context-turns present, DASH-02 TierBadge + reasoning SubBand
+  (timeline-reasoning-step) PRESERVED via TurnRowWithChildren, D-06 v1 fallback + "no per-turn
+  context captured" note for context-turns-free runs, Maximize2 fullscreen affordance,
+  isExperimentCell guard intact. Extended performance.spec.ts (+95): 4 v2 flows (modal open,
+  fullscreen, DASH-02 survival, D-06 note) w/ data-presence skip guards. NO packages installed
+  (T-86-03-SC honored). Human-verify APPROVED on :3032 via gsd-browser (v2 rows, drill-down
+  modal w/ segmented+hatched-cache band, fullscreen cumulative band, DASH-02 tier badges,
+  cache-write verbatim e.g. "cache w: 263"; vite build clean). CAVEAT: D-06 v1-fallback NOT
+  visually reproduced (no context-turns-free run in the dataset) — covered by acceptance grep
+  + e2e; live visual deferred. TDD note: Task 1 was tdd=true but no dashboard component-unit
+  harness exists (adding one = package install, excluded); build typecheck + Task-2 Playwright
+  e2e serve as behavioral evidence. See 86-03-SUMMARY.md.
   Plan 86-02 (Wave 1 — frozen band + slice contract) done (2/2 tasks, 2 commits, ~6 min).
   Exported the band-rendering primitives from context-cache-explainer.tsx (additive `export`
   on SEGMENTS/scaledBand/scrubSecrets/CACHE_WRITE_NA + Segment — zero behavior change, the
@@ -142,6 +165,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 ### Decisions
 
+- [86-03]: Timeline v2 shipped (DASH-02/VALID-01/ATTR-02). v2 TurnRow (turn-row.tsx) extracted from the inline ParentRow card scaffold; timeline.tsx EVOLVED IN PLACE (TierBadge/SubBand `timeline-reasoning-step`/ParentRow collapsible/`isExperimentCell` guard/canonical-model header preserved verbatim, never rewritten — DASH-02 regression anchor held). Row = TierBadge + role swatch + truncated excerpt + tool-name chips (`Badge variant=secondary`, "+N" overflow) + font-mono token/cache summary + `<ContextBand variant="mini">` + advisory `Repeat` loop badge when `loopFlags[i]` (mandatory tooltip); whole row `cursor-pointer` → `openTurnModal({taskId,index})`. Drill-down modal (turn-modal.tsx, `data-testid="turn-modal"`, mirrors KbDetailDialog, driven by slice `selectModalTurn`/`closeTurnModal`): full per-message list, D-03 semantic-first intent lines, cache-breakpoint markers, per-message bytes; EVERY preview/intent/arg through `scrubSecrets`, ZERO `dangerouslySetInnerHTML` (T-86-03-01/02); raw arg text only behind `capture_raw_bodies`; `cache_write===null → CACHE_WRITE_NA`, never 0 (T-86-03-04). Fullscreen route `/performance/timeline/:taskId` (timeline-fullscreen.tsx): cumulative `<ContextBand>` + legend, verbatim `canonical_model` → italic "unmeasured" when null (ATTR-02 anchor, no recompute), verbatim reconciliation note (D-12), ↑/↓/Enter/Esc keyboard nav. D-06: context-turns-free runs fall through to the v1 ParentRow + "no per-turn context captured" note (never an error). NO packages installed — Radix Dialog + react-router already present (T-86-03-SC). **TDD-harness note:** Task 1 was `tdd="true"` but the dashboard has no component-unit harness (no jsdom/vitest/testing-library); adding one is a package install (excluded) — verification is the `npm run build` typecheck gate, with the Task-2 Playwright e2e flows (modal-open/fullscreen/DASH-02-survival/D-06-note) as behavioral RED/GREEN evidence. Human-verify APPROVED on :3032 via gsd-browser. **CAVEAT:** the D-06 v1 fallback was NOT visually reproduced (no context-turns-free run in the current dataset) — covered by the acceptance grep + e2e; live visual deferred until such a run exists. Commits `8708bc150` (Task 1) / `baf336522` (Task 2). See 86-03-SUMMARY.md.
 - [84-04]: Per-request context-turns write hook landed at the proxy. The pure line-assembly logic (digest helpers + `buildAnthropicLine`/`buildOpenAILine` + `appendContextTurn`) was extracted into a NEW side-effect-free sibling module `proxy-bridge/context-turns.mjs`, because `server.mjs` boots an HTTP server on import and cannot be imported by a unit test — the coding-repo tests import the sibling cross-repo (`../../../_work/rapid-llm-proxy/proxy-bridge/context-turns.mjs`) and exercise the REAL production path. Each measured request appends one JSONL line under `.data/measurements/<sanitized task_id>/context-turns.jsonl` with the cache split kept as separate `usage.{input,output,cache_read,cache_write}` fields (never a folded total, D-09), a `wire:'anthropic'|'openai'` discriminator (OpenAI sets `cache_write:null` → UI N/A, D-12), `cache_breakpoints` as message INDICES (D-08; analyzers gained a parallel `cache_breakpoint_indices` field without dropping the existing count), a per-message digest (role/bytes/tool{name,size}/≤120-char preview, D-07), and `observation_ref:null` (correlation is Plan 05's job — Pitfall 1). Both write sites are best-effort never-throw sibling try/catch; interactive/neutral rows (empty task_id) are skipped; the `/api/complete` task_id is resolved ONCE into a hoisted const and reused (no fresh `resolveLiveTaskId()` — preserves the 82-06 ambient-span-leak fix). `GET /api/context-turns?task_id=` serves the array (gunzip `.gz` or plaintext `.jsonl`, graceful-empty on miss). Proxy is runtime JS (no build) and was NOT redeployed — live redeploy + golden E2E is Plan 09. Proxy commits `ad6f7f7`/`0b1b012`/`f6b462f` (in the `_work/rapid-llm-proxy` repo); coding test commit `fc2d6dc49`.
 - [83-07]: Golden-comparison acceptance gate PASSED — **Phase 83 complete (7/7 plans)**. Two-cell live run (UNATTENDED, 2026-07-06): (1) healthy-routed claude cell `wire-verify-83-reconcile--…-default--r0` reconciled totals (matched=5, unmatched_wire=0, fallback=0, flaggedCount=0; token_usage SUM input=5/output=677/cache_read=61902) EQUAL the pre-change transcript-only `wire-verify-82-06-v2--…-default--r0` baseline (input=5/output=679) within run-to-run variance — no double-count, no loss; cache_read 61902 within the calibrated 47946–72264 band. (2) proxy-down cell `…--proxy-down--r0` fell back to full transcript capture: `process=token-adapter-claude-fallback` (input=3/output=273/cache_read=15934), `summary.fallback=1`, the `:reason:0` row normal-provenance per D-01; the 3 fuzzy matches against task-less interactive wire rows were all tolerance-FLAGGED (loud, never silently mis-attributed; enrich is fill-gaps-only). (3) D-08 no-inherit held under live concurrency — daemon/interactive rows (health-coordinator, consolidator-insight) carried EMPTY task_id, only cell traffic carries the cell task_ids. GET reconciliation route lives on the **vkb-server :8080** (NOT obs-api :12436 — required restarting `web-services:vkb-server` because the live process predated Plan 05; F3 comment fix `0d3ba54f4`). THREE advisory follow-ups (non-blocking, NOT fixed here): F1 `lib/experiments/experiment-runner.mjs` fail-soft branch leaves an inherited `ANTHROPIC_BASE_URL` in baseEnv when the proxy is unhealthy (WR-05-class; caused Cell B attempt-1 ConnectionRefused abort from a proxy-routed parent env); F2 zero-wire proxy-down spans allow non-primary transcript rows to fuzzy-match adjacent task-less interactive wire rows (correctly flagged); F3 spec/plan named :12436 (fixed to :8080). Reqs D-01/D-02/D-04/D-05/D-12 discharged. Spec commit `6c0a97754`; F3 fix `0d3ba54f4`; SUMMARY `4f021611a`.
 - [82-06]: Live acceptance gate PASSED (WIRE-08; Phase 82 complete 6/6, all 3 human checkpoints approved 2026-07-06). Task 1 verified the ANTHROPIC_CUSTOM_HEADERS newline-separated `Name: value` shape binds the tap (sentinel row id 164372). Task 2 (concurrent 2-cell + interactive) surfaced a RESIDUAL /api/complete ambient-span leak — `proxy-bridge/server.mjs:2656` stamped `resolveLiveTaskId()` for any /api/complete caller without `body.task_id`, so background daemons (health-coordinator ×3 + consolidator-insight) inherited the claude cell's task_id (86% contamination, cell ids 164402-164405). Plan 82-02 had killed the ambient singleton only on the /v1/messages tap, NOT /api/complete. Fixed with a new `src/background-process.ts` `isBackgroundProcess()` denylist (exact: health-coordinator, observation-writer; prefixes: consolidator-, token-adapter-, wave-analysis-) at the stamping site — explicit body.task_id always wins, unknown processes keep legacy span fallback. Proxy commit d3f3869; regression test 2/2 green; v2 re-run (experiment wire-verify-82-06-v2) PASSED clean (zero daemon rows in cell task_ids, claude cache 47946-72264 matches cladpt, one row per tool_call_id). Task 3 proved tool-passthrough behaviorally: copilot BYOK (`claude-sonnet-4.6`, /v1/copilot/t/<task> path) and opencode each wrote a real /tmp file via a 2-turn agentic loop; capability gating kept tools-bearing requests off the tools-off claude-code CLI. TWO follow-ups carried forward (non-blocking): (1) duplicate `id` values in token_usage from a missing PK/unique constraint between the /v1/messages tap and adapter writers — attribution unaffected; (2) COPILOT_MODEL=haiku narrates instead of emitting tool_calls against copilot's large tool schema (model-choice, not a proxy defect; dotted names required, `claude-sonnet-4-5` rejected 400).
