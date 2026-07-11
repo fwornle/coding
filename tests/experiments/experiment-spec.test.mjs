@@ -208,10 +208,17 @@ test('SHELL_META_RE is exported from evidence-harness (single canonical regex, D
   assert.ok(!SHELL_META_RE.test('node --test tests/experiments'), 'accepts a fixed argv');
 });
 
-test('KNOWN_AGENTS equals the route-trace-resolve SoT set (no silent divergence, D-05)', () => {
+test('KNOWN_AGENTS is a SUPERSET of the route-trace-resolve SoT set (mastracode is spec-only, D-05/AVN-03)', () => {
   // WR-02 (Phase 77 review): compare against the ACTUAL exported route-trace set, not a
   // hardcoded literal — otherwise this test gives zero drift protection if route-trace changes.
-  assert.deepEqual([...KNOWN_AGENTS].sort(), [...ROUTE_TRACE_KNOWN_AGENTS].sort());
+  // Phase 87 (AVN-03): the spec enum now ADDS `mastracode` (a legal avenue agent) which has NO
+  // route-trace family because mastra is self-routed — so the spec set is a superset, and every
+  // route-trace agent must still be spec-legal (no silent drop of a trace-known agent).
+  for (const a of ROUTE_TRACE_KNOWN_AGENTS) {
+    assert.ok(KNOWN_AGENTS.includes(a), `route-trace agent '${a}' must remain spec-legal`);
+  }
+  const specOnly = [...KNOWN_AGENTS].filter((a) => !ROUTE_TRACE_KNOWN_AGENTS.includes(a));
+  assert.deepEqual(specOnly.sort(), ['mastracode'], 'the ONLY spec-only agent is mastracode (Phase 87 AVN-03)');
 });
 
 test('WR-01: an explicit empty variants:[] aborts (never collapse to zero cells)', () => {
