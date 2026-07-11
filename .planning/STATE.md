@@ -4,13 +4,13 @@ milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Phase 87 UI-SPEC approved
-last_updated: "2026-07-11T07:53:54.257Z"
-last_activity: 2026-07-11 -- Phase 87 executed (6/6 plans); verification gaps_found — fork-launch chain not wired
+last_updated: "2026-07-11T12:17:10.632Z"
+last_activity: 2026-07-11 -- Phase 87 planning complete
 progress:
   total_phases: 21
   completed_phases: 16
-  total_plans: 101
-  completed_plans: 94
+  total_plans: 103
+  completed_plans: 100
   percent: 76
 ---
 
@@ -55,7 +55,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 Phase: 87 (interactive-spans-and-branch-avenues) — EXECUTING
 Plan: 1 of 6
-Status: Executing Phase 87
+Status: Ready to execute
   Plan 86-05 (Wave 3 — declutter IA) done (3 autonomous tasks + 1 blocking human-verify
   checkpoint APPROVED, 3 feat commits 394777f88/c11d4327c/acebed864). Shipped the declutter
   IA (D-08/D-10/D-11/D-12): a per-run reconciliation badge (reconciliation-badge.tsx,
@@ -126,7 +126,7 @@ Status: Executing Phase 87
   all Task 1/2 acceptance greps green. The only 4 `error TS` are pre-existing out-of-scope
   diagnostics (node-details-sidebar.tsx + the deferred token-usage.tsx). See 86-02-SUMMARY.md.
   Next: Wave 2 UI plans consume this frozen contract (turn-modal, difference-viewer, badge).
-Last activity: 2026-07-11 -- Phase 87 executed (6/6 plans); verification gaps_found (fork-launch chain not wired end-to-end)
+Last activity: 2026-07-11 -- Phase 87 planning complete
 
 ## Deferred Items
 
