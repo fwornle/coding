@@ -436,7 +436,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 87-05-PLAN.md — Fork button + 4-axis variant picker + mandatory sweep count/cost guardrail (AVN-02/03)
+- [x] 87-05-PLAN.md — Fork button + 4-axis variant picker + mandatory sweep count/cost guardrail (AVN-02/03)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -473,4 +473,4 @@ Plans:
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
-| 87. Interactive Spans & Branch Avenues | v7.5 | 4/6 | In Progress|  |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 5/6 | In Progress|  |
