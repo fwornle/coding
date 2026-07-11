@@ -27,6 +27,8 @@ created: 2026-07-11
 
 **Existing shadcn components available for reuse (no install needed):** `card`, `button`, `badge`, `input`, `checkbox`, `select`, `dialog`, `sheet`, `collapsible`, `tooltip`, `tabs`, `table`, `separator`, `scroll-area`, `alert`, `progress`. All new surfaces MUST be built from these. **Do NOT install new packages** (Phase 86 held this line across all 5 plans — `T-86-*-SC` "NO packages installed"). If a control needs something not in this list, compose it from primitives.
 
+**Visual hierarchy / focal points:** On the origin-grouped N-way comparison panel (the primary screen this phase delivers), the **ranked comparison `Table` — outcome-score-sorted rows carrying merge-status badges — is the primary visual anchor**; secondary anchors are the per-row Promote/Prune actions. During fork setup, the **sweep guardrail count+cost preview box is the primary anchor** (it gates launch) and the four-axis variant picker is secondary. Everything else on these surfaces stays neutral (`bg-card` / `text-muted-foreground`) so the ranked numbers and the guardrail preview lead the eye.
+
 **Component reuse map (CONTEXT D-decisions → existing asset):**
 
 | New surface (D-ref) | Reuse / extend | Do NOT rebuild |
@@ -62,14 +64,16 @@ Exceptions: **12px (`gap-3`/`space-y-3`) is a load-bearing existing rhythm** in 
 
 ## Typography
 
-Extracted from the existing Performance components — the dashboard uses a compact, data-dense scale. Two weights only (`400` regular, `600` semibold via `font-semibold`/`font-medium`). `font-mono` (tabular) is reserved for machine values: task_ids, model names, token/cost counts, cell counts.
+Extracted from the existing Performance components — the dashboard uses a compact, data-dense scale of **exactly four sizes** (16 / 14 / 12 / 11px). Two weights only (`400` regular, `600` semibold via `font-semibold`/`font-medium`). `font-mono` (tabular) is reserved for machine values: task_ids, model names, token/cost counts, cell counts.
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Card title | 16px (`text-base`, `CardTitle className="text-base"`) | 600 (`font-semibold`, shadcn CardTitle default) | 1.2 (`leading-none` per shadcn CardTitle) |
 | Body / control label | 14px (`text-sm`) | 400 | 1.5 (`:root` default) |
 | Secondary / muted caption | 12px (`text-xs`, `text-muted-foreground`) | 400 | 1.5 |
-| Micro / dense metric | 11px (`text-[11px]` / `text-[10px]` badges) | 400 | 1.5 |
+| Micro / dense metric | 11px (`text-[11px]`) | 400 | 1.5 |
+
+**Micro-size choice:** the single micro size is **11px (`text-[11px]`)** — the observed dense-metric idiom in the components these surfaces extend: `difference-viewer.tsx:92` (strict-loops line) and `:142` (turn preview). The badge label inside a `Badge` uses shadcn's default badge text sizing (via the `badge` component's own class), not a bespoke `text-[10px]`, so the new merge-status badge — which reuses that `Badge` — introduces no fifth size. Any dense metric line in the N-way panel uses `text-[11px]`.
 
 **Mono treatment (not a new size — a family switch):** `font-mono` on `text-sm`/`text-xs` for task_ids (`difference-viewer` `ModelHeader`), model names (`normalizeModel`), token counts (`CumulativeDelta` `font-mono`), and the sweep cell count (`matrix-cell-count` `font-mono font-semibold`). All numeric columns in the N-way panel MUST be `font-mono` for column alignment. Signed deltas use U+2212 (minus) not hyphen, matching `difference-viewer` `CumulativeDelta`.
 
@@ -151,12 +155,13 @@ Ranking colour cue in the N-way panel: the best-ranked row (top outcome score) m
 
 These are prescriptive interaction contracts the executor implements against; they sit above the visual tokens.
 
-1. **Fork trigger location:** a `Fork into avenues` ghost button appears **only on COMPLETED span rows** in `runs-table.tsx` (guard identical to the D-11 Re-run "only on completed experiment runs" guard). Clicking it opens/pre-fills the variant picker and scrolls it into view with the `ring-2 ring-primary` transient highlight.
-2. **Variant picker axes (D-03):** four axes rendered as labelled groups — **Agent** (`claude` / `copilot` / `opencode` / `mastra`, multi-select), **Model** (`opus` / `sonnet` / `gpt-5` / `haiku` / …, multi-select), **SDD framework** (`gsd` / `spec-workflow` / `none`, multi-select, disambiguated label), **Knowledge injection** (on/off, prominent toggle). Curated-by-default: each picked combination = one avenue chip. A **Sweep** toggle expands chosen axes into their cross-product.
-3. **Sweep guardrail (D-02, MANDATORY):** whenever a sweep would expand the matrix, the count+cost preview MUST render **before** any launch is possible, and the launch button stays disabled until it has. The count comes from the **server-resolved** cell count (never a client-side axes recompute — the `experiment-launcher` D-09 discipline). Over-threshold shows a `text-status-warning` caution line.
-4. **Origin-grouped N-way panel (D-06/D-07):** a `Card` per origin span containing a sortable `Table`; **default sort = outcome score (Phase 73), best first**; secondary sortable columns = **tokens/cost, route quality, wall-clock** (all `font-mono`, right-aligned). Each row carries the **merge-status badge**, a **Promote** action, and a **Prune** action. Row selection is 2-of-N; enabling a `Compare selected (2)` CTA that calls `setCompareA/setCompareB` and switches to the Compare tab where the existing `DifferenceViewer` renders (the 86-05 wiring — do not fork it).
-5. **Honesty carries forward (Phases 82/83/86):** null/unmeasured values render as em-dash or italic `unmeasured`, never `0` or a fabricated status. Merge state `unknown` → no badge. Reconciliation/score cells stay verbatim server values.
-6. **Theme:** every new element must read correctly in BOTH light and `.dark` (use tokens, never raw hex). Verify visually in both themes at `localhost:3032` via `gsd-browser` (per CLAUDE.md — no hand-rolled Playwright scripts).
+1. **Visual hierarchy (focal points):** on the origin-grouped N-way panel the **ranked comparison `Table` with merge-status badges is the primary visual anchor**; during fork setup the **sweep guardrail count+cost preview is the primary anchor** (it gates launch) with the four-axis variant picker secondary. Keep surrounding chrome neutral so these lead the eye.
+2. **Fork trigger location:** a `Fork into avenues` ghost button appears **only on COMPLETED span rows** in `runs-table.tsx` (guard identical to the D-11 Re-run "only on completed experiment runs" guard). Clicking it opens/pre-fills the variant picker and scrolls it into view with the `ring-2 ring-primary` transient highlight.
+3. **Variant picker axes (D-03):** four axes rendered as labelled groups — **Agent** (`claude` / `copilot` / `opencode` / `mastra`, multi-select), **Model** (`opus` / `sonnet` / `gpt-5` / `haiku` / …, multi-select), **SDD framework** (`gsd` / `spec-workflow` / `none`, multi-select, disambiguated label), **Knowledge injection** (on/off, prominent toggle). Curated-by-default: each picked combination = one avenue chip. A **Sweep** toggle expands chosen axes into their cross-product.
+4. **Sweep guardrail (D-02, MANDATORY):** whenever a sweep would expand the matrix, the count+cost preview MUST render **before** any launch is possible, and the launch button stays disabled until it has. The count comes from the **server-resolved** cell count (never a client-side axes recompute — the `experiment-launcher` D-09 discipline). Over-threshold shows a `text-status-warning` caution line.
+5. **Origin-grouped N-way panel (D-06/D-07):** a `Card` per origin span containing a sortable `Table`; **default sort = outcome score (Phase 73), best first**; secondary sortable columns = **tokens/cost, route quality, wall-clock** (all `font-mono`, right-aligned). Each row carries the **merge-status badge**, a **Promote** action, and a **Prune** action. Row selection is 2-of-N; enabling a `Compare selected (2)` CTA that calls `setCompareA/setCompareB` and switches to the Compare tab where the existing `DifferenceViewer` renders (the 86-05 wiring — do not fork it).
+6. **Honesty carries forward (Phases 82/83/86):** null/unmeasured values render as em-dash or italic `unmeasured`, never `0` or a fabricated status. Merge state `unknown` → no badge. Reconciliation/score cells stay verbatim server values.
+7. **Theme:** every new element must read correctly in BOTH light and `.dark` (use tokens, never raw hex). Verify visually in both themes at `localhost:3032` via `gsd-browser` (per CLAUDE.md — no hand-rolled Playwright scripts).
 
 ---
 
