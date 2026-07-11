@@ -215,6 +215,10 @@ integrations/system-health-dashboard/test-results/
 # workspace/KB/config state and MUST NOT be committed (same security class as run-snapshots).
 .data/run-restores/
 
+# Phase 87 (AVN-05): persistent avenue/<task_id> branch worktrees. Like run-restores, these
+# are reconstructed working trees holding copies of live workspace state — MUST NOT be committed.
+.data/avenues/
+
 # Code graph RAG index (binary, regenerated on indexing)
 .data/code-graph-index/
 
