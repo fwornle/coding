@@ -105,6 +105,10 @@ None - no external service configuration required. (The coordinator + vkb-server
 - The UI-SPEC badge vocabulary (`merged`/`unmerged`/`conflicts`/`unknown` + ahead/behind/conflicts + branch) is returned as-is; `unknown` → NO badge is honored at the source.
 - No blockers. Wiring is behaviorally verified (33/33 experiment endpoint + avenue tests green); live route smoke against a running coordinator :3034 is deferred to the orchestrator's post-merge/Plan-06 integration.
 
+## Self-Check: PASSED
+
+All created/modified files exist on disk; all task + summary commits (`c10d960e9`, `1919ca33f`, `607004256`, `e9836b77f`) are in the git log. 33/33 experiment endpoint + avenue tests green.
+
 ---
 *Phase: 87-interactive-spans-and-branch-avenues*
 *Completed: 2026-07-11*
