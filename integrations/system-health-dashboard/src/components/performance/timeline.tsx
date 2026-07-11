@@ -562,7 +562,13 @@ export function PerformanceTimeline() {
 
   const stats = summarizeByRole(rows, run)
   const statByRole = Object.fromEntries(stats.map((s) => [s.role, s])) as Record<Role, RoleStat>
-  const visibleRows = rows.filter((r) => !hiddenRoles.has(roleForProcess(r.process, run)))
+  // Preserve each row's ORIGINAL position so the parallel `contextTurns` /
+  // `turnLoopFlags` arrays stay aligned after a role filter hides some rows.
+  // Indexing the unfiltered arrays by the filtered position desyncs every row's
+  // band/chips/loop-badge and the drill-down modal (CR-01).
+  const visibleRows = rows
+    .map((row, originalIndex) => ({ row, originalIndex }))
+    .filter(({ row }) => !hiddenRoles.has(roleForProcess(row.process, run)))
 
   // v2 gate (D-01/D-06): render the compact v2 TurnRow only when this run has
   // captured per-request context-turns. The advisory loop badge is computed ONCE
@@ -725,14 +731,14 @@ export function PerformanceTimeline() {
                  are preserved BELOW each v2 row so the tier badge + per-reasoning
                  -step sub-bands survive the evolution. */
               <div className="space-y-2">
-                {visibleRows.map((row, i) => (
+                {visibleRows.map(({ row, originalIndex }) => (
                   <TurnRowWithChildren
-                    key={row.tool_call_id ?? i}
+                    key={row.tool_call_id ?? originalIndex}
                     timelineRow={row}
-                    contextTurn={contextTurns[i]}
+                    contextTurn={contextTurns[originalIndex]}
                     taskId={taskId}
-                    index={i}
-                    loopFlag={turnLoopFlags[i] ?? false}
+                    index={originalIndex}
+                    loopFlag={turnLoopFlags[originalIndex] ?? false}
                   />
                 ))}
               </div>
@@ -746,11 +752,11 @@ export function PerformanceTimeline() {
                   no per-turn context captured
                 </p>
                 <div className="space-y-2">
-                  {visibleRows.map((row, i) => (
+                  {visibleRows.map(({ row, originalIndex }) => (
                     <ParentRow
-                      key={row.tool_call_id ?? i}
+                      key={row.tool_call_id ?? originalIndex}
                       row={row}
-                      index={i}
+                      index={originalIndex}
                       run={run}
                       observations={obsByRow.get(row) ?? []}
                       digestThemes={digestThemesForRow(row)}
