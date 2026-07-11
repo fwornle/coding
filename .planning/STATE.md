@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
-stopped_at: Completed 86-03-PLAN.md
+stopped_at: Completed 86-05-PLAN.md (Phase 86 execution complete — 5/5)
 last_updated: "2026-07-11T00:00:00.000Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 21
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 95
-  completed_plans: 93
-  percent: 72
+  completed_plans: 95
+  percent: 74
 ---
 
 # Project State
@@ -53,9 +53,36 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 86 (timeline-v2-and-declutter) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
+Phase: 86 (timeline-v2-and-declutter) — EXECUTION COMPLETE (5/5 plans)
+Plan: 5 of 5 — DONE
+Status: Phase 86 execution complete; ready for /gsd-verify-phase 86
+  Plan 86-05 (Wave 3 — declutter IA) done (3 autonomous tasks + 1 blocking human-verify
+  checkpoint APPROVED, 3 feat commits 394777f88/c11d4327c/acebed864). Shipped the declutter
+  IA (D-08/D-10/D-11/D-12): a per-run reconciliation badge (reconciliation-badge.tsx,
+  ReconciliationBadge — three states ✓ reconciled / ⚠ Δ discrepancy / transcript-fallback
+  from the VERBATIM summary via fetchReconciliation/selectReconciliationFor, lucide icon per
+  state, reconciliation===null → NO badge, D-06 honesty, T-86-05-02); inline-editable score
+  cells in runs-table.tsx (click/focus → inline-score-input numeric Input, autosave via the
+  EXISTING server-authoritative saveOverride PATCH — server re-validates + writes corrected_*,
+  NO client applyOverride, T-86-05-01; client validateDim range mirror UX-only; optimistic-
+  revert on non-2xx — 400 inline server message / 404 "reopen"; edited yellow badge + judged
+  tooltip retained; stopPropagation so editing doesn't bubble to setSelectedTaskId, D-11); a
+  gated "Compare selected (2)" CTA (enabled only when selectedRunIds.length===2 → setCompareA/
+  setCompareB + switch to the Compare tab, D-08); the page-header "Show quarantined (N)" control
+  re-homed out of faceted-sidebar.tsx to performance.tsx with a live runs.filter(r=>r.pending)
+  .length count (include-pending-toggle testid + setIncludePending/fetchRuns fetch pair
+  preserved, D-10); and the Plan-04 DifferenceViewer mounted BESIDE RunCompare in the Compare
+  tab (metric compare stays, UI-SPEC Q1), reachable from the CTA via controlled Tabs. Extended
+  performance.spec.ts (+82) + performance-compare.spec.ts (86-04 Wave-3-wiring skip lifted).
+  NO packages installed (T-86-05-SC honored). Human-verify APPROVED on :3032 via gsd-browser:
+  D-10 header control + live count, D-11 inline edit affordance + client validation (verified
+  NON-DESTRUCTIVELY — no data mutated), D-12 badge renders w/ data + absent when null, D-08
+  compare-of-2 → Compare tab → DifferenceViewer aligned from first divergence w/ cumulative Δ
+  tokens (−84,726 → −340,878); ATTR-02 italic "unmeasured" preserved; vite build clean.
+  CAVEAT: dataset had 0 scored runs, so a full inline-edit autosave round-trip against a scored
+  run was NOT exercised live (to avoid mutating user data) — the edit affordance + client
+  validation + saveOverride PATCH wiring were verified, and the autosave round-trip is covered
+  by the extended e2e spec. **Phase 86 execution complete (5/5).** See 86-05-SUMMARY.md.
   Plan 86-03 (Wave 2 — Timeline v2 + drill-down + fullscreen) done (2 autonomous tasks +
   1 blocking human-verify checkpoint APPROVED, 2 feat commits 8708bc150/baf336522).
   Shipped the v2 compact TurnRow (turn-row.tsx: tool-name chips +N overflow, mini ContextBand,

@@ -59,7 +59,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] **Phase 83: Token Reconciliation Layer** — Transcript adapters (cladpt/copadt) verify/enrich wire rows; per-span discrepancy sink; no double-counting (completed 2026-07-06)
 - [x] **Phase 84: Per-Turn Context Revelation** — Persist every measured request as context-turns JSONL with paired usage; read APIs; honest cache explainer (completed 2026-07-08)
 - [x] **Phase 85: Experiment Control Center** — Launch / re-run (same snapshot, param overrides) / monitor / cancel experiments from the performance dashboard (completed 2026-07-09)
-- [ ] **Phase 86: Timeline v2 & Performance Page Declutter** — Per-turn story (prompt, tool calls, cache split, context band) + IA cleanup
+- [x] **Phase 86: Timeline v2 & Performance Page Declutter** — Per-turn story (prompt, tool calls, cache split, context band) + IA cleanup (completed 2026-07-11)
 - [ ] **Phase 87: Interactive Spans & Branch Avenues** — Span snapshot from the main agent; forked avenue branches re-running the initial prompt with modified params; compare & merge
 
 ## Phase Details
@@ -346,7 +346,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   - [x] 86-02-PLAN.md — Shared primitives: export band/scrub from explainer + context-band component + slice fetchReconciliation/modal state (Wave 1)
   - [x] 86-03-PLAN.md — Timeline v2: turn-row + drill-down modal + fullscreen route; DASH-02 + D-06 fallback preserved [checkpoint] (Wave 2)
   - [x] 86-04-PLAN.md — Full difference viewer: aligned side-by-side trajectory diff with cumulative deltas + loop badges (Wave 2)
-  - [ ] 86-05-PLAN.md — Declutter IA: reconciliation badge + inline score edits + header quarantine control + compare-from-selection [checkpoint] (Wave 3)
+  - [x] 86-05-PLAN.md — Declutter IA: reconciliation badge + inline score edits + header quarantine control + compare-from-selection [checkpoint] (Wave 3)
 **UI hint**: yes
 
 ### Phase 87: Interactive Spans & Branch Avenues
@@ -385,5 +385,5 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 | 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete    | 2026-07-07 |
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
-| 86. Timeline v2 & Declutter | v7.5 | 4/5 | In Progress|  |
+| 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete   | 2026-07-11 |
 | 87. Interactive Spans & Branch Avenues | v7.5 | 0/? | Not started | - |
