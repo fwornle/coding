@@ -110,6 +110,10 @@ export function buildVariantMeta(args, { resolveSpec = resolveExperimentSpec } =
   // Phase 85-01 (D-05): --rerun-of carries the ORIGINAL run_id this run re-runs. String flag →
   // span.meta.rerun_of (buildRunTags folds it into Run.metadata; task_hash stays constant).
   const rerunOf = parseStrArg(args, '--rerun-of');
+  // Phase 87-03 (AVN-01): --origin-span-id carries the FORKED origin span's task_id so an
+  // avenue Run groups by its origin. String flag → span.meta.origin_span_id (buildRunTags folds
+  // it into Run.metadata, mirroring rerun_of/base_variant). Null-preserved downstream.
+  const originSpanId = parseStrArg(args, '--origin-span-id');
 
   // Fail fast on an unsafe --test-command BEFORE the span opens (D-08 / T-77-05). The
   // direct-CLI path must not smuggle a shell-metacharacter command into span.meta.
@@ -191,6 +195,8 @@ export function buildVariantMeta(args, { resolveSpec = resolveExperimentSpec } =
     ...(baseVariant ? { base_variant: baseVariant } : {}),
     // D-05: the ORIGINAL run_id this run re-runs (only when re-running).
     ...(rerunOf ? { rerun_of: rerunOf } : {}),
+    // AVN-01: the FORKED origin span's task_id (only when this run is an avenue fork).
+    ...(originSpanId ? { origin_span_id: originSpanId } : {}),
     // D-12: default OFF — only stamp the key (strictly true) when the presence flag is passed.
     ...(captureRawBodies ? { capture_raw_bodies: true } : {}),
   };
