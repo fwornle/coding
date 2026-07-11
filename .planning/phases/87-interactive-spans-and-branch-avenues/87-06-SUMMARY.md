@@ -101,3 +101,7 @@ No new security surface beyond the plan's `<threat_model>`. The frontend consume
 ## Known Stubs
 
 None. All data flows from live slice thunks (`fetchMergeStatus`, `selectAvenuesByOrigin` over `fetchRuns`) — no hardcoded empty values wired to render. Empty states are intentional honesty affordances, not stubs.
+
+## Self-Check: PASSED
+
+All created files exist on disk and all four commits (`267fcde25`, `344e40e04`, `ddcbbd566`, `568fab17c`) are present in git history.
