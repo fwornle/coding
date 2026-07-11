@@ -191,9 +191,13 @@ export function ExperimentLauncher() {
   // "Launch {N} avenues" CTA is the SERVER-resolved previewCellCount. We do NOT
   // multiply the picked axes client-side to produce the launch-gating number
   // (T-87-05-03 — the server cellCount is authoritative; a client cross-product
-  // could spoof it). The axis selections shape WHAT is forked; the SERVER resolves
-  // HOW MANY cells that becomes. Null until the preview has resolved → launch stays
-  // disabled (D-02: launch disabled until the preview has rendered).
+  // could spoof it). Post-Phase-87-07 (CR-02/CR-03) the chosen forkAxes ARE sent to
+  // the server (in both the launch payload and the fork-preview round-trip), and the
+  // count is the axes-aware, server-resolved synthesizeAvenueSpec cell count that
+  // reflects the ACTUAL fork request — not the origin spec's static YAML metadata.
+  // Before 87-07 forkAxes never left the client and this number tracked the origin
+  // spec's static count (the picker was decorative); that gap is closed. Null until
+  // the preview has resolved → launch stays disabled (D-02).
   const avenueCount: number | null = previewCellCount
 
   // Est. token / cost preview (D-02) — a labelled PLANNING hint derived from the

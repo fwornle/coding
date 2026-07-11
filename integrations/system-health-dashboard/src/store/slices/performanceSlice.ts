@@ -974,11 +974,16 @@ export const launchExperiment = createAsyncThunk<
         headers: { 'Content-Type': 'application/json' },
         // AVN-02/D-01: the fork is a THIN wrapper over the existing run bridge —
         // it POSTs the SAME body plus the top-level `origin_span_id` link (mirrors
-        // the WR-01 top-level `rerun_of` idiom). The server threads it to the
-        // runner's --origin-span-id (Plan 87-03) so avenue Runs group by origin;
-        // it is null-preserved (absent → null) exactly like rerun_of.
-        // Phase 87-07 (CR-02): also carry the chosen forkAxes + sweep flag so the
-        // server synthesizes the AVENUE matrix (not the origin spec's static matrix).
+        // the WR-01 top-level `rerun_of` idiom), null-preserved (absent → null)
+        // exactly like rerun_of, AND the chosen `forkAxes` + `sweep` flag.
+        // Post-Phase-87-07 (CR-02) the server side is fully wired: handleExperimentRun
+        // reads `origin_span_id` + `forkAxes`, calls `synthesizeAvenueSpec` to build the
+        // AVENUE matrix from the chosen axes (NOT the origin spec's static matrix),
+        // then threads `origin_span_id` + `--avenue` through the coordinator to the
+        // runner (runMatrix → runCell → measurement-start `--origin-span-id`) so the
+        // resulting avenue Runs carry a non-null origin_span_id and group by origin
+        // (selectAvenuesByOrigin). Before 87-07 only origin_span_id was sent and the
+        // server ignored it — that gap is closed; this body is the real shipped payload.
         body: JSON.stringify({
           spec,
           overrides: overrides ?? {},
