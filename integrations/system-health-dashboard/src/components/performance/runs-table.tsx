@@ -33,6 +33,7 @@ import {
 } from '@/store/slices/performanceSlice'
 import { effective, isEdited, judged, SCORE_DIMENSIONS } from './corrected-wins'
 import { distinctModels, normalizeModel } from './models'
+import { ReconciliationBadge } from './reconciliation-badge'
 
 // D-11 Re-run guard: a Re-run button is only meaningful on a COMPLETED experiment
 // run. A run is an experiment if it carries variant/base_variant provenance (only
@@ -291,6 +292,7 @@ export function RunsTable() {
               )
             })}
             <TableHead className="text-right">Tokens</TableHead>
+            <TableHead>Reconciliation</TableHead>
             <TableHead className="text-right sr-only">Edit</TableHead>
           </TableRow>
         </TableHeader>
@@ -350,6 +352,12 @@ export function RunsTable() {
                   {run.outcome?.totalTokens == null
                     ? <span className="text-muted-foreground">—</span>
                     : run.outcome.totalTokens.toLocaleString()}
+                </TableCell>
+                {/* D-12 per-run reconciliation badge — renders one of the three
+                    pinned states from VERBATIM Plan-02 summary data; absent (no
+                    badge) when the run has no reconciliation file (D-06 honesty). */}
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <ReconciliationBadge taskId={run.task_id} />
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
