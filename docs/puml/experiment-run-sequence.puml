@@ -1,0 +1,63 @@
+@startuml experiment-run-sequence
+!include _standard-style.puml
+
+title Experiment Run — describe → run → compare → dashboard
+
+box "Operator" #E8F4F8
+    actor "Operator" as op
+    participant "/experiment skill" as skill
+end box
+
+box "Runner" #F0E6FF
+    participant "experiment-run.mjs" as runner
+    participant "measurement-start" as mstart
+    participant "agent (sandbox)" as agent
+    participant "measurement-stop" as mstop
+end box
+
+box "Scoring & Store" #E6F7E6
+    participant "evidence + Haiku judge" as judge
+    participant "rapid-llm-proxy\n:12435 + token-usage.db" as proxy
+    database "experiments store\n(Run · Score · Outcome)" as store
+end box
+
+box "Compare & Dashboard" #FFE6E6
+    participant "experiments-compare.mjs" as compare
+    participant "Comparison tab (:3032)" as dash
+end box
+
+== Describe & confirm (natural-language mode) ==
+op -> skill: plain-English description
+skill -> skill: synthesize goal / variants / class / draft test
+skill -> op: preview + drafted gate
+op -> skill: confirm (Run it / ungated / edit)
+skill -> skill: write config/experiments/<id>.yaml\ncompute task_hash = sha256(goal_sentence)
+
+== Run the matrix (unattended) ==
+skill -> runner: --spec <id>.yaml
+loop each variant × repeat cell
+    runner -> mstart: open span (task_id)
+    mstart -> proxy: ambient task_id
+    runner -> agent: drive goal in sandbox
+    agent -> proxy: LLM calls
+    proxy -> proxy: record token_usage(task_id)
+    runner -> mstop: cell complete
+    mstop -> judge: gate (test_command) + 5-dim rubric
+    judge -> proxy: POST /api/complete
+    mstop -> proxy: aggregate tokens by task_id
+    mstop -> store: writeRun + writeScore (gate_passed)
+end
+
+== Compare & surface ==
+skill -> compare: --task-hash <hash> --rank-by composite
+compare -> store: readRuns join
+compare -> compare: buildComparison (honesty spine)
+compare -> dash: reports/<hash>.json (live source)
+op -> dash: read ranked variant columns
+
+note over compare,dash
+  Same buildComparison feeds the CLI table
+  and GET /api/experiments/comparison — no drift.
+end note
+
+@enduml

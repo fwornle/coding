@@ -1,0 +1,66 @@
+@startuml experiment-measurement-architecture
+!include _standard-style.puml
+
+title Cross-Agent Measurement & Comparison — Component Architecture
+top to bottom direction
+
+actor "Operator" as op
+
+package "Skill / CLI Layer" as cli_layer {
+  component "/experiment skill\n(plain-English or flags)" as skill <<cli>>
+  component "experiment-run.mjs\n(matrix runner)" as runner <<cli>>
+  component "experiments-compare.mjs\n(aggregate + rank)" as compare_cli <<cli>>
+}
+
+package "Measurement Span" as span_layer {
+  component "measurement-start.mjs\n(open span)" as mstart <<core>>
+  component "measurement-stop.mjs\n(close + score)" as mstop <<core>>
+  component "evidence harness\n(run test gate)" as evidence <<core>>
+  component "Haiku judge\n(5-dim rubric)" as judge <<agent>>
+}
+
+package "Token Attribution" as token_layer {
+  component "rapid-llm-proxy\n:12435 /api/complete" as proxy <<infra>>
+  database "token-usage.db\n(per task_id)" as tokendb <<storage>>
+}
+
+package "Experiment Store" as store_layer {
+  database ".data/experiments/leveldb\nRun · Score · Outcome" as store <<storage>>
+  component "compare.mjs\n(honesty spine, composite)" as compare_lib <<core>>
+  artifact "reports/<task_hash>.json" as report <<storage>>
+}
+
+package "Dashboard (:3032 / :8080)" as ui_layer {
+  component "GET /api/experiments/comparison" as api <<api>>
+  component "Comparison matrix\n(ranked/failed/ungated/unscored)" as matrix <<core>>
+}
+
+op --> skill : describe / declare
+skill --> runner : --spec <derived>.yaml
+runner --> mstart : per cell
+mstart --> proxy : ambient task_id
+proxy --> tokendb : record tokens
+runner --> mstop : cell done
+mstop --> evidence : gate (test_command)
+mstop --> judge : rubric
+judge --> proxy : POST /api/complete
+mstop --> tokendb : aggregate by task_id
+mstop --> store : writeRun + writeScore
+skill --> compare_cli : --task-hash <sha256(goal)>
+compare_cli --> compare_lib : buildComparison
+compare_lib --> store : readRuns join
+compare_cli --> report : writeReportJson
+api --> compare_lib : same buildComparison
+matrix --> api : fetchComparison
+report ..> matrix : live source
+
+note right of compare_lib
+  **Honesty spine**
+  ranked  = gate passed + complete + scored
+  failed  = gate false / timeout / abort
+  ungated = no test_command
+  unscored = trivial or judge failed
+  composite = totalTokens / goal_aligned_ratio
+end note
+
+@enduml
