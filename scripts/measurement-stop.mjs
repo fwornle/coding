@@ -71,7 +71,7 @@ import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-r
 // Haiku /api/complete call and internally quarantines to pending (73-04, never throws);
 // writeScore materializes the Score + scored edge (73-02); filterConsequential/
 // isTrivialRun (73-01) drive the D-04 trivial-run short-circuit (no proxy paid).
-import { gatherEvidence, deriveNonGsdRubric } from '../lib/experiments/evidence-harness.mjs';
+import { gatherEvidence, deriveNonGsdRubric, gateFromEvidence } from '../lib/experiments/evidence-harness.mjs';
 import { runJudge } from '../lib/experiments/judge.mjs';
 import { writeScore } from '../lib/experiments/score-write.mjs';
 import { filterConsequential, isTrivialRun } from '../lib/experiments/consequential-events.mjs';
@@ -860,6 +860,13 @@ async function main() {
     //   (D-08 security note), so a non-GSD run persists them even when the judge
     //   returned null/pending. A pending judgment IS gap-filled (its rubric is null).
     overlayNonGsdRubric(judgment, evidence);
+    // ── CMP-01 / Phase 79 (D-04a): stamp the OBJECTIVE per-cell test-gate outcome onto
+    //   the judgment so writeScore persists it as a discrete queryable field, DISTINCT
+    //   from the subjective rubric above (D-04). Compute-once from the ALREADY-computed
+    //   evidence.testRun (no second test execution, D-04) and attach-to-judgment —
+    //   mirrors overlayNonGsdRubric's mutate-in-place idiom; single writeScore below.
+    //   null = no test_command (ungated, D-02); true = exit 0; false = non-zero exit. ──
+    judgment.gate_passed = gateFromEvidence(evidence);
     await writeScore(store, { span, judgment });
 
     pendingCount = await countPending(store);
