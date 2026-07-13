@@ -219,6 +219,11 @@ integrations/system-health-dashboard/test-results/
 # are reconstructed working trees holding copies of live workspace state — MUST NOT be committed.
 .data/avenues/
 
+# Phase 87 (AVN-02/07): server/CLI-synthesized avenue fork specs. handleExperimentRun /
+# experiment-run.mjs synthesize these transiently from origin-Run data per fork — a runtime
+# artifact, not authored source, so they must not be committed.
+config/experiments/avenue-*.yaml
+
 # Code graph RAG index (binary, regenerated on indexing)
 .data/code-graph-index/
 

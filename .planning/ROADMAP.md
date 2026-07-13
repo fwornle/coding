@@ -60,7 +60,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] **Phase 84: Per-Turn Context Revelation** — Persist every measured request as context-turns JSONL with paired usage; read APIs; honest cache explainer (completed 2026-07-08)
 - [x] **Phase 85: Experiment Control Center** — Launch / re-run (same snapshot, param overrides) / monitor / cancel experiments from the performance dashboard (completed 2026-07-09)
 - [x] **Phase 86: Timeline v2 & Performance Page Declutter** — Per-turn story (prompt, tool calls, cache split, context band) + IA cleanup (completed 2026-07-11)
-- [ ] **Phase 87: Interactive Spans & Branch Avenues** — Span snapshot from the main agent; forked avenue branches re-running the initial prompt with modified params; compare & merge (gaps_found 2026-07-11 — fork-launch chain not wired end-to-end; see 87-VERIFICATION.md)
+- [x] **Phase 87: Interactive Spans & Branch Avenues** — Span snapshot from the main agent; forked avenue branches re-running the initial prompt with modified params; compare & merge (gaps_found 2026-07-11 — fork-launch chain not wired end-to-end; see 87-VERIFICATION.md) (completed 2026-07-13)
 
 ## Phase Details
 
@@ -445,7 +445,7 @@ Plans:
 **Wave 5** *(gap closure — fork-launch chain wiring, 2026-07-11)*
 
 - [x] 87-07-PLAN.md — Thread origin_span_id + forkAxes end-to-end (runMatrix→runCell, experiment-run.mjs CLI, run-launch argv, handleExperimentRun synthesizeAvenueSpec, coordinator, client payload+axes-aware preview) so a real fork produces an origin_span_id-bearing avenue Run (CR-01/02/03 → AVN-01/02/03/07)
-- [ ] 87-08-PLAN.md — Correct the two Blocker misleading comments (G4) + add the AVN-01..09 REQUIREMENTS.md section (G5) + live main-tree dashboard rebuild/restart + gsd-browser human verify of the origin-grouped ranked Avenues panel in both themes (AVN-01/02/03/07)
+- [x] 87-08-PLAN.md — Correct the two Blocker misleading comments (G4) + add the AVN-01..09 REQUIREMENTS.md section (G5) + live main-tree dashboard rebuild/restart + gsd-browser human verify of the origin-grouped ranked Avenues panel in both themes (AVN-01/02/03/07)
 
 **UI hint**: yes
 
@@ -478,4 +478,4 @@ Plans:
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
-| 87. Interactive Spans & Branch Avenues | v7.5 | 7/8 | In Progress|  |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 8/8 | Complete   | 2026-07-13 |
