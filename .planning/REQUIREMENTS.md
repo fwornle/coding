@@ -24,18 +24,18 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 *Corrections to v7.4 shipped code, diagnosed in `.planning/v7.4-attribution-findings.md` (pilot run) — required for a comparison to be meaningful.*
 
-- [ ] **VALID-01 (O1 — model attribution):** A Run's canonical model reflects the actual foreground interactive session model (e.g. `claude-opus-4-8`), not the most-frequent proxy token-row model (skewed by Haiku judge/consolidator calls sharing the window). Acceptance: a measured Opus session records model Opus in the runs table, score drawer, and timeline — not `claude-haiku-4.5`.
+- [x] **VALID-01 (O1 — model attribution):** A Run's canonical model reflects the actual foreground interactive session model (e.g. `claude-opus-4-8`), not the most-frequent proxy token-row model (skewed by Haiku judge/consolidator calls sharing the window). Acceptance: a measured Opus session records model Opus in the runs table, score drawer, and timeline — not `claude-haiku-4.5`.
 - [x] **VALID-02 (O2 — route time math):** Route wallclock/step and interval metrics produce plausible values over long, partially-idle interactive windows (no implausible ~28,000 s/step artifacts). Idle/wait gaps are excluded or the metric is defined per active step. Acceptance: a multi-hour session with steering pauses yields per-step times within a sane bound, documented.
-- [ ] **VALID-03 (O3 — non-GSD rubric coverage):** The 5-dimension outcome rubric is scored for non-GSD / ad-hoc tasks — `code_quality`, `test_coverage`, `regressions` are not null when `VERIFICATION.md`/`REVIEW.md` are absent; the evidence harness derives signal from the task's tests + working-tree diff, not only GSD artifacts. Acceptance: a straight-coding run scores all 5 dims (none null solely due to missing GSD files).
+- [x] **VALID-03 (O3 — non-GSD rubric coverage):** The 5-dimension outcome rubric is scored for non-GSD / ad-hoc tasks — `code_quality`, `test_coverage`, `regressions` are not null when `VERIFICATION.md`/`REVIEW.md` are absent; the evidence harness derives signal from the task's tests + working-tree diff, not only GSD artifacts. Acceptance: a straight-coding run scores all 5 dims (none null solely due to missing GSD files).
 
 ### Experiment Specification (SPEC)
 
-- [ ] **SPEC-01:** A user declares an experiment as `{goal_sentence, variants[], repeats N}` where each variant is a named settings bundle over `{agent, model, framework/approach, env}` — via CLI flags and/or a declarative spec file.
-- [ ] **SPEC-02:** Each variant resolves to a concrete executable config, validated before any run starts; unsupported combinations (e.g. Copilot headless) fail fast with an actionable message rather than mid-run.
+- [x] **SPEC-01:** A user declares an experiment as `{goal_sentence, variants[], repeats N}` where each variant is a named settings bundle over `{agent, model, framework/approach, env}` — via CLI flags and/or a declarative spec file.
+- [x] **SPEC-02:** Each variant resolves to a concrete executable config, validated before any run starts; unsupported combinations (e.g. Copilot headless) fail fast with an actionable message rather than mid-run.
 
 ### Cross-Agent Runner (RUN)
 
-- [ ] **RUN-01:** For each variant × repeat, the runner restores the identical starting snapshot (Phase 67 rig) before launching, so every variant starts from the same tree + state.
+- [x] **RUN-01:** For each variant × repeat, the runner restores the identical starting snapshot (Phase 67 rig) before launching, so every variant starts from the same tree + state.
 - [ ] **RUN-02:** The runner launches the specified agent (Claude / OpenCode / Mastra) autonomously against the goal, wrapping the work in a measured span tagged with `variant`, `repeat`, and `task_hash`.
 - [ ] **RUN-03:** Runs execute unattended to completion, timeout, or abort — producing a scored Run per variant × repeat without requiring interactive operator steering; timeouts/aborts are recorded as such.
 - [ ] **RUN-04:** Copilot participation is gated on an explicit headless-drivability capability check; if unsupported, the Copilot variant is skipped with a recorded reason (never silently absent).
