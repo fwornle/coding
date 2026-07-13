@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: milestone_complete
-stopped_at: Milestone complete (Phase 87 was final phase)
+status: executing
+stopped_at: Phase 87 complete; v7.5 NOT complete — Phases 78 (partial 4/5), 79 (unplanned), 80 (unplanned) outstanding (RUN/CMP/ORCH). Milestone audit pending.
 last_updated: 2026-07-13T09:00:25.415Z
-last_activity: 2026-07-11 -- Phase 87 execution started
+last_activity: 2026-07-13 -- Phase 87 complete; milestone-close halted (78-80 incomplete), routing to /gsd-audit-milestone v7.5
 progress:
   total_phases: 21
   completed_phases: 16
