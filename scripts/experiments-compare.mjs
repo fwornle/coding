@@ -74,7 +74,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // opens via openExperimentStore() — ontologyDir set in lib/experiments/store.mjs
 import { openExperimentStore } from '../lib/experiments/store.mjs';
 import { readRuns } from '../lib/experiments/query.mjs';
-import { buildComparison } from '../lib/experiments/compare.mjs';
+import { buildComparison, GROUP_GATE_OUTCOME, withGateOutcomes } from '../lib/experiments/compare.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = path.resolve(__dirname, '..');
@@ -143,18 +143,10 @@ function resolveReportPath(taskHash, ext, repoRoot) {
   return { reportsDir, filePath, safe };
 }
 
-/** Map a report group name to the per-variant gate_outcome enum value. */
-const GROUP_GATE_OUTCOME = Object.freeze({
-  ranked: 'passed',
-  failed: 'failed',
-  ungated: 'ungated',
-  unscored: 'unscored',
-});
-
-/** Stamp each VariantEntry with its group's gate_outcome (D-13) — pure copy. */
-function withGateOutcomes(group, outcome) {
-  return (Array.isArray(group) ? group : []).map((v) => ({ gate_outcome: outcome, ...v }));
-}
+// GROUP_GATE_OUTCOME + withGateOutcomes are the SHARED gate_outcome stamping,
+// imported from lib/experiments/compare.mjs (single source of truth — the
+// vkb-server handleComparison endpoint imports the same helpers so the live JSON
+// deep-equals this CLI's writeReportJson output; no schema drift — Phase 80).
 
 /**
  * Serialize the comparison report to the canonical stable JSON export at
