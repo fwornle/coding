@@ -41,6 +41,42 @@
 
 ---
 
+## Milestone: v7.5 — Cross-Agent Comparison Experiment Runner
+
+**Shipped:** 2026-07-13
+**Phases:** 12 (76–87) | **Plans:** 109 | **Requirements:** 23/23 verified
+
+### What Was Built
+- The comparison/aggregation/report core (CMP-01/02/03): an objective per-run success gate persisted at score time (`gate_passed`, reusing the evidence-harness's already-computed test result — never a second run), N-repeat per-variant `{mean,stddev,median,min,max,n}` variance, and a ranked side-by-side report keyed by `task_hash` (CLI table + JSON export).
+- The experiment surface (CMP-04/ORCH-01): a dashboard Comparison tab (variant columns) fed by a live `GET /api/experiments/comparison` endpoint, plus a single installed `experiment` skill (run→auto-compare) distributed across claude/copilot/opencode/mastra.
+- The autonomous runner (RUN-02/03/04) live-verified via the 78-05 cross-agent smoke: claude + opencode complete end-to-end, copilot probe-gated, zero blast radius.
+- Extension phases 81–87: wire-measurement foundation, token reconciliation, per-turn context revelation, experiment control center, timeline v2, interactive branch avenues.
+
+### What Worked
+- **Audit-driven gap closure.** A milestone audit returned `gaps_found` and precisely enumerated the 5 unsatisfied requirements (CMP-01..04, ORCH-01) — driving a focused discuss→plan→execute→verify pass on exactly Phases 79 and 80 rather than a vague "finish it" scramble.
+- **De-risking the plan by resolving the key unknown inline.** The single hardest question (was the objective gate persisted?) was answered with a direct code trace before planning — revealing the gate ran at score time but was never stored, which reshaped Phase 79's scope correctly (add persistence) instead of the planner rediscovering it mid-execution.
+- **The plan-checker caught a real requirement-breaking gap.** It found the skill had no mechanical way to obtain `task_hash` for its auto-compare step (`experiment-run.mjs` emits `task_id`, a different key) — a defect that would have silently broken the one-command end-to-end flow. The revision resolved it via skill-side `sha256(goal_sentence)`.
+- **Shared-helper extraction killed schema drift.** The dashboard endpoint and the CLI both stamp `gate_outcome` via a single shared helper, with a deep-equals-CLI test — so the 79→80 JSON contract can't silently diverge.
+- **Live verification caught container-only bugs.** 80-01's `sanitizeTaskHash` was unreachable in-container (`scripts/` not bind-mounted); only the live curl smoke surfaced it, prompting relocation into the mounted `compare.mjs`.
+
+### What Was Inefficient
+- **The milestone drifted mid-flight.** After Phase 77, work pivoted into a large set of inserted infrastructure phases (82–87) built *around* the unfinished runner core (79/80), leaving the headline product flow severed at the CMP boundary until this closing session reconnected it. Extension scope should attach after the core requirements verify, not interleave ahead of them.
+- **STATE.md drift.** The milestone status had been left at `completed` while three phases were outstanding — a stale-state trap that had to be corrected before work could proceed honestly.
+
+### Patterns Established
+- **Honesty spine as a first-class requirement.** "Never surface a failed/ungated/unscored variant as a cheap winner" was carried from the aggregator (`isRankable`) through the CLI to the dashboard, doubly-guarded structurally and by test — the empty-ranked state renders correctly rather than fabricating a result.
+- **Run service-affecting phases on the main tree, not worktrees.** Phase 80's deploy/verify targeted running services (vkb-server :8080, dashboard :3032) bind-mounted from main — worktree isolation would have made a restart pick up unmerged code, so those plans ran sequentially on main.
+
+### Key Lessons
+- A gate signal that is *computed* but not *persisted* is not a gate — CMP-01 needed the score-time result written as a discrete queryable field, because the sandbox that produced it is destroyed by comparison time.
+- Live infra outages (copilot's provider 500 during 78-05) are a valid gate outcome: the requirement is that the runner *records* a terminal state, not that every agent succeeds — recorded-but-empty ≠ silently absent.
+
+### Cost Observations
+- Model mix: pattern-mapper/planner/executors + orchestration on opus (1M); plan-checker/verifier on sonnet (quality profile).
+- Notable: the most expensive verification was the live 78-05 cross-agent smoke (real token spend across claude/opencode/copilot) — high value: it live-proved RUN-02/03/04 and exercised the runner's error-recording path against a real provider 500.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
