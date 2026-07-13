@@ -42,9 +42,9 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 ### Comparison & Reporting (CMP)
 
-- [ ] **CMP-01:** An objective success gate (task test suite / UAT command) is evaluated per run; cost/route/score metrics are compared only across runs that pass the gate — failed runs are reported separately, not averaged into a variant's cost.
-- [ ] **CMP-02:** The runner aggregates N repeats per variant into a per-variant summary with central tendency **and** variance (spread) for tokens, wallclock, route metrics, and rubric scores.
-- [ ] **CMP-03:** A side-by-side comparison report (CLI table + machine-readable export) ranks variants on the chosen metric(s), showing variance and each variant's success-gate outcome, keyed by `task_hash` for reproducibility.
+- [x] **CMP-01:** An objective success gate (task test suite / UAT command) is evaluated per run; cost/route/score metrics are compared only across runs that pass the gate — failed runs are reported separately, not averaged into a variant's cost.
+- [x] **CMP-02:** The runner aggregates N repeats per variant into a per-variant summary with central tendency **and** variance (spread) for tokens, wallclock, route metrics, and rubric scores.
+- [x] **CMP-03:** A side-by-side comparison report (CLI table + machine-readable export) ranks variants on the chosen metric(s), showing variance and each variant's success-gate outcome, keyed by `task_hash` for reproducibility.
 - [ ] **CMP-04:** The comparison is viewable in the Performance dashboard tab as variant columns (surfaces CMP-03 without re-running).
 
 ### Orchestration Surface (ORCH)
@@ -80,9 +80,9 @@ This file tracks the active milestone's requirements at the top, with previous m
 | RUN-02 | Phase 78 | Pending |
 | RUN-03 | Phase 78 | Pending |
 | RUN-04 | Phase 78 | Pending |
-| CMP-01 | Phase 79 | Pending |
-| CMP-02 | Phase 79 | Pending |
-| CMP-03 | Phase 79 | Pending |
+| CMP-01 | Phase 79 | Complete |
+| CMP-02 | Phase 79 | Complete |
+| CMP-03 | Phase 79 | Complete |
 | CMP-04 | Phase 80 | Pending |
 | ORCH-01 | Phase 80 | Pending |
 | AVN-01 | Phase 87 (87-03/87-07) | Complete |
