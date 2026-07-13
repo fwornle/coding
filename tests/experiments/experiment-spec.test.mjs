@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import {
   resolveExperimentSpec,
   expandAxes,
+  validateCells,
   UNSUPPORTED_COMBINATIONS,
   KNOWN_AGENTS,
 } from '../../lib/experiments/experiment-spec.mjs';
@@ -132,6 +133,50 @@ test('UNSUPPORTED_COMBINATIONS is a frozen list (extensible by later phases)', (
 });
 
 // ---------------------------------------------------------------------------
+// Phase 87 Plan 02 Task 1: mastracode agent enum (AVN-03 axis completeness) +
+// kb-on/kb-off knowledge-injection env-axis vocabulary (AVN-04), encoded in the
+// EXISTING `env` cell key (Pitfall 3 — no 5th cell key added).
+// ---------------------------------------------------------------------------
+
+test('validateCells: a mastracode avenue cell PASSES (no longer hard-blocked, AVN-03)', () => {
+  const { threw } = captureStderr(() => validateCells([
+    { agent: 'mastracode', model: 'sonnet', framework: 'straight', env: 'kb-on' },
+  ]));
+  assert.equal(threw, false, 'mastracode is a legal agent — validateCells does not hard-block it');
+});
+
+test('validateCells: an unknown agent STILL hard-blocks listing the legal set including mastracode', () => {
+  const { threw, err } = captureStderr(() => validateCells([
+    { agent: 'nope', model: 'sonnet', framework: 'straight', env: 'kb-on' },
+  ]));
+  assert.ok(threw, 'unknown agent still fail-fasts');
+  assert.match(err.message, /nope/, 'names the bad value');
+  assert.match(err.message, /mastracode/, 'mastracode now appears in the legal-agents list');
+});
+
+test('expandAxes: env:[kb-on,kb-off] yields 2 cells differing only in env, each with exactly 5 keys', () => {
+  const cells = expandAxes(
+    { agent: ['claude'], model: ['sonnet'], framework: ['gsd'], env: ['kb-on', 'kb-off'] },
+    { test_command: 'node --test tests/experiments' },
+  );
+  assert.equal(cells.length, 2, 'kb-on × kb-off expands to exactly 2 cells');
+  for (const cell of cells) {
+    assert.deepEqual(Object.keys(cell).sort(), CELL_KEYS, 'each cell carries exactly the 5 canonical keys (Pitfall 3)');
+    assert.equal(cell.agent, 'claude');
+    assert.equal(cell.model, 'sonnet');
+    assert.equal(cell.framework, 'gsd');
+  }
+  const envs = cells.map((c) => c.env).sort();
+  assert.deepEqual(envs, ['kb-off', 'kb-on'], 'the two cells differ only in the env axis');
+});
+
+test('makeCell (via expandAxes): a kb-off cell survives — env is a first-class key, never dropped (Pitfall 3)', () => {
+  const [cell] = expandAxes({ agent: ['mastracode'], model: ['sonnet'], framework: ['gsd'], env: ['kb-off'] });
+  assert.equal(cell.env, 'kb-off', 'kb-off env value is preserved through makeCell');
+  assert.deepEqual(Object.keys(cell).sort(), CELL_KEYS, 'no 5th key added, none dropped');
+});
+
+// ---------------------------------------------------------------------------
 // Task 2: cell validation (D-05 agent enum, D-07 combo gate, D-08 shell-safety,
 // D-06 aggregated whole-run fail-fast) + D-05 loose model/framework warnings.
 // ---------------------------------------------------------------------------
@@ -163,10 +208,17 @@ test('SHELL_META_RE is exported from evidence-harness (single canonical regex, D
   assert.ok(!SHELL_META_RE.test('node --test tests/experiments'), 'accepts a fixed argv');
 });
 
-test('KNOWN_AGENTS equals the route-trace-resolve SoT set (no silent divergence, D-05)', () => {
+test('KNOWN_AGENTS is a SUPERSET of the route-trace-resolve SoT set (mastracode is spec-only, D-05/AVN-03)', () => {
   // WR-02 (Phase 77 review): compare against the ACTUAL exported route-trace set, not a
   // hardcoded literal — otherwise this test gives zero drift protection if route-trace changes.
-  assert.deepEqual([...KNOWN_AGENTS].sort(), [...ROUTE_TRACE_KNOWN_AGENTS].sort());
+  // Phase 87 (AVN-03): the spec enum now ADDS `mastracode` (a legal avenue agent) which has NO
+  // route-trace family because mastra is self-routed — so the spec set is a superset, and every
+  // route-trace agent must still be spec-legal (no silent drop of a trace-known agent).
+  for (const a of ROUTE_TRACE_KNOWN_AGENTS) {
+    assert.ok(KNOWN_AGENTS.includes(a), `route-trace agent '${a}' must remain spec-legal`);
+  }
+  const specOnly = [...KNOWN_AGENTS].filter((a) => !ROUTE_TRACE_KNOWN_AGENTS.includes(a));
+  assert.deepEqual(specOnly.sort(), ['mastracode'], 'the ONLY spec-only agent is mastracode (Phase 87 AVN-03)');
 });
 
 test('WR-01: an explicit empty variants:[] aborts (never collapse to zero cells)', () => {

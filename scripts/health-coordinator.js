@@ -2755,6 +2755,10 @@ app.post('/experiments/run', async (req, res) => {
     // hostEnv is the coordinator's OWN env — it already carries CODING_REPO,
     // LLM_PROXY_DATA_DIR, LLM_PROXY_PORT, CODING_PROXY_ROUTE (run-launch merges
     // the four contract vars from it onto the child's process.env).
+    // Phase 87-07 (CR-02): `overrides` is forwarded WHOLE to runExperiment — the coordinator
+    // never filters override keys, so the avenue-fork keys folded in by handleExperimentRun
+    // (overrides.origin_span_id + overrides.avenue) reach run-launch's buildRunArgv unchanged
+    // (→ --origin-span-id + --avenue on the runner argv). No coordinator passthrough needed.
     const result = await runExperiment({ spec, run_id, run_dir, overrides, env: process.env });
     // slot_busy = the HOST-side D-02 live-run guard (Phase 85-06) — a 409, not a 500.
     const status = result.success ? 200 : (result.slot_busy ? 409 : 500);
@@ -2799,6 +2803,111 @@ app.post('/experiments/cancel', async (req, res) => {
     return res.status(status).json({ ok: result.success, ...result });
   } catch (err) {
     log(`experiments/cancel threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// =====================================================================
+// Phase 87-04 (Wave 2) — AVN-08/AVN-09: avenue merge-status / promote / prune host seam.
+// =====================================================================
+// State-changing git ops (promote/prune) MUST run on the HOST, never the container (Pitfall 6 /
+// the 87-01 host-only trust boundary). These three endpoints mirror the /experiments/run
+// delegation + the isExperimentOriginAllowed V4 gate above, and delegate to the fixed-argv
+// primitives in lib/experiments/avenue-branch.mjs. Each takes { task_id }, re-validates it via the
+// module's own sanitizeTaskId gate (task_id → git argv, T-87-04-05), and returns the primitive's
+// JSON VERBATIM (no client recompute). The vkb-server container proxy (api-routes.js) reaches
+// these over HTTP behind the same origin gate.
+
+let avenueBranchModule = null;
+async function getAvenueBranch() {
+  if (avenueBranchModule) return avenueBranchModule;
+  avenueBranchModule = await import('../lib/experiments/avenue-branch.mjs');
+  return avenueBranchModule;
+}
+
+// The avenue primitives sanitize internally, but a well-shaped task_id is required BEFORE argv:
+// reject an empty / non-string / '.'/'..' id at the coordinator boundary (mirror the module's
+// sanitizeTaskId charset so an unmappable id is a 400, not a silently-coerced branch).
+const AVENUE_TASK_ID_RE = /^[A-Za-z0-9._-]+$/;
+function isValidAvenueTaskId(id) {
+  return typeof id === 'string' && id.length > 0 && id.length <= 80
+    && AVENUE_TASK_ID_RE.test(id) && id !== '.' && id !== '..';
+}
+
+// POST /experiments/avenue-merge-status — READ-ONLY status compute (never mutates main).
+//   body: { task_id }
+//   200: { ok:true, state, ahead, behind, conflicts, branch }
+//   400: missing/invalid task_id
+//   403: external origin (V4 gate)
+//   500: primitive error
+app.post('/experiments/avenue-merge-status', async (req, res) => {
+  if (!isExperimentOriginAllowed(req)) {
+    log(`experiments/avenue-merge-status rejected external origin ${req.socket?.remoteAddress}`, 'WARN');
+    return res.status(403).json({ ok: false, error: 'origin not allowed' });
+  }
+  const { task_id } = req.body || {};
+  if (!isValidAvenueTaskId(task_id)) {
+    log(`experiments/avenue-merge-status rejected invalid task_id: ${JSON.stringify(task_id)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'invalid task_id' });
+  }
+  try {
+    const { avenueMergeStatus } = await getAvenueBranch();
+    const result = avenueMergeStatus({ taskId: task_id, repoRoot: REPO_ROOT });
+    return res.status(200).json({ ok: true, ...result }); // VERBATIM — no re-shaping
+  } catch (err) {
+    log(`experiments/avenue-merge-status threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /experiments/avenue-promote — STATE-CHANGING host-only merge (conflict-blocked).
+//   body: { task_id }
+//   200: { ok:true, promoted, reason?, conflicts? }
+//   400: missing/invalid task_id
+//   403: external origin (V4 gate)
+//   500: primitive error
+app.post('/experiments/avenue-promote', async (req, res) => {
+  if (!isExperimentOriginAllowed(req)) {
+    log(`experiments/avenue-promote rejected external origin ${req.socket?.remoteAddress}`, 'WARN');
+    return res.status(403).json({ ok: false, error: 'origin not allowed' });
+  }
+  const { task_id } = req.body || {};
+  if (!isValidAvenueTaskId(task_id)) {
+    log(`experiments/avenue-promote rejected invalid task_id: ${JSON.stringify(task_id)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'invalid task_id' });
+  }
+  try {
+    const { promoteAvenue } = await getAvenueBranch();
+    const result = promoteAvenue({ taskId: task_id, repoRoot: REPO_ROOT });
+    return res.status(200).json({ ok: true, ...result }); // VERBATIM — conflict-blocked in the primitive
+  } catch (err) {
+    log(`experiments/avenue-promote threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /experiments/avenue-prune — STATE-CHANGING host-only worktree+branch removal (on-demand).
+//   body: { task_id }
+//   200: { ok:true, removed }
+//   400: missing/invalid task_id
+//   403: external origin (V4 gate)
+//   500: primitive error
+app.post('/experiments/avenue-prune', async (req, res) => {
+  if (!isExperimentOriginAllowed(req)) {
+    log(`experiments/avenue-prune rejected external origin ${req.socket?.remoteAddress}`, 'WARN');
+    return res.status(403).json({ ok: false, error: 'origin not allowed' });
+  }
+  const { task_id } = req.body || {};
+  if (!isValidAvenueTaskId(task_id)) {
+    log(`experiments/avenue-prune rejected invalid task_id: ${JSON.stringify(task_id)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'invalid task_id' });
+  }
+  try {
+    const { pruneAvenueBranch } = await getAvenueBranch();
+    const result = pruneAvenueBranch({ taskId: task_id, repoRoot: REPO_ROOT });
+    return res.status(200).json({ ok: true, ...result }); // VERBATIM
+  } catch (err) {
+    log(`experiments/avenue-prune threw: ${err.message}`, 'ERROR');
     return res.status(500).json({ ok: false, error: err.message });
   }
 });

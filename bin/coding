@@ -219,7 +219,16 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      ARGS+=("$1")
+      # Bare-word agent selection: if this is the first positional arg, no agent
+      # has been forced yet, and a matching config/agents/<word>.sh exists, treat
+      # it as the agent selector (e.g. `coding opencode`, `coding copilot`).
+      # Otherwise it's a command arg for the agent (e.g. `coding suggest "..."`).
+      if [ -z "$FORCE_AGENT" ] && [ ${#ARGS[@]} -eq 0 ] \
+         && [ -f "$SCRIPT_DIR/../config/agents/$1.sh" ]; then
+        FORCE_AGENT="$1"
+      else
+        ARGS+=("$1")
+      fi
       shift
       ;;
   esac

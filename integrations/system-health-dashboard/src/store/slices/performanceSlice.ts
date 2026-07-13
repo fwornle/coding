@@ -310,6 +310,20 @@ interface PerformanceState {
   // D-11 re-run pre-fill payload (set by the runs-table Re-run button, consumed
   // + cleared by the launcher on mount).
   launcherPrefill: LauncherPrefill | null
+  // Branch avenues (Phase 87, Plan 87-06) — the git-computed merge status per
+  // avenue task_id, served VERBATIM (Plan 04). `null` value = fetched-but-absent
+  // (unknown/pruned branch) → the badge renders NOTHING (honesty). Keyed like the
+  // reconciliation cache above.
+  mergeStatusByTaskId: Record<string, AvenueMergeStatus | null>
+  // The task_ids with an in-flight promote / prune op (per-row spinners + disabled
+  // actions) so multiple avenue rows can act independently.
+  promotePendingIds: string[]
+  prunePendingIds: string[]
+  // The verbatim promote outcome per task_id (drives the conflict-refused notice —
+  // never a silent failure). Cleared when the row re-fetches status.
+  promoteResultByTaskId: Record<string, AvenuePromoteResult>
+  // The last avenue op error per task_id (surfaced inline, dismissible — D-09 honesty).
+  avenueErrorByTaskId: Record<string, string | null>
 }
 
 // The active measurement span (mirrors .data/active-measurement.json).
@@ -402,14 +416,87 @@ export interface RunProgress {
   [key: string]: unknown
 }
 
-// The D-11 re-run pre-fill payload. Set by the runs-table Re-run button and
-// consumed by the launcher to pre-populate the spec select + snapshot_id +
-// rerun_of + override fields (including any seeded per-variant variantOverrides).
+// The D-03 fork axis selections (AVN-03). Curated-by-default four-axis picker —
+// Agent × Model × SDD-framework × Knowledge-injection. The knowledge-injection
+// dimension is encoded into the runner's existing `env` axis as `kb-on`/`kb-off`
+// (Plan 87-02 — NOT a 5th cell key), so the frontend surfaces it as a prominent
+// on/off toggle and the server maps env==='kb-off' → CODING_KNOWLEDGE_INJECTION=0.
+// `agent` uses the runner literals (mastra is surfaced as `mastracode`, the
+// literal Plan 87-02 added to KNOWN_AGENTS). Every field optional — an empty
+// object means "seed from the origin span's own agent/model".
+export interface ForkAxes {
+  // Multi-select agent literals (claude / copilot / opencode / mastracode).
+  agents?: string[]
+  // Multi-select model literals (opus / sonnet / gpt-5 / haiku / …).
+  models?: string[]
+  // Multi-select SDD-framework literals (gsd / spec-workflow / none) — the
+  // spec-driven-development harness, disambiguated from a code framework.
+  frameworks?: string[]
+  // Knowledge-injection A/B: when true a kb-on cell is included; when false a
+  // kb-off cell. Both true → the injection axis is swept on vs off (2 cells).
+  kbOn?: boolean
+  kbOff?: boolean
+}
+
+// The D-11 re-run / D-03 fork pre-fill payload. Set by the runs-table Re-run and
+// Fork buttons and consumed by the launcher to pre-populate the spec select +
+// snapshot_id + rerun_of + override fields (including any seeded per-variant
+// variantOverrides). The fork extension (EXTENDS this interface, does NOT fork
+// the slice — Phase 86 frozen-contract discipline) carries the origin span link
+// (`origin_span_id`), the four selectable axes, and the sweep flag.
 export interface LauncherPrefill {
   spec: string
   snapshot_id?: string | null
   rerun_of?: string | null
   overrides?: ExperimentOverrides
+  // D-03 fork fields — present only when the launcher was pre-filled by "Fork
+  // into avenues" (absent for a plain Re-run, so the launcher renders the axis
+  // picker only in fork mode).
+  origin_span_id?: string | null
+  axes?: ForkAxes
+  // The D-02 sweep flag: expand the chosen axes into their cross-product. The
+  // count/cost preview MUST still resolve SERVER-side (D-09), never a client
+  // axes recompute.
+  sweep?: boolean
+}
+
+// Read a string field off a Run's index signature defensively (the experiment
+// runner stamps provenance fields — origin_span_id / snapshot_id / canonical_* —
+// onto the Run's `[key: string]: unknown` map). Returns null for missing/blank.
+function forkRunStr(run: Run, key: string): string | null {
+  const v = run[key]
+  return typeof v === 'string' && v.trim() !== '' ? v : null
+}
+
+// buildForkPrefill (AVN-02/D-03) — the fork analogue of buildRerunPrefill. Seeds
+// the four-axis picker from a COMPLETED span and carries the origin link
+// (`origin_span_id` = the origin Run's task_id, mirroring Plan 87-03's threading).
+// The picker opens CURATED-BY-DEFAULT: the origin's own agent/model pre-selected,
+// the SDD-framework at the origin's framework (or `none`), knowledge-injection ON
+// (the working-memory default), sweep OFF. The launch stays a THIN wrapper — the
+// server synthesizes the avenue-spec (Plan 87-03 synthesizeAvenueSpec) and the
+// count/cost preview is SERVER-resolved (D-09), never a client axes recompute.
+export function buildForkPrefill(run: Run): LauncherPrefill {
+  const originAgent = forkRunStr(run, 'canonical_agent') ?? forkRunStr(run, 'agent')
+  const originModel = forkRunStr(run, 'canonical_model') ?? forkRunStr(run, 'model')
+  const originFramework = forkRunStr(run, 'framework')
+  return {
+    spec: forkRunStr(run, 'spec') ?? '',
+    snapshot_id: forkRunStr(run, 'snapshot_id'),
+    // The fork groups avenues under the origin span — the origin Run's task_id is
+    // the origin_span_id the runner stamps onto each avenue Run (Plan 87-03).
+    origin_span_id: run.task_id,
+    axes: {
+      agents: originAgent ? [originAgent] : [],
+      models: originModel ? [originModel] : [],
+      frameworks: [originFramework ?? 'none'],
+      // Curated default: knowledge injection ON (the working-memory prefix is the
+      // normal operating mode); the operator A/Bs it off via the prominent toggle.
+      kbOn: true,
+      kbOff: false,
+    },
+    sweep: false,
+  }
 }
 
 const emptyFacetState: FacetState = {
@@ -469,6 +556,11 @@ const initialState: PerformanceState = {
   launchError: null,
   launchPending: false,
   launcherPrefill: null,
+  mergeStatusByTaskId: {},
+  promotePendingIds: [],
+  prunePendingIds: [],
+  promoteResultByTaskId: {},
+  avenueErrorByTaskId: {},
 }
 
 // Default operator identity stamped into overridden_by when no richer identity
@@ -871,20 +963,66 @@ export const fetchSpecList = createAsyncThunk<SpecSummary[], void | undefined, {
 // — the operator always sees WHY the launch was refused (D-09).
 export const launchExperiment = createAsyncThunk<
   { run_id: string; pid?: number | null },
-  { spec: string; overrides?: ExperimentOverrides; rerun_of?: string | null },
+  { spec: string; overrides?: ExperimentOverrides; rerun_of?: string | null; origin_span_id?: string | null; forkAxes?: ForkAxes; sweep?: boolean },
   { rejectValue: string }
 >(
   'performance/launchExperiment',
-  async ({ spec, overrides, rerun_of }, { rejectWithValue }) => {
+  async ({ spec, overrides, rerun_of, origin_span_id, forkAxes, sweep }, { rejectWithValue }) => {
     try {
       const response = await fetch('/api/experiments/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spec, overrides: overrides ?? {}, rerun_of: rerun_of ?? null }),
+        // AVN-02/D-01: the fork is a THIN wrapper over the existing run bridge —
+        // it POSTs the SAME body plus the top-level `origin_span_id` link (mirrors
+        // the WR-01 top-level `rerun_of` idiom), null-preserved (absent → null)
+        // exactly like rerun_of, AND the chosen `forkAxes` + `sweep` flag.
+        // Post-Phase-87-07 (CR-02) the server side is fully wired: handleExperimentRun
+        // reads `origin_span_id` + `forkAxes`, calls `synthesizeAvenueSpec` to build the
+        // AVENUE matrix from the chosen axes (NOT the origin spec's static matrix),
+        // then threads `origin_span_id` + `--avenue` through the coordinator to the
+        // runner (runMatrix → runCell → measurement-start `--origin-span-id`) so the
+        // resulting avenue Runs carry a non-null origin_span_id and group by origin
+        // (selectAvenuesByOrigin). Before 87-07 only origin_span_id was sent and the
+        // server ignored it — that gap is closed; this body is the real shipped payload.
+        body: JSON.stringify({
+          spec,
+          overrides: overrides ?? {},
+          rerun_of: rerun_of ?? null,
+          origin_span_id: origin_span_id ?? null,
+          forkAxes: forkAxes ?? null,
+          sweep: sweep ?? false,
+        }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
       return { run_id: data.run_id as string, pid: (data.pid ?? null) as number | null }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// Phase 87-07 (CR-02/CR-03): the axes-aware fork PREVIEW thunk. POSTs the chosen
+// { origin_span_id, forkAxes, sweep, repeats } to the server and returns the
+// SERVER-resolved { cellCount } (D-09 — the count is authoritative server-side, never
+// a client axes cross-product). Mirrors the refreshReport POST-thunk idiom. The launcher
+// dispatches this when the chosen axes/sweep/repeats change so the preview stays honest.
+export const previewForkCount = createAsyncThunk<
+  { cellCount: number },
+  { origin_span_id: string; forkAxes?: ForkAxes; sweep?: boolean; repeats?: number },
+  { rejectValue: string }
+>(
+  'performance/previewForkCount',
+  async ({ origin_span_id, forkAxes, sweep, repeats }, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/fork-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin_span_id, forkAxes: forkAxes ?? null, sweep: sweep ?? false, repeats: repeats ?? null }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
+      return { cellCount: (data.cellCount ?? 0) as number }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -930,6 +1068,136 @@ export const cancelRun = createAsyncThunk<
       const data = await response.json().catch(() => ({}))
       if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
       return { killed: data?.killed as boolean, run_id: data?.run_id as string }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Branch avenues (Phase 87, Plan 87-06, Wave 4) — AVN-07/AVN-08/AVN-09.
+// The origin-grouped N-way ranked panel groups avenue Runs by the `origin_span_id`
+// the runner stamps (Plan 87-03), ranks them by outcome score (Phase 73 corrected-
+// wins), and hangs a git-computed merge-status badge + host-side Promote/Prune
+// off each row. The merge-status / promote / prune ops route host-side through the
+// Plan 04 coordinator seam (vkb-server proxy → coordinator → avenue-branch.mjs) —
+// NEVER git in the browser/container. The status is served VERBATIM (`state`,
+// `ahead`, `behind`, `conflicts`, `branch`) — never client-recomputed (honesty).
+// ---------------------------------------------------------------------------
+
+// The verbatim git merge-status served by POST /api/experiments/avenue-merge-status
+// (Plan 04 avenueMergeStatus → coordinator → vkb proxy). Rendered STRAIGHT by the
+// merge-status badge (D-04). `state:'unknown'` (absent branch) → NO badge (honesty —
+// we never fabricate a merge state for a branch that was never created / pruned).
+export interface AvenueMergeStatus {
+  state: 'merged' | 'unmerged' | 'conflicts' | 'unknown'
+  ahead: number
+  behind: number
+  conflicts: number
+  branch: string
+}
+
+// The verbatim promote result served by POST /api/experiments/avenue-promote.
+// Conflict-blocked in the primitive: `{ promoted:false, reason:'conflicts' }`
+// WITHOUT touching main. A clean promote advances main and returns `promoted:true`.
+export interface AvenuePromoteResult {
+  promoted: boolean
+  reason?: 'conflicts' | 'unknown' | 'merge-failed'
+  conflicts?: number
+}
+
+// fetchMergeStatus (AVN-08) — pull THIS avenue's git-computed merge status VERBATIM
+// via the Plan 04 read route (host-only compute; the browser never runs git). Mirrors
+// fetchReconciliation's graceful shape: a rejected/absent status leaves the badge to
+// render nothing (honesty), never a crash. Body carries the avenue's task_id.
+export const fetchMergeStatus = createAsyncThunk<
+  { taskId: string; status: AvenueMergeStatus | null },
+  string,
+  { rejectValue: string }
+>(
+  'performance/fetchMergeStatus',
+  async (taskId, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/avenue-merge-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
+      // The proxy relays the primitive JSON verbatim: { ok, state, ahead, behind,
+      // conflicts, branch }. Store the shape MINUS the transport `ok` flag; a missing
+      // `state` degrades to null so the badge simply renders nothing (honesty).
+      const status: AvenueMergeStatus | null =
+        typeof data?.state === 'string'
+          ? {
+              state: data.state as AvenueMergeStatus['state'],
+              ahead: Number(data.ahead) || 0,
+              behind: Number(data.behind) || 0,
+              conflicts: Number(data.conflicts) || 0,
+              branch: String(data.branch ?? `avenue/${taskId}`),
+            }
+          : null
+      return { taskId, status }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// promoteAvenue (AVN-08) — merge the winning avenue branch into main, host-side.
+// Conflict-blocked at BOTH the server (the primitive re-probes conflicts and refuses)
+// AND the UI (the panel disables Promote when status==='conflicts'). Returns the
+// verbatim `{ promoted, reason?, conflicts? }` so the operator always sees WHY a
+// promote was refused. On success the caller re-fetches the merge status (main moved).
+export const promoteAvenue = createAsyncThunk<
+  { taskId: string; result: AvenuePromoteResult },
+  string,
+  { rejectValue: string }
+>(
+  'performance/promoteAvenue',
+  async (taskId, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/avenue-promote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
+      return {
+        taskId,
+        result: {
+          promoted: data?.promoted === true,
+          reason: data?.reason as AvenuePromoteResult['reason'],
+          conflicts: typeof data?.conflicts === 'number' ? data.conflicts : undefined,
+        },
+      }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// pruneAvenue (AVN-09) — remove the avenue's git worktree+branch, host-side. The
+// MEASUREMENT DATA in .data SURVIVES (D-05 guarantee — only the branch is removed);
+// the confirm bar copy states this explicitly. Returns the verbatim `{ removed }`.
+export const pruneAvenue = createAsyncThunk<
+  { taskId: string; removed: boolean },
+  string,
+  { rejectValue: string }
+>(
+  'performance/pruneAvenue',
+  async (taskId, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/avenue-prune', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || data?.error || `API returned ${response.status}`)
+      return { taskId, removed: data?.removed === true }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -1056,6 +1324,10 @@ const performanceSlice = createSlice({
     clearLaunchError(state) {
       state.launchError = null
     },
+    // Dismiss the inline per-avenue op error (D-09 honesty — never a silent failure).
+    clearAvenueError(state, action: PayloadAction<string>) {
+      state.avenueErrorByTaskId[action.payload] = null
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -1107,6 +1379,46 @@ const performanceSlice = createSlice({
       // on rejection we leave the existing entry so the badge degrades cleanly.
       .addCase(fetchReconciliation.fulfilled, (state, action) => {
         state.reconciliationByTaskId[action.payload.taskId] = action.payload.reconciliation
+      })
+      // fetchMergeStatus (Phase 87, Plan 87-06) — store the per-avenue git status
+      // VERBATIM keyed by task_id (null = fetched-but-absent → no badge). Best-effort
+      // like fetchReconciliation: on rejection leave the entry so the badge degrades.
+      .addCase(fetchMergeStatus.fulfilled, (state, action) => {
+        state.mergeStatusByTaskId[action.payload.taskId] = action.payload.status
+      })
+      // promoteAvenue — per-row pending flag + verbatim result (conflict-refused is
+      // NOT a rejection; it comes back { promoted:false, reason:'conflicts' }).
+      .addCase(promoteAvenue.pending, (state, action) => {
+        const id = action.meta.arg
+        if (!state.promotePendingIds.includes(id)) state.promotePendingIds.push(id)
+        state.avenueErrorByTaskId[id] = null
+      })
+      .addCase(promoteAvenue.fulfilled, (state, action) => {
+        const { taskId, result } = action.payload
+        state.promotePendingIds = state.promotePendingIds.filter((x) => x !== taskId)
+        state.promoteResultByTaskId[taskId] = result
+      })
+      .addCase(promoteAvenue.rejected, (state, action) => {
+        const id = action.meta.arg
+        state.promotePendingIds = state.promotePendingIds.filter((x) => x !== id)
+        state.avenueErrorByTaskId[id] = (action.payload as string) ?? 'Promote failed'
+      })
+      // pruneAvenue — per-row pending flag; on success drop the cached status so the
+      // badge disappears (the branch is gone — honesty). Measurement data survives.
+      .addCase(pruneAvenue.pending, (state, action) => {
+        const id = action.meta.arg
+        if (!state.prunePendingIds.includes(id)) state.prunePendingIds.push(id)
+        state.avenueErrorByTaskId[id] = null
+      })
+      .addCase(pruneAvenue.fulfilled, (state, action) => {
+        const { taskId, removed } = action.payload
+        state.prunePendingIds = state.prunePendingIds.filter((x) => x !== taskId)
+        if (removed) state.mergeStatusByTaskId[taskId] = null
+      })
+      .addCase(pruneAvenue.rejected, (state, action) => {
+        const id = action.meta.arg
+        state.prunePendingIds = state.prunePendingIds.filter((x) => x !== id)
+        state.avenueErrorByTaskId[id] = (action.payload as string) ?? 'Prune failed'
       })
       .addCase(fetchRunNarrative.pending, (state, action) => {
         state.narrativeLoadingId = action.meta.arg.taskId
@@ -1293,6 +1605,7 @@ export const {
   clearLauncherPrefill,
   setActiveRunId,
   clearLaunchError,
+  clearAvenueError,
 } = performanceSlice.actions
 
 // ---------------------------------------------------------------------------
@@ -1524,5 +1837,115 @@ export const selectFacetOptions = createSelector(
     }
   }
 )
+
+// ---------------------------------------------------------------------------
+// Branch avenues (Phase 87, Plan 87-06) — origin-grouping + ranking selectors +
+// merge-status readbacks. These power the origin-grouped N-way ranked panel
+// (avenue-panel.tsx): group the fetched Runs by the `origin_span_id` the runner
+// stamps (Plan 87-03), rank each origin's avenues by outcome score (Phase 73
+// corrected-wins default), and hang the VERBATIM git merge status off each row.
+// ---------------------------------------------------------------------------
+
+// The read-only-safe `origin_span_id` off a Run's index signature (the runner
+// stamps it — Plan 87-03). Reuses the same defensive read as buildForkPrefill.
+export function runOriginSpanId(run: Run): string | null {
+  return forkRunStr(run, 'origin_span_id')
+}
+
+// Outcome score for ranking — Phase 73 corrected-wins: prefer corrected_goal_achieved,
+// fall back to goal_achieved, else null (unmeasured — sorts LAST, never coerced to 0
+// so an unscored avenue never out-ranks a real low score — honesty). Read VERBATIM
+// off the persisted score; never recomputed.
+export function avenueOutcomeScore(run: Run): number | null {
+  const corrected = run.score?.corrected_goal_achieved
+  if (typeof corrected === 'number') return corrected
+  const goal = run.score?.goal_achieved
+  if (typeof goal === 'number') return goal
+  return null
+}
+
+// The sortable columns for the ranked panel (UI-SPEC Interaction Contract 5):
+// default = outcome score (best first); secondary = tokens/cost, route quality,
+// wall-clock. Each maps to a VERBATIM persisted field (no client recompute).
+export type AvenueRankColumn = 'outcome' | 'tokens' | 'route' | 'wallclock'
+export type AvenueSortDir = 'asc' | 'desc'
+
+// The comparable value for a given column — null = unmeasured (sorts last regardless
+// of direction, honesty). tokens = outcome.totalTokens; route = loop_count (lower is
+// better); wallclock = wallclock_per_step (lower is better).
+function avenueColumnValue(run: Run, column: AvenueRankColumn): number | null {
+  switch (column) {
+    case 'outcome':
+      return avenueOutcomeScore(run)
+    case 'tokens':
+      return typeof run.outcome?.totalTokens === 'number' ? run.outcome.totalTokens : null
+    case 'route':
+      return typeof run.loop_count === 'number' ? run.loop_count : null
+    case 'wallclock':
+      return typeof run.wallclock_per_step === 'number' ? run.wallclock_per_step : null
+    default:
+      return null
+  }
+}
+
+// Rank an origin's avenues by a column+direction. Nulls (unmeasured) ALWAYS sort to
+// the bottom (honesty — an unmeasured avenue never claims a rank it hasn't earned).
+// Stable via task_id tiebreak so re-sorts don't jitter equal rows.
+export function rankAvenues(
+  avenues: Run[],
+  column: AvenueRankColumn = 'outcome',
+  dir: AvenueSortDir = 'desc',
+): Run[] {
+  const sign = dir === 'desc' ? -1 : 1
+  return [...avenues].sort((a, b) => {
+    const va = avenueColumnValue(a, column)
+    const vb = avenueColumnValue(b, column)
+    if (va == null && vb == null) return a.task_id.localeCompare(b.task_id)
+    if (va == null) return 1 // a unmeasured → after b
+    if (vb == null) return -1 // b unmeasured → after a
+    if (va !== vb) return sign * (va - vb)
+    return a.task_id.localeCompare(b.task_id)
+  })
+}
+
+// Group the fetched Runs by origin_span_id into an ordered list of origin groups.
+// Only Runs that carry an origin_span_id (i.e. avenues forked off an origin span —
+// Plan 87-03) are grouped; plain (non-forked) Runs are excluded from the avenue
+// panel. Each group's avenues are ranked by the DEFAULT column (outcome, best-first);
+// the panel re-ranks per its own sort UI. Groups are ordered by origin id for a
+// stable render.
+export const selectAvenuesByOrigin = createSelector(
+  [selectRuns],
+  (runs): { originSpanId: string; avenues: Run[] }[] => {
+    const groups = new Map<string, Run[]>()
+    for (const run of runs) {
+      const origin = runOriginSpanId(run)
+      if (!origin) continue // not an avenue — skip
+      const bucket = groups.get(origin)
+      if (bucket) bucket.push(run)
+      else groups.set(origin, [run])
+    }
+    return Array.from(groups.entries())
+      .map(([originSpanId, avenues]) => ({ originSpanId, avenues: rankAvenues(avenues) }))
+      .sort((a, b) => a.originSpanId.localeCompare(b.originSpanId))
+  }
+)
+
+// Per-avenue merge-status selector factory (mirrors selectReconciliationFor). Returns
+// the VERBATIM git status, or null when absent/unknown/pruned so the badge renders
+// NOTHING (honesty — never a fabricated merge state).
+export const selectMergeStatusFor = (taskId: string | null) => (state: RootState): AvenueMergeStatus | null =>
+  taskId ? (state.performance.mergeStatusByTaskId[taskId] ?? null) : null
+
+// Per-avenue promote/prune pending predicates + the verbatim promote result + the
+// dismissible inline error (D-09).
+export const selectPromotePending = (taskId: string) => (state: RootState): boolean =>
+  state.performance.promotePendingIds.includes(taskId)
+export const selectPrunePending = (taskId: string) => (state: RootState): boolean =>
+  state.performance.prunePendingIds.includes(taskId)
+export const selectPromoteResultFor = (taskId: string | null) => (state: RootState): AvenuePromoteResult | null =>
+  taskId ? (state.performance.promoteResultByTaskId[taskId] ?? null) : null
+export const selectAvenueErrorFor = (taskId: string | null) => (state: RootState): string | null =>
+  taskId ? (state.performance.avenueErrorByTaskId[taskId] ?? null) : null
 
 export default performanceSlice.reducer

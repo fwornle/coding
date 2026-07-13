@@ -51,6 +51,20 @@ This file tracks the active milestone's requirements at the top, with previous m
 
 - [ ] **ORCH-01:** The full flow is invokable as a single command/skill (e.g. `experiment run --goal "…" --variants A,B --agents claude,opencode --repeats N`), installed and usable across the coding agents per the multi-agent skill ecosystem.
 
+### Interactive Spans & Branch Avenues (AVN)
+
+*Phase 87 (Uniform 4-Agent Measurement Program extension). A completed measurement span forks into "avenues" — headless re-runs of the initial prompt with a modified agent/model/framework/injection axis, each on a persistent `avenue/<task_id>` git branch, grouped by origin, compared in the dashboard, merge-status tracked; measurement data survives across branches (main-`.data` stores). Descriptions authoritative per `87-VERIFICATION.md` Requirements Coverage.*
+
+- [x] **AVN-01:** An avenue Run record carries `origin_span_id`, threaded from the fork request through the runner (runMatrix → runCell → measurement-start `--origin-span-id`) to persistence (run-write).
+- [x] **AVN-02:** The dashboard "Fork into avenues" launch is a thin wrapper over the existing `launchExperiment` → vkb-server → coordinator bridge (no UI-only path); the fork payload reaches the server with `origin_span_id` + the chosen fork axes.
+- [x] **AVN-03:** A curated 4-axis picker (agent/model/framework/injection) with a sweep toggle and a SERVER-resolved, axes-aware count/cost preview gates the launch before any run starts.
+- [x] **AVN-04:** Knowledge-injection is a per-avenue axis, threading `CODING_KNOWLEDGE_INJECTION=0` into the spawned agent env without affecting the interactive session.
+- [x] **AVN-05:** Avenue branches are named `avenue/<task_id>` worktrees (not detached); prune removes worktree + branch; measurement data survives; the detached default is preserved when avenue mode is not requested.
+- [x] **AVN-06:** An avenue span writes to MAIN `.data` (not the branch worktree), with no double-count across branches.
+- [x] **AVN-07:** The dashboard renders an origin-grouped, outcome-ranked N-way avenue panel (best-first, git-computed merge badges) with real forked-Run data.
+- [x] **AVN-08:** Merge status is computed from git without mutating main; promote is blocked on conflicts.
+- [x] **AVN-09:** Prune removes the worktree + branch via the coordinator seam only (never the container); reachable via the vkb-server → coordinator routes.
+
 ---
 
 ## v7.5 Traceability
@@ -71,8 +85,17 @@ This file tracks the active milestone's requirements at the top, with previous m
 | CMP-03 | Phase 79 | Pending |
 | CMP-04 | Phase 80 | Pending |
 | ORCH-01 | Phase 80 | Pending |
+| AVN-01 | Phase 87 (87-03/87-07) | Complete |
+| AVN-02 | Phase 87 (87-05/87-07) | Complete |
+| AVN-03 | Phase 87 (87-02/87-05/87-07) | Complete |
+| AVN-04 | Phase 87 (87-02) | Complete |
+| AVN-05 | Phase 87 (87-01) | Complete |
+| AVN-06 | Phase 87 (87-03) | Complete |
+| AVN-07 | Phase 87 (87-06/87-07) | Complete |
+| AVN-08 | Phase 87 (87-04) | Complete |
+| AVN-09 | Phase 87 (87-04/87-01/87-06) | Complete |
 
-**Coverage:** 14/14 v7.5 requirements mapped across 5 phases (76–80). No orphans, no duplicates.
+**Coverage:** 14/14 v7.5 requirements (76–80) + 9 AVN requirements (Phase 87, Uniform 4-Agent Measurement Program extension) mapped. No orphans, no duplicates.
 
 **Phase map (goal-backward):**
 - **Phase 76 — Measurement Validity Fixes [PREREQUISITE]:** VALID-01, VALID-02, VALID-03 — corrects the shipped attribution/route/score code so a comparison is meaningful; gates the runner phases.
