@@ -325,7 +325,12 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
   3. A side-by-side comparison report (CLI table + machine-readable export) ranks variants on the chosen metric(s), showing variance and each variant's success-gate outcome, keyed by `task_hash` for reproducibility (CMP-03).
   4. A variant whose runs all fail the gate is shown as "no successful runs", never surfaced as a cheap winner by averaging failed cheap runs.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 79-01-PLAN.md — Gate persistence: gateFromEvidence helper + thread gate_passed onto Score.metadata (CMP-01 enabler)
+- [ ] 79-02-PLAN.md — Aggregator lib/experiments/compare.mjs: gate groups + {mean,stddev,median,min,max,n} variance + composite ranking (CMP-01/02/03 core)
+- [ ] 79-03-PLAN.md — Operator CLI scripts/experiments-compare.mjs: ranked table + JSON/CSV export keyed by task_hash + path-safe sanitizer (CMP-03 surface)
 
 ### Phase 80: Experiment Surface — Dashboard & Skill Packaging
 
