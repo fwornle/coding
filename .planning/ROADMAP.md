@@ -346,8 +346,8 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 80-01-PLAN.md — CMP-04 backend: GET /api/experiments/comparison endpoint + shared gate_outcome stamping (no schema drift)
-- [ ] 80-02-PLAN.md — ORCH-01: `experiment` skill (run→auto-compare) distributed to all coding agents
+- [x] 80-01-PLAN.md — CMP-04 backend: GET /api/experiments/comparison endpoint + shared gate_outcome stamping (no schema drift)
+- [x] 80-02-PLAN.md — ORCH-01: `experiment` skill (run→auto-compare) distributed to all coding agents
 - [ ] 80-03-PLAN.md — CMP-04 frontend: Comparison tab variant-column matrix + gsd-browser visual verify + Playwright E2E
 **UI hint**: yes
 
@@ -481,7 +481,7 @@ Plans:
 | 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 3/3 | Complete    | 2026-07-03 |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 4/5 | In Progress|  |
 | 79. Comparison, Aggregation & Report | v7.5 | 3/3 | Complete   | 2026-07-13 |
-| 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
+| 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 2/3 | In Progress|  |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
 | 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete    | 2026-07-07 |

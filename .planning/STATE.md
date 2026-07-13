@@ -4,12 +4,12 @@ milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Phase 80 context gathered
-last_updated: "2026-07-13T18:05:09.716Z"
-last_activity: 2026-07-13 -- Phase 79 execution started
+last_updated: "2026-07-13T18:29:51.434Z"
+last_activity: 2026-07-13 -- Phase 80 execution started
 progress:
   total_phases: 21
   completed_phases: 18
-  total_plans: 106
+  total_plans: 109
   completed_plans: 105
   percent: 86
 ---
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 79 — comparison-aggregation-report
+**Current focus:** Phase 80 — experiment-surface-dashboard-skill-packaging
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,9 +53,9 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 79 (comparison-aggregation-report) — EXECUTING
+Phase: 80 (experiment-surface-dashboard-skill-packaging) — EXECUTING
 Plan: 1 of 3
-Status: Executing Phase 79
+Status: Executing Phase 80
   Plan 86-05 (Wave 3 — declutter IA) done (3 autonomous tasks + 1 blocking human-verify
   checkpoint APPROVED, 3 feat commits 394777f88/c11d4327c/acebed864). Shipped the declutter
   IA (D-08/D-10/D-11/D-12): a per-run reconciliation badge (reconciliation-badge.tsx,
@@ -126,7 +126,7 @@ Status: Executing Phase 79
   all Task 1/2 acceptance greps green. The only 4 `error TS` are pre-existing out-of-scope
   diagnostics (node-details-sidebar.tsx + the deferred token-usage.tsx). See 86-02-SUMMARY.md.
   Next: Wave 2 UI plans consume this frozen contract (turn-modal, difference-viewer, badge).
-Last activity: 2026-07-13 -- Phase 79 execution started
+Last activity: 2026-07-13 -- Phase 80 execution started
 
 ## Deferred Items
 
