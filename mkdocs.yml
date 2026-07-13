@@ -88,6 +88,11 @@ nav:
     - Health Monitoring: architecture/health-monitoring.md
     - Token Usage: architecture/token-usage.md
     - Data Flow: architecture/data-flow.md
+  - Measurement & Cost Optimization:
+    - Overview: measurement/overview.md
+    - Tutorial: measurement/tutorial.md
+    - Architecture: measurement/architecture.md
+    - The /experiment Skill: measurement/experiment-skill.md
   - Integrations:
     - Overview: integrations/index.md
     - Semantic Analysis: integrations/semantic-analysis.md
