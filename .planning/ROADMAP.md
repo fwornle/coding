@@ -50,7 +50,7 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] **Phase 77: Experiment Spec & Per-Variant Snapshot Foundation** — Declarative validated variant matrix + fail-fast config resolution + per-variant×repeat snapshot restore off the Phase-67 rig (SPEC-01/02, RUN-01) (completed 2026-07-03)
 - [ ] **Phase 78: Autonomous Cross-Agent Runner** — Unattended per-cell agent launch wrapped in a measured span; timeouts/aborts recorded; Copilot gated on a headless-drivability spike (RUN-02/03/04)
 - [x] **Phase 79: Comparison, Aggregation & Report** — Objective success gate, N-repeat aggregation with variance, ranked side-by-side report keyed by `task_hash` (CMP-01/02/03) (completed 2026-07-13)
-- [ ] **Phase 80: Experiment Surface — Dashboard & Skill Packaging** — Comparison as variant columns in the Performance tab + single installed `experiment run` skill across the coding agents (CMP-04, ORCH-01)
+- [x] **Phase 80: Experiment Surface — Dashboard & Skill Packaging** — Comparison as variant columns in the Performance tab + single installed `experiment run` skill across the coding agents (CMP-04, ORCH-01) (completed 2026-07-13)
 
 **Uniform-measurement extension (2026-07-05):** Phases 81–87 extend the milestone with the uniform 4-agent measurement program — wire-level token + context-window capture at the proxy for ALL agents, per-turn context revelation, dashboard control center + timeline v2, and interactive branch-avenue measurement. Research: `.planning/research/uniform-measurement-dossier.md`, `.planning/research/proxy-infra-report.md`.
 
@@ -348,7 +348,7 @@ Plans:
 Plans:
 - [x] 80-01-PLAN.md — CMP-04 backend: GET /api/experiments/comparison endpoint + shared gate_outcome stamping (no schema drift)
 - [x] 80-02-PLAN.md — ORCH-01: `experiment` skill (run→auto-compare) distributed to all coding agents
-- [ ] 80-03-PLAN.md — CMP-04 frontend: Comparison tab variant-column matrix + gsd-browser visual verify + Playwright E2E
+- [x] 80-03-PLAN.md — CMP-04 frontend: Comparison tab variant-column matrix + gsd-browser visual verify + Playwright E2E
 **UI hint**: yes
 
 ### Phase 81: Copilot BYOK Proxy-Routing Verification Spike
@@ -481,7 +481,7 @@ Plans:
 | 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 3/3 | Complete    | 2026-07-03 |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 4/5 | In Progress|  |
 | 79. Comparison, Aggregation & Report | v7.5 | 3/3 | Complete   | 2026-07-13 |
-| 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 2/3 | In Progress|  |
+| 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 3/3 | Complete   | 2026-07-13 |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
 | 83. Token Reconciliation Layer | v7.5 | 9/9 | Complete    | 2026-07-07 |
