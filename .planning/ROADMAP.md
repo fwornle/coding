@@ -478,4 +478,4 @@ Plans:
 | 84. Per-Turn Context Revelation | v7.5 | 9/9 | Complete   | 2026-07-08 |
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
-| 87. Interactive Spans & Branch Avenues | v7.5 | 8/8 | Complete   | 2026-07-13 |
+| 87. Interactive Spans & Branch Avenues | v7.5 | 8/8 | Complete    | 2026-07-13 |
