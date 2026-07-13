@@ -343,7 +343,12 @@ Plans:
   2. The comparison is viewable in the Performance dashboard tab as variant columns, surfacing CMP-03 without re-running the experiment (CMP-04).
   3. An operator can go from a one-line command to a rendered side-by-side variant comparison in the dashboard, end-to-end.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 80-01-PLAN.md — CMP-04 backend: GET /api/experiments/comparison endpoint + shared gate_outcome stamping (no schema drift)
+- [ ] 80-02-PLAN.md — ORCH-01: `experiment` skill (run→auto-compare) distributed to all coding agents
+- [ ] 80-03-PLAN.md — CMP-04 frontend: Comparison tab variant-column matrix + gsd-browser visual verify + Playwright E2E
 **UI hint**: yes
 
 ### Phase 81: Copilot BYOK Proxy-Routing Verification Spike
