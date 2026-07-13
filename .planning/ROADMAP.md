@@ -328,8 +328,8 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 **Plans**: 3 plans
 
 Plans:
-- [ ] 79-01-PLAN.md — Gate persistence: gateFromEvidence helper + thread gate_passed onto Score.metadata (CMP-01 enabler)
-- [ ] 79-02-PLAN.md — Aggregator lib/experiments/compare.mjs: gate groups + {mean,stddev,median,min,max,n} variance + composite ranking (CMP-01/02/03 core)
+- [x] 79-01-PLAN.md — Gate persistence: gateFromEvidence helper + thread gate_passed onto Score.metadata (CMP-01 enabler)
+- [x] 79-02-PLAN.md — Aggregator lib/experiments/compare.mjs: gate groups + {mean,stddev,median,min,max,n} variance + composite ranking (CMP-01/02/03 core)
 - [ ] 79-03-PLAN.md — Operator CLI scripts/experiments-compare.mjs: ranked table + JSON/CSV export keyed by task_hash + path-safe sanitizer (CMP-03 surface)
 
 ### Phase 80: Experiment Surface — Dashboard & Skill Packaging
@@ -475,7 +475,7 @@ Plans:
 | 76. Measurement Validity Fixes [PREREQUISITE] | v7.5 | 4/4 | Complete | VALID-01/02/03 verified (live 2026-07-03) |
 | 77. Experiment Spec & Per-Variant Snapshot Foundation | v7.5 | 3/3 | Complete    | 2026-07-03 |
 | 78. Autonomous Cross-Agent Runner | v7.5 | 4/5 | In Progress|  |
-| 79. Comparison, Aggregation & Report | v7.5 | 0/? | Not started | - |
+| 79. Comparison, Aggregation & Report | v7.5 | 2/3 | In Progress|  |
 | 80. Experiment Surface — Dashboard & Skill Packaging | v7.5 | 0/? | Not started | - |
 | 81. Copilot BYOK Verification Spike | v7.5 | 1/1 | Complete | 2026-07-05 |
 | 82. Wire-Measurement Foundation | v7.5 | 6/6 | Complete    | 2026-07-06 |
