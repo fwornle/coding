@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v7.5
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: executing
+status: Awaiting next milestone
 stopped_at: "Phase 78 COMPLETE (RUN-02/03/04 live-verified via 78-05, operator-approved) — ALL v7.5 core reqs satisfied; next: milestone close-out (84 verification doc, sign-offs, complete-milestone)"
-last_updated: "2026-07-13T19:54:22.867Z"
-last_activity: 2026-07-13 -- Phase 80 execution started
+last_updated: "2026-07-13T20:00:29.626Z"
+last_activity: 2026-07-13 — Milestone v7.5 completed and archived
 progress:
   total_phases: 21
   completed_phases: 20
@@ -53,80 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: 80 (experiment-surface-dashboard-skill-packaging) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 80
-  Plan 86-05 (Wave 3 — declutter IA) done (3 autonomous tasks + 1 blocking human-verify
-  checkpoint APPROVED, 3 feat commits 394777f88/c11d4327c/acebed864). Shipped the declutter
-  IA (D-08/D-10/D-11/D-12): a per-run reconciliation badge (reconciliation-badge.tsx,
-  ReconciliationBadge — three states ✓ reconciled / ⚠ Δ discrepancy / transcript-fallback
-  from the VERBATIM summary via fetchReconciliation/selectReconciliationFor, lucide icon per
-  state, reconciliation===null → NO badge, D-06 honesty, T-86-05-02); inline-editable score
-  cells in runs-table.tsx (click/focus → inline-score-input numeric Input, autosave via the
-  EXISTING server-authoritative saveOverride PATCH — server re-validates + writes corrected_*,
-  NO client applyOverride, T-86-05-01; client validateDim range mirror UX-only; optimistic-
-  revert on non-2xx — 400 inline server message / 404 "reopen"; edited yellow badge + judged
-  tooltip retained; stopPropagation so editing doesn't bubble to setSelectedTaskId, D-11); a
-  gated "Compare selected (2)" CTA (enabled only when selectedRunIds.length===2 → setCompareA/
-  setCompareB + switch to the Compare tab, D-08); the page-header "Show quarantined (N)" control
-  re-homed out of faceted-sidebar.tsx to performance.tsx with a live runs.filter(r=>r.pending)
-  .length count (include-pending-toggle testid + setIncludePending/fetchRuns fetch pair
-  preserved, D-10); and the Plan-04 DifferenceViewer mounted BESIDE RunCompare in the Compare
-  tab (metric compare stays, UI-SPEC Q1), reachable from the CTA via controlled Tabs. Extended
-  performance.spec.ts (+82) + performance-compare.spec.ts (86-04 Wave-3-wiring skip lifted).
-  NO packages installed (T-86-05-SC honored). Human-verify APPROVED on :3032 via gsd-browser:
-  D-10 header control + live count, D-11 inline edit affordance + client validation (verified
-  NON-DESTRUCTIVELY — no data mutated), D-12 badge renders w/ data + absent when null, D-08
-  compare-of-2 → Compare tab → DifferenceViewer aligned from first divergence w/ cumulative Δ
-  tokens (−84,726 → −340,878); ATTR-02 italic "unmeasured" preserved; vite build clean.
-  CAVEAT: dataset had 0 scored runs, so a full inline-edit autosave round-trip against a scored
-  run was NOT exercised live (to avoid mutating user data) — the edit affordance + client
-  validation + saveOverride PATCH wiring were verified, and the autosave round-trip is covered
-  by the extended e2e spec. **Phase 86 execution complete (5/5).** See 86-05-SUMMARY.md.
-  Plan 86-03 (Wave 2 — Timeline v2 + drill-down + fullscreen) done (2 autonomous tasks +
-  1 blocking human-verify checkpoint APPROVED, 2 feat commits 8708bc150/baf336522).
-  Shipped the v2 compact TurnRow (turn-row.tsx: tool-name chips +N overflow, mini ContextBand,
-  advisory loopFlags Repeat badge w/ tooltip, font-mono token/cache summary; whole row →
-  openTurnModal; DASH-02 TierBadge slot preserved) + the single-turn drill-down Radix modal
-  (turn-modal.tsx: full per-message list, D-03 semantic-first intent lines, cache-breakpoint
-  markers, per-message bytes; every string through scrubSecrets, ZERO dangerouslySetInnerHTML;
-  raw args only behind capture_raw_bodies; cache_write===null → CACHE_WRITE_NA never 0) + the
-  routed fullscreen /performance/timeline/:taskId view (timeline-fullscreen.tsx: cumulative
-  ContextBand + legend, verbatim canonical_model → italic "unmeasured" when null [ATTR-02],
-  verbatim reconciliation note [D-12], ↑/↓/Enter/Esc keyboard nav). Evolved timeline.tsx in
-  place: v2 TurnRow per turn when context-turns present, DASH-02 TierBadge + reasoning SubBand
-  (timeline-reasoning-step) PRESERVED via TurnRowWithChildren, D-06 v1 fallback + "no per-turn
-  context captured" note for context-turns-free runs, Maximize2 fullscreen affordance,
-  isExperimentCell guard intact. Extended performance.spec.ts (+95): 4 v2 flows (modal open,
-  fullscreen, DASH-02 survival, D-06 note) w/ data-presence skip guards. NO packages installed
-  (T-86-03-SC honored). Human-verify APPROVED on :3032 via gsd-browser (v2 rows, drill-down
-  modal w/ segmented+hatched-cache band, fullscreen cumulative band, DASH-02 tier badges,
-  cache-write verbatim e.g. "cache w: 263"; vite build clean). CAVEAT: D-06 v1-fallback NOT
-  visually reproduced (no context-turns-free run in the dataset) — covered by acceptance grep
-
-  + e2e; live visual deferred. TDD note: Task 1 was tdd=true but no dashboard component-unit
-  harness exists (adding one = package install, excluded); build typecheck + Task-2 Playwright
-  e2e serve as behavioral evidence. See 86-03-SUMMARY.md.
-  Plan 86-02 (Wave 1 — frozen band + slice contract) done (2/2 tasks, 2 commits, ~6 min).
-  Exported the band-rendering primitives from context-cache-explainer.tsx (additive `export`
-  on SEGMENTS/scaledBand/scrubSecrets/CACHE_WRITE_NA + Segment — zero behavior change, the
-  explainer keeps using them internally, 34f4fe319), and built the shared context-band.tsx
-  (ContextBand variant mini|cumulative + ContextBandLegend): mini = one turn's category
-  byte-share at h-2, cumulative = run-wide accreting bytes at h-4, both via the SHARED
-  scaledBand/SEGMENTS (D-05 one taxonomy, never forked). Cache-read renders as a 45deg
-  hatched CSS repeating-linear-gradient overlay (~4px pitch, ~0.55 opacity), solid=fresh
-  (UI-SPEC Q3); honesty gate branches on usage.cache_write===null -> verbatim CACHE_WRITE_NA,
-  never ??0, no amber write segment (D-12); no recharts/SVG. Slice (d82c8538d): landed the
-  frozen Redux contract Waves 2/3 read — fetchReconciliation thunk (mirrors fetchContextTurns
-  exactly; graceful-empty; normalises BOTH the {reconciliation:{summary}} sketch AND the
-  real VERBATIM top-level-summary wire shape to ReconciliationSummary|null; served AS-IS,
-  never client-recomputed, T-86-02-03) + reconciliationByTaskId + selectReconciliationFor;
-  modalTaskId/modalTurnIndex + openTurnModal/closeTurnModal + selectModalTurn (D-01/D-02,
-  mirror setExplainTaskId). ONE slice, no new slice (UI-SPEC Q2). Dashboard build passes;
-  all Task 1/2 acceptance greps green. The only 4 `error TS` are pre-existing out-of-scope
-  diagnostics (node-details-sidebar.tsx + the deferred token-usage.tsx). See 86-02-SUMMARY.md.
-  Next: Wave 2 UI plans consume this frozen contract (turn-modal, difference-viewer, badge).
-Last activity: 2026-07-13 -- Phase 80 execution started
+Phase: Milestone v7.5 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-13 — Milestone v7.5 completed and archived
 
 ## Deferred Items
 
@@ -502,3 +432,17 @@ Plan 02 follow-up for Plan 7:
 ## Operator Next Steps
 
 - Start the next milestone with /gsd-new-milestone
+
+## Deferred Items
+
+Items acknowledged and deferred at v7.5 milestone close on 2026-07-13 (all pre-v7.5 accumulated debt; none block v7.5's 23 verified requirements):
+
+| Category | Count | Notes |
+|----------|-------|-------|
+| debug_sessions | 3 | entity-naming-paths (unknown), llm-synthesis-failures (diagnosed), pattern-extraction-data-loss (investigating) — from Feb 2026 |
+| todos | 5 | console-log-logging, obs-api-libcxx-crash, orphan-digest-refs, okm-api-contract-bridge, +1 — Mar–Jun 2026 |
+| uat_gaps | 9 | prior-milestone phases 46/51/55/57/62/65/69 + v7.5 83 (accepted)/87 (passed, counter stale) |
+| verification_gaps | 8 | prior-milestone phases 37/55/57/62/63/66/69 + 83 (accepted) |
+| context_questions | 3 | phases 45/46/62 (prior milestones) |
+
+Full snapshot: `gsd-sdk query audit-open`. Carry forward to a future cleanup/milestone.

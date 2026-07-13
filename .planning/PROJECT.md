@@ -10,6 +10,8 @@ A self-learning coding environment that captures every session, builds knowledge
 
 ## Current State
 
+**v7.5 — Cross-Agent Comparison Experiment Runner — SHIPPED 2026-07-13.** All 23 requirements satisfied and verified (VALID/SPEC/RUN/CMP/ORCH/AVN across Phases 76–87). The v7.4 measurement rig is now an experiment tool: `experiment run --goal … --variants … --agents … --repeats N` (an installed skill across claude/copilot/opencode/mastra, ORCH-01) drives each variant across agents from an identical snapshot, applies an **objective per-run success gate** persisted at score time (`gate_passed`, CMP-01), aggregates N repeats into per-variant `{mean,stddev,median,min,max,n}` variance (CMP-02), and renders a **ranked side-by-side comparison** keyed by `task_hash` — as a CLI table + JSON export (CMP-03) and as **variant columns in the Performance dashboard's Comparison tab** fed by a live `GET /api/experiments/comparison` endpoint (CMP-04). The runner (Phase 78) was live-verified via the 78-05 cross-agent smoke (claude + opencode complete end-to-end, copilot probe-gated, zero blast radius). The honesty spine holds throughout: failed/ungated/unscored variants are shown separately and never surfaced as a cheap winner. Extension phases 81–87 (wire-measurement, reconciliation, per-turn context, control center, timeline v2, interactive branch avenues) shipped alongside. See `milestones/v7.5-*`.
+
 **v7.5 Phase 83 — Token Reconciliation Layer — complete 2026-07-07.** cladpt/copadt transcript adapters became verify/enrich sources via a new `reconcile` mode: wire rows are primary, transcript rows match by request-id with a time+model fuzzy fallback, per-span discrepancies land in `reconciliation.json`, transcript fallback is preserved for proxy-down windows, and copilot cache split merges from session-state — zero double-counting. Verification reached 26/26 must-haves after two gap-closure cycles: plan 83-09 fixed fuzzy candidate scoping (pre-loop wire snapshot ∖ consumed set) and copilot BYOK `/api/complete` `copadt` stamping; a code-review pass then keyed wire-row identity on SQLite `rowid` end-to-end (closing a cross-adapter id-collision blocker where the composite PK `(user_hash, id)` allowed a claude span to fuzzy-match a copadt row) plus 9 further fixes across both repos. One live-observation item persists (WR-06: copilot BYOK shim `tool_call_id` on a real BMW-network session) tracked in `83-HUMAN-UAT.md`; WR-09 (export durability) and WR-10 (copilot granularity semantics) are documented deferrals. Next: Phase 84 Per-Turn Context Revelation.
 
 **v7.5 Phase 82 — Wire-Measurement Foundation — complete 2026-07-06.** Uniform wire-level token capture is live across the four agents: proxy `token_usage` carries cache-token columns, the `/v1/messages` tap parses cache usage (SSE + non-streaming) and binds rows per-request via `x-task-id`/`x-agent` (ambient-singleton leakage killed on both the tap and — after a live-gate-caught fix — the `/api/complete` path), the OpenAI shim passes native tool calls through with loud capability gating plus a dedicated `/v1/copilot` path, coding-side dedup merges richer rows instead of first-writer-wins, and launchers route claude cells + copilot BYOK through the proxy. Verified live end-to-end (8/8 WIRE requirements, two human-approved gates, real files on disk from copilot + opencode agentic loops). Advisory code review logged 1 critical (sanitizeTaskId crash path) + 6 warnings in `82-REVIEW.md` for follow-up. Next: Phase 83 Token Reconciliation Layer.
@@ -52,11 +54,20 @@ Stack: Four coding agents (`coding --claude/--copilot/--opencode/--mastra`), liv
 - ✓ Per-agent scoring profiles (tier weight multipliers) — Phase 32
 - ✓ Cross-agent session continuity (session state file, 2-hour window) — Phase 32
 
+### Shipped in v7.5 (Cross-Agent Comparison Experiment Runner — Phases 76–87)
+
+- ✓ VALID-01/02/03 — canonical foreground model attribution, plausible route-time math, non-GSD 5-dim rubric coverage — v7.5
+- ✓ SPEC-01/02, RUN-01 — declarative variant matrix + fail-fast resolution + per-variant snapshot restore — v7.5
+- ✓ RUN-02/03/04 — autonomous cross-agent runner, unattended terminal states, copilot headless-drivability gate (live-verified 78-05) — v7.5
+- ✓ CMP-01/02/03 — objective success gate + N-repeat variance + ranked report keyed by `task_hash` — v7.5
+- ✓ CMP-04, ORCH-01 — dashboard variant columns + single installed `experiment` skill across agents — v7.5
+- ✓ AVN-01..09 — interactive spans + git-worktree branch avenues (origin-grouped, outcome-ranked, merge-badged) — v7.5
+
 ### Active
 
-See **Current Milestone: v7.5** below — requirements tracked in `.planning/REQUIREMENTS.md`.
+Next milestone requirements defined via `/gsd-new-milestone`. (v7.6 candidate: policy automation / auto-routing that consumes this runner's comparisons.)
 
-## Current Milestone: v7.5 Cross-Agent Comparison Experiment Runner
+## Shipped in v7.5 — Cross-Agent Comparison Experiment Runner (Phases 76–87, closed 2026-07-13)
 
 **Goal:** Turn the v7.4 measurement rig into an experiment tool — a user states a goal plus a variant matrix ("develop X, measure it under settings A vs B"), and the system drives each variant across agents from an identical starting snapshot, then returns a scored, side-by-side comparison with variance.
 
@@ -205,4 +216,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-07 — Phase 83 (Token Reconciliation Layer) complete (26/26 must-haves; 1 live-observation UAT item + 2 documented deferrals outstanding). v7.5 Cross-Agent Comparison Experiment Runner milestone started (declarative A/B variant matrix + cross-agent runner + scored comparison, on the v7.4 measurement substrate; phases continue from the previous milestone). v7.4 (Performance Measurement System) reached 100% of phases (9/9), complete pending formal close; auto-routing/policy reslotted to v7.6. v7.3 (LLM Proxy Worker Pool, Phases 62–66) shipped 2026-06-21. v7.2 (VKB & Online-Learning Quality) and v7.1 (KM-Core Unification) previously shipped.*
+*Last updated: 2026-07-13 — v7.5 Cross-Agent Comparison Experiment Runner SHIPPED (all 23 requirements verified; Phases 76–87). The comparison/aggregation/report core (CMP-01/02/03) and the dashboard + installed skill surface (CMP-04/ORCH-01) closed the milestone-audit gaps; the runner was live-verified via the 78-05 cross-agent smoke; 2 code-verified residuals (83 WR-06 copilot-BYOK UAT, 87 AVN-07 numeric-render) accepted-with-documented-limitation. 28 pre-v7.5 artifacts deferred (STATE.md). v7.6 candidate: policy automation / auto-routing consuming this runner's comparisons. v7.4 (Performance Measurement) reached 100% of phases, still pending its own formal close. v7.3 (Worker Pool) shipped 2026-06-21; v7.2/v7.1 previously shipped.*
