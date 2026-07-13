@@ -74,7 +74,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // opens via openExperimentStore() — ontologyDir set in lib/experiments/store.mjs
 import { openExperimentStore } from '../lib/experiments/store.mjs';
 import { readRuns } from '../lib/experiments/query.mjs';
-import { buildComparison, GROUP_GATE_OUTCOME, withGateOutcomes } from '../lib/experiments/compare.mjs';
+import {
+  buildComparison,
+  GROUP_GATE_OUTCOME,
+  withGateOutcomes,
+  sanitizeTaskHash,
+} from '../lib/experiments/compare.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = path.resolve(__dirname, '..');
@@ -94,35 +99,12 @@ function parseStrArg(argv, flag) {
   return argv[i + 1] ?? null;
 }
 
-/**
- * Validate + sanitize an operator-supplied task_hash before it becomes a report
- * filename (T-79-03-01). Allows ONLY `[A-Za-z0-9._-]`; rejects empty/non-string,
- * any path separator (`/`, `\`), a parent-dir token (`..`), and a null byte.
- * Returns the value UNCHANGED when it is already a safe basename — this is the
- * ONLY filename component the writers use.
- *
- * @param {string} hash
- * @returns {string} the safe basename (=== input for a valid hash)
- * @throws {Error} on any unsafe or empty value (routed to stderr by the caller).
- */
-export function sanitizeTaskHash(hash) {
-  if (typeof hash !== 'string' || hash.length === 0) {
-    throw new Error('sanitizeTaskHash: task_hash is required and must be a non-empty string');
-  }
-  if (hash.includes('\0')) {
-    throw new Error(`sanitizeTaskHash: task_hash contains a null byte (invalid): ${JSON.stringify(hash)}`);
-  }
-  if (hash.includes('/') || hash.includes('\\')) {
-    throw new Error(`sanitizeTaskHash: task_hash contains a path separator (invalid): ${JSON.stringify(hash)}`);
-  }
-  if (hash.includes('..')) {
-    throw new Error(`sanitizeTaskHash: task_hash contains '..' (traversal — invalid): ${JSON.stringify(hash)}`);
-  }
-  if (!/^[A-Za-z0-9._-]+$/.test(hash)) {
-    throw new Error(`sanitizeTaskHash: task_hash must match [A-Za-z0-9._-] (invalid): ${JSON.stringify(hash)}`);
-  }
-  return hash;
-}
+// sanitizeTaskHash is the SHARED allowlist validator, imported from
+// lib/experiments/compare.mjs (single source of truth — the in-container
+// vkb-server handleComparison endpoint imports the same helper; scripts/ is not
+// mounted into the container, so it MUST live under the mounted lib/experiments).
+// Re-exported below so existing importers (tests) keep resolving it here.
+export { sanitizeTaskHash };
 
 /**
  * Resolve the reports dir + the safe <hash>.<ext> path, asserting the resolved
