@@ -400,13 +400,30 @@ export async function loadObservationsForWindow({ from, to, agent } = {}) {
 }
 
 /**
+ * Corporate staff-ID redaction (q + 6 alphanumerics with at least one digit —
+ * the digit lookahead avoids matching plain words like "quality"/"queried").
+ * Mirrors the canonical corporate_user_ids rule in
+ * `.specstory/config/redaction-patterns.json`. Context-turns message previews
+ * carry raw filesystem paths (e.g. /Users/Q284340/…), so the persisted digest
+ * would otherwise store the staff number. Applied to the serialized JSON string:
+ * the replacement contains no JSON-special chars, so validity is preserved.
+ */
+const CORPORATE_USER_ID_RE = /\bq(?=[0-9a-z]{6}\b)(?=[0-9a-z]*\d)[0-9a-z]{6}\b/gi;
+export function redactCorporateIds(text) {
+  return typeof text === 'string'
+    ? text.replace(CORPORATE_USER_ID_RE, '<USER_ID_REDACTED>')
+    : text;
+}
+
+/**
  * Span-close lifecycle for the context-turns capture in `dir`
  * (`.data/measurements/<sanitized task_id>/`): enrich `context-turns.jsonl` in
- * place with observation_refs, gzip it → `context-turns.jsonl.gz`, remove the
- * plaintext (D-03), and gzip `raw-bodies.jsonl` → `.gz` when present. Each file
- * is guarded independently so a failure on one never skips the other and never
- * throws (the caller also wraps this best-effort). A missing file is normal — the
- * span may have had no measured requests — and is silently skipped.
+ * place with observation_refs, redact the staff ID (write-path hardening), gzip
+ * it → `context-turns.jsonl.gz`, remove the plaintext (D-03), and gzip
+ * `raw-bodies.jsonl` → `.gz` when present. Each file is guarded independently so
+ * a failure on one never skips the other and never throws (the caller also wraps
+ * this best-effort). A missing file is normal — the span may have had no measured
+ * requests — and is silently skipped.
  * @param {string} dir the per-task measurements directory.
  * @param {{from?:string,to?:string,agent?:string,observations?:object[]}} opts
  */
@@ -422,7 +439,7 @@ export function closeContextTurns(dir, { from, to, agent, observations } = {}) {
         .filter(Boolean);
       enrichObservationRefs(lines, { from, to, agent, observations });
       const out = lines.length
-        ? lines.map((l) => JSON.stringify(l)).join('\n') + '\n'
+        ? redactCorporateIds(lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
         : '';
       fs.writeFileSync(
         path.join(dir, 'context-turns.jsonl.gz'),
