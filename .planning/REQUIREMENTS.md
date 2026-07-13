@@ -36,9 +36,9 @@ This file tracks the active milestone's requirements at the top, with previous m
 ### Cross-Agent Runner (RUN)
 
 - [x] **RUN-01:** For each variant × repeat, the runner restores the identical starting snapshot (Phase 67 rig) before launching, so every variant starts from the same tree + state.
-- [ ] **RUN-02:** The runner launches the specified agent (Claude / OpenCode / Mastra) autonomously against the goal, wrapping the work in a measured span tagged with `variant`, `repeat`, and `task_hash`.
-- [ ] **RUN-03:** Runs execute unattended to completion, timeout, or abort — producing a scored Run per variant × repeat without requiring interactive operator steering; timeouts/aborts are recorded as such.
-- [ ] **RUN-04:** Copilot participation is gated on an explicit headless-drivability capability check; if unsupported, the Copilot variant is skipped with a recorded reason (never silently absent).
+- [x] **RUN-02:** The runner launches the specified agent (Claude / OpenCode / Mastra) autonomously against the goal, wrapping the work in a measured span tagged with `variant`, `repeat`, and `task_hash`.
+- [x] **RUN-03:** Runs execute unattended to completion, timeout, or abort — producing a scored Run per variant × repeat without requiring interactive operator steering; timeouts/aborts are recorded as such.
+- [x] **RUN-04:** Copilot participation is gated on an explicit headless-drivability capability check; if unsupported, the Copilot variant is skipped with a recorded reason (never silently absent).
 
 ### Comparison & Reporting (CMP)
 
@@ -77,9 +77,9 @@ This file tracks the active milestone's requirements at the top, with previous m
 | SPEC-01 | Phase 77 | Complete |
 | SPEC-02 | Phase 77 | Complete |
 | RUN-01 | Phase 77 | Complete |
-| RUN-02 | Phase 78 | Pending |
-| RUN-03 | Phase 78 | Pending |
-| RUN-04 | Phase 78 | Pending |
+| RUN-02 | Phase 78 | Complete |
+| RUN-03 | Phase 78 | Complete |
+| RUN-04 | Phase 78 | Complete |
 | CMP-01 | Phase 79 | Complete |
 | CMP-02 | Phase 79 | Complete |
 | CMP-03 | Phase 79 | Complete |
