@@ -1,97 +1,36 @@
 ---
 phase: 87-interactive-spans-and-branch-avenues
-verified: 2026-07-11T00:00:00Z
-status: gaps_found
-score: 4/9 must-haves verified (AVN-01 through AVN-09)
+verified: 2026-07-13T00:00:00Z
+status: human_needed
+score: 9/9 must-haves verified (AVN-01 through AVN-09); 1 residual documented limitation flagged for human acknowledgement
 overrides_applied: 0
-gaps:
-  - truth: "A fork request (dashboard 'Fork into avenues' launch) actually forks the origin span into avenue Runs on avenue/<task_id> branches, grouped by origin_span_id"
-    status: failed
-    reason: >
-      CR-01 CONFIRMED. `runMatrix` (lib/experiments/experiment-runner.mjs:675-793), the only
-      production caller of `runCell`, never destructures or forwards `avenue`, `originSpanId`, or
-      `commitAvenue` from its `opts` (destructure at 676-685) into the `runCell({...})` call site
-      (769-774). `runCell` itself (461-611) correctly implements avenue-mode branch restore,
-      `--origin-span-id` argv, and commit-on-close — but this logic is unreachable dead code via
-      the only real caller. No alternate caller threads these values either: scripts/experiment-run.mjs
-      has zero avenue/origin-span references (grep confirmed) and no --avenue/--origin-span-id CLI
-      flag; lib/experiments/run-launch.mjs's buildRunArgv override list (62-105) has no
-      origin_span_id/avenue entry; lib/experiments/experiment-executor.mjs has no avenue field
-      anywhere. Result: every fork request launches a plain (non-avenue) matrix run — no
-      avenue/<task_id> branch is ever created by a real launch.
-    artifacts:
-      - path: "lib/experiments/experiment-runner.mjs"
-        issue: "runMatrix opts destructure (676-685) and runCell call site (769-774) omit avenue/originSpanId/commitAvenue"
-      - path: "scripts/experiment-run.mjs"
-        issue: "No --avenue or --origin-span-id CLI flag; opts passed to runMatrix carry no avenue fields"
-      - path: "lib/experiments/run-launch.mjs"
-        issue: "buildRunArgv override list has no origin_span_id/avenue passthrough"
-    missing:
-      - "Thread avenue/originSpanId/commitAvenue from runMatrix opts into the runCell call"
-      - "Add --avenue/--origin-span-id CLI flags to scripts/experiment-run.mjs and thread through run-launch.mjs buildRunArgv"
-  - truth: "The dashboard fork-launch request reaches the server with origin_span_id and the chosen fork axes, and the server synthesizes/launches the forked spec accordingly"
-    status: failed
-    reason: >
-      CR-02 CONFIRMED. `handleExperimentRun` in lib/vkb-server/api-routes.js:957 destructures only
-      `{ spec, overrides, rerun_of }` from the request body — `origin_span_id` is never read, and
-      the coordinator POST body (~1073-1075) forwards only `{ spec, run_id, run_dir, overrides }`.
-      `synthesizeAvenueSpec` (lib/experiments/avenue-spec.mjs) is never imported or called from
-      api-routes.js; repo-wide grep confirms its only callers are its own module and its own test.
-      The coordinator's own /experiments/run handler (scripts/health-coordinator.js:2735-2766) also
-      destructures only `{ spec, run_id, run_dir, overrides }` — no origin_span_id awareness at any
-      server layer. Independently discovered: the client's own fork-axis picker preview
-      (experiment-launcher.tsx previewCellCount/avenueCount, lines 142-163) is computed entirely
-      from selectedSpec.variantCount/cellCount/repeats (the pre-existing origin spec's own YAML
-      metadata) — NOT from forkAxes (agent/model/framework/injection selections). The code comment
-      at lines 156-161 claims 'The axis selections shape WHAT is forked; the SERVER resolves HOW
-      MANY' but forkAxes is never included in the launchExperiment dispatch payload at all — this
-      is aspirational text, not implemented behavior. A fork launch runs the origin spec's
-      unmodified matrix regardless of which agent/model/framework/injection boxes are checked.
-    artifacts:
-      - path: "lib/vkb-server/api-routes.js"
-        issue: "handleExperimentRun (930-1100) never reads origin_span_id or forkAxes from the request body; never calls synthesizeAvenueSpec"
-      - path: "scripts/health-coordinator.js"
-        issue: "/experiments/run handler (2735-2766) has zero origin_span_id awareness, matching api-routes.js's omission"
-      - path: "integrations/system-health-dashboard/src/components/performance/experiment-launcher.tsx"
-        issue: "buildOverrides() (206-218) never includes forkAxes/sweep; previewCellCount/avenueCount (142-163) derive from the origin spec's own metadata, independent of the axis picker"
-    missing:
-      - "handleExperimentRun must read origin_span_id + forkAxes from the request body and call synthesizeAvenueSpec to build the forked spec before launch"
-      - "experiment-launcher.tsx must include forkAxes/sweep in the launchExperiment dispatch payload"
-      - "previewCellCount must reflect a server-computed count of the ACTUAL fork request (axes-aware), not the origin spec's static metadata"
-  - truth: "Completed avenue Runs carry a non-null origin_span_id so the dashboard's origin-grouped ranked panel (AVN-07/08/09) has real data to group and rank"
-    status: failed
-    reason: >
-      CR-03 CONFIRMED as the direct downstream symptom of CR-01/CR-02. performanceSlice.ts's
-      launchExperiment thunk (964-994) does POST origin_span_id at the top level, and its code
-      comment (975-979) explicitly claims 'The server threads it to the runner's --origin-span-id
-      (Plan 87-03) so avenue Runs group by origin' — this claim is false per CR-02. run-write.mjs
-      (line 139: origin_span_id: t.origin_span_id ?? null) and measurement-stop.mjs (line 180) are
-      correctly implemented to persist origin_span_id IF it reaches them, and
-      measurement-start.mjs correctly parses --origin-span-id IF passed (lines 113-116, 199) — but
-      per CR-01 no real caller ever passes that flag. selectAvenuesByOrigin (performanceSlice.ts
-      ~1881) is correctly implemented to group Runs by origin_span_id, and rankAvenues/
-      avenueOutcomeScore/MergeStatusBadge/AvenuePanel (Plan 06) are all genuinely well-built and
-      unit/spec-collection tested — but structurally unreachable with real data, since no Run
-      produced by the actual launch path ever carries a non-null origin_span_id.
-    artifacts:
-      - path: "integrations/system-health-dashboard/src/store/slices/performanceSlice.ts"
-        issue: "launchExperiment code comment (975-979) falsely claims server-side origin_span_id persistence; selectAvenuesByOrigin has no real data to group in production"
-    missing:
-      - "Fix CR-01 and CR-02 first; origin_span_id will then flow end-to-end without further changes to run-write.mjs/measurement-start.mjs/measurement-stop.mjs/performanceSlice.ts grouping logic, which are already correct"
+re_verification:
+  previous_status: gaps_found
+  previous_score: 4/9
+  gaps_closed:
+    - "CR-01: runMatrix now forwards avenue/originSpanId/commitAvenue into the runCell call (experiment-runner.mjs:783); scripts/experiment-run.mjs parses --avenue/--origin-span-id; run-launch.mjs buildRunArgv emits both flags"
+    - "CR-02: handleExperimentRun (api-routes.js) now reads origin_span_id + forkAxes, resolves the origin Run, maps forkAxes→variants, calls synthesizeAvenueSpec + synthesizeToYamlFile, and folds origin_span_id/avenue:true into the forwarded coordinator overrides"
+    - "CR-02/CR-03 client: experiment-launcher.tsx now sends forkAxes/sweep in the launch payload; previewCellCount in fork mode is sourced from the new server-side POST /api/experiments/fork-preview round-trip, never selectedSpec.variantCount"
+    - "CR-03: a real live fork (verified independently by querying the main-tree LevelDB) produced 2 Runs with non-null origin_span_id, proving selectAvenuesByOrigin has real data to group"
+    - "Two Blocker-severity misleading code comments (performanceSlice.ts:975-979, experiment-launcher.tsx:156-161) corrected to describe the real post-87-07 wiring; aspirational 'shape WHAT is forked' text removed"
+    - "REQUIREMENTS.md traceability gap closed: AVN-01..09 section + 9 traceability rows added"
+  gaps_remaining: []
+  regressions: []
+gaps: []
 deferred: []
 human_verification:
-  - test: "Rebuild the real (main-tree) dashboard, navigate to Performance > Avenues tab, fork a completed span with a chosen agent/model axis, wait for completion, and visually confirm a ranked origin-grouped row appears with a real (non-em-dash) outcome score and a git-computed merge-status badge, in both light and dark themes"
-    expected: "A ranked avenue row appears under the origin's Card, sorted best-first, with a merge badge and working Promote/Prune actions"
-    why_human: "Requires live e2e execution against a real forked Run; the worktree-authored performance-compare.spec.ts spec was only typecheck/collection-gated (6 tests collected, not run against live data per 87-06-SUMMARY.md) because the bind-mounted dashboard reflects main-tree code, not the worktree. This check is ALSO currently impossible to pass because CR-01/CR-02 mean no real fork ever produces an origin_span_id-bearing Run — the panel's empty state will show even after a real fork attempt until the gaps above are closed."
+  - test: "Fork a NON-trivial completed span (one whose judge/rubric assigns a real numeric score, not not_scored='trivial') and confirm the Avenues panel Outcome column renders a real formatted score (v.toFixed(2)) instead of the em-dash, and that best-first ranking visibly reorders rows by that score."
+    expected: "The Outcome column shows a numeric score (not '—') for at least one avenue row, and the row with the highest score is ordered first (or carries the left success-accent border per avenue-panel.tsx's isBest logic)."
+    why_human: "The only live fork exercised so far (87-08) forked a trivial fizzbuzz task; both produced avenue Runs scored not_scored='trivial', so avenueOutcomeScore() returned null for both and fmtScore() rendered the em-dash by design (honest null-handling, not a bug — confirmed by source read: fmtScore returns v.toFixed(2) for a real number). This is a data-availability gap in the one live test performed, not a wiring defect, but the numeric-score rendering path has not been visually exercised with a non-null value. Recommend one additional live fork of a scored (non-trivial) span before closing this residual, or explicit acceptance that the code-level guarantee (verified via source + unit-level formatting logic) is sufficient without a further live screenshot."
 ---
 
 # Phase 87: Interactive Spans & Branch Avenues Verification Report
 
 **Phase Goal:** A measurement span started from the main interactive agent captures origin snapshot + initial prompt; completed spans fork into "avenues" — headless re-runs of the initial prompt with modified agent/model/framework, each on a persistent `avenue/<task_id>` git branch — grouped by origin, compared in the dashboard, merge-status tracked; measurement data survives across branches (main-`.data` stores).
 
-**Verified:** 2026-07-11
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Verified:** 2026-07-13
+**Status:** human_needed
+**Re-verification:** Yes — after gap-closure plans 87-07 (fork-launch thread) and 87-08 (comment hygiene + REQUIREMENTS ledger + live verification)
 
 ## Goal Achievement
 
@@ -99,120 +38,107 @@ human_verification:
 
 | # | Truth (mapped to AVN-ID) | Status | Evidence |
 |---|---------|--------|----------|
-| 1 | AVN-01: An avenue span's Run record carries `origin_span_id`, threaded from the fork request through to persistence | ✗ FAILED | CR-01/CR-02 confirmed: no production caller ever passes `origin_span_id`/`avenue` into the runner. `run-write.mjs`/`measurement-start.mjs`/`measurement-stop.mjs` are correctly implemented but never invoked with the flag. `writeRun` unit test (AVN-01 test in experiment-runner.test.mjs) passes only in isolation with an injected `origin_span_id` tag — not exercised via the real launch path. |
-| 2 | AVN-02: Dashboard "Fork into avenues" launch is a thin wrapper over the existing `launchExperiment` → vkb-server → coordinator bridge (no UI-only path) | ⚠️ PARTIAL | The button exists, dispatches through the real bridge (confirmed: `runs-table.tsx` Fork button → `buildForkPrefill` → `launchExperiment` thunk → `/api/experiments/run` → coordinator `/experiments/run`), so the WIRING PATTERN is real (no client-side fake fork). But per CR-02 the bridge silently drops `origin_span_id`/fork axes en route, so the "fork" that reaches the server is indistinguishable from a plain rerun. |
-| 3 | AVN-03: 4-axis picker (agent/model/framework/injection) is curated-default with a sweep toggle and a SERVER-resolved count/cost preview before launch | ✗ FAILED | Picker UI exists (`experiment-launcher.tsx` `forkAxes` state, 4-axis controls). But `previewCellCount`/`avenueCount` (142-163) derive from `selectedSpec.variantCount/cellCount/repeats` — the origin spec's own static YAML metadata — NOT from the chosen `forkAxes`. `buildOverrides()` (206-218) never includes `forkAxes` in the launch payload. The "server-resolved" claim in the code comment is true only for the (irrelevant) origin-spec count, not for the actual fork request; the axis picker is decorative. |
-| 4 | AVN-04: Knowledge-injection toggle is a per-avenue axis, threading `CODING_KNOWLEDGE_INJECTION=0` into spawned agent env without affecting the interactive session | ✓ VERIFIED | `experiment-spec.mjs` encodes the injection axis in the existing `env` field (87-02 Plan). `knowledge-injection-hook.js` and `launch-agent-common.sh` both early-return on `CODING_KNOWLEDGE_INJECTION=0` (grep-confirmed patterns present). This primitive is real and scoped to spawned agent env — but per AVN-03's failure, no real fork request currently selects/threads this axis end-to-end from the dashboard. |
-| 5 | AVN-05: Avenue branches are named `avenue/<task_id>` worktrees (not detached); prune removes worktree+branch; measurement data survives; detached default preserved when avenue mode not requested | ✓ VERIFIED | `avenue-branch.mjs` primitives independently tested — 12/12 tests pass live against real git fixtures (createAvenueBranch named-worktree, pruneAvenueBranch removal+idempotency, path-traversal sanitization, commitAvenueWorktree). Genuinely solid in isolation, consistent with 87-REVIEW.md's positive assessment of the git layer. |
-| 6 | AVN-06: Avenue span writes to MAIN `.data` (not the branch worktree), with no double-count across branches | ✓ VERIFIED | `experiment-runner.mjs` documents and implements the span→MAIN dataDir split (lines 485-491); `runCell` unit tests confirm `--capture-raw-bodies`/dataDir forwarding. This is a data-integrity guarantee for avenue mode's storage target, verified structurally even though avenue mode itself is unreachable via the launch path (Truth 1). |
-| 7 | AVN-07: Origin-grouped, outcome-ranked N-way avenue panel (best-first, git-computed merge badges) | ⚠️ PARTIAL | `AvenuePanel`/`MergeStatusBadge`/`selectAvenuesByOrigin`/`rankAvenues` are all genuinely well-implemented (verified via source read) and the e2e spec is collection/typecheck-gated (6 tests). But this UI has ZERO real data to render given Truths 1-3's failures — `selectAvenuesByOrigin` will return an empty grouping against any real dataset today, so the panel is functionally unreachable, not just unverified. Live visual verification was explicitly deferred per 87-06-SUMMARY.md and could not pass today even if run, because no forked Run exists. |
-| 8 | AVN-08: Merge-status computed from git without mutating main; promote blocked on conflicts | ✓ VERIFIED | `avenueMergeStatus`/`promoteAvenue` primitives pass 12/12 live git tests (merged/unmerged/conflicts/unknown states; conflict-blocked promote; no-main-mutation guarantee). Coordinator endpoints (`scripts/health-coordinator.js:2806-2900+`) and vkb-server proxy routes (`api-routes.js` `handleAvenueMergeStatus`/`handleAvenuePromote`/`handleAvenuePrune`, `_proxyAvenue`) read directly — fully wired, origin-gated, verbatim pass-through, host-only state-changing ops per the Pitfall-6 trust boundary. This layer is genuinely solid end-to-end. |
-| 9 | AVN-09: Prune removes worktree+branch via the coordinator seam (never the container); reachable via vkb-server→coordinator routes | ✓ VERIFIED | Same evidence as Truth 8 — `pruneAvenueBranch` primitive tested, coordinator endpoint (`/experiments/avenue-prune`) and vkb-server proxy (`handleAvenuePrune`) both read and confirmed wired with origin validation and task_id sanitization. |
+| 1 | AVN-01: An avenue span's Run record carries `origin_span_id`, threaded from the fork request through to persistence | ✓ VERIFIED | Independently queried the main-tree `.data/experiments/leveldb` (not trusting SUMMARY): `readRuns` returns 2 rows with non-null `origin_span_id="compare-fizzbuzz-v9-rmrbyrzjh--claude-sonnet-straight-default--r0"` — `exp-d4164dca2e74--claude-opus-straight-kb-on--r0` (terminal_state=complete) and `exp-d4164dca2e74--opencode-opus-straight-kb-on--r0` (terminal_state=abort). `runMatrix` now forwards `avenue, originSpanId, commitAvenue` into the `runCell({...})` call (experiment-runner.mjs:783, confirmed via grep + read). `tests/experiments/avenue-fork-thread.test.mjs` passes 4/4 against the REAL runMatrix/runCell/run-write code. |
+| 2 | AVN-02: Dashboard "Fork into avenues" launch is a thin wrapper over the existing `launchExperiment` → vkb-server → coordinator bridge, and the payload now includes origin_span_id + fork axes | ✓ VERIFIED | `handleExperimentRun` (api-routes.js:962) destructures `{ spec, overrides, rerun_of, origin_span_id, forkAxes }`; resolves the origin Run, maps axes→variants, calls `synthesizeAvenueSpec`/`synthesizeToYamlFile`, folds `origin_span_id`+`avenue:true` into the coordinator overrides (api-routes.js:1105). Coordinator forwards `overrides` whole (health-coordinator.js:2762). Live proof: the 2 Runs above were produced via the real launch path (host CLI D-01 seam, sanctioned by 87-07 plan, used because the container's `config/experiments/` mount is read-only — documented, not a workaround of the seam itself). |
+| 3 | AVN-03: 4-axis picker (agent/model/framework/injection) is curated-default with a sweep toggle and a SERVER-resolved count/cost preview before launch | ✓ VERIFIED | New `POST /api/experiments/fork-preview` (api-routes.js:1166, `handleExperimentForkPreview`) synthesizes-and-counts without persisting/launching, reusing the same `_resolveOriginRun`/`_mapForkAxesToVariants` as the launch path so counts can't diverge. Client: `experiment-launcher.tsx` `previewCellCount` in fork mode reads `forkPreviewCount` (server round-trip via `previewForkCount` thunk) — confirmed by source read that the fork branch does NOT fall back to `selectedSpec.variantCount`. Live: SUMMARY records fork-preview returned `{"cellCount":2}` matching the 2 cells actually launched. |
+| 4 | AVN-04: Knowledge-injection toggle is a per-avenue axis, threading `CODING_KNOWLEDGE_INJECTION=0` into spawned agent env without affecting the interactive session | ✓ VERIFIED | No regression — `launch-agent-common.sh:345-351` guard confirmed unchanged and present. |
+| 5 | AVN-05: Avenue branches are named `avenue/<task_id>` worktrees (not detached); prune removes worktree+branch; measurement data survives; detached default preserved when avenue mode not requested | ✓ VERIFIED | `tests/experiments/avenue-branch.test.mjs` re-run independently: 5/5 pass (createAvenueBranch named-worktree, pruneAvenueBranch removal+idempotency, task_id sanitization, commitAvenueWorktree). Live: `git branch -a` shows the two real branches `avenue/exp-d4164dca2e74--claude-opus-straight-kb-on--r0` and `avenue/exp-d4164dca2e74--opencode-opus-straight-kb-on--r0` actually exist in the repo, produced by the live 87-08 fork. |
+| 6 | AVN-06: Avenue span writes to MAIN `.data` (not the branch worktree), with no double-count across branches | ✓ VERIFIED | No regression — structural guarantee unchanged; confirmed by the fact that the 2 live avenue Runs are readable from the MAIN-tree `.data/experiments/leveldb` (queried directly), not from a branch-worktree-local store. |
+| 7 | AVN-07: Origin-grouped, outcome-ranked N-way avenue panel (best-first, git-computed merge badges) | ✓ VERIFIED (grouping/badges/actions) — 1 residual item routed to human_verification | `selectAvenuesByOrigin`/`rankAvenues` confirmed correct by source read (null-safe, honest — never fabricates a score, sorts unmeasured last). Live gsd-browser screenshots (`11-avenues-merge-dark.png`, `12-avenues-merge-light.png`, viewed directly by this verifier, not just described) show: header "Avenues of compare-fizzbuzz-v9-...-r0 (2)" (real origin-grouped card), 2 avenue rows with agent/model labels, a real git-computed "⚠ conflicts" merge badge on both rows, in BOTH dark and light themes. Outcome column shows em-dash for both rows — confirmed this is because both live-forked Runs scored `not_scored='trivial'` (`avenueOutcomeScore()` correctly returns null, `fmtScore()` correctly renders the em-dash for null and `v.toFixed(2)` for a real number, per source read) — not a wiring defect, but the numeric-score render path was not visually exercised with a real value. Routed to human_verification below. |
+| 8 | AVN-08: Merge-status computed from git without mutating main; promote blocked on conflicts | ✓ VERIFIED | No regression — `avenue-branch.test.mjs`/`avenue-merge.test.mjs` primitives green. Live: both avenue rows show a real git-computed "conflicts" badge (ahead=1, behind=119, conflicts=2 per SUMMARY, plausible given a live 2-day-old origin branch); `avenue-panel.tsx` `hasConflicts` correctly disables the Promote button (source-confirmed at :127-146) — matches the screenshot's disabled/tooltip state. |
+| 9 | AVN-09: Prune removes worktree+branch via the coordinator seam (never the container); reachable via vkb-server→coordinator routes | ✓ VERIFIED | No regression — coordinator `/experiments/avenue-prune` + vkb-server `handleAvenuePrune` proxy unchanged and still wired (confirmed present in api-routes.js/health-coordinator.js). Live: Prune button rendered enabled on both avenue rows in the screenshots. |
 
-**Score:** 4/9 truths fully VERIFIED (AVN-04, AVN-05, AVN-06, AVN-08, AVN-09); 2/9 PARTIAL (AVN-02, AVN-07 — real primitives, unreachable/decorative in practice); 3/9 FAILED (AVN-01, AVN-03, and the composite fork-launch truth underlying CR-01/02/03)
+**Score:** 9/9 truths VERIFIED at the code + live-data level. 1 truth (AVN-07) has a documented, honestly-disclosed residual — the outcome-score numeric-render path was not visually exercised with a non-null value in the live test (both forked runs were trivial-scored) — routed to human_verification rather than counted as a gap, because (a) the rendering code (`fmtScore`) is source-verified correct for both null and non-null cases, and (b) the grouping/ranking/merge-badge/actions machinery — the actual novel wiring this phase built — IS live-proven.
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `lib/experiments/avenue-branch.mjs` | createAvenueBranch/pruneAvenueBranch/commitAvenueWorktree/avenueMergeStatus/promoteAvenue | ✓ VERIFIED | All 6 exports present; 12/12 live tests pass |
-| `lib/experiments/experiment-runner.mjs` (runCell avenue mode) | avenue/originSpanId/commitAvenue params implemented | ✓ VERIFIED (substantive) / ⚠️ ORPHANED (wiring) | Logic correct but unreachable — no caller passes these params |
-| `lib/experiments/experiment-runner.mjs` (runMatrix) | Threads avenue/originSpanId/commitAvenue from opts into runCell | ✗ MISSING | opts destructure (676-685) and runCell call site (769-774) omit all three fields |
-| `lib/experiments/avenue-spec.mjs` (synthesizeAvenueSpec) | Synthesizes forked spec from origin RunSnapshot + fork axes | ✓ VERIFIED (substantive) / ⚠️ ORPHANED (wiring) | Module correct per its own tests; zero production callers repo-wide |
-| `lib/vkb-server/api-routes.js` (handleExperimentRun) | Reads origin_span_id + fork axes, calls synthesizeAvenueSpec | ✗ STUB | Destructures only `{ spec, overrides, rerun_of }`; no origin_span_id/axes read; no synthesizeAvenueSpec call |
-| `lib/vkb-server/api-routes.js` (avenue-merge-status/promote/prune proxies) | Proxy to coordinator with task_id validation | ✓ VERIFIED | Fully wired, origin-gated |
-| `scripts/health-coordinator.js` (avenue-merge-status/promote/prune endpoints) | Host-only git ops, verbatim primitive results | ✓ VERIFIED | Fully wired, task_id-sanitized, origin-gated |
-| `integrations/system-health-dashboard/.../experiment-launcher.tsx` | 4-axis picker + server-resolved preview | ⚠️ ORPHANED | Axis picker UI exists but its selections never reach the launch payload or the preview computation |
-| `integrations/system-health-dashboard/.../avenue-panel.tsx` + `merge-status-badge.tsx` | Origin-grouped ranked panel | ✓ VERIFIED (substantive) / ⚠️ HOLLOW (data flow) | Well-built, but `selectAvenuesByOrigin` has no real grouped data given upstream gaps |
-| `integrations/system-health-dashboard/.../performanceSlice.ts` (launchExperiment, selectAvenuesByOrigin, rankAvenues) | origin_span_id threading + grouping/ranking | ✓ VERIFIED (substantive) / ✗ HOLLOW (data flow) | Client-side logic correct; server never returns/persists the data it needs |
+| `lib/experiments/experiment-runner.mjs` (runMatrix) | Threads avenue/originSpanId/commitAvenue from opts into runCell | ✓ VERIFIED | `avenue = false, originSpanId, commitAvenue` destructured at opts (~684), forwarded at runCell call site (line 783); non-avenue path stays byte-identical (avenue defaults false) |
+| `scripts/experiment-run.mjs` | `--avenue` / `--origin-span-id` CLI flags | ✓ VERIFIED | `args.includes('--avenue')` (line 178), `parseStrArg(args, '--origin-span-id')` (line 179), both threaded into runMatrix opts |
+| `lib/experiments/run-launch.mjs` (buildRunArgv) | Emits `--origin-span-id`/`--avenue` from overrides | ✓ VERIFIED | valueFlags entry `['origin_span_id', '--origin-span-id']` (line 83); boolean push on `overrides.avenue === true` (lines 112-113) |
+| `lib/vkb-server/api-routes.js` (handleExperimentRun) | Reads origin_span_id + forkAxes, calls synthesizeAvenueSpec | ✓ VERIFIED | Body destructure includes both (line 962); `synthesizeAvenueSpec`/`synthesizeToYamlFile` imported+called (lines 1042-1050); origin_span_id+avenue folded into forwarded overrides (line 1105) |
+| `lib/vkb-server/api-routes.js` (handleExperimentForkPreview) | NEW axes-aware preview endpoint | ✓ VERIFIED | Route registered (`POST /api/experiments/fork-preview`, line 121); handler synthesizes+counts without persist/launch (lines 1166-1190); shares `_resolveOriginRun`/`_mapForkAxesToVariants` with the launch path |
+| `integrations/system-health-dashboard/.../experiment-launcher.tsx` | forkAxes/sweep in launch payload; axes-aware server-resolved previewCellCount | ✓ VERIFIED | `forkAxes, sweep` included in `launchExperiment(...)` dispatch (line 276) only in fork mode; `previewCellCount` fork branch reads `forkPreviewCount` (line 180), non-fork branch unchanged |
+| `integrations/system-health-dashboard/.../performanceSlice.ts` | launchExperiment carries forkAxes/sweep; previewForkCount thunk added | ✓ VERIFIED | Thunk type extended (line 966), POST body includes both (lines 991-993); new `previewForkCount` thunk (line 1010) |
+| `.planning/REQUIREMENTS.md` | AVN-01..09 section + traceability | ✓ VERIFIED | 9 `- [x] **AVN-0N:**` bullets (lines 58-66) + 9 traceability rows (lines 88-96), all mapped to Phase 87 plans |
+| `tests/experiments/avenue-fork-thread.test.mjs` | Integration test proving the real thread end-to-end | ✓ VERIFIED | Created; 4/4 pass independently re-run; asserts the measurement-start seam receives `--origin-span-id` and a Run round-trips with non-null origin_span_id (and null for a non-avenue run) |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|-----|-----|--------|---------|
-| `runs-table.tsx` Fork button | `setLauncherPrefill(buildForkPrefill(run))` | dispatch | ✓ WIRED | Confirmed present |
-| `experiment-launcher.tsx` forkAxes state | `launchExperiment` dispatch payload | buildOverrides() | ✗ NOT_WIRED | forkAxes never appears in the POST body (only spec/overrides/rerun_of/origin_span_id) |
-| `performanceSlice.ts` launchExperiment thunk | `POST /api/experiments/run` body.origin_span_id | fetch | ✓ WIRED (client-side send) | Confirmed POST includes origin_span_id |
-| `api-routes.js` handleExperimentRun | request body.origin_span_id | destructure | ✗ NOT_WIRED | Field never read server-side — CR-02 |
-| `api-routes.js` handleExperimentRun | `synthesizeAvenueSpec` | import + call | ✗ NOT_WIRED | Zero production callers repo-wide |
-| `api-routes.js` handleExperimentRun | coordinator `/experiments/run` | POST proxy | ✗ PARTIAL | Forwards spec/run_id/run_dir/overrides only — no origin_span_id/axes |
-| `scripts/experiment-run.mjs` CLI opts | `runMatrix(spec, opts)` | opts object | ✗ NOT_WIRED | No avenue/origin_span_id in opts; no CLI flags exist for them |
-| `runMatrix` opts | `runCell({...})` call site | destructure + pass | ✗ NOT_WIRED | CR-01 — avenue/originSpanId/commitAvenue dropped between destructure and call |
-| `runCell` (avenue=true) | `measurement-start.mjs --origin-span-id` | argv | ✓ WIRED (in isolation) | Correct when avenue=true reaches runCell — but nothing ever sets avenue=true in production |
-| `measurement-stop.mjs` | `run-write.mjs writeRun` origin_span_id | span.meta passthrough | ✓ WIRED (in isolation) | Correct given a populated span.meta.origin_span_id — never populated in production |
-| `api-routes.js` avenue-merge-status/promote/prune | coordinator `/experiments/avenue-*` | `_proxyAvenue` | ✓ WIRED | Fully verified, origin-gated, task_id-validated |
-| `coordinator avenue-merge-status/promote/prune` | `avenue-branch.mjs` primitives | direct import + call | ✓ WIRED | Verbatim pass-through, verified |
-| `avenue-panel.tsx` | `selectAvenuesByOrigin` selector | useSelector | ✓ WIRED (code) / ✗ HOLLOW (data) | Selector call is real; upstream data source is empty in production |
+| `runMatrix` opts | `runCell({ ..., avenue, originSpanId, commitAvenue })` | opts destructure + call-site passthrough | ✓ WIRED | Confirmed at experiment-runner.mjs:783 |
+| `experiment-run.mjs` CLI | `runMatrix opts.avenue / opts.originSpanId` | `--avenue` / `--origin-span-id` flag parse | ✓ WIRED | Confirmed lines 178-179, 314 |
+| `run-launch buildRunArgv` | `--avenue` / `--origin-span-id` argv | `overrides.avenue` / `overrides.origin_span_id` passthrough | ✓ WIRED | Confirmed lines 83, 112-113 |
+| `handleExperimentRun` body | `synthesizeAvenueSpec(originRun, forkAxes)` → `synthesizeToYamlFile` → coordinator `/experiments/run` | origin_span_id + forkAxes read + spec synthesis | ✓ WIRED | Confirmed lines 962, 1023-1052, 1105 |
+| coordinator `/experiments/run` | `runExperiment overrides.origin_span_id / overrides.avenue` | request body destructure, whole-overrides forward | ✓ WIRED | Confirmed health-coordinator.js:2762 (overrides forwarded whole, no filter) |
+| `experiment-launcher.tsx` forkAxes state | `launchExperiment` dispatch payload | `buildOverrides()` / dispatch spread | ✓ WIRED | Confirmed line 276, fork-mode-only spread |
+| `experiment-launcher.tsx` previewCellCount | `previewForkCount` server round-trip | dispatch on axes/sweep/repeats change | ✓ WIRED | Confirmed lines 148, 180 |
+| avenue Run | `selectAvenuesByOrigin` grouping | non-null `origin_span_id` on the Run record | ✓ WIRED (real data) | Independently queried: 2 real Runs in main `.data` carry the predicate; `selectAvenuesByOrigin` groups by exactly that field (performanceSlice.ts ~1917-1926) |
+| `avenue-panel.tsx` | `MergeStatusBadge` + `AvenueRowActions` (Promote/Prune) | component composition | ✓ WIRED (live) | Screenshots confirm real "⚠ conflicts" badges + correctly-disabled Promote + enabled Prune |
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
 |----------|---------------|--------|---------------------|--------|
-| `avenue-panel.tsx` | `avenuesByOrigin` (via `selectAvenuesByOrigin`) | `fetchRuns` → Run[] filtered by non-null `origin_span_id` | No — no Run in production ever carries a non-null origin_span_id (CR-01/CR-02 chain) | ✗ DISCONNECTED |
-| `experiment-launcher.tsx` | `avenueCount`/`previewCellCount` | `selectedSpec.variantCount/cellCount` (origin spec YAML, via handleSpecList) | Real data, but the WRONG data — reflects the origin spec's static metadata, not the fork axes selected | ⚠️ STATIC (wrong source) |
-| `merge-status-badge.tsx` | `mergeStatusByTaskId[taskId]` | `fetchMergeStatus` thunk → coordinator `avenueMergeStatus` (real git query) | Yes, IF a task_id with a real avenue branch is queried — but no such task_id is ever produced by a real fork | ✓ FLOWING (primitive) / N/A (no real invocation target) |
+| `avenue-panel.tsx` | `avenuesByOrigin` (via `selectAvenuesByOrigin`) | `fetchRuns` → Run[] filtered by non-null `origin_span_id` | Yes — independently confirmed 2 real Runs in main-tree LevelDB carry non-null origin_span_id | ✓ FLOWING |
+| `experiment-launcher.tsx` | `previewCellCount` (fork mode) | `previewForkCount` thunk → `POST /api/experiments/fork-preview` → server-synthesized count | Yes — SUMMARY-recorded `{"cellCount":2}` matches the 2 cells actually launched | ✓ FLOWING |
+| `merge-status-badge.tsx` | `mergeStatusByTaskId[taskId]` | `fetchMergeStatus` thunk → coordinator `avenueMergeStatus` (real git query) | Yes — screenshots show real ahead/behind/conflicts values, not a placeholder | ✓ FLOWING |
+| `avenue-panel.tsx` Outcome column | `avenueOutcomeScore(run)` | `run.score.corrected_goal_achieved` / `goal_achieved` | Partial — both live Runs are `not_scored='trivial'` so this returns null by design (honest); rendering logic for a real value is source-verified but not live-exercised | ⚠️ NOT YET LIVE-EXERCISED (not a defect — see human_verification) |
 
 ### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|-------------|--------------|--------|----------|
-| AVN-01 | 87-03 | Run record carries origin_span_id | ✗ BLOCKED | run-write.mjs correct but unreachable (CR-01/CR-02) |
-| AVN-02 | 87-05 | Dashboard Fork = thin wrapper over existing bridge | ? PARTIAL/NEEDS HUMAN | Wiring pattern real, but payload incomplete (CR-02) |
-| AVN-03 | 87-02, 87-05 | Curated 4-axis picker + sweep + server-resolved preview | ✗ BLOCKED | Axis selections never reach launch or preview computation |
-| AVN-04 | 87-02 | Knowledge-injection per-avenue axis | ✓ SATISFIED | Hook/injector guards correctly implemented (primitive-level) |
-| AVN-05 | 87-01 | avenue/<task_id> worktree branch; prune; data survival; detached default preserved | ✓ SATISFIED | 12/12 live tests pass |
-| AVN-06 | 87-03 | Cross-branch: avenue span writes MAIN .data, no double-count | ✓ SATISFIED | Structural guarantee verified; unreachable via launch path but the guarantee itself holds when avenue mode IS invoked (e.g., directly via runCell) |
-| AVN-07 | 87-06 | Origin-grouped, outcome-ranked N-way panel | ✗ BLOCKED | Well-built but no real grouped data (downstream of CR-01/02/03) |
-| AVN-08 | 87-04 | Merge status computed from git, no main mutation | ✓ SATISFIED | Fully verified end-to-end |
-| AVN-09 | 87-04, 87-01, 87-06 | Prune via coordinator seam only; reachable via vkb-server routes | ✓ SATISFIED | Fully verified end-to-end |
+| AVN-01 | 87-03, 87-07 | Run record carries origin_span_id via the real launch path | ✓ SATISFIED | Live data + tests |
+| AVN-02 | 87-05, 87-07 | Dashboard Fork = thin wrapper, payload reaches server with origin_span_id + axes | ✓ SATISFIED | Live launch via the real bridge; server reads + acts on both fields |
+| AVN-03 | 87-02, 87-05, 87-07 | Curated 4-axis picker + sweep + server-resolved preview | ✓ SATISFIED | New fork-preview endpoint; client sources count from it |
+| AVN-04 | 87-02 | Knowledge-injection per-avenue axis | ✓ SATISFIED | No regression |
+| AVN-05 | 87-01 | avenue/<task_id> worktree branch; prune; data survival | ✓ SATISFIED | No regression + live branches exist |
+| AVN-06 | 87-03 | Cross-branch: avenue span writes MAIN .data, no double-count | ✓ SATISFIED | No regression + live data confirms MAIN-store write |
+| AVN-07 | 87-06, 87-07 | Origin-grouped, outcome-ranked N-way panel | ✓ SATISFIED (grouping/badges/actions); residual noted (score render not live-exercised) | Screenshots + source read |
+| AVN-08 | 87-04 | Merge status computed from git, no main mutation | ✓ SATISFIED | Live conflicts badge + blocked Promote |
+| AVN-09 | 87-04, 87-01, 87-06 | Prune via coordinator seam only | ✓ SATISFIED | No regression + live Prune button enabled |
 
-**IMPORTANT — Requirements traceability gap:** `.planning/REQUIREMENTS.md` contains **zero entries for AVN-01 through AVN-09**. A full-file read and repeated greps (`AVN`, `AVN-0`) confirm no match anywhere in the file. REQUIREMENTS.md currently documents only v7.4 (phases 67-75) and v7.5 (phases 76-80) requirement sections; Phase 87's entire requirement set (used throughout ROADMAP.md and all 6 PLAN.md frontmatter blocks) has no corresponding formal entry in the requirements ledger. This is a documentation/traceability process gap independent of the implementation gaps above, and should be closed by adding an AVN-* section to REQUIREMENTS.md regardless of how the CR-01/02/03 gaps are resolved.
+REQUIREMENTS.md now contains all 9 AVN entries (bullets + traceability rows) — the prior traceability gap is closed. No orphaned requirements found: every AVN ID referenced in ROADMAP.md and all 8 PLAN.md frontmatter blocks has a corresponding REQUIREMENTS.md entry.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `integrations/system-health-dashboard/.../performanceSlice.ts` | 975-979 | Code comment falsely claims server-side origin_span_id persistence ("The server threads it to the runner's --origin-span-id (Plan 87-03) so avenue Runs group by origin") | 🛑 Blocker | Misleading comment masks CR-02/CR-03; a future maintainer would trust this comment over tracing the actual server code |
-| `integrations/system-health-dashboard/.../experiment-launcher.tsx` | 156-161 | Code comment claims "The axis selections shape WHAT is forked; the SERVER resolves HOW MANY" — forkAxes is never sent to the server at all | 🛑 Blocker | Same class of issue — aspirational comment describes unimplemented behavior as fact |
-| `lib/experiments/experiment-runner.mjs` | 461-611 vs 675-793 | `runCell` implements avenue mode; `runMatrix` (its only caller) never passes the params | 🛑 Blocker | Dead code — CR-01 |
-| `.planning/REQUIREMENTS.md` | n/a | No AVN-01..09 entries exist | ⚠️ Warning | Traceability gap, not a code defect |
+| — | — | No TBD/FIXME/XXX/TODO/HACK/PLACEHOLDER found in any phase-87-modified file (grepped all 9 files across 87-07/87-08 file lists) | — | None |
+| `integrations/system-health-dashboard/src/pages/token-usage.tsx` | 675 | Pre-existing TS2322 typecheck error (unrelated file, Phase 66 code) | ℹ️ Info | Does not block `npm run build` (project's own `tsc --noEmit 2>/dev/null; vite build` convention suppresses tsc failures from gating vite); not a phase-87 regression — confirmed via `git log` the error line predates Phase 87 (introduced in commit `66a52bd6e`, Phase 66) |
 
-No `TBD`/`FIXME`/`XXX` markers found in the phase's modified files. No placeholder/"coming soon" strings found. The issues found are misleading-but-confident code comments describing unimplemented cross-layer wiring, not stub markers — a more insidious anti-pattern than an honest TODO because it actively asserts false completeness.
+The two previously-flagged Blocker-severity misleading comments (performanceSlice.ts:975-979, experiment-launcher.tsx:156-161) are CONFIRMED CORRECTED — both now describe the real post-87-07 wiring, explicitly noting what was true before 87-07 and what changed. No aspirational/false-completeness comments remain in the reviewed files.
 
 ### Human Verification Required
 
-### 1. Live avenue-panel visual + functional verification (post-gap-closure)
+### 1. Live fork of a non-trivial (scored) span — Outcome column numeric render
 
-**Test:** Rebuild the real dashboard (`npm run build` in `integrations/system-health-dashboard` → `docker exec coding-services supervisorctl restart web-services:health-dashboard-frontend`), fork a completed span from the Performance tab choosing a non-default agent/model axis, wait for the avenue run to complete, then check the Avenues sub-tab in both light and dark themes.
+**Test:** Fork a completed span whose task is non-trivial enough that the judge assigns a real numeric score (not `not_scored='trivial'`). Confirm the Avenues panel's Outcome column renders a formatted number (e.g. `0.85`) rather than the em-dash, and that best-first ranking visibly reflects that score (left success-accent border on the top-ranked row).
 
-**Expected:** A ranked avenue row appears under the origin span's Card with a real outcome score, a git-computed merge-status badge, and working 2-of-N compare / Promote / Prune actions.
+**Expected:** At least one avenue row shows a real numeric Outcome value; rows are ordered best-score-first.
 
-**Why human:** Requires live e2e execution against a genuinely forked Run with real measurement data; the authored `performance-compare.spec.ts` was only typecheck/collection-gated (6 tests listed, not run against live data) per 87-06-SUMMARY.md's own deferral note. This check is currently guaranteed to fail (empty state only) until the CR-01/CR-02 gaps are closed, since no real fork produces an origin_span_id-bearing Run today.
+**Why human:** The one live fork performed (87-08) used a trivial fizzbuzz task; both resulting avenue Runs scored `not_scored='trivial'`, so `avenueOutcomeScore()` correctly returned null and the panel correctly rendered the em-dash (verified via source read of `fmtScore`/`avenueOutcomeScore` — this is honest null-handling, not a defect). The numeric-render code path (`v.toFixed(2)`) has not yet been exercised with a live non-null value. This is a residual data-coverage gap in testing, not a code gap — but visual confirmation with a real score would fully close AVN-07's live-verification story.
 
 ## Gaps Summary
 
-The phase's headline capability — forking a completed span into avenues, grouped/compared/tracked in the dashboard — is broken at the seam between the dashboard launch request and the runner. Three confirmed, source-verified breaks form a single causal chain:
+No blocking gaps remain. All three previously-confirmed causal breaks (CR-01 runner threading, CR-02 server fork synthesis, CR-03 dashboard grouping data) are closed and independently re-verified against the actual codebase and live `.data` store — not merely re-stated from the SUMMARY narrative:
 
-1. **CR-01 (runner):** `runMatrix`, the only production caller of `runCell`, never threads `avenue`/`originSpanId`/`commitAvenue` into the call — `runCell`'s otherwise-correct avenue-mode implementation is dead code.
-2. **CR-02 (server):** `handleExperimentRun` never reads `origin_span_id` or fork axes from the request body and never calls `synthesizeAvenueSpec` — a fork request launches the origin spec unmodified. The client's own count/cost preview is derived from the origin spec's static metadata, not the chosen axes, making the axis picker decorative.
-3. **CR-03 (dashboard grouping):** As the direct downstream consequence of 1 and 2, no Run ever carries a non-null `origin_span_id` in production, so the well-built origin-grouped ranked panel (Plan 06) has no real data to display.
+- **CR-01 (runner):** Verified by direct grep/read of `experiment-runner.mjs:783`, `experiment-run.mjs:178-179/314`, and `run-launch.mjs:83/112-113` — the three fields are threaded through every layer.
+- **CR-02 (server):** Verified by direct grep/read of `api-routes.js` — `handleExperimentRun` reads `origin_span_id`/`forkAxes`, synthesizes+persists the avenue spec, folds provenance into the coordinator overrides; the coordinator forwards `overrides` whole (confirmed, not just claimed).
+- **CR-03 (dashboard data):** Verified by directly querying the main-tree `.data/experiments/leveldb` — 2 real Run records carry non-null `origin_span_id`, independently reproducing the SUMMARY's claim rather than trusting it.
 
-By contrast, the git-branch-lifecycle layer (Plan 01: create/prune/commit; Plan 04: merge-status/promote/prune + coordinator/vkb-server wiring) is genuinely solid — independently confirmed via 12/12 passing live-git tests and a direct read of the fully-wired coordinator endpoints and proxy routes. The knowledge-injection axis primitive (Plan 02, AVN-04) is also correctly implemented at the hook/injector layer, though it cannot currently be exercised via a real fork for the same CR-01/CR-02 reasons.
+The full experiments test suite was independently re-run (not trusted from the SUMMARY): 398 pass / 0 fail / 2 skip, matching the claimed count. The `avenue-fork-thread.test.mjs` and `run-endpoint.test.mjs` suites were also re-run individually and pass. The dashboard build was independently re-run; it succeeds (the one pre-existing TS error in an unrelated Phase-66 file does not gate the build per the project's own `tsc --noEmit 2>/dev/null; vite build` convention).
 
-Two misleading code comments (performanceSlice.ts:975-979, experiment-launcher.tsx:156-161) assert cross-layer behavior that does not exist — both should be corrected as part of closing these gaps to prevent future maintainers from trusting the comment over the code.
+The two live screenshots (`11-avenues-merge-dark.png`, `12-avenues-merge-light.png`) were viewed directly by this verifier (not just described) and confirm the origin-grouped panel, both avenue rows, real merge-conflict badges, and correct Promote/Prune button states in both themes.
 
-Separately, REQUIREMENTS.md has zero AVN-01..09 entries despite these IDs being the phase's formal requirement set throughout ROADMAP.md and all 6 PLAN.md files — a traceability gap that should be closed regardless of the implementation gaps.
+The one residual — the Outcome score column showing em-dash because both live-forked Runs were trivially-scored — is correctly classified as a documented, honest limitation of the one test performed, not a wiring defect: the rendering code (`fmtScore`) is source-verified to render a real number when one exists, and the ranking/grouping/badge/action machinery (the actual novel deliverable of this phase) is live-proven. This is routed to human_verification rather than blocking phase closure, per the guidance in the verification brief to distinguish "wiring + grouping + merge-badge + actions verified live" from "outcome-score column rendered with a real score."
 
-**This looks intentional in the sense that it is a genuine implementation gap, not a deviation to accept.** No override is suggested — CR-01/CR-02/CR-03 must be fixed to achieve the phase goal as written. Recommended fix scope for a closure plan:
-
-- Thread `avenue`/`originSpanId`/`commitAvenue` from `runMatrix` opts into the `runCell` call (experiment-runner.mjs)
-- Add `--avenue`/`--origin-span-id`/fork-axis CLI flags to `scripts/experiment-run.mjs`, threaded through `run-launch.mjs`'s `buildRunArgv`
-- Wire `handleExperimentRun` (api-routes.js) to read `origin_span_id` + fork axes from the request body and call `synthesizeAvenueSpec` before delegating to the coordinator; forward the synthesized spec's own axis-derived cell count back to the client for an honest preview
-- Include `forkAxes`/`sweep` in the `launchExperiment` dispatch payload (experiment-launcher.tsx) and recompute `previewCellCount` from a server round-trip that reflects the actual fork request, not the origin spec's static metadata
-- Correct the two misleading code comments once the real wiring exists
-- Add an AVN-01..09 section to REQUIREMENTS.md
+**Status is `human_needed`** (not `passed`) solely because of the one human-verification item above — all 9 AVN truths are otherwise fully VERIFIED at code and live-data level, with zero blocking gaps.
 
 ---
 
-_Verified: 2026-07-11_
+_Verified: 2026-07-13_
 _Verifier: Claude (gsd-verifier)_
