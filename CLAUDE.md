@@ -105,7 +105,7 @@ These skills are defined in `.claude/commands/` and provide reusable workflows.
 Read the full skill file when a task matches its description.
 
 - **/documentation-style** (`.claude/commands/documentation-style.md`): Enforce consistent styling for documentation artifacts (PlantUML, Mermaid, markdown, PNG diagrams).
-- **/experiment** (`.claude/commands/experiment.md`): Declare + run a cross-agent experiment matrix, then auto-compare and render the ranked variant table
+- **/experiment** (`.claude/commands/experiment.md`): Describe a cross-agent experiment in plain English (or with flags), then auto-run the matrix, compare, and render the ranked variant table
 - **/playwright-cli** (`.claude/commands/playwright-cli.md`): Use this skill whenever the user wants to automate a browser, scrape web content, take screenshots or PDFs of pages, fill out forms, click through UI flows, or run end-to-end tests — without using an MCP server. This skill drives Playwright directly from the bash_tool via Node.js scripts. Trigger whenever the user says things like "open this URL", "screenshot this page", "scrape this site", "automate this form", "test this UI", "extract data from", "click through", "check if this page works", or any task that requires real browser interaction. Prefer this skill over web_fetch when JavaScript rendering, authentication, interaction, or visual output is needed.
 - **/sl** (`.claude/commands/sl.md`): Load session logs (LSL) from current and coding projects for continuity
 
