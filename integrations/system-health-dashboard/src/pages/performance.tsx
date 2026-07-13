@@ -203,9 +203,13 @@ export function PerformancePage() {
           <TabsTrigger value="reports" data-testid="reports-tab">Reports</TabsTrigger>
         </TabsList>
         <TabsContent value="runs" className="mt-4">
-          <div className="grid grid-cols-[260px_1fr] gap-6">
+          {/* min-w-0 on the content column: a grid 1fr track defaults to
+              min-width:auto, so the wide runs table / timeline would force the
+              whole grid (and page) to scroll horizontally. min-w-0 lets the
+              track shrink so each child's own overflow-x-auto scrolls in-box. */}
+          <div className="grid min-w-0 grid-cols-[260px_1fr] gap-6">
             <FacetedSidebar />
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6">
               <RunsTable onCompare={() => setActiveTab('compare')} />
               <PerformanceTimeline />
             </div>
