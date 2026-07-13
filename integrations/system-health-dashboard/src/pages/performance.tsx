@@ -28,6 +28,7 @@ import { DifferenceViewer } from '@/components/performance/difference-viewer'
 import { AvenuePanel } from '@/components/performance/avenue-panel'
 import { ExperimentLauncher } from '@/components/performance/experiment-launcher'
 import { RunMonitor } from '@/components/performance/run-monitor'
+import { ComparisonMatrix } from '@/components/performance/comparison-matrix'
 
 // DASH-01/DASH-02 Performance page. Layout mirrors token-usage.tsx (header +
 // summary Card focal point + Tabs body) but ALL shared state lives in the
@@ -201,6 +202,7 @@ export function PerformancePage() {
           <TabsTrigger value="avenues" data-testid="avenues-tab">Avenues</TabsTrigger>
           <TabsTrigger value="compare" data-testid="compare-tab">Compare</TabsTrigger>
           <TabsTrigger value="reports" data-testid="reports-tab">Reports</TabsTrigger>
+          <TabsTrigger value="comparison" data-testid="comparison-tab">Comparison</TabsTrigger>
         </TabsList>
         <TabsContent value="runs" className="mt-4">
           {/* min-w-0 on the content column: a grid 1fr track defaults to
@@ -233,6 +235,13 @@ export function PerformancePage() {
         </TabsContent>
         <TabsContent value="reports" className="mt-4">
           <ReportsSubview />
+        </TabsContent>
+        {/* CMP-04 (Phase 80): the variant-comparison matrix — a DISTINCT 5th tab,
+            not the manual 2-run "Compare" (A/B) nor "Reports" (saved queries). Fed
+            live by GET /api/experiments/comparison via fetchComparison, keyed by
+            the selected experiment's task_hash (D-01/D-03). */}
+        <TabsContent value="comparison" className="mt-4">
+          <ComparisonMatrix />
         </TabsContent>
       </Tabs>
 
