@@ -1,8 +1,9 @@
 ---
 phase: 87-interactive-spans-and-branch-avenues
 verified: 2026-07-13T00:00:00Z
-status: human_needed
-score: 9/9 must-haves verified (AVN-01 through AVN-09); 1 residual documented limitation flagged for human acknowledgement
+status: passed
+operator_signoff: "accepted 2026-07-13 (v7.5 close-out): AVN-07 numeric-score render residual acknowledged — fmtScore source-verified correct for null AND non-null; the novel grouping/ranking/merge-badge/actions wiring is live-proven. Live numeric-render screenshot deferred as low-value."
+score: 9/9 must-haves verified (AVN-01 through AVN-09); 1 residual documented limitation ACKNOWLEDGED + ACCEPTED by operator 2026-07-13
 overrides_applied: 0
 re_verification:
   previous_status: gaps_found
