@@ -47,6 +47,11 @@ export interface RunOutcome {
 
 export interface Run {
   task_id: string
+  // The experiment identity (Phase 79/80): a stable hash over the spec goal +
+  // matrix. Every run of the same experiment shares it; the Comparison tab keys
+  // its live fetch by this (D-03). readRuns surfaces it on each row.
+  task_hash?: string | null
+  variant?: string | null
   task_class?: string | null
   agent?: string | null
   model?: string | null
@@ -177,6 +182,54 @@ export interface ReconciliationSummary {
   flaggedCount: number
 }
 
+// ---------------------------------------------------------------------------
+// CMP-04 (Phase 80): the variant-comparison report, modelling the FROZEN Phase 79
+// JSON schema (scripts/experiments-compare.mjs:26-56) VERBATIM. Served live by
+// GET /api/experiments/{comparison} keyed by ?task_hash=X&rank_by= (Plan 80-01) — the same
+// {task_hash, rank_by, generated_at, ranked/failed/ungated/unscored} doc the CLI
+// writes to .data/experiments/reports/<hash>.json (a drift test asserts equality).
+// The four group arrays ARE the honesty spine: `ranked` is best-first (each with
+// rank + composite); `failed`/`ungated`/`unscored` are shown, never ranked, each
+// carrying a `.reason`. A variant with no successful runs lands in `failed` as
+// "no successful runs" — never a cheap winner (D-02).
+// ---------------------------------------------------------------------------
+
+// A per-metric variance block: {mean,stddev,median,min,max,n}. Nulls are excluded
+// upstream, so an absent metric key means "no data for this variant/metric".
+export interface MetricStat {
+  mean: number
+  stddev: number
+  median: number
+  min: number
+  max: number
+  n: number
+}
+
+// The surfaced metric keys (frozen Phase 79 order). Kept as a wide record so an
+// unexpected/added metric key does not break typing — the matrix renders the
+// known rows and tolerates extras.
+export type ComparisonMetrics = Partial<Record<string, MetricStat>>
+
+export interface VariantEntry {
+  variant: string
+  n: number
+  gate_outcome: 'passed' | 'failed' | 'ungated' | 'unscored'
+  rank?: number // 1-based; ranked group only
+  composite?: number // ranked only: totalTokens.mean / rubric_score.mean
+  reason?: string // failed/ungated/unscored group only
+  metrics: ComparisonMetrics
+}
+
+export interface ComparisonReport {
+  task_hash: string
+  rank_by: 'composite' | 'tokens' | 'wallclock' | 'score' | string
+  generated_at: string
+  ranked: VariantEntry[]
+  failed: VariantEntry[]
+  ungated: VariantEntry[]
+  unscored: VariantEntry[]
+}
+
 // A development-narrative item: an observation written during a run's time window,
 // carrying the plain-language "Intent: …" of a foreground turn. Joined by time
 // window + agent (observations have no task_id), so it is best-effort and only
@@ -272,6 +325,11 @@ interface PerformanceState {
   // mirroring the context-turns cache above. Populated by fetchReconciliation;
   // `null` value = fetched-but-absent (a run with no reconciliation.json).
   reconciliationByTaskId: Record<string, ReconciliationSummary | null>
+  // Per-experiment comparison reports (CMP-04, Phase 80) keyed by task_hash,
+  // mirroring reconciliationByTaskId. Populated by fetchComparison; `null` value
+  // = fetched-but-absent (a task_hash the endpoint returned non-ok for). The
+  // matrix reads via selectComparisonFor and never fetches itself.
+  comparisonByTaskHash: Record<string, ComparisonReport | null>
   narrativeByTaskId: Record<string, NarrativeItem[]>
   narrativeLoadingId: string | null
   digestsByTaskId: Record<string, DigestItem[]>
@@ -530,6 +588,7 @@ const initialState: PerformanceState = {
   timelineError: null,
   contextTurnsByTaskId: {},
   reconciliationByTaskId: {},
+  comparisonByTaskHash: {},
   narrativeByTaskId: {},
   narrativeLoadingId: null,
   digestsByTaskId: {},
@@ -695,6 +754,36 @@ export const fetchReconciliation = createAsyncThunk(
         (data?.summary as ReconciliationSummary | undefined) ??
         null
       return { taskId, reconciliation: summary }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// fetchComparison (CMP-04, Phase 80): pull THIS experiment's variant-comparison
+// report from the live endpoint GET /api/experiments/{comparison}?task_hash=X, keyed
+// by task_hash (D-03). Mirrors fetchReconciliation: keyed-by-id, graceful on
+// absence — a non-ok response resolves to `report: null` (no thrown UI crash), so
+// the matrix degrades to an "empty" placeholder rather than a red banner. The
+// endpoint returns the frozen Phase 79 schema verbatim (same doc the CLI writes).
+export const fetchComparison = createAsyncThunk<
+  { taskHash: string; report: ComparisonReport | null },
+  { taskHash: string; rankBy?: string },
+  { rejectValue: string }
+>(
+  'performance/fetchComparison',
+  async ({ taskHash, rankBy }, { rejectWithValue }) => {
+    try {
+      const qs = new URLSearchParams({ task_hash: taskHash })
+      if (rankBy) qs.set('rank_by', rankBy)
+      const response = await fetch(`/api/experiments/comparison?${qs.toString()}`)
+      // Graceful-absent: a 4xx/5xx (unknown/invalid task_hash) is NOT a UI error —
+      // resolve to null so the matrix shows its "no comparison" placeholder.
+      if (!response.ok) {
+        return { taskHash, report: null }
+      }
+      const report = (await response.json()) as ComparisonReport
+      return { taskHash, report }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -1380,6 +1469,13 @@ const performanceSlice = createSlice({
       .addCase(fetchReconciliation.fulfilled, (state, action) => {
         state.reconciliationByTaskId[action.payload.taskId] = action.payload.reconciliation
       })
+      // fetchComparison (CMP-04, Phase 80) — store the variant-comparison report
+      // keyed by task_hash (null = fetched-but-absent). Fulfilled-only, best-effort
+      // like fetchReconciliation: no pending/rejected banner — the matrix degrades
+      // to an empty placeholder rather than a loading spinner or error alert.
+      .addCase(fetchComparison.fulfilled, (state, action) => {
+        state.comparisonByTaskHash[action.payload.taskHash] = action.payload.report
+      })
       // fetchMergeStatus (Phase 87, Plan 87-06) — store the per-avenue git status
       // VERBATIM keyed by task_id (null = fetched-but-absent → no badge). Best-effort
       // like fetchReconciliation: on rejection leave the entry so the badge degrades.
@@ -1646,6 +1742,27 @@ export const selectContextTurnsFor = (taskId: string | null) => (state: RootStat
 // absent/failed so the badge never crashes on a missing or failed fetch.
 export const selectReconciliationFor = (taskId: string | null) => (state: RootState): ReconciliationSummary | null =>
   taskId ? (state.performance.reconciliationByTaskId[taskId] ?? null) : null
+
+// CMP-04 (Phase 80): the comparison report for a given task_hash, or null when
+// absent/fetched-but-null so the matrix never crashes on a missing experiment.
+export const selectComparisonFor = (state: RootState, taskHash: string | null): ComparisonReport | null =>
+  taskHash ? (state.performance.comparisonByTaskHash[taskHash] ?? null) : null
+
+// The task_hash the Comparison tab fetches with (D-03). Resolves the experiment
+// identity from the currently-selected run (row click → selectedTaskId), falling
+// back to the FIRST fetched run's task_hash so the tab renders the (single, in the
+// pre-existing data) experiment by default instead of an empty placeholder. All
+// 36 pre-existing runs share one task_hash, so the fallback is the honest default.
+export const selectSelectedTaskHash = (state: RootState): string | null => {
+  const runs = state.performance.runs
+  const selectedId = state.performance.selectedTaskId
+  if (selectedId) {
+    const sel = runs.find((r) => r.task_id === selectedId)
+    if (sel?.task_hash) return sel.task_hash
+  }
+  const first = runs.find((r) => !!r.task_hash)
+  return first?.task_hash ?? null
+}
 
 export const selectNarrativeFor = (taskId: string | null) => (state: RootState): NarrativeItem[] =>
   taskId ? (state.performance.narrativeByTaskId[taskId] ?? []) : []
