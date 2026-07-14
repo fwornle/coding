@@ -157,6 +157,10 @@ integrations/mcp-server-browserbase/
 # run.json emitted under a run_id dir by scripts/experiment-run.mjs)
 .data/experiments/runs/
 
+# Comparison report exports (derived, regenerable from the leveldb store via
+# scripts/experiments-compare.mjs or GET /api/experiments/comparison).
+.data/experiments/reports/
+
 # One-shot repair / backfill / soak session logs — timestamped, disposable run
 # artifacts written by scripts/{repair-*,backfill-*,poll-orphan-floor-soak}.mjs.
 # Kept on disk for the run, never needed in git.
