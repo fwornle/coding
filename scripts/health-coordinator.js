@@ -586,25 +586,35 @@ function humanPresentByHid() {
  */
 function userActiveNow() {
   const now = Date.now();
-  // Physical-presence gate: if HID proves the human has been idle past the
-  // threshold, they are away — suppress deferrable background LLM work even if a
-  // session .jsonl is being written by a background agent / scheduled task. When
-  // HID is unknown (null, e.g. non-darwin) fall through to transcript-only.
-  if (humanPresentByHid() === false) return false;
+  const hid = humanPresentByHid(); // true | false | null
+  // Physical-presence gate (HID-authoritative on macOS, 2026-07-14).
+  //
+  // Deferrable background LLM (consolidation trigger, synthetic proxy probes, and
+  // the sub-agent sweep via state.user_active) must run ONLY when a human is
+  // demonstrably present — i.e. real keyboard/mouse input within
+  // HUMAN_HID_IDLE_MAX_MS. On darwin, ioreg HID idle-time is the authoritative
+  // signal:
+  //   true  → input within the threshold → active.
+  //   false → idle past the threshold → away → suppress.
+  //   null  → HID momentarily unreadable (transient ioreg/execSync failure). We do
+  //           NOT fall back to transcript-mtime here: the session .jsonl is written
+  //           continuously by the running agent AND by background daemons, so its
+  //           mtime stays fresh 24/7 and would FORGE presence — this was the
+  //           overnight-burn bug (hourly "say OK" probes + a 01:03 auto-consolidation
+  //           that drained for hours while the operator was asleep, 2026-07-14).
+  //           Fail safe: treat unknown as away so deferrable LLM stays suppressed
+  //           until HID reads cleanly again (a null is transient — the next 5s tick
+  //           re-reads it).
+  if (process.platform === 'darwin') {
+    return hid === true;
+  }
+  // Non-darwin: HID is fundamentally unavailable (always null). Fall back to the
+  // transcript-mtime signal — the best presence proxy we have off macOS. Keyed off
+  // the transcript .jsonl mtime (real tool calls / user messages), NOT entry.lastBeat
+  // (which is daemon-alive and stays fresh 24/7 — the pre-2026-06-25 always-true bug).
+  if (hid === false) return false;
   for (const entry of Object.values(currentState.lsl || {})) {
     if (!entry || entry.status === 'stopped' || !entry.transcriptPath) continue;
-    // FIX (2026-06-25): do NOT key idle-detection off entry.lastBeat. The ETM
-    // posts an lsl_heartbeat on EVERY poll (enhanced-transcript-monitor.js:4329),
-    // so lastBeat tracks "ETM daemon is alive" — NOT real activity — and stays
-    // fresh every few seconds 24/7 while the daemon runs. That made userActiveNow()
-    // return true all night even when the operator was asleep, so the idle proxy-
-    // probe back-off (10min/30min) never engaged and the coordinator burned the
-    // ~1700 "say-OK" calls/night this gate exists to prevent. The transcript .jsonl
-    // is written by the agent/CLI only on real tool calls and user messages, so its
-    // mtime is the authentic activity clock (the same signal the statusline's
-    // per-project lifecycle bubble uses). Sub-agent live-state heartbeats are
-    // intentionally NOT folded in here — they are also daemon-alive (rewritten on a
-    // timer), so they would reintroduce the always-true bug.
     let mt = 0;
     try { mt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { mt = 0; }
     if (mt > 0 && (now - mt) < USER_ACTIVE_HEARTBEAT_MAX_AGE_MS) return true;
@@ -2175,6 +2185,15 @@ async function runAllChecks() {
   // When AFK (_userActive === false) BOTH synthetic probes are skipped entirely
   // — see the AFK full-suspend note near PROXY_PROBE_INTERVAL_MS.
   const _userActive = userActiveNow();
+  // Presence-decision logging (2026-07-14): log every transition with the HID
+  // idle reading that drove it, so overnight AFK behavior is diagnosable without
+  // re-deriving it from proxy exports. Throttled to transitions only (no spam).
+  if (_userActive !== userActiveNow._lastLogged) {
+    const idleMs = hidIdleMs();
+    const idleStr = idleMs === null ? 'null(unreadable)' : `${(idleMs / 60000).toFixed(1)}min`;
+    log(`presence: user_active ${userActiveNow._lastLogged === undefined ? '(init)' : userActiveNow._lastLogged} → ${_userActive} (HID idle ${idleStr}, threshold ${(HUMAN_HID_IDLE_MAX_MS / 60000).toFixed(0)}min) — deferrable LLM ${_userActive ? 'ENABLED' : 'SUSPENDED'}`);
+    userActiveNow._lastLogged = _userActive;
+  }
   // Surface presence in /health/state so external AFK-gated background jobs
   // (e.g. the sub-agent-sweep launchd job) can suspend their own LLM work while
   // the operator is away — the coordinator is the single presence authority.
