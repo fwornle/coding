@@ -584,35 +584,15 @@ function humanPresentByHid() {
  * [📚] badge use. Returns false when every monitor is stopped or every
  * heartbeat is older than USER_ACTIVE_HEARTBEAT_MAX_AGE_MS.
  */
-function userActiveNow() {
+// Coding-engagement signal: at least one tracked, non-stopped session transcript
+// .jsonl was written within USER_ACTIVE_HEARTBEAT_MAX_AGE_MS. The transcript is
+// written by the agent CLI on real tool calls / user messages and goes stale when
+// no agent is working (verified: an idle session's mtime ages out normally, it is
+// NOT force-refreshed by daemons — entry.lastBeat is, which is why we key off the
+// .jsonl mtime, not lastBeat). Proxy-independent (local file), so it stays valid
+// even if the LLM proxy is down.
+function codingSessionFresh() {
   const now = Date.now();
-  const hid = humanPresentByHid(); // true | false | null
-  // Physical-presence gate (HID-authoritative on macOS, 2026-07-14).
-  //
-  // Deferrable background LLM (consolidation trigger, synthetic proxy probes, and
-  // the sub-agent sweep via state.user_active) must run ONLY when a human is
-  // demonstrably present — i.e. real keyboard/mouse input within
-  // HUMAN_HID_IDLE_MAX_MS. On darwin, ioreg HID idle-time is the authoritative
-  // signal:
-  //   true  → input within the threshold → active.
-  //   false → idle past the threshold → away → suppress.
-  //   null  → HID momentarily unreadable (transient ioreg/execSync failure). We do
-  //           NOT fall back to transcript-mtime here: the session .jsonl is written
-  //           continuously by the running agent AND by background daemons, so its
-  //           mtime stays fresh 24/7 and would FORGE presence — this was the
-  //           overnight-burn bug (hourly "say OK" probes + a 01:03 auto-consolidation
-  //           that drained for hours while the operator was asleep, 2026-07-14).
-  //           Fail safe: treat unknown as away so deferrable LLM stays suppressed
-  //           until HID reads cleanly again (a null is transient — the next 5s tick
-  //           re-reads it).
-  if (process.platform === 'darwin') {
-    return hid === true;
-  }
-  // Non-darwin: HID is fundamentally unavailable (always null). Fall back to the
-  // transcript-mtime signal — the best presence proxy we have off macOS. Keyed off
-  // the transcript .jsonl mtime (real tool calls / user messages), NOT entry.lastBeat
-  // (which is daemon-alive and stays fresh 24/7 — the pre-2026-06-25 always-true bug).
-  if (hid === false) return false;
   for (const entry of Object.values(currentState.lsl || {})) {
     if (!entry || entry.status === 'stopped' || !entry.transcriptPath) continue;
     let mt = 0;
@@ -620,6 +600,34 @@ function userActiveNow() {
     if (mt > 0 && (now - mt) < USER_ACTIVE_HEARTBEAT_MAX_AGE_MS) return true;
   }
   return false;
+}
+
+function userActiveNow() {
+  // Deferrable background LLM (consolidation trigger, synthetic proxy probes, and
+  // the sub-agent sweep via state.user_active) runs only when BOTH signals hold —
+  // coding engagement AND physical presence:
+  //
+  //   1. codingSessionFresh() — a coding agent is actually being driven (a session
+  //      transcript was written within the window). Goes stale when nothing is
+  //      coding, so it correctly reads "away" when the human is at the laptop doing
+  //      OTHER work with no agent running (the 2026-07-15 daytime false-active bug,
+  //      where physical presence alone re-enabled ~40 "say OK" probes/hour).
+  //   2. humanPresentByHid() — the human used real keyboard/mouse input within
+  //      HUMAN_HID_IDLE_MAX_MS. Reads "away" when the human is asleep even if an
+  //      agent/loop keeps a transcript fresh (the 2026-07-14 overnight-burn bug).
+  //
+  // AND of the two is the only combination that suppresses BOTH failure modes while
+  // staying active during genuine interactive coding. Both signals are
+  // proxy-independent, so the proxy-liveness probe still fires when a human is
+  // actively coding even if /api/complete just died (no circular dependency).
+  const hid = humanPresentByHid(); // true | false | null
+  if (hid === false) return false;                 // demonstrably away → suppress
+  if (!codingSessionFresh()) return false;         // no coding activity → suppress
+  // Coding is fresh AND HID is not "away". On darwin require positive presence
+  // (hid === true); a transient null does not by itself authorize deferrable work.
+  // Off darwin HID is unavailable (always null) → coding-freshness alone governs.
+  if (process.platform === 'darwin') return hid === true;
+  return true;
 }
 
 async function pollKnowledgePipeline() {
@@ -2185,13 +2193,14 @@ async function runAllChecks() {
   // When AFK (_userActive === false) BOTH synthetic probes are skipped entirely
   // — see the AFK full-suspend note near PROXY_PROBE_INTERVAL_MS.
   const _userActive = userActiveNow();
-  // Presence-decision logging (2026-07-14): log every transition with the HID
-  // idle reading that drove it, so overnight AFK behavior is diagnosable without
+  // Presence-decision logging: log every transition with BOTH driving signals
+  // (coding-session freshness AND HID idle), so AFK behavior is diagnosable without
   // re-deriving it from proxy exports. Throttled to transitions only (no spam).
   if (_userActive !== userActiveNow._lastLogged) {
     const idleMs = hidIdleMs();
     const idleStr = idleMs === null ? 'null(unreadable)' : `${(idleMs / 60000).toFixed(1)}min`;
-    log(`presence: user_active ${userActiveNow._lastLogged === undefined ? '(init)' : userActiveNow._lastLogged} → ${_userActive} (HID idle ${idleStr}, threshold ${(HUMAN_HID_IDLE_MAX_MS / 60000).toFixed(0)}min) — deferrable LLM ${_userActive ? 'ENABLED' : 'SUSPENDED'}`);
+    const coding = codingSessionFresh();
+    log(`presence: user_active ${userActiveNow._lastLogged === undefined ? '(init)' : userActiveNow._lastLogged} → ${_userActive} (coding_fresh=${coding}, HID idle ${idleStr}/${(HUMAN_HID_IDLE_MAX_MS / 60000).toFixed(0)}min) — deferrable LLM ${_userActive ? 'ENABLED' : 'SUSPENDED'}`);
     userActiveNow._lastLogged = _userActive;
   }
   // Surface presence in /health/state so external AFK-gated background jobs
