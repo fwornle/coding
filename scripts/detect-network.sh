@@ -39,6 +39,15 @@ INSIDE_CN=false
 PROXY_WORKING=true
 PROXY_REQUIRED=false
 
+# Generic internet-reachability probe target.
+# Must NOT be api.github.com: GitHub is intermittently throttled/blocked by the
+# GFW on the CN corporate network, producing false "no internet" results and
+# proxy on/off flapping. captive.apple.com is a tiny fixed "Success" page on
+# Apple's global CDN, reachable in mainland China, returns HTTP 200 fast.
+# Override with HEALTH_REACHABILITY_HOST. (Service-specific checks below still
+# probe api.github.com / api.anthropic.com directly — those are intentional.)
+REACHABILITY_HOST="${HEALTH_REACHABILITY_HOST:-captive.apple.com}"
+
 # ============================================
 # Corporate Network Detection
 # ============================================
@@ -104,10 +113,10 @@ detect_corporate_network() {
 test_proxy_connectivity() {
   if [ "$INSIDE_CN" = "false" ]; then
     # Outside CN: verify internet works (try direct first, then via proxy if set)
-    if timeout 5 curl -s --connect-timeout 3 --noproxy '*' https://api.github.com >/dev/null 2>&1; then
+    if timeout 5 curl -s --connect-timeout 3 --noproxy '*' "https://${REACHABILITY_HOST}" >/dev/null 2>&1; then
       PROXY_WORKING=true
       log "✅ Direct internet access working"
-    elif [ -n "${https_proxy:-${HTTPS_PROXY:-}}" ] && timeout 5 curl -s --connect-timeout 3 https://api.github.com >/dev/null 2>&1; then
+    elif [ -n "${https_proxy:-${HTTPS_PROXY:-}}" ] && timeout 5 curl -s --connect-timeout 3 "https://${REACHABILITY_HOST}" >/dev/null 2>&1; then
       # Proxy is set and works — internet IS available (just via proxy)
       PROXY_WORKING=true
       log "✅ Internet access working (via proxy, outside CN)"
@@ -123,7 +132,7 @@ test_proxy_connectivity() {
   log "Testing proxy connectivity for external access..."
 
   # Test with current proxy settings (may already be in environment)
-  if timeout 5 curl -s --connect-timeout 3 https://api.github.com >/dev/null 2>&1; then
+  if timeout 5 curl -s --connect-timeout 3 "https://${REACHABILITY_HOST}" >/dev/null 2>&1; then
     PROXY_WORKING=true
     log "✅ External access working (via proxy)"
   else
@@ -180,7 +189,7 @@ configure_proxy_if_needed() {
     _sync_bash_profile_proxy disabled
 
     # Test if direct internet works WITHOUT proxy
-    if timeout 5 curl -s --connect-timeout 3 --noproxy '*' https://api.github.com >/dev/null 2>&1; then
+    if timeout 5 curl -s --connect-timeout 3 --noproxy '*' "https://${REACHABILITY_HOST}" >/dev/null 2>&1; then
       # Direct works — safe to remove proxy vars
       if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
         log "Outside CN — disabling proxy (direct works; was: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"

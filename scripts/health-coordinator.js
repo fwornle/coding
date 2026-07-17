@@ -33,6 +33,8 @@ import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
 import { spawnSync, spawn, execFile, execSync } from 'node:child_process';
+import { promisify } from 'node:util';
+const execFileAsync = promisify(execFile);
 import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
@@ -272,6 +274,7 @@ const currentState = {
     proxy_running: false,                // true if px/proxydetox listening on 127.0.0.1:3128
     proxy_functional: false,             // true if proxy can actually reach external hosts
     internet_reachable: false,           // true if we can reach github.com (directly or via proxy)
+    consecutive_functional_failures: 0,  // debounce: raw functional-probe failures in a row (hysteresis)
     last_probe_end: null                 // ISO timestamp
   },
   generated_at: new Date(STARTED_AT).toISOString(),
@@ -594,9 +597,19 @@ function humanPresentByHid() {
 function codingSessionFresh() {
   const now = Date.now();
   for (const entry of Object.values(currentState.lsl || {})) {
-    if (!entry || entry.status === 'stopped' || !entry.transcriptPath) continue;
+    if (!entry || entry.status === 'stopped') continue;
+    // Freshness timestamp: prefer the transcript file mtime (Claude Code writes real
+    // .specstory/*.md files). Agents whose transcriptPath is a URI rather than a file
+    // path (e.g. opencode's "opencode://ses_..." handle) cannot be statted — fs.statSync
+    // throws → mt=0 → the session looked permanently stale, so user_active stayed false
+    // and the synthetic proxy probe was suspended forever (the "[🧠❓] never clears" bug).
+    // Fall back to the ETM heartbeat (lastBeat, epoch ms) in that case.
     let mt = 0;
-    try { mt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { mt = 0; }
+    const tp = entry.transcriptPath;
+    if (tp && !/^[a-z][a-z0-9+.-]*:\/\//i.test(tp)) {
+      try { mt = fs.statSync(tp).mtimeMs; } catch { mt = 0; }
+    }
+    if (mt === 0 && typeof entry.lastBeat === 'number') mt = entry.lastBeat;
     if (mt > 0 && (now - mt) < USER_ACTIVE_HEARTBEAT_MAX_AGE_MS) return true;
   }
   return false;
@@ -1745,6 +1758,14 @@ function refreshLslStaleness() {
 // ---------------------------------------------------------------------------
 const NETWORK_PROBE_INTERVAL_MS = 15_000;
 
+// Reachability probe target. MUST be reachable from every network we run on,
+// including the CN corporate network where GitHub is throttled/blocked by the
+// GFW. `captive.apple.com` is a tiny fixed "Success" page served from Apple's
+// globally-distributed CDN (reachable in mainland China), the de-facto standard
+// captive-portal check — fast, unauthenticated, and returns HTTP 200. Do NOT
+// use api.github.com here: it produces false "Internet Unreachable" errors in CN.
+const REACHABILITY_HOST = process.env.HEALTH_REACHABILITY_HOST || 'captive.apple.com';
+
 // Sleep/wake detection: if time between ticks exceeds 3x TICK_MS, we likely woke from sleep
 let lastTickTimestamp = Date.now();
 function detectWakeFromSleep() {
@@ -1806,25 +1827,60 @@ async function pollNetworkStatus() {
     //      — portListening=true but functional probe fails
     let effectivePortListening = portListening;
     let proxyFunctional = false;
+    let functionalFailConfirmed = false;  // debounced outage flag (see hysteresis block)
 
     if (proxyEnabledByUser) {
       // Functional probe: actually try to proxy a request (not just TCP connect)
       if (portListening) {
         try {
-          execSync('curl -s --connect-timeout 3 --max-time 5 -x http://127.0.0.1:3128 -o /dev/null -w "%{http_code}" https://api.github.com 2>/dev/null | grep -q 200', { timeout: 8000 });
-          proxyFunctional = true;
+          // Async (non-blocking) — execSync here froze the coordinator's event
+          // loop for up to 8s per poll, causing /health/state to time out
+          // (verifier STEP 2 failure + status-line getCoordinatorState timeout).
+          const { stdout } = await execFileAsync('curl', [
+            '-s', '--connect-timeout', '3', '--max-time', '5',
+            '-x', 'http://127.0.0.1:3128',
+            '-o', '/dev/null', '-w', '%{http_code}',
+            `https://${REACHABILITY_HOST}`
+          ], { timeout: 8000 });
+          proxyFunctional = stdout.trim() === '200';
         } catch {
           proxyFunctional = false;
         }
       }
 
-      // Need kickstart if: port dead OR port alive but not functional
-      const needsKickstart = !portListening || (portListening && !proxyFunctional);
+      // ── Hysteresis / debounce (2026-07-17) ────────────────────────────────
+      // A single transient curl failure (proxy busy, network jitter, in-flight
+      // TLS reset) must NOT flip the badge to P:OFF or trigger a disruptive
+      // proxydetox kickstart — that kickstart drops live connections, making
+      // the NEXT probe fail too, which self-reinforces into the ON/OFF/ON
+      // oscillation the status line showed. We only treat the proxy as
+      // "confirmed broken" after N consecutive raw functional failures.
+      //
+      // A dead port (TCP connect refused) is a HARD, unambiguous signal —
+      // proxydetox is genuinely not listening — so it is NOT debounced.
+      const FUNCTIONAL_FAIL_THRESHOLD = 3;
+      if (portListening) {
+        if (proxyFunctional) {
+          netState.consecutive_functional_failures = 0;
+        } else {
+          netState.consecutive_functional_failures =
+            (netState.consecutive_functional_failures || 0) + 1;
+        }
+      }
+      functionalFailConfirmed =
+        (netState.consecutive_functional_failures || 0) >= FUNCTIONAL_FAIL_THRESHOLD;
+
+      // Need kickstart if: port dead (hard signal) OR functional failure CONFIRMED
+      // over several consecutive probes (never on a single transient miss).
+      const needsKickstart = !portListening || (portListening && functionalFailConfirmed);
+      if (needsKickstart && portListening && functionalFailConfirmed) {
+        log(`network: proxy functional-probe failed ${netState.consecutive_functional_failures}x consecutively — treating as confirmed broken`, 'WARN');
+      }
       if (needsKickstart) {
         const reason = !portListening ? 'port 3128 dead (stale socket)' : 'port alive but proxy not functional (network change?)';
         log(`network: proxy intent=ON but ${reason} — kickstarting proxydetox`, 'WARN');
         try {
-          execSync('launchctl kickstart -k gui/$(id -u)/cc.colorto.proxydetox 2>/dev/null || launchctl start cc.colorto.proxydetox 2>/dev/null', { timeout: 5000 });
+          await execFileAsync('bash', ['-c', 'launchctl kickstart -k gui/$(id -u)/cc.colorto.proxydetox 2>/dev/null || launchctl start cc.colorto.proxydetox 2>/dev/null'], { timeout: 5000 });
           // Re-check after kickstart (give it 2s to bind + initialize)
           await new Promise(r => setTimeout(r, 2000));
           // Re-probe: port check
@@ -1837,20 +1893,27 @@ async function pollNetworkStatus() {
           if (portNow) {
             // Re-probe: functional check
             try {
-              execSync('curl -s --connect-timeout 3 --max-time 5 -x http://127.0.0.1:3128 -o /dev/null -w "%{http_code}" https://api.github.com 2>/dev/null | grep -q 200', { timeout: 8000 });
+              const { stdout: healCode } = await execFileAsync('curl', [
+                '-s', '--connect-timeout', '3', '--max-time', '5',
+                '-x', 'http://127.0.0.1:3128',
+                '-o', '/dev/null', '-w', '%{http_code}',
+                `https://${REACHABILITY_HOST}`
+              ], { timeout: 8000 });
+              if (healCode.trim() !== '200') throw new Error('not functional');
               proxyFunctional = true;
               log('network: proxydetox auto-healed — port 3128 listening and functional', 'INFO');
               // Force immediate semantic re-probe and LLM proxy restart on next tick
               // so the status line updates within 5-10s, not 60s
               currentState.proxy.last_probe_end = null;  // force immediate semantic re-probe
               currentState.proxy.consecutive_failures = 0;
+              netState.consecutive_functional_failures = 0;  // heal confirmed — clear debounce
             } catch {
               proxyFunctional = false;
               log('network: proxydetox kickstarted — port listening but still not functional', 'WARN');
             }
             // Also restart LLM proxy — its HTTP connections are stale after network change
             try {
-              execSync(`launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy`, { timeout: 5000 });
+              await execFileAsync('bash', ['-c', 'launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy'], { timeout: 5000 });
               log('network: LLM proxy kickstarted after proxydetox auto-heal (stale connections)', 'INFO');
             } catch (e) {
               log(`network: LLM proxy kickstart failed: ${e.message}`, 'WARN');
@@ -1868,7 +1931,16 @@ async function pollNetworkStatus() {
 
     // proxy_running = user enabled it AND proxydetox is actually listening AND functional
     netState.proxy_running = proxyEnabledByUser && effectivePortListening;
-    netState.proxy_functional = proxyEnabledByUser ? proxyFunctional : false;
+    // Debounced functional badge: a live probe pass reports true immediately;
+    // a raw miss holds the previous value until FUNCTIONAL_FAIL_THRESHOLD
+    // consecutive misses confirm the outage. Prevents single-blip P:OFF flaps.
+    if (!proxyEnabledByUser) {
+      netState.proxy_functional = false;
+    } else if (proxyFunctional) {
+      netState.proxy_functional = true;
+    } else if (functionalFailConfirmed || !effectivePortListening) {
+      netState.proxy_functional = false;
+    } // else: hold prior netState.proxy_functional (transient blip within debounce window)
     netState.proxy_port_listening = effectivePortListening;  // raw: is proxydetox daemon alive?
     netState.proxy_env_set = proxyEnvSet;           // track separately for debugging
     netState.proxy_enabled_by_user = proxyEnabledByUser;  // the persistent toggle
@@ -1898,15 +1970,14 @@ async function pollNetworkStatus() {
   // If the coordinator starts on a hotspot (public DNS), it will NEVER resolve
   // internal BMW hostnames even after switching to office LAN (corporate DNS).
   // 'dig' spawns a fresh process that uses the OS's current DNS configuration.
-  const pacResolved = await new Promise(resolve => {
+  const pacResolved = await (async () => {
     try {
-      const result = execSync('dig +short +timeout=2 +tries=1 muc.proxy-pac.bmwgroup.net A 2>/dev/null', { timeout: 4000, encoding: 'utf8' });
-      const hasIP = /\d+\.\d+\.\d+\.\d+/.test(result.trim());
-      resolve(hasIP);
+      const { stdout: result } = await execFileAsync('dig', ['+short', '+timeout=2', '+tries=1', 'muc.proxy-pac.bmwgroup.net', 'A'], { timeout: 4000, encoding: 'utf8' });
+      return /\d+\.\d+\.\d+\.\d+/.test(result.trim());
     } catch {
-      resolve(false);
+      return false;
     }
-  });
+  })();
 
   // Signal 3 (used only when PAC resolves): latency distinguishes physical CN vs VPN
   let onPhysicalCN = false;
@@ -1953,34 +2024,22 @@ async function pollNetworkStatus() {
      log(`network: auto-disabled proxy env vars (user disabled proxy via px)`, 'INFO');
    }
 
-   // 5. Check if proxy is functional (can actually CONNECT through to an external host)
-   // Only test when user has proxy enabled — otherwise P:OFF (not ERR)
-    if (proxyEnabledByUser && effectivePortListening) {
-    netState.proxy_functional = await new Promise(resolve => {
-      // Use CONNECT (actual tunnel) not plain GET (just checks if px process responds)
-      const proxyReq = http.request({
-        host: '127.0.0.1', port: 3128,
-        method: 'CONNECT', path: 'api.github.com:443',
-        timeout: 5000
-      });
-      proxyReq.on('connect', (res) => {
-        resolve(res.statusCode === 200);
-        proxyReq.destroy();
-      });
-      proxyReq.on('error', () => resolve(false));
-      proxyReq.on('timeout', () => { proxyReq.destroy(); resolve(false); });
-      proxyReq.end();
-    });
-  } else {
-    netState.proxy_functional = false;
-  }
+   // 5. Proxy functional status is ALREADY computed above with hysteresis /
+   // debounce (see the "consecutive_functional_failures" block). Do NOT
+   // re-probe here — a second single-shot probe (previously CONNECT to
+   // api.github.com:443) would OVERWRITE the debounced value with a raw,
+   // un-debounced result, re-introducing the exact P:ON/OFF/ON oscillation
+   // the debounce exists to prevent. This is especially harmful on the CN
+   // corporate network where api.github.com is intermittently throttled by
+   // the GFW, producing frequent transient misses even when the proxy is
+   // perfectly healthy. netState.proxy_functional is left as set above.
 
   // 6. Can we reach the internet?
   // Strategy: on corporate/vpn, try via proxy; on open, try direct.
   // Always try direct as fallback if proxy path fails.
   netState.internet_reachable = await new Promise(resolve => {
     const tryDirect = () => {
-      const req = https.get('https://api.github.com/', { timeout: 5000 }, res => {
+      const req = https.get(`https://${REACHABILITY_HOST}/`, { timeout: 5000 }, res => {
         res.resume();
         resolve(res.statusCode < 500);
       });
@@ -1992,7 +2051,7 @@ async function pollNetworkStatus() {
       // Try via proxy first, fall back to direct
       const proxyReq = http.request({
         host: '127.0.0.1', port: 3128,
-        method: 'CONNECT', path: 'api.github.com:443',
+        method: 'CONNECT', path: `${REACHABILITY_HOST}:443`,
         timeout: 5000
       });
       proxyReq.on('connect', (res) => {
