@@ -634,6 +634,40 @@ export function PerformanceTimeline() {
 
   const stats = summarizeByRole(rows, run)
   const statByRole = Object.fromEntries(stats.map((s) => [s.role, s])) as Record<Role, RoleStat>
+
+  // AGENT-AGNOSTIC lane totals. summarizeByRole only sees task_id-scoped (foreground)
+  // rows — which is why Knowledge/Infrastructure read 0/0 for EVERY agent whose
+  // background work isn't task-stamped (claude/copilot/mastra barely tag foreground
+  // rows at all, opencode tags 100%). The ambient rows are time-window matched to this
+  // run and the backend already EXCLUDES this run's own task_id, so they are DISJOINT
+  // from `stats` — folding them in is additive, never double-counted. Experiment cells
+  // are left untouched (no foreign time-window join into a sandboxed cell).
+  const mergedStats: RoleStat[] = isExperimentCell
+    ? stats
+    : ROLE_ORDER.map((role) => {
+        const base = statByRole[role] ?? { role, turns: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, models: [] }
+        const amb = ambient.filter((a) => a.role === role)
+        if (amb.length === 0) return base
+        const n = (v: number | null | undefined) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0)
+        return {
+          role,
+          turns: base.turns + amb.reduce((t, a) => t + n(a.calls), 0),
+          totalTokens: base.totalTokens + amb.reduce((t, a) => t + n(a.total_tokens), 0),
+          cacheRead: base.cacheRead + amb.reduce((t, a) => t + n(a.cache_read_tokens), 0),
+          cacheWrite: base.cacheWrite + amb.reduce((t, a) => t + n(a.cache_write_tokens), 0),
+          models: Array.from(new Set([...base.models, ...amb.flatMap((a) => a.models)])).filter(Boolean),
+        }
+      })
+  const mergedByRole = Object.fromEntries(mergedStats.map((s) => [s.role, s])) as Record<Role, RoleStat>
+  // AGENT-AGNOSTIC background-model fallback. The persisted run.background_models is
+  // computed from the task_id-scoped attribution upstream, so it is [] for every
+  // interactive/non-opencode run (→ the "Background: —" regression). Derive the
+  // distinct background daemon models from the time-window ambient rows instead —
+  // works for claude/copilot/mastra/opencode alike. Experiment cells keep the
+  // persisted value only (no foreign time-window join).
+  const ambientBackgroundModels: string[] = isExperimentCell
+    ? []
+    : Array.from(new Set(ambient.flatMap((a) => a.models))).filter(Boolean)
   // Preserve each row's ORIGINAL position so the parallel `contextTurns` /
   // `turnLoopFlags` arrays stay aligned after a role filter hides some rows.
   // Indexing the unfiltered arrays by the filtered position desyncs every row's
@@ -739,7 +773,9 @@ export function PerformanceTimeline() {
             Background:{' '}
             {run?.background_models?.length
               ? <span className="font-mono">{distinctModels(run.background_models).join(', ')}</span>
-              : <span>—</span>}
+              : ambientBackgroundModels.length
+                ? <span className="font-mono">{ambientBackgroundModels.join(', ')}</span>
+                : <span>—</span>}
           </span>
         </div>
       </CardHeader>
@@ -750,7 +786,8 @@ export function PerformanceTimeline() {
           <p className="text-sm text-muted-foreground">No per-turn telemetry recorded for this run.</p>
         ) : (
           <>
-            <StorySummary stats={stats} />
+            <StorySummary stats={mergedStats} />
+            {!isExperimentCell && ambient.length > 0 && <AmbientActivity rows={ambient} />}
 
             {isExperimentCell ? (
               /* 85-06: a sandboxed cell has no session observations of its own — show
@@ -791,7 +828,7 @@ export function PerformanceTimeline() {
                     <Checkbox checked={active} onCheckedChange={() => toggleRole(role)} />
                     <span className={`inline-block h-3 w-1 rounded-sm ${rm.swatch}`} />
                     {rm.label}
-                    <span className="text-muted-foreground">({statByRole[role]?.turns ?? 0})</span>
+                    <span className="text-muted-foreground">({mergedByRole[role]?.turns ?? 0})</span>
                   </label>
                 )
               })}

@@ -753,9 +753,27 @@ export const deleteSelectedRuns = createAsyncThunk<
 
 export const fetchTimeline = createAsyncThunk(
   'performance/fetchTimeline',
-  async (taskId: string, { rejectWithValue }) => {
+  async (taskId: string, { getState, rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/experiments/runs/${encodeURIComponent(taskId)}/timeline`)
+      // AGENT-AGNOSTIC ambient window: derive the run's wall-clock window from the
+      // Run record (started_at/ended_at) and pass it to the backend. Non-opencode
+      // agents (claude/copilot/mastra) barely tag foreground rows with task_id, so a
+      // timeline-derived window would be empty for them — the run's own timestamps are
+      // the only reliable, agent-independent anchor. Back/forward-pad 5min to catch
+      // observations stamped at user-prompt time (which precede the turns). Backend
+      // falls back to timeline min/max when we can't supply a window.
+      const run = (getState() as RootState).performance.runs.find((r) => r.task_id === taskId)
+      const params = new URLSearchParams()
+      const pad = (iso: string, ms: number) => {
+        const d = new Date(iso)
+        return Number.isNaN(d.getTime()) ? iso : new Date(d.getTime() + ms).toISOString()
+      }
+      if (run?.started_at) params.set('from', pad(run.started_at, -5 * 60_000))
+      if (run?.ended_at) params.set('to', pad(run.ended_at, 5 * 60_000))
+      const qs = params.toString()
+      const response = await fetch(
+        `/api/experiments/runs/${encodeURIComponent(taskId)}/timeline${qs ? `?${qs}` : ''}`
+      )
       if (!response.ok) {
         throw new Error(`API returned ${response.status}`)
       }
