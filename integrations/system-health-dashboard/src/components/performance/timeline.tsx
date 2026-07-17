@@ -659,15 +659,6 @@ export function PerformanceTimeline() {
         }
       })
   const mergedByRole = Object.fromEntries(mergedStats.map((s) => [s.role, s])) as Record<Role, RoleStat>
-  // AGENT-AGNOSTIC background-model fallback. The persisted run.background_models is
-  // computed from the task_id-scoped attribution upstream, so it is [] for every
-  // interactive/non-opencode run (→ the "Background: —" regression). Derive the
-  // distinct background daemon models from the time-window ambient rows instead —
-  // works for claude/copilot/mastra/opencode alike. Experiment cells keep the
-  // persisted value only (no foreign time-window join).
-  const ambientBackgroundModels: string[] = isExperimentCell
-    ? []
-    : Array.from(new Set(ambient.flatMap((a) => a.models))).filter(Boolean)
   // Preserve each row's ORIGINAL position so the parallel `contextTurns` /
   // `turnLoopFlags` arrays stay aligned after a role filter hides some rows.
   // Indexing the unfiltered arrays by the filtered position desyncs every row's
@@ -773,9 +764,7 @@ export function PerformanceTimeline() {
             Background:{' '}
             {run?.background_models?.length
               ? <span className="font-mono">{distinctModels(run.background_models).join(', ')}</span>
-              : ambientBackgroundModels.length
-                ? <span className="font-mono">{ambientBackgroundModels.join(', ')}</span>
-                : <span>—</span>}
+              : <span>—</span>}
           </span>
         </div>
       </CardHeader>
