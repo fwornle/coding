@@ -776,9 +776,40 @@ export class ObservationWriter {
         `\nSet Artifacts to "none" since no files were changed.`;
     }
 
+    // Lane attribution: stamp the live-session task_id so this background
+    // knowledge-capture call is attributed to the foreground run in the
+    // performance timeline (Knowledge lane). The proxy honors an explicit
+    // body.task_id even for background processes; its SPAN-LEAKAGE guard only
+    // blocks the *ambient* fallback, not an explicit stamp.
+    //
+    // Resolution order:
+    //   1. metadata.task_id  — the experiment measurement span, when one is open
+    //      (ETM stamps it from resolveLiveTaskIdSafe at the fire site).
+    //   2. metadata.sessionId — the opencode session_id for a live interactive
+    //      session. This is the SAME value foreground token rows are keyed on
+    //      (auto-measure-foreground.mjs sets task_id = opencode session_id), so
+    //      stamping it makes this Knowledge-lane call join the foreground run in
+    //      the timeline. Purely an attribution key here — it does NOT touch
+    //      ETM's persisted-entity dedup (which keeps using metadata.task_id).
+    //
+    // GATES (both must hold, else stamp nothing and stay ambient):
+    //   - never stamp an experiment-cell id ('--' marks a measured cell) — doing
+    //     so would reintroduce the v9 span-leakage regression.
+    //   - never stamp a synthetic non-opencode session ('live-<ts>') — it
+    //     matches no foreground run, so leave it unattributed.
+    const _rawTaskId =
+      (typeof metadata.task_id === 'string' && metadata.task_id.trim())
+        ? metadata.task_id.trim()
+        : (typeof metadata.sessionId === 'string' ? metadata.sessionId.trim() : '');
+    const attributableTaskId =
+      _rawTaskId && !_rawTaskId.includes('--') && !_rawTaskId.startsWith('live-')
+        ? _rawTaskId
+        : '';
+
     try {
       const requestBody = {
         process: 'observation-writer',
+        ...(attributableTaskId ? { task_id: attributableTaskId } : {}),
         ...(this.provider ? { provider: this.provider } : {}),
         messages: [
           {

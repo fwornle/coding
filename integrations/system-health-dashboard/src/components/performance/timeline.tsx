@@ -18,6 +18,7 @@ import {
   selectSelectedTaskId,
   selectSelectedRun,
   selectTimelineFor,
+  selectAmbientFor,
   selectContextTurnsFor,
   selectTimelineLoading,
   selectNarrativeFor,
@@ -26,6 +27,7 @@ import {
   selectDigestLoadingId,
   type Run,
   type TimelineRow,
+  type AmbientRow,
   type ContextTurnRow,
   type NarrativeItem,
   type DigestItem,
@@ -170,6 +172,23 @@ function TurnObservations({ items, digestThemes }: { items: NarrativeItem[]; dig
   )
 }
 
+// A compact per-turn "what was done" line — the lead assistant text plus the
+// sequence of tool actions, extracted from the agent's own session store. Turns
+// the timeline from anonymous token counts into a readable narrative of the run.
+function TurnActivity({ row }: { row: TimelineRow }) {
+  const activity = typeof row.prompt_preview === 'string' ? row.prompt_preview.trim() : ''
+  if (!activity) return null
+  return (
+    <div
+      className="px-3 pb-2 pl-9 text-sm text-muted-foreground"
+      data-testid="timeline-turn-activity"
+      title={activity}
+    >
+      {activity}
+    </div>
+  )
+}
+
 function ParentRow({
   row, index, run, observations, digestThemes,
 }: {
@@ -204,6 +223,7 @@ function ParentRow({
             {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
           </span>
         </div>
+        <TurnActivity row={row} />
         {obs}
       </div>
     )
@@ -222,6 +242,7 @@ function ParentRow({
           {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
         </span>
       </div>
+      <TurnActivity row={row} />
       {obs}
       <CollapsibleContent className="space-y-1 px-3 pb-2">
         {children.map((child, i) => (
@@ -292,6 +313,55 @@ function linkDigestsToRun(
     }
   }
   return { linked, themeByObsId }
+}
+
+// OPTION 2 — Concurrent background activity that ran DURING this run's window but
+// is NOT attributed to it (empty/foreign task_id). Honest, read-only surfacing of
+// knowledge-capture + infrastructure token spend that the task_id-exact role stats
+// (summarizeByRole) deliberately exclude. Never a claim of causation — just "this
+// was happening at the same time".
+function AmbientActivity({ rows }: { rows: AmbientRow[] }) {
+  if (!rows.length) return null
+  const total = rows.reduce((a, r) => a + (r.total_tokens ?? 0), 0)
+  return (
+    <details className="mb-3 rounded-md border border-dashed px-3 py-2" data-testid="timeline-ambient">
+      <summary className="cursor-pointer text-sm text-muted-foreground">
+        Concurrent background activity — {rows.length} process{rows.length === 1 ? '' : 'es'},{' '}
+        <span className="font-mono">{total.toLocaleString()}</span> tok
+        <span className="ml-1 text-xs">(in-window, not attributed to this run)</span>
+      </summary>
+      <table className="mt-2 w-full text-xs" data-testid="timeline-ambient-table">
+        <thead className="text-muted-foreground">
+          <tr className="text-left">
+            <th className="py-1 pr-3 font-medium">process</th>
+            <th className="py-1 pr-3 font-medium">role</th>
+            <th className="py-1 pr-3 font-medium text-right">calls</th>
+            <th className="py-1 pr-3 font-medium text-right">tokens</th>
+            <th className="py-1 font-medium">models</th>
+          </tr>
+        </thead>
+        <tbody className="font-mono">
+          {rows.map((r) => {
+            const rm = ROLE_META[r.role]
+            return (
+              <tr key={`${r.process}:${r.role}`} data-testid={`ambient-row-${r.process}`}>
+                <td className="py-0.5 pr-3">{processMeta(r.process, null).label ?? r.process}</td>
+                <td className="py-0.5 pr-3">
+                  <span className={`mr-1 inline-block h-2.5 w-1 rounded-sm align-middle ${rm.swatch}`} />
+                  {rm.label}
+                </td>
+                <td className="py-0.5 pr-3 text-right">{r.calls.toLocaleString()}</td>
+                <td className="py-0.5 pr-3 text-right">{(r.total_tokens ?? 0).toLocaleString()}</td>
+                <td className="max-w-[16rem] truncate py-0.5 text-muted-foreground" title={r.models.join(', ')}>
+                  {r.models.length ? r.models.join(', ') : '—'}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </details>
+  )
 }
 
 // The comparison-ready run story: one card per role with turns + tokens + models.
@@ -524,6 +594,8 @@ export function PerformanceTimeline() {
   const [hiddenRoles, setHiddenRoles] = useState<Set<Role>>(new Set())
 
   const contextTurns = useAppSelector(selectContextTurnsFor(taskId))
+  // OPTION 2 — concurrent background (knowledge/infra) activity in the run window.
+  const ambient = useAppSelector(selectAmbientFor(taskId))
 
   useEffect(() => {
     if (taskId) {
@@ -649,6 +721,11 @@ export function PerformanceTimeline() {
         {run?.goal_sentence && (
           <p className="mt-0.5 text-sm" data-testid="timeline-goal">
             <span className="text-muted-foreground">Goal:</span> {run.goal_sentence}
+          </p>
+        )}
+        {run?.session_summary && (
+          <p className="mt-0.5 text-sm text-muted-foreground" data-testid="timeline-summary">
+            <span className="text-muted-foreground">Summary:</span> {run.session_summary}
           </p>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">

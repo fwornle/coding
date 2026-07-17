@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, createSelector, PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '../index'
 import { normalizeModel } from '@/components/performance/models'
+import { roleForProcess, type Role } from '@/components/performance/roles'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +73,9 @@ export interface Run {
   // Run entity's `description`, surfaced by readRuns as goal_sentence). null for
   // legacy runs that recorded no goal. Distinct from the goal_achieved *score*.
   goal_sentence?: string | null
+  // LLM-generated 1-2 sentence narrative of what the session actually did,
+  // distinct from the short goal_sentence title. null when unavailable.
+  session_summary?: string | null
   pending?: boolean | null
   started_at?: string | null
   ended_at?: string | null
@@ -120,7 +124,63 @@ export interface TimelineRow {
   [key: string]: unknown
 }
 
+// OPTION 2 — a per-process rollup of CONCURRENT background (knowledge/infra) LLM
+// activity in a run's wall-clock window, returned alongside the timeline as
+// `{ ambient: [...] }` by GET /api/experiments/runs/:taskId/timeline. These rows
+// are deliberately NOT attributed to the run (their task_id differs) and NEVER feed
+// summarizeByRole — they are surfaced in a separate, clearly-labelled panel so the
+// knowledge/infra lanes are visible without silently joining foreign sessions.
+export interface AmbientRow {
+  process: string
+  agent?: string | null
+  model?: string | null
+  // Enriched in the fetchTimeline thunk from the backend's per-process rollup:
+  // `role` via roleForProcess(process) (same classifier as summarizeByRole) and
+  // `models` as a single-element array (backend rolls up MAX(model) per process).
+  role: Role
+  models: string[]
+  calls: number
+  total_tokens: number
+  cache_read_tokens?: number | null
+  cache_write_tokens?: number | null
+  first_ts?: string | null
+  last_ts?: string | null
+}
+
 // A per-message digest inside a context-turn line (D-07 fallback): the role,
+// Per-category DRILL-DOWN detail (Phase 85): the concrete content that went to
+// the LLM for one context-window category, so the explanation modal can open a
+// sub-modal showing WHAT was actually sent. Built by the proxy's
+// buildCategoryDetails() from the same parsed wire buffer as the byte-split.
+// All fields optional/defensive — a category may carry only the shape relevant
+// to it (tools → items[]; sys → summary; know → text; hist/tout/user → items[]).
+export interface CategoryDetail {
+  // System-instruction structural summary, MEMOIZED by content hash at source.
+  hash?: string
+  cached?: boolean
+  total_chars?: number
+  total_bytes?: number
+  block_count?: number
+  section_headers?: string[]
+  preview?: string
+  blocks?: { chars: number; cached: boolean; preview: string }[]
+  // Tools / history / tool-outputs / user samples.
+  count?: number
+  items?: {
+    name?: string
+    role?: string | null
+    bytes?: number
+    description?: string
+    input_schema_keys?: string[]
+    preview?: string
+  }[]
+  // Retrieved-knowledge injected text.
+  text?: string | null
+  occurrences?: number
+  // Present only if detail construction failed (never breaks the byte-split).
+  _error?: string
+}
+
 // UTF-8 byte size, optional tool metadata, and a ≤120-char preview. Written
 // VERBATIM by the proxy line-builder (buildAnthropicLine/buildOpenAILine).
 export interface ContextTurnMessage {
@@ -155,7 +215,7 @@ export interface ContextTurnRow {
   }
   // Message INDICES carrying cache_control (D-08) — empty [] on the OpenAI wire.
   cache_breakpoints: number[]
-  categories: { key: string; label: string; bytes: number }[]
+  categories: { key: string; label: string; bytes: number; detail?: CategoryDetail }[]
   messages: ContextTurnMessage[]
   // Correlated at span close (Plan 84-05); null in the hot path. When an ETM
   // observation lands in the turn's time+agent window it carries the semantic
@@ -316,6 +376,9 @@ interface PerformanceState {
   compareA: string | null // run-comparison view: left run
   compareB: string | null // run-comparison view: right run
   timelineByTaskId: Record<string, TimelineRow[]>
+  // OPTION 2: per-run concurrent background rollup, keyed by taskId, populated by
+  // fetchTimeline alongside timelineByTaskId (same request).
+  ambientByTaskId: Record<string, AmbientRow[]>
   timelineLoading: boolean
   timelineError: string | null
   // Per-request context-turns (Plan 84-08) keyed by taskId, mirroring the
@@ -584,6 +647,7 @@ const initialState: PerformanceState = {
   compareA: null,
   compareB: null,
   timelineByTaskId: {},
+  ambientByTaskId: {},
   timelineLoading: false,
   timelineError: null,
   contextTurnsByTaskId: {},
@@ -697,7 +761,18 @@ export const fetchTimeline = createAsyncThunk(
       }
       const data = await response.json()
       const timeline: TimelineRow[] = (data?.timeline ?? []) as TimelineRow[]
-      return { taskId, timeline }
+      // Enrich the backend's per-process rollup with the frontend role classifier
+      // (roleForProcess) and a models[] array, so AmbientActivity can render role
+      // swatches without the backend duplicating roles.ts. run=null: ambient rows
+      // are classified purely by process name, independent of any run.
+      const ambient: AmbientRow[] = ((data?.ambient ?? []) as Array<Record<string, unknown>>).map(
+        (r) => ({
+          ...(r as unknown as AmbientRow),
+          role: roleForProcess(String(r.process ?? ''), null),
+          models: r.model ? [String(r.model)] : [],
+        })
+      )
+      return { taskId, timeline, ambient }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -1450,6 +1525,7 @@ const performanceSlice = createSlice({
       })
       .addCase(fetchTimeline.fulfilled, (state, action) => {
         state.timelineByTaskId[action.payload.taskId] = action.payload.timeline
+        state.ambientByTaskId[action.payload.taskId] = action.payload.ambient
         state.timelineLoading = false
         state.timelineError = null
       })
@@ -1730,6 +1806,11 @@ export const selectTimelineError = (state: RootState) => state.performance.timel
 // Per-taskId timeline selector factory.
 export const selectTimelineFor = (taskId: string | null) => (state: RootState): TimelineRow[] =>
   taskId ? (state.performance.timelineByTaskId[taskId] ?? []) : []
+
+// OPTION 2 — per-taskId ambient background rollup selector factory. Returns the
+// concurrent knowledge/infra activity for the run's window, or [] when absent.
+export const selectAmbientFor = (taskId: string | null) => (state: RootState): AmbientRow[] =>
+  taskId ? (state.performance.ambientByTaskId[taskId] ?? []) : []
 
 // Per-taskId context-turns selector factory (Plan 84-08). Returns the stored
 // per-request lines, or [] when absent/null so the explainer never crashes on a
