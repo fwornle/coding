@@ -90,6 +90,19 @@ import { DatabaseManager } from '../src/databases/DatabaseManager.js';
 import { UnifiedInferenceEngine } from '../src/inference/UnifiedInferenceEngine.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
+// Agent-agnostic tool-name sets for artifact/activity extraction. Tool names are
+// NOT normalized to a single casing across agents: Claude emits capitalized
+// names (Edit/Write/Read/MultiEdit), opencode maps `part.tool` verbatim →
+// lowercase (edit/write/read), and copilot/mastra vary. All comparisons against
+// these sets MUST lowercase the incoming name first. This is why opencode
+// sessions reported "Artifacts: none" — the old code matched only 'Edit'/'Write'.
+const MODIFY_TOOL_NAMES = new Set([
+  'edit', 'write', 'multiedit', 'notebookedit', 'patch', 'applypatch',
+  'apply_patch', 'str_replace_editor', 'str_replace_based_edit_tool',
+  'create_file', 'insert_edit_into_file', 'createfile',
+]);
+const READ_TOOL_NAMES = new Set(['read', 'readfile', 'read_file']);
+
 // CR-02: stamp a message timestamp WITHOUT ever throwing. An absent/unparseable
 // exchange.timestamp makes new Date(...).toISOString() throw
 // RangeError: Invalid time value — and this runs from a .then() in a long-lived
@@ -193,14 +206,38 @@ class EnhancedTranscriptMonitor {
       (process.env.ETM_PROGRESS_TOKEN_DELTA != null
         ? Number(process.env.ETM_PROGRESS_TOKEN_DELTA)
         : DEFAULT_PROGRESS_TOKEN_DELTA);
+    // Wall-clock companion to progressTokenDelta: fire an in-progress observation
+    // when a live turn has been in flight this many ms since the last fire (or
+    // turn start), REGARDLESS of output tokens. This is the ONLY long-turn
+    // coverage that works for opencode/copilot/mastra — their normalized
+    // transcripts carry no usage.output_tokens (see readOpenCodeMessages), so
+    // sumOutputTokens is always 0 and the token-delta trigger is inert. Without
+    // it, a long autonomous non-Claude turn writes zero observations until the
+    // next user prompt (root cause of the orange [📚] badge during active
+    // opencode work). 0 disables; override via ETM_PROGRESS_ELAPSED_MS.
+    this.progressElapsedMs = config.progressElapsedMs ??
+      (process.env.ETM_PROGRESS_ELAPSED_MS != null
+        ? Number(process.env.ETM_PROGRESS_ELAPSED_MS)
+        : 5 * 60 * 1000);
     // Fire cursors — persisted across restarts so a mid-turn restart never
     // re-fires already-fired exchanges (which produced near-duplicate
     // observations the obs-api dedup couldn't merge). Loaded from the state file:
     //   _lastFiredExchangeUuid — last fired batch uuid per cursorKey (dedup boundary)
     //   _progressFiredTokens   — output-token mark per cursorKey (in-progress fires)
+    //   _progressFiredAt       — wall-clock ms of the last progress fire per cursorKey
     const _persisted = this._loadPersistedState();
     this._lastFiredExchangeUuid = new Map(Object.entries(_persisted.firedExchangeCursors || {}));
     this._progressFiredTokens = new Map(Object.entries(_persisted.progressFiredTokens || {}));
+    this._progressFiredAt = new Map(Object.entries(_persisted.progressFiredAt || {}));
+    // Last-seen turn START id per cursorKey — detects turn boundaries so the
+    // wall-clock reference and token mark reset when a new turn begins (not
+    // persisted: on restart the first poll re-seeds from the live set's start).
+    this._progressTurnKey = new Map();
+    // Monotonic per-process counter making every progress snapshot uuid unique —
+    // token-based fires embed the (growing) token mark, but time-based fires can
+    // recur with an unchanged mark (0 for opencode), so a seq guarantees distinct
+    // dedup identities across successive snapshots of the same turn.
+    this._progressSnapshotSeq = 0;
 
     // Initialize adaptive exchange extractor for streaming processing
     this.adaptiveExtractor = new AdaptiveExchangeExtractor();
@@ -379,6 +416,7 @@ class EnhancedTranscriptMonitor {
     return {
       firedExchangeCursors: prune(this._lastFiredExchangeUuid),
       progressFiredTokens: prune(this._progressFiredTokens),
+      progressFiredAt: prune(this._progressFiredAt),
     };
   }
 
@@ -686,8 +724,14 @@ class EnhancedTranscriptMonitor {
           const exchanges = await this.getUnprocessedExchanges();
           if (exchanges.length > 0) {
             await this.processExchanges(exchanges);
-            // After new content lands, emit an in-progress observation if this
-            // turn has crossed another output-token delta (long-turn coverage).
+          }
+          // Long-turn coverage: evaluate a progress fire on EVERY poll while a
+          // turn is in flight — not only when NEW exchanges landed. opencode/
+          // copilot/mastra transcripts carry no usage.output_tokens, so the
+          // token-delta trigger is inert for them; the wall-clock trigger in
+          // _maybeFireProgressObservation is what emits their periodic snapshots
+          // (root-cause fix for the orange [📚] badge during active opencode work).
+          if (this.currentUserPromptSet.length > 0) {
             this._maybeFireProgressObservation();
           }
 
@@ -1048,20 +1092,49 @@ class EnhancedTranscriptMonitor {
    */
   _maybeFireProgressObservation() {
     try {
-      if (!(this.progressTokenDelta > 0)) return;
+      if (!(this.progressTokenDelta > 0) && !(this.progressElapsedMs > 0)) return;
       const set = this.currentUserPromptSet;
       if (!set || set.length === 0) return;
       const cursorKey = `${this.sessionId || this.agentType || 'default'}|${this.transcriptPath || ''}`;
+      const nowMs = Date.now();
+      // Detect a turn boundary: the set's START id is invariant for the life of a
+      // turn but changes when the previous set completed/flushed and a new one
+      // began under the same cursorKey. On a new turn, reset BOTH the wall-clock
+      // reference (to this turn's start) and the token mark — otherwise the new
+      // turn inherits the old turn's last-fire timestamp and fires on its first
+      // poll, and the token baseline stays stuck at the old turn's larger mark.
+      const turnKey = this._turnKeyForSet(set);
+      const prevTurnKey = this._progressTurnKey.get(cursorKey);
+      const first = set[0];
+      const startMs = first && first.timestamp ? new Date(first.timestamp).getTime() : nowMs;
+      const turnStartMs = Number.isFinite(startMs) && startMs > 0 ? startMs : nowMs;
+      if (turnKey !== prevTurnKey) {
+        this._progressTurnKey.set(cursorKey, turnKey);
+        this._progressFiredAt.set(cursorKey, turnStartMs);
+        this._progressFiredTokens.set(cursorKey, 0);
+      }
       const setOutputTokens = sumOutputTokens(set);
       const firedOutputTokens = this._progressFiredTokens.get(cursorKey) || 0;
-      const { fire, mark } = progressFireDecision({
+      // Wall-clock reference: last fire, or (seeded above) this turn's start.
+      let lastFiredAtMs = this._progressFiredAt.get(cursorKey);
+      if (typeof lastFiredAtMs !== 'number' || !(lastFiredAtMs > 0)) {
+        lastFiredAtMs = turnStartMs;
+        this._progressFiredAt.set(cursorKey, lastFiredAtMs);
+      }
+      const { fire, mark, markAt } = progressFireDecision({
         setOutputTokens,
         firedOutputTokens,
         thresholdTokens: this.progressTokenDelta,
+        nowMs,
+        lastFiredAtMs,
+        elapsedThresholdMs: this.progressElapsedMs,
       });
       this._progressFiredTokens.set(cursorKey, mark);
       if (fire) {
-        process.stderr.write(`[ObservationTap] in-progress fire: turn at ${setOutputTokens} output tokens (+${setOutputTokens - firedOutputTokens} since last), Δ=${this.progressTokenDelta}\n`);
+        this._progressFiredAt.set(cursorKey, markAt > 0 ? markAt : nowMs);
+        const elapsedMin = Math.round((nowMs - lastFiredAtMs) / 60000);
+        const trigger = setOutputTokens - firedOutputTokens >= this.progressTokenDelta ? 'tokens' : 'elapsed';
+        process.stderr.write(`[ObservationTap] in-progress fire (${trigger}): turn at ${setOutputTokens} output tokens (+${setOutputTokens - firedOutputTokens} since last), Δtok=${this.progressTokenDelta}, elapsed=${elapsedMin}min/Δt=${Math.round(this.progressElapsedMs / 60000)}min\n`);
         this._fireProgressSnapshot(set, mark);
       }
     } catch (err) {
@@ -1089,7 +1162,10 @@ class EnhancedTranscriptMonitor {
   _fireProgressSnapshot(set, mark) {
     const lastEx = set[set.length - 1];
     const lastUuid = lastEx?.lastMessageUuid || lastEx?.uuid || lastEx?.id || '';
-    const snapshotUuid = `${lastUuid}-progress-${mark}`;
+    // Include a monotonic seq so time-based fires (whose token `mark` can stay
+    // constant at 0 for token-less agents) still produce distinct dedup ids.
+    this._progressSnapshotSeq = (this._progressSnapshotSeq || 0) + 1;
+    const snapshotUuid = `${lastUuid}-progress-${mark}-${this._progressSnapshotSeq}`;
     const nowIso = new Date().toISOString();
     const taskIdPromise = resolveLiveTaskIdSafe().catch(() => '');
     const turnKey = this._turnKeyForSet(set);
@@ -1130,11 +1206,17 @@ class EnhancedTranscriptMonitor {
     for (const exchange of exchanges || []) {
       if (!exchange?.toolCalls) continue;
       for (const tc of exchange.toolCalls) {
-        const filePath = tc.input?.file_path || tc.input?.filePath;
+        const filePath = tc.input?.file_path || tc.input?.filePath || tc.input?.path;
         if (!filePath) continue;
-        if (tc.name === 'Edit' || tc.name === 'Write') {
+        // Agent-agnostic tool-name matching. Claude emits capitalized names
+        // (Edit/Write/Read); opencode maps `part.tool` verbatim → lowercase
+        // (edit/write/read); other agents (copilot/mastra) vary too. Match
+        // case-insensitively across the known file-mutation / read tool variants
+        // so artifacts are captured regardless of which agent produced the turn.
+        const name = String(tc.name || '').toLowerCase();
+        if (MODIFY_TOOL_NAMES.has(name)) {
           if (!modifiedFiles.includes(filePath)) modifiedFiles.push(filePath);
-        } else if (tc.name === 'Read') {
+        } else if (READ_TOOL_NAMES.has(name)) {
           if (!readFiles.includes(filePath)) readFiles.push(filePath);
         }
       }
@@ -1201,14 +1283,19 @@ class EnhancedTranscriptMonitor {
       if (exchange.toolCalls && exchange.toolCalls.length > 0) {
         const toolSummary = exchange.toolCalls.map(tc => {
           const inp = tc.input || {};
-          if (tc.name === 'Edit' || tc.name === 'Write') {
-            return `${tc.name}: ${inp.file_path || 'unknown file'}`;
-          } else if (tc.name === 'Read') {
-            return `Read: ${inp.file_path || 'unknown file'}`;
-          } else if (tc.name === 'Bash') {
+          // Agent-agnostic: lowercase the name and read both file_path (Claude)
+          // and filePath/path (opencode) so opencode turns don't render as bare
+          // tool names with no target in the observation prompt.
+          const name = String(tc.name || '').toLowerCase();
+          const fp = inp.file_path || inp.filePath || inp.path || 'unknown file';
+          if (MODIFY_TOOL_NAMES.has(name)) {
+            return `${tc.name}: ${fp}`;
+          } else if (READ_TOOL_NAMES.has(name)) {
+            return `Read: ${fp}`;
+          } else if (name === 'bash' || name === 'shell') {
             const cmd = (inp.command || '').slice(0, 120);
             return `Bash: ${cmd}`;
-          } else if (tc.name === 'Grep' || tc.name === 'Glob') {
+          } else if (name === 'grep' || name === 'glob') {
             return `${tc.name}: ${inp.pattern || ''} in ${inp.path || '.'}`;
           } else {
             return tc.name;
@@ -2205,12 +2292,21 @@ class EnhancedTranscriptMonitor {
       try { Database = require('better-sqlite3'); }
       catch { Database = require('/Users/Q284340/Agentic/coding/node_modules/better-sqlite3'); }
       const db = Database(dbPath, { readonly: true });
+      // Freshness MUST be judged by the latest MESSAGE time, not s.time_updated:
+      // opencode stamps session.time_updated at creation and does NOT bump it per
+      // message, so a long-lived actively-used session looks "too old" and gets
+      // dropped (observations silently stop). Claude works because it uses the
+      // transcript file mtime, which updates on every message. COALESCE keeps the
+      // old behaviour for sessions that somehow have no message rows.
       const row = db.prepare(
-        `SELECT s.id, s.directory, s.time_updated, s.title FROM session s
-         WHERE s.directory = ? OR s.directory = ? ORDER BY s.time_updated DESC LIMIT 1`
+        `SELECT s.id, s.directory, s.title,
+                COALESCE((SELECT MAX(m.time_created) FROM message m WHERE m.session_id = s.id), s.time_updated) AS last_activity
+         FROM session s
+         WHERE s.directory = ? OR s.directory = ?
+         ORDER BY last_activity DESC LIMIT 1`
       ).get(resolvedPath, projectPath);
       db.close();
-      return this._resolveOpenCodeSession(row ? [row.id, row.directory, row.time_updated, row.title] : null);
+      return this._resolveOpenCodeSession(row ? [row.id, row.directory, row.last_activity, row.title] : null);
     } catch (error) {
       this.debug(`better-sqlite3 OpenCode lookup failed (${error.message}); falling back to sqlite3 CLI`);
     }
@@ -2220,7 +2316,7 @@ class EnhancedTranscriptMonitor {
       const execSync = _execSync;
       const escapedPath = resolvedPath.replace(/'/g, "''");
       const escapedOrig = projectPath.replace(/'/g, "''");
-      const query = `SELECT s.id, s.directory, s.time_updated, s.title FROM session s WHERE s.directory = '${escapedPath}' OR s.directory = '${escapedOrig}' ORDER BY s.time_updated DESC LIMIT 1;`;
+      const query = `SELECT s.id, s.directory, COALESCE((SELECT MAX(m.time_created) FROM message m WHERE m.session_id = s.id), s.time_updated) AS last_activity, s.title FROM session s WHERE s.directory = '${escapedPath}' OR s.directory = '${escapedOrig}' ORDER BY last_activity DESC LIMIT 1;`;
       const result = execSync(`sqlite3 "${dbPath}" "${query}"`, {
         encoding: 'utf-8',
         timeout: 5000
@@ -4146,15 +4242,17 @@ ORDER BY m.time_created ASC;`;
     const combinedText = (toolInput + resultContent + userMessage).toLowerCase();
     const isCoding = codingPaths.some(path => combinedText.includes(path));
     
-    // Determine activity category
+    // Determine activity category (agent-agnostic; names may be capitalized
+    // (Claude) or lowercase (opencode) or vary by agent).
     let category = 'general';
-    if (toolCall.name === 'Edit' || toolCall.name === 'Write' || toolCall.name === 'MultiEdit') {
+    const tName = String(toolCall.name || '').toLowerCase();
+    if (MODIFY_TOOL_NAMES.has(tName)) {
       category = 'file_modification';
-    } else if (toolCall.name === 'Read' || toolCall.name === 'Glob') {
+    } else if (tName === 'read' || tName === 'glob') {
       category = 'file_read';
-    } else if (toolCall.name === 'Bash') {
+    } else if (tName === 'bash') {
       category = 'command_execution';
-    } else if (toolCall.name === 'Grep') {
+    } else if (tName === 'grep') {
       category = 'search_operation';
     }
     
