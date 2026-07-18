@@ -56,6 +56,20 @@ const HAS = (name) => process.argv.includes(name);
 const ACTIVE_WINDOW_MS = parseInt(arg('--window', '30'), 10) * 60_000;
 const INTERVAL_S = parseInt(arg('--interval', '0'), 10);
 
+// Strip noise that must never survive into a human-facing title: embedded
+// absolute/home paths, [Image N] attachment markers, and inline URLs. Keeps the
+// surrounding prose intact ("...in the repo /Users/x" -> "...in the repo").
+function stripTitleNoise(s) {
+  return String(s)
+    .replace(/\[Image[^\]]*\]/gi, ' ')                // [Image 1] attachment markers
+    .replace(/\((?:project|repo)[^)]*\)/gi, ' ')       // (project coding) tails
+    .replace(/https?:\/\/\S+/g, ' ')                   // inline URLs
+    .replace(/(?:~|\/)[\w.\-]+(?:\/[\w.\-]+)+\/?/g, ' ') // absolute/home paths
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .trim();
+}
+
 // Pull the first natural-language line out of a message, skipping shell prompts,
 // command output, log lines, and paths so the title reads like a human request.
 function firstProseLine(text) {
@@ -68,7 +82,8 @@ function firstProseLine(text) {
     if (/^(https?:\/\/|\/|~\/|\.\/)/.test(l)) continue;    // urls / paths
     const letters = (l.match(/[a-zA-Z]/g) || []).length;
     if (letters < Math.max(6, l.length * 0.4)) continue;   // mostly symbols/output
-    return l;
+    const cleaned = stripTitleNoise(l);
+    if (cleaned && (cleaned.match(/[a-zA-Z]/g) || []).length >= 6) return cleaned;
   }
   return '';
 }
