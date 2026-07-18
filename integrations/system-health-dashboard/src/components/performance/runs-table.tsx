@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
-import { Pencil, Layers, Trash2, RotateCcw, GitCompare, GitBranch } from 'lucide-react'
+import { Pencil, Layers, Trash2, RotateCcw, GitCompare, GitBranch, Radio } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,10 +53,15 @@ function runStr(run: Run, key: string): string | null {
   return typeof v === 'string' && v.trim() !== '' ? v : null
 }
 
+// A run is an EXPERIMENT (a spec-driven cell) iff it carries variant/base_variant
+// provenance — only the experiment runner stamps these. An ambient auto-measured
+// session (opencode/claude/…) carries neither, so it can't be re-run or forked.
+function isExperimentRun(run: Run): boolean {
+  return runStr(run, 'variant') !== null || runStr(run, 'base_variant') !== null
+}
+
 function isCompletedExperimentRun(run: Run): boolean {
-  const isExperiment = runStr(run, 'variant') !== null || runStr(run, 'base_variant') !== null
-  const isComplete = runStr(run, 'terminal_state') === 'complete'
-  return isExperiment && isComplete
+  return isExperimentRun(run) && runStr(run, 'terminal_state') === 'complete'
 }
 
 // Newest-first sort key: prefer when the run ENDED, falling back to when it
@@ -548,93 +553,142 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                   <ReconciliationBadge taskId={run.task_id} />
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    {/* D-11: Re-run — only on COMPLETED experiment runs. Opens the
-                        launcher pre-filled (same spec + snapshot, rerun_of set, plus
-                        the per-variant model/agent seed). */}
-                    {isCompletedExperimentRun(run) && (
+                  {/* Rich hover copy on each action so a reader knows what it does.
+                      Re-run / Fork appear ONLY on completed experiment runs (they
+                      need a spec+snapshot to reproduce), so ambient auto-measured
+                      sessions correctly show just Explain + Edit scores. */}
+                  <TooltipProvider>
+                    <div className="flex items-center justify-end gap-1">
+                      {/* Ambient-session hint — an ambient run has no Re-run/Fork (there's
+                          no spec/snapshot to reproduce). A muted "session" tag explains the
+                          otherwise-empty action space the operator noticed. */}
+                      {!isExperimentRun(run) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="inline-flex cursor-help items-center gap-1 rounded border border-dashed px-1.5 py-0.5 text-xs text-muted-foreground"
+                              data-testid="ambient-session-hint"
+                            >
+                              <Radio className="size-3" />
+                              session
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            Ambient session — auto-measured from the live agent session, not a
+                            spec-driven experiment cell. There’s no snapshot to reproduce, so it
+                            can’t be re-run or forked into avenues.
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {/* D-11: Re-run — only on COMPLETED experiment runs. Opens the
+                          launcher pre-filled (same spec + snapshot, rerun_of set, plus
+                          the per-variant model/agent seed). */}
+                      {isCompletedExperimentRun(run) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid="rerun-experiment"
+                              aria-label={`Re-run experiment ${run.task_id}`}
+                              onClick={(e) => {
+                                // Don't bubble to the row (which drives the timeline).
+                                e.stopPropagation()
+                                dispatch(setLauncherPrefill(buildRerunPrefill(run, specList)))
+                                // 85-06 DEFECT B: the launcher card sits at the TOP of the page while
+                                // this button is far down the runs table, so the pre-fill happened
+                                // OFF-SCREEN and the click read as dead. Bring the launcher INTO VIEW
+                                // so the operator sees the rerun banner + pre-selected spec. The
+                                // launcher's own useEffect applies a transient highlight on consume.
+                                document
+                                  .getElementById('experiment-launcher')
+                                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                              }}
+                            >
+                              <RotateCcw className="size-3.5" />
+                              Re-run
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            Re-run this experiment — reopens the launcher pre-filled with the same spec,
+                            snapshot and variant, so a fresh run is directly comparable (same task_hash).
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {/* AVN-02 (D-01/D-03): Fork into avenues — SAME completed-span
+                          guard as Re-run. Pre-fills the launcher's four-axis picker
+                          (buildForkPrefill seeds it from this span + carries the
+                          origin_span_id link) and scrolls it into view with the
+                          transient ring-2 ring-primary highlight. The fork does NOT
+                          add a new API path — launch reuses launchExperiment; the
+                          avenue-spec synthesis is Plan 87-03's synthesizeAvenueSpec
+                          invoked server-side via the existing run bridge. */}
+                      {isCompletedExperimentRun(run) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid="fork-into-avenues"
+                              aria-label={`Fork span ${run.task_id} into avenues`}
+                              onClick={(e) => {
+                                // Don't bubble to the row (which drives the timeline).
+                                e.stopPropagation()
+                                dispatch(setLauncherPrefill(buildForkPrefill(run)))
+                                document
+                                  .getElementById('experiment-launcher')
+                                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                              }}
+                            >
+                              <GitBranch className="size-3.5" />
+                              Fork into avenues
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            Fork this run into avenues — seed a new sweep from this span across the
+                            agent / model / framework / knowledge-injection axes, each avenue running
+                            in its own isolated worktree.
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            data-testid="explain-context"
+                            aria-label={`Explain context and caching for ${run.task_id}`}
+                            onClick={(e) => {
+                              // Don't let the click bubble to the row (which drives the timeline).
+                              e.stopPropagation()
+                              dispatch(setExplainTaskId(run.task_id))
+                            }}
+                          >
+                            <Layers className="size-3.5" />
+                            Explain
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          Explain context &amp; caching — open a breakdown of this run’s context window:
+                          what filled it, what was cached, and the per-segment token cost.
+                        </TooltipContent>
+                      </Tooltip>
                       <Button
                         variant="ghost"
                         size="sm"
-                        data-testid="rerun-experiment"
-                        aria-label={`Re-run experiment ${run.task_id}`}
-                        title="Re-run this experiment pre-filled"
+                        data-testid="edit-scores"
+                        aria-label={`Edit scores for ${run.task_id}`}
                         onClick={(e) => {
-                          // Don't bubble to the row (which drives the timeline).
+                          // Don't let the click bubble to the row (which drives the timeline).
                           e.stopPropagation()
-                          dispatch(setLauncherPrefill(buildRerunPrefill(run, specList)))
-                          // 85-06 DEFECT B: the launcher card sits at the TOP of the page while
-                          // this button is far down the runs table, so the pre-fill happened
-                          // OFF-SCREEN and the click read as dead. Bring the launcher INTO VIEW
-                          // so the operator sees the rerun banner + pre-selected spec. The
-                          // launcher's own useEffect applies a transient highlight on consume.
-                          document
-                            .getElementById('experiment-launcher')
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                          dispatch(setOverrideTaskId(run.task_id))
                         }}
                       >
-                        <RotateCcw className="size-3.5" />
-                        Re-run
+                        <Pencil className="size-3.5" />
+                        Edit scores
                       </Button>
-                    )}
-                    {/* AVN-02 (D-01/D-03): Fork into avenues — SAME completed-span
-                        guard as Re-run. Pre-fills the launcher's four-axis picker
-                        (buildForkPrefill seeds it from this span + carries the
-                        origin_span_id link) and scrolls it into view with the
-                        transient ring-2 ring-primary highlight. The fork does NOT
-                        add a new API path — launch reuses launchExperiment; the
-                        avenue-spec synthesis is Plan 87-03's synthesizeAvenueSpec
-                        invoked server-side via the existing run bridge. */}
-                    {isCompletedExperimentRun(run) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        data-testid="fork-into-avenues"
-                        aria-label={`Fork span ${run.task_id} into avenues`}
-                        title="Fork this span into avenues"
-                        onClick={(e) => {
-                          // Don't bubble to the row (which drives the timeline).
-                          e.stopPropagation()
-                          dispatch(setLauncherPrefill(buildForkPrefill(run)))
-                          document
-                            .getElementById('experiment-launcher')
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                        }}
-                      >
-                        <GitBranch className="size-3.5" />
-                        Fork into avenues
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      data-testid="explain-context"
-                      aria-label={`Explain context and caching for ${run.task_id}`}
-                      title="Explain context & caching"
-                      onClick={(e) => {
-                        // Don't let the click bubble to the row (which drives the timeline).
-                        e.stopPropagation()
-                        dispatch(setExplainTaskId(run.task_id))
-                      }}
-                    >
-                      <Layers className="size-3.5" />
-                      Explain
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      data-testid="edit-scores"
-                      aria-label={`Edit scores for ${run.task_id}`}
-                      onClick={(e) => {
-                        // Don't let the click bubble to the row (which drives the timeline).
-                        e.stopPropagation()
-                        dispatch(setOverrideTaskId(run.task_id))
-                      }}
-                    >
-                      <Pencil className="size-3.5" />
-                      Edit scores
-                    </Button>
-                  </div>
+                    </div>
+                  </TooltipProvider>
                 </TableCell>
               </TableRow>
             )
