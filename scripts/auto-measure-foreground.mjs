@@ -33,6 +33,7 @@ import { openTokenDb, insertTokenRowDeduped } from '../lib/lsl/token/token-db.mj
 import { aggregateByTaskId, isForegroundGroup } from '../lib/experiments/token-aggregate.mjs';
 import { openExperimentStore } from '../lib/experiments/store.mjs';
 import { writeRun } from '../lib/experiments/run-write.mjs';
+import { readRuns } from '../lib/experiments/query.mjs';
 import { loadTaxonomy, deriveClassFromText } from '../lib/experiments/taxonomy.mjs';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
@@ -219,8 +220,80 @@ async function onePass(dbPath) {
   log(`pass complete — ${written} active session(s) written`);
 }
 
+// --reclassify: re-derive task_class for EXISTING session runs (task_id ^= 'ses_')
+// whose class is weak — 'unclassified', the legacy 'foreground-session' sentinel,
+// or any non-taxonomy value — via the LLM classifier. Covers rows the daemon's
+// bypass-only pass never touches (e.g. historical proxy-routed sessions written by
+// an older writer). Re-writes each run FAITHFULLY: only task_class changes, every
+// other field (totals, heuristics, canonical/background models, tags) is preserved
+// verbatim so token counts and route quality are never clobbered by the update.
+async function reclassifyPass(dbPath) {
+  const store = await openExperimentStore();
+  let taxonomy = null;
+  try { taxonomy = loadTaxonomy(); } catch (err) { log(`taxonomy load failed — cannot reclassify: ${err.message}`); await store.close(); return; }
+  const validClasses = new Set(taxonomy?.classes ? Object.keys(taxonomy.classes) : []);
+  if (!validClasses.size) { log('no taxonomy classes — nothing to reclassify'); await store.close(); return; }
+
+  let updated = 0;
+  try {
+    // includePending so quarantined ('unclassified' pending) rows are reachable too.
+    const runs = await readRuns(store, { includePending: true });
+    const weak = runs.filter((r) =>
+      /^ses_/.test(String(r.task_id || '')) &&
+      (r.task_class == null || r.task_class === 'unclassified' || !validClasses.has(r.task_class)),
+    );
+    log(`reclassify: ${weak.length} weak-class session run(s) to consider`);
+
+    for (const r of weak) {
+      const cls = await llmSessionClass(dbPath, r.task_id, log);
+      // Skip when the LLM is unavailable (null), genuinely can't classify
+      // ('unclassified'), or the class is unchanged — never a no-op re-write.
+      if (!cls || cls === 'unclassified' || cls === r.task_class) continue;
+
+      await writeRun(store, {
+        span: {
+          task_id: r.task_id, started_at: r.started_at, ended_at: r.ended_at,
+          goal_sentence: r.goal_sentence ?? '',
+        },
+        taskClass: cls,
+        pending: false,
+        // Preserve every tag verbatim (readRuns spreads Run.metadata onto r).
+        tags: {
+          task_hash: r.task_hash, agent: r.agent, model: r.model, framework: r.framework,
+          trace_id: r.trace_id, snapshot_id: r.snapshot_id,
+          canonical_model: r.canonical_model, canonical_agent: r.canonical_agent,
+          background_models: r.background_models ?? [], session_summary: r.session_summary,
+          variant: r.variant, repeat: r.repeat, terminal_state: r.terminal_state,
+          skip_reason: r.skip_reason, rerun_of: r.rerun_of, base_variant: r.base_variant,
+          origin_span_id: r.origin_span_id,
+        },
+        // Preserve the Outcome token totals (camelCase on r.outcome → snake_case in).
+        totals: {
+          input_tokens: r.outcome?.inputTokens, output_tokens: r.outcome?.outputTokens,
+          total_tokens: r.outcome?.totalTokens, reasoning_tokens: r.outcome?.reasoningTokens,
+        },
+        // Preserve the six route heuristics (flat on the Run metadata → r.*).
+        heuristics: {
+          loop_count: r.loop_count ?? null, edit_revert_count: r.edit_revert_count ?? null,
+          redundant_read_count: r.redundant_read_count ?? null, abandoned_tool_count: r.abandoned_tool_count ?? null,
+          total_step_count: r.total_step_count ?? null, wallclock_per_step: r.wallclock_per_step ?? null,
+        },
+      });
+      updated += 1;
+      log(`reclassified ${r.task_id.slice(0, 16)}: ${r.task_class ?? 'null'} → ${cls}`);
+    }
+  } finally {
+    await store.close();
+  }
+  log(`reclassify complete — ${updated} run(s) updated`);
+}
+
 async function main() {
   const dbPath = arg('--db', DEFAULT_OPENCODE_DB);
+  if (HAS('--reclassify')) {
+    await reclassifyPass(dbPath);
+    return;
+  }
   if (INTERVAL_S > 0 && !HAS('--once')) {
     log(`daemon mode — every ${INTERVAL_S}s, active-window ${ACTIVE_WINDOW_MS / 60000}min`);
     // eslint-disable-next-line no-constant-condition
