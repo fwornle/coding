@@ -585,7 +585,11 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                           the per-variant model/agent seed). */}
                       {isCompletedExperimentRun(run) && (
                         <Tooltip>
+                          {/* span wrapper: Button has no forwardRef, so asChild can't
+                              anchor Radix Popper to it → the tooltip renders off-screen.
+                              A span forwards the ref (same pattern as Compare-selected). */}
                           <TooltipTrigger asChild>
+                            <span className="inline-flex">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -608,6 +612,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                               <RotateCcw className="size-3.5" />
                               Re-run
                             </Button>
+                            </span>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs">
                             Re-run this experiment — reopens the launcher pre-filled with the same spec,
@@ -626,6 +631,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                       {isCompletedExperimentRun(run) && (
                         <Tooltip>
                           <TooltipTrigger asChild>
+                            <span className="inline-flex">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -643,6 +649,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                               <GitBranch className="size-3.5" />
                               Fork into avenues
                             </Button>
+                            </span>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs">
                             Fork this run into avenues — seed a new sweep from this span across the
@@ -653,6 +660,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                       )}
                       <Tooltip>
                         <TooltipTrigger asChild>
+                          <span className="inline-flex">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -667,6 +675,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                             <Layers className="size-3.5" />
                             Explain
                           </Button>
+                          </span>
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
                           Explain context &amp; caching — open a breakdown of this run’s context window:

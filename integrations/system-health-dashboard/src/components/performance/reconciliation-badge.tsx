@@ -87,15 +87,19 @@ export function ReconciliationBadge({ taskId }: { taskId: string }) {
   return (
     <TooltipProvider>
       <Tooltip>
+        {/* span wrapper: Badge has no forwardRef, so asChild can't anchor Radix
+            Popper to it → the tooltip renders off-screen. A span forwards the ref. */}
         <TooltipTrigger asChild>
-          <Badge
-            variant="outline"
-            className={`gap-1 ${tokenClass}`}
-            data-testid="reconciliation-badge"
-          >
-            <Icon className="size-3.5" />
-            {label}
-          </Badge>
+          <span className="inline-flex">
+            <Badge
+              variant="outline"
+              className={`gap-1 ${tokenClass}`}
+              data-testid="reconciliation-badge"
+            >
+              <Icon className="size-3.5" />
+              {label}
+            </Badge>
+          </span>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs space-y-1">
           <p className="font-medium">Token reconciliation</p>
