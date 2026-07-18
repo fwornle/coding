@@ -37,9 +37,9 @@ skill -> skill: write config/experiments/<id>.yaml\ncompute task_hash = sha256(g
 skill -> runner: --spec <id>.yaml
 loop each variant × repeat cell
     runner -> mstart: open span (task_id)
-    mstart -> proxy: ambient task_id
-    runner -> agent: drive goal in sandbox
-    agent -> proxy: LLM calls
+    mstart -> proxy: open ambient span (fallback)
+    runner -> agent: drive goal in sandbox\n(per-request binding: x-task-id / config splice)
+    agent -> proxy: LLM calls (task-bound)
     proxy -> proxy: record token_usage(task_id)
     runner -> mstop: cell complete
     mstop -> judge: gate (test_command) + 5-dim rubric

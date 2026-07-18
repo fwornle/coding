@@ -38,6 +38,8 @@ Open the dashboard at [http://localhost:3032](http://localhost:3032) → **Perfo
 
 ![Performance → Runs table](../images/measurement-runs-table.png)
 
+Click a run to expand its **timeline** — each turn is coloured by role (foreground development · knowledge capture · infrastructure), and a collapsible **Concurrent background activity** panel shows the knowledge/infra token spend that ran in the same window but isn't charged to the run.
+
 ## Step 4 — Read the ranked comparison
 
 Switch to the **Comparison** tab. Variants are columns; metrics are rows. The **ranked** group is ordered cheapest-per-quality first, with `mean ± stddev` (hover for median/min/max/n). Failed, ungated, and unscored variants are shown separately — never crowned as winners.

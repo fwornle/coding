@@ -236,10 +236,13 @@ node scripts/experiment-run.mjs --spec config/experiments/<derived-id>.yaml \
 
 Pass `--task-class` through so the runner classifies the Runs (belt-and-braces with the spec field).
 
-**RUN UNATTENDED** (one-global-span caveat): each cell opens ONE global `active-measurement.json`
-span slot that the shared host proxy reads to stamp `token_usage.task_id`. Any concurrent
-main-session LLM call in THIS repo while a cell is open would be mis-stamped with the cell's
-task_id. Kick this off standalone — do not drive it from an interactive agent working the same repo.
+**RUN UNATTENDED** (ambient-span caveat): each cell binds its OWN tokens per-request (claude via an
+`x-task-id` header, opencode via an `OPENCODE_CONFIG_CONTENT` provider splice on both wires — Phase
+84), so the cell captures reliably even under concurrency. But it still opens the ambient
+`active-measurement.json` span as the fallback the shared host proxy reads to stamp any *unbound*
+`token_usage.task_id`. A concurrent main-session LLM call in THIS repo that carries no binding of its
+own would be mis-stamped with the cell's task_id. Kick this off standalone — do not drive it from an
+interactive agent working the same repo.
 
 Env knobs the runner honours (surface if the operator needs them): `CODING_REPO`,
 `LLM_PROXY_DATA_DIR`, `LLM_PROXY_PORT`, `CODING_PROXY_ROUTE`.

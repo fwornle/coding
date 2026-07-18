@@ -43,6 +43,16 @@ If nothing passed the gate, the **ranked** section is empty — and the dashboar
 
 ---
 
+## Ambient, measurement, experiment — three layers
+
+Measurement happens at three levels, and only the top two ask anything of you:
+
+- **Ambient (always-on).** Every LLM call that routes through the `rapid-llm-proxy` is recorded passively, and the `auto-measure-foreground` daemon (`com.coding.auto-measure-foreground`, every 120s) writes one dashboard **Run per OpenCode session** — including bypass-provider sessions (e.g. copilot-BYOK) that never hit the proxy. You get a token/route timeline for *all* work without asking. It attributes cost but does **not** run the judge, so ambient Runs carry no quality **Score**.
+- **Measurement** — the Performance tab's **Start measurement** button. Opens a **named span** with a `task_id` + one-sentence goal you choose, so a specific task's tokens attribute to a stable `task_hash` (`sha256(goal)`); **Stop** then triggers the heavy close (token-aggregate + judge + score) that ambient skips. Reach for it when you want *one* hand-run task to be a scored, re-runnable, comparable unit — it is effectively a single manual experiment cell.
+- **Experiment** — the **Launch experiment** button, or the [`/experiment` skill](experiment-skill.md). Runs a whole matrix (`variants × repeats` cells, each measured, gated, judged), ranks them, and writes the report the **Comparison** tab reads.
+
+The **Performance** tab surfaces all three: the **Runs** table (every measured/ambient Run), each run's role-lane **timeline** with its **Ambient activity panel**, and the **Comparison** tab.
+
 ## When to reach for it
 
 - **Choosing a model** — is Haiku good enough for this class of task, or do you need Sonnet/Opus?

@@ -87,7 +87,7 @@ Flags override everything; there is no synthesis step. The skill detects this mo
 
 ## Operational notes
 
-- **Run unattended.** Each cell opens one global measurement span; don't drive an interactive agent in the same repo while a matrix runs, or its calls get mis-attributed.
+- **Run unattended.** Each cell now binds its own tokens **per-request** (claude via an `x-task-id` header, opencode via a provider-config splice on both wires), so a cell captures reliably even under concurrency. But a cell still opens the ambient `active-measurement.json` span as a fallback, so a *concurrent* interactive call in the same repo that carries no binding of its own can still be swept into the open cell — keep the matrix unattended.
 - **Agents:** `claude` and `opencode` are the RUN-verified drivable agents; `copilot` is probe-gated; `copilot` + `headless` is an unsupported combination and is dropped.
 
 See the [Tutorial](tutorial.md) for a full worked example and the [Architecture](architecture.md) for how the measurement works under the hood.

@@ -33,12 +33,13 @@ package "Experiment Store" as store_layer {
 package "Dashboard (:3032 / :8080)" as ui_layer {
   component "GET /api/experiments/comparison" as api <<api>>
   component "Comparison matrix\n(ranked/failed/ungated/unscored)" as matrix <<core>>
+  component "Runs timeline\n(role lanes + Ambient panel)" as timeline <<core>>
 }
 
 op --> skill : describe / declare
 skill --> runner : --spec <derived>.yaml
 runner --> mstart : per cell
-mstart --> proxy : ambient task_id
+mstart --> proxy : open ambient span (fallback)
 proxy --> tokendb : record tokens
 runner --> mstop : cell done
 mstop --> evidence : gate (test_command)
@@ -53,6 +54,15 @@ compare_cli --> report : writeReportJson
 api --> compare_lib : same buildComparison
 matrix --> api : fetchComparison
 report ..> matrix : live source
+store ..> timeline : per-run rows + ambient
+
+note bottom of proxy
+  **Per-request task binding** (primary)
+  claude: x-task-id header
+  opencode: config splice (both wires)
+  mastra / copilot: base-URL seam
+  ambient span = fallback for unbound calls
+end note
 
 note right of compare_lib
   **Honesty spine**
