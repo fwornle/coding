@@ -34,6 +34,9 @@ A run's tokens are classified into three **role lanes** — **foreground develop
 
 Historically, a real context-window breakdown required someone to click **Start measurement** first — an interactive session that never opened a span routed through the proxy with an empty `task_id`, so the dashboard could only show an *illustrative* context band. The **measurement reconciler** removes that manual step: it keeps a live measurement span bound for each foreground agent session automatically, so **claude / opencode / copilot** sessions get a real, proportional context-window breakdown with zero manual action.
 
+!!! warning "Capture requires proxy-routed traffic"
+    The per-category context-window breakdown is produced **only** by the proxy wire-tap at `localhost:12435`, which parses the actual request buffer. A session gets a real band only if its traffic **flows through the proxy** — i.e. it uses the `rapid-proxy` provider (`http://localhost:12435/v1`). Sessions on a provider that talks to the upstream API directly (e.g. opencode's built-in **`github-copilot/*`** models, or Claude Code before its `/v1/messages` calls are routed through the proxy) **bypass the tap**: the reconciler still binds a slot and token *totals* are backfilled by the `token-adapter-*` reconcilers, but there is no wire buffer to split, so the dashboard correctly falls back to the *illustrative* band. To capture an opencode session, point it at a `rapid-proxy/<model>` model rather than `github-copilot/<model>`.
+
 ![Always-on per-agent measurement — reconciler binds each live session](../images/measurement-auto-reconciler.png)
 
 **How it works.** A standalone, launchd-supervised loop (`scripts/measurement-reconciler.mjs`, `com.coding.measurement-reconciler`) ticks every `pollMs` (default **5s**):
