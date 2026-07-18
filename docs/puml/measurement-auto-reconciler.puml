@@ -1,0 +1,63 @@
+@startuml measurement-auto-reconciler
+!include _standard-style.puml
+
+title Always-on per-agent measurement — reconciler → per-agent span → proxy tap
+
+box "Live agent sessions" #E6F3FF
+    participant "claude\n(~/.claude/**/*.jsonl)" as claude
+    participant "opencode\n(SQLite session)" as oc
+    participant "copilot\n(events.jsonl)" as cop
+end box
+
+box "Reconciler (standalone, launchd)" #F0E6FF
+    participant "measurement-reconciler.mjs\ncom.coding.measurement-reconciler" as recon
+    participant "foreground-sessions.mjs\n(detection)" as detect
+    control "config/behavior.json\nautoMeasure.enabled" as cfg
+    database ".data/active-measurement.<agent>.json\n(per-agent slot)" as slot
+end box
+
+box "Proxy + store" #E6F7E6
+    participant "rapid-llm-proxy\n:12435" as proxy
+    database "token-usage.db\n(task_id rows)" as db
+end box
+
+box "Dashboard (:3032)" #FFE6E6
+    actor "Operator" as op
+    participant "Performance tab\nAuto-measure control" as dash
+end box
+
+== Detect & bind (every pollMs, default 5s) ==
+recon -> cfg: read autoMeasure.enabled (hot-reload)
+recon -> detect: detectForegroundSession(agent)
+detect -> claude: newest *.jsonl mtime
+detect -> oc: latest top-level session by time_updated
+detect -> cop: newest events.jsonl mtime
+detect --> recon: {sessionId, lastActivityMs} | null
+
+alt enabled AND session fresh (< freshnessMs)
+    recon -> slot: startMeasurement(task_id = sessionId, agent)\nmeta.source = "reconciler"
+else stale / disabled AND slot is reconciler-owned
+    recon -> slot: clearAgentSpan(agent)
+end
+
+== Bind live traffic (D-08 safe) ==
+claude -> proxy: /v1/messages (header-less interactive tap)
+proxy -> slot: resolveAgentSpanTaskId(agent)\nper-agent ONLY — never global
+proxy -> db: record token_usage(task_id = sessionId)
+note right of proxy
+  Global manual/experiment span is
+  NOT inherited on the interactive tap,
+  so experiment cells stay isolated.
+end note
+
+== Operator controls (global) ==
+op -> dash: toggle "Always-on auto measurement"
+dash -> cfg: POST /api/experiments/measurement/behavior
+op -> dash: Reset
+dash -> slot: POST /api/experiments/measurement/reset\nclear reconciler-owned slots
+note over recon, slot
+  Reset (a): slots cleared → reconciler
+  rebinds fresh on its next tick.
+end note
+
+@enduml

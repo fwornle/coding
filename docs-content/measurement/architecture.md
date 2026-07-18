@@ -30,6 +30,30 @@ A run's tokens are classified into three **role lanes** — **foreground develop
 
 ---
 
+## Always-on per-agent measurement
+
+Historically, a real context-window breakdown required someone to click **Start measurement** first — an interactive session that never opened a span routed through the proxy with an empty `task_id`, so the dashboard could only show an *illustrative* context band. The **measurement reconciler** removes that manual step: it keeps a live measurement span bound for each foreground agent session automatically, so **claude / opencode / copilot** sessions get a real, proportional context-window breakdown with zero manual action.
+
+![Always-on per-agent measurement — reconciler binds each live session](../images/measurement-auto-reconciler.png)
+
+**How it works.** A standalone, launchd-supervised loop (`scripts/measurement-reconciler.mjs`, `com.coding.measurement-reconciler`) ticks every `pollMs` (default **5s**):
+
+1. **Detect** each agent's live foreground session (`lib/measurement/foreground-sessions.mjs`) — claude via the newest `*.jsonl` transcript mtime, opencode via the most-recent top-level session in its SQLite store, copilot via the newest `events.jsonl` mtime. Locations come from `getAgentSearchPaths()`, the single source of truth. (**mastra** is stubbed — it returns `null` pending removal.)
+2. **Bind** a fresh session (activity within `freshnessMs`, default **120s**) by writing a **per-agent** span slot `.data/active-measurement.<agent>.json` with `task_id = session_id` — the same key the wire-tap Run reconstruction uses, so proxy traffic and the reconstructed Run correlate.
+3. **Clear** its own slot when a session goes stale, or rebind when the session rotates.
+
+**Isolation (D-08 preserved).** The proxy binds the header-less interactive `/v1/messages` tap to the **per-agent** slot *only* (`resolveAgentSpanTaskId`) — it never inherits the global `active-measurement.json` span. So a concurrent experiment or a manual measurement can never leak into an ambient interactive session, and vice versa. The global manual/experiment slot and any operator-pinned per-agent slot are left untouched by the reconciler.
+
+**Control (`config/behavior.json` → `autoMeasure`).** A single global checkbox in the dashboard's **Measurement** card toggles always-on binding; the reconciler hot-reloads the config each tick. When always-on is **enabled**, the manual Start form is replaced by a **Reset** button — Reset clears the reconciler-owned per-agent slots (`POST /api/experiments/measurement/reset`) so each live session rebinds fresh on the next tick.
+
+| Always-on **enabled** | Always-on **disabled** |
+|---|---|
+| ![Auto measurement on — Reset control](../images/measurement-auto-control.png) | ![Manual Start form](../images/measurement-manual-control.png) |
+
+**Endpoints:** `GET/POST /api/experiments/measurement/behavior` (read/merge `autoMeasure`) · `POST /api/experiments/measurement/reset` (clear-and-rebind).
+
+---
+
 ## The data model
 
 Three linked entities are written to the dedicated experiment store (`.data/experiments/leveldb`, kept separate from the knowledge graph to avoid churn):
