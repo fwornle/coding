@@ -416,6 +416,10 @@ interface PerformanceState {
   measurementLoading: boolean
   measurementError: string | null
   lastCloseCommand: string | null // host command surfaced after Stop
+  // Always-on auto-measure config (mirrors config/behavior.json autoMeasure block,
+  // served by GET/POST /api/experiments/measurement/behavior).
+  autoMeasure: AutoMeasureConfig | null
+  autoMeasureLoading: boolean
   // Experiment Control Center (Plan 85-05).
   specList: SpecSummary[]
   specListLoading: boolean
@@ -452,6 +456,16 @@ export interface ActiveMeasurement {
   task_id: string
   started_at: string
   goal_sentence?: string
+}
+
+// Always-on auto-measure config (mirrors config/behavior.json autoMeasure block).
+// The dashboard exposes only the global `enabled` toggle (#1: global); per-agent
+// flags remain in the file for the reconciler but are not surfaced in the UI.
+export interface AutoMeasureConfig {
+  enabled: boolean
+  freshnessMs?: number
+  pollMs?: number
+  agents?: Record<string, boolean>
 }
 
 // ---------------------------------------------------------------------------
@@ -671,6 +685,8 @@ const initialState: PerformanceState = {
   measurementLoading: false,
   measurementError: null,
   lastCloseCommand: null,
+  autoMeasure: null,
+  autoMeasureLoading: false,
   specList: [],
   specListLoading: false,
   activeRunId: null,
@@ -1109,6 +1125,65 @@ export const stopMeasurement = createAsyncThunk<
       const data = await response.json().catch(() => ({}))
       if (!response.ok) return rejectWithValue(data?.message || `API returned ${response.status}`)
       return { close_command: data.close_command as string }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Always-on auto-measure control (Phase 4) — same-origin
+// /api/experiments/measurement/behavior (GET/POST) + /reset (POST). The global
+// checkbox toggles autoMeasure.enabled; Reset clears the reconciler-owned
+// per-agent slots so the reconciler rebinds fresh on its next tick (#2: a).
+// ---------------------------------------------------------------------------
+
+export const fetchMeasurementBehavior = createAsyncThunk<
+  AutoMeasureConfig | null, void | undefined, { rejectValue: string }
+>(
+  'performance/fetchMeasurementBehavior',
+  async (_arg, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/measurement/behavior')
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || `API returned ${response.status}`)
+      return (data.autoMeasure ?? null) as AutoMeasureConfig | null
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+export const setMeasurementBehavior = createAsyncThunk<
+  AutoMeasureConfig, { enabled: boolean }, { rejectValue: string }
+>(
+  'performance/setMeasurementBehavior',
+  async ({ enabled }, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/measurement/behavior', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || `API returned ${response.status}`)
+      return data.autoMeasure as AutoMeasureConfig
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
+export const resetMeasurement = createAsyncThunk<
+  { cleared: string[] }, void | undefined, { rejectValue: string }
+>(
+  'performance/resetMeasurement',
+  async (_arg, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/measurement/reset', { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) return rejectWithValue(data?.message || `API returned ${response.status}`)
+      return { cleared: (data.cleared ?? []) as string[] }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -1726,6 +1801,33 @@ const performanceSlice = createSlice({
         state.measurementLoading = false
         state.measurementError = action.payload ?? 'Failed to stop measurement'
       })
+      // Always-on auto-measure config (Phase 4)
+      .addCase(fetchMeasurementBehavior.fulfilled, (state, action) => {
+        state.autoMeasure = action.payload
+      })
+      .addCase(setMeasurementBehavior.pending, (state) => {
+        state.autoMeasureLoading = true
+        state.measurementError = null
+      })
+      .addCase(setMeasurementBehavior.fulfilled, (state, action) => {
+        state.autoMeasureLoading = false
+        state.autoMeasure = action.payload
+      })
+      .addCase(setMeasurementBehavior.rejected, (state, action) => {
+        state.autoMeasureLoading = false
+        state.measurementError = action.payload ?? 'Failed to update auto-measure'
+      })
+      .addCase(resetMeasurement.pending, (state) => {
+        state.measurementLoading = true
+        state.measurementError = null
+      })
+      .addCase(resetMeasurement.fulfilled, (state) => {
+        state.measurementLoading = false
+      })
+      .addCase(resetMeasurement.rejected, (state, action) => {
+        state.measurementLoading = false
+        state.measurementError = action.payload ?? 'Failed to reset measurement'
+      })
       // Experiment Control Center (Plan 85-05)
       .addCase(fetchSpecList.pending, (state) => {
         state.specListLoading = true
@@ -1875,6 +1977,8 @@ export const selectActiveMeasurement = (state: RootState) => state.performance.a
 export const selectMeasurementLoading = (state: RootState) => state.performance.measurementLoading
 export const selectMeasurementError = (state: RootState) => state.performance.measurementError
 export const selectLastCloseCommand = (state: RootState) => state.performance.lastCloseCommand
+export const selectAutoMeasure = (state: RootState) => state.performance.autoMeasure
+export const selectAutoMeasureLoading = (state: RootState) => state.performance.autoMeasureLoading
 
 // Experiment Control Center selectors (Plan 85-05).
 export const selectSpecList = (state: RootState) => state.performance.specList

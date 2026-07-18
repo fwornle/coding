@@ -8,10 +8,15 @@ import {
   fetchActiveMeasurement,
   startMeasurement,
   stopMeasurement,
+  fetchMeasurementBehavior,
+  setMeasurementBehavior,
+  resetMeasurement,
   selectActiveMeasurement,
   selectMeasurementLoading,
   selectMeasurementError,
   selectLastCloseCommand,
+  selectAutoMeasure,
+  selectAutoMeasureLoading,
 } from '@/store/slices/performanceSlice'
 
 // Dashboard-only MVP measurement control (gap a). Start writes the active span the
@@ -27,13 +32,18 @@ export function MeasurementControl() {
   const loading = useAppSelector(selectMeasurementLoading)
   const error = useAppSelector(selectMeasurementError)
   const closeCommand = useAppSelector(selectLastCloseCommand)
+  const autoMeasure = useAppSelector(selectAutoMeasure)
+  const autoLoading = useAppSelector(selectAutoMeasureLoading)
 
   const [taskId, setTaskId] = useState('')
   const [goal, setGoal] = useState('')
   const [taskClass, setTaskClass] = useState('')
 
+  const autoEnabled = autoMeasure?.enabled ?? false
+
   useEffect(() => {
     dispatch(fetchActiveMeasurement())
+    dispatch(fetchMeasurementBehavior())
     const t = setInterval(() => dispatch(fetchActiveMeasurement()), 5000)
     return () => clearInterval(t)
   }, [dispatch])
@@ -51,6 +61,14 @@ export function MeasurementControl() {
     setTaskClass('')
   }
 
+  const onToggleAuto = (checked: boolean) => {
+    dispatch(setMeasurementBehavior({ enabled: checked }))
+  }
+
+  const onReset = () => {
+    dispatch(resetMeasurement())
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -64,6 +82,21 @@ export function MeasurementControl() {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        <label className="mb-3 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={autoEnabled}
+            disabled={autoLoading}
+            onChange={(e) => onToggleAuto(e.target.checked)}
+            data-testid="auto-measure-toggle"
+          />
+          <span className="font-medium">Always-on auto measurement</span>
+          <span className="text-muted-foreground">
+            {autoLoading ? 'saving…' : 'auto-binds claude / opencode / copilot sessions'}
+          </span>
+        </label>
+
         {active ? (
           <div className="space-y-3">
             <div className="text-sm">
@@ -90,6 +123,19 @@ export function MeasurementControl() {
             <p className="text-sm text-muted-foreground">
               Stop archives the span and records a close request. Run the surfaced host command to
               finish scoring (token-aggregate + judge + Run write run host-side).
+            </p>
+          </div>
+        ) : autoEnabled ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Button onClick={onReset} disabled={autoLoading} variant="outline" data-testid="measurement-reset">
+                {autoLoading ? 'Resetting…' : 'Reset measurement'}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Auto measurement is on — the reconciler binds each live agent session automatically, so
+              manual start is unnecessary. Reset clears the current per-agent slots; the reconciler
+              rebinds fresh on its next tick.
             </p>
           </div>
         ) : (
