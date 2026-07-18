@@ -135,6 +135,10 @@ integrations/mcp-server-browserbase/
 # Centralized health monitoring files
 .health/
 
+# Live measurement span slots (runtime state — reconciler/manual owned, never committed)
+.data/active-measurement.json
+.data/active-measurement.*.json
+
 # Workflow checkpoints (timestamps that change frequently but don't need git tracking)
 .data/workflow-checkpoints.json
 .data/workflow-progress.json
