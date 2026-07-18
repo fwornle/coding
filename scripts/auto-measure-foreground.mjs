@@ -28,7 +28,7 @@
 // Output via process.stderr.write only (no-console-log rule).
 
 import { buildOpencodeTokenRows, DEFAULT_OPENCODE_DB } from '../lib/lsl/token/opencode-token-rows.mjs';
-import { llmSessionTitle, llmSessionSummary } from '../lib/lsl/token/session-title-llm.mjs';
+import { llmSessionTitle, llmSessionSummary, llmSessionClass } from '../lib/lsl/token/session-title-llm.mjs';
 import { openTokenDb, insertTokenRowDeduped } from '../lib/lsl/token/token-db.mjs';
 import { aggregateByTaskId, isForegroundGroup } from '../lib/experiments/token-aggregate.mjs';
 import { openExperimentStore } from '../lib/experiments/store.mjs';
@@ -182,14 +182,19 @@ async function onePass(dbPath) {
       const summary = await llmSessionSummary(dbPath, sid, log);
       const model = canonical?.model || srows[srows.length - 1]?.model || 'unknown';
       const taskHash = createHash('sha256').update(title).digest('hex').slice(0, 16);
-      // Derive a real closed-6 class from the session's intent (title + summary)
-      // instead of a hardcoded constant. Only a CONFIDENT keyword derivation
-      // (D-11 threshold) is trusted; anything weaker is honestly 'unclassified'
-      // (the quarantine sentinel) so the column reflects reality, not a label.
-      const derived = taxonomy
-        ? deriveClassFromText(`${title} ${summary ?? ''}`, taxonomy)
-        : { taskClass: null, confident: false };
-      const taskClass = derived.confident ? derived.taskClass : 'unclassified';
+      // Derive a real closed-6 class from the session's intent. Prefer an LLM
+      // classification (Option A) — it reads descriptive titles far better than a
+      // keyword scorer, which quarantined most sessions ("Fix …"/"Research …"
+      // score below the confidence threshold). Fall back to the zero-LLM keyword
+      // scorer when the LLM is unavailable, then to the 'unclassified' sentinel so
+      // the column always reflects reality, never a hardcoded label.
+      let taskClass = await llmSessionClass(dbPath, sid, log);
+      if (!taskClass) {
+        const derived = taxonomy
+          ? deriveClassFromText(`${title} ${summary ?? ''}`, taxonomy)
+          : { taskClass: null, confident: false };
+        taskClass = derived.confident ? derived.taskClass : 'unclassified';
+      }
 
       await writeRun(store, {
         span: { task_id: taskId, started_at: started, ended_at: ended, goal_sentence: title },
