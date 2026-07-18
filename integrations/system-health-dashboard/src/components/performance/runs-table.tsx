@@ -75,6 +75,73 @@ function runSortTs(run: Run): string {
 // How many runs to reveal per "Show more" step (and the initial page size).
 const RUNS_PAGE_SIZE = 15
 
+// --- "When" column helpers (recency + stuck detection) ---------------------
+// Parse an ISO run timestamp to epoch ms, or null for absent/unparseable.
+function parseMs(s: string | null): number | null {
+  if (!s) return null
+  const t = Date.parse(s)
+  return Number.isNaN(t) ? null : t
+}
+
+// Compact relative age: "just now" / "5m ago" / "2h ago" / "3d ago".
+function relLabel(ms: number, now: number): string {
+  const sec = Math.floor(Math.max(0, now - ms) / 1000)
+  if (sec < 45) return 'just now'
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  return `${Math.floor(hr / 24)}d ago`
+}
+
+// Compact elapsed duration for an in-progress run: "12m" / "1h 3m".
+function durLabel(ms: number): string {
+  const min = Math.floor(Math.max(0, ms) / 60_000)
+  if (min < 60) return `${min}m`
+  return `${Math.floor(min / 60)}h ${min % 60}m`
+}
+
+// Local short absolute date/time, e.g. "18 Jul 17:19".
+function absLabel(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+// An open run (started, never ended) that has been running longer than this reads
+// as potentially STUCK — surfaced amber in the When column. Completed/aborted runs
+// always stamp ended_at, so a null ended_at is a reliable "still open" signal.
+const STUCK_AFTER_MS = 20 * 60_000
+
+// The "When" cell: relative age + absolute date/time for finished runs, or a live
+// "running Nm" (amber past STUCK_AFTER_MS) for runs still open. `now` is threaded
+// from a 30s tick so the label stays current without a reload.
+function WhenCell({ run, now }: { run: Run; now: number }): ReactNode {
+  const startMs = parseMs(runStr(run, 'started_at')) ?? parseMs(runStr(run, 'timestamp'))
+  const endMs = parseMs(runStr(run, 'ended_at'))
+  const anchorMs = endMs ?? startMs
+  if (anchorMs == null) return <span className="text-muted-foreground">—</span>
+  const running = endMs == null && startMs != null && !isCompletedExperimentRun(run)
+  if (running) {
+    const elapsed = now - (startMs as number)
+    const stuck = elapsed >= STUCK_AFTER_MS
+    return (
+      <div className="flex flex-col whitespace-nowrap leading-tight" title={new Date(anchorMs).toLocaleString()}>
+        <span className="text-sm">{relLabel(anchorMs, now)}</span>
+        <span className={`text-xs ${stuck ? 'font-medium text-amber-500' : 'text-muted-foreground'}`} data-testid="run-running">
+          running {durLabel(elapsed)}{stuck ? ' · stuck?' : ''}
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col whitespace-nowrap leading-tight" title={new Date(anchorMs).toLocaleString()}>
+      <span className="text-sm">{relLabel(anchorMs, now)}</span>
+      <span className="text-xs text-muted-foreground">{absLabel(anchorMs)}</span>
+    </div>
+  )
+}
+
 // Derive the spec FILE for a re-run (85-06): the Run row carries no `spec` field
 // (run-write never stamped one), so join the run to the server-listed spec whose
 // goal_sentence is IDENTICAL — the goal is the task_hash anchor (D-05: same goal
@@ -315,6 +382,15 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Live clock for the "When" column so relative ages and the running/stuck
+  // elapsed tick forward without a manual reload (30s cadence — cheap, and fine
+  // for minute-granularity labels).
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
   // Newest-first ordering (see runSortTs). Sort a COPY — the selector's array is
   // frozen/shared state. Then slice to the current page window.
   const sortedRuns = [...filtered].sort((a, b) => runSortTs(b).localeCompare(runSortTs(a)))
@@ -450,6 +526,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
               />
             </TableHead>
             <TableHead>Run</TableHead>
+            <TableHead data-testid="runs-col-when">When</TableHead>
             <TableHead>Class</TableHead>
             <TableHead>Agent</TableHead>
             {/* ATTR-02 two-column model display: the canonical (foreground chat)
@@ -512,6 +589,9 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                       </div>
                     )
                     : <span className="truncate font-mono text-sm">{run.task_id}</span>}
+                </TableCell>
+                <TableCell data-testid="run-when">
+                  <WhenCell run={run} now={now} />
                 </TableCell>
                 <TableCell className="text-sm">
                   {run.task_class ?? <span className="text-muted-foreground">unclassified</span>}
