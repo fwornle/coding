@@ -54,6 +54,7 @@ PLISTS=(
   com.coding.sub-agent-live-claude
   com.coding.sub-agent-live-opencode
   com.coding.sub-agent-live-copilot
+  com.coding.measurement-reconciler
 )
 
 log() { printf '[install-sub-agent] %s\n' "$*" >&2; }
