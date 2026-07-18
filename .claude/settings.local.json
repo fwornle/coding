@@ -590,7 +590,8 @@
       "Bash(gsd-browser list-pages *)",
       "Bash(gsd-browser switch-page *)",
       "Bash(gsd-browser reload *)",
-      "Bash(cd *)"
+      "Bash(cd *)",
+      "Skill(gsd-ui-phase)"
     ],
     "deny": [],
     "ask": []
